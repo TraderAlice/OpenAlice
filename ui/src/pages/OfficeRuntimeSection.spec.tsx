@@ -488,6 +488,28 @@ describe('OfficeRuntimeSection', () => {
       seq: 7,
       targetIds: ['operations'],
       label: 'A',
+      channel: 'all',
+    })
+  })
+
+  it('returns to the same journal channel after locating an event on the floor', async () => {
+    const onReplay = vi.fn()
+    mockJournal([{
+      seq: 9,
+      ts: Date.now(),
+      type: 'news.ingested',
+      payload: { newsItemId: 9, source: 'Wire', title: 'Market opens' },
+    }])
+    render(<OfficeRuntimeSection onReplay={onReplay} />)
+
+    await userEvent.click(await screen.findByRole('tab', { name: /News\s*1/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Find on floor' }))
+
+    expect(onReplay).toHaveBeenCalledWith({
+      seq: 9,
+      targetIds: ['news-service'],
+      label: 'Wire',
+      channel: 'news',
     })
   })
 

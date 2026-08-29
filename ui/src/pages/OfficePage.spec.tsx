@@ -31,9 +31,16 @@ vi.mock('./OfficeRuntimeSection', () => ({
   OfficeRuntimeSection: ({
     initialChannel,
     initialSelectedSeq,
+    onReplay,
   }: {
     initialChannel?: string
     initialSelectedSeq?: number | null
+    onReplay?: (focus: {
+      seq: number
+      targetIds: readonly string[]
+      label: string
+      channel: 'news'
+    }) => void
   }) => (
     <div
       data-testid="office-runtime-section"
@@ -41,6 +48,17 @@ vi.mock('./OfficeRuntimeSection', () => ({
       data-selected-seq={initialSelectedSeq ?? undefined}
     >
       Office occupancy
+      <button
+        type="button"
+        onClick={() => onReplay?.({
+          seq: 12,
+          targetIds: ['news-service'],
+          label: 'Wire',
+          channel: 'news',
+        })}
+      >
+        Mock find news on floor
+      </button>
     </div>
   ),
 }))
@@ -227,6 +245,23 @@ describe('OfficePage localization', () => {
     expect(acknowledgeMock).toHaveBeenCalledWith('news')
     expect(openOrFocusMock).not.toHaveBeenCalled()
     expect(navigateMock).not.toHaveBeenCalled()
+  })
+
+  it('reopens the exact replayed event and channel from the Operations board', async () => {
+    const { container } = render(<OfficePage />)
+
+    const menuTrigger = screen.getByRole('button', { name: '菜单' })
+    menuTrigger.focus()
+    await userEvent.keyboard('{ArrowDown}')
+    await userEvent.click(await screen.findByRole('menuitem', { name: '活动日志' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Mock find news on floor' }))
+
+    expect(container.querySelector<HTMLElement>('[data-replay="true"]')).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: '行动看板' }))
+
+    const runtime = await screen.findByTestId('office-runtime-section')
+    expect(runtime.dataset.channel).toBe('news')
+    expect(runtime.dataset.selectedSeq).toBe('12')
   })
 
   it('enters from the Workspace sign while keeping filed records on the cabinet', async () => {

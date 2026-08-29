@@ -281,10 +281,14 @@ export function OfficePage() {
                 }}
                 onOpenLog={(origin) => {
                   productActivity.acknowledge('agent')
+                  const replayLogView = replayFocus && replayFocus.seq === asOfSeq
+                    ? { channel: replayFocus.channel, focusSeq: replayFocus.seq }
+                    : null
                   setLogView({
                     origin,
-                    channel: 'all',
-                    focusSeq: origin === 'operations' ? productActivity.agent?.seq ?? null : null,
+                    channel: replayLogView?.channel ?? 'all',
+                    focusSeq: replayLogView?.focusSeq
+                      ?? (origin === 'operations' ? productActivity.agent?.seq ?? null : null),
                   })
                   setCabinetWorkspaceId(null)
                 }}

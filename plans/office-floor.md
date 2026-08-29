@@ -2817,6 +2817,23 @@ Distinct route-destination follow-up (2026-08-30):
   passed (2 files / 29 tests), together with root/UI TypeScript, the full 617-file Vitest run (5,117 passing; one file
   and nine tests skipped), and the production build; the existing large-chunk advisory is unchanged.
 
+Replay-context round-trip follow-up (2026-08-30):
+
+- Replayed real News event #1636 from Activity Log and used the Operations board to return. The floor correctly marked
+  the News terminal with `Seq 1636 · scmp-business`, but the reopened journal silently switched to All and selected the
+  latest Agent completion #1635. The map remembered the event while its main review surface forgot it.
+- Compared always returning to All, adding a second replay-detail strip on the map, and retaining the source channel
+  plus exact sequence as part of the replay target. Chose retained context: it preserves one journal/detail system and
+  makes spatial replay a reversible inspection action instead of a lossy navigation step.
+- Replay focus now owns the originating All, Agent, Inbox, or News channel in addition to its sequence and map targets.
+  Opening the Operations board from that snapshot restores the exact channel and event; normal live-floor entries keep
+  their established All/latest-Agent behavior, and players can still switch channels manually.
+- Browser-played both round trips against the real Office Lab. News #1636 returned to the selected News tab and pressed
+  #1636 row after marking the News terminal; Agent #1635 returned to the selected Agent tab and pressed #1635 row after
+  marking its coworker context. Focused replay, journal, page, and building specs passed (4 files / 37 tests), together
+  with root/UI TypeScript, the full 617-file Vitest run (5,120 passing; one file and nine tests skipped), and the
+  production build; the existing large-chunk advisory is unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

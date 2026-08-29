@@ -63,6 +63,7 @@ describe('OfficeBuilding', () => {
             'sign:chat-replay',
           ],
           label: 'Session 6',
+          channel: 'agent',
         }}
         onSelectEmployee={onSelectEmployee}
         onOpenEmployee={vi.fn()}

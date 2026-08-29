@@ -16,10 +16,14 @@ import { OfficeCoworkerSprite } from '../office/OfficeCoworkerSprite'
 import { officePixelImg } from '../office/furniture'
 import { OFFICE_HUD_ASSETS } from '../office/hud-assets'
 import { OFFICE_LOG_ASSETS, officeLogAssetKind } from '../office/log-assets'
-import { officeReplayFocusForEvent, type OfficeReplayFocus } from '../office/replay-focus'
+import {
+  officeReplayFocusForEvent,
+  type OfficeReplayChannel,
+  type OfficeReplayFocus,
+} from '../office/replay-focus'
 import { useWorkspace } from '../tabs/store'
 
-export type OfficeLogChannel = 'all' | 'agent' | 'inbox' | 'news'
+export type OfficeLogChannel = OfficeReplayChannel
 type OfficeLogFamily = Exclude<OfficeLogChannel, 'all'>
 
 const OFFICE_LOG_CHANNELS: readonly OfficeLogChannel[] = ['all', 'agent', 'inbox', 'news']
@@ -501,7 +505,11 @@ export function OfficeRuntimeSection({
               <button
                 type="button"
                 className="oa-office-runtime__open oa-office-runtime__open--replay"
-                onClick={() => onReplay(officeReplayFocusForEvent(selectedEvent, selectedIdentity.primary))}
+                onClick={() => onReplay(officeReplayFocusForEvent(
+                  selectedEvent,
+                  selectedIdentity.primary,
+                  channel,
+                ))}
               >
                 <img src={OFFICE_HUD_ASSETS.replayLatch} alt="" aria-hidden style={officePixelImg} />
                 {t('office.replayEvent')}
