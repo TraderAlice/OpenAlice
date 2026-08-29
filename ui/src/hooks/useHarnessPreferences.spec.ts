@@ -7,7 +7,11 @@ import { preferencesApi } from '../api/preferences'
 import { useHarnessPreferences } from './useHarnessPreferences'
 
 vi.mock('../api/preferences', () => ({
-  DEFAULT_HARNESS_PREFERENCES: { showHeadlessBornSessions: false },
+  DEFAULT_HARNESS_PREFERENCES: {
+    showHeadlessBornSessions: false,
+    showIssueAttachedSessions: false,
+    showUnverifiedHarnessReleases: false,
+  },
   preferencesApi: {
     getHarness: vi.fn(),
     saveHarness: vi.fn(),
@@ -18,7 +22,7 @@ describe('useHarnessPreferences', () => {
   beforeEach(() => {
     vi.mocked(preferencesApi.getHarness).mockReset()
     vi.mocked(preferencesApi.saveHarness).mockReset()
-    vi.mocked(preferencesApi.getHarness).mockResolvedValue({ showHeadlessBornSessions: false })
+    vi.mocked(preferencesApi.getHarness).mockResolvedValue({ showHeadlessBornSessions: false, showIssueAttachedSessions: false, showUnverifiedHarnessReleases: false })
     vi.mocked(preferencesApi.saveHarness).mockImplementation(async (next) => next)
   })
 
@@ -31,15 +35,15 @@ describe('useHarnessPreferences', () => {
   })
 
   it('loads and saves roster visibility without leaving a stale error', async () => {
-    vi.mocked(preferencesApi.getHarness).mockResolvedValue({ showHeadlessBornSessions: true })
+    vi.mocked(preferencesApi.getHarness).mockResolvedValue({ showHeadlessBornSessions: true, showIssueAttachedSessions: true, showUnverifiedHarnessReleases: false })
     const { result } = renderHook(() => useHarnessPreferences())
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.preferences.showHeadlessBornSessions).toBe(true)
 
     await act(async () => {
-      await result.current.save({ showHeadlessBornSessions: false })
+      await result.current.save({ showHeadlessBornSessions: false, showIssueAttachedSessions: false, showUnverifiedHarnessReleases: false })
     })
-    expect(preferencesApi.saveHarness).toHaveBeenCalledWith({ showHeadlessBornSessions: false })
+    expect(preferencesApi.saveHarness).toHaveBeenCalledWith({ showHeadlessBornSessions: false, showIssueAttachedSessions: false, showUnverifiedHarnessReleases: false })
     expect(result.current.preferences.showHeadlessBornSessions).toBe(false)
     expect(result.current.error).toBeNull()
   })

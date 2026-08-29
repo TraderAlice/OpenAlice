@@ -12,12 +12,21 @@ import { useWorkspaces } from '../contexts/workspaces-context'
 import { workspaceDisplayName } from './workspace/display'
 import { useWorkspace } from '../tabs/store'
 
-export function TelegramDeskPanel({ linked }: { linked: boolean }) {
+export function TelegramDeskPanel({
+  connectorId = 'telegram',
+  label,
+  linked,
+}: {
+  connectorId?: string
+  label?: string
+  linked: boolean
+}) {
   const { t } = useTranslation()
   const { workspaces } = useWorkspaces()
   const { recentChatWorkspaceId, loaded: launchPreferencesLoaded } = useAgentLaunchPreferences()
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
-  const { desk, loading, error, enable, disable, saveWhat, saveCadence } = useTelegramConnectorDesk()
+  const { desk, loading, error, enable, disable, saveWhat, saveCadence } = useTelegramConnectorDesk(connectorId)
+  const deskName = label ?? connectorId
   const [wsId, setWsId] = useState('')
   const [working, setWorking] = useState(false)
   const [confirmDisable, setConfirmDisable] = useState(false)
@@ -54,9 +63,9 @@ export function TelegramDeskPanel({ linked }: { linked: boolean }) {
       <div className="mb-3 flex items-start gap-2.5">
         <Phone size={15} className="mt-0.5 shrink-0 text-muted-foreground" aria-hidden />
         <div>
-          <h3 className="text-[13px] font-semibold text-foreground">{t('connectorSettings.desk.title')}</h3>
+          <h3 className="text-[13px] font-semibold text-foreground">{t('connectorSettings.desk.title', { name: deskName })}</h3>
           <p className="mt-1 text-[12px] leading-5 text-muted-foreground">
-            {t('connectorSettings.desk.description')}
+            {t('connectorSettings.desk.description', { name: deskName })}
           </p>
         </div>
       </div>
@@ -174,8 +183,8 @@ export function TelegramDeskPanel({ linked }: { linked: boolean }) {
 
       {confirmDisable && (
         <ConfirmDialog
-          title={t('connectorSettings.desk.disableTitle')}
-          message={t('connectorSettings.desk.disableMessage')}
+          title={t('connectorSettings.desk.disableTitle', { name: deskName })}
+          message={t('connectorSettings.desk.disableMessage', { name: deskName })}
           confirmLabel={t('connectorSettings.desk.disable')}
           workingLabel={t('connectorSettings.desk.disabling')}
           onConfirm={async () => {

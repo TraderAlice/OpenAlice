@@ -42,9 +42,17 @@ export function resolveAliceProjectIdentity(options: {
 }
 
 export function deriveAliceProjectId(home: string): string {
+  return deriveAliceProjectIdFromCanonicalHome(resolve(home))
+}
+
+/** Derive identity for an already-canonical path on another platform.
+ * The SSH transfer planner must not run a remote POSIX Home through the local
+ * host's path resolver (for example macOS `/home` symlink semantics).
+ */
+export function deriveAliceProjectIdFromCanonicalHome(home: string): string {
   const digest = createHash('sha256')
     .update('openalice/alice-project/v1\0')
-    .update(resolve(home))
+    .update(home)
     .digest('hex')
     .slice(0, 24)
   return `alice-project-${digest}`

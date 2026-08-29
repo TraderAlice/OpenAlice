@@ -42,90 +42,20 @@ import {
   vendorPreset,
 } from '../lib/presetHelpers'
 import { notifyWorkspaceDefaultsChanged } from '../lib/workspaceAiEvents'
-import { listAgents, type AgentInfo } from '../components/workspace/api'
+import type { AgentInfo } from '../components/workspace/api'
+import { useAgentRuntimes } from '../hooks/useAgentRuntimes'
+import { useWorkspace } from '../tabs/store'
 
 function credentialLabel(cred: Pick<CredentialSummary, 'slug' | 'vendor' | 'label'>): string {
   return cred.label?.trim() || cred.slug
 }
 
-// ==================== Agent runtimes ====================
-//
-// The native CLI runtimes a workspace can launch. These credentials feed them;
-// this panel orients the user on what each is and how it authenticates. Editorial
-// copy grounded in the adapters (src/workspaces/adapters/*) — keep it factual.
-
-interface RuntimeInfo {
-  id: string
-  name: string
-  blurbKey: 'aiProvider.runtime.claude.blurb' | 'aiProvider.runtime.codex.blurb' | 'aiProvider.runtime.cursor.blurb' | 'aiProvider.runtime.agy.blurb' | 'aiProvider.runtime.grok.blurb' | 'aiProvider.runtime.omp.blurb' | 'aiProvider.runtime.opencode.blurb' | 'aiProvider.runtime.pi.blurb'
-  modelsKey: 'aiProvider.runtime.claude.models' | 'aiProvider.runtime.codex.models' | 'aiProvider.runtime.cursor.models' | 'aiProvider.runtime.agy.models' | 'aiProvider.runtime.grok.models' | 'aiProvider.runtime.omp.models' | 'aiProvider.runtime.opencode.models' | 'aiProvider.runtime.pi.models'
-  authKey: 'aiProvider.runtime.claude.auth' | 'aiProvider.runtime.codex.auth' | 'aiProvider.runtime.cursor.auth' | 'aiProvider.runtime.agy.auth' | 'aiProvider.runtime.grok.auth' | 'aiProvider.runtime.omp.auth' | 'aiProvider.runtime.opencode.auth' | 'aiProvider.runtime.pi.auth'
-}
-
-const AGENT_RUNTIMES: RuntimeInfo[] = [
-  {
-    id: 'claude',
-    name: 'Claude Code',
-    blurbKey: 'aiProvider.runtime.claude.blurb',
-    modelsKey: 'aiProvider.runtime.claude.models',
-    authKey: 'aiProvider.runtime.claude.auth',
-  },
-  {
-    id: 'codex',
-    name: 'Codex',
-    blurbKey: 'aiProvider.runtime.codex.blurb',
-    modelsKey: 'aiProvider.runtime.codex.models',
-    authKey: 'aiProvider.runtime.codex.auth',
-  },
-  {
-    id: 'cursor',
-    name: 'Cursor Agent',
-    blurbKey: 'aiProvider.runtime.cursor.blurb',
-    modelsKey: 'aiProvider.runtime.cursor.models',
-    authKey: 'aiProvider.runtime.cursor.auth',
-  },
-  {
-    id: 'agy',
-    name: 'Antigravity',
-    blurbKey: 'aiProvider.runtime.agy.blurb',
-    modelsKey: 'aiProvider.runtime.agy.models',
-    authKey: 'aiProvider.runtime.agy.auth',
-  },
-  {
-    id: 'grok',
-    name: 'Grok Build',
-    blurbKey: 'aiProvider.runtime.grok.blurb',
-    modelsKey: 'aiProvider.runtime.grok.models',
-    authKey: 'aiProvider.runtime.grok.auth',
-  },
-  {
-    id: 'omp',
-    name: 'Oh My Pi',
-    blurbKey: 'aiProvider.runtime.omp.blurb',
-    modelsKey: 'aiProvider.runtime.omp.models',
-    authKey: 'aiProvider.runtime.omp.auth',
-  },
-  {
-    id: 'opencode',
-    name: 'opencode',
-    blurbKey: 'aiProvider.runtime.opencode.blurb',
-    modelsKey: 'aiProvider.runtime.opencode.models',
-    authKey: 'aiProvider.runtime.opencode.auth',
-  },
-  {
-    id: 'pi',
-    name: 'Pi',
-    blurbKey: 'aiProvider.runtime.pi.blurb',
-    modelsKey: 'aiProvider.runtime.pi.models',
-    authKey: 'aiProvider.runtime.pi.auth',
-  },
-]
-
 // ==================== Page ====================
 
 export function AIProviderPage() {
   const { t } = useTranslation()
-  const [agents, setAgents] = useState<AgentInfo[]>([])
+  const openOrFocus = useWorkspace((state) => state.openOrFocus)
+  const { agents } = useAgentRuntimes()
   const [credentials, setCredentials] = useState<CredentialSummary[] | null>(null)
   const [credentialsLoadError, setCredentialsLoadError] = useState(false)
   const [presets, setPresets] = useState<Preset[]>([])
@@ -147,7 +77,6 @@ export function AIProviderPage() {
   useEffect(() => {
     void reload()
     api.config.getPresets().then(({ presets: p }) => setPresets(p)).catch(() => {})
-    void listAgents().then(setAgents).catch(() => setAgents([]))
   }, [reload])
 
   const apiKeyPresets = useMemo(() => presets.filter(isApiKeyPreset), [presets])
@@ -313,43 +242,18 @@ export function AIProviderPage() {
           <WorkspaceDefaultsSection credentials={credentials} presets={presets} agents={agents} />
         </div>
 
-        {/* Runtime descriptions are reference material, not a prerequisite for
-            choosing the creation defaults above. Keep them available without
-            pushing the primary settings below several screens of prose. */}
-        <details className="group max-w-[1100px] min-w-0 mx-auto mt-6 rounded-lg border border-border bg-background">
-          <summary className="cursor-pointer list-none px-4 py-3 text-[13px] font-semibold text-foreground">
-            <span className="mr-2 inline-block text-muted-foreground transition-transform group-open:rotate-90">▸</span>
-            {t('aiProvider.runtimeReference')}
-          </summary>
-          <div className="border-t border-border p-4">
-            <div className="rounded-lg border border-border/50 bg-secondary/50 px-4 py-3 mb-4">
-              <p className="text-[13px] text-muted-foreground leading-relaxed">
-                {t('aiProvider.runtimeIntro')}
-              </p>
-            </div>
-            <div className="grid gap-2.5 lg:grid-cols-2">
-              {AGENT_RUNTIMES.map((rt) => (
-                <div key={rt.id} className="rounded-lg border border-border bg-background px-4 py-3">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-[13px] font-medium text-foreground">{rt.name}</span>
-                    <span className="text-[11px] text-muted-foreground font-mono">{rt.id}</span>
-                  </div>
-                  <p className="text-[12px] text-muted-foreground mt-0.5 leading-snug">{t(rt.blurbKey)}</p>
-                  <dl className="mt-2 space-y-1">
-                    <div className="flex gap-2 text-[11px] leading-snug">
-                      <dt className="text-muted-foreground/70 shrink-0 w-[58px]">{t('aiProvider.models')}</dt>
-                      <dd className="text-muted-foreground">{t(rt.modelsKey)}</dd>
-                    </div>
-                    <div className="flex gap-2 text-[11px] leading-snug">
-                      <dt className="text-muted-foreground/70 shrink-0 w-[58px]">{t('aiProvider.auth')}</dt>
-                      <dd className="text-muted-foreground">{t(rt.authKey)}</dd>
-                    </div>
-                  </dl>
-                </div>
-              ))}
-            </div>
-          </div>
-        </details>
+        <div className="mx-auto mt-6 max-w-[1100px] rounded-lg border border-border/70 bg-background px-4 py-3">
+          <p className="text-[13px] leading-relaxed text-muted-foreground">
+            {t('aiProvider.openAgentRuntimesDescription')}
+          </p>
+          <button
+            type="button"
+            onClick={() => openOrFocus({ kind: 'settings', params: { category: 'agent-runtimes' } })}
+            className="oa-pressable mt-2 text-[12px] font-medium text-primary hover:underline"
+          >
+            {t('aiProvider.openAgentRuntimes')}
+          </button>
+        </div>
       </SettingsScrollArea>
 
       {modal && (

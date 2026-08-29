@@ -32,6 +32,13 @@ with source checkout support retained as an explicit development fallback:
   matching Runtime bundle when approved, starts or reuses the remote Server,
   and opens the same loopback tunnel; explicit source providers still prepare
   build tools and checkouts when needed;
+- `openalice machine list|add|remove|inspect` owns an explicit local registry
+  of SSH hosts and reads each compatible host's registered AliceProjects with
+  one bounded aggregate SSH command;
+- `openalice project transfer` plans and copies one quiescent local
+  AliceProject into a new complete home on a registered SSH Machine, preserving
+  portable configuration and Workspace repositories while deliberately
+  starting with zero resumable Sessions;
 - Electron remains a complete local desktop distribution.
 
 The release-owned installer advances CLI, managed Pi, and the platform Runtime
@@ -109,6 +116,53 @@ protocol is deferred until the local/server boundary is stable.
 10. Shared Runtime facts use presentation-neutral names and versioned schemas.
     Browser layout, Electron chrome, modal state, and other client UI state do
     not become server truth.
+
+## AliceProject Transfer
+
+The first transfer direction is local AliceProject to a registered SSH
+Machine. `--plan` inventories without changing either host; apply requires an
+explicit confirmation or `--yes`. The source remains registered and unchanged,
+and the destination receives a new AliceProject id. Transfer never means
+takeover, move, merge, replacement, deletion, Runtime start, or default-project
+selection.
+
+```bash
+openalice project transfer \
+  --from research \
+  --to-machine cloud-dev \
+  --to-project research-cloud \
+  --to-home /home/alice/.openalice-research \
+  --session-owner-policy keep-blocked \
+  --plan
+```
+
+The plan reports portable file/byte totals, required destination free space,
+secret-free credential categories, excluded Session/runtime files, and exact-
+Session scheduled Issues. Apply re-probes source ownership and remote inventory,
+requires a stopped source (or the separate `--stop-source` authority), and
+refuses an occupied project key or Home.
+
+The sender uses a versioned, bounded stream over SSH stdin. The receiver checks
+normalized paths, entry types, symlink containment, sizes, checksums, available
+space, and transaction identity; writes an owner-private sibling staging Home;
+then atomically publishes and registers it without changing the remote default.
+A matching published receipt makes registration retry idempotent. Cancellation
+terminates the SSH receiver and leaves only that transaction's marked staging
+path eligible for a safe retry.
+
+Portable configuration, active and departed Workspace repositories, Git state,
+Workspace ids, and lifecycle records transfer. Absolute Workspace paths are
+rebased to the remote Home. Guardian state, Runtime payloads, ports, auth,
+headless/native conversation state, resume identities, and untracked Session
+dossiers do not. A deliberately Git-tracked `.alice/sessions` dossier remains
+as inert repository content but does not create a resumable remote Session.
+
+Home-owned AI/provider credentials can travel only in the private SSH stream.
+Broker and Connector values are decrypted in source-process memory and sealed
+on the receiver with a newly created destination key; the source sealing key is
+never copied. `--without-credentials` retains secret-free configuration and
+requires those integrations to be configured again. Exact-Session scheduled
+Issue owners require an explicit `keep-blocked` or `new-then-resume` policy.
 
 ## Layered Topology
 
@@ -246,6 +300,57 @@ openalice remote <target> --stop
 ```
 
 Neither command conflates “disconnect” with “stop my remote work.”
+
+### Registered Machines and aggregate inventory
+
+`openalice machine` adds durable fleet identity without changing the existing
+raw-target `openalice remote <target>` contract:
+
+```bash
+openalice machine list [--json]
+openalice machine add cloud --target alice@example.com [--ssh-port 22]
+  [--identity ~/.ssh/cloud] [--name "Cloud"] --yes
+openalice machine remove cloud --yes
+openalice machine inspect [cloud] [--json]
+```
+
+The implicit `local` Machine cannot be removed. SSH rows live in the
+machine-wide Supervisor root's owner-private `machines.json`; they contain a
+display name, OpenSSH target, port, and optional local identity-file path, but
+never passwords, private-key bytes, passphrases, host keys, agent material, or
+remote credentials. OpenSSH config, agent, ProxyJump, and host-key policy stay
+authoritative. Removing a row forgets local metadata only and never connects
+to or mutates the host.
+
+`machine inspect` uses the same typed inventory for local and remote Machines.
+Each remote probe invokes `openalice machine inspect local --json` once; that
+remote command reads only its Supervisor AliceProject registry and probes those
+registered complete homes. Fleet probes force OpenSSH batch mode so a password,
+key-passphrase, or host-key prompt cannot seize the Supervisor TUI; those cases
+become an `unauthorized` row. Interactive tunnel commands retain normal
+OpenSSH prompting. The inventory command does not scan other directories. The bounded
+response contains project identity, product, home/port, normalized Runtime
+state, safe component health, and advertised capabilities. Runtime owner PIDs,
+tokens, logs, command lines, environments, and credentials are omitted.
+
+Reachability is deliberately not Runtime state. A registered remote row is
+reported as `online`, `offline`, `unauthorized`, or `incompatible`; an online
+Machine may still contain stopped, unhealthy, or differently owned Projects.
+One unreachable Machine remains a row in the fleet result instead of failing
+the complete refresh. `remote-targets.json` continues to be only the hashed
+ephemeral local-port cache used by tunnels and is not a Machine registry.
+
+The Supervisor Fleet page consumes that contract directly. A running remote
+AliceProject with a validated `127.0.0.1` Web endpoint can be opened through
+the existing loopback tunnel. The TUI owns an abort controller for every such
+tunnel: `q`, `Esc`, `Ctrl+C`, or process termination closes the tunnel while
+leaving Guardian and the detached remote Server untouched. `s` may start a
+stopped compatible Project, but only after a fresh aggregate inventory and
+Machine-registry read prove the selected key is still stopped, available, and
+lifecycle-capable. The command then invokes the registered SSH target and
+refreshes Fleet state. Stop, restart, takeover, Setup, source, logs, Doctor,
+and configuration mutations remain unavailable for remote Fleet selections;
+offline or incompatible rows never receive guessed lifecycle actions.
 
 When `--app-dir` is absent, managed remote prefers the verified Runtime bundle
 installed with the matching CLI. No Git checkout or compiler is needed. On a

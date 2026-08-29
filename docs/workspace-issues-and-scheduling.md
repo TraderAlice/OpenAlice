@@ -108,23 +108,25 @@ The filename stem is the stable issue id. Frontmatter:
   `{comment}`. Chat-style Issues (including the Telegram phone desk) set
   `{comment}` alone so the inbound text is the prompt. Empty/null write drops
   the field and restores the default.
-- `telegramConnector: true` — present only on the Alice Project's Telegram
-  phone-desk Issue. Omission is a normal Issue. Any other value is invalid. At
-  most one live desk exists in the Project. Settings → Connectors is the only
-  writer of this flag; generic create/CLI/MCP cannot set it. The board and
-  Tracked list omit the row. What remains the exact scheduled Input Prompt.
-  Comments are the chat transcript. The desk is created with
-  `commentPrompt: '{comment}'` so inbound DMs are the Input Prompt as-is.
-  Owner Telegram DMs become comments. While a desk fire or comment reply is
-  running, later DMs stay in the Connector queue; Alice flushes that stack as
-  one quoted comment when the desk is idle again. Scheduled-fire
-  `assistantText` is stamped as a comment. Connector projects comments that
-  do not contain `[[no-reply]]` and did not arrive from Telegram. While a
-  desk turn is running, it also ships sealed mid-turn `text` blocks — the
-  last consecutive text before a tool or error — and never ships tool I/O.
-  The trailing text stays with the final comment. Projected comments use
-  Telegram MarkdownV2; a parse failure tries `sendRichMessage`, then plain
-  text.
+- `connectorDesk: <adapter id>` — present only on that connector's phone-desk
+  Issue (one live desk per connector, not one desk for the whole Project).
+  Omission is a normal Issue. Settings → Connectors on that adapter card is
+  the only writer; generic create/CLI/MCP cannot set it. The board and
+  Tracked list omit every desk row. What remains the exact scheduled Input
+  Prompt. Comments are that channel's chat transcript. Each desk is created
+  with `commentPrompt: '{comment}'` so inbound DMs are the Input Prompt as-is.
+  Owner DMs for that connector become comments on that Issue. While that desk
+  is generating, later DMs for the same connector stay in the Connector
+  queue; other connectors flush independently. Scheduled-fire
+  `assistantText` is stamped as a comment. Scheduler and Run now / Retry now
+  executions of this Issue carry `trigger.metadata.kind: connector-cron-issue`.
+  Only comments and progress from a run with that metadata consume
+  `[[no-reply]]`; ordinary chat mentions of the syntax are delivered as text.
+  Connector does not echo comments that arrived from that connector.
+  While a desk turn is running, it also ships sealed mid-turn `text` blocks —
+  the last consecutive text before a tool or error — and never ships tool I/O.
+  The trailing text stays with the final comment. Shipped
+  `telegramConnector: true` files are read as `connectorDesk: telegram`.
 
 `agent`, `credential`/`credentialSource`, `model`, and `effort` are one Session-creation tuple.
 Only the credential slug is persisted; endpoint and key material remain in the
@@ -224,6 +226,14 @@ accepted and later failed; that occurrence stays one attempt and uses
 **Retry now**. Creating a cron Issue still does not dump historical slots.
 
 ## Agent and Human Surfaces
+
+Ask Alice, Auto Quant, and Auto Prediction share one Session roster policy.
+Sessions currently owned by an exact Issue assignee, plus Sessions actively
+executing an Issue, stay on Issue and Automation surfaces by default. Settings
+→ Harness may opt them into the shared roster independently from the separate
+headless-born Session preference. Connector-desk Sessions remain hidden
+regardless of either preference because they are transport-owned rather than
+ordinary coworkers.
 
 Agents normally use:
 

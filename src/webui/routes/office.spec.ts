@@ -71,6 +71,7 @@ describe('GET /api/office/floor', () => {
     expect(body.config.harnessMinimumVisibleGroups).toEqual({
       chat: 1,
       'auto-quant': 1,
+      prediction: 1,
       other: 0,
     })
   })

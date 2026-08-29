@@ -31,6 +31,9 @@ const directoryState = vi.hoisted(() => ({
   directories: new Map(),
 }))
 const { openOrFocus } = actions
+const focusedTabState = vi.hoisted(() => ({
+  tab: null as { spec: { kind: string; params: Record<string, string> } } | null,
+}))
 
 vi.mock('../../hooks/useWorkspaceSessionDirectory', () => ({
   useWorkspaceSessionDirectories: () => ({
@@ -47,11 +50,12 @@ vi.mock('../../tabs/store', () => ({
 }))
 
 vi.mock('../../tabs/types', () => ({
-  getFocusedTab: () => null,
+  getFocusedTab: () => focusedTabState.tab,
 }))
 
 const harnessPreference = vi.hoisted(() => ({
   showHeadlessBornSessions: true,
+  showIssueAttachedSessions: true,
 }))
 
 vi.mock('../../hooks/useHarnessPreferences', () => ({
@@ -163,7 +167,9 @@ function renderSection(
 beforeEach(async () => {
   for (const mock of Object.values(actions)) mock.mockClear()
   directoryState.directories = new Map()
+  focusedTabState.tab = null
   harnessPreference.showHeadlessBornSessions = true
+  harnessPreference.showIssueAttachedSessions = true
   window.localStorage.clear()
   await i18n.changeLanguage('en')
 })
@@ -442,29 +448,165 @@ describe('ChatWorkspaceSection actions', () => {
     expect(retryTemplates).toHaveBeenCalledOnce()
   })
 
-  it('scrolls the full Workspace roster and keeps Browse in the context menu', () => {
+  it('caps focused and recent sidebars to a recent work set and keeps Browse complete', async () => {
     const sessions = Array.from({ length: 9 }, (_, index) => chatSession(index + 1))
+    const workspace = { ...chatWorkspace, sessions }
     const onNavigate = vi.fn()
-    renderSection([{ ...chatWorkspace, sessions }], null, onNavigate)
+    const user = userEvent.setup()
 
-    expect(screen.getAllByRole('button', { name: /^Conversation \d+$/ })).toHaveLength(9)
-    expect(screen.getByRole('button', { name: 'Conversation 3' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'View all 9 sessions' })).toBeNull()
+    const expectCappedSidebar = () => {
+      expect(screen.getAllByRole('button', { name: /^Conversation \d+$/ })).toHaveLength(8)
+      expect(screen.getByRole('button', { name: 'Conversation 9' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Conversation 3' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Conversation 2' })).toBeTruthy()
+      expect(screen.queryByRole('button', { name: 'Conversation 1' })).toBeNull()
+      expect(
+        screen.getByText('Recent conversations', { selector: 'span.uppercase' }).nextElementSibling?.textContent,
+      ).toBe('9')
+    }
 
-    fireEvent.click(screen.getByRole('button', { name: 'Chat context: Workspaces' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Browse all conversations' }))
+    const { unmount: unmountFocused } = renderSection([workspace], null, onNavigate, 'focused')
+    expectCappedSidebar()
+    const inlineBrowse = screen.getByRole('button', { name: 'View all 9 conversations' })
+    inlineBrowse.focus()
+    await user.click(inlineBrowse)
 
-    const dialog = screen.getByRole('dialog', { name: 'Browse all conversations' })
-    const browser = within(dialog)
+    let dialog = screen.getByRole('dialog', { name: 'Browse all conversations' })
+    let browser = within(dialog)
     expect(browser.getAllByRole('button', { name: /^Conversation \d+$/ })).toHaveLength(9)
+    expect(browser.getByRole('button', { name: 'Conversation 1' })).toBeTruthy()
+    expect(browser.getByRole('button', { name: 'Current Workspace' }).getAttribute('aria-pressed')).toBe('true')
     expect(openOrFocus).not.toHaveBeenCalled()
 
-    fireEvent.click(browser.getByRole('button', { name: 'Conversation 3' }))
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog', { name: 'Browse all conversations' })).toBeNull()
+    expect(document.activeElement).toBe(inlineBrowse)
+
+    await user.click(inlineBrowse)
+    dialog = screen.getByRole('dialog', { name: 'Browse all conversations' })
+    browser = within(dialog)
+
+    await user.click(browser.getByRole('button', { name: 'Conversation 3' }))
     expect(openOrFocus).toHaveBeenCalledWith({
       kind: 'workspace',
       params: { wsId: chatWorkspace.id, sessionId: 'chat-session-3', source: 'chat' },
     })
     expect(onNavigate).toHaveBeenCalledTimes(1)
+    unmountFocused()
+
+    const { unmount: unmountRecent } = renderSection([workspace], null, undefined, 'recent')
+    expectCappedSidebar()
+    await user.click(screen.getByRole('button', { name: 'View all 9 conversations' }))
+    dialog = screen.getByRole('dialog', { name: 'Browse all conversations' })
+    expect(within(dialog).getByRole('button', { name: 'All Workspaces' }).getAttribute('aria-pressed')).toBe('true')
+    unmountRecent()
+
+    focusedTabState.tab = {
+      spec: {
+        kind: 'workspace',
+        params: { wsId: chatWorkspace.id, sessionId: 'chat-session-1', source: 'chat' },
+      },
+    }
+    renderSection([workspace], null, undefined, 'focused')
+    expect(screen.getAllByRole('button', { name: /^Conversation \d+$/ })).toHaveLength(8)
+    expect(screen.getByRole('button', { name: 'Conversation 1' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Conversation 2' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Conversation 9' })).toBeTruthy()
+    expect(
+      screen.getByText('Recent conversations', { selector: 'span.uppercase' }).nextElementSibling?.textContent,
+    ).toBe('9')
+    expect(
+      screen.getByRole('button', { name: 'Conversation 9' }).compareDocumentPosition(
+        screen.getByRole('button', { name: 'Conversation 1' }),
+      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'View all 9 conversations' })).toBeTruthy()
+  })
+
+  it('does not show an inline Browse action when every recent conversation fits', () => {
+    const workspace = {
+      ...chatWorkspace,
+      sessions: Array.from({ length: 8 }, (_, index) => chatSession(index + 1)),
+    }
+
+    renderSection([workspace], null, undefined, 'focused')
+
+    expect(screen.getAllByRole('button', { name: /^Conversation \d+$/ })).toHaveLength(8)
+    expect(screen.queryByRole('button', { name: /View all \d+ conversations/ })).toBeNull()
+  })
+
+  it('keeps every running headless row while still capping the recent work set', () => {
+    directoryState.directories = new Map([[chatWorkspace.id, {
+      workspace: { id: chatWorkspace.id, tag: chatWorkspace.tag },
+      sessions: [
+        {
+          resumeId: 'resume-headless-running-a',
+          agent: 'claude',
+          createdAt: Date.parse('2026-08-03T00:00:00.000Z'),
+          updatedAt: Date.parse('2026-08-03T01:00:00.000Z'),
+          lifecycle: 'active',
+          resumable: true,
+          active: true,
+          latestExecution: {
+            taskId: 'task-run-a',
+            status: 'running',
+            startedAt: Date.parse('2026-08-03T01:00:00.000Z'),
+            issueId: 'scan-open',
+          },
+        },
+        {
+          resumeId: 'resume-headless-running-b',
+          agent: 'codex',
+          createdAt: Date.parse('2026-08-03T00:30:00.000Z'),
+          updatedAt: Date.parse('2026-08-03T02:00:00.000Z'),
+          lifecycle: 'active',
+          resumable: true,
+          active: true,
+          latestExecution: {
+            taskId: 'task-run-b',
+            status: 'running',
+            startedAt: Date.parse('2026-08-03T02:00:00.000Z'),
+            issueId: 'risk-watch',
+          },
+        },
+      ],
+    }]])
+    const sessions = [
+      ...Array.from({ length: 9 }, (_, index) => chatSession(index + 1)),
+      {
+        ...chatSession(20),
+        id: 'session-headless-running-a',
+        resumeId: 'resume-headless-running-a',
+        agent: 'claude',
+        name: 'c1',
+        surface: 'headless' as const,
+        state: 'running' as const,
+        title: null,
+        lastActiveAt: '2026-08-03T01:00:00.000Z',
+      },
+      {
+        ...chatSession(21),
+        id: 'session-headless-running-b',
+        resumeId: 'resume-headless-running-b',
+        agent: 'codex',
+        name: 'x1',
+        surface: 'headless' as const,
+        state: 'running' as const,
+        title: null,
+        lastActiveAt: '2026-08-03T02:00:00.000Z',
+      },
+    ]
+    renderSection([{ ...chatWorkspace, sessions }], null, undefined, 'focused')
+
+    const runningSection = screen.getByRole('region', { name: 'Running in background' })
+    expect(within(runningSection).getByText('Scan Open')).toBeTruthy()
+    expect(within(runningSection).getByText('Risk Watch')).toBeTruthy()
+    expect(within(runningSection).getByText('2')).toBeTruthy()
+    expect(screen.getAllByRole('button', { name: /^Conversation \d+$/ })).toHaveLength(8)
+    expect(screen.queryByRole('button', { name: 'Conversation 1' })).toBeNull()
+    expect(
+      screen.getByText('Recent conversations', { selector: 'span.uppercase' }).nextElementSibling?.textContent,
+    ).toBe('9')
   })
 
   it('browses current or cross-Workspace conversations without leaving the page first', async () => {

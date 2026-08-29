@@ -32,7 +32,7 @@ interface DialogFocusProps {
 }
 
 export interface WorkspacePickerDialogProps extends DialogFocusProps {
-  harness?: 'chat' | 'auto-quant'
+  harness?: 'chat' | 'auto-quant' | 'prediction'
   open: boolean
   workspaces: readonly Workspace[]
   currentWorkspaceId: string | null
@@ -43,6 +43,7 @@ export interface WorkspacePickerDialogProps extends DialogFocusProps {
 export function WorkspacePickerDialog(props: WorkspacePickerDialogProps): ReactElement {
   const { t } = useTranslation()
   const isAutoQuant = props.harness === 'auto-quant'
+  const isPrediction = props.harness === 'prediction'
   const [query, setQuery] = useState('')
   const searchRef = useRef<HTMLInputElement | null>(null)
 
@@ -70,7 +71,11 @@ export function WorkspacePickerDialog(props: WorkspacePickerDialogProps): ReactE
         <DialogHeader className="border-b border-border/70 px-5 py-4 pr-12">
           <DialogTitle>{t('chat.switchWorkspace')}</DialogTitle>
           <DialogDescription>
-            {isAutoQuant ? t('autoQuant.workspacePickerDescription') : t('chat.workspacePickerDescription')}
+            {isAutoQuant
+              ? t('autoQuant.workspacePickerDescription')
+              : isPrediction
+                ? t('autoPrediction.workspacePickerDescription')
+                : t('chat.workspacePickerDescription')}
           </DialogDescription>
         </DialogHeader>
 
@@ -132,7 +137,9 @@ export function WorkspacePickerDialog(props: WorkspacePickerDialogProps): ReactE
                           )}
                           <span>{isAutoQuant
                             ? t('autoQuant.workspaceSessionCount', { count: workspace.sessions.length })
-                            : t('chat.workspaceSessionCount', { count: workspace.sessions.length })}</span>
+                            : isPrediction
+                              ? t('autoPrediction.workspaceSessionCount', { count: workspace.sessions.length })
+                              : t('chat.workspaceSessionCount', { count: workspace.sessions.length })}</span>
                           {lastActiveAt && <span>{formatRelativeTime(lastActiveAt)}</span>}
                         </span>
                       </span>
@@ -153,11 +160,12 @@ type ConversationScope = 'current' | 'all'
 type ConversationStateFilter = 'all' | SessionRecord['state'] | 'archived'
 
 export interface ConversationBrowserDialogProps extends DialogFocusProps {
-  harness?: 'chat' | 'auto-quant'
+  harness?: 'chat' | 'auto-quant' | 'prediction'
   open: boolean
   workspaces: readonly Workspace[]
   directories?: ReadonlyMap<string, WorkspaceSessionDirectory>
   includeHeadlessBornSessions?: boolean
+  includeIssueAttachedSessions?: boolean
   currentWorkspaceId: string | null
   isRowActive?: (row: HarnessSession) => boolean
   activeSessionId?: string | null
@@ -169,6 +177,7 @@ export interface ConversationBrowserDialogProps extends DialogFocusProps {
 export function ConversationBrowserDialog(props: ConversationBrowserDialogProps): ReactElement {
   const { t } = useTranslation()
   const isAutoQuant = props.harness === 'auto-quant'
+  const isPrediction = props.harness === 'prediction'
   const [query, setQuery] = useState('')
   const [scope, setScope] = useState<ConversationScope>('current')
   const [stateFilter, setStateFilter] = useState<ConversationStateFilter>('all')
@@ -190,6 +199,7 @@ export function ConversationBrowserDialog(props: ConversationBrowserDialogProps)
         {
           presence: stateFilter === 'archived' ? 'archived' : 'active',
           includeHeadlessBornSessions: props.includeHeadlessBornSessions,
+          includeIssueAttachedSessions: props.includeIssueAttachedSessions,
         },
       )
       return rows.map((row) => ({ workspace, row }))
@@ -200,7 +210,7 @@ export function ConversationBrowserDialog(props: ConversationBrowserDialogProps)
       const occupancy = right.row.occupancyAt - left.row.occupancyAt
       if (occupancy !== 0) return occupancy
       return left.row.resumeId.localeCompare(right.row.resumeId)
-    }), [props.currentWorkspaceId, props.directories, props.includeHeadlessBornSessions, props.workspaces, scope, stateFilter])
+    }), [props.currentWorkspaceId, props.directories, props.includeHeadlessBornSessions, props.includeIssueAttachedSessions, props.workspaces, scope, stateFilter])
 
   const visibleSessions = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase()
@@ -241,9 +251,17 @@ export function ConversationBrowserDialog(props: ConversationBrowserDialogProps)
         finalFocus={props.restoreFocusRef}
       >
         <DialogHeader className="border-b border-border/70 px-5 py-4 pr-12">
-          <DialogTitle>{isAutoQuant ? t('autoQuant.browseResearch') : t('chat.browseWorkspace')}</DialogTitle>
+          <DialogTitle>{isAutoQuant
+            ? t('autoQuant.browseResearch')
+            : isPrediction
+              ? t('autoPrediction.browseResearch')
+              : t('chat.browseWorkspace')}</DialogTitle>
           <DialogDescription>
-            {isAutoQuant ? t('autoQuant.researchBrowserDescription') : t('chat.conversationBrowserDescription')}
+            {isAutoQuant
+              ? t('autoQuant.researchBrowserDescription')
+              : isPrediction
+                ? t('autoPrediction.researchBrowserDescription')
+                : t('chat.conversationBrowserDescription')}
           </DialogDescription>
         </DialogHeader>
 
@@ -251,19 +269,31 @@ export function ConversationBrowserDialog(props: ConversationBrowserDialogProps)
           <label className="flex h-10 items-center gap-2 rounded-lg border border-border bg-background px-3 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
             <Search size={15} strokeWidth={2} className="shrink-0 text-muted-foreground" aria-hidden />
             <span className="sr-only">
-              {isAutoQuant ? t('autoQuant.researchSearchPlaceholder') : t('chat.conversationSearchPlaceholder')}
+              {isAutoQuant
+                ? t('autoQuant.researchSearchPlaceholder')
+                : isPrediction
+                  ? t('autoPrediction.researchSearchPlaceholder')
+                  : t('chat.conversationSearchPlaceholder')}
             </span>
             <input
               ref={searchRef}
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder={isAutoQuant ? t('autoQuant.researchSearchPlaceholder') : t('chat.conversationSearchPlaceholder')}
+              placeholder={isAutoQuant
+                ? t('autoQuant.researchSearchPlaceholder')
+                : isPrediction
+                  ? t('autoPrediction.researchSearchPlaceholder')
+                  : t('chat.conversationSearchPlaceholder')}
               className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/65"
             />
           </label>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex rounded-lg bg-muted/70 p-0.5" role="group" aria-label={isAutoQuant ? t('autoQuant.researchScope') : t('chat.conversationScope')}>
+            <div className="flex rounded-lg bg-muted/70 p-0.5" role="group" aria-label={isAutoQuant
+              ? t('autoQuant.researchScope')
+              : isPrediction
+                ? t('autoPrediction.researchScope')
+                : t('chat.conversationScope')}>
               {scopeOptions.map((option) => (
                 <button
                   key={option.value}
@@ -303,11 +333,17 @@ export function ConversationBrowserDialog(props: ConversationBrowserDialogProps)
           <span className="sr-only" role="status" aria-live="polite">
             {isAutoQuant
               ? t('autoQuant.researchResultCount', { count: visibleSessions.length })
-              : t('chat.conversationResultCount', { count: visibleSessions.length })}
+              : isPrediction
+                ? t('autoPrediction.researchResultCount', { count: visibleSessions.length })
+                : t('chat.conversationResultCount', { count: visibleSessions.length })}
           </span>
           {visibleSessions.length === 0 ? (
             <div className="flex h-full min-h-40 items-center justify-center px-6 text-center text-sm text-muted-foreground">
-              {isAutoQuant ? t('autoQuant.noResearchMatches') : t('chat.noConversationMatches')}
+              {isAutoQuant
+                ? t('autoQuant.noResearchMatches')
+                : isPrediction
+                  ? t('autoPrediction.noResearchMatches')
+                  : t('chat.noConversationMatches')}
             </div>
           ) : (
             <ul className="space-y-1">

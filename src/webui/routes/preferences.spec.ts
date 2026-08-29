@@ -240,8 +240,16 @@ describe('preferences routes', () => {
   })
 
   it('reads and persists harness roster visibility', async () => {
-    const read = vi.fn(async () => ({ showHeadlessBornSessions: false }))
-    const save = vi.fn(async (next: { showHeadlessBornSessions: boolean }) => next)
+    const read = vi.fn(async () => ({
+      showHeadlessBornSessions: false,
+      showIssueAttachedSessions: false,
+      showUnverifiedHarnessReleases: false,
+    }))
+    const save = vi.fn(async (next: {
+      showHeadlessBornSessions: boolean
+      showIssueAttachedSessions: boolean
+      showUnverifiedHarnessReleases: boolean
+    }) => next)
     const app = createPreferencesRoutes({
       readQuickChatPreferences: vi.fn(),
       rememberQuickChatCredential: vi.fn(),
@@ -254,14 +262,106 @@ describe('preferences routes', () => {
 
     expect(await (await app.request('/harness')).json()).toEqual({
       showHeadlessBornSessions: false,
+      showIssueAttachedSessions: false,
+      showUnverifiedHarnessReleases: false,
     })
     const response = await app.request('/harness', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ showHeadlessBornSessions: true }),
+      body: JSON.stringify({
+        showHeadlessBornSessions: true,
+        showIssueAttachedSessions: true,
+        showUnverifiedHarnessReleases: false,
+      }),
     })
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ showHeadlessBornSessions: true })
-    expect(save).toHaveBeenCalledWith({ showHeadlessBornSessions: true })
+    expect(await response.json()).toEqual({
+      showHeadlessBornSessions: true,
+      showIssueAttachedSessions: true,
+      showUnverifiedHarnessReleases: false,
+    })
+    expect(save).toHaveBeenCalledWith({
+      showHeadlessBornSessions: true,
+      showIssueAttachedSessions: true,
+      showUnverifiedHarnessReleases: false,
+    })
+  })
+
+  it('reads and persists an ordered agent-runtime quick-access list', async () => {
+    const read = vi.fn(async () => ({ quickAccessIds: ['pi', 'codex'], recentAgentIds: ['grok'] }))
+    const save = vi.fn(async (next: { quickAccessIds: readonly string[] }) => ({
+      quickAccessIds: [...next.quickAccessIds],
+      recentAgentIds: ['grok'],
+    }))
+    const rememberUse = vi.fn(async (agentId: string) => ({
+      quickAccessIds: ['grok', 'opencode', 'pi'],
+      recentAgentIds: [agentId, 'grok'],
+    }))
+    const app = createPreferencesRoutes({
+      readQuickChatPreferences: vi.fn(),
+      rememberQuickChatCredential: vi.fn(),
+      rememberRecentChatWorkspace: unusedRecentWorkspace,
+      readAgentRuntimesPreferences: read,
+      saveAgentRuntimesPreferences: save,
+      rememberAgentRuntimeUse: rememberUse,
+      getWorkspaceShellStatus: unusedShellStatus,
+      saveWorkspaceShellPreference: unusedShellSave,
+    })
+
+    expect(await (await app.request('/agent-runtimes')).json()).toEqual({
+      quickAccessIds: ['pi', 'codex'],
+      recentAgentIds: ['grok'],
+    })
+    const response = await app.request('/agent-runtimes', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ quickAccessIds: ['grok', 'opencode', 'pi'] }),
+    })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({
+      quickAccessIds: ['grok', 'opencode', 'pi'],
+      recentAgentIds: ['grok'],
+    })
+    expect(save).toHaveBeenCalledWith({ quickAccessIds: ['grok', 'opencode', 'pi'] })
+
+    const recentResponse = await app.request('/agent-runtimes/recent', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ agentId: 'claude' }),
+    })
+    expect(recentResponse.status).toBe(200)
+    expect(await recentResponse.json()).toEqual({
+      quickAccessIds: ['grok', 'opencode', 'pi'],
+      recentAgentIds: ['claude', 'grok'],
+    })
+    expect(rememberUse).toHaveBeenCalledWith('claude')
+  })
+
+  it('rejects unknown, utility, duplicate, or oversized runtime quick-access lists', async () => {
+    const save = vi.fn()
+    const app = createPreferencesRoutes({
+      readQuickChatPreferences: vi.fn(),
+      rememberQuickChatCredential: vi.fn(),
+      rememberRecentChatWorkspace: unusedRecentWorkspace,
+      saveAgentRuntimesPreferences: save,
+      getWorkspaceShellStatus: unusedShellStatus,
+      saveWorkspaceShellPreference: unusedShellSave,
+    })
+
+    for (const quickAccessIds of [
+      ['shell'],
+      ['ghost'],
+      ['pi', 'pi'],
+      ['pi', 'codex', 'opencode', 'grok', 'claude'],
+      [''],
+    ]) {
+      const response = await app.request('/agent-runtimes', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ quickAccessIds }),
+      })
+      expect(response.status).toBe(400)
+    }
+    expect(save).not.toHaveBeenCalled()
   })
 })

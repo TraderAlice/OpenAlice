@@ -146,7 +146,8 @@ export interface IssueListItem {
   nextDueAtMs?: number | null
   /** Live scheduler/worker health; present iff the Issue has a schedule. */
   automationHealth?: IssueAutomationHealth
-  /** Present only on the Project Telegram phone-desk Issue. */
+  /** Adapter id when this row is that connector's phone-desk Issue. */
+  connectorDesk?: string
   telegramConnector?: true
   /**
    * True iff this issue's NAME (title, case-insensitive) is also claimed by an
@@ -178,10 +179,17 @@ export interface IssueSnapshot {
   duplicateNames?: string[]
 }
 
-export function isTelegramConnectorIssue(
-  issue: Pick<IssueListItem, 'telegramConnector'>,
+export function isConnectorDeskIssue(
+  issue: Pick<IssueListItem, 'connectorDesk' | 'telegramConnector'>,
 ): boolean {
-  return issue.telegramConnector === true
+  return typeof issue.connectorDesk === 'string' && issue.connectorDesk.length > 0
+    || issue.telegramConnector === true
+}
+
+export function isTelegramConnectorIssue(
+  issue: Pick<IssueListItem, 'connectorDesk' | 'telegramConnector'>,
+): boolean {
+  return issue.connectorDesk === 'telegram' || issue.telegramConnector === true
 }
 
 export function omitTelegramConnectorIssues(snapshot: IssueSnapshot): IssueSnapshot {
@@ -189,7 +197,7 @@ export function omitTelegramConnectorIssues(snapshot: IssueSnapshot): IssueSnaps
     ...snapshot,
     workspaces: snapshot.workspaces.map((workspace) => ({
       ...workspace,
-      issues: workspace.issues.filter((issue) => !isTelegramConnectorIssue(issue)),
+      issues: workspace.issues.filter((issue) => !isConnectorDeskIssue(issue)),
     })),
   }
 }
@@ -264,6 +272,7 @@ export interface IssueDetailIssue {
   nextDueAtMs?: number | null
   /** Live scheduler/worker health; present iff the Issue has a schedule. */
   automationHealth?: IssueAutomationHealth
+  connectorDesk?: string
   telegramConnector?: true
 }
 

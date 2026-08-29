@@ -1,13 +1,15 @@
 /**
- * Telegram phone-desk chat hop.
+ * Connector phone-desk chat hop.
  *
- * Connector only transports. Issue comments are the transcript. The literal
- * tag [[no-reply]] is filtered here so silent heartbeat comments stay local.
- * Sealed mid-turn text blocks (a tool or error followed them) also project so
- * the phone chat does not wait for the final reply.
+ * Connector only transports. Each adapter's Issue comments are that
+ * specialist's transcript. The literal tag [[no-reply]] stays local only for
+ * runs explicitly stamped with the connector-cron-issue execution profile.
+ * Sealed mid-turn text blocks also project so the phone chat does not
+ * wait for the final reply.
  */
 import { randomUUID } from 'node:crypto'
 import {
+  builtinConnectorHasCapability,
   ConnectorClient,
   type InboundOwnerMessage,
 } from '@traderalice/connector-protocol'
@@ -24,28 +26,33 @@ import {
 } from './comments.js'
 import { dispatchIssueCommentReply } from './comment-delivery.js'
 import {
-  findTelegramConnectorDesks,
-  type TelegramConnectorDesk,
-} from './telegram-connector.js'
-import { projectDeskComment } from './telegram-desk-project.js'
+  findConnectorDesks,
+  type ConnectorDesk,
+} from './connector-desk.js'
+import { projectDeskComment, projectDeskLifecycle } from './telegram-desk-project.js'
 
 export {
   TELEGRAM_NO_REPLY_TAG,
   containsTelegramNoReply,
   projectDeskComment,
+  projectDeskLifecycle,
   projectDeskTurnProgress,
+  projectWorkspaceDeskFailure,
   projectWorkspaceDeskTurnProgress,
   shouldProjectDeskComment,
 } from './telegram-desk-project.js'
 
-export interface TelegramDeskChatHost {
+export interface ConnectorDeskChatHost {
   listWorkspaces(): readonly { id: string; dir: string }[]
   getWorkspace(id: string): { id: string; dir: string } | undefined
   provenanceStore(): IProvenanceStore | undefined
   conversation(): WorkspaceConversationControl | undefined
   /** True while a scheduled fire or comment reply for this desk is running. */
-  deskGenerating?(desk: TelegramConnectorDesk): boolean
+  deskGenerating?(desk: ConnectorDesk): boolean
 }
+
+/** @deprecated Use {@link ConnectorDeskChatHost}. */
+export type TelegramDeskChatHost = ConnectorDeskChatHost
 
 export function telegramDeskHasRunningWork(
   tasks: readonly Pick<HeadlessTaskRecord, 'status' | 'trigger' | 'inquiry'>[],
@@ -79,32 +86,45 @@ function quoteInboundMessage(text: string): string {
 }
 
 export async function ingestTelegramOwnerMessage(
-  host: TelegramDeskChatHost,
+  host: ConnectorDeskChatHost,
   message: InboundOwnerMessage,
+  client?: ConnectorClient,
 ): Promise<{ ok: true; comment: IssueComment } | { ok: false; reason: string }> {
-  return ingestTelegramOwnerMessages(host, [message])
+  return ingestConnectorOwnerMessages(host, [message], client)
 }
 
 export async function ingestTelegramOwnerMessages(
-  host: TelegramDeskChatHost,
+  host: ConnectorDeskChatHost,
   messages: readonly InboundOwnerMessage[],
+  client?: ConnectorClient,
 ): Promise<{ ok: true; comment: IssueComment } | { ok: false; reason: string }> {
-  const texts = messages
-    .filter((message) => message.connectorId === 'telegram')
-    .map((message) => message.text)
-  if (texts.length === 0 && messages.length > 0) {
+  return ingestConnectorOwnerMessages(host, messages, client)
+}
+
+export async function ingestConnectorOwnerMessages(
+  host: ConnectorDeskChatHost,
+  messages: readonly InboundOwnerMessage[],
+  client: ConnectorClient = new ConnectorClient(resolveConnectorUrl()),
+): Promise<{ ok: true; comment: IssueComment } | { ok: false; reason: string }> {
+  const connectorId = messages[0]?.connectorId
+  if (!connectorId) return { ok: false, reason: 'empty' }
+  if (messages.some((message) => message.connectorId !== connectorId)) {
+    return { ok: false, reason: 'mixed_connector' }
+  }
+  if (!builtinConnectorHasCapability(connectorId, 'desk')) {
     return { ok: false, reason: 'unsupported_connector' }
   }
+  const texts = messages.map((message) => message.text)
   const markdown = formatTelegramInboundStack(texts)
   if (!markdown) return { ok: false, reason: 'empty' }
-  const desk = await findLiveDesk(host)
+  const desk = await findLiveDesk(host, connectorId)
   if (!desk) return { ok: false, reason: 'desk_disabled' }
   const workspace = host.getWorkspace(desk.wsId)
   if (!workspace) return { ok: false, reason: 'workspace_missing' }
 
   const appended = await appendIssueComment(workspace.dir, desk.issue.id, 'human', markdown, {
-    id: `telegram-${randomUUID()}`,
-    via: 'telegram',
+    id: `${connectorId}-${randomUUID()}`,
+    via: connectorId,
   })
   if (!appended.ok) {
     return { ok: false, reason: appended.reason === 'invalid' ? appended.error : 'issue_missing' }
@@ -113,7 +133,7 @@ export async function ingestTelegramOwnerMessages(
   await host.provenanceStore()?.append({
     artifact: { kind: 'issue', workspaceId: desk.wsId, issueId: desk.issue.id },
     action: 'commented',
-    origin: { kind: 'external', system: 'telegram' },
+    origin: { kind: 'external', system: connectorId },
     at: Date.now(),
   })
 
@@ -131,15 +151,35 @@ export async function ingestTelegramOwnerMessages(
   if (dispatched.status !== 'not_requested') {
     await updateIssueCommentDelivery(workspace.dir, desk.issue.id, appended.comment.id, dispatched.delivery)
   }
+  if (dispatched.status === 'scheduled') {
+    await projectDeskLifecycle({
+      issue: appended.issue,
+      conversationId: appended.comment.id,
+      phase: 'accepted',
+      client,
+    }).catch(() => undefined)
+  } else {
+    const reason = dispatched.status === 'failed'
+      ? dispatched.delivery.error
+      : 'No Agent reply was scheduled for this message.'
+    await projectDeskLifecycle({
+      issue: appended.issue,
+      conversationId: appended.comment.id,
+      phase: 'failed',
+      text: `OpenAlice could not start the Agent: ${reason}`,
+      client,
+    }).catch(() => undefined)
+  }
   return { ok: true, comment: appended.comment }
 }
 
 export async function stampTelegramDeskScheduledFire(input: {
-  host: TelegramDeskChatHost
+  host: ConnectorDeskChatHost
   workspaceId: string
   issueId: string
   task: HeadlessTaskRecord
   assistantText?: string | null
+  client?: ConnectorClient
 }): Promise<IssueComment | null> {
   // A native CLI can emit partial assistant text before exiting with an error
   // or interruption. Keep that diagnostic in the run record, but do not turn
@@ -147,11 +187,17 @@ export async function stampTelegramDeskScheduledFire(input: {
   if (input.task.status !== 'done') return null
   const text = input.assistantText?.trim()
   if (!text) return null
+  const triggerMetadata = input.task.trigger?.metadata
+  if (triggerMetadata?.kind !== 'connector-cron-issue') return null
   const workspace = input.host.getWorkspace(input.workspaceId)
   if (!workspace) return null
-  const desks = await findTelegramConnectorDesks(input.host.listWorkspaces())
+  const desks = await findConnectorDesks(input.host.listWorkspaces())
   const desk = desks.find((item) => item.wsId === input.workspaceId && item.issue.id === input.issueId)
-  if (!desk || desk.issue.status === 'canceled') return null
+  if (
+    !desk
+    || desk.issue.status === 'canceled'
+    || desk.connectorId !== triggerMetadata.connectorId
+  ) return null
 
   const appended = await appendIssueComment(
     workspace.dir,
@@ -174,32 +220,48 @@ export async function stampTelegramDeskScheduledFire(input: {
     at: input.task.finishedAt ?? Date.now(),
     fingerprint: `telegram-desk-fire:${input.task.taskId}`,
   })
-  await projectDeskComment(appended.issue, appended.comment, undefined, {
+  await projectDeskComment(appended.issue, appended.comment, input.client, {
     progressScopeId: input.task.taskId,
+    triggerMetadata,
   }).catch(() => undefined)
   return appended.comment
 }
 
 export async function pullTelegramDeskInbound(
-  host: TelegramDeskChatHost,
+  host: ConnectorDeskChatHost,
   client: ConnectorClient,
 ): Promise<void> {
-  // Drain is destructive. Leave Connector's queue untouched until a live desk
-  // can accept the stack as one comment, and until any in-flight generation
-  // has finished so later DMs can pile up instead of racing the same Session.
-  const desk = await findLiveDesk(host)
-  if (!desk) return
-  if (host.deskGenerating?.(desk)) return
   const messages = await client.drainInbound(AbortSignal.timeout(5_000))
   if (messages.length === 0) return
-  const result = await ingestTelegramOwnerMessages(host, messages)
-  if (!result.ok) {
-    console.warn('[connector] Telegram phone-desk inbound skipped:', result.reason)
+  const leftover: InboundOwnerMessage[] = []
+  const groups = new Map<string, InboundOwnerMessage[]>()
+  for (const message of messages) {
+    const group = groups.get(message.connectorId) ?? []
+    group.push(message)
+    groups.set(message.connectorId, group)
+  }
+  for (const [connectorId, group] of groups) {
+    if (!builtinConnectorHasCapability(connectorId, 'desk')) {
+      console.warn('[connector] phone-desk inbound skipped: unsupported_connector', connectorId)
+      continue
+    }
+    const desk = await findLiveDesk(host, connectorId)
+    if (!desk || host.deskGenerating?.(desk)) {
+      leftover.push(...group)
+      continue
+    }
+    const result = await ingestConnectorOwnerMessages(host, group, client)
+    if (!result.ok) {
+      console.warn(`[connector] ${connectorId} phone-desk inbound skipped:`, result.reason)
+    }
+  }
+  if (leftover.length > 0) {
+    await client.returnInbound(leftover, AbortSignal.timeout(5_000))
   }
 }
 
 export function startTelegramDeskInboundPoll(
-  host: TelegramDeskChatHost,
+  host: ConnectorDeskChatHost,
   options: { intervalMs?: number; client?: ConnectorClient } = {},
 ): () => void {
   const client = options.client ?? new ConnectorClient(resolveConnectorUrl())
@@ -226,8 +288,11 @@ export function startTelegramDeskInboundPoll(
   }
 }
 
-async function findLiveDesk(host: TelegramDeskChatHost): Promise<TelegramConnectorDesk | null> {
-  const desks = await findTelegramConnectorDesks(host.listWorkspaces())
+async function findLiveDesk(
+  host: ConnectorDeskChatHost,
+  connectorId: string,
+): Promise<ConnectorDesk | null> {
+  const desks = await findConnectorDesks(host.listWorkspaces(), connectorId)
   const desk = desks[0]
   if (!desk || desk.issue.status === 'canceled') return null
   return desk

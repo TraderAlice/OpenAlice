@@ -151,6 +151,50 @@ describe('SessionRow actions', () => {
     title: 'Review AAPL earnings',
   }
 
+  it('keeps the Session runtime brand visible independently of lifecycle state', () => {
+    const { rerender } = render(
+      <SessionRow
+        session={{ ...session, agent: 'codex' }}
+        isActive={false}
+        onSelect={vi.fn()}
+        onPause={vi.fn()}
+        onResume={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    )
+
+    const runningCodex = screen.getByRole('button', { name: 'Review AAPL earnings' }).querySelector('[data-agent-runtime-icon="codex"]')
+    expect(runningCodex).toBeTruthy()
+    expect(runningCodex?.parentElement?.className).toContain('text-foreground/80')
+
+    rerender(
+      <SessionRow
+        session={{ ...session, agent: 'codex', state: 'paused', pid: null, startedAt: null }}
+        isActive={false}
+        onSelect={vi.fn()}
+        onPause={vi.fn()}
+        onResume={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    )
+
+    const pausedCodex = screen.getByRole('button', { name: 'Review AAPL earnings' }).querySelector('[data-agent-runtime-icon="codex"]')
+    expect(pausedCodex?.parentElement?.className).toContain('text-foreground/80')
+
+    rerender(
+      <SessionRow
+        session={{ ...session, agent: 'claude' }}
+        isActive={false}
+        onSelect={vi.fn()}
+        onPause={vi.fn()}
+        onResume={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Review AAPL earnings' }).querySelector('[data-agent-runtime-icon="claude"]')).toBeTruthy()
+  })
+
   it('names destructive and lifecycle actions for their target session', async () => {
     const user = userEvent.setup()
     const onPause = vi.fn()

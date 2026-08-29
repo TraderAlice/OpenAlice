@@ -407,6 +407,7 @@ export interface WalletOperation {
 export interface WalletStatus {
   staged: WalletOperation[]
   pendingMessage: string | null
+  pendingHash?: string | null
   head: string | null
   commitCount: number
 }

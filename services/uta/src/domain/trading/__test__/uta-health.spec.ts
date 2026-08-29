@@ -217,7 +217,7 @@ describe('UTA health — offline behavior', () => {
 
     uta.stagePlaceOrder({ aliceId: 'mock-paper|AAPL', action: 'BUY', orderType: 'MKT', totalQuantity: '10' })
     uta.commit('buy AAPL')
-    await expect(uta.push()).rejects.toThrow(/offline/)
+    await expect(uta.push(uta.status().pendingHash!)).rejects.toThrow(/offline/)
     await uta.close()
   })
 

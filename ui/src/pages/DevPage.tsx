@@ -6,6 +6,7 @@ import { getIntlLocale } from '../lib/intl'
 import { useToast } from '../components/Toast'
 import { LogsPage } from './LogsPage'
 import { SimulatorPage } from './SimulatorPage'
+import { FrontendLabPage } from './FrontendLabPage'
 import { OnboardingDesignPage } from './OnboardingDesignPage'
 import {
   toolsApi,
@@ -22,6 +23,7 @@ import { filterAccountTierUTAs } from '../lib/uta-account-filter'
 type Tab = Extract<ViewSpec, { kind: 'dev' }>['params']['tab']
 
 const TAB_TITLE_KEYS = {
+  frontend: 'dev.frontend',
   tools: 'common.tools',
   onboarding: 'dev.onboarding',
   snapshots: 'dev.snapshots',
@@ -47,6 +49,7 @@ export function DevPage({ spec }: DevPageProps) {
       <PageHeader title={t(TAB_TITLE_KEYS[tab])} />
       <div className={`flex-1 min-h-0 ${SELF_SCROLLING_TABS.has(tab) ? 'flex flex-col' : 'overflow-y-auto'}`}>
         {tab === 'tools' && <ToolsTab />}
+        {tab === 'frontend' && <FrontendLabPage />}
         {tab === 'onboarding' && <OnboardingDesignPage />}
         {tab === 'snapshots' && <SnapshotsTab />}
         {tab === 'logs' && <LogsPage />}

@@ -5,10 +5,14 @@ import {
   connectorArtifactDeliverySchema,
   connectorArtifactFailureSchema,
   connectorArtifactRequestSchema,
+  connectorUtaFailureSchema,
+  connectorUtaPresentationSchema,
+  connectorUtaRequestSchema,
   artifactFailureMessage,
   inboundOwnerMessageSchema,
   isConnectorActionExpired,
   isInboxPushEnabled,
+  utaFailureMessage,
   type ConnectorAdapterConfig,
   type ConnectorAdapterHealth,
   type ConnectorArtifactDelivery,
@@ -17,6 +21,9 @@ import {
   type ConnectorConfig,
   type ConnectorDeliveryReceipt,
   type ConnectorServiceHealth,
+  type ConnectorUtaFailure,
+  type ConnectorUtaPresentation,
+  type ConnectorUtaRequest,
   type InboxNotification,
   type InboundOwnerMessage,
   type OwnerChatMessage,
@@ -57,7 +64,9 @@ export class DeliveryManager {
   private readonly commands = new Map<string, CommandRegistry>()
   private readonly inbound: InboundOwnerMessage[] = []
   private readonly actions: ConnectorArtifactRequest[] = []
+  private readonly utaActions: ConnectorUtaRequest[] = []
   private readonly bootRetries = new Map<string, ReturnType<typeof setTimeout>>()
+  private readonly reconnects = new Map<string, Promise<ConnectorAdapterHealth>>()
   private readonly startedAt: string
   private stopped = false
 
@@ -134,6 +143,37 @@ export class DeliveryManager {
     return probeId
   }
 
+  async reconnect(id: string): Promise<ConnectorAdapterHealth> {
+    const active = this.reconnects.get(id)
+    if (active) return active
+    const operation = this.reconnectAdapter(id)
+    this.reconnects.set(id, operation)
+    try {
+      return await operation
+    } finally {
+      if (this.reconnects.get(id) === operation) this.reconnects.delete(id)
+    }
+  }
+
+  private async reconnectAdapter(id: string): Promise<ConnectorAdapterHealth> {
+    const config = this.options.config.adapters[id]
+    if (!config?.enabled) throw new Error(`Connector is not enabled: ${id}`)
+    if (!this.options.registry.has(id)) throw new Error(`Unknown connector adapter: ${id}`)
+    this.clearAdapterStartRetry(id)
+    const previous = this.adapters.get(id)
+    if (previous) await previous.stop()
+    this.adapters.delete(id)
+    this.commands.delete(id)
+    this.installAdapter(id)
+    try {
+      await this.bootAdapter(id, config)
+    } catch (error) {
+      this.handleAdapterStartFailure(id, config, error, 0)
+      throw error
+    }
+    return this.adapters.get(id)!.health()
+  }
+
   acceptInbound(input: InboundOwnerMessage): void {
     const parsed = inboundOwnerMessageSchema.safeParse(input)
     if (!parsed.success) return
@@ -144,6 +184,17 @@ export class DeliveryManager {
 
   drainInbound(limit = MAX_INBOUND_OWNER_MESSAGES): InboundOwnerMessage[] {
     return this.inbound.splice(0, Math.max(0, limit))
+  }
+
+  returnInbound(messages: readonly unknown[]): void {
+    const restored = messages.flatMap((message) => {
+      const parsed = inboundOwnerMessageSchema.safeParse(message)
+      return parsed.success ? [parsed.data] : []
+    })
+    if (restored.length === 0) return
+    this.inbound.unshift(...restored)
+    const overflow = this.inbound.length - MAX_INBOUND_OWNER_MESSAGES
+    if (overflow > 0) this.inbound.splice(this.inbound.length - overflow, overflow)
   }
 
   enqueueArtifactRequest(connectorId: string, input: { entryId: string; docIndex: number }): string {
@@ -191,6 +242,116 @@ export class DeliveryManager {
 
   drainActions(limit = MAX_CONNECTOR_ACTION_REQUESTS): ConnectorArtifactRequest[] {
     return this.actions.splice(0, Math.max(0, limit))
+  }
+
+  enqueueUtaRequest(connectorId: string, input: {
+    action: 'review' | 'push' | 'reject'
+    utaId?: string
+    pendingHash?: string
+  }): string {
+    const expired = this.expireUtaActions()
+    for (const request of expired) {
+      void this.failUta({
+        requestId: request.requestId,
+        connectorId: request.connectorId,
+        reason: 'expired',
+        message: utaFailureMessage('expired'),
+      }).catch((error) => {
+        console.warn(
+          `[connector] ${request.connectorId} expired UTA-request notify failed:`,
+          error instanceof Error ? error.message : error,
+        )
+      })
+    }
+    if (this.utaActions.length >= MAX_CONNECTOR_ACTION_REQUESTS) {
+      throw new Error('Too many pending UTA requests. Try again in a moment.')
+    }
+    const request = connectorUtaRequestSchema.parse({
+      requestId: `uta-${randomUUID()}`,
+      connectorId,
+      createdAt: new Date().toISOString(),
+      action: input.action,
+      ...(input.utaId ? { utaId: input.utaId } : {}),
+      ...(input.pendingHash ? { pendingHash: input.pendingHash } : {}),
+    })
+    this.utaActions.push(request)
+    void this.record({
+      correlationId: request.requestId,
+      direction: 'inbound',
+      stage: 'action.enqueued',
+      connectorId,
+      payload: {
+        kind: 'uta',
+        requestId: request.requestId,
+        action: request.action,
+        utaId: request.utaId,
+        ttlMs: CONNECTOR_ACTION_TTL_MS,
+      },
+    })
+    return request.requestId
+  }
+
+  drainUtaActions(limit = MAX_CONNECTOR_ACTION_REQUESTS): ConnectorUtaRequest[] {
+    return this.utaActions.splice(0, Math.max(0, limit))
+  }
+
+  async presentUta(presentation: ConnectorUtaPresentation): Promise<void> {
+    const parsed = connectorUtaPresentationSchema.parse(presentation)
+    const adapter = this.adapters.get(parsed.connectorId)
+    if (!adapter) throw new Error(`Connector is not running: ${parsed.connectorId}`)
+    await this.record({
+      correlationId: parsed.requestId,
+      direction: 'outbound',
+      stage: 'delivery.attempted',
+      connectorId: adapter.id,
+      payload: {
+        kind: 'uta',
+        requestId: parsed.requestId,
+        accountCount: parsed.review.accounts.length,
+        result: parsed.result?.kind,
+      },
+    })
+    try {
+      if (adapter.presentUta) await adapter.presentUta(parsed)
+      else {
+        const waiting = parsed.review.accounts.filter((account) => account.pendingMessage).length
+        await adapter.sendOwnerText(
+          parsed.result?.message
+          ?? parsed.review.unavailable
+          ?? (waiting > 0
+            ? `UTA: ${waiting} account${waiting === 1 ? '' : 's'} waiting for approval. Open /uta in Telegram or Trading as Git in OpenAlice.`
+            : 'UTA: nothing waiting for approval.'),
+        )
+      }
+      await this.record({
+        correlationId: parsed.requestId,
+        direction: 'outbound',
+        stage: 'delivery.succeeded',
+        connectorId: adapter.id,
+        payload: { kind: 'uta', requestId: parsed.requestId },
+      })
+    } catch (error) {
+      await this.record({
+        correlationId: parsed.requestId,
+        direction: 'outbound',
+        stage: 'delivery.failed',
+        connectorId: adapter.id,
+        payload: {
+          kind: 'uta',
+          requestId: parsed.requestId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+      throw error
+    }
+  }
+
+  async failUta(failure: ConnectorUtaFailure): Promise<void> {
+    const parsed = connectorUtaFailureSchema.parse(failure)
+    const adapter = this.adapters.get(parsed.connectorId)
+    if (!adapter) throw new Error(`Connector is not running: ${parsed.connectorId}`)
+    if (adapter.failUta) await adapter.failUta(parsed)
+    else await adapter.sendOwnerText(parsed.message)
   }
 
   async deliverArtifact(delivery: ConnectorArtifactDelivery): Promise<void> {
@@ -266,16 +427,25 @@ export class DeliveryManager {
       direction: 'outbound',
       stage: 'delivery.attempted',
       connectorId: adapter.id,
-      payload: { kind: 'owner-chat', textLength: message.text.length },
+      payload: {
+        kind: 'owner-chat',
+        phase: message.phase,
+        conversationId: message.conversationId,
+        textLength: message.text?.length ?? 0,
+      },
     })
     try {
-      await adapter.sendOwnerText(message.text)
+      if (adapter.sendOwnerChat) {
+        await adapter.sendOwnerChat(message)
+      } else if (message.phase !== 'accepted' && message.text) {
+        await adapter.sendOwnerText(message.text)
+      }
       await this.record({
         correlationId,
         direction: 'outbound',
         stage: 'delivery.succeeded',
         connectorId: adapter.id,
-        payload: { kind: 'owner-chat' },
+        payload: { kind: 'owner-chat', phase: message.phase, conversationId: message.conversationId },
       })
     } catch (error) {
       await this.record({
@@ -283,7 +453,12 @@ export class DeliveryManager {
         direction: 'outbound',
         stage: 'delivery.failed',
         connectorId: adapter.id,
-        payload: { kind: 'owner-chat', error: error instanceof Error ? error.message : String(error) },
+        payload: {
+          kind: 'owner-chat',
+          phase: message.phase,
+          conversationId: message.conversationId,
+          error: error instanceof Error ? error.message : String(error),
+        },
       })
       throw error
     }
@@ -346,6 +521,7 @@ export class DeliveryManager {
         })
       },
       enqueueArtifactRequest: (input) => this.enqueueArtifactRequest(id, input),
+      enqueueUtaRequest: (input) => this.enqueueUtaRequest(id, input),
     }
     // Keep a failed adapter registered. start() may record a useful degraded
     // reason; dropping it here reduced Settings to "configured but not running".
@@ -433,6 +609,18 @@ export class DeliveryManager {
       if (!request || isConnectorActionExpired(request.createdAt, now)) {
         if (request) expired.push(request)
         this.actions.splice(index, 1)
+      }
+    }
+    return expired
+  }
+
+  private expireUtaActions(now = Date.now()): ConnectorUtaRequest[] {
+    const expired: ConnectorUtaRequest[] = []
+    for (let index = this.utaActions.length - 1; index >= 0; index -= 1) {
+      const request = this.utaActions[index]
+      if (!request || isConnectorActionExpired(request.createdAt, now)) {
+        if (request) expired.push(request)
+        this.utaActions.splice(index, 1)
       }
     }
     return expired

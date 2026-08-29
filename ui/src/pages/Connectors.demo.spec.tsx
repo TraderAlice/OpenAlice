@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   load: vi.fn(),
   save: vi.fn(),
   test: vi.fn(),
+  reconnect: vi.fn(),
   deskLoad: vi.fn(),
   openOrFocus: vi.fn(),
 }))
@@ -26,6 +27,7 @@ vi.mock('../api', async (importOriginal) => {
         load: mocks.load,
         save: mocks.save,
         test: mocks.test,
+        reconnect: mocks.reconnect,
         desk: {
           load: mocks.deskLoad,
           create: vi.fn(),
@@ -54,6 +56,7 @@ beforeEach(async () => {
   mocks.load.mockImplementation(async () => createDemoConnectorSnapshot())
   mocks.save.mockImplementation(async (config) => ({ config: redactSecrets(config) }))
   mocks.test.mockResolvedValue({ ok: true, probeId: 'connector-probe-demo' })
+  mocks.reconnect.mockResolvedValue({ ok: true, scope: 'adapter', adapterId: 'telegram' })
   mocks.deskLoad.mockResolvedValue({ desk: null })
 })
 
@@ -69,6 +72,31 @@ describe('Connector demo routes', () => {
     expect(screen.getByText(/External delivery is disabled/)).toBeTruthy()
   })
 
+  it('reconnects an unhealthy configured adapter from the operations route', async () => {
+    const snapshot = createDemoConnectorSnapshot()
+    snapshot.config.serviceEnabled = true
+    snapshot.config.adapters.telegram = {
+      enabled: true,
+      settings: {},
+      configuredSecrets: ['botToken'],
+    }
+    snapshot.health = {
+      enabled: true,
+      status: 'degraded',
+      service: {
+        status: 'degraded',
+        startedAt: '2026-08-23T00:00:00.000Z',
+        adapters: [{ id: 'telegram', enabled: true, status: 'degraded', lastError: 'offline' }],
+      },
+    }
+    mocks.load.mockResolvedValue(snapshot)
+
+    render(<ConnectorStatusPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Reconnect' }))
+
+    await waitFor(() => expect(mocks.reconnect).toHaveBeenCalledWith('telegram'))
+  })
+
   it('localizes the read-only operations route', async () => {
     await i18n.changeLanguage('zh')
     render(<ConnectorStatusPage />)
@@ -79,7 +107,7 @@ describe('Connector demo routes', () => {
     expect(screen.getByRole('heading', { name: '连接器服务' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: '投递连接器' })).toBeTruthy()
     expect(screen.getByText('将收件箱通知投递到你的私有 Discord 会话。')).toBeTruthy()
-    expect(screen.getAllByText('需要设置')).toHaveLength(3)
+    expect(screen.getAllByText('需要设置')).toHaveLength(4)
     expect(screen.queryByText('Delivery connectors')).toBeNull()
   })
 
@@ -90,6 +118,7 @@ describe('Connector demo routes', () => {
     expect(screen.getByText('Discord')).toBeTruthy()
     expect(screen.getByText('Telegram')).toBeTruthy()
     expect(screen.getByText('Slack')).toBeTruthy()
+    expect(screen.getByText('Feishu')).toBeTruthy()
     expect(screen.getByText('Application ID')).toBeTruthy()
     expect(screen.getAllByText('Bot token')).toHaveLength(3)
     expect(screen.queryByRole('button', { name: 'Send test' })).toBeNull()
@@ -104,7 +133,7 @@ describe('Connector demo routes', () => {
 
     expect(await screen.findByRole('heading', { name: '连接器' })).toBeTruthy()
     expect(screen.getByText('运行外部通知连接器')).toBeTruthy()
-    expect(screen.getAllByText('需要凭据')).toHaveLength(2)
+    expect(screen.getAllByText('需要凭据')).toHaveLength(3)
     expect(screen.getByRole('textbox', { name: 'Discord 应用 ID' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '管理 Telegram 连接信息' })).toBeTruthy()
     expect(screen.queryByText('Connection details')).toBeNull()

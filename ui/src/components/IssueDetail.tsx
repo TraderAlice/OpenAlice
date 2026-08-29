@@ -3,7 +3,6 @@ import type { ReactNode } from 'react'
 import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Check, ChevronRight, Clock, Cpu, Hash, History, Inbox, KeyRound, ListChecks, LoaderCircle, MessageSquare, Play, RotateCcw, Search, Settings, SlidersHorizontal, Timer, TrendingUp, UserRound, X } from 'lucide-react'
-import { inputClass } from './form'
 
 import type { HeadlessTaskStatus, HeadlessTurnProgress } from '../api/headless'
 import type { InboxEntry } from '../api/inbox'
@@ -67,6 +66,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
 import { resolveIssueAiSelection } from './issue-runtime-options'
 
 // Run-status pill tints — mirrors AutomationRunsSection's STATUS_STYLE so the
@@ -265,7 +265,7 @@ function AssigneeEditor({
         </span>
         <ChevronRight size={14} className="shrink-0 text-muted-foreground/70" aria-hidden />
       </button>
-      <DialogContent className="max-h-[min(42rem,calc(100dvh-2rem))] grid-cols-[minmax(0,1fr)] grid-rows-[auto_auto_minmax(0,1fr)_auto] overflow-hidden p-0 sm:max-w-xl">
+      <DialogContent className="max-h-[min(42rem,calc(100dvh-2rem))] min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[auto_auto_minmax(0,1fr)_auto] overflow-hidden p-0 sm:max-w-xl">
         <DialogHeader className="px-4 pt-4">
           <DialogTitle>{t('issues.detail.chooseAssignee')}</DialogTitle>
           <DialogDescription>{t('issues.detail.chooseAssigneeDescription')}</DialogDescription>
@@ -322,15 +322,15 @@ function AssigneeEditor({
             )}
           </div>
         </div>
-        <DialogFooter className="mx-0 mb-0 items-center rounded-none px-4 py-3 sm:justify-between">
-          <div className="min-w-0 text-left sm:mr-auto">
+        <DialogFooter className="mx-0 mb-0 min-w-0 flex-col items-stretch rounded-none px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 w-full max-w-full overflow-hidden text-left sm:mr-auto sm:flex-1">
             <span className="block text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
               {t('issues.detail.pendingAssignee')}
             </span>
             <span className="mt-0.5 block truncate text-sm font-medium text-foreground">{draftLabel}</span>
             {draftDescription && <span className="block truncate text-xs text-muted-foreground">{draftDescription}</span>}
           </div>
-          <div className="flex w-full justify-end gap-2 sm:w-auto">
+          <div className="flex w-full shrink-0 justify-end gap-2 sm:w-auto">
             <Button type="button" variant="outline" disabled={committing} onClick={close}>
               {t('common.cancel')}
             </Button>
@@ -799,6 +799,134 @@ function SchedulePolicyEditor({
   )
 }
 
+function CommentBehaviorEditor({
+  value,
+  disabled,
+  onSave,
+}: {
+  value?: string
+  disabled?: boolean
+  onSave: (commentPrompt: string | null) => Promise<boolean>
+}) {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState(value ?? DEFAULT_ISSUE_COMMENT_PROMPT)
+  const [saving, setSaving] = useState(false)
+  const stored = value ?? ''
+  const custom = Boolean(stored)
+  const dirty = draft !== (stored || DEFAULT_ISSUE_COMMENT_PROMPT)
+  const preview = custom
+    ? stored.split('\n').find((line) => line.trim()) ?? t('issues.detail.commentBehaviorCustom')
+    : t('issues.detail.commentBehaviorDefaultHint')
+
+  useEffect(() => {
+    setDraft(value ?? DEFAULT_ISSUE_COMMENT_PROMPT)
+  }, [value])
+
+  const close = () => {
+    if (saving) return
+    setDraft(value ?? DEFAULT_ISSUE_COMMENT_PROMPT)
+    setOpen(false)
+  }
+
+  const persist = async (commentPrompt: string | null) => {
+    if (saving) return
+    setSaving(true)
+    try {
+      const ok = await onSave(commentPrompt)
+      if (ok !== false) {
+        if (commentPrompt === null) setDraft(DEFAULT_ISSUE_COMMENT_PROMPT)
+        setOpen(false)
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (next) {
+          setDraft(value ?? DEFAULT_ISSUE_COMMENT_PROMPT)
+          setOpen(true)
+          return
+        }
+        close()
+      }}
+    >
+      <button
+        type="button"
+        disabled={disabled}
+        aria-label={t('issues.detail.commentBehavior')}
+        onClick={() => {
+          setDraft(value ?? DEFAULT_ISSUE_COMMENT_PROMPT)
+          setOpen(true)
+        }}
+        className="oa-pressable flex min-h-11 w-full min-w-0 items-center gap-2.5 rounded-md border border-border bg-background px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-secondary/50 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <MessageSquare size={15} className="shrink-0 text-muted-foreground" aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[13px] font-medium text-foreground">
+            {custom ? t('issues.detail.commentBehaviorCustom') : t('issues.detail.default')}
+          </span>
+          <span className="block truncate text-[11px] text-muted-foreground">{preview}</span>
+        </span>
+        <ChevronRight size={14} className="shrink-0 text-muted-foreground/70" aria-hidden />
+      </button>
+      <DialogContent className="max-h-[min(42rem,calc(100dvh-2rem))] min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden p-0 sm:max-w-lg">
+        <DialogHeader className="px-4 pt-4">
+          <DialogTitle>{t('issues.detail.commentBehavior')}</DialogTitle>
+          <DialogDescription>{t('issues.detail.commentPromptDescription')}</DialogDescription>
+        </DialogHeader>
+        <div className="min-h-0 space-y-3 overflow-x-hidden overflow-y-auto px-4 pb-4">
+          <div>
+            <p className="text-[11px] font-medium text-muted-foreground">
+              {t('issues.detail.commentPromptTokensLabel')}
+            </p>
+            <p className="mt-1 font-mono text-[11px] leading-snug text-muted-foreground">
+              {t('issues.detail.commentPromptTokens')}
+            </p>
+          </div>
+          <Textarea
+            autoFocus
+            value={draft}
+            disabled={saving}
+            aria-label={t('issues.detail.commentPrompt')}
+            onChange={(event) => setDraft(event.target.value)}
+            className="min-h-36 max-h-[min(24rem,50dvh)] resize-y overflow-y-auto font-mono text-[12.5px] leading-5"
+          />
+        </div>
+        <DialogFooter className="mx-0 mb-0 min-w-0 flex-col items-stretch rounded-none px-4 py-3 sm:flex-row sm:items-center sm:justify-end">
+          {custom ? (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={saving}
+              className="sm:mr-auto"
+              onClick={() => void persist(null)}
+            >
+              {t('issues.detail.commentPromptReset')}
+            </Button>
+          ) : null}
+          <div className="flex w-full shrink-0 justify-end gap-2 sm:w-auto">
+            <Button type="button" variant="outline" disabled={saving} onClick={close}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              type="button"
+              disabled={saving || !dirty}
+              onClick={() => void persist(draft.trim() === DEFAULT_ISSUE_COMMENT_PROMPT ? null : draft)}
+            >
+              {saving ? t('issues.detail.whatSaving') : t('issues.detail.commentPromptSave')}
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function PropertiesRail({
   wsId,
   issue,
@@ -1031,24 +1159,26 @@ function PropertiesRail({
         </InspectorSection>
 
         {issue.when && (
-          <>
-            <InspectorSection title={t('issues.detail.schedule')}>
-              <CadenceSummary when={issue.when} />
-              <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/50 pt-3 text-xs">
-                <span className="flex items-center gap-1.5 text-muted-foreground">
-                  <Clock size={13} aria-hidden />
-                  {t('issues.detail.nextRun')}
-                </span>
-                <span className="tabular-nums text-foreground">
-                  {issue.nextDueAtMs ? formatRelativeTime(issue.nextDueAtMs) : '—'}
-                </span>
-              </div>
-              <div className="mt-1 flex justify-end">
-                <SchedulePolicyEditor issue={issue} saving={saving} onPatch={onPatch} />
-              </div>
-            </InspectorSection>
+          <InspectorSection title={t('issues.detail.schedule')}>
+            <CadenceSummary when={issue.when} />
+            <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/50 pt-3 text-xs">
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <Clock size={13} aria-hidden />
+                {t('issues.detail.nextRun')}
+              </span>
+              <span className="tabular-nums text-foreground">
+                {issue.nextDueAtMs ? formatRelativeTime(issue.nextDueAtMs) : '—'}
+              </span>
+            </div>
+            <div className="mt-1 flex justify-end">
+              <SchedulePolicyEditor issue={issue} saving={saving} onPatch={onPatch} />
+            </div>
+          </InspectorSection>
+        )}
 
-            <InspectorSection title={t('issues.detail.agent')}>
+        <InspectorSection title={t('issues.detail.agent')}>
+          {issue.when && (
+            <>
               <InspectorField label={t('issues.detail.runtime')}>
                 {ownerResumeId ? (
                   <div
@@ -1125,9 +1255,19 @@ function PropertiesRail({
               {agentNeedsCredential && (
                 <p className="mt-2 text-xs leading-snug text-warning">{t('issues.detail.aiCredentialMissing')}</p>
               )}
-            </InspectorSection>
-          </>
-        )}
+            </>
+          )}
+          <InspectorField
+            label={t('issues.detail.commentBehavior')}
+            className={issue.when ? 'mt-3' : undefined}
+          >
+            <CommentBehaviorEditor
+              value={issue.commentPrompt}
+              disabled={saving}
+              onSave={(commentPrompt) => onPatch({ commentPrompt })}
+            />
+          </InspectorField>
+        </InspectorSection>
       </div>
       {(error || runtimeError) && (
         <p role="alert" className="mt-2 text-xs leading-snug text-destructive">{error || runtimeError}</p>
@@ -1292,75 +1432,6 @@ function WhatEditor({
         </p>
       </div>
       <MarkdownWhatEditor value={value} onSave={onSave} />
-    </section>
-  )
-}
-
-function CommentPromptEditor({
-  value,
-  onSave,
-}: {
-  value?: string
-  onSave: (commentPrompt: string | null) => Promise<boolean> | void
-}) {
-  const { t } = useTranslation()
-  const [draft, setDraft] = useState(value ?? DEFAULT_ISSUE_COMMENT_PROMPT)
-  const [saving, setSaving] = useState(false)
-  const stored = value ?? ''
-  const dirty = draft !== (stored || DEFAULT_ISSUE_COMMENT_PROMPT)
-
-  useEffect(() => {
-    setDraft(value ?? DEFAULT_ISSUE_COMMENT_PROMPT)
-  }, [value])
-
-  return (
-    <section id="issue-comment-prompt" className="mt-4 scroll-mt-20 border-t border-border/60 pt-4">
-      <div className="mb-2">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/80">
-          {t('issues.detail.commentPrompt')}
-        </h2>
-        <p className="mt-1 text-[11px] leading-snug text-muted-foreground/65">
-          {t('issues.detail.commentPromptDescription')}
-        </p>
-        <p className="mt-1 font-mono text-[11px] leading-snug text-muted-foreground">
-          {t('issues.detail.commentPromptTokens')}
-        </p>
-      </div>
-      <textarea
-        className={`${inputClass} min-h-28 font-mono text-[12.5px] leading-5`}
-        value={draft}
-        aria-label={t('issues.detail.commentPrompt')}
-        onChange={(event) => setDraft(event.target.value)}
-      />
-      <div className="mt-2 flex flex-wrap gap-2">
-        <button
-          type="button"
-          className="oa-pressable inline-flex min-h-9 items-center rounded-lg bg-primary px-3 py-1.5 text-[12px] font-medium text-primary-foreground disabled:opacity-50"
-          disabled={saving || !dirty}
-          onClick={async () => {
-            setSaving(true)
-            await onSave(draft.trim() === DEFAULT_ISSUE_COMMENT_PROMPT ? null : draft)
-            setSaving(false)
-          }}
-        >
-          {saving ? t('issues.detail.whatSaving') : t('issues.detail.commentPromptSave')}
-        </button>
-        {stored ? (
-          <button
-            type="button"
-            className="oa-pressable inline-flex min-h-9 items-center rounded-lg border border-border px-3 py-1.5 text-[12px] text-muted-foreground"
-            disabled={saving}
-            onClick={async () => {
-              setSaving(true)
-              const ok = await onSave(null)
-              if (ok !== false) setDraft(DEFAULT_ISSUE_COMMENT_PROMPT)
-              setSaving(false)
-            }}
-          >
-            {t('issues.detail.commentPromptReset')}
-          </button>
-        ) : null}
-      </div>
     </section>
   )
 }
@@ -2213,11 +2284,6 @@ export function IssueDetail({
             value={issue.what}
             scheduled={Boolean(issue.when)}
             onSave={(what) => onPatch({ what })}
-          />
-          <CommentPromptEditor
-            key={`${wsId}:${id}:comment-prompt`}
-            value={issue.commentPrompt}
-            onSave={(commentPrompt) => onPatch({ commentPrompt })}
           />
           <IssueActivity
             activity={activity}

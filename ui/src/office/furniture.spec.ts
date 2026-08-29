@@ -13,7 +13,20 @@ describe('OFFICE_FURNITURE', () => {
     expect(OFFICE_FURNITURE.desk).toBe('/office/furniture/desk.png')
     expect(OFFICE_FURNITURE.chair).toBe('/office/furniture/chair.png')
     expect(OFFICE_FURNITURE.cabinet).toBe('/office/furniture/cabinet.png')
-    for (const url of Object.values(OFFICE_FURNITURE)) {
+    expect(OFFICE_FURNITURE.generated.workstation).toBe('/office/furniture/workstation-v1.png')
+    expect(OFFICE_FURNITURE.generated.cabinet).toBe('/office/furniture/filing-cabinet-v1.png')
+    expect(OFFICE_FURNITURE.generated.operationsBoard).toBe('/office/furniture/operations-board-v1.png')
+    expect(OFFICE_FURNITURE.generated.workspaceSign).toBe('/office/furniture/workspace-sign-v1.png')
+    expect(OFFICE_FURNITURE.generated.spawnCompass).toBe('/office/furniture/spawn-compass-v1.png')
+    expect(OFFICE_FURNITURE.generated.wallWindowNight).toBe('/office/furniture/wall-window-night-v1.png')
+    for (const url of [
+      OFFICE_FURNITURE.desk,
+      OFFICE_FURNITURE.chair,
+      OFFICE_FURNITURE.cabinet,
+      OFFICE_FURNITURE.coffee,
+      OFFICE_FURNITURE.plant,
+      ...Object.values(OFFICE_FURNITURE.generated),
+    ]) {
       expect(url.endsWith('.png')).toBe(true)
       expect(url.includes('.jpg')).toBe(false)
       expect(url.includes('treadmill')).toBe(false)
@@ -22,5 +35,31 @@ describe('OFFICE_FURNITURE', () => {
       expect([...bytes.subarray(0, 8)]).toEqual(PNG_MAGIC)
       expect(bytes.byteLength).toBeGreaterThan(1000)
     }
+
+    const operations = readFileSync(resolve(
+      publicRoot,
+      OFFICE_FURNITURE.generated.operationsBoard.replace(/^\//, ''),
+    ))
+    expect(operations[25]).toBe(6) // PNG color type 6: RGBA.
+
+    const workspaceSign = readFileSync(resolve(
+      publicRoot,
+      OFFICE_FURNITURE.generated.workspaceSign.replace(/^\//, ''),
+    ))
+    expect(workspaceSign[25]).toBe(6)
+
+    const nightWindow = readFileSync(resolve(
+      publicRoot,
+      OFFICE_FURNITURE.generated.wallWindowNight.replace(/^\//, ''),
+    ))
+    expect(nightWindow[25]).toBe(6)
+
+    const spawnCompass = readFileSync(resolve(
+      publicRoot,
+      OFFICE_FURNITURE.generated.spawnCompass.replace(/^\//, ''),
+    ))
+    expect(spawnCompass[25]).toBe(6)
+    expect(spawnCompass.readUInt32BE(16)).toBe(144)
+    expect(spawnCompass.readUInt32BE(20)).toBe(144)
   })
 })

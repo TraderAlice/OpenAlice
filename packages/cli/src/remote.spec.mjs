@@ -342,6 +342,8 @@ describe('OpenAlice managed remote connector', () => {
     expect(buildRemoteSshArgs(options, command)).toEqual(expect.arrayContaining([
       '-i', '/tmp/id key', 'host', command,
     ]))
+    expect(buildRemoteSshArgs({ ...options, batchMode: true }, command))
+      .toEqual(expect.arrayContaining(['-o', 'BatchMode=yes']))
   })
 
   it('prints a plan without applying or opening a tunnel', async () => {

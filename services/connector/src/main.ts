@@ -11,6 +11,8 @@ import {
   connectorArtifactDeliverySchema,
   connectorArtifactFailureSchema,
   connectorDeliveryReceiptSchema,
+  connectorUtaFailureSchema,
+  connectorUtaPresentationSchema,
   inboxNotificationSchema,
   ownerChatMessageSchema,
 } from '@traderalice/connector-protocol'
@@ -20,6 +22,7 @@ import { ConnectorConfigStore } from './config-store.js'
 import { discordConnectorRegistration } from './adapters/discord.js'
 import { slackConnectorRegistration } from './adapters/slack.js'
 import { telegramConnectorRegistration } from './adapters/telegram.js'
+import { feishuConnectorRegistration } from './adapters/feishu.js'
 import { ConnectorIOJournal } from './core/io-journal.js'
 import { dataPath } from '@/core/paths.js'
 import { installConnectorProxyTransport } from './core/proxy.js'
@@ -38,6 +41,7 @@ async function main(): Promise<void> {
   registry.register(discordConnectorRegistration(proxy))
   registry.register(telegramConnectorRegistration(proxy))
   registry.register(slackConnectorRegistration(proxy))
+  registry.register(feishuConnectorRegistration(proxy))
   const journal = new ConnectorIOJournal({
     path: dataPath('logs', 'connector-io.jsonl'),
     warn: (message) => console.warn(`[connector] ${message}`),
@@ -69,6 +73,11 @@ async function main(): Promise<void> {
   app.post('/v1/inbound/drain', async (c) => {
     return c.json({ messages: manager.drainInbound() })
   })
+  app.post('/v1/inbound/return', async (c) => {
+    const body = await c.req.json().catch(() => null) as { messages?: unknown } | null
+    manager.returnInbound(Array.isArray(body?.messages) ? body.messages : [])
+    return c.json({ ok: true })
+  })
   app.post('/v1/actions/drain', (c) => {
     return c.json({ requests: manager.drainActions() })
   })
@@ -82,9 +91,26 @@ async function main(): Promise<void> {
     await manager.failArtifact(failure)
     return c.json(connectorDeliveryReceiptSchema.parse({ accepted: true, deliveryId: failure.requestId }))
   })
+  app.post('/v1/actions/uta/drain', (c) => {
+    return c.json({ requests: manager.drainUtaActions() })
+  })
+  app.post('/v1/uta/present', async (c) => {
+    const presentation = connectorUtaPresentationSchema.parse(await c.req.json())
+    await manager.presentUta(presentation)
+    return c.json(connectorDeliveryReceiptSchema.parse({ accepted: true, deliveryId: presentation.requestId }))
+  })
+  app.post('/v1/uta/fail', async (c) => {
+    const failure = connectorUtaFailureSchema.parse(await c.req.json())
+    await manager.failUta(failure)
+    return c.json(connectorDeliveryReceiptSchema.parse({ accepted: true, deliveryId: failure.requestId }))
+  })
   app.post('/v1/connectors/:id/test', async (c) => {
     const probeId = await manager.sendTest(c.req.param('id'))
     return c.json({ ok: true, probeId })
+  })
+  app.post('/v1/connectors/:id/reconnect', async (c) => {
+    const adapter = await manager.reconnect(c.req.param('id'))
+    return c.json({ ok: true, adapter })
   })
   app.onError((error, c) => {
     console.warn('[connector] request failed:', error instanceof Error ? error.message : error)

@@ -29,6 +29,19 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
+- [[plans/bun-cli-distribution.md]] — Replaces the expanded Node headless
+  Runtime with a Bun-compiled, multi-process CLI distribution. Direct,
+  npm/Bun, Homebrew, and AUR channels consume one accepted artifact set. The
+  CLI package owns OpenAlice only: Agent Runtime installation and Electron
+  packaging stay outside this plan.
+- [[plans/remote-project-fleet.md]] — Adds a machine-aware Supervisor fleet,
+  remote AliceProject inventory/connection, and safe local-to-SSH project
+  transfer for portable configuration and Workspaces while deliberately
+  excluding native/OpenAlice Session continuation state.
+- [[plans/auto-prediction-harness.md]] — Auto Prediction Beta conversation
+  Harness is in `dev`; managed AP/AQ Studio supervision, opaque routing, and
+  embedded product surfaces are implemented. Shared verified/unverified source
+  release management and cross-runtime acceptance remain active.
 - [[plans/antigravity-adapter.md]] — Antigravity (`agy`) CliAdapter.
   PATH `agy` only; never spawn `antigravity` / `gemini`.
   Serial PR from `feat/agy-adapter`; do not merge until Ame says so.
@@ -47,6 +60,9 @@ the durable truth after it changes. Git history is the archive.
   Telegram phone desk: What is the heartbeat prompt, comments are the chat,
   Connector only transports. Increment 1 bound the desk in Settings.
   Increment 2 projects comments unless `[[no-reply]]`.
+- [[plans/connector-desk.md]] — Desk specimen is shared; each `desk` adapter
+  owns its own Issue. Increment 1 generalizes `telegramConnector` →
+  `connectorDesk: <id>`. Feishu adapter is a later increment.
 - [[plans/connector-inbox-commands.md]] — Connectors declare `inbox` and
   `settings` capabilities and implement their own slash-command forms.
   Telegram uses a bounded `/inbox` summary plus on-demand file pull;

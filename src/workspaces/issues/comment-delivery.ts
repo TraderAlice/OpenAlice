@@ -19,7 +19,10 @@ import {
   issueAssigneeResumeId,
   type IssueRecord,
 } from './declaration.js'
-import { projectDeskComment } from './telegram-desk-project.js'
+import {
+  projectDeskComment,
+  projectWorkspaceDeskFailure,
+} from './telegram-desk-project.js'
 
 const COMMENT_REPLY_TIMEOUT_MS = 300_000
 
@@ -232,6 +235,10 @@ export async function recordIssueCommentReply(input: {
     return 'replied'
   }
 
+  const failureText = input.error
+    ?? (input.status === 'done'
+      ? 'The Issue reply Agent finished without a final reply.'
+      : `The Issue reply run ended as ${input.status}.`)
   const updated = await updateIssueCommentDelivery(
     input.issueWorkspaceDir,
     input.issueId,
@@ -240,12 +247,15 @@ export async function recordIssueCommentReply(input: {
       state: 'failed',
       targetResumeId: input.task.resumeId,
       taskId: input.task.taskId,
-      error: input.error
-        ?? (input.status === 'done'
-          ? 'The Issue reply Agent finished without a final reply.'
-          : `The Issue reply run ended as ${input.status}.`),
+      error: failureText,
     },
   )
   if (!updated.ok) throw new Error(updated.error)
+  await projectWorkspaceDeskFailure({
+    wsDir: input.issueWorkspaceDir,
+    issueId: input.issueId,
+    conversationId: input.sourceCommentId,
+    text: `The Agent could not complete this reply: ${failureText}`,
+  }).catch(() => undefined)
   return 'failed'
 }

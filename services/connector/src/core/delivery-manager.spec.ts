@@ -92,6 +92,38 @@ describe('DeliveryManager connector registry', () => {
     await manager.stop()
   })
 
+  it('replaces only the requested adapter during an explicit reconnect', async () => {
+    const created: FakeThirdPartyAdapter[] = []
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: {
+        id: 'carrier-pigeon',
+        label: 'Carrier Pigeon',
+        description: 'Test-only third connector.',
+        fields: [],
+        commands: [],
+      },
+      create: () => {
+        const adapter = new FakeThirdPartyAdapter()
+        created.push(adapter)
+        return adapter
+      },
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: { version: 1, adapters: { 'carrier-pigeon': { enabled: true, settings: {} } } },
+      updateAdapterSettings: vi.fn(),
+    })
+
+    await manager.start()
+    const health = await manager.reconnect('carrier-pigeon')
+
+    expect(created).toHaveLength(2)
+    expect(created[0]?.health().status).toBe('stopped')
+    expect(health.status).toBe('healthy')
+    await manager.stop()
+  })
+
   it('reports starting adapters before external startup finishes', async () => {
     let release!: () => void
     const gate = new Promise<void>((resolve) => { release = resolve })
@@ -350,7 +382,13 @@ describe('DeliveryManager connector registry', () => {
     })
     await manager.start()
 
-    expect(manager.enqueueOwnerChat({ id: 'desk-comment-1', adapterId: 'broken', text: 'hello' }))
+    expect(manager.enqueueOwnerChat({
+      id: 'desk-comment-1',
+      adapterId: 'broken',
+      conversationId: 'comment-1',
+      phase: 'final',
+      text: 'hello',
+    }))
       .toEqual({ accepted: true, deliveryId: 'desk-comment-1' })
     await vi.waitFor(() => expect(warn).toHaveBeenCalledWith(
       '[connector] broken owner-chat delivery failed:',
@@ -553,6 +591,55 @@ describe('DeliveryManager connector registry', () => {
       vi.useRealTimers()
       await manager.stop()
     }
+  })
+
+  it('keeps UTA review requests off the Inbox artifact drain', async () => {
+    const presented: unknown[] = []
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: { id: 'telegram', label: 'Telegram', description: 'Telegram.', fields: [], commands: [] },
+      create: () => ({
+        id: 'telegram',
+        start: async () => undefined,
+        stop: async () => undefined,
+        deliver: async () => undefined,
+        sendOwnerText: async () => undefined,
+        presentUta: async (presentation) => { presented.push(presentation) },
+        health: () => ({ id: 'telegram', enabled: true, status: 'healthy' as const }),
+      }),
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: { version: 1, adapters: { telegram: { enabled: true, settings: {} } } },
+      updateAdapterSettings: vi.fn(),
+    })
+    await manager.start()
+    const requestId = manager.enqueueUtaRequest('telegram', { action: 'review' })
+    expect(requestId.startsWith('uta-')).toBe(true)
+    expect(manager.drainActions()).toEqual([])
+    expect(manager.drainUtaActions()).toEqual([expect.objectContaining({
+      requestId,
+      connectorId: 'telegram',
+      action: 'review',
+    })])
+    await manager.presentUta({
+      requestId,
+      connectorId: 'telegram',
+      review: {
+        generatedAt: '2026-08-19T12:00:00.000Z',
+        accounts: [{
+          id: 'alpaca-paper',
+          label: 'Alpaca paper',
+          pendingMessage: 'long AAPL',
+          pendingHash: 'abc12345',
+          stagedCount: 1,
+          hiddenOperationCount: 0,
+          operations: [{ action: 'placeOrder', summary: 'BUY AAPL MKT × 10' }],
+        }],
+      },
+    })
+    expect(presented).toHaveLength(1)
+    await manager.stop()
   })
 
   it('delivers an artifact only to the requesting connector', async () => {

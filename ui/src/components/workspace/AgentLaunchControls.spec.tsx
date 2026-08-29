@@ -7,7 +7,27 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentLaunchConfigState } from '../../hooks/useAgentLaunchConfig'
 import { i18n } from '../../i18n'
 import type { AgentInfo, SavedCredential } from './api'
-import { AgentLaunchSelectors } from './AgentLaunchControls'
+import { AgentLaunchDetails, AgentLaunchSelectors } from './AgentLaunchControls'
+
+vi.mock('../../hooks/useAgentRuntimes', () => ({
+  useAgentRuntimes: () => ({
+    agents: [],
+    catalog: [],
+    primary: [],
+    others: [],
+    installed: [],
+    notInstalled: [],
+    readiness: null,
+    quickAccessIds: [],
+    recentAgentIds: [],
+    loading: false,
+    refreshing: false,
+    error: null,
+    refresh: vi.fn(),
+    saveQuickAccess: vi.fn(),
+    recordSuccessfulUse: vi.fn(),
+  }),
+}))
 
 const agents: AgentInfo[] = [
   {
@@ -118,20 +138,21 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     trigger.focus()
     await user.keyboard('{ArrowDown}')
 
-    const openCode = screen.getByRole('menuitem', { name: 'OpenCode' })
-    const pi = screen.getByRole('menuitem', { name: 'Pi' })
-    expect(document.activeElement).toBe(openCode)
+    const openCode = screen.getByRole('menuitem', { name: /OpenCode/ })
+    const pi = screen.getByRole('menuitem', { name: /^Pi/ })
+    const others = screen.getByRole('menuitem', { name: i18n.t('chatLanding.otherRuntimes') })
+    expect(document.activeElement).toBe(pi)
 
     await user.keyboard('{ArrowDown}')
-    expect(document.activeElement).toBe(pi)
-    await user.keyboard('{Home}')
     expect(document.activeElement).toBe(openCode)
+    await user.keyboard('{Home}')
+    expect(document.activeElement).toBe(pi)
     await user.keyboard('{End}')
+    expect(document.activeElement).toBe(others)
+    await user.keyboard('{Home}')
     expect(document.activeElement).toBe(pi)
     await user.keyboard('{ArrowDown}')
     expect(document.activeElement).toBe(openCode)
-    await user.keyboard('{ArrowUp}')
-    expect(document.activeElement).toBe(pi)
 
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('menu')).toBeNull()
@@ -150,7 +171,10 @@ describe('AgentLaunchSelectors keyboard menus', () => {
 
     const trigger = screen.getByRole('button', { name: i18n.t('chatLanding.selectAgent') })
     trigger.focus()
-    await user.keyboard('{ArrowDown}{ArrowDown}{Enter}')
+    await user.keyboard('{ArrowDown}')
+    const pi = await screen.findByRole('menuitem', { name: /^Pi/ })
+    pi.focus()
+    await user.keyboard('{Enter}')
 
     expect(selectAgent).toHaveBeenCalledWith('pi')
     expect(screen.queryByRole('menu')).toBeNull()
@@ -335,5 +359,48 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     await user.type(input, 'private-model-1')
     await user.click(screen.getByRole('button', { name: i18n.t('common.save') }))
     expect(selectModel).toHaveBeenCalledWith('private-model-1')
+  })
+})
+
+describe('AgentLaunchDetails setup notices', () => {
+  it('names the selected runtime instead of Claude Code', () => {
+    const grok: AgentInfo = {
+      id: 'grok',
+      displayName: 'Grok Build',
+      installed: true,
+      capabilities: {
+        parallelPerCwd: true,
+        resumeLast: true,
+        resumeById: true,
+        transcriptDiscovery: 'subprocess',
+      },
+    }
+    render(
+      <AgentLaunchDetails
+        config={launchConfig({
+          effectiveAgent: 'grok',
+          selectedAgent: grok,
+          needsCredential: false,
+          accessMode: 'native',
+          credentials: [],
+          effectiveCredential: null,
+          credential: null,
+          detectedCredential: {
+            configured: false,
+            slug: null,
+            model: null,
+            contextWindow: null,
+            wireShape: null,
+            interactiveSetupStatus: 'workspace-trust-required',
+          },
+          launchCredentialSlug: undefined,
+        })}
+        hasWorkspaceTarget
+      />,
+    )
+
+    const notice = screen.getByRole('status')
+    expect(notice.textContent).toContain('Grok Build will ask you to trust this workspace')
+    expect(notice.textContent).not.toContain('Claude')
   })
 })

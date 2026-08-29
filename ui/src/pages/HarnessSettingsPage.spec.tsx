@@ -8,7 +8,11 @@ import { HarnessSettingsPage } from './HarnessSettingsPage'
 
 const mocks = vi.hoisted(() => ({
   save: vi.fn(),
-  preferences: { showHeadlessBornSessions: false },
+  preferences: {
+    showHeadlessBornSessions: false,
+    showIssueAttachedSessions: false,
+    showUnverifiedHarnessReleases: false,
+  },
 }))
 
 vi.mock('../hooks/useHarnessPreferences', () => ({
@@ -24,6 +28,8 @@ afterEach(() => {
   cleanup()
   vi.clearAllMocks()
   mocks.preferences.showHeadlessBornSessions = false
+  mocks.preferences.showIssueAttachedSessions = false
+  mocks.preferences.showUnverifiedHarnessReleases = false
 })
 
 beforeEach(async () => {
@@ -37,11 +43,42 @@ describe('HarnessSettingsPage', () => {
 
     const toggle = screen.getByRole('switch', { name: 'Show headless-born Sessions' })
     expect(toggle.getAttribute('aria-checked')).toBe('false')
-    expect(screen.getByText('Shared roster')).toBeTruthy()
+    expect(screen.getByText('Shared Harness behavior')).toBeTruthy()
     expect(screen.getByText('Ask Alice')).toBeTruthy()
     expect(screen.getByText('Auto Quant')).toBeTruthy()
+    expect(screen.getByText('Auto Prediction')).toBeTruthy()
 
     fireEvent.click(toggle)
-    await waitFor(() => expect(mocks.save).toHaveBeenCalledWith({ showHeadlessBornSessions: true }))
+    await waitFor(() => expect(mocks.save).toHaveBeenCalledWith({
+      showHeadlessBornSessions: true,
+      showIssueAttachedSessions: false,
+      showUnverifiedHarnessReleases: false,
+    }))
+  })
+
+  it('opts into showing Sessions attached to Issues independently', async () => {
+    render(<HarnessSettingsPage />)
+
+    const toggle = screen.getByRole('switch', { name: 'Show Issue-attached Sessions' })
+    expect(toggle.getAttribute('aria-checked')).toBe('false')
+    expect(screen.getByText(/Connector chat Sessions always stay hidden/)).toBeTruthy()
+    fireEvent.click(toggle)
+    await waitFor(() => expect(mocks.save).toHaveBeenCalledWith({
+      showHeadlessBornSessions: false,
+      showIssueAttachedSessions: true,
+      showUnverifiedHarnessReleases: false,
+    }))
+  })
+
+  it('keeps unverified release discovery off until explicitly enabled', async () => {
+    render(<HarnessSettingsPage />)
+    const toggle = screen.getByRole('switch', { name: 'Show unverified Harness releases' })
+    expect(toggle.getAttribute('aria-checked')).toBe('false')
+    fireEvent.click(toggle)
+    await waitFor(() => expect(mocks.save).toHaveBeenCalledWith({
+      showHeadlessBornSessions: false,
+      showIssueAttachedSessions: false,
+      showUnverifiedHarnessReleases: true,
+    }))
   })
 })

@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   openOrFocus: vi.fn(),
   setCollapsed: vi.fn(),
   setRailCollapsed: vi.fn(),
+  connectorWarnings: 0,
 }))
 
 vi.mock('../tabs/store', () => ({
@@ -29,6 +30,10 @@ vi.mock('../live/trading-push', () => ({
   usePendingPushCount: () => 0,
 }))
 
+vi.mock('../live/connector-health', () => ({
+  useConnectorWarningCount: () => mocks.connectorWarnings,
+}))
+
 vi.mock('../live/activity-bar-collapse', () => ({
   useActivityBarCollapse: (selector: (state: Record<string, unknown>) => unknown) => selector({
     collapsedSections: {},
@@ -43,6 +48,8 @@ vi.mock('react-i18next', () => ({
     t: (key: string) => ({
       'nav.item.chat': 'Ask Alice',
       'nav.item.settings': 'Settings',
+      'nav.item.connectors': 'Connectors',
+      'nav.connectorNeedsAttention': '1 connector needs attention',
       'nav.section.beta': 'Beta',
       'nav.section.system': 'System',
     })[key] ?? key,
@@ -54,7 +61,8 @@ vi.mock('./ThemeToggle', () => ({
 }))
 
 beforeEach(() => {
-  mocks.selectedSidebar = 'settings'
+    mocks.selectedSidebar = 'settings'
+    mocks.connectorWarnings = 0
   vi.stubGlobal('matchMedia', vi.fn(() => ({
     matches: false,
     addEventListener: vi.fn(),
@@ -82,5 +90,12 @@ describe('ActivityBar current destination', () => {
     expect(screen.getByRole('button', { name: 'Ask Alice' }).getAttribute('aria-current')).toBe('page')
     expect(screen.getByRole('button', { name: 'Settings' }).getAttribute('aria-current')).toBeNull()
     expect(document.querySelectorAll('nav [aria-current="page"]')).toHaveLength(1)
+  })
+
+  it('shows configured connector degradation on the Connector activity item', () => {
+    mocks.connectorWarnings = 1
+    render(<ActivityBar open onClose={vi.fn()} />)
+
+    expect(screen.getByLabelText('1 connector needs attention').textContent).toBe('1')
   })
 })

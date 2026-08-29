@@ -3,25 +3,20 @@ import {
   useEffect,
   useId,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
-  type KeyboardEvent as ReactKeyboardEvent,
-  type RefObject,
 } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   AlertTriangle,
-  Bot,
   BrainCircuit,
   Check,
   ChevronDown,
-  Code2,
   Cpu,
   Info,
   KeyRound,
   Settings2,
-  Sparkles,
-  type LucideIcon,
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -49,13 +44,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { formatContextWindow, type AgentLaunchConfigState } from '../../hooks/useAgentLaunchConfig'
-
-const AGENT_ICONS: Record<string, LucideIcon> = {
-  claude: Sparkles,
-  codex: Cpu,
-  opencode: Code2,
-  pi: Bot,
-}
+import { useAgentRuntimes } from '../../hooks/useAgentRuntimes'
+import { projectAgentRuntimeQuickAccess } from '../../lib/agentRuntimeQuickAccess'
+import {
+  AgentRuntimePicker,
+  type AgentRuntimePickerHandle,
+} from './AgentRuntimePicker'
 
 const PROVIDER_ACCESS_LABELS: Readonly<Record<string, string>> = {
   anthropic: 'Anthropic API',
@@ -103,47 +97,6 @@ export interface AgentLaunchSelectorsProps {
 
 export interface AgentLaunchSelectorsHandle {
   openAgentMenu(): void
-}
-
-function menuItems(menuRef: RefObject<HTMLDivElement | null>): HTMLButtonElement[] {
-  return Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])
-}
-
-function focusMenuEdge(
-  menuRef: RefObject<HTMLDivElement | null>,
-  edge: 'first' | 'last',
-): void {
-  const items = menuItems(menuRef)
-  items[edge === 'first' ? 0 : items.length - 1]?.focus()
-}
-
-function handleMenuKeyDown(
-  event: ReactKeyboardEvent<HTMLDivElement>,
-  menuRef: RefObject<HTMLDivElement | null>,
-  close: () => void,
-  triggerRef: RefObject<HTMLButtonElement | null>,
-): void {
-  const items = menuItems(menuRef)
-  if (items.length === 0) return
-
-  if (event.key === 'Escape') {
-    event.preventDefault()
-    event.stopPropagation()
-    close()
-    triggerRef.current?.focus()
-    return
-  }
-
-  const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement)
-  let nextIndex: number | null = null
-  if (event.key === 'ArrowDown') nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % items.length
-  if (event.key === 'ArrowUp') nextIndex = currentIndex < 0 ? items.length - 1 : (currentIndex - 1 + items.length) % items.length
-  if (event.key === 'Home') nextIndex = 0
-  if (event.key === 'End') nextIndex = items.length - 1
-  if (nextIndex === null) return
-
-  event.preventDefault()
-  items[nextIndex]?.focus()
 }
 
 function AgentLaunchModelEditor({
@@ -470,15 +423,22 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
   ref,
 ) {
   const { t } = useTranslation()
-  const [agentMenuOpen, setAgentMenuOpen] = useState(false)
+  const discovery = useAgentRuntimes()
   const [credentialMenuOpen, setCredentialMenuOpen] = useState(false)
-  const agentBoxRef = useRef<HTMLDivElement>(null)
-  const agentTriggerRef = useRef<HTMLButtonElement>(null)
-  const agentMenuRef = useRef<HTMLDivElement>(null)
-  const agentFocusEdgeRef = useRef<'first' | 'last'>('first')
+  const agentPickerRef = useRef<AgentRuntimePickerHandle>(null)
   const settingsLayout = layout === 'settings'
-  const SelectedIcon = config.selectedAgent ? AGENT_ICONS[config.selectedAgent.id] : undefined
   const runtimeName = config.selectedAgent?.displayName ?? t('chatLanding.runtimeFallback')
+  const pickerAgents = discovery.catalog.length > 0
+    ? discovery.catalog
+    : config.agents.filter((agent) => agent.kind !== 'utility')
+  const pickerPrimary = useMemo(() => {
+    if (discovery.catalog.length > 0) return discovery.primary
+    return projectAgentRuntimeQuickAccess(
+      pickerAgents,
+      discovery.quickAccessIds,
+      discovery.recentAgentIds,
+    ).primary
+  }, [discovery.catalog.length, discovery.primary, discovery.quickAccessIds, discovery.recentAgentIds, pickerAgents])
   const workspaceAccess = config.accessMode === 'auto' && config.detectedCredential?.configured === true
   const nativeAccess = config.accessMode === 'native' || (
     config.accessMode === 'auto' && !workspaceAccess && config.effectiveCredential === null
@@ -498,101 +458,24 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
 
   useImperativeHandle(ref, () => ({
     openAgentMenu() {
-      agentFocusEdgeRef.current = 'first'
-      setAgentMenuOpen(true)
+      agentPickerRef.current?.open()
     },
   }), [])
 
-  useEffect(() => {
-    if (!agentMenuOpen) return
-    const onDown = (event: MouseEvent) => {
-      const target = event.target as Node
-      if (agentMenuOpen && agentBoxRef.current && !agentBoxRef.current.contains(target)) {
-        setAgentMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
-  }, [agentMenuOpen])
-
-  useEffect(() => {
-    if (!agentMenuOpen) return
-    focusMenuEdge(agentMenuRef, agentFocusEdgeRef.current)
-    agentFocusEdgeRef.current = 'first'
-  }, [agentMenuOpen])
-
   return (
     <>
-      {showRuntime && <div
-        ref={agentBoxRef}
-        className="relative"
-        onBlur={(event) => {
-          const next = event.relatedTarget as Node | null
-          if (!next || !event.currentTarget.contains(next)) setAgentMenuOpen(false)
-        }}
-      >
-        <button
-          ref={agentTriggerRef}
-          type="button"
-          onClick={() => {
-            agentFocusEdgeRef.current = 'first'
-            setAgentMenuOpen((open) => !open)
-          }}
-          onKeyDown={(event) => {
-            if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
-            event.preventDefault()
-            agentFocusEdgeRef.current = event.key === 'ArrowUp' ? 'last' : 'first'
-            setAgentMenuOpen(true)
-          }}
-          disabled={config.agents.length === 0}
-          aria-haspopup="menu"
-          aria-expanded={agentMenuOpen}
-          aria-label={t('chatLanding.selectAgent')}
-          className="oa-pressable inline-flex min-h-8 max-w-[190px] items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {SelectedIcon ? <SelectedIcon className="h-3 w-3 shrink-0" /> : <Bot className="h-3 w-3 shrink-0" />}
-          <span className="truncate">{config.selectedAgent?.displayName ?? t('chatLanding.selectAgent')}</span>
-          <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
-        </button>
-        {agentMenuOpen && config.agents.length > 0 && (
-          <div
-            ref={agentMenuRef}
-            role="menu"
-            onKeyDown={(event) => handleMenuKeyDown(
-              event,
-              agentMenuRef,
-              () => setAgentMenuOpen(false),
-              agentTriggerRef,
-            )}
-            className={`oa-popover-enter absolute left-0 z-20 min-w-[180px] rounded-lg border border-border/70 bg-secondary py-1 shadow-lg ${menuPlacement === 'down' ? 'top-full mt-1' : 'bottom-full mb-1'}`}
-          >
-            {config.agents.map((agent) => {
-              const Icon = AGENT_ICONS[agent.id]
-              const active = agent.id === config.effectiveAgent
-              const missing = agent.installed === false
-              return (
-                <button
-                  key={agent.id}
-                  type="button"
-                  role="menuitem"
-                  tabIndex={-1}
-                  onClick={() => {
-                    config.selectAgent(agent.id)
-                    setAgentMenuOpen(false)
-                    agentTriggerRef.current?.focus()
-                  }}
-                  className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] transition-colors hover:bg-muted ${active ? 'text-primary' : missing ? 'text-muted-foreground' : 'text-foreground'}`}
-                >
-                  {Icon ? <Icon className="h-3.5 w-3.5 shrink-0" /> : <span className="w-3.5 shrink-0" />}
-                  <span className="min-w-0 flex-1 truncate">{agent.displayName}</span>
-                  {missing && <span className="shrink-0 text-[10px] text-muted-foreground">{t('chatLanding.agentNotInstalled')}</span>}
-                  {active && <Check className="h-3.5 w-3.5 shrink-0" />}
-                </button>
-              )
-            })}
-          </div>
-        )}
-      </div>}
+      {showRuntime && (
+        <AgentRuntimePicker
+          ref={agentPickerRef}
+          agents={pickerAgents}
+          primary={pickerPrimary}
+          selectedId={config.effectiveAgent}
+          readiness={config.runtimeReadiness ?? discovery.readiness}
+          disabled={pickerAgents.length === 0}
+          menuPlacement={menuPlacement}
+          onSelect={config.selectAgent}
+        />
+      )}
 
       {showAi && showAccess && config.needsCredential && config.noCredentials && (
         <button
@@ -781,11 +664,12 @@ export function AgentLaunchDetails({
     }
   }
 
+  const runtimeName = config.selectedAgent?.displayName.trim() || t('chatLanding.runtimeFallback')
   const setupStatus = config.detectedCredential?.interactiveSetupStatus
   const setupNotice = setupStatus === 'runtime-onboarding-required'
-    ? t('chatLanding.claudeOnboardingRequired')
+    ? t('chatLanding.runtimeOnboardingRequired', { runtime: runtimeName })
     : setupStatus === 'workspace-trust-required'
-      ? t('chatLanding.claudeWorkspaceTrustRequired')
+      ? t('chatLanding.runtimeWorkspaceTrustRequired', { runtime: runtimeName })
       : null
 
   if (scope === null && setupNotice === null) return null

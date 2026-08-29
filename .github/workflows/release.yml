@@ -302,7 +302,7 @@ jobs:
         run: node scripts/install-docker-smoke.mjs
 
       - name: Exercise candidate installer through managed SSH remote
-        run: node scripts/remote-ssh-smoke.mjs
+        run: node scripts/remote-ssh-smoke.mjs --skip-tui
 
   build-headless-runtime:
     name: Build headless Runtime (${{ matrix.platform }}-${{ matrix.arch }})

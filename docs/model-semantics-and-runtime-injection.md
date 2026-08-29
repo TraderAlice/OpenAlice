@@ -175,7 +175,12 @@ resolved value:
   (`init` carries `conversation_id`). Resume is `--conversation` /
   `--continue`, not `--resume`. Bind the prompt with `-p <prompt>`; do not
   use a `--` terminator;
-- Grok Build: `--effort` (`none` through `max` / `xhigh`; `ultra` is rejected);
+- Grok Build: `--effort` (`none` through `max` / `xhigh`; `ultra` is rejected).
+  Issue / launch suggestions are the live `grok models` ids
+  (`src/workspaces/adapters/grok-models.ts`): `grok-4.6` (CLI default) and
+  `grok-4.5`. grok-4.6 advertises low / medium / high / xhigh; grok-4.5 omits
+  xhigh. A free-typed unknown id keeps the canonical CLI set. Do not offer
+  the retired `grok-build` alias;
 - Codex: project `model_reasoning_effort`.
 
 ### Workspace settings and durable Session bindings

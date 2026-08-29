@@ -6,11 +6,13 @@ import { SidebarRow } from './SidebarRow'
 import { SidebarSectionHeader } from './SidebarSectionHeader'
 import { SidebarRowsSkeleton } from './StateViews'
 import { ensureTradingModePolling, useTradingMode } from '../live/trading-mode'
+import { usePendingPushCount } from '../live/trading-push'
 import { useEffect } from 'react'
 
 /**
- * Portfolio sidebar — Overview + per-UTA accounts.
+ * Trading sidebar — Trading as Git, then Overview + per-UTA accounts.
  *
+ * - "Trading as Git" opens the staged-write review tab (`kind: 'trading-as-git'`).
  * - "All Accounts" opens the aggregate portfolio tab (`kind: 'portfolio'`).
  * - Each UTA row opens that account's detail tab (`kind: 'uta-detail'`).
  *
@@ -22,11 +24,13 @@ export function PortfolioSidebar() {
   const { utas, loading } = useTradingConfig()
   const tradingMode = useTradingMode((s) => s.status.mode)
   const tradingModeLoading = useTradingMode((s) => s.loading)
+  const pendingPush = usePendingPushCount()
   const focused = useWorkspace((state) => getFocusedTab(state)?.spec)
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
 
   useEffect(() => { ensureTradingModePolling() }, [])
 
+  const tradingAsGitActive = focused?.kind === 'trading-as-git'
   const overviewActive = focused?.kind === 'portfolio'
   const focusedUtaId =
     focused?.kind === 'uta-detail' ? focused.params.id : null
@@ -35,6 +39,22 @@ export function PortfolioSidebar() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <div className="flex-1 overflow-y-auto min-h-0 py-1">
+        <SidebarRow
+          label={t('nav.item.tradingAsGit')}
+          active={tradingAsGitActive}
+          onClick={() => openOrFocus({ kind: 'trading-as-git', params: {} })}
+          trail={
+            pendingPush > 0 ? (
+              <span
+                aria-label={t('nav.pendingPush', { count: pendingPush })}
+                className="min-w-[18px] h-[18px] px-1.5 rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground tabular-nums flex items-center justify-center"
+              >
+                {pendingPush > 99 ? '99+' : pendingPush}
+              </span>
+            ) : undefined
+          }
+        />
+
         <SidebarSectionHeader>{t('portfolio.overview')}</SidebarSectionHeader>
         <SidebarRow
           label={t('portfolio.allAccounts')}

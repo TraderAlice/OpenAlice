@@ -2,6 +2,17 @@
 
 Status: Active
 
+Distribution successor: [[plans/bun-cli-distribution.md]]. On 2026-08-29 the
+maintainer selected a Bun-compiled CLI distribution that preserves the current
+Guardian/Alice/UTA/Connector and per-Session Agent process topology while
+removing the CLI installer's managed Pi, host Node, and expanded headless
+Runtime ownership. This plan continues to own the Supervisor product,
+lifecycle, control, logs, Doctor, and configuration work. Its completed
+managed-Pi and headless-bundle checkboxes remain historical repository truth;
+do not extend those distribution mechanisms. Pending CLI packaging, native
+Windows installation, activation, rollback, and release-gate work moves to the
+successor plan.
+
 Delivery mode: Serial / interactive. The user selected serial delivery on
 2026-07-30 because the new TUI and its dependent Runtime/update work need each
 accepted increment integrated into `dev` before the next increment builds on
@@ -143,6 +154,14 @@ openalice completion <bash|zsh|fish|powershell>
 
 ### TUI information architecture
 
+The local-only root described below was superseded on 2026-08-23 by the
+Machine → AliceProject Fleet increment in
+[[plans/remote-project-fleet.md]]. Fleet is now the default root; the original
+local lifecycle projection remains the Overview page and remains available for
+the selected local AliceProject. This plan continues to own that lifecycle,
+logs, Doctor, update, Setup, and terminal-restoration behavior, while the Fleet
+plan owns remote inventory, tunnels, and transfer.
+
 The minimum 80 by 24 root screen contains:
 
 1. product version, channel, and update notice;
@@ -174,9 +193,10 @@ parses human logs as lifecycle truth.
 
 ### Technical shape
 
-- Build the CLI application in strict TypeScript and emit immutable ESM
-  artifacts for installation. Source readability and refactoring safety take
-  priority over maintaining a handwritten `.mjs` implementation.
+- Build the CLI application in strict TypeScript. Source readability and
+  refactoring safety take priority over maintaining a handwritten `.mjs`
+  implementation; the future installed executable and dependency boundary are
+  owned by [[plans/bun-cli-distribution.md]].
 - Use `@earendil-works/pi-tui` as the terminal substrate. It already supplies
   the TypeScript component model, differential rendering, overlays, Unicode
   width, IME-aware input, terminal lifecycle, and Windows terminal support that
@@ -194,8 +214,9 @@ parses human logs as lifecycle truth.
   call the same services as non-interactive commands.
 - Poll low-frequency status initially. Add streaming only when measured UX or
   remote efficiency requires it.
-- Bundle the dependency closure and any required native assets inside each
-  immutable CLI release; users never need a separate global TUI dependency.
+- Bundle the Supervisor's own code dependencies in the installed OpenAlice
+  artifact. Agent Runtime executables remain user-owned and are excluded by
+  [[plans/bun-cli-distribution.md]].
 - Retain the real-PTY/xterm harness as the terminal acceptance boundary. Do not
   retain the repository-owned ANSI renderer as product architecture.
 
@@ -223,9 +244,10 @@ defaults
 - `--home` is an explicit one-run instance-home override. `OPENALICE_HOME`
   remains the highest-priority environment override for the complete
   OpenAlice data root.
-- OpenAlice-managed Pi receives a per-instance `PI_CODING_AGENT_DIR` and
-  session root under the resolved home. This isolates settings, trust,
-  resources, and sessions between OpenAlice instances.
+- The released v0.90.1 managed Pi receives a per-instance
+  `PI_CODING_AGENT_DIR` and session root under the resolved home. This is
+  current compatibility behavior, not the future CLI distribution; the Bun
+  successor removes CLI-owned Pi installation and launch selection.
 - A user-installed Pi launched outside the managed OpenAlice path keeps Pi's
   native global configuration. OpenAlice does not globally rewrite the user's
   own Pi environment.
@@ -249,7 +271,7 @@ defaults
 
 ### Release and update model
 
-The final direct-install release contains:
+The released Node distribution currently contains:
 
 ```text
 OpenAlice release manifest
@@ -259,6 +281,12 @@ OpenAlice release manifest
   -> file hashes and authenticity metadata
   -> supported control compatibility range
 ```
+
+That payload diagram is historical current-state truth, not the target. The
+Bun executable, native Windows installer, released-layout migration, and
+artifact retirement are owned by [[plans/bun-cli-distribution.md]]. This plan
+retains the user-facing update, active-work, control-compatibility, and pending
+activation contracts below.
 
 The update transaction is:
 
@@ -284,8 +312,8 @@ Update discovery and update application are separate states:
 - after the TUI is usable, a bounded asynchronous check may advertise a newer
   OpenAlice release and cache release notes; network failure is non-fatal;
 - `openalice update --check` and the TUI update panel expose the same result;
-- applying an update always uses the OpenAlice release transaction above, not
-  Pi's npm update transport or Herdr's single-binary replacement;
+- applying an update always uses the OpenAlice-owned release transaction for
+  the detected installation provenance;
 - status reports installed CLI version, running Runtime version, protocol
   compatibility, and `restartNeeded`/pending activation independently;
 - an update first enumerates every running instance and active-work impact;
@@ -302,8 +330,8 @@ Update discovery and update application are separate states:
 - Replacing Electron signing, notarization, packaging, or auto-update.
 - Silent boot-at-login or system-service installation.
 - Live PTY handoff in the first headless bundle release.
-- Native Windows PowerShell installation before its distribution boundary is
-  reviewed.
+- Native Windows installation implementation; its reviewed boundary and
+  delivery live in [[plans/bun-cli-distribution.md]].
 - Application-state deletion during CLI uninstall or ordinary instance removal.
 
 ## Serial Delivery Increments
@@ -567,7 +595,7 @@ source-tool planning.
 
 | Scenario | Required result |
 |---|---|
-| clean non-root | Runnable CLI, TUI, Pi, and headless Runtime |
+| clean non-root | Runnable CLI, TUI, and selected OpenAlice Runtime |
 | repeat install | No duplicate releases/PATH/registry/data mutation |
 | compatible running N-1 | N stages; old Runtime usable until activation |
 | incompatible running N-1 | Restart requires consent |
@@ -618,7 +646,7 @@ non-trading and uses no real credentials or broker accounts.
 | TUI becomes a second product | Supervisor boundary and Web handoff |
 | Protocol strands old Runtime | Capabilities and cross-version fixtures |
 | Update kills active Agents | Download first, impact plan, compatible keep-alive |
-| Bundle drifts from Electron | Shared inventory/manifest and package smoke |
+| Shared source breaks Electron | Keep packaging independent and run the relevant Electron regression smoke |
 | Native dependency fails | Platform artifacts and clean-host matrix |
 | Instance conflicts with home | Additive versioned default mapping |
 
@@ -642,6 +670,12 @@ This plan is complete only when:
 7. owner guides record the shipped architecture and final release.
 
 ## Progress Log
+
+- 2026-08-23: The Machine Fleet increment superseded the local-only root with
+  a wide two-pane/narrow drill-down Machine → AliceProject view while retaining
+  Overview and all local lifecycle actions. Remote inventory is bounded and
+  non-interactive; compatible running remote Projects open through TUI-owned
+  SSH loopback tunnels that are aborted on detach without stopping Runtime.
 
 - 2026-07-29: Audited CLI lifecycle, Guardian control, source-backed Runtime,
   installer smoke, Herdr reference, and cross-surface gates. Drafted the first

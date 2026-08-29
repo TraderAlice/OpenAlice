@@ -1,20 +1,34 @@
 import { useEffect, useState } from 'react'
 
-import { defaultOfficeSpritePack, type OfficeEmployeeMood } from './sprite-pack'
+import { defaultOfficeSpritePack, type OfficeAlicePose } from './sprite-pack'
 
-export function OfficeEmployeeSprite({
-  mood,
+export type OfficeAliceDirection = 'up' | 'right' | 'down' | 'left'
+
+export function officeAlicePose(
+  direction: OfficeAliceDirection,
+  walking: boolean,
+): OfficeAlicePose {
+  if (direction === 'up') return 'idle-back'
+  if (!walking || direction === 'down') return 'idle'
+  return direction === 'left' ? 'walk-left' : 'walk-right'
+}
+
+export function OfficeAliceSprite({
+  direction,
+  walking,
   reducedMotion,
   label,
   scale = 0.5,
 }: {
-  mood: OfficeEmployeeMood
+  direction: OfficeAliceDirection
+  walking: boolean
   reducedMotion: boolean
   label: string
   scale?: number
 }) {
   const pack = defaultOfficeSpritePack
-  const pose = pack.pose(mood)
+  const action = officeAlicePose(direction, walking)
+  const pose = pack.pose(action)
   const [frame, setFrame] = useState(0)
 
   useEffect(() => {
@@ -32,21 +46,23 @@ export function OfficeEmployeeSprite({
     }
     tick()
     return () => window.clearTimeout(timer)
-  }, [mood, pose.frames, pose.durationsMs, reducedMotion])
+  }, [action, pose.durationsMs, pose.frames, reducedMotion])
 
-  const displayWidth = pack.cell.width * scale
-  const displayHeight = pack.cell.height * scale
+  const displayWidth = pose.cell.width * scale
+  const displayHeight = pose.cell.height * scale
   return (
     <div
       aria-hidden
       title={label}
       className="shrink-0"
+      data-pose={action}
+      data-frame={frame}
       style={{
         width: displayWidth,
         height: displayHeight,
-        backgroundImage: `url(${pack.sheetUrl})`,
+        backgroundImage: `url(${pose.sheetUrl})`,
         backgroundRepeat: 'no-repeat',
-        backgroundSize: `${pack.atlas.columns * displayWidth}px ${pack.atlas.rows * displayHeight}px`,
+        backgroundSize: `${pose.atlas.columns * displayWidth}px ${pose.atlas.rows * displayHeight}px`,
         backgroundPosition: `-${frame * displayWidth}px -${pose.row * displayHeight}px`,
         imageRendering: 'pixelated',
       }}

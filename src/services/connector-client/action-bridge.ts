@@ -5,10 +5,16 @@ import {
   type ConnectorArtifactDelivery,
   type ConnectorArtifactFailure,
   type ConnectorArtifactRequest,
+  type ConnectorUtaFailure,
+  type ConnectorUtaPresentation,
+  type ConnectorUtaRequest,
 } from '@traderalice/connector-protocol'
 import type { IInboxStore } from '../../core/inbox-store.js'
 import { readConnectorServiceEnabled } from '../../core/connector-config.js'
+import type { TradingModePolicy } from '../trading-mode.js'
+import type { UTAManagerSDK } from '../uta-client/index.js'
 import { projectInboxDoc, resolveConnectorUrl } from './index.js'
+import { processConnectorUtaRequests } from './uta-review.js'
 
 interface WorkspaceServiceLike {
   registry: { get(id: string): { dir: string } | undefined }
@@ -22,12 +28,23 @@ export interface ConnectorActionBridgeDeps {
   warn(message: string): void
   resolveWorkspace?(id: string): { dir: string } | null
   now?: () => number
+  drainUtaActions?: () => Promise<ConnectorUtaRequest[]>
+  presentUta?: (presentation: ConnectorUtaPresentation) => Promise<void>
+  failUta?: (failure: ConnectorUtaFailure) => Promise<void>
+  utaManager?: UTAManagerSDK
+  tradingModePolicy?: () => TradingModePolicy
+  warnUta?: (message: string) => void
 }
 
 export function startConnectorActionBridge(
   inboxStore: IInboxStore,
   getWorkspaceService?: () => WorkspaceServiceLike | null,
-  options: { intervalMs?: number; client?: ConnectorClient } = {},
+  options: {
+    intervalMs?: number
+    client?: ConnectorClient
+    utaManager?: UTAManagerSDK
+    tradingModePolicy?: () => TradingModePolicy
+  } = {},
 ): () => void {
   const client = options.client ?? new ConnectorClient(resolveConnectorUrl())
   const intervalMs = options.intervalMs ?? 1_500
@@ -47,6 +64,18 @@ export function startConnectorActionBridge(
         return workspace ? { dir: workspace.dir } : null
       },
     } : {}),
+    ...(options.utaManager && options.tradingModePolicy ? {
+      drainUtaActions: () => client.drainUtaActions(AbortSignal.timeout(5_000)),
+      presentUta: async (presentation) => {
+        await client.presentUta(presentation, AbortSignal.timeout(15_000))
+      },
+      failUta: async (failure) => {
+        await client.failUta(failure, AbortSignal.timeout(5_000))
+      },
+      utaManager: options.utaManager,
+      tradingModePolicy: options.tradingModePolicy,
+      warnUta: (message) => console.warn('[connector] UTA review request failed:', message),
+    } : {}),
   }, intervalMs)
   return stop
 }
@@ -63,6 +92,24 @@ export function attachConnectorActionBridge(
     running = true
     try {
       await processConnectorArtifactRequests(inboxStore, deps)
+      if (
+        deps.drainUtaActions
+        && deps.presentUta
+        && deps.failUta
+        && deps.utaManager
+        && deps.tradingModePolicy
+      ) {
+        await processConnectorUtaRequests({
+          isEnabled: deps.isEnabled,
+          drainUtaActions: deps.drainUtaActions,
+          presentUta: deps.presentUta,
+          failUta: deps.failUta,
+          warn: deps.warnUta ?? deps.warn,
+          utaManager: deps.utaManager,
+          tradingModePolicy: deps.tradingModePolicy,
+          now: deps.now,
+        })
+      }
     } catch (error) {
       deps.warn(error instanceof Error ? error.message : String(error))
     } finally {

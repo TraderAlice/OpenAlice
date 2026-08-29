@@ -134,6 +134,7 @@ describe('PushApprovalPanel localization', () => {
           },
         }],
         pendingMessage: '调整 AAPL 仓位',
+        pendingHash: 'abc12345',
         head: 'abc123456789',
         commitCount: 1,
       })
@@ -162,6 +163,7 @@ describe('PushApprovalPanel localization', () => {
         },
       }],
       pendingMessage: '调整 AAPL 仓位',
+      pendingHash: 'abc12345',
       head: 'abc123456789',
       commitCount: 1,
     })

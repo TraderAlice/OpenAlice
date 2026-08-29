@@ -22,12 +22,14 @@ export const AGENT_RUNTIME_EVENT_TYPES = [
   'runtime.turn.text',
   'runtime.turn.tool',
   'runtime.turn.error',
+  'dev.sonner_test',
 ] as const
 
 export type AgentRuntimeEventType = (typeof AGENT_RUNTIME_EVENT_TYPES)[number]
 export type AgentRuntimeSurface = 'terminal' | 'webpi' | 'headless'
 export type AgentRuntimeStopStatus = 'done' | 'failed' | 'interrupted' | 'paused'
 export type AgentRuntimeToolStatus = 'running' | 'completed' | 'failed'
+export type SonnerTestState = 'running' | 'success' | 'error'
 
 export interface AgentRuntimeTurnMetrics {
   readonly textBlocks: number
@@ -86,6 +88,10 @@ export type AgentRuntimePayload =
       readonly toolStatus: AgentRuntimeToolStatus
     })
   | (AgentRuntimeSubject & {
+      readonly message: string
+    })
+  | (AgentRuntimeSubject & {
+      readonly testState: SonnerTestState
       readonly message: string
     })
 
@@ -209,6 +215,9 @@ export class AgentRuntimeLog {
   private accept(event: AgentRuntimeEvent): void {
     this.total += 1
     if (this.first === 0 || event.seq < this.first) this.first = event.seq
+    // Dev-only notification probes belong to the append-only diagnostic stream
+    // so they exercise the real UI projection, but never represent occupancy.
+    if (event.type === 'dev.sonner_test') return
     const payload = event.payload as AgentRuntimeSubject
     if (!payload.workspaceId || !payload.resumeId) return
     const key = `${payload.workspaceId}\u0000${payload.resumeId}`

@@ -48,12 +48,45 @@ const autoQuantPreferencesSchema = z.object({
   defaultWorkspaceId: z.string().nullable().default(null),
 })
 
+const autoPredictionPreferencesSchema = z.object({
+  /** The durable desk behind the Auto Prediction Harness. */
+  defaultWorkspaceId: z.string().nullable().default(null),
+})
+
 const harnessPreferencesSchema = z.object({
   /**
    * Ask Alice and Auto Quant share one roster. Headless-born Sessions that
    * have never opened a TUI/WebPi stay off that roster unless this is true.
    */
   showHeadlessBornSessions: z.boolean().default(false),
+  /** Keep Sessions currently owned or occupied by an Issue off shared Harness rosters. */
+  showIssueAttachedSessions: z.boolean().default(false),
+  /** Also discover stable upstream tags outside OpenAlice's verified catalog. */
+  showUnverifiedHarnessReleases: z.boolean().default(false),
+})
+
+/** Installation-level launcher pins. Persist ids only — never install state. */
+export const AGENT_RUNTIME_QUICK_ACCESS_LIMIT = 4
+
+export function normalizeAgentRuntimeQuickAccessIds(ids: unknown): string[] {
+  if (!Array.isArray(ids)) return []
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const id of ids) {
+    if (typeof id !== 'string') continue
+    const trimmed = id.trim()
+    if (!trimmed || trimmed.length > 128 || seen.has(trimmed)) continue
+    seen.add(trimmed)
+    result.push(trimmed)
+    if (result.length >= AGENT_RUNTIME_QUICK_ACCESS_LIMIT) break
+  }
+  return result
+}
+
+const agentRuntimesPreferencesSchema = z.object({
+  quickAccessIds: z.unknown().default([]).transform(normalizeAgentRuntimeQuickAccessIds),
+  /** Successful Session launches, newest first. This is presentation history, not runtime config. */
+  recentAgentIds: z.unknown().default([]).transform(normalizeAgentRuntimeQuickAccessIds),
 })
 
 const preferencesSchema = z.object({
@@ -66,8 +99,17 @@ const preferencesSchema = z.object({
   autoQuant: autoQuantPreferencesSchema.default({
     defaultWorkspaceId: null,
   }),
+  autoPrediction: autoPredictionPreferencesSchema.default({
+    defaultWorkspaceId: null,
+  }),
   harness: harnessPreferencesSchema.default({
     showHeadlessBornSessions: false,
+    showIssueAttachedSessions: false,
+    showUnverifiedHarnessReleases: false,
+  }),
+  agentRuntimes: agentRuntimesPreferencesSchema.default({
+    quickAccessIds: [],
+    recentAgentIds: [],
   }),
 })
 
@@ -77,7 +119,12 @@ export type QuickChatPreferences = Omit<ParsedQuickChatPreferences, 'recentLaunc
   recentLaunch?: ParsedQuickChatPreferences['recentLaunch']
 }
 export type AutoQuantPreferences = z.infer<typeof autoQuantPreferencesSchema>
+export type AutoPredictionPreferences = z.infer<typeof autoPredictionPreferencesSchema>
 export type HarnessPreferences = z.infer<typeof harnessPreferencesSchema>
+export type AgentRuntimesPreferences = {
+  readonly quickAccessIds: readonly string[]
+  readonly recentAgentIds: readonly string[]
+}
 export type Preferences = z.infer<typeof preferencesSchema>
 
 function emptyPreferences(): Preferences {
@@ -113,9 +160,30 @@ export async function readAutoQuantPreferences(path = preferencesPath()): Promis
   return { defaultWorkspaceId: preferences.autoQuant.defaultWorkspaceId }
 }
 
+export async function readAutoPredictionPreferences(
+  path = preferencesPath(),
+): Promise<AutoPredictionPreferences> {
+  const preferences = await readPreferences(path)
+  return { defaultWorkspaceId: preferences.autoPrediction.defaultWorkspaceId }
+}
+
 export async function readHarnessPreferences(path = preferencesPath()): Promise<HarnessPreferences> {
   const preferences = await readPreferences(path)
-  return { showHeadlessBornSessions: preferences.harness.showHeadlessBornSessions }
+  return {
+    showHeadlessBornSessions: preferences.harness.showHeadlessBornSessions,
+    showIssueAttachedSessions: preferences.harness.showIssueAttachedSessions,
+    showUnverifiedHarnessReleases: preferences.harness.showUnverifiedHarnessReleases,
+  }
+}
+
+export async function readAgentRuntimesPreferences(
+  path = preferencesPath(),
+): Promise<AgentRuntimesPreferences> {
+  const preferences = await readPreferences(path)
+  return {
+    quickAccessIds: [...preferences.agentRuntimes.quickAccessIds],
+    recentAgentIds: [...preferences.agentRuntimes.recentAgentIds],
+  }
 }
 
 // Alice is single-writer at the process level, but two UI requests can still
@@ -232,6 +300,26 @@ export async function rememberAutoQuantDefaultWorkspace(
   return operation
 }
 
+export async function rememberAutoPredictionDefaultWorkspace(
+  workspaceId: string | null,
+  path = preferencesPath(),
+): Promise<AutoPredictionPreferences> {
+  const operation = mutationQueue.catch(() => undefined).then(async () => {
+    const preferences = await readPreferences(path)
+    const updated = preferencesSchema.parse({
+      ...preferences,
+      autoPrediction: {
+        ...preferences.autoPrediction,
+        defaultWorkspaceId: workspaceId,
+      },
+    })
+    await writePreferences(updated, path)
+    return { defaultWorkspaceId: updated.autoPrediction.defaultWorkspaceId }
+  })
+  mutationQueue = operation
+  return operation
+}
+
 export async function saveHarnessPreferences(
   next: HarnessPreferences,
   path = preferencesPath(),
@@ -243,7 +331,62 @@ export async function saveHarnessPreferences(
       harness: next,
     })
     await writePreferences(updated, path)
-    return { showHeadlessBornSessions: updated.harness.showHeadlessBornSessions }
+    return {
+      showHeadlessBornSessions: updated.harness.showHeadlessBornSessions,
+      showIssueAttachedSessions: updated.harness.showIssueAttachedSessions,
+      showUnverifiedHarnessReleases: updated.harness.showUnverifiedHarnessReleases,
+    }
+  })
+  mutationQueue = operation
+  return operation
+}
+
+export async function saveAgentRuntimesPreferences(
+  next: Pick<AgentRuntimesPreferences, 'quickAccessIds'>,
+  path = preferencesPath(),
+): Promise<AgentRuntimesPreferences> {
+  const operation = mutationQueue.catch(() => undefined).then(async () => {
+    const preferences = await readPreferences(path)
+    const updated = preferencesSchema.parse({
+      ...preferences,
+      agentRuntimes: {
+        ...preferences.agentRuntimes,
+        quickAccessIds: normalizeAgentRuntimeQuickAccessIds(next.quickAccessIds),
+      },
+    })
+    await writePreferences(updated, path)
+    return {
+      quickAccessIds: [...updated.agentRuntimes.quickAccessIds],
+      recentAgentIds: [...updated.agentRuntimes.recentAgentIds],
+    }
+  })
+  mutationQueue = operation
+  return operation
+}
+
+/** Promote a runtime only after a Session was created successfully. */
+export async function rememberAgentRuntimeUse(
+  agentId: string,
+  path = preferencesPath(),
+): Promise<AgentRuntimesPreferences> {
+  const operation = mutationQueue.catch(() => undefined).then(async () => {
+    const preferences = await readPreferences(path)
+    const recentAgentIds = normalizeAgentRuntimeQuickAccessIds([
+      agentId,
+      ...preferences.agentRuntimes.recentAgentIds.filter((id) => id !== agentId),
+    ])
+    const updated = preferencesSchema.parse({
+      ...preferences,
+      agentRuntimes: {
+        ...preferences.agentRuntimes,
+        recentAgentIds,
+      },
+    })
+    await writePreferences(updated, path)
+    return {
+      quickAccessIds: [...updated.agentRuntimes.quickAccessIds],
+      recentAgentIds: [...updated.agentRuntimes.recentAgentIds],
+    }
   })
   mutationQueue = operation
   return operation

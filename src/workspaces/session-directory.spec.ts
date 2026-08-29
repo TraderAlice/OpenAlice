@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildWorkspaceSessionDirectory } from './session-directory.js'
+import {
+  buildWorkspaceSessionDirectory,
+  connectorDeskRosterExclusions,
+  issueRosterAttachments,
+} from './session-directory.js'
 
 describe('buildWorkspaceSessionDirectory', () => {
   it('joins useful state while hiding native and launcher ids', () => {
@@ -77,6 +81,55 @@ describe('buildWorkspaceSessionDirectory', () => {
     expect(JSON.stringify(result)).not.toContain('private repeated prompt')
   })
 
+  it('projects connector-owned Sessions as hidden roster state', () => {
+    const result = buildWorkspaceSessionDirectory({
+      workspace: { id: 'ws-1', tag: 'research' },
+      identities: [{
+        resumeId: 'resume-phone-desk',
+        wsId: 'ws-1',
+        agent: 'pi',
+        createdAt: 1,
+        updatedAt: 2,
+        lifecycle: 'active',
+      }],
+      interactiveFor: () => undefined,
+      latestExecutionFor: () => null,
+      isActive: () => false,
+      rosterVisibilityFor: () => 'hidden',
+    })
+
+    expect(result.sessions[0]?.rosterVisibility).toBe('hidden')
+  })
+
+  it('does not describe a headless Session record as an interactive opening', () => {
+    const result = buildWorkspaceSessionDirectory({
+      workspace: { id: 'ws-1', tag: 'research' },
+      identities: [{
+        resumeId: 'resume-headless',
+        wsId: 'ws-1',
+        agent: 'pi',
+        createdAt: 1,
+        updatedAt: 2,
+        lifecycle: 'active',
+      }],
+      interactiveFor: () => ({
+        id: 'session-headless',
+        resumeId: 'resume-headless',
+        wsId: 'ws-1',
+        agent: 'pi',
+        name: 'p1',
+        createdAt: '2026-08-01T00:00:00.000Z',
+        lastActiveAt: '2026-08-01T00:01:00.000Z',
+        state: 'paused',
+        surface: 'headless',
+      }),
+      latestExecutionFor: () => null,
+      isActive: () => false,
+    })
+
+    expect(result.sessions[0]?.interactive).toBeUndefined()
+  })
+
   it('projects archived presence and keeps a deleted Session non-resumable', () => {
     const archived = buildWorkspaceSessionDirectory({
       workspace: { id: 'ws-1', tag: 'research' },
@@ -121,5 +174,48 @@ describe('buildWorkspaceSessionDirectory', () => {
       presence: 'deleted',
       resumable: false,
     })
+  })
+})
+
+describe('connectorDeskRosterExclusions', () => {
+  it('finds the fixed owner plus scheduled and inbound connector conversations', () => {
+    const hidden = connectorDeskRosterExclusions({
+      issues: [
+        { id: 'telegram-phone-desk', assignee: '@resume-current', connectorDesk: 'telegram' },
+        { id: 'ordinary-issue', assignee: '@resume-visible' },
+      ],
+      executionsForIssue: (issueId) => issueId === 'telegram-phone-desk'
+        ? [{ resumeId: 'resume-scheduled' }]
+        : [{ resumeId: 'resume-visible-run' }],
+      inquiriesForIssue: (issueId) => issueId === 'telegram-phone-desk'
+        ? [{ resumeId: 'resume-inbound' }]
+        : [{ resumeId: 'resume-visible-inquiry' }],
+    })
+
+    expect([...hidden].sort()).toEqual([
+      'resume-current',
+      'resume-inbound',
+      'resume-scheduled',
+    ])
+  })
+})
+
+describe('issueRosterAttachments', () => {
+  it('finds exact Issue owners and Sessions currently executing an Issue', () => {
+    const attached = issueRosterAttachments({
+      issues: [
+        { id: 'owned', assignee: '@resume-owner' },
+        { id: 'fresh', assignee: '@new-each-run' },
+      ],
+      runningExecutions: [{
+        resumeId: 'resume-running',
+        trigger: { kind: 'issue', workspaceId: 'ws-1', issueId: 'fresh' },
+      }, {
+        resumeId: 'resume-unrelated',
+        trigger: { kind: 'issue', workspaceId: 'ws-1', issueId: 'other' },
+      }],
+    })
+
+    expect([...attached].sort()).toEqual(['resume-owner', 'resume-running'])
   })
 })

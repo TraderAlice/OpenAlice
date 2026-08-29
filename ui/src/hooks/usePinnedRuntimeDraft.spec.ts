@@ -4,6 +4,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { AgentInfo } from '../components/workspace/api'
+import { resetAgentRuntimesStore } from './useAgentRuntimes'
 import {
   formatPinnedCapability,
   pinnedLaunchEquals,
@@ -26,6 +27,7 @@ vi.mock('../components/workspace/api', async (importOriginal) => {
     ...actual,
     listAgentCredentials: mocks.listAgentCredentials,
     getAgentRuntimeReadiness: mocks.getAgentRuntimeReadiness,
+    listAgents: vi.fn(async () => []),
     detectWorkspaceCredential: vi.fn(),
     getAgentReadiness: vi.fn(),
   }
@@ -74,6 +76,7 @@ const initial = pinnedLaunchFromBinding('codex', {
 })
 
 beforeEach(() => {
+  resetAgentRuntimesStore()
   mocks.listAgentCredentials.mockResolvedValue([{
     slug: 'openrouter-1',
     vendor: 'openrouter',

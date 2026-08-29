@@ -56,10 +56,13 @@ describe('OfficeRuntimeSection', () => {
         },
       }],
     })
-    render(<OfficeRuntimeSection />)
+    const { container } = render(<OfficeRuntimeSection />)
     expect(await screen.findByText('@resume-alice')).toBeTruthy()
+    expect(screen.getByText('#0001')).toBeTruthy()
     expect(screen.getByText(/webpi/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Open Runs' })).toBeTruthy()
+    expect(container.querySelector<HTMLImageElement>('.oa-office-runtime__badge img')?.src)
+      .toContain('/office/log/lifecycle-v1.png')
   })
 
   it('renders a headless tool block and completion reply', async () => {
@@ -102,9 +105,14 @@ describe('OfficeRuntimeSection', () => {
         },
       ],
     })
-    render(<OfficeRuntimeSection />)
+    const { container } = render(<OfficeRuntimeSection />)
     expect(await screen.findByText('workspace_list · completed')).toBeTruthy()
     expect(screen.getByText('Desk is clear.')).toBeTruthy()
     expect(screen.getByText(/1 text · 1 tools/)).toBeTruthy()
+    expect(Array.from(container.querySelectorAll<HTMLImageElement>('.oa-office-runtime__badge img'))
+      .map((image) => image.src)).toEqual([
+      expect.stringContaining('/office/log/lifecycle-v1.png'),
+      expect.stringContaining('/office/log/tool-action-v1.png'),
+    ])
   })
 })

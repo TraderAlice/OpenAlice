@@ -28,6 +28,7 @@ import { WebPiView } from '../components/workspace/WebPiView'
 import { ResumeCta } from '../components/workspace/ResumeCta'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { useAgentLaunchConfig, useAgentLaunchPreferences } from '../hooks/useAgentLaunchConfig'
+import { useAgentRuntimes } from '../hooks/useAgentRuntimes'
 import { isWorkspaceAiAgent } from '../lib/agentRuntime'
 import { useWorkspace } from '../tabs/store'
 import type { ViewSpec } from '../tabs/types'
@@ -38,6 +39,7 @@ const SUGGESTION_ICONS = [ClipboardCheck, UsersRound, GitMerge, RefreshCw] as co
 
 export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
   const { t } = useTranslation()
+  const { recordSuccessfulUse } = useAgentRuntimes()
   const {
     agents,
     defaultAgent,
@@ -103,6 +105,7 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
         launchConfig.launchReasoningEffort,
         launchConfig.accessMode === 'native' ? 'native' : undefined,
       )
+      void recordSuccessfulUse(effectiveAgent).catch(() => undefined)
       setDraft('')
       openOrFocus({ kind: 'workspace-manager', params: { sessionId: result.session.id } })
     } catch (cause) {

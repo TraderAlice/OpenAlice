@@ -3,6 +3,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { resetAgentRuntimesStore } from '../hooks/useAgentRuntimes'
 import { i18n } from '../i18n'
 import { AIProviderPage } from './AIProviderPage'
 
@@ -28,8 +29,14 @@ vi.mock('../components/workspace/api', async (importOriginal) => {
   return { ...actual, listAgents: mocks.listAgents }
 })
 
+vi.mock('../tabs/store', () => ({
+  useWorkspace: (selector: (state: { openOrFocus: () => void }) => unknown) =>
+    selector({ openOrFocus: vi.fn() }),
+}))
+
 beforeEach(async () => {
   vi.clearAllMocks()
+  resetAgentRuntimesStore()
   await i18n.changeLanguage('en')
   mocks.getPresets.mockResolvedValue({ presets: [] })
   mocks.getWorkspaceCredentialDefaults.mockResolvedValue({

@@ -280,6 +280,53 @@ describe('Workspace conversation control', () => {
     )
   })
 
+  it('creates a fresh Session only in the initialized default Auto Prediction Workspace', async () => {
+    const { svc, workspace, dispatchHeadlessTask } = fakeService({ workspaceTemplate: 'auto-prediction' })
+    await expect(createWorkspaceConversationControl(svc, {
+      readQuickChatPreferences: vi.fn(async () => ({ recentChatWorkspaceId: null })),
+      rememberRecentChatWorkspace: vi.fn(async () => undefined),
+      readAutoQuantPreferences: vi.fn(async () => ({ defaultWorkspaceId: null })),
+      readAutoPredictionPreferences: vi.fn(async () => ({ defaultWorkspaceId: workspace.id })),
+    }).ask({
+      target: { kind: 'harness', harness: 'prediction' },
+      prompt: 'Evaluate this prediction market.',
+      timeoutMs: 300_000,
+    })).resolves.toMatchObject({
+      status: 'dispatched',
+      workspaceId: workspace.id,
+      resolution: { mode: 'reconstructed', reason: 'harness-default' },
+    })
+    expect(dispatchHeadlessTask).toHaveBeenCalledWith(
+      workspace,
+      expect.anything(),
+      'Evaluate this prediction market.',
+      300_000,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      expect.anything(),
+      expect.objectContaining({ reason: 'harness-prediction' }),
+    )
+  })
+
+  it('does not create an Auto Prediction Workspace when the Harness is not initialized', async () => {
+    const { svc, dispatchHeadlessTask } = fakeService()
+    await expect(createWorkspaceConversationControl(svc, {
+      readQuickChatPreferences: vi.fn(async () => ({ recentChatWorkspaceId: null })),
+      rememberRecentChatWorkspace: vi.fn(async () => undefined),
+      readAutoQuantPreferences: vi.fn(async () => ({ defaultWorkspaceId: null })),
+      readAutoPredictionPreferences: vi.fn(async () => ({ defaultWorkspaceId: null })),
+    }).ask({
+      target: { kind: 'harness', harness: 'prediction' },
+      prompt: 'Evaluate this prediction market.',
+    })).resolves.toMatchObject({
+      status: 'unavailable',
+      resolution: { reason: 'prediction-not-initialized' },
+    })
+    expect(dispatchHeadlessTask).not.toHaveBeenCalled()
+  })
+
   it('continues the exact Session behind Issue provenance', async () => {
     const identity = { ...origin, wsId: origin.workspaceId, agentSessionId: 'native-private' }
     const { svc, adapter, workspace, dispatchHeadlessTask } = fakeService({

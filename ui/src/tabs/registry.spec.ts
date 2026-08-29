@@ -85,6 +85,13 @@ describe('Settings URL projection', () => {
       params: { category: 'activity-bar' },
     })).toBe('/settings/activity-bar')
   })
+
+  it('projects the Agent runtimes category onto /settings/agent-runtimes', () => {
+    expect(getView('settings').toUrl({
+      kind: 'settings',
+      params: { category: 'agent-runtimes' },
+    })).toBe('/settings/agent-runtimes')
+  })
 })
 
 describe('shared product shells', () => {
@@ -122,5 +129,24 @@ describe('shared product shells', () => {
       kind: 'file-viewer',
       params: { wsId: 'aq-1', path: 'README.md', source: 'auto-quant' },
     })).toBe('auto-quant')
+    expect(getViewShell({
+      kind: 'harness-surface',
+      params: { wsId: 'aq-1', capability: 'studio', source: 'auto-quant' },
+    })).toBe('auto-quant')
+  })
+
+  it('assigns every Auto Prediction surface to its own shared Harness shell', () => {
+    expect(getViewShell({ kind: 'auto-prediction-landing', params: {} })).toBe('prediction')
+    expect(getViewShell({
+      kind: 'workspace',
+      params: { wsId: 'prediction-1', sessionId: 'codex-1', source: 'prediction' },
+    })).toBe('prediction')
+    expect(getViewShell({
+      kind: 'file-viewer',
+      params: { wsId: 'prediction-1', path: 'README.md', source: 'prediction' },
+    })).toBe('prediction')
+    const studio = { kind: 'harness-surface', params: { wsId: 'prediction-1', capability: 'studio', source: 'prediction' } } as const
+    expect(getViewShell(studio)).toBe('prediction')
+    expect(getView('harness-surface').toUrl(studio)).toBe('/prediction/workspaces/prediction-1/studio')
   })
 })

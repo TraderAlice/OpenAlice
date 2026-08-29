@@ -130,6 +130,10 @@ describe('credential form catalog', () => {
       contextWindow: 500_000,
       reasoning: { efforts: ['low', 'medium', 'high', 'xhigh'], defaultEffort: 'high' },
     });
+    expect(XAI_API.models?.find((model) => model.id === 'grok-4.5')?.semantics).toMatchObject({
+      contextWindow: 500_000,
+      reasoning: { efforts: ['low', 'medium', 'high'], defaultEffort: 'high' },
+    });
   });
 
   it('offers current general-purpose Gemini tiers without mixing in media-only models', () => {

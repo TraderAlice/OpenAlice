@@ -2,12 +2,12 @@ import {
   BarChart3,
   Building2,
   Code2,
-  GitBranch,
   Inbox,
   LineChart,
   ListChecks,
   MessageSquare,
   Microscope,
+  Binary,
   Plug,
   Settings,
   Telescope,
@@ -28,9 +28,9 @@ import {
 } from '../live/ui-layout'
 
 type NavItemKey =
-  | 'nav.item.inbox' | 'nav.item.tracked' | 'nav.item.chat' | 'nav.item.autoQuant' | 'nav.item.workspaces'
-  | 'nav.item.market' | 'nav.item.office' | 'nav.item.tradingAsGit' | 'nav.item.issue'
-  | 'nav.item.portfolio' | 'nav.item.connectors' | 'nav.item.automation' | 'nav.item.settings' | 'nav.item.dev'
+  | 'nav.item.inbox' | 'nav.item.tracked' | 'nav.item.chat' | 'nav.item.autoQuant' | 'nav.item.autoPrediction' | 'nav.item.workspaces'
+  | 'nav.item.market' | 'nav.item.office' | 'nav.item.issue'
+  | 'nav.item.trading' | 'nav.item.connectors' | 'nav.item.automation' | 'nav.item.settings' | 'nav.item.dev'
 
 interface NavLeaf {
   page: Page
@@ -98,10 +98,11 @@ export const NAV_SECTIONS: NavSection[] = [
     labelKey: 'nav.section.beta',
     descriptionKey: 'nav.betaDescription',
     items: [
-      { page: 'office',         labelKey: 'nav.item.office',       icon: Building2, defaultTab: { kind: 'office', params: {} } },
-      { page: 'trading-as-git', labelKey: 'nav.item.tradingAsGit', icon: GitBranch, defaultTab: { kind: 'trading-as-git', params: {} } },
-      { page: 'portfolio',      labelKey: 'nav.item.portfolio',    icon: LineChart, defaultTab: { kind: 'portfolio', params: {} } },
-      { page: 'connectors',     labelKey: 'nav.item.connectors',   icon: Plug, defaultTab: { kind: 'connectors', params: {} } },
+      { page: 'prediction', labelKey: 'nav.item.autoPrediction', icon: Binary, defaultTab: { kind: 'auto-prediction-landing', params: {} } },
+      { page: 'office',     labelKey: 'nav.item.office',     icon: Building2, defaultTab: { kind: 'office', params: {} } },
+      // Trading as Git and broker accounts are Trading navigator leaves, not rail items.
+      { page: 'portfolio',  labelKey: 'nav.item.trading',    icon: LineChart, defaultTab: { kind: 'portfolio', params: {} } },
+      { page: 'connectors', labelKey: 'nav.item.connectors', icon: Plug, defaultTab: { kind: 'connectors', params: {} } },
     ],
   },
   {
