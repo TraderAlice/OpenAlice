@@ -109,6 +109,18 @@ function intersectsAlice(
     && position.y - OFFICE_ALICE_HALF_HEIGHT < rect.y + rect.height
 }
 
+export function isOfficePositionWalkable(
+  position: { x: number; y: number },
+  layout: OfficeMapLayout,
+  collisionRects: readonly OfficeCollisionRect[] = officeCollisionRects(layout),
+): boolean {
+  return position.x >= 24
+    && position.x <= layout.width - 24
+    && position.y >= 24
+    && position.y <= layout.height - 24
+    && !collisionRects.some((rect) => intersectsAlice(position, rect))
+}
+
 export function moveAliceOnOfficeMap(
   current: { x: number; y: number },
   movement: { x: number; y: number },

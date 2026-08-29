@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest'
 
 import { nearestOfficeInteractionTarget } from './interaction-targets'
 import { layoutOfficeMap } from './map-layout'
-import { moveAliceOnOfficeMap, officeCollisionRects } from './map-collision'
+import {
+  isOfficePositionWalkable,
+  moveAliceOnOfficeMap,
+  officeCollisionRects,
+} from './map-collision'
 import { OFFICE_CABINET_CENTER, OFFICE_DESK_CENTERS } from './pod-geometry'
 
 const layout = layoutOfficeMap([
@@ -11,6 +15,18 @@ const layout = layoutOfficeMap([
 ])
 
 describe('Office map collision', () => {
+  it('accepts remembered floor positions only inside walkable map space', () => {
+    const openFloor = { x: layout.alice.x, y: layout.alice.y + 48 }
+    const desk = layout.pods[0]!
+
+    expect(isOfficePositionWalkable(openFloor, layout)).toBe(true)
+    expect(isOfficePositionWalkable({ x: 0, y: openFloor.y }, layout)).toBe(false)
+    expect(isOfficePositionWalkable({
+      x: desk.x + OFFICE_DESK_CENTERS[0].x,
+      y: desk.y + OFFICE_DESK_CENTERS[0].y,
+    }, layout)).toBe(false)
+  })
+
   it('blocks the wall, desks, filing cabinets, props, and landmarks', () => {
     const ids = officeCollisionRects(layout).map((rect) => rect.id)
     expect(ids).toContain('wall')

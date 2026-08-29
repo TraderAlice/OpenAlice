@@ -40,7 +40,11 @@ import {
   officeInteractionPromptPlacement,
 } from './interaction-prompt'
 import { officeCoworkerLabel } from './label'
-import { moveAliceOnOfficeMap, officeCollisionRects } from './map-collision'
+import {
+  isOfficePositionWalkable,
+  moveAliceOnOfficeMap,
+  officeCollisionRects,
+} from './map-collision'
 import {
   officeFloorTerminalPosition,
   officeOperationsBoardPosition,
@@ -60,6 +64,10 @@ const OFFICE_MOVEMENTS = {
 type OfficeMovement = (typeof OFFICE_MOVEMENTS)[keyof typeof OFFICE_MOVEMENTS]
 const OFFICE_DEPARTURE_MS = 260
 export type OfficeLogOrigin = 'menu' | 'operations' | 'floor-terminal'
+export interface OfficePlayerState {
+  position: { x: number; y: number }
+  direction: OfficeAliceDirection
+}
 
 export function OfficeBuilding({
   building,
@@ -67,6 +75,8 @@ export function OfficeBuilding({
   selected,
   replaySeq = null,
   interactionSuspended = false,
+  initialPlayerState = null,
+  onPlayerStateChange,
   onSelectEmployee,
   onOpenEmployee,
   onOpenWorkspace,
@@ -80,6 +90,8 @@ export function OfficeBuilding({
   selected?: { workspaceId: string; resumeId: string } | null
   replaySeq?: number | null
   interactionSuspended?: boolean
+  initialPlayerState?: OfficePlayerState | null
+  onPlayerStateChange?: (state: OfficePlayerState) => void
   onSelectEmployee: (workspaceId: string, employee: OfficeFloorEmployee) => void
   onOpenEmployee: (workspaceId: string, employee: OfficeFloorEmployee) => void
   onOpenWorkspace: (workspaceId: string) => void
@@ -96,9 +108,13 @@ export function OfficeBuilding({
   const [menuOpen, setMenuOpen] = useState(false)
   const floorInteractionSuspended = interactionSuspended || menuOpen
   const [camera, setCamera] = useState({ x: 0, y: 0 })
-  const [alice, setAlice] = useState({ x: 480, y: 336 })
+  const initialPlayerStateRef = useRef(initialPlayerState)
+  const initialLayoutKeyRef = useRef<string | null>(null)
+  const [alice, setAlice] = useState(initialPlayerState?.position ?? { x: 480, y: 336 })
   const aliceRef = useRef(alice)
-  const [aliceDirection, setAliceDirection] = useState<OfficeAliceDirection>('down')
+  const [aliceDirection, setAliceDirection] = useState<OfficeAliceDirection>(
+    initialPlayerState?.direction ?? 'down',
+  )
   const [aliceWalking, setAliceWalking] = useState(false)
   const [aliceBumped, setAliceBumped] = useState(false)
   const [collisionImpact, setCollisionImpact] = useState<OfficeCollisionImpactState | null>(null)
@@ -305,11 +321,6 @@ export function OfficeBuilding({
     const viewport = viewportRef.current?.getBoundingClientRect()
     if (!viewport) return { x, y }
     return clampOfficeCamera({ x, y }, viewport, mapLayout)
-  }
-  const initialCamera = () => {
-    const viewport = viewportRef.current?.getBoundingClientRect()
-    if (!viewport || viewport.width <= 0 || viewport.height <= 0) return { x: 0, y: 0 }
-    return officeCameraCenteredOn(mapLayout.alice, viewport, mapLayout)
   }
   const centerCameraOnAlice = () => {
     const viewport = viewportRef.current?.getBoundingClientRect()
@@ -563,14 +574,34 @@ export function OfficeBuilding({
   }, [mapLayout.height, mapLayout.width])
   useLayoutEffect(() => {
     cancelAutoWalk()
-    aliceRef.current = mapLayout.alice
-    setAlice(mapLayout.alice)
-    setAliceDirection('down')
+    const layoutKey = `${mapLayout.width}x${mapLayout.height}`
+    const remembered = initialLayoutKeyRef.current == null || initialLayoutKeyRef.current === layoutKey
+      ? initialPlayerStateRef.current
+      : null
+    const canRestore = remembered && isOfficePositionWalkable(
+      remembered.position,
+      mapLayout,
+      collisionRects,
+    )
+    const nextPosition = canRestore ? remembered.position : mapLayout.alice
+    const nextDirection = canRestore ? remembered.direction : 'down'
+    initialLayoutKeyRef.current = layoutKey
+    aliceRef.current = nextPosition
+    setAlice(nextPosition)
+    setAliceDirection(nextDirection)
     setAliceWalking(false)
-    setCamera(initialCamera())
+    const viewport = viewportRef.current?.getBoundingClientRect()
+    setCamera(viewport && viewport.width > 0 && viewport.height > 0
+      ? officeCameraCenteredOn(nextPosition, viewport, mapLayout)
+      : { x: 0, y: 0 })
   // Reframe only when the visible map geometry changes, not on every live poll.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapLayout.width, mapLayout.height])
+
+  useEffect(() => {
+    if (!initialLayoutKeyRef.current) return
+    onPlayerStateChange?.({ position: alice, direction: aliceDirection })
+  }, [alice, aliceDirection, onPlayerStateChange])
 
   return (
     <div

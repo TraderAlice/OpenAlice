@@ -1,15 +1,22 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../i18n'
+import { clearOfficePlayerState } from '../office/office-excursion'
 import { OfficePage } from './OfficePage'
 
-const { officeFloorMock, openOrFocusMock } = vi.hoisted(() => ({
+const { navigateMock, officeFloorMock, openOrFocusMock } = vi.hoisted(() => ({
+  navigateMock: vi.fn(),
   officeFloorMock: vi.fn(),
   openOrFocusMock: vi.fn(),
+}))
+
+vi.mock('react-router-dom', async (importOriginal) => ({
+  ...await importOriginal<typeof import('react-router-dom')>(),
+  useNavigate: () => navigateMock,
 }))
 
 vi.mock('./OfficeRuntimeSection', () => ({
@@ -58,7 +65,9 @@ vi.mock('../tabs/store', () => ({
 beforeEach(async () => {
   await i18n.changeLanguage('zh')
   officeFloorMock.mockReturnValue(defaultOfficeFloor())
+  navigateMock.mockClear()
   openOrFocusMock.mockClear()
+  clearOfficePlayerState()
   vi.stubGlobal('matchMedia', vi.fn(() => ({
     matches: true,
     addEventListener: vi.fn(),
@@ -66,7 +75,10 @@ beforeEach(async () => {
   })))
 })
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+})
 
 describe('OfficePage localization', () => {
   it('renders an empty Office as a game floor instead of page copy', () => {
@@ -86,6 +98,22 @@ describe('OfficePage localization', () => {
     expect(screen.getByRole('img', { name: 'Office 地图上的 Alice' })).toBeTruthy()
     expect(screen.getByText('还没有 Workspace')).toBeTruthy()
     expect(screen.queryByRole('button', { name: '所有小组' })).toBeNull()
+  })
+
+  it('restores Alice after the Office view unmounts for an excursion', async () => {
+    const firstVisit = render(<OfficePage />)
+    const firstAlice = screen.getByRole('img', { name: 'Office 地图上的 Alice' })
+    const spawnTop = firstAlice.style.top
+
+    fireEvent.keyDown(document.body, { key: 's' })
+    await waitFor(() => expect(firstAlice.style.top).not.toBe(spawnTop))
+    const rememberedTop = firstAlice.style.top
+    firstVisit.unmount()
+
+    render(<OfficePage />)
+    const returnedAlice = screen.getByRole('img', { name: 'Office 地图上的 Alice' })
+    expect(returnedAlice.style.top).toBe(rememberedTop)
+    expect(returnedAlice.dataset.direction).toBe('down')
   })
 
   it('localizes the Office HUD and opens logs on request', async () => {
@@ -141,6 +169,10 @@ describe('OfficePage localization', () => {
       kind: 'workspace',
       params: { wsId: 'chat-1', source: 'chat' },
     }))
+    expect(navigateMock).toHaveBeenCalledTimes(1)
+    expect(navigateMock).toHaveBeenLastCalledWith('/office/return', {
+      state: { officeExcursion: true },
+    })
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(container.querySelector<HTMLElement>('.oa-office-scene')?.hasAttribute('inert')).toBe(false)
 
@@ -168,6 +200,7 @@ describe('OfficePage localization', () => {
       kind: 'workspace',
       params: { wsId: 'chat-1', source: 'chat' },
     })
+    expect(navigateMock).toHaveBeenCalledTimes(2)
   })
 
   it('enters Prediction through its own Workspace source', async () => {

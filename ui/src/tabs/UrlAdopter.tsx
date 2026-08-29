@@ -62,7 +62,14 @@ export function UrlAdopter() {
         <Route path="/automation" element={<Navigate to="/automation/runs" replace />} />
         <Route path="/automation/runtime" element={<Navigate to="/office" replace />} />
         <Route path="/automation/:section" element={<AdoptAutomation />} />
-        <Route path="/office" element={<AdoptStatic spec={{ kind: 'office', params: {} }} />} />
+        <Route
+          path="/office/return"
+          element={<OfficeReturnCheckpoint />}
+        />
+        <Route
+          path="/office"
+          element={<AdoptStatic key="office-floor" spec={{ kind: 'office', params: {} }} />}
+        />
         <Route path="/news" element={<Navigate to="/market/news" replace />} />
         <Route path="/market" element={<AdoptTraderStatic spec={{ kind: 'market-list', params: {} }} />} />
         <Route path="/market/rotation" element={<AdoptTraderStatic spec={{ kind: 'market-rotation', params: {} }} />} />
@@ -143,6 +150,14 @@ export function UrlAdopter() {
       <UrlSync />
     </>
   )
+}
+
+/**
+ * Passive Router location used only while an Office-launched surface owns the
+ * focused tab. Browser Back lands on the normal /office adopter behind it.
+ */
+function OfficeReturnCheckpoint() {
+  return null
 }
 
 /**

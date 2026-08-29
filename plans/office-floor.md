@@ -2074,6 +2074,32 @@ Physical map-boundary follow-up (2026-08-29):
   production build all passed. The first full-suite attempt used a PTY and invalidated the installer's explicit
   no-TTY test; the authoritative rerun used ordinary pipes and passed completely.
 
+Office excursion-return follow-up (2026-08-29):
+
+- Played the natural employee path all the way through `Talk -> Agent file -> Open session -> browser Back` and
+  reproduced a broken game-world exit: the internal lightweight-tab URL projection had replaced the Office history
+  entry, so Back first fell out to the browser's blank start. A simple native history copy changed the URL without
+  changing the focused view, proving that URL restoration alone was not an interaction contract.
+- Compared adding an Office button to every destination surface, embedding a complete Workspace inside the game
+  window, and making the Office departure itself create a Router-recognized checkpoint. Chose the last option: a
+  passive `/office/return` route temporarily distinguishes Router location without adopting or stealing a tab; the
+  existing focused Workspace still opens normally, while Back reaches the ordinary `/office` adopter and re-focuses
+  the floor. All Office exits use the same checkpoint, including signs, cabinets, reports, Issues, Inbox records,
+  trade decisions, and employee Sessions.
+- Alice position and facing are tracked in Office-owned tab-lifetime memory on every real movement without writing
+  persistent configuration. The returning Office validates that point against current map bounds and collision
+  rectangles before restoring it; invalid or
+  stale geometry falls back to the current spawn. The restore effect keys its initialization by map dimensions so
+  React Strict Mode's duplicate layout-effect pass cannot turn a valid return into a false map-change reset.
+- Browser-played the complete employee Session round trip at 1280x900, 390x844, and 844x390. Every size moved from
+  `312,240,left` into the real recorded Workspace Session and returned to `/office` at exactly `312,240,left`, with
+  the Agent file closed, the nearby TALK prompt immediately available, the Office view focused, and zero page-level
+  horizontal overflow. Portrait also exposed a separate next-increment candidate: the restored TALK prompt can be
+  clipped at the left camera edge.
+- Focused excursion, collision, OfficeBuilding, OfficePage, and URL-adopter specs passed: 5 files / 42 tests.
+  `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 611-file Vitest run (5,052 passing; one file and nine tests skipped),
+  and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

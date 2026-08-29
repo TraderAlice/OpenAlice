@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 
 import type { OfficeDrawerItem, OfficeFloorEmployee } from '../api/office'
 import { workspaceDisplayName } from '../components/workspace/display'
@@ -12,6 +13,10 @@ import { OfficeCabinetWindow } from '../office/OfficeCabinetWindow'
 import { officePixelImg } from '../office/furniture'
 import { OfficeInspectRail } from '../office/OfficeInspectRail'
 import { OFFICE_HUD_ASSETS } from '../office/hud-assets'
+import {
+  readOfficePlayerState,
+  rememberOfficePlayerState,
+} from '../office/office-excursion'
 import { OfficeReplayBar } from '../office/OfficeReplayBar'
 import { OfficeRosterWindow } from '../office/OfficeRosterWindow'
 import '../office/office.css'
@@ -31,8 +36,10 @@ function sourceForTag(tag: string): WorkspaceSource | undefined {
  */
 export function OfficePage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const { workspaces } = useWorkspaces()
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
+  const initialPlayerStateRef = useRef(readOfficePlayerState())
   const [asOfSeq, setAsOfSeq] = useState<number | null>(null)
   const [selected, setSelected] = useState<{ workspaceId: string; resumeId: string } | null>(null)
   const [logOpen, setLogOpen] = useState(false)
@@ -45,6 +52,9 @@ export function OfficePage() {
   >({ kind: 'map' })
   const [cabinetWorkspaceId, setCabinetWorkspaceId] = useState<string | null>(null)
   const { building, loading, error } = useOfficeFloor(asOfSeq)
+  const markExcursion = () => {
+    navigate('/office/return', { state: { officeExcursion: true } })
+  }
 
   const selectedSeat = useMemo(() => {
     if (!building || !selected) return null
@@ -127,6 +137,7 @@ export function OfficePage() {
   const openEmployee = (workspaceId: string, employee: OfficeFloorEmployee) => {
     const workspace = workspaces.find((item) => item.id === workspaceId)
     const source = workspace ? sourceForTag(workspace.tag) : undefined
+    markExcursion()
     openOrFocus({
       kind: 'workspace',
       params: {
@@ -141,6 +152,7 @@ export function OfficePage() {
     const workspace = workspaces.find((item) => item.id === workspaceId)
     const source = workspace ? sourceForTag(workspace.tag) : undefined
     useWorkspaceSidePanels.getState().setFiles(true)
+    markExcursion()
     openOrFocus({
       kind: 'workspace',
       params: { wsId: workspaceId, ...(source ? { source } : {}) },
@@ -151,6 +163,7 @@ export function OfficePage() {
     const workspace = workspaces.find((item) => item.id === workspaceId)
     const source = workspace ? sourceForTag(workspace.tag) : undefined
     useWorkspaceSidePanels.getState().setFiles(false)
+    markExcursion()
     openOrFocus({
       kind: 'workspace',
       params: { wsId: workspaceId, ...(source ? { source } : {}) },
@@ -161,6 +174,7 @@ export function OfficePage() {
     const workspace = workspaces.find((row) => row.id === workspaceId)
     const source = workspace ? sourceForTag(workspace.tag) : undefined
     if (item.kind === 'report' && item.path) {
+      markExcursion()
       openOrFocus({
         kind: 'file-viewer',
         params: {
@@ -173,15 +187,18 @@ export function OfficePage() {
       return
     }
     if (item.kind === 'issue' && item.issueId) {
+      markExcursion()
       openOrFocus({ kind: 'issue-detail', params: { wsId: workspaceId, id: item.issueId } })
       return
     }
     if (item.kind === 'inbox' && item.inboxEntryId) {
       useInboxSelection.getState().select(item.inboxEntryId)
+      markExcursion()
       openOrFocus({ kind: 'inbox', params: {} })
       return
     }
     if (item.kind === 'trade-decision') {
+      markExcursion()
       openOrFocus({ kind: 'trading-as-git', params: {} })
     }
   }
@@ -215,6 +232,8 @@ export function OfficePage() {
                 selected={selected}
                 replaySeq={asOfSeq}
                 interactionSuspended={modalOpen}
+                initialPlayerState={initialPlayerStateRef.current}
+                onPlayerStateChange={rememberOfficePlayerState}
                 onSelectEmployee={(workspaceId, employee) => {
                   employeeOriginRef.current = { kind: 'map' }
                   setSelected({ workspaceId, resumeId: employee.resumeId })

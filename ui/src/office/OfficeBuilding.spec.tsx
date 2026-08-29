@@ -170,6 +170,40 @@ describe('OfficeBuilding', () => {
     expect(building.querySelector('svg')).toBeNull()
   })
 
+  it('restores a remembered walkable player position and facing', async () => {
+    const onPlayerStateChange = vi.fn()
+    render(
+      <OfficeBuilding
+        building={{
+          config: {
+            workspaceSleepAfterMs: 1,
+            harnessMinimumVisibleGroups: { chat: 0, 'auto-quant': 0, prediction: 0, other: 0 },
+          },
+          lastSeq: 0,
+          firstSeq: 0,
+          offices: [],
+        }}
+        initialPlayerState={{ position: { x: 456, y: 432 }, direction: 'left' }}
+        onPlayerStateChange={onPlayerStateChange}
+        onSelectEmployee={vi.fn()}
+        onOpenEmployee={vi.fn()}
+        onOpenWorkspace={vi.fn()}
+        onOpenFiles={vi.fn()}
+        onOpenRoster={vi.fn()}
+        onOpenLog={vi.fn()}
+      />,
+    )
+
+    const alice = screen.getByRole('img', { name: 'Alice on the office map' })
+    expect(alice.style.left).toBe('456px')
+    expect(alice.style.top).toBe('432px')
+    expect(alice.dataset.direction).toBe('left')
+    await waitFor(() => expect(onPlayerStateChange).toHaveBeenLastCalledWith({
+      position: { x: 456, y: 432 },
+      direction: 'left',
+    }))
+  })
+
   it('gives Prediction its own console and skips departure motion when reduced', async () => {
     const onOpenWorkspace = vi.fn()
     render(
