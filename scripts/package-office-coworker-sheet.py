@@ -26,7 +26,10 @@ def hard_matte(image: Image.Image, threshold: int = 88) -> Image.Image:
 def trim_pose(sheet: Image.Image, index: int) -> Image.Image:
     left = round(sheet.width * index / 3)
     right = round(sheet.width * (index + 1) / 3)
-    panel = sheet.crop((left, 0, right, sheet.height)).convert("RGBA")
+    # Generated sheets often retain a faint alpha haze around the character.
+    # Matte it before measuring so that invisible fringe cannot make the
+    # packaged character look much smaller than its coworkers.
+    panel = hard_matte(sheet.crop((left, 0, right, sheet.height)))
     bounds = panel.getchannel("A").getbbox()
     if bounds is None:
         raise ValueError(f"pose {index + 1} has no visible pixels")

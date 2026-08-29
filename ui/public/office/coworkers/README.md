@@ -28,7 +28,11 @@ The roster now contains ten curated identities. Six additional feminine coworker
 three-pose sheets: two Codex variants (field mechanic and cyber scout), a Claude botanical archivist, a Pi field
 mathematician, and two OpenCode variants (workshop hacker and systems analyst). Each sheet keeps one identity across a
 standing portrait, seated idle pose, and seated typing pose. `scripts/package-office-coworker-sheet.py` splits those
-sheets and packages hard-alpha 72x104 portraits plus 176x176 seated canvases.
+sheets and packages hard-alpha 72x104 portraits plus 176x176 seated canvases. Packaging applies the hard-alpha matte
+before measuring each pose, so faint generated fringe cannot shrink the visible character. Existing idle/work pairs
+can be repacked with `scripts/normalize-office-coworker-pair.py`; both frames share one scale, fit a 164x164 visual
+area, and keep the same bottom-center anchor. This keeps every seated NPC legible at map scale without resizing Alice,
+desks, or collision geometry.
 
 Known runtimes map to a small family pool, and `agent + resumeId` selects one identity deterministically so a Session
 never changes appearance after refresh. The original four coworkers remain veteran variants; the six newcomers make

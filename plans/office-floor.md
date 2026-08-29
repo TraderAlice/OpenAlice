@@ -2381,6 +2381,22 @@ Low-noise auto-route follow-up (2026-08-29):
 - `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 612-file Vitest run (5,070 passing; one file and nine tests skipped),
   and the UI production build all passed. The build retains the existing large-chunk advisory only.
 
+Coworker map-scale normalization follow-up (2026-08-29):
+
+- Maintainer review used Alice as the correct scale reference and identified the seated NPCs—not the player—as too
+  small. Inspection found that every desk image had the same 176px canvas, but generated alpha fringe made some actual
+  silhouettes occupy only 93–119px vertically before the runtime's common 0.23 scale was applied.
+- Compared enlarging every coworker in CSS, changing the complete map scale, and normalizing the authored desk assets by
+  their actual hard-alpha bounds. Chose asset normalization because it fixes the inconsistent source occupancy while
+  leaving Alice, desks, pod spacing, hit targets, and collision geometry untouched.
+- Packaging now hard-mattes generated panels before trimming. A deterministic pair normalizer repacks all ten idle/work
+  sets with one shared scale and bottom-center anchor inside a 164px visual fit, preventing tiny newcomers and animation
+  breathing without rerendering or changing character identity.
+- Browser-rechecked the real 18-Workspace Project at 1280x720: the seated coworkers now read at the same character
+  scale as Alice without covering desks or changing the three-pod composition. Root/UI TypeScript, the 612-file Vitest
+  run (5,070 passing; one file and nine tests skipped), and the UI production build passed; the existing large-chunk
+  advisory remains unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
