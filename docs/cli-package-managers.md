@@ -89,6 +89,32 @@ and their publication manifest. Activating the public Homebrew and AUR commands
 still requires the TraderAlice tap and AUR package repositories to publish
 those generated files after the referenced GitHub Release assets are public.
 
+## Public channel activation
+
+For every non-prerelease, the release workflow first downloads all four
+archives anonymously from their final public GitHub Release URLs and verifies
+their bytes plus public SHA-256 sidecars against the accepted channel manifest.
+It then downloads the public formula, `PKGBUILD`, `.SRCINFO`, and npm publish
+order and compares them byte-for-byte with the preserved publication inputs. A
+30-day verification receipt is retained. npm, Tap, and AUR publication all
+depend on that receipt; none can publish from a private Actions artifact alone.
+
+External channels are explicit release switches:
+
+| Channel | Repository variable | Required authority |
+|---|---|---|
+| npm + Bun | `OPENALICE_PUBLISH_NPM=true` | `NPM_TOKEN` for all five public package names |
+| Homebrew | `OPENALICE_PUBLISH_HOMEBREW=true` | `HOMEBREW_TAP_TOKEN` with write access to `TraderAlice/homebrew-tap` |
+| AUR / paru | `OPENALICE_PUBLISH_AUR=true` | dedicated `AUR_SSH_PRIVATE_KEY` plus manually verified `AUR_KNOWN_HOSTS` |
+
+The Tap and AUR writers are idempotent: if the verified metadata is already
+active, they make no commit. AUR never learns its SSH host key from the same
+untrusted connection used to publish; the maintainer supplies the verified
+known-hosts entry as a secret. Creating registry packages, creating the Tap,
+and enrolling the AUR key remain deliberate maintainer actions. Enabling a
+switch without its external repository or authority is a release failure, not
+permission to invent another channel or silently skip publication.
+
 ## Update and uninstall ownership
 
 The installer that owns the visible command also owns later file mutation:
@@ -156,6 +182,6 @@ version transitions. Lifecycle assertions stay shared while file mutation
 remains owned by the manager under test.
 
 The release job derives every channel only after all native candidates pass,
-attaches the generated publication inputs to the GitHub Release, and publishes
-the npm meta package last. Tap/AUR publication must likewise happen only after
-the referenced release URLs and checksums are public.
+attaches the generated publication inputs to the GitHub Release, verifies that
+public release surface, and publishes the npm meta package last. Opted-in Tap
+and AUR jobs commit only the byte-identical metadata covered by that receipt.

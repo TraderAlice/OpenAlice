@@ -11,6 +11,7 @@ interface WorkflowStep {
 }
 
 interface WorkflowJob {
+  if?: string
   needs?: string | string[]
   'timeout-minutes'?: number
   steps?: WorkflowStep[]
@@ -147,8 +148,40 @@ describe('Release workflow critical path', () => {
 
   it('publishes npm platform packages before the stable meta package', () => {
     const npm = workflow.jobs['publish-cli-npm']
-    expect(needs(npm)).toEqual(['release', 'publish-release', 'build-cli-package-channels'])
+    expect(needs(npm)).toEqual([
+      'release',
+      'publish-release',
+      'build-cli-package-channels',
+      'verify-public-cli-channels',
+    ])
+    expect(npm.if).toContain("needs.verify-public-cli-channels.result == 'success'")
     const publish = step(npm, 'Publish platform packages before the meta package').run ?? ''
     expect(publish.indexOf('packages.slice(0,-1)')).toBeLessThan(publish.indexOf('packages.at(-1)'))
+  })
+
+  it('verifies public release bytes before activating external package channels', () => {
+    const verify = workflow.jobs['verify-public-cli-channels']
+    expect(needs(verify)).toEqual(['release', 'publish-release', 'build-cli-package-channels'])
+    expect(step(verify, 'Verify accepted archives are publicly readable and unchanged').run)
+      .toContain('verify-public-cli-channels.mjs')
+    expect(step(verify, 'Compare public metadata with the accepted publication inputs').run)
+      .toContain('cmp dist/cli-package-channels/cli-package-channels/homebrew/openalice.rb')
+
+    const homebrew = workflow.jobs['publish-cli-homebrew']
+    expect(needs(homebrew)).toContain('verify-public-cli-channels')
+    expect(homebrew.if).toContain("vars.OPENALICE_PUBLISH_HOMEBREW == 'true'")
+    const tapCheckout = homebrew.steps?.find((candidate) => candidate.uses === 'actions/checkout@v7')
+    expect(tapCheckout?.with?.repository).toBe('TraderAlice/homebrew-tap')
+    expect(step(homebrew, 'Activate the verified formula in the TraderAlice tap').run)
+      .toContain('git diff --cached --quiet')
+
+    const aur = workflow.jobs['publish-cli-aur']
+    expect(needs(aur)).toContain('verify-public-cli-channels')
+    expect(aur.if).toContain("vars.OPENALICE_PUBLISH_AUR == 'true'")
+    const aurCheckout = step(aur, 'Check out the AUR package repository').run ?? ''
+    expect(aurCheckout).toContain('AUR_KNOWN_HOSTS')
+    expect(aurCheckout).not.toContain('ssh-keyscan')
+    expect(step(aur, 'Activate the verified package metadata in AUR').run)
+      .toContain('git diff --cached --quiet')
   })
 })

@@ -23,6 +23,7 @@ jobs:
       # The tag and GitHub Release are deliberately created only after every
       # platform builds and passes Workspace acceptance.
       created: ${{ !github.event.inputs.mirror_tag && steps.check.outputs.exists == 'false' }}
+      version: ${{ steps.version.outputs.version }}
       tag: ${{ github.event.inputs.mirror_tag || steps.version.outputs.tag }}
       prerelease: ${{ steps.version.outputs.prerelease }}
       previous_tag: ${{ steps.version.outputs.previous_tag }}
@@ -820,8 +821,8 @@ jobs:
 
   publish-cli-npm:
     name: Publish npm CLI packages
-    needs: [release, publish-release, build-cli-package-channels]
-    if: needs.publish-release.result == 'success' && needs.release.outputs.prerelease == 'false' && vars.OPENALICE_PUBLISH_NPM == 'true'
+    needs: [release, publish-release, build-cli-package-channels, verify-public-cli-channels]
+    if: needs.verify-public-cli-channels.result == 'success' && needs.release.outputs.prerelease == 'false' && vars.OPENALICE_PUBLISH_NPM == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -848,6 +849,144 @@ jobs:
           npm publish "$META" --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  verify-public-cli-channels:
+    name: Verify public CLI channel assets
+    needs: [release, publish-release, build-cli-package-channels]
+    if: needs.publish-release.result == 'success' && needs.release.outputs.prerelease == 'false'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: cli-package-channels
+          path: dist/cli-package-channels
+
+      - name: Verify accepted archives are publicly readable and unchanged
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
+        run: >-
+          node scripts/verify-public-cli-channels.mjs
+          --manifest dist/cli-package-channels/cli-package-channels/cli-package-channels.json
+          --version "$VERSION"
+          > dist/cli-package-channels/public-channel-receipt.json
+
+      - name: Compare public metadata with the accepted publication inputs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.release.outputs.tag }}
+        run: |
+          mkdir -p dist/public-cli-channels
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --dir dist/public-cli-channels \
+            --pattern cli-package-channels.json \
+            --pattern openalice.rb \
+            --pattern PKGBUILD \
+            --pattern .SRCINFO \
+            --pattern npm-publish-order.json
+          cmp dist/cli-package-channels/cli-package-channels/cli-package-channels.json dist/public-cli-channels/cli-package-channels.json
+          cmp dist/cli-package-channels/cli-package-channels/homebrew/openalice.rb dist/public-cli-channels/openalice.rb
+          cmp dist/cli-package-channels/cli-package-channels/aur/PKGBUILD dist/public-cli-channels/PKGBUILD
+          cmp dist/cli-package-channels/cli-package-channels/aur/.SRCINFO dist/public-cli-channels/.SRCINFO
+          cmp dist/cli-package-channels/cli-npm-tarballs/npm-publish-order.json dist/public-cli-channels/npm-publish-order.json
+
+      - name: Preserve public channel verification receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-cli-channel-receipt
+          path: dist/cli-package-channels/public-channel-receipt.json
+          if-no-files-found: error
+          retention-days: 30
+
+  publish-cli-homebrew:
+    name: Publish Homebrew tap formula
+    needs: [release, verify-public-cli-channels, build-cli-package-channels]
+    if: needs.verify-public-cli-channels.result == 'success' && vars.OPENALICE_PUBLISH_HOMEBREW == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: cli-package-channels
+          path: dist/cli-package-channels
+
+      - uses: actions/checkout@v7
+        with:
+          repository: TraderAlice/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+          fetch-depth: 0
+
+      - name: Activate the verified formula in the TraderAlice tap
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          install -Dm644 dist/cli-package-channels/cli-package-channels/homebrew/openalice.rb tap/Formula/openalice.rb
+          cd tap
+          git config user.name OpenAlice Release Bot
+          git config user.email release-bot@openalice.ai
+          git add Formula/openalice.rb
+          if git diff --cached --quiet; then
+            echo "Homebrew formula already publishes OpenAlice ${VERSION}."
+            exit 0
+          fi
+          git commit -m "openalice ${VERSION}"
+          git push
+
+  publish-cli-aur:
+    name: Publish AUR package metadata
+    needs: [release, verify-public-cli-channels, build-cli-package-channels]
+    if: needs.verify-public-cli-channels.result == 'success' && vars.OPENALICE_PUBLISH_AUR == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: cli-package-channels
+          path: dist/cli-package-channels
+
+      - name: Check out the AUR package repository
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          AUR_KNOWN_HOSTS: ${{ secrets.AUR_KNOWN_HOSTS }}
+        run: |
+          test -n "$AUR_SSH_PRIVATE_KEY"
+          test -n "$AUR_KNOWN_HOSTS"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$AUR_SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$AUR_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+          git clone ssh://aur@aur.archlinux.org/openalice-bin.git aur
+
+      - name: Activate the verified package metadata in AUR
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          install -Dm644 dist/cli-package-channels/cli-package-channels/aur/PKGBUILD aur/PKGBUILD
+          install -Dm644 dist/cli-package-channels/cli-package-channels/aur/.SRCINFO aur/.SRCINFO
+          cd aur
+          git config user.name OpenAlice Release Bot
+          git config user.email release-bot@openalice.ai
+          git add PKGBUILD .SRCINFO
+          if git diff --cached --quiet; then
+            echo "AUR metadata already publishes OpenAlice ${VERSION}."
+            exit 0
+          fi
+          git commit -m "openalice-bin ${VERSION}"
+          git push
 
   mirror-release-assets:
     needs: [release, publish-release]

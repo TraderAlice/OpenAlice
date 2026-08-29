@@ -465,7 +465,9 @@ build harness when it improves the next investigation.
   GitHub Release succeeds. Stable publication remains explicitly disabled
   until registry authority and package names are established.
 - [ ] Publish Brew/AUR metadata only after the referenced release assets are
-  public and verified.
+  public and verified. The opt-in automation and public-byte receipt are ready;
+  external repository creation, credentials, activation, and first public
+  command walks still require maintainer authority.
 
 ### 6. Cutover and updates
 
@@ -893,3 +895,12 @@ This plan is complete only when:
   state, restart activation, local rollback, uninstall, and data preservation;
   every native dev and stable candidate now repeats the relevant artifact and
   component gates.
+- 2026-08-30: Added the external-channel activation chain without silently
+  claiming registry ownership. Every stable release now re-downloads all four
+  public archives and sidecars, verifies their accepted hashes, compares the
+  public formula/AUR/npm metadata byte-for-byte with the preserved inputs, and
+  retains a receipt before any registry writer can run. npm/Bun, the
+  TraderAlice Tap, and AUR have separate opt-in variables and least-scope
+  credentials; Tap/AUR commits are idempotent. Package-name reservation, Tap
+  creation, AUR key enrollment, enabling the switches, and the first public
+  install journeys remain explicit maintainer actions.
