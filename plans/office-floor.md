@@ -2761,6 +2761,26 @@ Journal report-disclosure follow-up (2026-08-30):
   together with root/UI TypeScript, the full 617-file Vitest run (5,114 passing; one file and nine tests skipped), and
   the production build; the existing large-chunk advisory is unchanged.
 
+In-floor service-station follow-up (2026-08-30):
+
+- Played the Inbox station from the live floor and found that Alice completed her walk only for the entire game map to
+  be replaced by the ordinary Inbox surface. The URL changed to `/inbox` while the Activity Bar still highlighted
+  Office, so a spatial “walk over and check the terminal” action ended as a contradictory page excursion.
+- Compared fixing only the Activity Bar selection, opening separate Inbox/News popovers, and routing both stations into
+  the existing Office journal. Chose the shared journal: it keeps the player on the floor, gives each product family a
+  first-class game facility without duplicating window behavior, and leaves the existing detail action as the explicit
+  deeper excursion.
+- Office log state now owns its origin, initial channel, and target sequence. Inbox and News stations open the modal on
+  their respective channel and latest landmark, acknowledgement happens on entry, Escape/close restores focus to the
+  originating terminal, and opening an Inbox event first selects that exact Inbox record before leaving the floor.
+  The shared journal keeps its existing responsive layout, tab semantics, modal focus boundary, and keyboard selection.
+- Browser-played Inbox and News from the real Office Lab. Both stayed on `/office`, the Inbox station selected #1296,
+  the News terminal selected newly ingested #1636, and close returned focus to `office-inbox-service`. A deeper jump
+  from the real #0823 Inbox event opened the matching “Office activity playtest is done” report rather than an empty
+  Inbox. Focused Office building/page/journal specs passed (3 files / 32 tests), together with root/UI TypeScript, the
+  full 617-file Vitest run (5,116 passing; one file and nine tests skipped), and the production build; the existing
+  large-chunk advisory is unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

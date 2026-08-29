@@ -1033,8 +1033,7 @@ describe('OfficeBuilding', () => {
   })
 
   it('turns Inbox and News activity into navigable floor landmarks', async () => {
-    const onOpenInbox = vi.fn()
-    const onOpenNews = vi.fn()
+    const onOpenService = vi.fn()
     const { container } = render(
       <OfficeBuilding
         building={{
@@ -1081,8 +1080,7 @@ describe('OfficeBuilding', () => {
         onOpenFiles={vi.fn()}
         onOpenRoster={vi.fn()}
         onOpenLog={vi.fn()}
-        onOpenInbox={onOpenInbox}
-        onOpenNews={onOpenNews}
+        onOpenService={onOpenService}
       />,
     )
 
@@ -1110,9 +1108,9 @@ describe('OfficeBuilding', () => {
     expect(inboxPrompt.textContent).toContain('codex · Agent report delivered')
 
     await userEvent.click(inbox)
-    await waitFor(() => expect(onOpenInbox).toHaveBeenCalledWith('inbox-11'))
+    await waitFor(() => expect(onOpenService).toHaveBeenCalledWith('inbox', 11))
     await userEvent.click(news)
-    await waitFor(() => expect(onOpenNews).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(onOpenService).toHaveBeenCalledWith('news', 12))
     expect(container.querySelector('[data-kind="news-service"]')).toBeTruthy()
   })
 })

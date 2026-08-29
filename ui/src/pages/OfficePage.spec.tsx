@@ -8,10 +8,18 @@ import { i18n } from '../i18n'
 import { clearOfficePlayerState } from '../office/office-excursion'
 import { OfficePage } from './OfficePage'
 
-const { navigateMock, officeFloorMock, openOrFocusMock } = vi.hoisted(() => ({
+const {
+  acknowledgeMock,
+  navigateMock,
+  officeFloorMock,
+  openOrFocusMock,
+  productActivityMock,
+} = vi.hoisted(() => ({
+  acknowledgeMock: vi.fn(),
   navigateMock: vi.fn(),
   officeFloorMock: vi.fn(),
   openOrFocusMock: vi.fn(),
+  productActivityMock: vi.fn(),
 }))
 
 vi.mock('react-router-dom', async (importOriginal) => ({
@@ -20,7 +28,21 @@ vi.mock('react-router-dom', async (importOriginal) => ({
 }))
 
 vi.mock('./OfficeRuntimeSection', () => ({
-  OfficeRuntimeSection: () => <div>Office occupancy</div>,
+  OfficeRuntimeSection: ({
+    initialChannel,
+    initialSelectedSeq,
+  }: {
+    initialChannel?: string
+    initialSelectedSeq?: number | null
+  }) => (
+    <div
+      data-testid="office-runtime-section"
+      data-channel={initialChannel}
+      data-selected-seq={initialSelectedSeq ?? undefined}
+    >
+      Office occupancy
+    </div>
+  ),
 }))
 
 vi.mock('../contexts/workspaces-context', () => ({
@@ -35,6 +57,10 @@ vi.mock('../contexts/workspaces-context', () => ({
 
 vi.mock('../hooks/useOfficeFloor', () => ({
   useOfficeFloor: officeFloorMock,
+}))
+
+vi.mock('../office/useOfficeProductActivity', () => ({
+  useOfficeProductActivity: productActivityMock,
 }))
 
 const defaultOfficeFloor = () => ({
@@ -67,6 +93,15 @@ beforeEach(async () => {
   officeFloorMock.mockReturnValue(defaultOfficeFloor())
   navigateMock.mockClear()
   openOrFocusMock.mockClear()
+  acknowledgeMock.mockClear()
+  productActivityMock.mockReturnValue({
+    agent: null,
+    inbox: null,
+    news: null,
+    attention: { agent: false, inbox: false, news: false },
+    freshKind: null,
+    acknowledge: acknowledgeMock,
+  })
   clearOfficePlayerState()
   vi.stubGlobal('matchMedia', vi.fn(() => ({
     matches: true,
@@ -158,6 +193,40 @@ describe('OfficePage localization', () => {
     await vi.waitFor(() => {
       expect(document.activeElement).toBe(floorTerminal)
     })
+  })
+
+  it('keeps Inbox and News station visits inside the Office journal', async () => {
+    productActivityMock.mockReturnValue({
+      agent: null,
+      inbox: { seq: 11, occurredAt: 1_100, inboxEntryId: 'inbox-11' },
+      news: { seq: 12, occurredAt: 1_200 },
+      attention: { agent: false, inbox: true, news: true },
+      freshKind: null,
+      acknowledge: acknowledgeMock,
+    })
+    const { container } = render(<OfficePage />)
+
+    const inbox = screen.getByRole('button', { name: 'Inbox 收件台 · 有新动态' })
+    await userEvent.click(inbox)
+    const runtime = await screen.findByTestId('office-runtime-section', {}, { timeout: 10_000 })
+    expect(runtime.dataset.channel).toBe('inbox')
+    expect(runtime.dataset.selectedSeq).toBe('11')
+    expect(acknowledgeMock).toHaveBeenCalledWith('inbox')
+    expect(openOrFocusMock).not.toHaveBeenCalled()
+    expect(navigateMock).not.toHaveBeenCalled()
+    expect(container.querySelector<HTMLElement>('.oa-office-scene')?.hasAttribute('inert')).toBe(true)
+
+    await userEvent.keyboard('{Escape}')
+    await vi.waitFor(() => expect(document.activeElement).toBe(inbox))
+
+    const news = screen.getByRole('button', { name: '新闻终端 · 有新动态' })
+    await userEvent.click(news)
+    const newsRuntime = await screen.findByTestId('office-runtime-section', {}, { timeout: 10_000 })
+    expect(newsRuntime.dataset.channel).toBe('news')
+    expect(newsRuntime.dataset.selectedSeq).toBe('12')
+    expect(acknowledgeMock).toHaveBeenCalledWith('news')
+    expect(openOrFocusMock).not.toHaveBeenCalled()
+    expect(navigateMock).not.toHaveBeenCalled()
   })
 
   it('enters from the Workspace sign while keeping filed records on the cabinet', async () => {

@@ -27,7 +27,7 @@ import { useOfficeProductActivity } from '../office/useOfficeProductActivity'
 import '../office/office.css'
 import { useWorkspace } from '../tabs/store'
 import type { WorkspaceSource } from '../tabs/types'
-import { OfficeRuntimeSection } from './OfficeRuntimeSection'
+import { OfficeRuntimeSection, type OfficeLogChannel } from './OfficeRuntimeSection'
 
 function sourceForTag(tag: string): WorkspaceSource | undefined {
   if (tag === 'chat') return 'chat'
@@ -48,8 +48,11 @@ export function OfficePage() {
   const [asOfSeq, setAsOfSeq] = useState<number | null>(null)
   const [replayFocus, setReplayFocus] = useState<OfficeReplayFocus | null>(null)
   const [selected, setSelected] = useState<{ workspaceId: string; resumeId: string } | null>(null)
-  const [logOpen, setLogOpen] = useState(false)
-  const logOriginRef = useRef<OfficeLogOrigin>('menu')
+  const [logView, setLogView] = useState<{
+    origin: OfficeLogOrigin
+    channel: OfficeLogChannel
+    focusSeq: number | null
+  } | null>(null)
   const [rosterWorkspaceId, setRosterWorkspaceId] = useState<string | null>(null)
   const [rosterFocusResumeId, setRosterFocusResumeId] = useState<string | null>(null)
   const employeeOriginRef = useRef<
@@ -104,17 +107,20 @@ export function OfficePage() {
       roomName: workspace ? workspaceDisplayName(workspace) : office.workspace.tag,
     }
   }, [building, cabinetWorkspaceId, workspaces])
-  const modalOpen = logOpen
+  const modalOpen = Boolean(logView)
     || Boolean(selectedSeat)
     || Boolean(rosterOffice)
     || Boolean(cabinetOffice)
   const closeLog = () => {
-    setLogOpen(false)
+    const origin = logView?.origin ?? 'menu'
+    setLogView(null)
     requestAnimationFrame(() => {
-      if (logOriginRef.current === 'operations') {
+      if (origin === 'operations') {
         document.getElementById('office-operations-board')?.focus()
-      } else if (logOriginRef.current === 'floor-terminal') {
+      } else if (origin === 'floor-terminal') {
         document.getElementById('office-floor-terminal')?.focus()
+      } else if (origin === 'inbox-service' || origin === 'news-service') {
+        document.getElementById(`office-${origin}`)?.focus()
       } else {
         document.querySelector<HTMLElement>('.oa-office-pause-trigger')?.focus()
       }
@@ -255,7 +261,7 @@ export function OfficePage() {
                   employeeOriginRef.current = { kind: 'map' }
                   setSelected({ workspaceId, resumeId: employee.resumeId })
                   setRosterFocusResumeId(null)
-                  setLogOpen(false)
+                  setLogView(null)
                   setCabinetWorkspaceId(null)
                 }}
                 onOpenEmployee={openEmployee}
@@ -264,32 +270,31 @@ export function OfficePage() {
                   setCabinetWorkspaceId(workspaceId)
                   setSelected(null)
                   setRosterWorkspaceId(null)
-                  setLogOpen(false)
+                  setLogView(null)
                 }}
                 onOpenRoster={(workspaceId) => {
                   setRosterWorkspaceId(workspaceId)
                   setRosterFocusResumeId(null)
                   setSelected(null)
                   setCabinetWorkspaceId(null)
-                  setLogOpen(false)
+                  setLogView(null)
                 }}
                 onOpenLog={(origin) => {
                   productActivity.acknowledge('agent')
-                  logOriginRef.current = origin
-                  setLogOpen(true)
+                  setLogView({
+                    origin,
+                    channel: 'all',
+                    focusSeq: origin === 'operations' ? productActivity.agent?.seq ?? null : null,
+                  })
                   setCabinetWorkspaceId(null)
                 }}
                 productActivity={productActivity}
-                onOpenInbox={(entryId) => {
-                  productActivity.acknowledge('inbox')
-                  if (entryId) useInboxSelection.getState().select(entryId)
-                  markExcursion()
-                  openOrFocus({ kind: 'inbox', params: {} })
-                }}
-                onOpenNews={() => {
-                  productActivity.acknowledge('news')
-                  markExcursion()
-                  openOrFocus({ kind: 'news', params: {} })
+                onOpenService={(kind, seq) => {
+                  productActivity.acknowledge(kind)
+                  setLogView({ origin: `${kind}-service`, channel: kind, focusSeq: seq ?? null })
+                  setSelected(null)
+                  setRosterWorkspaceId(null)
+                  setCabinetWorkspaceId(null)
                 }}
                 onReturnLive={() => {
                   setAsOfSeq(null)
@@ -298,7 +303,7 @@ export function OfficePage() {
               />
             </div>
             {modalOpen && <div className="oa-office-window-scrim" aria-hidden />}
-            {logOpen && (
+            {logView && (
               <section
                 role="dialog"
                 aria-modal="true"
@@ -336,6 +341,8 @@ export function OfficePage() {
                   </details>
                   <OfficeRuntimeSection
                     actors={activityActors}
+                    initialChannel={logView.channel}
+                    initialSelectedSeq={logView.focusSeq}
                     onReplay={(focus) => {
                       setReplayFocus(focus)
                       setAsOfSeq(focus.seq)
@@ -345,7 +352,7 @@ export function OfficePage() {
                 </div>
               </section>
             )}
-            {!logOpen && !cabinetOffice && selectedSeat && (
+            {!logView && !cabinetOffice && selectedSeat && (
               <OfficeInspectRail
                 employee={selectedSeat.employee}
                 coworkerAsset={selectedCoworkerAsset}
@@ -356,7 +363,7 @@ export function OfficePage() {
                 returnToRoster={employeeOriginRef.current.kind === 'roster'}
               />
             )}
-            {!logOpen && !selectedSeat && !cabinetOffice && rosterOffice && (
+            {!logView && !selectedSeat && !cabinetOffice && rosterOffice && (
               <OfficeRosterWindow
                 group={rosterOffice.office}
                 roomName={rosterOffice.roomName}
@@ -376,7 +383,7 @@ export function OfficePage() {
                 onClose={closeRoster}
               />
             )}
-            {!logOpen && !selectedSeat && !rosterOffice && cabinetOffice && (
+            {!logView && !selectedSeat && !rosterOffice && cabinetOffice && (
               <OfficeCabinetWindow
                 group={cabinetOffice.office}
                 roomName={cabinetOffice.roomName}

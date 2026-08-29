@@ -84,7 +84,12 @@ const OFFICE_MOVEMENT_KEYS: Record<string, OfficeMovement> = {
 const OFFICE_MANUAL_MOVE_INTERVAL_MS = 96
 const OFFICE_DIAGONAL_STEP = 17
 const OFFICE_DEPARTURE_MS = 520
-export type OfficeLogOrigin = 'menu' | 'operations' | 'floor-terminal'
+export type OfficeLogOrigin =
+  | 'menu'
+  | 'operations'
+  | 'floor-terminal'
+  | 'inbox-service'
+  | 'news-service'
 export interface OfficePlayerState {
   position: { x: number; y: number }
   direction: OfficeAliceDirection
@@ -112,8 +117,7 @@ export function OfficeBuilding({
     attention: { agent: false, inbox: false, news: false },
     freshKind: null,
   },
-  onOpenInbox,
-  onOpenNews,
+  onOpenService,
   onReturnLive,
 }: {
   building: OfficeBuildingSnapshot
@@ -131,8 +135,7 @@ export function OfficeBuilding({
   onOpenRoster: (workspaceId: string) => void
   onOpenLog: (origin: OfficeLogOrigin) => void
   productActivity?: OfficeProductActivityState
-  onOpenInbox?: (entryId?: string) => void
-  onOpenNews?: () => void
+  onOpenService?: (kind: 'inbox' | 'news', seq?: number) => void
   onReturnLive?: () => void
 }) {
   const { t } = useTranslation()
@@ -527,9 +530,9 @@ export function OfficeBuilding({
         )?.focus()
       }, 0)
     } else if (target.kind === 'inbox-service') {
-      onOpenInbox?.(productActivity.inbox?.inboxEntryId)
+      onOpenService?.('inbox', productActivity.inbox?.seq)
     } else if (target.kind === 'news-service') {
-      onOpenNews?.()
+      onOpenService?.('news', productActivity.news?.seq)
     } else {
       onOpenLog('operations')
     }

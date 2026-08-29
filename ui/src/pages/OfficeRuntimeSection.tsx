@@ -6,6 +6,7 @@ import { api } from '../api'
 import type { AgentRuntimeEvent } from '../api/agentRuntimeLog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { formatRelativeTime } from '../lib/intl'
+import { useInboxSelection } from '../live/inbox-selection'
 import {
   officeActivityFallbackLabel,
   type OfficeActivityActor,
@@ -18,7 +19,7 @@ import { OFFICE_LOG_ASSETS, officeLogAssetKind } from '../office/log-assets'
 import { officeReplayFocusForEvent, type OfficeReplayFocus } from '../office/replay-focus'
 import { useWorkspace } from '../tabs/store'
 
-type OfficeLogChannel = 'all' | 'agent' | 'inbox' | 'news'
+export type OfficeLogChannel = 'all' | 'agent' | 'inbox' | 'news'
 type OfficeLogFamily = Exclude<OfficeLogChannel, 'all'>
 
 const OFFICE_LOG_CHANNELS: readonly OfficeLogChannel[] = ['all', 'agent', 'inbox', 'news']
@@ -171,9 +172,13 @@ function mergeOfficeLogFamilies(
 
 export function OfficeRuntimeSection({
   actors = new Map(),
+  initialChannel = 'all',
+  initialSelectedSeq = null,
   onReplay,
 }: {
   actors?: ReadonlyMap<string, OfficeActivityActor>
+  initialChannel?: OfficeLogChannel
+  initialSelectedSeq?: number | null
   onReplay?: (focus: OfficeReplayFocus) => void
 } = {}) {
   const { t } = useTranslation()
@@ -185,7 +190,7 @@ export function OfficeRuntimeSection({
     news: [],
   })
   const [selectedSeq, setSelectedSeq] = useState<number | null>(null)
-  const [channel, setChannel] = useState<OfficeLogChannel>('all')
+  const [channel, setChannel] = useState<OfficeLogChannel>(initialChannel)
   const [detailExpanded, setDetailExpanded] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -238,10 +243,14 @@ export function OfficeRuntimeSection({
       setSelectedSeq(null)
       return
     }
-    setSelectedSeq((current) => visibleBeats.some((beat) => beat.event.seq === current)
-      ? current
-      : visibleBeats[0].event.seq)
-  }, [visibleBeats])
+    setSelectedSeq((current) => {
+      if (visibleBeats.some((beat) => beat.event.seq === current)) return current
+      if (visibleBeats.some((beat) => beat.event.seq === initialSelectedSeq)) {
+        return initialSelectedSeq
+      }
+      return visibleBeats[0].event.seq
+    })
+  }, [initialSelectedSeq, visibleBeats])
 
   useEffect(() => {
     setDetailExpanded(false)
@@ -514,7 +523,12 @@ export function OfficeRuntimeSection({
               <button
                 type="button"
                 className="oa-office-runtime__open"
-                onClick={() => openOrFocus({ kind: 'inbox', params: {} })}
+                onClick={() => {
+                  if (selectedPayload.inboxEntryId) {
+                    useInboxSelection.getState().select(selectedPayload.inboxEntryId)
+                  }
+                  openOrFocus({ kind: 'inbox', params: {} })
+                }}
               >
                 <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" aria-hidden style={officePixelImg} />
                 {t('office.interactInbox')}

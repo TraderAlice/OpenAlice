@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../i18n'
+import { useInboxSelection } from '../live/inbox-selection'
 import { OFFICE_COWORKER_SPRITES } from '../office/coworker-sprites'
 import { OfficeRuntimeSection } from './OfficeRuntimeSection'
 
@@ -45,6 +46,7 @@ vi.mock('../tabs/store', () => ({
 
 beforeEach(async () => {
   query.mockReset()
+  useInboxSelection.getState().select(null)
   await i18n.changeLanguage('en')
 })
 
@@ -281,6 +283,43 @@ describe('OfficeRuntimeSection', () => {
     expect(screen.getByRole('list', { name: 'Activity log · Agent' }).children).toHaveLength(2)
     expect(screen.getByRole('button', { name: /Tool action.*#0002/i })).toBeTruthy()
     expect(screen.queryByRole('button', { name: /News added/i })).toBeNull()
+  })
+
+  it('opens a service channel on its requested event', async () => {
+    const now = Date.now()
+    mockJournal([
+      {
+        seq: 9,
+        ts: now,
+        type: 'inbox.received',
+        payload: { inboxEntryId: 'inbox-9', summary: 'Newer dispatch' },
+      },
+      {
+        seq: 7,
+        ts: now - 2_000,
+        type: 'inbox.received',
+        payload: { inboxEntryId: 'inbox-7', summary: 'Requested dispatch' },
+      },
+      {
+        seq: 8,
+        ts: now - 1_000,
+        type: 'news.ingested',
+        payload: { newsItemId: 8, source: 'Wire', title: 'Market headline' },
+      },
+    ])
+
+    render(<OfficeRuntimeSection initialChannel="inbox" initialSelectedSeq={7} />)
+
+    const inboxTab = await screen.findByRole('tab', { name: /Inbox\s*2/ })
+    expect(inboxTab.getAttribute('data-active')).not.toBeNull()
+    expect(screen.getByRole('list', { name: 'Activity log · Inbox' }).children).toHaveLength(2)
+    expect(screen.getByRole('button', { name: /Inbox received.*#0007/i }).getAttribute('aria-pressed'))
+      .toBe('true')
+    expect(screen.getByText('Requested dispatch')).toBeTruthy()
+    expect(screen.queryByText('Market headline')).toBeNull()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Open Inbox' }))
+    expect(useInboxSelection.getState().selectedEntryId).toBe('inbox-7')
   })
 
   it('keeps product events in All when agent activity fills its own page', async () => {
