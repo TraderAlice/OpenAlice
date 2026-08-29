@@ -96,13 +96,13 @@ let initialStatus: RuntimeStatus | null = null
 let recoveredStatus: RuntimeStatus | null = null
 let externalBrokerPack: Awaited<ReturnType<typeof waitForBrokerPackFixture>> | null = null
 let readyDurationMs = 0
+let idleMemoryBytes: RuntimeMemoryReport | null = null
 try {
   await Promise.all([
     waitForHttp(`http://127.0.0.1:${webPort}/api/auth/status`, 90_000),
     waitForHttp(`http://127.0.0.1:${utaPort}/__uta/health`, 90_000),
     waitForHttp(`http://127.0.0.1:${connectorPort}/__connector/health`, 90_000),
   ])
-  externalBrokerPack = await waitForBrokerPackFixture(utaPort, brokerPackFixture)
   initialStatus = await waitForRuntimeStatus(smokeEnvironment, (status) => (
     status.class === 'running'
       && status.provider?.kind === 'bun'
@@ -115,6 +115,9 @@ try {
   if (new Set(initialPids).size !== 4) {
     throw new Error(`Guardian/Alice/UTA/Connector did not have four distinct PIDs: ${initialPids}`)
   }
+  externalBrokerPack = await waitForBrokerPackFixture(utaPort, brokerPackFixture)
+  await Bun.sleep(1_000)
+  idleMemoryBytes = await measureRuntimeMemory(initialStatus)
 
   const connectorPid = initialStatus.componentDetail?.connector?.pid
   if (!connectorPid) throw new Error('Connector PID was missing from Runtime status')
@@ -176,6 +179,8 @@ const report = {
   executableBytes: executable.size,
   buildDurationMs,
   readyDurationMs,
+  coldStartReadyMs: readyDurationMs,
+  idleMemoryBytes,
   processModel: {
     guardianPid: initialStatus?.owner?.pid,
     alicePid: initialStatus?.componentDetail?.alice?.pid,
@@ -204,6 +209,16 @@ interface RuntimeStatus {
   componentDetail?: Record<string, { state?: string; pid?: number }>
 }
 
+interface RuntimeMemoryReport {
+  sampleCount: number
+  sampleIntervalMs: number
+  guardian: number
+  alice: number
+  uta: number
+  connector: number
+  total: number
+}
+
 function runtimePids(status: RuntimeStatus): number[] {
   const pids = [
     status.owner?.pid,
@@ -215,6 +230,46 @@ function runtimePids(status: RuntimeStatus): number[] {
     throw new Error(`Runtime status omitted a component PID: ${JSON.stringify(status)}`)
   }
   return pids as number[]
+}
+
+async function measureRuntimeMemory(status: RuntimeStatus): Promise<RuntimeMemoryReport> {
+  const pids = runtimePids(status)
+  const samples = new Map<number, number[]>()
+  for (const pid of pids) samples.set(pid, [])
+  const sampleCount = 3
+  const sampleIntervalMs = 500
+  for (let sample = 0; sample < sampleCount; sample += 1) {
+    for (const pid of pids) samples.get(pid)?.push(readResidentSetBytes(pid))
+    if (sample + 1 < sampleCount) await Bun.sleep(sampleIntervalMs)
+  }
+  const [guardian, alice, uta, connector] = pids.map((pid) => median(samples.get(pid) ?? []))
+  return {
+    sampleCount,
+    sampleIntervalMs,
+    guardian,
+    alice,
+    uta,
+    connector,
+    total: guardian + alice + uta + connector,
+  }
+}
+
+function readResidentSetBytes(pid: number): number {
+  const probe = Bun.spawnSync(['/bin/ps', '-o', 'rss=', '-p', String(pid)], {
+    stdout: 'pipe',
+    stderr: 'pipe',
+  })
+  const residentKiB = Number.parseInt(probe.stdout.toString().trim(), 10)
+  if (probe.exitCode !== 0 || !Number.isFinite(residentKiB) || residentKiB <= 0) {
+    throw new Error(`failed to measure resident memory for PID ${pid}: ${probe.stderr.toString()}`)
+  }
+  return residentKiB * 1024
+}
+
+function median(values: number[]): number {
+  if (values.length === 0) throw new Error('cannot calculate a median without samples')
+  const sorted = [...values].sort((left, right) => left - right)
+  return sorted[Math.floor(sorted.length / 2)]
 }
 
 async function waitForRuntimeStatus(
