@@ -1,9 +1,13 @@
 #!/usr/bin/env node
 
-import { readFileSync, realpathSync } from 'node:fs'
+import { realpathSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
-import { installedContentIdentity, readInstallSource } from '../src/install-source.mjs'
+import {
+  CLI_VERSION,
+  installedContentIdentity,
+  readInstallSource,
+} from '../src/install-source.mjs'
 import {
   formatLifecycleHelp,
   formatRootHelp,
@@ -187,11 +191,14 @@ function installedRuntimeInfo(productVersion) {
 }
 
 function readVersion() {
-  const packageUrl = new URL('../package.json', import.meta.url)
-  return JSON.parse(readFileSync(packageUrl, 'utf8')).version
+  return CLI_VERSION
 }
 
-if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (
+  globalThis.__OPENALICE_BUILD_VERSION__ === undefined
+  && process.argv[1]
+  && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
   main().then(
     (code) => { process.exitCode = code },
     (error) => {

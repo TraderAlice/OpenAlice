@@ -1,16 +1,17 @@
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { readFileSync } from 'node:fs'
 import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { resolveInstalledLayout } from './install-layout.mjs'
-import { installSourceUpdateChannel, readInstallSource } from './install-source.mjs'
+import {
+  CLI_VERSION,
+  installSourceUpdateChannel,
+  readInstallSource,
+} from './install-source.mjs'
 
-const CURRENT_VERSION = JSON.parse(
-  readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
-).version
+const CURRENT_VERSION = CLI_VERSION
 const DEFAULT_MANIFEST_URL = 'https://download.openalice.ai/manifest.json'
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1_000
 const CHECK_TIMEOUT_MS = 1_500

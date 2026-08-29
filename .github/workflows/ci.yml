@@ -4,7 +4,7 @@ on:
   push:
     branches: [master, dev]
   pull_request:
-    branches: [dev, master]
+    branches: [dev, master, codex/usability-improvements]
   # Keep a full cross-platform safety net for lightweight PRs that intentionally
   # skip the expensive host matrix. Scheduled workflows run from the default
   # branch, while checkout below points the jobs at the current dev branch.

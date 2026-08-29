@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs'
 import { access, readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
@@ -6,14 +5,12 @@ import { inspectRuntime } from './lifecycle.mjs'
 import { discoverRuntimeLogs } from './logs.mjs'
 import { resolveInstalledLayout } from './install-layout.mjs'
 import {
+  CLI_VERSION,
   installedContentIdentity,
   readInstallSource,
 } from './install-source.mjs'
 import { probeOpenAlice } from './runtime-client.mjs'
 
-const CLI_VERSION = JSON.parse(
-  readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
-).version
 const MINIMUM_NODE_VERSION = [22, 19, 0]
 const SOURCE_ARTIFACTS = Object.freeze([
   'dist/main.js',

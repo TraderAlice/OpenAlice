@@ -348,8 +348,8 @@ Checkboxes reflect repository truth, not intent.
 
 ### 1. Feasibility gate
 
-- [ ] Pin the Bun build tool version used by CI and local release builds.
-- [ ] Compile the TypeScript CLI and Supervisor TUI for the current host with
+- [x] Pin the Bun build tool version used by CI and local release builds.
+- [x] Compile the TypeScript CLI and Supervisor TUI for the current host with
   no system Node requirement in the output.
 - [ ] Compile and boot Alice from an isolated `OPENALICE_HOME` with the real Web
   UI and auth-status route.
@@ -641,3 +641,11 @@ This plan is complete only when:
   at a time, then the accepted initiative is promoted coherently to `dev`.
   OrbStack Docker is the default clean Linux installation harness, with native
   macOS and Windows acceptance retained for platform-specific behavior.
+- 2026-08-29: Feasibility increment 1 pinned Bun 1.3.14, added a reusable
+  current-host compile/probe harness, and moved CLI version resolution behind a
+  build-time constant with the existing package-manifest fallback for source
+  execution. The compiled CLI and Supervisor import graph runs `--version` and
+  `--help` with an empty `PATH`: macOS arm64 produced 63,891,938 bytes in 70 ms;
+  OrbStack Linux arm64 produced 94,087,312 bytes in 232 ms; emulated Linux x64
+  produced 94,079,104 bytes in 480 ms. This proves the command shell only;
+  Alice/component boot, PTY, resources, and external broker packs remain open.
