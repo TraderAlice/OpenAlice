@@ -1928,6 +1928,25 @@ Landscape party-window density follow-up (2026-08-29):
   `cd ui && npx tsc -b`, the 608-file Vitest run (5,039 passing; one file and nine tests skipped), and the UI
   production build all passed.
 
+Landscape Agent-file hierarchy follow-up (2026-08-29):
+
+- Continued from the two-column landscape Team roster into a real member's Agent file at 844x390. The 726x240
+  window inherited the phone card reflow at 760px: facts dropped under the portrait and dialogue, raising content
+  scroll height to 288px inside a 232px client area. The session command remained visible, but both record drawers
+  began below the window edge, so the most useful history looked absent until the player discovered internal scroll.
+- Compared making every short-landscape modal taller, compressing the card's typography and controls, and separating
+  the Agent-file content breakpoint from the touch-HUD breakpoint. Chose the breakpoint split: the card keeps its
+  three-column game dossier through 680px, while genuinely narrow stages retain the established two-column portrait
+  and dialogue with facts, actions, and records stacked below. This preserves readable text and touch targets instead
+  of trading them for density.
+- Browser-played the result at 844x390. The dossier now resolves into 76px / 238px / 322px columns inside a 726x260
+  window; its 252px client height equals scroll height, and the Open session command plus record drawer finish inside
+  the visible frame. At 390x844 it still uses 64px / 202px columns, stacks every lower section, fits its 344x362
+  window without internal or page overflow, and Back restores focus to the initiating roster member.
+- Focused Agent-file style, component, and OfficePage specs passed: 3 files / 9 tests. `npx tsc --noEmit`,
+  `cd ui && npx tsc -b`, the 608-file Vitest run (5,040 passing; one file and nine tests skipped), and the UI
+  production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

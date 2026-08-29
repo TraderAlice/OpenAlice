@@ -3223,7 +3223,9 @@
   .oa-office-stats {
     display: none;
   }
+}
 
+@container (max-width: 680px) {
   .oa-office-inspect {
     max-height: min(320px, calc(100% - 84px));
   }
