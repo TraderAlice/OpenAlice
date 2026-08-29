@@ -1,12 +1,17 @@
-export type OfficeCoworkerArchetype = 'codex' | 'claude' | 'pi' | 'opencode'
+export type OfficeCoworkerArchetype = 'codex' | 'claude' | 'pi' | 'opencode' | 'grok'
 export type OfficeCoworkerIdentity =
-  | OfficeCoworkerArchetype
+  | Exclude<OfficeCoworkerArchetype, 'grok'>
   | 'codex-mechanic'
   | 'codex-scout'
   | 'claude-botanist'
   | 'pi-mathematician'
   | 'opencode-hacker'
   | 'opencode-analyst'
+  | 'grok-oracle'
+  | 'grok-engineer'
+  | 'grok-analyst'
+  | 'grok-researcher'
+  | 'grok-architect'
 
 export interface OfficeCoworkerSpriteAsset {
   id: OfficeCoworkerIdentity
@@ -43,6 +48,11 @@ export const OFFICE_COWORKER_SPRITES: Record<OfficeCoworkerIdentity, OfficeCowor
   opencode: coworkerAsset('opencode', 'var(--terminal-magenta)', -470),
   'opencode-hacker': coworkerAsset('opencode-hacker', 'var(--terminal-magenta)', -570),
   'opencode-analyst': coworkerAsset('opencode-analyst', 'var(--terminal-magenta)', -670),
+  'grok-oracle': coworkerAsset('grok-oracle', 'var(--terminal-cyan)', -730),
+  'grok-engineer': coworkerAsset('grok-engineer', 'var(--terminal-cyan)', -790),
+  'grok-analyst': coworkerAsset('grok-analyst', 'var(--terminal-cyan)', -850),
+  'grok-researcher': coworkerAsset('grok-researcher', 'var(--terminal-cyan)', -910),
+  'grok-architect': coworkerAsset('grok-architect', 'var(--terminal-cyan)', -970),
 }
 
 export const OFFICE_COWORKER_EMOTES = {
@@ -55,7 +65,7 @@ const AGENT_ARCHETYPE: Record<string, OfficeCoworkerArchetype> = {
   cursor: 'codex',
   'cursor-agent': 'codex',
   agy: 'codex',
-  grok: 'codex',
+  grok: 'grok',
   claude: 'claude',
   pi: 'pi',
   opencode: 'opencode',
@@ -67,12 +77,28 @@ const ARCHETYPE_POOL: Record<OfficeCoworkerArchetype, readonly OfficeCoworkerIde
   claude: ['claude-botanist', 'claude'],
   pi: ['pi-mathematician', 'pi'],
   opencode: ['opencode-hacker', 'opencode-analyst', 'opencode'],
+  grok: ['grok-oracle', 'grok-engineer', 'grok-analyst', 'grok-researcher', 'grok-architect'],
+}
+
+const ARCHETYPE_DEFAULT: Record<OfficeCoworkerArchetype, OfficeCoworkerIdentity> = {
+  codex: 'codex',
+  claude: 'claude',
+  pi: 'pi',
+  opencode: 'opencode',
+  grok: 'grok-oracle',
 }
 
 function stableCoworkerHash(value: string): number {
   return Array.from(value).reduce((hash, character) => (
     (hash * 31 + character.charCodeAt(0)) >>> 0
   ), 0)
+}
+
+function stableGrokCoworkerHash(value: string): number {
+  return Array.from(value).reduce((hash, character) => {
+    const mixed = hash ^ character.charCodeAt(0)
+    return Math.imul(mixed, 16_777_619) >>> 0
+  }, 2_166_136_261)
 }
 
 function archetypeForAgent(agent: string): OfficeCoworkerArchetype {
@@ -88,8 +114,12 @@ export function officeCoworkerSpriteForAgent(
   identity = '',
 ): OfficeCoworkerSpriteAsset {
   const archetype = archetypeForAgent(agent)
-  if (!identity) return OFFICE_COWORKER_SPRITES[archetype]
+  if (!identity) return OFFICE_COWORKER_SPRITES[ARCHETYPE_DEFAULT[archetype]]
   const pool = ARCHETYPE_POOL[archetype]
-  const selected = pool[stableCoworkerHash(`${agent.trim().toLowerCase()}:${identity}`) % pool.length]
-  return OFFICE_COWORKER_SPRITES[selected ?? archetype]
+  const hashInput = `${agent.trim().toLowerCase()}:${identity}`
+  const hash = archetype === 'grok'
+    ? stableGrokCoworkerHash(hashInput)
+    : stableCoworkerHash(hashInput)
+  const selected = pool[hash % pool.length]
+  return OFFICE_COWORKER_SPRITES[selected ?? ARCHETYPE_DEFAULT[archetype]]
 }

@@ -24,7 +24,7 @@ transparent sources, fit each full silhouette into a native 72x104 canvas with
 nearest-neighbor sampling, and hard-mat alpha for crisp GBA-scale cards. The
 generated full-resolution masters are intentionally not shipped at runtime.
 
-The roster now contains ten curated identities. Six additional feminine coworkers were generated as transparent
+The roster now contains fifteen curated identities. Six additional feminine coworkers were generated as transparent
 three-pose sheets: two Codex variants (field mechanic and cyber scout), a Claude botanical archivist, a Pi field
 mathematician, and two OpenCode variants (workshop hacker and systems analyst). Each sheet keeps one identity across a
 standing portrait, seated idle pose, and seated typing pose. `scripts/package-office-coworker-sheet.py` splits those
@@ -38,6 +38,17 @@ Known runtimes map to a small family pool, and `agent + resumeId` selects one id
 never changes appearance after refresh. The original four coworkers remain veteran variants; the six newcomers make
 the default population feminine-led without deleting the original cast. Unknown future runtime names receive a stable
 hash-selected family; they never fall back to Alice.
+
+Grok Build owns a separate five-woman runtime family instead of borrowing the
+Codex pool: a night-sky systems oracle, copper signal engineer, violet inference
+analyst, teal star-network researcher, and ivory lattice architect. Each was
+generated with the built-in image generator as one identity-locked three-pose
+sheet against the same style master and Codex scout pose references. When a
+generation baked its preview background into RGB, a background-extraction edit
+removed only that background before the standard packager applied hard alpha,
+native card/map canvases, shared seated scale, and bottom-center anchoring.
+Grok uses its own deterministic identity hash, so repeated Grok Sessions spread
+across this larger feminine cast while retaining their appearance after refresh.
 
 The four `*-desk-v1.png` files are a separate generated map-scale pose family.
 Each employee is seated, seen from a top-down three-quarter rear view, and faces
