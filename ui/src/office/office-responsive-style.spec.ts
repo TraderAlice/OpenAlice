@@ -49,6 +49,7 @@ describe('Office responsive style contract', () => {
     expect(narrowLiveCss).toContain('.oa-office-interact-prompt[data-has-detail="true"]')
     expect(narrowLiveCss).toContain('max-width: 168px')
     expect(narrowLiveCss).toContain('grid-template-columns: 30px minmax(0, 1fr) 32px')
+    expect(css.match(/var\(--office-prompt-tail-shift, 0px\)/g)).toHaveLength(4)
   })
 
   it('stacks window location and type as deliberate phone title lines', () => {

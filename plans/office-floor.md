@@ -2100,6 +2100,25 @@ Office excursion-return follow-up (2026-08-29):
   `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 611-file Vitest run (5,052 passing; one file and nine tests skipped),
   and the UI production build all passed.
 
+Camera-edge interaction prompt follow-up (2026-08-29):
+
+- Replayed the previously noted portrait `TALK` position at `312,240,left`. The prompt was not clipped in current code,
+  so no stale screenshot fix was applied. Current play instead showed the real conflict: the existing inward edge flip kept
+  the prompt visible by painting its detailed action strip directly over Alice.
+- Compared keeping the direct opposite-side flip, moving interaction copy into fixed HUD chrome, and retaining a world
+  callout with perpendicular edge fallback. Chose the world callout: it first uses the side away from Alice, then the
+  perpendicular side with more camera room, and only uses the side toward Alice as a last resort. This preserves the
+  spatial target relationship without sacrificing player readability.
+- The shared placement primitive now models the prompt and Alice bounds, rejects placements that cover the player,
+  cross-axis clamps a perpendicular prompt into the camera, and shifts its pixel tail back toward the target. Detailed
+  prompts use a deliberate 216px desktop width and 168px narrow width so placement geometry and rendered geometry agree.
+- Browser-played the same employee interaction at 1280x900, 390x844, and 844x390. Desktop retained the natural left-side
+  callout; portrait and short landscape used an unobstructed below-target callout, remained fully visible, and still
+  opened the Agent file with `Enter`.
+- Focused prompt, OfficeBuilding, and responsive-style specs passed: 3 files / 25 tests. `npx tsc --noEmit`,
+  `cd ui && npx tsc -b`, the 611-file Vitest run (5,054 passing; one file and nine tests skipped), and the UI production
+  build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

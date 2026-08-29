@@ -3781,7 +3781,7 @@
 
 .oa-office-interact-prompt[data-side="above"]::after {
   bottom: -7px;
-  left: calc(50% - 5px);
+  left: calc(50% + var(--office-prompt-tail-shift, 0px) - 5px);
   border-top: 0;
   border-left: 0;
 }
@@ -3792,7 +3792,7 @@
 
 .oa-office-interact-prompt[data-side="below"]::after {
   top: -7px;
-  left: calc(50% - 5px);
+  left: calc(50% + var(--office-prompt-tail-shift, 0px) - 5px);
   border-right: 0;
   border-bottom: 0;
 }
@@ -3802,7 +3802,7 @@
 }
 
 .oa-office-interact-prompt[data-side="left"]::after {
-  top: calc(50% - 5px);
+  top: calc(50% + var(--office-prompt-tail-shift, 0px) - 5px);
   right: -7px;
   border-bottom: 0;
   border-left: 0;
@@ -3813,7 +3813,7 @@
 }
 
 .oa-office-interact-prompt[data-side="right"]::after {
-  top: calc(50% - 5px);
+  top: calc(50% + var(--office-prompt-tail-shift, 0px) - 5px);
   left: -7px;
   border-top: 0;
   border-right: 0;

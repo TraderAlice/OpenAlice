@@ -37,6 +37,7 @@ import {
 } from './interaction-targets'
 import {
   OFFICE_PROMPT_DETAIL_MAX_WIDTH,
+  OFFICE_PROMPT_NARROW_DETAIL_MAX_WIDTH,
   officeInteractionPromptPlacement,
 } from './interaction-prompt'
 import { officeCoworkerLabel } from './label'
@@ -255,7 +256,9 @@ export function OfficeBuilding({
           },
           camera,
           nearbyTarget.kind === 'employee' && nearbyTarget.employee.bubble
-            ? OFFICE_PROMPT_DETAIL_MAX_WIDTH
+            ? viewportSize.width > 0 && viewportSize.width <= 520
+              ? OFFICE_PROMPT_NARROW_DETAIL_MAX_WIDTH
+              : OFFICE_PROMPT_DETAIL_MAX_WIDTH
             : undefined,
         )
       : null,
@@ -1052,8 +1055,10 @@ export function OfficeBuilding({
               style={{
                 left: promptPlacement.x,
                 top: promptPlacement.y,
+                width: promptPlacement.width,
                 zIndex: officeDepthAt(nearbyTarget.y) + 1000,
-              }}
+                '--office-prompt-tail-shift': `${promptPlacement.tailShift}px`,
+              } as CSSProperties}
             >
               <span
                 className="oa-office-interact-prompt__action"

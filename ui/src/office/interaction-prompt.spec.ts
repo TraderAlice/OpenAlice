@@ -15,41 +15,41 @@ describe('officeInteractionPromptPlacement', () => {
       { x: 420, y: 390 },
       map,
       camera,
-    )).toEqual({ side: 'left', x: 386, y: 390 })
+    )).toEqual({ side: 'left', x: 386, y: 390, width: 176, tailShift: 0 })
 
     expect(officeInteractionPromptPlacement(
       { x: 480, y: 360 },
       { x: 490, y: 280 },
       map,
       camera,
-    )).toEqual({ side: 'above', x: 490, y: 246 })
+    )).toEqual({ side: 'above', x: 490, y: 246, width: 176, tailShift: 0 })
   })
 
-  it('flips the callout inward at every map edge', () => {
+  it('uses a visible perpendicular side at every edge before covering Alice', () => {
     expect(officeInteractionPromptPlacement(
       { x: 300, y: 360 },
       { x: 180, y: 360 },
       map,
       camera,
-    ).side).toBe('right')
+    ).side).toBe('above')
     expect(officeInteractionPromptPlacement(
       { x: 660, y: 360 },
       { x: 820, y: 360 },
       map,
       camera,
-    ).side).toBe('left')
+    ).side).toBe('above')
     expect(officeInteractionPromptPlacement(
       { x: 480, y: 160 },
       { x: 480, y: 80 },
       map,
       camera,
-    ).side).toBe('below')
+    ).side).toBe('right')
     expect(officeInteractionPromptPlacement(
       { x: 480, y: 560 },
       { x: 480, y: 680 },
       map,
       camera,
-    ).side).toBe('above')
+    ).side).toBe('right')
   })
 
   it('uses the current camera viewport rather than invisible map space', () => {
@@ -58,7 +58,7 @@ describe('officeInteractionPromptPlacement', () => {
       { x: 438, y: 450 },
       { width: 760, height: 530 },
       { x: -113, y: 0 },
-    ).side).toBe('above')
+    ).side).toBe('right')
   })
 
   it('reserves the wider edge boundary only for a prompt with detail copy', () => {
@@ -72,6 +72,31 @@ describe('officeInteractionPromptPlacement', () => {
       map,
       camera,
       OFFICE_PROMPT_DETAIL_MAX_WIDTH,
+    ).side).toBe('above')
+  })
+
+  it('uses the opposite side only when it has room without covering Alice', () => {
+    expect(officeInteractionPromptPlacement(
+      { x: 620, y: 360 },
+      { x: 180, y: 360 },
+      { width: 960, height: 120 },
+      { x: 0, y: -300 },
     ).side).toBe('right')
+  })
+
+  it('slides a perpendicular prompt along the camera edge and keeps its tail on the target', () => {
+    expect(officeInteractionPromptPlacement(
+      { x: 100, y: 200 },
+      { x: 50, y: 200 },
+      { width: 374, height: 668 },
+      camera,
+      168,
+    )).toEqual({
+      side: 'below',
+      x: 96,
+      y: 234,
+      width: 168,
+      tailShift: -46,
+    })
   })
 })

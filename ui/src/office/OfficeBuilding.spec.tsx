@@ -642,6 +642,8 @@ describe('OfficeBuilding', () => {
     expect(interactionPrompt.parentElement?.classList.contains('oa-office-map')).toBe(true)
     expect(interactionPrompt.dataset.side).toBeTruthy()
     expect(interactionPrompt.dataset.kind).toBe('cabinet')
+    expect(interactionPrompt.style.width).toBe('176px')
+    expect(interactionPrompt.style.getPropertyValue('--office-prompt-tail-shift')).toMatch(/^-?\d+px$/)
     expect(interactionPrompt.querySelector('img')?.getAttribute('src'))
       .toBe('/office/hud/drawer-record-v2.png')
     expect(interactionPrompt.textContent).toContain('Files')
