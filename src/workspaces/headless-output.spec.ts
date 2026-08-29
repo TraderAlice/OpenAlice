@@ -294,7 +294,7 @@ describe('headless structured output', () => {
     ])
     expect(output.assistantText).toBe('Git rebase rewrites history.')
     expect(output.blocks).toEqual([
-      { type: 'text', text: 'Git rebase rewrites history.' },
+      { type: 'text', text: 'Git rebase rewrites history.\n' },
       {
         type: 'tool',
         id: 'step-4',

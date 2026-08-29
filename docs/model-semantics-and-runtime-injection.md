@@ -131,6 +131,12 @@ control, whether it resolves from login, environment, user settings, or local
 project files. Launcher-owned explicit `--settings` remain available in both
 modes.
 
+Headless streaming adapters must preserve incremental assistant text exactly,
+including standalone spaces and newlines. Those whitespace-only deltas carry
+Markdown structure and must not pass through truthiness checks based on
+`trim()`. Trimming remains appropriate only at a final-result or display
+boundary where the adapter has received one complete message.
+
 A registered provider default is descriptive model metadata, not an implicit
 Session launch parameter. OpenAlice may label that default in selection help,
 but it persists and projects an effort only when a Workspace preference, Issue,

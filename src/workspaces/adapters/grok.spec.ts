@@ -248,6 +248,21 @@ describe('grok headless extractors', () => {
     expect(grokAdapter.extractHeadlessAssistantText?.('  "text": "PONG",')).toBeNull();
   });
 
+  it('preserves standalone whitespace deltas used by Markdown layout', () => {
+    const chunks = ['#', ' ', 'Heading', '\n\n', '-', ' ', 'item'];
+    for (const chunk of chunks) {
+      expect(grokAdapter.extractHeadlessOutputEvents?.(JSON.stringify({
+        type: 'text',
+        data: chunk,
+      }))).toEqual([{ type: 'text', text: chunk, delta: true }]);
+    }
+
+    expect(parseHeadlessOutputText({
+      text: chunks.map((data) => JSON.stringify({ type: 'text', data })).join('\n'),
+      extractEvents: grokAdapter.extractHeadlessOutputEvents!.bind(grokAdapter),
+    }).assistantText).toBe('# Heading\n\n- item');
+  });
+
   it('reads live 1.0.4 flattened tool_call / tool_call_update lines', () => {
     const started = JSON.stringify({
       type: 'tool_call',
