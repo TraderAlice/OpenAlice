@@ -1945,6 +1945,8 @@ export const en = {
     surface: 'Surface',
     deskDrawers: 'Desk drawers',
     openSession: 'Open session',
+    showFullTitle: 'Show full title',
+    collapseTitle: 'Collapse title',
     amenityCoffee: 'Coffee',
     amenityPlant: 'Plant',
     timeline: 'Occupancy log',

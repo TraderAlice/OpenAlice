@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { OfficeFloorEmployee } from '../api/office'
 import { i18n } from '../i18n'
 import { OfficeDesk } from './OfficeDesk'
+import { officeCoworkerSpriteForAgent } from './coworker-sprites'
 
 const employee: OfficeFloorEmployee = {
   resumeId: 'resume-claude',
@@ -57,18 +58,19 @@ describe('OfficeDesk', () => {
       onSelect: () => undefined,
     }
     const { container, rerender } = render(<OfficeDesk {...props} />)
+    const coworker = officeCoworkerSpriteForAgent(employee.agent, employee.resumeId)
 
     expect(screen.getByRole('button').style.zIndex).toBe('107')
     expect(screen.queryByText('Researching…')).toBeNull()
-    expect(container.querySelector('.oa-office-coworker')?.getAttribute('data-agent')).toBe('claude')
+    expect(container.querySelector('.oa-office-coworker')?.getAttribute('data-agent')).toBe(coworker.id)
     expect(container.querySelector('.oa-office-coworker')?.getAttribute('data-pose')).toBe('desk')
     expect(container.querySelector('.oa-office-coworker')?.getAttribute('data-reduced-motion')).toBe('true')
     expect(container.querySelector<HTMLImageElement>('.oa-office-topdown-station__asset')?.src)
       .toContain('/office/furniture/workstation-v2.png')
     expect(container.querySelector<HTMLImageElement>('.oa-office-coworker img')?.src)
-      .toContain('/office/coworkers/claude-desk-v1.png')
+      .toContain(coworker.deskSrc)
     expect(container.querySelector<HTMLImageElement>('.oa-office-coworker__frame--work')?.src)
-      .toContain('/office/coworkers/claude-desk-work-v1.png')
+      .toContain(coworker.deskWorkSrc)
     expect(container.querySelector('.oa-office-nameplate')?.textContent).toContain('c1')
     expect(container.querySelector('.oa-office-nameplate')?.textContent).not.toContain('Open issue scan')
     expect(screen.getByRole('button').getAttribute('aria-label')).toContain('Open issue scan')

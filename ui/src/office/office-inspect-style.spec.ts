@@ -14,13 +14,19 @@ const compactCss = css.slice(compactStart, phoneStart)
 
 describe('Office Agent-file style contract', () => {
   it('keeps character information ahead of the full-width command row', () => {
-    expect(css).toMatch(/\.oa-office-inspect\s*\{[\s\S]*?max-height: 270px/)
+    expect(css).toMatch(/\.oa-office-inspect\s*\{[\s\S]*?max-height: 270px;[\s\S]*?overflow: hidden/)
     expect(css).toMatch(
-      /\.oa-office-inspect__profile\s*\{[\s\S]*?grid-template-columns: 76px minmax\(180px, 1fr\) minmax\(250px, 1\.35fr\)/,
+      /\.oa-office-inspect__profile\s*\{[\s\S]*?min-height: 0;[\s\S]*?grid-template-columns: 76px minmax\(180px, 1fr\) minmax\(250px, 1\.35fr\)[\s\S]*?overflow-y: auto/,
     )
     expect(css).toMatch(
-      /\.oa-office-inspect__actions\s*\{[\s\S]*?grid-column: 1 \/ -1/,
+      /\.oa-office-inspect__actions\s*\{[\s\S]*?grid-column: 1 \/ -1;[\s\S]*?flex: none/,
     )
+  })
+
+  it('clamps optional long titles and uses a simple DOM-owned close mark', () => {
+    expect(css).toMatch(/\.oa-office-inspect__identity p\s*\{[\s\S]*?-webkit-line-clamp: 3/)
+    expect(css).toMatch(/\.oa-office-inspect__identity p\[data-expanded="true"\]\s*\{[\s\S]*?overflow: visible/)
+    expect(css).toMatch(/\.oa-office-window__close-mark\s*\{[\s\S]*?clip-path: polygon/)
   })
 
   it('keeps the three-column character card in landscape windows', () => {

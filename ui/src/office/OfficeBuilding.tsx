@@ -63,7 +63,19 @@ const OFFICE_MOVEMENTS = {
   down: { x: 0, y: 24, direction: 'down' as const },
 }
 
-type OfficeMovement = (typeof OFFICE_MOVEMENTS)[keyof typeof OFFICE_MOVEMENTS]
+type OfficeMovement = { x: number; y: number; direction: OfficeAliceDirection }
+const OFFICE_MOVEMENT_KEYS: Record<string, OfficeMovement> = {
+  arrowleft: OFFICE_MOVEMENTS.left,
+  a: OFFICE_MOVEMENTS.left,
+  arrowright: OFFICE_MOVEMENTS.right,
+  d: OFFICE_MOVEMENTS.right,
+  arrowup: OFFICE_MOVEMENTS.up,
+  w: OFFICE_MOVEMENTS.up,
+  arrowdown: OFFICE_MOVEMENTS.down,
+  s: OFFICE_MOVEMENTS.down,
+}
+const OFFICE_MANUAL_MOVE_INTERVAL_MS = 96
+const OFFICE_DIAGONAL_STEP = 17
 const OFFICE_DEPARTURE_MS = 520
 export type OfficeLogOrigin = 'menu' | 'operations' | 'floor-terminal'
 export interface OfficePlayerState {
@@ -146,6 +158,10 @@ export function OfficeBuilding({
   const walkTimerRef = useRef<number | null>(null)
   const touchMoveDelayRef = useRef<number | null>(null)
   const touchMoveRepeatRef = useRef<number | null>(null)
+  const manualMoveRepeatRef = useRef<number | null>(null)
+  const manualMoveKeysRef = useRef(new Set<string>())
+  const lastManualMoveKeyRef = useRef<string | null>(null)
+  const manualMoveTickRef = useRef<() => void>(() => {})
   const routeTimerRef = useRef<number | null>(null)
   const departureTimerRef = useRef<number | null>(null)
   const routeGenerationRef = useRef(0)
@@ -501,6 +517,44 @@ export function OfficeBuilding({
       touchMoveRepeatRef.current = window.setInterval(() => moveAlice(movement), 96)
     }, 220)
   }
+  const stopManualMove = () => {
+    if (manualMoveRepeatRef.current != null) window.clearInterval(manualMoveRepeatRef.current)
+    manualMoveRepeatRef.current = null
+    manualMoveKeysRef.current.clear()
+    lastManualMoveKeyRef.current = null
+  }
+  const movementForHeldKeys = (): OfficeMovement | null => {
+    const held = Array.from(manualMoveKeysRef.current)
+      .map((key) => OFFICE_MOVEMENT_KEYS[key])
+      .filter((movement): movement is OfficeMovement => Boolean(movement))
+    const horizontal = Number(held.some(({ direction }) => direction === 'right'))
+      - Number(held.some(({ direction }) => direction === 'left'))
+    const vertical = Number(held.some(({ direction }) => direction === 'down'))
+      - Number(held.some(({ direction }) => direction === 'up'))
+    if (horizontal === 0 && vertical === 0) return null
+    const diagonal = horizontal !== 0 && vertical !== 0
+    const lastDirection = lastManualMoveKeyRef.current
+      ? OFFICE_MOVEMENT_KEYS[lastManualMoveKeyRef.current]?.direction
+      : undefined
+    const direction = lastDirection
+      ?? (horizontal < 0 ? 'left' : horizontal > 0 ? 'right' : vertical < 0 ? 'up' : 'down')
+    return {
+      x: horizontal * (diagonal ? OFFICE_DIAGONAL_STEP : 24),
+      y: vertical * (diagonal ? OFFICE_DIAGONAL_STEP : 24),
+      direction,
+    }
+  }
+  const moveAliceFromHeldKeys = () => {
+    const movement = movementForHeldKeys()
+    if (movement) moveAlice(movement)
+  }
+  manualMoveTickRef.current = () => {
+    if (floorInteractionSuspended || departingWorkspace || selected) {
+      stopManualMove()
+      return
+    }
+    moveAliceFromHeldKeys()
+  }
   useEffect(() => {
     const handleAmbientKeyDown = (event: KeyboardEvent) => {
       if (
@@ -529,24 +583,39 @@ export function OfficeBuilding({
         activateNearbyTarget()
         return
       }
-      const movement = {
-        arrowleft: OFFICE_MOVEMENTS.left,
-        a: OFFICE_MOVEMENTS.left,
-        arrowright: OFFICE_MOVEMENTS.right,
-        d: OFFICE_MOVEMENTS.right,
-        arrowup: OFFICE_MOVEMENTS.up,
-        w: OFFICE_MOVEMENTS.up,
-        arrowdown: OFFICE_MOVEMENTS.down,
-        s: OFFICE_MOVEMENTS.down,
-      }[key]
+      const movement = OFFICE_MOVEMENT_KEYS[key]
       if (!movement) return
       event.preventDefault()
       if (fromFloor && target !== viewport) viewport?.focus({ preventScroll: true })
+      if (manualMoveKeysRef.current.has(key)) return
+      manualMoveKeysRef.current.add(key)
+      lastManualMoveKeyRef.current = key
       cancelAutoWalk()
-      moveAlice(movement)
+      moveAliceFromHeldKeys()
+      if (manualMoveRepeatRef.current == null) {
+        manualMoveRepeatRef.current = window.setInterval(
+          () => manualMoveTickRef.current(),
+          OFFICE_MANUAL_MOVE_INTERVAL_MS,
+        )
+      }
+    }
+    const handleAmbientKeyUp = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase()
+      if (!OFFICE_MOVEMENT_KEYS[key]) return
+      manualMoveKeysRef.current.delete(key)
+      if (lastManualMoveKeyRef.current === key) {
+        lastManualMoveKeyRef.current = Array.from(manualMoveKeysRef.current).at(-1) ?? null
+      }
+      if (manualMoveKeysRef.current.size === 0) stopManualMove()
     }
     document.addEventListener('keydown', handleAmbientKeyDown)
-    return () => document.removeEventListener('keydown', handleAmbientKeyDown)
+    document.addEventListener('keyup', handleAmbientKeyUp)
+    window.addEventListener('blur', stopManualMove)
+    return () => {
+      document.removeEventListener('keydown', handleAmbientKeyDown)
+      document.removeEventListener('keyup', handleAmbientKeyUp)
+      window.removeEventListener('blur', stopManualMove)
+    }
   })
   useEffect(() => () => {
     if (bumpFrameRef.current != null) window.cancelAnimationFrame(bumpFrameRef.current)
@@ -556,6 +625,7 @@ export function OfficeBuilding({
     routeGenerationRef.current += 1
     if (routeTimerRef.current != null) window.clearTimeout(routeTimerRef.current)
     if (departureTimerRef.current != null) window.clearTimeout(departureTimerRef.current)
+    stopManualMove()
     stopTouchMove()
   // Timer refs are stable for the component lifetime.
   // eslint-disable-next-line react-hooks/exhaustive-deps

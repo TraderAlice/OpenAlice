@@ -12,6 +12,7 @@ import { OfficeBuilding, type OfficeLogOrigin } from '../office/OfficeBuilding'
 import { OfficeCabinetWindow } from '../office/OfficeCabinetWindow'
 import { officePixelImg } from '../office/furniture'
 import { OfficeInspectRail } from '../office/OfficeInspectRail'
+import { OfficeWindowControlGlyph } from '../office/OfficeWindowControlGlyph'
 import { OFFICE_HUD_ASSETS } from '../office/hud-assets'
 import {
   readOfficePlayerState,
@@ -281,7 +282,7 @@ export function OfficePage() {
                     <span>{t('office.timeline')}</span>
                   </div>
                   <button type="button" autoFocus aria-label={t('common.close')} onClick={closeLog}>
-                    <img src={OFFICE_HUD_ASSETS.windowClose} alt="" aria-hidden style={officePixelImg} />
+                    <OfficeWindowControlGlyph kind="close" />
                   </button>
                 </header>
                 <div className="oa-office-window__body">

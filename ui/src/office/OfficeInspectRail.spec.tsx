@@ -61,9 +61,9 @@ describe('OfficeInspectRail', () => {
 
     expect(screen.getByText('Polishing the Office floor.')).toBeTruthy()
     expect(container.querySelector<HTMLImageElement>('.oa-office-inspect__portrait .oa-office-coworker img')?.src)
-      .toContain('/office/coworkers/codex-portrait-v2.png')
-    expect(screen.getByRole('button', { name: 'Close' }).querySelector('img')?.getAttribute('src'))
-      .toBe('/office/hud/window-close-v2.png')
+      .toContain('/office/coworkers/codex-')
+    expect(screen.getByRole('button', { name: 'Close' }).querySelector('.oa-office-window__close-mark'))
+      .toBeTruthy()
     const openSession = screen.getByRole('button', { name: 'Open session' })
     expect(openSession.querySelector('img')?.getAttribute('src'))
       .toBe('/office/hud/session-portal-v2.png')
@@ -101,6 +101,35 @@ describe('OfficeInspectRail', () => {
     expect(onOpenDrawer).toHaveBeenCalledWith(employee.drawers[0])
     await userEvent.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('collapses a long Session title without moving the primary commands', async () => {
+    const longTitle = 'Research question: Is NVDA in a buyable technical setup right now, and does the broader semiconductor sector support it?'
+    const { container } = render(
+      <OfficeInspectRail
+        employee={{ ...employee, title: longTitle, bubble: null }}
+        roomName="Auto Quant"
+        onOpen={vi.fn()}
+        onOpenDrawer={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+
+    const title = screen.getByText(longTitle)
+    const toggle = screen.getByRole('button', { name: 'Show full title' })
+    expect(title.getAttribute('data-expanded')).toBeNull()
+    expect(container.querySelector('.oa-office-inspect')?.lastElementChild)
+      .toBe(container.querySelector('.oa-office-inspect__actions'))
+    expect(screen.getByRole('button', { name: 'Close' }).querySelector('.oa-office-window__close-mark'))
+      .toBeTruthy()
+    screen.getByRole('button', { name: 'Close' }).focus()
+    await userEvent.keyboard('{Tab}')
+    expect(document.activeElement).toBe(toggle)
+    await userEvent.keyboard('{Tab}')
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Open session' }))
+    await userEvent.click(toggle)
+    expect(title.dataset.expanded).toBe('true')
+    expect(screen.getByRole('button', { name: 'Collapse title' })).toBeTruthy()
   })
 
   it('uses the generated roster-return control when opened from the team list', async () => {

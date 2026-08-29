@@ -17,10 +17,24 @@ describe('Office coworker sprite registry', () => {
     expect(officeCoworkerSpriteForAgent('claude')).toBe(OFFICE_COWORKER_SPRITES.claude)
     expect(officeCoworkerSpriteForAgent('pi')).toBe(OFFICE_COWORKER_SPRITES.pi)
     expect(officeCoworkerSpriteForAgent('opencode')).toBe(OFFICE_COWORKER_SPRITES.opencode)
-    expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.portraitSrc)).size).toBe(4)
-    expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.deskSrc)).size).toBe(4)
-    expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.deskWorkSrc)).size).toBe(4)
-    expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.typingPhaseMs)).size).toBe(4)
+    expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.portraitSrc)).size).toBe(10)
+    expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.deskSrc)).size).toBe(10)
+    expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.deskWorkSrc)).size).toBe(10)
+    expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.typingPhaseMs)).size).toBe(10)
+  })
+
+  it('assigns a stable identity-led coworker from each runtime family pool', () => {
+    const samples = Array.from({ length: 64 }, (_, index) => `resume-${index}`)
+    expect(new Set(samples.map((identity) => officeCoworkerSpriteForAgent('codex', identity).id)).size)
+      .toBe(3)
+    expect(new Set(samples.map((identity) => officeCoworkerSpriteForAgent('claude', identity).id)).size)
+      .toBe(2)
+    expect(new Set(samples.map((identity) => officeCoworkerSpriteForAgent('pi', identity).id)).size)
+      .toBe(2)
+    expect(new Set(samples.map((identity) => officeCoworkerSpriteForAgent('opencode', identity).id)).size)
+      .toBe(3)
+    expect(officeCoworkerSpriteForAgent('codex', 'resume-7'))
+      .toBe(officeCoworkerSpriteForAgent('codex', 'resume-7'))
   })
 
   it('keeps aliases intentional and unknown runtimes stable without returning Alice', () => {

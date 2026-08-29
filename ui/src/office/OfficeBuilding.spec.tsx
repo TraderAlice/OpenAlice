@@ -172,6 +172,49 @@ describe('OfficeBuilding', () => {
     expect(building.querySelector('svg')).toBeNull()
   })
 
+  it('combines held direction keys into an equal-speed diagonal walk', () => {
+    vi.useFakeTimers()
+    try {
+      render(
+        <OfficeBuilding
+          building={{
+            config: {
+              workspaceSleepAfterMs: 1,
+              harnessMinimumVisibleGroups: { chat: 0, 'auto-quant': 0, prediction: 0, other: 0 },
+            },
+            firstSeq: 0,
+            lastSeq: 0,
+            offices: [],
+          }}
+          onSelectEmployee={vi.fn()}
+          onOpenEmployee={vi.fn()}
+          onOpenWorkspace={vi.fn()}
+          onOpenFiles={vi.fn()}
+          onOpenRoster={vi.fn()}
+          onOpenLog={vi.fn()}
+        />,
+      )
+
+      const map = screen.getByLabelText(
+        'Office map. Drag to pan; use arrows or WASD to move Alice; press Enter or Space to interact nearby.',
+      )
+      const alice = screen.getByRole('img', { name: 'Alice on the office map' })
+      fireEvent.keyDown(map, { key: 'w' })
+      expect(`${alice.style.left}:${alice.style.top}`).toBe('480px:312px')
+      fireEvent.keyDown(map, { key: 'd' })
+      expect(`${alice.style.left}:${alice.style.top}`).toBe('497px:295px')
+      expect(alice.dataset.direction).toBe('right')
+      act(() => vi.advanceTimersByTime(96))
+      expect(`${alice.style.left}:${alice.style.top}`).toBe('514px:278px')
+      fireEvent.keyUp(map, { key: 'd' })
+      fireEvent.keyUp(map, { key: 'w' })
+      act(() => vi.advanceTimersByTime(192))
+      expect(`${alice.style.left}:${alice.style.top}`).toBe('514px:278px')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('restores a remembered walkable player position and facing', async () => {
     const onPlayerStateChange = vi.fn()
     render(
@@ -374,7 +417,10 @@ describe('OfficeBuilding', () => {
       const map = screen.getByLabelText(
         'Office map. Drag to pan; use arrows or WASD to move Alice; press Enter or Space to interact nearby.',
       )
-      for (let index = 0; index < 9; index += 1) fireEvent.keyDown(map, { key: 'w' })
+      for (let index = 0; index < 9; index += 1) {
+        fireEvent.keyDown(map, { key: 'w' })
+        fireEvent.keyUp(map, { key: 'w' })
+      }
       const firstImpact = screen.getByTestId('office-collision-impact')
       expect(firstImpact.dataset.direction).toBe('up')
       const firstSerial = Number(firstImpact.dataset.serial)
@@ -385,6 +431,7 @@ describe('OfficeBuilding', () => {
         .toContain('/office/furniture/collision-impact-v1.png')
 
       fireEvent.keyDown(map, { key: 'w' })
+      fireEvent.keyUp(map, { key: 'w' })
       expect(Number(screen.getByTestId('office-collision-impact').dataset.serial)).toBe(firstSerial + 1)
       act(() => vi.advanceTimersByTime(400))
       expect(screen.queryByTestId('office-collision-impact')).toBeNull()
@@ -504,6 +551,7 @@ describe('OfficeBuilding', () => {
       fireEvent.click(quantSign)
       expect(screen.getByTestId('office-route-status').textContent).toContain('Walking to quant')
       fireEvent.keyDown(map, { key: 'ArrowDown' })
+      fireEvent.keyUp(map, { key: 'ArrowDown' })
       expect(controls?.dataset.learned).toBe('true')
       expect(screen.queryByTestId('office-route-status')).toBeNull()
       expect(screen.queryByTestId('office-route-trail')).toBeNull()
@@ -671,8 +719,10 @@ describe('OfficeBuilding', () => {
     expect(document.activeElement).toBe(document.body)
     fireEvent.keyDown(document.body, { key: 'd' })
     expect(alice.style.left).toBe('504px')
+    fireEvent.keyUp(document.body, { key: 'd' })
     fireEvent.keyDown(document.body, { key: 'a' })
     expect(alice.style.left).toBe('480px')
+    fireEvent.keyUp(document.body, { key: 'a' })
     fireEvent.keyDown(document.body, { key: 'd', ctrlKey: true })
     expect(alice.style.left).toBe('480px')
     const initialMenuTrigger = screen.getByRole('button', { name: 'Menu' })

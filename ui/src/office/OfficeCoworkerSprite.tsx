@@ -5,6 +5,7 @@ import { officeCoworkerSpriteForAgent } from './coworker-sprites'
 
 export function OfficeCoworkerSprite({
   agent,
+  identity,
   mood,
   reducedMotion,
   label,
@@ -12,13 +13,14 @@ export function OfficeCoworkerSprite({
   pose = 'portrait',
 }: {
   agent: string
+  identity?: string
   mood: OfficeEmployeeMood
   reducedMotion: boolean
   label: string
   scale?: number
   pose?: 'portrait' | 'desk'
 }) {
-  const asset = officeCoworkerSpriteForAgent(agent)
+  const asset = officeCoworkerSpriteForAgent(agent, identity)
   const height = 208 * scale
 
   return (

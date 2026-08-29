@@ -18,7 +18,6 @@ describe('OFFICE_HUD_ASSETS', () => {
     expect(OFFICE_HUD_ASSETS.occupancyLog).toBe('/office/hud/occupancy-log-v2.png')
     expect(OFFICE_HUD_ASSETS.signalReceiver).toBe('/office/hud/signal-receiver-v2.png')
     expect(OFFICE_HUD_ASSETS.rosterBadge).toBe('/office/hud/roster-badge-v2.png')
-    expect(OFFICE_HUD_ASSETS.windowClose).toBe('/office/hud/window-close-v2.png')
     expect(OFFICE_HUD_ASSETS.sessionPortal).toBe('/office/hud/session-portal-v2.png')
     expect(OFFICE_HUD_ASSETS.drawerRecord).toBe('/office/hud/drawer-record-v2.png')
     expect(OFFICE_HUD_ASSETS.talkBubble).toBe('/office/hud/talk-bubble-v2.png')

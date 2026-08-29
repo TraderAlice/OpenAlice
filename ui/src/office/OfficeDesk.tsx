@@ -108,6 +108,7 @@ export function OfficeDesk({
           >
             <OfficeCoworkerSprite
               agent={employee.agent}
+              identity={employee.resumeId}
               mood={employee.mood}
               reducedMotion={reducedMotion}
               label={label}

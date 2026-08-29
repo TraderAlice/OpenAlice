@@ -1913,6 +1913,8 @@ export const ja: Resources = {
     surface: 'サーフェス',
     deskDrawers: '机の引き出し',
     openSession: 'Session を開く',
+    showFullTitle: 'タイトルをすべて表示',
+    collapseTitle: 'タイトルを折りたたむ',
     amenityCoffee: 'ティーカート',
     amenityPlant: '観葉植物',
     timeline: '在席ログ',

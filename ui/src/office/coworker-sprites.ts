@@ -1,7 +1,15 @@
 export type OfficeCoworkerArchetype = 'codex' | 'claude' | 'pi' | 'opencode'
+export type OfficeCoworkerIdentity =
+  | OfficeCoworkerArchetype
+  | 'codex-mechanic'
+  | 'codex-scout'
+  | 'claude-botanist'
+  | 'pi-mathematician'
+  | 'opencode-hacker'
+  | 'opencode-analyst'
 
 export interface OfficeCoworkerSpriteAsset {
-  id: OfficeCoworkerArchetype
+  id: OfficeCoworkerIdentity
   portraitSrc: string
   deskSrc: string
   deskWorkSrc: string
@@ -9,39 +17,32 @@ export interface OfficeCoworkerSpriteAsset {
   accent: string
 }
 
-export const OFFICE_COWORKER_SPRITES: Record<OfficeCoworkerArchetype, OfficeCoworkerSpriteAsset> = {
-  codex: {
-    id: 'codex',
-    portraitSrc: '/office/coworkers/codex-portrait-v2.png',
-    deskSrc: '/office/coworkers/codex-desk-v1.png',
-    deskWorkSrc: '/office/coworkers/codex-desk-work-v1.png',
-    typingPhaseMs: 0,
-    accent: 'var(--terminal-yellow)',
-  },
-  claude: {
-    id: 'claude',
-    portraitSrc: '/office/coworkers/claude-portrait-v2.png',
-    deskSrc: '/office/coworkers/claude-desk-v1.png',
-    deskWorkSrc: '/office/coworkers/claude-desk-work-v1.png',
-    typingPhaseMs: -170,
-    accent: 'var(--terminal-red)',
-  },
-  pi: {
-    id: 'pi',
-    portraitSrc: '/office/coworkers/pi-portrait-v2.png',
-    deskSrc: '/office/coworkers/pi-desk-v1.png',
-    deskWorkSrc: '/office/coworkers/pi-desk-work-v1.png',
-    typingPhaseMs: -310,
-    accent: 'var(--terminal-cyan)',
-  },
-  opencode: {
-    id: 'opencode',
-    portraitSrc: '/office/coworkers/opencode-portrait-v2.png',
-    deskSrc: '/office/coworkers/opencode-desk-v1.png',
-    deskWorkSrc: '/office/coworkers/opencode-desk-work-v1.png',
-    typingPhaseMs: -470,
-    accent: 'var(--terminal-magenta)',
-  },
+function coworkerAsset(
+  id: OfficeCoworkerIdentity,
+  accent: string,
+  typingPhaseMs: number,
+): OfficeCoworkerSpriteAsset {
+  return {
+    id,
+    portraitSrc: `/office/coworkers/${id}-portrait-v2.png`,
+    deskSrc: `/office/coworkers/${id}-desk-v1.png`,
+    deskWorkSrc: `/office/coworkers/${id}-desk-work-v1.png`,
+    typingPhaseMs,
+    accent,
+  }
+}
+
+export const OFFICE_COWORKER_SPRITES: Record<OfficeCoworkerIdentity, OfficeCoworkerSpriteAsset> = {
+  codex: coworkerAsset('codex', 'var(--terminal-yellow)', 0),
+  'codex-mechanic': coworkerAsset('codex-mechanic', 'var(--terminal-yellow)', -110),
+  'codex-scout': coworkerAsset('codex-scout', 'var(--terminal-yellow)', -230),
+  claude: coworkerAsset('claude', 'var(--terminal-red)', -170),
+  'claude-botanist': coworkerAsset('claude-botanist', 'var(--terminal-red)', -290),
+  pi: coworkerAsset('pi', 'var(--terminal-cyan)', -310),
+  'pi-mathematician': coworkerAsset('pi-mathematician', 'var(--terminal-cyan)', -410),
+  opencode: coworkerAsset('opencode', 'var(--terminal-magenta)', -470),
+  'opencode-hacker': coworkerAsset('opencode-hacker', 'var(--terminal-magenta)', -570),
+  'opencode-analyst': coworkerAsset('opencode-analyst', 'var(--terminal-magenta)', -670),
 }
 
 export const OFFICE_COWORKER_EMOTES = {
@@ -61,14 +62,34 @@ const AGENT_ARCHETYPE: Record<string, OfficeCoworkerArchetype> = {
   omp: 'opencode',
 }
 
-export function officeCoworkerSpriteForAgent(agent: string): OfficeCoworkerSpriteAsset {
+const ARCHETYPE_POOL: Record<OfficeCoworkerArchetype, readonly OfficeCoworkerIdentity[]> = {
+  codex: ['codex-mechanic', 'codex-scout', 'codex'],
+  claude: ['claude-botanist', 'claude'],
+  pi: ['pi-mathematician', 'pi'],
+  opencode: ['opencode-hacker', 'opencode-analyst', 'opencode'],
+}
+
+function stableCoworkerHash(value: string): number {
+  return Array.from(value).reduce((hash, character) => (
+    (hash * 31 + character.charCodeAt(0)) >>> 0
+  ), 0)
+}
+
+function archetypeForAgent(agent: string): OfficeCoworkerArchetype {
   const normalized = agent.trim().toLowerCase()
   const mapped = AGENT_ARCHETYPE[normalized]
-  if (mapped) return OFFICE_COWORKER_SPRITES[mapped]
+  if (mapped) return mapped
+  const archetypes = Object.keys(ARCHETYPE_POOL) as OfficeCoworkerArchetype[]
+  return archetypes[stableCoworkerHash(normalized) % archetypes.length] ?? 'codex'
+}
 
-  const archetypes = Object.keys(OFFICE_COWORKER_SPRITES) as OfficeCoworkerArchetype[]
-  const hash = Array.from(normalized).reduce((value, character) => (
-    (value * 31 + character.charCodeAt(0)) >>> 0
-  ), 0)
-  return OFFICE_COWORKER_SPRITES[archetypes[hash % archetypes.length] ?? 'codex']
+export function officeCoworkerSpriteForAgent(
+  agent: string,
+  identity = '',
+): OfficeCoworkerSpriteAsset {
+  const archetype = archetypeForAgent(agent)
+  if (!identity) return OFFICE_COWORKER_SPRITES[archetype]
+  const pool = ARCHETYPE_POOL[archetype]
+  const selected = pool[stableCoworkerHash(`${agent.trim().toLowerCase()}:${identity}`) % pool.length]
+  return OFFICE_COWORKER_SPRITES[selected ?? archetype]
 }

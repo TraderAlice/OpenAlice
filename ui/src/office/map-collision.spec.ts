@@ -70,6 +70,19 @@ describe('Office map collision', () => {
     }])?.id).toBe('employee:chat-1:resume-1')
   })
 
+  it('slides along a free axis when a diagonal step meets a corner', () => {
+    const current = { x: 100, y: 100 }
+    const move = moveAliceOnOfficeMap(current, { x: 17, y: 17 }, layout, [{
+      id: 'corner',
+      x: 114,
+      y: 114,
+      width: 20,
+      height: 20,
+    }])
+
+    expect(move).toEqual({ position: { x: 117, y: 100 }, bumped: false })
+  })
+
   it('stops at a cabinet within interaction range and preserves open aisles', () => {
     const pod = layout.pods[0]!
     const cabinet = {

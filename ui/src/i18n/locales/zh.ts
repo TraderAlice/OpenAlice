@@ -1912,6 +1912,8 @@ export const zh: Resources = {
     surface: '来源',
     deskDrawers: '工位抽屉',
     openSession: '打开 Session',
+    showFullTitle: '展开完整标题',
+    collapseTitle: '收起标题',
     amenityCoffee: '茶水车',
     amenityPlant: '盆栽',
     timeline: '占用日志',

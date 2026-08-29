@@ -3,7 +3,7 @@
 These runtime-specific coworker sprites make Alice the unique player character
 instead of reusing her overworld sheet for every employee.
 
-The four full-resolution portrait masters were generated with the built-in image generator,
+The original four full-resolution portrait masters were generated with the built-in image generator,
 using `docs/assets/office/style-master-v1.png` as the environment palette
 reference and Alice's canonical maid art only as the pixel-density and
 character-proportion reference.
@@ -24,8 +24,16 @@ transparent sources, fit each full silhouette into a native 72x104 canvas with
 nearest-neighbor sampling, and hard-mat alpha for crisp GBA-scale cards. The
 generated full-resolution masters are intentionally not shipped at runtime.
 
-Known runtimes map to the closest authored archetype. Unknown future runtime
-names receive a stable hash-selected archetype; they never fall back to Alice.
+The roster now contains ten curated identities. Six additional feminine coworkers were generated as transparent
+three-pose sheets: two Codex variants (field mechanic and cyber scout), a Claude botanical archivist, a Pi field
+mathematician, and two OpenCode variants (workshop hacker and systems analyst). Each sheet keeps one identity across a
+standing portrait, seated idle pose, and seated typing pose. `scripts/package-office-coworker-sheet.py` splits those
+sheets and packages hard-alpha 72x104 portraits plus 176x176 seated canvases.
+
+Known runtimes map to a small family pool, and `agent + resumeId` selects one identity deterministically so a Session
+never changes appearance after refresh. The original four coworkers remain veteran variants; the six newcomers make
+the default population feminine-led without deleting the original cast. Unknown future runtime names receive a stable
+hash-selected family; they never fall back to Alice.
 
 The four `*-desk-v1.png` files are a separate generated map-scale pose family.
 Each employee is seated, seen from a top-down three-quarter rear view, and faces

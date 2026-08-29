@@ -6,6 +6,7 @@ import { employeesForOffice } from './desk-slots'
 import { OFFICE_FURNITURE, officePixelImg } from './furniture'
 import { nextOfficeGridIndex } from './grid-navigation'
 import { OFFICE_HUD_ASSETS } from './hud-assets'
+import { OfficeWindowControlGlyph } from './OfficeWindowControlGlyph'
 import { officeCoworkerLabel } from './label'
 
 interface CabinetRecord {
@@ -75,7 +76,7 @@ export function OfficeCabinetWindow({
             else workspaceFilesRef.current?.focus()
           }}
         >
-          <img src={OFFICE_HUD_ASSETS.windowClose} alt="" aria-hidden style={officePixelImg} />
+          <OfficeWindowControlGlyph kind="close" />
         </button>
       </header>
 

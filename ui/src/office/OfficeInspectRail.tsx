@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { OfficeDrawerItem, OfficeFloorEmployee } from '../api/office'
@@ -7,6 +7,7 @@ import { officePixelImg } from './furniture'
 import { nextOfficeGridIndex } from './grid-navigation'
 import { OFFICE_HUD_ASSETS } from './hud-assets'
 import { OfficeCoworkerSprite } from './OfficeCoworkerSprite'
+import { OfficeWindowControlGlyph } from './OfficeWindowControlGlyph'
 import { officeCoworkerLabel } from './label'
 import { useReducedMotion } from './use-reduced-motion'
 
@@ -29,8 +30,11 @@ export function OfficeInspectRail({
 }) {
   const { t } = useTranslation()
   const reducedMotion = useReducedMotion()
+  const titleId = useId()
+  const [titleExpanded, setTitleExpanded] = useState(false)
   const [focusedDrawerId, setFocusedDrawerId] = useState(employee?.drawers[0]?.id ?? null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const titleToggleRef = useRef<HTMLButtonElement>(null)
   const openButtonRef = useRef<HTMLButtonElement>(null)
   const drawerListRef = useRef<HTMLUListElement>(null)
   const drawerButtons = () => Array.from(
@@ -43,13 +47,17 @@ export function OfficeInspectRail({
 
   useEffect(() => {
     setFocusedDrawerId(employee?.drawers[0]?.id ?? null)
+    setTitleExpanded(false)
   }, [employee?.resumeId, employee?.drawers])
+
+  const employeeLabel = employee ? officeCoworkerLabel(employee) : ''
+  const titleCanExpand = employeeLabel.length > 72
 
   return (
     <aside
       role="dialog"
       aria-modal="true"
-      aria-label={employee ? officeCoworkerLabel(employee) : t('office.employeeFile')}
+      aria-label={employee ? employeeLabel : t('office.employeeFile')}
       data-testid="office-inspect"
       className="oa-office-inspect oa-office-window"
       onKeyDown={(event) => {
@@ -68,15 +76,10 @@ export function OfficeInspectRail({
             if (event.key !== 'Tab' || !employee) return
             event.preventDefault()
             if (event.shiftKey) (focusedDrawerButton() ?? openButtonRef.current)?.focus()
-            else openButtonRef.current?.focus()
+            else (titleToggleRef.current ?? openButtonRef.current)?.focus()
           }}
         >
-          <img
-            src={returnToRoster ? OFFICE_HUD_ASSETS.windowBack : OFFICE_HUD_ASSETS.windowClose}
-            alt=""
-            aria-hidden
-            style={officePixelImg}
-          />
+          <OfficeWindowControlGlyph kind={returnToRoster ? 'back' : 'close'} />
         </button>
       )}
       <div className="oa-office-inspect__profile">
@@ -85,6 +88,7 @@ export function OfficeInspectRail({
             <div className="oa-office-inspect__portrait" aria-hidden>
               <OfficeCoworkerSprite
                 agent={employee.agent}
+                identity={employee.resumeId}
                 mood={employee.mood}
                 reducedMotion={reducedMotion}
                 label={officeCoworkerLabel(employee)}
@@ -97,7 +101,27 @@ export function OfficeInspectRail({
                 {t('office.employeeFile')}
               </div>
               <div className="oa-office-inspect__identity">
-                <p>{officeCoworkerLabel(employee)}</p>
+                <p id={titleId} data-expanded={titleExpanded || undefined} title={employeeLabel}>
+                  {employeeLabel}
+                </p>
+                {titleCanExpand && (
+                  <button
+                    type="button"
+                    ref={titleToggleRef}
+                    className="oa-office-inspect__title-toggle"
+                    aria-controls={titleId}
+                    aria-expanded={titleExpanded}
+                    onClick={() => setTitleExpanded((expanded) => !expanded)}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Tab') return
+                      event.preventDefault()
+                      if (event.shiftKey) closeButtonRef.current?.focus()
+                      else openButtonRef.current?.focus()
+                    }}
+                  >
+                    {titleExpanded ? t('office.collapseTitle') : t('office.showFullTitle')}
+                  </button>
+                )}
                 <span>@{employee.resumeId}</span>
               </div>
               <blockquote>
@@ -123,24 +147,6 @@ export function OfficeInspectRail({
                 <dd>{employee.surface || '—'}</dd>
               </div>
             </dl>
-            <div className="oa-office-inspect__actions">
-              <button
-                type="button"
-                ref={openButtonRef}
-                autoFocus={!returnToRoster}
-                className="oa-office-inspect__open"
-                onClick={onOpen}
-                onKeyDown={(event) => {
-                  if (event.key !== 'Tab' || !onClose) return
-                  event.preventDefault()
-                  if (event.shiftKey) closeButtonRef.current?.focus()
-                  else (focusedDrawerButton() ?? closeButtonRef.current)?.focus()
-                }}
-              >
-                {t('office.openSession')}
-                <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" aria-hidden style={officePixelImg} />
-              </button>
-            </div>
             {employee.drawers.length > 0 && (
               <div className="oa-office-drawers">
                 <p>{t('office.deskDrawers')}</p>
@@ -212,6 +218,26 @@ export function OfficeInspectRail({
           </div>
         )}
       </div>
+      {employee && (
+        <div className="oa-office-inspect__actions">
+          <button
+            type="button"
+            ref={openButtonRef}
+            autoFocus={!returnToRoster}
+            className="oa-office-inspect__open"
+            onClick={onOpen}
+            onKeyDown={(event) => {
+              if (event.key !== 'Tab' || !onClose) return
+              event.preventDefault()
+              if (event.shiftKey) (titleToggleRef.current ?? closeButtonRef.current)?.focus()
+              else (focusedDrawerButton() ?? closeButtonRef.current)?.focus()
+            }}
+          >
+            {t('office.openSession')}
+            <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" aria-hidden style={officePixelImg} />
+          </button>
+        </div>
+      )}
       {children && (
         <div className="oa-office-inspect__timeline">
           <div className="oa-office-inspect__timeline-title">

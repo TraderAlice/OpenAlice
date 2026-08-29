@@ -2325,6 +2325,38 @@ Workspace-departure transition follow-up (2026-08-29):
   specs passed: 2 files / 24 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 612-file Vitest run (5,063 passing;
   one file and nine tests skipped), and the UI production build all passed.
 
+Coworker variety and control-legibility follow-up (2026-08-29):
+
+- Maintainer and community review identified four related game-completion gaps: the four runtime-locked coworkers make
+  a male-heavy clone floor, simultaneous direction keys cannot move diagonally, long Agent-file titles scroll the
+  primary command and close control out of view, and the ornate generated close chest hides its actual X affordance.
+- Character options compared replacing the four incumbents, adding one feminine alternate per runtime, and growing a
+  stable curated roster. Chose a ten-character roster: retain the four incumbents as veteran variants and add six
+  clearly feminine coworkers, yielding roughly eight feminine and two masculine silhouettes. `agent + resumeId`
+  deterministically owns identity so refreshes never reroll a Session. Every newcomer ships matched portrait, seated
+  idle, and seated working poses; runtime palettes remain recognizable without making every runtime a clone.
+- Movement options compared OS-repeat cardinal input, unnormalized two-key movement, and a held-key vector loop. Chose
+  a 96ms held-key loop with 24px cardinal and normalized 17px diagonal steps, last-pressed-axis facing, keyup/blur
+  cleanup, and axis sliding when a diagonal candidate meets furniture. This preserves speed and four-direction Alice
+  art while making simultaneous keys feel native.
+- Agent-file options compared hard truncation, an unconstrained expanding title, and a collapsed title disclosure inside
+  a fixed-control window. Chose a three-line default with explicit expand/collapse, a single internal content scroller,
+  and always-visible close and Open-session commands. Close becomes a deterministic high-contrast CSS pixel X; Back
+  keeps its directional asset because it has different navigation semantics.
+- Implemented the stable ten-character assignment, generated and packaged six transparent three-pose 16-bit coworkers,
+  and retained the four veteran assets. Packaging now applies a shared idle/work scale per character so animation does
+  not breathe between frames; the Pi sheet also received a dedicated transparency-extraction pass before packaging.
+- Implemented held-key diagonal movement with normalized steps, last-key facing, blur/keyup cleanup, and corner sliding.
+  Added exact two-key timing coverage plus a diagonal furniture-collision contract.
+- Implemented the three-line title disclosure, profile-only scrolling, fixed Open-session action, keyboard-loop ownership,
+  and the CSS-owned high-contrast close mark. Removed the more ornate generated close asset while retaining Back.
+- Browser-played the real `/office` route against the current 18-Workspace, roughly 87-agent Project at desktop size and
+  390x844. The live floor visibly distributes multiple newcomer silhouettes; long Agent files retain close and primary
+  action in collapsed and expanded states; the compact close mark remains easy to locate on phone. The final browser
+  state was restored to desktop size with no dialog left open.
+- `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 612-file Vitest run (5,068 passing; one file and nine tests skipped),
+  and the UI production build all passed. The build retains the existing large-chunk advisory only.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

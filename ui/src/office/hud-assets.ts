@@ -8,7 +8,6 @@ export const OFFICE_HUD_ASSETS = {
   occupancyLog: '/office/hud/occupancy-log-v2.png',
   signalReceiver: '/office/hud/signal-receiver-v2.png',
   rosterBadge: '/office/hud/roster-badge-v2.png',
-  windowClose: '/office/hud/window-close-v2.png',
   sessionPortal: '/office/hud/session-portal-v2.png',
   drawerRecord: '/office/hud/drawer-record-v2.png',
   talkBubble: '/office/hud/talk-bubble-v2.png',

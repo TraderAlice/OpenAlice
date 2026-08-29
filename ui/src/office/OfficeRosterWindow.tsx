@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import type { OfficeFloorEmployee, OfficeRoomSnapshot } from '../api/office'
 import { employeesForOffice } from './desk-slots'
 import { OfficeCoworkerSprite } from './OfficeCoworkerSprite'
+import { OfficeWindowControlGlyph } from './OfficeWindowControlGlyph'
 import { officePixelImg } from './furniture'
 import { OFFICE_HUD_ASSETS } from './hud-assets'
 import { officeCoworkerLabel } from './label'
@@ -65,7 +66,7 @@ export function OfficeRosterWindow({
               ?.focus()
           }}
         >
-          <img src={OFFICE_HUD_ASSETS.windowClose} alt="" aria-hidden style={officePixelImg} />
+          <OfficeWindowControlGlyph kind="close" />
         </button>
       </header>
       <div className="oa-office-roster__body">
@@ -122,6 +123,7 @@ export function OfficeRosterWindow({
                 <span className="oa-office-roster__portrait" aria-hidden>
                   <OfficeCoworkerSprite
                     agent={employee.agent}
+                    identity={employee.resumeId}
                     mood={employee.mood}
                     reducedMotion={reducedMotion}
                     label={officeCoworkerLabel(employee)}

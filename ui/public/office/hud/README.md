@@ -11,7 +11,7 @@ Live labels, button behavior, focus rings, and accessible names remain DOM-owned
 - `occupancy-log-v2.png` — occupancy-log command
 - `signal-receiver-v2.png` — live-floor and quiet-floor signal state
 - `roster-badge-v2.png` — Team roster window identity
-- `window-close-v2.png` — shared Office window close latch
+- Window close controls use a DOM-owned high-contrast pixel X so their affordance stays simpler than world art.
 - `session-portal-v2.png` — open the selected Agent session
 - `drawer-record-v2.png` — open a provenance record from an Agent desk
 - `talk-bubble-v2.png` — nearby conversation action in the compact world prompt

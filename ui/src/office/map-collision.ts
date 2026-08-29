@@ -127,14 +127,25 @@ export function moveAliceOnOfficeMap(
   layout: OfficeMapLayout,
   collisionRects: readonly OfficeCollisionRect[] = officeCollisionRects(layout),
 ): OfficeMoveResult {
-  const candidate = {
-    x: Math.min(layout.width - 24, Math.max(24, current.x + movement.x)),
-    y: Math.min(layout.height - 24, Math.max(24, current.y + movement.y)),
-  }
+  const candidateFor = (step: { x: number; y: number }) => ({
+    x: Math.min(layout.width - 24, Math.max(24, current.x + step.x)),
+    y: Math.min(layout.height - 24, Math.max(24, current.y + step.y)),
+  })
+  const candidate = candidateFor(movement)
   const obstacle = collisionRects.find((rect) => intersectsAlice(candidate, rect))
   const boundaryBump = candidate.x === current.x
     && candidate.y === current.y
     && (movement.x !== 0 || movement.y !== 0)
+
+  if (obstacle && movement.x !== 0 && movement.y !== 0) {
+    for (const axis of [{ x: movement.x, y: 0 }, { x: 0, y: movement.y }]) {
+      const slide = candidateFor(axis)
+      const stationary = slide.x === current.x && slide.y === current.y
+      if (!stationary && !collisionRects.some((rect) => intersectsAlice(slide, rect))) {
+        return { position: slide, bumped: false }
+      }
+    }
+  }
 
   if (obstacle || boundaryBump) {
     return {

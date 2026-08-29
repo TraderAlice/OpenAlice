@@ -1920,6 +1920,8 @@ export const zhHant: Resources = {
     surface: '來源',
     deskDrawers: '工位抽屜',
     openSession: '打開 Session',
+    showFullTitle: '展開完整標題',
+    collapseTitle: '收起標題',
     amenityCoffee: '茶水車',
     amenityPlant: '盆栽',
     timeline: '占用日誌',
