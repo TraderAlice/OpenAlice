@@ -37,6 +37,7 @@ Current runtime assets:
 - `wall-window-night-v2.png` — geometry-matched after-hours window variant
 - `wall-utility-v1.png` — archive shelving and network-control module centered behind Operations
 - `wall-utility-night-v1.png` — geometry-matched after-hours utility module
+- `building-foundation-v1.png` — seamless dark structural material outside the playable floor
 - `floor-tile-v2.png`
 - `workspace-rug-v2.png`
 - `coffee-station-v2.png` — Chat neighborhood social prop
@@ -106,3 +107,8 @@ no paper, folders, labels, characters, or UI frame.
 generic terminal kiosk. Its abstract probability bars, branching outcome display, paired result lights, and paper
 evidence tray contain no baked text. The built-in image generator followed the locked style master; the repository
 copy removes the generated checkerboard, hard-mats the alpha, and packages the prop on a native 72x88 canvas.
+
+`building-foundation-v1.png` replaces the exposed green checkerboard around maps narrower than the available
+stage. It is an opaque, seamless 192px structural-panel texture generated from the locked style master and kept
+substantially darker than the walkable Office floor. The floor retains a hard double outline, so the material reads
+as non-playable building depth rather than another room or a path Alice can enter.

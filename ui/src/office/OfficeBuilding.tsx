@@ -751,6 +751,9 @@ export function OfficeBuilding({
         data-panning={panning}
         data-pannable={cameraPannable || undefined}
         data-departing={Boolean(departingWorkspace) || undefined}
+        style={{
+          '--office-building-foundation': `url(${OFFICE_FURNITURE.generated.buildingFoundation})`,
+        } as CSSProperties}
         aria-busy={Boolean(departingWorkspace)}
         aria-label={replaySeq == null
           ? t(cameraPannable ? 'office.mapLabel' : 'office.mapLabelFixed')

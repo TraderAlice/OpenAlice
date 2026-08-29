@@ -31,6 +31,20 @@ describe('Office responsive style contract', () => {
     expect(css).not.toContain('aspect-ratio: 4 / 3')
   })
 
+  it('renders the non-walkable map perimeter as a physical building boundary', () => {
+    const campusBlocks = [...css.matchAll(/\.oa-office-campus\s*\{([\s\S]*?)\}/g)]
+      .map((match) => match[1])
+    const mapBlocks = [...css.matchAll(/\.oa-office-map\s*\{([\s\S]*?)\}/g)]
+      .map((match) => match[1])
+
+    expect(campusBlocks.some((block) => block.includes(
+      'background-image: var(--office-building-foundation)',
+    ))).toBe(true)
+    expect(campusBlocks.some((block) => block.includes('background-size: 192px 192px')))
+      .toBe(true)
+    expect(mapBlocks.some((block) => block.includes('0 0 0 4px var(--gba-ink)'))).toBe(true)
+  })
+
   it('keeps detailed interaction prompts inside the phone map', () => {
     expect(narrowLiveCss).toContain('.oa-office-interact-prompt[data-has-detail="true"]')
     expect(narrowLiveCss).toContain('max-width: 168px')

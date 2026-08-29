@@ -2051,6 +2051,29 @@ Roster party-menu navigation follow-up (2026-08-29):
   `cd ui && npx tsc -b`, the 610-file Vitest run (5,045 passing; one file and nine tests skipped), and the UI
   production build all passed.
 
+Physical map-boundary follow-up (2026-08-29):
+
+- Replayed the three-pod floor at 1280x900 and found that the strongest remaining completion break was outside the
+  map itself: two wide strips of the old bright green checkerboard remained visible whenever the 960px map was
+  narrower than the available stage. They read as an unfinished texture or grass and made the hard collision edge
+  look accidental.
+- Compared extending the walkable floor, replacing the checkerboard with a flat shadow, and giving the non-playable
+  perimeter its own physical building material. Chose the physical boundary: extending the floor would lie about
+  collision space, while a flat void would remove the bug without adding world semantics. The generated dark
+  structural foundation is deliberately lower-luminance than the Office, and a double hard outline now marks the
+  exact playable floor without changing map size, camera clamps, or collision coordinates.
+- Used the built-in image generator with `style-master-v1.png` as the locked reference, then packaged the opaque
+  result as the native 192x192 `building-foundation-v1.png` runtime tile. It contains no text, characters, furniture,
+  checkerboard, grass, path, or UI and is registered and dimension-checked with the rest of the furniture pack.
+- Browser-played 1280x900, 390x844, and 844x390. Desktop now exposes the dark foundation as intentional building
+  depth; portrait's wider map remains pannable with no invented side material; landscape shows the same boundary at
+  the short lower edge. The live computed campus background resolved to the new asset and every size retained zero
+  page overflow.
+- Focused furniture and responsive-style specs passed: 2 files / 9 tests. `npx tsc --noEmit`,
+  `cd ui && npx tsc -b`, the 610-file Vitest run (5,046 passing; one file and nine tests skipped), and the UI
+  production build all passed. The first full-suite attempt used a PTY and invalidated the installer's explicit
+  no-TTY test; the authoritative rerun used ordinary pipes and passed completely.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

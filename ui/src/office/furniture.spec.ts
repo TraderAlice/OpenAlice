@@ -21,6 +21,7 @@ describe('OFFICE_FURNITURE', () => {
       wallWindowNight: [204, 102],
       wallUtility: [204, 102],
       wallUtilityNight: [204, 102],
+      buildingFoundation: [192, 192],
       floorTile: [96, 96],
       workspaceRug: [264, 138],
       coffeeStation: [72, 72],
@@ -47,7 +48,9 @@ describe('OFFICE_FURNITURE', () => {
       expect(bytes.byteLength).toBeGreaterThan(key === 'routeTargetPointer' ? 750 : 1000)
       expect(bytes.readUInt32BE(16)).toBe(dimensions[key as keyof typeof dimensions][0])
       expect(bytes.readUInt32BE(20)).toBe(dimensions[key as keyof typeof dimensions][1])
-      expect(bytes[25]).toBe(key === 'floorTile' ? 2 : 6)
+      expect(bytes[25]).toBe(
+        key === 'floorTile' || key === 'buildingFoundation' ? 2 : 6,
+      )
     }
   })
 })

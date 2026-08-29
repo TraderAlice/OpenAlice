@@ -3386,6 +3386,10 @@
   padding: 0;
   cursor: default;
   outline: none;
+  background-color: var(--office-gba-ink-seed);
+  background-image: var(--office-building-foundation);
+  background-repeat: repeat;
+  background-size: 192px 192px;
   touch-action: none;
   user-select: none;
 }
@@ -3497,6 +3501,9 @@
   background-color: var(--gba-floor);
   background-repeat: repeat;
   background-size: 96px 96px;
+  box-shadow:
+    0 0 0 4px var(--gba-ink),
+    0 0 0 8px color-mix(in srgb, var(--gba-cream) 24%, var(--gba-ink));
   will-change: transform;
 }
 
