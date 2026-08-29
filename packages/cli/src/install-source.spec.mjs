@@ -1,6 +1,6 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { afterEach, describe, expect, it } from 'vitest'
@@ -107,6 +107,52 @@ describe('OpenAlice install source', () => {
     expect(parseInstallSource({ ...native, method: 'mystery' })).toBeNull()
   })
 
+  it('discovers package-manager provenance beside a standalone executable', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-package-source-'))
+    temporaryPaths.push(root)
+    await writeFile(join(root, 'install-source.json'), JSON.stringify({
+      schemaVersion: 3,
+      repository: 'TraderAlice/OpenAlice',
+      cliVersion: '0.91.0',
+      selector: { kind: 'version', value: 'v0.91.0' },
+      installerUrl: 'https://www.npmjs.com/package/openalice',
+      updateChannel: 'stable',
+      method: 'npm',
+      artifact: { platform: 'darwin', arch: 'arm64', sha256: 'a'.repeat(64) },
+      installedAt: '2026-08-30T00:00:00Z',
+    }))
+
+    await expect(readInstallSource({
+      bunStandalone: true,
+      executable: join(root, 'bin', 'openalice'),
+      env: {},
+    })).resolves.toMatchObject({ method: 'npm', cliVersion: '0.91.0' })
+  })
+
+  it('discovers system-manager provenance in the linked resource root', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-system-source-'))
+    temporaryPaths.push(root)
+    const resourceRoot = join(root, 'share', 'openalice')
+    await mkdir(resourceRoot, { recursive: true })
+    await writeFile(join(resourceRoot, 'install-source.json'), JSON.stringify({
+      schemaVersion: 3,
+      repository: 'TraderAlice/OpenAlice',
+      cliVersion: '0.91.0',
+      selector: { kind: 'version', value: 'v0.91.0' },
+      installerUrl: 'https://github.com/TraderAlice/homebrew-tap',
+      updateChannel: 'stable',
+      method: 'brew',
+      artifact: { platform: 'darwin', arch: 'arm64', sha256: 'b'.repeat(64) },
+      installedAt: '2026-08-30T00:00:00Z',
+    }))
+
+    await expect(readInstallSource({
+      bunStandalone: true,
+      executable: join(root, 'bin', 'openalice'),
+      env: { OPENALICE_APP_HOME: resourceRoot },
+    })).resolves.toMatchObject({ method: 'brew', cliVersion: '0.91.0' })
+  })
+
   it('derives installed content identity only from an immutable release directory', () => {
     const installedModuleUrl = pathToFileURL(join(
       tmpdir(),
@@ -130,5 +176,18 @@ describe('OpenAlice install source', () => {
     expect(installedContentIdentity(sourceModuleUrl, {
       env: { OPENALICE_CONTENT_IDENTITY: 'fedcba9876543210' },
     })).toBe('fedcba9876543210')
+    expect(installedContentIdentity(sourceModuleUrl, {
+      bunStandalone: true,
+      executable: '/usr/bin/openalice',
+      env: {},
+      readFileSync: (path) => {
+        if (path === resolve('/usr/share/openalice/release.json')) {
+          return JSON.stringify({ contentIdentity: 'aaaaaaaaaaaaaaaa' })
+        }
+        const error = new Error('missing')
+        error.code = 'ENOENT'
+        throw error
+      },
+    })).toBe('aaaaaaaaaaaaaaaa')
   })
 })

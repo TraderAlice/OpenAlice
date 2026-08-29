@@ -9,6 +9,10 @@ The current CLI payload is one target-native Bun executable plus immutable
 OpenAlice resources. The installer does not install Node.js, Bun, npm, source
 dependencies, build tools, or an Agent Runtime.
 
+npm, Bun, Homebrew, and Arch/AUR installation consume the same accepted native
+archives but remain owned by their package manager. Their topology, commands,
+and update behavior live in [[docs/cli-package-managers.md]].
+
 ## Supported entry paths
 
 Stable direct install:

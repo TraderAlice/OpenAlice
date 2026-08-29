@@ -257,7 +257,7 @@ The intended stable user surfaces are:
 curl -fsSL https://openalice.ai/install | bash
 # native Windows uses the matching PowerShell entry
 npm install -g openalice
-bun add -g openalice
+bun add -g --trust openalice
 brew install traderalice/tap/openalice
 paru -S openalice-bin
 ```
@@ -281,11 +281,10 @@ npm and Bun consume one registry topology rather than separate packages:
 ```text
 openalice                       # small meta package, exposes `openalice`
   optionalDependencies:
-    @traderalice/openalice-darwin-arm64
-    @traderalice/openalice-darwin-x64
-    @traderalice/openalice-linux-arm64
-    @traderalice/openalice-linux-x64
-    @traderalice/openalice-windows-x64
+    openalice-darwin-arm64
+    openalice-darwin-x64
+    openalice-linux-arm64
+    openalice-linux-x64
 ```
 
 Each platform package contains the already accepted native release payload.
@@ -442,25 +441,31 @@ build harness when it improves the next investigation.
 
 - [ ] Reserve the npm meta and platform package names; keep the resulting
   command named `openalice`.
-- [ ] Generate npm platform packages from accepted release archives and one
+- [x] Generate npm platform packages from accepted release archives and one
   meta package with platform `optionalDependencies`.
 - [ ] Install the meta package through both npm and Bun on every required
   platform; verify that the final command is the native executable and does
   not require the package manager at runtime.
-- [ ] Generate the TraderAlice Homebrew formula from accepted archive URLs and
-  checksums; test macOS arm64/x64 and supported Linux targets.
-- [ ] Generate and publish the `openalice-bin` AUR `PKGBUILD` and `.SRCINFO`
-  from the accepted Linux archives; test installation through `paru` in a clean
-  Arch fixture.
-- [ ] Record channel provenance without rebuilding or modifying the native
+- [x] Generate the TraderAlice Homebrew formula from accepted archive URLs and
+  checksums. The release gate is configured for native macOS arm64/x64
+  installation; Linuxbrew remains a release acceptance gap.
+- [x] Generate the `openalice-bin` AUR `PKGBUILD` and `.SRCINFO` from the
+  accepted Linux archives and configure a pinned clean Arch x64 build/install
+  gate. Native Arch Linux ARM acceptance remains open because the official
+  base-devel container has no arm64 image.
+- [ ] Publish the generated formula to the TraderAlice tap and `openalice-bin`
+  to AUR, then test the public `brew` and `paru` commands.
+- [x] Record channel provenance without rebuilding or modifying the native
   executable bytes.
-- [ ] Detect manager-owned installs in update/Doctor output and route update
+- [x] Detect manager-owned installs in update/Doctor output and route update
   and uninstall guidance back to the owning manager.
 - [ ] Exercise each manager's upgrade and removal while a Runtime is stopped,
   then exercise its documented behavior while Guardian is active.
-- [ ] Publish platform npm packages first, the npm meta package second, and
-  Brew/AUR metadata only after the referenced release assets are public and
-  verified.
+- [x] Record and enforce platform-first/meta-last npm publication after the
+  GitHub Release succeeds. Stable publication remains explicitly disabled
+  until registry authority and package names are established.
+- [ ] Publish Brew/AUR metadata only after the referenced release assets are
+  public and verified.
 
 ### 6. Cutover and updates
 
@@ -484,7 +489,7 @@ build harness when it improves the next investigation.
   inactive installer-owned releases.
 - [x] Make `openalice update` hand off to the exact-version Bash installer for
   direct macOS/Linux provenance; PowerShell remains in the deferred lane.
-- [ ] Keep package-manager-owned installations manager-owned.
+- [x] Keep package-manager-owned installations manager-owned.
 
 Do not add a permanent dual runtime, compatibility resolver, or old-layout
 repair path. Once the Bun release activates, normal startup knows only the Bun
@@ -774,3 +779,19 @@ This plan is complete only when:
   Doctor now reports its embedded Bun engine instead of Bun's compatibility
   `process.version` as a host Node dependency. The live network gate remains
   pending until this increment reaches `dev` and publishes its first aliases.
+- 2026-08-30: Added OpenCode-style platform npm packages plus a small
+  `openalice` meta package, generated Homebrew and `openalice-bin` AUR metadata,
+  schema 3 package-manager provenance, and manager-owned update/uninstall
+  routing. Bun installation deliberately uses `bun add -g --trust openalice`
+  because Bun blocks dependency lifecycle scripts by default; the postinstall
+  has no download fallback and runs under Bun without host Node. Real macOS
+  arm64 npm and pinned Bun 1.4.0 installs passed native `version`, detached
+  `up`, Doctor ownership, `down`, uninstall guidance, and manager removal with
+  Node/Bun absent from the Runtime `PATH`. PR/release workflows now repeat
+  npm/Bun on the native matrix, install the formula on both macOS arches, build
+  and install the x64 AUR package in a pinned Arch image, derive publication
+  inputs only from all four accepted archives, and publish npm platform
+  packages before the stable meta package. OrbStack confirmed the official
+  Arch base-devel image currently lacks arm64, so native Arch Linux ARM remains
+  an explicit acceptance gap. Public registry name reservation and external
+  tap/AUR publication remain activation work rather than hidden fallbacks.

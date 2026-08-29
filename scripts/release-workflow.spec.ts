@@ -5,6 +5,7 @@ import YAML from 'yaml'
 
 interface WorkflowStep {
   name?: string
+  run?: string
   uses?: string
   with?: Record<string, unknown>
 }
@@ -40,7 +41,7 @@ describe('Release workflow critical path', () => {
   it('bounds native candidate jobs without weakening downstream gates', () => {
     expect(workflow.jobs['build-desktop']['timeout-minutes']).toBe(45)
     expect(workflow.jobs['build-broker-packs']['timeout-minutes']).toBe(30)
-    expect(workflow.jobs['build-cli-release']['timeout-minutes']).toBe(35)
+    expect(workflow.jobs['build-cli-release']['timeout-minutes']).toBe(45)
   })
 
   it('builds native Broker Packs outside the desktop package jobs', () => {
@@ -78,6 +79,9 @@ describe('Release workflow critical path', () => {
       'accept-desktop-upgrade',
       'build-broker-packs',
       'build-cli-release',
+      'build-cli-package-channels',
+      'accept-cli-homebrew',
+      'accept-cli-aur',
       'cli-installer-acceptance',
     ]))
   })
@@ -98,5 +102,34 @@ describe('Release workflow critical path', () => {
     )
     expect(step(publication, 'Create tag and GitHub Release from accepted candidates').with?.files)
       .toContain('dist/release-cli/*.tar.gz.sha256')
+  })
+
+  it('accepts manager installs and derives every channel from accepted archives', () => {
+    const nativeCli = workflow.jobs['build-cli-release']
+    const channels = workflow.jobs['build-cli-package-channels']
+    const homebrew = workflow.jobs['accept-cli-homebrew']
+    const aur = workflow.jobs['accept-cli-aur']
+
+    const npmAndBun = step(nativeCli, 'Accept npm and Bun installs from the native candidate').run ?? ''
+    expect(npmAndBun).toContain('--manager npm')
+    expect(npmAndBun).toContain('--manager bun')
+    expect(needs(channels)).toEqual(['release', 'build-cli-release'])
+    expect(step(channels, 'Derive package-manager metadata from accepted archives').run)
+      .toContain('--require-all')
+    expect(homebrew.strategy?.matrix?.include).toEqual([
+      { os: 'macos-14', arch: 'arm64' },
+      { os: 'macos-15-intel', arch: 'x64' },
+    ])
+    expect(step(homebrew, 'Install and run the accepted archive through Homebrew').run)
+      .toContain('brew install --formula')
+    expect(step(aur, 'Build, install, and run the generated AUR package').run)
+      .toContain('archlinux:base-devel')
+  })
+
+  it('publishes npm platform packages before the stable meta package', () => {
+    const npm = workflow.jobs['publish-cli-npm']
+    expect(needs(npm)).toEqual(['release', 'publish-release', 'build-cli-package-channels'])
+    const publish = step(npm, 'Publish platform packages before the meta package').run ?? ''
+    expect(publish.indexOf('packages.slice(0,-1)')).toBeLessThan(publish.indexOf('packages.at(-1)'))
   })
 })

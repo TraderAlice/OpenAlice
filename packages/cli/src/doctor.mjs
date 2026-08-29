@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import { inspectRuntime } from './lifecycle.mjs'
 import { discoverRuntimeLogs } from './logs.mjs'
 import { resolveInstalledLayout } from './install-layout.mjs'
+import { packageManagerForSource } from './package-manager.mjs'
 import {
   CLI_VERSION,
   installedContentIdentity,
@@ -38,13 +39,17 @@ export async function diagnoseRuntime(options = {}, dependencies = {}) {
   const contentIdentity = (
     dependencies.installedContentIdentityImpl ?? installedContentIdentity
   )(import.meta.url)
+  const manager = packageManagerForSource(installSource)
+  const installed = Boolean(layout || manager)
   add(
     'cli.provenance',
-    layout ? 'pass' : 'warn',
+    installed ? 'pass' : 'warn',
     layout
       ? `Installed OpenAlice ${CLI_VERSION} metadata is readable`
+      : manager
+        ? `${manager.label}-managed OpenAlice ${CLI_VERSION} metadata is readable`
       : `OpenAlice ${CLI_VERSION} is running from a source checkout`,
-    layout
+    installed
       ? `${installSource.selector.kind} ${installSource.selector.value}; content ${contentIdentity ?? 'unknown'}`
       : 'Self-update is intentionally unavailable from a source checkout',
   )
@@ -77,7 +82,7 @@ export async function diagnoseRuntime(options = {}, dependencies = {}) {
   await addEndpointCheck(status, add, dependencies)
   addComponentChecks(status, add)
   await addProviderCheck(status, add, dependencies)
-  await addUpdateCheck(layout, add, dependencies)
+  await addUpdateCheck(layout, installSource, add, dependencies)
   await addLogCheck(status, add, dependencies)
 
   const failures = checks.filter((check) => check.status === 'fail').length
@@ -92,7 +97,7 @@ export async function diagnoseRuntime(options = {}, dependencies = {}) {
     },
     cli: {
       productVersion: CLI_VERSION,
-      installed: Boolean(layout),
+      installed,
       contentIdentity,
       installSource,
     },
@@ -226,7 +231,17 @@ async function addProviderCheck(status, add, dependencies) {
   )
 }
 
-async function addUpdateCheck(layout, add, dependencies) {
+async function addUpdateCheck(layout, installSource, add, dependencies) {
+  const manager = packageManagerForSource(installSource)
+  if (manager) {
+    add(
+      'update.metadata',
+      'pass',
+      `${manager.label} owns OpenAlice updates`,
+      `Use: ${manager.update}`,
+    )
+    return
+  }
   if (!layout) {
     add('update.metadata', 'pass', 'Source checkout update ownership is explicit')
     return

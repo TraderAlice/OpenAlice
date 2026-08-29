@@ -247,6 +247,9 @@ Read the relevant guide before editing its subsystem:
   packaging, UI installation, activation, runtime loading, and release assets.
 - [[docs/cli-installer.md]] — [CLI installer](docs/cli-installer.md): consent, installed layout,
   atomic updates, PATH integration, installer tests, and release checks.
+- [[docs/cli-package-managers.md]] — [CLI package-manager channels](docs/cli-package-managers.md):
+  npm/Bun platform packages, Homebrew and AUR metadata, provenance, update
+  ownership, and publication order.
 - [[docs/cli-supervisor.md]] — [Shell CLI Supervisor](docs/cli-supervisor.md): top-level
   Runtime lifecycle, status/JSON presentation, browser opening, completion,
   compatibility aliases, and Supervisor TUI boundary.

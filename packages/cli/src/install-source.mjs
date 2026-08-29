@@ -1,8 +1,14 @@
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
-import { basename, dirname } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+import {
+  isBunStandalone,
+  resolveBunContentIdentity,
+  resolveBunResourceRoot,
+} from './bun-standalone.mjs'
 
 const compiledCliVersion = globalThis.__OPENALICE_BUILD_VERSION__
 
@@ -21,22 +27,47 @@ export const DEFAULT_INSTALL_SOURCE = Object.freeze({
 
 export async function readInstallSource(options = {}) {
   const env = options.env ?? process.env
-  const metadataUrl = options.metadataUrl
-    ?? env['OPENALICE_INSTALL_SOURCE']
-    ?? new URL('../install-source.json', import.meta.url)
-  try {
-    return requireInstallSource(JSON.parse(await readFile(metadataUrl, 'utf8')))
-  } catch (error) {
-    if (error?.code === 'ENOENT') return cloneInstallSource(DEFAULT_INSTALL_SOURCE)
-    throw error
+  const metadataLocations = options.metadataUrl
+    ? [options.metadataUrl]
+    : env['OPENALICE_INSTALL_SOURCE']
+      ? [env['OPENALICE_INSTALL_SOURCE']]
+      : nativeInstallSourceLocations(options, env)
+  for (const metadataUrl of metadataLocations) {
+    try {
+      return requireInstallSource(JSON.parse(await readFile(metadataUrl, 'utf8')))
+    } catch (error) {
+      if (error?.code === 'ENOENT') continue
+      throw error
+    }
   }
+  return cloneInstallSource(DEFAULT_INSTALL_SOURCE)
 }
 
 export function installedContentIdentity(moduleUrl = import.meta.url, options = {}) {
-  const explicit = (options.env ?? process.env)['OPENALICE_CONTENT_IDENTITY']?.trim()
+  const env = options.env ?? process.env
+  const explicit = env['OPENALICE_CONTENT_IDENTITY']?.trim()
   if (/^[a-f0-9]{16}$/.test(explicit ?? '')) return explicit
+  const bunStandalone = options.bunStandalone ?? isBunStandalone()
+  if (bunStandalone) {
+    return resolveBunContentIdentity(
+      resolveBunResourceRoot(env, options.executable ?? process.execPath),
+      env,
+      options.readFileSync ?? readFileSync,
+    )
+  }
   const releaseDirectory = basename(dirname(dirname(fileURLToPath(moduleUrl))))
   return /-([a-f0-9]{16})$/.exec(releaseDirectory)?.[1] ?? null
+}
+
+function nativeInstallSourceLocations(options, env) {
+  const bunStandalone = options.bunStandalone ?? isBunStandalone()
+  if (!bunStandalone) return [new URL('../install-source.json', import.meta.url)]
+  const executable = resolve(options.executable ?? process.execPath)
+  const resourceRoot = resolveBunResourceRoot(env, executable)
+  return [
+    join(dirname(dirname(executable)), 'install-source.json'),
+    join(resourceRoot, 'install-source.json'),
+  ]
 }
 
 export function normalizeInstallSource(value, fallback = DEFAULT_INSTALL_SOURCE) {

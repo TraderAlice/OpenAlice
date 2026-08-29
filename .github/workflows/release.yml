@@ -325,7 +325,7 @@ jobs:
             platform: linux
             arch: arm64
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 35
+    timeout-minutes: 45
     permissions:
       contents: read
 
@@ -375,6 +375,28 @@ jobs:
             --home "$RUNNER_TEMP/openalice-home" \
             --json
 
+      - name: Accept npm and Bun installs from the native candidate
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          CONTENT_IDENTITY=$(node -p "require('./dist/bun-release/report.json').contentIdentity")
+          node scripts/build-cli-package-channels.mjs \
+            --input-dir dist/bun-release \
+            --output-dir "$RUNNER_TEMP/cli-package-channels" \
+            --version "$VERSION" \
+            --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --npm-only
+          node scripts/cli-package-manager-smoke.mjs \
+            --manager npm \
+            --packages-dir "$RUNNER_TEMP/cli-package-channels/npm" \
+            --expected-version "$VERSION" \
+            --expected-content-identity "$CONTENT_IDENTITY"
+          node scripts/cli-package-manager-smoke.mjs \
+            --manager bun \
+            --packages-dir "$RUNNER_TEMP/cli-package-channels/npm" \
+            --expected-version "$VERSION" \
+            --expected-content-identity "$CONTENT_IDENTITY"
+
       - name: Name the native acceptance report
         shell: bash
         run: >-
@@ -392,6 +414,171 @@ jobs:
           if-no-files-found: error
           compression-level: 0
           retention-days: 1
+
+  build-cli-package-channels:
+    name: Build CLI package-manager channels
+    needs: [release, build-cli-release]
+    if: needs.release.outputs.created == 'true' && needs.build-cli-release.result == 'success' && !github.event.inputs.mirror_tag
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cli-release-*
+          path: dist/release-cli
+          merge-multiple: true
+
+      - name: Derive package-manager metadata from accepted archives
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          node scripts/build-cli-package-channels.mjs \
+            --input-dir dist/release-cli \
+            --output-dir dist/cli-package-channels \
+            --version "$VERSION" \
+            --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --require-all
+          node scripts/pack-cli-npm-packages.mjs \
+            --input-dir dist/cli-package-channels/npm \
+            --output-dir dist/cli-npm-tarballs
+
+      - name: Preserve package-manager publication inputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-package-channels
+          path: |
+            dist/cli-package-channels/cli-package-channels.json
+            dist/cli-package-channels/homebrew/openalice.rb
+            dist/cli-package-channels/aur/PKGBUILD
+            dist/cli-package-channels/aur/.SRCINFO
+            dist/cli-npm-tarballs/*.tgz
+            dist/cli-npm-tarballs/npm-publish-order.json
+          include-hidden-files: true
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
+
+  accept-cli-homebrew:
+    name: Accept Homebrew CLI (${{ matrix.arch }})
+    needs: [release, build-cli-release]
+    if: needs.release.outputs.created == 'true' && needs.build-cli-release.result == 'success' && !github.event.inputs.mirror_tag
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            arch: arm64
+          - os: macos-15-intel
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cli-release-*
+          path: dist/release-cli
+          merge-multiple: true
+
+      - name: Install and run the accepted archive through Homebrew
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          ASSET_BASE_URL=$(node -e "const{pathToFileURL}=require('url');const{resolve}=require('path');process.stdout.write(pathToFileURL(resolve('dist/release-cli')).href)")
+          node scripts/build-cli-package-channels.mjs \
+            --input-dir dist/release-cli \
+            --output-dir dist/cli-package-homebrew-smoke \
+            --version "$VERSION" \
+            --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --asset-base-url "$ASSET_BASE_URL" \
+            --require-all
+          trap 'brew uninstall --force openalice >/dev/null 2>&1 || true' EXIT
+          brew install --formula dist/cli-package-homebrew-smoke/homebrew/openalice.rb
+          EXECUTABLE="$(brew --prefix openalice)/bin/openalice"
+          HOME_ROOT="$RUNNER_TEMP/homebrew-home"
+          RUNTIME_HOME="$RUNNER_TEMP/homebrew-runtime"
+          mkdir -p "$HOME_ROOT"
+          VERSION_JSON=$(env -i HOME="$HOME_ROOT" PATH=/usr/bin:/bin "$EXECUTABLE" version --json)
+          VERSION_JSON="$VERSION_JSON" EXPECTED_VERSION="$VERSION" node -e "const v=JSON.parse(process.env.VERSION_JSON);if(v.version!==process.env.EXPECTED_VERSION||v.installSource?.method!=='brew')process.exit(1)"
+          env -i HOME="$HOME_ROOT" PATH=/usr/bin:/bin "$EXECUTABLE" up --home "$RUNTIME_HOME" --no-update-check --wait 120 --json
+          env -i HOME="$HOME_ROOT" PATH=/usr/bin:/bin "$EXECUTABLE" doctor --home "$RUNTIME_HOME" --json | grep -Fq 'Homebrew owns OpenAlice updates'
+          env -i HOME="$HOME_ROOT" PATH=/usr/bin:/bin "$EXECUTABLE" down --home "$RUNTIME_HOME" --json
+          env -i HOME="$HOME_ROOT" PATH=/usr/bin:/bin "$EXECUTABLE" uninstall --yes | grep -Fq 'brew uninstall traderalice/tap/openalice'
+          test -x "$EXECUTABLE"
+          brew uninstall --force openalice
+          test ! -e "$EXECUTABLE"
+
+  accept-cli-aur:
+    name: Accept Arch/AUR CLI package
+    needs: [release, build-cli-release]
+    if: needs.release.outputs.created == 'true' && needs.build-cli-release.result == 'success' && !github.event.inputs.mirror_tag
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cli-release-*
+          path: dist/release-cli
+          merge-multiple: true
+
+      - name: Build, install, and run the generated AUR package
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          node scripts/build-cli-package-channels.mjs \
+            --input-dir dist/release-cli \
+            --output-dir dist/cli-package-aur-smoke \
+            --version "$VERSION" \
+            --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --asset-base-url file:///work/dist/release-cli \
+            --require-all
+          docker run --rm \
+            --platform linux/amd64 \
+            --volume "$GITHUB_WORKSPACE:/work" \
+            --workdir /work/dist/cli-package-aur-smoke/aur \
+            archlinux:base-devel@sha256:68bfc3b0d277b08a99101dc9b94aaa03e5ae70cf1b4fb965c03b2b87b915760d \
+            bash -euxo pipefail -c '
+              useradd --create-home builder
+              chown -R builder:builder /work/dist/cli-package-aur-smoke
+              su builder -c "makepkg --nodeps --noconfirm"
+              pacman -U --noconfirm ./openalice-bin-*.pkg.tar.zst
+              mkdir -p /tmp/openalice-home /tmp/openalice-runtime
+              VERSION_JSON=$(env -i HOME=/tmp/openalice-home PATH=/usr/bin:/bin /usr/bin/openalice version --json)
+              printf "%s" "$VERSION_JSON" | grep -Eq "\"method\"[[:space:]]*:[[:space:]]*\"aur\""
+              env -i HOME=/tmp/openalice-home PATH=/usr/bin:/bin /usr/bin/openalice up --home /tmp/openalice-runtime --no-update-check --wait 120 --json
+              env -i HOME=/tmp/openalice-home PATH=/usr/bin:/bin /usr/bin/openalice doctor --home /tmp/openalice-runtime --json | grep -Fq "pacman/AUR owns OpenAlice updates"
+              env -i HOME=/tmp/openalice-home PATH=/usr/bin:/bin /usr/bin/openalice down --home /tmp/openalice-runtime --json
+              env -i HOME=/tmp/openalice-home PATH=/usr/bin:/bin /usr/bin/openalice uninstall --yes | grep -Fq "paru -Rns openalice-bin"
+              test -x /usr/bin/openalice
+              pacman -Rns --noconfirm openalice-bin
+              test ! -e /usr/bin/openalice
+            '
 
   # Broker Packs are release artifacts, not inputs to the desktop package. Build
   # and validate them on their native platforms in parallel with desktop and
@@ -449,8 +636,8 @@ jobs:
 
   publish-release:
     name: Publish accepted release
-    needs: [release, build-desktop, accept-desktop-upgrade, build-cli-release, build-broker-packs, cli-installer-acceptance]
-    if: needs.release.outputs.created == 'true' && needs.build-desktop.result == 'success' && needs.accept-desktop-upgrade.result == 'success' && needs.build-cli-release.result == 'success' && needs.build-broker-packs.result == 'success' && needs.cli-installer-acceptance.result == 'success'
+    needs: [release, build-desktop, accept-desktop-upgrade, build-cli-release, build-cli-package-channels, accept-cli-homebrew, accept-cli-aur, build-broker-packs, cli-installer-acceptance]
+    if: needs.release.outputs.created == 'true' && needs.build-desktop.result == 'success' && needs.accept-desktop-upgrade.result == 'success' && needs.build-cli-release.result == 'success' && needs.build-cli-package-channels.result == 'success' && needs.accept-cli-homebrew.result == 'success' && needs.accept-cli-aur.result == 'success' && needs.build-broker-packs.result == 'success' && needs.cli-installer-acceptance.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -480,6 +667,11 @@ jobs:
           path: dist/release-cli
           merge-multiple: true
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: cli-package-channels
+          path: dist/release-cli-packages
+
       - name: Create tag and GitHub Release from accepted candidates
         uses: softprops/action-gh-release@v2
         with:
@@ -500,6 +692,43 @@ jobs:
             dist/release-broker-packs/*.tgz
             dist/release-cli/*.tar.gz
             dist/release-cli/*.tar.gz.sha256
+            dist/release-cli-packages/cli-package-channels/cli-package-channels.json
+            dist/release-cli-packages/cli-package-channels/homebrew/openalice.rb
+            dist/release-cli-packages/cli-package-channels/aur/PKGBUILD
+            dist/release-cli-packages/cli-package-channels/aur/.SRCINFO
+            dist/release-cli-packages/cli-npm-tarballs/*.tgz
+            dist/release-cli-packages/cli-npm-tarballs/npm-publish-order.json
+
+  publish-cli-npm:
+    name: Publish npm CLI packages
+    needs: [release, publish-release, build-cli-package-channels]
+    if: needs.publish-release.result == 'success' && needs.release.outputs.prerelease == 'false' && vars.OPENALICE_PUBLISH_NPM == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          registry-url: https://registry.npmjs.org
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: cli-package-channels
+          path: dist/cli-package-channels
+
+      - name: Publish platform packages before the meta package
+        working-directory: dist/cli-package-channels/cli-npm-tarballs
+        run: |
+          set -euo pipefail
+          node -e 'const m=require("./npm-publish-order.json");for(const p of m.packages.slice(0,-1))console.log(p.filename)' |
+            while IFS= read -r package; do npm publish "$package" --access public --provenance; done
+          META=$(node -e 'const m=require("./npm-publish-order.json");process.stdout.write(m.packages.at(-1).filename)')
+          npm publish "$META" --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   mirror-release-assets:
     needs: [release, publish-release]

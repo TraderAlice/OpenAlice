@@ -4,6 +4,8 @@ import { join } from 'node:path'
 import { createInterface } from 'node:readline/promises'
 
 import { resolveInstalledLayout } from './install-layout.mjs'
+import { readInstallSource } from './install-source.mjs'
+import { packageManagerUninstallMessage } from './package-manager.mjs'
 
 const BEGIN_MARKER = '# >>> OpenAlice CLI >>>'
 const END_MARKER = '# <<< OpenAlice CLI <<<'
@@ -28,6 +30,15 @@ export async function runUninstallCommand(argv, dependencies = {}) {
     ? dependencies.layout
     : resolveInstalledLayout(import.meta.url, { env: dependencies.env ?? process.env })
   if (!layout) {
+    const installSource = await (
+      dependencies.readInstallSourceImpl ?? readInstallSource
+    )({ env: dependencies.env ?? process.env })
+    const managerMessage = packageManagerUninstallMessage(installSource)
+    if (managerMessage) {
+      stdout.write(`${managerMessage}\n`)
+      stdout.write('OpenAlice did not modify the package manager\'s files or user data.\n')
+      return 0
+    }
     throw new Error('This OpenAlice CLI is running from source, not an installed release.')
   }
 
@@ -146,7 +157,8 @@ export function formatUninstallHelp() {
 Removes the native OpenAlice CLI releases, installer-owned launchers,
 provenance, update cache, and matching managed PATH blocks. It preserves
 OpenAlice data, Workspaces, source checkouts, credentials, keys, Agent Runtimes,
-and the shared install root.
+and the shared install root. Package-manager installations instead report the
+owning manager's exact uninstall command and do not remove its files directly.
 
 Options:
   --plan     Show exact ownership boundaries without changing files
