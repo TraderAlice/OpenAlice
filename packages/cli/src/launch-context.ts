@@ -6,7 +6,11 @@ import {
   resolveAliceProjectIdentity,
   type AliceProjectIdentity,
 } from './alice-project.ts'
-import { isBunStandalone, resolveBunResourceRoot } from './bun-standalone.mjs'
+import {
+  isBunStandalone,
+  resolveBunContentIdentity,
+  resolveBunResourceRoot,
+} from './bun-standalone.mjs'
 
 const PROJECT_KEY_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/
 const DEFAULT_PORT = 47_331
@@ -185,9 +189,7 @@ export function resolveLaunchContext(
   const runtimeProvider = bunStandalone
     ? {
         kind: 'bun' as const,
-        contentIdentity: parseOptionalRuntimeContentIdentity(
-          env['OPENALICE_RUNTIME_CONTENT_IDENTITY'],
-        ),
+        contentIdentity: resolveBunContentIdentity(selectedAppDir!, env),
       }
     : appDir.provenance.source === 'installed-runtime'
     ? {
@@ -232,11 +234,6 @@ export function resolveLaunchContext(
       },
     },
   })
-}
-
-function parseOptionalRuntimeContentIdentity(raw: string | undefined): string | null {
-  const value = raw?.trim()
-  return value && /^[A-Za-z0-9._-]{1,128}$/.test(value) ? value : null
 }
 
 export function resolveSupervisorRootPath(

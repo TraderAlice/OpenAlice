@@ -57,7 +57,7 @@ shrinking the ownership boundary to OpenAlice itself.
 
 Publish a native OpenAlice command for macOS and Linux that:
 
-- runs without a system Node.js or Bun installation;
+- runs without a system Node.js, Bun, or Git installation;
 - starts the existing Guardian-owned multi-process Runtime from any directory;
 - embeds or ships only OpenAlice-owned code and resources;
 - launches user-owned Agent Runtime executables as independent PTY processes;
@@ -186,6 +186,12 @@ preserve the old layout.
   releases/
     <version>-<platform>-<content-id>/
       bin/openalice[.exe]
+      share/openalice/
+        runtime/git/
+        ui/dist/
+        default/
+        src/workspaces/templates/
+        src/workspaces/cli/bin/
       adapters/
       release.json
   current -> releases/<active-release>
@@ -366,7 +372,7 @@ Checkboxes reflect repository truth, not intent.
   Node sidecar as the default answer.
 - [ ] Prove an installed broker pack can still be dynamically loaded from
   `OPENALICE_HOME` without bundling its SDK into UTA Core.
-- [ ] Prove embedded UI/default/template reads and one materialized external
+- [x] Prove embedded UI/default/template reads and one materialized external
   adapter file.
 - [ ] Record measured executable size, cold start, idle memory per role, and
   clean-build time against the released headless Runtime.
@@ -386,28 +392,31 @@ build harness when it improves the next investigation.
 - [x] Replace Guardian's child JavaScript paths with self-executable role
   spawns while preserving environment, readiness, restart, and shutdown
   behavior.
-- [ ] Bundle OpenAlice package dependencies and required platform-native
+- [x] Bundle OpenAlice package dependencies and required platform-native
   assets; keep broker packs external.
-- [ ] Generate platform archives, `release.json`, SHA-256 metadata, version,
+- [x] Generate platform archives, `release.json`, SHA-256 metadata, version,
   control compatibility, and content identity from accepted build outputs.
 - [ ] Keep source development on `pnpm dev`; it need not imitate the installed
   executable layout.
 
 ### 3. Resources and Workspace helper boundary
 
-- [ ] Embed Web UI, defaults, templates, migrations, and immutable adapter
+- [x] Ship Web UI, defaults, templates, migrations, and immutable adapter
   resources through one resource-root abstraction shared with source and
   Electron modes.
-- [ ] Serve the real UI and create every standard Workspace template from a
+- [x] Serve the real UI and create every standard Workspace template from a
   compiled executable outside the repository.
-- [ ] Replace Node-backed Workspace CLI shims with aliases or small wrappers
+- [x] Replace Node-backed Workspace CLI shims with aliases or small wrappers
   that dispatch into `openalice`.
-- [ ] Materialize only files that an external Agent process must open by path;
+- [x] Materialize only files that an external Agent process must open by path;
   verify lifecycle, permissions, content identity, and update replacement.
 - [ ] Remove CLI-only `OPENALICE_MANAGED_PI_*` selection and injection without
   changing Electron's bundled-Agent behavior.
 - [ ] Verify existing user-installed Agent CLIs retain their native config,
   version, executable path, and credentials.
+- [x] Ship a release-owned Git sidecar and prepend only its `bin` directory to
+  Runtime children; prove init, commit, local clone, and GitHub HTTPS with no
+  system Git on PATH.
 
 ### 4. Native CLI installers
 
@@ -605,7 +614,7 @@ These may change implementation details but not the fixed product boundaries:
 This plan is complete only when:
 
 1. a clean macOS or Linux CLI installation needs no preinstalled
-   Node, Bun, npm, source checkout, or Agent Runtime to run OpenAlice itself;
+   Node, Bun, npm, Git, source checkout, or Agent Runtime to run OpenAlice itself;
 2. one primary platform executable starts the existing multi-process Guardian,
    Alice, UTA, and Connector tree and every Agent Session remains an independent
    external process;
@@ -693,3 +702,14 @@ This plan is complete only when:
   PID, forced UTA failure left Alice ready, the control flag restored UTA under
   a new PID, and SIGTERM released the Guardian lock. The smoke also fixed an
   existing UTA restart deadlock by clearing a signalled child reference.
+- 2026-08-29: Release-artifact increment added a target-native archive builder
+  with per-file hashes, content identity, SHA-256 sidecar, licenses, immutable
+  resources, Bun-native Workspace helper dispatch, and a release-owned Git
+  sidecar. On macOS arm64 the expanded release measured 114,485,201 bytes and
+  the gzip archive 56,462,626 bytes; Git 2.53.0 occupied 19,168,630 bytes after
+  replacing duplicate built-in executables with 150 relative symlinks and
+  excluding GCM/LFS. Outside the checkout and with no system Node/Bun/Git on
+  PATH, acceptance passed Git init/commit/local clone, live GitHub HTTPS,
+  Chat/AutoQuant/Auto Prediction bootstrap, real `alice-workspace` manifest
+  plus invocation, default and Pi adapter materialization, content provenance,
+  and the real Web UI.

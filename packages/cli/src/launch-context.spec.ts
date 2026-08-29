@@ -150,8 +150,8 @@ describe('ResolvedLaunchContext', () => {
         },
       })
 
-      expect(context.appDir).toBe('/opt/openalice/releases/v1/share/openalice')
-      expect(context.aliceProject.appRoot).toBe('/opt/openalice/releases/v1/share/openalice')
+      expect(context.appDir).toBe(resolve('/opt/openalice/releases/v1/share/openalice'))
+      expect(context.aliceProject.appRoot).toBe(resolve('/opt/openalice/releases/v1/share/openalice'))
       expect(context.runtimeProvider).toEqual({
         kind: 'bun',
         contentIdentity: 'release-content-1',

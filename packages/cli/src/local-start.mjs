@@ -22,6 +22,7 @@ import {
 } from './runtime-deps.mjs'
 import { readRuntimeStatus as readGuardianRuntimeStatus } from './server-control.mjs'
 import {
+  buildBunRuntimeEnvironment,
   bunGuardianProcessSpec,
   isBunStandalone,
   resolveBunResourceRoot,
@@ -146,7 +147,7 @@ export async function startLocal(options, dependencies = {}) {
   const spawnProcess = dependencies.spawnProcess ?? spawn
   const waitForRuntime = dependencies.waitForRuntime ?? waitForOpenAlice
   const nodeBinary = dependencies.nodeBinary ?? process.execPath
-  const runtimeEnv = buildLocalRuntimeEnv(env, {
+  let runtimeEnv = buildLocalRuntimeEnv(env, {
     appDir,
     homeRoot,
     nodeBinary,
@@ -155,7 +156,11 @@ export async function startLocal(options, dependencies = {}) {
   })
   runtimeEnv.OPENALICE_RUNTIME_PROVIDER = runtimeProvider.kind
   if (standalone) {
-    runtimeEnv.OPENALICE_RUNTIME_EXECUTABLE = dependencies.runtimeExecutable ?? process.execPath
+    runtimeEnv = buildBunRuntimeEnvironment(
+      runtimeEnv,
+      appDir,
+      dependencies.runtimeExecutable ?? process.execPath,
+    )
   }
   delete runtimeEnv.OPENALICE_RUNTIME_CONTENT_IDENTITY
   if (runtimeProvider.contentIdentity) {

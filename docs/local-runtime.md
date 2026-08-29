@@ -76,6 +76,13 @@ UTA, and Connector by re-entering the same bytes under separate private roles.
 Every component remains an independent OS process; the provider changes launch
 artifacts, not ownership, health, restart, signal, or lock semantics.
 
+The target-native release layout keeps `bin/openalice` beside
+`share/openalice/`. That resource root owns the real Web UI, defaults,
+templates, external adapter files, Bun Workspace helper launchers, and a
+minimal Git runtime. The Bun provider prepends only that release-owned Git to
+the inherited PATH and records the archive's content identity from
+`release.json`; it does not require or replace a user's system Git.
+
 Source development continues to use `pnpm dev`, and the currently released
 installer continues to use the bundle provider until the Bun release and
 installation acceptance matrix is complete. Electron remains independent.

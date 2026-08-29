@@ -28,6 +28,7 @@
     "build:bun-cli:feasibility": "bun scripts/build-bun-cli-feasibility.ts",
     "build:bun-alice:feasibility": "bun scripts/build-bun-alice-feasibility.ts",
     "build:bun-runtime:feasibility": "bun scripts/build-bun-runtime-feasibility.ts",
+    "build:bun:release": "bun scripts/build-bun-release.ts",
     "build:migration-index": "tsx scripts/build-migration-index.ts",
     "broker-packs:build": "turbo run build --filter=./packages/uta-broker-* && tsx scripts/build-broker-packs.ts && pnpm broker-packs:verify",
     "broker-packs:upgrade-smoke": "tsx scripts/broker-pack-upgrade-smoke.ts",

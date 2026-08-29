@@ -21,6 +21,9 @@ on:
       - "scripts/install-smoke/**"
       - "scripts/build-bun-cli-feasibility.ts"
       - "scripts/build-bun-alice-feasibility.ts"
+      - "scripts/build-bun-runtime-feasibility.ts"
+      - "scripts/build-bun-release.ts"
+      - "THIRD_PARTY_NOTICES.md"
       - "scripts/remote-ssh-smoke.mjs"
       - "scripts/remote-smoke/**"
   push:
@@ -73,6 +76,10 @@ jobs:
       - run: pnpm build:bun-cli:feasibility
 
       - run: pnpm build:bun-alice:feasibility
+
+      - run: pnpm build:bun-runtime:feasibility
+
+      - run: pnpm build:bun:release
 
   checkout-install:
     if: github.event_name != 'push'

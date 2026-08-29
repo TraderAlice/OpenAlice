@@ -3,6 +3,8 @@
 import { INTERNAL_BOOTSTRAP_ROLE } from '../../../src/workspaces/bootstrap-runtime.js'
 import { parseInternalRole } from '../src/internal-role.js'
 
+const WORKSPACE_CLI_FLAG = '--workspace-cli'
+
 declare global {
   // Prevent the dynamically selected service module from also running its
   // legacy direct-entry wrapper inside the standalone executable.
@@ -12,6 +14,23 @@ declare global {
 
 async function main(): Promise<number> {
   const argv = process.argv.slice(2)
+  if (argv[0] === WORKSPACE_CLI_FLAG) {
+    const binary = argv[1]
+    if (!binary || !['alice', 'alice-workspace', 'alice-uta', 'traderhub'].includes(binary)) {
+      throw new Error(`invalid private Workspace CLI name: ${binary ?? '(missing)'}`)
+    }
+    globalThis.__OPENALICE_INTERNAL_ROLE_DISPATCH__ = true
+    process.env['OPENALICE_CLI_BIN'] = binary
+    process.argv.splice(2, process.argv.length - 2, ...argv.slice(2))
+    const loaded = await import('../../../src/workspaces/cli/bin/openalice-cli.cjs') as {
+      main?: () => Promise<void>
+      default?: { main?: () => Promise<void> }
+    }
+    const runWorkspaceCli = loaded.main ?? loaded.default?.main
+    if (!runWorkspaceCli) throw new Error('Workspace CLI payload did not export main()')
+    await runWorkspaceCli()
+    return 0
+  }
   const parsed = parseInternalRole(argv)
   if (parsed) {
     globalThis.__OPENALICE_INTERNAL_ROLE_DISPATCH__ = true
