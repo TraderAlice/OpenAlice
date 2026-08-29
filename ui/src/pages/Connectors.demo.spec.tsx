@@ -416,6 +416,11 @@ describe('Connector demo routes', () => {
 
     const navigation = await screen.findByRole('navigation', { name: 'Channel settings' })
     expect(navigation.querySelector('.grid')?.className).toContain('grid-cols-1')
+    expect(navigation.className).toContain('md:sticky')
+    expect(navigation.className).toContain('md:top-0')
+    const scrollArea = navigation.closest('[data-settings-scroll-area]') as HTMLElement
+    expect(scrollArea.className).not.toContain('py-5')
+    expect(scrollArea.querySelector('[data-connector-settings-top-spacer]')?.className).toContain('h-5')
     expect(within(navigation).getAllByRole('button')).toHaveLength(4)
     const slackSection = screen.getByRole('region', { name: 'Slack' })
     expect(slackSection.className).toContain('md:scroll-mt-[9.5rem]')

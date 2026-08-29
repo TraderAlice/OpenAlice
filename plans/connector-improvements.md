@@ -319,6 +319,19 @@ external adapters remain optional projections rather than sources of truth.
     and Chat text keep state from depending on color. Action wrapping and header
     alignment stay responsive, and real buttons such as Send test keep their
     distinct bordered shape.
+29. **Sticky navigation owns the scrollport edge, not a padded gap.** The full
+    Settings scroll owner begins below PageHeader, but its 20 px vertical
+    padding constrains the sticky channel navigator 20 px below that edge. A
+    preceding adapter's controls can therefore scroll through the gap; real
+    geometry showed Slack's Save connection at y=95–129, the scrollport at
+    y=101, and the navigator at y=121. Painting an upward mask could hide the
+    symptom but also cover a stale/retry notice, while a negative sticky offset
+    would clip the navigator itself. The chosen model removes top padding from
+    the scroll owner and restores the same initial whitespace with an ordinary
+    aria-hidden flow spacer. The spacer scrolls away, allowing `top: 0` to place
+    the navigator exactly at the scrollport edge. Bottom/horizontal padding,
+    mobile's static navigator, focus transfer, document order, and responsive
+    section scroll margins remain unchanged.
 
 ## Ordered Work
 
@@ -381,6 +394,8 @@ external adapters remain optional projections rather than sources of truth.
         credential setup while retaining status in overview/navigation.
   - [x] Remove pseudo-button containers around lifecycle and Chat toggles while
         preserving visible state labels and shared Toggle semantics.
+  - [x] Let the desktop channel navigator cover the Settings scrollport edge so
+        controls from preceding channels cannot show through above it.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -631,6 +646,21 @@ matched the viewport. No Toggle or Connector action was invoked, and the
 viewport was reset. The desktop pass also exposed a separate sticky-navigator
 gap that can reveal a preceding channel's scrolling controls; that is the next
 owned increment rather than hidden in this visual-only change.
+
+The sticky-edge increment passed 35 focused settings-navigation, overview, and
+Connector demo tests, UI and root typechecks, the production build, and all
+5,120 repository tests. Its structural contract keeps horizontal/bottom padding
+on the scroll owner, replaces only top
+padding with an aria-hidden 20 px flow spacer, and preserves the desktop-only
+`sticky top-0` navigator. Real Default AliceProject geometry at 1,052 x 734
+reproduced the defect with scrollport top 101 px, navigator top 121 px, and the
+preceding Slack Save connection spanning y=95–129. After the change the
+navigator top equaled the scrollport at 101 px (`gap: 0`) and fully covered the
+still-scrolling control. At 390 x 844, computed navigation position remained
+`static`, the initial gap remained 20 px, the navigator scrolled entirely above
+the viewport after choosing Feishu, and the focused section began 16 px below
+the scrollport edge with no horizontal overflow. No field, Toggle, or Connector
+action was invoked, and the viewport was reset.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.

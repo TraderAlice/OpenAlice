@@ -363,6 +363,10 @@ The surfaces deliberately have different jobs:
   responsive in-page channel navigator with the same lifecycle badges. Choosing
   a channel moves keyboard focus to its labelled section without changing route,
   hiding another adapter's draft, or adding browser history.
+  On desktop the sticky navigator sits exactly on the Settings scrollport edge,
+  so controls from the preceding channel cannot scroll through above it. Initial
+  page breathing room comes from a normal-flow spacer that scrolls away; the
+  narrow navigator stays static and consumes no persistent mobile height.
   The adapter dialog localizes its close control and gives that control a larger
   mobile touch target while retaining the shared primitive's focus restoration,
   Escape, and backdrop behavior.
