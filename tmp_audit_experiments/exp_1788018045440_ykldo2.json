@@ -1,0 +1,30 @@
+{
+  "id": "exp_1788018045440_ykldo2",
+  "strategyId": "strat-1",
+  "hypothesis": "EMA 20/50 cross captures trends during London session",
+  "parameters": {
+    "fastPeriod": 20,
+    "slowPeriod": 50
+  },
+  "instruments": [
+    "EURUSD"
+  ],
+  "timeframe": {
+    "resolution": "minute",
+    "start": "2023-01-01",
+    "end": "2023-12-31"
+  },
+  "dataSource": "oanda",
+  "inSamplePeriod": {
+    "start": "2023-01-01",
+    "end": "2023-12-31"
+  },
+  "backtestIds": [],
+  "childExperimentIds": [
+    "exp_1788018045443_gw66lm"
+  ],
+  "source": "manual",
+  "tags": [],
+  "createdAt": "2026-08-29T15:40:45.440Z",
+  "updatedAt": "2026-08-29T15:40:45.445Z"
+}
