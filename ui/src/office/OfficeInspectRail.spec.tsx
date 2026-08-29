@@ -56,11 +56,11 @@ describe('OfficeInspectRail', () => {
     expect(container.querySelector<HTMLImageElement>('.oa-office-inspect__portrait .oa-office-coworker img')?.src)
       .toContain('/office/coworkers/codex-portrait-v2.png')
     expect(screen.getByRole('button', { name: 'Close' }).querySelector('img')?.getAttribute('src'))
-      .toBe('/office/hud/window-close-v1.png')
+      .toBe('/office/hud/window-close-v2.png')
     expect(screen.getByRole('button', { name: 'Open session' }).querySelector('img')?.getAttribute('src'))
-      .toBe('/office/hud/session-portal-v1.png')
+      .toBe('/office/hud/session-portal-v2.png')
     expect(screen.getByRole('button', { name: 'desk-note.md' }).querySelector('img')?.getAttribute('src'))
-      .toBe('/office/hud/drawer-record-v1.png')
+      .toBe('/office/hud/drawer-record-v2.png')
     expect(container.querySelector('svg')).toBeNull()
 
     await userEvent.click(screen.getByRole('button', { name: 'Open session' }))
@@ -85,7 +85,7 @@ describe('OfficeInspectRail', () => {
     )
 
     const back = screen.getByRole('button', { name: 'Back to team roster' })
-    expect(back.querySelector('img')?.getAttribute('src')).toBe('/office/hud/window-back-v1.png')
+    expect(back.querySelector('img')?.getAttribute('src')).toBe('/office/hud/window-back-v2.png')
     expect(document.activeElement).toBe(back)
     await userEvent.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalledOnce()

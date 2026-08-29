@@ -1083,6 +1083,28 @@ Native coworker-portrait follow-up (2026-08-29):
 - `pnpm test` passed: 603 files / 5019 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Native HUD-pack follow-up (2026-08-29):
+
+- Opened the real Menu, Occupancy log, roster, and Agent-file window after the portrait pass and measured every
+  generated UI image against its rendered box. Journal art is already appropriately sized at 96px for 40-54px
+  display, but all twelve HUD controls were 128px masters repeatedly reduced to 18-38px; the narrow D-pad used a
+  particularly awkward 128-to-96 non-integer scale.
+- Compared repacking only the four Menu images, repacking HUD and journal together, and packaging the complete HUD
+  family on one shared canvas. Chose the complete HUD family because Menu-only would leave window controls at a
+  different density, while journal art is not an outlier and should remain untouched.
+- Nearest-neighbor sampling and hard alpha produced twelve native 48x48 v2 RGBA controls totaling 29.1 KiB instead
+  of 173.3 KiB, an 83.2% reduction. The canvas covers the live signal, Menu, floor modes, D-pad, recenter, roster,
+  conversation, provenance, session, back, and close actions without changing any DOM label or focus behavior.
+- Runtime and tests now use only v2 HUD paths; the twelve 128px sources were removed. The HUD registry spec locks
+  PNG RGBA encoding and the 48x48 canvas so future generated masters must be packaged before shipping.
+- Browser-checked the desktop Menu and the Occupancy log at 760x900. All visible HUD images report natural 48x48,
+  the D-pad scales exactly to 96x96, action silhouettes remain legible, no image is broken, and horizontal overflow
+  remains 0px.
+- Focused HUD, Building, roster, Agent-file, cabinet, and Office-page specs passed: 6 files / 16 tests.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 603 files / 5019 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

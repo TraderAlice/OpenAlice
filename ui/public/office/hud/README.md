@@ -3,19 +3,21 @@
 These generated RGBA PNGs are the game-art layer for the Office map controls.
 Live labels, button behavior, focus rings, and accessible names remain DOM-owned.
 
-- `move-pad-v1.png` — four-way movement tutorial icon
-- `reset-compass-v1.png` — map recenter control
-- `menu-terminal-v1.png` — pause-menu trigger and title icon
-- `group-grid-v1.png` — all-Workspace-groups floor mode
-- `occupancy-log-v1.png` — occupancy-log command
-- `signal-receiver-v1.png` — live-floor and quiet-floor signal state
-- `roster-badge-v1.png` — Team roster window identity
-- `window-close-v1.png` — shared Office window close latch
-- `session-portal-v1.png` — open the selected Agent session
-- `drawer-record-v1.png` — open a provenance record from an Agent desk
-- `talk-bubble-v1.png` — nearby conversation action in the compact world prompt
-- `window-back-v1.png` — return from an Agent file to its originating team roster
+- `move-pad-v2.png` — four-way movement tutorial icon
+- `reset-compass-v2.png` — map recenter control
+- `menu-terminal-v2.png` — pause-menu trigger and title icon
+- `group-grid-v2.png` — all-Workspace-groups floor mode
+- `occupancy-log-v2.png` — occupancy-log command
+- `signal-receiver-v2.png` — live-floor and quiet-floor signal state
+- `roster-badge-v2.png` — Team roster window identity
+- `window-close-v2.png` — shared Office window close latch
+- `session-portal-v2.png` — open the selected Agent session
+- `drawer-record-v2.png` — open a provenance record from an Agent desk
+- `talk-bubble-v2.png` — nearby conversation action in the compact world prompt
+- `window-back-v2.png` — return from an Agent file to its originating team roster
 
 All assets use `docs/assets/office/style-master-v1.png` as their visual reference.
 The command glyphs are separate transparent images so their silhouettes remain
-legible at UI size and their accessible labels stay DOM-owned.
+legible at UI size and their accessible labels stay DOM-owned. The generated
+masters are packaged onto shared native 48x48 RGBA canvases with nearest-neighbor
+sampling and hard alpha; full-resolution 128x128 sources are not shipped.

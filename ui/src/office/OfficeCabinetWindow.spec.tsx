@@ -78,7 +78,7 @@ describe('OfficeCabinetWindow', () => {
       'Thesis memoFiled by x1▶',
     ])
     expect(container.querySelector<HTMLImageElement>('header img')?.src)
-      .toContain('/office/hud/drawer-record-v1.png')
+      .toContain('/office/hud/drawer-record-v2.png')
 
     await userEvent.click(screen.getByRole('button', { name: /Review queue/ }))
     expect(onOpenRecord).toHaveBeenCalledWith(group.employees[1], group.employees[1].drawers[0])
