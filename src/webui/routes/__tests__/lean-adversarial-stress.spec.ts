@@ -535,12 +535,12 @@ describe('LEAN WebUI Routes — Adversarial & Empirical Stress Suite', () => {
       // Add inSample and outOfSample results to exp
       await expStore.update(exp.id, {
         results: {
-          inSample: mockBacktestResult.statistics,
+          inSample: mockBacktestResult.statistics as any,
           outOfSample: {
             ...mockBacktestResult.statistics,
             sharpeRatio: 1.1,
             netProfit: 1500
-          }
+          } as any
         }
       })
 
