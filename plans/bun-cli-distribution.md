@@ -530,9 +530,10 @@ artifacts.
 - [ ] Deferred Windows lane: run a clean standard-user PowerShell install.
 - [ ] Install and run the accepted release through npm, Bun, Homebrew, and
   `paru`, then verify manager-owned update and uninstall guidance.
-- [ ] Exercise the documented old-to-new cutover once on a currently supported
+- [x] Exercise the documented old-to-new cutover once on a currently supported
   v0.90.1 CLI host; this is evidence for the guidance, not a cross-platform
-  compatibility matrix or a release blocker for the Bun architecture.
+  compatibility matrix. Keep the real published v0.90.1 replacement as a
+  required Linux x64 `dev` and stable-release acceptance gate.
 - [ ] Prove `up`, detach, `status`, `open`, multiple independent Agent PTYs,
   component restart, `down`, update activation, rollback, and uninstall.
 - [ ] Run the root TypeScript/tests, UI typecheck, Guardian recovery, CLI PTY,
@@ -871,3 +872,13 @@ This plan is complete only when:
   generated `openalice-bin`, install it through `pacman`, and repeat stopped
   and active upgrade, ownership, restart activation, and removal checks before
   dev aliases or a stable release can publish.
+- 2026-08-30: Replayed the published v0.90.1 installer into an isolated macOS
+  home, replaced its expanded Node Runtime and managed Pi with the accepted Bun
+  candidate, and proved native `version`, detached `up`, `status`, `down`, and
+  uninstall with a minimal Runtime `PATH`. The cutover removed only
+  installer-owned `cli-versions` and Pi launchers while preserving product data
+  and an external user-owned Pi byte-for-byte. Dev and stable publication now
+  repeat the same bounded journey on native Linux x64. The historical Pi
+  manifests are fetched from the v0.90.1 OpenAlice tag and verified against the
+  hashes embedded by that published installer, avoiding dependence on the
+  upstream Pi asset URL that has since disappeared.
