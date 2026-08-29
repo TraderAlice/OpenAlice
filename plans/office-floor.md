@@ -1865,6 +1865,27 @@ Replay-deck material latch follow-up (2026-08-29):
 - Focused OfficePage and HUD-asset specs passed: 2 files / 6 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the
   608-file Vitest run (5,035 passing; one file and nine tests skipped), and the UI production build all passed.
 
+Large-viewport map-boundary follow-up (2026-08-29):
+
+- Played the three-pod floor at 1280x900 and measured a 1034x722 campus around the fixed 960x672 world. The map was
+  pinned at the campus origin, exposing all 74px of horizontal surplus on the right and all 50px of vertical surplus
+  below it. The one-sided green checker read as an unfinished map extension, while the grab cursor and accessible
+  instruction still promised panning even though the world was smaller than the viewport and could not move.
+- Compared stretching world geometry, continuing floor tiles into non-interactive space, and centering the bounded
+  world inside an intentional perimeter. Chose centering because it keeps 24px movement, collision, interaction, and
+  prop coordinates authoritative; fake floor would imply walkable space, while stretching would distort the level.
+- Camera clamping now centers any axis whose viewport is at least as large as the world and retains bounded negative
+  offsets on smaller axes. At 1280x900 this creates symmetric 37px side and 25px top/bottom perimeter bands. A fully
+  visible world no longer captures drag gestures or shows a grab cursor, and its localized map label omits the false
+  drag instruction in English, Simplified Chinese, Traditional Chinese, and Japanese.
+- Browser-played both directions of the responsive boundary. On a native 390x844 load, Alice remained visible at the
+  initial `-296,0` camera, the campus kept its grab affordance and drag label, and a 150px touch drag moved the camera
+  to `-446,0` with zero page overflow. Returning to 1280x900 clamped to `37,25`; the same drag gesture left that
+  camera unchanged and the cursor remained default.
+- Focused camera, OfficeBuilding, and OfficePage specs passed: 3 files / 22 tests. `npx tsc --noEmit`,
+  `cd ui && npx tsc -b`, the 608-file Vitest run (5,036 passing; one file and nine tests skipped), and the UI
+  production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

@@ -28,6 +28,7 @@ import { OfficeMapPod } from './OfficeMapPod'
 import { OfficeRouteTrail } from './OfficeRouteTrail'
 import { OfficeRouteTargetPointer } from './OfficeRouteTargetPointer'
 import {
+  clampOfficeCamera,
   nearestOfficeInteractionTarget,
   officeCameraFollowingAlice,
   officeInteractionTargets,
@@ -164,6 +165,9 @@ export function OfficeBuilding({
     }))),
     [groups],
   )
+  const cameraPannable = viewportSize.width <= 0 || viewportSize.height <= 0
+    || viewportSize.width < mapLayout.width
+    || viewportSize.height < mapLayout.height
   const rosterWorkspaceIds = useMemo(
     () => new Set(groups.filter((group) => group.employees.length > 4).map((group) => group.workspace.id)),
     [groups],
@@ -298,10 +302,7 @@ export function OfficeBuilding({
   const clampCamera = (x: number, y: number) => {
     const viewport = viewportRef.current?.getBoundingClientRect()
     if (!viewport) return { x, y }
-    return {
-      x: Math.min(0, Math.max(viewport.width - mapLayout.width, x)),
-      y: Math.min(0, Math.max(viewport.height - mapLayout.height, y)),
-    }
+    return clampOfficeCamera({ x, y }, viewport, mapLayout)
   }
   const initialCamera = () => {
     const viewport = viewportRef.current?.getBoundingClientRect()
@@ -510,10 +511,7 @@ export function OfficeBuilding({
           ? current
           : { width: rect.width, height: rect.height }
       ))
-      setCamera((current) => ({
-        x: Math.min(0, Math.max(rect.width - mapLayout.width, current.x)),
-        y: Math.min(0, Math.max(rect.height - mapLayout.height, current.y)),
-      }))
+      setCamera((current) => clampOfficeCamera(current, rect, mapLayout))
     }
     updateViewportSize()
     const observer = typeof ResizeObserver === 'undefined'
@@ -707,9 +705,12 @@ export function OfficeBuilding({
         ref={viewportRef}
         tabIndex={0}
         data-panning={panning}
+        data-pannable={cameraPannable || undefined}
         data-departing={Boolean(departingWorkspace) || undefined}
         aria-busy={Boolean(departingWorkspace)}
-        aria-label={replaySeq == null ? t('office.mapLabel') : t('office.replayMapLabel')}
+        aria-label={replaySeq == null
+          ? t(cameraPannable ? 'office.mapLabel' : 'office.mapLabelFixed')
+          : t('office.replayMapLabel')}
         onKeyDown={(event) => {
           if (departingWorkspace) return
           const key = event.key.toLowerCase()
@@ -736,6 +737,7 @@ export function OfficeBuilding({
         onPointerDown={(event) => {
           if (departingWorkspace) return
           if ((event.target as HTMLElement).closest('button')) return
+          if (!cameraPannable) return
           cancelAutoWalk()
           event.currentTarget.setPointerCapture(event.pointerId)
           dragRef.current = {

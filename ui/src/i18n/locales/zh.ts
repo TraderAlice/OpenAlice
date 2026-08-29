@@ -1811,6 +1811,7 @@ export const zh: Resources = {
     groups: '小组',
     floorView: '楼层视图',
     mapLabel: 'Office 地图。拖动查看地图，使用方向键或 WASD 移动 Alice，靠近对象后按回车或空格互动。',
+    mapLabelFixed: 'Office 地图。使用方向键或 WASD 移动 Alice，靠近对象后按回车或空格互动。',
     replayMapLabel: '重放楼层。移动 Alice 查看快照；使用运营面板回看，或返回直播。',
     replaySnapshot: '快照',
     replayLockedHint: '这是历史快照。返回直播后才能使用。',

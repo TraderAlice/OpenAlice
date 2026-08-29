@@ -548,6 +548,8 @@ describe('OfficeBuilding', () => {
       y: 0,
       toJSON: () => ({}),
     })
+    fireEvent(window, new Event('resize'))
+    expect(map.dataset.pannable).toBe('true')
     fireEvent.pointerDown(map, { pointerId: 2, clientX: 400, clientY: 300 })
     fireEvent.pointerMove(map, { pointerId: 2, clientX: 402, clientY: 301 })
     expect(controls?.dataset.learned).toBe('false')
@@ -579,7 +581,10 @@ describe('OfficeBuilding', () => {
     })
     fireEvent(window, new Event('resize'))
     expect(map.querySelector<HTMLElement>('.oa-office-map')?.style.transform)
-      .toBe('translate3d(0px, 0px, 0)')
+      .toBe('translate3d(120px, 64px, 0)')
+    expect(map.dataset.pannable).toBeUndefined()
+    expect(map.getAttribute('aria-label'))
+      .toBe('Office map. Use arrows or WASD to move Alice; press Enter or Space to interact nearby.')
     await userEvent.keyboard('aasss')
     const interactionPrompt = screen.getByRole('status', { name: 'Inspect chat files' })
     expect(interactionPrompt.classList.contains('oa-office-interact-prompt')).toBe(true)

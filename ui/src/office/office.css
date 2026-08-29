@@ -3381,13 +3381,17 @@
   position: relative;
   overflow: hidden;
   padding: 0;
-  cursor: grab;
+  cursor: default;
   outline: none;
   touch-action: none;
   user-select: none;
 }
 
-.oa-office-campus[data-panning="true"] {
+.oa-office-campus[data-pannable="true"] {
+  cursor: grab;
+}
+
+.oa-office-campus[data-pannable="true"][data-panning="true"] {
   cursor: grabbing;
 }
 

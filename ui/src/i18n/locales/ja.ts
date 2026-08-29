@@ -1812,6 +1812,7 @@ export const ja: Resources = {
     groups: 'グループ',
     floorView: 'フロア表示',
     mapLabel: 'Office マップ。ドラッグで移動し、矢印キーまたは WASD で Alice を動かします。近くの対象には Enter または Space で操作します。',
+    mapLabelFixed: 'Office マップ。矢印キーまたは WASD で Alice を動かします。近くの対象には Enter または Space で操作します。',
     replayMapLabel: 'リプレイフロア。Alice を動かしてスナップショットを確認し、運用ボードで見直すか Live に戻ります。',
     replaySnapshot: 'スナップショット',
     replayLockedHint: '過去のスナップショットです。Live に戻ると使用できます。',

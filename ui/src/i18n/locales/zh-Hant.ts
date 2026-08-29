@@ -1819,6 +1819,7 @@ export const zhHant: Resources = {
     groups: '小組',
     floorView: '樓層檢視',
     mapLabel: 'Office 地圖。拖動查看地圖，使用方向鍵或 WASD 移動 Alice，靠近物件後按 Enter 或空白鍵互動。',
+    mapLabelFixed: 'Office 地圖。使用方向鍵或 WASD 移動 Alice，靠近物件後按 Enter 或空白鍵互動。',
     replayMapLabel: '重放樓層。移動 Alice 查看快照；使用營運面板回看，或返回直播。',
     replaySnapshot: '快照',
     replayLockedHint: '這是歷史快照。返回直播後才能使用。',

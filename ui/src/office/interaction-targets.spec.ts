@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { OfficeRoomSnapshot } from '../api/office'
 import {
   OFFICE_INTERACTION_RADIUS,
+  clampOfficeCamera,
   nearestOfficeInteractionTarget,
   officeCameraFollowingAlice,
   officeInteractionTargets,
@@ -191,6 +192,26 @@ describe('Office interaction targets', () => {
       { width: 640, height: 420 },
       { width: 1200, height: 900 },
     )).toEqual({ x: 0, y: 0 })
+  })
+
+  it('centers a fixed map on axes larger than the world', () => {
+    expect(clampOfficeCamera(
+      { x: -80, y: 12 },
+      { width: 1200, height: 800 },
+      { width: 960, height: 672 },
+    )).toEqual({ x: 120, y: 64 })
+    expect(clampOfficeCamera(
+      { x: -80, y: -900 },
+      { width: 1200, height: 420 },
+      { width: 960, height: 900 },
+    )).toEqual({ x: 120, y: -480 })
+
+    expect(officeCameraFollowingAlice(
+      { x: 480, y: 336 },
+      { x: 0, y: 0 },
+      { width: 1200, height: 800 },
+      { width: 960, height: 672 },
+    )).toEqual({ x: 120, y: 64 })
   })
 
   it('adds a roster target only when a group exceeds the visible desk count', () => {

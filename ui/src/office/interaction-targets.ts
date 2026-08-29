@@ -192,8 +192,22 @@ export function officeCameraFollowingAlice(
     y -= screenY - (viewport.height - verticalMargin)
   }
 
+  return clampOfficeCamera({ x, y }, viewport, map)
+}
+
+export function clampOfficeCamera(
+  camera: { x: number; y: number },
+  viewport: { width: number; height: number },
+  map: { width: number; height: number },
+): { x: number; y: number } {
+  const axis = (position: number, viewportSize: number, mapSize: number) => (
+    viewportSize >= mapSize
+      ? Math.round((viewportSize - mapSize) / 2)
+      : Math.min(0, Math.max(viewportSize - mapSize, Math.round(position)))
+  )
+
   return {
-    x: Math.min(0, Math.max(viewport.width - map.width, Math.round(x))),
-    y: Math.min(0, Math.max(viewport.height - map.height, Math.round(y))),
+    x: axis(camera.x, viewport.width, map.width),
+    y: axis(camera.y, viewport.height, map.height),
   }
 }
