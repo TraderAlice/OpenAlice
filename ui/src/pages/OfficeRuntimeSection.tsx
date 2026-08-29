@@ -24,10 +24,12 @@ import {
 import { useWorkspace } from '../tabs/store'
 
 export type OfficeLogChannel = OfficeReplayChannel
-type OfficeLogFamily = Exclude<OfficeLogChannel, 'all'>
 
 const OFFICE_LOG_CHANNELS: readonly OfficeLogChannel[] = ['all', 'agent', 'inbox', 'news']
-const OFFICE_LOG_FAMILIES: readonly OfficeLogFamily[] = ['agent', 'inbox', 'news']
+const OFFICE_AGENT_BEAT_TARGET = 12
+const OFFICE_AGENT_PAGE_SIZE = 100
+const OFFICE_AGENT_MAX_PAGES = 5
+const OFFICE_SERVICE_PAGE_SIZE = 50
 const OFFICE_LOG_CHANNEL_LABEL_KEYS = {
   all: 'office.logChannelAll',
   agent: 'office.logChannelAgent',
@@ -174,6 +176,29 @@ function mergeOfficeLogFamilies(
   return [...bySequence.values()].sort((a, b) => b.seq - a.seq)
 }
 
+type ActivityQuery = typeof api.agentRuntime.query
+
+async function loadOfficeAgentWindow(query: ActivityQuery): Promise<AgentRuntimeEvent[]> {
+  let entries: AgentRuntimeEvent[] = []
+
+  for (let page = 1; page <= OFFICE_AGENT_MAX_PAGES; page += 1) {
+    const result = await query({
+      page,
+      pageSize: OFFICE_AGENT_PAGE_SIZE,
+      family: 'agent',
+    })
+    entries = mergeOfficeLogFamilies([entries, result.entries])
+
+    const hasEnoughStoryBeats = officeActivityBeats(entries).length >= OFFICE_AGENT_BEAT_TARGET
+    const hasNextPage = result.totalPages !== undefined
+      ? page < result.totalPages
+      : result.entries.length === OFFICE_AGENT_PAGE_SIZE
+    if (hasEnoughStoryBeats || !hasNextPage || result.entries.length === 0) break
+  }
+
+  return entries
+}
+
 export function OfficeRuntimeSection({
   actors = new Map(),
   initialChannel = 'all',
@@ -202,12 +227,13 @@ export function OfficeRuntimeSection({
   const load = useCallback(async () => {
     try {
       const activityApi = api.productActivity ?? api.agentRuntime
-      const pages = await Promise.all(OFFICE_LOG_FAMILIES.map((family) => activityApi.query({
-        page: 1,
-        pageSize: 50,
-        family,
-      })))
-      const [agent, inbox, news] = pages.map((page) => page.entries)
+      const [agent, inboxPage, newsPage] = await Promise.all([
+        loadOfficeAgentWindow(activityApi.query),
+        activityApi.query({ page: 1, pageSize: OFFICE_SERVICE_PAGE_SIZE, family: 'inbox' }),
+        activityApi.query({ page: 1, pageSize: OFFICE_SERVICE_PAGE_SIZE, family: 'news' }),
+      ])
+      const inbox = inboxPage.entries
+      const news = newsPage.entries
       setEntriesByChannel({
         all: mergeOfficeLogFamilies([agent, inbox, news]),
         agent,

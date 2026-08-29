@@ -2885,6 +2885,23 @@ HUD state-vocabulary follow-up (2026-08-30):
   together with root/UI TypeScript, the full 617-file Vitest run (5,122 passing; one file and nine tests skipped), and
   the production build; the existing large-chunk advisory is unchanged.
 
+Story-beat Agent window follow-up (2026-08-30):
+
+- Played the live Operations journal after several real Grok runs. Agent showed only two rows: one completion and one
+  49-update report. The UI requested 50 raw records and folded them afterwards, so one chatty task could consume the
+  entire Agent window and hide every preceding Session even though their product events remained in the journal.
+- Compared increasing the raw limit, assigning fixed per-task quotas, and adaptively paging until the journal contains
+  enough folded story beats. Chose adaptive paging: a larger fixed window only postpones the same failure, while task
+  quotas distort chronology and complicate replay semantics.
+- Agent now requests 100-record pages until it has 12 readable beats, exhausts available history, or reaches a bounded
+  five-page / 500-record ceiling. Inbox and News keep independent 50-record windows, and sequence merge/dedup preserves
+  the single chronological All channel. A regression spec covers one 100-update task followed by an earlier Session.
+- The live journal changed from `Agent 2` to `Agent 14`: the latest AutoQuant task remained two readable beats while two
+  recent Chat Grok Sessions and an earlier task returned. Selecting Chat completion #1837, locating it on the replay
+  floor, and reopening Operations restored the Agent channel and exact #1837 selection. Focused journal/activity-beat
+  specs passed (2 files / 16 tests), together with root/UI TypeScript, the full 617-file Vitest run (5,123 passing; one
+  file and nine tests skipped), and the production build; the existing large-chunk advisory is unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

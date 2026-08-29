@@ -12,7 +12,7 @@ import { OfficeRuntimeSection } from './OfficeRuntimeSection'
 const query = vi.fn()
 
 function mockJournal(entries: Array<{ type: string } & Record<string, unknown>>) {
-  query.mockImplementation(async (opts: { family?: string; pageSize?: number } = {}) => {
+  query.mockImplementation(async (opts: { family?: string; page?: number; pageSize?: number } = {}) => {
     const filtered = opts.family === 'inbox'
       ? entries.filter((entry) => entry.type === 'inbox.received')
       : opts.family === 'news'
@@ -20,13 +20,16 @@ function mockJournal(entries: Array<{ type: string } & Record<string, unknown>>)
         : opts.family === 'agent'
           ? entries.filter((entry) => entry.type !== 'inbox.received' && entry.type !== 'news.ingested')
           : entries
+    const page = opts.page ?? 1
+    const pageSize = opts.pageSize ?? filtered.length
+    const offset = (page - 1) * pageSize
     return {
-      entries: filtered.slice(0, opts.pageSize ?? filtered.length),
+      entries: filtered.slice(offset, offset + pageSize),
       lastSeq: entries.length,
       total: filtered.length,
-      page: 1,
-      pageSize: 50,
-      totalPages: 1,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil(filtered.length / pageSize)),
     }
   })
 }
@@ -359,6 +362,41 @@ describe('OfficeRuntimeSection', () => {
     expect(allLog.children).toHaveLength(3)
     expect(screen.getByRole('button', { name: /Inbox received.*#0100/i })).toBeTruthy()
     expect(screen.getByRole('button', { name: /News added.*#0099/i })).toBeTruthy()
+  })
+
+  it('fills the Agent journal with story beats beyond one chatty task', async () => {
+    const now = Date.now()
+    const recentProgress = Array.from({ length: 100 }, (_, index) => ({
+      seq: 202 - index,
+      ts: now - index * 100,
+      type: 'runtime.turn.text',
+      payload: {
+        resumeId: 'resume-chatty',
+        taskId: 'task-chatty',
+        text: `Progress ${index + 1}`,
+      },
+    }))
+    mockJournal([
+      ...recentProgress,
+      {
+        seq: 2,
+        ts: now - 20_000,
+        type: 'runtime.stopped',
+        payload: { resumeId: 'resume-earlier', taskId: 'task-earlier', status: 'done' },
+      },
+      {
+        seq: 1,
+        ts: now - 21_000,
+        type: 'runtime.started',
+        payload: { resumeId: 'resume-earlier', taskId: 'task-earlier' },
+      },
+    ])
+    render(<OfficeRuntimeSection />)
+
+    expect(await screen.findByRole('tab', { name: /Agent\s*3/ })).toBeTruthy()
+    expect(query).toHaveBeenCalledWith({ page: 2, pageSize: 100, family: 'agent' })
+    expect(screen.getByRole('button', { name: /Task complete.*#0002/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Task started.*#0001/i })).toBeTruthy()
   })
 
   it('folds adjacent reports from one task into a selectable activity beat', async () => {
