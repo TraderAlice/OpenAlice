@@ -364,12 +364,13 @@ Checkboxes reflect repository truth, not intent.
 - [x] Re-execute the compiled binary as Guardian, Alice, UTA, and Connector;
   prove separate PIDs, signal propagation, component failure isolation, and
   clean lock release.
-- [ ] Launch at least two independent fake or real Agent CLI PTYs; stopping one
+- [x] Launch at least two independent fake or real Agent CLI PTYs; stopping one
   must not stop the other, Alice, or Guardian.
-- [ ] Finish the Bun-native PTY gate. Bun 1.4 `Terminal` is accepted on macOS
+- [x] Finish the Bun-native PTY gate. Bun 1.4 `Terminal` is accepted on macOS
   arm64, Linux arm64, and Linux x64 behind the existing PTY ownership boundary;
-  high-output backpressure remains unproved. Do not add a
-  Node sidecar as the default answer.
+  high-output backpressure stops the whole PTY process group at the producer
+  boundary and resumes below the existing low watermark. Do not add a Node
+  sidecar as the default answer.
 - [ ] Prove an installed broker pack can still be dynamically loaded from
   `OPENALICE_HOME` without bundling its SDK into UTA Core.
 - [x] Prove embedded UI/default/template reads and one materialized external
@@ -584,17 +585,14 @@ live-paper trading is not part of packaging verification.
 
 These may change implementation details but not the fixed product boundaries:
 
-1. Does Bun need an OpenAlice-owned output-pressure buffer to replace
-   `node-pty` pause/resume semantics? The Windows PTY backend is deferred with
-   the rest of native Windows distribution.
-2. Can the current `@hono/node-server` paths run unchanged under Bun, or should
+1. Can the current `@hono/node-server` paths run unchanged under Bun, or should
    the CLI build use a small runtime-neutral server adapter while Electron and
    source development retain Node?
-3. Can installed broker-pack ESM and native SDKs load dynamically from disk in
+2. Can installed broker-pack ESM and native SDKs load dynamically from disk in
    the compiled UTA role without broadening the base artifact?
-4. Which current filesystem callers work directly against Bun embedded assets,
+3. Which current filesystem callers work directly against Bun embedded assets,
    and which externally consumed adapter files require materialization?
-5. What signing, notarization, and malware-scanning gates are required for the
+4. What signing, notarization, and malware-scanning gates are required for the
    standalone macOS CLI binary independently of Electron?
 
 ## Explicit Non-goals
@@ -713,3 +711,14 @@ This plan is complete only when:
   Chat/AutoQuant/Auto Prediction bootstrap, real `alice-workspace` manifest
   plus invocation, default and Pi adapter materialization, content provenance,
   and the real Web UI.
+- 2026-08-29: PTY backpressure increment completed the Bun-native PTY gate
+  without a Node sidecar or an application-level output spool. Because Bun
+  1.4's callback-only `Terminal` has no read-side pause API, the Bun backend
+  maps the existing high/low-watermark contract to `SIGSTOP`/`SIGCONT` on the
+  PTY's POSIX process group. A compiled high-output probe used a child writer
+  behind its parent shell, held output byte-for-byte stable while paused,
+  resumed past another 512 KiB, and exited normally when killed from the paused
+  state on native macOS arm64, OrbStack Linux arm64, and emulated Linux x64.
+  This keeps pressure at the producer/kernel PTY boundary and covers Agent
+  Runtime helper processes without an unbounded Bun heap queue. Native Windows
+  remains part of the deferred Windows distribution lane.

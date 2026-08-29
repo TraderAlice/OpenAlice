@@ -13,6 +13,7 @@ const env = Object.fromEntries(
 )
 const one = spawnInteractive('ONE')
 const two = spawnInteractive('TWO')
+let flowControl: Awaited<ReturnType<typeof probeFlowControl>> | undefined
 
 if (one.term.pid === two.term.pid) {
   throw new Error(`PTY sessions reused pid ${one.term.pid}`)
@@ -38,6 +39,7 @@ try {
 
   two.term.write('still-alive\n')
   await waitForOutput(two, 'OA_TWO_INPUT:still-alive')
+  flowControl = await probeFlowControl()
 } finally {
   try {
     one.term.kill()
@@ -57,7 +59,84 @@ console.log(JSON.stringify({
   backend: backend.name,
   supportsFlowControl: backend.supportsFlowControl,
   pids: [one.term.pid, two.term.pid],
+  flowControl,
 }))
+
+async function probeFlowControl(): Promise<{
+  pid: number
+  bytesBeforePause: number
+  bytesWhilePaused: number
+  bytesAfterResume: number
+  gracefulKillWhilePaused: true
+}> {
+  if (!backend.supportsFlowControl) {
+    throw new Error('Bun PTY backend did not advertise output flow control')
+  }
+
+  const marker = 'OA_FLOW_0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\n'
+  const session = {
+    bytes: 0,
+    term: backend.spawn('/bin/sh', [
+      '-c',
+      `while :; do printf '${marker.replace('\n', '\\n')}'; done & wait`,
+    ], {
+      name: 'xterm-256color',
+      cols: 80,
+      rows: 24,
+      cwd: process.cwd(),
+      env,
+    }),
+    exited: Promise.resolve(),
+  }
+  session.term.onData((data) => {
+    session.bytes += Buffer.isBuffer(data) ? data.byteLength : Buffer.byteLength(data)
+  })
+  session.exited = new Promise<void>((resolve) => {
+    session.term.onExit(() => resolve())
+  })
+
+  try {
+    await waitForBytes(session, 512 * 1024)
+    session.term.pause?.()
+
+    // Let bytes already read from the PTY master settle, then prove the
+    // producer group is stopped rather than copied into an unbounded JS queue.
+    await Bun.sleep(200)
+    const bytesBeforePause = session.bytes
+    await Bun.sleep(300)
+    const bytesWhilePaused = session.bytes
+    if (bytesWhilePaused !== bytesBeforePause) {
+      throw new Error(
+        `PTY output kept growing while paused: ${bytesBeforePause} -> ${bytesWhilePaused}`,
+      )
+    }
+
+    session.term.resume?.()
+    await waitForBytes(session, bytesWhilePaused + (512 * 1024))
+    const bytesAfterResume = session.bytes
+
+    // A stopped process cannot run a SIGTERM handler until continued. The
+    // backend must unstop the group as part of a normal Session shutdown.
+    session.term.pause?.()
+    await Bun.sleep(100)
+    session.term.kill()
+    await waitForPromise(session.exited, 'graceful PTY exit while paused')
+    return {
+      pid: session.term.pid,
+      bytesBeforePause,
+      bytesWhilePaused,
+      bytesAfterResume,
+      gracefulKillWhilePaused: true,
+    }
+  } finally {
+    try {
+      session.term.kill('SIGKILL')
+    } catch {
+      // already stopped
+    }
+    await session.exited
+  }
+}
 
 function spawnInteractive(label: string): {
   term: PtyProcess
@@ -119,4 +198,35 @@ async function waitForOutput(
     await Bun.sleep(20)
   }
   throw new Error(`Timed out waiting for ${expected}; output=${JSON.stringify(session.output)}`)
+}
+
+async function waitForBytes(
+  session: { bytes: number },
+  minimum: number,
+  timeoutMs = 10_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (session.bytes >= minimum) return
+    await Bun.sleep(20)
+  }
+  throw new Error(`Timed out waiting for ${minimum} PTY bytes; received=${session.bytes}`)
+}
+
+async function waitForPromise(
+  promise: Promise<void>,
+  label: string,
+  timeoutMs = 10_000,
+): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    await Promise.race([
+      promise,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error(`Timed out waiting for ${label}`)), timeoutMs)
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
 }

@@ -43,12 +43,13 @@ const bunRuntime = (globalThis as typeof globalThis & { Bun: BunPtyRuntime }).Bu
 
 export const ptyBackend: PtyBackend = {
   name: 'bun-native',
-  supportsFlowControl: false,
+  supportsFlowControl: true,
   spawn(file, args, options) {
     const dataListeners = new Set<(data: Buffer) => void>();
     const exitListeners = new Set<(event: PtyExitEvent) => void>();
     const pendingData: Buffer[] = [];
     let exitEvent: PtyExitEvent | undefined;
+    let paused = false;
 
     const child = bunRuntime.spawn([file, ...args], {
       cwd: options.cwd,
@@ -70,6 +71,7 @@ export const ptyBackend: PtyBackend = {
         },
       },
       onExit(_child, exitCode, signalCode) {
+        paused = false;
         exitEvent = {
           exitCode: exitCode ?? 1,
           signal: signalCode ?? undefined,
@@ -113,8 +115,61 @@ export const ptyBackend: PtyBackend = {
         terminal.resize(cols, rows);
       },
       kill(signal) {
-        child.kill(signal as NodeJS.Signals | undefined);
+        const requestedSignal = signal as NodeJS.Signals | undefined;
+        // A graceful signal remains pending while the process group is
+        // stopped. Resume first so shutdown handlers can actually run.
+        if (paused && requestedSignal !== 'SIGKILL') {
+          signalProcessGroup(child, 'SIGCONT');
+          paused = false;
+        }
+        signalProcessGroup(child, requestedSignal ?? 'SIGTERM');
+      },
+      pause() {
+        if (paused || exitEvent) return;
+        if (signalProcessGroup(child, 'SIGSTOP')) paused = true;
+      },
+      resume() {
+        if (!paused || exitEvent) return;
+        if (signalProcessGroup(child, 'SIGCONT')) paused = false;
       },
     } satisfies PtyProcess;
   },
 };
+
+/**
+ * Bun.Terminal is callback-only and currently has no read-side pause method.
+ * A PTY child is its own POSIX session/process-group leader, so stopping that
+ * group moves output pressure back to the producer without buffering an
+ * unbounded copy in the Bun heap. Group signalling also covers helper
+ * processes spawned by an Agent Runtime.
+ */
+function signalProcessGroup(
+  child: BunPtySubprocess,
+  signal: NodeJS.Signals,
+): boolean {
+  try {
+    process.kill(-child.pid, signal);
+    return true;
+  } catch (error) {
+    if (!isMissingProcessError(error)) throw error;
+  }
+
+  // Bun's PTY contract creates a process group whose id matches the child pid.
+  // Keep a direct-child fallback for an exit race or a future runtime change.
+  try {
+    child.kill(signal);
+    return true;
+  } catch (error) {
+    if (isMissingProcessError(error)) return false;
+    throw error;
+  }
+}
+
+function isMissingProcessError(error: unknown): boolean {
+  return (
+    typeof error === 'object'
+    && error !== null
+    && 'code' in error
+    && error.code === 'ESRCH'
+  );
+}
