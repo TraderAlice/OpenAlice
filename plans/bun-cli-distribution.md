@@ -351,7 +351,7 @@ Checkboxes reflect repository truth, not intent.
 - [x] Pin the Bun build tool version used by CI and local release builds.
 - [x] Compile the TypeScript CLI and Supervisor TUI for the current host with
   no system Node requirement in the output.
-- [ ] Compile and boot Alice from an isolated `OPENALICE_HOME` with the real Web
+- [x] Compile and boot Alice from an isolated `OPENALICE_HOME` with the real Web
   UI and auth-status route.
 - [ ] Re-execute the compiled binary as Guardian, Alice, UTA, and Connector;
   prove separate PIDs, signal propagation, component failure isolation, and
@@ -649,3 +649,12 @@ This plan is complete only when:
   OrbStack Linux arm64 produced 94,087,312 bytes in 232 ms; emulated Linux x64
   produced 94,079,104 bytes in 480 ms. This proves the command shell only;
   Alice/component boot, PTY, resources, and external broker packs remain open.
+- 2026-08-29: Feasibility increment 2 made `node-pty` lazy at the Session/probe
+  boundary and established `native/node-pty` beside the compiled executable as
+  the candidate native sidecar. Alice now boots from a Bun executable with an
+  empty `PATH`, isolated `OPENALICE_HOME`, and checkout-backed resources; the
+  real UI and `/api/auth/status` both return 200. macOS arm64 measured
+  67,937,378 bytes and 1,433 ms to readiness; OrbStack Linux arm64 measured
+  98,150,544 bytes and 735 ms; emulated Linux x64 measured 98,093,184 bytes and
+  4,047 ms. This does not yet prove PTY loading from the sidecar or embedded
+  resources outside a checkout.
