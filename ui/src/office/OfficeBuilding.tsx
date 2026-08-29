@@ -53,6 +53,7 @@ const OFFICE_MOVEMENTS = {
 
 type OfficeMovement = (typeof OFFICE_MOVEMENTS)[keyof typeof OFFICE_MOVEMENTS]
 const OFFICE_DEPARTURE_MS = 260
+export type OfficeLogOrigin = 'menu' | 'operations' | 'floor-terminal'
 
 export function OfficeBuilding({
   building,
@@ -78,7 +79,7 @@ export function OfficeBuilding({
   onOpenWorkspace: (workspaceId: string) => void
   onOpenFiles: (workspaceId: string) => void
   onOpenRoster: (workspaceId: string) => void
-  onOpenLog: (origin: 'menu' | 'operations') => void
+  onOpenLog: (origin: OfficeLogOrigin) => void
   onReturnLive?: () => void
 }) {
   const { t } = useTranslation()
@@ -581,9 +582,9 @@ export function OfficeBuilding({
                 className="oa-office-pause-trigger"
                 aria-label={t('office.pauseMenu')}
                 data-open={menuOpen}
-                onFocus={() => {
-                  if (!menuOpen) menuOriginRef.current = 'hud'
-                }}
+                onPointerDown={() => { menuOriginRef.current = 'hud' }}
+                onKeyDown={() => { menuOriginRef.current = 'hud' }}
+                onClick={() => { menuOriginRef.current = 'hud' }}
               />}
             >
               <img
@@ -624,7 +625,9 @@ export function OfficeBuilding({
               <DropdownMenuItem
                 onClick={() => {
                   closeFloorMenu(false)
-                  onOpenLog('menu')
+                  onOpenLog(menuOriginRef.current === 'floor-terminal'
+                    ? 'floor-terminal'
+                    : 'menu')
                 }}
               >
                 <img src={OFFICE_HUD_ASSETS.occupancyLog} alt="" aria-hidden style={officePixelImg} />

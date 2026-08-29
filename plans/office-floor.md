@@ -1531,6 +1531,27 @@ In-world floor terminal follow-up (2026-08-29):
 - Focused Office interaction specs passed: 4 files / 23 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the
   606-file Vitest run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
 
+Floor-terminal return provenance follow-up (2026-08-29):
+
+- Followed every Floor terminal menu exit instead of stopping at menu-open success. Choosing Occupancy log correctly
+  focused its Close control, but closing the log always returned to the top HUD Menu. Alice was still beside the
+  terminal and the terminal prompt was active, so keyboard focus and the visible game world disagreed.
+- Compared keeping one generic menu return, reopening Floor view after closing the log, and preserving the exact log
+  origin. Chose provenance: Operations, HUD Menu, and Floor terminal are three real entry points and should each own
+  their return without adding another intermediate screen.
+- The shared Office log origin now includes `floor-terminal`. Floor terminal menu actions pass that origin through
+  `OfficeBuilding`; `OfficePage` restores the generated terminal after the modal closes, while Operations still
+  restores its board and HUD-origin logs still restore the HUD trigger.
+- Combined Building/Page tests exposed a focus race in which Base UI briefly focused the HUD trigger while opening a
+  controlled terminal menu, overwriting the terminal origin. HUD provenance is now recorded only from actual pointer,
+  key, or click input on the HUD trigger; programmatic transition focus cannot mutate it. Office modal ownership also
+  continues to suppress any delayed menu restoration while the log is open.
+- Browser-played the three branches at 1280x720. Terminal -> log focused Close and returned to
+  `office-floor-terminal`; HUD -> log returned to `.oa-office-pause-trigger`; the terminal remained nearby. At
+  390x844, touch A -> log -> Close also returned to the terminal, restored the ready A action, and kept zero overflow.
+- Focused Building/Page specs passed: 2 files / 14 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 606-file
+  Vitest run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

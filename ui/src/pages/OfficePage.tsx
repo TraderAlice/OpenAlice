@@ -7,7 +7,7 @@ import { useWorkspaces } from '../contexts/workspaces-context'
 import { useOfficeFloor } from '../hooks/useOfficeFloor'
 import { useInboxSelection } from '../live/inbox-selection'
 import { useWorkspaceSidePanels } from '../live/workspace-side-panels'
-import { OfficeBuilding } from '../office/OfficeBuilding'
+import { OfficeBuilding, type OfficeLogOrigin } from '../office/OfficeBuilding'
 import { OfficeCabinetWindow } from '../office/OfficeCabinetWindow'
 import { officePixelImg } from '../office/furniture'
 import { OfficeInspectRail } from '../office/OfficeInspectRail'
@@ -36,7 +36,7 @@ export function OfficePage() {
   const [asOfSeq, setAsOfSeq] = useState<number | null>(null)
   const [selected, setSelected] = useState<{ workspaceId: string; resumeId: string } | null>(null)
   const [logOpen, setLogOpen] = useState(false)
-  const logOriginRef = useRef<'menu' | 'operations'>('menu')
+  const logOriginRef = useRef<OfficeLogOrigin>('menu')
   const [rosterWorkspaceId, setRosterWorkspaceId] = useState<string | null>(null)
   const [rosterFocusResumeId, setRosterFocusResumeId] = useState<string | null>(null)
   const employeeOriginRef = useRef<
@@ -87,6 +87,8 @@ export function OfficePage() {
     requestAnimationFrame(() => {
       if (logOriginRef.current === 'operations') {
         document.getElementById('office-operations-board')?.focus()
+      } else if (logOriginRef.current === 'floor-terminal') {
+        document.getElementById('office-floor-terminal')?.focus()
       } else {
         document.querySelector<HTMLElement>('.oa-office-pause-trigger')?.focus()
       }

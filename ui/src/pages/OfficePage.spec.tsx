@@ -119,6 +119,15 @@ describe('OfficePage localization', () => {
     await vi.waitFor(() => {
       expect(document.activeElement).toBe(operations)
     })
+
+    const floorTerminal = screen.getByRole('button', { name: '楼层终端' })
+    await userEvent.click(floorTerminal)
+    await userEvent.click(await screen.findByRole('menuitem', { name: '占用日志' }))
+    expect(screen.getByText('Office occupancy')).toBeTruthy()
+    await userEvent.keyboard('{Escape}')
+    await vi.waitFor(() => {
+      expect(document.activeElement).toBe(floorTerminal)
+    })
   })
 
   it('enters from the Workspace sign while keeping filed records on the cabinet', async () => {
