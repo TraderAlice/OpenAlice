@@ -29,6 +29,10 @@ on:
       - "scripts/pack-cli-npm-packages.mjs"
       - "scripts/pack-cli-npm-packages.spec.mjs"
       - "scripts/cli-package-manager-smoke.mjs"
+      - "scripts/cli-release-fixture.mjs"
+      - "scripts/cli-release-fixture.spec.mjs"
+      - "scripts/cli-system-package-manager-smoke.mjs"
+      - "scripts/prepare-cli-previous-release.mjs"
       - "scripts/prepare-cli-dev-assets.mjs"
       - "scripts/prepare-cli-dev-assets.spec.mjs"
       - "THIRD_PARTY_NOTICES.md"
@@ -177,6 +181,28 @@ jobs:
         run: |
           pnpm build:server
           pnpm build:bun:release
+
+      - name: Accept npm and Bun installs from the dev native candidate
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          CONTENT_IDENTITY=$(node -p "require('./dist/bun-release/report.json').contentIdentity")
+          node scripts/build-cli-package-channels.mjs \
+            --input-dir dist/bun-release \
+            --output-dir "$RUNNER_TEMP/cli-package-channels" \
+            --version "$VERSION" \
+            --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --npm-only
+          node scripts/cli-package-manager-smoke.mjs \
+            --manager npm \
+            --packages-dir "$RUNNER_TEMP/cli-package-channels/npm" \
+            --expected-version "$VERSION" \
+            --expected-content-identity "$CONTENT_IDENTITY"
+          node scripts/cli-package-manager-smoke.mjs \
+            --manager bun \
+            --packages-dir "$RUNNER_TEMP/cli-package-channels/npm" \
+            --expected-version "$VERSION" \
+            --expected-content-identity "$CONTENT_IDENTITY"
 
       - name: Name the native acceptance report
         shell: bash
