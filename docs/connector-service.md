@@ -349,7 +349,10 @@ The surfaces deliberately have different jobs:
   unlink, linking instructions, and explicit test sends. While credentials are
   missing, it keeps a short platform checklist and official console links beside
   the fields; those links open without dismissing the configuration dialog or
-  losing its drafts. Once linked, the lifecycle panel keeps routine availability
+  losing its drafts. The shared dialog sizes to short content on desktop and
+  bounds long forms with internal scrolling; narrow viewports keep a near-full-
+  height shell so controls remain usable around virtual keyboards. Once linked,
+  the lifecycle panel keeps routine availability
   and test controls visible; Unlink lives inside Connection details beside token
   replacement/removal and explains that sealed credentials remain available.
   A desk-capable adapter also binds that connector's chat Issue when its

@@ -281,6 +281,9 @@ describe('Connector demo routes', () => {
     fireEvent.click(trigger)
 
     const dialog = await screen.findByRole('dialog')
+    expect(dialog.className).toContain('h-[calc(100dvh-1rem)]')
+    expect(dialog.className).toContain('sm:h-auto')
+    expect(dialog.className).toContain('sm:max-h-[min(46rem,calc(100dvh-2rem))]')
     expect(within(dialog).getByRole('heading', { name: 'Configure Feishu' })).toBeTruthy()
     expect(within(dialog).getByText('Connection, delivery, and chat settings for Feishu.')).toBeTruthy()
     expect(within(dialog).queryByRole('switch', { name: 'Turn Feishu on or off' })).toBeNull()

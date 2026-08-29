@@ -39,7 +39,7 @@ export function ConfigurationDialog({
         keepMounted={keepMounted}
         initialFocus={false}
         finalFocus={restoreFocusRef}
-        className="flex h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-3xl flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:h-[min(46rem,calc(100dvh-2rem))] sm:w-[calc(100%-2rem)] sm:max-w-3xl"
+        className="flex h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-3xl flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:h-auto sm:max-h-[min(46rem,calc(100dvh-2rem))] sm:w-[calc(100%-2rem)] sm:max-w-3xl"
       >
         <DialogHeader className="shrink-0 border-b border-border/70 px-5 py-4 pr-12 sm:px-6">
           <div className="flex min-w-0 items-start justify-between gap-4">

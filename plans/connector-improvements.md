@@ -207,6 +207,17 @@ external adapters remain optional projections rather than sources of truth.
     established user reaches owned channels first. Both groups reuse the same
     card component and responsive one/two-column grid; headings establish screen
     reader structure without changing any action, credential, or runtime state.
+20. **Configuration height follows the task on desktop.** A fixed near-full-
+    height shell keeps long forms predictable but leaves short, established
+    Connector configurations looking unfinished. A small fixed dialog would
+    remove that empty space but force first-time credential guides into a cramped
+    viewport. The chosen responsive shell keeps the existing near-full-height
+    mobile treatment, where vertical space and virtual keyboards are volatile,
+    while desktop dialogs size to their content up to the existing 46 rem or
+    viewport maximum. Longer forms continue to scroll inside the dialog, so the
+    fixed header, focus trap, Escape/backdrop dismissal, draft preservation, and
+    document position do not change. The shared ConfigurationDialog owns the
+    sizing rule rather than each Connector form branching on its content.
 
 ## Ordered Work
 
@@ -251,6 +262,8 @@ external adapters remain optional projections rather than sources of truth.
         scheduled-check-in language while preserving Issue semantics.
   - [x] Separate owned/in-progress channels from pristine available adapters on
         the Connector overview without state-driven card reordering.
+  - [x] Make short desktop Connector dialogs content-sized while preserving
+        bounded scrolling for long forms and near-full-height narrow layouts.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -381,6 +394,17 @@ Telegram, and Feishu in stable definition order under Your channels, followed
 by pristine Slack under Available channels. Both headings and their descriptions
 remained in document order, no group was represented by color alone, and no
 Connector action was triggered. The temporary viewport override was reset.
+
+The adaptive-dialog increment passed the same 29 focused overview/demo tests,
+UI and root typechecks, the production build, and all 5,112 repository tests.
+Real Default AliceProject measurements at the 1,052 x 734 desktop viewport
+showed the short Discord dialog shrink from 702 px to 381 px and the longer
+Feishu dialog settle at 611 px. The first-time Slack form remained capped at
+702 px with its 742 px content scrolling inside the dialog. At 390 x 844,
+Slack and an expanded Discord connection both retained the 828 px near-full-
+height shell, internal scrolling, and a document width exactly matching the
+390 px viewport. Focus/dismissal behavior remained on the shared dialog
+primitive, no Connector action was triggered, and the viewport was reset.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.
