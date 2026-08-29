@@ -15,11 +15,12 @@ this guide is the OpenAlice contract.
 
 ## Status
 
-The repository now contains the bundle-backed Stage 0 through Stage 2 path,
-with source checkout support retained as an explicit development fallback:
+The repository now contains the Bun-native Stage 0 through Stage 2 path, with
+source checkout support retained only as an explicit development override:
 
-- `openalice up|run` prefers the installer-owned headless Runtime bundle and
-  starts Guardian without requiring a checkout or a current working directory;
+- `openalice up|run` re-executes the installed native command into the existing
+  Guardian/Alice/UTA/Connector process roles without requiring Node, Bun, a
+  checkout, or a current working directory;
 - `openalice start` remains a compatibility entry point and follows the same
   installed-Runtime preference;
 - `openalice up|run|status|open|down` provides the canonical local Shell
@@ -28,10 +29,9 @@ with source checkout support retained as an explicit development fallback:
   remote OpenAlice Runtime;
 - `openalice server run|start|status|stop` provides a browserless foreground or
   detached Runtime lifecycle backed by Guardian's local control endpoint;
-- `openalice remote <target>` probes, plans, installs the ordinary CLI plus its
-  matching Runtime bundle when approved, starts or reuses the remote Server,
-  and opens the same loopback tunnel; explicit source providers still prepare
-  build tools and checkouts when needed;
+- `openalice remote <target>` probes, plans, installs the matching native CLI
+  release when approved, starts or reuses the remote Server, and opens the same
+  loopback tunnel; an explicit `--app-dir` remains the source-development path;
 - `openalice machine list|add|remove|inspect` owns an explicit local registry
   of SSH hosts and reads each compatible host's registered AliceProjects with
   one bounded aggregate SSH command;
@@ -41,11 +41,13 @@ with source checkout support retained as an explicit development fallback:
   starting with zero resumable Sessions;
 - Electron remains a complete local desktop distribution.
 
-The release-owned installer advances CLI, managed Pi, and the platform Runtime
-as one OpenAlice version. The clean Docker SSH acceptance covers bundle
-download, install, management, and the tunnel loop. Real long-latency Agent TUI
-measurements remain a separate release observation rather than a reason to
-invent a new terminal protocol preemptively.
+The release-owned installer advances one checksum-bound native OpenAlice
+release. Agent Runtime executables remain user-owned and are only discovered
+from the remote host's `PATH`. The clean Docker SSH acceptance covers native
+download, install, multi-process startup, AliceProject transfer, and the tunnel
+loop on a host with no Node, Bun, or Agent Runtime installed. Real long-latency
+Agent TUI measurements remain a separate release observation rather than a
+reason to invent a new terminal protocol preemptively.
 
 ## Product Decision
 
@@ -109,10 +111,10 @@ protocol is deferred until the local/server boundary is stable.
    recorded Guardian owner.
 9. Remote bootstrap reuses the invoking local CLI's recorded ordinary
    installer source, selector, and installed content identity. It does not
-   carry a second SSH-only installer or upload the full OpenAlice Runtime
-   through SSH. The ordinary installer downloads the matching platform Runtime
-   directly on the remote host. An explicitly selected source provider clones
-   directly on that host when its checkout is missing.
+   carry a second SSH-only installer, upload Runtime bytes through SSH, install
+   Node/build tools, clone a checkout, or install an Agent Runtime. The ordinary
+   installer downloads the matching platform-native release directly on the
+   remote host. Only an explicit `--app-dir` opts into source preparation.
 10. Shared Runtime facts use presentation-neutral names and versioned schemas.
     Browser layout, Electron chrome, modal state, and other client UI state do
     not become server truth.
@@ -265,8 +267,8 @@ openalice remote <target>
 
 1. verify ordinary SSH connectivity and host-key policy;
 2. detect remote platform, home, and an installed `openalice` CLI;
-3. select a compatible installed Runtime bundle, or the explicit `--app-dir`
-   or selector-specific managed checkout used by a source provider;
+3. select the compatible Runtime embedded in the installed native CLI release,
+   or the explicit source checkout named by `--app-dir`;
 4. probe `openalice server status --json`, Runtime provider state, and protocol
    compatibility;
 5. compare the remote CLI version, installer source/selector, and immutable
@@ -275,9 +277,8 @@ openalice remote <target>
    separately before calling the normal installer on the remote host;
 7. re-probe and re-plan after installation so a newly visible owner can block
    or require a second explicit takeover decision;
-8. when an explicit source provider is selected, clone a missing managed
-   checkout atomically, or fast-forward a clean managed branch checkout and
-   rebuild after the plan names that update;
+8. when `--app-dir` is explicit, validate and prepare that user-selected source
+   checkout without turning it into a second default distribution path;
 9. run `openalice server start` with the selected installed Runtime or explicit
    source root and wait for readiness;
 10. create the same loopback tunnel used by `openalice ssh`;
@@ -352,15 +353,13 @@ refreshes Fleet state. Stop, restart, takeover, Setup, source, logs, Doctor,
 and configuration mutations remain unavailable for remote Fleet selections;
 offline or incompatible rows never receive guessed lifecycle actions.
 
-When `--app-dir` is absent, managed remote prefers the verified Runtime bundle
-installed with the matching CLI. No Git checkout or compiler is needed. On a
-lane or platform without that artifact it can fall back to a private managed
-checkout beneath the remote home. A missing fallback checkout is cloned only
-after the visible plan is approved. A clean managed branch checkout is compared
-with its selected upstream; an available fast-forward is planned together with
-a Server restart and rebuild. Tracked changes block that update. An explicit
-`--app-dir` is user-owned: it may be cloned when wholly absent, but existing
-source is never fetched, switched, reset, or overwritten.
+When `--app-dir` is absent, managed remote requires the verified native Runtime
+installed with the matching CLI. No Git checkout, Node, Bun, Python, compiler,
+or package-manager mutation is part of that path. A target outside the
+published platform/architecture matrix is reported as unsupported instead of
+silently changing distribution models. An explicit `--app-dir` is user-owned:
+it may be prepared as source, but existing source is never fetched, switched,
+reset, or overwritten merely to imitate the native release.
 
 `--yes` may approve the displayed install/update/start plan for automation, but
 it never implies `--takeover`. Non-interactive execution without a sufficient
@@ -459,7 +458,7 @@ The status result is presentation-neutral and includes at least:
     "pid": 1234,
     "instanceId": "<Guardian instance id>",
     "startedAt": "<ISO-8601>",
-    "launchRoot": "<source or bundle root>"
+    "launchRoot": "<native release resource root or explicit source root>"
   },
   "endpoints": {
     "web": "http://127.0.0.1:47331"
@@ -671,14 +670,12 @@ The read-only plan reports:
 - detected OpenAlice CLI path, version, and whether its install source and
   content identity match the invoking local CLI;
 - control protocol compatibility;
-- Server state, Runtime provider, bundle identity, and source/bundle root;
-- whether an installed bundle matches the CLI product version, platform, and
-  architecture;
-- for a source provider, whether its checkout already has complete Runtime
-  artifacts and whether it will be cloned, is user-owned, or has a safe managed
-  fast-forward available;
-- missing Git, Python 3, make, or C++ tools and the package-manager action that
-  would provide them;
+- Server state, Runtime provider, native content identity, and release/source
+  root;
+- whether the installed native Runtime matches the CLI product version,
+  platform, architecture, selector, and checksum-bound provenance;
+- for an explicit source override, whether its checkout already has complete
+  Runtime artifacts;
 - proposed install/update/start actions;
 - destination paths and whether PATH changes are required;
 - whether a running owner would be affected;
@@ -687,15 +684,12 @@ The read-only plan reports:
 Apply rules:
 
 1. no matching compatible CLI or Runtime: ask before invoking the normal
-   installer with the local CLI's recorded branch/tag/commit selector and
-   expected product version; the installer obtains the matching platform
-   Runtime from the same release;
-2. an explicitly selected source provider with absent artifacts and missing
-   Linux build tools: include
-   `--with-runtime-deps` in that same normal installer invocation after plan
-   consent;
-3. complete source artifacts: do not modify system packages merely because a
-   compiler is absent;
+   installer with the local CLI's recorded branch/version selector and expected
+   product version; the installer obtains the matching platform-native release;
+2. native mode never installs source-build dependencies or Agent Runtime
+   executables;
+3. explicit source mode validates its own prerequisites and remains separate
+   from the native installer transaction;
 4. compatible CLI, absent Server: start after explicit plan consent;
 5. compatible healthy Server: reuse without mutation;
 6. incompatible stopped CLI: ask before update;
@@ -703,11 +697,9 @@ Apply rules:
    effect-specific confirmation;
 8. owner conflict: fail unless the user separately passed `--takeover`;
 9. non-interactive mode: require flags that cover every proposed mutation.
-10. missing managed source: clone to a temporary sibling and rename only after
-    a complete checkout succeeds;
-11. managed branch advanced: refuse tracked changes, stop a self-owned Server,
-    fast-forward only, rebuild, and restart; never reset user work;
-12. explicit `--app-dir`: preserve existing Git state and never manage updates.
+10. unsupported native platform/architecture: stop with an explicit result;
+    do not fall back to a checkout;
+11. explicit `--app-dir`: preserve existing Git state and never manage updates.
 
 Remote SSH commands retry a small allowlist of transport failures (connection
 reset/timeout/close, key-verifier service interruption, and SSH identification
@@ -770,121 +762,36 @@ Runtime model.
 - stop is structured and self-owned;
 - Electron behavior remains unchanged.
 
-### Stage 2 — managed bundle-backed remote (implemented baseline)
+### Stage 2 — managed Bun-native remote (implemented)
 
 - `openalice remote` plan/apply orchestration;
-- probe and bootstrap the existing CLI, pinned managed Pi, and matching
-  headless Runtime with explicit consent;
-- prefer the installed release Runtime without Git or build tools;
-- retain source-provider selection, atomic clone, and safe fast-forward for
-  development and unsupported release lanes;
-- when an older healthy CLI Server lacks managed Pi, infer its recorded source
-  root, install Pi, stop that self-owned Server through `runtime.stop`, and
-  restart it so the Guardian tree inherits the managed runtime;
+- probe and bootstrap the matching native CLI release with explicit consent;
+- run the installed release without Node, Bun, source checkout, build tools, or
+  bundled Agent Runtime executables;
+- retain explicit `--app-dir` source preparation for development only;
+- report unsupported release targets instead of silently cloning source;
 - start/reuse the remote Server;
 - reuse the existing SSH loopback tunnel;
 - leave the Server alive after disconnect;
 - remaining release observation: validate ordinary Agent TUI interaction under
   representative network shaping before deciding whether Stage 3 is useful.
 
-#### Bundle-backed Linux SSH observation — 2026-07-30
+#### Bun-native Linux SSH observation — 2026-08-29
 
-The disposable OrbStack Docker SSH fixture exercised an ordinary Linux arm64
-remote with no source checkout. The remote plan detected the missing CLI, the
-normal installer downloaded and verified the matching Runtime archive, and the
-refreshed plan selected `provider=bundle` beneath `cli-versions/` without Git,
-Python, make, or a compiler. Detached readiness, `/api/auth/status`, tunnel
-disconnect persistence, managed Pi repair with a self-owned restart, same-port
-reconnect, status, and structured stop all passed. The fixture also asserted
-that no managed source checkout was created.
+The disposable OrbStack Docker SSH fixture exercised a Linux arm64 host with no
+Node, npm, Bun, source checkout, or Agent Runtime executable. The normal Bash
+installer downloaded and checksum-verified the native `dev` archive, activated
+it under `cli/releases/`, and reported `provider=bun`. The installed binary
+then re-executed Guardian, Alice, and optional UTA as distinct processes.
 
-#### Railway cold-host observation — 2026-07-15
-
-A disposable Railway Sandbox provided the first real clean-host acceptance for
-Stage 2. The host was Debian 13 x86_64 with Node 24, pnpm 11, curl, and Git. A
-fresh `dev` checkout did not have Python 3; `node-pty` had no matching bundled
-Linux x64 prebuild for that Node version, fell back to `node-gyp`, and made the
-old bootstrap fail during `pnpm install`. Installing Python 3, make, and g++
-allowed the same source preparation and detached Server start to complete.
-This failure is the reason the ordinary installer now owns the explicit Linux
-source-build-tool plan.
-
-The subsequent macOS-to-Railway loop verified:
-
-- real SSH plan, default-no confirmation boundary, CLI install, source build,
-  detached Server readiness, and local loopback tunnel;
-- a Shell Workspace Session accepted `printf 'REMOTE_PTY_OK\\n'`; the result and
-  next prompt were visible in the first observation within 500 ms;
-- closing the tunnel left the Server and Shell Session alive;
-- reconnecting replayed the existing terminal scrollback; current managed
-  remote also reuses the last successful local port when it remains available,
-  allowing the original browser tab and origin to recover;
-- structured `openalice server stop` returned the isolated home to `absent`.
-
-Claude Code, Codex, opencode, and Pi executables were present on that host, but
-only Shell completed an end-to-end PTY interaction. A harmless Codex prompt
-reached the remote process and failed with missing provider authentication, so
-this observation does not claim an authenticated model turn or the full Agent
-TUI matrix. No provider credentials were copied into the disposable host.
-Representative 20/80/150 ms network shaping also remains unmeasured.
-
-After the bootstrap fix, a second fresh Sandbox repeated the same cold-host
-shape with Python 3 absent. The managed plan reported only that missing tool,
-one outer confirmation authorized the normal installer, and the installer
-installed the declared Linux package set without a manual `apt` command.
-Python 3.13.5 was then available; source preparation, detached readiness, the
-real `/chat` route, tunnel disconnect, and reconnection on a new local port all
-passed. The Server was stopped through its control endpoint before the Sandbox
-was destroyed.
-
-A 2026-07-15 Railway regression run then exercised the hardened reconnect path
-against another fresh Sandbox. Successful source preparation printed only the
-install/build phases; two naturally occurring Railway SSH interruptions
-(`Connection closed` followed by the temporary key-verifier outage) were
-retried and recovered without repeating a completed mutation. Three tunnel
-connections all selected the same remembered local port. A browser tab left
-open across the final disconnect first showed its normal fetch failure, then
-recovered in place after the tunnel returned on the same origin. The Server was
-stopped through its control endpoint and the Sandbox was destroyed.
-
-A later user-facing Railway Sandbox completed the missing authenticated Agent
-loop. Pi `0.83.0` was installed on the live remote host, OpenAlice selected Pi
-as the Workspace default, injected a sealed LongCat-compatible provider
-credential through the normal AI Provider flow, and started a trusted Pi TUI
-without the project-trust deadlock. The prompt `请只回复：远程 OpenAlice Pi
-已经工作` returned exactly `远程 OpenAlice Pi 已经工作` through the macOS
-browser, SSH tunnel, remote PTY, remote Pi process, and provider round trip.
-This validates the functional Pi path; representative 20/80/150 ms network
-shaping remains a separate latency observation.
-
-A 2026-07-16 persistent-volume Railway service then exercised the stable
-`master` installer through ordinary OpenSSH. Cold bootstrap, source build,
-detached readiness, tunnel HTTP/auth, disconnect persistence, idempotent plan,
-and same-container restart recovery all passed. A full Railway redeploy kept
-the checkout, build artifacts, and `OPENALICE_HOME` on the volume while
-correctly dropping the container-local CLI and Pi, which managed remote then
-reinstalled from `https://openalice.ai/install` without rebuilding the source
-Runtime.
-
-The same persistent service later validated the no-path managed-source flow:
-the laptop supplied only the SSH target and a volume-backed `--home`.
-`openalice remote` selected and atomically cloned the stable `master`
-checkout beneath that home, built it, reached the real `/api/version` and
-`/api/auth/status` routes through the tunnel, and left the Server alive after
-disconnect. A naturally occurring Railway key-verifier interruption appeared
-only as the neutral retry line and the operation recovered. Bundling
-`--status` into one control probe reduced the same Railway status operation
-from roughly 24 seconds and many SSH sessions to roughly 2 seconds and one SSH
-session.
-
-The redeploy also confirmed the cross-machine safety boundary. The reattached
-volume still named the removed container as Guardian and Alice owner; ordinary
-start refused it, and explicit `--takeover` still refused to signal or reclaim
-an owner from another machine. After Railway independently reported the old
-deployment as removed, the operator quarantined all three foreign lock records
-before starting the new owner. This is an operational recovery observation,
-not automatic cross-machine failover: heartbeat expiry alone must never grant
-permission to reclaim a shared volume.
+The same journey verified default-no planning, detached readiness against the
+real `/api/auth/status` contract, tunnel disconnect persistence, same-origin
+and same-port reconnect, aggregate Machine/AliceProject inventory, structured
+stop, interrupted-transfer retry, secret resealing, a second transferred
+AliceProject home using the same immutable native release, and final clean
+shutdown. No managed source checkout or `bin/pi` launcher was created. This is
+the current native baseline; representative network shaping and authenticated
+third-party Agent turns remain separate observations.
 
 ### Stage 3 — terminal transport optimization
 
@@ -901,7 +808,7 @@ permission to reclaim a shared volume.
 - consider relay/device enrollment only after direct SSH is operationally
   understood.
 
-### Stage 5 — standalone headless Runtime hardening (in progress)
+### Stage 5 — native release hardening (in progress)
 
 - the initial content-addressed platform archive, hashed manifest, installer
   integration, and managed-remote selection are implemented;
@@ -935,17 +842,13 @@ permission to reclaim a shared volume.
 |---|---|
 | matching compatible remote CLI/Server | reuses both without mutation |
 | protocol-compatible CLI from a different branch/tag/commit | plan names a matching CLI update before connection |
-| compatible CLI Server but managed Pi missing | plan names Pi install and self-owned Server restart; refreshed Server reports pinned Pi |
 | missing remote CLI, interactive | shows plan; default no leaves host unchanged |
 | missing remote CLI, non-interactive | fails unless explicit approval is present |
 | incompatible running Server | explains process impact before update/restart |
-| matching installed Runtime bundle | plan selects it without a checkout or build-tool mutation |
-| missing remote CLI and Runtime | ordinary installer obtains matching platform artifacts; default no leaves the host unchanged |
-| managed remote source fallback missing | plan names the exact clone destination and selector; default no leaves it absent |
-| explicit source path missing | plan may clone only that exact path; an occupied non-OpenAlice path is refused |
-| managed branch advanced | clean checkout fast-forwards, rebuilds, and restarts; tracked changes block without overwrite |
-| source artifacts missing, build tools missing | plan names the tools and normal installer command; default no leaves packages untouched |
-| source artifacts complete, compiler missing | reuse artifacts without an unnecessary package-manager mutation |
+| matching installed native Runtime | plan selects it without Node, Bun, checkout, build-tool, or Agent-install mutation |
+| missing remote CLI and Runtime | ordinary installer obtains matching native platform artifact; default no leaves the host unchanged |
+| unsupported native target | reports the unsupported platform/architecture without cloning source |
+| explicit source path | remains a deliberate development override and preserves existing Git state |
 | tunnel disconnect | local command exits; remote Server and work continue |
 | reconnect | same local port is preferred; same Runtime, browser origin, and live terminal are reachable; a busy port falls back visibly |
 | status and stop | user-facing commands require no raw SSH; status uses one bundled control probe and stop verifies structured shutdown |
@@ -953,8 +856,8 @@ permission to reclaim a shared volume.
 | host-key failure | fails without disabling verification |
 | SSH agent/passphrase path | preserves normal OpenSSH interaction |
 | browser security | same-origin HTTP/WS works; public Origin remains rejected |
-| Agent TUI matrix | Shell, Claude Code, Codex, opencode, and Pi remain usable |
-| Docker SSH fixture | clean host exercises plan, consent, start, tunnel, reconnect, stop |
+| external Agent TUI matrix | each user-installed Shell/Agent executable retains its own version, config, and process |
+| Docker SSH fixture | no-Node host exercises install, start, tunnel, reconnect, transfer, and stop |
 
 ### Later protocols
 
@@ -1005,6 +908,6 @@ behavior.
 - replacing Shell or native Agent TUIs with Pi/WebPi;
 - scanning arbitrary remote directories or silently cloning OpenAlice; managed
   clone/update is restricted to the displayed destination and explicit plan;
-- installing optional additional Agent CLIs on a remote host; pinned managed
-  Pi is part of the visible baseline plan;
+- installing, pinning, downgrading, or repairing Agent Runtime executables on a
+  remote host;
 - moving broker credentials, account state, or trading writes out of UTA.

@@ -86,6 +86,27 @@ describe('OpenAlice install source', () => {
     expect(installSourcesMatch(stableRelease, explicitPin)).toBe(false)
   })
 
+  it('accepts complete native install provenance and rejects incomplete schema 3 metadata', () => {
+    const native = {
+      schemaVersion: 3,
+      repository: 'TraderAlice/OpenAlice',
+      cliVersion: '0.91.0',
+      selector: { kind: 'version', value: 'v0.91.0' },
+      installerUrl: 'https://openalice.ai/install',
+      updateChannel: 'stable',
+      method: 'direct',
+      artifact: {
+        platform: 'darwin',
+        arch: 'arm64',
+        sha256: 'a'.repeat(64),
+      },
+      installedAt: '2026-08-29T00:00:00Z',
+    }
+    expect(parseInstallSource(native)).toEqual(native)
+    expect(parseInstallSource({ ...native, artifact: undefined })).toBeNull()
+    expect(parseInstallSource({ ...native, method: 'mystery' })).toBeNull()
+  })
+
   it('derives installed content identity only from an immutable release directory', () => {
     const installedModuleUrl = pathToFileURL(join(
       tmpdir(),
@@ -106,5 +127,8 @@ describe('OpenAlice install source', () => {
     expect(installedContentIdentity(installedModuleUrl))
       .toBe('0123456789abcdef')
     expect(installedContentIdentity(sourceModuleUrl)).toBeNull()
+    expect(installedContentIdentity(sourceModuleUrl, {
+      env: { OPENALICE_CONTENT_IDENTITY: 'fedcba9876543210' },
+    })).toBe('fedcba9876543210')
   })
 })

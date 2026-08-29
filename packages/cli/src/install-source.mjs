@@ -20,7 +20,10 @@ export const DEFAULT_INSTALL_SOURCE = Object.freeze({
 })
 
 export async function readInstallSource(options = {}) {
-  const metadataUrl = options.metadataUrl ?? new URL('../install-source.json', import.meta.url)
+  const env = options.env ?? process.env
+  const metadataUrl = options.metadataUrl
+    ?? env['OPENALICE_INSTALL_SOURCE']
+    ?? new URL('../install-source.json', import.meta.url)
   try {
     return requireInstallSource(JSON.parse(await readFile(metadataUrl, 'utf8')))
   } catch (error) {
@@ -29,7 +32,9 @@ export async function readInstallSource(options = {}) {
   }
 }
 
-export function installedContentIdentity(moduleUrl = import.meta.url) {
+export function installedContentIdentity(moduleUrl = import.meta.url, options = {}) {
+  const explicit = (options.env ?? process.env)['OPENALICE_CONTENT_IDENTITY']?.trim()
+  if (/^[a-f0-9]{16}$/.test(explicit ?? '')) return explicit
   const releaseDirectory = basename(dirname(dirname(fileURLToPath(moduleUrl))))
   return /-([a-f0-9]{16})$/.exec(releaseDirectory)?.[1] ?? null
 }
@@ -47,11 +52,25 @@ export function parseInstallSource(value) {
   const ref = selector?.value
   const installerUrl = typeof value.installerUrl === 'string' ? value.installerUrl : ''
   const schemaVersion = value.schemaVersion
-  const updateChannel = schemaVersion === 2
+  const updateChannel = schemaVersion === 2 || schemaVersion === 3
     ? value.updateChannel
     : inferLegacyUpdateChannel({ selector, installerUrl })
+  const method = value.method
+  const artifact = value.artifact
+  const installedAt = value.installedAt
+  const validV3 = schemaVersion !== 3 || (
+    ['direct', 'npm', 'bun', 'brew', 'aur'].includes(method)
+    && artifact
+    && typeof artifact === 'object'
+    && ['darwin', 'linux'].includes(artifact.platform)
+    && ['arm64', 'x64'].includes(artifact.arch)
+    && typeof artifact.sha256 === 'string'
+    && /^[a-f0-9]{64}$/.test(artifact.sha256)
+    && typeof installedAt === 'string'
+    && Number.isFinite(Date.parse(installedAt))
+  )
   if (
-    ![1, 2].includes(schemaVersion)
+    ![1, 2, 3].includes(schemaVersion)
     || repository !== 'TraderAlice/OpenAlice'
     || cliVersion.length < 1
     || !['branch', 'version'].includes(kind)
@@ -62,6 +81,7 @@ export function parseInstallSource(value) {
     || !/^[A-Za-z0-9._/-]+$/.test(ref)
     || !isHttpUrl(installerUrl)
     || !['stable', 'pinned', 'development', 'custom'].includes(updateChannel)
+    || !validV3
   ) {
     return null
   }
@@ -71,7 +91,16 @@ export function parseInstallSource(value) {
     cliVersion,
     selector: { kind, value: ref },
     installerUrl,
-    ...(schemaVersion === 2 ? { updateChannel } : {}),
+    ...(schemaVersion >= 2 ? { updateChannel } : {}),
+    ...(schemaVersion === 3 ? {
+      method,
+      artifact: {
+        platform: artifact.platform,
+        arch: artifact.arch,
+        sha256: artifact.sha256,
+      },
+      installedAt,
+    } : {}),
   }
 }
 
@@ -95,7 +124,7 @@ export function installSourcesMatch(left, right) {
 
 export function installSourceUpdateChannel(source) {
   const normalized = requireInstallSource(source)
-  return normalized.schemaVersion === 2
+  return normalized.schemaVersion >= 2
     ? normalized.updateChannel
     : inferLegacyUpdateChannel(normalized)
 }
@@ -125,7 +154,10 @@ function cloneInstallSource(source) {
     cliVersion: source.cliVersion,
     selector: { ...source.selector },
     installerUrl: source.installerUrl,
-    ...(source.schemaVersion === 2 ? { updateChannel: source.updateChannel } : {}),
+    ...(source.schemaVersion >= 2 ? { updateChannel: source.updateChannel } : {}),
+    ...(source.schemaVersion === 3 && source.method ? { method: source.method } : {}),
+    ...(source.schemaVersion === 3 && source.artifact ? { artifact: { ...source.artifact } } : {}),
+    ...(source.schemaVersion === 3 && source.installedAt ? { installedAt: source.installedAt } : {}),
   }
 }
 

@@ -97,7 +97,7 @@ export async function runUpdateCommand(argv, dependencies = {}) {
 
   const layout = Object.hasOwn(dependencies, 'layout')
     ? dependencies.layout
-    : resolveInstalledLayout(import.meta.url)
+    : resolveInstalledLayout(import.meta.url, { env: dependencies.env ?? process.env })
   if (!layout) {
     throw new Error('This OpenAlice CLI is running from source, not an installed release. Re-run the public installer to update the installed command.')
   }
@@ -126,7 +126,7 @@ export async function maybeNotifyUpdate(options = {}, dependencies = {}) {
 
   const layout = Object.hasOwn(dependencies, 'layout')
     ? dependencies.layout
-    : resolveInstalledLayout(import.meta.url)
+    : resolveInstalledLayout(import.meta.url, { env })
   if (!layout) return null
 
   const readFileImpl = dependencies.readFileImpl ?? readFile
@@ -283,6 +283,7 @@ export async function downloadAndRunInstaller(result, context) {
     await chmod(installerPath, 0o700)
     const args = [
       installerPath,
+      '--version', result.latestVersion,
       '--install-dir', context.layout.installRoot,
       '--no-modify-path',
       ...(context.yes ? ['--yes'] : []),

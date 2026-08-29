@@ -9,9 +9,7 @@ import {
   DEFAULT_INSTALL_SOURCE,
   formatInstallSelector,
   installedContentIdentity,
-  installSourceUpdateChannel,
   installSourcesMatch,
-  managedSourceKey,
   parseInstallSource,
   readInstallSource,
   requireInstallSource,
@@ -20,7 +18,6 @@ import { formatMissingRuntimeBuildTools } from './runtime-deps.mjs'
 import { connectSsh } from './ssh-connect.mjs'
 
 const MINIMUM_NODE_VERSION = '22.19.0'
-const MANAGED_PI_VERSION = '0.83.0'
 const MAX_SSH_OUTPUT_BYTES = 1024 * 1024
 const REMOTE_STATE_VERSION = 1
 const MAX_REMEMBERED_TARGETS = 32
@@ -134,8 +131,6 @@ export async function connectRemote(options, dependencies = {}) {
   const connectionOptions = {
     ...options,
     ...(rememberedLocalPort === null ? {} : { preferredLocalPort: rememberedLocalPort }),
-    managedSourceKey: managedSourceKey(localInstall.installSource),
-    managedInstallSource: localInstall.installSource,
     repositoryUrl,
   }
   const probe = dependencies.probeRemote ?? probeRemoteHost
@@ -171,16 +166,12 @@ export async function connectRemote(options, dependencies = {}) {
   const runRemote = dependencies.runRemote ?? runSshCommand
   if (plan.runInstaller) {
     const expectedRemainingMutations = remainingMutationsAfterInstall(plan)
-    const installerPurpose = plan.installRuntimeDeps
-      ? 'Preparing OpenAlice, managed Pi, and source Runtime build tools'
-      : 'Installing OpenAlice and managed Pi'
-    stdout.write(`${installerPurpose} on ${options.destination} with the normal installer...\n`)
+    stdout.write(`Installing the native OpenAlice CLI Runtime on ${options.destination} with the normal installer...\n`)
     let installerError = null
     try {
       const output = await runRemote(connectionOptions, buildRemoteInstallCommand(
         plan.installSource,
         plan.installBaseUrl,
-        plan.installRuntimeDeps,
       ), dependencies)
       writeRemoteActionOutput(stdout, output)
     } catch (error) {
@@ -195,7 +186,7 @@ export async function connectRemote(options, dependencies = {}) {
     const matchingRemoteCli = remote.cliCompatible
       && installSourcesMatch(remote.installSource, plan.installSource)
       && contentIdentitiesMatch(plan.contentIdentity, remote.cliContentIdentity)
-    if (installerError && matchingRemoteCli && remote.piCompatible && (!plan.installRuntimeDeps || (remote.runtimeBuildToolsMissing ?? []).length === 0)) {
+    if (installerError && matchingRemoteCli) {
       stdout.write('The remote install completed before the disconnect; continuing from detected state.\n')
     } else if (installerError) {
       throw installerError
@@ -203,15 +194,11 @@ export async function connectRemote(options, dependencies = {}) {
     if (!remote.cliPath || !matchingRemoteCli) {
       throw new Error('The remote OpenAlice CLI install completed, but it does not match the invoking local CLI')
     }
-    if (!remote.piCompatible) {
-      throw new Error(`The remote install completed, but managed Pi ${MANAGED_PI_VERSION} was not detected`)
-    }
     const refreshedPlan = createRemotePlan(connectionOptions, remote, {
       installSource: plan.installSource,
       contentIdentity: plan.contentIdentity,
       installBaseUrl: plan.installBaseUrl,
       repositoryUrl: plan.repositoryUrl,
-      forceRestartForManagedPi: plan.restartServer,
     })
     const planChanged = JSON.stringify(refreshedPlan.mutations) !== JSON.stringify(expectedRemainingMutations)
     if (refreshedPlan.blocker || planChanged) {
@@ -262,7 +249,6 @@ export async function connectRemote(options, dependencies = {}) {
       contentIdentity: plan.contentIdentity,
       installBaseUrl: plan.installBaseUrl,
       repositoryUrl: plan.repositoryUrl,
-      forceRestartForManagedPi: plan.restartServer,
     })
     const planChanged = JSON.stringify(refreshedPlan.mutations) !== JSON.stringify(expectedRemainingMutations)
     if (refreshedPlan.blocker || planChanged) {
@@ -280,68 +266,13 @@ export async function connectRemote(options, dependencies = {}) {
     plan = refreshedPlan
   }
 
-  if (plan.restartServer) {
-    stdout.write(`Restarting the remote OpenAlice Server so it inherits managed Pi ${MANAGED_PI_VERSION}...\n`)
-    let stopError = null
-    try {
-      const output = await runRemote(connectionOptions, buildRemoteServerStopCommand(connectionOptions, remote.cliPath), dependencies)
-      writeRemoteActionOutput(stdout, output)
-    } catch (error) {
-      stopError = error
-      stdout.write('The SSH action ended unexpectedly; checking whether the remote Server stopped...\n')
-    }
-    try {
-      remote = await probe(connectionOptions, dependencies)
-    } catch (probeError) {
-      throw stopError ?? probeError
-    }
-    if (stopError && remote.status?.class === 'absent') {
-      stdout.write('The remote Server stopped before the disconnect; continuing from detected state.\n')
-    } else if (stopError) {
-      throw stopError
-    }
-    if (remote.status?.class !== 'absent') {
-      throw new Error(`Remote OpenAlice Server did not stop cleanly before restart (${remote.status?.class ?? 'no status'})`)
-    }
-  }
-
-  if (plan.updateSource) {
-    stdout.write(`Updating the managed OpenAlice source on ${options.destination}...\n`)
-    let updateError = null
-    try {
-      const output = await runRemote(connectionOptions, buildRemoteSourceUpdateCommand(
-        plan.serverAppDir,
-        plan.installSource,
-        plan.repositoryUrl,
-      ), dependencies)
-      writeRemoteActionOutput(stdout, output)
-    } catch (error) {
-      updateError = error
-      stdout.write('The connection ended unexpectedly; checking whether the source update completed...\n')
-    }
-    try {
-      remote = await probe(connectionOptions, dependencies)
-    } catch (probeError) {
-      throw updateError ?? probeError
-    }
-    if (updateError && remote.sourceUpdateAvailable === false) {
-      stdout.write('The managed source update completed before the disconnect; continuing from detected state.\n')
-    } else if (updateError) {
-      throw updateError
-    }
-    if (remote.sourceCheckoutState !== 'present' || remote.sourceUpdateAvailable === true) {
-      throw new Error(`Managed OpenAlice source did not update cleanly at ${plan.serverAppDir}`)
-    }
-  }
-
   if (plan.startServer) {
-    stdout.write(`${options.takeover ? 'Replacing' : plan.restartServer ? 'Starting the refreshed' : 'Starting'} OpenAlice Server on ${options.destination}...\n`)
+    stdout.write(`${options.takeover ? 'Replacing' : 'Starting'} OpenAlice Server on ${options.destination}...\n`)
     let startError = null
     try {
       const output = await runRemote(connectionOptions, buildRemoteServerStartCommand({
         ...connectionOptions,
-        appDir: plan.serverAppDir,
-        rebuild: plan.rebuildSource,
+        appDir: plan.nativeRuntimeExpected ? '' : plan.serverAppDir,
       }, remote.cliPath), dependencies)
       writeRemoteActionOutput(stdout, output)
     } catch (error) {
@@ -440,7 +371,7 @@ function formatManagedRemoteStatus(destination, remote) {
   ]
   if (status?.home) lines.push(`Home:    ${status.home}`)
   if (status?.owner?.launchRoot) {
-    lines.push(`${status.provider?.kind === 'bundle' ? 'Runtime' : 'Source'}:  ${status.owner.launchRoot}`)
+    lines.push(`${status.provider?.kind === 'source' ? 'Source' : 'Runtime'}:  ${status.owner.launchRoot}`)
   }
   if (status?.endpoints?.web) lines.push(`Web:     ${status.endpoints.web}`)
   return `${lines.join('\n')}\n\n`
@@ -451,42 +382,34 @@ export function createRemotePlan(options, remote, install = {}) {
   const contentIdentity = normalizeContentIdentity(install.contentIdentity)
   const installBaseUrl = install.installBaseUrl ?? ''
   const repositoryUrl = install.repositoryUrl ?? DEFAULT_REPOSITORY_URL
-  const forceRestartForManagedPi = install.forceRestartForManagedPi === true
   const mutations = []
   let blocker = ''
-  let installCli = false
-  let installManagedPi = false
-  let installRuntimeDeps = false
   let cloneSource = false
-  let updateSource = false
-  let rebuildSource = false
   let startServer = false
-  let restartServer = false
-  const bundledRuntime = !options.appDir
-    && remote.managedRuntime?.compatible === true
+  const cliMatchesLocal = remote.installSource != null
+    && installSourcesMatch(remote.installSource, installSource)
+    && contentIdentitiesMatch(contentIdentity, remote.cliContentIdentity)
+  const bundledRuntime = !options.appDir && remote.managedRuntime?.compatible === true
+  const installCli = !remote.cliPath
+    || !remote.cliCompatible
+    || !cliMatchesLocal
+    || (!options.appDir && !bundledRuntime)
+  const nativeRuntimeExpected = !options.appDir && (bundledRuntime || installCli)
   let serverAppDir = options.appDir
-    || (bundledRuntime ? remote.managedRuntime.path : remote.managedAppDir)
+    || (bundledRuntime ? remote.managedRuntime.path : '')
     || ''
   let remotePort = options.remotePort
 
   if (!['linux', 'darwin'].includes(remote.platform?.os)) {
     blocker = `Unsupported remote platform: ${remote.platform?.label ?? 'unknown'}. Stage 2 supports Linux and macOS hosts.`
-  } else if (!remote.nodeVersion) {
-    blocker = `The remote host does not have Node.js ${MINIMUM_NODE_VERSION} or newer; install Node.js 22 LTS before applying this plan.`
-  } else if (!nodeVersionSupported(remote.nodeVersion)) {
-    blocker = `The remote host reports ${remote.nodeVersion}; OpenAlice and managed Pi require Node.js ${MINIMUM_NODE_VERSION} or newer.`
+  } else if (!['x64', 'arm64'].includes(normalizeRemoteArchitecture(remote.platform?.architecture))) {
+    blocker = `Unsupported remote architecture: ${remote.platform?.label ?? 'unknown'}. Native releases support x64 and arm64.`
+  } else if (options.appDir && !remote.nodeVersion) {
+    blocker = `The explicit source Runtime requires Node.js ${MINIMUM_NODE_VERSION} or newer on the remote host.`
+  } else if (options.appDir && !nodeVersionSupported(remote.nodeVersion)) {
+    blocker = `The explicit source Runtime requires Node.js ${MINIMUM_NODE_VERSION} or newer; the remote host reports ${remote.nodeVersion}.`
   } else if (options.appDir && remote.sourceCheckoutState === 'invalid') {
     blocker = `${options.appDir} exists but is not an OpenAlice source checkout. Choose another --app-dir or move the existing path.`
-  }
-
-  const cliMatchesLocal = remote.installSource != null
-    && installSourcesMatch(remote.installSource, installSource)
-    && contentIdentitiesMatch(contentIdentity, remote.cliContentIdentity)
-  if (!remote.cliPath || !remote.cliCompatible || !cliMatchesLocal) {
-    installCli = true
-  }
-  if (!remote.piCompatible) {
-    installManagedPi = true
   }
 
   const status = remote.status
@@ -498,21 +421,11 @@ export function createRemotePlan(options, remote, install = {}) {
       blocker = `The remote CLI Server is listening on ${detectedRuntimePort}; omit --remote-port to reuse it or pass ${detectedRuntimePort}.`
     } else {
       remotePort = detectedRuntimePort
-      if (installManagedPi || forceRestartForManagedPi) {
-        serverAppDir = options.appDir || status.owner?.launchRoot || serverAppDir
-        if (!serverAppDir) {
-          blocker = `OpenAlice could not recover the running Server's source location for the managed Pi ${MANAGED_PI_VERSION} restart.`
-        } else {
-          restartServer = true
-          startServer = true
-          mutations.push(`restart remote OpenAlice Server with managed Pi ${MANAGED_PI_VERSION}`)
-        }
-      }
     }
   }
   if (!blocker && status?.class === 'owned_elsewhere') {
     if (options.takeover) {
-      if (!serverAppDir) blocker = 'OpenAlice could not select a source checkout for takeover.'
+      if (!nativeRuntimeExpected && !serverAppDir) blocker = 'OpenAlice could not select a source checkout for takeover.'
       else {
         startServer = true
         mutations.push(`take over ${status.owner?.surface ?? 'existing'} Runtime and start CLI Server`)
@@ -523,36 +436,21 @@ export function createRemotePlan(options, remote, install = {}) {
   } else if (!blocker && ['incompatible', 'unhealthy', 'stopping'].includes(status?.class)) {
     if (!options.takeover) {
       blocker = `Remote Runtime is ${status.class}; inspect it or pass --takeover only if replacement is intentional.`
-    } else if (!serverAppDir) {
+    } else if (!nativeRuntimeExpected && !serverAppDir) {
       blocker = 'OpenAlice could not select a source checkout for takeover.'
     } else {
       startServer = true
       mutations.push('replace incompatible or unhealthy Runtime with CLI Server')
     }
   } else if (!blocker && status?.class !== 'running') {
-    if (!serverAppDir) blocker = 'OpenAlice could not select a managed source checkout on the remote host.'
+    if (!nativeRuntimeExpected && !serverAppDir) blocker = 'OpenAlice could not select a Runtime on the remote host.'
     else {
       startServer = true
       mutations.push('start remote OpenAlice Server')
     }
   }
 
-  if (!blocker && !bundledRuntime && !options.appDir && remote.sourceCheckoutState === 'present' && remote.sourceUpdateAvailable === true) {
-    if (remote.sourceDirty) {
-      blocker = `${serverAppDir} has tracked local changes, so OpenAlice will not update the managed checkout. Preserve the changes with a separate checkout and pass --app-dir.`
-    } else {
-      updateSource = true
-      rebuildSource = true
-      mutations.unshift(`update managed OpenAlice source (${formatInstallSelector(installSource)})`)
-      if (status?.class === 'running' && status?.owner?.surface === 'cli-server' && !restartServer) {
-        restartServer = true
-        startServer = true
-        mutations.push('restart remote OpenAlice Server with updated source')
-      }
-    }
-  }
-
-  if (!blocker && startServer && !bundledRuntime) {
+  if (!blocker && startServer && !nativeRuntimeExpected) {
     if (remote.sourceCheckoutState === 'invalid') {
       blocker = `${serverAppDir} exists but is not an OpenAlice source checkout. Choose another --app-dir or move the existing path.`
     } else if (remote.sourceCheckoutState === 'absent') {
@@ -562,17 +460,14 @@ export function createRemotePlan(options, remote, install = {}) {
   }
 
   const runtimeBuildToolsMissing = remote.runtimeBuildToolsMissing ?? []
-  if (!blocker && startServer && !bundledRuntime && remote.sourceArtifactsReady !== true && runtimeBuildToolsMissing.length > 0) {
-    if (remote.platform?.os === 'linux') {
-      installRuntimeDeps = true
-    } else {
-      blocker = `The remote source Runtime is missing ${formatMissingRuntimeBuildTools(runtimeBuildToolsMissing)}. Run "xcode-select --install" in a local macOS session before reconnecting.`
-    }
+  if (!blocker && startServer && !nativeRuntimeExpected && remote.sourceArtifactsReady !== true && runtimeBuildToolsMissing.length > 0) {
+    const guidance = remote.platform?.os === 'darwin'
+      ? ' Run "xcode-select --install" in a local macOS session before reconnecting.'
+      : ' Install those source-development prerequisites on the remote host before reconnecting.'
+    blocker = `The explicit remote source Runtime is missing ${formatMissingRuntimeBuildTools(runtimeBuildToolsMissing)}.${guidance}`
   }
-  if (installRuntimeDeps) mutations.unshift('install source Runtime build tools')
-  if (installManagedPi) mutations.unshift(`install managed Pi ${MANAGED_PI_VERSION}`)
   if (installCli) mutations.unshift(remote.cliPath ? 'update remote OpenAlice CLI' : 'install remote OpenAlice CLI')
-  const runInstaller = installCli || installManagedPi || installRuntimeDeps
+  const runInstaller = installCli
   if (runInstaller && !remote.hasCurl && !blocker) {
     blocker = 'The remote host does not have curl, which the normal OpenAlice installer requires.'
   }
@@ -586,20 +481,18 @@ export function createRemotePlan(options, remote, install = {}) {
     cliCompatible: remote.cliCompatible === true,
     cliContentIdentity: remote.cliContentIdentity ?? null,
     cliMatchesLocal,
-    piPath: remote.piPath ?? 'missing',
-    piVersion: remote.piVersion ?? 'unknown',
-    piCompatible: remote.piCompatible === true,
     runtimeClass: status?.class ?? 'unknown',
     runtimeOwner: status?.owner?.surface ?? 'none',
-    appDir: serverAppDir || 'not selected',
+    appDir: serverAppDir || 'matching native release',
     serverAppDir,
     remoteHome: options.remoteHome || '~/.openalice (remote default)',
     sourceMode: options.appDir
       ? 'user-selected'
-      : bundledRuntime
-        ? 'installed-bundle'
-        : 'managed',
+      : nativeRuntimeExpected
+        ? 'installed-native'
+        : 'installed-native',
     bundledRuntime,
+    nativeRuntimeExpected,
     runtimeContentIdentity: bundledRuntime
       ? remote.managedRuntime.contentIdentity
       : null,
@@ -607,17 +500,10 @@ export function createRemotePlan(options, remote, install = {}) {
     remotePort,
     localPort: options.localPort || (options.preferredLocalPort ? `${options.preferredLocalPort} (remembered)` : 'auto'),
     installCli,
-    installManagedPi,
-    installRuntimeDeps,
     cloneSource,
-    updateSource,
-    rebuildSource,
     runInstaller,
     startServer,
-    restartServer,
     sourceCheckoutPresent: remote.sourceCheckoutPresent ?? null,
-    sourceUpdateAvailable: remote.sourceUpdateAvailable ?? null,
-    sourceDirty: remote.sourceDirty ?? null,
     sourceArtifactsReady: remote.sourceArtifactsReady ?? null,
     runtimeBuildToolsMissing,
     installSource,
@@ -633,7 +519,7 @@ export function formatRemotePlan(plan) {
   const actions = plan.mutations.length > 0
     ? [...plan.mutations, 'open local SSH tunnel']
     : ['reuse compatible remote CLI Server', 'open local SSH tunnel']
-  const buildTools = plan.bundledRuntime
+  const buildTools = plan.nativeRuntimeExpected
     ? 'Not needed (installed Runtime)'
     : plan.sourceArtifactsReady === true
     ? 'Not needed (built artifacts present)'
@@ -645,14 +531,13 @@ export function formatRemotePlan(plan) {
   const cliState = plan.cliCompatible && plan.cliMatchesLocal
     ? ', compatible and matches local CLI'
     : ', install/update required'
-  const sourceState = plan.bundledRuntime
+  const runtimeState = plan.bundledRuntime
     ? `, content ${plan.runtimeContentIdentity}`
     : plan.cloneSource
     ? ', will clone'
-    : plan.updateSource
-      ? ', update available'
-      : plan.sourceCheckoutState === 'present' ? ', ready' : ''
-  return `\nOpenAlice Remote\n\nRemote plan\n  Target         ${plan.target}\n  Platform       ${plan.platform}\n  Node.js        ${plan.nodeVersion}\n  CLI            ${plan.cliPath} (${plan.cliVersion}${cliState})\n  Agent          ${plan.piPath} (Pi ${plan.piVersion}${plan.piCompatible ? ', compatible' : `, install ${MANAGED_PI_VERSION} required`})\n  Runtime        ${plan.runtimeClass} (${plan.runtimeOwner})\n  Source         ${plan.appDir} (${plan.sourceMode}${sourceState})\n  Build tools    ${buildTools}\n  Home           ${plan.remoteHome}\n  Tunnel         127.0.0.1:${plan.localPort} -> remote 127.0.0.1:${plan.remotePort}\n  Actions        ${actions.join('; ')}\n${plan.runInstaller ? `  Installer      ${plan.installSource.installerUrl} (CLI ${plan.installSource.cliVersion}, ${formatInstallSelector(plan.installSource)}, selected by local CLI)\n` : ''}${plan.blocker ? `\nBlocked: ${plan.blocker}\n` : '\nNothing has changed yet.\n'}\n`
+    : plan.sourceCheckoutState === 'present' ? ', ready' : ''
+  const runtimeLabel = plan.nativeRuntimeExpected ? 'Release' : 'Source'
+  return `\nOpenAlice Remote\n\nRemote plan\n  Target         ${plan.target}\n  Platform       ${plan.platform}\n  CLI            ${plan.cliPath} (${plan.cliVersion}${cliState})\n  Runtime        ${plan.runtimeClass} (${plan.runtimeOwner})\n  ${runtimeLabel.padEnd(14)} ${plan.appDir} (${plan.sourceMode}${runtimeState})\n  Build tools    ${buildTools}\n  Home           ${plan.remoteHome}\n  Tunnel         127.0.0.1:${plan.localPort} -> remote 127.0.0.1:${plan.remotePort}\n  Actions        ${actions.join('; ')}\n${plan.runInstaller ? `  Installer      ${plan.installSource.installerUrl} (CLI ${plan.installSource.cliVersion}, ${formatInstallSelector(plan.installSource)}, selected by local CLI)\n` : ''}${plan.blocker ? `\nBlocked: ${plan.blocker}\n` : '\nNothing has changed yet.\n'}\n`
 }
 
 async function resolveLocalInstallIdentity(dependencies, env) {
@@ -689,26 +574,14 @@ export async function probeRemoteHost(options, dependencies = {}) {
   const [kernel = '', architecture = ''] = platformRaw.trim().split(/\r?\n/)
   const platform = normalizeRemotePlatform(kernel, architecture)
   const shellHome = normalizeRemoteHome((await runRemote(options, 'printf "%s\\n" "$HOME"', dependencies)).trim())
-  const managedRoot = options.remoteHome || `${shellHome}/.openalice`
-  const managedAppDir = `${managedRoot}/sources/${options.managedSourceKey ?? 'branch-master'}/OpenAlice`
-  const sourceAppDir = options.appDir || managedAppDir
-  const nodeVersion = (await runRemote(options, 'command -v node >/dev/null 2>&1 && node --version || true', dependencies)).trim() || null
+  const sourceAppDir = options.appDir
+  const nodeVersion = sourceAppDir
+    ? (await runRemote(options, 'command -v node >/dev/null 2>&1 && node --version || true', dependencies)).trim() || null
+    : null
   const hasCurl = (await runRemote(options, 'command -v curl >/dev/null 2>&1 && printf yes || true', dependencies)).trim() === 'yes'
-  const piPath = normalizeRemoteExecutablePath((await runRemote(options, 'command -v pi 2>/dev/null || { [ ! -x "$HOME/.openalice/bin/pi" ] || printf "%s\\n" "$HOME/.openalice/bin/pi"; }', dependencies)).trim(), 'pi')
-  let piVersion = null
-  if (piPath) {
-    try {
-      piVersion = (await runRemote(options, `${shellQuote(piPath)} --version`, dependencies)).trim() || null
-    } catch {
-      piVersion = null
-    }
-  }
-  const piCompatible = piVersion === MANAGED_PI_VERSION
   let sourceCheckoutState = null
   let sourceCheckoutPresent = null
   let sourceArtifactsReady = null
-  let sourceUpdateAvailable = null
-  let sourceDirty = null
   let runtimeBuildToolsMissing = []
   if (sourceAppDir) {
     sourceCheckoutState = (await runRemote(options, buildRemoteCheckoutProbeCommand(sourceAppDir), dependencies)).trim() || 'absent'
@@ -722,24 +595,10 @@ export async function probeRemoteHost(options, dependencies = {}) {
         .split(/\r?\n/)
         .filter((value) => ['git', 'python3', 'make', 'cxx'].includes(value))
     }
-    if (
-      sourceCheckoutPresent
-      && !options.appDir
-      && options.managedInstallSource?.selector?.kind === 'branch'
-    ) {
-      const updateProbe = await runRemote(options, buildRemoteSourceUpdateProbeCommand(
-        sourceAppDir,
-        options.managedInstallSource,
-        options.repositoryUrl ?? DEFAULT_REPOSITORY_URL,
-      ), dependencies)
-      const updateFacts = parseSourceUpdateProbe(updateProbe)
-      sourceUpdateAvailable = updateFacts.updateAvailable
-      sourceDirty = updateFacts.dirty
-    }
   }
   const cliPath = normalizeRemoteCliPath((await runRemote(options, 'command -v openalice 2>/dev/null || { [ ! -x "$HOME/.openalice/bin/openalice" ] || printf "%s\\n" "$HOME/.openalice/bin/openalice"; }', dependencies)).trim())
   if (!cliPath) {
-    return { platform, shellHome, managedAppDir, nodeVersion, hasCurl, sourceCheckoutState, sourceCheckoutPresent, sourceArtifactsReady, sourceUpdateAvailable, sourceDirty, runtimeBuildToolsMissing, piPath, piVersion, piCompatible, cliPath: null, cliVersion: null, cliContentIdentity: null, installSource: null, cliCompatible: false, status: null }
+    return { platform, shellHome, nodeVersion, hasCurl, sourceCheckoutState, sourceCheckoutPresent, sourceArtifactsReady, runtimeBuildToolsMissing, cliPath: null, cliVersion: null, cliContentIdentity: null, installSource: null, cliCompatible: false, status: null }
   }
 
   let cliVersion = null
@@ -770,7 +629,7 @@ export async function probeRemoteHost(options, dependencies = {}) {
   } catch {
     cliCompatible = false
   }
-  return { platform, shellHome, managedAppDir, managedRuntime, nodeVersion, hasCurl, sourceCheckoutState, sourceCheckoutPresent, sourceArtifactsReady, sourceUpdateAvailable, sourceDirty, runtimeBuildToolsMissing, piPath, piVersion, piCompatible, cliPath, cliVersion, cliContentIdentity, installSource: remoteInstallSource, cliCompatible, status }
+  return { platform, shellHome, managedRuntime, nodeVersion, hasCurl, sourceCheckoutState, sourceCheckoutPresent, sourceArtifactsReady, runtimeBuildToolsMissing, cliPath, cliVersion, cliContentIdentity, installSource: remoteInstallSource, cliCompatible, status }
 }
 
 async function probeRemoteControl(options, dependencies) {
@@ -844,24 +703,6 @@ export function buildRemoteCloneCommand(appDir, installSource, repositoryUrl = D
   return `set -eu\nroot=${root}\nparent=${parent}\ntest ! -e "$root" && test ! -L "$root" || { printf '%s\\n' "Source path already exists: $root" >&2; exit 1; }\nmkdir -p "$parent"\ntmp="$root.openalice-clone.$$"\ntrap 'rm -rf "$tmp"' EXIT HUP INT TERM\ngit clone ${cloneArgs} "$tmp"${checkout}\nmv "$tmp" "$root"\ntrap - EXIT HUP INT TERM\nprintf 'OpenAlice source is ready at %s\\n' "$root"`
 }
 
-export function buildRemoteSourceUpdateProbeCommand(appDir, installSource, repositoryUrl = DEFAULT_REPOSITORY_URL) {
-  const source = requireInstallSource(installSource)
-  if (source.selector.kind !== 'branch') throw new Error('Only managed branch checkouts can be updated')
-  const root = shellQuote(appDir)
-  const repository = shellQuote(repositoryUrl)
-  const remoteRef = shellQuote(`refs/heads/${source.selector.value}`)
-  return `root=${root}\nhead=$(git -C "$root" rev-parse HEAD 2>/dev/null || true)\nupstream=$(git ls-remote ${repository} ${remoteRef} 2>/dev/null | awk 'NR == 1 { print $1; exit }')\nif test -z "$head"; then dirty=unknown\nelif test -n "$(git -C "$root" status --porcelain --untracked-files=no 2>/dev/null)"; then dirty=yes\nelse dirty=no\nfi\nprintf 'head=%s\\nupstream=%s\\ndirty=%s\\n' "$head" "$upstream" "$dirty"`
-}
-
-export function buildRemoteSourceUpdateCommand(appDir, installSource, repositoryUrl = DEFAULT_REPOSITORY_URL) {
-  const source = requireInstallSource(installSource)
-  if (source.selector.kind !== 'branch') throw new Error('Only managed branch checkouts can be updated')
-  const root = shellQuote(appDir)
-  const repository = shellQuote(repositoryUrl)
-  const remoteRef = shellQuote(`refs/heads/${source.selector.value}`)
-  return `set -eu\nroot=${root}\ntest -z "$(git -C "$root" status --porcelain --untracked-files=no)" || { printf '%s\\n' 'Managed source has tracked local changes; refusing update.' >&2; exit 1; }\ngit -C "$root" fetch --prune ${repository} ${remoteRef}\ngit -C "$root" merge --ff-only FETCH_HEAD\nprintf 'Managed OpenAlice source is now at %s\\n' "$(git -C "$root" rev-parse --short HEAD)"`
-}
-
 export function buildRemoteArtifactsProbeCommand(appDir) {
   const root = shellQuote(appDir)
   return `root=${root}\ntest -f "$root/dist/main.js" \\\n  && test -f "$root/ui/dist/index.html" \\\n  && test -f "$root/services/uta/dist/uta.js" \\\n  && test -f "$root/services/connector/dist/connector.cjs" \\\n  && test -f "$root/packages/guardian-runtime/dist/index.js" \\\n  && test -d "$root/node_modules" \\\n  && printf ready || true`
@@ -897,20 +738,17 @@ export function buildRemoteServerStopCommand(options, cliPath) {
   return args.join(' ')
 }
 
-export function buildRemoteInstallCommand(installSource, installBaseUrl = '', withRuntimeDeps = false) {
+export function buildRemoteInstallCommand(installSource, installBaseUrl = '') {
   const source = requireInstallSource(installSource)
   const url = shellQuote(source.installerUrl)
   const selectorFlag = source.selector.kind === 'branch' ? '--branch' : '--version'
   const selectorValue = shellQuote(source.selector.value)
   const installEnv = [
     `OPENALICE_INSTALL_URL=${url}`,
-    `OPENALICE_INSTALL_UPDATE_CHANNEL=${shellQuote(installSourceUpdateChannel(source))}`,
-    'OPENALICE_INSTALL_CONTEXT=remote',
     `OPENALICE_EXPECTED_CLI_VERSION=${shellQuote(source.cliVersion)}`,
-    installBaseUrl ? `OPENALICE_INSTALL_BASE_URL=${shellQuote(installBaseUrl)}` : '',
+    installBaseUrl ? `OPENALICE_DOWNLOAD_BASE_URL=${shellQuote(installBaseUrl)}` : '',
   ].filter(Boolean).join(' ')
-  const runtimeDepsFlag = withRuntimeDeps ? ' --with-runtime-deps' : ''
-  return `set -eu\ntmp=$(mktemp "${'${TMPDIR:-/tmp}'}/openalice-install.XXXXXX")\ntrap 'rm -f "$tmp"' EXIT HUP INT TERM\ncurl -fsSL ${url} -o "$tmp"\n${installEnv} bash "$tmp" --yes --no-modify-path ${selectorFlag} ${selectorValue}${runtimeDepsFlag}`
+  return `set -eu\ntmp=$(mktemp "${'${TMPDIR:-/tmp}'}/openalice-install.XXXXXX")\ntrap 'rm -f "$tmp"' EXIT HUP INT TERM\ncurl -fsSL ${url} -o "$tmp"\n${installEnv} bash "$tmp" --yes --no-modify-path ${selectorFlag} ${selectorValue}`
 }
 
 export function buildRemoteSshArgs(options, remoteCommand) {
@@ -1057,12 +895,12 @@ Plans and, after explicit consent, installs or reuses the matching OpenAlice
 Runtime on the SSH host. It then opens the normal loopback browser tunnel.
 Disconnecting closes only the tunnel; the remote Server keeps running.
 
-When --app-dir is omitted, OpenAlice prefers the installed platform Runtime and
-falls back to a private managed checkout only for older/source-only installs.
-Pass an absolute checkout path to keep source ownership manual.
+When --app-dir is omitted, OpenAlice requires the installed platform-native
+Runtime. It does not install Node/build tools or fall back to a checkout. Pass
+an absolute checkout path only to opt into the source-development path.
 
 Options:
-  --app-dir <path>        Existing or new checkout path (default: managed)
+  --app-dir <path>        Advanced: explicit existing or new source checkout
   --home <path>           Absolute remote OPENALICE_HOME (default: ~/.openalice)
   --local-port <port|auto> Local tunnel port (default: auto)
   --remote-port <port>    Remote OpenAlice web port (default: 47331)
@@ -1136,16 +974,6 @@ function parseRemoteStatus(output) {
   return status
 }
 
-function parseSourceUpdateProbe(output) {
-  const head = /^head=([a-f0-9]{40,64})$/m.exec(output)?.[1] ?? null
-  const upstream = /^upstream=([a-f0-9]{40,64})$/m.exec(output)?.[1] ?? null
-  const dirtyValue = /^dirty=(yes|no|unknown)$/m.exec(output)?.[1] ?? 'unknown'
-  return {
-    updateAvailable: head && upstream ? head !== upstream : null,
-    dirty: dirtyValue === 'yes' ? true : dirtyValue === 'no' ? false : null,
-  }
-}
-
 function normalizeRemotePlatform(kernel, architecture) {
   const os = kernel === 'Linux' ? 'linux' : kernel === 'Darwin' ? 'darwin' : 'unsupported'
   return { os, architecture, label: `${kernel || 'unknown'} ${architecture || 'unknown'}` }
@@ -1196,8 +1024,6 @@ function remoteRuntimePort(status) {
 function remainingMutationsAfterInstall(plan) {
   return plan.mutations.filter((mutation) => (
     !/^(install|update) remote OpenAlice CLI$/.test(mutation)
-    && !mutation.startsWith('install managed Pi ')
-    && mutation !== 'install source Runtime build tools'
   ))
 }
 
