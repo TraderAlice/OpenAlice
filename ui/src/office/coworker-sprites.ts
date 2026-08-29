@@ -68,6 +68,7 @@ export const OFFICE_COWORKER_SPRITES: Record<OfficeCoworkerIdentity, OfficeCowor
 
 export const OFFICE_COWORKER_EMOTES = {
   working: '/office/hud/talk-bubble-v2.png',
+  sleeping: '/office/coworkers/sleep-emote-v1.png',
   waiting: '/office/coworkers/waiting-emote-v1.png',
   failed: '/office/coworkers/failed-emote-v1.png',
   review: '/office/coworkers/review-emote-v1.png',

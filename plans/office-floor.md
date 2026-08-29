@@ -2834,6 +2834,25 @@ Replay-context round-trip follow-up (2026-08-30):
   with root/UI TypeScript, the full 617-file Vitest run (5,120 passing; one file and nine tests skipped), and the
   production build; the existing large-chunk advisory is unchanged.
 
+Sleeping-coworker state follow-up (2026-08-30):
+
+- Played the live Office Lab at `0 working · 0 awake` and found every dormant coworker still seated at a powered-down
+  workstation with no visible state cue. The counters and accessible labels were correct, but the floor composition
+  still read as a fully staffed office at first glance.
+- Compared removing dormant coworkers, relying on the existing dim workstation, and retaining each cast member with a
+  restrained GBA sleep cue. Chose the sleep cue: hiding established characters weakens the party fantasy, while
+  dimming alone had already failed the real-play read. The generated cue is compact enough to preserve the map hierarchy.
+- Generated a transparent cream-and-cyan three-`Z` thought puff against the existing Office emote references, then
+  hard-matted and packaged it on a 48×48 RGBA canvas. Powered-down desks now show that cue, prioritize sleep over a stale
+  runtime mood, stagger its low-amplitude stepped motion across seats, and hold it static under reduced motion. Waking a
+  Session removes the cue immediately; existing working, waiting, review, and failure emotes retain their behavior.
+- Ran real Grok Session `run-81CphXJV` in the Chat pod. The floor changed from `0/2 awake` to `1/3 awake`, gave the new
+  Grok Engineer a live work bubble with no sleep cue, then restored the sleep cue when the 45-second run completed and
+  the HUD returned to `0 working · 0 awake`. All seven visible sleepers remained readable without covering signs,
+  roster badges, cabinets, or Alice. Focused desk, asset, and responsive-style specs passed (3 files / 29 tests),
+  together with root/UI TypeScript, the full 617-file Vitest run (5,121 passing; one file and nine tests skipped), and
+  the production build; the existing large-chunk advisory is unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

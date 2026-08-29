@@ -4421,20 +4421,37 @@
   filter: drop-shadow(2px 3px 0 color-mix(in srgb, var(--gba-ink) 24%, transparent));
 }
 
-.oa-office-mood-emote[data-mood="working"] {
+.oa-office-mood-emote[data-kind="working"] {
   opacity: 0.9;
   animation: oa-office-emote-working 1.1s steps(2, end) infinite;
 }
 
-.oa-office-mood-emote[data-mood="waiting"] {
+.oa-office-mood-emote[data-kind="sleeping"] {
+  top: -4px;
+  left: 64%;
+  width: 40px;
+  height: 40px;
+  opacity: 0.82;
+  animation: oa-office-emote-sleeping 2.4s steps(3, end) infinite;
+}
+
+.oa-office-pod__desks > li:nth-child(even) .oa-office-mood-emote[data-kind="sleeping"] {
+  animation-delay: -1.2s;
+}
+
+.oa-office-pod__desks > li:nth-child(3n) .oa-office-mood-emote[data-kind="sleeping"] {
+  animation-delay: -800ms;
+}
+
+.oa-office-mood-emote[data-kind="waiting"] {
   animation: oa-office-emote-waiting 1.4s steps(2, end) infinite;
 }
 
-.oa-office-mood-emote[data-mood="failed"] {
+.oa-office-mood-emote[data-kind="failed"] {
   animation: oa-office-emote-failed 700ms steps(2, end) infinite;
 }
 
-.oa-office-mood-emote[data-mood="review"] {
+.oa-office-mood-emote[data-kind="review"] {
   animation: oa-office-emote-review 1.8s steps(2, end) 3;
 }
 
@@ -4444,6 +4461,11 @@
 
 @keyframes oa-office-emote-working {
   50% { transform: translate(-50%, -2px); }
+}
+
+@keyframes oa-office-emote-sleeping {
+  34% { opacity: 0.62; transform: translate(-50%, -1px); }
+  67% { opacity: 0.9; transform: translate(-50%, -2px); }
 }
 
 @keyframes oa-office-emote-waiting {

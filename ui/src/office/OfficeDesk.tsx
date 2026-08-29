@@ -36,14 +36,16 @@ export function OfficeDesk({
 }) {
   const { t } = useTranslation()
   const station = officeStationComposition()
-  const emote = employee && (
-    employee.mood === 'working'
-    || employee.mood === 'waiting'
-    || employee.mood === 'failed'
-    || employee.mood === 'review'
-  )
-    ? { mood: employee.mood, src: OFFICE_COWORKER_EMOTES[employee.mood] }
-    : null
+  const emote = employee && !employee.awake
+    ? { kind: 'sleeping' as const, src: OFFICE_COWORKER_EMOTES.sleeping }
+    : employee && (
+      employee.mood === 'working'
+      || employee.mood === 'waiting'
+      || employee.mood === 'failed'
+      || employee.mood === 'review'
+    )
+      ? { kind: employee.mood, src: OFFICE_COWORKER_EMOTES[employee.mood] }
+      : null
   const label = employee
     ? t('office.employeeLabel', {
       name: officeCoworkerCallsign(employee, coworkerAsset),
@@ -86,9 +88,9 @@ export function OfficeDesk({
         {emote && (
           <span
             className="oa-office-mood-emote"
-            data-mood={emote.mood}
+            data-kind={emote.kind}
             data-reduced-motion={reducedMotion || undefined}
-            data-testid={`office-emote-${emote.mood}`}
+            data-testid={`office-emote-${emote.kind}`}
             aria-hidden
           >
             <img src={emote.src} alt="" style={officePixelImg} />

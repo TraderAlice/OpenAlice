@@ -104,6 +104,36 @@ describe('OfficeDesk', () => {
     expect(container.querySelector<HTMLImageElement>('.oa-office-topdown-station__asset')?.src)
       .toContain('/office/furniture/vacant-workstation-v2.png')
     expect(container.querySelector('.oa-office-coworker')).toBeTruthy()
+    const sleepEmote = screen.getByTestId('office-emote-sleeping')
+    expect(sleepEmote.querySelector('img')?.getAttribute('src'))
+      .toBe('/office/coworkers/sleep-emote-v1.png')
+    expect(sleepEmote.dataset.reducedMotion).toBeUndefined()
+  })
+
+  it('removes the sleep cue as soon as the Session wakes', () => {
+    const { rerender } = render(
+      <OfficeDesk
+        employee={{ ...employee, awake: false, mood: 'idle', bubble: null }}
+        roomName="Chat"
+        selected={false}
+        depth={107}
+        reducedMotion
+        onSelect={() => undefined}
+      />,
+    )
+
+    expect(screen.getByTestId('office-emote-sleeping').dataset.reducedMotion).toBe('true')
+    rerender(
+      <OfficeDesk
+        employee={{ ...employee, awake: true, mood: 'idle', bubble: null }}
+        roomName="Chat"
+        selected={false}
+        depth={107}
+        reducedMotion
+        onSelect={() => undefined}
+      />,
+    )
+    expect(screen.queryByTestId('office-emote-sleeping')).toBeNull()
   })
 
   it.each([
