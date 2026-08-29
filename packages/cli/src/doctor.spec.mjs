@@ -89,6 +89,30 @@ describe('OpenAlice Doctor', () => {
       summary: 'OpenAlice 0.88.0 is available',
     })
   })
+
+  it('reports the embedded Bun engine without implying a system Node dependency', async () => {
+    const home = await makeTempDir()
+    const doctor = await diagnoseRuntime({ homeRoot: home }, {
+      layout: { updateCachePath: join(home, '.cli-update-check.json') },
+      bunStandalone: true,
+      bunVersion: '1.4.0',
+      readInstallSourceImpl: async () => installSource(),
+      installedContentIdentityImpl: () => '0123456789abcdef',
+      inspectRuntime: async () => ({
+        ...runningStatus(home, null),
+        provider: { kind: 'bun', contentIdentity: '0123456789abcdef' },
+      }),
+      probeRuntime: async () => true,
+      discoverLogs: async () => [{ name: 'server.log' }],
+    })
+
+    expect(doctor.checks.find((check) => check.id === 'runtime.engine')).toMatchObject({
+      status: 'pass',
+      summary: 'Bun 1.4.0 is embedded in the OpenAlice executable',
+      detail: 'No system Node.js or Bun installation is required',
+    })
+    expect(doctor.checks.find((check) => check.id === 'runtime.node')).toBeUndefined()
+  })
 })
 
 function runningStatus(home, root) {

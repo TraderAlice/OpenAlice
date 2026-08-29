@@ -24,19 +24,13 @@ on:
       - "scripts/bun-broker-pack-fixture.ts"
       - "scripts/build-bun-runtime-feasibility.ts"
       - "scripts/build-bun-release.ts"
+      - "scripts/prepare-cli-dev-assets.mjs"
+      - "scripts/prepare-cli-dev-assets.spec.mjs"
       - "THIRD_PARTY_NOTICES.md"
       - "scripts/remote-ssh-smoke.mjs"
       - "scripts/remote-smoke/**"
   push:
     branches: [dev]
-    paths:
-      - ".github/workflows/cli-installer-smoke.yml"
-      - ".github/workflows/release.yml"
-      - "install"
-      - "package.json"
-      - "packages/cli/**"
-      - "scripts/install-channel-smoke.mjs"
-      - "scripts/install-channel-smoke/**"
 
 permissions:
   contents: read
@@ -114,9 +108,140 @@ jobs:
       - name: Exercise clean SSH host fixture
         run: node scripts/remote-ssh-smoke.mjs --skip-tui
 
+  build-dev-cli:
+    if: github.event_name == 'push'
+    name: Build dev native CLI (${{ matrix.platform }}-${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            platform: darwin
+            arch: arm64
+          - os: macos-15-intel
+            platform: darwin
+            arch: x64
+          - os: ubuntu-24.04
+            platform: linux
+            arch: x64
+          - os: ubuntu-24.04-arm
+            platform: linux
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          cache: pnpm
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: ".bun-version"
+
+      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
+
+      - name: Build Alice and native CLI
+        run: |
+          pnpm build:server
+          pnpm build:bun:release
+
+      - name: Name the native acceptance report
+        shell: bash
+        run: >-
+          cp dist/bun-release/report.json
+          dist/bun-release/openalice-cli-${{ matrix.platform }}-${{ matrix.arch }}.report.json
+
+      - name: Preserve accepted dev candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-cli-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            dist/bun-release/*.tar.gz
+            dist/bun-release/*.tar.gz.sha256
+            dist/bun-release/openalice-cli-*.report.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
+
+  publish-dev-cli:
+    if: github.event_name == 'push'
+    name: Publish dev native CLI aliases
+    needs: build-dev-cli
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dev-cli-*
+          path: dist/dev-cli-candidates
+          merge-multiple: true
+
+      - name: Validate candidates and prepare channel aliases
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          node scripts/prepare-cli-dev-assets.mjs \
+            --input-dir dist/dev-cli-candidates \
+            --output-dir dist/dev-cli-upload \
+            --commit "$GITHUB_SHA" \
+            --version "$VERSION"
+
+      - name: Install AWS CLI
+        run: |
+          python3 -m pip install --user awscli
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Publish immutable candidates and activate dev aliases
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_EC2_METADATA_DISABLED: true
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          aws s3 cp "dist/dev-cli-upload/releases/${GITHUB_SHA}" \
+            "s3://${R2_BUCKET}/cli/dev/releases/${GITHUB_SHA}/" \
+            --recursive \
+            --cache-control "public, max-age=31536000, immutable" \
+            --endpoint-url "$ENDPOINT"
+
+          for archive in dist/dev-cli-upload/aliases/*.tar.gz; do
+            aws s3 cp "$archive" "s3://${R2_BUCKET}/cli/dev/$(basename "$archive")" \
+              --cache-control "no-cache" \
+              --content-type "application/gzip" \
+              --endpoint-url "$ENDPOINT"
+          done
+
+          for checksum in dist/dev-cli-upload/aliases/*.sha256; do
+            aws s3 cp "$checksum" "s3://${R2_BUCKET}/cli/dev/$(basename "$checksum")" \
+              --cache-control "no-cache" \
+              --content-type "text/plain" \
+              --endpoint-url "$ENDPOINT"
+          done
+
+          aws s3 cp dist/dev-cli-upload/manifest.json "s3://${R2_BUCKET}/cli/dev/manifest.json" \
+            --cache-control "no-cache" \
+            --content-type "application/json" \
+            --endpoint-url "$ENDPOINT"
+
   dev-channel-install:
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: always() && ((github.event_name == 'push' && needs.publish-dev-cli.result == 'success') || github.event_name == 'workflow_dispatch')
     name: Live raw dev channel install
+    needs: publish-dev-cli
     runs-on: ubuntu-latest
     timeout-minutes: 20
 

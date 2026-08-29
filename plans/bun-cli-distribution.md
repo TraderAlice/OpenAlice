@@ -504,7 +504,7 @@ artifacts.
 
 ### 8. Retire the expanded CLI Runtime
 
-- [ ] Delete the CLI release path that builds and publishes
+- [x] Delete the CLI release path that builds and publishes
   `openalice-runtime-*.tar.gz` dependency-closure archives.
 - [x] Delete CLI installation and repair of managed Pi, including the public
   `pi` launcher owned by OpenAlice.
@@ -764,3 +764,13 @@ This plan is complete only when:
   tunnel disconnect/reconnect, aggregate AliceProject inventory, structured
   stop, interrupted transfer retry, credential resealing, and startup of a
   transferred second Home on the same immutable release.
+- 2026-08-30: Replaced the formal expanded-headless release matrix with four
+  target-native Bun CLI candidates and made their archives plus SHA-256
+  sidecars part of the gated GitHub Release. Every `dev` push now builds the
+  same matrix, verifies sidecars and internal target/version/Bun metadata,
+  publishes commit-addressed immutable copies, activates fixed preview aliases
+  checksum-last, and runs the raw `dev/install` network journey on a non-root
+  Debian host with Node, npm, pnpm, Bun, and Agent Runtimes absent. Native
+  Doctor now reports its embedded Bun engine instead of Bun's compatibility
+  `process.version` as a host Node dependency. The live network gate remains
+  pending until this increment reaches `dev` and publishes its first aliases.

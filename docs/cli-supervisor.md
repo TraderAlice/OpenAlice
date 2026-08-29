@@ -460,7 +460,8 @@ network request, takeover, restart, configuration write, credential read, or
 broker action. It checks:
 
 - CLI product version, install source, and installed content identity;
-- the Node.js minimum;
+- the execution engine: embedded Bun for a native CLI, or the Node.js minimum
+  for a source-backed CLI;
 - Guardian ownership, control compatibility, and lifecycle state;
 - the advertised loopback Web endpoint with a bounded auth-status probe;
 - Alice, UTA, and Connector state;
