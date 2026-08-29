@@ -76,6 +76,7 @@ describe('Release workflow critical path', () => {
 
   it('keeps publication gated on both candidate builds and upgrade receipts', () => {
     expect(needs(workflow.jobs['publish-release'])).toEqual(expect.arrayContaining([
+      'preflight-public-cli-authority',
       'build-desktop',
       'accept-desktop-upgrade',
       'build-broker-packs',
@@ -86,6 +87,26 @@ describe('Release workflow critical path', () => {
       'accept-cli-legacy-cutover',
       'cli-installer-acceptance',
     ]))
+    expect(workflow.jobs['publish-release'].if).toContain(
+      "needs.preflight-public-cli-authority.result == 'success'",
+    )
+  })
+
+  it('preflights every enabled public CLI channel before creating the release', () => {
+    const preflight = workflow.jobs['preflight-public-cli-authority']
+    expect(needs(preflight)).toEqual(['release'])
+    expect(preflight['timeout-minutes']).toBe(5)
+    const verify = step(preflight, 'Verify every opted-in public channel before release publication')
+    expect(verify.if).toContain("needs.release.outputs.prerelease == 'false'")
+    expect(verify.run).toBe('node scripts/preflight-public-cli-authority.mjs')
+    for (const job of [
+      'build-desktop',
+      'cli-installer-acceptance',
+      'build-cli-release',
+      'build-broker-packs',
+    ]) {
+      expect(needs(workflow.jobs[job])).toContain('preflight-public-cli-authority')
+    }
   })
 
   it('publishes the four accepted native CLI archives and checksums', () => {
