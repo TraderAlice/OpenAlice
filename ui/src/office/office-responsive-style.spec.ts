@@ -16,6 +16,10 @@ const touchLayoutStart = css.lastIndexOf('@container (max-width: 760px)', narrow
 const compactWindowStart = css.indexOf('@container (max-width: 680px)', touchLayoutStart)
 const touchLayoutCss = css.slice(touchLayoutStart, compactWindowStart)
 const compactWindowCss = css.slice(compactWindowStart, narrowLiveStart)
+const coarseTouchStart = css.indexOf('@media (hover: none), (pointer: coarse)', touchLayoutStart)
+const coarseTouchEnd = css.indexOf('@container (max-width: 680px)', coarseTouchStart)
+const narrowLayoutCss = css.slice(touchLayoutStart, coarseTouchStart)
+const coarseTouchCss = css.slice(coarseTouchStart, coarseTouchEnd)
 
 describe('Office responsive style contract', () => {
   it('uses the available stage instead of forcing the viewport into 4:3', () => {
@@ -40,6 +44,20 @@ describe('Office responsive style contract', () => {
     expect(compactWindowCss).toContain('.oa-office-roster ul,')
     expect(compactWindowCss).toContain('grid-template-columns: 1fr')
     expect(compactWindowCss).toContain('.oa-office-roster__summary small')
+  })
+
+  it('lets input capability own touch controls independently of stage width', () => {
+    expect(coarseTouchStart).toBeGreaterThan(touchLayoutStart)
+    expect(coarseTouchEnd).toBeGreaterThan(coarseTouchStart)
+    expect(narrowLayoutCss).not.toContain('.oa-office-touch-dpad')
+    expect(narrowLayoutCss).not.toContain("[data-input='touch']")
+    expect(coarseTouchCss).not.toContain('@container (max-width: 760px)')
+    expect(coarseTouchCss).toContain('.oa-office-touch-dpad')
+    expect(coarseTouchCss).toContain('display: grid')
+    expect(coarseTouchCss).toContain('.oa-office-touch-action')
+    expect(coarseTouchCss).toContain("[data-input='keyboard']")
+    expect(coarseTouchCss).toContain("[data-input='touch']")
+    expect(coarseTouchCss).toContain('.oa-office-map-controls__move')
   })
 
   it('keeps the live-floor identity and Menu on the first phone HUD row', () => {

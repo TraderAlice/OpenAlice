@@ -5303,6 +5303,12 @@
     display: none;
   }
 
+  .oa-office-hud__status span:not(:first-child) {
+    display: none;
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
   .oa-office-touch-dpad {
     display: grid;
   }
@@ -5322,11 +5328,6 @@
   .oa-office-map-controls__move {
     display: none;
   }
-
-  .oa-office-hud__status span:not(:first-child) {
-    display: none;
-  }
-
 }
 
 @container (max-width: 680px) {

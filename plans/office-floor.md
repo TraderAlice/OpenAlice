@@ -1965,6 +1965,24 @@ Floor-menu pause ownership follow-up (2026-08-29):
   `cd ui && npx tsc -b`, the 609-file Vitest run (5,041 passing; one file and nine tests skipped), and the UI
   production build all passed.
 
+Input-capability HUD follow-up (2026-08-29):
+
+- Played the adaptive 844x390 stage with a real fine pointer and found that its 750x272 floor still inferred touch
+  input from width alone. A 96x96 D-pad and 72x72 A button covered both lower corners while the useful WASD/Arrow and
+  Enter prompts were hidden, even though the browser reported `pointer: fine` and `hover: hover`.
+- Compared shrinking the virtual controls, keeping a width-plus-input double gate, and letting primary input
+  capability own the control scheme. Chose capability ownership: shrinking would preserve the wrong controls, while
+  the double gate would strand wide touch tablets without movement. Coarse-pointer or no-hover devices now receive
+  the D-pad, A button, and touch prompt at every stage width; fine-pointer devices keep the keyboard HUD at every
+  width. Container queries continue to own layout only.
+- Browser-played fine-pointer 1280x900, 844x390, and 390x844 stages. All three hid the virtual controls, showed the
+  keyboard HUD, and retained zero page overflow. On landscape, four real W inputs moved Alice from `480,336` to
+  `480,264`; the nearby Operations prompt exposed Enter and kept A hidden. The recovered corners made the short map
+  materially easier to read without changing its 750x272 camera geometry.
+- Focused responsive-style and OfficeBuilding specs passed: 2 files / 16 tests. `npx tsc --noEmit`,
+  `cd ui && npx tsc -b`, the 609-file Vitest run (5,042 passing; one file and nine tests skipped), and the UI
+  production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
