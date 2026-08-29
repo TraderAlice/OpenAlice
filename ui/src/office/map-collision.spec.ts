@@ -124,13 +124,24 @@ describe('Office map collision', () => {
       .toContain('roster:chat-1')
   })
 
-  it('keeps service landmarks out of dense multi-row floors', () => {
-    const denseLayout = layoutOfficeMap(Array.from({ length: 5 }, (_, index) => ({
+  it('turns a partial final row into a collidable service bay', () => {
+    const partialLayout = layoutOfficeMap(Array.from({ length: 3 }, (_, index) => ({
       id: `workspace-${index}`,
       harness: 'chat' as const,
     })))
-    expect(denseLayout.rows).toBeGreaterThan(1)
-    const ids = officeCollisionRects(denseLayout).map((rect) => rect.id)
+    expect(partialLayout).toMatchObject({ columns: 2, rows: 2 })
+    const ids = officeCollisionRects(partialLayout).map((rect) => rect.id)
+    expect(ids).toContain('landmark:mail-service')
+    expect(ids).toContain('landmark:archive-service')
+  })
+
+  it('keeps service landmarks out of complete multi-row floors', () => {
+    const completeLayout = layoutOfficeMap(Array.from({ length: 4 }, (_, index) => ({
+      id: `workspace-${index}`,
+      harness: 'chat' as const,
+    })))
+    expect(completeLayout).toMatchObject({ columns: 2, rows: 2 })
+    const ids = officeCollisionRects(completeLayout).map((rect) => rect.id)
     expect(ids).not.toContain('landmark:mail-service')
     expect(ids).not.toContain('landmark:archive-service')
   })

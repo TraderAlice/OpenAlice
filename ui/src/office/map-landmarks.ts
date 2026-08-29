@@ -1,4 +1,9 @@
-import type { OfficeMapLayout } from './map-layout'
+import {
+  OFFICE_POD_GAP,
+  OFFICE_POD_HEIGHT,
+  OFFICE_POD_WIDTH,
+  type OfficeMapLayout,
+} from './map-layout'
 
 export const OFFICE_OPERATIONS_BOARD_Y = 204
 export const OFFICE_FLOOR_TERMINAL_Y = 164
@@ -11,6 +16,32 @@ export interface OfficeServiceLandmark {
   width: number
   height: number
   collision: { x: number; y: number; width: number; height: number }
+}
+
+const SERVICE_WIDTH = 120
+const SERVICE_HEIGHT = 104
+
+function serviceLandmarksAt(mailX: number, archiveX: number, y: number): OfficeServiceLandmark[] {
+  return [
+    {
+      id: 'mail-service',
+      kind: 'mail',
+      x: mailX,
+      y,
+      width: SERVICE_WIDTH,
+      height: SERVICE_HEIGHT,
+      collision: { x: 10, y: 54, width: 100, height: 46 },
+    },
+    {
+      id: 'archive-service',
+      kind: 'archive',
+      x: archiveX,
+      y,
+      width: SERVICE_WIDTH,
+      height: SERVICE_HEIGHT,
+      collision: { x: 8, y: 56, width: 104, height: 44 },
+    },
+  ]
 }
 
 export function officeOperationsBoardPosition(mapWidth: number): { x: number; y: number } {
@@ -28,30 +59,29 @@ export function officeFloorTerminalPosition(mapWidth: number): { x: number; y: n
 }
 
 export function officeServiceLandmarks(layout: OfficeMapLayout): OfficeServiceLandmark[] {
-  if (layout.rows !== 1) return []
-  const y = layout.height - 124
-  const width = 120
-  const height = 104
-  const centerX = Math.round(layout.width / 2)
-  const centerGap = 72
-  return [
-    {
-      id: 'mail-service',
-      kind: 'mail',
-      x: centerX - width - centerGap,
+  if (layout.rows === 1) {
+    const y = layout.height - 124
+    const centerX = Math.round(layout.width / 2)
+    const centerGap = 72
+    return serviceLandmarksAt(
+      centerX - SERVICE_WIDTH - centerGap,
+      centerX + centerGap,
       y,
-      width,
-      height,
-      collision: { x: 10, y: 54, width: 100, height: 46 },
-    },
-    {
-      id: 'archive-service',
-      kind: 'archive',
-      x: centerX + centerGap,
-      y,
-      width,
-      height,
-      collision: { x: 8, y: 56, width: 104, height: 44 },
-    },
-  ]
+    )
+  }
+
+  const occupiedFinalRow = layout.columns > 0 ? layout.pods.length % layout.columns : 0
+  const firstPod = layout.pods[0]
+  const finalPod = layout.pods.at(-1)
+  if (!firstPod || !finalPod || occupiedFinalRow === 0) return []
+
+  const emptyCellX = firstPod.x + occupiedFinalRow * (OFFICE_POD_WIDTH + OFFICE_POD_GAP)
+  const serviceGap = 20
+  const insetX = Math.round((OFFICE_POD_WIDTH - SERVICE_WIDTH * 2 - serviceGap) / 2)
+  const y = finalPod.y + Math.round((OFFICE_POD_HEIGHT - SERVICE_HEIGHT) * 0.64)
+  return serviceLandmarksAt(
+    emptyCellX + insetX,
+    emptyCellX + insetX + SERVICE_WIDTH + serviceGap,
+    y,
+  )
 }

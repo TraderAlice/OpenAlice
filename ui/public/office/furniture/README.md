@@ -95,8 +95,8 @@ lifetime instead of animating the sheet; the effect is decorative and does not c
 
 `mail-service-v1.png` and `archive-service-v1.png` were generated together from the locked style master, extracted
 from a chroma-key sheet, baseline-aligned, nearest-neighbor reduced to 120x104, and quantized against one 64-color
-palette. They appear only when the map has one Workspace row, turning its otherwise empty lower margin into two
-recognizable service landmarks without crowding denser floors.
+palette. One-row maps place them along the open lower service edge. Multi-row maps place the pair inside the first
+unused cell of a partial final row, turning a structural grid gap into a service bay without crowding complete floors.
 
 `empty-cabinet-v1.png` was generated from the locked style master and the shipped cabinet identity as a single
 cream two-drawer cabinet with its upper drawer pulled open and visibly empty. The transparent master was trimmed,

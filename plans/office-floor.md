@@ -2285,6 +2285,26 @@ Agent-file command-menu follow-up (2026-08-29):
   `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 611-file Vitest run (5,058 passing; one file and nine tests skipped),
   and the UI production build all passed.
 
+Partial-row service-bay follow-up (2026-08-29):
+
+- Audited the 16-bit furniture pack and browser-played the three-Workspace floor. The repository already contains
+  transparent, palette-matched mail/water and copier/archive landmarks, but layout restricts them to one-row maps; the
+  current 2x2 composition therefore leaves its entire fourth cell as an accidental-looking empty field.
+- Compared reducing map height, forcing three Workspaces into one long row, and turning the unused final grid cell into
+  a service bay. Chose the service bay: it keeps the stable pod/camera geometry and future expansion space, avoids a
+  worse horizontal phone corridor, and converts the structural gap into recognizable Office world-building.
+- Layout contract: one-row floors retain their lower-edge services; a multi-row floor receives the same two generated
+  props only when its final row is partial, centered inside the first unused cell. Each prop keeps a tight lower-body
+  collision rect while the cell's upper aisle and pod gaps remain walkable. Complete rows receive no service props.
+- Implemented partial-row placement from the actual pod grid geometry, retained the one-row lower-edge composition, and
+  registered the service bodies in the existing collision system. Added direct geometry contracts for one-row, partial,
+  and complete layouts; complete 2x2 floors remain undecorated instead of overlapping a real fourth Workspace.
+- Browser-played the three-Workspace service bay at 1280x900 and 390x844, then walked Alice into the water/mail station.
+  The pair fills the unused fourth cell without a fake Workspace rug or sign, stays legible in the phone camera, leaves
+  an open upper aisle, and produces the normal collision impact at its physical base. Focused landmark/collision/building
+  specs passed: 4 files / 25 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 612-file Vitest run (5,062 passing;
+  one file and nine tests skipped), and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
