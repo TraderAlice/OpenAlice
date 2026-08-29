@@ -2265,6 +2265,26 @@ Auto-route legibility follow-up (2026-08-29):
   specs passed: 2 files / 23 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 611-file Vitest run (5,058 passing;
   one file and nine tests skipped), and the UI production build all passed.
 
+Agent-file command-menu follow-up (2026-08-29):
+
+- Browser-played a direct desk interaction at 1280x900. The Agent file presents a strong RPG dialogue composition, but
+  focuses Close on entry; pressing the interaction/confirm key again immediately dismisses the window instead of
+  executing its primary `Open session` command.
+- Compared retaining universal Close focus, universally focusing Open session, and adapting the first command to the
+  entry context. Chose context-aware command focus: direct map dialogue starts on Open session, roster drill-down keeps
+  Back to roster, and an empty file keeps Close. This preserves both RPG confirmation flow and nested party-menu return.
+- The command model will form one bounded keyboard loop across Open session, drawer records, and Close/Back. Drawer
+  records use the shared geometry-aware Office grid navigation plus Home/End, so horizontal desktop inventory and any
+  responsive wrapping follow their physical placement rather than source order assumptions.
+- Implemented entry-aware autofocus, retained-drawer roving focus, spatial arrows, Home/End, and a bounded Tab loop.
+  Direct dialogue now confirms Open session; roster drill-down still begins on Back, and Escape keeps its universal
+  dismiss/return role. Focus follows a newly selected employee's first drawer instead of leaking another file's state.
+- Browser-played the direct command loop and roster drill-down at 1280x900, then a direct file at 390x844. The primary
+  green command and roster Back each received the expected visible focus, the phone file fit in 289px without internal
+  scrolling, and the map remained paused behind it. Focused InspectRail/shared-grid specs passed: 2 files / 4 tests.
+  `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 611-file Vitest run (5,058 passing; one file and nine tests skipped),
+  and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

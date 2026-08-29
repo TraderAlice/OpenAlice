@@ -23,6 +23,13 @@ const employee: OfficeFloorEmployee = {
     at: Date.now(),
     label: 'desk-note.md',
     path: 'docs/desk-note.md',
+  }, {
+    id: 'handoff-note',
+    kind: 'report',
+    action: 'open-file',
+    at: Date.now() - 1,
+    label: 'handoff.md',
+    path: 'docs/handoff.md',
   }],
 }
 
@@ -57,16 +64,38 @@ describe('OfficeInspectRail', () => {
       .toContain('/office/coworkers/codex-portrait-v2.png')
     expect(screen.getByRole('button', { name: 'Close' }).querySelector('img')?.getAttribute('src'))
       .toBe('/office/hud/window-close-v2.png')
-    expect(screen.getByRole('button', { name: 'Open session' }).querySelector('img')?.getAttribute('src'))
+    const openSession = screen.getByRole('button', { name: 'Open session' })
+    expect(openSession.querySelector('img')?.getAttribute('src'))
       .toBe('/office/hud/session-portal-v2.png')
     const drawerExit = screen.getByRole('button', { name: 'Open desk-note.md in Workspace' })
+    const handoffExit = screen.getByRole('button', { name: 'Open handoff.md in Workspace' })
     expect(drawerExit.querySelector('img')?.getAttribute('src')).toBe('/office/hud/drawer-record-v2.png')
     expect(drawerExit.querySelector('.oa-office-drawer__destination img')?.getAttribute('src'))
       .toBe('/office/hud/session-portal-v2.png')
     expect(drawerExit.querySelector('.oa-office-drawer__destination')?.textContent).toBe('Open')
     expect(container.querySelector('svg')).toBeNull()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Open session' }))
+    expect(document.activeElement).toBe(openSession)
+    await userEvent.keyboard('{Tab}')
+    expect(document.activeElement).toBe(drawerExit)
+    vi.spyOn(drawerExit, 'getBoundingClientRect').mockReturnValue({
+      left: 0, right: 120, top: 0, bottom: 38,
+    } as DOMRect)
+    vi.spyOn(handoffExit, 'getBoundingClientRect').mockReturnValue({
+      left: 128, right: 248, top: 0, bottom: 38,
+    } as DOMRect)
+    await userEvent.keyboard('{ArrowRight}')
+    expect(document.activeElement).toBe(handoffExit)
+    await userEvent.keyboard('{Home}')
+    expect(document.activeElement).toBe(drawerExit)
+    await userEvent.keyboard('{End}')
+    expect(document.activeElement).toBe(handoffExit)
+    await userEvent.keyboard('{Tab}')
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close' }))
+    await userEvent.keyboard('{Tab}')
+    expect(document.activeElement).toBe(openSession)
+
+    await userEvent.click(openSession)
     expect(onOpen).toHaveBeenCalledOnce()
     await userEvent.click(drawerExit)
     expect(onOpenDrawer).toHaveBeenCalledWith(employee.drawers[0])
@@ -90,6 +119,8 @@ describe('OfficeInspectRail', () => {
     const back = screen.getByRole('button', { name: 'Back to team roster' })
     expect(back.querySelector('img')?.getAttribute('src')).toBe('/office/hud/window-back-v2.png')
     expect(document.activeElement).toBe(back)
+    await userEvent.keyboard('{Tab}')
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Open session' }))
     await userEvent.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalledOnce()
   })
