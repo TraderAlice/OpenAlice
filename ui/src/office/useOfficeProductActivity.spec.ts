@@ -33,6 +33,26 @@ const newsEleven = event(11, 'news.ingested', {
   newsItemId: 4, title: 'Latest headline', source: 'Market feed',
 })
 
+function queueRefresh(entries: AgentRuntimeEvent[], lastSeq: number) {
+  const newest = (matches: (entry: AgentRuntimeEvent) => boolean) => entries
+    .filter(matches)
+    .sort((a, b) => b.seq - a.seq)
+    .slice(0, 1)
+  queryRuntime
+    .mockResolvedValueOnce({
+      entries: newest((entry) => entry.type !== 'inbox.received' && entry.type !== 'news.ingested'),
+      lastSeq,
+    })
+    .mockResolvedValueOnce({
+      entries: newest((entry) => entry.type === 'inbox.received'),
+      lastSeq,
+    })
+    .mockResolvedValueOnce({
+      entries: newest((entry) => entry.type === 'news.ingested'),
+      lastSeq,
+    })
+}
+
 beforeEach(() => {
   queryRuntime.mockReset()
   window.sessionStorage.clear()
@@ -93,19 +113,22 @@ describe('projectOfficeProductActivity', () => {
 
 describe('useOfficeProductActivity', () => {
   it('baselines existing history, then remembers activity that happened while away', async () => {
-    queryRuntime.mockResolvedValueOnce({ entries: [inboxNine, newsEleven], lastSeq: 11 })
+    queueRefresh([inboxNine, newsEleven], 11)
     const firstVisit = renderHook(() => useOfficeProductActivity())
     await waitFor(() => expect(firstVisit.result.current.news?.seq).toBe(11))
+    expect(queryRuntime).toHaveBeenCalledWith(expect.objectContaining({
+      pageSize: 1,
+      types: expect.arrayContaining(['runtime.started', 'runtime.stopped']),
+    }))
+    expect(queryRuntime).toHaveBeenCalledWith({ page: 1, pageSize: 1, family: 'inbox' })
+    expect(queryRuntime).toHaveBeenCalledWith({ page: 1, pageSize: 1, family: 'news' })
     expect(firstVisit.result.current.attention).toEqual({ agent: false, inbox: false, news: false })
     firstVisit.unmount()
 
     const newsTwelve = event(12, 'news.ingested', {
       newsItemId: 5, title: 'New while away', source: 'Wire',
     })
-    queryRuntime.mockResolvedValueOnce({
-      entries: [inboxNine, newsEleven, newsTwelve],
-      lastSeq: 12,
-    })
+    queueRefresh([inboxNine, newsEleven, newsTwelve], 12)
     const returnVisit = renderHook(() => useOfficeProductActivity())
     await waitFor(() => expect(returnVisit.result.current.news?.seq).toBe(12))
     expect(returnVisit.result.current.attention).toEqual({ agent: false, inbox: false, news: true })
@@ -115,10 +138,7 @@ describe('useOfficeProductActivity', () => {
     expect(returnVisit.result.current.attention.news).toBe(false)
     returnVisit.unmount()
 
-    queryRuntime.mockResolvedValueOnce({
-      entries: [inboxNine, newsEleven, newsTwelve],
-      lastSeq: 12,
-    })
+    queueRefresh([inboxNine, newsEleven, newsTwelve], 12)
     const acknowledgedVisit = renderHook(() => useOfficeProductActivity())
     await waitFor(() => expect(acknowledgedVisit.result.current.news?.seq).toBe(12))
     expect(acknowledgedVisit.result.current.attention.news).toBe(false)
@@ -126,14 +146,14 @@ describe('useOfficeProductActivity', () => {
   })
 
   it('animates live activity while keeping it pending until acknowledged', async () => {
-    queryRuntime.mockResolvedValueOnce({ entries: [inboxNine, newsEleven], lastSeq: 11 })
+    queueRefresh([inboxNine, newsEleven], 11)
     const hook = renderHook(() => useOfficeProductActivity())
     await waitFor(() => expect(hook.result.current.news?.seq).toBe(11))
 
     const inboxTwelve = event(12, 'inbox.received', {
       inboxEntryId: 'inbox-12', summary: 'Live delivery', agent: 'pi',
     })
-    queryRuntime.mockResolvedValueOnce({ entries: [inboxTwelve], lastSeq: 12 })
+    queueRefresh([inboxNine, inboxTwelve, newsEleven], 12)
     act(() => window.dispatchEvent(new Event(GLOBAL_ACTIVITY_REFRESH_EVENT)))
     await waitFor(() => expect(hook.result.current.inbox?.seq).toBe(12))
     expect(hook.result.current.attention.inbox).toBe(true)
@@ -149,14 +169,14 @@ describe('useOfficeProductActivity', () => {
   })
 
   it('raises and acknowledges Operations Board attention for an Agent milestone', async () => {
-    queryRuntime.mockResolvedValueOnce({ entries: [inboxNine, newsEleven], lastSeq: 11 })
+    queueRefresh([inboxNine, newsEleven], 11)
     const hook = renderHook(() => useOfficeProductActivity())
     await waitFor(() => expect(hook.result.current.news?.seq).toBe(11))
 
     const started = event(12, 'runtime.started', {
       agent: 'grok', workspaceLabel: 'Office Lab', surface: 'terminal',
     })
-    queryRuntime.mockResolvedValueOnce({ entries: [started], lastSeq: 12 })
+    queueRefresh([started, inboxNine, newsEleven], 12)
     act(() => window.dispatchEvent(new Event(GLOBAL_ACTIVITY_REFRESH_EVENT)))
     await waitFor(() => expect(hook.result.current.agent?.seq).toBe(12))
     expect(hook.result.current.attention.agent).toBe(true)

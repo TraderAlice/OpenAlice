@@ -5,13 +5,12 @@ import type { AgentRuntimeEvent } from '../api/agentRuntimeLog'
 import { GLOBAL_ACTIVITY_REFRESH_EVENT } from '../hooks/useGlobalAgentActivity'
 
 const POLL_MS = 4_000
-const EVENT_LIMIT = 100
 const FRESH_MS = 12_000
 const ACK_STORAGE_PREFIX = 'openalice:office-product-activity:ack:'
 const OFFICE_ACTIVITY_KINDS = ['agent', 'inbox', 'news'] as const
 type OfficeActivityKind = typeof OFFICE_ACTIVITY_KINDS[number]
 
-const OFFICE_AGENT_MILESTONE_TYPES = new Set<AgentRuntimeEvent['type']>([
+const OFFICE_AGENT_MILESTONE_TYPES = [
   'session.born',
   'runtime.started',
   'runtime.spawn_failed',
@@ -19,7 +18,10 @@ const OFFICE_AGENT_MILESTONE_TYPES = new Set<AgentRuntimeEvent['type']>([
   'runtime.rejected',
   'runtime.turn.error',
   'dev.sonner_test',
-])
+] as const satisfies readonly AgentRuntimeEvent['type'][]
+const OFFICE_AGENT_MILESTONE_TYPE_SET = new Set<AgentRuntimeEvent['type']>(
+  OFFICE_AGENT_MILESTONE_TYPES,
+)
 
 export interface OfficeActivityLandmark {
   readonly seq: number
@@ -47,7 +49,7 @@ export function projectOfficeProductActivity(
   events: readonly AgentRuntimeEvent[],
 ): Pick<OfficeProductActivityState, 'agent' | 'inbox' | 'news'> {
   const ordered = [...events].sort((a, b) => b.seq - a.seq)
-  const agent = ordered.find((event) => OFFICE_AGENT_MILESTONE_TYPES.has(event.type))
+  const agent = ordered.find((event) => OFFICE_AGENT_MILESTONE_TYPE_SET.has(event.type))
   const inbox = ordered.find((event) => event.type === 'inbox.received')
   const news = ordered.find((event) => event.type === 'news.ingested')
 
@@ -98,7 +100,7 @@ function activityExcerpt(value: string | undefined): string | undefined {
 function activityKindForEvent(event: AgentRuntimeEvent): OfficeActivityKind | null {
   if (event.type === 'inbox.received') return 'inbox'
   if (event.type === 'news.ingested') return 'news'
-  return OFFICE_AGENT_MILESTONE_TYPES.has(event.type) ? 'agent' : null
+  return OFFICE_AGENT_MILESTONE_TYPE_SET.has(event.type) ? 'agent' : null
 }
 
 function readAcknowledgedSeq(kind: OfficeActivityKind): number | null {
@@ -130,23 +132,22 @@ export function useOfficeProductActivity(): OfficeProductActivity {
     news: false,
   })
   const initializedRef = useRef(false)
-  const cursorRef = useRef(0)
   const freshTimerRef = useRef<number | null>(null)
   const freshKindRef = useRef<OfficeActivityKind | null>(null)
-  const eventsRef = useRef<AgentRuntimeEvent[]>([])
   const acknowledgedSeqRef = useRef<Record<OfficeActivityKind, number>>({ agent: 0, inbox: 0, news: 0 })
   const latestSeqRef = useRef<Record<OfficeActivityKind, number>>({ agent: 0, inbox: 0, news: 0 })
 
   const refresh = useCallback(async () => {
     const activityApi = api.productActivity ?? api.agentRuntime
-    const result = await (initializedRef.current
-      ? activityApi.query({ afterSeq: cursorRef.current, limit: EVENT_LIMIT })
-      : activityApi.query({ page: 1, pageSize: EVENT_LIMIT })).catch(() => null)
-    if (!result) return
-    const incoming = [...result.entries].sort((a, b) => a.seq - b.seq)
-    const bySeq = new Map(eventsRef.current.map((event) => [event.seq, event]))
-    for (const event of incoming) bySeq.set(event.seq, event)
-    const nextEvents = [...bySeq.values()].sort((a, b) => a.seq - b.seq).slice(-EVENT_LIMIT)
+    const pages = await Promise.all([
+      activityApi.query({ page: 1, pageSize: 1, types: [...OFFICE_AGENT_MILESTONE_TYPES] }),
+      activityApi.query({ page: 1, pageSize: 1, family: 'inbox' }),
+      activityApi.query({ page: 1, pageSize: 1, family: 'news' }),
+    ]).catch(() => null)
+    if (!pages) return
+    const nextEvents = pages.flatMap((page) => page.entries).sort((a, b) => a.seq - b.seq)
+    const journalLastSeq = Math.max(0, ...pages.map((page) => page.lastSeq))
+    const previousLatest = { ...latestSeqRef.current }
     const nextProjected = projectOfficeProductActivity(nextEvents)
     latestSeqRef.current = {
       agent: nextProjected.agent?.seq ?? 0,
@@ -159,7 +160,7 @@ export function useOfficeProductActivity(): OfficeProductActivity {
       for (const kind of OFFICE_ACTIVITY_KINDS) {
         const stored = readAcknowledgedSeq(kind)
         const latest = latestSeqRef.current[kind]
-        const acknowledged = stored == null || stored > result.lastSeq ? latest : stored
+        const acknowledged = stored == null || stored > journalLastSeq ? latest : stored
         acknowledgedSeqRef.current[kind] = acknowledged
         writeAcknowledgedSeq(kind, acknowledged)
         nextAttention[kind] = latest > acknowledged
@@ -174,9 +175,12 @@ export function useOfficeProductActivity(): OfficeProductActivity {
         news: current.news
           || latestSeqRef.current.news > acknowledgedSeqRef.current.news,
       }))
-      const notable = [...incoming]
+      const notable = [...nextEvents]
         .reverse()
-        .find((event) => activityKindForEvent(event) != null)
+        .find((event) => {
+          const kind = activityKindForEvent(event)
+          return kind != null && event.seq > previousLatest[kind]
+        })
       if (notable) {
         const nextFreshKind = activityKindForEvent(notable) as OfficeActivityKind
         freshKindRef.current = nextFreshKind
@@ -190,9 +194,7 @@ export function useOfficeProductActivity(): OfficeProductActivity {
       }
     }
 
-    eventsRef.current = nextEvents
     setEvents(nextEvents)
-    cursorRef.current = Math.max(cursorRef.current, result.lastSeq, ...incoming.map((event) => event.seq))
     initializedRef.current = true
   }, [])
 

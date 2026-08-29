@@ -58,6 +58,14 @@ describe('GET /api/agent-runtime', () => {
     const res = await app.request('/?page=1&pageSize=50&family=inbox')
     expect(res.status).toBe(200)
     expect(query).toHaveBeenCalledWith({ page: 1, pageSize: 50, family: 'inbox' })
+
+    const typed = await app.request('/?page=1&pageSize=1&types=runtime.started,runtime.stopped')
+    expect(typed.status).toBe(200)
+    expect(query).toHaveBeenCalledWith({
+      page: 1,
+      pageSize: 1,
+      types: ['runtime.started', 'runtime.stopped'],
+    })
   })
 
   it('records a Sonner probe through the same runtime journal', async () => {

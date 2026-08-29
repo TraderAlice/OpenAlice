@@ -94,6 +94,7 @@ export const agentRuntimeLogApi = {
     afterSeq?: number
     limit?: number
     type?: AgentRuntimeEventType
+    types?: AgentRuntimeEventType[]
     family?: string
   } = {}): Promise<AgentRuntimePage> {
     const params = new URLSearchParams()
@@ -102,6 +103,7 @@ export const agentRuntimeLogApi = {
     if (opts.page) params.set('page', String(opts.page))
     if (opts.pageSize) params.set('pageSize', String(opts.pageSize))
     if (opts.type) params.set('type', opts.type)
+    if (opts.types?.length) params.set('types', opts.types.join(','))
     if (opts.family) params.set('family', opts.family)
     const qs = params.toString()
     return fetchJson<AgentRuntimePage>(`/api/agent-runtime${qs ? `?${qs}` : ''}`)

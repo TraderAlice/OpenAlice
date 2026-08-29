@@ -110,6 +110,10 @@ TraderAlice 可以注册全部三类；NanoAlice 或未来通用 Alice 可以省
   `family`，Office 每轮并行刷新 `All / Agent / Inbox / News` 四个独立页面。真实 Project
   复测为 `All 50 / Agent 50 / Inbox 4 / News 50`，Inbox #0823 在 1,295 条总日志与密集
   Agent 工具流之后仍可直接打开。
+- 同一轮 Grok 测试还证明空间地标的旧 100 条全量窗口会在 remount 后丢掉稀疏提醒。
+  Journal 因此也提供有界多类型查询；Office 地标每次只取最新 Agent 里程碑、Inbox 与
+  News 各一条，而不消费工具流。真实触发 Inbox #1296 / News #1297 后，两处静态 `!`
+  在整页重载后仍保留，直到各自的物理终端被打开。
 
 ## Completion
 

@@ -53,6 +53,14 @@ describe('AgentRuntimeLog', () => {
     expect(page.total).toBe(3)
     expect(page.entries.map((entry) => entry.type)).toEqual(['runtime.stopped', 'runtime.started'])
 
+    const milestones = await log.query({
+      page: 1,
+      pageSize: 1,
+      types: ['session.born', 'runtime.stopped'],
+    })
+    expect(milestones.total).toBe(2)
+    expect(milestones.entries.map((entry) => entry.type)).toEqual(['runtime.stopped'])
+
     const replay = await log.read({ afterSeq: 1 })
     expect(replay.map((entry) => entry.seq)).toEqual([2, 3])
   })

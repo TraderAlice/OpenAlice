@@ -152,6 +152,8 @@ export class ProductActivityJournal {
   private readonly registeredFamilies = new Map<string, ProductActivityFamily>()
   private readonly recentByFamily = new Map<ProductActivityFamily, AgentRuntimeEvent[]>()
   private readonly familyTotals = new Map<ProductActivityFamily, number>()
+  private readonly recentByType = new Map<string, AgentRuntimeEvent[]>()
+  private readonly typeTotals = new Map<string, number>()
   private total = 0
   private first = 0
 
@@ -266,10 +268,45 @@ export class ProductActivityJournal {
     readonly page?: number
     readonly pageSize?: number
     readonly type?: AgentRuntimeEventType
+    readonly types?: readonly AgentRuntimeEventType[]
     readonly family?: ProductActivityFamily
   } = {}): Promise<EventLogQueryResult> {
     const page = Math.max(1, opts.page ?? 1)
     const pageSize = Math.max(1, opts.pageSize ?? 100)
+    const requestedTypes = opts.types?.length
+      ? [...new Set(opts.types)]
+      : opts.type
+        ? [opts.type]
+        : []
+    if (requestedTypes.length > 0 && page * pageSize <= ProductActivityJournal.FAMILY_BUFFER_SIZE) {
+      const matching = requestedTypes
+        .flatMap((type) => this.recentByType.get(type) ?? [])
+        .sort((a, b) => a.seq - b.seq)
+      const total = requestedTypes.reduce((sum, type) => sum + (this.typeTotals.get(type) ?? 0), 0)
+      const start = Math.max(0, matching.length - page * pageSize)
+      const end = matching.length - (page - 1) * pageSize
+      return {
+        entries: matching.slice(start, end).reverse(),
+        total,
+        page,
+        pageSize,
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      }
+    }
+    if (requestedTypes.length > 0) {
+      const typeSet = new Set(requestedTypes)
+      const matching = this.asAgentRuntimeEvents(await this.events.read())
+        .filter((event) => typeSet.has(event.type))
+      const start = Math.max(0, matching.length - page * pageSize)
+      const end = matching.length - (page - 1) * pageSize
+      return {
+        entries: matching.slice(start, end).reverse(),
+        total: matching.length,
+        page,
+        pageSize,
+        totalPages: Math.max(1, Math.ceil(matching.length / pageSize)),
+      }
+    }
     if (opts.family) {
       const total = this.familyTotals.get(opts.family) ?? 0
       const recent = this.recentByFamily.get(opts.family) ?? []
@@ -316,6 +353,8 @@ export class ProductActivityJournal {
     this.latestBySession.clear()
     this.recentByFamily.clear()
     this.familyTotals.clear()
+    this.recentByType.clear()
+    this.typeTotals.clear()
     this.total = 0
     this.first = 0
   }
@@ -335,6 +374,13 @@ export class ProductActivityJournal {
     }
     this.recentByFamily.set(family, familyEvents)
     this.familyTotals.set(family, (this.familyTotals.get(family) ?? 0) + 1)
+    const typeEvents = this.recentByType.get(event.type) ?? []
+    typeEvents.push(event)
+    if (typeEvents.length > ProductActivityJournal.FAMILY_BUFFER_SIZE) {
+      typeEvents.splice(0, typeEvents.length - ProductActivityJournal.FAMILY_BUFFER_SIZE)
+    }
+    this.recentByType.set(event.type, typeEvents)
+    this.typeTotals.set(event.type, (this.typeTotals.get(event.type) ?? 0) + 1)
     // Dev-only notification probes belong to the append-only diagnostic stream
     // so they exercise the real UI projection, but never represent occupancy.
     if (event.type === 'dev.sonner_test') return
