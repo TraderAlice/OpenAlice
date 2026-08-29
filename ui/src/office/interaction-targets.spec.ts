@@ -5,6 +5,7 @@ import {
   OFFICE_INTERACTION_RADIUS,
   clampOfficeCamera,
   nearestOfficeInteractionTarget,
+  officeCameraCenteredOn,
   officeCameraFollowingAlice,
   officeInteractionTargets,
 } from './interaction-targets'
@@ -212,6 +213,14 @@ describe('Office interaction targets', () => {
       { width: 1200, height: 800 },
       { width: 960, height: 672 },
     )).toEqual({ x: 120, y: 64 })
+  })
+
+  it('centers Alice in a short landscape viewport', () => {
+    expect(officeCameraCenteredOn(
+      { x: 480, y: 336 },
+      { width: 750, height: 272 },
+      { width: 960, height: 672 },
+    )).toEqual({ x: -105, y: -200 })
   })
 
   it('adds a roster target only when a group exceeds the visible desk count', () => {

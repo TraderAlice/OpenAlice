@@ -6,11 +6,23 @@ import { describe, expect, it } from 'vitest'
 const uiRoot = basename(process.cwd()) === 'ui' ? process.cwd() : resolve(process.cwd(), 'ui')
 const css = readFileSync(resolve(uiRoot, 'src/office/office.css'), 'utf8')
 
+const stageStart = css.indexOf('.oa-office-main {')
+const stageEnd = css.indexOf('\n}', stageStart)
+const stageCss = css.slice(stageStart, stageEnd)
 const narrowLiveStart = css.indexOf('@container (max-width: 520px)')
 const narrowLiveEnd = css.indexOf('@media (prefers-reduced-motion: reduce)', narrowLiveStart)
 const narrowLiveCss = css.slice(narrowLiveStart, narrowLiveEnd)
 
 describe('Office responsive style contract', () => {
+  it('uses the available stage instead of forcing the viewport into 4:3', () => {
+    expect(stageStart).toBeGreaterThan(-1)
+    expect(stageEnd).toBeGreaterThan(stageStart)
+    expect(stageCss).toContain('width: 100cqw')
+    expect(stageCss).toContain('height: 100cqh')
+    expect(stageCss).toContain('aspect-ratio: auto')
+    expect(css).not.toContain('aspect-ratio: 4 / 3')
+  })
+
   it('keeps detailed interaction prompts inside the phone map', () => {
     expect(narrowLiveCss).toContain('.oa-office-interact-prompt[data-has-detail="true"]')
     expect(narrowLiveCss).toContain('max-width: 168px')

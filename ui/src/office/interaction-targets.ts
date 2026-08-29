@@ -211,3 +211,14 @@ export function clampOfficeCamera(
     y: axis(camera.y, viewport.height, map.height),
   }
 }
+
+export function officeCameraCenteredOn(
+  point: { x: number; y: number },
+  viewport: { width: number; height: number },
+  map: { width: number; height: number },
+): { x: number; y: number } {
+  return clampOfficeCamera({
+    x: viewport.width / 2 - point.x,
+    y: viewport.height / 2 - point.y,
+  }, viewport, map)
+}

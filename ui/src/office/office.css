@@ -37,8 +37,9 @@
 .oa-office-main {
   position: relative;
   display: flex;
-  width: min(calc(100cqw - 24px), calc(133.333cqh - 32px));
-  aspect-ratio: 4 / 3;
+  width: 100cqw;
+  height: 100cqh;
+  aspect-ratio: auto;
   min-width: 0;
   min-height: 0;
   flex: none;
@@ -5441,11 +5442,5 @@
   .oa-office-layout {
     align-items: stretch;
     padding: 8px;
-  }
-
-  .oa-office-main {
-    width: 100cqw;
-    height: 100cqh;
-    aspect-ratio: auto;
   }
 }

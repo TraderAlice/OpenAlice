@@ -30,6 +30,7 @@ import { OfficeRouteTargetPointer } from './OfficeRouteTargetPointer'
 import {
   clampOfficeCamera,
   nearestOfficeInteractionTarget,
+  officeCameraCenteredOn,
   officeCameraFollowingAlice,
   officeInteractionTargets,
   type OfficeInteractionTarget,
@@ -307,20 +308,12 @@ export function OfficeBuilding({
   const initialCamera = () => {
     const viewport = viewportRef.current?.getBoundingClientRect()
     if (!viewport || viewport.width <= 0 || viewport.height <= 0) return { x: 0, y: 0 }
-    return clampCamera(
-      Math.round(viewport.width / 2 - mapLayout.alice.x),
-      mapLayout.height > 720
-        ? Math.round(viewport.height / 2 - mapLayout.alice.y)
-        : 0,
-    )
+    return officeCameraCenteredOn(mapLayout.alice, viewport, mapLayout)
   }
   const centerCameraOnAlice = () => {
     const viewport = viewportRef.current?.getBoundingClientRect()
     if (!viewport || viewport.width <= 0 || viewport.height <= 0) return
-    setCamera(clampCamera(
-      Math.round(viewport.width / 2 - aliceRef.current.x),
-      Math.round(viewport.height / 2 - aliceRef.current.y),
-    ))
+    setCamera(officeCameraCenteredOn(aliceRef.current, viewport, mapLayout))
   }
   const showCollisionBump = (movement: OfficeMovement = OFFICE_MOVEMENTS[aliceDirection]) => {
     if (walkTimerRef.current != null) window.clearTimeout(walkTimerRef.current)

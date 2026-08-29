@@ -1886,6 +1886,29 @@ Large-viewport map-boundary follow-up (2026-08-29):
   `cd ui && npx tsc -b`, the 608-file Vitest run (5,036 passing; one file and nine tests skipped), and the UI
   production build all passed.
 
+Adaptive game-stage follow-up (2026-08-29):
+
+- Played Office at 844x390 landscape and found the remaining 4:3 frame contract reduced a 784px-wide layout to a
+  402x300 game panel. Nearly half the horizontal space became inert app background while the HUD wrapped to 80px and
+  the touch controls competed inside a 402x220 map viewport. The world and camera already supported arbitrary viewport
+  geometry, so the outer screenshot ratio—not the level—was limiting play.
+- Compared retaining 4:3 with smaller controls, adding a landscape-only exception, and making the Office panel an
+  adaptive game stage at every size. Chose the adaptive stage because the viewport is a camera into the fixed 960x672
+  world, not a game asset itself. One sizing contract now consumes the layout content box; the redundant phone-only
+  override and forced 4:3 ratio were removed rather than kept as compatibility branches.
+- The wider landscape stage exposed an older initial-camera shortcut that only centered vertically when the map was
+  taller than 720px. A 672px world inside a 272px landscape viewport therefore started with Alice below the screen.
+  Initial and explicit recentering now share a pure camera-centering function, which centers Alice first and then uses
+  the existing per-axis world clamp for both smaller and larger viewports.
+- Browser-played 844x390, 1280x900, and 390x844. Landscape expanded the panel from 402x300 to 756x330 and the map
+  viewport from 402x220 to 750x272; Alice landed exactly at its center with camera `-105,-200`, zero page overflow,
+  and a 52px single-row HUD. Desktop filled its available stage while preserving symmetric map perimeter, and portrait
+  retained its 374x748 panel, touch controls, centered Alice, and zero overflow. Landscape Occupancy log also kept its
+  close latch visible and independently scrolled a 460px journal through a 210px body.
+- Focused responsive-style, camera, and OfficeBuilding specs passed: 3 files / 22 tests. `npx tsc --noEmit`,
+  `cd ui && npx tsc -b`, the 608-file Vitest run (5,038 passing; one file and nine tests skipped), and the UI
+  production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
