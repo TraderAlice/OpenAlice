@@ -29,6 +29,11 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
+- [[plans/bun-cli-distribution.md]] — Replaces the expanded Node headless
+  Runtime with a Bun-compiled, multi-process CLI distribution. Direct,
+  npm/Bun, Homebrew, and AUR channels consume one accepted artifact set. The
+  CLI package owns OpenAlice only: Agent Runtime installation and Electron
+  packaging stay outside this plan.
 - [[plans/remote-project-fleet.md]] — Adds a machine-aware Supervisor fleet,
   remote AliceProject inventory/connection, and safe local-to-SSH project
   transfer for portable configuration and Workspaces while deliberately
