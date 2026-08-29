@@ -18,6 +18,7 @@ describe('Office replay focus', () => {
     }), 'Scout', 'Task complete', 'all')).toEqual({
       seq: 42,
       workspaceId: 'prediction-1',
+      resumeId: 'resume-scout',
       targetIds: [
         'employee:prediction-1:resume-scout',
         'roster:prediction-1',

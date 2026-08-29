@@ -57,6 +57,7 @@ describe('OfficeBuilding', () => {
         replayFocus={{
           seq: 2,
           workspaceId: 'chat-replay',
+          resumeId: 'resume-5',
           targetIds: [
             'employee:chat-replay:resume-5',
             'roster:chat-replay',

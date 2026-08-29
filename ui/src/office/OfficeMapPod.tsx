@@ -25,6 +25,7 @@ export function OfficeMapPod({
   onOpenRoster,
   nearbyTargetId,
   routeTargetId,
+  replayFocusResumeId,
 }: {
   group: OfficeRoomSnapshot
   layout: { x: number; y: number; width: number; height: number }
@@ -41,6 +42,7 @@ export function OfficeMapPod({
   onOpenRoster: (workspaceId: string) => void
   nearbyTargetId?: string | null
   routeTargetId?: string | null
+  replayFocusResumeId?: string | null
 }) {
   const { t } = useTranslation()
   const coworkerCast = useMemo(() => officeCoworkerCast(group.employees), [group.employees])
@@ -143,6 +145,7 @@ export function OfficeMapPod({
                 employee
                 && routeTargetId === `employee:${group.workspace.id}:${employee.resumeId}`
               )}
+              replayFocused={Boolean(employee && employee.resumeId === replayFocusResumeId)}
               depth={officeDepthAt(layout.y + OFFICE_DESK_CENTERS[index].y)}
               reducedMotion={reducedMotion}
               interactionDisabled={interactionDisabled}

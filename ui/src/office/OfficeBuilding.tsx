@@ -1336,6 +1336,10 @@ export function OfficeBuilding({
                 onOpenRoster={(workspaceId) => requestTargetInteraction(`roster:${workspaceId}`)}
                 nearbyTargetId={nearbyTarget?.id}
                 routeTargetId={routeTargetId}
+                replayFocusResumeId={replayFocus?.seq === replaySeq
+                  && replayFocus.workspaceId === group.workspace.id
+                  ? replayFocus.resumeId
+                  : null}
               />
             )
           })}

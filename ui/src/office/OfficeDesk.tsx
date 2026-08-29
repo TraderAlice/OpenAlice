@@ -13,6 +13,7 @@ export function OfficeDesk({
   selected,
   nearby,
   targeted,
+  replayFocused = false,
   depth,
   reducedMotion,
   interactionDisabled = false,
@@ -26,6 +27,7 @@ export function OfficeDesk({
   selected: boolean
   nearby?: boolean
   targeted?: boolean
+  replayFocused?: boolean
   depth: number
   reducedMotion: boolean
   interactionDisabled?: boolean
@@ -36,16 +38,19 @@ export function OfficeDesk({
 }) {
   const { t } = useTranslation()
   const station = officeStationComposition()
-  const emote = employee && !employee.awake
-    ? { kind: 'sleeping' as const, src: OFFICE_COWORKER_EMOTES.sleeping }
-    : employee && (
-      employee.mood === 'working'
-      || employee.mood === 'waiting'
-      || employee.mood === 'failed'
-      || employee.mood === 'review'
-    )
-      ? { kind: employee.mood, src: OFFICE_COWORKER_EMOTES[employee.mood] }
-      : null
+  const moodEmote = employee && (
+    employee.mood === 'working'
+    || employee.mood === 'waiting'
+    || employee.mood === 'failed'
+    || employee.mood === 'review'
+  )
+    ? { kind: employee.mood, src: OFFICE_COWORKER_EMOTES[employee.mood] }
+    : null
+  const emote = replayFocused && moodEmote
+    ? moodEmote
+    : employee && !employee.awake
+      ? { kind: 'sleeping' as const, src: OFFICE_COWORKER_EMOTES.sleeping }
+      : moodEmote
   const label = employee
     ? t('office.employeeLabel', {
       name: officeCoworkerCallsign(employee, coworkerAsset),
@@ -70,6 +75,7 @@ export function OfficeDesk({
         data-selected={selected}
         data-nearby={nearby}
         data-route={targeted}
+        data-replay-focus={replayFocused || undefined}
         data-occupied={Boolean(employee)}
         data-awake={employee?.awake}
         data-mood={employee?.mood}

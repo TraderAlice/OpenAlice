@@ -6,6 +6,7 @@ export interface OfficeReplayFocus {
   seq: number
   targetIds: readonly string[]
   workspaceId?: string
+  resumeId?: string
   label: string
   summary: string
   channel: OfficeReplayChannel
@@ -29,6 +30,7 @@ export function officeReplayFocusForEvent(
     return {
       seq: event.seq,
       workspaceId,
+      resumeId,
       targetIds: [
         `employee:${workspaceId}:${resumeId}`,
         `roster:${workspaceId}`,

@@ -136,6 +136,28 @@ describe('OfficeDesk', () => {
     expect(screen.queryByTestId('office-emote-sleeping')).toBeNull()
   })
 
+  it('shows the selected historical event state over the generic sleep cue', () => {
+    const replayEmployee = { ...employee, awake: false, mood: 'review' as const, bubble: null }
+    const props = {
+      employee: replayEmployee,
+      roomName: 'Chat',
+      selected: false,
+      depth: 107,
+      reducedMotion: true,
+      onSelect: () => undefined,
+    }
+    const { rerender } = render(<OfficeDesk {...props} replayFocused />)
+
+    expect(screen.getByRole('button').dataset.replayFocus).toBe('true')
+    expect(screen.getByTestId('office-emote-review').querySelector('img')?.getAttribute('src'))
+      .toBe('/office/coworkers/review-emote-v1.png')
+    expect(screen.queryByTestId('office-emote-sleeping')).toBeNull()
+
+    rerender(<OfficeDesk {...props} />)
+    expect(screen.getByTestId('office-emote-sleeping')).toBeTruthy()
+    expect(screen.queryByTestId('office-emote-review')).toBeNull()
+  })
+
   it.each([
     ['waiting', '/office/coworkers/waiting-emote-v1.png'],
     ['failed', '/office/coworkers/failed-emote-v1.png'],

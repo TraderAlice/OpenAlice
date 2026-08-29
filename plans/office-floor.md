@@ -2921,6 +2921,23 @@ Replay-prompt provenance follow-up (2026-08-30):
   TypeScript, the full 617-file Vitest run (5,123 passing; one file and nine tests skipped), and the production build;
   the existing large-chunk advisory is unchanged.
 
+Replay-focus performance follow-up (2026-08-30):
+
+- The corrected #1837 replay exposed a second contradiction on the floor: Chat reported one active employee and the
+  replay beacon targeted a `review` Grok Engineer, but every visible coworker still showed Zzz. Desk presentation always
+  prioritized `awake=false` over a non-idle historical mood, so the selected story character looked uninvolved.
+- Compared changing every historical employee to mood-first, adding another beacon-only decoration, and giving only the
+  exact replay employee event-state priority. Chose the focused exception: global mood-first would make old rooms look
+  falsely alive, while another overlay would add noise without letting the character perform the event.
+- Replay focus now carries the event's `resumeId` directly through Building and Pod. When that employee is visible and
+  has a working, waiting, failed, or review mood, its event emote wins over the generic sleep cue; all other desks retain
+  the live presence-first rule. The powered-down workstation and accessible `asleep` state remain truthful.
+- Browser-replayed real Chat completion #1837. The focused, asleep Grok Engineer rendered the generated review-document
+  emote with no sleep cue, while the other three Chat coworkers retained Zzz; the room stayed `1/4 active`, the beacon
+  stayed on the correct desk, and the Operations summary stayed on the same report. Focused Desk, replay-focus, and
+  Building specs passed (3 files / 25 tests), together with root/UI TypeScript, the full 617-file Vitest run (5,124
+  passing; one file and nine tests skipped), and the production build; the existing large-chunk advisory is unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
