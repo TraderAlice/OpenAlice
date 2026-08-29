@@ -154,6 +154,7 @@ export function officeCoworkerSpriteForAgent(
  */
 export function officeCoworkerCast(
   members: readonly OfficeCoworkerCastMember[],
+  retainedCast: ReadonlyMap<string, OfficeCoworkerSpriteAsset> = new Map(),
 ): ReadonlyMap<string, OfficeCoworkerSpriteAsset> {
   const cast = new Map<string, OfficeCoworkerSpriteAsset>()
   const families = new Map<OfficeCoworkerArchetype, OfficeCoworkerCastMember[]>()
@@ -166,12 +167,23 @@ export function officeCoworkerCast(
 
   for (const [archetype, family] of families) {
     const pool = ARCHETYPE_POOL[archetype]
-    const ordered = [...family].sort((a, b) => {
+    const pending: OfficeCoworkerCastMember[] = []
+    const claimed = new Set<number>()
+    for (const member of family) {
+      const retained = retainedCast.get(member.resumeId)
+      const retainedIndex = retained ? pool.indexOf(retained.id) : -1
+      if (!retained || retainedIndex < 0) {
+        pending.push(member)
+        continue
+      }
+      cast.set(member.resumeId, retained)
+      claimed.add(retainedIndex)
+    }
+    const ordered = pending.sort((a, b) => {
       const aHash = stableCoworkerHash(`${archetype}:${a.resumeId}`)
       const bHash = stableCoworkerHash(`${archetype}:${b.resumeId}`)
       return aHash - bHash || a.resumeId.localeCompare(b.resumeId)
     })
-    const claimed = new Set<number>()
     for (const member of ordered) {
       const preferredAsset = officeCoworkerSpriteForAgent(member.agent, member.resumeId)
       const preferredIndex = Math.max(0, pool.indexOf(preferredAsset.id))

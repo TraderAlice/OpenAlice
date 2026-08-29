@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
@@ -11,7 +11,7 @@ import { useWorkspaceSidePanels } from '../live/workspace-side-panels'
 import { OfficeBuilding, type OfficeLogOrigin } from '../office/OfficeBuilding'
 import { OfficeCabinetWindow } from '../office/OfficeCabinetWindow'
 import { officeActivityActors } from '../office/activity-actors'
-import { officeCoworkerCast } from '../office/coworker-sprites'
+import { officeCoworkerCast, type OfficeCoworkerSpriteAsset } from '../office/coworker-sprites'
 import { officePixelImg } from '../office/furniture'
 import { OfficeInspectRail } from '../office/OfficeInspectRail'
 import { OfficeWindowControlGlyph } from '../office/OfficeWindowControlGlyph'
@@ -78,6 +78,26 @@ export function OfficePage() {
       roomName: workspace ? workspaceDisplayName(workspace) : office.workspace.tag,
     }
   }, [building, selected, workspaces])
+  const committedCastsRef = useRef<ReadonlyMap<
+    string,
+    ReadonlyMap<string, OfficeCoworkerSpriteAsset>
+  >>(new Map())
+  const coworkerCastSnapshot = useMemo(() => {
+    const byWorkspace = new Map<string, ReadonlyMap<string, OfficeCoworkerSpriteAsset>>()
+    const assets = new Map<string, OfficeCoworkerSpriteAsset>()
+    for (const office of building?.offices ?? []) {
+      const cast = officeCoworkerCast(
+        office.employees,
+        committedCastsRef.current.get(office.workspace.id),
+      )
+      byWorkspace.set(office.workspace.id, cast)
+      for (const [resumeId, asset] of cast) assets.set(resumeId, asset)
+    }
+    return { assets, byWorkspace }
+  }, [building])
+  useLayoutEffect(() => {
+    committedCastsRef.current = coworkerCastSnapshot.byWorkspace
+  }, [coworkerCastSnapshot])
   const rosterOffice = useMemo(() => {
     if (!building || !rosterWorkspaceId) return null
     const office = building.offices.find((item) => item.workspace.id === rosterWorkspaceId)
@@ -88,15 +108,15 @@ export function OfficePage() {
       roomName: workspace ? workspaceDisplayName(workspace) : office.workspace.tag,
     }
   }, [building, rosterWorkspaceId, workspaces])
-  const selectedCoworkerAsset = useMemo(() => selectedSeat
-    ? officeCoworkerCast(selectedSeat.office.employees).get(selectedSeat.employee.resumeId)
-    : undefined, [selectedSeat])
+  const selectedCoworkerAsset = selectedSeat
+    ? coworkerCastSnapshot.assets.get(selectedSeat.employee.resumeId)
+    : undefined
   const activityActors = useMemo(() => building
     ? officeActivityActors(building.offices, (workspaceId, tag) => {
         const workspace = workspaces.find((item) => item.id === workspaceId)
         return workspace ? workspaceDisplayName(workspace) : tag
-      })
-    : new Map(), [building, workspaces])
+      }, coworkerCastSnapshot.assets)
+    : new Map(), [building, coworkerCastSnapshot.assets, workspaces])
   const cabinetOffice = useMemo(() => {
     if (!building || !cabinetWorkspaceId) return null
     const office = building.offices.find((item) => item.workspace.id === cabinetWorkspaceId)
@@ -247,6 +267,7 @@ export function OfficePage() {
             >
               <OfficeBuilding
                 building={building}
+                coworkerAssets={coworkerCastSnapshot.assets}
                 groupTitle={(workspaceId, tag) => {
                   const workspace = workspaces.find((item) => item.id === workspaceId)
                   return workspace ? workspaceDisplayName(workspace) : tag
@@ -373,6 +394,7 @@ export function OfficePage() {
                 group={rosterOffice.office}
                 roomName={rosterOffice.roomName}
                 focusResumeId={rosterFocusResumeId}
+                coworkerAssets={coworkerCastSnapshot.assets}
                 onSelect={(employee) => {
                   employeeOriginRef.current = {
                     kind: 'roster',
@@ -392,6 +414,7 @@ export function OfficePage() {
               <OfficeCabinetWindow
                 group={cabinetOffice.office}
                 roomName={cabinetOffice.roomName}
+                coworkerAssets={coworkerCastSnapshot.assets}
                 onOpenWorkspaceFiles={() => openWorkspaceFiles(cabinetOffice.office.workspace.id)}
                 onOpenRecord={(employee, item) => {
                   openDrawer(cabinetOffice.office.workspace.id, employee, item)

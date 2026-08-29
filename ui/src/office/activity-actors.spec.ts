@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { OfficeRoomSnapshot } from '../api/office'
 import { officeActivityActors, officeActivityFallbackLabel } from './activity-actors'
+import { OFFICE_COWORKER_SPRITES } from './coworker-sprites'
 
 describe('Office activity actors', () => {
   it('projects the same cast and player-facing identity used by the team', () => {
@@ -25,15 +26,22 @@ describe('Office activity actors', () => {
       ],
     }
 
-    const actor = officeActivityActors([office], () => 'Prediction Lab')
+    const actor = officeActivityActors(
+      [office],
+      () => 'Prediction Lab',
+      new Map([[
+        'resume-crisp-slate-terrace-d82wad',
+        OFFICE_COWORKER_SPRITES['grok-sentinel'],
+      ]]),
+    )
       .get('resume-crisp-slate-terrace-d82wad')
 
     expect(actor).toMatchObject({
-      label: expect.stringMatching(/^Grok /),
+      label: 'Grok Sentinel',
       assignment: 'Roster scout two ready.',
       secondary: 'grok · g5 · Prediction Lab',
     })
-    expect(actor?.asset.id).toMatch(/^grok-/)
+    expect(actor?.asset.id).toBe('grok-sentinel')
   })
 
   it('turns a historical resume slug into a stable call sign', () => {

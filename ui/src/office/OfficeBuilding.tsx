@@ -119,6 +119,7 @@ export function OfficeBuilding({
   },
   onOpenService,
   onReturnLive,
+  coworkerAssets: retainedCoworkerAssets,
 }: {
   building: OfficeBuildingSnapshot
   groupTitle?: (workspaceId: string, tag: string) => string
@@ -137,6 +138,7 @@ export function OfficeBuilding({
   productActivity?: OfficeProductActivityState
   onOpenService?: (kind: 'inbox' | 'news', seq?: number) => void
   onReturnLive?: () => void
+  coworkerAssets?: ReadonlyMap<string, OfficeCoworkerSpriteAsset>
 }) {
   const { t } = useTranslation()
   const hiddenGroupCountId = useId()
@@ -256,13 +258,14 @@ export function OfficeBuilding({
     () => new Map(groups.map((group) => [group.workspace.id, group])),
     [groups],
   )
-  const coworkerAssets = useMemo(() => {
+  const localCoworkerAssets = useMemo(() => {
     const assets = new Map<string, OfficeCoworkerSpriteAsset>()
     for (const group of groups) {
       for (const [resumeId, asset] of officeCoworkerCast(group.employees)) assets.set(resumeId, asset)
     }
     return assets
   }, [groups])
+  const coworkerAssets = retainedCoworkerAssets ?? localCoworkerAssets
   const resolveGroupTitle = useMemo(
     () => groupTitle ?? ((_workspaceId: string, tag: string) => tag),
     [groupTitle],
@@ -1340,6 +1343,7 @@ export function OfficeBuilding({
                   && replayFocus.workspaceId === group.workspace.id
                   ? replayFocus.resumeId
                   : null}
+                coworkerAssets={coworkerAssets}
               />
             )
           })}

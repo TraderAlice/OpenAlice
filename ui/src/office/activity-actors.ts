@@ -14,13 +14,14 @@ export interface OfficeActivityActor {
 export function officeActivityActors(
   offices: readonly OfficeRoomSnapshot[],
   groupTitle: (workspaceId: string, tag: string) => string,
+  retainedAssets: ReadonlyMap<string, OfficeCoworkerSpriteAsset> = new Map(),
 ): ReadonlyMap<string, OfficeActivityActor> {
   const actors = new Map<string, OfficeActivityActor>()
   for (const office of offices) {
     const cast = officeCoworkerCast(office.employees)
     const roomName = groupTitle(office.workspace.id, office.workspace.tag)
     for (const employee of office.employees) {
-      const asset = cast.get(employee.resumeId)!
+      const asset = retainedAssets.get(employee.resumeId) ?? cast.get(employee.resumeId)!
       const label = officeCoworkerCallsign(employee, asset)
       const assignment = officeCoworkerAssignment(employee)
       actors.set(employee.resumeId, {

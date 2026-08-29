@@ -2992,6 +2992,28 @@ Contextual rest-state follow-up (2026-08-30):
   passed (2 files / 27 tests), together with root/UI TypeScript, the full 617-file Vitest run (5,128 passing; one file
   and nine tests skipped), and the production build; the existing direct-eval and large-chunk advisories are unchanged.
 
+Stable coworker spatial identity follow-up (2026-08-30):
+
+- Started a real Chat Grok Session from the quiet floor and watched the four existing visible coworkers all move to new
+  desks when g5 entered the first slot; g1 was simultaneously pushed behind `+1`. The active employee was correctly
+  visible, but a new Session behaved like a room-wide map reset instead of one coworker joining an established party.
+- Compared creation-order seats, resumeId-hashed seats, a persisted seat registry, and reconciling the current priority
+  roster against the last committed presentation. Chose reconciliation: the same active-first four-person roster stays
+  authoritative, retained members keep their exact slot, and a newcomer fills only the vacancy left by the one dormant
+  employee displaced into the roster. The rule is presentation-local and adds no storage or migration boundary.
+- The first real rerun kept g5, g4, and g3 in their existing three seats while working g6 occupied only g2's former
+  fourth seat. That run exposed the paired identity defect: collision-free cast assignment was recomputed for the whole
+  room, changing g5 from Grok Synthesist to Grok Sentinel when g6 joined.
+- Cast assignment now retains every committed resumeId-to-asset choice, claims unused family art only for newcomers,
+  and still avoids repeats until the authored pool is exhausted. OfficePage owns the committed per-Workspace cast and
+  shares it with the map, interaction labels, Agent file, roster, cabinet records, and activity journal.
+- Browser-started a second real Grok Session. Existing g6 stayed Grok Synthesist in seat one, g5 stayed Grok Sentinel in
+  seat two, and g4 stayed Grok Architect in seat three; new working g7 alone entered seat four as Grok Researcher. The
+  seven-member roster then showed the same callsigns and portraits as the floor. Focused cast, seat, activity-actor,
+  Building, and Office-page specs passed (5 files / 36 tests), together with root/UI TypeScript, the full 617-file
+  Vitest run (5,131 passing; one file and nine tests skipped), and the production build; the existing direct-eval and
+  large-chunk advisories are unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

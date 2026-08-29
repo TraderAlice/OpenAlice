@@ -9,7 +9,7 @@ import { OFFICE_FURNITURE, officePixelImg } from './furniture'
 import { nextOfficeGridIndex } from './grid-navigation'
 import { OFFICE_HUD_ASSETS } from './hud-assets'
 import { OfficeWindowControlGlyph } from './OfficeWindowControlGlyph'
-import { officeCoworkerCast } from './coworker-sprites'
+import { officeCoworkerCast, type OfficeCoworkerSpriteAsset } from './coworker-sprites'
 import { officeCoworkerCallsign } from './label'
 
 interface CabinetRecord {
@@ -23,12 +23,14 @@ export function OfficeCabinetWindow({
   onOpenWorkspaceFiles,
   onOpenRecord,
   onClose,
+  coworkerAssets,
 }: {
   group: OfficeRoomSnapshot
   roomName: string
   onOpenWorkspaceFiles: () => void
   onOpenRecord: (employee: OfficeFloorEmployee, item: OfficeDrawerItem) => void
   onClose: () => void
+  coworkerAssets?: ReadonlyMap<string, OfficeCoworkerSpriteAsset>
 }) {
   const { t } = useTranslation()
   const records = useMemo(() => employeesForOffice(group.employees)
@@ -156,7 +158,10 @@ export function OfficeCabinetWindow({
                         <time dateTime={new Date(item.at).toISOString()}>{relativeTime}</time>
                       </small>
                       <small>{t('office.cabinetRecordOwner', {
-                        name: officeCoworkerCallsign(employee, coworkerCast.get(employee.resumeId)),
+                        name: officeCoworkerCallsign(
+                          employee,
+                          coworkerAssets?.get(employee.resumeId) ?? coworkerCast.get(employee.resumeId),
+                        ),
                       })}</small>
                     </span>
                     <span className="oa-office-cabinet-window__destination" aria-hidden>

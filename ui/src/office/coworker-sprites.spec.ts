@@ -61,6 +61,23 @@ describe('Office coworker sprite registry', () => {
     )
   })
 
+  it('retains established cast identities when a new coworker joins', () => {
+    const originalMembers = ['g5', 'g4', 'g3', 'g2'].map((resumeId) => ({
+      resumeId,
+      agent: 'grok',
+    }))
+    const original = officeCoworkerCast(originalMembers)
+    const joined = officeCoworkerCast(
+      [{ resumeId: 'g6', agent: 'grok' }, ...originalMembers],
+      original,
+    )
+
+    for (const member of originalMembers) {
+      expect(joined.get(member.resumeId)).toBe(original.get(member.resumeId))
+    }
+    expect(new Set(Array.from(joined.values(), (asset) => asset.id)).size).toBe(5)
+  })
+
   it('keeps aliases intentional and unknown runtimes stable without returning Alice', () => {
     expect(officeCoworkerSpriteForAgent('cursor-agent')).toBe(OFFICE_COWORKER_SPRITES.codex)
     expect(officeCoworkerSpriteForAgent('omp')).toBe(OFFICE_COWORKER_SPRITES.opencode)

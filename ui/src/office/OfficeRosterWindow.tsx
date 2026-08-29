@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 
 import type { OfficeFloorEmployee, OfficeRoomSnapshot } from '../api/office'
 import { employeesForOffice } from './desk-slots'
-import { officeCoworkerCast } from './coworker-sprites'
+import { officeCoworkerCast, type OfficeCoworkerSpriteAsset } from './coworker-sprites'
 import { OfficeCoworkerSprite } from './OfficeCoworkerSprite'
 import { OfficeWindowControlGlyph } from './OfficeWindowControlGlyph'
 import { officePixelImg } from './furniture'
@@ -18,12 +18,14 @@ export function OfficeRosterWindow({
   focusResumeId,
   onSelect,
   onClose,
+  coworkerAssets,
 }: {
   group: OfficeRoomSnapshot
   roomName: string
   focusResumeId?: string | null
   onSelect: (employee: OfficeFloorEmployee) => void
   onClose: () => void
+  coworkerAssets?: ReadonlyMap<string, OfficeCoworkerSpriteAsset>
 }) {
   const { t } = useTranslation()
   const reducedMotion = useReducedMotion()
@@ -113,7 +115,7 @@ export function OfficeRosterWindow({
           }}
         >
           {employees.map((employee) => {
-            const asset = coworkerCast.get(employee.resumeId)
+            const asset = coworkerAssets?.get(employee.resumeId) ?? coworkerCast.get(employee.resumeId)
             const callsign = officeCoworkerCallsign(employee, asset)
             const assignment = officeCoworkerAssignment(employee)
             return (

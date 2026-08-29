@@ -1,10 +1,10 @@
-import { useMemo } from 'react'
+import { useLayoutEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { OfficeFloorEmployee, OfficeRoomSnapshot } from '../api/office'
 import { OfficeDesk } from './OfficeDesk'
-import { officeCoworkerCast } from './coworker-sprites'
-import { deskSlotsForOffice, visibleEmployeesForOffice } from './desk-slots'
+import { officeCoworkerCast, type OfficeCoworkerSpriteAsset } from './coworker-sprites'
+import { stableDeskSlotsForOffice } from './desk-slots'
 import { OFFICE_FURNITURE, officePixelImg } from './furniture'
 import { OFFICE_CABINET_CENTER, OFFICE_DESK_CENTERS, officeRosterCenter } from './pod-geometry'
 import { officeDepthAt } from './scene-depth'
@@ -26,6 +26,7 @@ export function OfficeMapPod({
   nearbyTargetId,
   routeTargetId,
   replayFocusResumeId,
+  coworkerAssets,
 }: {
   group: OfficeRoomSnapshot
   layout: { x: number; y: number; width: number; height: number }
@@ -43,12 +44,19 @@ export function OfficeMapPod({
   nearbyTargetId?: string | null
   routeTargetId?: string | null
   replayFocusResumeId?: string | null
+  coworkerAssets?: ReadonlyMap<string, OfficeCoworkerSpriteAsset>
 }) {
   const { t } = useTranslation()
-  const coworkerCast = useMemo(() => officeCoworkerCast(group.employees), [group.employees])
-  const visibleEmployees = visibleEmployeesForOffice(group.employees)
-  const slots = deskSlotsForOffice(visibleEmployees, 4)
-  const additionalCount = Math.max(0, group.employees.length - visibleEmployees.length)
+  const localCoworkerCast = useMemo(() => officeCoworkerCast(group.employees), [group.employees])
+  const previousSeatIdsRef = useRef<readonly (string | null)[]>([])
+  const slots = useMemo(
+    () => stableDeskSlotsForOffice(group.employees, previousSeatIdsRef.current, 4),
+    [group.employees],
+  )
+  useLayoutEffect(() => {
+    previousSeatIdsRef.current = slots.map((employee) => employee?.resumeId ?? null)
+  }, [slots])
+  const additionalCount = Math.max(0, group.employees.length - slots.filter(Boolean).length)
   const activeCount = group.employees.filter((employee) => employee.mood !== 'idle').length
   const awakeCount = group.employees.filter((employee) => employee.awake).length
   const statusLabel = interactionDisabled
@@ -150,7 +158,9 @@ export function OfficeMapPod({
               reducedMotion={reducedMotion}
               interactionDisabled={interactionDisabled}
               spriteScale={0.23}
-              coworkerAsset={employee ? coworkerCast.get(employee.resumeId) : undefined}
+              coworkerAsset={employee
+                ? coworkerAssets?.get(employee.resumeId) ?? localCoworkerCast.get(employee.resumeId)
+                : undefined}
               onSelect={() => employee && onSelectEmployee(group.workspace.id, employee)}
               onOpen={() => employee && onOpenEmployee(group.workspace.id, employee)}
             />
