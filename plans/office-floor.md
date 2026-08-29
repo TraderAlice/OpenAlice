@@ -893,6 +893,10 @@ Alice-overworld animation follow-up (2026-08-29):
 - `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
 - `pnpm test` passed: 601 files / 5011 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
+- The preceding route increment's Linux and Windows CI both exposed the same near-boundary test timeout: the
+  reduced-motion sign route completed locally just under Testing Library's one-second default while saturated
+  runners missed it. The interaction assertion now carries an explicit ten-second asynchronous-route budget;
+  the focused Office page spec passes 1 file / 4 tests locally.
 
 ## Completion
 

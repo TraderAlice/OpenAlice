@@ -124,7 +124,7 @@ describe('OfficePage localization', () => {
 
     await vi.waitFor(() => {
       expect(screen.getByRole('dialog', { name: '档案柜 · chat' })).toBeTruthy()
-    })
+    }, { timeout: 10_000 })
     expect(screen.getByText('这里还没有归档任何工位记录。')).toBeTruthy()
     expect(openOrFocusMock).not.toHaveBeenCalled()
     expect(container.querySelector<HTMLElement>('.oa-office-scene')?.hasAttribute('inert')).toBe(true)
