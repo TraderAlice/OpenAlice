@@ -12,6 +12,7 @@ describe('OFFICE_HUD_ASSETS', () => {
   it('ships generated RGBA pixel controls', () => {
     expect(OFFICE_HUD_ASSETS.menuTerminal).toBe('/office/hud/menu-terminal-v2.png')
     expect(OFFICE_HUD_ASSETS.movePad).toBe('/office/hud/move-pad-v2.png')
+    expect(OFFICE_HUD_ASSETS.actionButton).toBe('/office/hud/action-button-v1.png')
     expect(OFFICE_HUD_ASSETS.resetCompass).toBe('/office/hud/reset-compass-v2.png')
     expect(OFFICE_HUD_ASSETS.groupGrid).toBe('/office/hud/group-grid-v2.png')
     expect(OFFICE_HUD_ASSETS.occupancyLog).toBe('/office/hud/occupancy-log-v2.png')
@@ -23,13 +24,14 @@ describe('OFFICE_HUD_ASSETS', () => {
     expect(OFFICE_HUD_ASSETS.talkBubble).toBe('/office/hud/talk-bubble-v2.png')
     expect(OFFICE_HUD_ASSETS.windowBack).toBe('/office/hud/window-back-v2.png')
 
-    for (const url of Object.values(OFFICE_HUD_ASSETS)) {
+    for (const [name, url] of Object.entries(OFFICE_HUD_ASSETS)) {
       const bytes = readFileSync(resolve(publicRoot, url.replace(/^\//, '')))
       expect([...bytes.subarray(0, 8)]).toEqual(PNG_MAGIC)
       expect(bytes[25]).toBe(6) // PNG color type 6: RGBA.
       expect(bytes.byteLength).toBeGreaterThan(1000)
-      expect(bytes.readUInt32BE(16)).toBe(48)
-      expect(bytes.readUInt32BE(20)).toBe(48)
+      const expectedSize = name === 'actionButton' ? 72 : 48
+      expect(bytes.readUInt32BE(16)).toBe(expectedSize)
+      expect(bytes.readUInt32BE(20)).toBe(expectedSize)
     }
   })
 })

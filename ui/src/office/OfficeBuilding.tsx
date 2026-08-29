@@ -323,7 +323,7 @@ export function OfficeBuilding({
     }
   }
   const activateNearbyTarget = () => {
-    if (!nearbyTarget || selected) return
+    if (!nearbyTarget || selected || interactionSuspended) return
     activateTarget(nearbyTarget)
   }
   function cancelAutoWalk() {
@@ -829,7 +829,10 @@ export function OfficeBuilding({
                 <span className="oa-office-interact-prompt__copy" aria-hidden>
                   <strong>{promptPresentation.action}</strong>
                 </span>
-                <kbd aria-hidden>{t('office.interactKey')}</kbd>
+                <kbd aria-hidden>
+                  <span data-input="keyboard">{t('office.interactKey')}</span>
+                  <span data-input="touch">{t('office.touchActionKey')}</span>
+                </kbd>
               </span>
             </div>
           )}
@@ -878,6 +881,21 @@ export function OfficeBuilding({
             />
           ))}
         </div>
+        <button
+          type="button"
+          className="oa-office-touch-action"
+          data-ready={Boolean(nearbyTarget) && !selected && !interactionSuspended}
+          disabled={!nearbyTarget || Boolean(selected) || interactionSuspended}
+          aria-label={nearbyTarget && promptPresentation
+            ? promptPresentation.label
+            : t('office.touchActionUnavailable')}
+          onClick={(event) => {
+            event.stopPropagation()
+            activateNearbyTarget()
+          }}
+        >
+          <img src={OFFICE_HUD_ASSETS.actionButton} alt="" aria-hidden style={officePixelImg} />
+        </button>
       </div>
     </div>
   )

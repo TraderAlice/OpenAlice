@@ -1866,6 +1866,8 @@ export const ja: Resources = {
     cabinetEmpty: 'まだデスク記録は保管されていません。',
     openWorkspaceFiles: 'Workspace ファイルへ進む',
     interactKey: 'Enter',
+    touchActionKey: 'A',
+    touchActionUnavailable: '近くに操作対象がありません',
     interactNow: '操作：{{action}}',
     interactTalk: '{{name}} と話す',
     interactFiles: '{{name}} のファイルを確認',

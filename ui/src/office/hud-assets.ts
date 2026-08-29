@@ -2,6 +2,7 @@
 export const OFFICE_HUD_ASSETS = {
   menuTerminal: '/office/hud/menu-terminal-v2.png',
   movePad: '/office/hud/move-pad-v2.png',
+  actionButton: '/office/hud/action-button-v1.png',
   resetCompass: '/office/hud/reset-compass-v2.png',
   groupGrid: '/office/hud/group-grid-v2.png',
   occupancyLog: '/office/hud/occupancy-log-v2.png',

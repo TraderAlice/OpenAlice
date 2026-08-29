@@ -1873,6 +1873,8 @@ export const zhHant: Resources = {
     cabinetEmpty: '這裡還沒有歸檔任何工位記錄。',
     openWorkspaceFiles: '進入 Workspace 檔案',
     interactKey: 'Enter',
+    touchActionKey: 'A',
+    touchActionUnavailable: '附近沒有可執行動作',
     interactNow: '互動：{{action}}',
     interactTalk: '和 {{name}} 對話',
     interactFiles: '查看 {{name}} 檔案',

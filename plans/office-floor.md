@@ -1226,6 +1226,31 @@ Portrait-viewport follow-up (2026-08-29):
 - `pnpm test` passed: 604 files / 5023 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Touch-action follow-up (2026-08-29):
+
+- Played the phone-sized Menu, Occupancy log, roster, and both filing-cabinet states after the portrait pass. Their
+  bounds, internal scrolling, and dismissal behavior held at 390x844, but the floor exposed only a left-thumb D-pad;
+  its nearby prompt still asked touch players to press `Enter` and supplied no controller-native action.
+- Compared relabelling the prompt as `Tap`, making the world prompt itself clickable, and adding one right-thumb
+  action button. Chose the native A button because a text-only hint does not complete the touch loop, while turning
+  the floating prompt into a target would duplicate the object hit area and reintroduce ambiguous click ownership.
+- Used the built-in image generator with the shipped D-pad and Office style master as references to author one round,
+  raised pixel-art A button. The prompt required a single exact `A`, transparent background, hard pixels, the locked
+  charcoal/teal/cream palette, and no controller body, glow, UI, or extra objects. The result is hard-alpha packaged
+  as `action-button-v1.png` on a native 72x72 RGBA canvas for its primary touch hit target.
+- The phone controller now follows a conventional two-thumb layout: movement remains on the left and A sits on the
+  right. A is disabled when no world action is available, adopts the exact nearby target's accessible name when
+  active, and invokes the same guarded employee, sign, cabinet, roster, or Operations activation used by Enter.
+  Nearby prompts retain `Enter` on desktop and switch their visible keycap to `A` at the touch breakpoint.
+- Browser-played the complete 390x844 touch loop: D-pad reset, left-left-down-down-down to the Semis filing cabinet,
+  prompt activation, and A-button click. The prompt rendered `FILES A`, the 72px control changed from muted to active,
+  and clicking it opened the existing compact one-record cabinet without a second navigation or dialog path. At
+  1280x720 both touch controls remained hidden and the page retained 0px horizontal overflow.
+- Focused HUD and Building specs passed: 2 files / 9 tests.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 604 files / 5023 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

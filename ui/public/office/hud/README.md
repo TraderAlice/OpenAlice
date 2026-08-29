@@ -4,6 +4,7 @@ These generated RGBA PNGs are the game-art layer for the Office map controls.
 Live labels, button behavior, focus rings, and accessible names remain DOM-owned.
 
 - `move-pad-v2.png` — four-way movement tutorial icon
+- `action-button-v1.png` — right-thumb nearby action control
 - `reset-compass-v2.png` — map recenter control
 - `menu-terminal-v2.png` — pause-menu trigger and title icon
 - `group-grid-v2.png` — all-Workspace-groups floor mode
@@ -19,5 +20,6 @@ Live labels, button behavior, focus rings, and accessible names remain DOM-owned
 All assets use `docs/assets/office/style-master-v1.png` as their visual reference.
 The command glyphs are separate transparent images so their silhouettes remain
 legible at UI size and their accessible labels stay DOM-owned. The generated
-masters are packaged onto shared native 48x48 RGBA canvases with nearest-neighbor
-sampling and hard alpha; full-resolution 128x128 sources are not shipped.
+masters are packaged onto native RGBA canvases with nearest-neighbor sampling and
+hard alpha. Command icons use 48x48 canvases; the primary touch action uses 72x72
+for its larger hit target. Full-resolution generated sources are not shipped.

@@ -3540,6 +3540,10 @@
   text-transform: uppercase;
 }
 
+.oa-office-interact-prompt kbd [data-input='touch'] {
+  display: none;
+}
+
 .oa-office-interact-prompt__copy {
   position: relative;
   z-index: 1;
@@ -3600,6 +3604,49 @@
 .oa-office-touch-dpad button:is(:hover, :focus-visible, :active) {
   background: color-mix(in srgb, var(--gba-water) 32%, transparent);
   box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--gba-cream) 60%, transparent);
+}
+
+.oa-office-touch-action {
+  position: absolute;
+  right: 14px;
+  bottom: 52px;
+  z-index: 15;
+  display: none;
+  width: 72px;
+  height: 72px;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  cursor: pointer;
+  filter: drop-shadow(3px 4px 0 color-mix(in srgb, var(--gba-ink) 28%, transparent));
+  touch-action: manipulation;
+  transition: opacity 100ms steps(2, end), transform 100ms steps(2, end);
+}
+
+.oa-office-touch-action img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.oa-office-touch-action:not(:disabled):is(:hover, :focus-visible, :active) {
+  filter:
+    drop-shadow(3px 4px 0 color-mix(in srgb, var(--gba-ink) 28%, transparent))
+    brightness(1.12);
+  transform: translateY(2px);
+}
+
+.oa-office-touch-action:focus-visible {
+  outline: 3px solid var(--gba-cream);
+  outline-offset: 2px;
+}
+
+.oa-office-touch-action:disabled {
+  cursor: default;
+  filter: grayscale(0.7) drop-shadow(2px 3px 0 color-mix(in srgb, var(--gba-ink) 22%, transparent));
+  opacity: 0.42;
 }
 
 @keyframes oa-office-interact-in {
@@ -4821,6 +4868,18 @@
 @container (max-width: 760px) {
   .oa-office-touch-dpad {
     display: grid;
+  }
+
+  .oa-office-touch-action {
+    display: block;
+  }
+
+  .oa-office-interact-prompt kbd [data-input='keyboard'] {
+    display: none;
+  }
+
+  .oa-office-interact-prompt kbd [data-input='touch'] {
+    display: inline;
   }
 
   .oa-office-map-controls__move {

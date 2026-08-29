@@ -1898,6 +1898,8 @@ export const en = {
     cabinetEmpty: 'No desk records have been filed here yet.',
     openWorkspaceFiles: 'Enter Workspace files',
     interactKey: 'Enter',
+    touchActionKey: 'A',
+    touchActionUnavailable: 'No nearby action',
     interactNow: 'Interact: {{action}}',
     interactTalk: 'Talk to {{name}}',
     interactFiles: 'Inspect {{name}} files',

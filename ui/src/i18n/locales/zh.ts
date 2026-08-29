@@ -1865,6 +1865,8 @@ export const zh: Resources = {
     cabinetEmpty: '这里还没有归档任何工位记录。',
     openWorkspaceFiles: '进入 Workspace 文件',
     interactKey: '回车',
+    touchActionKey: 'A',
+    touchActionUnavailable: '附近没有可执行动作',
     interactNow: '互动：{{action}}',
     interactTalk: '和 {{name}} 对话',
     interactFiles: '查看 {{name}} 文件',
