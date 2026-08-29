@@ -55,6 +55,14 @@ describe('CLI installer dev publication workflow', () => {
     expect(acceptance).toContain('--npm-only')
   })
 
+  it('repeats npm and Bun lifecycle acceptance on every dev target', () => {
+    const build = workflow.jobs['build-dev-cli']
+    const acceptance = step(build, 'Accept npm and Bun installs from the dev native candidate').run ?? ''
+    expect(acceptance).toContain('--manager npm')
+    expect(acceptance).toContain('--manager bun')
+    expect(acceptance).toContain('--expected-content-identity')
+  })
+
   it('validates candidates before uploading immutable assets and fixed aliases', () => {
     const publish = workflow.jobs['publish-dev-cli']
     expect(publish.needs).toBe('build-dev-cli')
