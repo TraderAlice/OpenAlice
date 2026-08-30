@@ -4,6 +4,7 @@ import { Bot, CheckCircle2, ChevronDown, CircleAlert, ExternalLink, Eye, EyeOff,
 import { useTranslation } from 'react-i18next'
 import { api, type ConnectorDefinition, type ConnectorHealth, type PublicConnectorConfig } from '../api'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { ConnectorDiagnosticDetails } from '../components/ConnectorDiagnosticDetails'
 import { PageHeader } from '../components/PageHeader'
 import { SaveIndicator } from '../components/SaveIndicator'
 import { RecoverySurface, RefreshNotice, Skeleton } from '../components/StateViews'
@@ -1252,6 +1253,7 @@ function SetupStatePanel({
   const Icon = presentation.icon
   const running = setup.stage === 'starting' || setup.stage === 'awaiting_link' || setup.stage === 'linked' || setup.stage === 'error'
   const canRun = setup.stage !== 'needs_credentials'
+  const runtimeDiagnostic = runtime?.lastError ?? runtime?.detail
 
   return (
     <section className={`oa-status-surface rounded-xl border border-l-2 px-3.5 py-3 ${presentation.container}`}>
@@ -1318,6 +1320,21 @@ function SetupStatePanel({
           </div>
         )}
       </div>
+      {setup.stage === 'error'
+        && runtimeDiagnostic
+        && runtimeDiagnostic !== 'Adapter is configured but not running.' && (
+        <ConnectorDiagnosticDetails summary={t('connectorStatus.technicalDetails')}>
+          <span>{runtimeDiagnostic}</span>
+          {runtime?.nextAttemptAt && (
+            <span className="mt-1 block text-muted-foreground">
+              {t('connectorStatus.nextRetryAt', {
+                time: formatConnectorDate(runtime.nextAttemptAt),
+                count: runtime.consecutiveFailures ?? 1,
+              })}
+            </span>
+          )}
+        </ConnectorDiagnosticDetails>
+      )}
       {testing === definition.id && (
         <div
           role="status"
@@ -1451,7 +1468,12 @@ function runtimeErrorDescription(
   if (detail === 'Adapter is configured but not running.') {
     return t('connectorSettings.stage.error.configuredNotRunning', { name: label })
   }
-  return detail ?? t('connectorSettings.stage.error.description', { name: label })
+  return t('connectorSettings.stage.error.description', { name: label })
+}
+
+function formatConnectorDate(value: string): string {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
 }
 
 function HealthBadge({ health, t }: { health: ConnectorHealth | null; t: TFunction }) {

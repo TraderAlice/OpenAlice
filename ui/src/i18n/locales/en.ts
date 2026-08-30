@@ -2271,7 +2271,7 @@ export const en = {
         title: 'Needs attention',
         badge: 'Unavailable',
         configuredNotRunning: 'The {{name}} bot is configured but is not running.',
-        description: 'The {{name}} adapter could not start. Check the credentials and Connector logs.',
+        description: '{{name}} could not connect. Reconnect now; if it keeps failing, review the connection details below.',
       },
     },
   },

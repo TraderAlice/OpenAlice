@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import type { TFunction } from 'i18next'
 import {
   ArrowRight,
@@ -22,6 +22,7 @@ import type {
   PublicConnectorConfig,
 } from '../api'
 import { ConfigurationDialog } from '../components/ConfigurationDialog'
+import { ConnectorDiagnosticDetails } from '../components/ConnectorDiagnosticDetails'
 import { PageHeader } from '../components/PageHeader'
 import { SaveIndicator } from '../components/SaveIndicator'
 import { RecoverySurface, RefreshNotice, Skeleton } from '../components/StateViews'
@@ -342,9 +343,9 @@ function ConnectorOverview({
             </div>
           </div>
           {snapshot.health.lastError && !snapshot.health.service && (
-            <DiagnosticDetails summary={t('connectorStatus.technicalDetails')}>
+            <ConnectorDiagnosticDetails summary={t('connectorStatus.technicalDetails')}>
               {snapshot.health.lastError}
-            </DiagnosticDetails>
+            </ConnectorDiagnosticDetails>
           )}
         </section>
       )}
@@ -568,7 +569,7 @@ function ConnectorOverviewCard({
       )}
 
       {(runtime?.detail || runtime?.lastError) && (
-        <DiagnosticDetails summary={t('connectorStatus.technicalDetails')}>
+        <ConnectorDiagnosticDetails summary={t('connectorStatus.technicalDetails')}>
           <span>{runtime.lastError ?? runtime.detail}</span>
           {runtime.nextAttemptAt && (
             <span className="mt-1 block text-muted-foreground">
@@ -578,7 +579,7 @@ function ConnectorOverviewCard({
               })}
             </span>
           )}
-        </DiagnosticDetails>
+        </ConnectorDiagnosticDetails>
       )}
 
       <div
@@ -784,20 +785,6 @@ function ConnectorGlyph({ id }: { id: string }) {
     >
       <Icon size={18} />
     </span>
-  )
-}
-
-function DiagnosticDetails({ summary, children }: { summary: string; children: ReactNode }) {
-  return (
-    <details className="group/details mt-3 border-t border-border/60 pt-3 text-[11.5px]">
-      <summary className="oa-pressable flex w-fit cursor-pointer list-none items-center gap-2 font-medium text-muted-foreground hover:text-foreground">
-        <CircleAlert size={13} aria-hidden />
-        {summary}
-      </summary>
-      <div className="mt-2 break-words pl-5 leading-5 text-destructive">
-        {children}
-      </div>
-    </details>
   )
 }
 

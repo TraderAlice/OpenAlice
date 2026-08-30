@@ -478,6 +478,17 @@ external adapters remain optional projections rather than sources of truth.
     action. Setup, link, and recovery stages retain their instructional copy,
     where the link state is part of the task rather than repeated evidence. The
     English and Chinese surfaces share this same information hierarchy.
+41. **Runtime errors use one progressive-disclosure hierarchy.** Full Settings
+    currently promotes raw adapter messages such as a 30,000 ms polling timeout
+    into the primary lifecycle sentence, while Overview keeps the same evidence
+    under Technical details. Replacing raw text with only a generic sentence
+    would remove useful diagnosis; leaving it inline makes implementation
+    language compete with recovery. The chosen model gives Settings a friendly,
+    actionable error sentence and moves the raw message plus retry timing into
+    the same shared Connector diagnostic disclosure used by Overview. The
+    disclosure summary itself has a 40 px target. The known configured-but-not-
+    running condition retains its dedicated product sentence and does not repeat
+    the implementation string as technical evidence.
 
 ## Ordered Work
 
@@ -564,6 +575,8 @@ external adapters remain optional projections rather than sources of truth.
         40 px interaction target.
   - [x] Separate overview lifecycle impact copy from persistent connection
         evidence in English and Chinese.
+  - [x] Share progressive technical details between Overview and Settings error
+        states without exposing raw failures as primary copy.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -975,6 +988,21 @@ rendered delivery impact without repeating its retained link evidence. At 1,052
 x 734 the same hierarchy remained legible, and document width exactly matched
 both viewports. No Connector control or external action was invoked; the
 temporary audit tab was closed and the viewport was reset.
+
+The shared-error-disclosure increment passed 40 focused overview and demo-route
+tests, UI and root typechecking, the production build, and all 5,126 repository
+tests. Both surfaces now use one Connector diagnostic component whose summary
+has a 40 px target. The Settings contract proves a degraded Telegram lifecycle
+renders the product recovery sentence while retaining `offline` only inside a
+closed Technical details element. In the real full Settings route at 1,052 x
+734, Telegram's main sentence became `Telegram could not connect. Reconnect
+now; if it keeps failing, review the connection details below.` while the raw
+30,000 ms polling timeout and retry attempt 243 remained in the closed detail.
+At 390 x 844, the closed detail had zero visible raw-content height and a 40 px
+summary; opening it revealed the timeout and retry attempt 244 without changing
+the primary sentence or overflowing the 390 px document. No field, switch,
+send, reconnect, or external action was invoked; the temporary audit tab was
+closed and the viewport was reset.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.

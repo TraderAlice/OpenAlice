@@ -357,9 +357,13 @@ The surfaces deliberately have different jobs:
   both the dialog and full Settings document; larger disclosures and Chat
   actions retain their 44–48 px targets.
   Every later lifecycle stage retains its panel for runtime, linking, test, or
-  recovery actions. The shared dialog sizes to short content on desktop and
-  bounds long forms with internal scrolling; narrow viewports keep a near-full-
-  height shell so controls remain usable around virtual keyboards. Once linked,
+  recovery actions. Error panels keep the primary sentence actionable and put
+  raw adapter messages plus retry timing in the same 40 px Technical details
+  disclosure used by Overview. The known configured-but-not-running state keeps
+  its dedicated product sentence without repeating the implementation string.
+  The shared dialog sizes to short content on desktop and bounds long forms with
+  internal scrolling; narrow viewports keep a near-full-height shell so controls
+  remain usable around virtual keyboards. Once linked,
   the lifecycle panel keeps routine availability
   and test controls visible; Unlink lives inside Connection details beside token
   replacement/removal and explains that sealed credentials remain available.

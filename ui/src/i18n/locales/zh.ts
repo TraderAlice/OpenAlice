@@ -2238,7 +2238,7 @@ export const zh: Resources = {
         title: '需要处理',
         badge: '不可用',
         configuredNotRunning: '{{name}} 机器人已配置，但当前未运行。',
-        description: '{{name}} 适配器无法启动。请检查凭据与连接器日志。',
+        description: '{{name}} 无法连接。请立即重新连接；如果仍然失败，请检查下方连接详情。',
       },
     },
   },

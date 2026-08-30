@@ -111,7 +111,9 @@ describe('Connector demo routes', () => {
     render(<ConnectorStatusPage />)
     const diagnostics = (await screen.findByText('Technical details')).closest('details') as HTMLDetailsElement
     expect(diagnostics.open).toBe(false)
-    fireEvent.click(within(diagnostics).getByText('Technical details'))
+    const diagnosticSummary = within(diagnostics).getByText('Technical details').closest('summary') as HTMLElement
+    expect(diagnosticSummary.className).toContain('min-h-10')
+    fireEvent.click(diagnosticSummary)
     expect(diagnostics.open).toBe(true)
     fireEvent.click(await screen.findByRole('button', { name: 'Reconnect' }))
 
@@ -139,10 +141,51 @@ describe('Connector demo routes', () => {
 
     render(<ConnectorsPage />)
     const reconnect = await screen.findByRole('button', { name: 'Reconnect' })
+    const lifecycle = reconnect.closest('section') as HTMLElement
+    expect(within(lifecycle).getByText(
+      'Telegram could not connect. Reconnect now; if it keeps failing, review the connection details below.',
+    )).toBeTruthy()
+    const diagnostics = within(lifecycle).getByText('Technical details').closest('details') as HTMLDetailsElement
+    expect(diagnostics.open).toBe(false)
+    expect(within(diagnostics).getByText('offline')).toBeTruthy()
+    expect(within(diagnostics).getByText('Technical details').closest('summary')?.className).toContain('min-h-10')
     expect(reconnect.className).toContain('min-h-10')
     fireEvent.click(reconnect)
 
     await waitFor(() => expect(mocks.reconnect).toHaveBeenCalledWith('telegram'))
+  })
+
+  it('keeps a known stopped-adapter condition in product language only', async () => {
+    const snapshot = createDemoConnectorSnapshot()
+    snapshot.config.serviceEnabled = true
+    snapshot.config.adapters.telegram = {
+      enabled: true,
+      settings: {},
+      configuredSecrets: ['botToken'],
+    }
+    snapshot.health = {
+      enabled: true,
+      status: 'degraded',
+      service: {
+        status: 'degraded',
+        startedAt: '2026-08-23T00:00:00.000Z',
+        adapters: [{
+          id: 'telegram',
+          enabled: true,
+          status: 'stopped',
+          detail: 'Adapter is configured but not running.',
+        }],
+      },
+    }
+    mocks.load.mockResolvedValue(snapshot)
+
+    render(<ConnectorsPage />)
+
+    const lifecycle = (await screen.findByText(
+      'The Telegram bot is configured but is not running.',
+    )).closest('section') as HTMLElement
+    expect(within(lifecycle).queryByText('Technical details')).toBeNull()
+    expect(within(lifecycle).queryByText('Adapter is configured but not running.')).toBeNull()
   })
 
   it('localizes the read-only operations route', async () => {
