@@ -1913,6 +1913,7 @@ export const ja: Resources = {
     interactTalk: '{{name}} と話す',
     interactCheck: '{{name}} を確認',
     interactFailure: '{{name}} の失敗した実行を確認',
+    interactResult: '{{name}} の最新結果を確認',
     interactWorkspace: '{{name}} Workspace に入る',
     interactFiles: '{{name}} のファイルを確認',
     interactRoster: '{{name}} の名簿を見る',

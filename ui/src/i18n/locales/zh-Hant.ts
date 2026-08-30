@@ -1920,6 +1920,7 @@ export const zhHant: Resources = {
     interactTalk: '和 {{name}} 對話',
     interactCheck: '查看 {{name}}',
     interactFailure: '檢視 {{name}} 的失敗執行',
+    interactResult: '查看 {{name}} 的最新結果',
     interactWorkspace: '進入 {{name}} Workspace',
     interactFiles: '查看 {{name}} 檔案',
     interactRoster: '查看 {{name}} 名冊',

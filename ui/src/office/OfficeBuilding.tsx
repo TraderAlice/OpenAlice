@@ -20,7 +20,11 @@ import { OFFICE_HUD_ASSETS } from './hud-assets'
 import { officeInteractionPath, type OfficeInteractionPathStep } from './interaction-path'
 import { OFFICE_LOG_ASSETS } from './log-assets'
 import { OfficeAliceSprite, type OfficeAliceDirection } from './OfficeAliceSprite'
-import { officeCoworkerCast, type OfficeCoworkerSpriteAsset } from './coworker-sprites'
+import {
+  OFFICE_COWORKER_EMOTES,
+  officeCoworkerCast,
+  type OfficeCoworkerSpriteAsset,
+} from './coworker-sprites'
 import {
   OfficeCollisionImpact,
   officeCollisionImpactPosition,
@@ -553,6 +557,7 @@ export function OfficeBuilding({
         coworkerAssets.get(nearbyTarget.employee.resumeId),
       )
       const failed = nearbyTarget.employee.mood === 'failed'
+      const hasFreshResult = nearbyTarget.employee.mood === 'review'
       const canTalk = nearbyTarget.employee.awake
       const interaction = failed
         ? {
@@ -560,17 +565,23 @@ export function OfficeBuilding({
             action: t('office.interactActionReview'),
             label: t('office.interactFailure', { name: target }),
           }
-        : canTalk
+        : hasFreshResult
           ? {
-              icon: OFFICE_HUD_ASSETS.talkBubble,
-              action: t('office.interactActionTalk'),
-              label: t('office.interactTalk', { name: target }),
+              icon: OFFICE_COWORKER_EMOTES.review,
+              action: t('office.interactActionReview'),
+              label: t('office.interactResult', { name: target }),
             }
-          : {
-              icon: OFFICE_HUD_ASSETS.rosterBadge,
-              action: t('office.interactActionCheck'),
-              label: t('office.interactCheck', { name: target }),
-            }
+          : canTalk
+            ? {
+                icon: OFFICE_HUD_ASSETS.talkBubble,
+                action: t('office.interactActionTalk'),
+                label: t('office.interactTalk', { name: target }),
+              }
+            : {
+                icon: OFFICE_HUD_ASSETS.rosterBadge,
+                action: t('office.interactActionCheck'),
+                label: t('office.interactCheck', { name: target }),
+              }
       return {
         ...interaction,
         detail: nearbyTarget.employee.bubble

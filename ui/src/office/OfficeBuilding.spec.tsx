@@ -1578,6 +1578,25 @@ describe('OfficeBuilding', () => {
         .toBe('/office/log/alert-v1.png')
       expect(reviewPrompt.textContent).toContain('Review')
       expect(screen.queryByRole('status', { name: /Check Grok Strategist/ })).toBeNull()
+
+      view.rerender(
+        <OfficeBuilding
+          building={{
+            ...building,
+            offices: building.offices.map((office) => ({
+              ...office,
+              employees: office.employees.map((employee) => ({ ...employee, mood: 'review' })),
+            })),
+          }}
+          {...callbacks}
+        />,
+      )
+
+      const resultPrompt = screen.getByRole('status', { name: 'Review Grok Strategist’s latest result' })
+      expect(resultPrompt.querySelector('img')?.getAttribute('src'))
+        .toBe('/office/coworkers/review-emote-v1.png')
+      expect(resultPrompt.textContent).toContain('Review')
+      expect(screen.queryByRole('status', { name: /failed run/ })).toBeNull()
     } finally {
       vi.useRealTimers()
     }

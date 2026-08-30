@@ -1912,6 +1912,7 @@ export const zh: Resources = {
     interactTalk: '和 {{name}} 对话',
     interactCheck: '查看 {{name}}',
     interactFailure: '复盘 {{name}} 的失败运行',
+    interactResult: '查看 {{name}} 的最新结果',
     interactWorkspace: '进入 {{name}} Workspace',
     interactFiles: '查看 {{name}} 文件',
     interactRoster: '查看 {{name}} 名册',

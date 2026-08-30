@@ -1945,6 +1945,7 @@ export const en = {
     interactTalk: 'Talk to {{name}}',
     interactCheck: 'Check {{name}}',
     interactFailure: 'Review {{name}}’s failed run',
+    interactResult: 'Review {{name}}’s latest result',
     interactWorkspace: 'Enter {{name}} workspace',
     interactFiles: 'Inspect {{name}} files',
     interactRoster: 'View {{name}} roster',

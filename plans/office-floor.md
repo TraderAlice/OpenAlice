@@ -5083,6 +5083,23 @@ Failed coworker action-priority follow-up (2026-08-31):
   tests (one file and nine tests skipped); the production UI build passed with only the existing ports fallback and
   large-chunk advisory.
 
+Fresh-result action-priority follow-up (2026-08-31):
+
+- Recruited two real Grok headless Sessions in `office-lab-chat` to play the full runtime lifecycle instead of relying
+  on fixtures. The read-only inventory run exercised working, text, and tool bubbles before timing out into the already
+  verified failure path. A fixed-phrase run completed successfully and moved g26 from working to the short-lived
+  `review` mood with the generated checkmark emote and a visible Latest result in its Agent file.
+- Compared leaving the success state as generic `CHECK`, making completed results permanently urgent, and matching the
+  existing transient review window. Permanent urgency would outlive the backend-owned freshness signal; generic copy
+  wastes the only moment when a new result is explicitly ready. Chose the transient RPG quest-return convention:
+  `review` uses the existing checkmark bubble and `REVIEW`, then naturally returns to neutral `CHECK` when it ages out.
+- Implemented the fresh-result priority and localized accessible label in the shared floor prompt model, with focused
+  regression coverage. Real-floor acceptance resumed the same g26 beside Alice and captured the 30-second freshness
+  window directly: the prompt rendered one checkmark-bubble `REVIEW`, included `Fresh result verified.`, and retained
+  the normal Enter action. The focused floor suite passed all 24 tests. Root and UI TypeScript passed; the full suite
+  passed all 620 test files and 5,195 tests (one file and nine tests skipped); the production UI build passed with only
+  the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
