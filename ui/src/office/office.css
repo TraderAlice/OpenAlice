@@ -2889,6 +2889,28 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
   white-space: nowrap;
 }
 
+.oa-office-cabinet-window__records strong[data-compacted='true'] {
+  display: flex;
+  min-width: 0;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.oa-office-cabinet-window__records strong[data-compacted='true'] [data-title-leading] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+.oa-office-cabinet-window__records strong[data-compacted='true'] :is(i, [data-title-trailing]) {
+  flex: none;
+  font: inherit;
+}
+
+.oa-office-cabinet-window__records strong[data-compacted='true'] i {
+  font-style: normal;
+}
+
 .oa-office-cabinet-window__records small {
   color: var(--gba-ink-soft);
 }

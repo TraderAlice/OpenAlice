@@ -177,6 +177,41 @@ describe('OfficeCabinetWindow', () => {
     expect(dialog.getAttribute('data-dense')).toBe('true')
   })
 
+  it('keeps the distinguishing suffix of long record titles visible', () => {
+    const longTitle = 'office-live-state-qa-20260831'
+    const longTitleGroup: OfficeRoomSnapshot = {
+      ...group,
+      employees: [{
+        ...group.employees[0],
+        drawers: [{
+          id: 'long-title',
+          kind: 'issue',
+          action: 'open_issue',
+          at: 30,
+          label: longTitle,
+          issueId: 'issue-long-title',
+        }],
+      }],
+    }
+    const { container } = render(
+      <OfficeCabinetWindow
+        group={longTitleGroup}
+        roomName="Semis"
+        onOpenWorkspaceFiles={vi.fn()}
+        onOpenRecord={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+
+    const title = container.querySelector<HTMLElement>(
+      '.oa-office-cabinet-window__record-copy strong',
+    )
+    expect(title?.dataset.compacted).toBe('true')
+    expect(title?.textContent).toBe('office-live-state-qa…-20260831')
+    expect(title?.getAttribute('title')).toBe(longTitle)
+    expect(screen.getByRole('button', { name: /Open office-live-state-qa-20260831/ })).toBeTruthy()
+  })
+
   it('presents Inbox artifacts as deliveries instead of raw record ids', () => {
     const inboxId = 'a74b15cc-c443-4137-960e-fca08fe0c0a4'
     const inboxGroup: OfficeRoomSnapshot = {

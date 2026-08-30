@@ -4734,6 +4734,27 @@ Pause-submenu cursor provenance follow-up (2026-08-31):
   tests. Root and UI TypeScript passed; the full suite passed all 618 test files and 5,185 tests (one file and nine tests
   skipped); the production UI build passed with only the existing ports fallback and large-chunk advisory.
 
+Filing-cabinet record identity follow-up (2026-08-31):
+
+- Played the full Live-floor facility loop through Floor terminal, Team roster, Agent file, and the Chat filing cabinet.
+  Modal return focus, nested roster Back behavior, route cancellation, and keyboard movement remained intact. The cabinet
+  exposed the next real gap: several distinct records rendered as the same `office-live-state-qa-202…` prefix, forcing
+  the player to open entries just to discover the differentiating date or run suffix.
+- Compared two-line cards, hover-only disclosure, and a compact save-menu treatment that preserves both semantic prefix
+  and unique suffix. Chose the last option. Two-line cards materially reduce the visible record grid, while hover cannot
+  help keyboard or touch players; middle compaction keeps the existing dense cabinet rhythm and makes sibling records
+  distinguishable before activation.
+- Short record names remain untouched. Long names are split on record-style separators, with date/time tails receiving
+  explicit priority; the leading segment flexes into the available width around one authored middle ellipsis. The full
+  title remains in the button's accessible name and a pointer tooltip, so the visual abbreviation does not discard data.
+- Real-browser acceptance on the 12-record Chat cabinet changed the first four ambiguous cards into distinguishable
+  combinations such as `office-live-sta…-20260831`, `office-li…-20260830-1836`, and
+  `office-li…-20260830-1835`. Each 191px title row remained exactly contained (`clientWidth === scrollWidth`), Arrow
+  Right still moved from the first record to the second full-name button, and the window closed back to a clean Live
+  floor. Focused Cabinet tests passed all 5 cases. Root and UI TypeScript passed; the full suite passed all 618 test files
+  and 5,186 tests (one file and nine tests skipped); the production UI build passed with only the existing ports fallback
+  and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
