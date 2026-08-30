@@ -101,6 +101,7 @@ interface FeishuReceiveEvent {
     sender_type?: string
   }
   message?: {
+    message_id?: string
     chat_id?: string
     chat_type?: string
     message_type?: string
