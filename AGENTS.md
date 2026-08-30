@@ -88,11 +88,19 @@ for current ownership and entry points.
 - `dev` is the integration lane. Routine PRs target `dev`.
 - `dev` is also the active preview channel: installer work must pass against
   both the checked-out tree and the matching `raw/.../dev/install` +
-  `--branch dev` network path before promotion.
-- `master` is the stable/user-facing lane. Only human-directed promotions from
-  `dev` and explicit emergency hotfixes target `master`.
-- A merge to `master` is a versioned release event, not a post-release staging
-  step. Stable CDN aliases are updated only from the resulting tag.
+  `--channel dev` network path before promotion.
+- `master` is the release-source/user-facing lane. Human-directed promotions
+  from `dev`, explicit emergency hotfixes, and focused maintainer-directed
+  version-only release-prep PRs may target `master`, but a merge to `master`
+  does not by itself choose or publish a product version.
+- Beta and stable releases are explicit manual actions. The maintainer supplies
+  a channel and tag from `master`; release automation requires that tag and both
+  product package manifests to declare the same version before it builds
+  accepted candidates, including the immutable installer snapshot. A new beta
+  release may update only beta feeds/manifests and the shared channel-neutral
+  installer, while stable CDN product aliases and package-manager metadata are
+  updated only by a stable release tag. Mirror repair never rewrites the shared
+  installer.
 - Do not commit directly to `master`. Avoid direct commits to `dev` unless the
   maintainer explicitly requests integration work.
 - Never force-push or delete `master` or `dev`.
@@ -105,10 +113,19 @@ for current ownership and entry points.
 
 Choose delivery authority before implementation:
 
+Feature-branch iteration is an explicit integration hold, not a third delivery
+mode. When the maintainer says to keep iterating on a feature branch until they
+are satisfied, keep all related increments on one owned branch and do not open
+or merge its PR to `dev` until the maintainer says it is ready. This instruction
+applies independently to serial or parallel work. It does not relax
+verification, known-failure handling, scope coherence, or the single-integrator
+rule; parallel workers still hand commits to the branch owner instead of racing
+to push it.
+
 | Mode | Trigger | Delivery to `dev` |
 |---|---|---|
-| Serial / interactive | Default: the user is actively requesting and steering concrete work | After proportional local verification, open and merge the PR without waiting for pending remote CI; delete the feature branch and return to updated `dev` unless the user says to pause |
-| Autonomous / topic contribution | Explicit `/goal` or direct request to autonomously find and contribute improvements | Keep one community-facing Draft PR for the active topic, add related work as atomic commits, and leave the topic unmerged for later acceptance |
+| Serial / interactive | Default: the user is actively requesting and steering concrete work | After proportional local verification, open and merge the PR without waiting for pending remote CI; delete the feature branch and return to updated `dev` unless the user says to pause or declares feature-branch iteration |
+| Autonomous / topic contribution | Explicit `/goal` or direct request to autonomously find and contribute improvements | Keep one community-facing Draft PR for the active topic, add related work as atomic commits, and leave the topic unmerged for later acceptance; an explicit feature-branch iteration hold delays opening that PR until the maintainer says the branch is ready |
 
 Internal agent decomposition must not become one GitHub PR per finding. Define a
 coherent topic and acceptance boundary, keep a single integrator responsible for
@@ -247,6 +264,9 @@ Read the relevant guide before editing its subsystem:
   packaging, UI installation, activation, runtime loading, and release assets.
 - [[docs/cli-installer.md]] — [CLI installer](docs/cli-installer.md): consent, installed layout,
   atomic updates, PATH integration, installer tests, and release checks.
+- [[docs/cli-package-managers.md]] — [CLI package-manager channels](docs/cli-package-managers.md):
+  npm/Bun platform packages, Homebrew and AUR metadata, provenance, update
+  ownership, and publication order.
 - [[docs/cli-supervisor.md]] — [Shell CLI Supervisor](docs/cli-supervisor.md): top-level
   Runtime lifecycle, status/JSON presentation, browser opening, completion,
   compatibility aliases, and Supervisor TUI boundary.

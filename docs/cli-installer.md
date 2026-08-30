@@ -1,813 +1,435 @@
 # CLI Installer
 
-This guide owns the OpenAlice CLI installer contract: bootstrap behavior,
-interactive consent, installed layout, update safety, PATH integration,
-platform boundaries, verification, and release checks. Update it whenever the
-root `install` script, the distributed CLI file set, or installer smoke changes.
+This guide owns the macOS/Linux OpenAlice CLI bootstrap, installed layout,
+activation, provenance, update, rollback, uninstall, and release acceptance.
+Runtime behavior after activation belongs to [[docs/local-runtime.md]]. Electron
+packaging remains independent under [[docs/managed-workspace-runtime.md]].
 
-Related guides: [[docs/local-runtime.md]],
-[[docs/cli-supervisor.md]],
-[[docs/managed-workspace-runtime.md]], and
-[[docs/development-workflow.md]]. Optional broker integration delivery belongs
-to [[docs/broker-packs.md]]. External installer research is deliberately
-non-authoritative and lives in
-[[docs/reference/install-script/README.md]].
+The current CLI payload is one target-native Bun executable plus immutable
+OpenAlice resources. The installer does not install Node.js, Bun, npm, source
+dependencies, build tools, or an Agent Runtime.
 
-## Product Boundary
+npm, Bun, Homebrew, and Arch/AUR installation consume the same accepted native
+archives but remain owned by their package manager. Their topology, commands,
+and update behavior live in [[docs/cli-package-managers.md]].
 
-The stable installer makes the `openalice` command, pinned Pi, and the matching
-platform headless Runtime available. Pi and Runtime are installed inside the
-same immutable OpenAlice release, not into a system or user-global prefix.
-Development/source-only channels can still offer Linux source-build tools, but
-only after the user selects that option and approves the exact system command.
-By default it does not:
+## Supported entry paths
 
-- clone the OpenAlice repository;
-- install or modify Electron;
-- start Alice, UTA, Connector Service, or a browser before separate consent;
-- configure credentials or install Claude Code, Codex, opencode, or other
-  user-owned agent CLIs;
-- expose a public listener;
-- remove user data during an update.
-
-`--with-runtime-deps` is deliberately narrower than a general machine setup
-mode. It covers Git, Python 3, make, and a C++ compiler because pnpm may need to
-compile native Node modules such as `node-pty`. It does not install Node,
-additional Agent CLIs, broker SDKs, credentials, Docker, or Electron. Managed
-Pi is part of the baseline OpenAlice transaction, not a Runtime-tool option.
-
-The stable browser-local distribution is bundle-backed:
-
-```text
-curl installer
-  └── immutable OpenAlice CLI + managed Pi + platform Runtime
-        ├── openalice command injects managed Pi and Runtime into Guardian
-        ├── pi command exposes the same pinned runtime directly
-        └── localhost Runtime independent of cwd
-```
-
-The install script targets macOS, Linux, WSL, and Git Bash. Native Windows
-desktop distribution remains the complete Electron installer. A future native
-PowerShell bootstrap may reuse the same installer contract, but it must not
-weaken or silently replace the Electron lane.
-
-## Current Entry Point
-
-The stable installer is served from the OpenAlice site:
+Stable direct install:
 
 ```bash
 curl -fsSL https://openalice.ai/install | bash
 ```
 
-The release workflow publishes the same bytes as a versioned GitHub Release
-asset, mirrors them to `download.openalice.ai`, records their SHA-256 in the
-download manifest, and updates the rolling `install` alias without caching it.
-The main-site route proxies that release-owned alias and refuses non-script
-upstream content.
+Beta and development channels use the same installer:
 
-The script requires Node.js 22.19.0 or newer, matching the pinned Pi runtime's
-engine floor. A release-owned installer embeds its OpenAlice version and
-selects that immutable tag; the raw development installer uses its explicit
-branch selector.
+```bash
+curl -fsSL https://openalice.ai/install | bash -s -- --channel beta
+curl -fsSL https://openalice.ai/install | bash -s -- --channel dev
+```
 
-The independently active development channel deliberately uses GitHub's raw
-branch endpoint rather than the release CDN. Both layers must select `dev`:
+The raw dev path remains a publication acceptance seam for installer changes:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/TraderAlice/OpenAlice/dev/install \
-  | bash -s -- --branch dev
+  | bash -s -- --channel dev
 ```
 
-That command tests the current dev installer script and the current dev CLI
-payload together. Running the stable `https://openalice.ai/install` script with
-`--branch dev` can be useful as a compatibility probe, but it does not prove
-that changes to `dev/install` work. The raw endpoint is mutable preview
-infrastructure for maintainers, not a user-facing release mirror.
-
-`--version` selects a tag or commit, and the two selectors are mutually
-exclusive. The default install root is `~/.openalice`, and the downloaded
-OpenAlice payload is the file set declared by `FILES` in the root `install`
-script. The installer also downloads Pi's release-owned install manifest and
-lockfile for version `0.83.0`, verifies both against pinned SHA-256 values, and
-runs `npm ci --omit=dev --ignore-scripts` in the staged release.
-
-## Load-Bearing Files
-
-- `install` — user-facing Bash bootstrap and durable install transaction.
-- `packages/cli/package.json` — CLI version, engine requirement, bin entry, and
-  published file list.
-- `packages/cli/bin/openalice.ts` — installed TypeScript application entry;
-  Node 22.19+ executes its erasable types directly.
-- `packages/cli/src/install-source.mjs` — validated installation-source
-  metadata used when managed remote reproduces the invoking CLI.
-- `packages/cli/src/supervisor-config.ts` — machine-local Supervisor and
-  selected-instance configuration loading and atomic persistence.
-- `packages/cli/src/project-command.ts` and
-  `packages/cli/src/ai-credential-copy.ts` — AliceProject list/select and
-  confirmed AI credential copy between complete homes.
-- `packages/cli/src/managed-source.ts` — installer-channel-aligned local source
-  selection, validated atomic clone, and collision refusal.
-- `packages/cli/src/install-layout.mjs` — strict discovery of installer-owned
-  roots from immutable release paths.
-- `packages/cli/src/update.mjs` — stable manifest checks, bounded start notice,
-  installer verification, and update handoff.
-- `packages/cli/src/uninstall.mjs` — installer-lock safety, PATH cleanup, and
-  the state-preserving CLI-only removal boundary.
-- `packages/cli/src/lifecycle{,-command}.mjs` — canonical top-level Runtime
-  lifecycle, structured presentation, and shell completion.
-- `packages/cli/src/{logs,doctor,observability-command}.mjs` — bounded
-  redacted log tails and read-only diagnostics shipped in the immutable CLI
-  release.
-- `packages/cli/src/server{,-control}.mjs` — detached lifecycle and the
-  legacy presenter plus Guardian control client.
-- `packages/cli/src/remote.mjs` — consent-first managed SSH orchestration.
-- `packages/cli/src/runtime-deps.mjs` — source-build tool probe and actionable
-  local-start failure.
-- `packages/cli/src/install.spec.mjs` — plan, consent, PTY, layout, and live-lock
-  contract tests.
-- `scripts/install-docker-smoke.mjs` — local Docker acceptance runner.
-- `scripts/install-channel-smoke.mjs` — clean-host acceptance for the live raw
-  dev installer and matching dev payload.
-- `scripts/remote-ssh-smoke.mjs` — local clean-host Server/SSH acceptance
-  runner; its product contract belongs to [[docs/remote-access.md]].
-- `scripts/install-smoke/` — clean user, local HTTP fixture, automated smoke,
-  manual playground, exact Pi release assets, and an offline npm fixture.
-- `.github/workflows/cli-installer-smoke.yml` — checkout acceptance on relevant
-  PRs and live raw-channel acceptance after installer changes merge to `dev`.
-- `docs/local-runtime.md` — behavior after the installed command starts a
-  source-backed localhost Runtime.
-- `docs/reference/install-script/README.md` — Claude Code and Codex research;
-  useful context, not OpenAlice truth.
-
-When a new runtime file is imported by the installed CLI, update all of the
-following together:
-
-1. `packages/cli/package.json` `files`;
-2. `FILES` in `install`;
-3. syntax or runtime validation in `install`;
-4. installer tests and Docker fixture assertions as needed.
-
-Leaving those lists out of sync produces an installer that validates locally
-but fails only after the downloaded command imports a missing file.
-
-## Installation Transaction
-
-The durable sequence is:
-
-```text
-preflight
-  -> optional source-build-tool selection
-  -> visible install plan
-  -> explicit consent
-  -> optional system package command
-  -> installer lock
-  -> download or local copy into staging
-  -> SHA-256 verification of pinned Pi manifest and lockfile
-  -> npm ci for managed Pi inside staging
-  -> syntax, manifest, Pi version, and executable validation
-  -> record branch/tag/commit installer provenance
-  -> content identity
-  -> immutable release directory
-  -> validate temporary launchers
-  -> atomically replace visible launchers
-  -> best-effort managed PATH update
-  -> verify installed command
-  -> release lock
-  -> optional, separate localhost start prompt
-```
-
-Nothing under the install root is created and no package manager is invoked
-before the install plan is approved. The `--plan` path exits immediately after
-preflight and the plan. System package managers are not transactional with the
-CLI install: a package-manager failure can leave packages partially updated,
-but it cannot publish a partial OpenAlice CLI release.
-
-### Preflight and plan
-
-Preflight validates:
-
-- the requested branch/tag/commit selector syntax and length;
-- Node.js availability and the exact `>=22.19.0` floor;
-- npm availability for the staged managed-Pi install;
-- `curl` for remote installs, or CLI sources for `--source` installs;
-- target paths and shell-profile choice;
-- whether Git, Python 3, make, and a C++ compiler are already available;
-- on Linux, the supported package manager and whether root or `sudo` is
-  available when Runtime-tool installation is selected;
-- whether another `openalice` currently resolves earlier on `PATH`.
-
-The visible plan includes action, source, branch or version, install root, both
-command paths, the pinned Pi version and source, the exact Pi npm command,
-shell change, Runtime-tool action, exact system package-manager command when
-selected, and any PATH conflict. A check that only reads the system may happen
-before consent; no installer-owned filesystem mutation may happen there.
-
-### Consent contract
-
-| Invocation | Required behavior |
-|---|---|
-| Interactive default with missing build tools | First ask whether to include the tools, then print one complete plan and ask `Continue with this install? [y/N]` |
-| Interactive default with tools ready | Print the plan and ask `Continue with this install? [y/N]`; only an explicit `y` proceeds |
-| Blank or `n` | Exit successfully without changing files |
-| No TTY and no `--yes` | Exit with code 2 before creating the install root |
-| `--yes` | Approve the baseline CLI + managed Pi transaction and only the extra actions selected by flags; never implies Runtime tools and never starts the Runtime |
-| `--with-runtime-deps` | Select missing Linux build tools; does not bypass the final confirmation |
-| `--plan` | Print the same plan and exit without opening a prompt or changing files |
-| Interactive install inside a checkout | After success, separately ask `Open the OpenAlice Supervisor now? [y/N]` |
-
-The installer reads prompts from `/dev/tty`, not the curl pipe. The
-Runtime-tool selection, final plan approval, and optional Supervisor launch are
-all default-no. They are intentionally different decisions. Opening the
-Supervisor does not start the Runtime until the user chooses Start inside the
-TUI. For automation,
-`--yes --with-runtime-deps` is the explicit pair that approves the displayed
-Linux package command as well as the CLI transaction.
-
-When no local checkout is discoverable after a source-only installation, bare
-`openalice` opens the Supervisor and Enter inspects the installed branch or
-version, shows the managed Runtime preparation plan, and continues through
-start plus browser open after consent. `m` opens the same managed-source plan
-explicitly, while `c` selects an existing checkout. Managed preparation never
-overwrites an occupied invalid path. Its first Start can install repository
-dependencies and build the source Runtime; the installer therefore discloses
-and optionally prepares the required native build tools before consent.
-
-### Source Runtime build tools
-
-The Linux package mapping is:
-
-| Manager | Packages |
-|---|---|
-| `apt-get` | `git python3 make g++` |
-| `dnf`, `yum` | `git python3 make gcc-c++` |
-| `apk` | `git python3 make g++` |
-| `pacman` | `git python make gcc` |
-
-The installer uses the package manager directly as root and prefixes it with
-`sudo` otherwise. It refuses the selected action if neither authority is
-available or if the host has no supported manager. It re-probes every tool
-after the package command and fails before downloading the CLI if the machine
-is still incomplete.
-
-On macOS, the installer detects the same tool groups but does not try to launch
-the GUI-backed Command Line Tools flow over a curl pipe or SSH session. A
-selected but incomplete setup stops with the local-session instruction
-`xcode-select --install`. Native Windows remains the Electron lane; WSL follows
-the Linux contract.
-
-### Lock and staging
-
-After consent, the installer acquires:
-
-```text
-<install-root>/.cli-install.lock/pid
-```
-
-A live PID blocks a concurrent installer. A lock without a live owner is
-treated as stale and recovered. Cleanup releases a lock owned by the current
-installer and removes temporary staging or launcher files.
-
-Downloads first land in a temporary `openalice-cli.*` directory outside the
-visible command path. A failed or interrupted download therefore leaves the
-previous installed command untouched.
-
-Managed Pi is installed under `managed/pi/` and the expanded platform Runtime
-under `managed/runtime/` in that same staging tree. npm never receives
-`--global`. The Runtime archive SHA-256 comes from release-owned metadata; its
-internal manifest then verifies platform, architecture, product version,
-entrypoint, every file hash, safe symlinks, and a 16-character content
-identity. A failure leaves the previous content-addressed release visible.
-
-### Validation and content identity
-
-Before a release becomes visible, the installer:
-
-1. runs `node --check` on every JavaScript entry;
-2. verifies that `package.json` names `@traderalice/openalice-cli` and carries a
-   string version;
-3. executes the staged CLI with `--version` and compares its result with the
-   package manifest;
-4. verifies the Pi install manifest and lockfile against the SHA-256 values
-   pinned in the installer, requires the staged Pi CLI to report `0.83.0`, and
-   resolves the pinned `@earendil-works/pi-tui` dependency from that exact
-   managed Pi closure;
-5. verifies and expands the matching headless Runtime when the selected release
-   supplies one, then requires its product version to equal the CLI version;
-6. writes `install-source.json` with the CLI version, selected
-   branch/tag/commit, installer URL, and independent update-channel policy;
-7. hashes the ordered OpenAlice CLI payload, install-source metadata, and both
-   Pi install files with SHA-256 and uses the first 16 hex characters as the
-   cross-platform CLI install content identity.
-
-That metadata is returned by `openalice version --json` together with the
-16-character identity derived from the immutable installed release directory.
-Managed `openalice remote` compares both provenance and content identity before
-deciding that a remote CLI matches, then invokes the same ordinary installer
-source and selector when it does not. This catches changed payload bytes even
-when the product version and branch name are unchanged. The platform Runtime
-keeps a separate manifest identity so a macOS CLI can match the same release's
-Linux CLI while each host still verifies its own Runtime bytes. The CLI package
-version must equal the root OpenAlice version; tests and the release workflow
-reject a mismatch. `remote` has no independent branch/version option.
-
-The resulting directory is:
-
-```text
-<install-root>/cli-versions/<safe-ref>-<content-id>/
-```
-
-Installing identical content for the same ref reuses the existing directory
-only when the content hash, executable Pi version, managed `pi-tui` dependency,
-and full Runtime manifest verification still match. If a directory claims that
-identity but its files no longer hash correctly or its managed Pi runtime is
-missing/damaged, it is preserved as
-`<release>.damaged.<pid>` and replaced with the validated staging tree. The
-installer does not silently destroy the damaged evidence.
-
-### Atomic visible-command switch
-
-The installer writes temporary `openalice`, `openalice.cmd`, `pi`, and `pi.cmd`
-launchers in the target bin directory. All point to the complete immutable
-release. It executes both temporary shell launchers before replacing any
-visible command, then moves the launchers into place within the same directory.
-The OpenAlice launchers export `OPENALICE_MANAGED_PI_PATH`,
-`OPENALICE_MANAGED_PI_NODE_PATH`, `OPENALICE_MANAGED_RUNTIME_PATH`, and
-`OPENALICE_MANAGED_RUNTIME_CONTENT_IDENTITY`; foreground and detached Guardian
-trees therefore inherit the pinned agent and application Runtime without
-relying on cwd or shell-profile reloads.
-
-This gives updates a simple safety property: a visible launcher points to the
-complete old release or the complete new release, never to a half-written
-replacement tree. The final installed launcher is executed again with
-`--version` before success is reported.
-
-Old content-addressed releases are retained during installation and update.
-There is currently no automatic garbage collection or rollback command.
-
-## Product Version and Update Lifecycle
-
-The computer-level CLI uses the OpenAlice product version from the same release:
-
-```text
-package.json#version == packages/cli/package.json#version
-```
-
-There is no second user-facing CLI version sequence. Version bumps that do not
-update both manifests fail CLI tests and release preflight.
-
-An installed stable-channel CLI checks
-`https://download.openalice.ai/manifest.json` before an interactive
-`openalice start`:
-
-- public release installers record two independent facts: the immutable
-  release tag used for the installed payload and `updateChannel: stable`;
-- legacy metadata from a public `branch master` installation at
-  `https://openalice.ai/install` remains compatible with the stable channel;
-- exact tag/commit installations remain pinned;
-- `dev` and other branch installations keep their selected development channel;
-- custom installer/mirror installations do not cross into the public trust
-  boundary;
-- checks time out after 1.5 seconds, failures are silent, and the result is
-  cached for 24 hours under `<install-root>/.cli-update-check.json`;
-- `--no-update-check` or `OPENALICE_NO_UPDATE_CHECK=1` disables the start check;
-- discovery only prints a notice. It never mutates files or makes startup
-  depend on a successful network request.
-
-Release installers published before provenance v2 recorded their embedded tag
-in the same shape as a deliberate `--version` pin. The CLI cannot safely guess
-which intent produced that old metadata. An affected install therefore remains
-pinned until the public stable installer is run once again; that ordinary
-atomic reinstall preserves application state and writes the unambiguous v2
-stable-channel provenance.
-
-Explicit controls are:
+Exact release and local acceptance:
 
 ```bash
-openalice update --check
-openalice update --check --json
-openalice update
-openalice update --yes
+bash install --version 0.91.0
+bash install --archive ./openalice-cli-0.91.0-linux-x64.tar.gz \
+  --sha256 <64-lowercase-hex>
 ```
 
-`openalice update` downloads the release's versioned Bash installer from the
-manifest, verifies its SHA-256, and invokes the ordinary installer for the
-detected install root. The normal install plan and default-no consent remain
-authoritative; `--yes` is the explicit automation path. The updater also passes
-the manifest version as an expected CLI version so a release/payload race cannot
-publish an unexpected product version.
+Native Windows PowerShell installation is deferred. Windows users use the
+Electron distribution or an explicitly chosen POSIX environment until that
+lane is implemented and accepted.
 
-## CLI-Only Uninstall
+## Artifact contract
 
-The supported removal flow is:
+Every accepted archive is named:
 
-```bash
-openalice uninstall --plan
-openalice uninstall
-openalice uninstall --yes
+```text
+openalice-cli-<version>-<darwin|linux>-<arm64|x64>.tar.gz
 ```
 
-The command refuses to race a live installer and removes only:
+It contains exactly one top-level directory with:
 
-- the four `openalice`/`pi` shell and CMD launchers;
-- all immutable directories under `cli-versions/`;
+```text
+openalice-cli-<version>-<platform>-<arch>/
+├── bin/openalice
+├── release.json
+├── share/openalice/
+│   ├── ui/dist/
+│   ├── default/
+│   ├── templates and external adapter resources
+│   └── runtime/git/
+├── LICENSE
+└── THIRD_PARTY_NOTICES.md
+```
+
+The sidecar `<archive>.sha256` is part of the release contract. The installer
+verifies the downloaded bytes before extraction, rejects unsafe or multi-root
+archives, validates the `release.json` target, version, and content-identity
+shape, checks an expected content identity when the update handoff supplied
+one, and runs the staged executable's `--version` before activation. The build
+owns the canonical content-identity calculation; the installer does not
+recompute that payload manifest. Dev and release publication do recompute the
+identity from `release.json` before accepting an archive, so stale or tampered
+manifest identities cannot become channel metadata.
+
+`contentIdentity` is a canonical digest of the complete native payload
+manifest: product metadata plus every shipped file hash, size, mode, and
+symlink target, with `release.json` excluded to avoid self-reference. It is not
+an executable-only checksum; UI, default assets, templates, and release-owned
+Git changes all produce a new identity.
+
+The channel-neutral installer defaults to the latest non-prerelease GitHub
+Release. `--channel beta` resolves `beta/manifest.json`, while `--channel dev`
+downloads the fixed per-commit preview aliases:
+
+```text
+https://download.openalice.ai/cli/dev/openalice-cli-dev-<platform>-<arch>.tar.gz
+https://download.openalice.ai/cli/dev/openalice-cli-dev-<platform>-<arch>.tar.gz.sha256
+```
+
+Every `dev` push builds all four native targets. Publication verifies each
+sidecar and the archive's target/version metadata, uploads an immutable copy
+under `cli/dev/releases/<commit>/`, then replaces the fixed archive aliases.
+Each checksum alias is written after its archive, so a reader racing a publish
+can fail verification but cannot activate mismatched bytes. The dev manifest is
+published last as the completed-set receipt. Versioned beta and stable releases
+publish the same four target archives and sidecars as GitHub Release assets and
+mirror them unchanged to the download CDN. Stable and beta manifests remain separate;
+immutable `OpenAlice-<version>-install` and
+`cli/dev/releases/<commit>/install` files are verified snapshots of the same
+root `install` source, not separate channel scripts.
+
+Each native build also emits `report.json`. `buildDurationMs` is the clean Bun
+standalone compile, `artifactBuildDurationMs` is assembly plus archive creation
+with already-built server inputs, and `totalDurationMs` includes the real
+acceptance smoke. `smoke.coldStartReadyMs` runs from process spawn until
+Guardian reports Alice ready. `smoke.idleMemoryBytes` samples Guardian and
+Alice RSS three times after a one-second settling period and records the
+median. The separate multiprocess feasibility report applies the same method
+to Guardian, Alice, UTA, and Connector. These are target-run acceptance
+measurements, not cross-host performance promises; compare builds on the same
+runner and preserve the report beside its archive.
+
+## Ownership boundary
+
+The direct installer owns only:
+
+- immutable OpenAlice CLI releases;
+- release-owned Git and OpenAlice resources;
+- `openalice` and Workspace helper launchers;
+- the `cli/current` activation pointer;
+- the direct-install `cli/activation.json` readiness receipt;
+- per-release provenance;
 - the installer lock and update-check cache;
-- managed PATH blocks that reference this exact install root.
+- its marked shell `PATH` block.
 
-It may remove an empty `bin/` directory, but it never removes the shared install
-root. It explicitly preserves `data/`, `workspaces/`, `sources/`,
-`provider-keys.json`, `sealing.key`, backups, credentials, and every other
-application or user-owned path. Symlinked shell profiles remain symlinks.
+It does not own:
 
-## Installed Layout
+- Pi, OpenCode, Codex, Claude Code, or another Agent Runtime;
+- Agent Runtime versions, credentials, configuration, or plugins;
+- OpenAlice application data, AliceProjects, credentials, or broker state;
+- Electron packages or desktop update state;
+- a background service merely because installation succeeded.
 
-With the default installer and Runtime roots:
+Agent Runtimes remain ordinary external adapter targets discovered from the
+user's environment. A missing Runtime is a startup/onboarding concern, not an
+installer transaction.
+
+## Installed layout
+
+The default install root is `~/.openalice`, independent from any
+`OPENALICE_HOME` used by a particular AliceProject:
 
 ```text
 ~/.openalice/
 ├── bin/
 │   ├── openalice
-│   ├── openalice.cmd
-│   ├── pi
-│   └── pi.cmd
-├── cli-versions/
-│   ├── v<version>-<content-id>/
-│   │   ├── install-source.json
-│   │   └── managed/
-│   │       ├── pi/         # pinned npm agent runtime
-│   │       └── runtime/    # verified platform headless Runtime
-│   ├── dev-<content-id>/   # only after an explicit --branch dev install
-│   └── <older-ref-or-content>/
-├── .cli-install.lock/       # present only while an installer owns it
-├── .cli-update-check.json   # best-effort stable update cache
-├── sources/                 # selector-specific managed local/remote checkouts
-├── data/                    # application state, not installer debris
-├── workspaces/              # user work, not installer debris
-├── provider-keys.json       # sensitive user state
-└── sealing.key              # sensitive machine-bound key
+│   ├── alice
+│   ├── alice-workspace
+│   ├── alice-uta
+│   └── traderhub
+├── cli/
+│   ├── current -> releases/<active-release>
+│   ├── activation.json
+│   ├── releases/<version>-<platform>-<arch>-<content-id>/
+│   ├── provenance/<release-name>.json
+│   └── staging/
+├── .cli-install.lock/       # only while an installer owns the transaction
+├── .cli-update-check.json   # optional bounded update cache
+├── data/                    # preserved product state
+├── workspaces/              # preserved user work
+├── sources/                 # preserved explicit source overrides
+├── provider-keys.json       # preserved credentials
+└── sealing.key              # preserved key material
 ```
 
-`sources/` is created only after an approved local Supervisor or managed-remote
-source action, not by the installer transaction itself. CLI-only uninstall
-preserves it deliberately because a checkout may subsequently contain user
-work; a future purge flow must inspect ownership and dirtiness rather than
-blindly deleting it. The installer root and Runtime `OPENALICE_HOME` independently default to
-`~/.openalice`. The installer does not read an `OPENALICE_HOME` override, and
-`openalice start` does not infer Runtime home from the CLI's install location.
-Either override may therefore diverge intentionally. Their default co-location
-is convenient, but it makes the uninstall boundary critical:
-`openalice uninstall` resolves ownership from its immutable CLI path and never
-implements removal as `rm -rf ~/.openalice`.
+Launchers resolve `cli/current` on every invocation and export the canonical
+install root, release root, provenance path, content identity, and install
+method to the native executable. They never hard-code one release path, so an
+atomic pointer change is enough for update or rollback.
 
-## PATH Integration
+## Consent and transaction
 
-The installer prepends `<install-root>/bin` through a marked block:
+Before creating the install root, the installer prints:
 
-```text
-# >>> OpenAlice CLI >>>
-export PATH=.../bin:$PATH
-# <<< OpenAlice CLI <<<
+- install or update action;
+- channel and target;
+- platform and architecture;
+- artifact URL or local path;
+- expected SHA-256;
+- install root, command path, activation pointer, retention count;
+- the OpenAlice and Agent Runtime ownership boundary.
+
+`--plan` exits without mutation. Interactive consent defaults to no and reads
+from a real controlling terminal, never from the curl pipe. A non-interactive
+install must pass `--yes`; otherwise it exits with status 2. Installation
+consent never starts OpenAlice.
+
+After consent, the transaction:
+
+1. rejects a live installer lock or removes a stale one;
+2. stages on the same filesystem as the release store;
+3. downloads or copies the archive and verifies SHA-256;
+4. validates and smoke-runs the staged release;
+5. moves the release into its immutable content-addressed directory;
+6. writes provenance outside the release;
+7. records the exact previous release as a pending activation, then atomically
+   replaces `cli/current` using platform-correct symlink semantics;
+8. atomically replaces installer-owned launchers;
+9. verifies the newly active `openalice` launcher, restoring the exact previous
+   pointer if this post-activation install step fails;
+10. retains the newest three releases by default and never collects the exact
+    pending rollback release;
+11. writes one marked PATH block when requested;
+12. releases the lock and removes staging on every exit path.
+
+An existing release is reused only when file contents, path types, modes, and
+symlink targets match the complete staged tree. A damaged collision stops with
+evidence preserved.
+
+## Provenance
+
+Direct installs write schema 3 metadata:
+
+```json
+{
+  "schemaVersion": 3,
+  "repository": "TraderAlice/OpenAlice",
+  "cliVersion": "0.91.0",
+  "selector": { "kind": "version", "value": "v0.91.0" },
+  "installerUrl": "https://openalice.ai/install",
+  "updateChannel": "stable",
+  "method": "direct",
+  "artifact": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "sha256": "..."
+  },
+  "installedAt": "2026-08-29T00:00:00Z"
+}
 ```
 
-Profile selection is:
+`openalice version --json` reports this provenance and the active content
+identity. Invalid installed metadata is an error; the CLI does not silently
+change channels or trust boundaries.
 
-| Shell | Platform | Profile |
-|---|---|---|
-| zsh | macOS | `~/.zprofile` |
-| zsh | other | `~/.zshrc` |
-| bash | macOS | `~/.bash_profile` |
-| bash | other | `~/.bashrc` |
-| fish | all | `~/.config/fish/config.fish` |
-| unknown | all | no automatic change; print manual command |
+## Update and rollback
 
-Repeated installs replace the managed block instead of appending duplicates.
-The migration also removes the exact unmarked PATH line written by the earlier
-preview installer. A symlinked profile is updated through the symlink instead
-of replacing the symlink itself.
+`openalice update --check` reads the manifest owned by the installed stable,
+beta, or dev channel. Stable never accepts a prerelease manifest and beta
+accepts only beta versions. Dev compares the complete platform archive
+SHA-256, because multiple dev commits may carry the same package version.
+Pinned and custom installs remain non-updating unless the user explicitly
+selects a channel.
 
-The installer cannot mutate the environment of the parent shell that invoked
-`curl | bash`. When the installed bin directory is not already active, the
-success output therefore labels and prints the exact shell-specific command as
-`Activate OpenAlice in this terminal now (no restart required)`. Running that
-one line makes `openalice` and `pi` immediately available; the managed profile
-block covers future terminals. The printed path reflects `--install-dir`, and
-fish receives `fish_add_path` rather than POSIX `export` syntax.
+For a direct install, `openalice update` downloads the channel manifest's
+immutable snapshot of the shared Bash installer, verifies its SHA-256, and
+invokes it with the current install root and ordinary consent. Native stable
+and beta releases pass both the channel and exact accepted version. Dev passes
+the channel and binds the expected archive identity. An update therefore
+preserves or changes the selected channel without turning it into an
+exact-version pin. The historical v0.90.1 bridge is a bootstrap and forward
+cutover seam only; it is never used to replace an existing native layout. A
+running process keeps its already-mapped executable; the new pointer affects
+the next invocation.
 
-PATH integration is non-critical. If profile editing fails, the validated CLI
-remains installed and the user receives the command needed for the current
-shell. The installer never uninstalls a conflicting npm, Homebrew, or other
-`openalice` command automatically; it reports which command currently resolves
-first.
+In the manifest, `installer.versionedUrl` is the executable update input and
+`installer.sha256` binds those immutable bytes. `installer.url` is the mutable
+human bootstrap entry only; an updater never combines that URL with the
+versioned checksum.
+`openalice status` and an idempotent `openalice up` report the pending product
+version while an older Guardian is still active.
 
-## Options and Environment
+The first successful Guardian plus Alice HTTP readiness from the newly active
+content confirms `cli/activation.json`. If that first start exits early, times
+out, or cannot execute, the CLI validates the retained provenance and restores
+the exact previous `cli/current` target atomically. It does not start that
+release automatically and it never changes user data; the error tells the user
+to run `openalice` again. An initial install has no previous release and
+therefore reports the failure without inventing a rollback target.
+
+Rollback is local and download-free:
+
+```bash
+openalice rollback --plan
+openalice rollback --yes
+openalice rollback --to <full-retained-release-name> --yes
+```
+
+It validates both releases and their provenance, refuses to race a live
+installer, records the inverse switch as a pending activation, and atomically
+switches only `cli/current`. Its first readiness receives the same recovery
+protection as an update. It does not alter user data or remove releases. The
+current process is not hot-reloaded; run `openalice` again after update or
+rollback.
+
+## v0.90.1 cutover
+
+The native installer recognizes the last expanded CLI layout under
+`cli-versions/`. It stages and validates the Bun release first, then removes
+only that installer-owned tree and its managed-Pi launchers. Product data,
+credentials, AliceProjects, and Agent Runtimes elsewhere on `PATH` remain
+untouched. Normal startup after activation knows only the native layout; there
+is no permanent dual-runtime resolver. Before changing the active pointer, the
+cutover also backs up every legacy launcher; a validation failure restores the
+old launchers and removes the unconfirmed native pointer.
+
+Both `dev` alias publication and every versioned beta/stable release replay this
+cutover from the published v0.90.1 installer on Linux x64. The acceptance
+fixture pins the historical Pi manifests by SHA-256 because the upstream Pi
+release assets are not part of OpenAlice's durable release surface. It then
+proves native `version`, detached `up`, `status`, `down`, and uninstall with Node
+and Agent Runtimes absent from the new Runtime path, while preserving a data
+marker and a user-owned external Pi executable.
+
+The shipped v0.90.1 updater invoked the accepted versioned installer without a
+selector and bound the candidate with `OPENALICE_EXPECTED_CLI_VERSION`. The
+shared installer keeps that forward invocation on `stable`; a normal
+user-supplied `--version` remains `pinned`.
+
+A native beta/dev installation cannot safely downgrade in place to the old
+Node-managed v0.90.1 layout: the historical installer does not own
+`cli/current` or all native helper launchers. While v0.90.1 is the latest
+stable, both `openalice update --channel stable` and the Supervisor channel
+picker therefore report the transition as unsupported and leave the native
+installation unchanged. Once stable is native, ordinary channel switching
+resumes through the shared installer.
+
+The v0.90.1 GitHub Release predates native CLI archives. While v0.90.1 remains
+the latest stable release during the first beta rollout, a fresh default
+stable install therefore verifies the immutable published v0.90.1 installer
+by its pinned SHA-256 and delegates to it. Exact v0.90.1 selection does the
+same for a fresh or already-legacy root, retaining `pinned` ownership when
+`--version` was used alone. The bridge refuses a root containing a native
+release or pointer. Beta/dev and every native stable release use the ordinary
+native artifact transaction.
+
+## Uninstall
+
+Review first:
+
+```bash
+openalice uninstall --plan
+openalice uninstall --yes
+```
+
+Native uninstall removes `cli/`, the five installer-owned launchers, the update
+cache, installer lock, and matching PATH blocks. It preserves application data,
+AliceProjects, sources, provider credentials, sealing keys, external Agent
+Runtimes, and the shared install root. It refuses to race a live installer.
+
+## Options and test seams
 
 Public options:
 
 | Option | Meaning |
 |---|---|
-| `--branch <name>` | Select a named Git branch (default: `master`) |
-| `--version <git-ref>` | Select a Git tag or commit; mutually exclusive with `--branch` |
-| `--install-dir <path>` | Override the OpenAlice install/user root |
-| `--with-runtime-deps` | Include missing Linux Git/Python/make/C++ source-build tools in the approved plan |
-| `--no-modify-path` | Install launchers without editing a shell profile |
-| `--plan` | Show the exact plan and make no changes |
-| `-y`, `--yes` | Explicit non-interactive installation consent |
-| `-h`, `--help` | Print installer usage without making changes |
+| `--channel stable` | Latest stable release; the default |
+| `--channel beta` | Latest accepted beta release |
+| `--channel dev` | Latest dev-branch native preview |
+| `--version <version>` | Exact pinned GitHub release when used alone |
+| `--channel stable --version <x.y.z>` | Exact stable candidate that remains on stable |
+| `--channel beta --version <x.y.z-beta[.N]>` | Exact beta candidate that remains on beta |
+| `--branch master\|dev` | Compatibility alias for stable or dev |
+| `--archive <path>` | Local archive; requires `--sha256` |
+| `--install-dir <path>` | Alternate installation root |
+| `--no-modify-path` | Do not edit a shell profile |
+| `--plan` | Print the complete transaction without mutation |
+| `--yes`, `-y` | Approve non-interactively |
 
-Development-only option:
+Bounded environment seams:
 
-| Option | Meaning |
+| Variable | Purpose |
 |---|---|
-| `--source <checkout>` | Copy CLI payload files from a local OpenAlice checkout |
-| `--runtime-archive <path>` | Install a locally built platform Runtime archive |
-| `--runtime-sha256 <hex>` | Require an exact SHA-256 for the local Runtime archive |
+| `OPENALICE_INSTALL_DIR` | Alternate install root |
+| `OPENALICE_INSTALL_URL` | Recorded HTTP(S) installer source for a trusted mirror/test |
+| `OPENALICE_DOWNLOAD_BASE_URL` | Default beta-manifest and dev-preview artifact base |
+| `OPENALICE_RELEASES_API_URL` | Stable release discovery endpoint |
+| `OPENALICE_BETA_MANIFEST_URL` | Beta release discovery manifest |
+| `OPENALICE_RELEASE_ASSET_BASE_URL` | Versioned release asset base for release tests/mirrors |
+| `OPENALICE_LEGACY_STABLE_INSTALLER_URL` | Test override for the pinned v0.90.1 transition installer |
+| `OPENALICE_LEGACY_STABLE_INSTALLER_SHA256` | Test override for that transition installer's pinned digest |
+| `OPENALICE_INSTALL_KEEP_RELEASES` | Positive release retention count |
+| `OPENALICE_EXPECTED_CLI_VERSION` | Update handoff binding to one artifact version |
+| `OPENALICE_EXPECTED_CLI_ARTIFACT_SHA256` | Dev update handoff binding to one complete archive |
+| `OPENALICE_EXPECTED_CLI_CONTENT_IDENTITY` | Dev update binding to the complete payload identity |
 
-Environment inputs:
-
-| Variable | Meaning |
-|---|---|
-| `OPENALICE_INSTALL_DIR` | Default install root when `--install-dir` is absent |
-| `OPENALICE_INSTALL_URL` | Override the public installer URL recorded in installed provenance; used by fixtures and private mirrors |
-| `OPENALICE_INSTALL_BASE_URL` | Override payload base URL for local fixtures and installer tests |
-| `OPENALICE_PI_RELEASE_BASE_URL` | Override the pinned Pi release-asset base for installer tests |
-| `OPENALICE_PI_SOURCE_DIR` | Read the exact Pi manifest/lock assets from a local fixture |
-| `OPENALICE_NPM_BIN` | Use a single alternate npm executable in installer tests |
-| `OPENALICE_INSTALL_CONTEXT` | Internal managed-remote context; returns control without local checkout/start guidance |
-| `OPENALICE_INSTALL_UPDATE_CHANNEL` | Internal exact-provenance reproduction seam used by managed SSH installs |
-| `OPENALICE_EXPECTED_CLI_VERSION` | Internal verified-update guard; rejects a payload whose CLI/product version differs from the release manifest |
-| `OPENALICE_RUNTIME_RELEASE_BASE_URL` | Release/test override for Runtime metadata and archive downloads |
-| `OPENALICE_INSTALLER_RELEASE_VERSION` | Embedded by the release workflow; binds the installer to one OpenAlice tag and Runtime set |
-| `OPENALICE_INSTALLER_UPDATE_CHANNEL` | Embedded as `stable` by the release workflow; keeps the exact tag independently updateable through the public release channel |
-| `OPENALICE_RUNTIME_ARCHIVE`, `OPENALICE_RUNTIME_ARCHIVE_SHA256` | Local/CI equivalents of the development Runtime archive flags |
-| `NO_COLOR` | Disable installer color output |
-| `HOME`, `SHELL`, `PATH`, `TERM` | Standard environment used for paths, profile detection, conflicts, and color |
-
-The Pi overrides, `OPENALICE_INSTALL_URL`, and `OPENALICE_INSTALL_BASE_URL`
-are distributor/test seams, not user-facing branch selectors. Managed remote
-sets `OPENALICE_INSTALL_CONTEXT=remote` only after the user approves its outer
-plan; the installer still owns its normal transaction and prints a
-remote-appropriate heading, then returns instead of suggesting a second manual
-clone or local start. The same pinned SHA-256 checks still apply to local Pi
-assets. A real mirror design must define equivalent authenticity and version
-semantics before becoming public API.
-
-## Authenticity Boundary
-
-The public bootstrap is release-owned: each accepted release carries a
-versioned installer asset, the R2 manifest records its SHA-256, and the rolling
-main-site entry resolves to the mirrored bytes. The installed content identity
-then protects update layout and detects accidental or local modification.
-`openalice update` improves consistency by fetching the versioned installer URL
-from that manifest and verifying the recorded SHA-256 before execution.
-
-This is still not a cryptographic signature. The release Runtime archive has
-both a release-metadata SHA-256 and an internal file manifest, while the CLI
-payload still comes from the selected immutable GitHub tag. Those hashes and
-the mirrored installer belong to the same release control plane rather than an
-independent trust anchor.
-
-Do not describe the CLI path as signed. A future archive/signature path should
-establish this chain:
-
-```text
-trusted release metadata
-  -> expected checksum or signature
-  -> downloaded archive
-  -> validated package layout
-  -> installed executable version
-```
-
-The expected checksum must come from release-owned metadata or a signature,
-not from an unsigned manifest downloaded beside the archive. Preserve the
-existing staging, executable validation, immutable placement, and atomic switch
-after that trust chain is added.
+Do not add source package lists, managed Agent Runtime pins, package-manager
+installation, or system dependency mutation back to these seams.
 
 ## Verification
 
-### Fast local feedback
+For installer changes run:
 
 ```bash
-bash -n install scripts/install-smoke/run.sh scripts/install-smoke/interactive.sh \
-  scripts/install-channel-smoke/run.sh
-pnpm -F @traderalice/openalice-cli test
-```
-
-The unit suite covers:
-
-- default-`master`, explicit-branch, tag/commit, and selector-conflict behavior;
-- persisted install provenance and `openalice version --json`;
-- installed layout and a runnable launcher;
-- pinned managed Pi layout, version, direct launcher, and OpenAlice env
-  injection;
-- `--plan` no-write behavior;
-- refusal without TTY or `--yes`;
-- blank-input cancellation;
-- explicit interactive approval and separate start refusal;
-- source-build-tool preflight before pnpm;
-- live installer lock rejection;
-- product/CLI version alignment and release-version comparison;
-- stable, pinned, and development update-channel behavior;
-- daily-cached failure-tolerant start notices;
-- update installer checksum and expected-version enforcement;
-- uninstall plan, consent, live-lock refusal, symlink preservation, and exact
-  state-preservation boundaries.
-
-### Clean Docker acceptance
-
-```bash
+bash -n install
+pnpm exec vitest run packages/cli/src/install.spec.mjs
 pnpm test:install:docker
+npx tsc --noEmit
+pnpm test
 ```
 
-The smoke builds a non-root Debian fixture with an empty home, Node and curl,
-no global pnpm, and no external network during the run. A local HTTP server
-exercises the same OpenAlice remote-download branch as `curl | bash`; exact
-release Pi assets plus a strict fake npm exercise the offline install contract.
-It verifies:
+The Docker smoke uses a clean non-root Debian host with Node, npm, pnpm, Bun,
+and Agent Runtimes absent. It verifies plan, consent, native installation,
+dynamic launchers, update activation, retention, PATH, and lock cleanup. Use
+`pnpm test:install:docker -- --interactive` for the manual prompt playground.
 
-- default `master`, explicit `dev`, and mutually exclusive selectors;
-- unattended refusal before the install root exists;
-- stale-lock recovery and lock cleanup;
-- downloaded payload equality;
-- default install invokes only the declared non-global managed-Pi npm command
-  and does not invoke a system package manager;
-- `--with-runtime-deps --plan` shows the exact elevated command without
-  running it;
-- approved Runtime-tool setup invokes the expected package list and re-probes
-  the resulting commands;
-- installed `server status --json` execution and inclusion of every reachable
-  Server/remote module;
-- installed content identity in `openalice version --json`, so same-version
-  remote payload drift is detectable;
-- runnable OpenAlice/Pi shell and CMD launchers plus managed-Pi env injection;
-- an installed bare Supervisor launched through a pseudo-TTY, including
-  install-provenance managed Runtime planning, cancellation, and detach;
-- idempotent managed PATH configuration;
-- identical-release reuse;
-- damaged-release preservation and repair when Pi remains runnable but its TUI
-  dependency is missing;
-- ref switching without deleting the prior release;
-- development-channel update guidance without a stable-channel network check;
-- installed uninstall execution that removes CLI assets and PATH integration
-  while preserving data, Workspaces, sources, credentials, and keys.
+Before promotion also:
 
-Relevant PRs run this deterministic acceptance in CI against the exact checkout.
-The same workflow runs `pnpm test:remote:docker` in a separate clean SSH fixture
-so installer changes cannot pass while managed remote is broken.
+1. build the real target-native Bun archive;
+2. install it into an isolated root and run `version --json`;
+3. update from a distinct retained release and exercise rollback;
+4. build/install on native macOS and clean Linux for each supported arch;
+5. publish the fixed dev aliases and exercise the raw `dev/install` plus
+   `--channel dev` network path;
+6. verify release assets and sidecar checksums before making any channel alias
+   visible; a beta mirror must also prove the stable manifest and stable update
+   feeds remained byte-for-byte unchanged. The shared installer may change only
+   when its default still resolves stable.
 
-### Live dev-channel acceptance
+Treat missing or non-positive build, readiness, or per-role memory metrics as
+an invalid native acceptance report. A compile-only result is not sufficient.
 
-```bash
-pnpm test:install:dev-channel
-```
-
-This smoke builds an empty non-root container but copies no OpenAlice installer
-or CLI payload into it. It downloads
-`https://raw.githubusercontent.com/TraderAlice/OpenAlice/dev/install`, installs
-the matching `--branch dev` payload through the real network path, and verifies:
-
-- the response is the Bash installer and passes syntax validation;
-- `--plan` selects dev without writing the install root;
-- the complete OpenAlice CLI and managed Pi transaction succeeds;
-- installed provenance records the raw dev URL and branch selector;
-- the CLI version, Pi version, and `server status --json` execute;
-- an identical second install reuses the same content identity and immutable
-  release directory.
-
-The workflow runs this job after relevant changes merge to `dev`. PR checks use
-the checkout fixtures instead, because the raw dev URL correctly continues to
-represent the previously merged branch until the PR lands. A network failure is
-reported separately from deterministic checkout acceptance rather than being
-hidden by a local fixture.
-
-### Manual interaction review
-
-```bash
-pnpm test:install:docker --interactive
-```
-
-The playground first offers the Runtime-tool choice, stops again at the real
-combined plan, and then leaves the tester in the clean container. Its fake
-offline package manager records the exact command while still exercising the
-non-root plus `sudo` branch. The fixture supplies a minimal offline `pi-tui`
-adapter so the automated Docker lane can execute the installed TUI state
-machine; the repository's real-PTY suite remains the renderer/terminal
-acceptance boundary. Review both choices, copy, and spacing, approve with an
-explicit `y`, and run at least:
-
-```bash
-command -v openalice
-openalice --version
-openalice version --json
-openalice status --home /tmp/openalice-unused-home --json
-openalice up --help
-openalice completion zsh
-openalice update --check
-openalice uninstall --plan
-command -v pi
-pi --version
-cat ~/.bashrc
-curl -fsSL "$OPENALICE_INSTALL_URL" | bash -s -- --plan
-curl -fsSL "$OPENALICE_INSTALL_URL" | bash -s -- --plan --branch dev
-curl -fsSL "$OPENALICE_INSTALL_URL" | bash -s -- --plan --with-runtime-deps
-cat "$OPENALICE_RUNTIME_DEPS_LOG"
-```
-
-Manual review is required when prompt text, color, progress, profile behavior,
-or next-step guidance changes. A passing non-interactive smoke cannot judge
-whether the installer feels alarming or confusing.
-
-### End-to-end localhost handoff
-
-When installer behavior, the distributed payload, or the optional start handoff
-changes:
-
-1. run `pnpm build:server`;
-2. install from `--source` into a temporary install root;
-3. start the installed CLI with `openalice up`, an isolated `--home`, and an
-   unused port;
-4. verify `/api/auth/status` and the real root page;
-5. prove the Runtime survives the starting shell, stop it with
-   `openalice down`, and confirm the Guardian/Alice tree exits cleanly;
-6. repeat with `openalice run`, stop with Ctrl+C, and confirm foreground
-   ownership exits cleanly.
-
-Never use the normal user home or a live broker account for this acceptance.
-Electron smoke is required only when shared dependency topology, managed
-Runtime behavior, PTY behavior, or Electron files also change.
-
-## Release Checklist
-
-Before publishing or promoting a change that affects the installer:
-
-1. Confirm the CLI payload list in `install` and `packages/cli/package.json`
-   still match the imports reachable from `bin/openalice.ts`.
-2. Confirm the intended source ref, equal root and CLI package versions, Pi
-   version, release asset hashes, lockfile engine floor, and root/CLI Node
-   engines. Do not accidentally advertise mutable `dev` as a stable release.
-3. Run the fast installer tests and the full repository-required checks.
-4. Require checkout install and managed-remote CI acceptance to pass, then
-   require the post-merge `pnpm test:install:dev-channel` result for current
-   `dev` to be green.
-5. Walk `pnpm test:install:docker --interactive` as a human when prompts,
-   progress, PATH guidance, or next steps changed.
-6. Exercise the installed CLI from `--source`; include the localhost handoff if
-   the payload or start boundary changed.
-7. Treat the `dev` to `master` merge as the release event. The release workflow
-   repeats checkout acceptance before publication, creates the installer from
-   the accepted tag, then verifies the versioned asset, R2 `install` alias,
-   manifest checksum, and main-site proxy. State the remaining
-   archive/signature gap explicitly.
-8. Keep Electron signing and notarization in the Electron release lane; the CLI
-   preview must not read those secrets.
-
-Do not refresh the stable installer from an unreleased `master` commit. A
-manual release mirror may only reproduce the exact bytes owned by its requested
-tag; new installer behavior stays on the live dev channel until the next
-versioned promotion under [[docs/development-workflow.md]].
+Routine acceptance is non-trading and uses isolated homes without real
+credentials or broker accounts.
 
 ## Troubleshooting
 
-| Symptom | Interpretation and next check |
+| Message | Meaning |
 |---|---|
-| `No interactive terminal is available` | The installer correctly refused implicit consent; use `--plan`, or review the plan and pass `--yes` intentionally |
-| `Another OpenAlice CLI installer is running` | Check the recorded PID and wait for the live installer; do not delete a lock owned by a live process |
-| `Removing a stale CLI installer lock` | The prior owner no longer exists; the installer recovered before downloading |
-| `PATH warning` or the wrong command runs | Use the printed absolute command, inspect `command -v openalice`, and reload the managed profile block |
-| npm is missing or Node is below 22.19.0 | Install the complete Node.js 22 LTS distribution; OpenAlice rejects the host before consent instead of publishing a broken Pi runtime |
-| Pi asset SHA-256 check fails | Stop. The pinned release metadata and downloaded asset disagree; do not bypass the check |
-| A `.damaged.<pid>` directory appears | A content-addressed release no longer matched its identity; preserve it for diagnosis while the validated replacement becomes active |
-| `stable release update checks are disabled` | This CLI is pinned or follows a development branch; re-run that selector's installer instead of silently crossing channels |
-| update installer SHA-256 fails | Stop. The release manifest and versioned installer bytes disagree; the updater must not execute them |
-| uninstall reports a live installer | Wait for that PID to finish; uninstall and install share the same ownership boundary and must not race |
-| CLI installs but localhost startup fails | Installation succeeded; continue with [[docs/local-runtime.md]] and Guardian/runtime diagnostics |
-| Remote install succeeds and then prints no clone command | Managed remote set the installer context and is continuing with its already-approved source plan |
-| Native PowerShell/CMD bootstrap is unavailable | Use the complete Electron installer, WSL, or Git Bash until a reviewed native bootstrap exists |
-
-## Design Decisions and Next Steps
-
-These decisions are intentional:
-
-- localhost-first browser use is the initial CLI distribution contract;
-- Electron remains a complete, independent desktop distribution;
-- installation and service start always require separate consent;
-- managed Pi is the explicit baseline agent shown in every install plan;
-  Claude Code, Codex, opencode, and other user-owned CLIs remain optional and
-  belong to a later inspectable setup layer;
-- Claude Code installer source may be read as public behavior but is not
-  vendored; Codex's Apache-2.0 installer is the inspectable engineering
-  reference, while OpenAlice keeps an independent implementation;
-- release authenticity must be designed explicitly rather than implied by a
-  locally computed content hash.
-
-Likely follow-up stages, in dependency order:
-
-1. publish an immutable CLI archive with release-owned checksums or signatures;
-2. move durable install logic behind a shared cross-platform core before adding
-   a native PowerShell bootstrap;
-3. add explicit CLI rollback, garbage collection, and surgical uninstall;
-4. add independent signature/authenticity verification for the published
-   headless Runtime and CLI payload;
-5. layer additional remote transports around a loopback Runtime rather than opening the
-   Runtime itself to the network.
-
-Do not implement a later stage by weakening the current consent, data ownership,
-loopback, Electron, or authenticity boundaries.
+| `No interactive terminal is available` | Review `--plan`, then pass `--yes` intentionally |
+| `Another OpenAlice CLI installer is running` | Wait for the recorded live PID; do not delete its lock |
+| `Removing a stale CLI installer lock` | The recorded owner no longer exists and recovery is safe |
+| `failed SHA-256 verification` | Stop; artifact bytes and trusted checksum disagree |
+| `Existing release ... is damaged` | Preserve the collision for inspection; do not overwrite it |
+| `No previous OpenAlice release is retained` | Install/update once more before rollback is available |
+| startup says the activation was rolled back | The new direct-install Runtime failed first readiness; run `openalice` again to start the restored release |
+| update reports a non-updating channel | Refresh with the same selector instead of crossing trust boundaries |

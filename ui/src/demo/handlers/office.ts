@@ -1,5 +1,11 @@
 import { http, HttpResponse } from 'msw'
 
+import {
+  DEMO_AUTO_QUANT_WORKSPACE_ID,
+  DEMO_CHAT_WORKSPACE_ID,
+  demoChatWorkspace,
+} from '../fixtures/workspaces'
+
 export const officeHandlers = [
   http.get('/api/office/floor', ({ request }) => {
     const asOfRaw = new URL(request.url).searchParams.get('asOfSeq')
@@ -16,34 +22,34 @@ export const officeHandlers = [
       ...(asOfSeq != null ? { asOfSeq } : {}),
       offices: [
         {
-          workspace: { id: 'chat-demo', tag: 'chat', harness: 'chat' },
+          workspace: { id: DEMO_CHAT_WORKSPACE_ID, tag: 'chat', harness: 'chat' },
           lastInteractionAt: now,
           sleeping: false,
-          employees: [
-            {
-              resumeId: 'resume-chat-demo',
-              agent: 'codex',
-              name: 'c1',
-              title: 'Desk mate',
-              sessionRecordId: 'codex-demo-1',
-              mood: working ? 'working' : 'idle',
-              surface: 'headless',
-              bubble: working ? { kind: 'tool', name: 'workspace_list' } : null,
-              lastSeq: working ? 4 : 2,
-              lastInteractionAt: now,
-              drawers: [{
-                id: 'prov-demo',
-                kind: 'report',
-                action: 'created',
-                at: Date.now() - 60_000,
-                label: 'desk-note.md',
-                path: 'docs/desk-note.md',
-              }],
-            },
-          ],
+          employees: demoChatWorkspace.sessions.map((session, index) => ({
+            resumeId: session.resumeId,
+            agent: session.agent,
+            name: session.name,
+            title: session.title,
+            sessionRecordId: session.id,
+            mood: working && session.state === 'running' ? 'working' : 'idle',
+            ...(session.surface ? { surface: session.surface } : {}),
+            bubble: working && session.state === 'running'
+              ? { kind: 'tool' as const, name: index === 0 ? 'workspace_list' : 'research' }
+              : null,
+            lastSeq: working && session.state === 'running' ? 4 : 2,
+            lastInteractionAt: Date.parse(session.lastActiveAt),
+            drawers: index === 0 ? [{
+              id: 'prov-demo',
+              kind: 'report' as const,
+              action: 'created',
+              at: Date.now() - 60_000,
+              label: 'ai-chain-2026-06-02.md',
+              path: 'rotation/ai-chain-2026-06-02.md',
+            }] : [],
+          })),
         },
         {
-          workspace: { id: 'quant-demo', tag: 'auto-quant', harness: 'auto-quant' },
+          workspace: { id: DEMO_AUTO_QUANT_WORKSPACE_ID, tag: 'auto-quant', harness: 'auto-quant' },
           lastInteractionAt: now,
           sleeping: false,
           employees: [],

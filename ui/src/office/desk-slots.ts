@@ -9,3 +9,17 @@ export function deskSlotsForOffice(
   while (slots.length < min) slots.push(null)
   return slots
 }
+
+export function visibleEmployeesForOffice(
+  employees: readonly OfficeFloorEmployee[],
+  limit = 4,
+): OfficeFloorEmployee[] {
+  return employeesForOffice(employees).slice(0, limit)
+}
+
+export function employeesForOffice(
+  employees: readonly OfficeFloorEmployee[],
+): OfficeFloorEmployee[] {
+  return [...employees]
+    .sort((a, b) => Number(a.mood === 'idle') - Number(b.mood === 'idle'))
+}

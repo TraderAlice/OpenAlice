@@ -101,6 +101,7 @@ interface FeishuReceiveEvent {
     sender_type?: string
   }
   message?: {
+    message_id?: string
     chat_id?: string
     chat_type?: string
     message_type?: string
@@ -332,7 +333,12 @@ export class FeishuConnectorAdapter implements ConnectorAdapter {
     }
     if (!this.isOwner(userId)) return
     try {
-      await context.forwardOwnerText({ text, userId, chatId })
+      await context.forwardOwnerText({
+        text,
+        userId,
+        chatId,
+        ...(message?.message_id ? { eventId: message.message_id } : {}),
+      })
     } catch (error) {
       this.tracker.degraded(error)
       await this.replyToChat(chatId, 'OpenAlice could not accept this message. Check Connector Settings and logs.')

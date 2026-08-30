@@ -3045,7 +3045,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     serializeTelegramDeskMutation(async () => {
       const definition = BUILTIN_CONNECTOR_DEFINITIONS.find((item) => item.id === connectorId);
       if (!definition || !connectorDefinitionHasCapability(definition, 'desk')) {
-        const err = new Error(`Connector ${connectorId} does not advertise a phone desk`);
+        const err = new Error(`Connector ${connectorId} does not support chat`);
         err.name = 'ConnectorDeskUnsupported';
         throw err;
       }
@@ -3062,7 +3062,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       );
       if (!created.ok) {
         if (created.reason === 'conflict') {
-          const err = new Error(`${definition.label} phone desk already exists as ${created.wsId}/${created.id}`);
+          const err = new Error(`Chat on ${definition.label} already exists as ${created.wsId}/${created.id}`);
           err.name = 'ConnectorDeskConflict';
           throw err;
         }
@@ -3076,13 +3076,13 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     patch: { what?: string; when?: { kind: 'every'; every: ConnectorDeskCadence } },
   ): Promise<ConnectorDesk> => serializeTelegramDeskMutation(async () => {
     if (patch.when && !isConnectorDeskCadence(patch.when.every)) {
-      const err = new Error(`Unsupported phone-desk cadence: ${patch.when.every}`);
+      const err = new Error(`Unsupported heartbeat: ${patch.when.every}`);
       err.name = 'ConnectorDeskInvalid';
       throw err;
     }
     const desk = await connectorDeskOp(connectorId);
     if (!desk) {
-      const err = new Error('Phone desk not found');
+      const err = new Error('Chat not found');
       err.name = 'ConnectorDeskNotFound';
       throw err;
     }
@@ -3094,7 +3094,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     }
     const updated = await updateConnectorDeskFile(workspace.dir, desk.issue.id, patch);
     if (!updated.ok) {
-      const err = new Error(updated.reason === 'invalid' ? updated.error : 'Phone desk not found');
+      const err = new Error(updated.reason === 'invalid' ? updated.error : 'Chat not found');
       err.name = updated.reason === 'not_found' ? 'ConnectorDeskNotFound' : 'ConnectorDeskInvalid';
       throw err;
     }
@@ -3108,7 +3108,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       if (!workspace) return null;
       const disabled = await disableConnectorDeskFile(workspace.dir, desk.issue.id);
       if (!disabled.ok) {
-        throw new Error(disabled.reason === 'invalid' ? disabled.error : 'Phone desk could not be disabled');
+        throw new Error(disabled.reason === 'invalid' ? disabled.error : 'Chat could not be turned off');
       }
       return { ...desk, issue: disabled.issue };
     })

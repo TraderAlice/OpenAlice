@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { createHash } from 'node:crypto'
-import { copyFileSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
@@ -34,17 +34,12 @@ export function prepareBuildMetadata({ outDir, platform, arch, version }) {
     }
 
     if (arch === 'arm64') {
-      copyIfPresent(outDir, source, ['latest-mac-arm64.yml', `${channel}-mac-arm64.yml`])
+      copyIfPresent(outDir, source, [`${channel}-mac-arm64.yml`])
       return
     }
 
     if (arch === 'x64') {
-      const primary = 'latest-mac-intel.yml'
-      const updaterAlias = 'latest-intel-mac.yml'
-      copyIfPresent(outDir, source, [primary, updaterAlias])
-      if (channel !== 'latest') {
-        copyIfPresent(outDir, source, [`${channel}-mac-intel.yml`, `${channel}-intel-mac.yml`])
-      }
+      copyIfPresent(outDir, source, [`${channel}-mac-intel.yml`, `${channel}-intel-mac.yml`])
       // Keep the generic channel metadata owned by the arm64 build. Intel
       // clients request the architecture-specific compatibility alias above,
       // and merged release artifacts must not contain two competing copies.
@@ -56,7 +51,10 @@ export function prepareBuildMetadata({ outDir, platform, arch, version }) {
   }
 
   if (normalizedPlatform === 'windows' || normalizedPlatform === 'win32') {
-    if (channel !== 'latest') copyIfPresent(outDir, 'latest.yml', [`${channel}.yml`])
+    if (channel !== 'latest') {
+      copyIfPresent(outDir, 'latest.yml', [`${channel}.yml`])
+      rmSync(join(outDir, 'latest.yml'), { force: true })
+    }
     return
   }
 
@@ -83,6 +81,10 @@ function sha256File(path) {
 export function prepareMirrorAssets({ outDir, tag, baseUrl, repository }) {
   const version = tag.replace(/^v/, '')
   const channel = prereleaseChannel(version)
+  const releaseChannel = channel === 'latest' ? 'stable' : channel
+  if (releaseChannel !== 'stable' && releaseChannel !== 'beta') {
+    throw new Error(`[release-assets] unsupported release channel: ${releaseChannel}`)
+  }
   const normalizedBaseUrl = baseUrl.replace(/\/+$/, '')
   const names = readdirSync(outDir)
   const macArm64Dmg = findFirst(names, [`OpenAlice-${version}-arm64.dmg`])
@@ -93,18 +95,16 @@ export function prepareMirrorAssets({ outDir, tag, baseUrl, repository }) {
   const windowsX64Blockmap = findFirst(names, [`OpenAlice.Setup.${version}.exe.blockmap`])
   const installerAsset = findFirst(names, [`OpenAlice-${version}-install`])
 
-  copyAlias(outDir, macArm64Dmg, 'mac-arm64.dmg')
-  copyAlias(outDir, macArm64Zip, 'mac-arm64.zip')
-  copyAlias(outDir, macX64Dmg, 'mac-x64.dmg')
-  copyAlias(outDir, macX64Zip, 'mac-x64.zip')
-  copyAlias(outDir, windowsX64Exe, 'windows-x64.exe')
+  if (releaseChannel === 'stable') {
+    copyAlias(outDir, macArm64Dmg, 'mac-arm64.dmg')
+    copyAlias(outDir, macArm64Zip, 'mac-arm64.zip')
+    copyAlias(outDir, macX64Dmg, 'mac-x64.dmg')
+    copyAlias(outDir, macX64Zip, 'mac-x64.zip')
+    copyAlias(outDir, windowsX64Exe, 'windows-x64.exe')
+  }
   copyAlias(outDir, installerAsset, 'install')
-
-  if (channel !== 'latest') {
-    copyIfPresent(outDir, 'latest-mac.yml', [`${channel}-mac.yml`])
-    copyIfPresent(outDir, 'latest-mac-intel.yml', [`${channel}-mac-intel.yml`])
-    copyIfPresent(outDir, 'latest-intel-mac.yml', [`${channel}-intel-mac.yml`])
-    copyIfPresent(outDir, 'latest.yml', [`${channel}.yml`])
+  if (releaseChannel === 'beta') {
+    mkdirSync(join(outDir, 'beta'), { recursive: true })
   }
 
   const windowsMetadata = join(outDir, `${channel === 'latest' ? 'latest' : channel}.yml`)
@@ -117,9 +117,13 @@ export function prepareMirrorAssets({ outDir, tag, baseUrl, repository }) {
   }
 
   const urlFor = (name) => name ? `${normalizedBaseUrl}/${name}` : null
+  const mutableUrlFor = (stableAlias, versionedAsset) => releaseChannel === 'stable'
+    ? urlFor(stableAlias)
+    : urlFor(versionedAsset)
   const releaseNotesUrl = `https://github.com/${repository}/releases/tag/${tag}`
   const intelFeed = `${channel}-mac-intel.yml`
   const manifest = {
+    channel: releaseChannel,
     version,
     publishedAt: new Date().toISOString(),
     releaseNotesUrl,
@@ -129,14 +133,14 @@ export function prepareMirrorAssets({ outDir, tag, baseUrl, repository }) {
       macIntel: existsSync(join(outDir, intelFeed)) ? `${normalizedBaseUrl}/${intelFeed}` : null,
       windows: `${normalizedBaseUrl}/${channel}.yml`,
     },
-    macArm64Dmg: urlFor(macArm64Dmg && 'mac-arm64.dmg'),
-    macArm64Zip: urlFor(macArm64Zip && 'mac-arm64.zip'),
-    macX64Dmg: urlFor(macX64Dmg && 'mac-x64.dmg'),
-    macX64Zip: urlFor(macX64Zip && 'mac-x64.zip'),
-    windowsX64Exe: urlFor(windowsX64Exe && 'windows-x64.exe'),
+    macArm64Dmg: mutableUrlFor(macArm64Dmg && 'mac-arm64.dmg', macArm64Dmg),
+    macArm64Zip: mutableUrlFor(macArm64Zip && 'mac-arm64.zip', macArm64Zip),
+    macX64Dmg: mutableUrlFor(macX64Dmg && 'mac-x64.dmg', macX64Dmg),
+    macX64Zip: mutableUrlFor(macX64Zip && 'mac-x64.zip', macX64Zip),
+    windowsX64Exe: mutableUrlFor(windowsX64Exe && 'windows-x64.exe', windowsX64Exe),
     installer: installerAsset ? {
       url: urlFor('install'),
-      sha256: sha256File(join(outDir, 'install')),
+      sha256: sha256File(join(outDir, installerAsset)),
       versionedUrl: urlFor(installerAsset),
     } : null,
     versioned: {
@@ -148,7 +152,10 @@ export function prepareMirrorAssets({ outDir, tag, baseUrl, repository }) {
     },
   }
 
-  writeFileSync(join(outDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`)
+  const manifestPath = releaseChannel === 'stable'
+    ? join(outDir, 'manifest.json')
+    : join(outDir, 'beta', 'manifest.json')
+  writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
   rmSync(join(outDir, 'builder-debug.yml'), { force: true })
   return manifest
 }

@@ -281,8 +281,26 @@ describe('agy headless extractors', () => {
     expect(agyAdapter.extractHeadlessAssistantText?.(assistant)).toBeNull();
     expect(agyAdapter.extractHeadlessAssistantText?.(result)).toBe('Git rebase rewrites history.\n');
     expect(agyAdapter.extractHeadlessOutputEvents?.(assistant)).toEqual([
-      { type: 'text', text: 'Git rebase rewrites history.\n' },
+      { type: 'text', text: 'Git rebase rewrites history.\n', delta: true },
     ]);
+  });
+
+  it('preserves and joins standalone whitespace text deltas', () => {
+    const chunks = ['#', ' ', 'Heading', '\n\n', '-', ' ', 'item'];
+    for (const chunk of chunks) {
+      expect(agyAdapter.extractHeadlessOutputEvents?.(JSON.stringify({
+        event: 'step_update',
+        step_update: { step_type: 'agent_response', text_delta: chunk },
+      }))).toEqual([{ type: 'text', text: chunk, delta: true }]);
+    }
+
+    expect(parseHeadlessOutputText({
+      text: chunks.map((text_delta) => JSON.stringify({
+        event: 'step_update',
+        step_update: { step_type: 'agent_response', text_delta },
+      })).join('\n'),
+      extractEvents: agyAdapter.extractHeadlessOutputEvents!.bind(agyAdapter),
+    }).assistantText).toBe('# Heading\n\n- item');
   });
 
   it('reads documented tool step_update events', () => {
@@ -330,7 +348,7 @@ describe('agy headless extractors', () => {
       schemaVersion: 1,
       assistantText: 'Git rebase rewrites history.',
       blocks: [
-        { type: 'text', text: 'Git rebase rewrites history.' },
+        { type: 'text', text: 'Git rebase rewrites history.\n' },
         {
           type: 'tool',
           id: 'step-4',

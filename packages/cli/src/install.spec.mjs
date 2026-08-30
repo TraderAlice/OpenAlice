@@ -1,233 +1,270 @@
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { createServer } from 'node:http'
-import { access, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import {
+  access,
+  chmod,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readlink,
+  realpath,
+  readdir,
+  rm,
+  writeFile,
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 
-import * as pty from 'node-pty'
 import { afterEach, describe, expect, it } from 'vitest'
 
 const execFileAsync = promisify(execFile)
 const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), '../../..')
-const fakeNpm = join(repositoryRoot, 'scripts/install-smoke/fake-npm.sh')
-const piAssets = join(repositoryRoot, 'scripts/install-smoke/pi-assets')
-const productVersion = JSON.parse(
-  await readFile(join(repositoryRoot, 'package.json'), 'utf8'),
-).version
+const installer = join(repositoryRoot, 'install')
+const platform = process.platform === 'darwin' ? 'darwin' : 'linux'
+const architecture = process.arch === 'arm64' ? 'arm64' : 'x64'
 const temporaryPaths = []
 
 afterEach(async () => {
   await Promise.all(temporaryPaths.splice(0).map((path) => rm(path, { recursive: true, force: true })))
 })
 
-describe.skipIf(process.platform === 'win32')('OpenAlice CLI installer', { timeout: 30_000 }, () => {
-  it('keeps the CLI and desktop managed-Pi pins aligned', async () => {
-    const installer = await readFile(join(repositoryRoot, 'install'), 'utf8')
-    const desktopVendor = await readFile(join(repositoryRoot, 'scripts/vendor-managed-runtime.mjs'), 'utf8')
-    const packageBytes = await readFile(join(piAssets, 'package.json'))
-    const lockBytes = await readFile(join(piAssets, 'package-lock.json'))
-    const piManifest = JSON.parse(packageBytes.toString('utf8'))
-    const rootManifest = JSON.parse(await readFile(join(repositoryRoot, 'package.json'), 'utf8'))
-    const cliManifest = JSON.parse(await readFile(join(repositoryRoot, 'packages/cli/package.json'), 'utf8'))
+describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', { timeout: 30_000 }, () => {
+  it('shows a complete non-mutating plan and an explicit ownership boundary', async () => {
+    const fixture = await makeReleaseArchive('0.91.0', '1'.repeat(16))
+    const installRoot = join(fixture.root, 'install root')
+    const result = await runInstaller(fixture, installRoot, ['--plan'])
 
-    expect(installer).toContain('DEFAULT_BRANCH="master"')
-    expect(installer).toContain('PUBLIC_INSTALLER_URL="https://openalice.ai/install"')
-    expect(installer).toContain('OPENALICE_INSTALLER_UPDATE_CHANNEL="${OPENALICE_INSTALLER_UPDATE_CHANNEL:-}"')
-    expect(installer).toContain('MINIMUM_NODE_VERSION="22.19.0"')
-    expect(installer).toContain('PI_VERSION="0.83.0"')
-    expect(desktopVendor).toContain("const PI_VERSION = '0.83.0'")
-    expect(piManifest).toEqual(expect.objectContaining({
-      version: '0.83.0',
-      engines: { node: '>=22.19.0' },
-      dependencies: { '@earendil-works/pi-coding-agent': '0.83.0' },
-    }))
-    expect(rootManifest.engines.node).toBe('>=22.19.0')
-    expect(cliManifest.engines.node).toBe('>=22.19.0')
-    expect(cliManifest.version).toBe(rootManifest.version)
-    for (const file of cliManifest.files) {
-      expect(installer).toContain(`  "${file}"`)
-    }
-    expect(sha256(packageBytes)).toBe('41f07a3eb41227905ac436ad41d949e4589dcc34c15454d718f85f399b533cb6')
-    expect(sha256(lockBytes)).toBe('f5cb41dcfc60561ba54490b49c17beecec202900f73eb5f104b34f8b2a79a0af')
+    expect(result.stdout).toContain('OpenAlice CLI install plan')
+    expect(result.stdout).toContain('OpenAlice does not manage: Agent Runtime executables')
+    expect(result.stdout).toContain('Plan complete. No files were changed.')
+    await expect(access(installRoot)).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
-  it('defaults to master, accepts an explicit branch, and rejects multiple selectors', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'openalice-install-selectors-'))
-    temporaryPaths.push(home)
-    const installer = join(repositoryRoot, 'install')
-    const commonArgs = [
-      '--source', repositoryRoot,
-      '--install-dir', join(home, '.openalice'),
-      '--no-modify-path',
-      '--plan',
-    ]
+  it('installs one native release, provenance, dynamic launchers, and no Agent Runtime', async () => {
+    const fixture = await makeReleaseArchive('0.91.0', '2'.repeat(16))
+    const installRoot = join(fixture.root, 'install root')
+    const result = await runInstaller(fixture, installRoot, ['--yes'])
+    const releaseName = `0.91.0-${platform}-${architecture}-${'2'.repeat(16)}`
 
-    const stable = await execFileAsync('bash', [installer, ...commonArgs], { env: installerEnv(home) })
-    expect(stable.stdout).toContain('Branch         master')
-
-    const preview = await execFileAsync('bash', [installer, ...commonArgs, '--branch', 'dev'], { env: installerEnv(home) })
-    expect(preview.stdout).toContain('Branch         dev')
-
-    await expect(execFileAsync('bash', [installer,
-      ...commonArgs,
-      '--branch', 'dev',
-      '--version', 'v0.2.0',
-    ], { env: installerEnv(home) })).rejects.toMatchObject({
-      stderr: expect.stringContaining('Use only one of --branch or --version'),
-    })
-  })
-
-  it('records the public installer URL for the default master channel', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'openalice-install-public-source-'))
-    temporaryPaths.push(home)
-    const installRoot = join(home, '.openalice')
-    const installer = join(repositoryRoot, 'install')
-
-    const installed = await execFileAsync('bash', [installer,
-      '--source', repositoryRoot,
-      '--install-dir', installRoot,
-      '--no-modify-path',
-      '--yes',
-    ], {
-      env: {
-        ...installerEnv(home),
-        OPENALICE_INSTALL_CONTEXT: 'remote',
-      },
-    })
-
-    expect(installed.stdout).toContain('Remote Runtime CLI installer')
-    expect(installed.stdout).not.toContain('then run locally in your browser')
-    expect(installed.stdout).toContain('Returning to the approved remote setup plan')
-    expect(installed.stdout).not.toContain('Next: launch from an OpenAlice checkout')
-
-    const versionInfo = await execFileAsync(join(installRoot, 'bin', 'openalice'), ['version', '--json'])
-    expect(JSON.parse(versionInfo.stdout).installSource).toMatchObject({
-      schemaVersion: 2,
-      selector: { kind: 'branch', value: 'master' },
-      installerUrl: 'https://openalice.ai/install',
-      updateChannel: 'stable',
-    })
-  })
-
-  it('installs a runnable, versioned CLI without touching the shell profile', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'openalice-install-test-'))
-    temporaryPaths.push(home)
-    const installRoot = join(home, '.openalice')
-    const installer = join(repositoryRoot, 'install')
-    const installed = await execFileAsync('bash', [installer,
-      '--source', repositoryRoot,
-      '--version', 'test/ref',
-      '--install-dir', installRoot,
-      '--no-modify-path',
-      '--yes',
-    ], { env: installerEnv(home) })
-
-    expect(installed.stdout).toContain('Local Runtime CLI installer')
-    expect(installed.stdout).toContain('System build tools are optional and listed before consent')
-    expect(installed.stdout).toContain('No system packages were changed')
-    expect(installed.stdout).toContain('Install plan')
-    expect(installed.stdout).toContain('Managed agent  Pi 0.83.0')
-    expect(installed.stdout).toContain('OpenAlice and Pi are ready')
-    expect(installed.stdout).toContain('Activate OpenAlice in this terminal now (no restart required):')
-    const activation = installed.stdout.match(/Activate OpenAlice in this terminal now \(no restart required\):\n  (.+)\n/)?.[1]
-    expect(activation).toBeDefined()
-    const activated = await execFileAsync('bash', ['-c', `${activation}; command -v openalice`], {
-      env: installerEnv(home),
-    })
-    expect(activated.stdout.trim()).toBe(join(installRoot, 'bin', 'openalice'))
-    const releases = await readdir(join(installRoot, 'cli-versions'))
-    expect(releases).toHaveLength(1)
-    expect(releases[0]).toMatch(/^test_ref-[a-f0-9]{16}$/)
-    await expect(access(join(installRoot, 'cli-versions', releases[0], 'bin', 'openalice.ts'))).resolves.toBeUndefined()
-    await expect(access(join(installRoot, 'cli-versions', releases[0], 'managed', 'pi', 'node_modules', '@earendil-works', 'pi-coding-agent', 'dist', 'cli.js'))).resolves.toBeUndefined()
-    await expect(access(join(installRoot, 'cli-versions', releases[0], 'managed', 'pi', 'node_modules', '@earendil-works', 'pi-tui', 'package.json'))).resolves.toBeUndefined()
-    await expect(access(join(installRoot, 'bin', 'openalice.cmd'))).resolves.toBeUndefined()
-    await expect(access(join(installRoot, 'bin', 'pi.cmd'))).resolves.toBeUndefined()
-
-    const result = await execFileAsync(join(installRoot, 'bin', 'openalice'), ['--version'])
-    expect(result.stdout.trim()).toBe(productVersion)
-    const versionInfo = await execFileAsync(join(installRoot, 'bin', 'openalice'), ['version', '--json'])
-    expect(JSON.parse(versionInfo.stdout)).toEqual({
-      version: productVersion,
-      contentIdentity: releases[0].slice(-16),
-      installSource: {
-        schemaVersion: 2,
-        repository: 'TraderAlice/OpenAlice',
-        cliVersion: productVersion,
-        selector: { kind: 'version', value: 'test/ref' },
-        installerUrl: 'https://raw.githubusercontent.com/TraderAlice/OpenAlice/test/ref/install',
-        updateChannel: 'pinned',
-      },
-      managedRuntime: null,
-    })
-    await expect(access(join(installRoot, 'cli-versions', releases[0], 'install-source.json'))).resolves.toBeUndefined()
-    const pi = await execFileAsync(join(installRoot, 'bin', 'pi'), ['--version'])
-    expect(pi.stdout.trim()).toBe('0.83.0')
-    const launcher = await readFile(join(installRoot, 'bin', 'openalice'), 'utf8')
-    expect(launcher).toContain('OPENALICE_MANAGED_PI_PATH=')
-  })
-
-  it('recovers a legacy pinned release install onto stable without losing its exact ref', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'openalice-install-stable-ref-'))
-    temporaryPaths.push(home)
-    const installRoot = join(home, '.openalice')
-    const installerArgs = [
-      '--source', repositoryRoot,
-      '--version', `v${productVersion}`,
-      '--install-dir', installRoot,
-      '--no-modify-path',
-      '--yes',
-    ]
-
-    await execFileAsync('bash', [join(repositoryRoot, 'install'), ...installerArgs], {
-      env: {
-        ...installerEnv(home),
-        OPENALICE_INSTALL_CONTEXT: 'remote',
-      },
-    })
-    const [legacyRelease] = await readdir(join(installRoot, 'cli-versions'))
-    await writeFile(join(installRoot, 'cli-versions', legacyRelease, 'install-source.json'), `${JSON.stringify({
+    expect(result.stdout).toContain('Agent Runtimes remain user-owned')
+    expect(await readlink(join(installRoot, 'cli', 'current'))).toBe(`releases/${releaseName}`)
+    expect(JSON.parse(await readFile(join(installRoot, 'cli', 'activation.json'), 'utf8'))).toMatchObject({
       schemaVersion: 1,
-      repository: 'TraderAlice/OpenAlice',
-      cliVersion: productVersion,
-      selector: { kind: 'version', value: `v${productVersion}` },
-      installerUrl: `https://raw.githubusercontent.com/TraderAlice/OpenAlice/v${productVersion}/install`,
-    }, null, 2)}\n`)
-    const pinnedCheck = await execFileAsync(join(installRoot, 'bin', 'openalice'), ['update', '--check', '--json'])
-    expect(JSON.parse(pinnedCheck.stdout)).toMatchObject({ status: 'unsupported', channel: 'pinned' })
-
-    await execFileAsync('bash', [join(repositoryRoot, 'install'), ...installerArgs], {
-      env: {
-        ...installerEnv(home),
-        OPENALICE_INSTALL_CONTEXT: 'remote',
-        OPENALICE_INSTALL_UPDATE_CHANNEL: 'stable',
-      },
+      activeRelease: releaseName,
+      previousRelease: null,
+      productVersion: '0.91.0',
+      state: 'pending',
     })
-
-    const versionInfo = await execFileAsync(join(installRoot, 'bin', 'openalice'), ['version', '--json'])
-    expect(JSON.parse(versionInfo.stdout).installSource).toEqual({
-      schemaVersion: 2,
-      repository: 'TraderAlice/OpenAlice',
-      cliVersion: productVersion,
-      selector: { kind: 'version', value: `v${productVersion}` },
-      installerUrl: `https://raw.githubusercontent.com/TraderAlice/OpenAlice/v${productVersion}/install`,
-      updateChannel: 'stable',
+    const provenance = JSON.parse(await readFile(join(installRoot, 'cli', 'provenance', `${releaseName}.json`), 'utf8'))
+    expect(provenance).toMatchObject({
+      schemaVersion: 3,
+      cliVersion: '0.91.0',
+      method: 'direct',
+      artifact: { platform, arch: architecture, sha256: fixture.sha256 },
     })
+    const debug = await execFileAsync(join(installRoot, 'bin', 'openalice'), ['debug-env'])
+    const canonicalInstallRoot = await realpath(installRoot)
+    expect(debug.stdout.trim()).toBe([
+      canonicalInstallRoot,
+      join(canonicalInstallRoot, 'cli', 'releases', releaseName),
+      join(canonicalInstallRoot, 'cli', 'provenance', `${releaseName}.json`),
+      '2'.repeat(16),
+      'direct',
+    ].join('|'))
+    for (const command of ['openalice', 'alice', 'alice-workspace', 'alice-uta', 'traderhub']) {
+      await expect(access(join(installRoot, 'bin', command))).resolves.toBeUndefined()
+    }
+    await expect(access(join(installRoot, 'bin', 'pi'))).rejects.toMatchObject({ code: 'ENOENT' })
+  })
 
-    const server = createServer((_request, response) => {
-      response.setHeader('content-type', 'application/json')
-      response.end(JSON.stringify({
-        version: productVersion,
-        releaseNotesUrl: `https://github.com/TraderAlice/OpenAlice/releases/tag/v${productVersion}`,
-        installer: {
-          url: 'https://download.openalice.ai/install',
-          versionedUrl: `https://download.openalice.ai/OpenAlice-${productVersion}-install`,
-          sha256: '0'.repeat(64),
-        },
-      }))
+  it('reuses only a content-and-mode-identical installed release', async () => {
+    const fixture = await makeReleaseArchive('0.91.0', 'a'.repeat(16))
+    const installRoot = join(fixture.root, 'installed')
+    const releaseName = `0.91.0-${platform}-${architecture}-${'a'.repeat(16)}`
+    await runInstaller(fixture, installRoot, ['--yes'])
+
+    const reused = await runInstaller(fixture, installRoot, ['--yes'])
+    expect(reused.stdout).toContain(`Reusing verified release ${releaseName}.`)
+
+    const installedIndex = join(
+      installRoot,
+      'cli',
+      'releases',
+      releaseName,
+      'share',
+      'openalice',
+      'ui',
+      'dist',
+      'index.html',
+    )
+    await chmod(installedIndex, 0o600)
+    await expect(runInstaller(fixture, installRoot, ['--yes']))
+      .rejects.toMatchObject({ stderr: expect.stringContaining(`Existing release ${releaseName} is damaged`) })
+
+    await chmod(installedIndex, 0o644)
+    await writeFile(
+      installedIndex,
+      '<!doctype html><p>damaged</p>',
+    )
+    await expect(runInstaller(fixture, installRoot, ['--yes']))
+      .rejects.toMatchObject({ stderr: expect.stringContaining(`Existing release ${releaseName} is damaged`) })
+  })
+
+  it('updates by activating a new immutable release while retaining rollback state', async () => {
+    const first = await makeReleaseArchive('0.91.0', '3'.repeat(16))
+    const second = await makeReleaseArchive('0.92.0', '4'.repeat(16))
+    const installRoot = join(first.root, 'installed')
+    await runInstaller(first, installRoot, ['--yes'])
+    await runInstaller(second, installRoot, ['--yes'])
+
+    expect(await readlink(join(installRoot, 'cli', 'current')))
+      .toBe(`releases/0.92.0-${platform}-${architecture}-${'4'.repeat(16)}`)
+    expect((await readdir(join(installRoot, 'cli', 'releases'))).sort()).toEqual([
+      `0.91.0-${platform}-${architecture}-${'3'.repeat(16)}`,
+      `0.92.0-${platform}-${architecture}-${'4'.repeat(16)}`,
+    ])
+    expect(JSON.parse(await readFile(join(installRoot, 'cli', 'activation.json'), 'utf8'))).toMatchObject({
+      activeRelease: `0.92.0-${platform}-${architecture}-${'4'.repeat(16)}`,
+      previousRelease: `0.91.0-${platform}-${architecture}-${'3'.repeat(16)}`,
+      productVersion: '0.92.0',
+      state: 'pending',
+    })
+    const debug = await execFileAsync(join(installRoot, 'bin', 'openalice'), ['debug-env'])
+    expect(debug.stdout).toContain(`|${'4'.repeat(16)}|direct`)
+  })
+
+  it('cuts over a legacy installer only after the native launcher validates', async () => {
+    const fixture = await makeReleaseArchive('0.91.0', '9'.repeat(16))
+    const installRoot = join(fixture.root, 'installed')
+    await mkdir(join(installRoot, 'cli-versions', 'legacy', 'managed', 'pi'), { recursive: true })
+    await mkdir(join(installRoot, 'bin'), { recursive: true })
+    await mkdir(join(installRoot, 'data'), { recursive: true })
+    await writeFile(join(installRoot, 'bin', 'pi'), 'legacy managed Pi')
+    await writeFile(join(installRoot, 'bin', 'pi.cmd'), 'legacy managed Pi')
+    await writeFile(join(installRoot, 'bin', 'openalice.cmd'), 'legacy command')
+    await writeFile(join(installRoot, 'data', 'preserved'), 'state')
+
+    const result = await runInstaller(fixture, installRoot, ['--yes'])
+    expect(result.stdout).toContain('Removed the validated legacy CLI release and managed-Pi launchers')
+    await expect(access(join(installRoot, 'cli-versions'))).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(access(join(installRoot, 'bin', 'pi'))).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(readFile(join(installRoot, 'data', 'preserved'), 'utf8')).resolves.toBe('state')
+    await expect(execFileAsync(join(installRoot, 'bin', 'openalice'), ['--version']))
+      .resolves.toMatchObject({ stdout: '0.91.0\n' })
+  })
+
+  it('restores every legacy launcher when native validation fails after activation', async () => {
+    const fixture = await makeReleaseArchive('0.91.0', 'b'.repeat(16), {
+      failInstalledLauncher: true,
+    })
+    const installRoot = join(fixture.root, 'legacy rollback')
+    const legacyLaunchers = {
+      openalice: '#!/bin/sh\nprintf "legacy openalice\\n"\n',
+      alice: 'legacy alice\n',
+      'alice-workspace': 'legacy workspace\n',
+      'alice-uta': 'legacy uta\n',
+      traderhub: 'legacy traderhub\n',
+      pi: 'legacy pi\n',
+      'pi.cmd': 'legacy pi cmd\n',
+      'openalice.cmd': 'legacy openalice cmd\n',
+    }
+    await mkdir(join(installRoot, 'cli-versions', 'legacy'), { recursive: true })
+    await mkdir(join(installRoot, 'bin'), { recursive: true })
+    for (const [name, contents] of Object.entries(legacyLaunchers)) {
+      await writeFile(join(installRoot, 'bin', name), contents)
+    }
+    await chmod(join(installRoot, 'bin', 'openalice'), 0o755)
+
+    await expect(runInstaller(fixture, installRoot, ['--yes'])).rejects.toBeTruthy()
+
+    for (const [name, contents] of Object.entries(legacyLaunchers)) {
+      await expect(readFile(join(installRoot, 'bin', name), 'utf8')).resolves.toBe(contents)
+    }
+    await expect(access(join(installRoot, 'cli-versions', 'legacy'))).resolves.toBeUndefined()
+    await expect(access(join(installRoot, 'cli', 'current'))).rejects.toMatchObject({ code: 'ENOENT' })
+    expect(JSON.parse(await readFile(join(installRoot, 'cli', 'activation.json'), 'utf8'))).toMatchObject({
+      activeRelease: `0.91.0-${platform}-${architecture}-${'b'.repeat(16)}`,
+      previousRelease: null,
+      state: 'rolled_back',
+      failureCode: 'EINSTALL',
+    })
+  })
+
+  it('retains the exact pending rollback release even when retention is one', async () => {
+    const first = await makeReleaseArchive('0.91.0', 'a'.repeat(16))
+    const second = await makeReleaseArchive('0.92.0', 'b'.repeat(16))
+    const installRoot = join(first.root, 'installed')
+    await runInstaller(first, installRoot, ['--yes'], { OPENALICE_INSTALL_KEEP_RELEASES: '1' })
+    await runInstaller(second, installRoot, ['--yes'], { OPENALICE_INSTALL_KEEP_RELEASES: '1' })
+
+    expect((await readdir(join(installRoot, 'cli', 'releases'))).sort()).toEqual([
+      `0.91.0-${platform}-${architecture}-${'a'.repeat(16)}`,
+      `0.92.0-${platform}-${architecture}-${'b'.repeat(16)}`,
+    ])
+  })
+
+  it('restores the exact previous pointer when installation fails after activation', async () => {
+    const first = await makeReleaseArchive('0.91.0', 'c'.repeat(16))
+    const second = await makeReleaseArchive('0.92.0', 'd'.repeat(16))
+    const installRoot = join(first.root, 'installed')
+    const previousName = `0.91.0-${platform}-${architecture}-${'c'.repeat(16)}`
+    const failedName = `0.92.0-${platform}-${architecture}-${'d'.repeat(16)}`
+    await runInstaller(first, installRoot, ['--yes'])
+    await mkdir(join(installRoot, 'data'), { recursive: true })
+    await writeFile(join(installRoot, 'data', 'preserved'), 'state')
+    await rm(join(installRoot, 'bin', 'openalice'))
+    await mkdir(join(installRoot, 'bin', 'openalice'))
+
+    await expect(runInstaller(second, installRoot, ['--yes'])).rejects.toBeTruthy()
+    expect(await readlink(join(installRoot, 'cli', 'current'))).toBe(`releases/${previousName}`)
+    expect(JSON.parse(await readFile(join(installRoot, 'cli', 'activation.json'), 'utf8'))).toMatchObject({
+      activeRelease: failedName,
+      previousRelease: previousName,
+      state: 'rolled_back',
+      failureCode: 'EINSTALL',
+    })
+    await expect(readFile(join(installRoot, 'data', 'preserved'), 'utf8')).resolves.toBe('state')
+  })
+
+  it('rejects missing consent and a bad archive checksum before activation', async () => {
+    const fixture = await makeReleaseArchive('0.91.0', '5'.repeat(16))
+    const installRoot = join(fixture.root, 'installed')
+    await expect(runInstaller(fixture, installRoot, [])).rejects.toMatchObject({
+      code: 2,
+      stderr: expect.stringContaining('No interactive terminal'),
+    })
+    await expect(runInstaller({ ...fixture, sha256: '0'.repeat(64) }, installRoot, ['--yes']))
+      .rejects.toMatchObject({ stderr: expect.stringContaining('SHA-256 verification') })
+    await expect(access(join(installRoot, 'cli', 'current'))).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('recovers a stale lock and refuses to race a live installer', async () => {
+    const fixture = await makeReleaseArchive('0.91.0', '6'.repeat(16))
+    const installRoot = join(fixture.root, 'installed')
+    const lockDir = join(installRoot, '.cli-install.lock')
+    await mkdir(lockDir, { recursive: true })
+    await writeFile(join(lockDir, 'pid'), '99999999\n')
+    const recovered = await runInstaller(fixture, installRoot, ['--yes'])
+    expect(recovered.stdout).toContain('Removing a stale CLI installer lock')
+
+    await mkdir(lockDir)
+    await writeFile(join(lockDir, 'pid'), `${process.pid}\n`)
+    await expect(runInstaller(fixture, installRoot, ['--yes']))
+      .rejects.toMatchObject({ stderr: expect.stringContaining('installer is running') })
+  })
+
+  it('uses the fixed dev-channel archive and records dev provenance', async () => {
+    const fixture = await makeReleaseArchive('0.92.0', '7'.repeat(16))
+    const installRoot = join(fixture.root, 'installed')
+    const server = createServer(async (request, response) => {
+      if (request.url?.endsWith('.sha256')) {
+        response.end(`${fixture.sha256}  archive.tar.gz\n`)
+        return
+      }
+      response.end(await readFile(fixture.archive))
     })
     await new Promise((resolvePromise, rejectPromise) => {
       server.once('error', rejectPromise)
@@ -235,187 +272,412 @@ describe.skipIf(process.platform === 'win32')('OpenAlice CLI installer', { timeo
     })
     try {
       const address = server.address()
-      const stableCheck = await execFileAsync(join(installRoot, 'bin', 'openalice'), ['update', '--check', '--json'], {
+      await execFileAsync('bash', [installer,
+        '--branch', 'dev',
+        '--install-dir', installRoot,
+        '--no-modify-path',
+        '--yes',
+      ], {
         env: {
           ...process.env,
-          OPENALICE_UPDATE_MANIFEST_URL: `http://127.0.0.1:${address.port}/manifest.json`,
+          HOME: fixture.root,
+          OPENALICE_DOWNLOAD_BASE_URL: `http://127.0.0.1:${address.port}`,
         },
       })
-      expect(JSON.parse(stableCheck.stdout)).toMatchObject({
-        status: 'current',
-        currentVersion: productVersion,
-        latestVersion: productVersion,
-        channel: 'stable',
+      const [provenanceName] = await readdir(join(installRoot, 'cli', 'provenance'))
+      const provenance = JSON.parse(await readFile(join(installRoot, 'cli', 'provenance', provenanceName), 'utf8'))
+      expect(provenance).toMatchObject({
+        selector: { kind: 'branch', value: 'dev' },
+        updateChannel: 'development',
+        installerUrl: 'https://raw.githubusercontent.com/TraderAlice/OpenAlice/dev/install',
       })
     } finally {
       await new Promise((resolvePromise) => server.close(resolvePromise))
     }
   })
 
-  it('can show the complete plan without creating the install root', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'openalice-install-plan-'))
-    temporaryPaths.push(home)
-    const installRoot = join(home, '.openalice')
-    const installer = join(repositoryRoot, 'install')
-    const result = await execFileAsync('bash', [installer,
-      '--source', repositoryRoot,
-      '--version', 'plan-only',
+  it('writes a sourceable PATH entry for install roots containing spaces and quotes', async () => {
+    const fixture = await makeReleaseArchive('0.91.0', 'c'.repeat(16))
+    const installRoot = join(fixture.root, "install root's")
+    const home = join(fixture.root, 'profile home')
+    await mkdir(home)
+
+    await execFileAsync('bash', [installer,
+      '--archive', fixture.archive,
+      '--sha256', fixture.sha256,
       '--install-dir', installRoot,
-      '--no-modify-path',
-      '--plan',
-    ], { env: installerEnv(home) })
-
-    expect(result.stdout).toContain('Install plan')
-    expect(result.stdout).toContain('Plan complete')
-    await expect(access(installRoot)).rejects.toMatchObject({ code: 'ENOENT' })
-  })
-
-  it('rejects a payload that does not match the update manifest version', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'openalice-install-expected-version-'))
-    temporaryPaths.push(home)
-    await expect(execFileAsync('bash', [join(repositoryRoot, 'install'),
-      '--source', repositoryRoot,
-      '--install-dir', join(home, '.openalice'),
-      '--no-modify-path',
       '--yes',
     ], {
-      env: {
-        ...installerEnv(home),
-        OPENALICE_EXPECTED_CLI_VERSION: '999.0.0',
-      },
-    })).rejects.toMatchObject({
-      stderr: expect.stringContaining('instead of expected release 999.0.0'),
+      env: { ...process.env, HOME: home, SHELL: '/bin/bash' },
     })
-    await expect(access(join(home, '.openalice', 'bin', 'openalice')))
-      .rejects.toMatchObject({ code: 'ENOENT' })
+
+    const profile = join(home, process.platform === 'darwin' ? '.bash_profile' : '.bashrc')
+    const profileContents = await readFile(profile, 'utf8')
+    expect(profileContents).toContain("export PATH='")
+    expect(profileContents).toContain("'\\''")
+    const sourced = await execFileAsync('bash', [
+      '-c',
+      '. "$1"; printf "%s\\n" "$PATH"',
+      'openalice-path-test',
+      profile,
+    ], { env: { ...process.env, PATH: '/usr/bin:/bin' } })
+    expect(sourced.stdout.trim().split(':')[0]).toBe(join(installRoot, 'bin'))
   })
 
-  it('requires explicit approval when no interactive terminal is available', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'openalice-install-unattended-'))
-    temporaryPaths.push(home)
-    const installRoot = join(home, '.openalice')
-    const installer = join(repositoryRoot, 'install')
+  it.each([
+    ['stable', '0.92.0'],
+    ['beta', '0.92.0-beta.1'],
+  ])('resolves and records the %s channel through the shared installer', async (channel, version) => {
+    const fixture = await makeReleaseArchive(version, channel === 'stable' ? 'e'.repeat(16) : 'f'.repeat(16))
+    const installRoot = join(fixture.root, 'installed')
+    const server = createServer(async (request, response) => {
+      if (request.url === '/releases/latest') {
+        response.setHeader('content-type', 'application/json')
+        response.end(JSON.stringify({ tag_name: `v${version}` }))
+        return
+      }
+      if (request.url === '/beta/manifest.json') {
+        response.setHeader('content-type', 'application/json')
+        response.end(JSON.stringify({ channel: 'beta', version }))
+        return
+      }
+      if (request.url?.endsWith('.sha256')) {
+        response.end(`${fixture.sha256}  archive.tar.gz\n`)
+        return
+      }
+      response.end(await readFile(fixture.archive))
+    })
+    await new Promise((resolvePromise, rejectPromise) => {
+      server.once('error', rejectPromise)
+      server.listen(0, '127.0.0.1', resolvePromise)
+    })
+    try {
+      const address = server.address()
+      const baseUrl = `http://127.0.0.1:${address.port}`
+      await execFileAsync('bash', [installer,
+        '--channel', channel,
+        '--install-dir', installRoot,
+        '--no-modify-path',
+        '--yes',
+      ], {
+        env: {
+          ...process.env,
+          HOME: fixture.root,
+          OPENALICE_DOWNLOAD_BASE_URL: baseUrl,
+          OPENALICE_RELEASES_API_URL: `${baseUrl}/releases/latest`,
+          OPENALICE_RELEASE_ASSET_BASE_URL: baseUrl,
+        },
+      })
+      const [provenanceName] = await readdir(join(installRoot, 'cli', 'provenance'))
+      const provenance = JSON.parse(await readFile(join(installRoot, 'cli', 'provenance', provenanceName), 'utf8'))
+      expect(provenance).toMatchObject({
+        selector: { kind: 'version', value: `v${version}` },
+        updateChannel: channel,
+        installerUrl: 'https://openalice.ai/install',
+      })
+    } finally {
+      await new Promise((resolvePromise) => server.close(resolvePromise))
+    }
+  })
 
+  it('bridges fresh latest and exact v0.90.1 installs with explicit update ownership', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-legacy-stable-'))
+    temporaryPaths.push(root)
+    const receipt = join(root, 'receipt.txt')
+    const installRoot = join(root, 'install root')
+    const legacyInstaller = Buffer.from(`#!/usr/bin/env bash
+{
+  printf 'url=%s\\n' "$OPENALICE_INSTALL_URL"
+  printf 'install-update=%s\\n' "$OPENALICE_INSTALL_UPDATE_CHANNEL"
+  printf 'installer-update=%s\\n' "$OPENALICE_INSTALLER_UPDATE_CHANNEL"
+  printf 'args='
+  printf '<%s>' "$@"
+  printf '\\n'
+} > "$OPENALICE_LEGACY_TEST_RECEIPT"
+`)
+    const legacySha256 = createHash('sha256').update(legacyInstaller).digest('hex')
+    const server = createServer((request, response) => {
+      if (request.url === '/releases/latest') {
+        response.setHeader('content-type', 'application/json')
+        response.end(JSON.stringify({ tag_name: 'v0.90.1' }))
+      } else if (request.url === '/legacy-install') {
+        response.end(legacyInstaller)
+      } else {
+        response.statusCode = 404
+        response.end()
+      }
+    })
+    await new Promise((resolvePromise, rejectPromise) => {
+      server.once('error', rejectPromise)
+      server.listen(0, '127.0.0.1', resolvePromise)
+    })
+    try {
+      const address = server.address()
+      const baseUrl = `http://127.0.0.1:${address.port}`
+      await execFileAsync('bash', [installer,
+        '--install-dir', installRoot,
+        '--no-modify-path',
+        '--plan',
+      ], {
+        env: {
+          ...process.env,
+          HOME: root,
+          OPENALICE_RELEASES_API_URL: `${baseUrl}/releases/latest`,
+          OPENALICE_LEGACY_STABLE_INSTALLER_URL: `${baseUrl}/legacy-install`,
+          OPENALICE_LEGACY_STABLE_INSTALLER_SHA256: legacySha256,
+          OPENALICE_LEGACY_TEST_RECEIPT: receipt,
+          OPENALICE_INSTALL_UPDATE_CHANNEL: 'dev',
+          OPENALICE_INSTALLER_UPDATE_CHANNEL: 'dev',
+        },
+      })
+      expect(await readFile(receipt, 'utf8')).toBe([
+        'url=https://openalice.ai/install',
+        'install-update=stable',
+        'installer-update=stable',
+        `args=<--install-dir><${installRoot}><--no-modify-path><--plan>`,
+        '',
+      ].join('\n'))
+
+      const pinnedRoot = join(root, 'pinned install')
+      await execFileAsync('bash', [installer,
+        '--version', '0.90.1',
+        '--install-dir', pinnedRoot,
+        '--no-modify-path',
+        '--plan',
+      ], {
+        env: {
+          ...process.env,
+          HOME: root,
+          OPENALICE_LEGACY_STABLE_INSTALLER_URL: `${baseUrl}/legacy-install`,
+          OPENALICE_LEGACY_STABLE_INSTALLER_SHA256: legacySha256,
+          OPENALICE_LEGACY_TEST_RECEIPT: receipt,
+          OPENALICE_INSTALL_UPDATE_CHANNEL: 'dev',
+          OPENALICE_INSTALLER_UPDATE_CHANNEL: 'dev',
+        },
+      })
+      expect(await readFile(receipt, 'utf8')).toBe([
+        'url=https://openalice.ai/install',
+        'install-update=pinned',
+        'installer-update=pinned',
+        `args=<--install-dir><${pinnedRoot}><--no-modify-path><--plan>`,
+        '',
+      ].join('\n'))
+
+      const channelRoot = join(root, 'stable channel install')
+      await execFileAsync('bash', [installer,
+        '--channel', 'stable',
+        '--version', '0.90.1',
+        '--install-dir', channelRoot,
+        '--no-modify-path',
+        '--plan',
+      ], {
+        env: {
+          ...process.env,
+          HOME: root,
+          OPENALICE_LEGACY_STABLE_INSTALLER_URL: `${baseUrl}/legacy-install`,
+          OPENALICE_LEGACY_STABLE_INSTALLER_SHA256: legacySha256,
+          OPENALICE_LEGACY_TEST_RECEIPT: receipt,
+        },
+      })
+      expect(await readFile(receipt, 'utf8')).toBe([
+        'url=https://openalice.ai/install',
+        'install-update=stable',
+        'installer-update=stable',
+        `args=<--install-dir><${channelRoot}><--no-modify-path><--plan>`,
+        '',
+      ].join('\n'))
+    } finally {
+      await new Promise((resolvePromise) => server.close(resolvePromise))
+    }
+  })
+
+  it('refuses to replace a native CLI with the legacy v0.90.1 stable layout', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-native-stable-refusal-'))
+    temporaryPaths.push(root)
+    const installRoot = join(root, 'native install')
+    await mkdir(join(installRoot, 'cli', 'releases'), { recursive: true })
+    let legacyInstallerRequests = 0
+    const server = createServer((request, response) => {
+      if (request.url === '/releases/latest') {
+        response.setHeader('content-type', 'application/json')
+        response.end(JSON.stringify({ tag_name: 'v0.90.1' }))
+      } else if (request.url === '/legacy-install') {
+        legacyInstallerRequests += 1
+        response.end('#!/usr/bin/env bash\nexit 0\n')
+      } else {
+        response.statusCode = 404
+        response.end()
+      }
+    })
+    await new Promise((resolvePromise, rejectPromise) => {
+      server.once('error', rejectPromise)
+      server.listen(0, '127.0.0.1', resolvePromise)
+    })
+    try {
+      const address = server.address()
+      const baseUrl = `http://127.0.0.1:${address.port}`
+      await expect(execFileAsync('bash', [installer,
+        '--channel', 'stable',
+        '--install-dir', installRoot,
+        '--plan',
+      ], {
+        env: {
+          ...process.env,
+          HOME: root,
+          OPENALICE_RELEASES_API_URL: `${baseUrl}/releases/latest`,
+          OPENALICE_LEGACY_STABLE_INSTALLER_URL: `${baseUrl}/legacy-install`,
+        },
+      })).rejects.toMatchObject({
+        stderr: expect.stringContaining('cannot safely replace a native CLI installation'),
+      })
+      await expect(execFileAsync('bash', [installer,
+        '--version', '0.90.1',
+        '--install-dir', installRoot,
+        '--plan',
+      ], { env: { ...process.env, HOME: root } })).rejects.toMatchObject({
+        stderr: expect.stringContaining('cannot safely replace a native CLI installation'),
+      })
+      expect(legacyInstallerRequests).toBe(0)
+    } finally {
+      await new Promise((resolvePromise) => server.close(resolvePromise))
+    }
+  })
+
+  it('keeps --version pinned unless an update channel is explicit', async () => {
+    const fixture = await makeReleaseArchive('0.92.0', '0'.repeat(16))
+    const installRoot = join(fixture.root, 'pinned')
+    const server = createServer(async (request, response) => {
+      if (request.url?.endsWith('.sha256')) response.end(`${fixture.sha256}  archive.tar.gz\n`)
+      else response.end(await readFile(fixture.archive))
+    })
+    await new Promise((resolvePromise, rejectPromise) => {
+      server.once('error', rejectPromise)
+      server.listen(0, '127.0.0.1', resolvePromise)
+    })
+    try {
+      const address = server.address()
+      await execFileAsync('bash', [installer,
+        '--version', '0.92.0',
+        '--install-dir', installRoot,
+        '--no-modify-path',
+        '--yes',
+      ], {
+        env: {
+          ...process.env,
+          HOME: fixture.root,
+          OPENALICE_RELEASE_ASSET_BASE_URL: `http://127.0.0.1:${address.port}`,
+        },
+      })
+      const [provenanceName] = await readdir(join(installRoot, 'cli', 'provenance'))
+      const provenance = JSON.parse(await readFile(join(installRoot, 'cli', 'provenance', provenanceName), 'utf8'))
+      expect(provenance).toMatchObject({ updateChannel: 'pinned' })
+    } finally {
+      await new Promise((resolvePromise) => server.close(resolvePromise))
+    }
+    await expect(execFileAsync('bash', [installer, '--channel', 'beta', '--version', '0.92.0', '--plan'], {
+      env: { ...process.env, HOME: fixture.root },
+    })).rejects.toMatchObject({ stderr: expect.stringContaining('--channel beta requires a beta --version') })
+  })
+
+  it('accepts the v0.90.1 updater handoff as a stable install', async () => {
+    const fixture = await makeReleaseArchive('0.92.0', '1'.repeat(16))
+    const installRoot = join(fixture.root, 'legacy-updater')
+    const server = createServer(async (request, response) => {
+      if (request.url === '/releases/latest') {
+        response.setHeader('content-type', 'application/json')
+        response.end(JSON.stringify({ tag_name: 'v0.92.0' }))
+      } else if (request.url?.endsWith('.sha256')) {
+        response.end(`${fixture.sha256}  archive.tar.gz\n`)
+      } else {
+        response.end(await readFile(fixture.archive))
+      }
+    })
+    await new Promise((resolvePromise, rejectPromise) => {
+      server.once('error', rejectPromise)
+      server.listen(0, '127.0.0.1', resolvePromise)
+    })
+    try {
+      const address = server.address()
+      const baseUrl = `http://127.0.0.1:${address.port}`
+      await execFileAsync('bash', [installer,
+        '--install-dir', installRoot,
+        '--no-modify-path',
+        '--yes',
+      ], {
+        env: {
+          ...process.env,
+          HOME: fixture.root,
+          OPENALICE_EXPECTED_CLI_VERSION: '0.92.0',
+          OPENALICE_RELEASES_API_URL: `${baseUrl}/releases/latest`,
+          OPENALICE_RELEASE_ASSET_BASE_URL: baseUrl,
+        },
+      })
+      const [provenanceName] = await readdir(join(installRoot, 'cli', 'provenance'))
+      const provenance = JSON.parse(await readFile(join(installRoot, 'cli', 'provenance', provenanceName), 'utf8'))
+      expect(provenance).toMatchObject({ updateChannel: 'stable' })
+    } finally {
+      await new Promise((resolvePromise) => server.close(resolvePromise))
+    }
+  })
+
+  it('rejects conflicting selectors', async () => {
+    const fixture = await makeReleaseArchive('0.91.0', '8'.repeat(16))
     await expect(execFileAsync('bash', [installer,
-      '--source', repositoryRoot,
-      '--version', 'unattended',
-      '--install-dir', installRoot,
-      '--no-modify-path',
-    ], { env: installerEnv(home) })).rejects.toMatchObject({
-      code: 2,
-      stderr: expect.stringContaining('--yes'),
+      '--archive', fixture.archive,
+      '--version', '0.91.0',
+      '--sha256', fixture.sha256,
+      '--plan',
+    ], { env: { ...process.env, HOME: fixture.root } })).rejects.toMatchObject({
+      stderr: expect.stringContaining('--version cannot be combined with --archive'),
     })
-
-    await expect(access(installRoot)).rejects.toMatchObject({ code: 'ENOENT' })
-  })
-
-  it('treats blank interactive confirmation as cancellation', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'openalice-install-cancel-'))
-    temporaryPaths.push(home)
-    const installRoot = join(home, '.openalice')
-    const result = await runInstallerInPty([
-      '--source', repositoryRoot,
-      '--version', 'interactive-cancel',
-      '--install-dir', installRoot,
-      '--no-modify-path',
-    ], { home, reply: '\r' })
-
-    expect(result.exitCode).toBe(0)
-    expect(result.output).toContain('Continue with this install?')
-    expect(result.output).toContain('[y/N]')
-    expect(result.output).toContain('No changes made')
-    await expect(access(installRoot)).rejects.toMatchObject({ code: 'ENOENT' })
-  })
-
-  it('installs after an explicit interactive y confirmation', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'openalice-install-confirm-'))
-    temporaryPaths.push(home)
-    const installRoot = join(home, '.openalice')
-    const result = await runInstallerInPty([
-      '--source', repositoryRoot,
-      '--version', 'interactive-confirm',
-      '--install-dir', installRoot,
-      '--no-modify-path',
-    ], { home, reply: 'y\r' })
-
-    expect(result.exitCode).toBe(0)
-    expect(result.output).toContain('Continue with this install?')
-    expect(result.output).toContain('OpenAlice and Pi are ready')
-    expect(result.output).toContain('Open the OpenAlice Supervisor now?')
-    expect(result.output).toContain('Start it when you are ready')
-    await expect(access(join(installRoot, 'bin', 'openalice'))).resolves.toBeUndefined()
-  })
-
-  it('refuses to race another live installer', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'openalice-install-lock-'))
-    temporaryPaths.push(home)
-    const installRoot = join(home, '.openalice')
-    const lockDir = join(installRoot, '.cli-install.lock')
-    const installer = join(repositoryRoot, 'install')
-    await mkdir(lockDir, { recursive: true })
-    await writeFile(join(lockDir, 'pid'), `${process.pid}\n`)
-
-    await expect(execFileAsync('bash', [installer,
-      '--source', repositoryRoot,
-      '--version', 'locked',
-      '--install-dir', installRoot,
-      '--no-modify-path',
-      '--yes',
-    ], { env: installerEnv(home) })).rejects.toMatchObject({
-      stderr: expect.stringContaining('Another OpenAlice CLI installer is running'),
-    })
-
-    await expect(access(join(installRoot, 'bin', 'openalice'))).rejects.toMatchObject({ code: 'ENOENT' })
   })
 })
 
-function runInstallerInPty(args, { home, reply }) {
-  return new Promise((resolvePromise, rejectPromise) => {
-    const terminal = pty.spawn('bash', [join(repositoryRoot, 'install'), ...args], {
-      cwd: repositoryRoot,
-      cols: 120,
-      rows: 32,
-      env: {
-        ...installerEnv(home),
-        SHELL: '/bin/bash',
-        TERM: 'xterm-256color',
-      },
-    })
-    let output = ''
-    let replied = false
-    let declinedStart = false
-    const timeout = setTimeout(() => {
-      terminal.kill()
-      rejectPromise(new Error(`installer PTY timed out:\n${output}`))
-    }, 20_000)
-
-    terminal.onData((data) => {
-      output += data
-      if (!replied && output.includes('Continue with this install?')) {
-        replied = true
-        terminal.write(reply)
-      }
-      if (!declinedStart && output.includes('Open the OpenAlice Supervisor now?')) {
-        declinedStart = true
-        terminal.write('n\r')
-      }
-    })
-    terminal.onExit(({ exitCode, signal }) => {
-      clearTimeout(timeout)
-      resolvePromise({ exitCode, signal, output })
-    })
-  })
+async function runInstaller(fixture, installRoot, extraArgs, extraEnv = {}) {
+  return await execFileAsync('bash', [installer,
+    '--archive', fixture.archive,
+    '--sha256', fixture.sha256,
+    '--install-dir', installRoot,
+    '--no-modify-path',
+    ...extraArgs,
+  ], { env: { ...process.env, HOME: fixture.root, ...extraEnv } })
 }
 
-function installerEnv(home) {
+async function makeReleaseArchive(version, contentIdentity, options = {}) {
+  const root = await mkdtemp(join(tmpdir(), 'openalice-native-installer-'))
+  temporaryPaths.push(root)
+  const releaseName = `openalice-cli-${version}-${platform}-${architecture}`
+  const release = join(root, releaseName)
+  await mkdir(join(release, 'bin'), { recursive: true })
+  await mkdir(join(release, 'share', 'openalice', 'ui', 'dist'), { recursive: true })
+  const executable = join(release, 'bin', 'openalice')
+  const installedLauncherFailure = options.failInstalledLauncher
+    ? 'if [ "${OPENALICE_INSTALL_METHOD:-}" = "direct" ]; then exit 42; fi\n'
+    : ''
+  await writeFile(executable, `#!/bin/sh
+set -eu
+${installedLauncherFailure}if [ "\${1:-}" = "--version" ]; then printf '%s\\n' '${version}'; exit 0; fi
+if [ "\${1:-}" = "debug-env" ]; then
+  printf '%s|%s|%s|%s|%s\\n' "\$OPENALICE_INSTALL_ROOT" "\$OPENALICE_RELEASE_DIR" "\$OPENALICE_INSTALL_SOURCE" "\$OPENALICE_CONTENT_IDENTITY" "\$OPENALICE_INSTALL_METHOD"
+  exit 0
+fi
+printf 'fixture %s\\n' '${version}'
+`)
+  await chmod(executable, 0o755)
+  await writeFile(join(release, 'share', 'openalice', 'ui', 'dist', 'index.html'), '<!doctype html>')
+  await writeFile(join(release, 'release.json'), `${JSON.stringify({
+    schemaVersion: 1,
+    version,
+    platform,
+    arch: architecture,
+    contentIdentity,
+  })}\n`)
+  const archive = join(root, `${releaseName}.tar.gz`)
+  await execFileAsync('tar', ['-czf', archive, '-C', root, releaseName])
+  const bytes = await readFile(archive)
   return {
-    ...process.env,
-    HOME: home,
-    OPENALICE_NPM_BIN: fakeNpm,
-    OPENALICE_PI_SOURCE_DIR: piAssets,
+    root,
+    archive,
+    sha256: createHash('sha256').update(bytes).digest('hex'),
   }
-}
-
-function sha256(bytes) {
-  return createHash('sha256').update(bytes).digest('hex')
 }

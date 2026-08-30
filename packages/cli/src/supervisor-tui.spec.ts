@@ -13,16 +13,23 @@ import {
 const matchesKey = (data: string, key: string) => data === key
 
 describe('Supervisor TUI screen', () => {
-  it('labels source-run, branch, and version channels from install provenance', async () => {
+  it('labels source-run, stable, beta, and dev channels from install provenance', async () => {
     await expect(resolveSupervisorChannel({
       resolveLayout: () => null,
-    })).resolves.toBe('development')
+    })).resolves.toBe('dev')
     await expect(resolveSupervisorChannel({
       resolveLayout: () => ({}),
       readSource: async () => ({
         selector: { kind: 'branch', value: 'dev' },
       }),
-    })).resolves.toBe('branch dev')
+    })).resolves.toBe('dev')
+    await expect(resolveSupervisorChannel({
+      resolveLayout: () => ({}),
+      readSource: async () => ({
+        updateChannel: 'beta',
+        selector: { kind: 'version', value: 'v0.90.2-beta.1' },
+      }),
+    })).resolves.toBe('beta')
     await expect(resolveSupervisorChannel({
       resolveLayout: () => ({}),
       readSource: async () => ({
@@ -45,7 +52,7 @@ describe('Supervisor TUI screen', () => {
 
     const lines = screen.render(80)
 
-    expect(lines).toContain('OpenAlice  0.87.0-beta  dev')
+    expect(lines).toContain('OpenAlice  0.87.0-beta  channel dev')
     expect(lines).toContain('Runtime state: absent')
     expect(lines.join('\n')).toContain('Enter Start & open · s Background · p Setup')
     expect(lines.join('\n')).toContain('i AliceProjects')
@@ -952,11 +959,13 @@ describe('Supervisor TUI screen', () => {
         status: 'available',
         currentVersion: '0.89.4-beta',
         latestVersion: '0.90.0',
+        channel: 'stable',
+        sourceChannel: 'stable',
       },
       confirmation: 'update',
     })
     const confirmation = screen.render(100).join('\n')
-    expect(confirmation).toContain('Install OpenAlice 0.90.0 now?')
+    expect(confirmation).toContain('Install OpenAlice 0.90.0 from stable now?')
     expect(confirmation).toContain('will not reload')
     expect(confirmation).toContain('run openalice again')
 
@@ -1099,6 +1108,21 @@ describe('Supervisor TUI screen', () => {
   it('installs an available update from the TUI after confirmation', async () => {
     const calls: string[] = []
     let inputListener: ((data: string) => unknown) | undefined
+    class FakeSelectList {
+      onSelect?: (item: { value: string }) => void
+      onCancel?: () => void
+      private index = 0
+
+      constructor(private readonly items: Array<{ value: string }>) {}
+      setSelectedIndex(index: number): void { this.index = index }
+      render(): string[] { return this.items.map((item) => item.value) }
+      invalidate(): void {}
+      handleInput(data: string): void {
+        if (data === 'down') this.index = Math.min(this.items.length - 1, this.index + 1)
+        if (data === 'enter') this.onSelect?.(this.items[this.index]!)
+        if (data === 'escape') this.onCancel?.()
+      }
+    }
     class FakeTui {
       addChild(): void {}
       addInputListener(listener: (data: string) => unknown): () => void {
@@ -1107,6 +1131,15 @@ describe('Supervisor TUI screen', () => {
       }
       requestRender(): void {}
       setShowHardwareCursor(): void {}
+      showOverlay(component: { handleInput?(data: string): void }) {
+        return {
+          hide: () => undefined,
+          focus: () => {
+            component.handleInput?.('down')
+            component.handleInput?.('enter')
+          },
+        }
+      }
       start(): void {
         queueMicrotask(() => inputListener?.('u'))
       }
@@ -1128,21 +1161,23 @@ describe('Supervisor TUI screen', () => {
       start: async () => {
         calls.push('start')
       },
-      checkUpdate: async () => {
-        calls.push('check')
+      checkUpdate: async (channel) => {
+        calls.push(`check:${channel}`)
         setTimeout(() => inputListener?.('enter'), 0)
         return {
           status: 'available',
           currentVersion: '0.89.4-beta',
-          latestVersion: '0.90.0',
+          latestVersion: '0.90.2-beta.1',
+          channel,
+          sourceChannel: 'stable',
           installer: {
-            versionedUrl: 'https://download.openalice.ai/OpenAlice-0.90.0-install',
+            versionedUrl: 'https://download.openalice.ai/OpenAlice-0.90.2-beta.1-install',
             sha256: 'a'.repeat(64),
           },
         }
       },
       applyUpdate: async (result) => {
-        calls.push(`apply:${result.latestVersion}`)
+        calls.push(`apply:${result.channel}:${result.latestVersion}`)
         queueMicrotask(() => inputListener?.('q'))
         return 0
       },
@@ -1150,13 +1185,70 @@ describe('Supervisor TUI screen', () => {
       loadTui: async () => ({
         ProcessTerminal: class {},
         TUI: FakeTui,
+        SelectList: FakeSelectList,
         matchesKey,
       }) as never,
       version: '0.89.4-beta',
       channel: 'stable',
     })).resolves.toBe(0)
 
-    expect(calls).toEqual(['check', 'apply:0.90.0'])
+    expect(calls).toEqual(['check:beta', 'apply:beta:0.90.2-beta.1'])
+  })
+
+  it('does not replace a package-manager installation from the TUI', async () => {
+    let inputListener: ((data: string) => unknown) | undefined
+    const applyUpdate = vi.fn(async () => 0)
+    class FakeSelectList {
+      onSelect?: (item: { value: string }) => void
+      constructor(private readonly items: Array<{ value: string }>) {}
+      setSelectedIndex(): void {}
+      render(): string[] { return [] }
+      invalidate(): void {}
+      handleInput(data: string): void {
+        if (data === 'enter') this.onSelect?.(this.items[0]!)
+      }
+    }
+    class FakeTui {
+      addChild(): void {}
+      addInputListener(listener: (data: string) => unknown): () => void { inputListener = listener; return () => undefined }
+      requestRender(): void {}
+      setShowHardwareCursor(): void {}
+      showOverlay(component: { handleInput?(data: string): void }) {
+        return { hide: () => undefined, focus: () => component.handleInput?.('enter') }
+      }
+      start(): void { queueMicrotask(() => inputListener?.('u')) }
+      stop(): void {}
+    }
+
+    await expect(runSupervisorTui({}, {
+      stdin: { isTTY: true } as NodeJS.ReadStream,
+      stdout: { isTTY: true } as NodeJS.WriteStream,
+      resolveContext: () => resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' }),
+      inspect: async () => ({ class: 'absent', owner: null, endpoints: {} }),
+      checkUpdate: async (channel) => {
+        setTimeout(() => inputListener?.('q'), 0)
+        return {
+          status: 'available',
+          currentVersion: '0.90.1',
+          latestVersion: '0.90.2',
+          channel,
+          sourceChannel: 'stable',
+          packageManager: { label: 'Homebrew', update: 'brew upgrade traderalice/tap/openalice' },
+          installer: { versionedUrl: 'https://example.test/install', sha256: 'a'.repeat(64) },
+        }
+      },
+      applyUpdate,
+      discoverUpdate: async () => null,
+      loadTui: async () => ({
+        ProcessTerminal: class {},
+        TUI: FakeTui,
+        SelectList: FakeSelectList,
+        matchesKey,
+      }) as never,
+      channel: 'stable',
+    })).resolves.toBe(0)
+
+    expect(applyUpdate).not.toHaveBeenCalled()
   })
 })
 

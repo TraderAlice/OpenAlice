@@ -41,6 +41,16 @@ function candidateScore(count: number, columns: number): number {
 }
 
 export function layoutOfficeMap(inputs: readonly OfficeMapLayoutInput[]): OfficeMapLayout {
+  if (inputs.length === 0) {
+    return {
+      width: 960,
+      height: 672,
+      columns: 0,
+      rows: 0,
+      alice: { x: 480, y: 336 },
+      pods: [],
+    }
+  }
   const count = Math.max(1, inputs.length)
   let columns = 1
   let bestScore = Number.POSITIVE_INFINITY

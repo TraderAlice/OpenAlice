@@ -270,31 +270,33 @@ describe('telegram desk ingest and stamp', () => {
     )
     expect(created.ok).toBe(true)
     const { client } = mockClient()
-    const result = await ingestTelegramOwnerMessages(host(), [
-      { connectorId: 'telegram', userId: '42', text: '那个事情我想了想你再改改' },
-      { connectorId: 'telegram', userId: '42', text: '算了不用改了,就这样吧' },
-    ], client)
+    const messages = [
+      { connectorId: 'telegram', eventId: '101', userId: '42', text: '那个事情我想了想你再改改' },
+      { connectorId: 'telegram', eventId: '102', userId: '42', text: '算了不用改了,就这样吧' },
+    ]
+    const result = await ingestTelegramOwnerMessages(host(), messages, client)
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.comment.markdown).toBe([
       '> 那个事情我想了想你再改改',
       '> 算了不用改了,就这样吧',
     ].join('\n'))
+    const replayed = await ingestTelegramOwnerMessages(host(), messages, client)
+    expect(replayed.ok && replayed.comment.id).toBe(result.comment.id)
     const comments = await readIssueComments(wsDir, created.ok ? created.issue.id : 'telegram-phone-desk')
     expect(comments.ok && comments.comments).toHaveLength(1)
   })
 
   it('returns inbound when no live desk exists yet', async () => {
-    const returned: unknown[] = []
+    const returned: string[] = []
     const client = {
-      drainInbound: async () => [{ connectorId: 'telegram', userId: '42', text: 'queued' }],
-      returnInbound: async (messages: unknown[]) => {
-        returned.push(...messages)
-      },
+      claimInbound: async () => ({ claimId: 'claim-1', items: [{ queueId: 'in-1', eventId: '1', connectorId: 'telegram', userId: '42', text: 'queued' }] }),
+      releaseInbound: async (_claimId: string, itemIds: string[]) => { returned.push(...itemIds) },
+      ackInbound: async () => undefined,
     } as unknown as ConnectorClient
 
     await pullTelegramDeskInbound(host(), client)
-    expect(returned).toEqual([{ connectorId: 'telegram', userId: '42', text: 'queued' }])
+    expect(returned).toEqual(['in-1'])
 
     const created = await createTelegramConnectorDesk(
       { id: 'ws-a', dir: wsDir },
@@ -312,16 +314,15 @@ describe('telegram desk ingest and stamp', () => {
       [{ id: 'ws-a', dir: wsDir }],
     )
     expect(created.ok).toBe(true)
-    const returned: unknown[] = []
+    const returned: string[] = []
     const client = {
-      drainInbound: async () => [{ connectorId: 'telegram', userId: '42', text: 'later' }],
-      returnInbound: async (messages: unknown[]) => {
-        returned.push(...messages)
-      },
+      claimInbound: async () => ({ claimId: 'claim-1', items: [{ queueId: 'in-1', eventId: '1', connectorId: 'telegram', userId: '42', text: 'later' }] }),
+      releaseInbound: async (_claimId: string, itemIds: string[]) => { returned.push(...itemIds) },
+      ackInbound: async () => undefined,
     } as unknown as ConnectorClient
 
     await pullTelegramDeskInbound(host({ deskGenerating: () => true }), client)
-    expect(returned).toEqual([{ connectorId: 'telegram', userId: '42', text: 'later' }])
+    expect(returned).toEqual(['in-1'])
 
     returned.length = 0
     await pullTelegramDeskInbound(host({ deskGenerating: () => false }), client)
@@ -339,13 +340,13 @@ describe('telegram desk ingest and stamp', () => {
     let maxActive = 0
     let drains = 0
     const client = {
-      drainInbound: async () => {
+      claimInbound: async () => {
         drains += 1
         active += 1
         maxActive = Math.max(maxActive, active)
         await new Promise((resolve) => setTimeout(resolve, 20))
         active -= 1
-        return []
+        return { claimId: 'claim-empty', items: [] }
       },
     } as unknown as ConnectorClient
 

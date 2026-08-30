@@ -1,14 +1,18 @@
 import { Hono } from 'hono'
 import {
   BUILTIN_CONNECTOR_DEFINITIONS,
+  connectorAdapterMutationSchema,
   connectorDefinitionHasCapability,
-  publicConnectorConfigSchema,
+  connectorServiceMutationSchema,
+  type ConnectorAdapterMutation,
+  type PublicConnectorAdapterMutationResult,
   type PublicConnectorConfig,
 } from '@traderalice/connector-protocol'
 import {
+  mutateConnectorServiceEnabled,
+  mutatePublicConnectorAdapter,
   readPublicConnectorConfig,
   triggerConnectorRestart,
-  writePublicConnectorConfig,
 } from '../../core/connector-config.js'
 import { connectorBridgeHealth, resolveConnectorUrl } from '../../services/connector-client/index.js'
 import { detailIssue } from '../../workspaces/issues/board.js'
@@ -23,11 +27,15 @@ export function createConnectorRoutes(deps: {
   readConnectorConfig?: () => Promise<PublicConnectorConfig>
   fetchImpl?: typeof fetch
   restartConnectorService?: () => Promise<void>
+  mutateAdapter?: (id: string, mutation: ConnectorAdapterMutation) => Promise<PublicConnectorAdapterMutationResult>
+  mutateService?: (enabled: boolean) => Promise<{ serviceEnabled: boolean; serviceChanged: boolean }>
 } = {}) {
   const app = new Hono()
   const readConnectorConfig = deps.readConnectorConfig ?? readPublicConnectorConfig
   const fetchImpl = deps.fetchImpl ?? fetch
   const restartConnectorService = deps.restartConnectorService ?? triggerConnectorRestart
+  const mutateAdapter = deps.mutateAdapter ?? mutatePublicConnectorAdapter
+  const mutateService = deps.mutateService ?? mutateConnectorServiceEnabled
 
   app.get('/', async (c) => c.json({
     definitions: BUILTIN_CONNECTOR_DEFINITIONS,
@@ -35,10 +43,53 @@ export function createConnectorRoutes(deps: {
     health: await connectorBridgeHealth(),
   }))
 
-  app.put('/', async (c) => {
+  app.patch('/service', async (c) => {
     try {
-      const config = publicConnectorConfigSchema.parse(await c.req.json())
-      return c.json({ config: await writePublicConnectorConfig(config) })
+      const mutation = connectorServiceMutationSchema.parse(await c.req.json())
+      const result = await mutateService(mutation.enabled)
+      if (result.serviceChanged) await restartConnectorService()
+      return c.json(result)
+    } catch (error) {
+      return c.json({ error: error instanceof Error ? error.message : String(error) }, 400)
+    }
+  })
+
+  app.patch('/:id', async (c) => {
+    const id = c.req.param('id')
+    if (!BUILTIN_CONNECTOR_DEFINITIONS.some((definition) => definition.id === id)) {
+      return c.json({ error: 'unknown_connector', message: `Unknown connector: ${id}` }, 404)
+    }
+    try {
+      const mutation = connectorAdapterMutationSchema.parse(await c.req.json())
+      const result = await mutateAdapter(id, mutation)
+      if (result.serviceChanged) {
+        await restartConnectorService()
+        return c.json({ ...result, runtime: { scope: 'service', status: 'starting' } }, 202)
+      }
+      if (!result.adapterChanged || !result.serviceEnabled) {
+        return c.json({ ...result, runtime: { scope: 'adapter', status: 'unchanged' } })
+      }
+      try {
+        const response = await fetchImpl(new URL(`/v1/connectors/${encodeURIComponent(id)}/reconcile`, resolveConnectorUrl()), {
+          method: 'POST',
+          signal: AbortSignal.timeout(10_000),
+        })
+        if (!response.ok) {
+          const detail = await response.json().catch(() => null) as { error?: unknown } | null
+          return c.json({
+            ...result,
+            runtime: {
+              scope: 'adapter',
+              status: 'degraded',
+              message: typeof detail?.error === 'string' ? detail.error : `Adapter reconcile failed: ${response.status}`,
+            },
+          })
+        }
+        return c.json({ ...result, runtime: { scope: 'adapter', status: 'reconciled' } })
+      } catch {
+        await restartConnectorService()
+        return c.json({ ...result, runtime: { scope: 'service', status: 'starting' } }, 202)
+      }
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : String(error) }, 400)
     }
@@ -68,7 +119,7 @@ export function createConnectorRoutes(deps: {
       if (!isConnectorOwnerLinked(await readConnectorConfig(), connectorId)) {
         return c.json({
           error: 'not_linked',
-          message: 'Link this connector to its private owner chat before enabling the phone desk',
+          message: 'Link this connector to its private owner chat before turning on chat',
         }, 409)
       }
       const desk = await service.createConnectorDesk(connectorId, wsId)
@@ -102,7 +153,7 @@ export function createConnectorRoutes(deps: {
       if (candidate?.kind !== 'every'
         || typeof candidate.every !== 'string'
         || !isConnectorDeskCadence(candidate.every)) {
-        return c.json({ error: 'invalid', message: 'when must use a supported phone-desk cadence' }, 400)
+        return c.json({ error: 'invalid', message: 'when must use a supported heartbeat' }, 400)
       }
       patch.when = { kind: 'every', every: candidate.every }
     }

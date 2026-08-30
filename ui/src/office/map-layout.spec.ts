@@ -47,6 +47,17 @@ function expectValidGeometry(count: number) {
 }
 
 describe('layoutOfficeMap', () => {
+  it('keeps an empty floor centered in the default game frame', () => {
+    expect(layoutOfficeMap([])).toEqual({
+      width: 960,
+      height: 672,
+      columns: 0,
+      rows: 0,
+      alice: { x: 480, y: 336 },
+      pods: [],
+    })
+  })
+
   it.each([1, 2, 5, 17])('packs %i Workspace pods into a bounded 2D tilemap', (count) => {
     expectValidGeometry(count)
   })

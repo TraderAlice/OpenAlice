@@ -68,8 +68,9 @@ describe('OpenAlice Doctor', () => {
     const cachePath = join(home, '.cli-update-check.json')
     await writeFile(cachePath, JSON.stringify({
       schemaVersion: 1,
+      channel: 'stable',
       checkedAt: '2026-07-29T00:00:00.000Z',
-      result: { status: 'available', latestVersion: '0.88.0' },
+      result: { status: 'available', channel: 'stable', latestVersion: '0.88.0' },
     }))
     const doctor = await diagnoseRuntime({ homeRoot: home }, {
       layout: { updateCachePath: cachePath },
@@ -86,7 +87,66 @@ describe('OpenAlice Doctor', () => {
 
     expect(doctor.checks.find((check) => check.id === 'update.metadata')).toMatchObject({
       status: 'warn',
-      summary: 'OpenAlice 0.88.0 is available',
+      summary: 'OpenAlice 0.88.0 is available on stable',
+    })
+  })
+
+  it('reports the embedded Bun engine without implying a system Node dependency', async () => {
+    const home = await makeTempDir()
+    const doctor = await diagnoseRuntime({ homeRoot: home }, {
+      layout: { updateCachePath: join(home, '.cli-update-check.json') },
+      bunStandalone: true,
+      bunVersion: '1.4.0',
+      readInstallSourceImpl: async () => installSource(),
+      installedContentIdentityImpl: () => '0123456789abcdef',
+      inspectRuntime: async () => ({
+        ...runningStatus(home, null),
+        provider: { kind: 'bun', contentIdentity: '0123456789abcdef' },
+      }),
+      probeRuntime: async () => true,
+      discoverLogs: async () => [{ name: 'server.log' }],
+    })
+
+    expect(doctor.checks.find((check) => check.id === 'runtime.engine')).toMatchObject({
+      status: 'pass',
+      summary: 'Bun 1.4.0 is embedded in the OpenAlice executable',
+      detail: 'No system Node.js or Bun installation is required',
+    })
+    expect(doctor.checks.find((check) => check.id === 'runtime.node')).toBeUndefined()
+  })
+
+  it('reports package-manager provenance and update ownership as installed', async () => {
+    const home = await makeTempDir()
+    const source = {
+      ...installSource(),
+      schemaVersion: 3,
+      selector: { kind: 'version', value: 'v0.90.1' },
+      updateChannel: 'stable',
+      method: 'brew',
+      artifact: { platform: 'darwin', arch: 'arm64', sha256: 'a'.repeat(64) },
+      installedAt: '2026-08-30T00:00:00Z',
+    }
+    const doctor = await diagnoseRuntime({ homeRoot: home }, {
+      layout: null,
+      bunStandalone: true,
+      bunVersion: '1.4.0',
+      readInstallSourceImpl: async () => source,
+      installedContentIdentityImpl: () => '0123456789abcdef',
+      inspectRuntime: async () => ({
+        ...runningStatus(home, null),
+        provider: { kind: 'bun', contentIdentity: '0123456789abcdef' },
+      }),
+      probeRuntime: async () => true,
+      discoverLogs: async () => [{ name: 'server.log' }],
+    })
+
+    expect(doctor.cli.installed).toBe(true)
+    expect(doctor.checks.find((check) => check.id === 'cli.provenance')?.summary)
+      .toContain('Homebrew-managed')
+    expect(doctor.checks.find((check) => check.id === 'update.metadata')).toMatchObject({
+      status: 'pass',
+      summary: 'Homebrew owns OpenAlice updates',
+      detail: 'Use: brew upgrade traderalice/tap/openalice',
     })
   })
 })

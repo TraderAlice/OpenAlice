@@ -73,4 +73,21 @@ describe('MarkdownWhatEditor', () => {
     await waitFor(() => expect(onSave).toHaveBeenCalledWith('更新后的描述'), { timeout: 2_000 })
     expect(getByText('已保存')).toBeTruthy()
   })
+
+  it('accepts a contextual accessible label and placeholder', async () => {
+    const { container } = render(
+      <MarkdownWhatEditor
+        value="Initial description"
+        onSave={vi.fn(async () => true)}
+        ariaLabel="Check-in prompt"
+        placeholder="Describe the next check-in…"
+      />,
+    )
+
+    await waitFor(() => {
+      const editor = container.querySelector('[contenteditable="true"]')
+      expect(editor?.getAttribute('aria-label')).toBe('Check-in prompt')
+      expect(editor?.getAttribute('data-placeholder')).toBe('Describe the next check-in…')
+    })
+  })
 })

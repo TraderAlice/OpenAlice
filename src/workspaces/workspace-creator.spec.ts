@@ -15,6 +15,7 @@ import * as childProcess from 'node:child_process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { orderCreateAdapters, resolveTemplateSource, runScript } from './workspace-creator.js';
+import { INTERNAL_BOOTSTRAP_ROLE } from './bootstrap-runtime.js';
 import type { TemplateMeta } from './template-registry.js';
 
 vi.mock('node:child_process', async (importOriginal) => ({
@@ -130,6 +131,7 @@ describe('runScript platform branching', () => {
   afterEach(() => {
     setPlatform(originalPlatform);
     mockSpawn.mockReset();
+    vi.unstubAllGlobals();
   });
 
   it('on macOS / Linux, spawns the script directly so kernel reads the shebang', async () => {
@@ -212,6 +214,24 @@ describe('runScript platform branching', () => {
     expect(mockSpawn).toHaveBeenCalledWith(
       process.execPath,
       ['/tmp/foo/bootstrap.mjs', 't', '/out'],
+      expect.objectContaining({ env: expect.objectContaining({ ELECTRON_RUN_AS_NODE: '1' }) }),
+    );
+  });
+
+  it('a Bun standalone re-enters Alice through the internal bootstrap role', async () => {
+    setPlatform('darwin');
+    vi.stubGlobal('__OPENALICE_BUN_STANDALONE__', true);
+    const child = makeFakeChild();
+    mockSpawn.mockReturnValue(child as unknown as childProcess.ChildProcess);
+
+    const promise = runScript('/tmp/foo/bootstrap.mjs', ['t', '/out'], {}, 60_000);
+    child.emit('close', 0);
+    const res = await promise;
+
+    expect(res.ok).toBe(true);
+    expect(mockSpawn).toHaveBeenCalledWith(
+      process.execPath,
+      [INTERNAL_BOOTSTRAP_ROLE, '/tmp/foo/bootstrap.mjs', 't', '/out'],
       expect.objectContaining({ env: expect.objectContaining({ ELECTRON_RUN_AS_NODE: '1' }) }),
     );
   });

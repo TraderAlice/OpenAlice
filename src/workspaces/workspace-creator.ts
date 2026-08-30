@@ -12,6 +12,7 @@ import {
 } from '@/core/config.js';
 
 import { prepareAgentRuntimeWorkspace, type AdapterRegistry } from './cli-adapter.js';
+import { resolveMjsBootstrapInvocation } from './bootstrap-runtime.js';
 import { injectWorkspaceContext } from './context-injector.js';
 import { credentialToWorkspaceAiCred } from './credential-injection.js';
 import type { Logger } from './logger.js';
@@ -511,19 +512,24 @@ export function runScript(
   const isMjs = script.endsWith('.mjs');
   const isWindows = process.platform === 'win32';
 
-  // `.mjs` (built-in templates): run on the Electron-bundled Node. In the
-  // packaged app `process.execPath` is the Electron binary; ELECTRON_RUN_AS_NODE
-  // flips it to pure-Node mode (a harmless no-op for a plain `node` execPath in
-  // dev). No bash, no shebang reliance → works on a bare Windows/Mac box.
+  // `.mjs` (built-in templates): Node/Electron uses its bundled Node runtime.
+  // A Bun standalone re-enters the same Alice executable through a private
+  // bootstrap role because its process.execPath is the product binary, not a
+  // general-purpose Bun interpreter. No system Node/Bun/bash is required.
+  // ELECTRON_RUN_AS_NODE flips Electron to pure-Node mode and is harmless for
+  // the other runtimes.
   // `.sh` (third-party fallback): unix reads the `#!/usr/bin/env bash` shebang;
   // Windows has no native bash, so invoke the Git-for-Windows executable we
   // resolved above (with a final bare-name fallback for WSL/custom PATHs).
-  const cmd = isMjs
-    ? process.execPath
+  const mjsInvocation = isMjs
+    ? resolveMjsBootstrapInvocation(script, args)
+    : null;
+  const cmd = mjsInvocation
+    ? mjsInvocation.command
     : isWindows
       ? resolveBashPath(process.env, 'win32') ?? 'bash'
       : script;
-  const cmdArgs = isMjs || isWindows ? [script, ...args] : args;
+  const cmdArgs = mjsInvocation?.args ?? (isWindows ? [script, ...args] : args);
   const env = isMjs
     ? { ...process.env, ...extraEnv, ELECTRON_RUN_AS_NODE: '1' }
     : { ...process.env, ...extraEnv };

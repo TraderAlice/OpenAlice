@@ -66,7 +66,7 @@ describe('fetchLatestRelease (mocked fetch)', () => {
     globalThis.fetch = origFetch
   })
 
-  it('returns the parsed release on success (array shape, takes first non-draft)', async () => {
+  it('returns the parsed stable release on success', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -78,23 +78,24 @@ describe('fetchLatestRelease (mocked fetch)', () => {
           body: '## Changelog',
           published_at: '2026-05-09T00:00:00Z',
           draft: false,
-          prerelease: true,
+          prerelease: false,
         },
       ]),
     }) as unknown as typeof fetch
 
-    const { result, error } = await fetchLatestRelease()
+    const { result, error } = await fetchLatestRelease({ channel: 'stable' })
     expect(error).toBeNull()
     expect(result?.version).toBe('1.2.3') // leading v stripped
     expect(result?.url).toContain('github.com')
     expect(result?.body).toBe('## Changelog')
   })
 
-  it('skips draft releases', async () => {
+  it('skips drafts and prereleases on the stable channel', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true, status: 200, statusText: 'OK',
       json: async () => ([
         { tag_name: 'v2.0.0', html_url: 'x', body: '', published_at: '', draft: true, prerelease: false },
+        { tag_name: 'v1.5.0-beta.1', html_url: 'beta', body: '', published_at: '', draft: false, prerelease: true },
         { tag_name: 'v1.0.0', html_url: 'y', body: '', published_at: '', draft: false, prerelease: false },
       ]),
     }) as unknown as typeof fetch
@@ -103,16 +104,55 @@ describe('fetchLatestRelease (mocked fetch)', () => {
     expect(result?.version).toBe('1.0.0') // first non-draft
   })
 
-  it('accepts prereleases as updates', async () => {
+  it('selects only beta prereleases on the beta channel', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true, status: 200, statusText: 'OK',
       json: async () => ([
+        { tag_name: 'v0.12.0', html_url: 'stable', body: '', published_at: '', draft: false, prerelease: false },
+        { tag_name: 'v0.11.0-rc.1', html_url: 'rc', body: '', published_at: '', draft: false, prerelease: true },
         { tag_name: 'v0.10.0-beta.0', html_url: 'x', body: '', published_at: '', draft: false, prerelease: true },
       ]),
     }) as unknown as typeof fetch
 
-    const { result } = await fetchLatestRelease()
+    const { result } = await fetchLatestRelease({ channel: 'beta' })
     expect(result?.version).toBe('0.10.0-beta.0')
+  })
+
+  it('defaults to the channel encoded in the installed version', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true, status: 200, statusText: 'OK',
+      json: async () => ([
+        { tag_name: 'v999.999.999-beta.1', html_url: 'beta', body: '', published_at: '', draft: false, prerelease: true },
+        { tag_name: 'v999.999.999', html_url: 'stable', body: '', published_at: '', draft: false, prerelease: false },
+      ]),
+    }) as unknown as typeof fetch
+
+    const { result } = await fetchLatestRelease()
+    const expected = /-beta(?:\.|$)/i.test(getCurrentVersion())
+      ? '999.999.999-beta.1'
+      : '999.999.999'
+    expect(result?.version).toBe(expected)
+  })
+
+  it('keeps stable and beta caches isolated', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true, status: 200, statusText: 'OK',
+      json: async () => ([
+        { tag_name: 'v1.0.0-beta.1', html_url: 'beta', body: '', published_at: '', draft: false, prerelease: true },
+        { tag_name: 'v0.9.0', html_url: 'stable', body: '', published_at: '', draft: false, prerelease: false },
+      ]),
+    })
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+
+    const stable = await fetchLatestRelease({ channel: 'stable' })
+    const beta = await fetchLatestRelease({ channel: 'beta' })
+    expect(stable.result?.version).toBe('0.9.0')
+    expect(beta.result?.version).toBe('1.0.0-beta.1')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+
+    await fetchLatestRelease({ channel: 'stable' })
+    await fetchLatestRelease({ channel: 'beta' })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
   it('returns error when no published releases found', async () => {

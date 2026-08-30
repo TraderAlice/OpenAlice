@@ -7,7 +7,7 @@
  * Sealed mid-turn text blocks also project so the phone chat does not
  * wait for the final reply.
  */
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import {
   builtinConnectorHasCapability,
   ConnectorClient,
@@ -122,13 +122,18 @@ export async function ingestConnectorOwnerMessages(
   const workspace = host.getWorkspace(desk.wsId)
   if (!workspace) return { ok: false, reason: 'workspace_missing' }
 
+  const stableEvents = messages.map((message) => message.eventId).filter((id): id is string => Boolean(id))
+  const commentId = stableEvents.length === messages.length
+    ? `${connectorId}-${createHash('sha256').update(stableEvents.join('\0')).digest('hex').slice(0, 24)}`
+    : `${connectorId}-${randomUUID()}`
   const appended = await appendIssueComment(workspace.dir, desk.issue.id, 'human', markdown, {
-    id: `${connectorId}-${randomUUID()}`,
+    id: commentId,
     via: connectorId,
   })
   if (!appended.ok) {
     return { ok: false, reason: appended.reason === 'invalid' ? appended.error : 'issue_missing' }
   }
+  if (!appended.created) return { ok: true, comment: appended.comment }
 
   await host.provenanceStore()?.append({
     artifact: { kind: 'issue', workspaceId: desk.wsId, issueId: desk.issue.id },
@@ -228,11 +233,12 @@ export async function pullTelegramDeskInbound(
   host: ConnectorDeskChatHost,
   client: ConnectorClient,
 ): Promise<void> {
-  const messages = await client.drainInbound(AbortSignal.timeout(5_000))
-  if (messages.length === 0) return
-  const leftover: InboundOwnerMessage[] = []
-  const groups = new Map<string, InboundOwnerMessage[]>()
-  for (const message of messages) {
+  const claim = await client.claimInbound(AbortSignal.timeout(5_000))
+  if (claim.items.length === 0) return
+  const acknowledge: string[] = []
+  const release: string[] = []
+  const groups = new Map<string, typeof claim.items>()
+  for (const message of claim.items) {
     const group = groups.get(message.connectorId) ?? []
     group.push(message)
     groups.set(message.connectorId, group)
@@ -240,21 +246,24 @@ export async function pullTelegramDeskInbound(
   for (const [connectorId, group] of groups) {
     if (!builtinConnectorHasCapability(connectorId, 'desk')) {
       console.warn('[connector] phone-desk inbound skipped: unsupported_connector', connectorId)
+      acknowledge.push(...group.map((message) => message.queueId))
       continue
     }
     const desk = await findLiveDesk(host, connectorId)
     if (!desk || host.deskGenerating?.(desk)) {
-      leftover.push(...group)
+      release.push(...group.map((message) => message.queueId))
       continue
     }
     const result = await ingestConnectorOwnerMessages(host, group, client)
     if (!result.ok) {
       console.warn(`[connector] ${connectorId} phone-desk inbound skipped:`, result.reason)
+      release.push(...group.map((message) => message.queueId))
+    } else {
+      acknowledge.push(...group.map((message) => message.queueId))
     }
   }
-  if (leftover.length > 0) {
-    await client.returnInbound(leftover, AbortSignal.timeout(5_000))
-  }
+  if (acknowledge.length > 0) await client.ackInbound(claim.claimId, acknowledge, AbortSignal.timeout(5_000))
+  if (release.length > 0) await client.releaseInbound(claim.claimId, release, AbortSignal.timeout(5_000))
 }
 
 export function startTelegramDeskInboundPoll(

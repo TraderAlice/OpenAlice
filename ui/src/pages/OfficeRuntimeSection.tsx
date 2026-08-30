@@ -4,19 +4,8 @@ import { useTranslation } from 'react-i18next'
 import { api } from '../api'
 import type { AgentRuntimeEvent, AgentRuntimeEventType } from '../api/agentRuntimeLog'
 import { formatRelativeTime } from '../lib/intl'
+import { OFFICE_LOG_ASSETS, officeLogAssetKind } from '../office/log-assets'
 import { useWorkspace } from '../tabs/store'
-
-const STATUS_STYLE: Record<AgentRuntimeEventType, string> = {
-  'session.born': 'bg-muted text-muted-foreground',
-  'runtime.started': 'bg-info/15 text-info',
-  'runtime.spawn_failed': 'bg-destructive/15 text-destructive',
-  'runtime.stopped': 'bg-secondary text-foreground',
-  'runtime.rejected': 'bg-warning/15 text-warning',
-  'runtime.turn.text': 'bg-primary/10 text-foreground',
-  'runtime.turn.tool': 'bg-info/10 text-info',
-  'runtime.turn.error': 'bg-destructive/15 text-destructive',
-  'dev.sonner_test': 'bg-secondary text-muted-foreground',
-}
 
 function eventLabel(type: AgentRuntimeEventType): string {
   if (type === 'runtime.turn.text') return 'text'
@@ -109,35 +98,40 @@ export function OfficeRuntimeSection() {
         {entries.map((event) => {
           const payload = event.payload
           const detail = eventDetail(event)
+          const kind = officeLogAssetKind(event.type)
+          const meta = [
+            payload.surface,
+            causeLabel(event),
+            payload.status,
+            payload.metrics
+              ? `${payload.metrics.textBlocks} text · ${payload.metrics.toolCalls} tools${payload.metrics.toolFailures > 0 ? ` · ${payload.metrics.toolFailures} failed` : ''}`
+              : null,
+            payload.reason,
+            payload.launchErrorCode,
+          ].filter((value): value is string => Boolean(value))
           return (
-            <article key={event.seq} className="oa-office-runtime__event">
-              <span className={`inline-flex max-w-full rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] ${STATUS_STYLE[event.type]}`}>
-                {eventLabel(event.type)}
-              </span>
-              <div className="min-w-0">
-                <div className="break-words text-sm text-foreground">
-                  <span className="font-medium">@{payload.resumeId || '—'}</span>
-                  <span className="text-muted-foreground"> · {payload.agent || '—'} · {payload.workspaceId || '—'}</span>
+            <article key={event.seq} className="oa-office-runtime__event" data-kind={kind}>
+              <div className="oa-office-runtime__badge" aria-hidden>
+                <img src={OFFICE_LOG_ASSETS[kind]} alt="" />
+              </div>
+              <div className="oa-office-runtime__content">
+                <header className="oa-office-runtime__heading">
+                  <span className="oa-office-runtime__type">{eventLabel(event.type)}</span>
+                  <span className="oa-office-runtime__seq">#{String(event.seq).padStart(4, '0')}</span>
+                  <time dateTime={new Date(event.ts).toISOString()}>{formatRelativeTime(event.ts)}</time>
+                </header>
+                <div className="oa-office-runtime__identity">
+                  <strong>@{payload.resumeId || '—'}</strong>
+                  <span>{payload.agent || '—'} · {payload.workspaceId || '—'}</span>
                 </div>
                 {detail && (
                   <p className="oa-office-runtime__detail">
                     {detail}
                   </p>
                 )}
-                <div className="oa-office-runtime__meta">
-                  <span>{formatRelativeTime(event.ts)}</span>
-                  {payload.surface && <span>{payload.surface}</span>}
-                  <span>{causeLabel(event)}</span>
-                  {payload.status && <span>{payload.status}</span>}
-                  {payload.metrics && (
-                    <span>
-                      {payload.metrics.textBlocks} text · {payload.metrics.toolCalls} tools
-                      {payload.metrics.toolFailures > 0 ? ` · ${payload.metrics.toolFailures} failed` : ''}
-                    </span>
-                  )}
-                  {payload.reason && <span>{payload.reason}</span>}
-                  {payload.launchErrorCode && <span>{payload.launchErrorCode}</span>}
-                </div>
+                <ul className="oa-office-runtime__meta" aria-label={t('office.eventDetails')}>
+                  {meta.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}
+                </ul>
               </div>
               {payload.taskId && (
                 <button
@@ -145,6 +139,7 @@ export function OfficeRuntimeSection() {
                   className="oa-office-runtime__open"
                   onClick={() => openOrFocus({ kind: 'automation', params: { section: 'runs' } })}
                 >
+                  <span aria-hidden>A</span>
                   {t('office.openRun')}
                 </button>
               )}

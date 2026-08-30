@@ -1,22 +1,18 @@
 import { useTranslation } from 'react-i18next'
 
-import type { OfficeBubble, OfficeFloorEmployee } from '../api/office'
+import type { OfficeFloorEmployee } from '../api/office'
+import { officeBubbleText } from './bubble-text'
 import { officeCoworkerLabel } from './label'
-import { OfficeEmployeeSprite } from './OfficeEmployeeSprite'
+import { OfficeCoworkerSprite } from './OfficeCoworkerSprite'
 import { OFFICE_FURNITURE, officePixelImg } from './furniture'
 import { officeStationComposition } from './station'
-
-function OfficeBubbleText({ bubble }: { bubble: OfficeBubble }) {
-  const { t } = useTranslation()
-  if (bubble.kind === 'text' || bubble.kind === 'error') return bubble.text
-  if (bubble.kind === 'tool') return String(t('office.bubbleTool', { name: bubble.name }))
-  return String(t('office.bubbleRejected'))
-}
 
 export function OfficeDesk({
   employee,
   roomName,
   selected,
+  nearby,
+  depth,
   reducedMotion,
   spriteScale,
   onSelect,
@@ -25,6 +21,8 @@ export function OfficeDesk({
   employee: OfficeFloorEmployee | null
   roomName: string
   selected: boolean
+  nearby?: boolean
+  depth: number
   reducedMotion: boolean
   spriteScale?: number
   onSelect: () => void
@@ -32,6 +30,7 @@ export function OfficeDesk({
 }) {
   const { t } = useTranslation()
   const station = officeStationComposition()
+  const showBubble = Boolean(employee?.bubble && (selected || nearby))
   const label = employee
     ? t('office.employeeLabel', {
       name: officeCoworkerLabel(employee),
@@ -52,28 +51,32 @@ export function OfficeDesk({
         onDoubleClick={() => employee && onOpen?.()}
         className="oa-office-desk"
         data-selected={selected}
+        data-nearby={nearby}
         data-occupied={Boolean(employee)}
         data-mood={employee?.mood}
-        style={{ width: station.widthPx, height: station.heightPx }}
+        style={{ width: station.widthPx, height: station.heightPx, zIndex: depth }}
       >
         <span className="oa-office-topdown-station" aria-hidden>
-          <span className="oa-office-topdown-station__desk" />
-          <span className="oa-office-topdown-station__terminal" />
-          <span className="oa-office-topdown-station__chair" />
+          <img
+            src={OFFICE_FURNITURE.generated.workstation}
+            alt=""
+            className="oa-office-topdown-station__asset"
+            style={officePixelImg}
+          />
         </span>
-        {employee?.bubble && (
+        {employee?.bubble && showBubble && (
           <span
             className="oa-office-bubble"
             style={{ top: station.bubble.topPx, zIndex: station.bubble.zIndex }}
           >
-            <OfficeBubbleText bubble={employee.bubble} />
+            {officeBubbleText(employee.bubble, t)}
           </span>
         )}
         {employee && (
           <span
             className="oa-office-nameplate"
             style={{
-              top: employee.bubble ? station.name.topPx + 20 : station.name.topPx,
+              top: showBubble ? station.name.topPx + 20 : station.name.topPx,
               zIndex: station.name.zIndex,
             }}
           >
@@ -104,7 +107,8 @@ export function OfficeDesk({
               zIndex: station.sprite.zIndex,
             }}
           >
-            <OfficeEmployeeSprite
+            <OfficeCoworkerSprite
+              agent={employee.agent}
               mood={employee.mood}
               reducedMotion={reducedMotion}
               label={label}

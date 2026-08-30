@@ -29,7 +29,7 @@ import { installConnectorProxyTransport } from './core/proxy.js'
 
 const CONNECTOR_PORT = Number(process.env['OPENALICE_CONNECTOR_PORT'] ?? 47334)
 
-async function main(): Promise<void> {
+export async function startConnectorService(): Promise<void> {
   const startedAt = new Date().toISOString()
   console.log(`[connector] bootstrap @ ${startedAt}`)
 
@@ -70,16 +70,32 @@ async function main(): Promise<void> {
     const message = ownerChatMessageSchema.parse(await c.req.json())
     return c.json(connectorDeliveryReceiptSchema.parse(manager.enqueueOwnerChat(message)), 202)
   })
-  app.post('/v1/inbound/drain', async (c) => {
-    return c.json({ messages: manager.drainInbound() })
+  app.post('/v1/inbound/claim', async (c) => {
+    const claim = await manager.claimInbound()
+    return c.json({
+      claimId: claim.claimId,
+      messages: claim.items.map((item) => ({ ...item.payload, queueId: item.id })),
+    })
   })
-  app.post('/v1/inbound/return', async (c) => {
-    const body = await c.req.json().catch(() => null) as { messages?: unknown } | null
-    manager.returnInbound(Array.isArray(body?.messages) ? body.messages : [])
+  app.post('/v1/inbound/:claimId/ack', async (c) => {
+    await manager.ackInbound(c.req.param('claimId'), await workItemIds(c))
     return c.json({ ok: true })
   })
-  app.post('/v1/actions/drain', (c) => {
-    return c.json({ requests: manager.drainActions() })
+  app.post('/v1/inbound/:claimId/release', async (c) => {
+    await manager.releaseInbound(c.req.param('claimId'), await workItemIds(c))
+    return c.json({ ok: true })
+  })
+  app.post('/v1/actions/claim', async (c) => {
+    const claim = await manager.claimActions()
+    return c.json({ claimId: claim.claimId, requests: claim.items.map((item) => item.payload) })
+  })
+  app.post('/v1/actions/:claimId/ack', async (c) => {
+    await manager.ackActions(c.req.param('claimId'), await workItemIds(c))
+    return c.json({ ok: true })
+  })
+  app.post('/v1/actions/:claimId/release', async (c) => {
+    await manager.releaseActions(c.req.param('claimId'), await workItemIds(c))
+    return c.json({ ok: true })
   })
   app.post('/v1/artifacts/deliver', async (c) => {
     const delivery = connectorArtifactDeliverySchema.parse(await c.req.json())
@@ -91,8 +107,17 @@ async function main(): Promise<void> {
     await manager.failArtifact(failure)
     return c.json(connectorDeliveryReceiptSchema.parse({ accepted: true, deliveryId: failure.requestId }))
   })
-  app.post('/v1/actions/uta/drain', (c) => {
-    return c.json({ requests: manager.drainUtaActions() })
+  app.post('/v1/actions/uta/claim', async (c) => {
+    const claim = await manager.claimUtaActions()
+    return c.json({ claimId: claim.claimId, requests: claim.items.map((item) => item.payload) })
+  })
+  app.post('/v1/actions/uta/:claimId/ack', async (c) => {
+    await manager.ackActions(c.req.param('claimId'), await workItemIds(c))
+    return c.json({ ok: true })
+  })
+  app.post('/v1/actions/uta/:claimId/release', async (c) => {
+    await manager.releaseActions(c.req.param('claimId'), await workItemIds(c))
+    return c.json({ ok: true })
   })
   app.post('/v1/uta/present', async (c) => {
     const presentation = connectorUtaPresentationSchema.parse(await c.req.json())
@@ -110,6 +135,12 @@ async function main(): Promise<void> {
   })
   app.post('/v1/connectors/:id/reconnect', async (c) => {
     const adapter = await manager.reconnect(c.req.param('id'))
+    return c.json({ ok: true, adapter })
+  })
+  app.post('/v1/connectors/:id/reconcile', async (c) => {
+    const id = c.req.param('id')
+    const latest = await configStore.read()
+    const adapter = await manager.reconcile(id, latest.adapters[id] ?? { enabled: false, settings: {} })
     return c.json({ ok: true, adapter })
   })
   app.onError((error, c) => {
@@ -137,7 +168,16 @@ async function main(): Promise<void> {
   await manager.start()
 }
 
-main().catch((error) => {
-  console.error('[connector] fatal:', error)
-  process.exit(1)
-})
+async function workItemIds(c: { req: { json(): Promise<unknown> } }): Promise<string[]> {
+  const body = await c.req.json().catch(() => null) as { itemIds?: unknown } | null
+  return Array.isArray(body?.itemIds)
+    ? body.itemIds.filter((id): id is string => typeof id === 'string' && id.length > 0)
+    : []
+}
+
+if (!(globalThis as { __OPENALICE_INTERNAL_ROLE_DISPATCH__?: boolean }).__OPENALICE_INTERNAL_ROLE_DISPATCH__) {
+  startConnectorService().catch((error) => {
+    console.error('[connector] fatal:', error)
+    process.exit(1)
+  })
+}

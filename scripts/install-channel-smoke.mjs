@@ -9,26 +9,26 @@ const args = process.argv.slice(2)
 const keepImage = args.includes('--keep-image')
 const installerUrl = optionValue('--installer-url')
   ?? 'https://raw.githubusercontent.com/TraderAlice/OpenAlice/dev/install'
-const branch = optionValue('--branch') ?? 'dev'
+const channel = optionValue('--channel') ?? 'dev'
 let imageBuilt = false
 
 if (args.includes('--help') || args.includes('-h')) {
-  console.log(`Usage: pnpm test:install:dev-channel [--installer-url <url>] [--branch <name>] [--keep-image]
+  console.log(`Usage: pnpm test:install:dev-channel [--installer-url <url>] [--channel dev] [--keep-image]
 
 Build a clean container, download the installer from the live dev channel, and
-install the matching branch through the real network path. The default pair is
-raw.githubusercontent.com/TraderAlice/OpenAlice/dev/install plus --branch dev.
+install the matching channel through the real network path. The default pair is
+raw.githubusercontent.com/TraderAlice/OpenAlice/dev/install plus --channel dev.
 
 Options:
   --installer-url <url>  Installer endpoint to exercise
-  --branch <name>        Matching payload branch (default: dev)
+  --channel dev          Development payload channel (default: dev)
   --keep-image           Preserve the temporary image for investigation
   -h, --help             Show this help
 `)
   process.exit(0)
 }
 
-const valuedOptions = new Set(['--installer-url', '--branch'])
+const valuedOptions = new Set(['--installer-url', '--channel'])
 const flagOptions = new Set(['--keep-image'])
 for (let index = 0; index < args.length; index += 1) {
   const arg = args[index]
@@ -50,8 +50,8 @@ if (!/^https:\/\//.test(installerUrl)) {
   console.error('install channel smoke: --installer-url must use https://')
   process.exit(1)
 }
-if (!/^[A-Za-z0-9._/-]+$/.test(branch) || branch.startsWith('/') || branch.endsWith('/')) {
-  console.error('install channel smoke: --branch is invalid')
+if (channel !== 'dev') {
+  console.error('install channel smoke: only the dev preview channel is supported')
   process.exit(1)
 }
 
@@ -82,11 +82,11 @@ try {
   ])
   imageBuilt = true
 
-  console.log(`[install-channel-smoke] exercising ${installerUrl} with branch ${branch}`)
+  console.log(`[install-channel-smoke] exercising ${installerUrl} with channel ${channel}`)
   docker([
     'run', '--rm',
     '--env', `OPENALICE_CHANNEL_INSTALLER_URL=${installerUrl}`,
-    '--env', `OPENALICE_CHANNEL_BRANCH=${branch}`,
+    '--env', `OPENALICE_CHANNEL=${channel}`,
     image,
   ])
 } catch (error) {

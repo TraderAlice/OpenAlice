@@ -6,6 +6,12 @@ import {
   resolveAliceProjectIdentity,
   type AliceProjectIdentity,
 } from './alice-project.ts'
+import {
+  buildExternalAgentRuntimeEnvironment,
+  isBunStandalone,
+  resolveBunContentIdentity,
+  resolveBunResourceRoot,
+} from './bun-standalone.mjs'
 
 const PROJECT_KEY_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/
 const DEFAULT_PORT = 47_331
@@ -58,7 +64,7 @@ export interface ResolvedLaunchContext {
   port: number
   appDir: string | null
   runtimeProvider: {
-    kind: 'source' | 'bundle'
+    kind: 'source' | 'bundle' | 'bun'
     contentIdentity: string | null
   }
   updateChecks: boolean
@@ -177,7 +183,16 @@ export function resolveLaunchContext(
   )
 
   const managedPiRoot = join(home.value, 'runtime', 'pi')
-  const runtimeProvider = appDir.provenance.source === 'installed-runtime'
+  const bunStandalone = isBunStandalone()
+  const selectedAppDir = bunStandalone
+    ? resolveBunResourceRoot(env)
+    : appDir.value
+  const runtimeProvider = bunStandalone
+    ? {
+        kind: 'bun' as const,
+        contentIdentity: resolveBunContentIdentity(selectedAppDir!, env),
+      }
+    : appDir.provenance.source === 'installed-runtime'
     ? {
         kind: 'bundle' as const,
         contentIdentity: parseRuntimeContentIdentity(
@@ -192,14 +207,14 @@ export function resolveLaunchContext(
     project: project.value,
     aliceProject: resolveAliceProjectIdentity({
       home: home.value,
-      appRoot: appDir.value,
+      appRoot: selectedAppDir,
       env,
       key: project.value,
       displayName: projectConfig.displayName,
     }),
     home: home.value,
     port: port.value,
-    appDir: appDir.value,
+    appDir: selectedAppDir,
     runtimeProvider,
     updateChecks: updateChecks.value,
     supervisorRoot: supervisorRoot.value,
@@ -237,6 +252,9 @@ export function buildManagedPiEnv(
   context: ResolvedLaunchContext,
   baseEnv: NodeJS.ProcessEnv = process.env,
 ): NodeJS.ProcessEnv {
+  if (context.runtimeProvider.kind === 'bun') {
+    return buildExternalAgentRuntimeEnvironment(baseEnv)
+  }
   return buildManagedPiEnvForHome(context.home, baseEnv)
 }
 

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryInboxStore } from '../../core/inbox-store.js'
-import { processConnectorArtifactRequests } from './action-bridge.js'
+import { processConnectorArtifactClaims, processConnectorArtifactRequests } from './action-bridge.js'
 
 const tempDirs: string[] = []
 
@@ -12,6 +12,45 @@ afterEach(async () => {
 })
 
 describe('Connector action bridge', () => {
+  it('acks a completed claim and releases it when terminal delivery cannot be reported', async () => {
+    const store = createMemoryInboxStore()
+    const ackActions = vi.fn(async () => undefined)
+    const releaseActions = vi.fn(async () => undefined)
+    const base = {
+      isEnabled: async () => true,
+      drainActions: async () => [],
+      claimActions: async () => ({
+        claimId: 'claim-art',
+        items: [{
+          requestId: 'art-missing',
+          connectorId: 'telegram',
+          entryId: 'gone',
+          docIndex: 0,
+          createdAt: new Date().toISOString(),
+        }],
+      }),
+      ackActions,
+      releaseActions,
+      deliverArtifact: async () => undefined,
+      warn: vi.fn(),
+    }
+
+    await processConnectorArtifactClaims(store, {
+      ...base,
+      failArtifact: async () => undefined,
+    })
+    expect(ackActions).toHaveBeenCalledWith('claim-art', ['art-missing'])
+    expect(releaseActions).not.toHaveBeenCalled()
+
+    ackActions.mockClear()
+    await processConnectorArtifactClaims(store, {
+      ...base,
+      failArtifact: async () => { throw new Error('connector offline') },
+    })
+    expect(releaseActions).toHaveBeenCalledWith('claim-art', ['art-missing'])
+    expect(ackActions).not.toHaveBeenCalled()
+  })
+
   it('materializes the selected current file and delivers it only as an artifact', async () => {
     const root = await mkdtemp(join(tmpdir(), 'openalice-action-bridge-'))
     tempDirs.push(root)

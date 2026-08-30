@@ -62,16 +62,22 @@ function context(overrides: Partial<ConnectorAdapterContext> = {}): ConnectorAda
     getServiceStatus: () => 'healthy',
     sendTest: async () => 'probe',
     forwardOwnerText: async () => undefined,
-    enqueueArtifactRequest: () => 'art-test',
-    enqueueUtaRequest: () => 'uta-test',
+    enqueueArtifactRequest: async () => 'art-test',
+    enqueueUtaRequest: async () => 'uta-test',
     ...overrides,
   }
 }
 
-function p2pEvent(text: string, options: { openId?: string; chatId?: string; chatType?: string } = {}) {
+function p2pEvent(text: string, options: {
+  openId?: string
+  chatId?: string
+  chatType?: string
+  messageId?: string
+} = {}) {
   return {
     sender: { sender_id: { open_id: options.openId ?? 'ou_owner' }, sender_type: 'user' },
     message: {
+      ...(options.messageId ? { message_id: options.messageId } : {}),
       chat_id: options.chatId ?? 'oc_chat',
       chat_type: options.chatType ?? 'p2p',
       message_type: 'text',
@@ -236,6 +242,17 @@ describe('Feishu owner chat', () => {
       userId: 'ou_owner',
       chatId: 'oc_chat',
     })
+  })
+
+  it('forwards the platform message id for durable inbound dedupe', async () => {
+    const forwardOwnerText = vi.fn(async () => undefined)
+    const adapter = new FeishuConnectorAdapter({ startupTimeoutMs: 200 })
+    await adapter.start({
+      enabled: true,
+      settings: { appId: APP_ID, appSecret: APP_SECRET, ownerUserId: 'ou_owner', chatId: 'oc_chat' },
+    }, context({ forwardOwnerText }))
+    await receiveHandler?.(p2pEvent('hello', { messageId: 'om_event_1' }))
+    expect(forwardOwnerText).toHaveBeenCalledWith(expect.objectContaining({ eventId: 'om_event_1' }))
   })
 
   it('sends owner-chat markdown and inbox files after link', async () => {

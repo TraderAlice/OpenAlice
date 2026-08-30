@@ -31,23 +31,19 @@ client.
 On the laptop:
 
 - macOS, Linux, or WSL;
-- Node.js `22.19.0` or newer;
 - `curl` and OpenSSH;
 - SSH access to the target.
 
 On the remote host:
 
 - Linux or macOS;
-- Node.js `22.19.0` or newer;
-- `curl`;
+- `curl`, `tar`, and a SHA-256 utility;
 - enough disk and memory for the installed Runtime.
 
-The release Runtime does not require Git or source-build tools. If you
-explicitly select a source checkout, the remote plan can install missing Git,
-Python 3, make, and C++ tools on supported Linux hosts after showing the exact
-package-manager command. On macOS, install Command Line Tools locally with
-`xcode-select --install` when that source plan asks for them. OpenAlice does
-not install Node.js or configure SSH keys for you.
+The native release does not require Node.js, Bun, Git, an Agent Runtime, or
+source-build tools. If you explicitly select a source checkout, that separate
+development path requires its normal Node/build prerequisites. OpenAlice does
+not install Agent Runtimes or configure SSH keys for you.
 
 ## 1. Install the CLI on Your Laptop
 
@@ -62,12 +58,12 @@ verify the installed commands:
 ```bash
 openalice --version
 openalice version --json
-pi --version
 ```
 
-The installer records its branch, tag, or commit and an immutable payload
-identity. Managed remote reproduces that same CLI and Pi on the target; it has
-no separate hidden release channel.
+The installer records its channel/version, target, checksum, and immutable
+content identity. Managed remote reproduces that same native OpenAlice release
+on the target; it has no separate hidden release channel and does not install
+or change the target's Agent Runtime executables.
 
 ## 2. Give the Host a Useful SSH Name
 
@@ -97,15 +93,14 @@ authentication policy.
 openalice remote openalice-box --plan
 ```
 
-The read-only plan reports the remote platform, Node.js, CLI and Pi, Runtime
-owner and provider, ports, and every proposed change. On a new supported host
-it normally includes:
+The read-only plan reports the remote platform, CLI, Runtime owner/provider,
+ports, and every proposed change. On a new supported host it normally includes:
 
-1. install the matching OpenAlice CLI, managed Pi, and platform Runtime;
+1. install the matching native OpenAlice release;
 2. verify and start the detached OpenAlice Server from that immutable Runtime;
 3. open a local loopback tunnel.
 
-The installed Runtime lives in the installer's immutable `cli-versions/`
+The installed Runtime lives in the installer's immutable `cli/releases/`
 release directory. You do not need to SSH in, clone the repository, install a
 compiler, find an absolute source path, or repeat `--app-dir` on later
 connections. Nothing changes until you approve the plan.
@@ -116,9 +111,9 @@ connections. Nothing changes until you approve the plan.
 openalice remote openalice-box
 ```
 
-Approve the displayed plan. First preparation can take several minutes;
-successful install and build phases stay compact, while failures include a
-bounded diagnostic tail. When ready, OpenAlice opens a URL such as
+Approve the displayed plan. The native archive downloads and activates as one
+bounded transaction; failures include a bounded diagnostic tail. When ready,
+OpenAlice opens a URL such as
 `http://127.0.0.1:49891` in the local browser.
 
 The browser, page APIs, and Workspace PTY WebSocket all cross the same SSH
@@ -161,10 +156,12 @@ does not become the normal OpenAlice experience.
 The default installed Runtime is maintained by the ordinary OpenAlice
 installer:
 
-- the CLI, managed Pi, and Runtime carry the same OpenAlice product version;
+- the CLI and every OpenAlice process role carry the same product/content
+  identity;
 - archives are selected for the remote platform and architecture;
 - the archive checksum and internal file manifest are verified before
   activation;
+- Agent Runtime executables remain user-owned and are discovered from `PATH`;
 - reconnect reuses a compatible healthy Runtime without mutation.
 
 For development or a deliberately pinned checkout, pass your own absolute
