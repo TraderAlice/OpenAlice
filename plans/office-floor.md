@@ -4458,6 +4458,23 @@ Replay transport follow-up (2026-08-31):
   full suite passed all 618 test files and 5,178 tests (one file and nine tests skipped); the production UI build passed
   with only the existing ports fallback and large-chunk advisory.
 
+Deterministic Agent-file confirm follow-up (2026-08-31):
+
+- Played the Live floor through Grok Analyst approach, Agent File, Session exit, roster return, and a real four-record
+  Prediction drawer. The compact failure state, long assignment wrapping, portrait scale, and fixed primary action all
+  remained readable, but the focused `Open session` button ignored Enter on the real host while pointer click worked.
+- Compared repairing only the primary exit, adding separate key literals to each record type, and applying the existing
+  Office confirm predicate to every Agent-file command. Chose the complete window contract: close/back, long-title toggle,
+  drawer records, and `Open session` now explicitly consume Enter/Space, prevent the later native click, and activate once.
+  The established Tab loop, drawer grid arrows/Home/End, pointer interaction, and Escape close behavior remain unchanged.
+- Real-browser acceptance used Enter on Grok Analyst's focused primary action to open the exact
+  `grok-rounded-copper-field` Session. From the Prediction roster, Enter on Back restored Grok Analyst's roster row;
+  Tab reached the first `activity-feedback-playtest` drawer, and Enter and Space independently opened the correct
+  `activity-feedback-playtest` Issue route. No operation was performed outside the observed navigation destinations.
+- Focused Inspect-rail and shared-input suites passed six tests. Root and UI TypeScript passed; the full suite passed all
+  618 test files and 5,178 tests (one file and nine tests skipped); the production UI build passed with only the existing
+  ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

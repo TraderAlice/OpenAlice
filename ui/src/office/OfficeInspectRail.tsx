@@ -9,6 +9,7 @@ import { officeBubbleText } from './bubble-text'
 import { officePixelImg } from './furniture'
 import { nextOfficeGridIndex } from './grid-navigation'
 import { OFFICE_HUD_ASSETS } from './hud-assets'
+import { isOfficeConfirmKey } from './input'
 import { OfficeCoworkerSprite } from './OfficeCoworkerSprite'
 import type { OfficeCoworkerSpriteAsset } from './coworker-sprites'
 import { OfficeWindowControlGlyph } from './OfficeWindowControlGlyph'
@@ -91,6 +92,11 @@ export function OfficeInspectRail({
           aria-label={returnToRoster ? t('office.backToRoster') : t('common.close')}
           onClick={onClose}
           onKeyDown={(event) => {
+            if (isOfficeConfirmKey(event.key)) {
+              event.preventDefault()
+              onClose()
+              return
+            }
             if (event.key !== 'Tab' || !employee) return
             event.preventDefault()
             if (event.shiftKey) (focusedDrawerButton() ?? openButtonRef.current)?.focus()
@@ -138,6 +144,11 @@ export function OfficeInspectRail({
                     aria-expanded={titleExpanded}
                     onClick={() => setTitleExpanded((expanded) => !expanded)}
                     onKeyDown={(event) => {
+                      if (isOfficeConfirmKey(event.key)) {
+                        event.preventDefault()
+                        setTitleExpanded((expanded) => !expanded)
+                        return
+                      }
                       if (event.key !== 'Tab') return
                       event.preventDefault()
                       if (event.shiftKey) closeButtonRef.current?.focus()
@@ -239,6 +250,11 @@ export function OfficeInspectRail({
                           aria-label={t('office.drawerOpenRecord', { record: title, kind, time: relativeTime })}
                           onFocus={() => setFocusedDrawerId(item.id)}
                           onClick={() => onOpenDrawer(item)}
+                          onKeyDown={(event) => {
+                            if (!isOfficeConfirmKey(event.key)) return
+                            event.preventDefault()
+                            onOpenDrawer(item)
+                          }}
                         >
                           <img src={OFFICE_HUD_ASSETS.drawerRecord} alt="" aria-hidden style={officePixelImg} />
                           <span className="oa-office-drawer__copy">
@@ -277,6 +293,11 @@ export function OfficeInspectRail({
             className="oa-office-inspect__open"
             onClick={onOpen}
             onKeyDown={(event) => {
+              if (isOfficeConfirmKey(event.key)) {
+                event.preventDefault()
+                onOpen()
+                return
+              }
               if (event.key !== 'Tab' || !onClose) return
               event.preventDefault()
               if (event.shiftKey) (titleToggleRef.current ?? closeButtonRef.current)?.focus()
