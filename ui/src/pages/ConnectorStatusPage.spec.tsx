@@ -140,7 +140,10 @@ describe('Connector overview state hierarchy', () => {
     expect(within(chooser).getAllByRole('article')).toHaveLength(4)
     const discord = within(chooser).getByRole('heading', { name: 'Discord' }).closest('article') as HTMLElement
     const setup = within(discord).getByRole('button', { name: 'Set up Discord' })
+    const glyph = discord.querySelector('[data-connector-glyph]') as HTMLElement
     expect(discord.className).toContain('rounded-xl')
+    expect(glyph.className).toContain('bg-secondary/60')
+    expect(glyph.className).not.toContain('bg-primary')
     expect(setup.className).toContain('bg-background/60')
     expect(setup.className).toContain('min-h-10')
     expect(setup.className).not.toContain('bg-primary')
@@ -156,6 +159,9 @@ describe('Connector overview state hierarchy', () => {
 
     const discord = screen.getByRole('heading', { name: 'Discord' }).closest('article') as HTMLElement
     const toggle = within(discord).getByRole('switch', { name: 'Turn Discord on or off' })
+    const glyph = discord.querySelector('[data-connector-glyph]') as HTMLElement
+    expect(glyph.className).toContain('bg-secondary/60')
+    expect(glyph.className).not.toContain('bg-primary')
     expect(toggle.getAttribute('aria-checked')).toBe('false')
     expect(screen.queryByRole('switch', { name: 'Turn Slack on or off' })).toBeNull()
 

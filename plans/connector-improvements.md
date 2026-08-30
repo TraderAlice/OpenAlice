@@ -397,6 +397,17 @@ external adapters remain optional projections rather than sources of truth.
     use the full lifecycle card, so progress, evidence, diagnostics, switches,
     and recovery are unchanged. This deliberately supersedes only Decision 19's
     same-card reuse, not its stable owned/available grouping.
+34. **A platform glyph identifies the channel; it is not an action or status.**
+    The mixed real overview gives every owned channel a primary-blue bordered
+    glyph while pristine choices use neutral glyphs, making the former resemble
+    icon buttons and implying ownership through interaction color. Brand colors
+    would add an isolated palette, while success/warning/error glyphs would
+    duplicate the adjacent textual lifecycle badge. The chosen model gives every
+    platform the same neutral border, secondary surface, and muted icon. Blue
+    remains reserved for real selection, enabled switches, focus, and primary
+    recovery actions; semantic state remains in the badge and copy. The glyph is
+    still `aria-hidden`, and its size, icon mapping, card hierarchy, responsive
+    geometry, and every interaction remain unchanged.
 
 ## Ordered Work
 
@@ -469,6 +480,8 @@ external adapters remain optional projections rather than sources of truth.
         overview summary and diagnostics.
   - [x] Replace the zero-configuration operations grid with a concise,
         capability-aware channel chooser.
+  - [x] Remove action-blue treatment from decorative channel glyphs across
+        owned and pristine cards.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -786,6 +799,17 @@ At 390 x 844, they became 358 px single-column cards, all setup targets measured
 40 px high, the chooser ended at y=791, and document width stayed exactly 390 px.
 The Demo used only its in-memory snapshot; no real Connector setting or external
 action was invoked. The viewport was reset after acceptance.
+
+The neutral-glyph increment passed the same 38 focused overview and demo-route
+tests, UI and root typechecking, the production build, and all 5,123 repository
+tests. Contracts assert that both a
+pristine choice and a credential-ready owned card use `bg-secondary/60` and no
+`bg-primary` glyph treatment. In the real mixed Default AliceProject at 1,052 x
+734, Discord, Telegram, Feishu, and pristine Slack all measured 40 x 40 px with
+the same neutral class; enabled switches remained the only blue controls in the
+visible work area. At 390 x 844, all four glyphs remained 40 x 40 px, card
+alignment stayed intact, and document width remained exactly 390 px. No Connector
+control or external action was invoked, and the viewport was reset.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.

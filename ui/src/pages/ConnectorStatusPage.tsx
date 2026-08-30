@@ -474,7 +474,7 @@ function AvailableConnectorGroup({
             className="oa-status-surface flex min-w-0 flex-col gap-3 rounded-xl border border-border/80 bg-secondary/10 p-4 sm:flex-row sm:items-center"
           >
             <div className="flex min-w-0 flex-1 items-center gap-3">
-              <ConnectorGlyph id={definition.id} muted />
+              <ConnectorGlyph id={definition.id} />
               <div className="min-w-0">
                 <h4 className="text-[14px] font-semibold text-foreground">{definition.label}</h4>
                 <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11.5px] text-muted-foreground">
@@ -761,7 +761,7 @@ function SummaryPill({ tone = 'neutral', children }: { tone?: 'neutral' | 'dange
   )
 }
 
-function ConnectorGlyph({ id, muted = false }: { id: string; muted?: boolean }) {
+function ConnectorGlyph({ id }: { id: string }) {
   const glyphs: Record<string, LucideIcon> = {
     discord: MessageCircle,
     telegram: Send,
@@ -770,10 +770,11 @@ function ConnectorGlyph({ id, muted = false }: { id: string; muted?: boolean }) 
   }
   const Icon = glyphs[id] ?? Plug
   return (
-    <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${muted
-      ? 'border-border bg-secondary/60 text-muted-foreground'
-      : 'border-primary/20 bg-primary/10 text-primary'
-    }`} aria-hidden>
+    <span
+      data-connector-glyph
+      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-secondary/60 text-muted-foreground"
+      aria-hidden
+    >
       <Icon size={18} />
     </span>
   )

@@ -424,7 +424,10 @@ The surfaces deliberately have different jobs:
   repeated generic delivery subtitle and do
   not impose a fixed minimum height: the state explanation is the primary body,
   while evidence and the next action remain in stable document order. A channel
-  article is the single visual container; state copy is not wrapped in a nested
+  article is the single visual container. Platform glyphs use one neutral
+  identity treatment across owned and pristine cards; interaction blue belongs
+  to selection, focus, enabled switches, and primary actions, while lifecycle
+  badges and copy own status. State copy is not wrapped in a nested
   status card, diagnostics use a thin native disclosure, and the non-clickable
   article has no hover treatment. Every
   credential-ready card also exposes the same `Use <platform>` runtime switch as
