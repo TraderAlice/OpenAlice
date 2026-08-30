@@ -1914,6 +1914,7 @@ export const en = {
     cabinetRecords_other: '{{count}} filed records',
     cabinetInspectHint: 'Desk records stay in Office until you choose where to go.',
     cabinetKeyboardHint: 'Arrows choose · Enter to open',
+    cabinetEmptyKeyboardHint: 'Enter opens Workspace files',
     cabinetRecordOwner: 'Filed by {{name}}',
     drawerOpenRecord: 'Open {{record}}, {{kind}}, {{time}}, in Workspace',
     drawerRecordAction: 'Open',

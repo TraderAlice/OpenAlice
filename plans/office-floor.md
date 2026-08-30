@@ -3104,6 +3104,20 @@ Contextual window-control legend follow-up (2026-08-30):
   UI TypeScript passed. Root TypeScript, the full 617-file Vitest run (5,135 passing; one file and nine tests skipped),
   and the production build also passed; the existing direct-eval and large-chunk advisories are unchanged.
 
+Empty-cabinet command follow-up (2026-08-30):
+
+- Continued the real acceptance loop into AutoQuant's zero-record filing cabinet. The new desktop legend still said
+  `Arrows choose · Enter to open` even though no grid existed; its only command was Enter Workspace files. The empty
+  illustration was polished, but the instruction described an impossible move.
+- Chose content-derived command copy rather than hiding the summary or inventing a disabled grid cursor. Nonempty
+  cabinets keep the spatial navigation legend, while an empty cabinet says `Enter opens Workspace files` in the four
+  shipped locales and autofocuses that exact command through the existing menu contract.
+- Browser-reopened the real zero-record cabinet. The summary and highlighted green command now agree, no Arrows copy
+  remains, and Enter Workspace files owns focus. Focused cabinet and responsive-style specs passed (2 files / 19
+  tests), including the zero-record legend and focus contract. Root/UI TypeScript, the full 617-file Vitest run (5,135
+  passing; one file and nine tests skipped), and the production build also passed; the existing direct-eval and
+  large-chunk advisories are unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

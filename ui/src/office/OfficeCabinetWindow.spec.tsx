@@ -179,6 +179,8 @@ describe('OfficeCabinetWindow', () => {
     expect(dialog.getAttribute('data-empty')).toBe('true')
     expect(dialog.getAttribute('data-record-count')).toBe('0')
     expect(screen.getByText('No desk records have been filed here yet.')).toBeTruthy()
+    expect(screen.getByText('Enter opens Workspace files').getAttribute('data-input')).toBe('keyboard')
+    expect(screen.queryByText('Arrows choose · Enter to open')).toBeNull()
     expect(container.querySelector<HTMLImageElement>('.oa-office-cabinet-window__empty img')?.src)
       .toContain('/office/furniture/empty-cabinet-v1.png')
     const workspaceFiles = screen.getByRole('button', { name: 'Enter Workspace files' })
