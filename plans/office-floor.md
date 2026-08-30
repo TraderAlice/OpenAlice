@@ -4122,6 +4122,23 @@ Replay actor-state composition follow-up (2026-08-30):
   UI TypeScript passed, the full suite passed all 617 test files and 5,172 tests (one file and nine tests skipped), and
   the production UI build passed with only the existing ports fallback, jsdom canvas, and large-chunk advisories.
 
+Visible journal-exit hierarchy follow-up (2026-08-30):
+
+- Played the live News-terminal loop as a game window: auto-walk to the terminal, open its channel, move the record
+  cursor with Arrow Down, and press Escape. On the desktop two-pane journal, the first Escape produced no visible
+  change and the second closed the window. The runtime was unconditionally applying its narrow-screen
+  `detail -> index` transition even though desktop already displayed the index and detail together.
+- Compared exposing a desktop Back command, making every viewport close immediately, and matching Escape to the
+  hierarchy actually visible. Chose the visible hierarchy: an expanded report still collapses first; a narrow detail
+  page returns to its visible record index; a desktop two-pane journal bubbles the first Escape directly to the owning
+  game window. This preserves the handheld drill-down without teaching desktop players that Escape sometimes fails.
+- Real-browser acceptance repeated the News route, moved selection from scmp-business #4986 to marketwatch #4985,
+  and closed Activity Log with one Escape. Focus returned to the physical News terminal with its latest-headline prompt
+  intact. Focused runtime and Office-page suites passed 30 tests; the responsive contract explicitly simulates whether
+  the Back control participates in layout so both desktop and narrow behavior remain covered. Root and UI TypeScript
+  passed, the full suite passed all 617 test files and 5,172 tests (one file and nine tests skipped), and the production
+  UI build passed with only the existing ports fallback, jsdom canvas, and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

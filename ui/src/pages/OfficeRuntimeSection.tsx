@@ -557,7 +557,8 @@ export function OfficeRuntimeSection({
       setDetailExpanded(false)
       return
     }
-    if (mobileView !== 'detail') return
+    const detailBackVisible = journalBackRef.current?.offsetParent != null
+    if (mobileView !== 'detail' || !detailBackVisible) return
     keyboardEvent.preventDefault()
     keyboardEvent.stopPropagation()
     returnToJournalIndex()

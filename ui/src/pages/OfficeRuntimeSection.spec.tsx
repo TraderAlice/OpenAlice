@@ -394,6 +394,11 @@ describe('OfficeRuntimeSection', () => {
     )
 
     const backToRecords = screen.getByRole('button', { name: 'Back to records' })
+    await userEvent.keyboard('{Escape}')
+    expect(journal.getAttribute('data-mobile-view')).toBe('detail')
+    expect(onParentKeyDown).toHaveBeenCalledOnce()
+    onParentKeyDown.mockClear()
+
     Object.defineProperty(backToRecords, 'offsetParent', {
       configurable: true,
       value: journal,

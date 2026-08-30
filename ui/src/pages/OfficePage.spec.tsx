@@ -388,6 +388,12 @@ describe('OfficePage localization', () => {
     expect(acknowledgeMock).toHaveBeenCalledWith('news')
     expect(openOrFocusMock).not.toHaveBeenCalled()
     expect(navigateMock).not.toHaveBeenCalled()
+
+    const focusedNewsRow = screen.getByRole('button', { name: 'Mock find news on floor' })
+    focusedNewsRow.focus()
+    await userEvent.keyboard('{ArrowDown}{Escape}')
+    await vi.waitFor(() => expect(screen.queryByTestId('office-runtime-section')).toBeNull())
+    await vi.waitFor(() => expect(document.activeElement).toBe(news))
   })
 
   it('reopens the exact replayed event and channel from the Operations board', async () => {
