@@ -1,8 +1,8 @@
 # Bun-native CLI Distribution
 
-Status: Active — macOS/Linux native CLI is public in v0.90.2; v0.91.0-beta.1
-acceptance is next; native PowerShell and external package-manager activation
-remain deferred
+Status: Active — macOS/Linux native CLI is public in v0.90.2 and the separately
+dispatched v0.91.0-beta.1 is externally verified; stable remains v0.90.2 while
+native PowerShell and external package-manager activation remain deferred
 
 Delivery mode: Serial / interactive from current `dev`. The accepted native CLI
 increments have already reached `dev`; the old `codex/usability-improvements`
@@ -549,19 +549,19 @@ artifacts.
 
 ### 10. Publish the 0.91 beta checkpoint
 
-- [ ] Capture the current stable manifest, updater feeds, aliases, and shared
+- [x] Capture the current stable manifest, updater feeds, aliases, and shared
   installer before beta publication.
-- [ ] Promote the exact accepted `dev` tip, including the GitHub-safe AUR
+- [x] Promote the exact accepted `dev` tip, including the GitHub-safe AUR
   metadata asset contract, to `master` through the full promotion gate.
-- [ ] Use a focused `master` branch and PR to set both product manifests to
+- [x] Use a focused `master` branch and PR to set both product manifests to
   `0.91.0-beta.1`; do not merge that version-only commit back to `dev`.
-- [ ] Dispatch one `beta` release for `v0.91.0-beta.1`. Do not produce or queue
+- [x] Dispatch one `beta` release for `v0.91.0-beta.1`. Do not produce or queue
   a stable release from the same run.
-- [ ] Externally verify the beta GitHub Release, updater feeds, CLI manifest,
+- [x] Externally verify the beta GitHub Release, updater feeds, CLI manifest,
   installer, native Runtime, and Broker Packs while proving every stable-owned
   mutable surface stayed byte-for-byte unchanged.
-- [ ] Leave later fixes on `dev`. A `beta.2` checkpoint is optional; stable is
-  a separate later decision after tomorrow's testing.
+- [x] Leave later fixes on `dev`. A `beta.2` checkpoint is optional; stable is
+  a separate later decision after beta testing and maintainer acceptance.
 
 ## Verification Matrix
 
@@ -942,3 +942,17 @@ This plan is complete only when:
   separate serial intents: fixes may accumulate on `dev` between them, another
   beta is optional, and unchanged-source stable promotion is the exception
   rather than an automatic second output.
+- 2026-08-31: Published only
+  [`v0.91.0-beta.1`](https://github.com/TraderAlice/OpenAlice/releases/tag/v0.91.0-beta.1)
+  from `009d3f466288bd69cf831e6bddccee501ca99c04` in
+  [release run 33329951354](https://github.com/TraderAlice/OpenAlice/actions/runs/33329951354).
+  The prerelease contains 49 uploaded assets: four native CLI archives and
+  sidecars, 20 Broker Pack archives plus catalogs, signed and notarized macOS
+  desktop packages, the intentionally unsigned Windows package, updater
+  metadata, and installers. Independent public verification downloaded and
+  hashed all CLI and Broker bytes with zero mismatches, then completed a clean
+  non-root Debian beta install, Runtime start/status/stop, uninstall, and data
+  preservation journey with no host Node, Bun, or Agent Runtime. The captured
+  stable manifest, feeds, aliases, and default installer route remained
+  unchanged at `v0.90.2`; npm, Homebrew Tap, and AUR publication stayed
+  disabled. No stable release was produced or queued.
