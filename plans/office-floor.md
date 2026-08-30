@@ -3718,6 +3718,27 @@ Landscape cabinet complete-row follow-up (2026-08-30):
   files and 5,162 tests (one file and nine tests skipped), and the production UI build passed with only the existing
   jsdom canvas and large-chunk advisories.
 
+Complete Agent reward-row follow-up (2026-08-30):
+
+- Ran two bounded, read-only Grok Issues in the real Office Lab Chat workspace: one fast completion probe and one
+  deliberately delayed working-state probe. The live floor correctly reported `1 WORKING · 1 AWAKE`, placed the
+  active Grok Librarian at a lit desk, then moved it through review to idle while Operations recorded task start,
+  agent report, tool action, and completion.
+- Opening that completed agent's Agent File exposed a presentation defect rather than a runtime-state defect. The
+  fixed Open session command covered the bottom of its only Issue reward card by 17px; the three-reward Grok
+  Tactician file still clipped its last row after a smaller 384px allowance.
+- Compared auto-scrolling the profile to its rewards, compressing reward targets, and giving the wide-screen
+  character sheet enough height for its supported three-card reward row. Chose the larger wide allowance: identity
+  and latest result stay visible on open, reward cards retain their game-menu target size, and content still
+  shrink-wraps when an agent has only one reward.
+- The wide Agent File cap is now 416px. In the real browser, the three-card profile measured about 345px of content,
+  displayed every reward with 10px clearance above the fixed command, and produced an approximately 401px window;
+  the one-card file naturally stayed around 364px. At 844x390 the existing `calc(100% - 84px)` bound kept the panel
+  at 272px with no body overflow, while the max-680px responsive rules remained authoritative. Focused Agent File
+  style tests passed (2 files / 9 tests). Root and UI TypeScript passed, the full suite passed all 617 test files and
+  5,162 tests (one file and nine tests skipped), and the production UI build passed with only the existing jsdom
+  canvas and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
