@@ -3296,6 +3296,28 @@ Replay-drawer signposting follow-up (2026-08-30):
   TypeScript passed, all 617 test files passed (5,143 tests; one file and nine tests skipped), and the production build
   passed with only the existing jsdom canvas and large-chunk advisories.
 
+In-world floor connection follow-up (2026-08-30):
+
+- Reloaded the real Office Lab and captured the first API gap before the floor snapshot arrived. The entire 16-bit
+  frame disappeared, leaving only the ordinary page sentence `Opening the offices…`; an initial failure used the same
+  generic page treatment, and any later polling failure placed error copy above the floor instead of behaving like a
+  state inside the game world.
+- Compared an ordinary skeleton, replacing the floor with one loading/error page for every request, and separating
+  first-entry boot from later signal loss. Chose the third model: the initial request now boots through a full-frame
+  Floor Receiver with radar waves, a stepped eight-cell signal meter, concise synchronization copy, reduced-motion
+  handling, and an in-world reconnect command. This makes the first frame belong to Office without pretending that a
+  cached floor remains authoritative before one has ever loaded.
+- Once a valid building exists, a later fetch failure no longer replaces or pushes down the playable scene. Alice,
+  desks, pods, and controls remain in place while a compact `Floor signal interrupted` cartridge appears below the HUD
+  with the bounded error reason and Reconnect command. Successful polling removes it automatically; manual retry uses
+  the same domain-hook refresh rather than reloading the app.
+- Browser acceptance paused only `/api/office/floor` while leaving the app shell live and captured the complete Floor
+  Receiver boot screen. A second run blocked only Office floor polling: the interruption cartridge appeared while Alice
+  and all three Office Lab groups remained visible, then disappeared after the block was cleared and polling recovered.
+  The browser was restored to unrestricted LIVE mode. The focused page spec passed (13 tests), Root/UI TypeScript
+  passed, all 617 test files passed (5,146 tests; one file and nine tests skipped), and the production build passed with
+  only the existing jsdom canvas and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

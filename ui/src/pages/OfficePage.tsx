@@ -14,6 +14,7 @@ import { officeActivityActors } from '../office/activity-actors'
 import { officeCoworkerCast, type OfficeCoworkerSpriteAsset } from '../office/coworker-sprites'
 import { readOfficeCoworkerCasts, writeOfficeCoworkerCasts } from '../office/coworker-cast-storage'
 import { officePixelImg } from '../office/furniture'
+import { OfficeConnectionBanner, OfficeConnectionScreen } from '../office/OfficeConnectionState'
 import { OfficeInspectRail } from '../office/OfficeInspectRail'
 import { OfficeWindowControlGlyph } from '../office/OfficeWindowControlGlyph'
 import { OFFICE_HUD_ASSETS } from '../office/hud-assets'
@@ -49,6 +50,7 @@ export function OfficePage() {
   const [asOfSeq, setAsOfSeq] = useState<number | null>(null)
   const [replayFocus, setReplayFocus] = useState<OfficeReplayFocus | null>(null)
   const [replayPanelOpen, setReplayPanelOpen] = useState(false)
+  const [retryingFloor, setRetryingFloor] = useState(false)
   const [selected, setSelected] = useState<{ workspaceId: string; resumeId: string } | null>(null)
   const [logView, setLogView] = useState<{
     origin: OfficeLogOrigin
@@ -62,8 +64,16 @@ export function OfficePage() {
     | { kind: 'roster'; workspaceId: string; resumeId: string }
   >({ kind: 'map' })
   const [cabinetWorkspaceId, setCabinetWorkspaceId] = useState<string | null>(null)
-  const { building, loading, error } = useOfficeFloor(asOfSeq)
+  const { building, error, refresh } = useOfficeFloor(asOfSeq)
   const productActivity = useOfficeProductActivity()
+  const retryFloor = async () => {
+    setRetryingFloor(true)
+    try {
+      await refresh()
+    } finally {
+      setRetryingFloor(false)
+    }
+  }
   const markExcursion = () => {
     navigate('/office/return', { state: { officeExcursion: true } })
   }
@@ -257,11 +267,12 @@ export function OfficePage() {
         <h2>{t('nav.item.office')}</h2>
         <p>{t('office.description')}</p>
       </div>
-      {error && (
-        <p role="alert" className="px-4 pt-3 text-sm text-destructive md:px-6">{t('office.loadFailed')}: {error}</p>
-      )}
-      {loading && !building && (
-        <p className="px-4 pt-3 text-sm text-muted-foreground md:px-6">{t('office.loadingFloor')}</p>
+      {!building && (
+        <OfficeConnectionScreen
+          error={error}
+          retrying={retryingFloor}
+          onRetry={() => { void retryFloor() }}
+        />
       )}
       {building && (
         <div className="oa-office-layout">
@@ -335,6 +346,13 @@ export function OfficePage() {
                 }}
               />
             </div>
+            {error && (
+              <OfficeConnectionBanner
+                error={error}
+                retrying={retryingFloor}
+                onRetry={() => { void retryFloor() }}
+              />
+            )}
             {modalOpen && <div className="oa-office-window-scrim" aria-hidden />}
             {logView && (
               <section

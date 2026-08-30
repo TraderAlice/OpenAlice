@@ -15,12 +15,14 @@ const {
   officeFloorMock,
   openOrFocusMock,
   productActivityMock,
+  refreshMock,
 } = vi.hoisted(() => ({
   acknowledgeMock: vi.fn(),
   navigateMock: vi.fn(),
   officeFloorMock: vi.fn(),
   openOrFocusMock: vi.fn(),
   productActivityMock: vi.fn(),
+  refreshMock: vi.fn(async () => undefined),
 }))
 
 vi.mock('react-router-dom', async (importOriginal) => ({
@@ -104,7 +106,7 @@ const defaultOfficeFloor = () => ({
   },
   loading: false,
   error: null,
-  refresh: async () => undefined,
+  refresh: refreshMock,
 })
 
 vi.mock('../tabs/store', () => ({
@@ -118,6 +120,7 @@ beforeEach(async () => {
   navigateMock.mockClear()
   openOrFocusMock.mockClear()
   acknowledgeMock.mockClear()
+  refreshMock.mockClear()
   productActivityMock.mockReturnValue({
     agent: null,
     inbox: null,
@@ -141,6 +144,55 @@ afterEach(() => {
 })
 
 describe('OfficePage localization', () => {
+  it('opens with an in-world receiver screen while the floor synchronizes', () => {
+    officeFloorMock.mockReturnValue({
+      building: null,
+      loading: true,
+      error: null,
+      refresh: refreshMock,
+    })
+
+    const { container } = render(<OfficePage />)
+
+    const screenState = screen.getByTestId('office-connection-screen')
+    expect(screenState.getAttribute('role')).toBe('status')
+    expect(screenState.getAttribute('aria-busy')).toBe('true')
+    expect(screen.getByText('楼层接收机')).toBeTruthy()
+    expect(screen.getByText('正在同步房间、工位与 Agent 信号。')).toBeTruthy()
+    expect(screenState.querySelector<HTMLImageElement>('.oa-office-connection-screen__receiver img')?.src)
+      .toContain('/office/hud/signal-receiver-v2.png')
+    expect(container.querySelector('.oa-office-main')).toBeTruthy()
+  })
+
+  it('offers an in-world reconnect command when the first floor request fails', async () => {
+    officeFloorMock.mockReturnValue({
+      building: null,
+      loading: false,
+      error: '503 receiver unavailable',
+      refresh: refreshMock,
+    })
+
+    render(<OfficePage />)
+
+    expect(screen.getByRole('alert').textContent).toContain('无法连接 Office 楼层')
+    expect(screen.getByRole('alert').textContent).toContain('503 receiver unavailable')
+    await userEvent.click(screen.getByRole('button', { name: '重新连接' }))
+    expect(refreshMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the last playable floor visible when a live refresh loses signal', () => {
+    officeFloorMock.mockReturnValue({
+      ...defaultOfficeFloor(),
+      error: 'socket interrupted',
+    })
+
+    render(<OfficePage />)
+
+    expect(screen.getByRole('img', { name: 'Office 地图上的 Alice' })).toBeTruthy()
+    expect(screen.getByRole('alert').textContent).toContain('楼层信号中断')
+    expect(screen.getByRole('alert').textContent).toContain('socket interrupted')
+  })
+
   it('renders an empty Office as a game floor instead of page copy', () => {
     officeFloorMock.mockReturnValue({
       ...defaultOfficeFloor(),
