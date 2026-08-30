@@ -4053,6 +4053,23 @@ Short-landscape journal command-frame follow-up (2026-08-30):
   passed, the full suite passed all 617 test files and 5,167 tests (one file and nine tests skipped), and the production
   UI build passed with only the existing ports fallback and large-chunk advisories.
 
+Interactive awake-state follow-up (2026-08-30):
+
+- Started real Grok terminal Sessions in the Office lab to inspect live character state. The Workspace API correctly
+  reported the Sessions as `running`, but Office rendered every one as `idle, asleep` and kept the HUD at
+  `0 working · 0 awake`; the Session directory only counted headless execution ids when projecting `active`.
+- Compared leaving terminal Sessions invisible until tool activity, presenting every running terminal as working, and
+  separating process power from current activity. Chose the third option: a running non-headless Session is awake,
+  while mood continues to come exclusively from product runtime events. An open terminal can therefore stand by
+  without pretending that it is doing work, and stale headless records still require a real active execution.
+- Real-browser acceptance resumed Grok Engineer g19 and changed the HUD to `0 working · 1 awake`, the Chat sign to
+  `1/19 awake`, and promoted g19 into one of four visible desks instead of hiding her behind `+15`. Agent File agreed
+  on `idle`, `office-lab-chat`, and `terminal`; closing restored map focus. Pausing the QA Session returned both the
+  desk and HUD to asleep, and left no QA process running.
+- Focused Session-directory and Office-floor suites passed 19 tests. Root and UI TypeScript passed, the full suite
+  passed all 617 test files and 5,168 tests (one file and nine tests skipped), and the production UI build passed with
+  only the existing ports fallback and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

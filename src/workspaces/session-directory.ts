@@ -110,6 +110,8 @@ export function buildWorkspaceSessionDirectory(input: {
     sessions: input.identities.map((identity) => {
       const execution = input.latestExecutionFor(identity.resumeId)
       const interactive = input.interactiveFor(identity.resumeId)
+      const interactiveActive = interactive?.surface !== 'headless'
+        && interactive?.state === 'running'
       const interactiveTitle = interactive ? sessionPreferredTitle(interactive) : undefined
       return {
         resumeId: identity.resumeId,
@@ -123,7 +125,8 @@ export function buildWorkspaceSessionDirectory(input: {
         resumable: identity.lifecycle !== 'retired'
           && sessionPresence(identity) !== 'deleted'
           && Boolean(identity.agentSessionId),
-        active: identity.lifecycle !== 'retired' && input.isActive(identity.resumeId),
+        active: identity.lifecycle !== 'retired'
+          && (input.isActive(identity.resumeId) || interactiveActive),
         ...(identity.metadata?.createdBy ? { createdBy: identity.metadata.createdBy } : {}),
         ...(input.rosterVisibilityFor?.(identity.resumeId) === 'hidden'
           ? { rosterVisibility: 'hidden' as const }
