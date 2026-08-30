@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -92,6 +92,22 @@ describe('public connector config', () => {
       chatId: 'chat-42',
       inboxPush: false,
     })
+  })
+
+  it('does not signal a process restart for an adapter-only mutation', async () => {
+    const config = await loadModule()
+    await config.writeConnectorServiceEnabled(true)
+
+    const result = await config.mutatePublicConnectorAdapter('discord', {
+      enabled: false,
+      set: { inboxPush: false },
+      unset: [],
+      setSecrets: {},
+      removeSecrets: [],
+    })
+
+    expect(result).toMatchObject({ serviceEnabled: true, serviceChanged: false, adapterChanged: true })
+    await expect(stat(join(home, 'data/control/restart-connector.flag'))).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
   it('clears learned owner fields on unlink without dropping the sealed token', async () => {

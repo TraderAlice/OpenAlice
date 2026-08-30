@@ -888,8 +888,19 @@ external adapters remain optional projections rather than sources of truth.
   nine skipped), root and UI typechecks, 16 Connector replay specs, and the
   Connector Service smoke. The isolated Guardian recovery smoke also passed
   healthy takeover, crashed-owner reclaim, and forced stubborn-tree recovery.
-  Electron/package and production-carrier acceptance remain open; no live
-  external message was sent.
+  At that checkpoint, package and production-carrier acceptance remained open;
+  no live external message was sent.
+- Unsigned packaged-Electron acceptance now passes the production build,
+  packaged launch, IPC/PTY, Workspace lifecycle, and managed-Pi side-effect
+  checks. Its first build exposed a missing Feishu `message_id` event field;
+  the adapter boundary and stable-id forwarding spec were corrected before the
+  successful rerun.
+- Adapter-only config coverage now asserts that no
+  `restart-connector.flag` is created, in addition to route and manager specs
+  proving that peer adapters are not restarted. Dev/production Guardian and
+  desktop lifecycle specs passed (52 checks). `pnpm docker:smoke` could not
+  start because the local OrbStack Docker daemon/socket was unavailable, so
+  Docker runtime acceptance remains explicitly open.
 
 ## Verification
 
