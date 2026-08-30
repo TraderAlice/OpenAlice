@@ -14,7 +14,8 @@ import {
   RefreshCw,
   Clock,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Cpu
 } from 'lucide-react'
 import {
   leanApi,
@@ -95,11 +96,11 @@ export function QuantLabPage({ spec }: QuantLabPageProps) {
     return (
       <div className="flex h-full flex-col items-center justify-center bg-background p-8 text-center">
         <Beaker className="h-12 w-12 text-muted-foreground/40 mb-4" />
-        <h2 className="text-lg font-semibold text-foreground mb-2">Quant Lab is not enabled</h2>
+        <h2 className="text-lg font-semibold text-foreground mb-2">LEAN GUI is not enabled</h2>
         <p className="text-sm text-muted-foreground max-w-sm mb-4">
-          To activate Quant Lab, set <code className="font-mono bg-secondary px-1 rounded">enabled: true</code> in{' '}
+          To activate LEAN GUI, set <code className="font-mono bg-secondary px-1 rounded">enabled: true</code> in{' '}
           <code className="font-mono bg-secondary px-1 rounded">data/config/lean.json</code>.
-          All existing OpenAlice features remain fully operational while Quant Lab is disabled.
+          All existing OpenAlice features remain fully operational while LEAN GUI is disabled.
         </p>
       </div>
     )
@@ -108,7 +109,7 @@ export function QuantLabPage({ spec }: QuantLabPageProps) {
   return (
     <PageSidebarLayout
       storageKey="quant-lab-sidebar"
-      title="Quant Lab"
+      title="LEAN GUI"
       defaultWidth={260}
       sidebar={<QuantLabSidebar />}
     >
@@ -119,7 +120,7 @@ export function QuantLabPage({ spec }: QuantLabPageProps) {
             <div className="flex items-center gap-2">
               <Beaker className="text-primary h-6 w-6" />
               <h1 className="text-xl font-bold tracking-tight text-foreground">
-                Quant Lab Research Center
+                LEAN GUI Research Center
               </h1>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -146,7 +147,7 @@ export function QuantLabPage({ spec }: QuantLabPageProps) {
         </div>
 
         {/* Engine Banner & Metrics */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
           <div className="rounded-lg border border-border bg-card p-4 flex flex-col justify-between">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>LEAN Engine</span>
@@ -162,8 +163,21 @@ export function QuantLabPage({ spec }: QuantLabPageProps) {
 
           <div className="rounded-lg border border-border bg-card p-4 flex flex-col justify-between">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Native LEAN CLI</span>
+              <Cpu size={14} className="text-primary" />
+            </div>
+            <div className="mt-2 text-lg font-bold text-foreground">
+              {status?.leanCliAvailable ? 'CLI Ready' : 'CLI Missing'}
+            </div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">
+              {status?.leanCliVersion || 'Install QuantConnect LEAN CLI for native commands'}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-border bg-card p-4 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>Active Strategies</span>
-              <Code2 size={14} className="text-primary" />
+              <Code2 size={14} className="text-chart-2" />
             </div>
             <div className="mt-2 text-2xl font-bold font-mono text-foreground">
               {strategies.length}
@@ -176,7 +190,7 @@ export function QuantLabPage({ spec }: QuantLabPageProps) {
           <div className="rounded-lg border border-border bg-card p-4 flex flex-col justify-between">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>Backtest Runs</span>
-              <History size={14} className="text-emerald-500" />
+              <History size={14} className="text-chart-1" />
             </div>
             <div className="mt-2 text-2xl font-bold font-mono text-foreground">
               {backtests.length}
@@ -189,7 +203,7 @@ export function QuantLabPage({ spec }: QuantLabPageProps) {
           <div className="rounded-lg border border-border bg-card p-4 flex flex-col justify-between">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>Experiments & Integrity</span>
-              <ShieldCheck size={14} className="text-purple-500" />
+              <ShieldCheck size={14} className="text-chart-4" />
             </div>
             <div className="mt-2 text-2xl font-bold font-mono text-foreground">
               {experiments.length}

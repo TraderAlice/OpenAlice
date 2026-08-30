@@ -101,7 +101,7 @@ export function ResearchIntegrityPage({ spec }: ResearchIntegrityPageProps) {
   return (
     <PageSidebarLayout
       storageKey="quant-lab-sidebar"
-      title="Quant Lab"
+      title="LEAN GUI"
       defaultWidth={260}
       sidebar={<QuantLabSidebar />}
     >
@@ -117,7 +117,7 @@ export function ResearchIntegrityPage({ spec }: ResearchIntegrityPageProps) {
             </button>
             <div>
               <div className="flex items-center gap-2">
-                <ShieldCheck className="text-emerald-500 h-6 w-6" />
+                <ShieldCheck className="text-chart-2 h-6 w-6" />
                 <h1 className="text-xl font-bold tracking-tight text-foreground">
                   Research Integrity & Bias Audit
                 </h1>

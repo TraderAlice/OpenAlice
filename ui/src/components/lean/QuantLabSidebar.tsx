@@ -91,11 +91,19 @@ export function QuantLabSidebar({ onNavigate }: QuantLabSidebarProps) {
           <span className="text-border">|</span>
           <span>{status?.enabled ? 'Active' : 'Disabled'}</span>
         </div>
+        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+          <span
+            className={`inline-block w-2 h-2 rounded-full ${
+              status?.leanCliAvailable ? 'bg-success' : 'bg-muted-foreground/40'
+            }`}
+          />
+          <span>{status?.leanCliAvailable ? 'Native LEAN CLI Ready' : 'Native LEAN CLI Missing'}</span>
+        </div>
       </div>
 
       {/* Main Navigation */}
       <div className="flex flex-col gap-0.5">
-        <SidebarSectionHeader title="Quant Research" />
+        <SidebarSectionHeader>Quant Research</SidebarSectionHeader>
         <SidebarRow
           label="Strategies & Hub"
           icon={<Layers size={13} className="text-primary" />}
@@ -109,7 +117,7 @@ export function QuantLabSidebar({ onNavigate }: QuantLabSidebarProps) {
         />
         <SidebarRow
           label="Research Integrity"
-          icon={<ShieldCheck size={13} className="text-emerald-500" />}
+          icon={<ShieldCheck size={13} className="text-chart-2" />}
           active={isIntegrityActive}
           onClick={() =>
             navTo({
@@ -118,18 +126,18 @@ export function QuantLabSidebar({ onNavigate }: QuantLabSidebarProps) {
             })
           }
           trail={
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 font-medium">
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-success/10 text-success font-medium">
               Evidence
             </span>
           }
         />
         <SidebarRow
           label="Discretionary Journal"
-          icon={<BookOpen size={13} className="text-amber-500" />}
+          icon={<BookOpen size={13} className="text-chart-3" />}
           active={isJournalActive}
           onClick={() => navTo({ kind: 'quant-lab-journal', params: {} })}
           trail={
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 font-mono">
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-warning/10 text-warning font-mono">
               {status?.journalCount ?? 0}
             </span>
           }
@@ -181,7 +189,7 @@ export function QuantLabSidebar({ onNavigate }: QuantLabSidebarProps) {
 
       {/* Recent Backtests */}
       <div className="flex flex-col gap-0.5">
-        <SidebarSectionHeader title="Recent Runs" />
+        <SidebarSectionHeader>Recent Runs</SidebarSectionHeader>
         {backtests.length === 0 ? (
           <div className="px-3 py-2 text-xs text-muted-foreground/80 italic">
             No backtest runs found

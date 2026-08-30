@@ -154,7 +154,7 @@ export function TradeJournalPage({ spec }: TradeJournalPageProps) {
   return (
     <PageSidebarLayout
       storageKey="quant-lab-sidebar"
-      title="Quant Lab"
+      title="LEAN GUI"
       defaultWidth={260}
       sidebar={<QuantLabSidebar />}
     >
@@ -163,7 +163,7 @@ export function TradeJournalPage({ spec }: TradeJournalPageProps) {
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/60 pb-5">
           <div>
             <div className="flex items-center gap-2">
-              <BookOpen className="text-amber-500 h-6 w-6" />
+              <BookOpen className="text-chart-3 h-6 w-6" />
               <h1 className="text-xl font-bold tracking-tight text-foreground">
                 Discretionary Trade Journal & Systematic Formalizer
               </h1>
@@ -332,10 +332,10 @@ export function TradeJournalPage({ spec }: TradeJournalPageProps) {
 
         {/* Formalization Proposal Modal / Banner */}
         {proposal && (
-          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-5 space-y-4">
+          <div className="rounded-lg border border-warning/30 bg-warning/5 p-5 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Sparkles className="text-amber-500" size={16} />
+                <Sparkles className="text-chart-3" size={16} />
                 <h3 className="text-sm font-bold text-foreground">
                   Systematic Strategy Formulation Proposal
                 </h3>
@@ -423,7 +423,7 @@ export function TradeJournalPage({ spec }: TradeJournalPageProps) {
                       <span
                         className={`text-[10px] font-mono px-2 py-0.5 rounded font-semibold ${
                           ent.formalizationStatus === 'formalized'
-                            ? 'bg-amber-500/15 text-amber-500'
+                            ? 'bg-warning/15 text-warning'
                             : 'bg-muted text-muted-foreground'
                         }`}
                       >
@@ -477,7 +477,7 @@ export function TradeJournalPage({ spec }: TradeJournalPageProps) {
                       onClick={() => handleFormalize(ent.id)}
                       className="flex items-center gap-1.5 text-primary font-semibold hover:underline"
                     >
-                      <Sparkles size={13} className="text-amber-500" />
+                      <Sparkles size={13} className="text-chart-3" />
                       Formalize into Strategy →
                     </button>
                   </div>

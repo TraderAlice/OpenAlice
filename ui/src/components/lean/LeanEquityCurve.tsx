@@ -126,20 +126,20 @@ export function LeanEquityCurve({
           <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="equityGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={isPositive ? '#10b981' : '#ef4444'} stopOpacity={0.3} />
-                <stop offset="95%" stopColor={isPositive ? '#10b981' : '#ef4444'} stopOpacity={0.0} />
+                <stop offset="5%" stopColor={isPositive ? 'var(--chart-2)' : 'var(--destructive)'} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={isPositive ? 'var(--chart-2)' : 'var(--destructive)'} stopOpacity={0.0} />
               </linearGradient>
             </defs>
             <XAxis
               dataKey="date"
-              stroke="#64748b"
+              stroke="var(--muted-foreground)"
               fontSize={11}
               tickLine={false}
               axisLine={false}
               minTickGap={40}
             />
             <YAxis
-              stroke="#64748b"
+              stroke="var(--muted-foreground)"
               fontSize={11}
               tickLine={false}
               axisLine={false}
@@ -169,11 +169,11 @@ export function LeanEquityCurve({
                 return null
               }}
             />
-            <ReferenceLine y={initialCash} stroke="#475569" strokeDasharray="3 3" />
+            <ReferenceLine y={initialCash} stroke="var(--muted-foreground)" strokeDasharray="3 3" />
             <Area
               type="monotone"
               dataKey="equity"
-              stroke={isPositive ? '#10b981' : '#ef4444'}
+              stroke={isPositive ? 'var(--chart-2)' : 'var(--destructive)'}
               strokeWidth={2}
               fillOpacity={1}
               fill="url(#equityGrad)"
@@ -192,13 +192,13 @@ export function LeanEquityCurve({
             <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="ddGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.0} />
-                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0.4} />
+                  <stop offset="5%" stopColor="var(--destructive)" stopOpacity={0.0} />
+                  <stop offset="95%" stopColor="var(--destructive)" stopOpacity={0.4} />
                 </linearGradient>
               </defs>
               <XAxis dataKey="date" hide />
               <YAxis
-                stroke="#64748b"
+                stroke="var(--muted-foreground)"
                 fontSize={10}
                 tickLine={false}
                 axisLine={false}
@@ -208,7 +208,7 @@ export function LeanEquityCurve({
               <Area
                 type="monotone"
                 dataKey="drawdown"
-                stroke="#ef4444"
+                stroke="var(--destructive)"
                 strokeWidth={1.5}
                 fillOpacity={1}
                 fill="url(#ddGrad)"

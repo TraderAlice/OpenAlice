@@ -30,7 +30,7 @@ export function ResearchIntegrityCards({ report }: ResearchIntegrityCardsProps) 
   return (
     <div className="flex flex-col gap-6">
       {/* Evidence-First Methodology Notice */}
-      <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4 text-xs text-emerald-600 dark:text-emerald-400 flex items-start gap-3">
+      <div className="rounded-lg border border-success/20 bg-success/5 p-4 text-xs text-success flex items-start gap-3">
         <ShieldCheck size={18} className="shrink-0 mt-0.5" />
         <div>
           <span className="font-bold">Evidence-First Integrity Guarantee:</span>{' '}
@@ -136,7 +136,7 @@ export function ResearchIntegrityCards({ report }: ResearchIntegrityCardsProps) 
             <div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded bg-emerald-500/10 text-emerald-500">
+                  <div className="p-1.5 rounded bg-success/10 text-success">
                     <Repeat size={15} />
                   </div>
                   <h4 className="text-sm font-bold text-foreground">Walk-Forward Efficiency</h4>
@@ -188,7 +188,7 @@ export function ResearchIntegrityCards({ report }: ResearchIntegrityCardsProps) 
             <div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded bg-purple-500/10 text-purple-500">
+                  <div className="p-1.5 rounded bg-chart-4/10 text-chart-4">
                     <Binary size={15} />
                   </div>
                   <h4 className="text-sm font-bold text-foreground">
@@ -250,7 +250,7 @@ export function ResearchIntegrityCards({ report }: ResearchIntegrityCardsProps) 
             <div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded bg-amber-500/10 text-amber-500">
+                  <div className="p-1.5 rounded bg-warning/10 text-warning">
                     <AlertOctagon size={15} />
                   </div>
                   <h4 className="text-sm font-bold text-foreground">Data Snooping Penalty</h4>
@@ -301,7 +301,7 @@ export function ResearchIntegrityCards({ report }: ResearchIntegrityCardsProps) 
         {sensitivity && (
           <div className="col-span-1 md:col-span-2 rounded-lg border border-border bg-card p-5">
             <div className="flex items-center gap-2 mb-3">
-              <div className="p-1.5 rounded bg-blue-500/10 text-blue-500">
+              <div className="p-1.5 rounded bg-chart-1/10 text-chart-1">
                 <Sliders size={15} />
               </div>
               <h4 className="text-sm font-bold text-foreground">Parameter Fragility & Elasticity</h4>

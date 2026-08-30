@@ -72,6 +72,7 @@ describe('ui-layout document', () => {
       'portfolio',
       'connectors',
       'prediction',
+      'quant-lab',
     ])
     expect(layout.hidden).not.toContain('trading-as-git')
     expect(layout.hidden).toEqual(['dev'])

@@ -87,7 +87,7 @@ export function BacktestResultsPage({ spec }: BacktestResultsPageProps) {
     return (
       <PageSidebarLayout
         storageKey="quant-lab-sidebar"
-        title="Quant Lab"
+        title="LEAN GUI"
         defaultWidth={260}
         sidebar={<QuantLabSidebar />}
       >
@@ -103,7 +103,7 @@ export function BacktestResultsPage({ spec }: BacktestResultsPageProps) {
     return (
       <PageSidebarLayout
         storageKey="quant-lab-sidebar"
-        title="Quant Lab"
+        title="LEAN GUI"
         defaultWidth={260}
         sidebar={<QuantLabSidebar />}
       >
@@ -121,7 +121,7 @@ export function BacktestResultsPage({ spec }: BacktestResultsPageProps) {
   return (
     <PageSidebarLayout
       storageKey="quant-lab-sidebar"
-      title="Quant Lab"
+      title="LEAN GUI"
       defaultWidth={260}
       sidebar={<QuantLabSidebar />}
     >
@@ -184,7 +184,7 @@ export function BacktestResultsPage({ spec }: BacktestResultsPageProps) {
             <button
               onClick={handleLaunchIntegrityCheck}
               disabled={evaluating}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-semibold shadow hover:bg-emerald-500 transition-colors"
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-success text-success-foreground text-xs font-semibold shadow hover:bg-success/85 transition-colors"
             >
               <ShieldCheck size={14} className={evaluating ? 'animate-spin' : ''} />
               {evaluating ? 'Analyzing...' : 'Research Integrity Teardown'}
