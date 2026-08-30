@@ -4278,6 +4278,23 @@ Paused-world route-continuity follow-up (2026-08-30):
   5,174 tests (one file and nine tests skipped), and the production UI build passed with only the existing ports
   fallback and large-chunk advisories.
 
+Stable-world geometry ownership follow-up (2026-08-31):
+
+- Audited the paused-route controller against live floor changes. Its map reset was keyed only by canvas width and
+  height, so two Workspace pods could swap positions inside the same-sized canvas while Alice retained a path and
+  delayed activation aimed at the old physical coordinates; the current target pointer would already be rendered at
+  the new location.
+- Compared canceling only from the All groups menu command, depending on each newly allocated layout object, and using
+  a stable physical-world fingerprint. Chose the fingerprint: canvas bounds, ordered pod identities and rectangles,
+  and the service-zone rectangle now define geometry ownership. Real Workspace moves cancel stale paths, while normal
+  employee and product-log polling leaves the same physical world—and its active route—untouched.
+- The same-dimensions regression starts a Chat-sign route, swaps Chat and AutoQuant pod order, and proves the route,
+  trail, status, and delayed activation are all canceled. In the real browser, a Grok Analyst route remained frozen at
+  x480/y456 through a 5.2-second menu pause spanning the four-second product poll, then resumed to x312/y504 and opened
+  the correct Agent File. The focused Building suite passed 21 tests. Root and UI TypeScript passed, the full suite
+  passed all 617 test files and 5,175 tests (one file and nine tests skipped), and the production UI build passed with
+  only the existing ports fallback and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

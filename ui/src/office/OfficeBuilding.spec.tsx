@@ -916,6 +916,72 @@ describe('OfficeBuilding', () => {
     }
   })
 
+  it('cancels an old route when pods reorder inside the same map dimensions', () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })))
+    try {
+      const onOpenWorkspace = vi.fn()
+      const office = (id: 'chat-geometry' | 'quant-geometry') => ({
+        workspace: id === 'chat-geometry'
+          ? { id, tag: 'chat', harness: 'chat' as const }
+          : { id, tag: 'quant', harness: 'auto-quant' as const },
+        lastInteractionAt: 1,
+        sleeping: false,
+        employees: [],
+      })
+      const building = (order: Array<'chat-geometry' | 'quant-geometry'>) => ({
+        config: {
+          workspaceSleepAfterMs: 1,
+          harnessMinimumVisibleGroups: { chat: 1, 'auto-quant': 1, prediction: 0, other: 0 },
+        },
+        lastSeq: 1,
+        firstSeq: 1,
+        offices: order.map(office),
+      })
+      const callbacks = {
+        onSelectEmployee: vi.fn(),
+        onOpenEmployee: vi.fn(),
+        onOpenWorkspace,
+        onOpenFiles: vi.fn(),
+        onOpenRoster: vi.fn(),
+        onOpenLog: vi.fn(),
+      }
+      const { rerender } = render(
+        <OfficeBuilding
+          building={building(['chat-geometry', 'quant-geometry'])}
+          {...callbacks}
+        />,
+      )
+
+      const map = screen.getByTestId('office-building').querySelector<HTMLElement>('.oa-office-map')
+      const initialDimensions = `${map?.style.width}:${map?.style.height}`
+      const chatSign = screen.getByRole('button', { name: /Enter chat workspace/ })
+      fireEvent.click(chatSign)
+      expect(chatSign.dataset.route).toBe('true')
+      expect(screen.getByTestId('office-route-trail')).toBeTruthy()
+
+      rerender(
+        <OfficeBuilding
+          building={building(['quant-geometry', 'chat-geometry'])}
+          {...callbacks}
+        />,
+      )
+
+      expect(`${map?.style.width}:${map?.style.height}`).toBe(initialDimensions)
+      expect(screen.queryByTestId('office-route-trail')).toBeNull()
+      expect(screen.queryByTestId('office-route-status')).toBeNull()
+      expect(screen.getByRole('button', { name: /Enter chat workspace/ }).dataset.route).toBe('false')
+      act(() => vi.advanceTimersByTime(5_000))
+      expect(onOpenWorkspace).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('keeps the auto-route status on the screen edge opposite Alice', () => {
     expect(officeRouteStatusEdge(
       { x: 120, y: 600 },

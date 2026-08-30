@@ -272,6 +272,11 @@ export function OfficeBuilding({
     }))),
     [groups],
   )
+  const mapLayoutGeometryKey = useMemo(() => [
+    `${mapLayout.width}x${mapLayout.height}`,
+    ...mapLayout.pods.map((pod) => `${pod.id}@${pod.x},${pod.y}:${pod.width}x${pod.height}`),
+    `service@${mapLayout.serviceZone.x},${mapLayout.serviceZone.y}:${mapLayout.serviceZone.width}x${mapLayout.serviceZone.height}`,
+  ].join('|'), [mapLayout])
   const cameraPannable = viewportSize.width <= 0 || viewportSize.height <= 0
     || viewportSize.width < mapLayout.width
     || viewportSize.height < mapLayout.height
@@ -1013,7 +1018,7 @@ export function OfficeBuilding({
   }, [mapLayout.height, mapLayout.width])
   useLayoutEffect(() => {
     cancelAutoWalk()
-    const layoutKey = `${mapLayout.width}x${mapLayout.height}`
+    const layoutKey = mapLayoutGeometryKey
     const remembered = initialLayoutKeyRef.current == null || initialLayoutKeyRef.current === layoutKey
       ? initialPlayerStateRef.current
       : null
@@ -1038,7 +1043,7 @@ export function OfficeBuilding({
       : { x: 0, y: 0 })
   // Reframe only when the visible map geometry changes, not on every live poll.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapLayout.width, mapLayout.height])
+  }, [mapLayoutGeometryKey])
 
   useLayoutEffect(() => {
     if (replaySeq == null || !replayFocus || !replayFocusTarget) {
