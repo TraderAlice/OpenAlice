@@ -280,11 +280,12 @@ describe('Connector demo routes', () => {
     expect(within(card).getByRole('button', { name: 'Review Telegram' })).toBeTruthy()
   })
 
-  it('opens one connector configuration in place and restores focus on close', async () => {
+  it('opens one connector configuration on its title and restores focus on close', async () => {
     render(<ConnectorStatusPage />)
 
     const trigger = await screen.findByRole('button', { name: 'Set up Feishu' })
     const before = window.location.pathname
+    trigger.focus()
     fireEvent.click(trigger)
 
     const dialog = await screen.findByRole('dialog')
@@ -294,7 +295,9 @@ describe('Connector demo routes', () => {
     expect(dialog.className).toContain('h-[calc(100dvh-1rem)]')
     expect(dialog.className).toContain('sm:h-auto')
     expect(dialog.className).toContain('sm:max-h-[min(46rem,calc(100dvh-2rem))]')
-    expect(within(dialog).getByRole('heading', { name: 'Configure Feishu' })).toBeTruthy()
+    const title = within(dialog).getByRole('heading', { name: 'Configure Feishu' })
+    expect(title.getAttribute('tabindex')).toBe('-1')
+    await waitFor(() => expect(document.activeElement).toBe(title))
     expect(within(dialog).getByText('Connection, delivery, and chat settings for Feishu.')).toBeTruthy()
     expect(within(dialog).queryByText('Credentials required')).toBeNull()
     expect(within(dialog).queryByRole('switch', { name: 'Turn Feishu on or off' })).toBeNull()

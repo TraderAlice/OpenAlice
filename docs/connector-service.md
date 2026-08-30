@@ -373,9 +373,12 @@ The surfaces deliberately have different jobs:
   so controls from the preceding channel cannot scroll through above it. Initial
   page breathing room comes from a normal-flow spacer that scrolls away; the
   narrow navigator stays static and consumes no persistent mobile height.
-  The adapter dialog localizes its close control and gives that control a larger
-  mobile touch target while retaining the shared primitive's focus restoration,
-  Escape, and backdrop behavior.
+  The adapter dialog moves initial focus to its semantic title so the selected
+  channel is announced without focusing a credential field or opening a mobile
+  keyboard. Its title is programmatically focusable rather than another Tab
+  stop. The dialog localizes its close control and gives that control a larger
+  mobile touch target while retaining the shared primitive's trigger focus
+  restoration, Escape, focus containment, and backdrop behavior.
   Runtime and Chat switches use their localized label (and Chat's explicit
   On/Off text) directly beside the shared Toggle; they are not wrapped in a
   second bordered pseudo-button. The Toggle remains the only switch control and

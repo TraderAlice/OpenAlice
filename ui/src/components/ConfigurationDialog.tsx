@@ -1,4 +1,4 @@
-import type { ReactNode, RefObject } from 'react'
+import { useRef, type ReactNode, type RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -35,11 +35,12 @@ export function ConfigurationDialog({
   keepMounted = false,
 }: ConfigurationDialogProps) {
   const { t } = useTranslation()
+  const titleRef = useRef<HTMLHeadingElement>(null)
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         keepMounted={keepMounted}
-        initialFocus={false}
+        initialFocus={titleRef}
         finalFocus={restoreFocusRef}
         closeLabel={t('common.close')}
         closeButtonClassName="right-2.5 top-2.5 size-10 sm:right-2 sm:top-2 sm:size-8"
@@ -48,7 +49,13 @@ export function ConfigurationDialog({
         <DialogHeader className="shrink-0 border-b border-border/70 px-5 py-4 pr-12 sm:px-6">
           <div className="flex min-w-0 items-start justify-between gap-4">
             <div className="min-w-0">
-              <DialogTitle className="truncate text-[16px] font-semibold leading-6">{title}</DialogTitle>
+              <DialogTitle
+                ref={titleRef}
+                tabIndex={-1}
+                className="truncate text-[16px] font-semibold leading-6 outline-none"
+              >
+                {title}
+              </DialogTitle>
               {description && (
                 <DialogDescription className="mt-0.5 text-[12px] leading-5">
                   {description}

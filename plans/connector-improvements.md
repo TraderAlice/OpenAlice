@@ -408,6 +408,17 @@ external adapters remain optional projections rather than sources of truth.
     recovery actions; semantic state remains in the badge and copy. The glyph is
     still `aria-hidden`, and its size, icon mapping, card hierarchy, responsive
     geometry, and every interaction remain unchanged.
+35. **A configuration dialog opens on its contextual heading, not behind the
+    modal or inside a credential field.** Real mobile inspection found focus
+    remaining on the obscured overview trigger after opening both configured
+    and first-time channel dialogs. Focusing the first credential field would
+    summon the mobile keyboard and over-prioritize data entry; focusing Close
+    would make dismissal the dialog's first announced action. The shared shell
+    instead gives its title a programmatic-only `tabIndex=-1` target and asks
+    Base UI to focus it on every open. This announces the selected channel and
+    leaves the viewport at the start of the document without adding a tab stop.
+    Normal Tab navigation stays trapped inside the modal, and close/Escape still
+    restores the exact overview trigger.
 
 ## Ordered Work
 
@@ -482,6 +493,8 @@ external adapters remain optional projections rather than sources of truth.
         capability-aware channel chooser.
   - [x] Remove action-blue treatment from decorative channel glyphs across
         owned and pristine cards.
+  - [x] Move initial focus from the obscured overview trigger to the current
+        configuration-dialog heading.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -810,6 +823,19 @@ the same neutral class; enabled switches remained the only blue controls in the
 visible work area. At 390 x 844, all four glyphs remained 40 x 40 px, card
 alignment stayed intact, and document width remained exactly 390 px. No Connector
 control or external action was invoked, and the viewport was reset.
+
+The configuration-dialog focus increment passed all 27 demo-route tests, UI and
+root typechecking, the production build, and all 5,123 repository tests. The
+contract now proves that opening a
+channel focuses its `tabIndex=-1` semantic heading and closing restores the
+exact overview trigger. In the real Default AliceProject, both pristine Slack
+setup and configured Feishu opened at scroll position zero on a 390 x 844
+viewport with the active element inside the dialog on its H2; Escape restored
+Set up Slack and Manage Feishu respectively, and document width remained exactly
+390 px. At the default 1,052 px desktop width, configured Discord likewise
+focused Configure Discord at scroll position zero and restored Manage Discord
+on Escape. No field, switch, send, reconnect, or external action was invoked,
+and the viewport was reset.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.
