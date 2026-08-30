@@ -3943,6 +3943,23 @@ Roster power-state follow-up (2026-08-30):
   test files and 5,166 tests (one file and nine tests skipped), and the production UI build passed with only the
   existing ports fallback and large-chunk advisories.
 
+Agent-file power-state follow-up (2026-08-30):
+
+- Followed an asleep Grok Librarian from the real Chat roster into Agent File. The authored dialogue correctly said
+  `Off duty. Ready when the floor wakes.`, while the structured fact still said `Status idle` and the Agent-file
+  kicker continued pulsing like a live unit. The same character therefore exposed three conflicting power signals.
+- Compared adding a fourth Power fact, composing `idle · asleep`, and carrying the roster's single dominant state into
+  the dossier. Chose the same power-first rule: awake characters keep their operational mood; asleep characters use
+  one `ASLEEP` status without spending another fact column or weakening the short-landscape story hierarchy.
+- Agent File now carries explicit awake state. An asleep file uses a hollow non-animated kicker lamp, a restrained
+  low-power portrait treatment, and a hollow Status indicator whose text reads asleep; its timeline live marker stays
+  independent because that describes the event stream rather than the Session.
+- Real-browser acceptance at 844x390 kept Assignment, off-duty dialogue, and Latest result ahead of the internally
+  scrollable facts. At 1052x734 the complete three-column dossier showed `Status asleep`, Office, and Surface without
+  profile scroll, and the viewport override was reset afterward. Focused Agent-file and style tests passed (3 files /
+  33 tests). Root and UI TypeScript passed, the full suite passed all 617 test files and 5,166 tests (one file and nine
+  tests skipped), and the production UI build passed with only the existing ports fallback and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

@@ -78,6 +78,8 @@ describe('OfficeInspectRail', () => {
       .toBe('/office/hud/session-portal-v2.png')
     expect(drawerExit.querySelector('.oa-office-drawer__destination')?.textContent).toBe('Open')
     expect(container.querySelector('svg')).toBeNull()
+    expect(screen.getByText('working').getAttribute('data-power')).toBe('awake')
+    expect(screen.getByTestId('office-inspect').dataset.awake).toBe('true')
 
     expect(document.activeElement).toBe(openSession)
     await userEvent.keyboard('{Tab}')
@@ -134,7 +136,9 @@ describe('OfficeInspectRail', () => {
     expect(container.textContent).not.toContain('**')
     expect(container.textContent).not.toContain('/tracked/report.md')
     expect(container.querySelector('blockquote')?.textContent).not.toContain('idle · headless')
-    expect(screen.getByText('idle')).toBeTruthy()
+    expect(screen.queryByText('idle')).toBeNull()
+    expect(screen.getByText('asleep').getAttribute('data-power')).toBe('asleep')
+    expect(screen.getByTestId('office-inspect').dataset.awake).toBe('false')
     expect(screen.getByText('headless')).toBeTruthy()
   })
 

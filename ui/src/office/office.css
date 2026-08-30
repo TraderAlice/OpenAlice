@@ -627,6 +627,18 @@
   text-transform: uppercase;
 }
 
+.oa-office-inspect[data-awake="false"] .oa-office-inspect__kicker .oa-office-live-dot {
+  border: 1px solid var(--office-text-muted);
+  background: transparent;
+  box-shadow: none;
+  animation: none;
+}
+
+.oa-office-inspect[data-awake="false"] .oa-office-inspect__portrait .oa-office-coworker img {
+  filter: saturate(0.58) brightness(0.86)
+    drop-shadow(1px 1px 0 color-mix(in srgb, var(--gba-ink) 20%, transparent));
+}
+
 .oa-office-inspect__identity {
   display: flex;
   align-items: center;
@@ -729,6 +741,11 @@
 
 .oa-office-inspect__facts dd[data-mood="idle"] > span {
   background: var(--muted-foreground);
+}
+
+.oa-office-inspect__facts dd[data-power="asleep"] > span {
+  border: 1px solid currentColor;
+  background: transparent;
 }
 
 .oa-office-inspect__open {

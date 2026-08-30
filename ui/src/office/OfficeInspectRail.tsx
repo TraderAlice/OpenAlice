@@ -76,6 +76,7 @@ export function OfficeInspectRail({
       aria-modal="true"
       aria-label={employee ? employeeLabel : t('office.employeeFile')}
       data-testid="office-inspect"
+      data-awake={employee?.awake}
       className="oa-office-inspect oa-office-window"
       onKeyDown={(event) => {
         if (event.key === 'Escape') onClose?.()
@@ -168,9 +169,12 @@ export function OfficeInspectRail({
             <dl className="oa-office-inspect__facts">
               <div>
                 <dt>{t('office.status')}</dt>
-                <dd data-mood={employee.mood}>
+                <dd
+                  data-mood={employee.mood}
+                  data-power={employee.awake ? 'awake' : 'asleep'}
+                >
                   <span aria-hidden />
-                  {t(`office.mood.${employee.mood}`)}
+                  {t(employee.awake ? `office.mood.${employee.mood}` : 'office.power.asleep')}
                 </dd>
               </div>
               <div>
