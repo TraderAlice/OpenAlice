@@ -133,6 +133,7 @@ export function OfficeRosterWindow({
                 type="button"
                 autoFocus={employee.resumeId === initialFocusResumeId}
                 data-resume-id={employee.resumeId}
+                data-awake={employee.awake}
                 tabIndex={employee.resumeId === focusedResumeId ? 0 : -1}
                 onFocus={() => setFocusedResumeId(employee.resumeId)}
                 onClick={() => onSelect(employee)}
@@ -154,9 +155,13 @@ export function OfficeRosterWindow({
                 <small className="oa-office-roster__meta">
                   {assignment ?? `${employee.agent} · ${employee.name}`}
                 </small>
-                <span className="oa-office-roster__status" data-mood={employee.mood}>
+                <span
+                  className="oa-office-roster__status"
+                  data-mood={employee.mood}
+                  data-power={employee.awake ? 'awake' : 'asleep'}
+                >
                   <i aria-hidden />
-                  {t(`office.mood.${employee.mood}`)}
+                  {t(employee.awake ? `office.mood.${employee.mood}` : 'office.power.asleep')}
                 </span>
                 <img
                   className="oa-office-roster__cursor"

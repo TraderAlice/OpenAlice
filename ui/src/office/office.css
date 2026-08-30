@@ -2547,6 +2547,10 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
   transform: translate(-1px, -1px);
 }
 
+.oa-office-roster li button[data-awake="false"] {
+  background: color-mix(in srgb, var(--gba-ink-soft) 7%, var(--gba-paper));
+}
+
 .oa-office-roster__portrait {
   display: grid;
   grid-column: 1;
@@ -2561,6 +2565,11 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
 
 .oa-office-roster__portrait > .oa-office-coworker {
   transform: translateY(5px);
+}
+
+.oa-office-roster li button[data-awake="false"] .oa-office-roster__portrait > .oa-office-coworker img {
+  filter: saturate(0.58) brightness(0.86)
+    drop-shadow(1px 1px 0 color-mix(in srgb, var(--gba-ink) 20%, transparent));
 }
 
 .oa-office-roster__title {
@@ -2617,6 +2626,18 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
 
 .oa-office-roster__status[data-mood="failed"] i {
   background: var(--gba-alert);
+}
+
+.oa-office-roster__status[data-power="asleep"] {
+  color: var(--gba-ink-soft);
+  background: color-mix(in srgb, var(--gba-ink-soft) 12%, var(--gba-paper));
+}
+
+.oa-office-roster__status[data-power="asleep"] i {
+  background: transparent;
+  box-shadow:
+    inset 0 0 0 1px var(--gba-paper),
+    1px 1px 0 var(--gba-ink);
 }
 
 .oa-office-roster__cursor {

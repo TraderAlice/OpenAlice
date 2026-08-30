@@ -3926,6 +3926,23 @@ Pause-to-play focus follow-up (2026-08-30):
   (one file and nine tests skipped), and the production UI build passed with only the existing ports fallback and
   large-chunk advisories.
 
+Roster power-state follow-up (2026-08-30):
+
+- Opened the real 16-member Chat roster at 844x390 while the Office HUD reported `0 awake`. Every listed teammate was
+  asleep, but all cards still presented `IDLE`, making powered-down Sessions read like available coworkers and
+  contradicting the floor's primary status.
+- Compared adding a second power chip, showing awake counts only in the title, and letting power state replace mood
+  only while a Session is asleep. Chose one dominant per-member status: short-landscape cards keep their compact RPG
+  party-menu rhythm, awake coworkers retain working/waiting/review/failed mood, and asleep coworkers say `ASLEEP`.
+- Roster cards now carry explicit awake/power semantics. Sleeping portraits and paper receive a restrained low-power
+  treatment, and the status lamp becomes hollow rather than reusing the filled idle indicator; names, assignments,
+  cursor affordance, and resume interaction remain fully legible and enabled.
+- Real-browser acceptance showed four complete cards in the 844x390 window, all with readable `ASLEEP` labels and
+  distinct portraits; the 16-member list and window retained their established client/scroll geometry. Focused roster
+  and responsive-style tests passed (2 files / 25 tests). Root and UI TypeScript passed, the full suite passed all 617
+  test files and 5,166 tests (one file and nine tests skipped), and the production UI build passed with only the
+  existing ports fallback and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
