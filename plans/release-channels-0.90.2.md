@@ -217,8 +217,9 @@ appropriate.
   package smoke; use OrbStack for Linux acceptance.
 - [x] Finish and locally verify the coherent feature branch after classifying
   or repairing every known release-channel blocker.
-- [ ] Merge the serial PR to `dev` and verify the post-merge dev-channel
-  publication plus live installer path.
+- [x] Merge the serial PR to `dev` and verify the post-merge dev-channel
+  publication plus live installer path (PR #1257; `CLI Installer Smoke`
+  run `33311979583`).
 - [ ] Promote the accepted `dev` source to `master` under the full promotion
   gate.
 
