@@ -109,6 +109,30 @@ describe('projectOfficeProductActivity', () => {
     expect(projection.inbox).toBeNull()
     expect(projection.news).toBeNull()
   })
+
+  it('projects Markdown-rich activity as compact in-world copy', () => {
+    const projection = projectOfficeProductActivity([
+      event(16, 'runtime.stopped', {
+        agent: 'grok',
+        status: 'done',
+        assistantText: '## Result\n**Recognition** stays with the [agent file](/office) and `callsign`.',
+      }),
+      event(17, 'inbox.received', {
+        inboxEntryId: 'inbox-17',
+        summary: '> **Desk note:** read the [handoff](/inbox/17).',
+      }),
+      event(18, 'news.ingested', {
+        newsItemId: 18,
+        title: '`NVDA` **results** arrive',
+        source: 'Wire',
+      }),
+    ])
+
+    expect(projection.agent?.detail)
+      .toBe('Result Recognition stays with the agent file and callsign.')
+    expect(projection.inbox?.detail).toBe('Desk note: read the handoff.')
+    expect(projection.news?.detail).toBe('NVDA results arrive')
+  })
 })
 
 describe('useOfficeProductActivity', () => {

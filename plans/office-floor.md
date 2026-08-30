@@ -3050,6 +3050,25 @@ Truthful journal-channel vocabulary follow-up (2026-08-30):
   Vitest run (5,133 passing; one file and nine tests skipped), and the production build; the existing direct-eval and
   large-chunk advisories are unchanged.
 
+In-world activity-copy cleanup follow-up (2026-08-30):
+
+- Returned from a real Grok replay to Live and walked Alice to Operations. The one-line interaction HUD exposed raw
+  report syntax as `**Recognition stays...`; Markdown punctuation consumed scarce prompt width and made a polished
+  game surface look like a developer log.
+- Compared rendering rich Markdown inside the HUD, replacing all detail with fixed milestone copy, and deriving a
+  compact plain-text projection. Chose the projection: the journal remains the full-fidelity report surface, while
+  Office landmarks keep the useful human summary without introducing nested markup, multiline layout, or another
+  visual dialect.
+- The Office product-activity projection now removes fenced/inline code markers, headings, quotes, list prefixes,
+  emphasis, strike syntax, links, HTML tags, and Markdown escapes before whitespace folding and the existing bounded
+  excerpt. Agent, Inbox, and News landmarks share the rule; stored events and journal rendering are untouched.
+- Browser-walked the real Live floor back to Operations. The HUD and its accessible label now read
+  `Recognition stays attached...` with no raw asterisks, while the existing one-line truncation and action key remain
+  stable at the current 1024-pixel app viewport. Focused product-activity and Building specs passed (2 files / 20
+  tests), including Markdown-rich Agent, Inbox, and News examples. Root/UI TypeScript, the full 617-file Vitest run
+  (5,134 passing; one file and nine tests skipped), and the production build also passed; the existing direct-eval and
+  large-chunk advisories are unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
