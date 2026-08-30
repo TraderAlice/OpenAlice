@@ -299,51 +299,54 @@ function ConnectorOverview({
   const configuredCount = adapters.filter(({ setup }) => setup.ready).length
   const ownedAdapters = adapters.filter(hasStartedConnectorSetup)
   const availableAdapters = adapters.filter((adapter) => !hasStartedConnectorSetup(adapter))
+  const showServiceSummary = configuredCount > 0 || activeCount > 0
 
   return (
     <>
-      <section className={`oa-status-surface rounded-xl border px-4 py-3.5 ${service.tone === 'danger'
-        ? 'border-destructive/25 bg-destructive/[0.035]'
-        : service.tone === 'warning'
-          ? 'border-warning/25 bg-warning/[0.035]'
-        : 'border-border bg-secondary/25'
-      }`}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${service.tone === 'danger'
-              ? 'border-destructive/20 bg-destructive/10 text-destructive'
-              : service.tone === 'healthy'
-                ? 'border-success/20 bg-success/10 text-success'
-                : service.tone === 'warning'
-                  ? 'border-warning/20 bg-warning/10 text-warning'
-                : 'border-border bg-background text-muted-foreground'
-            }`}>
-              <Plug size={17} aria-hidden />
-            </div>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-[13px] font-semibold text-foreground">{t('connectorStatus.serviceTitle')}</h3>
-                <StatusBadge tone={service.tone}>{service.label}</StatusBadge>
+      {showServiceSummary && (
+        <section className={`oa-status-surface rounded-xl border px-4 py-3.5 ${service.tone === 'danger'
+          ? 'border-destructive/25 bg-destructive/[0.035]'
+          : service.tone === 'warning'
+            ? 'border-warning/25 bg-warning/[0.035]'
+          : 'border-border bg-secondary/25'
+        }`}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${service.tone === 'danger'
+                ? 'border-destructive/20 bg-destructive/10 text-destructive'
+                : service.tone === 'healthy'
+                  ? 'border-success/20 bg-success/10 text-success'
+                  : service.tone === 'warning'
+                    ? 'border-warning/20 bg-warning/10 text-warning'
+                  : 'border-border bg-background text-muted-foreground'
+              }`}>
+                <Plug size={17} aria-hidden />
               </div>
-              <p className="mt-0.5 max-w-[660px] text-[12px] leading-5 text-muted-foreground">
-                {service.description}
-              </p>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-[13px] font-semibold text-foreground">{t('connectorStatus.serviceTitle')}</h3>
+                  <StatusBadge tone={service.tone}>{service.label}</StatusBadge>
+                </div>
+                <p className="mt-0.5 max-w-[660px] text-[12px] leading-5 text-muted-foreground">
+                  {service.description}
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+              <SummaryPill>{t('connectorStatus.configuredCount', { count: configuredCount })}</SummaryPill>
+              <SummaryPill>{t('connectorStatus.activeCount', { count: activeCount })}</SummaryPill>
+              {attentionCount > 0 && (
+                <SummaryPill tone="danger">{t('connectorStatus.attentionCount', { count: attentionCount })}</SummaryPill>
+              )}
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-            <SummaryPill>{t('connectorStatus.configuredCount', { count: configuredCount })}</SummaryPill>
-            <SummaryPill>{t('connectorStatus.activeCount', { count: activeCount })}</SummaryPill>
-            {attentionCount > 0 && (
-              <SummaryPill tone="danger">{t('connectorStatus.attentionCount', { count: attentionCount })}</SummaryPill>
-            )}
-          </div>
-        </div>
-        {snapshot.health.lastError && !snapshot.health.service && (
-          <DiagnosticDetails summary={t('connectorStatus.technicalDetails')}>
-            {snapshot.health.lastError}
-          </DiagnosticDetails>
-        )}
-      </section>
+          {snapshot.health.lastError && !snapshot.health.service && (
+            <DiagnosticDetails summary={t('connectorStatus.technicalDetails')}>
+              {snapshot.health.lastError}
+            </DiagnosticDetails>
+          )}
+        </section>
+      )}
 
       {ownedAdapters.length > 0 && (
         <ConnectorGroup
@@ -361,16 +364,15 @@ function ConnectorOverview({
       )}
 
       {availableAdapters.length > 0 && (
-        <ConnectorGroup
-          title={t('connectorStatus.availableTitle')}
-          description={t('connectorStatus.availableDescription')}
+        <AvailableConnectorGroup
+          title={t(ownedAdapters.length === 0
+            ? 'connectorStatus.chooseTitle'
+            : 'connectorStatus.availableTitle')}
+          description={t(ownedAdapters.length === 0
+            ? 'connectorStatus.chooseDescription'
+            : 'connectorStatus.availableDescription')}
           adapters={availableAdapters}
           onConfigure={onConfigure}
-          onReconnect={onReconnect}
-          onToggle={onToggle}
-          reconnectingId={reconnectingId}
-          toggling={toggling}
-          actionError={actionError}
           t={t}
         />
       )}
@@ -440,6 +442,64 @@ function ConnectorGroup({
             actionError={actionError?.id === adapter.definition.id ? actionError : null}
             t={t}
           />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function AvailableConnectorGroup({
+  title,
+  description,
+  adapters,
+  onConfigure,
+  t,
+}: {
+  title: string
+  description: string
+  adapters: AdapterOverviewItem[]
+  onConfigure: (id: string, trigger: HTMLButtonElement) => void
+  t: TFunction
+}) {
+  return (
+    <section>
+      <div className="mb-3.5 px-0.5">
+        <h3 className="text-[14px] font-semibold text-foreground">{title}</h3>
+        <p className="mt-0.5 text-[12px] text-muted-foreground">{description}</p>
+      </div>
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        {adapters.map(({ definition }) => (
+          <article
+            key={definition.id}
+            className="oa-status-surface flex min-w-0 flex-col gap-3 rounded-xl border border-border/80 bg-secondary/10 p-4 sm:flex-row sm:items-center"
+          >
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <ConnectorGlyph id={definition.id} muted />
+              <div className="min-w-0">
+                <h4 className="text-[14px] font-semibold text-foreground">{definition.label}</h4>
+                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11.5px] text-muted-foreground">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Send size={12} aria-hidden />
+                    {t('connectorStatus.capabilityDelivery')}
+                  </span>
+                  {definition.capabilities?.includes('desk') && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <MessageCircle size={12} aria-hidden />
+                      {t('connectorStatus.capabilityChat')}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="oa-pressable inline-flex min-h-10 w-full shrink-0 items-center justify-center gap-2 rounded-lg border border-border bg-background/60 px-3 py-2 text-[12px] font-medium text-foreground hover:border-primary/45 hover:text-primary sm:w-auto"
+              onClick={(event) => onConfigure(definition.id, event.currentTarget)}
+            >
+              {t('connectorStatus.configureAdapter', { name: definition.label })}
+              <ArrowRight size={13} aria-hidden />
+            </button>
+          </article>
         ))}
       </div>
     </section>
@@ -701,7 +761,7 @@ function SummaryPill({ tone = 'neutral', children }: { tone?: 'neutral' | 'dange
   )
 }
 
-function ConnectorGlyph({ id }: { id: string }) {
+function ConnectorGlyph({ id, muted = false }: { id: string; muted?: boolean }) {
   const glyphs: Record<string, LucideIcon> = {
     discord: MessageCircle,
     telegram: Send,
@@ -710,7 +770,10 @@ function ConnectorGlyph({ id }: { id: string }) {
   }
   const Icon = glyphs[id] ?? Plug
   return (
-    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary" aria-hidden>
+    <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${muted
+      ? 'border-border bg-secondary/60 text-muted-foreground'
+      : 'border-primary/20 bg-primary/10 text-primary'
+    }`} aria-hidden>
       <Icon size={18} />
     </span>
   )

@@ -415,7 +415,13 @@ The surfaces deliberately have different jobs:
   enabled, and partially configured adapters in stable definition order under
   Your channels. Only pristine adapters appear under Available channels, so
   transient runtime changes never reorder established targets and empty groups
-  do not add headings. Cards omit the repeated generic delivery subtitle and do
+  do not add headings. Before any adapter is credential-ready or enabled, the
+  irrelevant Off/zero-count service summary is omitted and the pristine group
+  becomes Choose a channel. Pristine adapters use compact selection articles
+  with neutral 40 px setup actions plus localized Inbox delivery and capability-
+  gated Workspace chat labels; once setup starts, that adapter moves to the full
+  lifecycle card without losing its configuration dialog. Cards omit the
+  repeated generic delivery subtitle and do
   not impose a fixed minimum height: the state explanation is the primary body,
   while evidence and the next action remain in stable document order. A channel
   article is the single visual container; state copy is not wrapped in a nested

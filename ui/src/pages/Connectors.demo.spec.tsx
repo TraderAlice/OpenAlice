@@ -66,10 +66,12 @@ describe('Connector demo routes', () => {
   it('renders the read-only operations route from the demo snapshot', async () => {
     render(<ConnectorStatusPage />)
 
-    expect(await screen.findByText('Delivery service')).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Choose a channel' })).toBeTruthy()
     expect(screen.getByText('Discord')).toBeTruthy()
     expect(screen.getByText('Telegram')).toBeTruthy()
-    expect(screen.getByText(/All external delivery is paused/)).toBeTruthy()
+    expect(screen.queryByText('Delivery service')).toBeNull()
+    expect(screen.getAllByText('Inbox delivery')).toHaveLength(4)
+    expect(screen.getAllByText('Workspace chat')).toHaveLength(2)
   })
 
   it('reconnects an unhealthy configured adapter from the operations route', async () => {
@@ -134,10 +136,12 @@ describe('Connector demo routes', () => {
     expect(screen.getByRole('button', { name: '刷新' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '配置' })).toBeNull()
     expect(screen.getByRole('button', { name: '设置 Feishu' })).toBeTruthy()
-    expect(screen.getByRole('heading', { name: '投递服务' })).toBeTruthy()
-    expect(screen.getByRole('heading', { name: '可用渠道' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: '投递服务' })).toBeNull()
+    expect(screen.getByRole('heading', { name: '选择聊天渠道' })).toBeTruthy()
     expect(screen.queryByText('将收件箱通知投递到你的私有 Discord 会话。')).toBeNull()
-    expect(screen.getAllByText('需要设置')).toHaveLength(4)
+    expect(screen.queryByText('需要设置')).toBeNull()
+    expect(screen.getAllByText('收件箱投递')).toHaveLength(4)
+    expect(screen.getAllByText('工作区聊天')).toHaveLength(2)
     expect(screen.queryByText('Delivery connectors')).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: '设置 Feishu' }))

@@ -83,7 +83,7 @@ describe('Connector overview state hierarchy', () => {
     }
     render(<ConnectorStatusPage />)
 
-    expect(screen.getByRole('heading', { name: 'Available channels' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Choose a channel' })).toBeTruthy()
     expect(screen.getByRole('status').textContent).toContain('Showing the last known state')
     expect(screen.queryByRole('heading', { name: 'Couldn’t load your channels' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
@@ -123,6 +123,27 @@ describe('Connector overview state hierarchy', () => {
 
     expect(headings(owned)).toEqual(['Discord', 'Slack', 'Feishu'])
     expect(headings(available)).toEqual(['Telegram'])
+  })
+
+  it('starts with a concise capability-aware channel chooser', () => {
+    mocks.state.current = loaded(createDemoConnectorSnapshot())
+    render(<ConnectorStatusPage />)
+
+    expect(screen.queryByRole('heading', { name: 'Delivery service' })).toBeNull()
+    const chooser = screen.getByRole('heading', { name: 'Choose a channel' }).closest('section') as HTMLElement
+    expect(within(chooser).getByText(
+      'Connect the private chat you already use. You can add other channels later.',
+    )).toBeTruthy()
+    expect(within(chooser).queryByText('Needs setup')).toBeNull()
+    expect(within(chooser).getAllByText('Inbox delivery')).toHaveLength(4)
+    expect(within(chooser).getAllByText('Workspace chat')).toHaveLength(2)
+    expect(within(chooser).getAllByRole('article')).toHaveLength(4)
+    const discord = within(chooser).getByRole('heading', { name: 'Discord' }).closest('article') as HTMLElement
+    const setup = within(discord).getByRole('button', { name: 'Set up Discord' })
+    expect(discord.className).toContain('rounded-xl')
+    expect(setup.className).toContain('bg-background/60')
+    expect(setup.className).toContain('min-h-10')
+    expect(setup.className).not.toContain('bg-primary')
   })
 
   it('offers the runtime switch on a credential-ready channel card', async () => {

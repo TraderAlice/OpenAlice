@@ -377,6 +377,26 @@ external adapters remain optional projections rather than sources of truth.
     context, and the same compact summary wraps without hierarchy changes on
     narrow screens. Protocol, polling, recovery actions, and adapter state do not
     change.
+33. **Pristine channels are choices, not four incomplete operations.** The
+    isolated zero-configuration surface shows an Off service summary with zero
+    counts before delivery exists, followed by four full-size cards that repeat
+    Needs setup, Add credentials, and equal-weight primary actions. Keeping the
+    operational card everywhere is structurally uniform but makes first use feel
+    broken; recommending one platform or forcing a wizard would invent product
+    preference the user did not express. The chosen model hides the service
+    summary until at least one adapter is credential-ready or enabled and turns
+    only pristine adapters into compact selection articles. In the completely
+    empty state the group becomes Choose a channel with copy that says other
+    channels can be added later. Each choice preserves a semantic platform
+    heading and explicit Set up button, replaces the redundant lifecycle badge
+    and credential sentence with localized Inbox delivery and capability-gated
+    Workspace chat labels, and uses neutral icon/action treatment so four choices
+    do not compete as primary commands. Desktop rows keep identity, capability,
+    and action on one line; narrow rows stack the action below a readable header
+    without horizontal scrolling. Started setup and owned channels continue to
+    use the full lifecycle card, so progress, evidence, diagnostics, switches,
+    and recovery are unchanged. This deliberately supersedes only Decision 19's
+    same-card reuse, not its stable owned/available grouping.
 
 ## Ordered Work
 
@@ -447,6 +467,8 @@ external adapters remain optional projections rather than sources of truth.
         currently being read.
   - [x] Separate service availability from per-channel attention in the
         overview summary and diagnostics.
+  - [x] Replace the zero-configuration operations grid with a concise,
+        capability-aware channel chooser.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -751,6 +773,19 @@ Healthy branch with zero summary disclosures and channel-local Telegram progress
 At 390 x 844, the summary wrapped to 352 x 112.25 px, retained both aggregate
 counts, and kept document width exactly 390 px. No Connector action was invoked,
 and the viewport was reset after acceptance.
+
+The zero-configuration chooser increment passed 38 focused overview and demo-
+route tests, UI and root typechecking, the production build, and all 5,123
+repository tests. Its empty-state contract
+omits Delivery service, Off, zero-count, and repeated Needs setup chrome; asserts
+four Inbox delivery labels, two capability-derived Workspace chat labels, four
+semantic articles and explicit neutral setup buttons; and keeps the mixed owned/
+available grouping covered separately. In the isolated Demo at 1,280 x 720, the
+four choices rendered as two rows of 508 x 76.25 px cards with no service summary.
+At 390 x 844, they became 358 px single-column cards, all setup targets measured
+40 px high, the chooser ended at y=791, and document width stayed exactly 390 px.
+The Demo used only its in-memory snapshot; no real Connector setting or external
+action was invoked. The viewport was reset after acceptance.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.
