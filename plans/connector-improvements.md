@@ -446,6 +446,17 @@ external adapters remain optional projections rather than sources of truth.
     The navigator stays
     static on narrow screens, sticky on desktop, and preserves the same focus,
     scroll, active-section, and document-order behavior.
+38. **Owned-channel cards use one responsive action rail.** At 390 px, a normal
+    ready card currently spends separate rows on its runtime switch and its
+    only management action, producing a 272 px card while the management button
+    itself measures only 36 px high. Moving the switch into the title row would
+    make lifecycle status and runtime control compete for the same hierarchy;
+    hiding management in an overflow menu would add an unnecessary interaction.
+    The chosen footer keeps the labelled switch and explicit actions together
+    in one wrapping rail. Normal one-action cards fit on one row, while recovery
+    cards may wrap their Reconnect and Review actions without reordering them.
+    Every footer action is at least 40 px high, and progress or failure feedback
+    remains below the complete rail in the owning card.
 
 ## Ordered Work
 
@@ -526,6 +537,8 @@ external adapters remain optional projections rather than sources of truth.
         without replacing in-progress configuration drafts.
   - [x] Compact the narrow channel navigator without hiding lifecycle status or
         reducing touch targets.
+  - [x] Consolidate owned-channel runtime and management controls into one
+        responsive action rail with 40 px targets.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -895,6 +908,20 @@ overflow; targets rendered 58.25 px high and the navigator measured 176.5 px.
 At 360 x 800 it returned to one 296 px column with four 40 px targets. Document
 width exactly matched both viewports. No Connector control or external action
 was invoked; the temporary audit tab was closed and the viewport was reset.
+
+The owned-card action-rail increment passed 39 focused overview and demo-route
+tests, UI and root typechecking, the production build, and all 5,125 repository
+tests. The component contract keeps the labelled runtime control and explicit
+actions inside one wrapping rail, lets the runtime control grow beside a normal
+management action, and gives both management and recovery buttons a 40 px
+minimum. In the real overview at 390 x 844, paused Discord and connected Feishu
+cards moved from 272.25 px to 224.25 px while their runtime switch and management
+button remained on one row; the longer Telegram recovery/progress controls
+wrapped without reordering. At 1,052 x 734, ordinary cards retained one-row
+action rails while Telegram's Reconnect and Review actions occupied a second
+row. Every measured switch and button was 40 px high, and document width exactly
+matched both viewports. No Connector control or external action was invoked;
+the temporary audit tab was closed and the viewport was reset.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.

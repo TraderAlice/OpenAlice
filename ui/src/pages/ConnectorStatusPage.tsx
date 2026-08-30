@@ -581,9 +581,15 @@ function ConnectorOverviewCard({
         </DiagnosticDetails>
       )}
 
-      <div className="mt-auto border-t border-border/60 pt-4">
+      <div
+        data-connector-card-action-rail
+        className={`mt-auto flex flex-wrap items-center gap-x-4 gap-y-3 border-t border-border/60 pt-4 ${setup.ready ? 'justify-between' : ''}`}
+      >
         {setup.ready && (
-          <div className="flex min-h-10 items-center justify-between gap-3">
+          <div
+            data-connector-runtime-control
+            className="flex min-h-10 min-w-[7.5rem] flex-1 items-center justify-between gap-3"
+          >
             <span className="text-[12.5px] font-medium text-foreground">
               {t('connectorSettings.useConnector', { name: definition.label })}
             </span>
@@ -596,11 +602,11 @@ function ConnectorOverviewCard({
             />
           </div>
         )}
-        <div className={`flex flex-wrap items-center gap-2 ${setup.ready ? 'mt-3' : ''}`}>
+        <div data-connector-card-actions className="flex flex-wrap items-center gap-2">
           {setup.stage === 'error' && (
             <button
               type="button"
-              className="oa-pressable inline-flex items-center gap-2 rounded-lg border border-primary bg-primary px-3 py-2 text-[12px] font-medium text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
+              className="oa-pressable inline-flex min-h-10 items-center gap-2 rounded-lg border border-primary bg-primary px-3 py-2 text-[12px] font-medium text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
               disabled={actionsBusy}
               onClick={() => void onReconnect(definition.id)}
             >
@@ -610,7 +616,7 @@ function ConnectorOverviewCard({
           )}
           <button
             type="button"
-            className={`oa-pressable inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-medium ${setupAction
+            className={`oa-pressable inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-medium ${setupAction
               ? 'border border-primary bg-primary text-primary-foreground shadow-sm hover:bg-primary/90'
               : 'border border-border bg-background/50 text-foreground hover:border-primary/45 hover:text-primary'
             }`}

@@ -159,9 +159,16 @@ describe('Connector overview state hierarchy', () => {
 
     const discord = screen.getByRole('heading', { name: 'Discord' }).closest('article') as HTMLElement
     const toggle = within(discord).getByRole('switch', { name: 'Turn Discord on or off' })
+    const actionRail = discord.querySelector('[data-connector-card-action-rail]') as HTMLElement
+    const runtimeControl = discord.querySelector('[data-connector-runtime-control]') as HTMLElement
+    const manage = within(discord).getByRole('button', { name: 'Manage Discord' })
     const glyph = discord.querySelector('[data-connector-glyph]') as HTMLElement
     expect(glyph.className).toContain('bg-secondary/60')
     expect(glyph.className).not.toContain('bg-primary')
+    expect(actionRail.className).toContain('flex-wrap')
+    expect(actionRail.className).toContain('gap-y-3')
+    expect(runtimeControl.className).toContain('flex-1')
+    expect(manage.className).toContain('min-h-10')
     expect(toggle.getAttribute('aria-checked')).toBe('false')
     expect(screen.queryByRole('switch', { name: 'Turn Slack on or off' })).toBeNull()
 
@@ -204,7 +211,11 @@ describe('Connector overview state hierarchy', () => {
     render(<ConnectorStatusPage />)
 
     const discord = screen.getByRole('heading', { name: 'Discord' }).closest('article') as HTMLElement
-    fireEvent.click(within(discord).getByRole('button', { name: 'Reconnect' }))
+    const reconnect = within(discord).getByRole('button', { name: 'Reconnect' })
+    const review = within(discord).getByRole('button', { name: 'Review Discord' })
+    expect(reconnect.className).toContain('min-h-10')
+    expect(review.className).toContain('min-h-10')
+    fireEvent.click(reconnect)
 
     const alert = await within(discord).findByRole('alert')
     expect(alert.textContent).toBe('Couldn’t reconnect Discord: socket closed')

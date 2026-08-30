@@ -442,9 +442,12 @@ The surfaces deliberately have different jobs:
   preserves credentials, linkage, delivery preference, and Chat configuration.
   The switch reflects actual runtime availability when the shared service is
   paused, not merely the adapter's retained preference. Toggle/reconnect
-  progress and failures stay inside the affected card. The health domain reloads
-  current configuration before this whole-config write, then refreshes the live
-  snapshot so the overview does not own a second polling lifecycle.
+  progress and failures stay inside the affected card. The labelled runtime
+  switch and explicit management or recovery actions share one wrapping action
+  rail: ordinary one-action cards keep them on one row, recovery actions wrap
+  without reordering, and every action retains a 40 px target. The health domain
+  reloads current configuration before this whole-config write, then refreshes
+  the live snapshot so the overview does not own a second polling lifecycle.
 - **Activity Bar → Connectors** shows a warning count for enabled, configured
   adapters that are degraded, stopped, unreachable, or stuck in `starting`
   beyond the grace window. `awaiting_link` remains setup state and does not
