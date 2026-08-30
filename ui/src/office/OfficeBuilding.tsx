@@ -1495,7 +1495,7 @@ export function OfficeBuilding({
               style={{
                 left: promptPlacement.x,
                 top: promptPlacement.y,
-                width: promptPlacement.width,
+                width: promptPresentation.detail ? promptPlacement.width : 'max-content',
                 zIndex: officeDepthAt(nearbyTarget.y) + 1000,
                 '--office-prompt-tail-shift': `${promptPlacement.tailShift}px`,
               } as CSSProperties}

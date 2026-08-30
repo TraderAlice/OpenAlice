@@ -3845,6 +3845,29 @@ Agent-file world-focus follow-up (2026-08-30):
   file and nine tests skipped), and the production UI build passed with only the existing jsdom canvas and large-chunk
   advisories.
 
+World-callout and camera-ownership follow-up (2026-08-30):
+
+- Continued the real 844x390 return loop among the four Chat desks. The idle `TALK / ENTER` callout was always forced
+  to the placement algorithm's 176px worst-case width, so its empty middle column covered a neighboring desk even
+  though the complete action needed only about 146px. Roster counts, employee bubbles, and service activity genuinely
+  need their fixed wrapping measure; idle Talk/Files/Terminal prompts do not.
+- Compared moving every prompt to a bottom dialogue band, shrinking icon/type globally, and allowing only prompts with
+  no detail copy to use their intrinsic width. Chose intrinsic no-detail width: the tail remains attached to its world
+  target, type stays 14px, icons and Enter/A affordances remain intact, and information-bearing callouts retain their
+  authored line measure.
+- Browser measurement changed idle Talk from 176px to 146px and Files to 154px; the `12 more teammates` roster stayed
+  at 176px. While verifying the edge desk, DOM geometry exposed a second camera path: focus had changed the
+  `overflow: hidden` map stage to `scrollTop=122.5`, which compounded the authored `translateY(-368px)` camera and
+  lifted the physical floor edge into mid-screen.
+- Compared distributing `preventScroll`, resetting scroll offsets after every focus, and making the stage a true
+  non-scroll clipping surface. Chose `overflow: clip`: camera translation remains the sole world-position owner and
+  native focus can no longer create hidden stage scroll state. Repeating Chat roster, cabinet, and edge-employee loops
+  kept stage scrollLeft/scrollTop at zero, the floor edge at y349–373 exactly against the 304px stage bottom, and the
+  compact Talk prompt fully visible above it. Focused Building, placement, and responsive-style tests passed (3 files
+  / 48 tests). Root and UI TypeScript passed, the full suite passed all 617 test files and 5,165 tests (one file and
+  nine tests skipped), and the production UI build passed with only the existing jsdom canvas and large-chunk
+  advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

@@ -3373,7 +3373,7 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
   display: block;
   width: 100%;
   height: 100%;
-  overflow: hidden;
+  overflow: clip;
   background: transparent;
 }
 

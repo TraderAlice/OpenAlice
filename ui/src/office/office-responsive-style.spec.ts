@@ -23,7 +23,7 @@ const coarseTouchCss = css.slice(coarseTouchStart, coarseTouchEnd)
 
 describe('Office responsive style contract', () => {
   it('owns one map stage without the superseded room and group scene graph', () => {
-    expect(css).toMatch(/\.oa-office-map-stage\s*\{[\s\S]*?overflow: hidden/)
+    expect(css).toMatch(/\.oa-office-map-stage\s*\{[\s\S]*?overflow: clip/)
     expect(css).not.toMatch(/\.oa-office-room(?:\b|--|__|\[|:)/)
     expect(css).not.toMatch(/\.oa-office-group(?:s)?(?:\b|__|\[|:)/)
     expect(css).not.toContain('.oa-office-room-grid')
