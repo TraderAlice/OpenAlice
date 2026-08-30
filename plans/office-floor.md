@@ -3995,6 +3995,24 @@ Replay-to-Live control handoff follow-up (2026-08-30):
   tests (one file and nine tests skipped), and the production UI build passed with only the existing ports fallback
   and large-chunk advisories.
 
+Replay character-state semantics follow-up (2026-08-30):
+
+- Replayed the real Grok Librarian report at `SEQ 4806`. The HUD and beacon correctly presented one active historical
+  character, and the replay-focused desk restored the review/talking visual over its current sleep treatment, but the
+  accessible desk label still ended in `asleep`. The picture and its interaction semantics described different times.
+- Traced the split deliberately: Replay activity comes from the historical non-idle mood, while `awake` remains the
+  current process power state. Compared pretending the Session was awake, reporting both active and asleep, and
+  naming the historical projection explicitly. Chose `active in replay`, which explains the time boundary without
+  mutating current-state truth.
+- Replay-focused Office desks now use the explicit historical power label, with matching English, Simplified Chinese,
+  Traditional Chinese, and Japanese strings. Non-focused and Live desks retain the existing awake/asleep contract;
+  only the selected historical projection is overridden, matching its existing visual exception.
+- Real-browser acceptance showed `review, active in replay` beside the `1/26 agents active` HUD. Returning Live changed
+  the same Grok Librarian back to `idle, asleep`, removed replay focus, and kept `office-floor` active. Focused Desk and
+  Building suites passed (2 files / 29 tests). Root and UI TypeScript passed, the full suite passed all 617 test files
+  and 5,166 tests (one file and nine tests skipped), and the production UI build passed with only the existing ports
+  fallback and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

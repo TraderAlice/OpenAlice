@@ -169,7 +169,10 @@ describe('OfficeDesk', () => {
     }
     const { rerender } = render(<OfficeDesk {...props} replayFocused />)
 
-    expect(screen.getByRole('button').dataset.replayFocus).toBe('true')
+    const replayDesk = screen.getByRole('button')
+    expect(replayDesk.dataset.replayFocus).toBe('true')
+    expect(replayDesk.getAttribute('aria-label')).toContain('active in replay')
+    expect(replayDesk.getAttribute('aria-label')).not.toContain('asleep')
     expect(screen.getByTestId('office-emote-review').querySelector('img')?.getAttribute('src'))
       .toBe('/office/coworkers/review-emote-v1.png')
     expect(screen.queryByTestId('office-emote-sleeping')).toBeNull()

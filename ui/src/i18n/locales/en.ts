@@ -2060,6 +2060,7 @@ export const en = {
     power: {
       awake: 'awake',
       asleep: 'asleep',
+      replayActive: 'active in replay',
     },
     mood: {
       idle: 'idle',

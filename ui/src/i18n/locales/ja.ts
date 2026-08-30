@@ -2028,6 +2028,7 @@ export const ja: Resources = {
     power: {
       awake: '稼働中',
       asleep: '休止中',
+      replayActive: 'リプレイ時に活動中',
     },
     mood: {
       idle: '待機',

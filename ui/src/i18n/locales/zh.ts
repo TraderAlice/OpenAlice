@@ -2027,6 +2027,7 @@ export const zh: Resources = {
     power: {
       awake: '已唤醒',
       asleep: '休眠',
+      replayActive: '回放时活跃',
     },
     mood: {
       idle: '空闲',

@@ -61,7 +61,11 @@ export function OfficeDesk({
       name: officeCoworkerCallsign(employee, coworkerAsset),
       resumeId: employee.resumeId,
       mood: t(`office.mood.${employee.mood}`),
-      power: t(employee.awake ? 'office.power.awake' : 'office.power.asleep'),
+      power: t(replayFocused
+        ? 'office.power.replayActive'
+        : employee.awake
+          ? 'office.power.awake'
+          : 'office.power.asleep'),
     })
     : t('office.emptyDesk', { name: roomName })
 

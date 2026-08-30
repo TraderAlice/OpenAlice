@@ -2035,6 +2035,7 @@ export const zhHant: Resources = {
     power: {
       awake: '已喚醒',
       asleep: '休眠',
+      replayActive: '回放時活躍',
     },
     mood: {
       idle: '空閒',
