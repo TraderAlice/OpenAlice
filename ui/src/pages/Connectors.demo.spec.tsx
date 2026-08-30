@@ -766,8 +766,14 @@ describe('Connector demo routes', () => {
 
     fireEvent.click(sendTest)
     await waitFor(() => expect(mocks.test).toHaveBeenCalledWith('discord'))
-    await waitFor(() => expect(within(lifecycle).getByRole('status').textContent).toContain('connector-probe-demo'))
-    expect(within(lifecycle).getByText('connector-probe-demo')).toBeTruthy()
+    const success = await within(lifecycle).findByRole('status')
+    expect(success.textContent).toBe('Test sent. Check your private Discord chat.')
+    expect(within(success).queryByText('connector-probe-demo')).toBeNull()
+    const testDetails = within(lifecycle).getByText('Test details').closest('details') as HTMLDetailsElement
+    expect(testDetails.open).toBe(false)
+    expect(within(testDetails).getByText('connector-probe-demo')).toBeTruthy()
+    fireEvent.click(within(testDetails).getByText('Test details'))
+    expect(testDetails.open).toBe(true)
   })
 
   it('keeps a failed test delivery beside the connector action', async () => {

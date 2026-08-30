@@ -423,7 +423,10 @@ The surfaces deliberately have different jobs:
   owns its hit target, focus, disabled, and checked semantics.
   Test-delivery progress, probe confirmation, and test/reconnect failures remain
   inside the same lifecycle panel as their action; feedback is adapter-scoped and
-  announced without making the operator search below unrelated settings.
+  announced without making the operator search below unrelated settings. A
+  successful test leads with the human outcome and destination; its internal
+  delivery reference stays available in a collapsed Test details disclosure
+  instead of requiring the operator to understand or confirm a probe id.
   A desk-capable adapter also binds that connector's chat Issue when its
   definition advertises `desk`:
   the Workspace picker defaults to the Ask Alice Chat workspace. The operator

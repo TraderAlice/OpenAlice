@@ -1500,18 +1500,26 @@ function SetupStatePanel({
         </div>
       )}
       {testing !== definition.id && actionFeedback?.status === 'success' && (
-        <div
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-          className="mt-3 flex items-start gap-2 border-t border-current/10 pt-3 text-[12px] text-success"
-        >
-          <CheckCircle2 size={14} className="mt-0.5 shrink-0" aria-hidden />
-          <span>
-            {t('connectorSettings.probeSentBefore')}{' '}
-            <code className="font-mono font-medium">{actionFeedback.probeId}</code>.{' '}
-            {t('connectorSettings.probeSentAfter')}
-          </span>
+        <div className="mt-3 border-t border-current/10 pt-3 text-[12px]">
+          <div
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            className="flex items-start gap-2 text-success"
+          >
+            <CheckCircle2 size={14} className="mt-0.5 shrink-0" aria-hidden />
+            <span>{t('connectorSettings.testSent', { name: definition.label })}</span>
+          </div>
+          <details data-connector-test-details className="group/details mt-1 pl-5 text-[11.5px] text-muted-foreground">
+            <summary className="oa-pressable flex min-h-10 w-fit cursor-pointer list-none items-center gap-2 font-medium hover:text-foreground">
+              <ListChecks size={13} aria-hidden />
+              {t('connectorSettings.testDetails')}
+            </summary>
+            <div className="mb-1 break-words pl-5 leading-5">
+              {t('connectorSettings.deliveryReference')}{' '}
+              <code className="break-all font-mono text-foreground/80">{actionFeedback.probeId}</code>
+            </div>
+          </details>
         </div>
       )}
       {testing !== definition.id && actionFeedback?.status === 'error' && (
