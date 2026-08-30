@@ -275,6 +275,12 @@ describe('Office responsive style contract', () => {
     expect(coarseTouchCss).toMatch(/\.oa-office-runtime__input-hint\s*\{\s*display: none;/)
   })
 
+  it('reserves enough pause-menu legend width for the dual-purpose Escape command', () => {
+    expect(css).toMatch(
+      /\.oa-office-pause-menu__controls dl > div\s*\{[\s\S]*?grid-template-columns: minmax\(92px, auto\) 1fr;/,
+    )
+  })
+
   it('keeps long journal reports summarized without losing the command row', () => {
     expect(css).toMatch(
       /\.oa-office-runtime__event\s*\{[\s\S]*?grid-template-rows: minmax\(min-content, 1fr\) auto;[\s\S]*?min-height: 400px;/,

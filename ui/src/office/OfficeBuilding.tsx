@@ -956,9 +956,16 @@ export function OfficeBuilding({
         manualMoveSprintRef.current = true
         return
       }
-      if (key === 'escape' && routeTargetId) {
+      if (key === 'escape') {
         event.preventDefault()
-        cancelAutoWalk()
+        if (routeTargetId) {
+          cancelAutoWalk()
+        } else {
+          stopTouchMove()
+          setPanning(false)
+          restoreFloorFocusRef.current = true
+          setMenuOpen(true)
+        }
         return
       }
       if (
@@ -1219,6 +1226,7 @@ export function OfficeBuilding({
                 type="button"
                 className="oa-office-pause-trigger"
                 aria-label={t('office.pauseMenu')}
+                aria-keyshortcuts="Escape"
                 data-open={menuOpen}
               />}
             >
@@ -1350,7 +1358,7 @@ export function OfficeBuilding({
                   </div>
                   <div>
                     <dt><kbd>Esc</kbd></dt>
-                    <dd>{t('office.controlCancel')}</dd>
+                    <dd>{t('office.controlMenuCancel')}</dd>
                   </div>
                 </dl>
               </div>

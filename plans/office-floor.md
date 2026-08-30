@@ -4673,6 +4673,28 @@ Initial game-focus handoff follow-up (2026-08-31):
   and UI TypeScript passed; the full suite passed all 618 test files and 5,184 tests (one file and nine tests skipped);
   the production UI build passed with only the existing ports fallback and large-chunk advisory.
 
+Escape pause-loop follow-up (2026-08-31):
+
+- Continued from the newly focused Live floor with a keyboard-only pass. The map owned focus and advertised movement, but
+  Escape did nothing while Alice was idle; the pause menu still required the pointer or a reverse Tab trip to the HUD.
+  Escape only had a player-facing meaning while auto-walk was active, where it correctly cancelled the route.
+- Compared globally intercepting keyboard input, adding another dedicated menu key, and treating Escape as the familiar
+  game context key. Chose the existing-key model: idle floor Escape opens Menu, route Escape keeps its higher-priority
+  cancel behavior, Menu Escape closes, and the established focus restoration returns control to the composite floor.
+- The Menu trigger now exposes the Escape shortcut to assistive technology. All four Office locales teach the dual
+  `Menu / cancel` meaning, and the initial floor legend includes it without adding another HUD asset. The legend copy was
+  compressed rather than widening its box: real-browser geometry was exactly 326px client and scroll width, so `ESC MENU`
+  remained fully visible inside the authored 330px cap.
+- The first menu pass exposed a small presentation consequence: the longer Escape command wrapped while the other three
+  control rows stayed single-line. Rebalanced the existing two-column legend from 104px to 92px for its key column. The
+  final row measured 92px + 94px with a 13.8px label height, matching the other rows instead of growing to 27.6px.
+- Real-browser acceptance opened Menu directly from the focused map, confirmed the `Floor view` menu owned focus, and
+  closed back to the floor. A second run auto-walked toward News: before Escape both route status and trail existed;
+  afterward both were gone, no Menu had opened, and focus remained on `office-floor`. Focused Building and responsive
+  style suites passed all 50 tests. Root and UI TypeScript passed; the full suite passed all 618 test files and 5,185
+  tests (one file and nine tests skipped); the production UI build passed with only the existing ports fallback and
+  large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

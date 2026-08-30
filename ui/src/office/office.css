@@ -5197,7 +5197,7 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
 
 .oa-office-pause-menu__controls dl > div {
   display: grid;
-  grid-template-columns: minmax(104px, auto) 1fr;
+  grid-template-columns: minmax(92px, auto) 1fr;
   align-items: center;
   gap: 6px;
 }

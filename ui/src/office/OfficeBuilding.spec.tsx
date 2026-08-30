@@ -46,6 +46,13 @@ describe('OfficeBuilding', () => {
     const topBeforeMove = alice.style.top
     await userEvent.keyboard('{ArrowDown}')
     expect(alice.style.top).not.toBe(topBeforeMove)
+    await userEvent.keyboard('{Escape}')
+    const pauseMenu = screen.getByRole('menu', { name: 'Menu' })
+    expect(document.activeElement).toBe(pauseMenu)
+    await userEvent.keyboard('{ArrowDown}')
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Activity log' }))
+    await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(document.activeElement).toBe(floor))
   })
 
   it('keeps historical floors visibly in replay mode with a direct return to Live', async () => {
@@ -485,7 +492,7 @@ describe('OfficeBuilding', () => {
         />,
       )
 
-      expect(screen.getByText('MOVE · WASD / ARROWS · SHIFT RUN')).toBeTruthy()
+      expect(screen.getByText('WASD/ARROWS · SHIFT RUN · ESC MENU')).toBeTruthy()
       const map = screen.getByTestId('office-floor')
       const alice = screen.getByRole('img', { name: 'Alice on the office map' })
       fireEvent.keyDown(map, { key: 'Shift' })
@@ -1004,6 +1011,7 @@ describe('OfficeBuilding', () => {
       expect(screen.queryByTestId('office-route-status')).toBeNull()
       expect(screen.queryByTestId('office-route-trail')).toBeNull()
       expect(quantSign.dataset.route).toBe('false')
+      expect(screen.queryByRole('menu', { name: 'Menu' })).toBeNull()
 
       fireEvent.click(quantSign)
       expect(screen.getByTestId('office-route-status').textContent).toContain('Walking to quant')
@@ -1414,6 +1422,7 @@ describe('OfficeBuilding', () => {
     await userEvent.click(workspaceSign)
     await waitFor(() => expect(onOpenWorkspace).toHaveBeenCalledWith('chat-1'))
     const menuTrigger = screen.getByRole('button', { name: 'Menu' })
+    expect(menuTrigger.getAttribute('aria-keyshortcuts')).toBe('Escape')
     menuTrigger.focus()
     await userEvent.keyboard('{ArrowDown}')
     const pauseMenu = screen.getByRole('menu', { name: 'Menu' })
@@ -1444,7 +1453,7 @@ describe('OfficeBuilding', () => {
     expect(controlsLegend.textContent).toContain('WASD/↑←↓→Move')
     expect(controlsLegend.textContent).toContain('ShiftRun')
     expect(controlsLegend.textContent).toContain('Enter/SpaceInteract')
-    expect(controlsLegend.textContent).toContain('EscCancel')
+    expect(controlsLegend.textContent).toContain('EscMenu / cancel')
     expect(controlsLegend.querySelectorAll('kbd')).toHaveLength(6)
     expect(document.activeElement).toBe(screen.getByRole('menuitemradio', { name: 'Live map' }))
     await userEvent.keyboard('{ArrowDown}')
