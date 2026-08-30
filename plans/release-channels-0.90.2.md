@@ -169,6 +169,15 @@ appropriate.
   immediately after its four native packaging jobs; full release checks remain
   on beta/stable, while PR and local lanes provide earlier feedback without
   becoming a publication dependency.
+- The first beta version rehearsal exposed stable-only version specs that had
+  relied on the old implicit release selection. Those fixtures now select the
+  stable channel explicitly and also exercise equal-current beta semantics.
+- Two same-SHA native preview attempts stalled before Guardian printed its
+  startup banner even though their reruns passed. The temporary production port
+  probe could accept an HTTP readiness connection and then wait forever for
+  that non-HTTP socket while closing. The probe now rejects accidental clients
+  immediately; the repaired `dev` source must complete preview and promotion
+  again before either 0.90.2 tag is attempted.
 
 ## Work Plan
 
@@ -221,7 +230,9 @@ appropriate.
   publication plus live installer path (PR #1257; `CLI Installer Smoke`
   run `33311979583`).
 - [ ] Promote the accepted `dev` source to `master` under the full promotion
-  gate.
+  gate. PR #1259 promoted the first accepted source, but subsequent release
+  rehearsal repairs on `dev` supersede it; repeat the promotion from the final
+  green preview SHA.
 
 ### 5. Prove 0.90.2
 
