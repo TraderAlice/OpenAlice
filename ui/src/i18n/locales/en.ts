@@ -2185,7 +2185,7 @@ export const en = {
     enterCredentialToSave: 'Enter a credential above to save it.',
     connectionSaveError: 'Connection was not saved: {{error}}',
     removeToken: 'Remove token',
-    tokenTooShort: 'That value is too short to be a bot token. The saved token was not changed.',
+    tokenTooShort: 'Enter at least 20 non-whitespace characters.',
     replaceSecretTitle: 'Replace {{name}} token?',
     replaceSecretMessage: 'This overwrites the sealed token. A short or accidental draft cannot be recovered.',
     removing: 'Removing…',

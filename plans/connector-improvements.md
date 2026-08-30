@@ -521,6 +521,16 @@ external adapters remain optional projections rather than sources of truth.
     of the exact missing labels. As each value becomes present, its badge and name
     disappear; once complete, the ordinary grouped-save hint returns. The save
     boundary, token validation, and disabled semantics remain unchanged.
+45. **Grouped credential validation returns to the first field that needs
+    repair.** On a narrow Slack form, submitting two short drafts currently
+    leaves focus on the bottom Save connection button and inserts two long error
+    paragraphs above it. A footer summary or toast would announce failure but
+    still disconnect recovery from the fields. The chosen flow preserves inline
+    errors, marks each invalid input and associates its message
+    programmatically, focuses the first invalid draft so the browser brings it
+    back into view, and uses a concise actionable minimum-length sentence. A
+    subsequent edit clears only that field's error. API/save failures retain
+    their existing scoped presentation and no credential boundary changes.
 
 ## Ordered Work
 
@@ -615,6 +625,8 @@ external adapters remain optional projections rather than sources of truth.
         accessible finite-choice field.
   - [x] Explain every disabled first-time Save connection action with localized,
         field-specific missing requirements.
+  - [x] Return grouped credential validation to the first invalid field with
+        concise, accessible inline recovery.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -1082,6 +1094,20 @@ choices, and `还需要填写：应用 ID · 应用密钥。` without overflow. 
 demo secret draft was never saved; no real credential, Connector, or external
 platform action was invoked. The temporary tab and demo runtime were closed,
 and the viewport was reset.
+
+The grouped-validation-recovery increment passed all 32 demo-route tests, UI
+and root typechecking, the demo production build, and all 5,130 repository
+tests. Short grouped drafts still stop before the API boundary, but every
+invalid secret input now carries `aria-invalid`, references its own alert, and
+uses the error border; the first invalid field receives focus after React
+commits the messages. At 390 x 844, submitting two short Slack drafts moved
+focus from the footer back to Bot token at y 473.42, kept that 40 px control in
+view, and rendered the concise Chinese requirement `请输入至少 20 个非空白字符。`
+without overflowing the 390 px document. At 1,052 x 734 the focused field
+measured 684 x 40 px at y 369.42 and document width remained exact. Editing one
+draft cleared only its own field error in the focused contract. No save API,
+real credential, Connector, or external platform action was invoked. The
+temporary tab and demo runtime were closed, and the viewport was reset.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.

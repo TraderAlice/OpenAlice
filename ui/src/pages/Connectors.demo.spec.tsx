@@ -477,6 +477,35 @@ describe('Connector demo routes', () => {
     expect(within(dialog).getByText('还需要填写：应用 ID · 应用密钥。')).toBeTruthy()
   })
 
+  it('returns grouped token validation to the first invalid field', async () => {
+    render(<ConnectorStatusPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Set up Slack' }))
+    const dialog = await screen.findByRole('dialog')
+    const botToken = within(dialog).getByLabelText('Slack Bot token') as HTMLInputElement
+    const appToken = within(dialog).getByLabelText('Slack App-level token') as HTMLInputElement
+
+    fireEvent.change(botToken, { target: { value: 'short-bot' } })
+    fireEvent.change(appToken, { target: { value: 'short-app' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save connection' }))
+
+    await waitFor(() => expect(document.activeElement).toBe(botToken))
+    expect(mocks.save).not.toHaveBeenCalled()
+    expect(botToken.getAttribute('aria-invalid')).toBe('true')
+    expect(appToken.getAttribute('aria-invalid')).toBe('true')
+    expect(botToken.className).toContain('!border-destructive/60')
+    const botErrorId = botToken.getAttribute('aria-describedby')
+    expect(botErrorId).toBeTruthy()
+    expect(document.getElementById(botErrorId ?? '')?.textContent).toBe(
+      'Token was not saved: Enter at least 20 non-whitespace characters.',
+    )
+
+    fireEvent.change(botToken, { target: { value: 'xoxb-plausible-slack-bot-token' } })
+    expect(botToken.getAttribute('aria-invalid')).toBeNull()
+    expect(botToken.getAttribute('aria-describedby')).toBeNull()
+    expect(appToken.getAttribute('aria-invalid')).toBe('true')
+  })
+
   it('finishes a pending auto-save after the configuration dialog closes', async () => {
     const snapshot = createDemoConnectorSnapshot()
     snapshot.config.adapters.discord = {
@@ -857,7 +886,7 @@ describe('Connector demo routes', () => {
 
     fireEvent.change(input, { target: { value: 'qweqw' } })
     fireEvent.click(screen.getAllByRole('button', { name: 'Save connection' })[0])
-    expect((await screen.findByRole('alert')).textContent).toContain('too short to be a bot token')
+    expect((await screen.findByRole('alert')).textContent).toContain('at least 20 non-whitespace characters')
     expect(mocks.save).not.toHaveBeenCalled()
 
     expect(input.type).toBe('password')
@@ -949,7 +978,7 @@ describe('Connector demo routes', () => {
     fireEvent.change(input, { target: { value: 'qweqw' } })
     fireEvent.click(screen.getByRole('button', { name: 'Replace token' }))
 
-    expect((await screen.findByRole('alert')).textContent).toContain('too short to be a bot token')
+    expect((await screen.findByRole('alert')).textContent).toContain('at least 20 non-whitespace characters')
     expect(screen.queryByRole('heading', { name: 'Replace Discord token?' })).toBeNull()
     expect(mocks.save).not.toHaveBeenCalled()
   })

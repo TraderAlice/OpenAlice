@@ -2160,7 +2160,7 @@ export const zhHant: Resources = {
     enterCredentialToSave: '請在上方填寫要儲存的憑證。',
     connectionSaveError: '連線未儲存：{{error}}',
     removeToken: '移除權杖',
-    tokenTooShort: '這段內容太短，不像機器人權杖。已儲存的權杖沒有變更。',
+    tokenTooShort: '請輸入至少 20 個非空白字元。',
     replaceSecretTitle: '取代 {{name}} 權杖？',
     replaceSecretMessage: '這會覆蓋已加密儲存的權杖。過短或誤輸入的內容無法復原。',
     removing: '正在移除…',

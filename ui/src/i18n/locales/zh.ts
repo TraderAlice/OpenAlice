@@ -2152,7 +2152,7 @@ export const zh: Resources = {
     enterCredentialToSave: '请在上方填写要保存的凭据。',
     connectionSaveError: '连接未保存：{{error}}',
     removeToken: '移除令牌',
-    tokenTooShort: '这段内容太短，不像机器人令牌。已保存的令牌没有改动。',
+    tokenTooShort: '请输入至少 20 个非空白字符。',
     replaceSecretTitle: '替换 {{name}} 令牌？',
     replaceSecretMessage: '这会覆盖已加密保存的令牌。过短或误输入的内容无法恢复。',
     removing: '正在移除…',

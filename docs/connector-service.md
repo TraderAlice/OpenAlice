@@ -371,7 +371,12 @@ The surfaces deliberately have different jobs:
   ordinary grouped-save explanation once every requirement is present. Save
   connection remains disabled until the same existing credential boundary is
   satisfied; the hint explains that state without manufacturing a validation
-  error.
+  error. If grouped secret validation fails after submission, every invalid
+  input exposes `aria-invalid` plus its own described inline error and the first
+  invalid field receives focus, bringing recovery back into view on long or
+  narrow forms. Editing a draft clears only that field's error. Client-side
+  length guidance stays concise while backend save failures retain their
+  existing scoped error surface.
   Every later lifecycle stage retains its panel for runtime, linking, test, or
   recovery actions. Error panels keep the primary sentence actionable and put
   raw adapter messages plus retry timing in the same 40 px Technical details

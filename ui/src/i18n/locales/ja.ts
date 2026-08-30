@@ -2153,7 +2153,7 @@ export const ja: Resources = {
     enterCredentialToSave: '保存する認証情報を上に入力してください。',
     connectionSaveError: '接続を保存できませんでした: {{error}}',
     removeToken: 'トークンを削除',
-    tokenTooShort: 'この値は Bot トークンとしては短すぎます。保存済みのトークンは変更していません。',
+    tokenTooShort: '空白以外の文字を 20 文字以上入力してください。',
     replaceSecretTitle: '{{name}} トークンを置換しますか？',
     replaceSecretMessage: '封印済みのトークンを上書きします。短い入力や誤入力は復元できません。',
     removing: '削除中…',

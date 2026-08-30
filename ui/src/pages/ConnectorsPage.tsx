@@ -267,6 +267,9 @@ function ConnectorSettingsSurface({
           t('connectorSettings.tokenTooShort'),
         ])),
       }))
+      window.requestAnimationFrame(() => {
+        document.getElementById(`connector-${id}-${invalidDrafts[0].key}`)?.focus()
+      })
       return
     }
 
@@ -1109,7 +1112,9 @@ function ConnectorCredentialsEditor({
           const secretDraft = secretDrafts[draftKey] ?? ''
           const secretSaving = savingSecret === draftKey
           const secretMasked = maskedSecrets[draftKey] ?? true
+          const secretError = secretErrors[draftKey]
           const inputId = `connector-${definition.id}-${field.key}`
+          const inputErrorId = `${inputId}-error`
           const fieldLabel = t(`connectorSettings.fields.${field.key}`, { defaultValue: field.label })
           const fieldDescription = field.description
             ? t(`connectorSettings.fieldDescriptions.${field.key}`, { defaultValue: field.description })
@@ -1162,7 +1167,9 @@ function ConnectorCredentialsEditor({
                       <input
                         id={inputId}
                         aria-label={`${definition.label} ${fieldLabel}`}
-                        className={`${inputClass} min-h-10 pr-10`}
+                        aria-invalid={secretError ? true : undefined}
+                        aria-describedby={secretError ? inputErrorId : undefined}
+                        className={`${inputClass} min-h-10 pr-10 ${secretError ? '!border-destructive/60 focus:!border-destructive' : ''}`}
                         type={secretMasked ? 'password' : 'text'}
                         required={fieldMissing}
                         value={secretDraft}
@@ -1213,9 +1220,9 @@ function ConnectorCredentialsEditor({
                       </>
                     )}
                   </div>
-                  {secretErrors[draftKey] && (
-                    <p className="mt-1 text-[12px] text-destructive" role="alert">
-                      {t('connectorSettings.tokenSaveError', { error: secretErrors[draftKey] })}
+                  {secretError && (
+                    <p id={inputErrorId} className="mt-1 text-[12px] leading-5 text-destructive" role="alert">
+                      {t('connectorSettings.tokenSaveError', { error: secretError })}
                     </p>
                   )}
                 </>
