@@ -24,6 +24,7 @@ import {
   buildUpgradeVerifyExpression,
   candidateDesktopAssetName,
   DESKTOP_UPGRADE_RECEIPT_SCHEMA_VERSION,
+  desktopUpgradeWorkspaceTags,
   previousDesktopAssetName,
   selectPreviousDesktopTag,
   versionFromTag,
@@ -454,8 +455,7 @@ async function main() {
       OPENALICE_UTA_DISABLED: '1',
     }
     delete commonEnv.OPENALICE_TAKEOVER
-    const tag = `desktop-upgrade-${previousVersion.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`
-    const postUpgradeTag = `${tag}-post`
+    const { tag, postUpgradeTag } = desktopUpgradeWorkspaceTags(previousVersion)
     const sentinelKey = 'openalice-desktop-upgrade-smoke'
     const sentinelValue = `${fromTag}->${candidateVersion}`
 
