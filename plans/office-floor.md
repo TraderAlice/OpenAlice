@@ -3336,6 +3336,26 @@ Touch D-pad parity follow-up (2026-08-30):
   Connector demo timing failure; that file passed alone, then the clean full rerun passed all 617 test files and 5,147
   tests (one file and nine tests skipped). The existing jsdom canvas and large-chunk advisories are unchanged.
 
+Replay HUD command hierarchy follow-up (2026-08-30):
+
+- Played the complete News terminal loop on the real Office Lab: auto-walk to the unread terminal, inspect the News
+  Activity Log, and use `Find on floor` to enter sequence 4044. The historical marker and snapshot state were clear,
+  but at 390x844 the desktop-only Replay HUD clipped the sequence title, hid both historical counters, and styled its
+  only exit as a low-contrast `LIVE` status cartridge rather than a command.
+- Compared only recoloring `LIVE`, hiding Replay counters on phones, and sharing the existing two-row phone HUD between
+  Live and Replay. Chose the shared layout: the first row now keeps the compact `Replay · Seq n`, a green `↩ LIVE`
+  return command, and Menu; the second row retains both the historical active-agent ratio and group count. This removes
+  the exceptional Replay layout instead of adding another playback bar or dropping information.
+- The visual button stays compact while its localized accessible name explicitly says `Return live`; English,
+  Simplified Chinese, Traditional Chinese, and Japanese copy all distinguish the command from the reusable `Live`
+  state label. Focus and hover use the semantic live green rather than the replay-water color.
+- Real-browser acceptance repeated the News-to-Replay loop at 390x844 and 1200x800. The phone HUD showed the complete
+  sequence title, `0/22 agents active`, `3/3 groups`, Return live, and Menu without overlap; desktop retained its
+  single-row hierarchy. The actual Return live command restored the live floor in both layouts.
+- Focused building and responsive-style specs passed (2 files / 33 tests). Root and UI TypeScript passed, the full
+  suite passed all 617 test files and 5,147 tests (one file and nine tests skipped), and the production UI build passed
+  with only the existing jsdom canvas and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

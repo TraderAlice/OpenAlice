@@ -201,20 +201,25 @@ describe('Office responsive style contract', () => {
     expect(css).toContain(".oa-office-building[data-controls-suspended='true'] :is(")
   })
 
-  it('keeps the live-floor identity and Menu on the first phone HUD row', () => {
+  it('keeps the floor identity and commands on the first phone HUD row', () => {
     expect(narrowLiveStart).toBeGreaterThan(-1)
     expect(narrowLiveEnd).toBeGreaterThan(narrowLiveStart)
-    expect(narrowLiveCss).toContain('.oa-office-building:not([data-replay="true"]) .oa-office-hud')
+    expect(narrowLiveCss).toMatch(/\n\s*\.oa-office-hud \{/)
+    expect(narrowLiveCss).not.toContain(':not([data-replay="true"])')
     expect(narrowLiveCss).toContain('"identity actions"')
     expect(narrowLiveCss).toContain('grid-template-columns: minmax(0, 1fr) auto')
     expect(narrowLiveCss).toContain('grid-area: identity')
     expect(narrowLiveCss).toContain('grid-area: actions')
   })
 
-  it('preserves live agent status as a separate full-width phone HUD row', () => {
+  it('preserves live and replay agent status as a separate full-width phone HUD row', () => {
     expect(narrowLiveCss).toContain('"status status"')
     expect(narrowLiveCss).toContain('grid-area: status')
+    expect(narrowLiveCss).toContain('.oa-office-building[data-replay="true"] .oa-office-hud__status')
+    expect(narrowLiveCss).toContain('display: flex')
     expect(narrowLiveCss).toContain('width: 100%')
     expect(narrowLiveCss).toContain('border-top: 1px solid')
+    expect(narrowLiveCss).toContain('.oa-office-hud__status span:not(:first-child)')
+    expect(narrowLiveCss).toContain('display: inline-flex')
   })
 })

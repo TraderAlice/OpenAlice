@@ -78,7 +78,7 @@ describe('OfficeBuilding', () => {
     )
 
     expect(screen.getByTestId('office-building').getAttribute('data-replay')).toBe('true')
-    expect(screen.getByText('Replay floor · Seq 2')).toBeTruthy()
+    expect(screen.getByText('Replay · Seq 2')).toBeTruthy()
     const replayVisitor = screen.getByTestId('office-replay-visitor')
     const replayAlice = screen.getByRole('img', { name: 'Alice on the office map' })
     expect(replayVisitor.querySelector('img')?.getAttribute('src'))
@@ -126,7 +126,10 @@ describe('OfficeBuilding', () => {
     expect(onOpenFiles).not.toHaveBeenCalled()
     expect(onOpenRoster).not.toHaveBeenCalled()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Live' }))
+    const returnLive = screen.getByRole('button', { name: 'Return live' })
+    expect(returnLive.textContent).toContain('↩')
+    expect(returnLive.textContent).toContain('Live')
+    await userEvent.click(returnLive)
     expect(onReturnLive).toHaveBeenCalledTimes(1)
   })
 
@@ -155,8 +158,8 @@ describe('OfficeBuilding', () => {
       />,
     )
 
-    expect(screen.getByText('Replay floor · Seq 2')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /^Live$/ })).toBeNull()
+    expect(screen.getByText('Replay · Seq 2')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Return live' })).toBeNull()
   })
 
   it('keeps an empty Office inside the game world with Alice centered', () => {

@@ -4648,8 +4648,8 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
   padding: 0 9px;
   border: 2px solid var(--office-gba-ink-seed);
   border-radius: 2px;
-  color: var(--office-gba-paper-seed);
-  background: var(--office-gba-water-seed);
+  color: var(--office-gba-ink-seed);
+  background: var(--office-gba-live);
   box-shadow: 2px 2px 0 color-mix(in srgb, var(--office-gba-ink-seed) 24%, transparent);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-weight: 900;
@@ -4657,9 +4657,14 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
 }
 
 .oa-office-replay-exit:is(:hover, :focus-visible) {
-  outline: 3px solid var(--office-gba-water-seed);
+  outline: 3px solid var(--office-gba-live);
   outline-offset: 2px;
   filter: brightness(1.1);
+}
+
+.oa-office-replay-exit__arrow {
+  font-size: 14px;
+  line-height: 1;
 }
 
 .oa-office-pause-trigger {
@@ -5508,7 +5513,7 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
     padding-inline: 2px;
   }
 
-  .oa-office-building:not([data-replay="true"]) .oa-office-hud {
+  .oa-office-hud {
     grid-template-areas:
       "identity actions"
       "status status";
@@ -5517,11 +5522,13 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
     min-height: 68px;
   }
 
-  .oa-office-building:not([data-replay="true"]) .oa-office-hud__identity {
+  .oa-office-hud__identity {
     grid-area: identity;
   }
 
-  .oa-office-building:not([data-replay="true"]) .oa-office-hud__status {
+  .oa-office-hud__status,
+  .oa-office-building[data-replay="true"] .oa-office-hud__status {
+    display: flex;
     width: 100%;
     min-width: 0;
     grid-area: status;
@@ -5529,7 +5536,11 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
     border-top: 1px solid color-mix(in srgb, var(--office-gba-ink-seed) 22%, transparent);
   }
 
-  .oa-office-building:not([data-replay="true"]) .oa-office-hud__actions {
+  .oa-office-hud__status span:not(:first-child) {
+    display: inline-flex;
+  }
+
+  .oa-office-hud__actions {
     grid-area: actions;
   }
 }

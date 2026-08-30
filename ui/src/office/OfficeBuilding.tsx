@@ -914,9 +914,10 @@ export function OfficeBuilding({
             <button
               type="button"
               className="oa-office-replay-exit"
+              aria-label={t('office.replayReturnLive')}
               onClick={onReturnLive}
             >
-              <span className="oa-office-live-dot" aria-hidden />
+              <span className="oa-office-replay-exit__arrow" aria-hidden>↩</span>
               {t('office.replayLive')}
             </button>
           )}
