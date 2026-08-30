@@ -100,7 +100,7 @@ describe('fetchLatestRelease (mocked fetch)', () => {
       ]),
     }) as unknown as typeof fetch
 
-    const { result } = await fetchLatestRelease()
+    const { result } = await fetchLatestRelease({ channel: 'stable' })
     expect(result?.version).toBe('1.0.0') // first non-draft
   })
 
@@ -218,7 +218,7 @@ describe('getVersionInfo', () => {
       }]),
     }) as unknown as typeof fetch
 
-    const info = await getVersionInfo()
+    const info = await getVersionInfo({ channel: 'stable' })
     expect(info.latest).toBe('999.999.999')
     expect(info.hasUpdate).toBe(true)
     expect(info.error).toBeNull()
@@ -226,13 +226,16 @@ describe('getVersionInfo', () => {
 
   it('reports hasUpdate=false when latest = current', async () => {
     const current = getCurrentVersion()
+    const isBeta = /-beta(?:\.|$)/i.test(current)
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true, status: 200, statusText: 'OK',
-      json: async () => ([{ tag_name: current, html_url: 'x', body: '', published_at: '', draft: false, prerelease: false }]),
+      json: async () => ([{ tag_name: current, html_url: 'x', body: '', published_at: '', draft: false, prerelease: isBeta }]),
     }) as unknown as typeof fetch
 
     const info = await getVersionInfo()
+    expect(info.latest).toBe(current)
     expect(info.hasUpdate).toBe(false)
+    expect(info.error).toBeNull()
   })
 
   it('returns error when GitHub fetch fails', async () => {
