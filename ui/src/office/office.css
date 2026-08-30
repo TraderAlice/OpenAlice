@@ -5526,6 +5526,11 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
     left: 12px;
   }
 
+  .oa-office-roster {
+    bottom: 12px;
+    height: auto;
+  }
+
   .oa-office-roster ul,
   .oa-office-cabinet-window__records {
     grid-template-columns: 1fr;

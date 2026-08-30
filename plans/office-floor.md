@@ -3566,6 +3566,24 @@ Replay-focused seat-plan follow-up (2026-08-30):
   seats afterward. Root and UI TypeScript passed, the full suite passed all 617 test files and 5,156 tests (one file and
   nine tests skipped), and the production UI build passed with only the existing jsdom canvas and large-chunk advisories.
 
+Responsive team-roster follow-up (2026-08-30):
+
+- Personally played the real 14-person Chat roster as a party-menu loop on desktop and narrow viewports. Selecting a
+  hidden coworker, opening their Agent File, and returning already restored both focus and scroll; the geometry-based
+  arrow-key navigation also followed the rendered two-column grid. The remaining friction was spatial: the roster kept
+  its desktop 380px height at 390x844, exposed only three coworkers, and left most of the available floor unused below.
+- Compared retaining the compact window with paging or jump controls against making only the narrow-screen roster a
+  near-full-height party panel. Chose the responsive panel: it reuses the existing continuous list and keyboard model,
+  gives portraits and assignments materially more room, and keeps the desktop map-plus-window composition unchanged.
+- At container widths up to 680px the roster now anchors 12px above the bottom of the Office viewport and derives its
+  height from the existing 78px top inset. The fixed header and close control remain visible while only the member list
+  scrolls; short screens naturally collapse rather than overflowing.
+- Real-browser acceptance at 390x844 increased the dialog from 380px to 630px and the list viewport from 262px to
+  512px, while the focused bottom coworker remained visible after the Agent File round trip. At 390x600 the dialog
+  safely collapsed to 386px with the close control visible, and the 1052x734 desktop dialog remained exactly 380px.
+  Root and UI TypeScript passed, the full suite passed all 617 test files and 5,156 tests (one file and nine tests
+  skipped), and the production UI build passed with only the existing jsdom canvas and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
