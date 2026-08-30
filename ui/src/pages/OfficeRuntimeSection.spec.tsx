@@ -426,6 +426,32 @@ describe('OfficeRuntimeSection', () => {
     expect(screen.queryByRole('button', { name: /News added/i })).toBeNull()
   })
 
+  it('marks channel inventories when more story records exist beyond the playable window', async () => {
+    const now = Date.now()
+    const agentEvents = Array.from({ length: 101 }, (_, index) => ({
+      seq: 500 - index,
+      ts: now - index,
+      type: index % 2 === 0 ? 'runtime.started' : 'runtime.stopped',
+      payload: {
+        resumeId: `resume-${index}`,
+        status: index % 2 === 0 ? undefined : 'done',
+      },
+    }))
+    const newsEvents = Array.from({ length: 51 }, (_, index) => ({
+      seq: 300 - index,
+      ts: now - 1_000 - index,
+      type: 'news.ingested',
+      payload: { newsItemId: index, source: 'Wire', title: `Headline ${index}` },
+    }))
+    mockJournal([...agentEvents, ...newsEvents])
+    render(<OfficeRuntimeSection />)
+
+    expect(await screen.findByRole('tab', { name: /Overview\s*30\+/ })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /Agent\s*100\+/ })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /Inbox\s*0/ })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /News\s*50\+/ })).toBeTruthy()
+  })
+
   it('opens a service channel on its requested event', async () => {
     const now = Date.now()
     mockJournal([

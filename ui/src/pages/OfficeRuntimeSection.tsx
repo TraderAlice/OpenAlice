@@ -256,8 +256,24 @@ function mergeOfficeLogFamilies(
 
 type ActivityQuery = typeof api.agentRuntime.query
 
-async function loadOfficeAgentWindow(query: ActivityQuery): Promise<AgentRuntimeEvent[]> {
+interface OfficeLogWindow {
+  entries: AgentRuntimeEvent[]
+  hasMore: boolean
+}
+
+function officeLogPageHasMore(
+  page: { entries: AgentRuntimeEvent[]; page?: number; pageSize?: number; total?: number; totalPages?: number },
+  fallbackPageSize: number,
+): boolean {
+  const currentPage = page.page ?? 1
+  if (page.totalPages !== undefined) return currentPage < page.totalPages
+  if (page.total !== undefined) return currentPage * (page.pageSize ?? fallbackPageSize) < page.total
+  return page.entries.length === fallbackPageSize
+}
+
+async function loadOfficeAgentWindow(query: ActivityQuery): Promise<OfficeLogWindow> {
   let entries: AgentRuntimeEvent[] = []
+  let hasMore = false
 
   for (let page = 1; page <= OFFICE_AGENT_MAX_PAGES; page += 1) {
     const result = await query({
@@ -268,13 +284,12 @@ async function loadOfficeAgentWindow(query: ActivityQuery): Promise<AgentRuntime
     entries = mergeOfficeLogFamilies([entries, result.entries])
 
     const hasEnoughStoryBeats = officeActivityBeats(entries).length >= OFFICE_AGENT_BEAT_TARGET
-    const hasNextPage = result.totalPages !== undefined
-      ? page < result.totalPages
-      : result.entries.length === OFFICE_AGENT_PAGE_SIZE
+    const hasNextPage = officeLogPageHasMore(result, OFFICE_AGENT_PAGE_SIZE)
+    hasMore = hasNextPage
     if (hasEnoughStoryBeats || !hasNextPage || result.entries.length === 0) break
   }
 
-  return entries
+  return { entries, hasMore }
 }
 
 export function OfficeRuntimeSection({
@@ -298,6 +313,12 @@ export function OfficeRuntimeSection({
     inbox: [],
     news: [],
   })
+  const [hasMoreByChannel, setHasMoreByChannel] = useState<Record<OfficeLogChannel, boolean>>({
+    overview: false,
+    agent: false,
+    inbox: false,
+    news: false,
+  })
   const [selectedSeq, setSelectedSeq] = useState<number | null>(null)
   const [channel, setChannel] = useState<OfficeLogChannel>(initialChannel)
   const [mobileView, setMobileView] = useState<OfficeLogMobileView>(
@@ -318,7 +339,7 @@ export function OfficeRuntimeSection({
   const load = useCallback(async () => {
     try {
       const activityApi = api.productActivity ?? api.agentRuntime
-      const [agent, inboxPage, newsPage] = await Promise.all([
+      const [agentWindow, inboxPage, newsPage] = await Promise.all([
         loadOfficeAgentWindow(activityApi.query),
         activityApi.query({ page: 1, pageSize: OFFICE_SERVICE_PAGE_SIZE, family: 'inbox' }),
         activityApi.query({ page: 1, pageSize: OFFICE_SERVICE_PAGE_SIZE, family: 'news' }),
@@ -326,10 +347,18 @@ export function OfficeRuntimeSection({
       const inbox = inboxPage.entries
       const news = newsPage.entries
       setEntriesByChannel({
-        overview: mergeOfficeLogFamilies([agent, inbox, news]),
-        agent,
+        overview: mergeOfficeLogFamilies([agentWindow.entries, inbox, news]),
+        agent: agentWindow.entries,
         inbox,
         news,
+      })
+      const inboxHasMore = officeLogPageHasMore(inboxPage, OFFICE_SERVICE_PAGE_SIZE)
+      const newsHasMore = officeLogPageHasMore(newsPage, OFFICE_SERVICE_PAGE_SIZE)
+      setHasMoreByChannel({
+        overview: agentWindow.hasMore || inboxHasMore || newsHasMore,
+        agent: agentWindow.hasMore,
+        inbox: inboxHasMore,
+        news: newsHasMore,
       })
       setError(null)
     } catch (err) {
@@ -362,6 +391,16 @@ export function OfficeRuntimeSection({
     inbox: beatsByChannel.inbox.length,
     news: beatsByChannel.news.length,
   }), [beatsByChannel])
+  const channelCountLabels = useMemo(() => {
+    const overviewIsCapped = hasMoreByChannel.overview
+      || channelCounts.overview < channelCounts.agent + channelCounts.inbox + channelCounts.news
+    return {
+      overview: `${channelCounts.overview}${overviewIsCapped ? '+' : ''}`,
+      agent: `${channelCounts.agent}${hasMoreByChannel.agent ? '+' : ''}`,
+      inbox: `${channelCounts.inbox}${hasMoreByChannel.inbox ? '+' : ''}`,
+      news: `${channelCounts.news}${hasMoreByChannel.news ? '+' : ''}`,
+    }
+  }, [channelCounts, hasMoreByChannel])
   const visibleBeats = beatsByChannel[channel]
 
   useEffect(() => {
@@ -480,7 +519,7 @@ export function OfficeRuntimeSection({
             {OFFICE_LOG_CHANNELS.map((item) => (
               <TabsTrigger key={item} value={item}>
                 <span>{t(OFFICE_LOG_CHANNEL_LABEL_KEYS[item])}</span>
-                <b>{channelCounts[item]}</b>
+                <b>{channelCountLabels[item]}</b>
               </TabsTrigger>
             ))}
           </TabsList>
@@ -664,7 +703,7 @@ export function OfficeRuntimeSection({
           {OFFICE_LOG_CHANNELS.map((item) => (
             <TabsTrigger key={item} value={item}>
               <span>{t(OFFICE_LOG_CHANNEL_LABEL_KEYS[item])}</span>
-              <b>{channelCounts[item]}</b>
+              <b>{channelCountLabels[item]}</b>
             </TabsTrigger>
           ))}
         </TabsList>

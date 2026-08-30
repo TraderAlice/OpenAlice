@@ -4981,6 +4981,24 @@ Honest failed-run diagnosis follow-up (2026-08-31):
   TypeScript passed; the full suite passed all 620 test files and 5,193 tests (one file and nine tests skipped); the
   production UI build passed with only the existing ports fallback and large-chunk advisory.
 
+Truthful journal-inventory follow-up (2026-08-31):
+
+- Played the real Floor terminal and News terminal loop. The Activity Log presented `Overview 30`, `Agent 26`,
+  `Inbox 6`, and `News 50` as peer inventory badges, even though the live product journal currently reports 4,788
+  Agent events and 304 News events. Overview is intentionally capped at 30 curated story beats, Agent stops loading
+  after it has enough readable beats, and service channels fetch one 50-event page, so the badges looked exact while
+  describing different windows.
+- Compared raw journal totals, removing all counts, and retaining visible story-beat counts with an overflow marker.
+  Raw totals would count noisy tool fragments rather than player-facing records; removing counts would discard useful
+  channel-density information. Chose the RPG-inventory convention: keep the number of records the player can browse
+  now and append `+` whenever more records exist beyond that window. Overview also gains `+` when its curated limit
+  omits loaded family beats.
+- Implemented per-channel overflow ownership from the same paginated queries that supply each playable window. Real
+  News-terminal acceptance now reads `Overview 30+`, `Agent 26+`, `Inbox 6`, and `News 50+`; the selected channel,
+  record cursor, detail, and keyboard hint remain unchanged. The focused runtime-log suite passed all 20 tests. Root
+  and UI TypeScript passed; the full suite passed all 620 test files and 5,194 tests (one file and nine tests skipped);
+  the production UI build passed with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
