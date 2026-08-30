@@ -2659,30 +2659,39 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
 }
 
 .oa-office-roster__title {
-  display: -webkit-box;
-  grid-column: 2 / 4;
-  grid-row: 1;
   min-width: 0;
   overflow: hidden;
   line-height: 1.15;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.oa-office-roster__meta {
-  grid-column: 2;
-  grid-row: 2;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--gba-ink-soft);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.oa-office-roster__identity {
+  display: grid;
+  grid-column: 2 / 4;
+  grid-row: 1;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.oa-office-roster__meta {
+  display: -webkit-box;
+  grid-column: 2 / 4;
+  grid-row: 2;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--gba-ink-soft);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .oa-office-roster__status {
   display: inline-flex;
-  grid-column: 3;
-  grid-row: 2;
   align-items: center;
   gap: 5px;
   padding: 2px 5px 1px;

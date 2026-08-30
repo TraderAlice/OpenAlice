@@ -90,6 +90,8 @@ describe('OfficeRosterWindow', () => {
     expect(screen.getAllByText('asleep')).toHaveLength(2)
     expect(container.querySelectorAll('.oa-office-roster__status[data-power="awake"]')).toHaveLength(2)
     expect(container.querySelectorAll('.oa-office-roster__status[data-power="asleep"]')).toHaveLength(4)
+    expect(container.querySelectorAll('.oa-office-roster__identity > .oa-office-roster__status')).toHaveLength(6)
+    expect(container.querySelector('.oa-office-roster__meta')?.textContent).toBe('Research session 1')
     expect(container.querySelectorAll('.oa-office-roster li button[data-awake="false"]')).toHaveLength(4)
     const focusedMember = screen.getByRole('button', { name: /Claude.*c1.*Research session 6/i })
     expect(document.activeElement).toBe(focusedMember)

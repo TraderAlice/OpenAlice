@@ -78,6 +78,15 @@ describe('Office responsive style contract', () => {
     expect(narrowLiveCss).toContain('grid-column: 2')
   })
 
+  it('keeps roster state beside identity and gives assignments two stable lines', () => {
+    expect(css).toMatch(
+      /\.oa-office-roster__identity\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) auto;/s,
+    )
+    expect(css).toMatch(
+      /\.oa-office-roster__meta\s*\{[^}]*overflow-wrap:\s*anywhere;[^}]*-webkit-line-clamp:\s*2;/s,
+    )
+  })
+
   it('keeps auto-route markers small, static, and anchored to Alice feet', () => {
     expect(css).toMatch(/\.oa-office-route-trail__step\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 12px;[\s\S]*?opacity: 0\.42;[\s\S]*?calc\(-50% \+ 22px\)/)
     expect(css).toMatch(/\.oa-office-route-target-pointer\s*\{[\s\S]*?width: 20px;[\s\S]*?height: 20px;[\s\S]*?opacity: 0\.78;/)

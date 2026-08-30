@@ -4565,6 +4565,21 @@ Composite-map focus follow-up (2026-08-31):
   files and 5,178 tests (one file and nine tests skipped); the production UI build passed with only the existing ports
   fallback and large-chunk advisory.
 
+High-density roster legibility follow-up (2026-08-31):
+
+- Reopened the physical Chat roster with its real 24-person cast and walked the first rows by keyboard. The live G23 and
+  G24 assignments were `Office live-state QA sleep README check` and `Office Visual-State QA Sleep Command`, but their
+  cards reduced them to same-prefix fragments because the status chip consumed the assignment row's remaining width.
+- Compared selected-card expansion, middle ellipsis, and rebalancing the fixed-height party card. Chose the party-menu
+  hierarchy: callsign and status share the identity line, while assignment owns a strict two-line region beneath it.
+  This reveals useful suffixes without making selection or scroll position jump; long callsigns still ellipsize first.
+- Real-browser acceptance showed `README check` and `Sleep Command` simultaneously. All 24 cards remained exactly 82px
+  high. Arrow Right moved G20 to G24, End focused the final teammate at list scrollTop 814, and Home restored G20 and
+  scrollTop 0, preserving the established two-column roving-focus model under real roster density.
+- Focused Roster and responsive-style suites passed 27 tests. Root and UI TypeScript passed; the full suite passed all
+  618 test files and 5,179 tests (one file and nine tests skipped); the production UI build passed with only the existing
+  ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

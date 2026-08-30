@@ -155,20 +155,22 @@ export function OfficeRosterWindow({
                     scale={0.22}
                   />
                 </span>
-                <strong className="oa-office-roster__title">
-                  {callsign}<span> · {employee.name}</span>
-                </strong>
+                <span className="oa-office-roster__identity">
+                  <strong className="oa-office-roster__title">
+                    {callsign}<span> · {employee.name}</span>
+                  </strong>
+                  <span
+                    className="oa-office-roster__status"
+                    data-mood={employee.mood}
+                    data-power={employee.awake ? 'awake' : 'asleep'}
+                  >
+                    <i aria-hidden />
+                    {t(officeCoworkerStatusKey(employee))}
+                  </span>
+                </span>
                 <small className="oa-office-roster__meta">
                   {assignment ?? `${employee.agent} · ${employee.name}`}
                 </small>
-                <span
-                  className="oa-office-roster__status"
-                  data-mood={employee.mood}
-                  data-power={employee.awake ? 'awake' : 'asleep'}
-                >
-                  <i aria-hidden />
-                  {t(officeCoworkerStatusKey(employee))}
-                </span>
                 <img
                   className="oa-office-roster__cursor"
                   src={OFFICE_HUD_ASSETS.journalCursor}
