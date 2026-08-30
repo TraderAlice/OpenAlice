@@ -351,7 +351,11 @@ The surfaces deliberately have different jobs:
   actionless `Credentials required` lifecycle panel is omitted because overview
   and the Settings navigator already establish that state. The section keeps a
   short platform checklist and official console links beside the fields; those
-  links open without dismissing the configuration dialog or losing its drafts.
+  links form a wrapping 40 px action row immediately after the platform
+  description and before the numbered steps, so opening the official destination
+  is visibly the first task. One- and two-destination adapters share the same
+  data-driven layout. Links open without dismissing the configuration dialog or
+  losing its drafts.
   Connector-owned fields, secret reveal controls, setup links, and explicit
   credential, recovery, and test actions keep a 40 px interaction minimum in
   both the dialog and full Settings document; larger disclosures and Chat

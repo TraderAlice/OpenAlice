@@ -1183,20 +1183,8 @@ function ConnectorSetupGuide({ definition, t }: { definition: ConnectorDefinitio
           </p>
         </div>
       </div>
-      {steps.length > 0 && (
-        <ol className="mt-3 space-y-2 pl-11 text-[11.5px] leading-5 text-foreground/90">
-          {steps.map((step, index) => (
-            <li key={step} className="flex gap-2">
-              <span className="flex size-5 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-background/70 text-[10px] font-semibold text-primary">
-                {index + 1}
-              </span>
-              <span>{step}</span>
-            </li>
-          ))}
-        </ol>
-      )}
       {definition.setupLinks && definition.setupLinks.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2 pl-11">
+        <div data-connector-setup-links className="mt-3 flex flex-wrap gap-2 pl-11">
           {definition.setupLinks.map((link) => {
             const label = t(`connectorSettings.setupGuide.links.${link.key}`, {
               defaultValue: t('connectorSettings.setupGuide.openSetup', { name: definition.label }),
@@ -1216,6 +1204,18 @@ function ConnectorSetupGuide({ definition, t }: { definition: ConnectorDefinitio
             )
           })}
         </div>
+      )}
+      {steps.length > 0 && (
+        <ol className="mt-3 space-y-2 pl-11 text-[11.5px] leading-5 text-foreground/90">
+          {steps.map((step, index) => (
+            <li key={step} className="flex gap-2">
+              <span className="flex size-5 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-background/70 text-[10px] font-semibold text-primary">
+                {index + 1}
+              </span>
+              <span>{step}</span>
+            </li>
+          ))}
+        </ol>
       )}
     </aside>
   )

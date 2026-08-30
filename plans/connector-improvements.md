@@ -489,6 +489,16 @@ external adapters remain optional projections rather than sources of truth.
     disclosure summary itself has a 40 px target. The known configured-but-not-
     running condition retains its dedicated product sentence and does not repeat
     the implementation string as technical evidence.
+42. **Platform setup begins with the official destination, before the
+    checklist.** The first-use guide currently renders catalog-owned official
+    links after all setup steps, even though opening that destination is the
+    user's first action. A header-side link would compete with the title on
+    narrow screens and does not accommodate Feishu/Lark's two equal choices;
+    keeping links last makes the guide read like documentation rather than a
+    task. The chosen guide places one wrapping action row immediately after the
+    platform description and before the numbered checklist. It remains fully
+    data-driven, supports one or two official destinations, keeps 40 px targets,
+    and leaves credential fields and save semantics unchanged.
 
 ## Ordered Work
 
@@ -577,6 +587,8 @@ external adapters remain optional projections rather than sources of truth.
         evidence in English and Chinese.
   - [x] Share progressive technical details between Overview and Settings error
         states without exposing raw failures as primary copy.
+  - [x] Move official platform setup actions before the first-use checklist
+        without hard-coding adapter-specific UI.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -1003,6 +1015,18 @@ summary; opening it revealed the timeout and retry attempt 244 without changing
 the primary sentence or overflowing the 390 px document. No field, switch,
 send, reconnect, or external action was invoked; the temporary audit tab was
 closed and the viewport was reset.
+
+The setup-action-order increment passed all 29 demo-route tests, UI and root
+typechecking, the demo production build, and all 5,126 repository tests. The
+contract keeps catalog-owned setup links in a dedicated wrapping row before the
+first numbered step while retaining 40 px targets. Because the long-running
+real Alice process had loaded an older catalog, current-source visual acceptance
+used an isolated demo runtime with no real credentials or Connector actions. At
+1,052 x 734, Slack app settings measured 138.7 x 40 px at y 255.85 and the first
+step began at y 307.85. At 390 x 844, the link remained before the checklist in
+the 306 px guide with document width exactly 390 px. Feishu and Lark rendered as
+two 40 px rows without overflow at the same width. The temporary tabs and demo
+runtime were closed, and the viewport was reset.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.

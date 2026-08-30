@@ -402,11 +402,16 @@ describe('Connector demo routes', () => {
     const appToken = within(dialog).getByLabelText('Slack App-level token') as HTMLInputElement
     const draftToggles = within(dialog).getAllByRole('button', { name: 'Show draft' })
     const setupLinks = within(dialog).getAllByRole('link')
+    const firstSetupStep = within(dialog).getByText(
+      'Create an app from scratch in the Slack workspace you want to use.',
+    )
 
     expect(botToken.className).toContain('min-h-10')
     expect(appToken.className).toContain('min-h-10')
     draftToggles.forEach((button) => expect(button.className).toContain('min-w-10'))
     setupLinks.forEach((link) => expect(link.className).toContain('min-h-10'))
+    expect(setupLinks[0].closest('[data-connector-setup-links]')).toBeTruthy()
+    expect(setupLinks[0].compareDocumentPosition(firstSetupStep) & 4).toBe(4)
     expect(saveConnection.className).toContain('min-h-10')
     expect(saveConnection.disabled).toBe(true)
     expect(within(dialog).queryByRole('button', { name: 'Save token' })).toBeNull()
