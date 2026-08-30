@@ -7,15 +7,20 @@ PUBLIC_INSTALLER_URL="https://openalice.ai/install"
 DOWNLOAD_BASE_URL="${OPENALICE_DOWNLOAD_BASE_URL:-https://download.openalice.ai}"
 RELEASES_API_URL="${OPENALICE_RELEASES_API_URL:-https://api.github.com/repos/${REPOSITORY}/releases/latest}"
 RELEASE_ASSET_BASE_URL="${OPENALICE_RELEASE_ASSET_BASE_URL:-https://github.com/${REPOSITORY}/releases/download}"
+BETA_MANIFEST_URL="${OPENALICE_BETA_MANIFEST_URL:-${DOWNLOAD_BASE_URL}/beta/manifest.json}"
+LEGACY_STABLE_VERSION="0.90.1"
+LEGACY_STABLE_INSTALLER_URL="${OPENALICE_LEGACY_STABLE_INSTALLER_URL:-${RELEASE_ASSET_BASE_URL}/v${LEGACY_STABLE_VERSION}/OpenAlice-${LEGACY_STABLE_VERSION}-install}"
+LEGACY_STABLE_INSTALLER_SHA256="${OPENALICE_LEGACY_STABLE_INSTALLER_SHA256:-a2f34a715cc4a089854fde18741e316953868c1685db592b67b2b4ea10ede0bb}"
 INSTALL_DIR="${OPENALICE_INSTALL_DIR:-$HOME/.openalice}"
 INSTALLER_URL="${OPENALICE_INSTALL_URL:-}"
 KEEP_RELEASES="${OPENALICE_INSTALL_KEEP_RELEASES:-3}"
-OPENALICE_INSTALLER_RELEASE_VERSION="${OPENALICE_INSTALLER_RELEASE_VERSION:-}"
-OPENALICE_INSTALLER_UPDATE_CHANNEL="${OPENALICE_INSTALLER_UPDATE_CHANNEL:-}"
 
-selector_kind="stable"
-selector_value="latest"
-selector_set=false
+channel="stable"
+channel_set=false
+exact_version=""
+legacy_branch=""
+selector_kind=""
+selector_value=""
 archive_path=""
 archive_sha256=""
 plan_only=false
@@ -34,8 +39,9 @@ OpenAlice CLI Installer
 Usage: install [options]
 
 Options:
-  --branch <master|dev>   Install stable or the dev preview channel
-  --version <x.y.z>       Install an exact GitHub release
+  --channel <name>        Follow stable, beta, or dev (default: stable)
+  --version <x.y.z>       Install an exact release; alone it remains pinned
+  --branch <master|dev>   Compatibility alias for stable or dev
   --archive <path>        Install a local Bun release archive
   --sha256 <hex>          Required checksum for --archive
   --install-dir <path>    Install root (default: ~/.openalice)
@@ -51,33 +57,43 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --channel)
+      [[ $# -ge 2 ]] || fail "--channel requires a value"
+      [[ -z "$archive_path" ]] || fail "--channel cannot be combined with --archive"
+      [[ "$channel_set" == false ]] || fail "Specify --channel only once"
+      case "$2" in
+        stable|beta|dev) channel="$2" ;;
+        *) fail "--channel must be stable, beta, or dev" ;;
+      esac
+      channel_set=true
+      shift 2
+      ;;
     --branch)
       [[ $# -ge 2 ]] || fail "--branch requires a value"
-      [[ "$selector_set" == false ]] || fail "Use only one of --branch, --version, or --archive"
-      selector_set=true
+      [[ -z "$archive_path" ]] || fail "--branch cannot be combined with --archive"
+      [[ "$channel_set" == false ]] || fail "Use only one of --channel or --branch"
       case "$2" in
-        master) selector_kind="stable"; selector_value="master" ;;
-        dev) selector_kind="development"; selector_value="dev" ;;
+        master) channel="stable" ;;
+        dev) channel="dev" ;;
         *) fail "Bun preview installs support only --branch master or --branch dev" ;;
       esac
+      channel_set=true
+      legacy_branch="$2"
       shift 2
       ;;
     --version)
       [[ $# -ge 2 ]] || fail "--version requires a value"
-      [[ "$selector_set" == false ]] || fail "Use only one of --branch, --version, or --archive"
-      selector_set=true
-      selector_kind="pinned"
-      selector_value="${2#v}"
-      [[ "$selector_value" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]] \
+      [[ -z "$archive_path" ]] || fail "--version cannot be combined with --archive"
+      [[ -z "$exact_version" ]] || fail "Specify --version only once"
+      exact_version="${2#v}"
+      [[ "$exact_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]] \
         || fail "--version must be an OpenAlice release version such as 0.91.0"
       shift 2
       ;;
     --archive)
       [[ $# -ge 2 ]] || fail "--archive requires a path"
-      [[ "$selector_set" == false ]] || fail "Use only one of --branch, --version, or --archive"
-      selector_set=true
-      selector_kind="local"
-      selector_value="local"
+      [[ -z "$archive_path" && -z "$exact_version" && "$channel_set" == false ]] \
+        || fail "--archive cannot be combined with --channel, --branch, or --version"
       archive_path="$2"
       shift 2
       ;;
@@ -99,13 +115,33 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ "$selector_set" == false && -n "$OPENALICE_INSTALLER_RELEASE_VERSION" ]]; then
-  [[ "$OPENALICE_INSTALLER_RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]] \
-    || fail "embedded release installer version is invalid"
-  [[ -z "$OPENALICE_INSTALLER_UPDATE_CHANNEL" || "$OPENALICE_INSTALLER_UPDATE_CHANNEL" == stable ]] \
-    || fail "embedded release installer update channel must be stable"
-  selector_kind="release"
-  selector_value="$OPENALICE_INSTALLER_RELEASE_VERSION"
+if [[ -n "$archive_path" ]]; then
+  selector_kind="local"
+  selector_value="local"
+elif [[ -n "$exact_version" ]]; then
+  [[ -z "$legacy_branch" ]] \
+    || fail "--branch cannot be combined with --version; use --channel to retain an update channel"
+  if [[ "$channel_set" == true ]]; then
+    if [[ "$channel" == stable ]]; then
+      [[ "$exact_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+        || fail "--channel stable requires a stable --version"
+    elif [[ "$channel" == beta ]]; then
+      [[ "$exact_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-beta(\.[1-9][0-9]*)?$ ]] \
+        || fail "--channel beta requires a beta --version"
+    else
+      fail "--channel dev cannot be combined with --version"
+    fi
+    selector_kind="release"
+  else
+    selector_kind="pinned"
+  fi
+  selector_value="$exact_version"
+else
+  case "$channel" in
+    stable) selector_kind="stable"; selector_value="latest" ;;
+    beta) selector_kind="beta"; selector_value="latest" ;;
+    dev) selector_kind="development"; selector_value="dev" ;;
+  esac
 fi
 
 [[ "$INSTALL_DIR" == /* ]] || INSTALL_DIR="$PWD/${INSTALL_DIR#./}"
@@ -113,12 +149,11 @@ fi
 [[ "$INSTALL_DIR" != *$'\n'* && "$INSTALL_DIR" != *$'\r'* ]] || fail "--install-dir must not contain a newline"
 
 if [[ -z "$INSTALLER_URL" ]]; then
-  case "$selector_kind" in
-    stable|local) INSTALLER_URL="$PUBLIC_INSTALLER_URL" ;;
-    development) INSTALLER_URL="https://raw.githubusercontent.com/${REPOSITORY}/dev/install" ;;
-    pinned) INSTALLER_URL="https://raw.githubusercontent.com/${REPOSITORY}/v${selector_value}/install" ;;
-    release) INSTALLER_URL="$PUBLIC_INSTALLER_URL" ;;
-  esac
+  if [[ "$legacy_branch" == dev ]]; then
+    INSTALLER_URL="https://raw.githubusercontent.com/${REPOSITORY}/dev/install"
+  else
+    INSTALLER_URL="$PUBLIC_INSTALLER_URL"
+  fi
 fi
 case "$INSTALLER_URL" in
   http://*|https://*) ;;
@@ -155,6 +190,46 @@ else
   fail "sha256sum or shasum is required"
 fi
 
+delegate_legacy_stable_install() {
+  local legacy_update_channel="${1:-stable}"
+  local temporary legacy_installer actual_sha256 legacy_status
+  local -a legacy_args
+  case "$legacy_update_channel" in
+    stable|pinned) ;;
+    *) fail "Internal error: invalid legacy stable update channel $legacy_update_channel" ;;
+  esac
+  if [[ -e "$INSTALL_DIR/cli" || -L "$INSTALL_DIR/cli" ]]; then
+    fail "OpenAlice ${LEGACY_STABLE_VERSION} uses the legacy Node-managed layout and cannot safely replace a native CLI installation. Stay on beta/dev until a native stable release is available."
+  fi
+  [[ "$LEGACY_STABLE_INSTALLER_SHA256" =~ ^[a-f0-9]{64}$ ]] \
+    || fail "Legacy stable installer checksum is invalid"
+  temporary="$(mktemp -d "${TMPDIR:-/tmp}/openalice-legacy-installer.XXXXXX")"
+  legacy_installer="$temporary/install"
+  if ! curl -fL --retry 2 --connect-timeout 10 --max-time 60 \
+    -o "$legacy_installer" "$LEGACY_STABLE_INSTALLER_URL"; then
+    rm -rf "$temporary"
+    fail "Could not download the verified OpenAlice ${LEGACY_STABLE_VERSION} installer"
+  fi
+  actual_sha256="$(hash_file "$legacy_installer")"
+  if [[ "$actual_sha256" != "$LEGACY_STABLE_INSTALLER_SHA256" ]]; then
+    rm -rf "$temporary"
+    fail "OpenAlice ${LEGACY_STABLE_VERSION} installer failed SHA-256 verification"
+  fi
+  legacy_args=(--install-dir "$INSTALL_DIR")
+  [[ "$modify_path" == true ]] || legacy_args+=(--no-modify-path)
+  [[ "$plan_only" == true ]] && legacy_args+=(--plan)
+  [[ "$assume_yes" == true ]] && legacy_args+=(--yes)
+  legacy_status=0
+  OPENALICE_INSTALL_URL="$INSTALLER_URL" \
+    OPENALICE_INSTALLER_RELEASE_VERSION="$LEGACY_STABLE_VERSION" \
+    OPENALICE_INSTALL_UPDATE_CHANNEL="$legacy_update_channel" \
+    OPENALICE_INSTALLER_UPDATE_CHANNEL="$legacy_update_channel" \
+    bash "$legacy_installer" "${legacy_args[@]}" \
+    || legacy_status=$?
+  rm -rf "$temporary"
+  exit "$legacy_status"
+}
+
 release_version=""
 artifact_url=""
 if [[ -n "$archive_path" ]]; then
@@ -167,14 +242,28 @@ else
     latest_json="$(curl -fsSL --max-time 15 "$RELEASES_API_URL")" \
       || fail "Could not resolve the latest OpenAlice release"
     release_version="$(printf '%s' "$latest_json" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v\{0,1\}\([^"]*\)".*/\1/p' | head -n 1)"
-    [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]] \
+    [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
       || fail "Latest release metadata did not contain a valid version"
+    if [[ "$release_version" == "$LEGACY_STABLE_VERSION" ]]; then
+      delegate_legacy_stable_install stable
+    fi
     artifact_url="${RELEASE_ASSET_BASE_URL}/v${release_version}/openalice-cli-${release_version}-${platform}-${architecture}.tar.gz"
-  elif [[ "$selector_kind" == pinned ]]; then
-    release_version="$selector_value"
+  elif [[ "$selector_kind" == beta ]]; then
+    beta_json="$(curl -fsSL --max-time 15 "$BETA_MANIFEST_URL")" \
+      || fail "Could not resolve the latest OpenAlice beta"
+    release_version="$(printf '%s' "$beta_json" | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)"
+    [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-beta(\.[1-9][0-9]*)?$ ]] \
+      || fail "Beta manifest did not contain a valid beta version"
     artifact_url="${RELEASE_ASSET_BASE_URL}/v${release_version}/openalice-cli-${release_version}-${platform}-${architecture}.tar.gz"
-  elif [[ "$selector_kind" == release ]]; then
+  elif [[ "$selector_kind" == pinned || "$selector_kind" == release ]]; then
     release_version="$selector_value"
+    if [[ "$release_version" == "$LEGACY_STABLE_VERSION" ]]; then
+      if [[ "$selector_kind" == pinned ]]; then
+        delegate_legacy_stable_install pinned
+      else
+        delegate_legacy_stable_install stable
+      fi
+    fi
     artifact_url="${RELEASE_ASSET_BASE_URL}/v${release_version}/openalice-cli-${release_version}-${platform}-${architecture}.tar.gz"
   else
     artifact_url="${DOWNLOAD_BASE_URL}/cli/dev/openalice-cli-dev-${platform}-${architecture}.tar.gz"
@@ -186,15 +275,22 @@ else
   [[ "$archive_sha256" =~ ^[a-f0-9]{64}$ ]] || fail "Release checksum metadata is invalid"
   artifact_source="$artifact_url"
 fi
+[[ -z "${OPENALICE_EXPECTED_CLI_ARTIFACT_SHA256:-}" || "$archive_sha256" == "$OPENALICE_EXPECTED_CLI_ARTIFACT_SHA256" ]] \
+  || fail "Release checksum $archive_sha256 does not match expected $OPENALICE_EXPECTED_CLI_ARTIFACT_SHA256"
 
 action="Install"
 legacy_cli_root="$INSTALL_DIR/cli-versions"
 legacy_detected=false
+if [[ -d "$legacy_cli_root" ]]; then
+  legacy_detected=true
+fi
 if [[ -L "$INSTALL_DIR/cli/current" ]]; then
   action="Update"
-elif [[ -d "$legacy_cli_root" ]]; then
+  if [[ "$legacy_detected" == true ]]; then
+    action="Update and remove legacy CLI"
+  fi
+elif [[ "$legacy_detected" == true ]]; then
   action="Replace legacy CLI"
-  legacy_detected=true
 fi
 cat <<EOF
 $PRODUCT install plan
@@ -244,32 +340,35 @@ previous_release_name=""
 activation_receipt_written=false
 activation_switched=false
 install_complete=false
+legacy_launcher_backup=""
+legacy_launchers_backed_up=false
 
 cleanup() {
   cleanup_status=$?
   trap - EXIT INT TERM HUP
-  if [[ "$cleanup_status" -ne 0 && "$install_complete" != true && "$activation_receipt_written" == true ]]; then
+  if [[ "$cleanup_status" -ne 0 && "$install_complete" != true ]]; then
     set +e
-    rollback_restored=true
-    if [[ "$activation_switched" == true ]]; then
-      if [[ -n "$previous_release_name" ]]; then
-        rollback_link="$cli_root/current.rollback.$$"
-        rm -f "$rollback_link"
-        if ! ln -s "releases/$previous_release_name" "$rollback_link"; then
-          rollback_restored=false
-        elif [[ "$platform" == darwin ]]; then
-          mv -fh "$rollback_link" "$cli_root/current" || rollback_restored=false
+    if [[ "$activation_receipt_written" == true ]]; then
+      rollback_restored=true
+      if [[ "$activation_switched" == true ]]; then
+        if [[ -n "$previous_release_name" ]]; then
+          rollback_link="$cli_root/current.rollback.$$"
+          rm -f "$rollback_link"
+          if ! ln -s "releases/$previous_release_name" "$rollback_link"; then
+            rollback_restored=false
+          elif [[ "$platform" == darwin ]]; then
+            mv -fh "$rollback_link" "$cli_root/current" || rollback_restored=false
+          else
+            mv -Tf "$rollback_link" "$cli_root/current" || rollback_restored=false
+          fi
         else
-          mv -Tf "$rollback_link" "$cli_root/current" || rollback_restored=false
+          rm -f "$cli_root/current" || rollback_restored=false
         fi
-      else
-        rm -f "$cli_root/current" || rollback_restored=false
       fi
-    fi
-    if [[ "$rollback_restored" == true ]]; then
-      rollback_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-      activation_next="$activation_path.next.$$"
-      cat >"$activation_next" <<EOF
+      if [[ "$rollback_restored" == true ]]; then
+        rollback_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        activation_next="$activation_path.next.$$"
+        cat >"$activation_next" <<EOF
 {
   "schemaVersion": 1,
   "activeRelease": "$release_name",
@@ -281,12 +380,26 @@ cleanup() {
   "failureCode": "EINSTALL"
 }
 EOF
-      chmod 600 "$activation_next" && mv -f "$activation_next" "$activation_path" \
-        || printf 'Warning: restored the previous release but could not record rollback metadata.\n' >&2
-    else
-      printf 'Warning: automatic restoration of the previous OpenAlice release failed; inspect %s before retrying.\n' "$cli_root/current" >&2
+        chmod 600 "$activation_next" && mv -f "$activation_next" "$activation_path" \
+          || printf 'Warning: restored the previous release but could not record rollback metadata.\n' >&2
+      else
+        printf 'Warning: automatic restoration of the previous OpenAlice release failed; inspect %s before retrying.\n' "$cli_root/current" >&2
+      fi
+      [[ -z "${rollback_link:-}" ]] || rm -f "$rollback_link"
     fi
-    [[ -z "${rollback_link:-}" ]] || rm -f "$rollback_link"
+    if [[ "$legacy_launchers_backed_up" == true ]]; then
+      launcher_restore_ok=true
+      for launcher_name in openalice alice alice-workspace alice-uta traderhub pi pi.cmd openalice.cmd; do
+        rm -f "$bin_dir/$launcher_name" || launcher_restore_ok=false
+        if [[ -e "$legacy_launcher_backup/$launcher_name" || -L "$legacy_launcher_backup/$launcher_name" ]]; then
+          mv "$legacy_launcher_backup/$launcher_name" "$bin_dir/$launcher_name" \
+            || launcher_restore_ok=false
+        fi
+      done
+      if [[ "$launcher_restore_ok" != true ]]; then
+        printf 'Warning: automatic restoration of one or more legacy OpenAlice launchers failed; inspect %s before retrying.\n' "$bin_dir" >&2
+      fi
+    fi
     set -e
   fi
   [[ -z "$staging_dir" ]] || rm -rf "$staging_dir"
@@ -361,6 +474,8 @@ content_identity="$(json_field "$release_json" contentIdentity)"
 [[ "$artifact_platform" == "$platform" && "$artifact_arch" == "$architecture" ]] \
   || fail "Archive target $artifact_platform-$artifact_arch does not match $platform-$architecture"
 [[ "$content_identity" =~ ^[a-f0-9]{16}$ ]] || fail "release.json has an invalid content identity"
+[[ -z "${OPENALICE_EXPECTED_CLI_CONTENT_IDENTITY:-}" || "$content_identity" == "$OPENALICE_EXPECTED_CLI_CONTENT_IDENTITY" ]] \
+  || fail "Archive content identity $content_identity does not match expected $OPENALICE_EXPECTED_CLI_CONTENT_IDENTITY"
 [[ -z "$release_version" || "$artifact_version" == "$release_version" ]] \
   || fail "Archive version $artifact_version does not match requested $release_version"
 [[ -z "${OPENALICE_EXPECTED_CLI_VERSION:-}" || "$artifact_version" == "$OPENALICE_EXPECTED_CLI_VERSION" ]] \
@@ -370,19 +485,61 @@ reported_version="$(OPENALICE_APP_HOME="$candidate/share/openalice" "$executable
 [[ "$reported_version" == "$artifact_version" ]] \
   || fail "Executable reports $reported_version but release.json reports $artifact_version"
 
+tree_metadata() {
+  local root="$1" path relative entry_type entry_mode link_target
+  while IFS= read -r -d '' path; do
+    relative="${path#"$root"}"
+    relative="${relative#/}"
+    [[ -n "$relative" ]] || relative="."
+    link_target=""
+    if [[ -L "$path" ]]; then
+      entry_type="link"
+      entry_mode="-"
+      link_target="$(readlink "$path")"
+    elif [[ -d "$path" ]]; then
+      entry_type="directory"
+      if [[ "$platform" == darwin ]]; then
+        entry_mode="$(stat -f '%Lp' "$path")"
+      else
+        entry_mode="$(stat -c '%a' "$path")"
+      fi
+    elif [[ -f "$path" ]]; then
+      entry_type="file"
+      if [[ "$platform" == darwin ]]; then
+        entry_mode="$(stat -f '%Lp' "$path")"
+      else
+        entry_mode="$(stat -c '%a' "$path")"
+      fi
+    else
+      entry_type="other"
+      entry_mode="-"
+    fi
+    printf '%s\t%s\t%s\t%s\n' "$relative" "$entry_type" "$entry_mode" "$link_target"
+  done < <(find "$root" -print0)
+}
+
 release_name="${artifact_version}-${platform}-${architecture}-${content_identity}"
 final_release="$releases_dir/$release_name"
 if [[ -e "$final_release" ]]; then
-  existing_sha="$(hash_file "$final_release/bin/openalice" 2>/dev/null || true)"
-  candidate_sha="$(hash_file "$executable")"
-  [[ "$existing_sha" == "$candidate_sha" ]] || fail "Existing release $release_name is damaged; preserve it and reinstall after inspection"
+  [[ -d "$final_release" && ! -L "$final_release" ]] \
+    || fail "Existing release $release_name is damaged; preserve it and reinstall after inspection"
+  command -v diff >/dev/null 2>&1 \
+    || fail "diff is required to verify the existing OpenAlice release"
+  diff -qr "$candidate" "$final_release" >/dev/null \
+    || fail "Existing release $release_name is damaged; preserve it and reinstall after inspection"
+  diff -u \
+    <(tree_metadata "$candidate" | LC_ALL=C sort) \
+    <(tree_metadata "$final_release" | LC_ALL=C sort) >/dev/null \
+    || fail "Existing release $release_name is damaged; preserve it and reinstall after inspection"
   printf 'Reusing verified release %s.\n' "$release_name"
 else
   mv "$candidate" "$final_release"
 fi
 
 case "$selector_kind" in
-  stable|release) update_channel="stable"; selector_json_kind="version"; selector_json_value="v$artifact_version" ;;
+  stable) update_channel="stable"; selector_json_kind="version"; selector_json_value="v$artifact_version" ;;
+  beta) update_channel="beta"; selector_json_kind="version"; selector_json_value="v$artifact_version" ;;
+  release) update_channel="$channel"; selector_json_kind="version"; selector_json_value="v$artifact_version" ;;
   pinned) update_channel="pinned"; selector_json_kind="version"; selector_json_value="v$artifact_version" ;;
   development) update_channel="development"; selector_json_kind="branch"; selector_json_value="dev" ;;
   local) update_channel="custom"; selector_json_kind="version"; selector_json_value="local-$artifact_version" ;;
@@ -409,6 +566,25 @@ if [[ -L "$cli_root/current" ]]; then
   previous_release_name="$(basename "$previous_release_path")"
   [[ "$previous_release_name" =~ ^[A-Za-z0-9._+-]+$ ]] \
     || fail "The active OpenAlice release name is invalid"
+fi
+
+if [[ "$legacy_detected" == true ]]; then
+  legacy_launcher_backup="$staging_dir/legacy-launchers"
+  mkdir "$legacy_launcher_backup"
+  for launcher_name in openalice alice alice-workspace alice-uta traderhub pi pi.cmd openalice.cmd; do
+    launcher_path="$bin_dir/$launcher_name"
+    if [[ -e "$launcher_path" || -L "$launcher_path" ]]; then
+      [[ -f "$launcher_path" || -L "$launcher_path" ]] \
+        || fail "Legacy launcher path is not a regular file or symlink and cannot be replaced safely: $launcher_path"
+    fi
+  done
+  for launcher_name in openalice alice alice-workspace alice-uta traderhub pi pi.cmd openalice.cmd; do
+    launcher_path="$bin_dir/$launcher_name"
+    if [[ -e "$launcher_path" || -L "$launcher_path" ]]; then
+      cp -pP "$launcher_path" "$legacy_launcher_backup/$launcher_name"
+    fi
+  done
+  legacy_launchers_backed_up=true
 fi
 
 if [[ "$previous_release_name" != "$release_name" ]]; then
@@ -469,13 +645,13 @@ EOF
 write_launcher openalice
 for helper in alice alice-workspace alice-uta traderhub; do write_launcher "$helper" "$helper"; done
 "$bin_dir/openalice" --version >/dev/null
-install_complete=true
 
 if [[ "$legacy_detected" == true ]]; then
   rm -f "$bin_dir/pi" "$bin_dir/pi.cmd" "$bin_dir/openalice.cmd"
   rm -rf "$legacy_cli_root"
   printf 'Removed the validated legacy CLI release and managed-Pi launchers.\n'
 fi
+install_complete=true
 
 active_release="$(CDPATH= cd -- "$cli_root/current" && pwd -P)"
 release_paths=("$releases_dir"/*)
@@ -496,12 +672,18 @@ fi
 
 BEGIN_MARKER="# >>> OpenAlice CLI >>>"
 END_MARKER="# <<< OpenAlice CLI <<<"
-path_command="export PATH=$bin_dir:\$PATH"
+shell_single_quote() {
+  local quoted
+  quoted="$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+  printf "'%s'" "$quoted"
+}
+quoted_bin_dir="$(shell_single_quote "$bin_dir")"
+path_command="export PATH=${quoted_bin_dir}:\$PATH"
 profile=""
 case "$(basename "${SHELL:-}")" in
   zsh) [[ "$platform" == darwin ]] && profile="$HOME/.zprofile" || profile="$HOME/.zshrc" ;;
   bash) [[ "$platform" == darwin ]] && profile="$HOME/.bash_profile" || profile="$HOME/.bashrc" ;;
-  fish) profile="$HOME/.config/fish/config.fish"; path_command="fish_add_path $bin_dir" ;;
+  fish) profile="$HOME/.config/fish/config.fish"; path_command="fish_add_path -- ${quoted_bin_dir}" ;;
 esac
 if [[ "$modify_path" == true && -n "$profile" ]]; then
   mkdir -p "$(dirname "$profile")"

@@ -9,6 +9,7 @@ import {
   DEFAULT_INSTALL_SOURCE,
   formatInstallSelector,
   installedContentIdentity,
+  installSourceUpdateChannel,
   installSourcesMatch,
   parseInstallSource,
   readInstallSource,
@@ -741,14 +742,18 @@ export function buildRemoteServerStopCommand(options, cliPath) {
 export function buildRemoteInstallCommand(installSource, installBaseUrl = '') {
   const source = requireInstallSource(installSource)
   const url = shellQuote(source.installerUrl)
-  const selectorFlag = source.selector.kind === 'branch' ? '--branch' : '--version'
-  const selectorValue = shellQuote(source.selector.value)
+  const updateChannel = installSourceUpdateChannel(source)
+  const selectorArgs = updateChannel === 'stable' || updateChannel === 'beta'
+    ? `--channel ${updateChannel} --version ${shellQuote(source.cliVersion)}`
+    : updateChannel === 'development'
+      ? '--channel dev'
+      : `${source.selector.kind === 'branch' ? '--branch' : '--version'} ${shellQuote(source.selector.value)}`
   const installEnv = [
     `OPENALICE_INSTALL_URL=${url}`,
     `OPENALICE_EXPECTED_CLI_VERSION=${shellQuote(source.cliVersion)}`,
     installBaseUrl ? `OPENALICE_DOWNLOAD_BASE_URL=${shellQuote(installBaseUrl)}` : '',
   ].filter(Boolean).join(' ')
-  return `set -eu\ntmp=$(mktemp "${'${TMPDIR:-/tmp}'}/openalice-install.XXXXXX")\ntrap 'rm -f "$tmp"' EXIT HUP INT TERM\ncurl -fsSL ${url} -o "$tmp"\n${installEnv} bash "$tmp" --yes --no-modify-path ${selectorFlag} ${selectorValue}`
+  return `set -eu\ntmp=$(mktemp "${'${TMPDIR:-/tmp}'}/openalice-install.XXXXXX")\ntrap 'rm -f "$tmp"' EXIT HUP INT TERM\ncurl -fsSL ${url} -o "$tmp"\n${installEnv} bash "$tmp" --yes --no-modify-path ${selectorArgs}`
 }
 
 export function buildRemoteSshArgs(options, remoteCommand) {

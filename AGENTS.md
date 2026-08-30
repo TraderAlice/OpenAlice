@@ -88,11 +88,19 @@ for current ownership and entry points.
 - `dev` is the integration lane. Routine PRs target `dev`.
 - `dev` is also the active preview channel: installer work must pass against
   both the checked-out tree and the matching `raw/.../dev/install` +
-  `--branch dev` network path before promotion.
-- `master` is the stable/user-facing lane. Only human-directed promotions from
-  `dev` and explicit emergency hotfixes target `master`.
-- A merge to `master` is a versioned release event, not a post-release staging
-  step. Stable CDN aliases are updated only from the resulting tag.
+  `--channel dev` network path before promotion.
+- `master` is the release-source/user-facing lane. Human-directed promotions
+  from `dev`, explicit emergency hotfixes, and focused maintainer-directed
+  version-only release-prep PRs may target `master`, but a merge to `master`
+  does not by itself choose or publish a product version.
+- Beta and stable releases are explicit manual actions. The maintainer supplies
+  a channel and tag from `master`; release automation requires that tag and both
+  product package manifests to declare the same version before it builds
+  accepted candidates, including the immutable installer snapshot. A new beta
+  release may update only beta feeds/manifests and the shared channel-neutral
+  installer, while stable CDN product aliases and package-manager metadata are
+  updated only by a stable release tag. Mirror repair never rewrites the shared
+  installer.
 - Do not commit directly to `master`. Avoid direct commits to `dev` unless the
   maintainer explicitly requests integration work.
 - Never force-push or delete `master` or `dev`.

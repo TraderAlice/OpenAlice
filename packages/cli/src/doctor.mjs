@@ -252,7 +252,7 @@ async function addUpdateCheck(layout, installSource, add, dependencies) {
     cache = JSON.parse(await readFileImpl(layout.updateCachePath, 'utf8'))
   } catch (error) {
     if (error?.code === 'ENOENT') {
-      add('update.metadata', 'warn', 'No stable update check has been cached yet')
+      add('update.metadata', 'warn', 'No update check has been cached yet')
       return
     }
     add('update.metadata', 'warn', 'Cached update metadata is unreadable', safeError(error))
@@ -263,14 +263,22 @@ async function addUpdateCheck(layout, installSource, add, dependencies) {
     add('update.metadata', 'warn', 'Cached update metadata is incomplete')
     return
   }
+  const channel = typeof result.channel === 'string'
+    ? result.channel
+    : typeof cache.channel === 'string'
+      ? cache.channel
+      : 'installed channel'
+  const candidate = channel === 'dev' && typeof result.latestCommit === 'string'
+    ? `dev@${result.latestCommit.slice(0, 12)}`
+    : String(result.latestVersion)
   add(
     'update.metadata',
     result.status === 'available' ? 'warn' : 'pass',
     result.status === 'available'
-      ? `OpenAlice ${String(result.latestVersion)} is available`
+      ? `OpenAlice ${candidate} is available on ${channel}`
       : result.status === 'current'
-        ? 'The cached stable release check is current'
-        : 'This install source does not use the stable self-update channel',
+        ? `The cached ${channel} update check is current`
+        : 'This install source does not use an automatic update channel',
     typeof cache.checkedAt === 'string' ? `checked ${cache.checkedAt}` : undefined,
   )
 }

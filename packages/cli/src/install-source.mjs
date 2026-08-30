@@ -111,7 +111,7 @@ export function parseInstallSource(value) {
     || ref.includes('..')
     || !/^[A-Za-z0-9._/-]+$/.test(ref)
     || !isHttpUrl(installerUrl)
-    || !['stable', 'pinned', 'development', 'custom'].includes(updateChannel)
+    || !['stable', 'beta', 'pinned', 'development', 'custom'].includes(updateChannel)
     || !validV3
   ) {
     return null

@@ -70,6 +70,11 @@ must publish successfully before the `openalice` meta package is published.
 Stable npm publication is disabled unless the repository explicitly enables
 `OPENALICE_PUBLISH_NPM` and provides npm publishing authority.
 
+Package-manager channels are stable-only in this release model. A beta release
+still accepts direct npm/Bun installation mechanics against its candidate
+archives, but it does not generate or attach registry/Tap/AUR publication
+inputs and cannot mutate any of those public package channels.
+
 ## Homebrew and AUR topology
 
 The generated Homebrew formula selects the accepted archive and SHA-256 for the
@@ -84,10 +89,11 @@ Linux archive for `aarch64` or `x86_64`, verify its checksum, and install the
 same payload under `/usr/bin` and `/usr/share/openalice`. `paru` is an AUR
 client; OpenAlice does not ship or manage it.
 
-The GitHub Release contains the generated formula, AUR metadata, npm tarballs,
-and their publication manifest. Activating the public Homebrew and AUR commands
-still requires the TraderAlice tap and AUR package repositories to publish
-those generated files after the referenced GitHub Release assets are public.
+A stable GitHub Release contains the generated formula, AUR metadata, npm
+tarballs, and their publication manifest. Activating the public Homebrew and
+AUR commands still requires the TraderAlice tap and AUR package repositories to
+publish those generated files after the referenced GitHub Release assets are
+public.
 
 ## Public channel activation
 
@@ -143,7 +149,10 @@ The installer that owns the visible command also owns later file mutation:
 
 `openalice update`, Doctor, and `openalice uninstall` read schema 3 install
 provenance. For a package-manager install they report the exact owning-manager
-command and never overwrite or remove manager-owned files. Stop a running
+command and never overwrite or remove manager-owned files. The Supervisor TUI
+may probe stable, beta, or dev, but it cannot apply a direct installer over a
+package-manager prefix; switching channels requires an explicit direct install.
+Stop a running
 Runtime with `openalice down` before changing the installed version; a running
 Guardian keeps its already-mapped executable until stopped.
 
@@ -171,15 +180,18 @@ pnpm exec vitest run \
 ```
 
 The PR workflow samples native macOS arm64 and Linux x64 candidates through npm
-and Bun. Every `dev` push and the formal release matrix repeat npm/Bun acceptance
-on all four targets before preserving the candidate. Release acceptance also
-installs the formula on native arm64 and Intel macOS runners, repeats the full
-formula lifecycle on native Linux arm64/x64 runners inside pinned official
-Homebrew images, and builds plus installs `openalice-bin` on native Linux x64
-and arm64 runners. The x64 AUR lane uses the pinned official Arch image; because
-that image has no arm64 manifest, the arm64 lane uses a pinned Arch Linux ARM
-image built from signature-checked upstream repositories. Each smoke uses an
-isolated home, exercises
+and Bun. A `dev` push stays on the preview packaging lane: it builds the four
+native artifacts, validates their sidecars and metadata, publishes them, and
+runs the live channel smoke without waiting for package-manager or historical
+upgrade gates. The formal beta/stable release matrix repeats npm/Bun mechanics
+on all four targets before preserving the candidate. Stable release acceptance
+also installs the formula on native arm64 and Intel macOS runners, repeats the
+full formula lifecycle on native Linux arm64/x64 runners inside pinned official
+Homebrew images, and builds plus installs
+`openalice-bin` on native Linux x64 and arm64 runners. The x64 AUR lane uses the
+pinned official Arch image; because that image has no arm64 manifest, the arm64
+lane uses a pinned Arch Linux ARM image built from signature-checked upstream
+repositories. Each smoke uses an isolated home, exercises
 an actual stopped upgrade and removal, then starts a synthetic prior candidate
 and replaces it through the manager while Guardian is active. The new command
 must report the older running content as pending activation, preserve that
@@ -196,7 +208,8 @@ candidate, then lets a local Git-backed tap or real `pacman -U` perform both
 version transitions. Lifecycle assertions stay shared while file mutation
 remains owned by the manager under test.
 
-The release job derives every channel only after all native candidates pass,
-attaches the generated publication inputs to the GitHub Release, verifies that
-public release surface, and publishes the npm meta package last. Opted-in Tap
-and AUR jobs commit only the byte-identical metadata covered by that receipt.
+For a stable release, the release job derives every package-manager channel only
+after all native candidates pass, attaches the generated publication inputs to
+the GitHub Release, verifies the GitHub bytes and completed stable CDN mirror,
+and publishes the npm meta package last. Opted-in Tap and AUR jobs commit only
+the byte-identical metadata covered by that receipt.

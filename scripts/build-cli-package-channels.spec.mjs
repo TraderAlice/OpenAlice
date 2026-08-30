@@ -15,6 +15,7 @@ import { promisify } from 'node:util'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { bunReleaseContentIdentity } from './bun-release-content-identity.mjs'
 import { buildCliPackageChannels } from './build-cli-package-channels.mjs'
 
 const execFileAsync = promisify(execFile)
@@ -156,22 +157,44 @@ async function fixture(options = {}) {
     await mkdir(join(releaseRoot, 'share/openalice'), { recursive: true })
     await writeFile(executable, `#!/bin/sh\nprintf '${version}\\n'\n`)
     await chmod(executable, 0o755)
-    await writeFile(join(releaseRoot, 'share/openalice/fixture.txt'), 'resource\n')
-    await writeFile(join(releaseRoot, 'LICENSE'), 'license\n')
-    await writeFile(join(releaseRoot, 'THIRD_PARTY_NOTICES.md'), 'notices\n')
-    await writeFile(join(releaseRoot, 'release.json'), JSON.stringify({
+    const resource = join(releaseRoot, 'share/openalice/fixture.txt')
+    const license = join(releaseRoot, 'LICENSE')
+    const notices = join(releaseRoot, 'THIRD_PARTY_NOTICES.md')
+    await writeFile(resource, 'resource\n')
+    await writeFile(license, 'license\n')
+    await writeFile(notices, 'notices\n')
+    const release = {
       schemaVersion: 1,
       product: 'OpenAlice CLI',
       version,
       platform,
       arch,
       bunVersion: '1.4.0',
-      contentIdentity: createHash('sha256').update(`${platform}-${arch}`).digest('hex').slice(0, 16),
-    }))
+      executable: 'bin/openalice',
+      resourceRoot: 'share/openalice',
+      files: [
+        fileEntry('bin/openalice', await readFile(executable), 0o755),
+        fileEntry('share/openalice/fixture.txt', await readFile(resource)),
+        fileEntry('LICENSE', await readFile(license)),
+        fileEntry('THIRD_PARTY_NOTICES.md', await readFile(notices)),
+      ],
+    }
+    release.contentIdentity = bunReleaseContentIdentity(release)
+    await writeFile(join(releaseRoot, 'release.json'), JSON.stringify(release))
     const archive = join(input, `${releaseName}.tar.gz`)
     await execFileAsync('tar', ['-czf', archive, '-C', root, releaseName])
     const checksum = createHash('sha256').update(await readFile(archive)).digest('hex')
     await writeFile(`${archive}.sha256`, `${checksum}  ${basename(archive)}\n`)
   }
   return root
+}
+
+function fileEntry(path, content, mode = 0o644) {
+  return {
+    path,
+    type: 'file',
+    bytes: content.length,
+    mode,
+    sha256: createHash('sha256').update(content).digest('hex'),
+  }
 }

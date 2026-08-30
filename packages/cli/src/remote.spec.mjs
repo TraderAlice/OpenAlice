@@ -81,8 +81,7 @@ describe('OpenAlice managed remote connector', () => {
     const command = buildRemoteInstallCommand(masterInstallSource)
     expect(command).toContain('OPENALICE_INSTALL_URL=')
     expect(command).toContain(`OPENALICE_EXPECTED_CLI_VERSION='${CLI_VERSION}'`)
-    expect(command).toContain("--branch 'master'")
-    expect(command).not.toContain('--version')
+    expect(command).toContain(`--channel stable --version '${CLI_VERSION}'`)
     expect(command).not.toContain('managed Pi')
   })
 
@@ -90,12 +89,35 @@ describe('OpenAlice managed remote connector', () => {
     const command = buildRemoteInstallCommand({
       schemaVersion: 2,
       repository: 'TraderAlice/OpenAlice',
-      cliVersion: '0.89.0-beta',
-      selector: { kind: 'version', value: 'v0.89.0-beta' },
-      installerUrl: 'https://raw.githubusercontent.com/TraderAlice/OpenAlice/v0.89.0-beta/install',
+      cliVersion: '0.89.0',
+      selector: { kind: 'version', value: 'v0.89.0' },
+      installerUrl: 'https://openalice.ai/install',
       updateChannel: 'stable',
     })
-    expect(command).toContain("--version 'v0.89.0-beta'")
+    expect(command).toContain("--channel stable --version '0.89.0'")
+  })
+
+  it('preserves beta and dev channels when installing a remote CLI', () => {
+    const beta = buildRemoteInstallCommand({
+      schemaVersion: 2,
+      repository: 'TraderAlice/OpenAlice',
+      cliVersion: '0.90.2-beta.1',
+      selector: { kind: 'version', value: 'v0.90.2-beta.1' },
+      installerUrl: 'https://openalice.ai/install',
+      updateChannel: 'beta',
+    })
+    expect(beta).toContain("--channel beta --version '0.90.2-beta.1'")
+
+    const dev = buildRemoteInstallCommand({
+      schemaVersion: 2,
+      repository: 'TraderAlice/OpenAlice',
+      cliVersion: '0.90.2',
+      selector: { kind: 'branch', value: 'dev' },
+      installerUrl: 'https://openalice.ai/install',
+      updateChannel: 'development',
+    })
+    expect(dev).toContain('--channel dev')
+    expect(dev).not.toContain('--version')
   })
 
   it('plans install and start separately, with no implicit takeover', () => {

@@ -1,16 +1,32 @@
 name: Release
 
 on:
-  push:
-    # Releases are cut only from the stable user-facing lane. Routine work
-    # lands on dev first and reaches release eligibility through promotion.
-    branches: [master]
   workflow_dispatch:
     inputs:
-      mirror_tag:
-        description: Existing release tag to mirror to the download CDN without cutting a new release.
-        required: false
+      operation:
+        description: Create a release or repair mirrors for a channel-aware release made by this workflow.
+        required: true
+        default: release
+        type: choice
+        options:
+          - release
+          - mirror
+      tag:
+        description: Release tag, for example v0.91.0 or v0.91.0-beta.1.
+        required: true
         type: string
+      channel:
+        description: Mutable release channel that this tag is allowed to update.
+        required: true
+        default: beta
+        type: choice
+        options:
+          - beta
+          - stable
+
+concurrency:
+  group: openalice-release-publication
+  cancel-in-progress: false
 
 jobs:
   release:
@@ -19,52 +35,113 @@ jobs:
     permissions:
       contents: write
     outputs:
-      # Whether this push introduces a version that does not have a tag yet.
+      # Whether this dispatch requests a new release. The tag/package version
+      # contract is validated before any expensive candidate jobs begin.
       # The tag and GitHub Release are deliberately created only after every
       # platform builds and passes Workspace acceptance.
-      created: ${{ !github.event.inputs.mirror_tag && steps.check.outputs.exists == 'false' }}
-      version: ${{ steps.version.outputs.version }}
-      tag: ${{ github.event.inputs.mirror_tag || steps.version.outputs.tag }}
-      prerelease: ${{ steps.version.outputs.prerelease }}
-      previous_tag: ${{ steps.version.outputs.previous_tag }}
+      created: ${{ steps.plan.outputs.created }}
+      operation: ${{ steps.plan.outputs.operation }}
+      version: ${{ steps.plan.outputs.version }}
+      tag: ${{ steps.plan.outputs.tag }}
+      channel: ${{ steps.plan.outputs.channel }}
+      prerelease: ${{ steps.plan.outputs.prerelease }}
+      previous_tag: ${{ steps.plan.outputs.previous_tag }}
+      source_sha: ${{ steps.plan.outputs.source_sha }}
 
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # full history for git-cliff
 
-      - name: Get version from package.json
-        id: version
+      - name: Validate release intent and version authority
+        id: plan
+        env:
+          OPERATION: ${{ inputs.operation }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_CHANNEL: ${{ inputs.channel }}
+          SOURCE_REF: ${{ github.ref }}
+          SOURCE_SHA: ${{ github.sha }}
         run: |
-          VERSION=$(node -p "require('./package.json').version")
-          CLI_VERSION=$(node -p "require('./packages/cli/package.json').version")
-          test "$CLI_VERSION" = "$VERSION"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
-          echo "previous_tag=$(git describe --tags --abbrev=0 2>/dev/null || true)" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
 
-          # Determine if pre-release (contains - like beta.1, rc.1)
-          if [[ "$VERSION" == *-* ]]; then
+          if [ "$OPERATION" != "release" ] && [ "$OPERATION" != "mirror" ]; then
+            echo "Operation must be release or mirror, got: $OPERATION" >&2
+            exit 1
+          fi
+          if [ "$SOURCE_REF" != "refs/heads/master" ]; then
+            echo "Release operations must be dispatched from master, got: $SOURCE_REF" >&2
+            exit 1
+          fi
+
+          if [ "$RELEASE_CHANNEL" = "stable" ]; then
+            TAG_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+$'
+            PREVIOUS_TAG_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+$'
+          elif [ "$RELEASE_CHANNEL" = "beta" ]; then
+            TAG_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+-beta(\.[1-9][0-9]*)?$'
+            PREVIOUS_TAG_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+-beta(\.[1-9][0-9]*)?$'
+          else
+            echo "Release channel must be beta or stable, got: $RELEASE_CHANNEL" >&2
+            exit 1
+          fi
+
+          if [[ ! "$RELEASE_TAG" =~ $TAG_PATTERN ]]; then
+            echo "Release tag $RELEASE_TAG does not match channel $RELEASE_CHANNEL" >&2
+            exit 1
+          fi
+
+          VERSION="${RELEASE_TAG#v}"
+          if [ "$OPERATION" = "release" ]; then
+            PACKAGE_VERSION=$(node -p "require('./package.json').version")
+            CLI_VERSION=$(node -p "require('./packages/cli/package.json').version")
+            if [ "$PACKAGE_VERSION" != "$VERSION" ] || [ "$CLI_VERSION" != "$VERSION" ]; then
+              echo "Release tag $RELEASE_TAG requires package versions $VERSION; root=$PACKAGE_VERSION cli=$CLI_VERSION" >&2
+              exit 1
+            fi
+
+            if git rev-parse "$RELEASE_TAG" >/dev/null 2>&1; then
+              echo "Release tag already exists: $RELEASE_TAG" >&2
+              exit 1
+            fi
+            CREATED=true
+          else
+            if ! git rev-parse "$RELEASE_TAG^{commit}" >/dev/null 2>&1; then
+              echo "Mirror repair requires an existing release tag: $RELEASE_TAG" >&2
+              exit 1
+            fi
+            CREATED=false
+          fi
+
+          echo "created=$CREATED" >> "$GITHUB_OUTPUT"
+          echo "operation=$OPERATION" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          echo "channel=$RELEASE_CHANNEL" >> "$GITHUB_OUTPUT"
+          PREVIOUS_TAG=$(
+            git for-each-ref --merged="$SOURCE_SHA" --sort=-version:refname \
+              --format='%(refname:short)' refs/tags \
+              | grep -E "$PREVIOUS_TAG_PATTERN" \
+              | head -n 1 \
+              || true
+          )
+          if [ "$OPERATION" = "release" ] && [ -z "$PREVIOUS_TAG" ]; then
+            echo "No previous $RELEASE_CHANNEL release tag is reachable from $SOURCE_SHA" >&2
+            exit 1
+          fi
+          echo "previous_tag=$PREVIOUS_TAG" >> "$GITHUB_OUTPUT"
+          echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+
+          if [ "$RELEASE_CHANNEL" = "beta" ]; then
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
           else
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Check if tag already exists
-        id: check
-        run: |
-          if git rev-parse "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Install git-cliff
-        if: steps.check.outputs.exists == 'false' && !github.event.inputs.mirror_tag
+        if: steps.plan.outputs.created == 'true'
         uses: kenji-miyake/setup-git-cliff@v2
 
       - name: Generate release notes
-        if: steps.check.outputs.exists == 'false' && !github.event.inputs.mirror_tag
+        if: steps.plan.outputs.created == 'true'
         id: notes
         run: |
           # Generate notes for this version only (since last tag).
@@ -72,8 +149,8 @@ jobs:
           # BEFORE the tag exists (it's created only after candidate acceptance), so without
           # this the section header falls back to "[Unreleased]" instead of
           # the version. See cliff.toml's `{% if version %}` template.
-          TAG="${{ steps.version.outputs.tag }}"
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          TAG="${{ steps.plan.outputs.tag }}"
+          LAST_TAG="${{ steps.plan.outputs.previous_tag }}"
           if [ -z "$LAST_TAG" ]; then
             git-cliff --tag "$TAG" --output notes.md
           else
@@ -81,7 +158,7 @@ jobs:
           fi
 
       - name: Preserve release notes for gated publication
-        if: steps.check.outputs.exists == 'false' && !github.event.inputs.mirror_tag
+        if: steps.plan.outputs.created == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: release-notes
@@ -91,7 +168,7 @@ jobs:
   preflight-public-cli-authority:
     name: Preflight public CLI channel authority
     needs: release
-    if: needs.release.outputs.created == 'true' && !github.event.inputs.mirror_tag
+    if: needs.release.outputs.created == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -105,7 +182,7 @@ jobs:
           node-version: 22.19.0
 
       - name: Verify every opted-in public channel before release publication
-        if: needs.release.outputs.prerelease == 'false'
+        if: needs.release.outputs.channel == 'stable'
         run: node scripts/preflight-public-cli-authority.mjs
         env:
           OPENALICE_PUBLISH_NPM: ${{ vars.OPENALICE_PUBLISH_NPM }}
@@ -124,7 +201,7 @@ jobs:
   # unsigned until a Windows code-signing certificate exists.
   build-desktop:
     needs: [release, preflight-public-cli-authority]
-    if: needs.release.outputs.created == 'true' && !github.event.inputs.mirror_tag
+    if: needs.release.outputs.created == 'true'
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -259,7 +336,7 @@ jobs:
   accept-desktop-upgrade:
     name: Accept desktop upgrade (${{ matrix.os }}, ${{ matrix.arch }})
     needs: [release, build-desktop]
-    if: needs.release.outputs.created == 'true' && needs.build-desktop.result == 'success' && !github.event.inputs.mirror_tag
+    if: needs.release.outputs.created == 'true' && needs.build-desktop.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -314,7 +391,7 @@ jobs:
   cli-installer-acceptance:
     name: Accept CLI installer candidate
     needs: [release, preflight-public-cli-authority]
-    if: needs.release.outputs.created == 'true' && !github.event.inputs.mirror_tag
+    if: needs.release.outputs.created == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     permissions:
@@ -333,10 +410,43 @@ jobs:
       - name: Exercise candidate installer through managed SSH remote
         run: node scripts/remote-ssh-smoke.mjs --skip-tui
 
+  build-cli-installer:
+    name: Build channel-neutral CLI installer snapshot
+    needs: release
+    if: needs.release.outputs.created == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Freeze and verify the accepted installer bytes
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist/cli-installer
+          installer="OpenAlice-${VERSION}-install"
+          cp install "dist/cli-installer/${installer}"
+          bash -n "dist/cli-installer/${installer}"
+          (cd dist/cli-installer && sha256sum "$installer" > "${installer}.sha256")
+
+      - name: Preserve immutable installer candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-installer
+          path: |
+            dist/cli-installer/OpenAlice-*-install
+            dist/cli-installer/OpenAlice-*-install.sha256
+          if-no-files-found: error
+          retention-days: 1
+
   build-cli-release:
     name: Build native CLI (${{ matrix.platform }}-${{ matrix.arch }})
     needs: [release, preflight-public-cli-authority]
-    if: needs.release.outputs.created == 'true' && !github.event.inputs.mirror_tag
+    if: needs.release.outputs.created == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -448,7 +558,7 @@ jobs:
   build-cli-package-channels:
     name: Build CLI package-manager channels
     needs: [release, build-cli-release]
-    if: needs.release.outputs.created == 'true' && needs.build-cli-release.result == 'success' && !github.event.inputs.mirror_tag
+    if: needs.release.outputs.created == 'true' && needs.release.outputs.channel == 'stable' && needs.build-cli-release.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -499,7 +609,7 @@ jobs:
   accept-cli-homebrew:
     name: Accept Homebrew CLI (${{ matrix.arch }})
     needs: [release, build-cli-release]
-    if: needs.release.outputs.created == 'true' && needs.build-cli-release.result == 'success' && !github.event.inputs.mirror_tag
+    if: needs.release.outputs.created == 'true' && needs.release.outputs.channel == 'stable' && needs.build-cli-release.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -566,7 +676,7 @@ jobs:
   accept-cli-linuxbrew:
     name: Accept Linuxbrew CLI (${{ matrix.arch }})
     needs: [release, build-cli-release]
-    if: needs.release.outputs.created == 'true' && needs.build-cli-release.result == 'success' && !github.event.inputs.mirror_tag
+    if: needs.release.outputs.created == 'true' && needs.release.outputs.channel == 'stable' && needs.build-cli-release.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -631,7 +741,7 @@ jobs:
   accept-cli-aur:
     name: Accept Arch/AUR CLI package (${{ matrix.arch }})
     needs: [release, build-cli-release]
-    if: needs.release.outputs.created == 'true' && needs.build-cli-release.result == 'success' && !github.event.inputs.mirror_tag
+    if: needs.release.outputs.created == 'true' && needs.release.outputs.channel == 'stable' && needs.build-cli-release.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -696,7 +806,7 @@ jobs:
   accept-cli-legacy-cutover:
     name: Accept published v0.90.1 CLI cutover
     needs: [release, build-cli-release]
-    if: needs.release.outputs.created == 'true' && needs.build-cli-release.result == 'success' && !github.event.inputs.mirror_tag
+    if: needs.release.outputs.created == 'true' && needs.build-cli-release.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     permissions:
@@ -726,7 +836,8 @@ jobs:
             --archive "$ARCHIVE" \
             --sha256 "$SHA256" \
             --expected-version "$VERSION" \
-            --expected-content-identity "$CONTENT_IDENTITY"
+            --expected-content-identity "$CONTENT_IDENTITY" \
+            --channel "${{ needs.release.outputs.channel }}"
 
   # Broker Packs are release artifacts, not inputs to the desktop package. Build
   # and validate them on their native platforms in parallel with desktop and
@@ -734,7 +845,7 @@ jobs:
   build-broker-packs:
     name: Build Broker Packs (${{ matrix.os }}, ${{ matrix.arch }})
     needs: [release, preflight-public-cli-authority]
-    if: needs.release.outputs.created == 'true' && !github.event.inputs.mirror_tag
+    if: needs.release.outputs.created == 'true'
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -784,8 +895,28 @@ jobs:
 
   publish-release:
     name: Publish accepted release
-    needs: [release, preflight-public-cli-authority, build-desktop, accept-desktop-upgrade, build-cli-release, build-cli-package-channels, accept-cli-homebrew, accept-cli-linuxbrew, accept-cli-aur, accept-cli-legacy-cutover, build-broker-packs, cli-installer-acceptance]
-    if: needs.release.outputs.created == 'true' && needs.preflight-public-cli-authority.result == 'success' && needs.build-desktop.result == 'success' && needs.accept-desktop-upgrade.result == 'success' && needs.build-cli-release.result == 'success' && needs.build-cli-package-channels.result == 'success' && needs.accept-cli-homebrew.result == 'success' && needs.accept-cli-linuxbrew.result == 'success' && needs.accept-cli-aur.result == 'success' && needs.accept-cli-legacy-cutover.result == 'success' && needs.build-broker-packs.result == 'success' && needs.cli-installer-acceptance.result == 'success'
+    needs: [release, preflight-public-cli-authority, build-desktop, accept-desktop-upgrade, build-cli-installer, build-cli-release, build-cli-package-channels, accept-cli-homebrew, accept-cli-linuxbrew, accept-cli-aur, accept-cli-legacy-cutover, build-broker-packs, cli-installer-acceptance]
+    if: >-
+      always() &&
+      needs.release.outputs.created == 'true' &&
+      needs.preflight-public-cli-authority.result == 'success' &&
+      needs.build-desktop.result == 'success' &&
+      needs.accept-desktop-upgrade.result == 'success' &&
+      needs.build-cli-installer.result == 'success' &&
+      needs.build-cli-release.result == 'success' &&
+      needs.accept-cli-legacy-cutover.result == 'success' &&
+      needs.build-broker-packs.result == 'success' &&
+      needs.cli-installer-acceptance.result == 'success' &&
+      (
+        needs.release.outputs.channel == 'beta' ||
+        (
+          needs.release.outputs.channel == 'stable' &&
+          needs.build-cli-package-channels.result == 'success' &&
+          needs.accept-cli-homebrew.result == 'success' &&
+          needs.accept-cli-linuxbrew.result == 'success' &&
+          needs.accept-cli-aur.result == 'success'
+        )
+      )
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -817,18 +948,25 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
+          name: cli-installer
+          path: dist/release-cli-installer
+
+      - uses: actions/download-artifact@v4
+        if: needs.release.outputs.channel == 'stable'
+        with:
           name: cli-package-channels
           path: dist/release-cli-packages
 
-      - name: Create tag and GitHub Release from accepted candidates
+      - name: Create beta tag and GitHub prerelease from accepted candidates
+        if: needs.release.outputs.channel == 'beta'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.release.outputs.tag }}
           name: ${{ needs.release.outputs.tag }}
           body_path: dist/release-notes/notes.md
-          prerelease: ${{ needs.release.outputs.prerelease == 'true' }}
+          prerelease: true
           generate_release_notes: false
-          target_commitish: ${{ github.sha }}
+          target_commitish: ${{ needs.release.outputs.source_sha }}
           fail_on_unmatched_files: true
           files: |
             dist/release-assets/*.dmg
@@ -840,6 +978,32 @@ jobs:
             dist/release-broker-packs/*.tgz
             dist/release-cli/*.tar.gz
             dist/release-cli/*.tar.gz.sha256
+            dist/release-cli-installer/OpenAlice-*-install
+            dist/release-cli-installer/OpenAlice-*-install.sha256
+
+      - name: Create stable tag and GitHub Release from accepted candidates
+        if: needs.release.outputs.channel == 'stable'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.release.outputs.tag }}
+          name: ${{ needs.release.outputs.tag }}
+          body_path: dist/release-notes/notes.md
+          prerelease: false
+          generate_release_notes: false
+          target_commitish: ${{ needs.release.outputs.source_sha }}
+          fail_on_unmatched_files: true
+          files: |
+            dist/release-assets/*.dmg
+            dist/release-assets/*.zip
+            dist/release-assets/*.yml
+            dist/release-assets/*.blockmap
+            dist/release-assets/*.exe
+            dist/release-broker-packs/*.json
+            dist/release-broker-packs/*.tgz
+            dist/release-cli/*.tar.gz
+            dist/release-cli/*.tar.gz.sha256
+            dist/release-cli-installer/OpenAlice-*-install
+            dist/release-cli-installer/OpenAlice-*-install.sha256
             dist/release-cli-packages/cli-package-channels/cli-package-channels.json
             dist/release-cli-packages/cli-package-channels/homebrew/openalice.rb
             dist/release-cli-packages/cli-package-channels/aur/PKGBUILD
@@ -850,7 +1014,7 @@ jobs:
   publish-cli-npm:
     name: Publish npm CLI packages
     needs: [release, publish-release, build-cli-package-channels, verify-public-cli-channels]
-    if: needs.verify-public-cli-channels.result == 'success' && needs.release.outputs.prerelease == 'false' && vars.OPENALICE_PUBLISH_NPM == 'true'
+    if: needs.release.outputs.channel == 'stable' && needs.verify-public-cli-channels.result == 'success' && vars.OPENALICE_PUBLISH_NPM == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -880,8 +1044,8 @@ jobs:
 
   verify-public-cli-channels:
     name: Verify public CLI channel assets
-    needs: [release, publish-release, build-cli-package-channels]
-    if: needs.publish-release.result == 'success' && needs.release.outputs.prerelease == 'false'
+    needs: [release, publish-release, build-cli-package-channels, mirror-release-assets]
+    if: needs.release.outputs.channel == 'stable' && needs.publish-release.result == 'success' && needs.mirror-release-assets.result == 'success'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -937,7 +1101,7 @@ jobs:
   publish-cli-homebrew:
     name: Publish Homebrew tap formula
     needs: [release, verify-public-cli-channels, build-cli-package-channels]
-    if: needs.verify-public-cli-channels.result == 'success' && vars.OPENALICE_PUBLISH_HOMEBREW == 'true'
+    if: needs.release.outputs.channel == 'stable' && needs.verify-public-cli-channels.result == 'success' && vars.OPENALICE_PUBLISH_HOMEBREW == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -974,7 +1138,7 @@ jobs:
   publish-cli-aur:
     name: Publish AUR package metadata
     needs: [release, verify-public-cli-channels, build-cli-package-channels]
-    if: needs.verify-public-cli-channels.result == 'success' && vars.OPENALICE_PUBLISH_AUR == 'true'
+    if: needs.release.outputs.channel == 'stable' && needs.verify-public-cli-channels.result == 'success' && vars.OPENALICE_PUBLISH_AUR == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -1018,18 +1182,13 @@ jobs:
 
   mirror-release-assets:
     needs: [release, publish-release]
-    if: always() && ((needs.release.outputs.created == 'true' && needs.publish-release.result == 'success') || github.event.inputs.mirror_tag)
+    if: always() && ((needs.release.outputs.created == 'true' && needs.publish-release.result == 'success') || needs.release.outputs.operation == 'mirror')
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
       - uses: actions/checkout@v7
-        with:
-          # A manual mirror is an idempotent repair of an existing release.
-          # Always derive the installer from that tag, never from whichever
-          # commit happens to be at master when the workflow is dispatched.
-          ref: ${{ github.event.inputs.mirror_tag || needs.release.outputs.tag }}
 
       - uses: actions/setup-node@v7
         with:
@@ -1038,30 +1197,28 @@ jobs:
       - name: Download release assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.event.inputs.mirror_tag || needs.release.outputs.tag }}
+          TAG: ${{ needs.release.outputs.tag }}
         run: |
           mkdir -p dist/r2-upload
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir dist/r2-upload --clobber
 
-      - name: Prepare release-owned CLI installer
+      - name: Verify release-owned CLI installer
         env:
-          TAG: ${{ github.event.inputs.mirror_tag || needs.release.outputs.tag }}
+          TAG: ${{ needs.release.outputs.tag }}
         run: |
+          set -euo pipefail
           VERSION="${TAG#v}"
-          PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          CLI_PACKAGE_VERSION=$(node -p "require('./packages/cli/package.json').version")
-          test "$PACKAGE_VERSION" = "$VERSION"
-          test "$CLI_PACKAGE_VERSION" = "$VERSION"
-          bash -n install
-          cp install "dist/r2-upload/OpenAlice-${VERSION}-install"
-          node scripts/prepare-cli-release-installer.mjs \
-            "$VERSION" \
-            "dist/r2-upload/OpenAlice-${VERSION}-install"
-          bash -n "dist/r2-upload/OpenAlice-${VERSION}-install"
+          installer="OpenAlice-${VERSION}-install"
+          if [ ! -f "dist/r2-upload/${installer}" ] || [ ! -f "dist/r2-upload/${installer}.sha256" ]; then
+            echo "Mirror repair requires a channel-aware Release with its immutable installer and checksum sidecar: ${TAG}" >&2
+            exit 1
+          fi
+          bash -n "dist/r2-upload/${installer}"
+          (cd dist/r2-upload && sha256sum -c "${installer}.sha256")
 
       - name: Prepare CDN download aliases
         env:
-          TAG: ${{ github.event.inputs.mirror_tag || needs.release.outputs.tag }}
+          TAG: ${{ needs.release.outputs.tag }}
           DOWNLOAD_BASE_URL: ${{ secrets.DOWNLOAD_BASE_URL }}
         run: |
           node scripts/prepare-desktop-release-assets.mjs mirror \
@@ -1070,25 +1227,46 @@ jobs:
             --base-url "${DOWNLOAD_BASE_URL:-https://download.openalice.ai}" \
             --repository "$GITHUB_REPOSITORY"
 
-      - name: Publish generated release metadata and installer
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.event.inputs.mirror_tag || needs.release.outputs.tag }}
-        run: |
-          shopt -s nullglob
-          files=(dist/r2-upload/*-mac-intel.yml dist/r2-upload/*-intel-mac.yml dist/r2-upload/latest-mac-arm64.yml)
-          installer="dist/r2-upload/OpenAlice-${TAG#v}-install"
-          if [ -f "$installer" ]; then
-            files+=("$installer")
-          fi
-          if ((${#files[@]})); then
-            gh release upload "$TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --clobber
-          fi
-
       - name: Install AWS CLI
         run: |
           python3 -m pip install --user awscli
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Keep mirror repair on the active channel release
+        if: needs.release.outputs.operation == 'mirror'
+        env:
+          DOWNLOAD_BASE_URL: ${{ secrets.DOWNLOAD_BASE_URL }}
+          RELEASE_CHANNEL: ${{ needs.release.outputs.channel }}
+          VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          BASE_URL="${DOWNLOAD_BASE_URL:-https://download.openalice.ai}"
+          BASE_URL="${BASE_URL%/}"
+          if [ "$RELEASE_CHANNEL" = "stable" ]; then
+            MANIFEST_PATH="manifest.json"
+          else
+            MANIFEST_PATH="beta/manifest.json"
+          fi
+          curl -fsSL "${BASE_URL}/${MANIFEST_PATH}" -o /tmp/openalice-active-channel.json
+          CHANNEL="$RELEASE_CHANNEL" VERSION="$VERSION" node -e '
+            const value = require("/tmp/openalice-active-channel.json");
+            if (value.version !== process.env.VERSION) process.exit(1);
+            if (value.channel !== undefined && value.channel !== process.env.CHANNEL) process.exit(1);
+          '
+
+      - name: Snapshot stable aliases before a beta mirror
+        if: needs.release.outputs.channel == 'beta'
+        env:
+          DOWNLOAD_BASE_URL: ${{ secrets.DOWNLOAD_BASE_URL }}
+        run: |
+          set -euo pipefail
+          BASE_URL="${DOWNLOAD_BASE_URL:-https://download.openalice.ai}"
+          BASE_URL="${BASE_URL%/}"
+          mkdir -p /tmp/openalice-stable-before
+          for name in manifest.json latest-mac.yml latest-mac-arm64.yml latest-mac-intel.yml latest-intel-mac.yml latest.yml; do
+            curl -fsSL "${BASE_URL}/${name}" -o "/tmp/openalice-stable-before/${name//\//_}"
+          done
+          (cd /tmp/openalice-stable-before && sha256sum *) > /tmp/openalice-stable-before.sha256
 
       - name: Mirror release assets to Cloudflare R2
         env:
@@ -1098,77 +1276,106 @@ jobs:
           AWS_EC2_METADATA_DISABLED: true
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          RELEASE_CHANNEL: ${{ needs.release.outputs.channel }}
+          RELEASE_OPERATION: ${{ needs.release.outputs.operation }}
         run: |
           ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          if [ "$RELEASE_CHANNEL" = "stable" ]; then
+            FEED_PREFIX="latest"
+          else
+            FEED_PREFIX="beta"
+          fi
 
           aws s3 cp dist/r2-upload "s3://${R2_BUCKET}/" \
             --recursive \
             --exclude "*.yml" \
             --exclude "manifest.json" \
+            --exclude "beta/*" \
+            --exclude "install" \
+            --exclude "OpenAlice-*-install" \
+            --exclude "OpenAlice-*-install.sha256" \
             --exclude "mac-arm64.dmg" \
             --exclude "mac-arm64.zip" \
             --exclude "mac-x64.dmg" \
             --exclude "mac-x64.zip" \
             --exclude "windows-x64.exe" \
-            --exclude "install" \
-            --exclude "OpenAlice-*-install" \
             --cache-control "public, max-age=31536000, immutable" \
             --endpoint-url "$ENDPOINT"
 
           aws s3 cp dist/r2-upload "s3://${R2_BUCKET}/" \
             --recursive \
             --exclude "*" \
-            --include "*.yml" \
+            --include "${FEED_PREFIX}*.yml" \
             --cache-control "no-cache" \
             --content-type "text/yaml" \
             --endpoint-url "$ENDPOINT"
 
-          aws s3 cp dist/r2-upload/manifest.json "s3://${R2_BUCKET}/manifest.json" \
-            --cache-control "no-cache" \
-            --content-type "application/json" \
-            --endpoint-url "$ENDPOINT"
-
-          for installer in dist/r2-upload/OpenAlice-*-install; do
-            aws s3 cp "$installer" "s3://${R2_BUCKET}/$(basename "$installer")" \
-              --cache-control "public, max-age=31536000, immutable" \
-              --content-type "text/plain" \
-              --endpoint-url "$ENDPOINT"
+          for installer in \
+            dist/r2-upload/OpenAlice-*-install \
+            dist/r2-upload/OpenAlice-*-install.sha256; do
+            [ -f "$installer" ] || continue
+            key=$(basename "$installer")
+            existing="/tmp/${key}.existing"
+            if aws s3api head-object --bucket "$R2_BUCKET" --key "$key" \
+              --endpoint-url "$ENDPOINT" >/dev/null 2>&1; then
+              aws s3 cp "s3://${R2_BUCKET}/${key}" "$existing" --endpoint-url "$ENDPOINT"
+              cmp "$installer" "$existing"
+            else
+              aws s3 cp "$installer" "s3://${R2_BUCKET}/${key}" \
+                --cache-control "public, max-age=31536000, immutable" \
+                --content-type "text/plain" \
+                --endpoint-url "$ENDPOINT"
+            fi
           done
 
-          aws s3 cp dist/r2-upload/install "s3://${R2_BUCKET}/install" \
-            --cache-control "no-cache" \
-            --content-type "text/plain" \
-            --endpoint-url "$ENDPOINT"
+          if [ "$RELEASE_OPERATION" = "release" ]; then
+            aws s3 cp dist/r2-upload/install "s3://${R2_BUCKET}/install" \
+              --cache-control "no-cache" \
+              --content-type "text/plain" \
+              --endpoint-url "$ENDPOINT"
+          fi
 
-          if [ -f dist/r2-upload/mac-arm64.dmg ]; then
+          if [ "$RELEASE_CHANNEL" = "beta" ]; then
+            aws s3 cp dist/r2-upload/beta/manifest.json "s3://${R2_BUCKET}/beta/manifest.json" \
+              --cache-control "no-cache" \
+              --content-type "application/json" \
+              --endpoint-url "$ENDPOINT"
+          else
+            aws s3 cp dist/r2-upload/manifest.json "s3://${R2_BUCKET}/manifest.json" \
+              --cache-control "no-cache" \
+              --content-type "application/json" \
+              --endpoint-url "$ENDPOINT"
+          fi
+
+          if [ "$RELEASE_CHANNEL" = "stable" ] && [ -f dist/r2-upload/mac-arm64.dmg ]; then
             aws s3 cp dist/r2-upload/mac-arm64.dmg "s3://${R2_BUCKET}/mac-arm64.dmg" \
               --cache-control "no-cache" \
               --content-type "application/x-apple-diskimage" \
               --endpoint-url "$ENDPOINT"
           fi
 
-          if [ -f dist/r2-upload/mac-arm64.zip ]; then
+          if [ "$RELEASE_CHANNEL" = "stable" ] && [ -f dist/r2-upload/mac-arm64.zip ]; then
             aws s3 cp dist/r2-upload/mac-arm64.zip "s3://${R2_BUCKET}/mac-arm64.zip" \
               --cache-control "no-cache" \
               --content-type "application/zip" \
               --endpoint-url "$ENDPOINT"
           fi
 
-          if [ -f dist/r2-upload/mac-x64.dmg ]; then
+          if [ "$RELEASE_CHANNEL" = "stable" ] && [ -f dist/r2-upload/mac-x64.dmg ]; then
             aws s3 cp dist/r2-upload/mac-x64.dmg "s3://${R2_BUCKET}/mac-x64.dmg" \
               --cache-control "no-cache" \
               --content-type "application/x-apple-diskimage" \
               --endpoint-url "$ENDPOINT"
           fi
 
-          if [ -f dist/r2-upload/mac-x64.zip ]; then
+          if [ "$RELEASE_CHANNEL" = "stable" ] && [ -f dist/r2-upload/mac-x64.zip ]; then
             aws s3 cp dist/r2-upload/mac-x64.zip "s3://${R2_BUCKET}/mac-x64.zip" \
               --cache-control "no-cache" \
               --content-type "application/zip" \
               --endpoint-url "$ENDPOINT"
           fi
 
-          if [ -f dist/r2-upload/windows-x64.exe ]; then
+          if [ "$RELEASE_CHANNEL" = "stable" ] && [ -f dist/r2-upload/windows-x64.exe ]; then
             aws s3 cp dist/r2-upload/windows-x64.exe "s3://${R2_BUCKET}/windows-x64.exe" \
               --cache-control "no-cache" \
               --content-type "application/vnd.microsoft.portable-executable" \
@@ -1179,62 +1386,94 @@ jobs:
         env:
           DOWNLOAD_BASE_URL: ${{ secrets.DOWNLOAD_BASE_URL }}
           PUBLIC_INSTALL_URL: https://openalice.ai/install
-          TAG: ${{ github.event.inputs.mirror_tag || needs.release.outputs.tag }}
+          TAG: ${{ needs.release.outputs.tag }}
+          RELEASE_CHANNEL: ${{ needs.release.outputs.channel }}
+          RELEASE_OPERATION: ${{ needs.release.outputs.operation }}
         run: |
-          BASE_URL="${DOWNLOAD_BASE_URL%/}"
+          set -euo pipefail
+          BASE_URL="${DOWNLOAD_BASE_URL:-https://download.openalice.ai}"
+          BASE_URL="${BASE_URL%/}"
           VERSION="${TAG#v}"
-          CHANNEL="latest"
           shopt -s nullglob
 
-          if [[ "$VERSION" == *-* ]]; then
-            CHANNEL="${VERSION#*-}"
-            CHANNEL="${CHANNEL%%.*}"
-          fi
-
-          if [ "$CHANNEL" = "latest" ]; then
+          if [ "$RELEASE_CHANNEL" = "stable" ]; then
+            CHANNEL="latest"
             MAC_METADATA="latest-mac.yml"
             WINDOWS_METADATA="latest.yml"
+            MANIFEST_PATH="manifest.json"
           else
-            MAC_METADATA="${CHANNEL}-mac.yml"
-            WINDOWS_METADATA="${CHANNEL}.yml"
+            CHANNEL="beta"
+            MAC_METADATA="beta-mac.yml"
+            WINDOWS_METADATA="beta.yml"
+            MANIFEST_PATH="beta/manifest.json"
           fi
+          INSTALL_PATH="install"
 
           curl -fsSI "${BASE_URL}/${MAC_METADATA}"
           curl -fsSI "${BASE_URL}/${WINDOWS_METADATA}"
           curl -fsSI "${BASE_URL}/OpenAlice-${VERSION}-arm64.dmg"
-          curl -fsSI "${BASE_URL}/mac-arm64.dmg"
-          if [ -f dist/r2-upload/mac-x64.dmg ]; then
-            curl -fsSI "${BASE_URL}/mac-x64.dmg"
-          fi
-          if [ -f dist/r2-upload/mac-x64.zip ]; then
-            curl -fsSI "${BASE_URL}/mac-x64.zip"
-          fi
           if [ -f "dist/r2-upload/${CHANNEL}-mac-intel.yml" ]; then
             curl -fsSI "${BASE_URL}/${CHANNEL}-mac-intel.yml"
           fi
-          curl -fsSI "${BASE_URL}/windows-x64.exe"
-          curl -fsSI "${BASE_URL}/manifest.json"
           curl -fsSI "${BASE_URL}/OpenAlice-${VERSION}-install"
-          curl -fsSI "${BASE_URL}/install"
+          curl -fsSI "${BASE_URL}/${MANIFEST_PATH}"
+          curl -fsSI "${BASE_URL}/${INSTALL_PATH}"
           curl -fsSL "${BASE_URL}/OpenAlice-${VERSION}-install" -o /tmp/openalice-versioned-install
-          curl -fsSL "${BASE_URL}/install" -o /tmp/openalice-install
-          curl -fsSL "$PUBLIC_INSTALL_URL" -o /tmp/openalice-site-install
           cmp /tmp/openalice-versioned-install "dist/r2-upload/OpenAlice-${VERSION}-install"
-          cmp /tmp/openalice-install dist/r2-upload/install
-          cmp /tmp/openalice-versioned-install /tmp/openalice-install
-          cmp /tmp/openalice-install /tmp/openalice-site-install
-          bash -n /tmp/openalice-install
-          bash /tmp/openalice-install --plan | tee /tmp/openalice-install-plan
+          bash -n /tmp/openalice-versioned-install
+          bash /tmp/openalice-versioned-install \
+            --channel "$RELEASE_CHANNEL" \
+            --version "$VERSION" \
+            --plan | tee /tmp/openalice-install-plan
           grep -Fq "Channel         release (${VERSION})" /tmp/openalice-install-plan
           grep -Fq "Artifact        https://github.com/TraderAlice/OpenAlice/releases/download/${TAG}/openalice-cli-${VERSION}-linux-x64.tar.gz" /tmp/openalice-install-plan
-          INSTALLER_PATH=/tmp/openalice-install MANIFEST_URL="${BASE_URL}/manifest.json" node -e '
+          INSTALLER_PATH=/tmp/openalice-versioned-install MANIFEST_URL="${BASE_URL}/${MANIFEST_PATH}" INSTALL_URL="${BASE_URL}/install" RELEASE_CHANNEL="$RELEASE_CHANNEL" node -e '
             const { createHash } = require("node:crypto");
             const { readFileSync } = require("node:fs");
             const manifest = JSON.parse(require("node:child_process").execFileSync("curl", ["-fsSL", process.env.MANIFEST_URL], { encoding: "utf8" }));
             const digest = createHash("sha256").update(readFileSync(process.env.INSTALLER_PATH)).digest("hex");
-            if (manifest.installer?.url !== process.env.MANIFEST_URL.replace(/manifest\.json$/, "install")) process.exit(1);
+            if (manifest.installer?.url !== process.env.INSTALL_URL) process.exit(1);
             if (manifest.installer?.sha256 !== digest) process.exit(1);
+            if (manifest.channel !== process.env.RELEASE_CHANNEL) process.exit(1);
           '
+
+          if [ "$RELEASE_OPERATION" = "release" ]; then
+            curl -fsSL "${BASE_URL}/${INSTALL_PATH}" -o /tmp/openalice-channel-install
+            cmp /tmp/openalice-versioned-install /tmp/openalice-channel-install
+            bash /tmp/openalice-channel-install --plan | tee /tmp/openalice-default-install-plan
+            if [ "$RELEASE_CHANNEL" = "stable" ]; then
+              grep -Fq "Channel         stable (latest)" /tmp/openalice-default-install-plan
+            else
+              # Until v0.90.2 stable exists, the channel-neutral installer keeps
+              # its stable default by delegating the verified v0.90.1 installer.
+              # Accept either plan vocabulary while keeping beta opt-in explicit.
+              grep -Eq '^(Channel[[:space:]]+stable \(latest\)|[[:space:]]*Updates[[:space:]]+stable)$' \
+                /tmp/openalice-default-install-plan
+            fi
+          fi
+
+          if [ "$RELEASE_CHANNEL" = "stable" ]; then
+            curl -fsSI "${BASE_URL}/mac-arm64.dmg"
+            if [ -f dist/r2-upload/mac-x64.dmg ]; then
+              curl -fsSI "${BASE_URL}/mac-x64.dmg"
+            fi
+            if [ -f dist/r2-upload/mac-x64.zip ]; then
+              curl -fsSI "${BASE_URL}/mac-x64.zip"
+            fi
+            curl -fsSI "${BASE_URL}/windows-x64.exe"
+          else
+            mkdir -p /tmp/openalice-stable-after
+            for name in manifest.json latest-mac.yml latest-mac-arm64.yml latest-mac-intel.yml latest-intel-mac.yml latest.yml; do
+              curl -fsSL "${BASE_URL}/${name}" -o "/tmp/openalice-stable-after/${name//\//_}"
+            done
+            (cd /tmp/openalice-stable-after && sha256sum *) > /tmp/openalice-stable-after.sha256
+            cmp /tmp/openalice-stable-before.sha256 /tmp/openalice-stable-after.sha256
+          fi
+
+          if [ "$RELEASE_OPERATION" = "release" ]; then
+            curl -fsSL "$PUBLIC_INSTALL_URL" -o /tmp/openalice-site-install
+            cmp /tmp/openalice-channel-install /tmp/openalice-site-install
+          fi
 
           cli_asset_count=0
           for archive in dist/r2-upload/openalice-cli-${VERSION}-*.tar.gz; do

@@ -7,7 +7,7 @@ fail() {
 }
 
 installer_url="${OPENALICE_CHANNEL_INSTALLER_URL:?OPENALICE_CHANNEL_INSTALLER_URL is required}"
-branch="${OPENALICE_CHANNEL_BRANCH:-dev}"
+channel="${OPENALICE_CHANNEL:-dev}"
 install_root="$HOME/.openalice"
 installer_path="$(mktemp)"
 plan_path="$(mktemp)"
@@ -38,8 +38,8 @@ head -n 1 "$installer_path" | grep -Fq '#!/usr/bin/env bash' \
 bash -n "$installer_path"
 
 OPENALICE_INSTALL_URL="$installer_url" \
-  bash "$installer_path" --plan --branch "$branch" --no-modify-path >"$plan_path"
-grep -Eq "^Channel[[:space:]]+development \(${branch}\)$" "$plan_path" \
+  bash "$installer_path" --plan --channel "$channel" --no-modify-path >"$plan_path"
+grep -Eq "^Channel[[:space:]]+development \(${channel}\)$" "$plan_path" \
   || fail "plan did not select the development channel"
 grep -Eq "^Platform[[:space:]]+linux-(x64|arm64)$" "$plan_path" \
   || fail "plan did not select a supported Linux native target"
@@ -48,7 +48,7 @@ grep -Eq "^Artifact[[:space:]]+https://download\.openalice\.ai/cli/dev/openalice
 [[ ! -e "$install_root" ]] || fail "plan changed the install root"
 
 OPENALICE_INSTALL_URL="$installer_url" \
-  bash "$installer_path" --yes --branch "$branch" --no-modify-path \
+  bash "$installer_path" --yes --channel "$channel" --no-modify-path \
     --install-dir "$install_root"
 
 openalice="$install_root/bin/openalice"
@@ -60,11 +60,11 @@ done
 
 version_json="$($openalice version --json)"
 first_content_identity="$(printf '%s' "$version_json" | jq -er \
-  --arg branch "$branch" \
+    --arg channel "$channel" \
   --arg installer_url "$installer_url" '
     select(.installSource.schemaVersion == 3)
     | select(.installSource.selector.kind == "branch")
-    | select(.installSource.selector.value == $branch)
+    | select(.installSource.selector.value == $channel)
     | select(.installSource.installerUrl == $installer_url)
     | select(.installSource.updateChannel == "development")
     | select(.installSource.method == "direct")
@@ -86,7 +86,7 @@ printf '%s' "$runtime_status" | jq -e '
 ' >/dev/null || fail "installed CLI could not execute native Runtime status"
 
 OPENALICE_INSTALL_URL="$installer_url" \
-  bash "$installer_path" --yes --branch "$branch" --no-modify-path \
+  bash "$installer_path" --yes --channel "$channel" --no-modify-path \
     --install-dir "$install_root"
 
 second_content_identity="$($openalice version --json | jq -er '.contentIdentity')"
@@ -101,4 +101,4 @@ for command in node npm pnpm bun pi opencode codex claude; do
     || fail "native install unexpectedly provided $command"
 done
 
-echo "[install-channel-smoke] passed $installer_url -> branch $branch ($first_content_identity)"
+echo "[install-channel-smoke] passed $installer_url -> channel $channel ($first_content_identity)"

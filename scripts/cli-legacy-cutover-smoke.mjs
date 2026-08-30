@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import {
   chmodSync,
@@ -18,6 +18,9 @@ import { pathToFileURL } from 'node:url'
 export const DEFAULT_LEGACY_VERSION = '0.90.1'
 export const DEFAULT_LEGACY_INSTALLER_URL =
   `https://github.com/TraderAlice/OpenAlice/releases/download/v${DEFAULT_LEGACY_VERSION}/OpenAlice-${DEFAULT_LEGACY_VERSION}-install`
+export const DEFAULT_LEGACY_INSTALLER_SHA256 =
+  'a2f34a715cc4a089854fde18741e316953868c1685db592b67b2b4ea10ede0bb'
+const PUBLIC_INSTALLER_URL = 'https://openalice.ai/install'
 export const LEGACY_PI_ASSETS = Object.freeze({
   'package.json': {
     url: `https://raw.githubusercontent.com/TraderAlice/OpenAlice/v${DEFAULT_LEGACY_VERSION}/scripts/install-smoke/pi-assets/package.json`,
@@ -28,6 +31,67 @@ export const LEGACY_PI_ASSETS = Object.freeze({
     sha256: 'f5cb41dcfc60561ba54490b49c17beecec202900f73eb5f104b34f8b2a79a0af',
   },
 })
+
+const FIXTURE_SERVER_SOURCE = `
+const { createServer } = require('node:http')
+const { appendFileSync, readFileSync, writeFileSync } = require('node:fs')
+
+const config = JSON.parse(process.env.OPENALICE_CLI_UPDATE_FIXTURE_CONFIG)
+const server = createServer((request, response) => {
+  const pathname = new URL(request.url, 'http://127.0.0.1').pathname
+  appendFileSync(config.requestLog, request.method + ' ' + pathname + '\\n')
+  const baseUrl = 'http://' + request.headers.host
+
+  if (pathname === '/manifest.json') {
+    response.setHeader('content-type', 'application/json')
+    response.end(JSON.stringify({
+      channel: 'stable',
+      version: config.version,
+      releaseNotesUrl: baseUrl + '/release-notes',
+      installer: {
+        url: baseUrl + '/install',
+        versionedUrl: baseUrl + config.installerPath,
+        sha256: config.installerSha256,
+      },
+    }))
+    return
+  }
+  if (pathname === '/releases/latest') {
+    response.setHeader('content-type', 'application/json')
+    response.end(JSON.stringify({ tag_name: 'v' + config.version }))
+    return
+  }
+  if (pathname === config.installerPath || pathname === '/install') {
+    response.setHeader('content-type', 'text/plain')
+    response.end(readFileSync(config.installer))
+    return
+  }
+  if (pathname === config.archivePath) {
+    response.setHeader('content-type', 'application/gzip')
+    response.end(readFileSync(config.archive))
+    return
+  }
+  if (pathname === config.archivePath + '.sha256') {
+    response.setHeader('content-type', 'text/plain')
+    response.end(config.archiveSha256 + '  ' + config.archiveName + '\\n')
+    return
+  }
+  if (pathname === '/release-notes') {
+    response.setHeader('content-type', 'text/plain')
+    response.end('OpenAlice ' + config.version + '\\n')
+    return
+  }
+  response.statusCode = 404
+  response.end('not found\\n')
+})
+
+server.listen(0, '127.0.0.1', () => {
+  writeFileSync(config.portFile, String(server.address().port))
+})
+const stop = () => server.close(() => process.exit(0))
+process.on('SIGINT', stop)
+process.on('SIGTERM', stop)
+`
 
 export function runLegacyCutoverSmoke(options) {
   const root = mkdtempSync(join(tmpdir(), 'openalice-legacy-cutover-'))
@@ -53,14 +117,14 @@ export function runLegacyCutoverSmoke(options) {
       '-fsSL', '--retry', '3', '--retry-delay', '2',
       '-o', legacyInstaller, options.legacyInstallerUrl,
     ], legacyEnv, 5 * 60_000)
+    verifyLegacyInstallerSha256(readFileSync(legacyInstaller), options.legacyInstallerSha256)
     chmodSync(legacyInstaller, 0o755)
     prepareLegacyPiAssets(options.curl, legacyPiAssets, legacyEnv)
     run(legacyInstaller, [
-      '--version', `v${options.legacyVersion}`,
       '--install-dir', installRoot,
       '--no-modify-path',
       '--yes',
-    ], { ...legacyEnv, OPENALICE_PI_SOURCE_DIR: legacyPiAssets }, 15 * 60_000)
+    ], legacySeedEnvironment(options, legacyEnv, legacyPiAssets), 15 * 60_000)
 
     if (!existsSync(join(installRoot, 'cli-versions'))) {
       fail('published legacy installer did not create the expected cli-versions layout')
@@ -69,18 +133,42 @@ export function runLegacyCutoverSmoke(options) {
     if (!existsSync(join(installRoot, 'bin', 'pi'))) {
       fail('published legacy installer did not create its managed Pi launcher')
     }
+    const legacyVersion = JSON.parse(capture(executable, ['version', '--json'], legacyEnv))
+    if (legacyVersion.version !== options.legacyVersion) {
+      fail(`published legacy installer installed ${legacyVersion.version}, expected ${options.legacyVersion}`)
+    }
+    if (legacyVersion.installSource?.updateChannel !== 'stable') {
+      fail(`published legacy installer recorded ${legacyVersion.installSource?.updateChannel}, expected stable`)
+    }
 
     mkdirSync(dirname(dataMarker), { recursive: true })
     writeFileSync(dataMarker, 'preserve-product-data\n')
     const externalPiBefore = readFileSync(externalPi, 'utf8')
 
-    run(options.installer, [
-      '--archive', options.archive,
-      '--sha256', options.sha256,
-      '--install-dir', installRoot,
-      '--no-modify-path',
-      '--yes',
-    ], { ...legacyEnv, PATH: `${dirname(externalPi)}:${inheritedPath}` }, 5 * 60_000)
+    if (options.channel === 'stable') {
+      const fixture = startStableUpdateFixture(options, root)
+      try {
+        run(executable, ['update', '--yes'], {
+          ...legacyEnv,
+          PATH: `${dirname(externalPi)}:${inheritedPath}`,
+          OPENALICE_INSTALL_URL: 'https://openalice.ai/install',
+          OPENALICE_UPDATE_MANIFEST_URL: `${fixture.baseUrl}/manifest.json`,
+          OPENALICE_RELEASES_API_URL: `${fixture.baseUrl}/releases/latest`,
+          OPENALICE_RELEASE_ASSET_BASE_URL: fixture.baseUrl,
+        }, 10 * 60_000)
+      } finally {
+        fixture.stop()
+      }
+      fixture.assertRequests()
+    } else {
+      run(options.installer, [
+        '--archive', options.archive,
+        '--sha256', options.sha256,
+        '--install-dir', installRoot,
+        '--no-modify-path',
+        '--yes',
+      ], { ...legacyEnv, PATH: `${dirname(externalPi)}:${inheritedPath}` }, 5 * 60_000)
+    }
 
     if (existsSync(join(installRoot, 'cli-versions'))) {
       fail('native cutover left the installer-owned legacy cli-versions layout behind')
@@ -102,6 +190,20 @@ export function runLegacyCutoverSmoke(options) {
     }
     if (version.installSource?.method !== 'direct') {
       fail(`native cutover provenance method is ${version.installSource?.method}, expected direct`)
+    }
+    if (options.channel === 'stable') {
+      if (version.installSource?.updateChannel !== 'stable') {
+        fail(`stable updater cutover recorded ${version.installSource?.updateChannel}, expected stable`)
+      }
+      if (
+        version.installSource?.selector?.kind !== 'version'
+        || version.installSource?.selector?.value !== `v${options.expectedVersion}`
+      ) {
+        fail(`stable updater cutover recorded unexpected selector ${JSON.stringify(version.installSource?.selector)}`)
+      }
+      if (version.installSource?.installerUrl !== 'https://openalice.ai/install') {
+        fail(`stable updater cutover recorded unexpected installer ${version.installSource?.installerUrl}`)
+      }
     }
 
     run(executable, [
@@ -137,6 +239,91 @@ export function runLegacyCutoverSmoke(options) {
   }
 }
 
+export function legacySeedEnvironment(options, baseEnv, piAssets) {
+  return {
+    ...baseEnv,
+    OPENALICE_PI_SOURCE_DIR: piAssets,
+    OPENALICE_INSTALL_URL: PUBLIC_INSTALLER_URL,
+    OPENALICE_INSTALL_UPDATE_CHANNEL: 'stable',
+    OPENALICE_INSTALLER_RELEASE_VERSION: options.legacyVersion,
+    OPENALICE_INSTALLER_UPDATE_CHANNEL: 'stable',
+    OPENALICE_EXPECTED_CLI_VERSION: options.legacyVersion,
+  }
+}
+
+export function verifyLegacyInstallerSha256(bytes, expectedSha256) {
+  const actualSha256 = createHash('sha256').update(bytes).digest('hex')
+  if (actualSha256 !== expectedSha256) {
+    fail(`published legacy installer failed SHA-256 verification: expected ${expectedSha256}, received ${actualSha256}`)
+  }
+  return actualSha256
+}
+
+function startStableUpdateFixture(options, root) {
+  const platform = process.platform === 'darwin' ? 'darwin' : process.platform === 'linux' ? 'linux' : null
+  const arch = process.arch === 'arm64' ? 'arm64' : process.arch === 'x64' ? 'x64' : null
+  if (!platform || !arch) fail(`unsupported stable update fixture target: ${process.platform}-${process.arch}`)
+
+  const archiveName = `openalice-cli-${options.expectedVersion}-${platform}-${arch}.tar.gz`
+  const installerPath = `/OpenAlice-${options.expectedVersion}-install`
+  const archivePath = `/v${options.expectedVersion}/${archiveName}`
+  const portFile = join(root, 'stable-update-fixture.port')
+  const requestLog = join(root, 'stable-update-fixture.requests')
+  writeFileSync(requestLog, '')
+  const config = {
+    version: options.expectedVersion,
+    installer: options.installer,
+    installerPath,
+    installerSha256: createHash('sha256').update(readFileSync(options.installer)).digest('hex'),
+    archive: options.archive,
+    archiveName,
+    archivePath,
+    archiveSha256: options.sha256,
+    portFile,
+    requestLog,
+  }
+  const child = spawn(process.execPath, ['--eval', FIXTURE_SERVER_SOURCE], {
+    env: {
+      ...process.env,
+      OPENALICE_CLI_UPDATE_FIXTURE_CONFIG: JSON.stringify(config),
+    },
+    stdio: ['ignore', 'inherit', 'inherit'],
+  })
+  const deadline = Date.now() + 10_000
+  const waitCell = new Int32Array(new SharedArrayBuffer(4))
+  while (!existsSync(portFile) && Date.now() < deadline) {
+    Atomics.wait(waitCell, 0, 0, 25)
+  }
+  if (!existsSync(portFile)) {
+    child.kill('SIGTERM')
+    fail('stable update fixture did not become ready')
+  }
+  const port = readFileSync(portFile, 'utf8').trim()
+  if (!/^[1-9][0-9]*$/.test(port)) {
+    child.kill('SIGTERM')
+    fail(`stable update fixture returned an invalid port: ${port}`)
+  }
+  const requiredRequests = [
+    '/manifest.json',
+    installerPath,
+    '/releases/latest',
+    archivePath,
+    `${archivePath}.sha256`,
+  ]
+  return {
+    baseUrl: `http://127.0.0.1:${port}`,
+    stop: () => child.kill('SIGTERM'),
+    assertRequests: () => {
+      const requests = new Set(readFileSync(requestLog, 'utf8').trim().split('\n').filter(Boolean))
+      for (const pathname of requiredRequests) {
+        if (!requests.has(`GET ${pathname}`)) {
+          fail(`stable update fixture did not receive GET ${pathname}; received ${[...requests].join(', ')}`)
+        }
+      }
+    },
+  }
+}
+
 function prepareLegacyPiAssets(curl, destination, env) {
   mkdirSync(destination, { recursive: true })
   for (const [name, asset] of Object.entries(LEGACY_PI_ASSETS)) {
@@ -152,10 +339,12 @@ function prepareLegacyPiAssets(curl, destination, env) {
 
 export function parseArgs(argv) {
   const result = {
+    channel: 'stable',
     curl: 'curl',
     installer: resolve(import.meta.dirname, '..', 'install'),
     legacyversion: DEFAULT_LEGACY_VERSION,
     legacyinstallerurl: DEFAULT_LEGACY_INSTALLER_URL,
+    legacyinstallersha256: DEFAULT_LEGACY_INSTALLER_SHA256,
     keep: false,
   }
   for (let index = 0; index < argv.length; index += 1) {
@@ -166,7 +355,8 @@ export function parseArgs(argv) {
     }
     if (![
       '--archive', '--sha256', '--expected-version', '--expected-content-identity',
-      '--legacy-version', '--legacy-installer-url', '--installer', '--curl',
+      '--legacy-version', '--legacy-installer-url', '--legacy-installer-sha256',
+      '--installer', '--curl', '--channel',
     ].includes(name)) fail(`unknown option: ${name}\n${usage()}`)
     const value = argv[++index]
     if (!value || value.startsWith('--')) fail(`${name} requires a value\n${usage()}`)
@@ -176,21 +366,33 @@ export function parseArgs(argv) {
     fail(usage())
   }
   if (!/^[a-f0-9]{64}$/.test(result.sha256)) fail('--sha256 must be 64 lowercase hex characters')
+  if (!/^[a-f0-9]{64}$/.test(result.legacyinstallersha256)) {
+    fail('--legacy-installer-sha256 must be 64 lowercase hex characters')
+  }
   if (!/^[a-f0-9]{16}$/.test(result.expectedcontentidentity)) {
     fail('--expected-content-identity must be 16 lowercase hex characters')
   }
+  if (!['stable', 'beta', 'dev'].includes(result.channel)) fail('--channel must be stable, beta, or dev')
   for (const version of [result.legacyversion, result.expectedversion]) {
     if (!/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(version)) {
       fail(`invalid OpenAlice version: ${version}`)
     }
   }
+  if (result.channel === 'stable' && !/^\d+\.\d+\.\d+$/.test(result.expectedversion)) {
+    fail(`stable cutover requires a stable expected version: ${result.expectedversion}`)
+  }
+  if (result.channel === 'beta' && !/^\d+\.\d+\.\d+-beta(?:\.[1-9][0-9]*)?$/.test(result.expectedversion)) {
+    fail(`beta cutover requires a beta expected version: ${result.expectedversion}`)
+  }
   return {
+    channel: result.channel,
     archive: resolve(result.archive),
     sha256: result.sha256,
     expectedVersion: result.expectedversion,
     expectedContentIdentity: result.expectedcontentidentity,
     legacyVersion: result.legacyversion,
     legacyInstallerUrl: result.legacyinstallerurl,
+    legacyInstallerSha256: result.legacyinstallersha256,
     installer: resolve(result.installer),
     curl: result.curl,
     keep: result.keep,
@@ -232,7 +434,7 @@ function fail(message) {
 }
 
 function usage() {
-  return 'Usage: cli-legacy-cutover-smoke.mjs --archive <tar.gz> --sha256 <hex> --expected-version <version> --expected-content-identity <id> [--legacy-version <version>] [--legacy-installer-url <url>] [--installer <path>] [--curl <command>] [--keep]'
+  return 'Usage: cli-legacy-cutover-smoke.mjs --archive <tar.gz> --sha256 <hex> --expected-version <version> --expected-content-identity <id> [--channel <stable|beta|dev>] [--legacy-version <version>] [--legacy-installer-url <url>] [--legacy-installer-sha256 <hex>] [--installer <path>] [--curl <command>] [--keep]'
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

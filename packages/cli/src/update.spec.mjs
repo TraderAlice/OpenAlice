@@ -17,7 +17,8 @@ const currentCliVersion = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
 ).version
 const [currentMajor = '0', currentMinor = '0'] = currentCliVersion.split('.')
-const newerCliVersion = `${currentMajor}.${Number(currentMinor) + 1}.0-beta`
+const newerStableVersion = `${currentMajor}.${Number(currentMinor) + 1}.0`
+const newerBetaVersion = `${currentMajor}.${Number(currentMinor) + 1}.0-beta.1`
 
 const stableSource = {
   schemaVersion: 2,
@@ -26,6 +27,25 @@ const stableSource = {
   selector: { kind: 'version', value: `v${currentCliVersion}` },
   installerUrl: `https://raw.githubusercontent.com/TraderAlice/OpenAlice/v${currentCliVersion}/install`,
   updateChannel: 'stable',
+}
+
+const betaSource = {
+  ...stableSource,
+  cliVersion: `${currentMajor}.${currentMinor}.0-beta.1`,
+  selector: { kind: 'version', value: `v${currentMajor}.${currentMinor}.0-beta.1` },
+  installerUrl: 'https://openalice.ai/install',
+  updateChannel: 'beta',
+}
+
+const devSource = {
+  ...stableSource,
+  schemaVersion: 3,
+  selector: { kind: 'branch', value: 'dev' },
+  installerUrl: 'https://openalice.ai/install',
+  updateChannel: 'development',
+  method: 'direct',
+  artifact: { platform: 'linux', arch: 'x64', sha256: 'd'.repeat(64) },
+  installedAt: '2026-08-30T00:00:00Z',
 }
 
 describe('OpenAlice CLI updates', () => {
@@ -48,21 +68,48 @@ describe('OpenAlice CLI updates', () => {
 
   it('reports a newer stable product release from the download manifest', async () => {
     const result = await checkForUpdate({
-      currentVersion: '0.87.0-beta',
+      currentVersion: '0.87.0',
       installSource: stableSource,
     }, {
-      fetchImpl: manifestFetch(newerCliVersion),
+      fetchImpl: manifestFetch(newerStableVersion),
       env: {},
     })
     expect(result).toMatchObject({
       status: 'available',
-      currentVersion: '0.87.0-beta',
-      latestVersion: newerCliVersion,
+      currentVersion: '0.87.0',
+      latestVersion: newerStableVersion,
       channel: 'stable',
     })
   })
 
-  it('keeps exact refs and development branches outside stable auto-update', async () => {
+  it('keeps beta installs on the beta manifest and beta versions', async () => {
+    const fetchImpl = manifestFetch(newerBetaVersion)
+    await expect(checkForUpdate({
+      currentVersion: `${currentMajor}.${currentMinor}.0-beta.1`,
+      installSource: betaSource,
+    }, { fetchImpl, env: {} })).resolves.toMatchObject({
+      status: 'available',
+      latestVersion: newerBetaVersion,
+      channel: 'beta',
+    })
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'https://download.openalice.ai/beta/manifest.json',
+      expect.any(Object),
+    )
+  })
+
+  it('rejects manifests that cross the selected release channel', async () => {
+    await expect(checkForUpdate({
+      installSource: stableSource,
+    }, { fetchImpl: manifestFetch(newerBetaVersion), env: {} }))
+      .rejects.toThrow('stable update manifest advertises out-of-channel version')
+    await expect(checkForUpdate({
+      installSource: betaSource,
+    }, { fetchImpl: manifestFetch(newerStableVersion), env: {} }))
+      .rejects.toThrow('beta update manifest advertises out-of-channel version')
+  })
+
+  it('keeps exact refs and custom installers outside implicit channel updates', async () => {
     await expect(checkForUpdate({
       installSource: {
         ...stableSource,
@@ -73,18 +120,86 @@ describe('OpenAlice CLI updates', () => {
     await expect(checkForUpdate({
       installSource: {
         ...stableSource,
-        selector: { kind: 'branch', value: 'dev' },
-        updateChannel: 'development',
-      },
-    })).resolves.toMatchObject({ status: 'unsupported', channel: 'development' })
-    await expect(checkForUpdate({
-      installSource: {
-        ...stableSource,
         selector: { kind: 'branch', value: 'master' },
         installerUrl: 'https://mirror.example.test/install',
         updateChannel: 'custom',
       },
     })).resolves.toMatchObject({ status: 'unsupported', channel: 'custom' })
+  })
+
+  it('checks dev by whole-archive identity instead of package version', async () => {
+    const fetchImpl = devManifestFetch({
+      version: currentCliVersion,
+      commit: '0123456789abcdef0123456789abcdef01234567',
+      sha256: 'e'.repeat(64),
+      contentIdentity: '1'.repeat(16),
+    })
+    await expect(checkForUpdate({ installSource: devSource, platform: 'linux', arch: 'x64' }, {
+      fetchImpl,
+      env: {},
+    })).resolves.toMatchObject({
+      status: 'available',
+      channel: 'dev',
+      latestArtifactSha256: 'e'.repeat(64),
+      latestCommit: '0123456789abcdef0123456789abcdef01234567',
+    })
+    await expect(checkForUpdate({
+      installSource: devSource,
+      currentArtifactSha256: 'e'.repeat(64),
+      platform: 'linux',
+      arch: 'x64',
+    }, { fetchImpl, env: {} })).resolves.toMatchObject({
+      status: 'current',
+      channel: 'dev',
+    })
+
+    await expect(checkForUpdate({
+      installSource: {
+        ...devSource,
+        schemaVersion: 2,
+        artifact: undefined,
+        method: undefined,
+        installedAt: undefined,
+      },
+      platform: 'linux',
+      arch: 'x64',
+    }, {
+      fetchImpl,
+      installedContentIdentityImpl: () => '1'.repeat(16),
+      env: {},
+    })).resolves.toMatchObject({
+      status: 'available',
+      channel: 'dev',
+    })
+  })
+
+  it('rejects a dev target whose archive name does not match its platform', async () => {
+    await expect(checkForUpdate({
+      installSource: devSource,
+      platform: 'linux',
+      arch: 'x64',
+    }, {
+      fetchImpl: devManifestFetch({
+        version: currentCliVersion,
+        commit: '0123456789abcdef0123456789abcdef01234567',
+        sha256: 'e'.repeat(64),
+        contentIdentity: '1'.repeat(16),
+        archive: 'openalice-cli-dev-darwin-arm64.tar.gz',
+      }),
+      env: {},
+    })).rejects.toThrow('invalid linux-x64 target')
+  })
+
+  it('treats an explicit cross-channel selection as an installable switch', async () => {
+    await expect(checkForUpdate({
+      currentVersion: newerStableVersion,
+      installSource: stableSource,
+      channel: 'beta',
+    }, { fetchImpl: manifestFetch(newerBetaVersion), env: {} })).resolves.toMatchObject({
+      status: 'available',
+      channel: 'beta',
+      sourceChannel: 'stable',
+    })
   })
 
   it('continues to recognize legacy public-master metadata as stable', async () => {
@@ -98,7 +213,17 @@ describe('OpenAlice CLI updates', () => {
         installerUrl: 'https://openalice.ai/install',
       },
     }, {
-      fetchImpl: manifestFetch(newerCliVersion),
+      fetchImpl: manifestFetch(newerStableVersion),
+      env: {},
+    })).resolves.toMatchObject({ status: 'available', channel: 'stable' })
+  })
+
+  it('accepts the shipped pre-channel stable manifest during the 0.90.1 cutover', async () => {
+    await expect(checkForUpdate({
+      currentVersion: '0.90.1',
+      installSource: stableSource,
+    }, {
+      fetchImpl: manifestFetch(newerStableVersion, { omitChannel: true }),
       env: {},
     })).resolves.toMatchObject({ status: 'available', channel: 'stable' })
   })
@@ -108,14 +233,14 @@ describe('OpenAlice CLI updates', () => {
     const stdout = { write: vi.fn() }
     await expect(runUpdateCommand(['--yes'], {
       applyUpdate,
-      fetchImpl: manifestFetch(newerCliVersion),
+      fetchImpl: manifestFetch(newerStableVersion),
       layout: { installRoot: '/tmp/.openalice' },
       readInstallSourceImpl: async () => stableSource,
       stdout,
       env: {},
     })).resolves.toBe(0)
     expect(applyUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ latestVersion: newerCliVersion }),
+      expect.objectContaining({ latestVersion: newerStableVersion }),
       expect.objectContaining({
         layout: { installRoot: '/tmp/.openalice' },
         yes: true,
@@ -158,6 +283,7 @@ describe('OpenAlice CLI updates', () => {
     }
     await expect(downloadAndRunInstaller({
       latestVersion: '0.88.0-beta',
+      channel: 'beta',
       installer: {
         versionedUrl: 'https://download.openalice.ai/OpenAlice-0.88.0-beta-install',
         sha256: createHash('sha256').update(bytes).digest('hex'),
@@ -176,7 +302,8 @@ describe('OpenAlice CLI updates', () => {
     expect(invocation).toMatchObject({
       command: 'bash',
       args: expect.arrayContaining([
-        '--version', '0.88.0-beta', '--install-dir', '/tmp/.openalice', '--no-modify-path', '--yes',
+        '--channel', 'beta', '--version', '0.88.0-beta',
+        '--install-dir', '/tmp/.openalice', '--no-modify-path', '--yes',
       ]),
       options: {
         stdio: 'inherit',
@@ -187,10 +314,47 @@ describe('OpenAlice CLI updates', () => {
     })
   })
 
+  it('refuses a native-to-legacy stable channel switch during the 0.90.1 transition', async () => {
+    await expect(checkForUpdate({
+      currentVersion: '0.90.1',
+      installSource: devSource,
+      channel: 'stable',
+    }, {
+      fetchImpl: manifestFetch('0.90.1'),
+      env: {},
+    })).resolves.toMatchObject({
+      status: 'unsupported',
+      channel: 'stable',
+      sourceChannel: 'dev',
+      latestVersion: '0.90.1',
+      message: expect.stringContaining('cannot safely replace a native CLI installation'),
+    })
+  })
+
+  it('defensively refuses to execute the legacy stable installer for a native update', async () => {
+    const fetchImpl = vi.fn()
+    await expect(downloadAndRunInstaller({
+      latestVersion: '0.90.1',
+      channel: 'stable',
+      installer: {
+        versionedUrl: 'https://download.openalice.ai/OpenAlice-0.90.1-install',
+        sha256: 'a'.repeat(64),
+      },
+    }, {
+      layout: { installRoot: '/tmp/.openalice' },
+      yes: true,
+      env: { PATH: '/bin' },
+      fetchImpl,
+      spawnImpl: vi.fn(),
+    })).rejects.toThrow('cannot safely replace a native CLI installation')
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
+
   it('never executes an installer whose release checksum differs', async () => {
     const spawnImpl = vi.fn()
     await expect(downloadAndRunInstaller({
       latestVersion: '0.88.0-beta',
+      channel: 'beta',
       installer: {
         versionedUrl: 'https://download.openalice.ai/OpenAlice-0.88.0-beta-install',
         sha256: '0'.repeat(64),
@@ -206,6 +370,31 @@ describe('OpenAlice CLI updates', () => {
       }),
       spawnImpl,
     })).rejects.toThrow('SHA-256')
+    expect(spawnImpl).not.toHaveBeenCalled()
+  })
+
+  it('requires complete dev artifact identity before executing its installer', async () => {
+    const bytes = Buffer.from('#!/usr/bin/env bash\nexit 0\n')
+    const spawnImpl = vi.fn()
+    await expect(downloadAndRunInstaller({
+      latestVersion: currentCliVersion,
+      latestCommit: '0123456789abcdef0123456789abcdef01234567',
+      channel: 'dev',
+      installer: {
+        versionedUrl: 'https://download.openalice.ai/cli/dev/releases/0123456789abcdef/install',
+        sha256: createHash('sha256').update(bytes).digest('hex'),
+      },
+    }, {
+      layout: { installRoot: '/tmp/.openalice' },
+      yes: true,
+      env: {},
+      fetchImpl: async () => ({
+        ok: true,
+        status: 200,
+        arrayBuffer: async () => bytes,
+      }),
+      spawnImpl,
+    })).rejects.toThrow('missing verified artifact identity')
     expect(spawnImpl).not.toHaveBeenCalled()
   })
 
@@ -225,7 +414,7 @@ describe('OpenAlice CLI updates', () => {
       },
       writeFileImpl: async (_path, value) => { cache = value },
       readInstallSourceImpl: async () => stableSource,
-      fetchImpl: manifestFetch(newerCliVersion),
+      fetchImpl: manifestFetch(newerStableVersion),
       stderr,
       env: {},
       now: () => Date.parse('2026-07-29T00:00:00.000Z'),
@@ -234,6 +423,38 @@ describe('OpenAlice CLI updates', () => {
     await maybeNotifyUpdate({}, dependencies)
     expect(stderr.write).toHaveBeenCalledTimes(1)
     expect(stderr.write).toHaveBeenCalledWith(expect.stringContaining('openalice update'))
+  })
+
+  it('invalidates the startup cache when the installed artifact changes', async () => {
+    let cache = null
+    let source = stableSource
+    const fetchImpl = manifestFetch(newerStableVersion)
+    const dependencies = {
+      interactive: true,
+      layout: { updateCachePath: '/tmp/update-cache.json' },
+      readFileImpl: async () => {
+        if (cache == null) throw Object.assign(new Error('missing'), { code: 'ENOENT' })
+        return cache
+      },
+      writeFileImpl: async (_path, value) => { cache = value },
+      readInstallSourceImpl: async () => source,
+      fetchImpl,
+      stderr: { isTTY: true, write: vi.fn() },
+      env: {},
+      now: () => Date.parse('2026-07-29T00:00:00.000Z'),
+    }
+    await maybeNotifyUpdate({}, dependencies)
+    source = {
+      ...stableSource,
+      schemaVersion: 3,
+      cliVersion: newerStableVersion,
+      selector: { kind: 'version', value: `v${newerStableVersion}` },
+      method: 'direct',
+      artifact: { platform: 'linux', arch: 'x64', sha256: 'f'.repeat(64) },
+      installedAt: '2026-07-29T00:01:00.000Z',
+    }
+    await maybeNotifyUpdate({}, dependencies)
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
   })
 
   it('does not make startup depend on release-check availability', async () => {
@@ -252,12 +473,15 @@ describe('OpenAlice CLI updates', () => {
   })
 })
 
-function manifestFetch(version) {
+function manifestFetch(version, options = {}) {
   const installer = '#!/usr/bin/env bash\n'
   return vi.fn(async () => ({
     ok: true,
     status: 200,
     json: async () => ({
+      ...(!options.omitChannel
+        ? { channel: version.includes('-beta') ? 'beta' : 'stable' }
+        : {}),
       version,
       releaseNotesUrl: `https://github.com/TraderAlice/OpenAlice/releases/tag/v${version}`,
       installer: {
@@ -265,6 +489,39 @@ function manifestFetch(version) {
         versionedUrl: `https://download.openalice.ai/OpenAlice-${version}-install`,
         sha256: createHash('sha256').update(installer).digest('hex'),
       },
+    }),
+  }))
+}
+
+function devManifestFetch({
+  version,
+  commit,
+  sha256,
+  contentIdentity,
+  archive = 'openalice-cli-dev-linux-x64.tar.gz',
+}) {
+  const installer = '#!/usr/bin/env bash\n'
+  return vi.fn(async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      schemaVersion: 1,
+      channel: 'dev',
+      repository: 'TraderAlice/OpenAlice',
+      version,
+      commit,
+      installer: {
+        url: 'https://download.openalice.ai/install',
+        versionedUrl: `https://download.openalice.ai/cli/dev/releases/${commit}/install`,
+        sha256: createHash('sha256').update(installer).digest('hex'),
+      },
+      targets: [{
+        platform: 'linux',
+        arch: 'x64',
+        archive,
+        sha256,
+        contentIdentity,
+      }],
     }),
   }))
 }

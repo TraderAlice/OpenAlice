@@ -11,6 +11,7 @@ import {
   preparePreviousCliReleaseArchives,
   syntheticPreviousVersion,
 } from './cli-release-fixture.mjs'
+import { bunReleaseContentIdentity } from './bun-release-content-identity.mjs'
 
 const execFileAsync = promisify(execFile)
 const temporaryPaths = []
@@ -43,6 +44,7 @@ describe.skipIf(process.platform === 'win32')('CLI prior-release fixture', () =>
         version: '0.90.0',
         contentIdentity: target.previousContentIdentity,
       })
+      expect(release.contentIdentity).toBe(bunReleaseContentIdentity(release))
       expect((await execFileAsync('tar', [
         '-xOzf', archive, `${name}/bin/openalice`,
       ])).stdout).toContain('0.90.0')
@@ -53,8 +55,10 @@ describe.skipIf(process.platform === 'win32')('CLI prior-release fixture', () =>
 
   it('keeps the synthetic version byte length stable', () => {
     expect(syntheticPreviousVersion('1.10.0')).toBe('0.99.9')
+    expect(syntheticPreviousVersion('0.91.0-beta')).toBe('0.90.9-beta')
+    expect(syntheticPreviousVersion('0.91.0-beta.1')).toBe('0.90.9-beta.1')
     expect(() => syntheticPreviousVersion('0.0.0')).toThrow('cannot derive')
-    expect(() => syntheticPreviousVersion('0.91.0-beta.1')).toThrow('stable numeric version')
+    expect(() => syntheticPreviousVersion('0.91.0-rc.1')).toThrow('stable or beta version')
   })
 })
 
@@ -78,19 +82,22 @@ async function fixture() {
     await writeFile(executablePath, `#!/bin/sh\nprintf '${version}\\n'\n`)
     await chmod(executablePath, 0o755)
     await writeFile(packagePath, `${JSON.stringify({ version })}\n`)
-    await writeFile(join(releaseRoot, 'release.json'), `${JSON.stringify({
+    const release = {
       schemaVersion: 1,
       product: 'OpenAlice CLI',
       version,
       platform,
       arch,
       bunVersion: '1.4.0',
-      contentIdentity: sha256(Buffer.from(`${platform}-${arch}`)).slice(0, 16),
+      executable: 'bin/openalice',
+      resourceRoot: 'share/openalice',
       files: [
-        fileEntry('bin/openalice', await readFile(executablePath)),
+        fileEntry('bin/openalice', await readFile(executablePath), 0o755),
         fileEntry('share/openalice/package.json', await readFile(packagePath)),
       ],
-    }, null, 2)}\n`)
+    }
+    release.contentIdentity = bunReleaseContentIdentity(release)
+    await writeFile(join(releaseRoot, 'release.json'), `${JSON.stringify(release, null, 2)}\n`)
     const archive = join(input, `${releaseName}.tar.gz`)
     await execFileAsync('tar', ['-czf', archive, '-C', root, releaseName])
     await writeFile(`${archive}.sha256`, `${sha256(await readFile(archive))}  ${basename(archive)}\n`)
@@ -98,8 +105,8 @@ async function fixture() {
   return root
 }
 
-function fileEntry(path, content) {
-  return { path, type: 'file', bytes: content.length, sha256: sha256(content) }
+function fileEntry(path, content, mode = 0o644) {
+  return { path, type: 'file', bytes: content.length, mode, sha256: sha256(content) }
 }
 
 function sha256(content) {
