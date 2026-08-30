@@ -3093,7 +3093,8 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
   -webkit-line-clamp: 2;
 }
 
-.oa-office-inspect__title-toggle {
+.oa-office-inspect__title-toggle,
+.oa-office-inspect__result-toggle {
   margin-top: 3px;
   padding: 0;
   border: 0;
@@ -3182,6 +3183,18 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+}
+
+.oa-office-inspect__latest-result p[data-expanded="true"] {
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: unset;
+}
+
+.oa-office-inspect__result-toggle {
+  display: block;
+  grid-column: 1 / -1;
+  margin-top: 4px;
 }
 
 .oa-office-inspect__latest-result time {
@@ -3385,6 +3398,10 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
 
   .oa-office-inspect__latest-result p {
     grid-column: 1 / -1;
+    grid-row: 3;
+  }
+
+  .oa-office-inspect__result-toggle {
     grid-row: 2;
   }
 

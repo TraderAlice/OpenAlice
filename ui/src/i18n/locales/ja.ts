@@ -2011,6 +2011,8 @@ export const ja: Resources = {
     runModeWorkspace: 'Workspace セッション',
     assignment: '担当任務',
     latestResult: '最新の結果',
+    showFullResult: '結果をすべて読む',
+    collapseResult: '結果を折りたたむ',
     eventTrigger: '開始元',
     eventTriggerIssue: 'Issue · {{id}}',
     eventTriggerConversation: '{{from}} からの依頼',

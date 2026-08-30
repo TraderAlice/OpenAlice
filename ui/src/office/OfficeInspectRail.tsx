@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 
 import type { OfficeDrawerItem, OfficeFloorEmployee } from '../api/office'
 import { formatRelativeTime } from '../lib/intl'
-import { officeActivityExcerpt } from './activity-text'
+import { officeActivityText } from './activity-text'
 import { officeDrawerKindLabel, officeDrawerTitles } from './drawer-presentation'
 import { officeBubbleText } from './bubble-text'
 import { officePixelImg } from './furniture'
@@ -41,11 +41,14 @@ export function OfficeInspectRail({
   const { t } = useTranslation()
   const reducedMotion = useReducedMotion()
   const titleId = useId()
+  const resultId = useId()
   const [titleExpanded, setTitleExpanded] = useState(false)
+  const [resultExpanded, setResultExpanded] = useState(false)
   const [focusedDrawerId, setFocusedDrawerId] = useState(employee?.drawers[0]?.id ?? null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const profileRef = useRef<HTMLDivElement>(null)
   const titleToggleRef = useRef<HTMLButtonElement>(null)
+  const resultToggleRef = useRef<HTMLButtonElement>(null)
   const reviewActivityRef = useRef<HTMLButtonElement>(null)
   const openButtonRef = useRef<HTMLButtonElement>(null)
   const drawerListRef = useRef<HTMLUListElement>(null)
@@ -60,6 +63,7 @@ export function OfficeInspectRail({
   useEffect(() => {
     setFocusedDrawerId(employee?.drawers[0]?.id ?? null)
     setTitleExpanded(false)
+    setResultExpanded(false)
   }, [employee?.resumeId, employee?.drawers])
 
   useLayoutEffect(() => {
@@ -69,12 +73,18 @@ export function OfficeInspectRail({
 
   const employeeLabel = employee ? officeCoworkerCallsign(employee, coworkerAsset) : ''
   const employeeAssignment = employee ? officeCoworkerAssignment(employee) : null
-  const latestResultText = officeActivityExcerpt(employee?.latestResult?.text)
+  const latestResultText = officeActivityText(employee?.latestResult?.text)
   const employeeByline = employee
     ? [employee.agent, employee.name].filter(Boolean).join(' · ')
     : ''
   const titleCanExpand = (employeeAssignment?.length ?? 0) > 72
+  const resultCanExpand = (latestResultText?.length ?? 0) > 120
   const drawerTitles = officeDrawerTitles(employee?.drawers ?? [], t)
+  const toggleLatestResult = () => {
+    setTitleExpanded(false)
+    setResultExpanded((expanded) => !expanded)
+    requestAnimationFrame(() => resultToggleRef.current?.focus({ preventScroll: true }))
+  }
 
   return (
     <aside
@@ -86,11 +96,16 @@ export function OfficeInspectRail({
       className="oa-office-inspect oa-office-window"
       onKeyDown={(event) => {
         if (event.key !== 'Escape') return
-        if (titleExpanded) {
+        if (titleExpanded || resultExpanded) {
           event.preventDefault()
           event.stopPropagation()
-          setTitleExpanded(false)
-          requestAnimationFrame(() => titleToggleRef.current?.focus({ preventScroll: true }))
+          if (resultExpanded) {
+            setResultExpanded(false)
+            requestAnimationFrame(() => resultToggleRef.current?.focus({ preventScroll: true }))
+          } else {
+            setTitleExpanded(false)
+            requestAnimationFrame(() => titleToggleRef.current?.focus({ preventScroll: true }))
+          }
           return
         }
         onClose?.()
@@ -113,7 +128,12 @@ export function OfficeInspectRail({
             if (event.key !== 'Tab' || !employee) return
             event.preventDefault()
             if (event.shiftKey) (focusedDrawerButton() ?? openButtonRef.current)?.focus()
-            else (titleToggleRef.current ?? reviewActivityRef.current ?? openButtonRef.current)?.focus()
+            else (
+              titleToggleRef.current
+              ?? resultToggleRef.current
+              ?? reviewActivityRef.current
+              ?? openButtonRef.current
+            )?.focus()
           }}
         >
           <OfficeWindowControlGlyph kind={returnToRoster ? 'back' : 'close'} />
@@ -155,17 +175,25 @@ export function OfficeInspectRail({
                     className="oa-office-inspect__title-toggle"
                     aria-controls={titleId}
                     aria-expanded={titleExpanded}
-                    onClick={() => setTitleExpanded((expanded) => !expanded)}
+                    onClick={() => {
+                      setResultExpanded(false)
+                      setTitleExpanded((expanded) => !expanded)
+                    }}
                     onKeyDown={(event) => {
                       if (isOfficeConfirmKey(event.key)) {
                         event.preventDefault()
+                        setResultExpanded(false)
                         setTitleExpanded((expanded) => !expanded)
                         return
                       }
                       if (event.key !== 'Tab') return
                       event.preventDefault()
                       if (event.shiftKey) closeButtonRef.current?.focus()
-                      else (reviewActivityRef.current ?? openButtonRef.current)?.focus()
+                      else (
+                        resultToggleRef.current
+                        ?? reviewActivityRef.current
+                        ?? openButtonRef.current
+                      )?.focus()
                     }}
                   >
                     {titleExpanded ? t('office.collapseTitle') : t('office.showFullTitle')}
@@ -183,7 +211,43 @@ export function OfficeInspectRail({
               {!employee.bubble && employee.latestResult && latestResultText && (
                 <div className="oa-office-inspect__latest-result">
                   <small>{t('office.latestResult')}</small>
-                  <p title={latestResultText}>{latestResultText}</p>
+                  {resultCanExpand && (
+                    <button
+                      type="button"
+                      ref={resultToggleRef}
+                      className="oa-office-inspect__result-toggle"
+                      aria-controls={resultId}
+                      aria-expanded={resultExpanded}
+                      onClick={toggleLatestResult}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Escape' && resultExpanded) {
+                          event.preventDefault()
+                          event.stopPropagation()
+                          setResultExpanded(false)
+                          requestAnimationFrame(() => resultToggleRef.current?.focus({ preventScroll: true }))
+                          return
+                        }
+                        if (isOfficeConfirmKey(event.key)) {
+                          event.preventDefault()
+                          toggleLatestResult()
+                          return
+                        }
+                        if (event.key !== 'Tab') return
+                        event.preventDefault()
+                        if (event.shiftKey) (titleToggleRef.current ?? closeButtonRef.current)?.focus()
+                        else (reviewActivityRef.current ?? openButtonRef.current)?.focus()
+                      }}
+                    >
+                      {resultExpanded ? t('office.collapseResult') : t('office.showFullResult')}
+                    </button>
+                  )}
+                  <p
+                    id={resultId}
+                    data-expanded={resultExpanded || undefined}
+                    title={latestResultText}
+                  >
+                    {latestResultText}
+                  </p>
                   <time dateTime={new Date(employee.latestResult.at).toISOString()}>
                     {formatRelativeTime(employee.latestResult.at)}
                   </time>
@@ -317,7 +381,11 @@ export function OfficeInspectRail({
                 }
                 if (event.key !== 'Tab') return
                 event.preventDefault()
-                if (event.shiftKey) (titleToggleRef.current ?? closeButtonRef.current)?.focus()
+                if (event.shiftKey) (
+                  resultToggleRef.current
+                  ?? titleToggleRef.current
+                  ?? closeButtonRef.current
+                )?.focus()
                 else openButtonRef.current?.focus()
               }}
             >
@@ -340,7 +408,12 @@ export function OfficeInspectRail({
               if (event.key !== 'Tab' || !onClose) return
               event.preventDefault()
               if (event.shiftKey) {
-                (reviewActivityRef.current ?? titleToggleRef.current ?? closeButtonRef.current)?.focus()
+                (
+                  reviewActivityRef.current
+                  ?? resultToggleRef.current
+                  ?? titleToggleRef.current
+                  ?? closeButtonRef.current
+                )?.focus()
               }
               else (focusedDrawerButton() ?? closeButtonRef.current)?.focus()
             }}

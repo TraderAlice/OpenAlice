@@ -1,5 +1,5 @@
-export function officeActivityExcerpt(value: string | undefined): string | undefined {
-  const normalized = value
+export function officeActivityText(value: string | undefined): string | undefined {
+  return value
     ?.replace(/```(?:[^\n]*)\n?([\s\S]*?)```/g, '$1')
     .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
@@ -12,6 +12,10 @@ export function officeActivityExcerpt(value: string | undefined): string | undef
     .replace(/\\([\\`*{}[\]()#+\-.!_>])/g, '$1')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+export function officeActivityExcerpt(value: string | undefined): string | undefined {
+  const normalized = officeActivityText(value)
   if (!normalized) return undefined
   return normalized.length > 180 ? `${normalized.slice(0, 179)}…` : normalized
 }

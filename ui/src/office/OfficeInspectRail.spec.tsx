@@ -157,6 +157,44 @@ describe('OfficeInspectRail', () => {
     expect(container.textContent).not.toContain('headless')
   })
 
+  it('lets keyboard players read and collapse a complete latest result', async () => {
+    const onClose = vi.fn()
+    const result = `The full shift report is ready. ${'Detailed evidence remains visible. '.repeat(12)}`
+    const normalizedResult = result.trim()
+    const { container } = render(
+      <OfficeInspectRail
+        employee={{
+          ...employee,
+          awake: false,
+          mood: 'idle',
+          bubble: null,
+          latestResult: { text: result, at: Date.now() - 60_000 },
+        }}
+        roomName="Prediction"
+        onOpen={vi.fn()}
+        onOpenDrawer={vi.fn()}
+        onClose={onClose}
+      />,
+    )
+
+    const resultText = screen.getByText(normalizedResult)
+    expect(resultText.textContent?.length).toBeGreaterThan(180)
+    expect(resultText.textContent?.endsWith('…')).toBe(false)
+    const toggle = screen.getByRole('button', { name: 'Read full result' })
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    expect(resultText.getAttribute('data-expanded')).toBeNull()
+
+    await userEvent.click(toggle)
+    expect(screen.getByRole('button', { name: 'Collapse result' }).getAttribute('aria-expanded')).toBe('true')
+    expect(resultText.getAttribute('data-expanded')).toBe('true')
+    expect(container.querySelector('.oa-office-inspect__latest-result p')?.textContent).toBe(normalizedResult)
+
+    await userEvent.keyboard('{Escape}')
+    expect(screen.getByRole('button', { name: 'Read full result' }).getAttribute('aria-expanded')).toBe('false')
+    expect(document.activeElement).toBe(toggle)
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
   it('keeps a stopped failure actionable while preserving asleep power state', async () => {
     const onReviewActivity = vi.fn()
     render(

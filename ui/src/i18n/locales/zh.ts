@@ -2010,6 +2010,8 @@ export const zh: Resources = {
     runModeWorkspace: '工作区会话',
     assignment: '当前委托',
     latestResult: '最近结果',
+    showFullResult: '阅读完整结果',
+    collapseResult: '收起结果',
     eventTrigger: '启动来源',
     eventTriggerIssue: 'Issue · {{id}}',
     eventTriggerConversation: '来自 {{from}} 的请求',

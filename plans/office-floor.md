@@ -4878,6 +4878,24 @@ Repeated drawer-record identity follow-up (2026-08-31):
   passed all 619 test files and 5,189 tests (one file and nine tests skipped); the production UI build passed with only
   the existing ports fallback and large-chunk advisory.
 
+Expandable latest-result dialogue follow-up (2026-08-31):
+
+- Continued through Prediction g2's real Agent file. Its 973-character cleaned latest result was hard-cut at 180
+  characters in the player-facing UI, so keyboard and touch players could see that work completed but could not read
+  what the coworker actually found.
+- Compared always showing the full result, relying on a hover tooltip, and a compact game-dialogue disclosure. Chose the
+  disclosure: the default two-line summary preserves the Agent-file hierarchy, while `Read full result` reveals the
+  complete cleaned text inside the existing scrolling profile without requiring hover or exposing markup.
+- Split full activity text cleaning from the short floor-callout excerpt, added localized expand/collapse controls, and
+  made long assignment and result disclosures mutually exclusive. The result toggle stays above expanded copy so it
+  remains reachable, and Escape now belongs to the innermost disclosure first: one press collapses and restores focus;
+  the next returns to the Team roster.
+- Real-browser acceptance exercised Prediction g2's complete result. The collapsed copy remained a two-line 36px block,
+  expansion exposed the full tail inside the 360px scrolling profile, mouse collapse restored the compact state, and
+  keyboard Escape collapsed before returning to the roster. Focused activity-text and Agent-file suites passed all 7
+  tests. Root and UI TypeScript passed; the full suite passed all 620 test files and 5,191 tests (one file and nine tests
+  skipped); the production UI build passed with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

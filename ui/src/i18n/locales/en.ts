@@ -2043,6 +2043,8 @@ export const en = {
     runModeWorkspace: 'Workspace session',
     assignment: 'Assignment',
     latestResult: 'Latest result',
+    showFullResult: 'Read full result',
+    collapseResult: 'Collapse result',
     eventTrigger: 'Started by',
     eventTriggerIssue: 'Issue · {{id}}',
     eventTriggerConversation: 'Request from {{from}}',

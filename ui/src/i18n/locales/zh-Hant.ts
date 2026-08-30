@@ -2018,6 +2018,8 @@ export const zhHant: Resources = {
     runModeWorkspace: '工作區工作階段',
     assignment: '目前委託',
     latestResult: '最近結果',
+    showFullResult: '閱讀完整結果',
+    collapseResult: '收起結果',
     eventTrigger: '啟動來源',
     eventTriggerIssue: 'Issue · {{id}}',
     eventTriggerConversation: '來自 {{from}} 的請求',
