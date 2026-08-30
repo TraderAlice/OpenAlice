@@ -100,10 +100,13 @@ public.
 For every non-prerelease, the release workflow first downloads all four
 archives anonymously from their final public GitHub Release URLs and verifies
 their bytes plus public SHA-256 sidecars against the accepted channel manifest.
-It then downloads the public formula, `PKGBUILD`, `.SRCINFO`, and npm publish
-order and compares them byte-for-byte with the preserved publication inputs. A
-30-day verification receipt is retained. npm, Tap, and AUR publication all
-depend on that receipt; none can publish from a private Actions artifact alone.
+It then downloads the public formula, `PKGBUILD`, `openalice-bin.SRCINFO`, and
+npm publish order and compares them byte-for-byte with the preserved publication
+inputs. GitHub Release assets cannot retain a leading-dot filename, so the
+public `openalice-bin.SRCINFO` asset is the exact byte-for-byte copy that is
+installed as `.SRCINFO` in the AUR repository. A 30-day verification receipt is
+retained. npm, Tap, and AUR publication all depend on that receipt; none can
+publish from a private Actions artifact alone.
 
 External channels are explicit release switches:
 

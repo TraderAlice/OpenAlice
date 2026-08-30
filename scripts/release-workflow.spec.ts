@@ -272,6 +272,7 @@ describe('Release workflow critical path', () => {
 
   it('verifies public release bytes before activating external package channels', () => {
     const verify = workflow.jobs['verify-public-cli-channels']
+    const publication = workflow.jobs['publish-release']
     expect(needs(verify)).toEqual([
       'release',
       'publish-release',
@@ -282,6 +283,36 @@ describe('Release workflow critical path', () => {
       .toContain('verify-public-cli-channels.mjs')
     expect(step(verify, 'Compare public metadata with the accepted publication inputs').run)
       .toContain('cmp dist/cli-package-channels/cli-package-channels/homebrew/openalice.rb')
+    const stageSrcinfo = step(publication, 'Stage GitHub-safe AUR metadata asset')
+    expect(stageSrcinfo.if).toBe("needs.release.outputs.channel == 'stable'")
+    expect(stageSrcinfo.run).toContain(
+      'aur/.SRCINFO dist/release-cli-packages/cli-package-channels/aur/openalice-bin.SRCINFO',
+    )
+    const stableFiles = step(
+      publication,
+      'Create stable tag and GitHub Release from accepted candidates',
+    ).with?.files
+    const betaFiles = step(
+      publication,
+      'Create beta tag and GitHub prerelease from accepted candidates',
+    ).with?.files
+    expect(stableFiles).toContain('aur/openalice-bin.SRCINFO')
+    expect(stableFiles).not.toContain('aur/.SRCINFO')
+    expect(betaFiles).not.toContain('openalice-bin.SRCINFO')
+    expect(betaFiles).not.toContain('aur/.SRCINFO')
+
+    const acceptedInputs = step(
+      workflow.jobs['build-cli-package-channels'],
+      'Preserve package-manager publication inputs',
+    )
+    expect(acceptedInputs.with?.path).toContain('aur/.SRCINFO')
+    expect(acceptedInputs.with?.path).not.toContain('openalice-bin.SRCINFO')
+    expect(acceptedInputs.with?.['include-hidden-files']).toBe(true)
+
+    const compare = step(verify, 'Compare public metadata with the accepted publication inputs').run ?? ''
+    expect(compare).toContain('--pattern openalice-bin.SRCINFO')
+    expect(compare).toContain('aur/.SRCINFO dist/public-cli-channels/openalice-bin.SRCINFO')
+    expect(compare).not.toContain('--pattern .SRCINFO')
 
     const homebrew = workflow.jobs['publish-cli-homebrew']
     expect(needs(homebrew)).toContain('verify-public-cli-channels')
@@ -299,8 +330,12 @@ describe('Release workflow critical path', () => {
     const aurCheckout = step(aur, 'Check out the AUR package repository').run ?? ''
     expect(aurCheckout).toContain('AUR_KNOWN_HOSTS')
     expect(aurCheckout).not.toContain('ssh-keyscan')
-    expect(step(aur, 'Activate the verified package metadata in AUR').run)
-      .toContain('git diff --cached --quiet')
+    const activateAur = step(aur, 'Activate the verified package metadata in AUR').run ?? ''
+    expect(activateAur).toContain(
+      'dist/cli-package-channels/cli-package-channels/aur/.SRCINFO aur/.SRCINFO',
+    )
+    expect(activateAur).not.toContain('openalice-bin.SRCINFO')
+    expect(activateAur).toContain('git diff --cached --quiet')
   })
 
   it('keeps beta mirrors away from stable aliases', () => {

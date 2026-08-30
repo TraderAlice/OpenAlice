@@ -12,10 +12,12 @@ Related owner guides:
 ## Goal
 
 Separate source integration from product publication, then prove the new
-contract by releasing the same accepted 0.90.2 line first as beta and later as
-stable. Existing Bun/native CLI work already present in `dev` remains part of
-the candidate, but this plan does not introduce another Bun architecture or
-packaging redesign.
+contract by releasing a 0.90.2 beta checkpoint, continuing ordinary fixes on
+`dev`, and later releasing the accepted stable checkpoint. A beta may be
+promoted unchanged when it needs no repair, but beta and stable are independent
+release intents rather than two labels emitted from one build. Existing
+Bun/native CLI work already present in `dev` remains part of the candidate, but
+this plan does not introduce another Bun architecture or packaging redesign.
 
 ## Scope
 
@@ -48,6 +50,12 @@ this release line.
 human-promoted release source, but merging to `master` does not publish. A
 maintainer manually dispatches the workflow from the exact `master` commit and
 supplies both a channel and tag.
+
+Beta is a public test checkpoint, not the stable artifact produced early. After
+`beta.1`, fixes continue on `dev`, pass the normal promotion gate, and may become
+`beta.2` before a later stable intent. Stable therefore builds from the latest
+accepted `master`; it may have the same source as the last beta only when no
+intervening fix was needed.
 
 ### Channel and version are one contract
 
@@ -184,6 +192,12 @@ appropriate.
   that non-HTTP socket while closing. The probe now rejects accidental clients
   immediately; the repaired `dev` source must complete preview and promotion
   again before either 0.90.2 tag is attempted.
+- GitHub Release does not retain a leading-dot asset name: uploading the AUR
+  `.SRCINFO` exposed it as `default.SRCINFO`, so the final public metadata
+  receipt could not download the requested name even though the accepted and
+  public bytes matched. Release publication now stages an exact copy as
+  `openalice-bin.SRCINFO` for GitHub while AUR activation continues to install
+  the accepted source file as the standard repository-local `.SRCINFO`.
 
 ## Work Plan
 
@@ -247,11 +261,19 @@ appropriate.
 - [x] Verify the GitHub prerelease and all 49 assets, beta updater feeds, beta
   CLI manifest, shared installer, a clean external install/Runtime/uninstall,
   and byte-for-byte unchanged stable feeds and download aliases.
-- [ ] Merge the bounded Workspace-tag repair to `dev`, promote it normally, and
+- [x] Merge the bounded Workspace-tag repair to `dev`, promote it normally, and
   refresh the stable version-only PR #1265 from the repaired `master` source.
-- [ ] Set both product package versions to `0.90.2`, dispatch `stable` +
-  `v0.90.2`, and verify GitHub, updater, CDN, installer, Broker Pack, and opted-in
-  package-manager publication evidence.
+- [x] Set both product package versions to `0.90.2`, dispatch `stable` +
+  `v0.90.2`, and publish the accepted GitHub Release plus R2 mirrors from exact
+  source `cb199051` (Release workflow `33322819923`).
+- [x] Independently verify GitHub, updater, CDN, installer, and Broker Pack
+  surfaces, including a clean native install/Runtime/uninstall and unchanged
+  beta manifest/feeds. npm, Homebrew, and AUR activation remain intentionally
+  disabled until their external publication authority exists.
+- [ ] Merge the GitHub-safe `.SRCINFO` public asset-name repair. The original
+  workflow remains honestly red at its final metadata-name comparison; after
+  renaming that same public asset, a recovery check compared all five public
+  metadata files byte-for-byte with run `33322819923`'s accepted artifact.
 
 ## Completion Criteria
 
