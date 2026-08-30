@@ -4475,6 +4475,24 @@ Deterministic Agent-file confirm follow-up (2026-08-31):
   618 test files and 5,178 tests (one file and nine tests skipped); the production UI build passed with only the existing
   ports fallback and large-chunk advisory.
 
+Roving service-journal follow-up (2026-08-31):
+
+- Played the physical News and Inbox terminals through auto-walk, service-specific journal channel, selected event,
+  product exit, and return. Both terminals chose the correct live event (`News #5031`, `Inbox #4254`), but every row in
+  the 50-entry News journal remained `tabIndex=0`; reaching `Find on floor` or `Open News` by Tab meant crossing all
+  remaining records despite the visible instruction already assigning record movement to Up/Down.
+- Compared leaving native tab order, hiding the whole journal from Tab, and using the conventional roving composite-list
+  model. Chose roving focus: only the selected record is a Tab stop; Arrow Up/Down, Home/End, and channel Left/Right keep
+  moving and selecting inside the list. Tab now changes regions instead of duplicating the journal's own navigation.
+- Applied the established Office confirm contract to the same detail surface: Back, full-report toggle, aggregate-update
+  toggle, `Find on floor`, `Open Runs`, `Open Inbox`, and `Open News` explicitly consume Enter/Space while pointer clicks
+  remain unchanged. This keeps the journal's record and action layers deterministic on browser and desktop hosts.
+- Real-browser acceptance measured News row tab indices as `[0,-1,-1,-1,-1,-1…]` with `News50/#5031` selected, then
+  opened `/market/news` from `Open News` using Enter. Inbox measured `[0,-1,-1,-1…]` with `Inbox6/#4254` selected and
+  opened `/inbox` using Space. Focused Runtime-section tests passed 17 cases. Root and UI TypeScript passed; the full
+  suite passed all 618 test files and 5,178 tests (one file and nine tests skipped); the production UI build passed with
+  only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

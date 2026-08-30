@@ -10,6 +10,7 @@ import { OFFICE_COWORKER_SPRITES } from '../office/coworker-sprites'
 import { OfficeRuntimeSection, revealOfficeJournalRow } from './OfficeRuntimeSection'
 
 const query = vi.fn()
+const openOrFocus = vi.fn()
 
 function mockJournal(entries: Array<{ type: string } & Record<string, unknown>>) {
   query.mockImplementation(async (opts: { family?: string; page?: number; pageSize?: number } = {}) => {
@@ -44,11 +45,12 @@ vi.mock('../api', () => ({
 
 vi.mock('../tabs/store', () => ({
   useWorkspace: (select: (state: { openOrFocus: () => void }) => unknown) =>
-    select({ openOrFocus: vi.fn() }),
+    select({ openOrFocus }),
 }))
 
 beforeEach(async () => {
   query.mockReset()
+  openOrFocus.mockReset()
   useInboxSelection.getState().select(null)
   await i18n.changeLanguage('en')
 })
@@ -121,6 +123,8 @@ describe('OfficeRuntimeSection', () => {
     expect(screen.getByRole('button', { name: 'Open Runs' })).toBeTruthy()
     expect(screen.getByRole('button', { name: /Task started.*Market Scout.*#0001/i }).getAttribute('aria-pressed'))
       .toBe('true')
+    expect(screen.getByRole('button', { name: /Task started.*Market Scout.*#0001/i }).tabIndex)
+      .toBe(0)
     expect(document.activeElement).toBe(
       screen.getByRole('button', { name: /Task started.*Market Scout.*#0001/i }),
     )
@@ -342,6 +346,8 @@ describe('OfficeRuntimeSection', () => {
       .toBe('ArrowUp ArrowDown ArrowLeft ArrowRight Home End Enter Space')
 
     await userEvent.click(overviewToolRow)
+    expect(overviewToolRow.tabIndex).toBe(0)
+    expect(screen.getByRole('button', { name: /News added.*#0004/i }).tabIndex).toBe(-1)
     await userEvent.keyboard('{ArrowRight}')
     expect(screen.getByRole('tab', { name: /Agent\s*2/ }).getAttribute('data-active')).not.toBeNull()
     expect(document.activeElement).toBe(screen.getByRole('button', { name: /Tool action.*#0002/i }))
@@ -426,6 +432,7 @@ describe('OfficeRuntimeSection', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Open Inbox' }))
     expect(useInboxSelection.getState().selectedEntryId).toBe('inbox-7')
+    expect(openOrFocus).toHaveBeenLastCalledWith({ kind: 'inbox', params: {} })
   })
 
   it('keeps product events in All when agent activity fills its own page', async () => {
@@ -726,7 +733,9 @@ describe('OfficeRuntimeSection', () => {
     render(<OfficeRuntimeSection onReplay={onReplay} />)
 
     await userEvent.click(await screen.findByRole('button', { name: /Agent report.*#0007/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'Find on floor' }))
+    const replay = screen.getByRole('button', { name: 'Find on floor' })
+    replay.focus()
+    await userEvent.keyboard('{Enter}')
 
     expect(onReplay).toHaveBeenCalledWith({
       seq: 7,
@@ -735,6 +744,8 @@ describe('OfficeRuntimeSection', () => {
       summary: 'Earlier report.',
       channel: 'overview',
     })
+    await userEvent.keyboard(' ')
+    expect(onReplay).toHaveBeenCalledTimes(2)
   })
 
   it('returns to the same journal channel after locating an event on the floor', async () => {

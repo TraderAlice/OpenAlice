@@ -516,6 +516,18 @@ export function OfficeRuntimeSection({
     setChannel(value as OfficeLogChannel)
     setMobileView('index')
   }
+  const confirmRuntimeAction = (
+    event: KeyboardEvent<HTMLButtonElement>,
+    action: () => void,
+  ) => {
+    if (!isOfficeConfirmKey(event.key)) return
+    event.preventDefault()
+    action()
+  }
+  const toggleReport = () => {
+    reportToggleFocusPendingRef.current = true
+    setDetailExpanded((expanded) => !expanded)
+  }
   const reportToggle = detailCanExpand ? (
     <button
       type="button"
@@ -523,10 +535,8 @@ export function OfficeRuntimeSection({
       className="oa-office-runtime__detail-toggle"
       aria-controls={selectedDetailId}
       aria-expanded={detailExpanded}
-      onClick={() => {
-        reportToggleFocusPendingRef.current = true
-        setDetailExpanded((expanded) => !expanded)
-      }}
+      onClick={toggleReport}
+      onKeyDown={(event) => confirmRuntimeAction(event, toggleReport)}
     >
       {detailExpanded ? t('office.collapseReport') : t('office.showFullReport')}
     </button>
@@ -630,6 +640,7 @@ export function OfficeRuntimeSection({
                 <button
                   type="button"
                   aria-pressed={active}
+                  tabIndex={active ? 0 : -1}
                   data-kind={kind}
                   data-seq={event.seq}
                   onClick={() => selectJournalEvent(event.seq)}
@@ -683,6 +694,7 @@ export function OfficeRuntimeSection({
             ref={journalBackRef}
             className="oa-office-runtime__back"
             onClick={returnToJournalIndex}
+            onKeyDown={(event) => confirmRuntimeAction(event, returnToJournalIndex)}
           >
             <span aria-hidden>←</span>
             {t('office.logBackToRecords')}
@@ -748,6 +760,10 @@ export function OfficeRuntimeSection({
                   aria-controls={`office-runtime-beat-${selectedEvent.seq}`}
                   aria-expanded={beatExpanded}
                   onClick={() => setBeatExpanded((expanded) => !expanded)}
+                  onKeyDown={(event) => confirmRuntimeAction(
+                    event,
+                    () => setBeatExpanded((expanded) => !expanded),
+                  )}
                 >
                   {beatExpanded
                     ? t('office.collapseBeatUpdates')
@@ -794,6 +810,14 @@ export function OfficeRuntimeSection({
                   officeReplaySummary(selectedEvent, t),
                   channel,
                 ))}
+                onKeyDown={(event) => confirmRuntimeAction(event, () => onReplay(
+                  officeReplayFocusForEvent(
+                    selectedEvent,
+                    selectedIdentity.primary,
+                    officeReplaySummary(selectedEvent, t),
+                    channel,
+                  ),
+                ))}
               >
                 <img src={OFFICE_HUD_ASSETS.replayLatch} alt="" aria-hidden style={officePixelImg} />
                 {t('office.replayEvent')}
@@ -806,6 +830,10 @@ export function OfficeRuntimeSection({
                 type="button"
                 className="oa-office-runtime__open"
                 onClick={() => openOrFocus({ kind: 'automation', params: { section: 'runs' } })}
+                onKeyDown={(event) => confirmRuntimeAction(
+                  event,
+                  () => openOrFocus({ kind: 'automation', params: { section: 'runs' } }),
+                )}
               >
                 <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" aria-hidden style={officePixelImg} />
                 {t('office.openRun')}
@@ -821,6 +849,12 @@ export function OfficeRuntimeSection({
                   }
                   openOrFocus({ kind: 'inbox', params: {} })
                 }}
+                onKeyDown={(event) => confirmRuntimeAction(event, () => {
+                  if (selectedPayload.inboxEntryId) {
+                    useInboxSelection.getState().select(selectedPayload.inboxEntryId)
+                  }
+                  openOrFocus({ kind: 'inbox', params: {} })
+                })}
               >
                 <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" aria-hidden style={officePixelImg} />
                 {t('office.interactInbox')}
@@ -831,6 +865,10 @@ export function OfficeRuntimeSection({
                 type="button"
                 className="oa-office-runtime__open"
                 onClick={() => openOrFocus({ kind: 'news', params: {} })}
+                onKeyDown={(event) => confirmRuntimeAction(
+                  event,
+                  () => openOrFocus({ kind: 'news', params: {} }),
+                )}
               >
                 <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" aria-hidden style={officePixelImg} />
                 {t('office.interactNews')}
