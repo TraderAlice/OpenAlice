@@ -135,13 +135,18 @@ describe('OfficeBuilding', () => {
     expect(screen.queryByLabelText('Current floor view: Live map')).toBeNull()
     await userEvent.click(screen.getByRole('menuitem', { name: 'Live map' }))
     expect(onReturnLive).toHaveBeenCalledTimes(1)
-    expect(document.activeElement).toBe(menuTrigger)
+    const map = screen.getByTestId('office-floor')
+    await waitFor(() => expect(document.activeElement).toBe(map))
 
     const returnLive = screen.getByRole('button', { name: 'Return live' })
     expect(returnLive.textContent).toContain('↩')
     expect(returnLive.textContent).toContain('Live')
     await userEvent.click(returnLive)
     expect(onReturnLive).toHaveBeenCalledTimes(2)
+    await waitFor(() => expect(document.activeElement).toBe(map))
+    const leftBeforeMove = replayAlice.style.left
+    await userEvent.keyboard('{ArrowRight}')
+    expect(replayAlice.style.left).not.toBe(leftBeforeMove)
   })
 
   it('leaves the active Replay menu as the only Live exit while the floor is suspended', () => {

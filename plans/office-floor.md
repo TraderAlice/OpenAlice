@@ -3978,6 +3978,23 @@ Activity-journal return-stack follow-up (2026-08-30):
   and nine tests skipped), and the production UI build passed with only the existing ports fallback and large-chunk
   advisories.
 
+Replay-to-Live control handoff follow-up (2026-08-30):
+
+- Played the real Activity log → `Find on floor` → Replay loop. The snapshot composition, focused `SEQ 4806` beacon,
+  active ratios, and direct Live command all read clearly, but clicking Live removed its own button and left focus on
+  the document body. The floor looked playable again while the next arrow key was silently ignored.
+- Compared retaining an invisible command, capturing movement keys globally, and explicitly returning control to the
+  world surface. Chose the floor handoff: it follows the same pause-menu contract, leaves ordinary document keyboard
+  semantics intact, and makes returning to Live feel like resuming play rather than completing a web navigation.
+- Both Replay exits now share the handoff. The HUD Live command invokes the live transition and focuses
+  `office-floor` after the render; Menu → Live map closes with normal floor-focus restoration instead of suppressing
+  it. The focused replay test also proves that the next directional key changes Alice's position.
+- Real-browser acceptance confirmed the direct HUD path ended with `office-floor` active. The Menu path removed the
+  menu and Replay state, focused the floor, and the immediate ArrowUp moved Alice from y552 to y528. The focused
+  Building suite passed all 18 tests. Root and UI TypeScript passed, the full suite passed all 617 test files and 5,166
+  tests (one file and nine tests skipped), and the production UI build passed with only the existing ports fallback
+  and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

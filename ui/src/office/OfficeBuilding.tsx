@@ -602,6 +602,10 @@ export function OfficeBuilding({
     if (!restoreFocus) restoreFloorFocusRef.current = false
     setMenuOpen(false)
   }
+  const returnToLiveFloor = () => {
+    onReturnLive?.()
+    requestAnimationFrame(() => viewportRef.current?.focus({ preventScroll: true }))
+  }
   const activateNearbyTarget = () => {
     if (!nearbyTarget || selected || departingWorkspace || floorInteractionSuspended) return
     activateTarget(nearbyTarget)
@@ -973,7 +977,7 @@ export function OfficeBuilding({
               type="button"
               className="oa-office-replay-exit"
               aria-label={t('office.replayReturnLive')}
-              onClick={onReturnLive}
+              onClick={returnToLiveFloor}
             >
               <span className="oa-office-replay-exit__arrow" aria-hidden>↩</span>
               {t('office.replayLive')}
@@ -1044,8 +1048,8 @@ export function OfficeBuilding({
                   {onReturnLive && (
                     <DropdownMenuItem
                       onClick={() => {
-                        closeFloorMenu(false)
-                        onReturnLive()
+                        closeFloorMenu()
+                        returnToLiveFloor()
                       }}
                     >
                       <img src={OFFICE_HUD_ASSETS.resetCompass} alt="" aria-hidden style={officePixelImg} />
