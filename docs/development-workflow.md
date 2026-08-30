@@ -13,11 +13,13 @@ Canonical startup rules: [[AGENTS.md]]. Guide index: [[docs/README.md]].
   testable preview environment. Merged installer changes are exercised through
   the mutable `raw/.../dev/install` endpoint with a matching `--branch dev`
   payload selector.
-- `master` is the stable/user-facing lane and the default GitHub branch. A
-  `dev` to `master` merge is a versioned release event, not another integration
-  step.
-- Release automation runs from `master` and derives public artifacts from the
-  accepted release tag. It is the only path that updates stable CDN aliases.
+- `master` is the stable/user-facing source lane and the default GitHub branch.
+  A `dev` to `master` merge establishes stable source but does not choose a
+  version or publish a release.
+- Release automation is dispatched manually from `master` with an explicit
+  tag. The tag version and both product package manifests must agree before
+  candidate work begins. The accepted tag is the only path that updates stable
+  CDN aliases.
 - `archive/dev-pre-beta6` is a historical snapshot; do not modify or delete it.
 - `local` is a legacy shared-worktree branch. It is not the default workflow;
   audit its unmerged commits before deciding whether to retain or retire it.
@@ -335,10 +337,9 @@ ownership.
 
 ## Promotion: `dev` to `master`
 
-Promotion is a human-directed, versioned release decision. Do not merge
-unreleased follow-up work to `master` merely to make a public alias catch up;
-finish and test it in the active `dev` environment, then include it in the next
-release.
+Promotion is a human-directed stable-source decision, not a release trigger.
+Do not merge unfinished follow-up work to `master` merely to make a public
+alias catch up; finish and test it in the active `dev` environment first.
 
 ```bash
 git fetch origin
@@ -354,18 +355,22 @@ Before merging a promotion:
 - follow [[docs/cli-installer.md]]; require the checkout installer/remote jobs
   and the post-merge live dev-channel job to be green, and walk the interactive
   installer locally when its human-facing flow changed;
-- confirm the new release version, notes, and tag intent; the release workflow
-  must see a version whose tag does not already exist, and the root and
-  `packages/cli` manifests must carry that same product version;
 - confirm CI and release workflow triggers still match the branch policy.
 
+After promotion, a maintainer may prepare a separate version-only change when
+the stable source is ready to release. Run the `Release` workflow manually from
+`master`, choose the `release` operation, and supply the intended `vX.Y.Z` tag.
+The workflow rejects a tag that already exists or disagrees with either the
+root or `packages/cli` package version. It binds the accepted candidates and
+the eventual tag to the dispatch commit SHA.
+
 The release workflow repeats the deterministic installer and managed-remote
-acceptance against the exact master candidate before it can create the tag and
+acceptance against that exact master candidate before it can create the tag and
 GitHub Release. It then creates the versioned installer from that tag, mirrors
 the same bytes to `download.openalice.ai/install`, writes the manifest checksum,
-and verifies both CDN objects. A manual `mirror_tag` run is recovery-only: it
-checks out that existing tag and may reproduce its bytes, but must never source
-an installer from current `master`.
+and verifies both CDN objects. A manual `mirror` operation is recovery-only: it
+requires an existing tag, checks out that tag, and may reproduce its bytes, but
+must never source an installer from current `master`.
 
 Desktop promotion evidence includes a real N-1 state journey on Apple Silicon,
 Intel macOS, and Windows. PR package jobs seed state with the previous published

@@ -1,15 +1,19 @@
 name: Release
 
 on:
-  push:
-    # Releases are cut only from the stable user-facing lane. Routine work
-    # lands on dev first and reaches release eligibility through promotion.
-    branches: [master]
   workflow_dispatch:
     inputs:
-      mirror_tag:
-        description: Existing release tag to mirror to the download CDN without cutting a new release.
-        required: false
+      operation:
+        description: Create a new release or repair the mirrors for an existing release.
+        required: true
+        default: release
+        type: choice
+        options:
+          - release
+          - mirror
+      tag:
+        description: Release tag, for example v0.91.0.
+        required: true
         type: string
 
 jobs:
@@ -19,29 +23,76 @@ jobs:
     permissions:
       contents: write
     outputs:
-      # Whether this push introduces a version that does not have a tag yet.
+      # Whether this dispatch requests a new release. The tag/package version
+      # contract is validated before any expensive candidate jobs begin.
       # The tag and GitHub Release are deliberately created only after every
       # platform builds and passes Workspace acceptance.
-      created: ${{ !github.event.inputs.mirror_tag && steps.check.outputs.exists == 'false' }}
-      version: ${{ steps.version.outputs.version }}
-      tag: ${{ github.event.inputs.mirror_tag || steps.version.outputs.tag }}
-      prerelease: ${{ steps.version.outputs.prerelease }}
-      previous_tag: ${{ steps.version.outputs.previous_tag }}
+      created: ${{ steps.plan.outputs.created }}
+      operation: ${{ steps.plan.outputs.operation }}
+      version: ${{ steps.plan.outputs.version }}
+      tag: ${{ steps.plan.outputs.tag }}
+      prerelease: ${{ steps.plan.outputs.prerelease }}
+      previous_tag: ${{ steps.plan.outputs.previous_tag }}
+      source_sha: ${{ steps.plan.outputs.source_sha }}
 
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # full history for git-cliff
 
-      - name: Get version from package.json
-        id: version
+      - name: Validate release intent and version authority
+        id: plan
+        env:
+          OPERATION: ${{ inputs.operation }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          SOURCE_REF: ${{ github.ref }}
+          SOURCE_SHA: ${{ github.sha }}
         run: |
-          VERSION=$(node -p "require('./package.json').version")
-          CLI_VERSION=$(node -p "require('./packages/cli/package.json').version")
-          test "$CLI_VERSION" = "$VERSION"
+          set -euo pipefail
+
+          if [ "$OPERATION" != "release" ] && [ "$OPERATION" != "mirror" ]; then
+            echo "Operation must be release or mirror, got: $OPERATION" >&2
+            exit 1
+          fi
+
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Release tag must look like v0.91.0 or v0.91.0-beta.1, got: $RELEASE_TAG" >&2
+            exit 1
+          fi
+
+          VERSION="${RELEASE_TAG#v}"
+          if [ "$OPERATION" = "release" ]; then
+            if [ "$SOURCE_REF" != "refs/heads/master" ]; then
+              echo "Stable releases must be dispatched from master, got: $SOURCE_REF" >&2
+              exit 1
+            fi
+
+            PACKAGE_VERSION=$(node -p "require('./package.json').version")
+            CLI_VERSION=$(node -p "require('./packages/cli/package.json').version")
+            if [ "$PACKAGE_VERSION" != "$VERSION" ] || [ "$CLI_VERSION" != "$VERSION" ]; then
+              echo "Release tag $RELEASE_TAG requires package versions $VERSION; root=$PACKAGE_VERSION cli=$CLI_VERSION" >&2
+              exit 1
+            fi
+
+            if git rev-parse "$RELEASE_TAG" >/dev/null 2>&1; then
+              echo "Release tag already exists: $RELEASE_TAG" >&2
+              exit 1
+            fi
+            CREATED=true
+          else
+            if ! git rev-parse "$RELEASE_TAG^{commit}" >/dev/null 2>&1; then
+              echo "Mirror repair requires an existing release tag: $RELEASE_TAG" >&2
+              exit 1
+            fi
+            CREATED=false
+          fi
+
+          echo "created=$CREATED" >> "$GITHUB_OUTPUT"
+          echo "operation=$OPERATION" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
           echo "previous_tag=$(git describe --tags --abbrev=0 2>/dev/null || true)" >> "$GITHUB_OUTPUT"
+          echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
 
           # Determine if pre-release (contains - like beta.1, rc.1)
           if [[ "$VERSION" == *-* ]]; then
@@ -50,21 +101,12 @@ jobs:
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Check if tag already exists
-        id: check
-        run: |
-          if git rev-parse "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Install git-cliff
-        if: steps.check.outputs.exists == 'false' && !github.event.inputs.mirror_tag
+        if: steps.plan.outputs.created == 'true'
         uses: kenji-miyake/setup-git-cliff@v2
 
       - name: Generate release notes
-        if: steps.check.outputs.exists == 'false' && !github.event.inputs.mirror_tag
+        if: steps.plan.outputs.created == 'true'
         id: notes
         run: |
           # Generate notes for this version only (since last tag).
@@ -72,7 +114,7 @@ jobs:
           # BEFORE the tag exists (it's created only after candidate acceptance), so without
           # this the section header falls back to "[Unreleased]" instead of
           # the version. See cliff.toml's `{% if version %}` template.
-          TAG="${{ steps.version.outputs.tag }}"
+          TAG="${{ steps.plan.outputs.tag }}"
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           if [ -z "$LAST_TAG" ]; then
             git-cliff --tag "$TAG" --output notes.md
@@ -81,7 +123,7 @@ jobs:
           fi
 
       - name: Preserve release notes for gated publication
-        if: steps.check.outputs.exists == 'false' && !github.event.inputs.mirror_tag
+        if: steps.plan.outputs.created == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: release-notes
@@ -91,7 +133,7 @@ jobs:
   preflight-public-cli-authority:
     name: Preflight public CLI channel authority
     needs: release
-    if: needs.release.outputs.created == 'true' && !github.event.inputs.mirror_tag
+    if: needs.release.outputs.created == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -124,7 +166,7 @@ jobs:
   # unsigned until a Windows code-signing certificate exists.
   build-desktop:
     needs: [release, preflight-public-cli-authority]
-    if: needs.release.outputs.created == 'true' && !github.event.inputs.mirror_tag
+    if: needs.release.outputs.created == 'true'
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -259,7 +301,7 @@ jobs:
   accept-desktop-upgrade:
     name: Accept desktop upgrade (${{ matrix.os }}, ${{ matrix.arch }})
     needs: [release, build-desktop]
-    if: needs.release.outputs.created == 'true' && needs.build-desktop.result == 'success' && !github.event.inputs.mirror_tag
+    if: needs.release.outputs.created == 'true' && needs.build-desktop.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -314,7 +356,7 @@ jobs:
   cli-installer-acceptance:
     name: Accept CLI installer candidate
     needs: [release, preflight-public-cli-authority]
-    if: needs.release.outputs.created == 'true' && !github.event.inputs.mirror_tag
+    if: needs.release.outputs.created == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     permissions:
@@ -336,7 +378,7 @@ jobs:
   build-cli-release:
     name: Build native CLI (${{ matrix.platform }}-${{ matrix.arch }})
     needs: [release, preflight-public-cli-authority]
-    if: needs.release.outputs.created == 'true' && !github.event.inputs.mirror_tag
+    if: needs.release.outputs.created == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -448,7 +490,7 @@ jobs:
   build-cli-package-channels:
     name: Build CLI package-manager channels
     needs: [release, build-cli-release]
-    if: needs.release.outputs.created == 'true' && needs.build-cli-release.result == 'success' && !github.event.inputs.mirror_tag
+    if: needs.release.outputs.created == 'true' && needs.build-cli-release.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -499,7 +541,7 @@ jobs:
   accept-cli-homebrew:
     name: Accept Homebrew CLI (${{ matrix.arch }})
     needs: [release, build-cli-release]
-    if: needs.release.outputs.created == 'true' && needs.build-cli-release.result == 'success' && !github.event.inputs.mirror_tag
+    if: needs.release.outputs.created == 'true' && needs.build-cli-release.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -566,7 +608,7 @@ jobs:
   accept-cli-linuxbrew:
     name: Accept Linuxbrew CLI (${{ matrix.arch }})
     needs: [release, build-cli-release]
-    if: needs.release.outputs.created == 'true' && needs.build-cli-release.result == 'success' && !github.event.inputs.mirror_tag
+    if: needs.release.outputs.created == 'true' && needs.build-cli-release.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -631,7 +673,7 @@ jobs:
   accept-cli-aur:
     name: Accept Arch/AUR CLI package (${{ matrix.arch }})
     needs: [release, build-cli-release]
-    if: needs.release.outputs.created == 'true' && needs.build-cli-release.result == 'success' && !github.event.inputs.mirror_tag
+    if: needs.release.outputs.created == 'true' && needs.build-cli-release.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -696,7 +738,7 @@ jobs:
   accept-cli-legacy-cutover:
     name: Accept published v0.90.1 CLI cutover
     needs: [release, build-cli-release]
-    if: needs.release.outputs.created == 'true' && needs.build-cli-release.result == 'success' && !github.event.inputs.mirror_tag
+    if: needs.release.outputs.created == 'true' && needs.build-cli-release.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     permissions:
@@ -734,7 +776,7 @@ jobs:
   build-broker-packs:
     name: Build Broker Packs (${{ matrix.os }}, ${{ matrix.arch }})
     needs: [release, preflight-public-cli-authority]
-    if: needs.release.outputs.created == 'true' && !github.event.inputs.mirror_tag
+    if: needs.release.outputs.created == 'true'
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -828,7 +870,7 @@ jobs:
           body_path: dist/release-notes/notes.md
           prerelease: ${{ needs.release.outputs.prerelease == 'true' }}
           generate_release_notes: false
-          target_commitish: ${{ github.sha }}
+          target_commitish: ${{ needs.release.outputs.source_sha }}
           fail_on_unmatched_files: true
           files: |
             dist/release-assets/*.dmg
@@ -1018,7 +1060,7 @@ jobs:
 
   mirror-release-assets:
     needs: [release, publish-release]
-    if: always() && ((needs.release.outputs.created == 'true' && needs.publish-release.result == 'success') || github.event.inputs.mirror_tag)
+    if: always() && ((needs.release.outputs.created == 'true' && needs.publish-release.result == 'success') || needs.release.outputs.operation == 'mirror')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -1029,7 +1071,7 @@ jobs:
           # A manual mirror is an idempotent repair of an existing release.
           # Always derive the installer from that tag, never from whichever
           # commit happens to be at master when the workflow is dispatched.
-          ref: ${{ github.event.inputs.mirror_tag || needs.release.outputs.tag }}
+          ref: ${{ needs.release.outputs.tag }}
 
       - uses: actions/setup-node@v7
         with:
@@ -1038,14 +1080,14 @@ jobs:
       - name: Download release assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.event.inputs.mirror_tag || needs.release.outputs.tag }}
+          TAG: ${{ needs.release.outputs.tag }}
         run: |
           mkdir -p dist/r2-upload
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir dist/r2-upload --clobber
 
       - name: Prepare release-owned CLI installer
         env:
-          TAG: ${{ github.event.inputs.mirror_tag || needs.release.outputs.tag }}
+          TAG: ${{ needs.release.outputs.tag }}
         run: |
           VERSION="${TAG#v}"
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
@@ -1061,7 +1103,7 @@ jobs:
 
       - name: Prepare CDN download aliases
         env:
-          TAG: ${{ github.event.inputs.mirror_tag || needs.release.outputs.tag }}
+          TAG: ${{ needs.release.outputs.tag }}
           DOWNLOAD_BASE_URL: ${{ secrets.DOWNLOAD_BASE_URL }}
         run: |
           node scripts/prepare-desktop-release-assets.mjs mirror \
@@ -1073,7 +1115,7 @@ jobs:
       - name: Publish generated release metadata and installer
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.event.inputs.mirror_tag || needs.release.outputs.tag }}
+          TAG: ${{ needs.release.outputs.tag }}
         run: |
           shopt -s nullglob
           files=(dist/r2-upload/*-mac-intel.yml dist/r2-upload/*-intel-mac.yml dist/r2-upload/latest-mac-arm64.yml)
@@ -1179,7 +1221,7 @@ jobs:
         env:
           DOWNLOAD_BASE_URL: ${{ secrets.DOWNLOAD_BASE_URL }}
           PUBLIC_INSTALL_URL: https://openalice.ai/install
-          TAG: ${{ github.event.inputs.mirror_tag || needs.release.outputs.tag }}
+          TAG: ${{ needs.release.outputs.tag }}
         run: |
           BASE_URL="${DOWNLOAD_BASE_URL%/}"
           VERSION="${TAG#v}"
