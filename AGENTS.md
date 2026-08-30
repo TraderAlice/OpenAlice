@@ -89,10 +89,13 @@ for current ownership and entry points.
 - `dev` is also the active preview channel: installer work must pass against
   both the checked-out tree and the matching `raw/.../dev/install` +
   `--branch dev` network path before promotion.
-- `master` is the stable/user-facing lane. Only human-directed promotions from
-  `dev` and explicit emergency hotfixes target `master`.
-- A merge to `master` is a versioned release event, not a post-release staging
-  step. Stable CDN aliases are updated only from the resulting tag.
+- `master` is the stable/user-facing source lane. Only human-directed
+  promotions from `dev` and explicit emergency hotfixes target `master`, but a
+  merge to `master` does not by itself choose or publish a product version.
+- Stable releases are explicit manual actions. The maintainer supplies a tag
+  from `master`; release automation requires that tag and both product package
+  manifests to declare the same version before it builds accepted candidates.
+  Stable CDN aliases are updated only from the resulting release tag.
 - Do not commit directly to `master`. Avoid direct commits to `dev` unless the
   maintainer explicitly requests integration work.
 - Never force-push or delete `master` or `dev`.

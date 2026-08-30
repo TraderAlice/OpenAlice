@@ -25,7 +25,18 @@ interface WorkflowJob {
 const root = resolve(import.meta.dirname, '..')
 const workflow = YAML.parse(
   readFileSync(resolve(root, '.github/workflows/release.yml'), 'utf8'),
-) as { jobs: Record<string, WorkflowJob> }
+) as {
+  on: {
+    workflow_dispatch?: {
+      inputs?: Record<string, {
+        required?: boolean
+        type?: string
+        options?: string[]
+      }>
+    }
+  }
+  jobs: Record<string, WorkflowJob>
+}
 
 function step(job: WorkflowJob, name: string): WorkflowStep {
   const found = job.steps?.find((candidate) => candidate.name === name)
@@ -39,6 +50,40 @@ function needs(job: WorkflowJob): string[] {
 }
 
 describe('Release workflow critical path', () => {
+  it('requires an explicit tag/package release decision instead of publishing on master push', () => {
+    expect(Object.keys(workflow.on)).toEqual(['workflow_dispatch'])
+    expect(workflow.on.workflow_dispatch?.inputs).toMatchObject({
+      operation: {
+        required: true,
+        type: 'choice',
+        options: ['release', 'mirror'],
+      },
+      tag: {
+        required: true,
+        type: 'string',
+      },
+    })
+
+    const plan = step(workflow.jobs.release, 'Validate release intent and version authority').run ?? ''
+    expect(plan).toContain('refs/heads/master')
+    expect(plan).toContain("require('./package.json').version")
+    expect(plan).toContain("require('./packages/cli/package.json').version")
+    expect(plan).toContain('Release tag already exists')
+
+    expect(
+      step(workflow.jobs['publish-release'], 'Create tag and GitHub Release from accepted candidates')
+        .with?.target_commitish,
+    ).toBe('${{ needs.release.outputs.source_sha }}')
+  })
+
+  it('keeps existing-tag mirror repair distinct from new release creation', () => {
+    const plan = step(workflow.jobs.release, 'Validate release intent and version authority').run ?? ''
+    expect(plan).toContain('Mirror repair requires an existing release tag')
+    expect(workflow.jobs['mirror-release-assets'].if).toContain(
+      "needs.release.outputs.operation == 'mirror'",
+    )
+  })
+
   it('bounds native candidate jobs without weakening downstream gates', () => {
     expect(workflow.jobs['build-desktop']['timeout-minutes']).toBe(45)
     expect(workflow.jobs['build-broker-packs']['timeout-minutes']).toBe(30)

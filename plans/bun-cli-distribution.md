@@ -531,6 +531,10 @@ artifacts.
 
 ### 9. Release acceptance
 
+- [x] Decouple stable-source promotion from publication: the manual Release
+  workflow accepts an explicit tag, requires it to match both product package
+  versions, binds candidates to the dispatch commit, and keeps existing-tag
+  mirror repair as a separate operation.
 - [ ] Build every required target from the accepted tagged tree.
 - [ ] Verify archive checksum and internal release metadata before upload.
 - [ ] Run clean non-admin Bash installs on macOS and Linux.
@@ -652,6 +656,13 @@ This plan is complete only when:
 
 ## Progress Log
 
+- 2026-08-30: Release entry was separated from `master` promotion without
+  changing the established candidate matrix. A manual dispatch now chooses
+  `release` or `mirror` plus an explicit tag. New releases must run from
+  `master`, the tag must not already exist, and its version must equal both the
+  root and CLI package manifests before expensive builds start. The accepted
+  tag is created only after the existing desktop, CLI, installer, Broker Pack,
+  and package-manager gates pass.
 - 2026-08-29: Maintainer selected the architecture after comparing Herdr and
   OpenCode. CLI is treated as a primary long-running distribution. The selected
   direction is one Bun-compiled OpenAlice artifact that re-executes into the
