@@ -1999,6 +1999,7 @@ export const zh: Resources = {
     collapseBeatUpdates: '收起更新',
     logStatusDone: '已完成',
     logStatusFailed: '失败',
+    logFailureNoReport: '本次运行在同事提交最终报告前结束了。',
     logStatusInterrupted: '已中断',
     logStatusPaused: '已暂停',
     logToolStatusRunning: '运行中',

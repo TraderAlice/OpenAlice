@@ -177,6 +177,7 @@ describe('OfficeBuilding', () => {
     expect(replayPrompt.textContent).toContain('Session 6 · Earlier Session completed its assignment.')
     expect(replayPrompt.dataset.layout).toBe('dialogue')
     expect(replayPrompt.style.width).toBe('320px')
+    expect(replayPrompt.dataset.side).not.toBe('above')
     await userEvent.keyboard('{Enter}')
     expect(onOpenLog).toHaveBeenCalledWith('operations')
     expect(onSelectEmployee).not.toHaveBeenCalled()

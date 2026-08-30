@@ -168,8 +168,13 @@ function eventDetail(event: AgentRuntimeEvent, t: TFunction): string | null {
   if (event.type === 'dev.sonner_test') return payload.message ?? null
   if (event.type === 'inbox.received') return payload.summary ?? payload.title ?? null
   if (event.type === 'news.ingested') return payload.title ?? null
-  if (event.type === 'runtime.stopped' && payload.assistantText) {
-    return officeRuntimeDialogue(payload.assistantText)
+  if (event.type === 'runtime.stopped') {
+    if (payload.assistantText) return officeRuntimeDialogue(payload.assistantText)
+    if (payload.status === 'failed') {
+      const suppliedFailure = payload.error ?? payload.reason ?? payload.message
+      if (suppliedFailure) return officeRuntimeDialogue(suppliedFailure)
+      if (payload.metrics?.textBlocks === 0) return t('office.logFailureNoReport')
+    }
   }
   return null
 }

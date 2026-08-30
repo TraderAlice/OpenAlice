@@ -2007,6 +2007,7 @@ export const zhHant: Resources = {
     collapseBeatUpdates: '收起更新',
     logStatusDone: '已完成',
     logStatusFailed: '失敗',
+    logFailureNoReport: '本次執行在同事提交最終報告前結束了。',
     logStatusInterrupted: '已中斷',
     logStatusPaused: '已暫停',
     logToolStatusRunning: '執行中',

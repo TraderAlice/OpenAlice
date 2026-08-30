@@ -2000,6 +2000,7 @@ export const ja: Resources = {
     collapseBeatUpdates: '更新を折りたたむ',
     logStatusDone: '完了',
     logStatusFailed: '失敗',
+    logFailureNoReport: '同僚が最終レポートを提出する前に実行が終了しました。',
     logStatusInterrupted: '中断',
     logStatusPaused: '一時停止',
     logToolStatusRunning: '実行中',

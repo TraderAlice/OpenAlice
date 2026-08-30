@@ -105,6 +105,11 @@ const OFFICE_PROMPT_DESK_TOP = 35
 const OFFICE_PROMPT_DESK_BOTTOM = 36
 const OFFICE_PROMPT_SIGN_HALF_WIDTH = 132
 const OFFICE_PROMPT_SIGN_HALF_HEIGHT = 32
+const OFFICE_PROMPT_CABINET_HALF_WIDTH = 24
+const OFFICE_PROMPT_CABINET_TOP = 36
+const OFFICE_PROMPT_CABINET_BOTTOM = 32
+const OFFICE_PROMPT_ROSTER_HALF_WIDTH = 34
+const OFFICE_PROMPT_ROSTER_HALF_HEIGHT = 30
 export type OfficeLogOrigin =
   | 'menu'
   | 'operations'
@@ -438,9 +443,12 @@ export function OfficeBuilding({
     && nearbyTarget?.id === replayFocusTarget.id
   const promptAvoidBounds = useMemo<OfficePromptAvoidBounds[]>(() => {
     const bounds: OfficePromptAvoidBounds[] = []
-    if (nearbyTarget?.kind !== 'roster') return bounds
+    if (!nearbyTarget) return bounds
+    if (nearbyTarget?.kind !== 'roster' && !nearbyDialogue) return bounds
+    if (!('workspaceId' in nearbyTarget)) return bounds
     bounds.push(...availableInteractionTargets.flatMap((target) => {
       if (!('workspaceId' in target) || target.workspaceId !== nearbyTarget.workspaceId) return []
+      if (target.id === nearbyTarget.id) return []
       if (target.kind === 'sign') {
         return [{
           left: target.x - OFFICE_PROMPT_SIGN_HALF_WIDTH,
@@ -457,10 +465,26 @@ export function OfficeBuilding({
           bottom: target.y + OFFICE_PROMPT_DESK_BOTTOM,
         }]
       }
+      if (target.kind === 'cabinet') {
+        return [{
+          left: target.x - OFFICE_PROMPT_CABINET_HALF_WIDTH,
+          top: target.y - OFFICE_PROMPT_CABINET_TOP,
+          right: target.x + OFFICE_PROMPT_CABINET_HALF_WIDTH,
+          bottom: target.y + OFFICE_PROMPT_CABINET_BOTTOM,
+        }]
+      }
+      if (target.kind === 'roster') {
+        return [{
+          left: target.x - OFFICE_PROMPT_ROSTER_HALF_WIDTH,
+          top: target.y - OFFICE_PROMPT_ROSTER_HALF_HEIGHT,
+          right: target.x + OFFICE_PROMPT_ROSTER_HALF_WIDTH,
+          bottom: target.y + OFFICE_PROMPT_ROSTER_HALF_HEIGHT,
+        }]
+      }
       return []
     }))
     return bounds
-  }, [availableInteractionTargets, nearbyTarget])
+  }, [availableInteractionTargets, nearbyDialogue, nearbyTarget])
   const promptTargetBounds = useMemo<OfficePromptAvoidBounds | undefined>(() => {
     if (nearbyTarget?.kind !== 'inbox-service' && nearbyTarget?.kind !== 'news-service') return undefined
     const landmark = serviceLandmarks.find((item) => item.id === nearbyTarget.id)

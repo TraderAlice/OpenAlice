@@ -729,7 +729,11 @@ describe('OfficeRuntimeSection', () => {
         seq: 6,
         ts: now,
         type: 'runtime.stopped',
-        payload: { resumeId: 'resume-a', status: 'failed' },
+        payload: {
+          resumeId: 'resume-a',
+          status: 'failed',
+          metrics: { textBlocks: 0, toolCalls: 2, toolFailures: 0 },
+        },
       },
       {
         seq: 5,
@@ -765,12 +769,31 @@ describe('OfficeRuntimeSection', () => {
     render(<OfficeRuntimeSection />)
 
     expect(await screen.findByRole('button', { name: /Task failed.*#0006/i })).toBeTruthy()
+    expect(screen.getByText('The run ended before the coworker filed a final report.')).toBeTruthy()
     expect(screen.getByRole('button', { name: /Task interrupted.*#0005/i })).toBeTruthy()
     expect(screen.getByRole('button', { name: /Task paused.*#0004/i })).toBeTruthy()
     expect(screen.getByRole('button', { name: /Needs attention.*#0003/i })).toBeTruthy()
     expect(screen.getByRole('button', { name: /Launch failed.*#0002/i })).toBeTruthy()
     expect(screen.getByRole('button', { name: /Agent report.*#0001/i })).toBeTruthy()
     expect(screen.queryByText(/^stopped$|^text$|^rejected$/i)).toBeNull()
+  })
+
+  it('prefers a supplied failure reason over the no-report diagnosis', async () => {
+    mockJournal([{
+      seq: 1,
+      ts: Date.now(),
+      type: 'runtime.stopped',
+      payload: {
+        resumeId: 'resume-a',
+        status: 'failed',
+        error: 'Provider request timed out.',
+        metrics: { textBlocks: 0, toolCalls: 0, toolFailures: 0 },
+      },
+    }])
+    render(<OfficeRuntimeSection />)
+
+    expect(await screen.findByText('Provider request timed out.')).toBeTruthy()
+    expect(screen.queryByText('The run ended before the coworker filed a final report.')).toBeNull()
   })
 
   it('opens the floor snapshot for the selected journal event', async () => {

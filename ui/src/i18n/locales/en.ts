@@ -2032,6 +2032,7 @@ export const en = {
     collapseBeatUpdates: 'Collapse updates',
     logStatusDone: 'Complete',
     logStatusFailed: 'Failed',
+    logFailureNoReport: 'The run ended before the coworker filed a final report.',
     logStatusInterrupted: 'Interrupted',
     logStatusPaused: 'Paused',
     logToolStatusRunning: 'Running',

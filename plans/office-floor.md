@@ -4960,6 +4960,27 @@ Large-roster selection counter follow-up (2026-08-31):
   and 5,192 tests (one file and nine tests skipped); the production UI build passed with only the existing ports fallback
   and large-chunk advisory.
 
+Honest failed-run diagnosis follow-up (2026-08-31):
+
+- Followed real failed Chat coworker g20 from roster to Agent file and its selected #4984 Activity Log event. The path
+  was actionable, but the detail pane only exposed `Failed` plus `0 text blocks · 2 tool calls`; expanding #4980-4983
+  showed all tool actions completed and still did not explain what the player could conclude from the run.
+- Verified the authoritative #4984 payload directly: it has no `error` or `reason`, `status: failed`, zero text blocks,
+  two tool calls, and zero tool failures. Compared inventing a generic Agent-file error, retaining raw counters only,
+  and deriving a bounded diagnosis from the facts already present in the product log. Chose the honest derived detail.
+- Activity Log should prefer a real error/reason when supplied; otherwise a failed stop with zero text blocks will say
+  that the run ended before a final report was filed. Raw Output metrics remain visible, and the same summary flows into
+  Find on floor/replay without changing runtime data or any non-Office surface.
+- Real-floor follow-up found g20's 320px replay dialogue painted over the Chat sign and roster count. Raising z-index
+  would only swap which object was hidden, while a fixed HUD strip would detach the dialogue from its world target.
+  Chose to keep the world-space callout and feed same-workspace sign, other desk, cabinet, and roster geometry into the
+  existing least-overlap solver.
+- Implemented and replayed the real #4984 path. Activity Log now renders the bounded diagnosis beside the unchanged
+  `0 text blocks · 2 tool calls` evidence, and the replay dialogue remains fully readable above the Chat pod instead of
+  painting its copy through the workspace sign and `1/24` label. Focused Office suites passed 42 tests. Root and UI
+  TypeScript passed; the full suite passed all 620 test files and 5,193 tests (one file and nine tests skipped); the
+  production UI build passed with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
