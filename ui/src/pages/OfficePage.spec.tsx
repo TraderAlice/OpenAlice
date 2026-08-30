@@ -327,7 +327,11 @@ describe('OfficePage localization', () => {
     render(<OfficePage />)
 
     await userEvent.click(screen.getByTestId('office-desk-resume-grok-failed'))
-    const reviewActivity = await screen.findByRole('button', { name: '查看活动' })
+    const reviewActivity = await screen.findByRole(
+      'button',
+      { name: '查看活动' },
+      { timeout: 10_000 },
+    )
     expect(document.activeElement).toBe(reviewActivity)
     await userEvent.keyboard('{Enter}')
 
@@ -375,8 +379,10 @@ describe('OfficePage localization', () => {
     expect(container.querySelector('.oa-office-window-scrim')).toBeNull()
     const floor = screen.getByTestId('office-floor')
     await vi.waitFor(() => {
-      expect(document.activeElement).toBe(floor)
+      expect(document.activeElement).toBe(screen.getByRole('menu', { name: '菜单' }))
     })
+    await userEvent.keyboard('{Escape}')
+    await vi.waitFor(() => expect(document.activeElement).toBe(floor))
     const alice = container.querySelector<HTMLElement>('.oa-office-alice')!
     const leftBeforeResume = alice.style.left
     await userEvent.keyboard('{ArrowRight}')
@@ -450,6 +456,8 @@ describe('OfficePage localization', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Mock find news on floor' }))
 
     expect(container.querySelector<HTMLElement>('[data-replay="true"]')).toBeTruthy()
+    expect(screen.queryByRole('menu', { name: '菜单' })).toBeNull()
+    await vi.waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('office-floor')))
     await userEvent.click(screen.getByRole('button', { name: '行动看板' }))
 
     const runtime = await screen.findByTestId('office-runtime-section')

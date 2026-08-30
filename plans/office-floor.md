@@ -4695,6 +4695,28 @@ Escape pause-loop follow-up (2026-08-31):
   tests (one file and nine tests skipped); the production UI build passed with only the existing ports fallback and
   large-chunk advisory.
 
+Pause-submenu return stack follow-up (2026-08-31):
+
+- Continued the keyboard-only flow through `Escape → Menu → Activity Log → Escape`. The Log opened correctly, but a
+  normal close discarded its Menu origin and focused the floor. That made the Activity Log behave like an unrelated web
+  modal instead of the second level of the pause menu players had deliberately entered.
+- Compared declaring Activity Log a permanent top-level window, simulating a click on the Menu DOM button, and carrying
+  explicit return intent through Office state. Chose the stateful return stack: OfficePage records a monotonic menu-resume
+  request, and the still-mounted OfficeBuilding consumes it only after the modal is no longer suspending the scene.
+- Ordinary close controls and Escape now return a Menu-origin Log to Menu. Explicit scene transitions remain distinct:
+  Replay's view-floor command and an event's `Find on floor` close to the floor, never reopen Menu, and keep their existing
+  replay target/focus behavior. Operations, employee, floor-terminal, Inbox, and News origins retain their authored focus
+  restoration rather than being folded into the pause stack.
+- Real-browser acceptance opened Log from the Escape menu, closed it, and found one `Floor view` menu with focus on the
+  menu container. Reopening the same Log and choosing `Find on floor` produced no dialog and no menu, activated replay,
+  started the target route, and focused the replay floor. Focused OfficePage and Building suites passed all 38 tests.
+- The first full-suite run was intentionally concurrent with both TypeScript lanes and the production build; under that
+  load, an existing auto-walk Agent-file assertion exceeded Testing Library's one-second default even though the focused
+  suite had passed. The exact interaction passed five consecutive isolated repetitions. Its wait now uses the same
+  ten-second product-transition allowance as the neighboring Office auto-walk tests. The isolated full rerun passed all
+  618 test files and 5,185 tests (one file and nine tests skipped); root and UI TypeScript and the production UI build also
+  passed, with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

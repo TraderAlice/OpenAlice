@@ -57,6 +57,7 @@ export function OfficePage() {
     channel: OfficeLogChannel
     focusSeq: number | null
   } | null>(null)
+  const [menuResumeToken, setMenuResumeToken] = useState(0)
   const [rosterWorkspaceId, setRosterWorkspaceId] = useState<string | null>(null)
   const [rosterFocusResumeId, setRosterFocusResumeId] = useState<string | null>(null)
   const employeeOriginRef = useRef<
@@ -147,9 +148,13 @@ export function OfficePage() {
     || Boolean(selectedSeat)
     || Boolean(rosterOffice)
     || Boolean(cabinetOffice)
-  const closeLog = () => {
+  const closeLogWithDestination = (destination: 'origin' | 'floor') => {
     const origin = logView?.origin ?? 'menu'
     setLogView(null)
+    if (origin === 'menu' && destination === 'origin') {
+      setMenuResumeToken((current) => current + 1)
+      return
+    }
     requestAnimationFrame(() => {
       if (origin === 'operations') {
         document.getElementById('office-operations-board')?.focus()
@@ -164,6 +169,8 @@ export function OfficePage() {
       }
     })
   }
+  const closeLog = () => closeLogWithDestination('origin')
+  const closeLogToFloor = () => closeLogWithDestination('floor')
   const closeEmployee = () => {
     setSelected(null)
     if (employeeOriginRef.current.kind === 'roster') {
@@ -292,6 +299,7 @@ export function OfficePage() {
                 replaySeq={asOfSeq}
                 replayFocus={replayFocus}
                 interactionSuspended={modalOpen}
+                menuResumeToken={menuResumeToken}
                 initialPlayerState={initialPlayerStateRef.current}
                 onPlayerStateChange={rememberOfficePlayerState}
                 onSelectEmployee={(workspaceId, employee) => {
@@ -407,7 +415,7 @@ export function OfficePage() {
                           setReplayFocus(null)
                           setAsOfSeq(seq)
                         }}
-                        onViewFloor={closeLog}
+                        onViewFloor={closeLogToFloor}
                       />
                     </details>
                   )}
@@ -419,7 +427,7 @@ export function OfficePage() {
                     onReplay={(focus) => {
                       setReplayFocus(focus)
                       setAsOfSeq(focus.seq)
-                      closeLog()
+                      closeLogToFloor()
                     }}
                   />
                 </div>

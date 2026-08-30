@@ -122,6 +122,7 @@ export function OfficeBuilding({
   replaySeq = null,
   replayFocus = null,
   interactionSuspended = false,
+  menuResumeToken = 0,
   initialPlayerState = null,
   onPlayerStateChange,
   onSelectEmployee,
@@ -147,6 +148,7 @@ export function OfficeBuilding({
   replaySeq?: number | null
   replayFocus?: OfficeReplayFocus | null
   interactionSuspended?: boolean
+  menuResumeToken?: number
   initialPlayerState?: OfficePlayerState | null
   onPlayerStateChange?: (state: OfficePlayerState) => void
   onSelectEmployee: (workspaceId: string, employee: OfficeFloorEmployee) => void
@@ -227,6 +229,7 @@ export function OfficeBuilding({
   const routeGenerationRef = useRef(0)
   const replayFocusKeyRef = useRef<string | null>(null)
   const restoreFloorFocusRef = useRef(true)
+  const handledMenuResumeTokenRef = useRef(menuResumeToken)
   floorInteractionSuspendedRef.current = floorInteractionSuspended
 
   useLayoutEffect(() => {
@@ -721,6 +724,13 @@ export function OfficeBuilding({
     if (!restoreFocus) restoreFloorFocusRef.current = false
     setMenuOpen(false)
   }
+  function openFloorMenu() {
+    pauseAutoWalk()
+    stopTouchMove()
+    setPanning(false)
+    restoreFloorFocusRef.current = true
+    setMenuOpen(true)
+  }
   const returnToLiveFloor = () => {
     cancelAutoWalk()
     onReturnLive?.()
@@ -842,6 +852,16 @@ export function OfficeBuilding({
     if (floorInteractionSuspended) pauseAutoWalk()
     else resumeAutoWalk()
   }, [floorInteractionSuspended])
+  useEffect(() => {
+    if (
+      handledMenuResumeTokenRef.current === menuResumeToken
+      || floorInteractionSuspended
+      || selected
+      || departingWorkspace
+    ) return
+    handledMenuResumeTokenRef.current = menuResumeToken
+    openFloorMenu()
+  }, [departingWorkspace, floorInteractionSuspended, menuResumeToken, selected])
   const movementForDirections = (
     directions: OfficeAliceDirection[],
     lastDirection?: OfficeAliceDirection | null,
@@ -961,10 +981,7 @@ export function OfficeBuilding({
         if (routeTargetId) {
           cancelAutoWalk()
         } else {
-          stopTouchMove()
-          setPanning(false)
-          restoreFloorFocusRef.current = true
-          setMenuOpen(true)
+          openFloorMenu()
         }
         return
       }
@@ -1201,13 +1218,7 @@ export function OfficeBuilding({
             open={menuOpen}
             onOpenChange={(open) => {
               if (open) {
-                pauseAutoWalk()
-                stopTouchMove()
-                setPanning(false)
-              }
-              if (open) {
-                restoreFloorFocusRef.current = true
-                setMenuOpen(true)
+                openFloorMenu()
               } else {
                 setMenuOpen(false)
               }
