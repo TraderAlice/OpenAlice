@@ -1946,7 +1946,7 @@ export const en = {
     interactActionFiles: 'Files',
     interactActionRoster: 'Roster',
     interactActionOperations: 'Review',
-    interactActionTerminal: 'Menu',
+    interactActionTerminal: 'Log',
     interactActionInbox: 'Check mail',
     interactActionNews: 'Read news',
     interactInbox: 'Open Inbox',

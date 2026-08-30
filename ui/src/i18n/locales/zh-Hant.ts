@@ -1921,7 +1921,7 @@ export const zhHant: Resources = {
     interactActionFiles: '檔案',
     interactActionRoster: '名冊',
     interactActionOperations: '行動',
-    interactActionTerminal: '選單',
+    interactActionTerminal: '日誌',
     interactActionInbox: '查收',
     interactActionNews: '閱讀',
     interactInbox: '開啟 Inbox',

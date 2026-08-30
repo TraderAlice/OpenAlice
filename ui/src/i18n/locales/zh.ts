@@ -1913,7 +1913,7 @@ export const zh: Resources = {
     interactActionFiles: '文件',
     interactActionRoster: '名册',
     interactActionOperations: '行动',
-    interactActionTerminal: '菜单',
+    interactActionTerminal: '日志',
     interactActionInbox: '查收',
     interactActionNews: '阅读',
     interactInbox: '打开 Inbox',

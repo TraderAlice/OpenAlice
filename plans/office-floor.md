@@ -3373,6 +3373,25 @@ Opaque game-window opening follow-up (2026-08-30):
   test files and 5,148 tests (one file and nine tests skipped), and the production UI build passed with only the existing
   jsdom canvas and large-chunk advisories.
 
+Floor-terminal direct command follow-up (2026-08-30):
+
+- Walked from the real Office spawn to the upper-right Floor terminal after comparing it with the always-available HUD
+  Menu and the Operations board. The terminal opened the HUD Menu in the opposite corner, focused its first item, and
+  required another selection even though `Live map` was only a current-state row and Activity Log was the sole command.
+- Compared keeping the shared remote dropdown, positioning a duplicate menu beside the terminal, and making the world
+  terminal execute its single useful command. Chose direct Activity Log: the HUD Menu remains the global shortcut for
+  floor view and logging, while walking to the physical terminal now immediately opens the Office journal with origin
+  `floor-terminal`. This removes an empty decision and the spatially disconnected focus jump without duplicating UI.
+- Removed the now-obsolete menu-origin branch; HUD Activity Log calls always retain `menu` origin, and closing a terminal
+  journal still returns focus to the physical terminal through the existing page-level origin contract. The nearby
+  interaction verb is now localized as `Log` / `日志` / `日誌` / `ログ` instead of `Menu`.
+- Real-browser acceptance repeated the auto-walk and direct open at 1200x800, then reopened the journal from the nearby
+  terminal at 390x844. In both cases the Activity Log appeared with no intermediate Menu; closing returned to the live
+  map and preserved the terminal as the nearby interaction target.
+- Focused building and page specs passed (2 files / 28 tests). Root and UI TypeScript passed, the full suite passed all
+  617 test files and 5,148 tests (one file and nine tests skipped), and the production UI build passed with only the
+  existing jsdom canvas and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

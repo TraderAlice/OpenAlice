@@ -307,8 +307,8 @@ describe('OfficePage localization', () => {
 
     const floorTerminal = screen.getByRole('button', { name: '楼层终端' })
     await userEvent.click(floorTerminal)
-    await userEvent.click(await screen.findByRole('menuitem', { name: '活动日志' }))
-    expect(screen.getByText('Office occupancy')).toBeTruthy()
+    expect(await screen.findByText('Office occupancy')).toBeTruthy()
+    expect(screen.queryByRole('menu', { name: '菜单' })).toBeNull()
     await userEvent.keyboard('{Escape}')
     await vi.waitFor(() => {
       expect(document.activeElement).toBe(floorTerminal)

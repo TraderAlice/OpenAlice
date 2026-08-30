@@ -194,7 +194,6 @@ export function OfficeBuilding({
   const departureTimerRef = useRef<number | null>(null)
   const routeGenerationRef = useRef(0)
   const replayFocusKeyRef = useRef<string | null>(null)
-  const menuOriginRef = useRef<'hud' | 'floor-terminal'>('hud')
   const menuTriggerRef = useRef<HTMLButtonElement>(null)
   const recentGroups = useMemo(
     () => building.offices.filter((office) => !office.sleeping),
@@ -541,13 +540,7 @@ export function OfficeBuilding({
     } else if (target.kind === 'roster') {
       onOpenRoster(target.workspaceId)
     } else if (target.kind === 'floor-terminal') {
-      menuOriginRef.current = 'floor-terminal'
-      setMenuOpen(true)
-      window.setTimeout(() => {
-        document.querySelector<HTMLElement>(
-          '.oa-office-pause-menu :is([role="menuitemradio"], [role="menuitem"])',
-        )?.focus()
-      }, 0)
+      onOpenLog('floor-terminal')
     } else if (target.kind === 'inbox-service') {
       onOpenService?.('inbox', productActivity.inbox?.seq)
     } else if (target.kind === 'news-service') {
@@ -561,11 +554,7 @@ export function OfficeBuilding({
     if (!restoreFocus) return
     requestAnimationFrame(() => {
       if (document.querySelector('.oa-office-window[aria-modal="true"]')) return
-      if (menuOriginRef.current === 'floor-terminal') {
-        document.getElementById('office-floor-terminal')?.focus()
-      } else {
-        menuTriggerRef.current?.focus()
-      }
+      menuTriggerRef.current?.focus()
     })
   }
   const activateNearbyTarget = () => {
@@ -943,9 +932,6 @@ export function OfficeBuilding({
                 className="oa-office-pause-trigger"
                 aria-label={t('office.pauseMenu')}
                 data-open={menuOpen}
-                onPointerDown={() => { menuOriginRef.current = 'hud' }}
-                onKeyDown={() => { menuOriginRef.current = 'hud' }}
-                onClick={() => { menuOriginRef.current = 'hud' }}
               />}
             >
               <img
@@ -1024,9 +1010,7 @@ export function OfficeBuilding({
               <DropdownMenuItem
                 onClick={() => {
                   closeFloorMenu(false)
-                  onOpenLog(menuOriginRef.current === 'floor-terminal'
-                    ? 'floor-terminal'
-                    : 'menu')
+                  onOpenLog('menu')
                 }}
               >
                 <img src={OFFICE_HUD_ASSETS.occupancyLog} alt="" aria-hidden style={officePixelImg} />

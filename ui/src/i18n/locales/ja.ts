@@ -1914,7 +1914,7 @@ export const ja: Resources = {
     interactActionFiles: 'ファイル',
     interactActionRoster: '名簿',
     interactActionOperations: '確認',
-    interactActionTerminal: 'メニュー',
+    interactActionTerminal: 'ログ',
     interactActionInbox: '受信箱',
     interactActionNews: 'ニュース',
     interactInbox: 'Inboxを開く',
