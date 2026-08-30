@@ -29,9 +29,6 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
-- [[plans/connector-improvements.md]] — Feature-held Connector reliability and
-  operator-experience improvements grounded in the real Default AliceProject;
-  no PR to `dev` until Ame accepts the accumulated branch.
 - [[plans/bun-cli-distribution.md]] — Replaces the expanded Node headless
   Runtime with a Bun-compiled, multi-process CLI distribution. Direct,
   npm/Bun, Homebrew, and AUR channels consume one accepted artifact set. The
