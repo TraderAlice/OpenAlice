@@ -210,6 +210,8 @@ export function OfficeBuilding({
   const manualMoveRepeatRef = useRef<number | null>(null)
   const manualMoveKeysRef = useRef(new Set<string>())
   const lastManualMoveKeyRef = useRef<string | null>(null)
+  const manualMoveOriginRef = useRef<{ x: number; y: number } | null>(null)
+  const manualMoveHasRepeatedRef = useRef(false)
   const manualMoveTickRef = useRef<() => void>(() => {})
   const routeTimerRef = useRef<number | null>(null)
   const departureTimerRef = useRef<number | null>(null)
@@ -793,6 +795,8 @@ export function OfficeBuilding({
     manualMoveRepeatRef.current = null
     manualMoveKeysRef.current.clear()
     lastManualMoveKeyRef.current = null
+    manualMoveOriginRef.current = null
+    manualMoveHasRepeatedRef.current = false
     clearAlicePushFeedback()
   }
   const movementForHeldKeys = (): OfficeMovement | null => {
@@ -813,6 +817,7 @@ export function OfficeBuilding({
       stopManualMove()
       return
     }
+    manualMoveHasRepeatedRef.current = true
     moveAliceFromHeldKeys()
   }
   useEffect(() => {
@@ -854,10 +859,23 @@ export function OfficeBuilding({
       event.preventDefault()
       if (fromFloor && target !== viewport) viewport?.focus({ preventScroll: true })
       if (manualMoveKeysRef.current.has(key)) return
+      const beginsMove = manualMoveKeysRef.current.size === 0
+      if (beginsMove) {
+        manualMoveOriginRef.current = { ...aliceRef.current }
+        manualMoveHasRepeatedRef.current = false
+      }
       manualMoveKeysRef.current.add(key)
       lastManualMoveKeyRef.current = key
       cancelAutoWalk()
-      moveAliceFromHeldKeys()
+      if (beginsMove) {
+        moveAliceFromHeldKeys()
+      } else if (!manualMoveHasRepeatedRef.current && manualMoveOriginRef.current) {
+        const movement = movementForHeldKeys()
+        if (movement && movement.x !== 0 && movement.y !== 0) {
+          aliceRef.current = manualMoveOriginRef.current
+          moveAlice(movement)
+        }
+      }
       if (manualMoveRepeatRef.current == null) {
         manualMoveRepeatRef.current = window.setInterval(
           () => manualMoveTickRef.current(),

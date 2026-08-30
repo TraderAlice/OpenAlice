@@ -393,14 +393,14 @@ describe('OfficeBuilding', () => {
       fireEvent.keyDown(map, { key: 'w' })
       expect(`${alice.style.left}:${alice.style.top}`).toBe('480px:312px')
       fireEvent.keyDown(map, { key: 'd' })
-      expect(`${alice.style.left}:${alice.style.top}`).toBe('497px:295px')
+      expect(`${alice.style.left}:${alice.style.top}`).toBe('497px:319px')
       expect(alice.dataset.direction).toBe('right')
       act(() => vi.advanceTimersByTime(96))
-      expect(`${alice.style.left}:${alice.style.top}`).toBe('514px:278px')
+      expect(`${alice.style.left}:${alice.style.top}`).toBe('514px:302px')
       fireEvent.keyUp(map, { key: 'd' })
       fireEvent.keyUp(map, { key: 'w' })
       act(() => vi.advanceTimersByTime(192))
-      expect(`${alice.style.left}:${alice.style.top}`).toBe('514px:278px')
+      expect(`${alice.style.left}:${alice.style.top}`).toBe('514px:302px')
     } finally {
       vi.useRealTimers()
     }

@@ -4210,6 +4210,23 @@ Service-prompt object-clearance follow-up (2026-08-30):
   tests. Root and UI TypeScript passed, the full suite passed all 617 test files and 5,173 tests (one file and nine
   tests skipped), and the production UI build passed with only the existing ports fallback and large-chunk advisories.
 
+Diagonal first-beat normalization follow-up (2026-08-30):
+
+- Rechecked an earlier QA report against the current real floor instead of assuming it remained true. Repeated diagonal
+  input stopped at x912/y620 with Alice's visual bounds exactly inside the right and bottom metal edges; the north-wall
+  approach stopped at y130 with the rendered sprite and wall touching at the same pixel and zero geometric overlap.
+  Current collision ownership was therefore retained.
+- The same playthrough exposed a different movement defect: one right+down chord produced a 41x17px first beat because
+  the first key moved 24px immediately and the second key appended a full 17x17px diagonal before the repeat loop.
+  Compared frame-delayed polling, ignoring the second key until the next repeat, and recomputing the unrepeated first
+  beat. Chose first-beat recomputation: it keeps controls immediate while replacing the ordered cardinal step with one
+  normalized diagonal vector whenever the perpendicular key arrives before movement repetition begins.
+- Real-browser acceptance changed the same chord from x480/y336 -> x521/y353 to x480/y336 -> x497/y353. Four more
+  independent right+down chords each advanced exactly 17px on both axes, with no initial axis lurch. Focused Building,
+  collision, and path suites passed 36 tests. Root and UI TypeScript passed, the full suite passed all 617 test files
+  and 5,173 tests (one file and nine tests skipped), and the production UI build passed with only the existing ports
+  fallback and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
