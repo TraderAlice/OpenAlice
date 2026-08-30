@@ -51,6 +51,19 @@ const OFFICE_LOG_CHANNEL_LABEL_KEYS = {
   news: 'office.logChannelNews',
 } as const satisfies Record<OfficeLogChannel, string>
 
+export function revealOfficeJournalRow(
+  journal: HTMLOListElement,
+  row: HTMLButtonElement,
+): void {
+  const journalBounds = journal.getBoundingClientRect()
+  const rowBounds = row.getBoundingClientRect()
+  if (rowBounds.top < journalBounds.top) {
+    journal.scrollTop = Math.max(0, journal.scrollTop - (journalBounds.top - rowBounds.top))
+  } else if (rowBounds.bottom > journalBounds.bottom) {
+    journal.scrollTop += rowBounds.bottom - journalBounds.bottom
+  }
+}
+
 function officeLogFamilyForEvent(event: AgentRuntimeEvent): Exclude<OfficeLogChannel, 'all'> {
   if (event.type === 'inbox.received') return 'inbox'
   if (event.type === 'news.ingested') return 'news'
@@ -375,7 +388,9 @@ export function OfficeRuntimeSection({
     if (selectedSeq == null) return
     const selectedRow = journalIndexRef.current
       ?.querySelector<HTMLButtonElement>(`button[data-seq="${selectedSeq}"]`)
-    selectedRow?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    if (journalIndexRef.current && selectedRow) {
+      revealOfficeJournalRow(journalIndexRef.current, selectedRow)
+    }
     if (journalInitialFocusPendingRef.current && selectedRow) {
       journalInitialFocusPendingRef.current = false
       const activeElement = document.activeElement
@@ -491,7 +506,9 @@ export function OfficeRuntimeSection({
     requestAnimationFrame(() => {
       const selectedRow = journalIndexRef.current
         ?.querySelector<HTMLButtonElement>(`button[data-seq="${selectedEvent.seq}"]`)
-      selectedRow?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+      if (journalIndexRef.current && selectedRow) {
+        revealOfficeJournalRow(journalIndexRef.current, selectedRow)
+      }
       selectedRow?.focus({ preventScroll: true })
     })
   }

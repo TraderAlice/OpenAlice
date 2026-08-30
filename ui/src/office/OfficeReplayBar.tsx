@@ -1,8 +1,9 @@
-import type { CSSProperties } from 'react'
+import type { CSSProperties, KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { officePixelImg } from './furniture'
 import { OFFICE_HUD_ASSETS } from './hud-assets'
+import { isOfficeConfirmKey } from './input'
 
 export function OfficeReplayBar({
   firstSeq,
@@ -24,6 +25,14 @@ export function OfficeReplayBar({
   if (lastSeq <= 0) return null
   const progress = lastSeq === minSeq ? 100 : ((value - minSeq) / (lastSeq - minSeq)) * 100
   const setReplaySeq = (next: number) => onAsOfSeq(next >= lastSeq ? null : Math.max(minSeq, next))
+  const confirmReplayAction = (
+    event: KeyboardEvent<HTMLButtonElement>,
+    action: () => void,
+  ) => {
+    if (!isOfficeConfirmKey(event.key)) return
+    event.preventDefault()
+    action()
+  }
 
   return (
     <div className="oa-office-replay">
@@ -34,6 +43,7 @@ export function OfficeReplayBar({
           aria-label={t('office.replayPrevious')}
           disabled={value <= minSeq}
           onClick={() => setReplaySeq(value - 1)}
+          onKeyDown={(event) => confirmReplayAction(event, () => setReplaySeq(value - 1))}
         >
           <img src={OFFICE_HUD_ASSETS.windowBack} alt="" aria-hidden style={officePixelImg} />
         </button>
@@ -47,6 +57,7 @@ export function OfficeReplayBar({
           aria-label={t('office.replayNext')}
           disabled={live}
           onClick={() => setReplaySeq(value + 1)}
+          onKeyDown={(event) => confirmReplayAction(event, () => setReplaySeq(value + 1))}
         >
           <img src={OFFICE_HUD_ASSETS.windowBack} alt="" aria-hidden style={officePixelImg} />
         </button>
@@ -61,11 +72,26 @@ export function OfficeReplayBar({
         aria-valuemax={lastSeq}
         aria-valuenow={value}
         aria-label={t('office.replay')}
+        aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Home End"
         aria-valuetext={live ? String(t('office.replayLive')) : String(t('office.replayAt', { seq: value }))}
         data-live={live}
         style={{ '--office-replay-progress': `${progress}%` } as CSSProperties}
         onChange={(event) => {
           setReplaySeq(Number(event.target.value))
+        }}
+        onKeyDown={(event) => {
+          const next = event.key === 'ArrowLeft' || event.key === 'ArrowDown'
+            ? value - 1
+            : event.key === 'ArrowRight' || event.key === 'ArrowUp'
+              ? value + 1
+              : event.key === 'Home'
+                ? minSeq
+                : event.key === 'End'
+                  ? lastSeq
+                  : null
+          if (next == null) return
+          event.preventDefault()
+          setReplaySeq(next)
         }}
         className="oa-office-replay__range"
       />
@@ -75,6 +101,7 @@ export function OfficeReplayBar({
             type="button"
             className="oa-office-replay__view"
             onClick={onViewFloor}
+            onKeyDown={(event) => confirmReplayAction(event, onViewFloor)}
           >
             {t('office.replayViewFloor')}
           </button>
@@ -84,6 +111,7 @@ export function OfficeReplayBar({
             type="button"
             className="oa-office-replay__live"
             onClick={() => onAsOfSeq(null)}
+            onKeyDown={(event) => confirmReplayAction(event, () => onAsOfSeq(null))}
           >
             <span className="oa-office-live-dot" aria-hidden />
             {t('office.replayLive')}

@@ -7,10 +7,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { i18n } from '../i18n'
 import { useInboxSelection } from '../live/inbox-selection'
 import { OFFICE_COWORKER_SPRITES } from '../office/coworker-sprites'
-import { OfficeRuntimeSection } from './OfficeRuntimeSection'
+import { OfficeRuntimeSection, revealOfficeJournalRow } from './OfficeRuntimeSection'
 
 const query = vi.fn()
-const scrollIntoView = vi.fn()
 
 function mockJournal(entries: Array<{ type: string } & Record<string, unknown>>) {
   query.mockImplementation(async (opts: { family?: string; page?: number; pageSize?: number } = {}) => {
@@ -50,11 +49,6 @@ vi.mock('../tabs/store', () => ({
 
 beforeEach(async () => {
   query.mockReset()
-  scrollIntoView.mockReset()
-  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
-    configurable: true,
-    value: scrollIntoView,
-  })
   useInboxSelection.getState().select(null)
   await i18n.changeLanguage('en')
 })
@@ -62,6 +56,26 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('OfficeRuntimeSection', () => {
+  it('reveals a selected record by scrolling only the journal index', () => {
+    const journal = document.createElement('ol')
+    const row = document.createElement('button')
+    journal.append(row)
+    journal.scrollTop = 40
+    vi.spyOn(journal, 'getBoundingClientRect').mockReturnValue({
+      top: 100,
+      bottom: 300,
+    } as DOMRect)
+    const rowBounds = vi.spyOn(row, 'getBoundingClientRect')
+    rowBounds.mockReturnValueOnce({ top: 280, bottom: 340 } as DOMRect)
+
+    revealOfficeJournalRow(journal, row)
+    expect(journal.scrollTop).toBe(80)
+
+    rowBounds.mockReturnValueOnce({ top: 70, bottom: 110 } as DOMRect)
+    revealOfficeJournalRow(journal, row)
+    expect(journal.scrollTop).toBe(50)
+  })
+
   it('shows the empty occupancy copy', async () => {
     query.mockResolvedValue({ entries: [], lastSeq: 0, total: 0, page: 1, pageSize: 50, totalPages: 1 })
     render(<OfficeRuntimeSection />)
@@ -387,11 +401,6 @@ describe('OfficeRuntimeSection', () => {
       .toBe('true')
     expect(screen.getByText('Requested dispatch')).toBeTruthy()
     expect(screen.queryByText('Market headline')).toBeNull()
-
-    expect(scrollIntoView).toHaveBeenLastCalledWith({ block: 'nearest', inline: 'nearest' })
-    expect(scrollIntoView.mock.instances.at(-1)).toBe(
-      screen.getByRole('button', { name: /Inbox received.*#0007/i }),
-    )
 
     const backToRecords = screen.getByRole('button', { name: 'Back to records' })
     await userEvent.keyboard('{Escape}')

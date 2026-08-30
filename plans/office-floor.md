@@ -4438,6 +4438,26 @@ Playable replay-target follow-up (2026-08-31):
   test files and 5,177 tests (one file and nine tests skipped); the production UI build passed with only the existing ports
   fallback and large-chunk advisory.
 
+Replay transport follow-up (2026-08-31):
+
+- Re-entered the exact `Seq 5018` event from the historical Grok Curator target and opened the Replay transport. Its
+  data contract was correct, but the Activity Log's selected-row `scrollIntoView` also scrolled the outer window body to
+  96.5px: the Replay summary and both step buttons sat above the visible dialog, leaving only an unexplained range track.
+- Compared resetting every log to the top, resetting only when the Replay drawer opens, and constraining selected-row
+  reveal to the journal index that owns it. Chose local scrolling. The first drawer-only reset passed jsdom but lost the
+  real layout-effect race, so it was removed rather than kept as a competing patch. `revealOfficeJournalRow` now measures
+  the row against the index viewport and changes only that list's `scrollTop`; ordinary channel position remains intact.
+- Real-browser acceptance reopened `Seq 5018` with the outer body at 0px, the Replay panel at 179px, its summary at 182px,
+  and transport at 230px. The 394px journal independently scrolled to 410.5px to reveal the event. The full title,
+  previous/next controls, slider, `View replay floor`, and `Live` action were simultaneously visible with no clipping.
+- Continued real keyboard play and found native control defaults were unreliable on the host: focused step buttons ignored
+  Enter/Space and the focused range ignored arrows. Replay controls now explicitly own the shared Office confirm keys;
+  the range owns Left/Down, Right/Up, Home, and End and advertises those shortcuts. In the live journal, pointer Previous
+  moved `5018→5017`, Enter moved to `5016`, Space to `5015`, and range Right returned to `5016`, while the outer body stayed
+  at 0px. Focused Replay-bar, Runtime-section, and Office-page suites passed 34 tests. Root and UI TypeScript passed; the
+  full suite passed all 618 test files and 5,178 tests (one file and nine tests skipped); the production UI build passed
+  with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
