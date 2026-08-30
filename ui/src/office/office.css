@@ -2053,6 +2053,14 @@
 @container (max-width: 760px) and (max-height: 420px) {
   .oa-office-window--log:has(
     .oa-office-runtime__journal[data-mobile-view="detail"]
+  ) {
+    top: 52px;
+    bottom: 0;
+    max-height: none;
+  }
+
+  .oa-office-window--log:has(
+    .oa-office-runtime__journal[data-mobile-view="detail"]
   ) :is(
     .oa-office-replay-panel,
     .oa-office-runtime__channels,
@@ -2065,6 +2073,7 @@
     .oa-office-runtime__journal[data-mobile-view="detail"]
   ) .oa-office-runtime__actions {
     position: static;
+    padding-top: 2px;
   }
 }
 

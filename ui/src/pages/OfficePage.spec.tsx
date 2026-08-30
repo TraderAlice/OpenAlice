@@ -329,9 +329,14 @@ describe('OfficePage localization', () => {
     await userEvent.keyboard('{Escape}')
     await vi.waitFor(() => expect(screen.queryByText('Office occupancy')).toBeNull())
     expect(container.querySelector('.oa-office-window-scrim')).toBeNull()
+    const floor = screen.getByTestId('office-floor')
     await vi.waitFor(() => {
-      expect(document.activeElement).toBe(menuTrigger)
+      expect(document.activeElement).toBe(floor)
     })
+    const alice = container.querySelector<HTMLElement>('.oa-office-alice')!
+    const leftBeforeResume = alice.style.left
+    await userEvent.keyboard('{ArrowRight}')
+    expect(alice.style.left).not.toBe(leftBeforeResume)
 
     const operations = screen.getByRole('button', { name: '行动看板' })
     await userEvent.click(operations)

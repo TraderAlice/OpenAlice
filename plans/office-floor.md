@@ -4033,6 +4033,26 @@ Auto-route HUD occlusion follow-up (2026-08-30):
   all 617 test files and 5,167 tests (one file and nine tests skipped), and the production UI build passed with only
   the existing ports fallback and large-chunk advisories.
 
+Short-landscape journal command-frame follow-up (2026-08-30):
+
+- Opened the real Activity log from the pause menu at 844x390 and entered the latest News detail. The selected record
+  itself was readable, but both 42px primary commands ended at y384 while the log window clipped at y365; only their
+  top strips were visible. This contradicted the existing short-landscape detail-first contract and made the current
+  actions look decorative rather than playable.
+- Compared compressing the record, restoring sticky actions, introducing an inner detail scroller, and letting detail
+  mode consume the map's reserved top/bottom window margins. Chose the last option: Buttons keep their full game-menu
+  size, long Inbox reports retain natural outer scrolling, and index, portrait, and desktop layouts remain untouched.
+- At <=760x420 only, a selected detail now starts exactly below the Office HUD, extends to the map content edge, and
+  uses a 2px paper gap above its static command row. Real-browser geometry measured HUD bottom/window top at y69,
+  command bottom at y372.39, and window bottom at y373 (`fullyVisible: true`). Returning to the index restored the
+  original y77-y365 inset plus Replay and channel controls; 390x844 retained its complete portrait composition.
+- Closing an Activity log opened from Menu also exposed a related pause-loop break: Focus returned to Menu and the
+  first Arrow key did nothing. Menu-origin close now resumes `office-floor`, while Operations, terminal, Inbox, and
+  News origins still return to their exact world object. Browser acceptance focused the floor and moved Alice from
+  x480 to x504 on the immediate ArrowRight. Focused page/runtime/style suites passed 54 tests. Root and UI TypeScript
+  passed, the full suite passed all 617 test files and 5,167 tests (one file and nine tests skipped), and the production
+  UI build passed with only the existing ports fallback and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

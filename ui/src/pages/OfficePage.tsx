@@ -158,7 +158,7 @@ export function OfficePage() {
       } else if (origin === 'inbox-service' || origin === 'news-service') {
         document.getElementById(`office-${origin}`)?.focus()
       } else {
-        document.querySelector<HTMLElement>('.oa-office-pause-trigger')?.focus()
+        document.querySelector<HTMLElement>('[data-testid="office-floor"]')?.focus()
       }
     })
   }
