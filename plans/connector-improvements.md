@@ -510,6 +510,17 @@ external adapters remain optional projections rather than sources of truth.
     localized labels and destination hints. The field remains catalog-driven,
     preserves ordinary non-secret auto-save, supports keyboard navigation, and
     stacks cleanly on narrow screens without adapter-specific renderer branches.
+44. **A disabled first-save action names the fields that still block it.**
+    Every built-in Connector currently disables Save connection until all
+    required values exist, but its labels do not mark missing requirements and
+    the footer only says that drafts save together. An asterisk alone would not
+    explain the disabled action; enabling the button and surfacing validation on
+    click would turn an ordinary incomplete draft into an avoidable error state.
+    The chosen form marks only currently missing required fields with a localized
+    Required badge and replaces the generic footer hint with a live, neutral list
+    of the exact missing labels. As each value becomes present, its badge and name
+    disappear; once complete, the ordinary grouped-save hint returns. The save
+    boundary, token validation, and disabled semantics remain unchanged.
 
 ## Ordered Work
 
@@ -602,6 +613,8 @@ external adapters remain optional projections rather than sources of truth.
         without hard-coding adapter-specific UI.
   - [x] Replace Feishu/Lark free-text platform entry with a catalog-driven,
         accessible finite-choice field.
+  - [x] Explain every disabled first-time Save connection action with localized,
+        field-specific missing requirements.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -1054,6 +1067,21 @@ shared Saved feedback. At 390 x 844, the choices stacked into a 306 px-wide,
 374 x 828 px, and document width remained exactly 390 px. No real credential,
 Connector, or external-platform action was invoked. The temporary tabs and demo
 runtime were closed, and the viewport was reset.
+
+The first-save-requirements increment passed all 31 demo-route tests, UI and
+root typechecking, the demo production build, and all 5,129 repository tests.
+The generic credential editor now derives one missing-required set for its
+labels, live footer hint, and existing disabled save predicate. Slack initially
+named `Bot token · App-level token`; after a simulated first draft, the matching
+Required badge disappeared and the hint retained only App-level token while Save
+connection remained disabled. At 1,052 x 734 the two-field hierarchy fit without
+crowding. At 390 x 844 the save action measured 306 x 40 px inside a 374 x 828 px
+dialog with document width exactly 390 px. The Chinese Feishu route rendered
+localized App ID/App secret labels, placeholders, Required badges, platform
+choices, and `还需要填写：应用 ID · 应用密钥。` without overflow. The incomplete
+demo secret draft was never saved; no real credential, Connector, or external
+platform action was invoked. The temporary tab and demo runtime were closed,
+and the viewport was reset.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.

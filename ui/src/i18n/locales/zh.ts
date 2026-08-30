@@ -2117,6 +2117,8 @@ export const zh: Resources = {
     hideDraft: '隐藏草稿',
     fields: {
       applicationId: '应用 ID',
+      appId: '应用 ID',
+      appSecret: '应用密钥',
       botToken: '机器人令牌',
       appToken: '应用级令牌',
       domain: '开放平台',
@@ -2134,6 +2136,8 @@ export const zh: Resources = {
     },
     placeholders: {
       applicationId: 'Discord 应用 ID',
+      appId: '飞书或 Lark 开发者后台中的 cli_…',
+      appSecret: '仅在本地加密保存',
       botToken: '仅在本地加密保存',
       appToken: '带 connections:write 的 xapp 令牌',
     },
@@ -2144,6 +2148,8 @@ export const zh: Resources = {
     saveConnection: '保存连接',
     savingConnection: '正在保存连接…',
     saveConnectionHint: '上方填写的凭据会一起保存。',
+    missingConnectionFields: '还需要填写：{{fields}}。',
+    enterCredentialToSave: '请在上方填写要保存的凭据。',
     connectionSaveError: '连接未保存：{{error}}',
     removeToken: '移除令牌',
     tokenTooShort: '这段内容太短，不像机器人令牌。已保存的令牌没有改动。',

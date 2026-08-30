@@ -2118,6 +2118,8 @@ export const ja: Resources = {
     hideDraft: '下書きを隠す',
     fields: {
       applicationId: 'アプリケーション ID',
+      appId: 'アプリ ID',
+      appSecret: 'アプリシークレット',
       botToken: 'Bot トークン',
       appToken: 'アプリレベル トークン',
       domain: 'オープンプラットフォーム',
@@ -2135,6 +2137,8 @@ export const ja: Resources = {
     },
     placeholders: {
       applicationId: 'Discord アプリケーション ID',
+      appId: 'Feishu または Lark 開発者コンソールの cli_…',
+      appSecret: 'ローカルで暗号化して保存',
       botToken: 'ローカルで暗号化して保存',
       appToken: 'connections:write 付きの xapp トークン',
     },
@@ -2145,6 +2149,8 @@ export const ja: Resources = {
     saveConnection: '接続を保存',
     savingConnection: '接続を保存中…',
     saveConnectionHint: '上に入力した認証情報をまとめて保存します。',
+    missingConnectionFields: '未入力：{{fields}}。',
+    enterCredentialToSave: '保存する認証情報を上に入力してください。',
     connectionSaveError: '接続を保存できませんでした: {{error}}',
     removeToken: 'トークンを削除',
     tokenTooShort: 'この値は Bot トークンとしては短すぎます。保存済みのトークンは変更していません。',

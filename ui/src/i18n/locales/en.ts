@@ -2150,6 +2150,8 @@ export const en = {
     hideDraft: 'Hide draft',
     fields: {
       applicationId: 'Application ID',
+      appId: 'App ID',
+      appSecret: 'App secret',
       botToken: 'Bot token',
       appToken: 'App-level token',
       domain: 'Open platform',
@@ -2167,6 +2169,8 @@ export const en = {
     },
     placeholders: {
       applicationId: 'Discord application ID',
+      appId: 'cli_… from the Feishu or Lark developer console',
+      appSecret: 'Stored locally and sealed',
       botToken: 'Stored locally and sealed',
       appToken: 'xapp token with connections:write',
     },
@@ -2177,6 +2181,8 @@ export const en = {
     saveConnection: 'Save connection',
     savingConnection: 'Saving connection…',
     saveConnectionHint: 'Credential drafts above are saved together.',
+    missingConnectionFields: 'Still needed: {{fields}}.',
+    enterCredentialToSave: 'Enter a credential above to save it.',
     connectionSaveError: 'Connection was not saved: {{error}}',
     removeToken: 'Remove token',
     tokenTooShort: 'That value is too short to be a bot token. The saved token was not changed.',

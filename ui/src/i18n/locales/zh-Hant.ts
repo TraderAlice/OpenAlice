@@ -2125,6 +2125,8 @@ export const zhHant: Resources = {
     hideDraft: '隱藏草稿',
     fields: {
       applicationId: '應用程式 ID',
+      appId: '應用程式 ID',
+      appSecret: '應用程式密鑰',
       botToken: '機器人權杖',
       appToken: '應用層權杖',
       domain: '開放平台',
@@ -2142,6 +2144,8 @@ export const zhHant: Resources = {
     },
     placeholders: {
       applicationId: 'Discord 應用程式 ID',
+      appId: '飛書或 Lark 開發者後台中的 cli_…',
+      appSecret: '僅在本機加密儲存',
       botToken: '僅在本機加密儲存',
       appToken: '具 connections:write 的 xapp 權杖',
     },
@@ -2152,6 +2156,8 @@ export const zhHant: Resources = {
     saveConnection: '儲存連線',
     savingConnection: '正在儲存連線…',
     saveConnectionHint: '上方填寫的憑證會一起儲存。',
+    missingConnectionFields: '仍需填寫：{{fields}}。',
+    enterCredentialToSave: '請在上方填寫要儲存的憑證。',
     connectionSaveError: '連線未儲存：{{error}}',
     removeToken: '移除權杖',
     tokenTooShort: '這段內容太短，不像機器人權杖。已儲存的權杖沒有變更。',

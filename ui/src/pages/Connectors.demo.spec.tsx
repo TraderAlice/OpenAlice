@@ -425,10 +425,18 @@ describe('Connector demo routes', () => {
     const appToken = within(dialog).getByLabelText('Slack App-level token') as HTMLInputElement
     const draftToggles = within(dialog).getAllByRole('button', { name: 'Show draft' })
     const setupLinks = within(dialog).getAllByRole('link')
+    const botTokenLabel = within(dialog).getByText('Bot token', { exact: true }).closest('label') as HTMLLabelElement
+    const appTokenLabel = within(dialog).getByText('App-level token', { exact: true }).closest('label') as HTMLLabelElement
     const firstSetupStep = within(dialog).getByText(
       'Create an app from scratch in the Slack workspace you want to use.',
     )
 
+    expect(within(botTokenLabel).getByText('Required')).toBeTruthy()
+    expect(within(appTokenLabel).getByText('Required')).toBeTruthy()
+    expect(botToken.required).toBe(true)
+    expect(appToken.required).toBe(true)
+    const initialHint = within(dialog).getByText('Still needed: Bot token · App-level token.')
+    expect(saveConnection.getAttribute('aria-describedby')).toBe(initialHint.id)
     expect(botToken.className).toContain('min-h-10')
     expect(appToken.className).toContain('min-h-10')
     draftToggles.forEach((button) => expect(button.className).toContain('min-w-10'))
@@ -439,8 +447,13 @@ describe('Connector demo routes', () => {
     expect(saveConnection.disabled).toBe(true)
     expect(within(dialog).queryByRole('button', { name: 'Save token' })).toBeNull()
     fireEvent.change(botToken, { target: { value: 'xoxb-plausible-slack-bot-token' } })
+    expect(within(botTokenLabel).queryByText('Required')).toBeNull()
+    expect(botToken.required).toBe(false)
+    expect(within(dialog).getByText('Still needed: App-level token.')).toBeTruthy()
     expect(saveConnection.disabled).toBe(true)
     fireEvent.change(appToken, { target: { value: 'xapp-plausible-slack-app-token' } })
+    expect(within(appTokenLabel).queryByText('Required')).toBeNull()
+    expect(within(dialog).getByText('Credential drafts above are saved together.')).toBeTruthy()
     expect(saveConnection.disabled).toBe(false)
     fireEvent.click(saveConnection)
 
@@ -450,6 +463,18 @@ describe('Connector demo routes', () => {
     expect(saved.adapters.slack.settings.appToken).toBe('xapp-plausible-slack-app-token')
     expect(saved.adapters.slack.configuredSecrets).toEqual(['botToken', 'appToken'])
     await waitFor(() => expect(within(dialog).queryByRole('button', { name: 'Save connection' })).toBeNull())
+  })
+
+  it('localizes the exact missing Feishu connection fields', async () => {
+    await i18n.changeLanguage('zh')
+    render(<ConnectorStatusPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /Feishu/ }))
+    const dialog = await screen.findByRole('dialog')
+
+    expect(within(dialog).getByLabelText('Feishu 应用 ID')).toBeTruthy()
+    expect(within(dialog).getByLabelText('Feishu 应用密钥')).toBeTruthy()
+    expect(within(dialog).getByText('还需要填写：应用 ID · 应用密钥。')).toBeTruthy()
   })
 
   it('finishes a pending auto-save after the configuration dialog closes', async () => {

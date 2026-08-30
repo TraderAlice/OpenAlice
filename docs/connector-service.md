@@ -365,7 +365,13 @@ The surfaces deliberately have different jobs:
   Connector-owned fields, secret reveal controls, setup links, and explicit
   credential, recovery, and test actions keep a 40 px interaction minimum in
   both the dialog and full Settings document; larger disclosures and Chat
-  actions retain their 44–48 px targets.
+  actions retain their 44–48 px targets. During first save, only currently
+  missing required fields carry a localized Required badge. The save footer
+  names those exact field labels in a polite live hint, then returns to the
+  ordinary grouped-save explanation once every requirement is present. Save
+  connection remains disabled until the same existing credential boundary is
+  satisfied; the hint explains that state without manufacturing a validation
+  error.
   Every later lifecycle stage retains its panel for runtime, linking, test, or
   recovery actions. Error panels keep the primary sentence actionable and put
   raw adapter messages plus retry timing in the same 40 px Technical details

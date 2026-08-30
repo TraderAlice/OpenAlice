@@ -916,6 +916,7 @@ function ConnectorChoiceField({
   fieldKey,
   label,
   description,
+  required,
   options,
   value,
   onChange,
@@ -923,8 +924,9 @@ function ConnectorChoiceField({
 }: {
   id: string
   fieldKey: string
-  label: string
+  label: ReactNode
   description?: string
+  required: boolean
   options: NonNullable<ConnectorDefinition['fields'][number]['options']>
   value: string
   onChange: (value: string) => void
@@ -954,6 +956,7 @@ function ConnectorChoiceField({
                 name={id}
                 value={option.value}
                 checked={selected}
+                required={required}
                 className="peer sr-only"
                 aria-label={optionLabel}
                 onChange={(event) => {
@@ -1039,17 +1042,27 @@ function ConnectorCredentialsEditor({
   const enteredMissingSecretKeys = missingSecretFields
     .filter((field) => (secretDrafts[connectorFieldKey(definition.id, field.key)] ?? '').length > 0)
     .map((field) => field.key)
-  const requiredConnectionComplete = credentialFields.every((field) => {
-    if (!field.required) return true
+  const fieldHasValue = (field: ConnectorDefinition['fields'][number]) => {
     if (field.kind === 'secret') {
       return adapter.configuredSecrets.includes(field.key)
         || (secretDrafts[connectorFieldKey(definition.id, field.key)] ?? '').length > 0
     }
-    return isConnectorSettingPresent(adapter.settings[field.key])
-  })
+    return isConnectorSettingPresent(adapter.settings[field.key] ?? field.defaultValue)
+  }
+  const missingRequiredFields = credentialFields.filter((field) => field.required && !fieldHasValue(field))
+  const requiredConnectionComplete = missingRequiredFields.length === 0
+  const missingRequiredLabels = missingRequiredFields.map((field) => (
+    t(`connectorSettings.fields.${field.key}`, { defaultValue: field.label })
+  ))
   const connectionSavingKey = connectorFieldKey(definition.id, '__connection__')
   const connectionSaving = savingSecret === connectionSavingKey
   const connectionError = secretErrors[connectionSavingKey]
+  const connectionHintId = `${credentialsId}-save-hint`
+  const connectionHint = missingRequiredLabels.length > 0
+    ? t('connectorSettings.missingConnectionFields', { fields: missingRequiredLabels.join(' · ') })
+    : enteredMissingSecretKeys.length === 0
+      ? t('connectorSettings.enterCredentialToSave')
+      : t('connectorSettings.saveConnectionHint')
   return (
     <section className="overflow-hidden rounded-xl border border-border/70 bg-secondary/10">
       <button
@@ -1101,14 +1114,24 @@ function ConnectorCredentialsEditor({
           const fieldDescription = field.description
             ? t(`connectorSettings.fieldDescriptions.${field.key}`, { defaultValue: field.description })
             : undefined
+          const fieldMissing = missingRequiredFields.some((missingField) => missingField.key === field.key)
+          const fieldLabelContent = fieldMissing ? (
+            <span className="flex items-center gap-1.5">
+              <span>{fieldLabel}</span>
+              <span className="rounded-full bg-warning/10 px-1.5 py-0.5 text-[9.5px] font-medium leading-none text-warning">
+                {t('connectorSettings.required')}
+              </span>
+            </span>
+          ) : fieldLabel
           if (field.options && field.options.length > 0) {
             return (
               <ConnectorChoiceField
                 key={field.key}
                 id={inputId}
                 fieldKey={field.key}
-                label={fieldLabel}
+                label={fieldLabelContent}
                 description={fieldDescription}
+                required={fieldMissing}
                 options={field.options}
                 value={String(value ?? field.defaultValue ?? '')}
                 onChange={(next) => onSettingChange(field.key, next)}
@@ -1119,7 +1142,7 @@ function ConnectorCredentialsEditor({
           return (
             <Field
               key={field.key}
-              label={fieldLabel}
+              label={fieldLabelContent}
               description={fieldDescription}
               controlId={inputId}
             >
@@ -1128,6 +1151,7 @@ function ConnectorCredentialsEditor({
                   id={inputId}
                   aria-label={`${definition.label} ${fieldLabel}`}
                   type="checkbox"
+                  required={fieldMissing}
                   checked={value === true}
                   onChange={(event) => onSettingChange(field.key, event.target.checked)}
                 />
@@ -1140,6 +1164,7 @@ function ConnectorCredentialsEditor({
                         aria-label={`${definition.label} ${fieldLabel}`}
                         className={`${inputClass} min-h-10 pr-10`}
                         type={secretMasked ? 'password' : 'text'}
+                        required={fieldMissing}
                         value={secretDraft}
                         placeholder={configured
                           ? t('connectorSettings.configuredPlaceholder')
@@ -1200,6 +1225,7 @@ function ConnectorCredentialsEditor({
                   aria-label={`${definition.label} ${fieldLabel}`}
                   className={`${inputClass} min-h-10`}
                   type={field.kind}
+                  required={fieldMissing}
                   value={String(value ?? '')}
                   placeholder={t(`connectorSettings.placeholders.${field.key}`, { defaultValue: field.placeholder ?? '' })}
                   autoComplete="off"
@@ -1215,13 +1241,19 @@ function ConnectorCredentialsEditor({
         {missingSecretFields.length > 0 && (
           <div className="mt-4 border-t border-border/60 pt-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-[11.5px] leading-5 text-muted-foreground">
-                {t('connectorSettings.saveConnectionHint')}
+              <p
+                id={connectionHintId}
+                className="text-[11.5px] leading-5 text-muted-foreground"
+                aria-live="polite"
+                aria-atomic="true"
+              >
+                {connectionHint}
               </p>
               <button
                 type="button"
                 className="oa-pressable inline-flex min-h-10 w-full shrink-0 items-center justify-center rounded-lg bg-primary px-4 py-2 text-[12px] font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                 disabled={!requiredConnectionComplete || enteredMissingSecretKeys.length === 0 || savingSecret !== null}
+                aria-describedby={connectionHintId}
                 onClick={() => onSaveConnection(enteredMissingSecretKeys)}
               >
                 {connectionSaving

@@ -113,7 +113,7 @@ export function ConfigSection({
 // ==================== Field ====================
 
 interface FieldProps {
-  label: string
+  label: ReactNode
   description?: string
   controlId?: string
   descriptionId?: string
