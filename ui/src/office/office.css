@@ -2132,7 +2132,8 @@
   .oa-office-window--log:has(
     .oa-office-runtime__journal[data-mobile-view="detail"]
   ) .oa-office-runtime__actions {
-    position: static;
+    position: sticky;
+    bottom: 0;
     padding-top: 2px;
   }
 }

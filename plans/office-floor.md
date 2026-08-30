@@ -4636,6 +4636,24 @@ Outcome-to-evidence action follow-up (2026-08-31):
   files and 5,183 tests (one file and nine tests skipped); the production UI build passed with only the existing ports
   fallback and large-chunk advisory.
 
+Short-landscape evidence commands follow-up (2026-08-31):
+
+- Played the same Live Office at 390×844 with coarse-pointer touch emulation. The D-pad, A command, nearby prompt,
+  auto-walk, Agent File, exact Activity Log handoff, and two-command rows all remained reachable without overlap. Alice
+  also had to route around the Chat sign instead of walking through it, preserving the floor's authored collision model.
+- A second pass at 844×390 found the real responsive gap: the compact Agent File correctly kept `Review activity` and
+  `Open session` fixed at the bottom, but the exact failed-event view put `Find on floor` and `Open Runs` below the first
+  fold. The player reached the evidence and then had to scroll before taking the next action.
+- Compared hiding more evidence, compressing the report, and retaining its existing sticky command row in the short
+  detail layout. Chose the sticky row: evidence remains complete and scrollable while the next actions stay game-like and
+  immediately available. The short-landscape override no longer cancels sticky positioning.
+- Real-browser acceptance at 844×390 kept the event body at scrollTop 0 with 304px of content inside a 223px viewport,
+  while both 42px commands remained visible from y=315 to y=357 inside the window's y=369 lower edge. The tall-phone
+  contract is unaffected because the correction is scoped to the existing max-height 420px detail rule. The focused
+  responsive-style suite passed all 26 tests. Root and UI TypeScript passed; the full suite passed all 618 test files
+  and 5,183 tests (one file and nine tests skipped); the production UI build passed with only the existing ports fallback
+  and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
