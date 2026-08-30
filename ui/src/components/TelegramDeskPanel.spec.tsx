@@ -109,48 +109,76 @@ afterEach(() => cleanup())
 
 describe('TelegramDeskPanel', () => {
   it('asks for a linked bot before enabling an unbound desk', () => {
-    render(<TelegramDeskPanel linked={false} label="Telegram" />)
+    render(<TelegramDeskPanel linked={false} online={false} label="Telegram" />)
     expect(screen.getByText(/Finish linking the bot/)).toBeTruthy()
-    expect((screen.getByRole('button', { name: 'Enable phone desk' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByText('Available after linking')).toBeTruthy()
+    expect(screen.queryByRole('switch', { name: 'Turn Chat on Telegram on or off' })).toBeNull()
+    expect(screen.queryByLabelText('Workspace')).toBeNull()
   })
 
   it('defaults the unbound picker to the Ask Alice Chat workspace', () => {
-    render(<TelegramDeskPanel linked label="Telegram" />)
+    render(<TelegramDeskPanel linked online label="Telegram" />)
     expect((screen.getByLabelText('Workspace') as HTMLSelectElement).value).toBe('ws-b')
+    const toggle = screen.getByRole('switch', { name: 'Turn Chat on Telegram on or off' })
+    expect(toggle.parentElement?.className).not.toContain('border')
+    expect(toggle.parentElement?.className).not.toContain('rounded')
+    expect(screen.getByText('Off')).toBeTruthy()
   })
 
   it('falls back to the active Chat workspace when Ask Alice has no remembered target', () => {
     launchMocks.recentChatWorkspaceId = null
-    render(<TelegramDeskPanel linked label="Telegram" />)
+    render(<TelegramDeskPanel linked online label="Telegram" />)
     expect((screen.getByLabelText('Workspace') as HTMLSelectElement).value).toBe('ws-c')
   })
 
   it('enables the desk in the Ask Alice workspace without a manual pick', async () => {
-    render(<TelegramDeskPanel linked label="Telegram" />)
-    fireEvent.click(screen.getByRole('button', { name: 'Enable phone desk' }))
+    render(<TelegramDeskPanel linked online label="Telegram" />)
+    fireEvent.click(screen.getByRole('switch', { name: 'Turn Chat on Telegram on or off' }))
     await waitFor(() => expect(mocks.desk.enable).toHaveBeenCalledWith('ws-b'))
   })
 
   it('enables the desk in the selected workspace once linked', async () => {
-    render(<TelegramDeskPanel linked label="Telegram" />)
+    render(<TelegramDeskPanel linked online label="Telegram" />)
     fireEvent.change(screen.getByLabelText('Workspace'), { target: { value: 'ws-c' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Enable phone desk' }))
+    fireEvent.click(screen.getByRole('switch', { name: 'Turn Chat on Telegram on or off' }))
     await waitFor(() => expect(mocks.desk.enable).toHaveBeenCalledWith('ws-c'))
   })
 
   it('opens the bound Issue detail and confirms disable', async () => {
     mocks.desk.desk = boundDesk()
-    render(<TelegramDeskPanel linked label="Telegram" />)
+    render(<TelegramDeskPanel linked online label="Telegram" />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open phone desk' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open chat history' }))
     expect(mocks.openOrFocus).toHaveBeenCalledWith({
       kind: 'issue-detail',
       params: { wsId: 'ws-a', id: 'telegram-phone-desk' },
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Disable phone desk' }))
-    expect(screen.getByRole('heading', { name: 'Disable Telegram phone desk?' })).toBeTruthy()
-    fireEvent.click(screen.getAllByRole('button', { name: 'Disable phone desk' }).at(-1)!)
+    fireEvent.click(screen.getByRole('switch', { name: 'Turn Chat on Telegram on or off' }))
+    expect(screen.getByRole('heading', { name: 'Turn off Chat on Telegram?' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Turn off chat' }))
     await waitFor(() => expect(mocks.desk.disable).toHaveBeenCalled())
+  })
+
+  it('keeps an offline chat configured while naming its unavailable runtime', () => {
+    mocks.desk.desk = boundDesk()
+    render(<TelegramDeskPanel linked online={false} label="Telegram" />)
+
+    expect(screen.getByText('Waiting')).toBeTruthy()
+    expect(screen.queryByText('On')).toBeNull()
+    expect(screen.getByText(
+      'Ready in Alpha desk. Conversations resume when Telegram is online.',
+    )).toBeTruthy()
+    expect(screen.getByRole('switch', { name: 'Turn Chat on Telegram on or off' }).getAttribute('aria-checked'))
+      .toBe('true')
+  })
+
+  it('allows offline chat preparation without promising an active conversation', () => {
+    render(<TelegramDeskPanel linked online={false} label="Telegram" />)
+
+    expect(screen.getByText(
+      'Choose the Workspace now. Conversations begin after Telegram is online.',
+    )).toBeTruthy()
+    expect(screen.getByRole('switch', { name: 'Turn Chat on Telegram on or off' })).toBeTruthy()
   })
 })

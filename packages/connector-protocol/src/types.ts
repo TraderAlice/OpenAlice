@@ -3,6 +3,13 @@ import { z } from 'zod'
 export const connectorFieldKindSchema = z.enum(['text', 'secret', 'number', 'boolean'])
 export type ConnectorFieldKind = z.infer<typeof connectorFieldKindSchema>
 
+export const connectorFieldOptionSchema = z.object({
+  value: z.string().min(1),
+  label: z.string().min(1),
+  description: z.string().optional(),
+})
+export type ConnectorFieldOption = z.infer<typeof connectorFieldOptionSchema>
+
 export const connectorFieldDefinitionSchema = z.object({
   key: z.string().min(1),
   label: z.string().min(1),
@@ -16,6 +23,8 @@ export const connectorFieldDefinitionSchema = z.object({
   /** Settings card section. `preferences` stays out of connection details. */
   group: z.enum(['credentials', 'preferences']).optional(),
   defaultValue: z.union([z.string(), z.number(), z.boolean()]).optional(),
+  /** Finite values rendered as an explicit choice instead of free-form input. */
+  options: z.array(connectorFieldOptionSchema).min(2).max(6).optional(),
 })
 export type ConnectorFieldDefinition = z.infer<typeof connectorFieldDefinitionSchema>
 
@@ -24,6 +33,12 @@ export type ConnectorFieldDefinition = z.infer<typeof connectorFieldDefinitionSc
  *  `desk` means this adapter owns one phone-desk Issue and owner-chat ingest. */
 export const connectorCapabilitySchema = z.enum(['inbox', 'settings', 'uta', 'desk'])
 export type ConnectorCapability = z.infer<typeof connectorCapabilitySchema>
+
+export const connectorSetupLinkSchema = z.object({
+  key: z.string().min(1),
+  url: z.string().url(),
+})
+export type ConnectorSetupLink = z.infer<typeof connectorSetupLinkSchema>
 
 export const connectorDefinitionSchema = z.object({
   id: z.string().min(1),
@@ -35,6 +50,8 @@ export const connectorDefinitionSchema = z.object({
     description: z.string().min(1),
   })).default([]),
   capabilities: z.array(connectorCapabilitySchema).optional(),
+  /** Official third-party entry points used by the generic credential guide. */
+  setupLinks: z.array(connectorSetupLinkSchema).max(3).optional(),
 })
 export type ConnectorDefinition = z.infer<typeof connectorDefinitionSchema>
 
@@ -62,6 +79,41 @@ export const publicConnectorConfigSchema = z.object({
   adapters: z.record(z.string(), publicConnectorAdapterConfigSchema),
 })
 export type PublicConnectorConfig = z.infer<typeof publicConnectorConfigSchema>
+
+const connectorSettingValueSchema = z.union([z.string(), z.number(), z.boolean()])
+
+/** Adapter-scoped configuration command. Public callers never send a complete
+ * Connector document or secret-presence markers: each mutation owns only the
+ * named adapter and the explicit fields in this payload. */
+export const connectorAdapterMutationSchema = z.object({
+  enabled: z.boolean().optional(),
+  set: z.record(z.string(), connectorSettingValueSchema).default({}),
+  unset: z.array(z.string().min(1)).max(32).default([]),
+  setSecrets: z.record(z.string(), z.string()).default({}),
+  removeSecrets: z.array(z.string().min(1)).max(16).default([]),
+}).superRefine((value, context) => {
+  if (
+    value.enabled === undefined
+    && Object.keys(value.set).length === 0
+    && value.unset.length === 0
+    && Object.keys(value.setSecrets).length === 0
+    && value.removeSecrets.length === 0
+  ) {
+    context.addIssue({ code: 'custom', message: 'Connector adapter mutation is empty.' })
+  }
+})
+export type ConnectorAdapterMutation = z.infer<typeof connectorAdapterMutationSchema>
+
+export const connectorServiceMutationSchema = z.object({ enabled: z.boolean() })
+export type ConnectorServiceMutation = z.infer<typeof connectorServiceMutationSchema>
+
+export const publicConnectorAdapterMutationResultSchema = z.object({
+  serviceEnabled: z.boolean(),
+  serviceChanged: z.boolean(),
+  adapterChanged: z.boolean(),
+  adapter: publicConnectorAdapterConfigSchema,
+})
+export type PublicConnectorAdapterMutationResult = z.infer<typeof publicConnectorAdapterMutationResultSchema>
 
 /** Keep inline delivery bounded below both Discord's ordinary upload limit and
  * Telegram's document limit. Alice reads only the small Markdown reports that
@@ -163,11 +215,14 @@ export type OwnerChatMessage = z.infer<typeof ownerChatMessageSchema>
 
 export const inboundOwnerMessageSchema = z.object({
   connectorId: z.string().min(1),
+  eventId: z.string().min(1).max(128).optional(),
   userId: z.string().min(1),
   chatId: z.string().min(1).optional(),
   text: z.string().min(1).max(OWNER_CHAT_TEXT_MAX),
 })
 export type InboundOwnerMessage = z.infer<typeof inboundOwnerMessageSchema>
+export type ClaimedInboundOwnerMessage = InboundOwnerMessage & { queueId: string }
+export interface ConnectorWorkClaim<T> { claimId: string; items: T[] }
 export type ConnectorDeliveryReceipt = z.infer<typeof connectorDeliveryReceiptSchema>
 
 /** Bounded Connector → Alice work that is not phone-desk inbound chat. */

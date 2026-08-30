@@ -41,15 +41,24 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  closeLabel = "Close",
+  closeButtonClassName,
   overlayClassName,
+  keepMounted = false,
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
+  /** Accessible label for the close control. Product shells should localize it. */
+  closeLabel?: string
+  /** Product-shell sizing or placement adjustments for the close control. */
+  closeButtonClassName?: string
   /** Raise or otherwise tune the backdrop when a shared dialog is nested above a legacy modal. */
   overlayClassName?: string
+  /** Keep stateful form content mounted while the dialog is closed. */
+  keepMounted?: boolean
 }) {
   return (
-    <DialogPortal>
+    <DialogPortal keepMounted={keepMounted}>
       <DialogOverlay className={overlayClassName} />
       <DialogPrimitive.Popup
         data-slot="dialog-content"
@@ -66,14 +75,14 @@ function DialogContent({
             render={
               <Button
                 variant="ghost"
-                className="absolute top-2 right-2"
+                className={cn("absolute top-2 right-2", closeButtonClassName)}
                 size="icon-sm"
               />
             }
           >
             <XIcon
             />
-            <span className="sr-only">Close</span>
+            <span className="sr-only">{closeLabel}</span>
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Popup>

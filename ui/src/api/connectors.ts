@@ -18,9 +18,15 @@ export interface ConnectorDefinition {
     learnedBy?: string
     group?: 'credentials' | 'preferences'
     defaultValue?: string | number | boolean
+    options?: Array<{
+      value: string
+      label: string
+      description?: string
+    }>
   }>
   commands: Array<{ name: string; description: string }>
   capabilities?: Array<'inbox' | 'settings' | 'uta' | 'desk'>
+  setupLinks?: Array<{ key: string; url: string }>
 }
 
 export interface PublicConnectorConfig {
@@ -30,6 +36,26 @@ export interface PublicConnectorConfig {
     settings: Record<string, string | number | boolean>
     configuredSecrets: string[]
   }>
+}
+
+export interface ConnectorAdapterMutation {
+  enabled?: boolean
+  set?: Record<string, string | number | boolean>
+  unset?: string[]
+  setSecrets?: Record<string, string>
+  removeSecrets?: string[]
+}
+
+export interface ConnectorAdapterMutationResult {
+  serviceEnabled: boolean
+  serviceChanged: boolean
+  adapterChanged: boolean
+  adapter: PublicConnectorConfig['adapters'][string]
+  runtime: {
+    scope: 'adapter' | 'service'
+    status: 'unchanged' | 'reconciled' | 'degraded' | 'starting'
+    message?: string
+  }
 }
 
 export interface ConnectorHealth {
@@ -89,11 +115,18 @@ export const connectorsApi = {
   async load(): Promise<ConnectorSettingsSnapshot> {
     return decodeConnectorSettingsSnapshot(await fetchJson<unknown>('/api/connectors'))
   },
-  save(config: PublicConnectorConfig): Promise<{ config: PublicConnectorConfig }> {
-    return fetchJson('/api/connectors', {
-      method: 'PUT',
+  setService(enabled: boolean): Promise<{ serviceEnabled: boolean; serviceChanged: boolean }> {
+    return fetchJson('/api/connectors/service', {
+      method: 'PATCH',
       headers,
-      body: JSON.stringify(config),
+      body: JSON.stringify({ enabled }),
+    })
+  },
+  mutateAdapter(id: string, mutation: ConnectorAdapterMutation): Promise<ConnectorAdapterMutationResult> {
+    return fetchJson(`/api/connectors/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(mutation),
     })
   },
   test(id: string): Promise<{ ok: boolean; probeId: string }> {
@@ -161,7 +194,17 @@ function isConnectorDefinition(value: unknown): boolean {
       && (field.defaultValue === undefined
         || typeof field.defaultValue === 'string'
         || typeof field.defaultValue === 'number'
-        || typeof field.defaultValue === 'boolean'))
+        || typeof field.defaultValue === 'boolean')
+      && (field.options === undefined
+        || (Array.isArray(field.options)
+          && field.options.length >= 2
+          && field.options.length <= 6
+          && field.options.every((option) => isRecord(option)
+            && typeof option.value === 'string'
+            && option.value.length > 0
+            && typeof option.label === 'string'
+            && option.label.length > 0
+            && isOptionalString(option.description)))))
     && Array.isArray(value.commands)
     && value.commands.every((command) => isRecord(command)
       && typeof command.name === 'string'
@@ -171,6 +214,11 @@ function isConnectorDefinition(value: unknown): boolean {
         && value.capabilities.every((capability) => (
           capability === 'inbox' || capability === 'settings' || capability === 'uta' || capability === 'desk'
         ))))
+    && (value.setupLinks === undefined
+      || (Array.isArray(value.setupLinks)
+        && value.setupLinks.every((link) => isRecord(link)
+          && typeof link.key === 'string'
+          && typeof link.url === 'string')))
 }
 
 function isPublicConnectorConfig(value: unknown): boolean {

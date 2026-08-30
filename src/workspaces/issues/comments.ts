@@ -136,7 +136,7 @@ export async function readIssueComments(
 }
 
 export type AppendIssueCommentResult =
-  | { ok: true; issue: IssueRecord; comment: IssueComment }
+  | { ok: true; issue: IssueRecord; comment: IssueComment; created: boolean }
   | { ok: false; reason: 'not_found' }
   | { ok: false; reason: 'invalid'; error: string }
 
@@ -202,7 +202,7 @@ export async function appendIssueComment(
 
     if (options.id) {
       const duplicate = existing.comments.find((comment) => comment.id === options.id)
-      if (duplicate) return { ok: true, issue: issue.issue, comment: duplicate }
+      if (duplicate) return { ok: true, issue: issue.issue, comment: duplicate, created: false }
     }
 
     const comment: IssueComment = {
@@ -215,7 +215,7 @@ export async function appendIssueComment(
       ...(options.via ? { via: options.via } : {}),
     }
     await writeIssueComments(wsDir, id, [...existing.comments, comment])
-    return { ok: true, issue: issue.issue, comment }
+    return { ok: true, issue: issue.issue, comment, created: true }
   })
 }
 

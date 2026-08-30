@@ -49,6 +49,9 @@ export const demoConnectorSnapshot: ConnectorSettingsSnapshot = {
         { name: 'uta', description: 'Review and approve pending trades.' },
       ],
       capabilities: ['inbox', 'settings', 'uta'],
+      setupLinks: [
+        { key: 'discordPortal', url: 'https://discord.com/developers/applications' },
+      ],
     },
     {
       id: 'telegram',
@@ -99,6 +102,9 @@ export const demoConnectorSnapshot: ConnectorSettingsSnapshot = {
         { name: 'uta', description: 'Review and approve pending trades.' },
       ],
       capabilities: ['inbox', 'settings', 'uta', 'desk'],
+      setupLinks: [
+        { key: 'telegramBotFather', url: 'https://t.me/BotFather' },
+      ],
     },
     {
       id: 'slack',
@@ -147,6 +153,9 @@ export const demoConnectorSnapshot: ConnectorSettingsSnapshot = {
         { name: 'uta', description: 'Review and approve pending trades.' },
       ],
       capabilities: ['inbox', 'settings', 'uta'],
+      setupLinks: [
+        { key: 'slackPortal', url: 'https://api.slack.com/apps' },
+      ],
     },
     {
       id: 'feishu',
@@ -173,8 +182,11 @@ export const demoConnectorSnapshot: ConnectorSettingsSnapshot = {
           kind: 'text',
           required: false,
           defaultValue: 'feishu',
-          placeholder: 'feishu or lark',
-          description: 'feishu is open.feishu.cn (China). lark is open.larksuite.com. Do not mix them.',
+          description: 'Choose the platform where you created this app.',
+          options: [
+            { value: 'feishu', label: 'Feishu', description: 'open.feishu.cn (China)' },
+            { value: 'lark', label: 'Lark', description: 'open.larksuite.com (Global)' },
+          ],
         },
         {
           key: 'ownerUserId',
@@ -213,6 +225,10 @@ export const demoConnectorSnapshot: ConnectorSettingsSnapshot = {
         { name: 'uta', description: 'Review and approve pending trades.' },
       ],
       capabilities: ['inbox', 'settings', 'uta', 'desk'],
+      setupLinks: [
+        { key: 'feishuPortal', url: 'https://open.feishu.cn/app' },
+        { key: 'larkPortal', url: 'https://open.larksuite.com/app' },
+      ],
     },
   ],
   config: {

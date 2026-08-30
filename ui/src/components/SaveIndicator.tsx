@@ -1,32 +1,41 @@
+import { Check, CircleAlert, LoaderCircle } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { SaveStatus } from '../hooks/useAutoSave'
 
 export function SaveIndicator({ status, onRetry }: { status: SaveStatus; onRetry?: () => void }) {
+  const { t } = useTranslation()
   if (status === 'idle') return null
 
   return (
-    <span className="inline-flex items-center gap-1.5 text-[11px] shrink-0">
+    <span
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      className="inline-flex shrink-0 items-center gap-1.5 text-[11px]"
+    >
       {status === 'saving' && (
         <>
-          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-          <span className="text-muted-foreground">Saving…</span>
+          <LoaderCircle className="size-3 animate-spin text-primary motion-reduce:animate-none" aria-hidden />
+          <span className="text-muted-foreground">{t('common.saving')}</span>
         </>
       )}
       {status === 'saved' && (
         <>
-          <span className="w-1.5 h-1.5 rounded-full bg-success" />
-          <span className="text-muted-foreground">Saved</span>
+          <Check className="size-3 text-success" aria-hidden />
+          <span className="text-muted-foreground">{t('common.saved')}</span>
         </>
       )}
       {status === 'error' && (
         <>
-          <span className="w-1.5 h-1.5 rounded-full bg-destructive" />
-          <span className="text-destructive">Save failed</span>
+          <CircleAlert className="size-3 text-destructive" aria-hidden />
+          <span className="text-destructive">{t('common.saveFailed')}</span>
           {onRetry && (
             <button
+              type="button"
               onClick={onRetry}
-              className="text-destructive underline underline-offset-2 hover:text-foreground ml-0.5"
+              className="oa-pressable ml-0.5 rounded-sm text-destructive underline underline-offset-2 hover:text-foreground"
             >
-              Retry
+              {t('common.retry')}
             </button>
           )}
         </>

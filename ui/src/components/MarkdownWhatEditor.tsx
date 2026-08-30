@@ -10,6 +10,8 @@ interface MarkdownWhatEditorProps {
   value: string
   /** Returns true only after the server has accepted this exact Markdown. */
   onSave: (what: string) => Promise<boolean>
+  ariaLabel?: string
+  placeholder?: string
 }
 
 const AUTOSAVE_DELAY_MS = 800
@@ -25,7 +27,7 @@ const SAVED_LABEL_MS = 1_200
  * overwrite what the human is currently typing. Incoming poll/write snapshots
  * are only applied when there are no local edits waiting to be saved.
  */
-export function MarkdownWhatEditor({ value, onSave }: MarkdownWhatEditorProps) {
+export function MarkdownWhatEditor({ value, onSave, ariaLabel, placeholder }: MarkdownWhatEditorProps) {
   const { t } = useTranslation()
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const mountedRef = useRef(true)
@@ -78,8 +80,8 @@ export function MarkdownWhatEditor({ value, onSave }: MarkdownWhatEditorProps) {
     },
     editorProps: {
       attributes: {
-        'aria-label': t('issues.detail.whatEditorLabel'),
-        'data-placeholder': t('issues.detail.whatEditorPlaceholder'),
+        'aria-label': ariaLabel ?? t('issues.detail.whatEditorLabel'),
+        'data-placeholder': placeholder ?? t('issues.detail.whatEditorPlaceholder'),
         spellcheck: 'true',
       },
     },
@@ -148,13 +150,13 @@ export function MarkdownWhatEditor({ value, onSave }: MarkdownWhatEditorProps) {
     editor.setOptions({
       editorProps: {
         attributes: {
-          'aria-label': t('issues.detail.whatEditorLabel'),
-          'data-placeholder': t('issues.detail.whatEditorPlaceholder'),
+          'aria-label': ariaLabel ?? t('issues.detail.whatEditorLabel'),
+          'data-placeholder': placeholder ?? t('issues.detail.whatEditorPlaceholder'),
           spellcheck: 'true',
         },
       },
     })
-  }, [editor, t])
+  }, [ariaLabel, editor, placeholder, t])
 
   useEffect(() => {
     if (!editor) return

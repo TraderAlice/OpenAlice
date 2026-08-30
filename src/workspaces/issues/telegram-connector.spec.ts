@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { createIssue } from './mutate.js'
 import {
+  connectorDeskDefaultWhat,
   createConnectorDesk,
   createTelegramConnectorDesk,
   disableTelegramConnectorDesk,
@@ -55,6 +56,10 @@ describe('telegram connector desk', () => {
     expect(first.ok).toBe(true)
     if (!first.ok) return
     expect(first.issue.id).toBe(TELEGRAM_CONNECTOR_ISSUE_ID)
+    expect(first.issue.title).toBe('Chat on Telegram')
+    expect(first.issue.what).toBe(connectorDeskDefaultWhat('Telegram'))
+    expect(first.issue.what).toContain('the chat connected to the owner through Telegram')
+    expect(first.issue.what).not.toMatch(/phone desk/i)
     expect(first.issue.connectorDesk).toBe('telegram')
     expect(first.issue.commentPrompt).toBe('{comment}')
 
@@ -102,9 +107,34 @@ describe('telegram connector desk', () => {
     expect(revived.ok).toBe(true)
     if (!revived.ok) return
     expect(revived.issue.id).toBe(TELEGRAM_CONNECTOR_ISSUE_ID)
+    expect(revived.issue.title).toBe(first.issue.title)
+    expect(revived.issue.what).toBe(first.issue.what)
     expect(revived.issue.connectorDesk).toBe('telegram')
     expect(revived.issue.status).toBe('todo')
     expect(revived.issue.commentPrompt).toBe('{comment}')
+  })
+
+  it('does not rewrite title or What when reviving a leftover desk', async () => {
+    await writeFile(join(wsA, '.alice', 'issues', `${TELEGRAM_CONNECTOR_ISSUE_ID}.md`), `---
+title: Telegram phone desk
+status: canceled
+assignee: '@new-then-resume'
+when: { kind: every, every: 4h }
+---
+
+You are the Telegram phone desk for this Workspace.
+`)
+    const revived = await createTelegramConnectorDesk(
+      { id: 'ws-a', dir: wsA },
+      [{ id: 'ws-a', dir: wsA }],
+    )
+    expect(revived.ok).toBe(true)
+    if (!revived.ok) return
+    expect(revived.issue.id).toBe(TELEGRAM_CONNECTOR_ISSUE_ID)
+    expect(revived.issue.title).toBe('Telegram phone desk')
+    expect(revived.issue.what).toBe('You are the Telegram phone desk for this Workspace.')
+    expect(revived.issue.connectorDesk).toBe('telegram')
+    expect(revived.issue.status).toBe('todo')
   })
 
   it('updates the desk cadence through the Settings helper', async () => {
@@ -137,7 +167,7 @@ describe('telegram connector desk', () => {
     expect(updated).toMatchObject({
       ok: false,
       reason: 'invalid',
-      error: 'Unsupported phone-desk cadence: 3h',
+      error: 'Unsupported heartbeat: 3h',
     })
   })
 
@@ -169,6 +199,8 @@ x
     expect(telegram.issue.connectorDesk).toBe('telegram')
     expect(other.issue.connectorDesk).toBe('feishu')
     expect(other.issue.id).toBe('feishu-phone-desk')
+    expect(other.issue.title).toBe('Chat on Feishu')
+    expect(other.issue.what).toBe(connectorDeskDefaultWhat('Feishu'))
     const all = await findConnectorDesks([{ id: 'ws-a', dir: wsA }, { id: 'ws-b', dir: wsB }])
     expect(all.map((desk) => desk.connectorId).sort()).toEqual(['feishu', 'telegram'])
   })

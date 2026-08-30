@@ -31,25 +31,20 @@ describe('demo Connector handlers', () => {
     expect(body.health).toEqual({ enabled: false, status: 'disabled' })
   })
 
-  it('echoes public PUT state without returning entered secrets', async () => {
-    const response = await fetch(`${baseUrl}/api/connectors`, {
-      method: 'PUT',
+  it('applies one adapter mutation without returning entered secrets', async () => {
+    const response = await fetch(`${baseUrl}/api/connectors/discord`, {
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        serviceEnabled: true,
-        adapters: {
-          discord: {
-            enabled: true,
-            settings: { applicationId: 'demo-app', botToken: 'demo-secret' },
-            configuredSecrets: [],
-          },
-        },
+        enabled: true,
+        set: { applicationId: 'demo-app' },
+        setSecrets: { botToken: 'demo-secret' },
       }),
     })
     const body = await response.json()
 
-    expect(response.status).toBe(200)
-    expect(body.config.adapters.discord).toEqual({
+    expect(response.status).toBe(202)
+    expect(body.adapter).toEqual({
       enabled: true,
       settings: { applicationId: 'demo-app' },
       configuredSecrets: ['botToken'],
@@ -57,11 +52,12 @@ describe('demo Connector handlers', () => {
     expect(JSON.stringify(body)).not.toContain('demo-secret')
 
     const refreshed = await fetch(`${baseUrl}/api/connectors`).then((result) => result.json())
-    expect(refreshed.config).toEqual(body.config)
+    expect(refreshed.config.serviceEnabled).toBe(true)
+    expect(refreshed.config.adapters.discord).toEqual(body.adapter)
     expect(refreshed.health.status).toBe('degraded')
   })
 
-  it('binds, updates, and disables the demo Telegram phone desk', async () => {
+  it('binds, updates, and disables demo Chat on Telegram', async () => {
     const missing = await fetch(`${baseUrl}/api/connectors/telegram/desk`)
     expect(await missing.json()).toEqual({ desk: null })
 
@@ -74,6 +70,8 @@ describe('demo Connector handlers', () => {
     expect(created.status).toBe(201)
     expect(createdBody.desk.wsId).toBe('ws-demo')
     expect(createdBody.desk.issue.telegramConnector).toBe(true)
+    expect(createdBody.desk.issue.title).toBe('Chat on Telegram')
+    expect(createdBody.desk.issue.what).not.toMatch(/phone desk/i)
 
     const conflict = await fetch(`${baseUrl}/api/connectors/telegram/desk`, {
       method: 'POST',

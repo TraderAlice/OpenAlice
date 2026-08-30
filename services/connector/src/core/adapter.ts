@@ -33,13 +33,13 @@ export interface ConnectorAdapterContext {
   updateSettings(patch: Record<string, string | number | boolean>): Promise<void>
   getServiceStatus(): string
   sendTest(connectorId: string): Promise<string>
-  forwardOwnerText(input: { text: string; userId: string; chatId?: string }): Promise<void>
-  enqueueArtifactRequest(input: { entryId: string; docIndex: number }): string
+  forwardOwnerText(input: { text: string; userId: string; chatId?: string; eventId?: string }): Promise<void>
+  enqueueArtifactRequest(input: { entryId: string; docIndex: number }): Promise<string>
   enqueueUtaRequest(input: {
     action: 'review' | 'push' | 'reject'
     utaId?: string
     pendingHash?: string
-  }): string
+  }): Promise<string>
 }
 
 export interface ConnectorAdapter {

@@ -1,4 +1,4 @@
-import { api, type ConnectorSettingsSnapshot } from '../api'
+import { api, type ConnectorHealth, type ConnectorSettingsSnapshot } from '../api'
 import { createLiveStore, type Apply } from './createLiveStore'
 import { reloadOnHotUpdate } from '../lib/hmr'
 
@@ -42,6 +42,18 @@ export function useConnectorHealthState(): ConnectorHealthLiveState {
   return connectorHealthLive.useStore((state) => state)
 }
 
+/** Runtime-only selection for settings forms that must retain local config drafts. */
+export function useConnectorRuntimeHealthState(): {
+  health: ConnectorHealth | null
+  error: string | null
+} {
+  const state = connectorHealthLive.useStore((current) => current)
+  return {
+    health: state.snapshot?.health ?? null,
+    error: state.error,
+  }
+}
+
 export function useConnectorWarningCount(): number {
   return connectorHealthLive.useStore((state) => connectorWarningCount(state.snapshot))
 }
@@ -58,6 +70,11 @@ export async function reconnectConnector(id: string): Promise<'adapter' | 'servi
   const result = await api.connectors.reconnect(id)
   await refreshConnectorHealth()
   return result.scope
+}
+
+export async function setConnectorEnabled(id: string, enabled: boolean): Promise<void> {
+  await api.connectors.mutateAdapter(id, { enabled })
+  await refreshConnectorHealth()
 }
 
 export function connectorWarningCount(snapshot: ConnectorSettingsSnapshot | null, nowMs = Date.now()): number {

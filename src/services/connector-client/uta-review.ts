@@ -19,6 +19,9 @@ import type { UTAAccountSDK, UTAManagerSDK } from '../uta-client/index.js'
 export interface ConnectorUtaBridgeDeps {
   isEnabled(): Promise<boolean>
   drainUtaActions(): Promise<ConnectorUtaRequest[]>
+  claimUtaActions?(): Promise<{ claimId: string; items: ConnectorUtaRequest[] }>
+  ackUtaActions?: (claimId: string, itemIds: string[]) => Promise<void>
+  releaseUtaActions?: (claimId: string, itemIds: string[]) => Promise<void>
   presentUta(presentation: ConnectorUtaPresentation): Promise<void>
   failUta(failure: ConnectorUtaFailure): Promise<void>
   warn(message: string): void
@@ -29,11 +32,17 @@ export interface ConnectorUtaBridgeDeps {
 
 export async function processConnectorUtaRequests(deps: ConnectorUtaBridgeDeps): Promise<void> {
   if (!await deps.isEnabled()) return
-  const requests = await deps.drainUtaActions()
+  const claim = deps.claimUtaActions ? await deps.claimUtaActions() : null
+  const requests = claim?.items ?? await deps.drainUtaActions()
   const now = deps.now?.() ?? Date.now()
+  const completed: string[] = []
+  const retry: string[] = []
   for (const request of requests) {
-    await fulfillUtaRequest(deps, request, now)
+    if (await fulfillUtaRequest(deps, request, now)) completed.push(request.requestId)
+    else retry.push(request.requestId)
   }
+  if (claim && completed.length > 0) await deps.ackUtaActions?.(claim.claimId, completed)
+  if (claim && retry.length > 0) await deps.releaseUtaActions?.(claim.claimId, retry)
 }
 
 export function compactUtaOperation(op: unknown): ConnectorUtaOperation {
@@ -121,7 +130,7 @@ async function fulfillUtaRequest(
   deps: ConnectorUtaBridgeDeps,
   request: ConnectorUtaRequest,
   now: number,
-): Promise<void> {
+): Promise<boolean> {
   const fail = async (reason: ConnectorUtaFailure['reason'], message?: string) => {
     const failure: ConnectorUtaFailure = {
       requestId: request.requestId,
@@ -131,75 +140,67 @@ async function fulfillUtaRequest(
     }
     try {
       await deps.failUta(failure)
+      return true
     } catch (error) {
       deps.warn(error instanceof Error ? error.message : String(error))
+      return false
     }
   }
 
   if (isConnectorActionExpired(request.createdAt, now)) {
-    await fail('expired')
-    return
+    return fail('expired')
   }
 
   try {
     if (request.action === 'review') {
-      await present(deps, request, await buildConnectorUtaReview(deps.utaManager, deps.tradingModePolicy()))
-      return
+      return present(deps, request, await buildConnectorUtaReview(deps.utaManager, deps.tradingModePolicy()))
     }
 
     const policy = deps.tradingModePolicy()
     if (policy.mode === 'lite') {
-      await fail('unavailable', describeTradingMode('lite'))
-      return
+      return fail('unavailable', describeTradingMode('lite'))
     }
     if (!request.utaId) {
-      await fail('not_found')
-      return
+      return fail('not_found')
     }
     if (!request.pendingHash) {
-      await fail('conflict')
-      return
+      return fail('conflict')
     }
 
     const uta = await deps.utaManager.get(request.utaId)
     if (!uta) {
-      await fail('not_found')
-      return
+      return fail('not_found')
     }
     const status = await uta.status()
     if (!status.pendingMessage) {
-      await present(deps, request, await buildConnectorUtaReview(deps.utaManager, policy), {
+      return present(deps, request, await buildConnectorUtaReview(deps.utaManager, policy), {
         kind: 'error',
         utaId: request.utaId,
         message: 'Nothing is waiting for approval on that account.',
       })
-      return
     }
     if (status.staged.length > MAX_CONNECTOR_UTA_OPERATIONS) {
-      await present(deps, request, await buildConnectorUtaReview(deps.utaManager, policy), {
+      return present(deps, request, await buildConnectorUtaReview(deps.utaManager, policy), {
         kind: 'error',
         utaId: request.utaId,
         message: `This commit has ${status.staged.length} operations. Approve it in OpenAlice → Trading as Git.`,
       })
-      return
     }
 
     if (request.action === 'push') {
       if (policy.mode === 'readonly') {
-        await fail('readonly')
-        return
+        return fail('readonly')
       }
       const pushed = await uta.push(request.pendingHash)
-      await present(deps, request, await buildConnectorUtaReview(deps.utaManager, policy), {
+      return present(deps, request, await buildConnectorUtaReview(deps.utaManager, policy), {
         kind: 'pushed',
         utaId: request.utaId,
         message: formatPushResult(uta.label || request.utaId, pushed),
       })
-      return
     }
 
     const rejected = await uta.reject(undefined, request.pendingHash)
-    await present(deps, request, await buildConnectorUtaReview(deps.utaManager, policy), {
+    return present(deps, request, await buildConnectorUtaReview(deps.utaManager, policy), {
       kind: 'rejected',
       utaId: request.utaId,
       message: `Rejected ${uta.label || request.utaId} · ${rejected.hash}`,
@@ -207,15 +208,13 @@ async function fulfillUtaRequest(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     if (isHashConflict(error)) {
-      await fail('conflict')
-      return
+      return fail('conflict')
     }
     if (/readonly/i.test(message)) {
-      await fail('readonly', message)
-      return
+      return fail('readonly', message)
     }
     deps.warn(message)
-    await fail('delivery_failed', truncate(message, 400))
+    return fail('delivery_failed', truncate(message, 400))
   }
 }
 
@@ -224,7 +223,7 @@ async function present(
   request: ConnectorUtaRequest,
   review: ConnectorUtaReview,
   result?: ConnectorUtaResult,
-): Promise<void> {
+): Promise<boolean> {
   try {
     await deps.presentUta({
       requestId: request.requestId,
@@ -232,15 +231,17 @@ async function present(
       review,
       ...(result ? { result } : {}),
     })
+    return true
   } catch (error) {
     deps.warn(error instanceof Error ? error.message : String(error))
-    await deps.failUta({
+    return deps.failUta({
       requestId: request.requestId,
       connectorId: request.connectorId,
       reason: 'delivery_failed',
       message: utaFailureMessage('delivery_failed'),
-    }).catch((failError) => {
+    }).then(() => true).catch((failError) => {
       deps.warn(failError instanceof Error ? failError.message : String(failError))
+      return false
     })
   }
 }
