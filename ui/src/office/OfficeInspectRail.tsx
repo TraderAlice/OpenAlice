@@ -150,7 +150,7 @@ export function OfficeInspectRail({
                 mood={employee.mood}
                 reducedMotion={reducedMotion}
                 label={employeeLabel}
-                scale={0.34}
+                scale={0.42}
               />
             </div>
             <div className="oa-office-inspect__dialogue">

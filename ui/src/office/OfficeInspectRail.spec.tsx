@@ -66,6 +66,10 @@ describe('OfficeInspectRail', () => {
     expect(container.textContent).not.toContain('demo-resume-chat')
     expect(container.querySelector<HTMLImageElement>('.oa-office-inspect__portrait .oa-office-coworker img')?.src)
       .toContain('/office/coworkers/codex-')
+    expect(Number.parseFloat(
+      (container.querySelector('.oa-office-inspect__portrait .oa-office-coworker') as HTMLElement)
+        ?.style.height ?? '',
+    )).toBeCloseTo(87.36)
     expect(screen.getByRole('button', { name: 'Close' }).querySelector('.oa-office-window__close-mark'))
       .toBeTruthy()
     const openSession = screen.getByRole('button', { name: 'Open session' })

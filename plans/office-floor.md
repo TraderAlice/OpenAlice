@@ -5016,6 +5016,24 @@ Roster portrait framing follow-up (2026-08-31):
   spec passed. Root and UI TypeScript passed; the full suite passed all 620 test files and 5,194 tests (one file and nine
   tests skipped); the production UI build passed with only the existing ports fallback and large-chunk advisory.
 
+Agent-file portrait framing follow-up (2026-08-31):
+
+- Opened real successful-but-asleep g24 through the Chat roster. Assignment, latest result, outcome copy, provenance,
+  and the deterministic return to roster were already strong, but the 76×82 Agent-file portrait rendered its formal
+  character only about 71px tall and then shifted it down 8px. The resulting near-19px sky band made the larger profile
+  frame look less characterful than the compact roster card.
+- Compared widening the profile column, generating a separate headshot registry, and applying the same close-framing
+  grammar already accepted in the roster. A wider column would steal room from assignment/status/provenance, while a
+  second image registry would split one coworker identity across two asset systems. Chose the shared portrait at about
+  87px tall inside the existing frame: retain a few pixels above the hair, trim shoes at the bottom, and give the Agent
+  file a GBA party-profile silhouette without changing its information layout.
+- Implemented the shared close framing and reopened real g24. The character now fills the portrait while Assignment,
+  Latest result, status facts, Issue provenance, and the full-width Open session command retain their exact layout.
+  Returning through the back glyph restored the g24 cursor and `02/24` roster position. The focused Agent-file suite
+  passed all six tests. Root and UI TypeScript passed; the full suite passed all 620 test files and 5,194 tests (one
+  file and nine tests skipped); the production UI build passed with only the existing ports fallback and large-chunk
+  advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
