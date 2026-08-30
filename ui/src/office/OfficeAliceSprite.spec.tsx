@@ -60,7 +60,7 @@ describe('OfficeAliceSprite', () => {
 
   it('advances the authored run cycle while Alice keeps moving', () => {
     vi.useFakeTimers()
-    const { container } = render(
+    const { container, rerender } = render(
       <OfficeAliceSprite
         direction="right"
         walking
@@ -75,5 +75,22 @@ describe('OfficeAliceSprite', () => {
     expect(container.firstElementChild?.getAttribute('data-frame')).toBe('1')
     act(() => vi.advanceTimersByTime(120))
     expect(container.firstElementChild?.getAttribute('data-frame')).toBe('2')
+
+    rerender(
+      <OfficeAliceSprite
+        direction="right"
+        walking
+        sprinting
+        reducedMotion={false}
+        label="Alice"
+        scale={1}
+      />,
+    )
+    expect(container.firstElementChild?.getAttribute('data-frame')).toBe('0')
+    expect(container.firstElementChild?.getAttribute('data-sprinting')).toBe('true')
+    act(() => vi.advanceTimersByTime(79))
+    expect(container.firstElementChild?.getAttribute('data-frame')).toBe('0')
+    act(() => vi.advanceTimersByTime(1))
+    expect(container.firstElementChild?.getAttribute('data-frame')).toBe('1')
   })
 })

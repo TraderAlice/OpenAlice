@@ -175,6 +175,7 @@ export function OfficeBuilding({
     initialPlayerState?.direction ?? 'down',
   )
   const [aliceWalking, setAliceWalking] = useState(false)
+  const [aliceSprinting, setAliceSprinting] = useState(false)
   const [alicePushing, setAlicePushing] = useState(false)
   const [aliceBumped, setAliceBumped] = useState(false)
   const [collisionImpact, setCollisionImpact] = useState<OfficeCollisionImpactState | null>(null)
@@ -606,14 +607,19 @@ export function OfficeBuilding({
     walkTimerRef.current = null
     setAlicePushing(false)
     setAliceWalking(false)
+    setAliceSprinting(false)
   }
-  const showCollisionBump = (movement: OfficeMovement = OFFICE_MOVEMENTS[aliceDirection]) => {
+  const showCollisionBump = (
+    movement: OfficeMovement = OFFICE_MOVEMENTS[aliceDirection],
+    sprinting = false,
+  ) => {
     const sustainedInput = manualMoveKeysRef.current.size > 0
       || touchMovePointersRef.current.size > 0
     if (walkTimerRef.current != null) window.clearTimeout(walkTimerRef.current)
     walkTimerRef.current = null
     setAlicePushing(sustainedInput)
     setAliceWalking(sustainedInput)
+    setAliceSprinting(sustainedInput && sprinting)
     if (sustainedInput && pushDirectionRef.current === movement.direction) return
     pushDirectionRef.current = sustainedInput ? movement.direction : null
     if (bumpFrameRef.current != null) window.cancelAnimationFrame(bumpFrameRef.current)
@@ -634,12 +640,20 @@ export function OfficeBuilding({
       bumpTimerRef.current = window.setTimeout(() => setAliceBumped(false), 140)
     })
   }
-  const showAliceWalking = () => {
+  const showAliceWalking = (sprinting = false) => {
     if (walkTimerRef.current != null) window.clearTimeout(walkTimerRef.current)
     setAliceWalking(true)
-    walkTimerRef.current = window.setTimeout(() => setAliceWalking(false), 150)
+    setAliceSprinting(sprinting)
+    walkTimerRef.current = window.setTimeout(() => {
+      setAliceWalking(false)
+      setAliceSprinting(false)
+    }, 150)
   }
-  const moveAlice = (movement: OfficeMovement, learnsManualControls = true): boolean => {
+  const moveAlice = (
+    movement: OfficeMovement,
+    learnsManualControls = true,
+    sprinting = false,
+  ): boolean => {
     if (learnsManualControls) {
       setControlsLearned(true)
       setInteractionAnchorTargetId(null)
@@ -647,14 +661,14 @@ export function OfficeBuilding({
     setAliceDirection(movement.direction)
     const move = moveAliceOnOfficeMap(aliceRef.current, movement, mapLayout, collisionRects)
     if (move.bumped) {
-      showCollisionBump(movement)
+      showCollisionBump(movement, sprinting)
       return false
     }
     clearAlicePushFeedback()
     const next = move.position
     aliceRef.current = next
     setAlice(next)
-    showAliceWalking()
+    showAliceWalking(sprinting)
     const viewport = viewportRef.current?.getBoundingClientRect()
     if (viewport) {
       setCamera((currentCamera) => officeCameraFollowingAlice(
@@ -883,9 +897,10 @@ export function OfficeBuilding({
     return movementForDirections(held.map(({ direction }) => direction), lastDirection)
   }
   const moveAliceAtManualPace = (movement: OfficeMovement) => {
-    const steps = manualMoveSprintRef.current ? 2 : 1
+    const sprinting = manualMoveSprintRef.current
+    const steps = sprinting ? 2 : 1
     for (let index = 0; index < steps; index += 1) {
-      if (!moveAlice(movement)) break
+      if (!moveAlice(movement, true, sprinting)) break
     }
   }
   const moveAliceFromHeldKeys = () => {
@@ -1054,6 +1069,7 @@ export function OfficeBuilding({
     setAlice(nextPosition)
     setAliceDirection(nextDirection)
     setAliceWalking(false)
+    setAliceSprinting(false)
     setAlicePushing(false)
     setInteractionAnchorTargetId(null)
     pushDirectionRef.current = null
@@ -1573,6 +1589,7 @@ export function OfficeBuilding({
               aria-label={t('office.aliceAvatar')}
               data-direction={aliceDirection}
               data-walking={aliceWalking}
+              data-sprinting={aliceSprinting || undefined}
               data-pushing={alicePushing}
               data-bumped={aliceBumped}
               style={{ left: alice.x, top: alice.y, zIndex: officeDepthAt(alice.y) }}
@@ -1581,6 +1598,7 @@ export function OfficeBuilding({
                 <OfficeAliceSprite
                   direction={aliceDirection}
                   walking={aliceWalking}
+                  sprinting={aliceSprinting}
                   reducedMotion={reducedMotion}
                   label={t('office.aliceAvatar')}
                   scale={1}

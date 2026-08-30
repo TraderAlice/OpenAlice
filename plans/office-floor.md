@@ -4311,6 +4311,20 @@ Collision-safe desktop sprint follow-up (2026-08-31):
   tests. Root and UI TypeScript passed, the full suite passed all 617 test files and 5,176 tests (one file and nine
   tests skipped), and the production UI build passed with only the existing ports fallback and large-chunk advisories.
 
+Sprint gait-cadence follow-up (2026-08-31):
+
+- Audited the new Shift pace against Alice's authored three-frame overworld atlas. Ordinary walking and sprinting both
+  selected the same 120ms frame duration even though sprint covered twice the floor distance every 96ms movement beat,
+  creating a mechanical sliding risk rather than a faster gait.
+- Compared leaving the shared cadence, adding another bob/scale animation, and making sprint an explicit sprite state
+  that accelerates the existing authored frames. Chose the explicit state: normal, touch, and auto-route walking remain
+  120ms per frame; active Shift movement uses the same clean atlas at 80ms per frame; reduced-motion still holds frame
+  zero. Collision pushing inherits the active pace, and the state settles with the existing 150ms movement tail.
+- Real-browser continuous sprint captured x600 -> x552 -> x504 -> x456 -> x408 while the sprite advanced through frames
+  1 -> 2 -> 1 -> 2 with `walking` and `sprinting` both true. Focused Alice/Building suites passed 24 tests. Root and UI
+  TypeScript passed, the full suite passed all 617 test files and 5,176 tests (one file and nine tests skipped), and the
+  production UI build passed with only the existing ports fallback and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

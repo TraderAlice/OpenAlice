@@ -435,6 +435,7 @@ describe('OfficeBuilding', () => {
       fireEvent.keyDown(map, { key: 'Shift' })
       fireEvent.keyDown(map, { key: 'd', shiftKey: true })
       expect(`${alice.style.left}:${alice.style.top}`).toBe('528px:336px')
+      expect(alice.dataset.sprinting).toBe('true')
       fireEvent.keyDown(map, { key: 's', shiftKey: true })
       expect(`${alice.style.left}:${alice.style.top}`).toBe('514px:370px')
       act(() => vi.advanceTimersByTime(96))
@@ -442,6 +443,8 @@ describe('OfficeBuilding', () => {
       fireEvent.keyUp(map, { key: 's', shiftKey: true })
       fireEvent.keyUp(map, { key: 'd', shiftKey: true })
       fireEvent.keyUp(map, { key: 'Shift' })
+      act(() => vi.advanceTimersByTime(150))
+      expect(alice.dataset.sprinting).toBeUndefined()
 
       fireEvent.keyDown(map, { key: 'a' })
       fireEvent.keyUp(map, { key: 'a' })
