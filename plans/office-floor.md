@@ -3888,6 +3888,26 @@ Short-landscape Agent-story follow-up (2026-08-30):
   suite passed all 617 test files and 5,166 tests (one file and nine tests skipped), and the production UI build passed
   with only the existing ports fallback and large-chunk advisories.
 
+Contextual camera-command follow-up (2026-08-30):
+
+- Continued the 844x390 map from Grok Architect to Grok Researcher and repeatedly used the bottom-right reset compass.
+  The first click changed the camera from `translate3d(-150px, -128px)` to the reachable Alice-centered
+  `translate3d(0px, -88px)`; the second click left the transform byte-for-byte unchanged, but the same 28px command
+  remained visible and keyboard-focusable. At map clamps and on floors wider than the world it could be permanently
+  inert.
+- Compared keeping the control permanently visible, disabling it in place, and rendering it only after a meaningful
+  camera displacement. Chose the contextual command: Office computes Alice's clamped centered camera from the real
+  stage size and exposes the compass only when either axis differs by at least two map tiles (48px). Small rounding or
+  one-step drift no longer adds HUD noise, while a dragged or safe-area-followed camera still offers a clear return.
+- Real-browser auto-walk produced a visible compass once Alice and camera separated. After route arrival, clicking it
+  changed `translate3d(-105px, -144px)` to `translate3d(-210px, -88px)`, removed the command from both the picture and
+  Tab order, and returned focus to `office-floor`; the next spatial Enter/arrow input therefore remains owned by the
+  game surface. A centered spawn showed no compass, and the map-stage hidden scroll remained zero.
+- The focused Building suite passed all 18 tests, including centered absence, a 390x844 displaced-camera appearance,
+  the reset-compass asset, the exact recentered transform, command removal, and map-focus handoff. Root and UI
+  TypeScript passed, the full suite passed all 617 test files and 5,166 tests (one file and nine tests skipped), and the
+  production UI build passed with only the existing ports fallback and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

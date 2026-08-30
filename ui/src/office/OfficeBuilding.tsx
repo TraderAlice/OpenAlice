@@ -85,6 +85,7 @@ const OFFICE_MOVEMENT_KEYS: Record<string, OfficeMovement> = {
 const OFFICE_MANUAL_MOVE_INTERVAL_MS = 96
 const OFFICE_DIAGONAL_STEP = 17
 const OFFICE_DEPARTURE_MS = 520
+const OFFICE_CAMERA_RECENTER_THRESHOLD = 48
 export type OfficeLogOrigin =
   | 'menu'
   | 'operations'
@@ -250,6 +251,13 @@ export function OfficeBuilding({
   const cameraPannable = viewportSize.width <= 0 || viewportSize.height <= 0
     || viewportSize.width < mapLayout.width
     || viewportSize.height < mapLayout.height
+  const centeredCamera = viewportSize.width > 0 && viewportSize.height > 0
+    ? officeCameraCenteredOn(alice, viewportSize, mapLayout)
+    : camera
+  const cameraRecenterAvailable = cameraPannable && (
+    Math.abs(camera.x - centeredCamera.x) >= OFFICE_CAMERA_RECENTER_THRESHOLD
+    || Math.abs(camera.y - centeredCamera.y) >= OFFICE_CAMERA_RECENTER_THRESHOLD
+  )
   const rosterWorkspaceIds = useMemo(
     () => new Set(groups.filter((group) => group.employees.length > 4).map((group) => group.workspace.id)),
     [groups],
@@ -506,6 +514,7 @@ export function OfficeBuilding({
     const viewport = viewportRef.current?.getBoundingClientRect()
     if (!viewport || viewport.width <= 0 || viewport.height <= 0) return
     setCamera(officeCameraCenteredOn(aliceRef.current, viewport, mapLayout))
+    viewportRef.current?.focus({ preventScroll: true })
   }
   const clearAlicePushFeedback = () => {
     if (pushDirectionRef.current == null) return
@@ -1584,14 +1593,16 @@ export function OfficeBuilding({
             <img src={OFFICE_HUD_ASSETS.movePad} alt="" aria-hidden style={officePixelImg} />
             <span>{t('office.mapHint')}</span>
           </span>
-          <button type="button" onClick={centerCameraOnAlice} aria-label={t('office.centerMapOnAlice')}>
-            <img
-              src={OFFICE_HUD_ASSETS.resetCompass}
-              alt=""
-              aria-hidden
-              style={officePixelImg}
-            />
-          </button>
+          {cameraRecenterAvailable && (
+            <button type="button" onClick={centerCameraOnAlice} aria-label={t('office.centerMapOnAlice')}>
+              <img
+                src={OFFICE_HUD_ASSETS.resetCompass}
+                alt=""
+                aria-hidden
+                style={officePixelImg}
+              />
+            </button>
+          )}
         </div>
         <div
           className="oa-office-touch-dpad"

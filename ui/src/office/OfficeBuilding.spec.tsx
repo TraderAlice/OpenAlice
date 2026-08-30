@@ -750,7 +750,7 @@ describe('OfficeBuilding', () => {
         .toBe('/office/furniture/route-destination-v1.png')
       expect(`${alice.style.left}:${alice.style.top}`).not.toBe('480px:336px')
       const routePosition = `${alice.style.left}:${alice.style.top}`
-      fireEvent.click(screen.getByRole('button', { name: 'Center map on Alice' }))
+      expect(screen.queryByRole('button', { name: 'Center map on Alice' })).toBeNull()
       expect(`${alice.style.left}:${alice.style.top}`).toBe(routePosition)
       expect(sign.dataset.route).toBe('true')
       expect(screen.getByTestId('office-route-trail')).toBeTruthy()
@@ -926,8 +926,7 @@ describe('OfficeBuilding', () => {
     expect(screen.getByTestId('office-building').querySelector<HTMLImageElement>('.oa-office-hud__signal img')?.src)
       .toContain('/office/hud/signal-receiver-v2.png')
     expect(screen.getByTestId('office-building').querySelector('svg')).toBeNull()
-    expect(screen.getByRole('button', { name: 'Center map on Alice' }).querySelector('img')?.src)
-      .toContain('/office/hud/reset-compass-v2.png')
+    expect(screen.queryByRole('button', { name: 'Center map on Alice' })).toBeNull()
     const alice = screen.getByRole('img', { name: 'Alice on the office map' })
     expect(alice.style.left).toBe('480px')
     const spawnCompass = screen.getByTestId('office-spawn-compass')
@@ -1008,6 +1007,13 @@ describe('OfficeBuilding', () => {
     fireEvent(window, new Event('resize'))
     expect(map.querySelector<HTMLElement>('.oa-office-map')?.style.transform)
       .toBe('translate3d(-210px, 86px, 0)')
+    const recenter = screen.getByRole('button', { name: 'Center map on Alice' })
+    expect(recenter.querySelector('img')?.src).toContain('/office/hud/reset-compass-v2.png')
+    await userEvent.click(recenter)
+    expect(map.querySelector<HTMLElement>('.oa-office-map')?.style.transform)
+      .toBe('translate3d(-309px, 86px, 0)')
+    expect(screen.queryByRole('button', { name: 'Center map on Alice' })).toBeNull()
+    expect(document.activeElement).toBe(map)
     vi.mocked(map.getBoundingClientRect).mockReturnValue({
       width: 1200,
       height: 800,
@@ -1055,7 +1061,7 @@ describe('OfficeBuilding', () => {
     await userEvent.keyboard('{Enter}')
     expect(onOpenFiles).toHaveBeenCalledWith('chat-1')
     const cabinetPosition = `${alice.style.left}:${alice.style.top}`
-    await userEvent.click(screen.getByRole('button', { name: 'Center map on Alice' }))
+    expect(screen.queryByRole('button', { name: 'Center map on Alice' })).toBeNull()
     expect(`${alice.style.left}:${alice.style.top}`).toBe(cabinetPosition)
     expect(controls?.dataset.learned).toBe('true')
     await userEvent.click(map)
@@ -1069,7 +1075,7 @@ describe('OfficeBuilding', () => {
     expect(operations.dataset.nearby).toBe('true')
     await userEvent.keyboard('{Enter}')
     expect(onOpenLog).toHaveBeenCalledWith('operations')
-    await userEvent.click(screen.getByRole('button', { name: 'Center map on Alice' }))
+    expect(screen.queryByRole('button', { name: 'Center map on Alice' })).toBeNull()
     expect(alice.style.left).toBe('480px')
     expect(alice.style.top).toBe('264px')
     await userEvent.click(screen.getByTestId('office-desk-resume-alice'))
