@@ -3203,6 +3203,21 @@ Sticky journal-footer safe-area follow-up (2026-08-30):
   passing; one file and nine tests skipped), and the production build passed; the existing direct-eval and large-chunk
   advisories are unchanged.
 
+Persistent roster-command legend follow-up (2026-08-30):
+
+- Played the real eight-person Prediction roster from its first row through the final row. Directional focus correctly
+  scrolled the roster, but the teammate count and `Arrows choose · Enter to inspect` legend scrolled away with it;
+  the window then began with a clipped card and no longer exposed the controls needed to continue playing.
+- Compared moving the legend into the title, adding a second fixed footer, making the existing legend sticky, and
+  separating fixed menu chrome from its scrollable records. Chose the structural split: the roster body now owns a
+  fixed summary row plus a single independently scrolling teammate grid, avoiding duplicate chrome and preventing a
+  sticky overlay from covering focus targets.
+- Real-browser keyboard QA moved directly to the last teammate and back upward. The body remained at scroll zero, the
+  grid scrolled to 94px, the summary stayed fixed at y149–188, and the upward-focused card aligned exactly with the
+  grid top instead of hiding behind the legend. Focused roster and responsive-style specs passed (2 files / 18 tests),
+  together with UI TypeScript. Root TypeScript, the full 617-file Vitest run (5,136 passing; one file and nine tests
+  skipped), and the production build also passed; the existing direct-eval and large-chunk advisories are unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

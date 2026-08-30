@@ -119,6 +119,15 @@ describe('Office responsive style contract', () => {
     expect(compactWindowCss).toContain('.oa-office-roster__summary small')
   })
 
+  it('keeps the roster command legend fixed while only the teammate grid scrolls', () => {
+    expect(css).toMatch(
+      /\.oa-office-roster__body\s*\{[\s\S]*?display: grid;[\s\S]*?grid-template-rows: auto minmax\(0, 1fr\);[\s\S]*?overflow: hidden;/,
+    )
+    expect(css).toMatch(
+      /\.oa-office-roster ul\s*\{[\s\S]*?min-height: 0;[\s\S]*?overflow: auto;/,
+    )
+  })
+
   it('shrink-wraps the desktop occupancy journal without weakening narrow-stage containment', () => {
     expect(css).toMatch(/\.oa-office-window--log\s*\{[\s\S]*?bottom: auto;[\s\S]*?max-height: calc\(100% - 92px\)/)
     expect(css).toMatch(

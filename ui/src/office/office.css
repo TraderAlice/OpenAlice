@@ -2360,8 +2360,10 @@
 }
 
 .oa-office-roster__body {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   height: calc(100% - 38px);
-  overflow: auto;
+  overflow: hidden;
   padding: 12px;
   background:
     linear-gradient(color-mix(in srgb, var(--gba-moss) 9%, transparent) 1px, transparent 1px),
@@ -2394,9 +2396,12 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+  min-height: 0;
   margin: 0;
-  padding: 0;
+  overflow: auto;
+  padding: 0 4px 4px 0;
   list-style: none;
+  scrollbar-color: var(--gba-ink-soft) var(--gba-cream);
 }
 
 .oa-office-roster li button {
