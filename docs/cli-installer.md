@@ -21,11 +21,18 @@ Stable direct install:
 curl -fsSL https://openalice.ai/install | bash
 ```
 
-Development preview:
+Beta and development channels use the same installer:
+
+```bash
+curl -fsSL https://openalice.ai/install | bash -s -- --channel beta
+curl -fsSL https://openalice.ai/install | bash -s -- --channel dev
+```
+
+The raw dev path remains a publication acceptance seam for installer changes:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/TraderAlice/OpenAlice/dev/install \
-  | bash -s -- --branch dev
+  | bash -s -- --channel dev
 ```
 
 Exact release and local acceptance:
@@ -65,11 +72,23 @@ openalice-cli-<version>-<platform>-<arch>/
 
 The sidecar `<archive>.sha256` is part of the release contract. The installer
 verifies the downloaded bytes before extraction, rejects unsafe or multi-root
-archives, validates `release.json` target/version/content identity, and runs
-the staged executable's `--version` before activation.
+archives, validates the `release.json` target, version, and content-identity
+shape, checks an expected content identity when the update handoff supplied
+one, and runs the staged executable's `--version` before activation. The build
+owns the canonical content-identity calculation; the installer does not
+recompute that payload manifest. Dev and release publication do recompute the
+identity from `release.json` before accepting an archive, so stale or tampered
+manifest identities cannot become channel metadata.
 
-The stable selector resolves the latest GitHub release and downloads the exact
-versioned asset. `--branch dev` downloads the fixed preview aliases:
+`contentIdentity` is a canonical digest of the complete native payload
+manifest: product metadata plus every shipped file hash, size, mode, and
+symlink target, with `release.json` excluded to avoid self-reference. It is not
+an executable-only checksum; UI, default assets, templates, and release-owned
+Git changes all produce a new identity.
+
+The channel-neutral installer defaults to the latest non-prerelease GitHub
+Release. `--channel beta` resolves `beta/manifest.json`, while `--channel dev`
+downloads the fixed per-commit preview aliases:
 
 ```text
 https://download.openalice.ai/cli/dev/openalice-cli-dev-<platform>-<arch>.tar.gz
@@ -81,9 +100,12 @@ sidecar and the archive's target/version metadata, uploads an immutable copy
 under `cli/dev/releases/<commit>/`, then replaces the fixed archive aliases.
 Each checksum alias is written after its archive, so a reader racing a publish
 can fail verification but cannot activate mismatched bytes. The dev manifest is
-published last as the completed-set receipt. Stable releases publish the same
-four versioned archives and sidecars as GitHub Release assets and mirror them
-unchanged to the download CDN.
+published last as the completed-set receipt. Versioned beta and stable releases
+publish the same four target archives and sidecars as GitHub Release assets and
+mirror them unchanged to the download CDN. Stable and beta manifests remain separate;
+immutable `OpenAlice-<version>-install` and
+`cli/dev/releases/<commit>/install` files are verified snapshots of the same
+root `install` source, not separate channel scripts.
 
 Each native build also emits `report.json`. `buildDurationMs` is the clean Bun
 standalone compile, `artifactBuildDurationMs` is assembly plus archive creation
@@ -182,15 +204,16 @@ After consent, the transaction:
 7. records the exact previous release as a pending activation, then atomically
    replaces `cli/current` using platform-correct symlink semantics;
 8. atomically replaces installer-owned launchers;
-9. verifies the stable `openalice` launcher, restoring the exact previous
+9. verifies the newly active `openalice` launcher, restoring the exact previous
    pointer if this post-activation install step fails;
 10. retains the newest three releases by default and never collects the exact
     pending rollback release;
 11. writes one marked PATH block when requested;
 12. releases the lock and removes staging on every exit path.
 
-An existing release is reused only when its executable checksum matches the
-staged release. A damaged collision stops with evidence preserved.
+An existing release is reused only when file contents, path types, modes, and
+symlink targets match the complete staged tree. A damaged collision stops with
+evidence preserved.
 
 ## Provenance
 
@@ -220,15 +243,30 @@ change channels or trust boundaries.
 
 ## Update and rollback
 
-`openalice update --check` reads the stable release manifest. Development,
-pinned, and custom installs do not cross to stable automatically.
+`openalice update --check` reads the manifest owned by the installed stable,
+beta, or dev channel. Stable never accepts a prerelease manifest and beta
+accepts only beta versions. Dev compares the complete platform archive
+SHA-256, because multiple dev commits may carry the same package version.
+Pinned and custom installs remain non-updating unless the user explicitly
+selects a channel.
 
-For a stable direct install, `openalice update` downloads the versioned Bash
-installer, verifies the installer's manifest checksum, and invokes it with the
-exact advertised `--version`, current install root, and ordinary consent. A
+For a direct install, `openalice update` downloads the channel manifest's
+immutable snapshot of the shared Bash installer, verifies its SHA-256, and
+invokes it with the current install root and ordinary consent. Native stable
+and beta releases pass both the channel and exact accepted version. Dev passes
+the channel and binds the expected archive identity. An update therefore
+preserves or changes the selected channel without turning it into an
+exact-version pin. The historical v0.90.1 bridge is a bootstrap and forward
+cutover seam only; it is never used to replace an existing native layout. A
 running process keeps its already-mapped executable; the new pointer affects
-the next invocation. `openalice status` and an idempotent `openalice up` report
-the pending product version while an older Guardian is still active.
+the next invocation.
+
+In the manifest, `installer.versionedUrl` is the executable update input and
+`installer.sha256` binds those immutable bytes. `installer.url` is the mutable
+human bootstrap entry only; an updater never combines that URL with the
+versioned checksum.
+`openalice status` and an idempotent `openalice up` report the pending product
+version while an older Guardian is still active.
 
 The first successful Guardian plus Alice HTTP readiness from the newly active
 content confirms `cli/activation.json`. If that first start exits early, times
@@ -260,15 +298,39 @@ The native installer recognizes the last expanded CLI layout under
 only that installer-owned tree and its managed-Pi launchers. Product data,
 credentials, AliceProjects, and Agent Runtimes elsewhere on `PATH` remain
 untouched. Normal startup after activation knows only the native layout; there
-is no permanent dual-runtime resolver.
+is no permanent dual-runtime resolver. Before changing the active pointer, the
+cutover also backs up every legacy launcher; a validation failure restores the
+old launchers and removes the unconfirmed native pointer.
 
-Both `dev` alias publication and stable release publication replay this cutover
-from the published v0.90.1 installer on Linux x64. The acceptance fixture pins
-the historical Pi manifests by SHA-256 because the upstream Pi release assets
-are not part of OpenAlice's durable release surface. It then proves native
-`version`, detached `up`, `status`, `down`, and uninstall with Node and Agent
-Runtimes absent from the new Runtime path, while preserving a data marker and a
-user-owned external Pi executable.
+Both `dev` alias publication and every versioned beta/stable release replay this
+cutover from the published v0.90.1 installer on Linux x64. The acceptance
+fixture pins the historical Pi manifests by SHA-256 because the upstream Pi
+release assets are not part of OpenAlice's durable release surface. It then
+proves native `version`, detached `up`, `status`, `down`, and uninstall with Node
+and Agent Runtimes absent from the new Runtime path, while preserving a data
+marker and a user-owned external Pi executable.
+
+The shipped v0.90.1 updater invoked the accepted versioned installer without a
+selector and bound the candidate with `OPENALICE_EXPECTED_CLI_VERSION`. The
+shared installer keeps that forward invocation on `stable`; a normal
+user-supplied `--version` remains `pinned`.
+
+A native beta/dev installation cannot safely downgrade in place to the old
+Node-managed v0.90.1 layout: the historical installer does not own
+`cli/current` or all native helper launchers. While v0.90.1 is the latest
+stable, both `openalice update --channel stable` and the Supervisor channel
+picker therefore report the transition as unsupported and leave the native
+installation unchanged. Once stable is native, ordinary channel switching
+resumes through the shared installer.
+
+The v0.90.1 GitHub Release predates native CLI archives. While v0.90.1 remains
+the latest stable release during the first beta rollout, a fresh default
+stable install therefore verifies the immutable published v0.90.1 installer
+by its pinned SHA-256 and delegates to it. Exact v0.90.1 selection does the
+same for a fresh or already-legacy root, retaining `pinned` ownership when
+`--version` was used alone. The bridge refuses a root containing a native
+release or pointer. Beta/dev and every native stable release use the ordinary
+native artifact transaction.
 
 ## Uninstall
 
@@ -290,9 +352,13 @@ Public options:
 
 | Option | Meaning |
 |---|---|
-| `--branch master` | Stable channel; equivalent to the default selector |
-| `--branch dev` | Development preview channel |
-| `--version <x.y.z>` | Exact pinned GitHub release |
+| `--channel stable` | Latest stable release; the default |
+| `--channel beta` | Latest accepted beta release |
+| `--channel dev` | Latest dev-branch native preview |
+| `--version <version>` | Exact pinned GitHub release when used alone |
+| `--channel stable --version <x.y.z>` | Exact stable candidate that remains on stable |
+| `--channel beta --version <x.y.z-beta[.N]>` | Exact beta candidate that remains on beta |
+| `--branch master\|dev` | Compatibility alias for stable or dev |
 | `--archive <path>` | Local archive; requires `--sha256` |
 | `--install-dir <path>` | Alternate installation root |
 | `--no-modify-path` | Do not edit a shell profile |
@@ -305,11 +371,16 @@ Bounded environment seams:
 |---|---|
 | `OPENALICE_INSTALL_DIR` | Alternate install root |
 | `OPENALICE_INSTALL_URL` | Recorded HTTP(S) installer source for a trusted mirror/test |
-| `OPENALICE_DOWNLOAD_BASE_URL` | Dev preview artifact base |
+| `OPENALICE_DOWNLOAD_BASE_URL` | Default beta-manifest and dev-preview artifact base |
 | `OPENALICE_RELEASES_API_URL` | Stable release discovery endpoint |
+| `OPENALICE_BETA_MANIFEST_URL` | Beta release discovery manifest |
 | `OPENALICE_RELEASE_ASSET_BASE_URL` | Versioned release asset base for release tests/mirrors |
+| `OPENALICE_LEGACY_STABLE_INSTALLER_URL` | Test override for the pinned v0.90.1 transition installer |
+| `OPENALICE_LEGACY_STABLE_INSTALLER_SHA256` | Test override for that transition installer's pinned digest |
 | `OPENALICE_INSTALL_KEEP_RELEASES` | Positive release retention count |
 | `OPENALICE_EXPECTED_CLI_VERSION` | Update handoff binding to one artifact version |
+| `OPENALICE_EXPECTED_CLI_ARTIFACT_SHA256` | Dev update handoff binding to one complete archive |
+| `OPENALICE_EXPECTED_CLI_CONTENT_IDENTITY` | Dev update binding to the complete payload identity |
 
 Do not add source package lists, managed Agent Runtime pins, package-manager
 installation, or system dependency mutation back to these seams.
@@ -338,9 +409,11 @@ Before promotion also:
 3. update from a distinct retained release and exercise rollback;
 4. build/install on native macOS and clean Linux for each supported arch;
 5. publish the fixed dev aliases and exercise the raw `dev/install` plus
-   `--branch dev` network path;
-6. verify release assets and sidecar checksums before making any stable alias
-   visible.
+   `--channel dev` network path;
+6. verify release assets and sidecar checksums before making any channel alias
+   visible; a beta mirror must also prove the stable manifest and stable update
+   feeds remained byte-for-byte unchanged. The shared installer may change only
+   when its default still resolves stable.
 
 Treat missing or non-positive build, readiness, or per-role memory metrics as
 an invalid native acceptance report. A compile-only result is not sufficient.
@@ -359,4 +432,4 @@ credentials or broker accounts.
 | `Existing release ... is damaged` | Preserve the collision for inspection; do not overwrite it |
 | `No previous OpenAlice release is retained` | Install/update once more before rollback is available |
 | startup says the activation was rolled back | The new direct-install Runtime failed first readiness; run `openalice` again to start the restored release |
-| update reports a non-stable channel | Refresh with the same selector instead of crossing trust boundaries |
+| update reports a non-updating channel | Refresh with the same selector instead of crossing trust boundaries |

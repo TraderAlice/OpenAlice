@@ -68,8 +68,9 @@ describe('OpenAlice Doctor', () => {
     const cachePath = join(home, '.cli-update-check.json')
     await writeFile(cachePath, JSON.stringify({
       schemaVersion: 1,
+      channel: 'stable',
       checkedAt: '2026-07-29T00:00:00.000Z',
-      result: { status: 'available', latestVersion: '0.88.0' },
+      result: { status: 'available', channel: 'stable', latestVersion: '0.88.0' },
     }))
     const doctor = await diagnoseRuntime({ homeRoot: home }, {
       layout: { updateCachePath: cachePath },
@@ -86,7 +87,7 @@ describe('OpenAlice Doctor', () => {
 
     expect(doctor.checks.find((check) => check.id === 'update.metadata')).toMatchObject({
       status: 'warn',
-      summary: 'OpenAlice 0.88.0 is available',
+      summary: 'OpenAlice 0.88.0 is available on stable',
     })
   })
 

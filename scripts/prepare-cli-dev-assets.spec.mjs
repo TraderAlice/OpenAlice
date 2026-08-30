@@ -1,12 +1,13 @@
 import { createHash } from 'node:crypto'
 import { execFile } from 'node:child_process'
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { promisify } from 'node:util'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { bunReleaseContentIdentity } from './bun-release-content-identity.mjs'
 import { prepareCliDevAssets } from './prepare-cli-dev-assets.mjs'
 
 const execFileAsync = promisify(execFile)
@@ -27,6 +28,7 @@ describe.skipIf(process.platform === 'win32')('CLI dev channel assets', () => {
       outputDir: output,
       commit,
       version,
+      installerPath: join(root, 'install'),
     })
 
     expect(manifest.targets).toHaveLength(4)
@@ -46,6 +48,13 @@ describe.skipIf(process.platform === 'win32')('CLI dev channel assets', () => {
         `${target.sha256}  ${alias}\n`,
       )
     }
+    expect(await readFile(join(output, 'releases', commit, 'install'), 'utf8'))
+      .toBe('#!/usr/bin/env bash\n')
+    expect(manifest.installer).toEqual({
+      url: 'https://download.openalice.ai/install',
+      versionedUrl: `https://download.openalice.ai/cli/dev/releases/${commit}/install`,
+      sha256: createHash('sha256').update('#!/usr/bin/env bash\n').digest('hex'),
+    })
     expect(JSON.parse(await readFile(join(output, 'manifest.json'), 'utf8'))).toEqual(manifest)
   })
 
@@ -58,15 +67,28 @@ describe.skipIf(process.platform === 'win32')('CLI dev channel assets', () => {
       outputDir: join(root, 'output'),
       commit,
       version,
+      installerPath: join(root, 'install'),
     })).toThrow('does not match its SHA-256 sidecar')
+  })
+
+  it('rejects a candidate whose stored content identity does not match its files manifest', async () => {
+    const root = await fixture({ tamperedIdentityTarget: 'linux-x64' })
+    expect(() => prepareCliDevAssets({
+      inputDir: join(root, 'input'),
+      outputDir: join(root, 'output'),
+      commit,
+      version,
+      installerPath: join(root, 'install'),
+    })).toThrow('content identity does not match its release manifest')
   })
 })
 
-async function fixture() {
+async function fixture({ tamperedIdentityTarget } = {}) {
   const root = await mkdtemp(join(tmpdir(), 'openalice-cli-dev-assets-'))
   temporaryPaths.push(root)
   const input = join(root, 'input')
   await mkdir(input)
+  await writeFile(join(root, 'install'), '#!/usr/bin/env bash\n')
   for (const [platform, arch] of [
     ['darwin', 'arm64'],
     ['darwin', 'x64'],
@@ -76,16 +98,34 @@ async function fixture() {
     const releaseName = `openalice-cli-${version}-${platform}-${arch}`
     const releaseRoot = join(root, releaseName)
     await mkdir(join(releaseRoot, 'bin'), { recursive: true })
-    await writeFile(join(releaseRoot, 'bin', 'openalice'), '#!/bin/sh\n')
-    await writeFile(join(releaseRoot, 'release.json'), JSON.stringify({
+    const executable = join(releaseRoot, 'bin', 'openalice')
+    const executableBytes = Buffer.from('#!/bin/sh\n')
+    await writeFile(executable, executableBytes)
+    await chmod(executable, 0o755)
+    const release = {
       schemaVersion: 1,
       product: 'OpenAlice CLI',
       version,
       platform,
       arch,
       bunVersion: '1.4.0',
-      contentIdentity: createHash('sha256').update(`${platform}-${arch}`).digest('hex').slice(0, 16),
-    }))
+      executable: 'bin/openalice',
+      resourceRoot: 'share/openalice',
+      files: [{
+        path: 'bin/openalice',
+        type: 'file',
+        bytes: executableBytes.length,
+        mode: 0o755,
+        sha256: createHash('sha256').update(executableBytes).digest('hex'),
+      }],
+    }
+    release.contentIdentity = bunReleaseContentIdentity(release)
+    if (tamperedIdentityTarget === `${platform}-${arch}`) {
+      release.contentIdentity = release.contentIdentity === 'ffffffffffffffff'
+        ? 'eeeeeeeeeeeeeeee'
+        : 'ffffffffffffffff'
+    }
+    await writeFile(join(releaseRoot, 'release.json'), JSON.stringify(release))
     const archive = join(input, `${releaseName}.tar.gz`)
     await execFileAsync('tar', ['-czf', archive, '-C', root, releaseName])
     const checksum = createHash('sha256').update(await readFile(archive)).digest('hex')

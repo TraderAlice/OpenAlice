@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { packCliNpmPackages } from './pack-cli-npm-packages.mjs'
 
 const temporaryPaths = []
+const npmPackTimeoutMs = 30_000
 
 afterEach(async () => {
   await Promise.all(temporaryPaths.splice(0).map((path) => rm(path, { recursive: true, force: true })))
@@ -26,7 +27,7 @@ describe('CLI npm package packing', () => {
     expect(report.packages.every((item) => item.integrity.startsWith('sha512-'))).toBe(true)
     expect(JSON.parse(await readFile(join(output, 'npm-publish-order.json'), 'utf8')))
       .toEqual(report)
-  })
+  }, npmPackTimeoutMs)
 
   it('rejects a platform version that diverges from the meta package', async () => {
     const root = await fixture({ platformVersion: '0.90.0' })

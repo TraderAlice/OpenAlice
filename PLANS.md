@@ -29,6 +29,10 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
+- [[plans/release-channels-0.90.2.md]] — Decouples source promotion from
+  publication, makes beta/stable releases explicit manual tag decisions, and
+  prevents beta artifacts from mutating stable CDN or package-manager aliases.
+  The first acceptance sequence is `v0.90.2-beta.1` followed by `v0.90.2`.
 - [[plans/bun-cli-distribution.md]] — Replaces the expanded Node headless
   Runtime with a Bun-compiled, multi-process CLI distribution. Direct,
   npm/Bun, Homebrew, and AUR channels consume one accepted artifact set. The

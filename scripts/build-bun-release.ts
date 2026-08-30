@@ -16,6 +16,7 @@ import { basename, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { INTERNAL_BOOTSTRAP_ROLE } from '../src/workspaces/bootstrap-runtime.js'
+import { bunReleaseContentIdentity } from './bun-release-content-identity.mjs'
 
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url))
 const pinnedBunVersion = (await readFile(join(repositoryRoot, '.bun-version'), 'utf8')).trim()
@@ -100,17 +101,14 @@ const gitReport = await buildPortableGit(
   gitRoot,
 )
 
-const executableHash = await sha256File(executablePath)
-const contentIdentity = executableHash.slice(0, 16)
 const files = await releaseFiles(releaseRoot, new Set(['release.json']))
-const releaseMetadata = {
+const unsignedReleaseMetadata = {
   schemaVersion: 1,
   product: 'OpenAlice CLI',
   version: product.version,
   platform: platformName,
   arch: process.arch,
   bunVersion: Bun.version,
-  contentIdentity,
   executable: 'bin/openalice',
   resourceRoot: 'share/openalice',
   git: {
@@ -122,6 +120,11 @@ const releaseMetadata = {
     ...gitReport,
   },
   files,
+}
+const contentIdentity = bunReleaseContentIdentity(unsignedReleaseMetadata)
+const releaseMetadata = {
+  ...unsignedReleaseMetadata,
+  contentIdentity,
 }
 await writeFile(join(releaseRoot, 'release.json'), `${JSON.stringify(releaseMetadata, null, 2)}\n`)
 const assemblyDurationMs = Math.round(performance.now() - releaseStartedAt)
@@ -878,6 +881,7 @@ async function releaseFiles(root: string, excluded = new Set<string>()): Promise
   type: 'file' | 'symlink'
   bytes: number
   sha256: string
+  mode?: number
   target?: string
 }>> {
   const output: Array<{
@@ -885,6 +889,7 @@ async function releaseFiles(root: string, excluded = new Set<string>()): Promise
     type: 'file' | 'symlink'
     bytes: number
     sha256: string
+    mode?: number
     target?: string
   }> = []
   async function walk(current: string): Promise<void> {
@@ -904,10 +909,12 @@ async function releaseFiles(root: string, excluded = new Set<string>()): Promise
           target,
         })
       } else if (entry.isFile()) {
+        const info = await lstat(absolute)
         output.push({
           path,
           type: 'file',
-          bytes: (await lstat(absolute)).size,
+          bytes: info.size,
+          mode: info.mode & 0o777,
           sha256: await sha256File(absolute),
         })
       }

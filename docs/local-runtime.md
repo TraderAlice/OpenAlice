@@ -40,6 +40,10 @@ resources resolve beside the active release under `share/openalice/`:
 - materialized adapter and Workspace CLI files external processes open by path;
 - release-owned portable Git.
 
+The installed content identity covers the complete payload manifest, including
+these resources, file modes, and symlink targets. It is not derived from the
+primary executable alone.
+
 The provider prepends only the release-owned Git `bin` directory to Runtime
 children. The installed CLI therefore requires no system Node.js, Bun, npm, or
 Git and does not modify a user's system Git.
@@ -125,10 +129,11 @@ Installation never starts a Runtime. Update or rollback changes the next CLI
 invocation and does not hot-reload an already-running process tree. Restart is
 an explicit lifecycle decision.
 
-The stable channel performs a bounded, daily-cached update check on interactive
-startup. Network failure is silent and never blocks use. Development, pinned,
-custom, and later package-manager-owned channels do not silently cross into the
-direct stable channel.
+Stable, beta, and dev direct installs perform bounded, channel-keyed update
+checks on their own manifests at interactive startup. Network failure is silent
+and never blocks use. Pinned and custom installs do not silently cross into a
+release channel. Package-manager-owned installs report their manager's stable
+update command and are never overwritten by the direct installer.
 
 ## Data and concurrent development
 
@@ -156,18 +161,21 @@ The native Runtime acceptance must prove:
 - multiple independent Agent PTYs with input, resize, backpressure, and
   isolated termination;
 - real Web UI, defaults, templates, Workspace helpers, and portable Git;
-- an external real Agent Runtime through its normal adapter without changing
-  its config or version;
+- an external Agent Runtime-shaped process through its normal adapter without
+  changing its config or version; the optional real-runtime smoke exercises
+  OpenCode only when `OPENALICE_BUN_REAL_OPENCODE_PATH` explicitly selects its
+  installed executable;
 - external Broker Pack loading without moving SDKs into UTA Core;
 - update activation and local rollback with user data preserved.
 
 Routine verification is non-trading and uses isolated homes. Live-paper broker
 acceptance remains a separate explicit lane under [[docs/uta-live-testing.md]].
 
-Every native `dev` and stable candidate runs the artifact acceptance itself:
-the compiled CLI opens a captured platform browser command, launches two
-external OpenCode-adapter PTYs with distinct PIDs, sends independent input and
-resize messages, stops one Session, and proves the other remains interactive.
+Every native `dev` and versioned beta/stable candidate runs the artifact
+acceptance itself: the compiled CLI opens a captured platform browser command,
+launches two external OpenCode-adapter PTYs with distinct PIDs, sends independent
+input and resize messages, stops one Session, and proves the other remains
+interactive.
 The same candidate lane also runs the four-process feasibility receipt, which
 forces Connector and UTA failures and proves they recover without restarting
 Alice. Installer and package-manager receipts separately cover stopped and

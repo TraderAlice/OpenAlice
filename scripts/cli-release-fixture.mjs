@@ -16,6 +16,7 @@ import {
   CLI_RELEASE_TARGETS,
   validateCliReleaseArchive,
 } from './prepare-cli-dev-assets.mjs'
+import { bunReleaseContentIdentity } from './bun-release-content-identity.mjs'
 
 export function preparePreviousCliReleaseArchives({ inputDir, outputDir, version }) {
   const inputRoot = resolve(inputDir)
@@ -94,7 +95,6 @@ export function rewriteExpandedCliRelease({ releaseRoot, fromVersion, toVersion 
   }
   const rewrittenExecutable = readFileSync(executablePath)
   const executableSha256 = sha256(rewrittenExecutable)
-  const contentIdentity = executableSha256.slice(0, 16)
 
   const resourcePackagePath = join(releaseRoot, 'share', 'openalice', 'package.json')
   const resourcePackage = JSON.parse(readFileSync(resourcePackagePath, 'utf8'))
@@ -107,17 +107,18 @@ export function rewriteExpandedCliRelease({ releaseRoot, fromVersion, toVersion 
     throw new Error(`release metadata version is ${release.version}, expected ${fromVersion}`)
   }
   release.version = toVersion
-  release.contentIdentity = contentIdentity
   updateReleaseFile(release, 'bin/openalice', executablePath)
   updateReleaseFile(release, 'share/openalice/package.json', resourcePackagePath)
+  const contentIdentity = bunReleaseContentIdentity(release)
+  release.contentIdentity = contentIdentity
   writeFileSync(releasePath, `${JSON.stringify(release, null, 2)}\n`)
   return { contentIdentity, executableSha256, replacements }
 }
 
 export function syntheticPreviousVersion(version) {
-  const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version)
-  if (!match) throw new Error(`package-manager smoke requires a stable numeric version, got ${version}`)
-  const [, majorRaw, minorRaw, patchRaw] = match
+  const match = /^(\d+)\.(\d+)\.(\d+)(-beta(?:\.[1-9][0-9]*)?)?$/.exec(version)
+  if (!match) throw new Error(`package-manager smoke requires a stable or beta version, got ${version}`)
+  const [, majorRaw, minorRaw, patchRaw, prerelease = ''] = match
   const major = Number(majorRaw)
   const minor = Number(minorRaw)
   const patch = Number(patchRaw)
@@ -126,7 +127,9 @@ export function syntheticPreviousVersion(version) {
     ...(minor > 0 ? [`${majorRaw}.${minor - 1}.${'9'.repeat(patchRaw.length)}`] : []),
     ...(major > 0 ? [`${major - 1}.${'9'.repeat(minorRaw.length)}.${'9'.repeat(patchRaw.length)}`] : []),
   ]
-  const candidate = candidates.find((value) => value.length === version.length)
+  const candidate = candidates
+    .map((value) => `${value}${prerelease}`)
+    .find((value) => value.length === version.length)
   if (candidate) return candidate
   throw new Error(`cannot derive a prior package-manager fixture version from ${version}`)
 }

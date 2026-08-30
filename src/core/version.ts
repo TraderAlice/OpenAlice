@@ -117,10 +117,36 @@ interface CacheEntry {
   error: string | null
 }
 
+export type ReleaseChannel = 'stable' | 'beta'
+
+interface FetchLatestReleaseOptions {
+  /** Force re-fetch even if this channel's cache is fresh. */
+  force?: boolean
+  /** Override the channel inferred from the installed product version. */
+  channel?: ReleaseChannel
+}
+
 const SUCCESS_TTL_MS = 60 * 60 * 1000 // 1h
 const ERROR_TTL_MS = 5 * 60 * 1000 // 5min
 
-let cache: CacheEntry | null = null
+const cache = new Map<ReleaseChannel, CacheEntry>()
+
+function releaseChannelForVersion(version: string): ReleaseChannel {
+  return parseVersion(version).pre?.split('.')[0]?.toLowerCase() === 'beta'
+    ? 'beta'
+    : 'stable'
+}
+
+function matchesReleaseChannel(
+  release: { tag_name?: string; draft?: boolean; prerelease?: boolean },
+  channel: ReleaseChannel,
+): boolean {
+  if (release.draft || !release.tag_name) return false
+  if (channel === 'beta') {
+    return release.prerelease === true && /-beta(?:\.|$)/i.test(release.tag_name)
+  }
+  return release.prerelease !== true && !release.tag_name.includes('-')
+}
 
 /**
  * Fetch the latest GitHub release. Returns null + error string when the
@@ -128,47 +154,49 @@ let cache: CacheEntry | null = null
  * (success or failure) is cached so a flapping UI doesn't burn the
  * rate limit.
  */
-export async function fetchLatestRelease(opts?: {
-  /** Force re-fetch even if cache is fresh. */
-  force?: boolean
-}): Promise<{ result: LatestRelease | null; error: string | null }> {
+export async function fetchLatestRelease(
+  opts?: FetchLatestReleaseOptions,
+): Promise<{ result: LatestRelease | null; error: string | null }> {
   const now = Date.now()
-  if (!opts?.force && cache) {
-    const ttl = cache.error ? ERROR_TTL_MS : SUCCESS_TTL_MS
-    if (now - cache.fetchedAt < ttl) {
-      return { result: cache.result, error: cache.error }
+  const channel = opts?.channel ?? releaseChannelForVersion(getCurrentVersion())
+  const cached = cache.get(channel)
+  if (!opts?.force && cached) {
+    const ttl = cached.error ? ERROR_TTL_MS : SUCCESS_TTL_MS
+    if (now - cached.fetchedAt < ttl) {
+      return { result: cached.result, error: cached.error }
     }
   }
 
   const slug = getRepoSlug()
   if (!slug) {
-    cache = { fetchedAt: now, result: null, error: 'Could not derive repo slug from package.json' }
-    return { result: null, error: cache.error }
+    const entry = { fetchedAt: now, result: null, error: 'Could not derive repo slug from package.json' }
+    cache.set(channel, entry)
+    return { result: null, error: entry.error }
   }
 
   try {
-    // Use /releases (not /releases/latest) — the latter excludes
-    // prerelease tags by default. We accept prereleases as valid
-    // updates because most active projects (including this one)
-    // ship -beta/-rc versions before stable. Drafts are still
-    // skipped explicitly.
-    const url = `https://api.github.com/repos/${slug.owner}/${slug.repo}/releases?per_page=10`
+    // Use /releases so beta installations can see prereleases. Stable and beta
+    // installations intentionally select disjoint rows from the same response.
+    const url = `https://api.github.com/repos/${slug.owner}/${slug.repo}/releases?per_page=100`
     const res = await fetch(url, {
       headers: { 'Accept': 'application/vnd.github+json' },
       signal: AbortSignal.timeout(10_000),
     })
     if (!res.ok) {
       const error = `GitHub API ${res.status} ${res.statusText}`
-      cache = { fetchedAt: now, result: null, error }
+      cache.set(channel, { fetchedAt: now, result: null, error })
       return { result: null, error }
     }
     type ReleaseRow = { tag_name?: string; html_url?: string; body?: string; published_at?: string; draft?: boolean; prerelease?: boolean }
     const list = await res.json() as ReleaseRow[]
-    // GitHub returns newest-first by default. Take the first non-draft.
-    const data = Array.isArray(list) ? list.find((r) => !r.draft && r.tag_name) : null
+    // GitHub returns newest-first by default. Take the first release in the
+    // installed product's channel; stable never follows a prerelease and beta
+    // never follows stable or another prerelease family such as rc.
+    const data = Array.isArray(list) ? list.find((release) => matchesReleaseChannel(release, channel)) : null
     if (!data || !data.tag_name) {
-      cache = { fetchedAt: now, result: null, error: 'No published releases found' }
-      return { result: null, error: cache.error }
+      const entry = { fetchedAt: now, result: null, error: `No published releases found for ${channel} channel` }
+      cache.set(channel, entry)
+      return { result: null, error: entry.error }
     }
     const result: LatestRelease = {
       version: data.tag_name.replace(/^v/, ''),
@@ -176,18 +204,18 @@ export async function fetchLatestRelease(opts?: {
       body: data.body ?? '',
       publishedAt: data.published_at ?? '',
     }
-    cache = { fetchedAt: now, result, error: null }
+    cache.set(channel, { fetchedAt: now, result, error: null })
     return { result, error: null }
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err)
-    cache = { fetchedAt: now, result: null, error }
+    cache.set(channel, { fetchedAt: now, result: null, error })
     return { result: null, error }
   }
 }
 
 /** Reset the in-memory cache. Test-only. */
 export function _resetCacheForTest(): void {
-  cache = null
+  cache.clear()
 }
 
 // ==================== Combined view ====================
@@ -202,7 +230,7 @@ export interface VersionInfo {
   error: string | null
 }
 
-export async function getVersionInfo(opts?: { force?: boolean }): Promise<VersionInfo> {
+export async function getVersionInfo(opts?: FetchLatestReleaseOptions): Promise<VersionInfo> {
   const current = getCurrentVersion()
   const { result, error } = await fetchLatestRelease(opts)
   if (!result) {

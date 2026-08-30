@@ -75,15 +75,29 @@ describe('OpenAlice install source', () => {
     const stableRelease = {
       schemaVersion: 2,
       repository: 'TraderAlice/OpenAlice',
-      cliVersion: '0.89.0-beta',
-      selector: { kind: 'version', value: 'v0.89.0-beta' },
-      installerUrl: 'https://raw.githubusercontent.com/TraderAlice/OpenAlice/v0.89.0-beta/install',
+      cliVersion: '0.90.1',
+      selector: { kind: 'version', value: 'v0.90.1' },
+      installerUrl: 'https://openalice.ai/install',
       updateChannel: 'stable',
     }
     const explicitPin = { ...stableRelease, updateChannel: 'pinned' }
 
     expect(installSourceUpdateChannel(stableRelease)).toBe('stable')
     expect(installSourcesMatch(stableRelease, explicitPin)).toBe(false)
+  })
+
+  it('recognizes beta as an explicit update channel', () => {
+    const betaRelease = {
+      schemaVersion: 2,
+      repository: 'TraderAlice/OpenAlice',
+      cliVersion: '0.90.2-beta.1',
+      selector: { kind: 'version', value: 'v0.90.2-beta.1' },
+      installerUrl: 'https://openalice.ai/install',
+      updateChannel: 'beta',
+    }
+
+    expect(parseInstallSource(betaRelease)).toEqual(betaRelease)
+    expect(installSourceUpdateChannel(betaRelease)).toBe('beta')
   })
 
   it('accepts complete native install provenance and rejects incomplete schema 3 metadata', () => {

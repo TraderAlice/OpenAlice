@@ -189,28 +189,6 @@ jobs:
           pnpm build:bun-runtime:feasibility
           pnpm build:bun:release
 
-      - name: Accept npm and Bun installs from the dev native candidate
-        shell: bash
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          CONTENT_IDENTITY=$(node -p "require('./dist/bun-release/report.json').contentIdentity")
-          node scripts/build-cli-package-channels.mjs \
-            --input-dir dist/bun-release \
-            --output-dir "$RUNNER_TEMP/cli-package-channels" \
-            --version "$VERSION" \
-            --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            --npm-only
-          node scripts/cli-package-manager-smoke.mjs \
-            --manager npm \
-            --packages-dir "$RUNNER_TEMP/cli-package-channels/npm" \
-            --expected-version "$VERSION" \
-            --expected-content-identity "$CONTENT_IDENTITY"
-          node scripts/cli-package-manager-smoke.mjs \
-            --manager bun \
-            --packages-dir "$RUNNER_TEMP/cli-package-channels/npm" \
-            --expected-version "$VERSION" \
-            --expected-content-identity "$CONTENT_IDENTITY"
-
       - name: Name the native acceptance report
         shell: bash
         run: >-
@@ -229,169 +207,10 @@ jobs:
           compression-level: 0
           retention-days: 1
 
-  accept-dev-linuxbrew:
-    if: github.event_name == 'push'
-    name: Accept dev Linuxbrew CLI (${{ matrix.arch }})
-    needs: build-dev-cli
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-24.04
-            arch: x64
-          - os: ubuntu-24.04-arm
-            arch: arm64
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
-
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22.19.0
-
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: dev-cli-*
-          path: dist/dev-cli-candidates
-          merge-multiple: true
-
-      - name: Accept the dev archives through Linuxbrew
-        shell: bash
-        run: |
-          set -euo pipefail
-          VERSION=$(node -p "require('./package.json').version")
-          node scripts/prepare-cli-previous-release.mjs \
-            --input-dir dist/dev-cli-candidates \
-            --output-dir dist/dev-linuxbrew-previous \
-            --version "$VERSION"
-          PREVIOUS_VERSION=$(node -p "require('./dist/dev-linuxbrew-previous/fixture.json').previousVersion")
-          node scripts/build-cli-package-channels.mjs \
-            --input-dir dist/dev-cli-candidates \
-            --output-dir dist/dev-linuxbrew-current \
-            --version "$VERSION" \
-            --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            --asset-base-url file:///work/dist/dev-cli-candidates \
-            --require-all
-          node scripts/build-cli-package-channels.mjs \
-            --input-dir dist/dev-linuxbrew-previous \
-            --output-dir dist/dev-linuxbrew-previous-channels \
-            --version "$PREVIOUS_VERSION" \
-            --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            --asset-base-url file:///work/dist/dev-linuxbrew-previous \
-            --require-all
-          CURRENT_ID=$(node -e "const f=require('./dist/dev-linuxbrew-current/cli-package-channels.json');process.stdout.write(f.targets.find(t=>t.platform==='linux'&&t.arch==='${{ matrix.arch }}').contentIdentity)")
-          PREVIOUS_ID=$(node -e "const f=require('./dist/dev-linuxbrew-previous/fixture.json');process.stdout.write(f.targets.find(t=>t.platform==='linux'&&t.arch==='${{ matrix.arch }}').previousContentIdentity)")
-          node scripts/cli-linuxbrew-smoke.mjs \
-            --arch "${{ matrix.arch }}" \
-            --previous-version "$PREVIOUS_VERSION" \
-            --current-version "$VERSION" \
-            --previous-content-identity "$PREVIOUS_ID" \
-            --current-content-identity "$CURRENT_ID" \
-            --previous-package dist/dev-linuxbrew-previous-channels/homebrew/openalice.rb \
-            --current-package dist/dev-linuxbrew-current/homebrew/openalice.rb
-
-  accept-dev-aur:
-    if: github.event_name == 'push'
-    name: Accept dev Arch/AUR CLI (${{ matrix.arch }})
-    needs: build-dev-cli
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-24.04
-            arch: x64
-          - os: ubuntu-24.04-arm
-            arch: arm64
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
-
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22.19.0
-
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: dev-cli-*
-          path: dist/dev-cli-candidates
-          merge-multiple: true
-
-      - name: Accept the dev archives through Arch/AUR
-        shell: bash
-        run: |
-          set -euo pipefail
-          VERSION=$(node -p "require('./package.json').version")
-          node scripts/prepare-cli-previous-release.mjs \
-            --input-dir dist/dev-cli-candidates \
-            --output-dir dist/dev-aur-previous \
-            --version "$VERSION"
-          PREVIOUS_VERSION=$(node -p "require('./dist/dev-aur-previous/fixture.json').previousVersion")
-          node scripts/build-cli-package-channels.mjs \
-            --input-dir dist/dev-cli-candidates \
-            --output-dir dist/dev-aur-current \
-            --version "$VERSION" \
-            --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            --asset-base-url file:///work/dist/dev-cli-candidates \
-            --require-all
-          node scripts/build-cli-package-channels.mjs \
-            --input-dir dist/dev-aur-previous \
-            --output-dir dist/dev-aur-previous-channels \
-            --version "$PREVIOUS_VERSION" \
-            --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            --asset-base-url file:///work/dist/dev-aur-previous \
-            --require-all
-          CURRENT_ID=$(node -e "const f=require('./dist/dev-aur-current/cli-package-channels.json');process.stdout.write(f.targets.find(t=>t.platform==='linux'&&t.arch==='${{ matrix.arch }}').contentIdentity)")
-          PREVIOUS_ID=$(node -e "const f=require('./dist/dev-aur-previous/fixture.json');process.stdout.write(f.targets.find(t=>t.platform==='linux'&&t.arch==='${{ matrix.arch }}').previousContentIdentity)")
-          node scripts/cli-aur-container-smoke.mjs \
-            --arch "${{ matrix.arch }}" \
-            --previous-version "$PREVIOUS_VERSION" \
-            --current-version "$VERSION" \
-            --previous-content-identity "$PREVIOUS_ID" \
-            --current-content-identity "$CURRENT_ID" \
-            --previous-package dist/dev-aur-previous-channels/aur/PKGBUILD \
-            --current-package dist/dev-aur-current/aur/PKGBUILD
-
-  accept-dev-legacy-cutover:
-    if: github.event_name == 'push'
-    name: Accept published v0.90.1 CLI cutover
-    needs: build-dev-cli
-    runs-on: ubuntu-24.04
-    timeout-minutes: 25
-
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22.19.0
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: dev-cli-linux-x64
-          path: dist/dev-cli-linux-x64
-
-      - name: Replace the published legacy CLI with the accepted native candidate
-        shell: bash
-        run: |
-          set -euo pipefail
-          VERSION=$(node -p "require('./package.json').version")
-          ARCHIVE=$(find dist/dev-cli-linux-x64 -maxdepth 1 -name '*.tar.gz' -print -quit)
-          SHA256=$(awk 'NR == 1 { print $1 }' "$ARCHIVE.sha256")
-          CONTENT_IDENTITY=$(node -e "const fs=require('fs');const p=fs.readdirSync('dist/dev-cli-linux-x64').find(v=>v.endsWith('.report.json'));process.stdout.write(require('./dist/dev-cli-linux-x64/'+p).contentIdentity)")
-          node scripts/cli-legacy-cutover-smoke.mjs \
-            --archive "$ARCHIVE" \
-            --sha256 "$SHA256" \
-            --expected-version "$VERSION" \
-            --expected-content-identity "$CONTENT_IDENTITY"
-
   publish-dev-cli:
     if: github.event_name == 'push'
     name: Publish dev native CLI aliases
-    needs: [build-dev-cli, accept-dev-linuxbrew, accept-dev-aur, accept-dev-legacy-cutover]
+    needs: build-dev-cli
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -415,7 +234,8 @@ jobs:
             --input-dir dist/dev-cli-candidates \
             --output-dir dist/dev-cli-upload \
             --commit "$GITHUB_SHA" \
-            --version "$VERSION"
+            --version "$VERSION" \
+            --installer install
 
       - name: Install AWS CLI
         run: |

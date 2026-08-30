@@ -3,17 +3,19 @@
 This guide owns the computer-level `openalice` command surface above Guardian:
 background and foreground lifecycle, status presentation, browser opening,
 machine-readable envelopes, shell completion, compatibility aliases, and the
-boundary of the planned Supervisor TUI.
+boundary of the Supervisor TUI.
 
 Installer transactions belong to [[docs/cli-installer.md]]. Source preparation
-and the future headless bundle provider belong to [[docs/local-runtime.md]].
+and the native headless bundle provider belong to [[docs/local-runtime.md]].
 Remote orchestration belongs to [[docs/remote-access.md]]. Guardian lock,
 takeover, and process-tree truth belong to [[docs/project-structure.md]] and
 `packages/guardian-runtime/`.
 
-The active multi-increment TUI and headless-release work is tracked in
-[[plans/shell-first-cli-supervisor.md]]. This guide describes only behavior
-already shipped in the current tree.
+Remaining Supervisor product work is tracked in
+[[plans/shell-first-cli-supervisor.md]]. Native Bun distribution and explicit
+release-channel work are tracked in [[plans/bun-cli-distribution.md]] and
+[[plans/release-channels-0.90.2.md]]. This guide describes only behavior already
+shipped in the current tree.
 
 ## Product Boundary
 
@@ -144,11 +146,20 @@ explicit commands. Its ordinary path is intentionally parameter-free:
   confirmation;
 - `l` reads the bounded, redacted log tail;
 - `d` runs read-only Doctor checks;
-- `u` checks for a product update and, when one is available, can install it
-  after explicit confirmation through the same verified atomic installer path as
-  `openalice update --yes`. After a successful in-TUI install, the running
-  Supervisor is still the previous CLI and does not reload; the user must exit
-  and run `openalice` again;
+- `u` first chooses stable, beta, or dev, then probes that channel and, when a
+  candidate is available, can install it after explicit confirmation through
+  the same verified atomic installer path as `openalice update --yes`. The
+  choice is session-local until installation succeeds; installer provenance
+  makes the chosen channel the next launch's default. Package-manager-owned
+  installs are never overwritten by the TUI: a stable candidate shows the
+  matching manager command, while beta/dev explain that those channels require
+  an explicit switch to the direct installer. During the beta-first transition,
+  a native beta/dev installation also refuses to switch back to the legacy
+  v0.90.1 stable layout; the picker leaves the installation unchanged until a
+  native stable release exists.
+  After a successful in-TUI install, the running Supervisor is still the
+  previous CLI and does not reload; the user must exit and run `openalice`
+  again;
 - `i` lists the implicit default plus registered AliceProjects, selects one
   without stopping another project, or creates a separate named complete home.
   AI vault copy is a separate command: `openalice project copy-ai-creds`;
@@ -163,8 +174,13 @@ explicit commands. Its ordinary path is intentionally parameter-free:
 The TUI refuses to stop or restart Electron, development, incompatible, or
 otherwise foreign owners. Its stop/restart confirmation states that active Web
 and agent sessions will disconnect. Detaching never implies stopping. Update
-discovery runs in the background and cannot block lifecycle controls. Discovery
-never installs; only a confirmed `u` action may invoke the installer.
+discovery runs in the background against the installed channel and cannot block
+lifecycle controls. Discovery never opens the channel selector or installs;
+only a confirmed `u` action may invoke the installer. Stable/beta compare
+product versions; dev compares the complete native archive checksum and
+displays its commit as a diagnostic revision. The bounded startup cache is
+keyed by both channel and installed source fingerprint, so activating a new
+version or dev archive cannot reuse the previous installation's result.
 
 The installed Runtime is the default provider below stored configuration and
 above cwd discovery. TUI start therefore works from any directory and shows a
@@ -476,7 +492,7 @@ broker action. It checks:
 - Alice, UTA, and Connector state;
 - source-provider version and required built artifacts, or advertised bundle
   content identity;
-- locally cached stable-update metadata;
+- recorded cached update metadata and its reported channel;
 - safe Runtime log discovery.
 
 Human output uses explicit PASS/WARN/FAIL rows. JSON uses the same versioned

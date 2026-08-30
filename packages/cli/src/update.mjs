@@ -16,7 +16,12 @@ import {
 } from './install-source.mjs'
 
 const CURRENT_VERSION = CLI_VERSION
-const DEFAULT_MANIFEST_URL = 'https://download.openalice.ai/manifest.json'
+const DEFAULT_MANIFEST_URLS = Object.freeze({
+  stable: 'https://download.openalice.ai/manifest.json',
+  beta: 'https://download.openalice.ai/beta/manifest.json',
+  dev: 'https://download.openalice.ai/cli/dev/manifest.json',
+})
+const LEGACY_STABLE_VERSION = '0.90.1'
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1_000
 const CHECK_TIMEOUT_MS = 1_500
 const EXPLICIT_CHECK_TIMEOUT_MS = 10_000
@@ -24,10 +29,17 @@ const INSTALLER_DOWNLOAD_TIMEOUT_MS = 30_000
 
 export function parseUpdateArgs(argv) {
   const options = { checkOnly: false, yes: false, json: false }
-  for (const arg of argv) {
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index]
     if (arg === '--check') options.checkOnly = true
     else if (arg === '--yes' || arg === '-y') options.yes = true
     else if (arg === '--json') options.json = true
+    else if (arg === '--channel') {
+      const channel = normalizeUpdateChannel(argv[index + 1])
+      if (!channel) throw new Error('--channel must be stable, beta, or dev')
+      options.channel = channel
+      index += 1
+    }
     else throw new Error(`Unknown update option: ${arg}`)
   }
   if (options.json && !options.checkOnly) {
@@ -40,14 +52,52 @@ export async function checkForUpdate(options = {}, dependencies = {}) {
   const currentVersion = options.currentVersion ?? CURRENT_VERSION
   const installSource = options.installSource ?? await (
     dependencies.readInstallSourceImpl ?? readInstallSource
-  )()
-  const channel = installSourceUpdateChannel(installSource)
-  if (channel !== 'stable') {
+  )({ env: dependencies.env ?? process.env })
+  const sourceChannel = normalizeUpdateChannel(installSourceUpdateChannel(installSource))
+  const channel = options.channel === undefined
+    ? sourceChannel
+    : normalizeUpdateChannel(options.channel)
+  if (!channel) {
     return {
       status: 'unsupported',
       currentVersion,
+      channel: installSourceUpdateChannel(installSource),
+      sourceChannel: installSourceUpdateChannel(installSource),
+      message: unsupportedChannelMessage(
+        installSource,
+        installSourceUpdateChannel(installSource),
+      ),
+    }
+  }
+
+  const manager = packageManagerForSource(installSource)
+  const ownership = manager ? { label: manager.label, update: manager.update } : null
+  if (channel === 'dev') {
+    const manifest = await fetchDevManifest({
+      manifestUrl: options.manifestUrl
+        ?? dependencies.env?.['OPENALICE_UPDATE_MANIFEST_URL']
+        ?? process.env['OPENALICE_UPDATE_MANIFEST_URL']
+        ?? DEFAULT_MANIFEST_URLS.dev,
+      timeoutMs: options.timeoutMs ?? EXPLICIT_CHECK_TIMEOUT_MS,
+      platform: options.platform ?? process.platform,
+      arch: options.arch ?? process.arch,
+    }, dependencies)
+    const currentArtifactSha256 = options.currentArtifactSha256
+      ?? installSource?.artifact?.sha256
+      ?? null
+    const sameArtifact = currentArtifactSha256 === manifest.target.sha256
+    return {
+      status: sourceChannel !== 'dev' || !sameArtifact ? 'available' : 'current',
+      currentVersion,
+      latestVersion: manifest.version,
+      latestCommit: manifest.commit,
+      latestContentIdentity: manifest.target.contentIdentity,
+      latestArtifactSha256: manifest.target.sha256,
+      releaseNotesUrl: `https://github.com/TraderAlice/OpenAlice/commit/${manifest.commit}`,
+      installer: manifest.installer,
       channel,
-      message: unsupportedChannelMessage(installSource, channel),
+      sourceChannel: sourceChannel ?? installSourceUpdateChannel(installSource),
+      ...(ownership ? { packageManager: ownership } : {}),
     }
   }
 
@@ -55,17 +105,37 @@ export async function checkForUpdate(options = {}, dependencies = {}) {
     manifestUrl: options.manifestUrl
       ?? dependencies.env?.['OPENALICE_UPDATE_MANIFEST_URL']
       ?? process.env['OPENALICE_UPDATE_MANIFEST_URL']
-      ?? DEFAULT_MANIFEST_URL,
+      ?? DEFAULT_MANIFEST_URLS[channel],
     timeoutMs: options.timeoutMs ?? EXPLICIT_CHECK_TIMEOUT_MS,
   }, dependencies)
+  if (manifest.channel !== channel || !releaseChannelMatchesVersion(channel, manifest.version)) {
+    throw new Error(`${channel} update manifest advertises out-of-channel version ${manifest.version}`)
+  }
+  if (
+    channel === 'stable'
+    && manifest.version === LEGACY_STABLE_VERSION
+    && isNativeDirectInstallSource(installSource)
+  ) {
+    return {
+      status: 'unsupported',
+      currentVersion,
+      latestVersion: manifest.version,
+      releaseNotesUrl: manifest.releaseNotesUrl,
+      channel,
+      sourceChannel: sourceChannel ?? installSourceUpdateChannel(installSource),
+      message: 'Stable 0.90.1 uses the legacy Node-managed layout and cannot safely replace a native CLI installation. Stay on beta/dev until a native stable release is available.',
+    }
+  }
   const comparison = compareVersions(manifest.version, currentVersion)
   return {
-    status: comparison > 0 ? 'available' : 'current',
+    status: sourceChannel !== channel || comparison > 0 ? 'available' : 'current',
     currentVersion,
     latestVersion: manifest.version,
     releaseNotesUrl: manifest.releaseNotesUrl,
     installer: manifest.installer,
     channel,
+    sourceChannel: sourceChannel ?? installSourceUpdateChannel(installSource),
+    ...(ownership ? { packageManager: ownership } : {}),
   }
 }
 
@@ -77,13 +147,19 @@ export async function runUpdateCommand(argv, dependencies = {}) {
   )({ env: dependencies.env ?? process.env })
   const manager = packageManagerForSource(installSource)
   if (manager && !options.checkOnly) {
+    if (options.channel && options.channel !== 'stable') {
+      stdout.write(`${manager.label} owns this OpenAlice installation and publishes only the stable channel.\n`)
+      stdout.write(`To switch to ${options.channel}, use the direct installer explicitly: curl -fsSL https://openalice.ai/install | bash -s -- --channel ${options.channel}\n`)
+      stdout.write('OpenAlice did not modify the package manager\'s files.\n')
+      return 0
+    }
     stdout.write(`${packageManagerUpdateMessage(installSource)}\n`)
     stdout.write('OpenAlice did not modify the package manager\'s files.\n')
     return 0
   }
   let result
   try {
-    result = await checkForUpdate({ installSource }, dependencies)
+    result = await checkForUpdate({ installSource, channel: options.channel }, dependencies)
   } catch (error) {
     throw new Error(`Could not check for OpenAlice updates: ${error instanceof Error ? error.message : String(error)}`)
   }
@@ -97,16 +173,21 @@ export async function runUpdateCommand(argv, dependencies = {}) {
     return 0
   }
   if (result.status === 'current') {
-    stdout.write(`OpenAlice ${result.currentVersion} is current.\n`)
+    stdout.write(`OpenAlice ${result.currentVersion} is current on ${result.channel}.\n`)
     if (manager) stdout.write(`${manager.label} owns future updates for this installation.\n`)
     return 0
   }
 
-  stdout.write(`OpenAlice ${result.latestVersion} is available (current ${result.currentVersion}).\n`)
+  const candidate = result.channel === 'dev' && result.latestCommit
+    ? `dev@${result.latestCommit.slice(0, 12)}`
+    : result.latestVersion
+  stdout.write(`OpenAlice ${candidate} is available on ${result.channel} (current ${result.currentVersion}).\n`)
   if (result.releaseNotesUrl) stdout.write(`Release notes: ${result.releaseNotesUrl}\n`)
   if (options.checkOnly) {
     stdout.write(manager
-      ? `Update with: ${manager.update}\n`
+      ? result.channel === 'stable'
+        ? `Update with: ${manager.update}\n`
+        : `Switch with the direct installer: curl -fsSL https://openalice.ai/install | bash -s -- --channel ${result.channel}\n`
       : 'Run "openalice update" to review and install it.\n')
     return 0
   }
@@ -147,26 +228,47 @@ export async function maybeNotifyUpdate(options = {}, dependencies = {}) {
   const readFileImpl = dependencies.readFileImpl ?? readFile
   const writeFileImpl = dependencies.writeFileImpl ?? writeFile
   const now = dependencies.now?.() ?? Date.now()
+  let installSource
+  try {
+    installSource = options.installSource ?? await (
+      dependencies.readInstallSourceImpl ?? readInstallSource
+    )({ env })
+  } catch {
+    return null
+  }
+  const channel = normalizeUpdateChannel(installSourceUpdateChannel(installSource))
+  if (!channel) return null
+  const sourceFingerprint = updateSourceFingerprint(installSource, channel)
   let cache = await readUpdateCache(layout.updateCachePath, readFileImpl)
-  let result = cachedResult(cache, now)
+  let result = cachedResult(cache, now, channel, sourceFingerprint)
 
   if (!result) {
     try {
-      result = await checkForUpdate({ timeoutMs: CHECK_TIMEOUT_MS }, dependencies)
+      result = await checkForUpdate({
+        timeoutMs: CHECK_TIMEOUT_MS,
+        installSource,
+        channel,
+      }, dependencies)
       cache = {
         schemaVersion: 1,
+        channel,
+        sourceFingerprint,
         checkedAt: new Date(now).toISOString(),
         result,
         notifiedAt: cache?.notifiedAt ?? null,
         notifiedVersion: cache?.notifiedVersion ?? null,
+        notifiedKey: cache?.notifiedKey ?? null,
       }
     } catch {
       cache = {
         schemaVersion: 1,
+        channel,
+        sourceFingerprint,
         checkedAt: new Date(now).toISOString(),
         result: null,
         notifiedAt: cache?.notifiedAt ?? null,
         notifiedVersion: cache?.notifiedVersion ?? null,
+        notifiedKey: cache?.notifiedKey ?? null,
       }
       await writeCacheBestEffort(layout.updateCachePath, cache, writeFileImpl)
       return null
@@ -177,17 +279,22 @@ export async function maybeNotifyUpdate(options = {}, dependencies = {}) {
     await writeCacheBestEffort(layout.updateCachePath, cache, writeFileImpl)
     return result
   }
+  const notificationKey = updateNotificationKey(result)
   const lastNotified = Date.parse(cache?.notifiedAt ?? '')
-  const alreadyRecent = cache?.notifiedVersion === result.latestVersion
+  const alreadyRecent = cache?.notifiedKey === notificationKey
     && Number.isFinite(lastNotified)
     && now - lastNotified < CHECK_INTERVAL_MS
   if (!alreadyRecent) {
+    const candidate = result.channel === 'dev' && result.latestCommit
+      ? `dev@${result.latestCommit.slice(0, 12)}`
+      : result.latestVersion
     stderr.write(
-      `\nOpenAlice ${result.latestVersion} is available (current ${result.currentVersion}). `
+      `\nOpenAlice ${candidate} is available on ${result.channel} (current ${result.currentVersion}). `
       + 'Run "openalice update" to review and install it.\n\n',
     )
     cache.notifiedAt = new Date(now).toISOString()
     cache.notifiedVersion = result.latestVersion
+    cache.notifiedKey = notificationKey
   }
   await writeCacheBestEffort(layout.updateCachePath, cache, writeFileImpl)
   return result
@@ -206,15 +313,16 @@ export function compareVersions(left, right) {
 
 export function formatUpdateHelp() {
   return `Usage:
-  openalice update --check [--json]
-  openalice update [--yes]
+  openalice update --check [--channel stable|beta|dev] [--json]
+  openalice update [--channel stable|beta|dev] [--yes]
 
-Checks the stable release manifest. Applying an update downloads the
-release-owned installer, verifies its SHA-256, and runs the ordinary atomic
-installer transaction for a direct install. Package-manager installs report
-the owning manager's exact update command and do not overwrite its prefix.
+Without --channel, checks the installation's current update channel. Applying
+an update downloads the same channel-neutral installer, verifies its SHA-256,
+and runs the ordinary atomic installer transaction for a direct install.
+Package-manager installs report their owning manager and are never overwritten.
 
 Options:
+  --channel  Check or switch to stable, beta, or dev
   --check    Check and report without changing files
   --json     Print machine-readable check output (requires --check)
   -y, --yes  Approve the installer plan non-interactively
@@ -240,14 +348,90 @@ async function fetchReleaseManifest(options, dependencies) {
 }
 
 function requireReleaseManifest(value) {
-  const installer = value?.installer
+  const channel = value?.channel === undefined && /^\d+\.\d+\.\d+$/.test(value?.version ?? '')
+    ? 'stable'
+    : value?.channel
   if (
     !value
+    || !['stable', 'beta'].includes(channel)
     || typeof value.version !== 'string'
     || !isVersion(value.version)
     || typeof value.releaseNotesUrl !== 'string'
     || !isHttpUrl(value.releaseNotesUrl)
-    || !installer
+  ) {
+    throw new Error('release manifest does not contain a valid CLI installer')
+  }
+  return {
+    channel,
+    version: value.version,
+    releaseNotesUrl: value.releaseNotesUrl,
+    installer: requireInstaller(value.installer, 'release'),
+  }
+}
+
+async function fetchDevManifest(options, dependencies) {
+  const fetchImpl = dependencies.fetchImpl ?? fetch
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), options.timeoutMs)
+  timeout.unref?.()
+  try {
+    const response = await fetchImpl(options.manifestUrl, {
+      signal: controller.signal,
+      headers: { accept: 'application/json' },
+    })
+    if (!response.ok) throw new Error(`dev manifest returned HTTP ${response.status}`)
+    return requireDevManifest(await response.json(), options)
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+function requireDevManifest(value, options) {
+  if (
+    value?.schemaVersion !== 1
+    || value.channel !== 'dev'
+    || value.repository !== 'TraderAlice/OpenAlice'
+    || typeof value.version !== 'string'
+    || !isVersion(value.version)
+    || typeof value.commit !== 'string'
+    || !/^[a-f0-9]{7,64}$/.test(value.commit)
+    || !Array.isArray(value.targets)
+  ) {
+    throw new Error('dev manifest is invalid')
+  }
+  const matchingTargets = value.targets.filter((target) => (
+    target?.platform === options.platform && target?.arch === options.arch
+  ))
+  if (matchingTargets.length !== 1) {
+    throw new Error(`dev manifest does not contain exactly one ${options.platform}-${options.arch} target`)
+  }
+  const target = matchingTargets[0]
+  const expectedArchive = `openalice-cli-dev-${options.platform}-${options.arch}.tar.gz`
+  if (
+    typeof target.archive !== 'string'
+    || target.archive !== expectedArchive
+    || typeof target.sha256 !== 'string'
+    || !/^[a-f0-9]{64}$/.test(target.sha256)
+    || typeof target.contentIdentity !== 'string'
+    || !/^[a-f0-9]{16}$/.test(target.contentIdentity)
+  ) {
+    throw new Error(`dev manifest contains an invalid ${options.platform}-${options.arch} target`)
+  }
+  return {
+    version: value.version,
+    commit: value.commit,
+    installer: requireInstaller(value.installer, 'dev'),
+    target: {
+      archive: target.archive,
+      sha256: target.sha256,
+      contentIdentity: target.contentIdentity,
+    },
+  }
+}
+
+function requireInstaller(installer, manifestKind) {
+  if (
+    !installer
     || typeof installer.url !== 'string'
     || !isHttpUrl(installer.url)
     || typeof installer.versionedUrl !== 'string'
@@ -255,20 +439,30 @@ function requireReleaseManifest(value) {
     || typeof installer.sha256 !== 'string'
     || !/^[a-f0-9]{64}$/.test(installer.sha256)
   ) {
-    throw new Error('release manifest does not contain a valid CLI installer')
+    throw new Error(`${manifestKind} manifest does not contain a valid CLI installer`)
   }
   return {
-    version: value.version,
-    releaseNotesUrl: value.releaseNotesUrl,
-    installer: {
-      url: installer.url,
-      versionedUrl: installer.versionedUrl,
-      sha256: installer.sha256,
-    },
+    url: installer.url,
+    versionedUrl: installer.versionedUrl,
+    sha256: installer.sha256,
   }
 }
 
 export async function downloadAndRunInstaller(result, context) {
+  const channel = normalizeUpdateChannel(result.channel)
+  if (!channel) throw new Error('update result does not contain a supported channel')
+  if (channel === 'stable' && result.latestVersion === LEGACY_STABLE_VERSION) {
+    throw new Error('Stable 0.90.1 cannot safely replace a native CLI installation; wait for a native stable release')
+  }
+  if (
+    channel === 'dev'
+    && (
+      !/^[a-f0-9]{64}$/.test(result.latestArtifactSha256 ?? '')
+      || !/^[a-f0-9]{16}$/.test(result.latestContentIdentity ?? '')
+    )
+  ) {
+    throw new Error('dev update result is missing verified artifact identity')
+  }
   const fetchImpl = context.fetchImpl ?? fetch
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), INSTALLER_DOWNLOAD_TIMEOUT_MS)
@@ -297,9 +491,12 @@ export async function downloadAndRunInstaller(result, context) {
   try {
     await writeFile(installerPath, bytes, { mode: 0o700 })
     await chmod(installerPath, 0o700)
+    const selectorArgs = channel === 'dev'
+      ? ['--channel', 'dev']
+      : ['--channel', channel, '--version', result.latestVersion]
     const args = [
       installerPath,
-      '--version', result.latestVersion,
+      ...selectorArgs,
       '--install-dir', context.layout.installRoot,
       '--no-modify-path',
       ...(context.yes ? ['--yes'] : []),
@@ -309,6 +506,12 @@ export async function downloadAndRunInstaller(result, context) {
       env: {
         ...context.env,
         OPENALICE_EXPECTED_CLI_VERSION: result.latestVersion,
+        ...(result.latestContentIdentity
+          ? { OPENALICE_EXPECTED_CLI_CONTENT_IDENTITY: result.latestContentIdentity }
+          : {}),
+        ...(result.latestArtifactSha256
+          ? { OPENALICE_EXPECTED_CLI_ARTIFACT_SHA256: result.latestArtifactSha256 }
+          : {}),
       },
     })
   } finally {
@@ -335,6 +538,25 @@ function unsupportedChannelMessage(source, channel) {
     return `This CLI was installed from ${source.installerUrl}; public stable-channel updates are disabled for custom installers. Use that installer to update without crossing trust boundaries.`
   }
   return `This CLI follows branch ${source?.selector?.value ?? 'unknown'}; stable release update checks are disabled for development channels. Re-run that branch's installer to refresh it.`
+}
+
+function isNativeDirectInstallSource(source) {
+  return source?.schemaVersion === 3
+    && source.method === 'direct'
+    && source.artifact !== null
+    && typeof source.artifact === 'object'
+}
+
+export function normalizeUpdateChannel(channel) {
+  if (channel === 'stable' || channel === 'beta' || channel === 'dev') return channel
+  if (channel === 'development') return 'dev'
+  return null
+}
+
+function releaseChannelMatchesVersion(channel, version) {
+  if (channel === 'stable') return /^\d+\.\d+\.\d+$/.test(version)
+  if (channel === 'beta') return /^\d+\.\d+\.\d+-beta(?:\.[1-9][0-9]*)?$/.test(version)
+  return false
 }
 
 function parseVersion(value) {
@@ -373,16 +595,38 @@ function comparePrerelease(left, right) {
   return 0
 }
 
-function cachedResult(cache, now) {
+function cachedResult(cache, now, channel, sourceFingerprint) {
   const checkedAt = Date.parse(cache?.checkedAt ?? '')
   if (
     cache?.schemaVersion !== 1
+    || cache?.channel !== channel
+    || cache?.sourceFingerprint !== sourceFingerprint
+    || cache?.result?.channel !== channel
     || !Number.isFinite(checkedAt)
     || now - checkedAt >= CHECK_INTERVAL_MS
   ) {
     return null
   }
   return cache.result ?? null
+}
+
+function updateSourceFingerprint(source, channel) {
+  const artifact = source?.artifact?.sha256
+  const selector = `${source?.selector?.kind ?? 'unknown'}:${source?.selector?.value ?? 'unknown'}`
+  return [
+    channel,
+    source?.cliVersion ?? CURRENT_VERSION,
+    artifact ?? selector,
+    source?.method ?? 'legacy',
+  ].join(':')
+}
+
+function updateNotificationKey(result) {
+  return [
+    result.channel ?? 'unknown',
+    result.latestVersion ?? 'unknown',
+    result.latestArtifactSha256 ?? result.latestCommit ?? 'release',
+  ].join(':')
 }
 
 async function readUpdateCache(path, readFileImpl) {

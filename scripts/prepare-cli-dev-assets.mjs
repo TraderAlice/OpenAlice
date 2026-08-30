@@ -5,7 +5,9 @@ import { execFileSync } from 'node:child_process'
 import { copyFileSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, join, parse, resolve } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+
+import { bunReleaseContentIdentity } from './bun-release-content-identity.mjs'
 
 export const CLI_RELEASE_TARGETS = [
   ['darwin', 'arm64'],
@@ -15,7 +17,7 @@ export const CLI_RELEASE_TARGETS = [
 ]
 const PINNED_BUN_VERSION = readFileSync(new URL('../.bun-version', import.meta.url), 'utf8').trim()
 
-export function prepareCliDevAssets({ inputDir, outputDir, commit, version }) {
+export function prepareCliDevAssets({ inputDir, outputDir, commit, version, installerPath }) {
   if (!/^[a-f0-9]{7,64}$/.test(commit)) {
     throw new Error(`invalid commit identity: ${commit}`)
   }
@@ -38,6 +40,13 @@ export function prepareCliDevAssets({ inputDir, outputDir, commit, version }) {
   rmSync(outputRoot, { recursive: true, force: true })
   mkdirSync(immutableRoot, { recursive: true })
   mkdirSync(aliasRoot, { recursive: true })
+
+  const installerSource = resolve(
+    installerPath ?? fileURLToPath(new URL('../install', import.meta.url)),
+  )
+  const installerBytes = readFileSync(installerSource)
+  const installerSha256 = createHash('sha256').update(installerBytes).digest('hex')
+  copyFileSync(installerSource, join(immutableRoot, 'install'))
 
   const expectedArchives = new Set()
   const targets = []
@@ -73,6 +82,11 @@ export function prepareCliDevAssets({ inputDir, outputDir, commit, version }) {
     repository: 'TraderAlice/OpenAlice',
     version,
     commit,
+    installer: {
+      url: 'https://download.openalice.ai/install',
+      versionedUrl: `https://download.openalice.ai/cli/dev/releases/${commit}/install`,
+      sha256: installerSha256,
+    },
     targets,
   }
   writeFileSync(join(outputRoot, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`)
@@ -108,6 +122,15 @@ export function validateCliReleaseArchive({ archivePath, version, platform, arch
   ) {
     throw new Error(`${archiveName} contains invalid release metadata`)
   }
+  let contentIdentity
+  try {
+    contentIdentity = bunReleaseContentIdentity(metadata)
+  } catch {
+    throw new Error(`${archiveName} contains invalid release metadata`)
+  }
+  if (contentIdentity !== metadata.contentIdentity) {
+    throw new Error(`${archiveName} content identity does not match its release manifest`)
+  }
   const entries = execFileSync('tar', ['-tzf', archivePath], { encoding: 'utf8' })
     .split('\n')
     .filter(Boolean)
@@ -129,26 +152,27 @@ function parseChecksum(content, archiveName) {
 }
 
 function parseArgs(argv) {
-  if (argv.length !== 8) {
-    throw new Error('Usage: prepare-cli-dev-assets.mjs --input-dir <dir> --output-dir <dir> --commit <sha> --version <version>')
+  if (argv.length !== 8 && argv.length !== 10) {
+    throw new Error('Usage: prepare-cli-dev-assets.mjs --input-dir <dir> --output-dir <dir> --commit <sha> --version <version> [--installer <path>]')
   }
   const options = {}
   for (let index = 0; index < argv.length; index += 2) {
     const name = argv[index]
     const value = argv[index + 1]
-    if (!['--input-dir', '--output-dir', '--commit', '--version'].includes(name) || !value) {
-      throw new Error('Usage: prepare-cli-dev-assets.mjs --input-dir <dir> --output-dir <dir> --commit <sha> --version <version>')
+    if (!['--input-dir', '--output-dir', '--commit', '--version', '--installer'].includes(name) || !value) {
+      throw new Error('Usage: prepare-cli-dev-assets.mjs --input-dir <dir> --output-dir <dir> --commit <sha> --version <version> [--installer <path>]')
     }
     options[name.slice(2)] = value
   }
-  if (Object.keys(options).length !== 4) {
-    throw new Error('Usage: prepare-cli-dev-assets.mjs --input-dir <dir> --output-dir <dir> --commit <sha> --version <version>')
+  if (!options['input-dir'] || !options['output-dir'] || !options.commit || !options.version) {
+    throw new Error('Usage: prepare-cli-dev-assets.mjs --input-dir <dir> --output-dir <dir> --commit <sha> --version <version> [--installer <path>]')
   }
   return {
     inputDir: options['input-dir'],
     outputDir: options['output-dir'],
     commit: options.commit,
     version: options.version,
+    installerPath: options.installer,
   }
 }
 
