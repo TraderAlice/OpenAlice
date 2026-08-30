@@ -24,7 +24,7 @@ transparent sources, fit each full silhouette into a native 72x104 canvas with
 nearest-neighbor sampling, and hard-mat alpha for crisp GBA-scale cards. The
 generated full-resolution masters are intentionally not shipped at runtime.
 
-The roster now contains twenty-two curated identities. Six additional feminine coworkers were generated as transparent
+The roster now contains twenty-six curated identities. Six additional feminine coworkers were generated as transparent
 three-pose sheets: two Codex variants (field mechanic and cyber scout), a Claude botanical archivist, a Pi field
 mathematician, and two OpenCode variants (workshop hacker and systems analyst). Each sheet keeps one identity across a
 standing portrait, seated idle pose, and seated typing pose. `scripts/package-office-coworker-sheet.py` splits those
@@ -51,9 +51,13 @@ native card/map canvases, shared seated scale, and bottom-center anchoring.
 Four later arrivals extend the party for larger Office teams: an auburn field
 cartographer, mint technical alchemist, burgundy museum curator, and platinum
 operations strategist. Their sheets use the same standing / seated / typing
-contract and the same native packager. Grok uses its own deterministic identity
-hash, so a twelve-person party exhausts the authored feminine cast before any
-appearance repeats while retaining each Session's appearance after refresh.
+contract and the same native packager. A violet tactician, coral diplomat,
+copper artificer, and blue-black librarian now extend that party to sixteen;
+the cast repair path also replaces an already-retained duplicate as soon as a
+new authored identity becomes available. Grok uses its own deterministic
+identity hash, so a sixteen-person party exhausts the authored feminine cast
+before any appearance repeats while retaining each Session's appearance after
+refresh.
 
 The four `*-desk-v1.png` files are a separate generated map-scale pose family.
 Each employee is seated, seen from a top-down three-quarter rear view, and faces

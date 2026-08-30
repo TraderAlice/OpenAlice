@@ -19,6 +19,10 @@ export type OfficeCoworkerIdentity =
   | 'grok-alchemist'
   | 'grok-curator'
   | 'grok-strategist'
+  | 'grok-tactician'
+  | 'grok-diplomat'
+  | 'grok-artificer'
+  | 'grok-librarian'
 
 export interface OfficeCoworkerSpriteAsset {
   id: OfficeCoworkerIdentity
@@ -72,6 +76,10 @@ export const OFFICE_COWORKER_SPRITES: Record<OfficeCoworkerIdentity, OfficeCowor
   'grok-alchemist': coworkerAsset('grok-alchemist', 'var(--terminal-cyan)', -1_270),
   'grok-curator': coworkerAsset('grok-curator', 'var(--terminal-cyan)', -1_330),
   'grok-strategist': coworkerAsset('grok-strategist', 'var(--terminal-cyan)', -1_390),
+  'grok-tactician': coworkerAsset('grok-tactician', 'var(--terminal-cyan)', -1_450),
+  'grok-diplomat': coworkerAsset('grok-diplomat', 'var(--terminal-cyan)', -1_510),
+  'grok-artificer': coworkerAsset('grok-artificer', 'var(--terminal-cyan)', -1_570),
+  'grok-librarian': coworkerAsset('grok-librarian', 'var(--terminal-cyan)', -1_630),
 }
 
 export const OFFICE_COWORKER_EMOTES = {
@@ -112,6 +120,10 @@ const ARCHETYPE_POOL: Record<OfficeCoworkerArchetype, readonly OfficeCoworkerIde
     'grok-alchemist',
     'grok-curator',
     'grok-strategist',
+    'grok-tactician',
+    'grok-diplomat',
+    'grok-artificer',
+    'grok-librarian',
   ],
 }
 
@@ -181,14 +193,29 @@ export function officeCoworkerCast(
     const pool = ARCHETYPE_POOL[archetype]
     const pending: OfficeCoworkerCastMember[] = []
     const claimed = new Set<number>()
-    for (const retained of retainedCast.values()) {
+    const currentResumeIds = new Set(family.map((member) => member.resumeId))
+    const retainedOwnerByIndex = new Map<number, string>()
+    for (const [resumeId, retained] of retainedCast) {
       const retainedIndex = pool.indexOf(retained.id)
-      if (retainedIndex >= 0) claimed.add(retainedIndex)
+      if (retainedIndex < 0) continue
+      claimed.add(retainedIndex)
+      const owner = retainedOwnerByIndex.get(retainedIndex)
+      if (!owner) {
+        retainedOwnerByIndex.set(retainedIndex, resumeId)
+        continue
+      }
+      const ownerDeparted = !currentResumeIds.has(owner)
+      const candidateDeparted = !currentResumeIds.has(resumeId)
+      if ((candidateDeparted && !ownerDeparted)
+        || (candidateDeparted === ownerDeparted && resumeId.localeCompare(owner) < 0)) {
+        retainedOwnerByIndex.set(retainedIndex, resumeId)
+      }
     }
     for (const member of family) {
       const retained = retainedCast.get(member.resumeId)
       const retainedIndex = retained ? pool.indexOf(retained.id) : -1
-      if (!retained || retainedIndex < 0) {
+      if (!retained || retainedIndex < 0
+        || retainedOwnerByIndex.get(retainedIndex) !== member.resumeId) {
         pending.push(member)
         continue
       }

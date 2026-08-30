@@ -19,10 +19,10 @@ describe('Office coworker sprite registry', () => {
     expect(officeCoworkerSpriteForAgent('pi')).toBe(OFFICE_COWORKER_SPRITES.pi)
     expect(officeCoworkerSpriteForAgent('opencode')).toBe(OFFICE_COWORKER_SPRITES.opencode)
     expect(officeCoworkerSpriteForAgent('grok')).toBe(OFFICE_COWORKER_SPRITES['grok-oracle'])
-    expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.portraitSrc)).size).toBe(22)
-    expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.deskSrc)).size).toBe(22)
-    expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.deskWorkSrc)).size).toBe(22)
-    expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.typingPhaseMs)).size).toBe(22)
+    expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.portraitSrc)).size).toBe(26)
+    expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.deskSrc)).size).toBe(26)
+    expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.deskWorkSrc)).size).toBe(26)
+    expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.typingPhaseMs)).size).toBe(26)
   })
 
   it('assigns a stable identity-led coworker from each runtime family pool', () => {
@@ -36,7 +36,7 @@ describe('Office coworker sprite registry', () => {
     expect(new Set(samples.map((identity) => officeCoworkerSpriteForAgent('opencode', identity).id)).size)
       .toBe(3)
     expect(new Set(samples.map((identity) => officeCoworkerSpriteForAgent('grok', identity).id)).size)
-      .toBe(12)
+      .toBe(16)
     expect(officeCoworkerSpriteForAgent('codex', 'resume-7'))
       .toBe(officeCoworkerSpriteForAgent('codex', 'resume-7'))
   })
@@ -61,20 +61,36 @@ describe('Office coworker sprite registry', () => {
     )
   })
 
-  it('keeps a twelve-person Grok party fully authored before any repeat', () => {
-    const members = Array.from({ length: 12 }, (_, index) => ({
+  it('keeps a sixteen-person Grok party fully authored before any repeat', () => {
+    const members = Array.from({ length: 16 }, (_, index) => ({
       resumeId: `grok-party-${index + 1}`,
       agent: 'grok',
     }))
     const cast = officeCoworkerCast(members)
 
-    expect(new Set(Array.from(cast.values(), (asset) => asset.id)).size).toBe(12)
+    expect(new Set(Array.from(cast.values(), (asset) => asset.id)).size).toBe(16)
     expect(Array.from(cast.values(), (asset) => asset.id)).toEqual(expect.arrayContaining([
-      'grok-cartographer',
-      'grok-alchemist',
-      'grok-curator',
-      'grok-strategist',
+      'grok-tactician',
+      'grok-diplomat',
+      'grok-artificer',
+      'grok-librarian',
     ]))
+  })
+
+  it('repairs a retained duplicate when the authored party gains an open identity', () => {
+    const repeated = OFFICE_COWORKER_SPRITES['grok-alchemist']
+    const members = [
+      { resumeId: 'resume-established', agent: 'grok' },
+      { resumeId: 'resume-newcomer', agent: 'grok' },
+    ]
+    const cast = officeCoworkerCast(members, new Map([
+      ['resume-established', repeated],
+      ['resume-newcomer', repeated],
+    ]))
+
+    expect(cast.get('resume-established')).toBe(repeated)
+    expect(cast.get('resume-newcomer')).not.toBe(repeated)
+    expect(new Set(Array.from(cast.values(), (asset) => asset.id)).size).toBe(2)
   })
 
   it('retains established cast identities when a new coworker joins', () => {

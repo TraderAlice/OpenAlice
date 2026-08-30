@@ -3408,6 +3408,30 @@ Sparse activity-channel follow-up (2026-08-30):
   Root and UI TypeScript passed, the full suite passed all 617 test files and 5,149 tests (one file and nine tests
   skipped), and the production UI build passed with only the existing jsdom canvas and large-chunk advisories.
 
+Sixteen-member Grok party follow-up (2026-08-30):
+
+- Started the existing `office-navigation-playtest` Issue as a real Grok Build run (`run-zTDiOD9y`) and watched the
+  live Office change from `0 working · 0 awake` to `1 working · 1 awake`. The thirteenth Chat coworker appeared at a
+  working desk and emitted birth, start, report, and tool beats, but reused the already-visible Grok Alchemist name and
+  silhouette. The twelve-person cast was complete only at its exact fixture size; an ordinary newcomer broke identity.
+- Compared accepting repeats after twelve, minting new callsigns over duplicated art, and extending the authored party
+  while repairing already-retained collisions. Chose the authored extension: aliases would make Agent Files nominally
+  different but leave the in-world cast visibly cloned, while dropping retained identity wholesale would make every
+  established coworker change after refresh.
+- Used the built-in image generator with `docs/assets/office/style-master-v1.png` as the palette reference and the Grok
+  Navigator portrait / seated idle / seated typing assets as pose references. Four feminine three-pose identities add
+  distinct silhouettes and palettes: violet Tactician, coral Diplomat, copper Artificer, and blue-black Librarian. The
+  standard hard-alpha packager produced twelve project-bound PNGs on native 72x104 and 176x176 canvases; source masters
+  remain outside the runtime bundle. All packaged portraits and desk pairs were visually inspected.
+- Grok's family pool now exhausts sixteen identities before repeating. Retained-cast repair deterministically keeps one
+  owner for a duplicated identity, preserves a departed owner's reservation, and moves the duplicate into a newly free
+  authored slot. It does not migrate or dual-read any older data shape.
+- After HMR and a full page reload, the existing g11 remained Grok Alchemist while g13 became Grok Tactician. The real
+  Chat roster reported thirteen members and thirteen unique callsigns; Tactician's Agent File showed the same portrait,
+  assignment, Issue, Inbox delivery, and report at 1200x800 and 390x844. Focused sprite/storage specs passed (2 files /
+  13 tests). Root and UI TypeScript passed, the full suite passed all 617 test files and 5,150 tests (one file and nine
+  tests skipped), and the production UI build passed with only the existing jsdom canvas and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
