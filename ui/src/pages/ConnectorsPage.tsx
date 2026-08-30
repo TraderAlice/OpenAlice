@@ -747,7 +747,10 @@ function ConnectorSectionNav({
           {t('connectorSettings.channelNavigationDescription')}
         </p>
       </div>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+      <div
+        data-connector-channel-grid
+        className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-2 xl:grid-cols-4"
+      >
         {definitions.map((definition) => {
           const adapter = config.adapters[definition.id] ?? emptyAdapter()
           const runtime = adapterHealth.get(definition.id)
@@ -775,7 +778,7 @@ function ConnectorSectionNav({
                 name: definition.label,
                 status: badge,
               })}
-              className={`oa-pressable flex min-w-0 items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left ${active
+              className={`oa-pressable flex min-h-10 min-w-0 items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left min-[380px]:min-h-12 min-[380px]:flex-col min-[380px]:items-start min-[380px]:justify-center min-[380px]:gap-1 sm:min-h-10 sm:flex-row sm:items-center sm:justify-between sm:gap-2 ${active
                 ? 'border-primary/40 bg-primary/[0.06] ring-1 ring-primary/10'
                 : 'border-border/70 bg-secondary/20 hover:border-primary/35 hover:bg-primary/[0.035]'
               }`}

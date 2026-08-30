@@ -372,7 +372,11 @@ The surfaces deliberately have different jobs:
   On desktop the sticky navigator sits exactly on the Settings scrollport edge,
   so controls from the preceding channel cannot scroll through above it. Initial
   page breathing room comes from a normal-flow spacer that scrolls away; the
-  narrow navigator stays static and consumes no persistent mobile height.
+  narrow navigator stays static and consumes no persistent mobile height. At
+  380–639 px, its always-visible channel choices use a two-column grid with the
+  complete channel name above the lifecycle badge; narrower screens return to
+  one inline column, and desktop uses one inline row. Every navigation target is
+  at least 40 px high.
   The adapter dialog moves initial focus to its semantic title so the selected
   channel is announced without focusing a credential field or opening a mobile
   keyboard. Its title is programmatically focusable rather than another Tab

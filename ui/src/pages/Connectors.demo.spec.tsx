@@ -437,13 +437,22 @@ describe('Connector demo routes', () => {
     render(<ConnectorsPage />)
 
     const navigation = await screen.findByRole('navigation', { name: 'Channel settings' })
-    expect(navigation.querySelector('.grid')?.className).toContain('grid-cols-1')
+    const channelGrid = navigation.querySelector('[data-connector-channel-grid]') as HTMLElement
+    expect(channelGrid.className).toContain('grid-cols-1')
+    expect(channelGrid.className).toContain('min-[380px]:grid-cols-2')
     expect(navigation.className).toContain('md:sticky')
     expect(navigation.className).toContain('md:top-0')
     const scrollArea = navigation.closest('[data-settings-scroll-area]') as HTMLElement
     expect(scrollArea.className).not.toContain('py-5')
     expect(scrollArea.querySelector('[data-connector-settings-top-spacer]')?.className).toContain('h-5')
-    expect(within(navigation).getAllByRole('button')).toHaveLength(4)
+    const navigationButtons = within(navigation).getAllByRole('button')
+    expect(navigationButtons).toHaveLength(4)
+    navigationButtons.forEach((button) => {
+      expect(button.className).toContain('min-h-10')
+      expect(button.className).toContain('min-[380px]:min-h-12')
+      expect(button.className).toContain('min-[380px]:flex-col')
+      expect(button.className).toContain('sm:flex-row')
+    })
     const discordNavigation = within(navigation).getByRole('button', { name: /^Discord settings,/ })
     const slackNavigation = within(navigation).getByRole('button', { name: /^Slack settings,/ })
     const feishuNavigation = within(navigation).getByRole('button', { name: /^Feishu settings,/ })

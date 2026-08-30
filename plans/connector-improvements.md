@@ -433,6 +433,19 @@ external adapters remain optional projections rather than sources of truth.
     delivery, and post-save actions retain their immediate runtime-only refresh.
     The shared domain remains the periodic authority. This preserves drafts while
     removing contradictory runtime truth and duplicate permanent polling.
+37. **The narrow channel navigator remains an overview, but not a four-row
+    obstacle.** At 390 px the current single-column navigator measured 221 px
+    tall and exposed four 36.25 px controls before the user could reach Delivery
+    service. A select would hide lifecycle states behind another interaction;
+    horizontal scrolling would hide channels offscreen. The chosen layout keeps
+    every channel and status visible, switches to a two-by-two grid at 380 px,
+    and retains one column below that threshold where labels cannot fit safely.
+    Two-column targets place the full channel name above its lifecycle badge;
+    desktop and sub-threshold single-column targets keep the inline form. Every
+    target is at least 40 px high and the compact two-column target is 48 px.
+    The navigator stays
+    static on narrow screens, sticky on desktop, and preserves the same focus,
+    scroll, active-section, and document-order behavior.
 
 ## Ordered Work
 
@@ -511,6 +524,8 @@ external adapters remain optional projections rather than sources of truth.
         configuration-dialog heading.
   - [x] Make Overview and full Settings consume one live runtime-health source
         without replacing in-progress configuration drafts.
+  - [x] Compact the narrow channel navigator without hiding lifecycle status or
+        reducing touch targets.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -867,6 +882,19 @@ Settings service card remained 352 px wide, its switch retained a 40 px target,
 and document width remained exactly 390 px. No field, switch, send, reconnect,
 or external action was invoked; the temporary audit tab was closed and the
 viewport was reset.
+
+The narrow-navigator increment passed all 28 demo-route tests, UI and root
+typechecking, the production build, and all 5,125 repository tests. The
+contract keeps four semantic channel buttons, requires the 380 px two-column
+breakpoint, and gives every target a 40 px minimum with a 48 px compact-grid
+minimum. In the real Settings route at 390 x 844, the navigator changed from
+four 36.25 px rows in a 221 px container to a two-by-two grid of 159 px-wide
+targets. After rejecting an inline version that visibly truncated Telegram,
+the accepted stacked labels measured their full text width with no internal
+overflow; targets rendered 58.25 px high and the navigator measured 176.5 px.
+At 360 x 800 it returned to one 296 px column with four 40 px targets. Document
+width exactly matched both viewports. No Connector control or external action
+was invoked; the temporary audit tab was closed and the viewport was reset.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.
