@@ -474,8 +474,13 @@ The surfaces deliberately have different jobs:
   badges and copy own status. State copy is not wrapped in a nested
   status card, diagnostics use a thin native disclosure, and the non-clickable
   article has no hover treatment. Every
-  credential-ready card also exposes the same `Use <platform>` runtime switch as
-  Settings. Turning it on enables the shared service when needed; turning it off
+  credential-ready card also exposes the same runtime switch as Settings.
+  Before the first start, its visible label becomes `Start <platform>` and the
+  configuration action becomes a neutral setup-details affordance, so opening a
+  dialog does not compete visually with the control that actually advances the
+  lifecycle. Once the adapter is awaiting `/link`, the dialog action becomes the
+  emphasized link-instruction path. Turning the switch on enables the shared
+  service when needed; turning it off
   preserves credentials, linkage, delivery preference, and Chat configuration.
   The switch reflects actual runtime availability when the shared service is
   paused, not merely the adapter's retained preference. Toggle/reconnect

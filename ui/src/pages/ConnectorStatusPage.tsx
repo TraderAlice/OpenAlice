@@ -530,14 +530,17 @@ function ConnectorOverviewCard({
   t: TFunction
 }) {
   const supportsLinking = definition.fields.some((field) => Boolean(field.learnedBy))
-  const setupAction = setup.stage === 'needs_credentials'
-    || setup.stage === 'ready_to_link'
+  const prioritizeConfiguration = setup.stage === 'needs_credentials'
+    || setup.stage === 'starting'
     || setup.stage === 'awaiting_link'
   const running = setup.stage === 'starting'
     || setup.stage === 'awaiting_link'
     || setup.stage === 'linked'
     || setup.stage === 'error'
-  const ActionIcon = setupAction ? ArrowRight : Settings2
+  const ActionIcon = prioritizeConfiguration ? ArrowRight : Settings2
+  const runtimeLabel = setup.stage === 'ready_to_link'
+    ? t('connectorStatus.startChannel', { name: definition.label })
+    : t('connectorSettings.useConnector', { name: definition.label })
 
   return (
     <article className="oa-status-surface flex flex-col rounded-2xl border border-border/80 bg-secondary/15 p-5">
@@ -591,8 +594,11 @@ function ConnectorOverviewCard({
             data-connector-runtime-control
             className="flex min-h-10 min-w-[7.5rem] flex-1 items-center justify-between gap-3"
           >
-            <span className="text-[12.5px] font-medium text-foreground">
-              {t('connectorSettings.useConnector', { name: definition.label })}
+            <span className={`text-[12.5px] font-medium ${setup.stage === 'ready_to_link'
+              ? 'text-primary'
+              : 'text-foreground'
+            }`}>
+              {runtimeLabel}
             </span>
             <Toggle
               size="sm"
@@ -617,7 +623,7 @@ function ConnectorOverviewCard({
           )}
           <button
             type="button"
-            className={`oa-pressable inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-medium ${setupAction
+            className={`oa-pressable inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-medium ${prioritizeConfiguration
               ? 'border border-primary bg-primary text-primary-foreground shadow-sm hover:bg-primary/90'
               : 'border border-border bg-background/50 text-foreground hover:border-primary/45 hover:text-primary'
             }`}
@@ -738,7 +744,8 @@ function adapterPresentation(
 
 function adapterActionLabel(stage: ConnectorSetupState['stage'], name: string, t: TFunction): string {
   if (stage === 'needs_credentials') return t('connectorStatus.configureAdapter', { name })
-  if (stage === 'ready_to_link' || stage === 'awaiting_link') return t('connectorStatus.finishSetup', { name })
+  if (stage === 'ready_to_link') return t('connectorStatus.setupDetails', { name })
+  if (stage === 'awaiting_link') return t('connectorStatus.linkingSteps', { name })
   if (stage === 'starting') return t('connectorStatus.viewProgress', { name })
   if (stage === 'error') return t('connectorStatus.reviewAdapter', { name })
   return t('connectorStatus.manageAdapter', { name })

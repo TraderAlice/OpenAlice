@@ -285,11 +285,14 @@ describe('Connector demo routes', () => {
 
     render(<ConnectorStatusPage />)
 
-    await screen.findByRole('button', { name: 'Finish setting up Discord' })
+    await screen.findByRole('button', { name: 'Discord setup details' })
     const card = (await screen.findByRole('heading', { name: 'Discord' })).closest('article') as HTMLElement
     expect(within(card).getByText('Ready to link')).toBeTruthy()
     expect(within(card).getByText('Private chat not linked')).toBeTruthy()
-    expect(within(card).getByRole('button', { name: 'Finish setting up Discord' })).toBeTruthy()
+    expect(within(card).getByText('Start Discord')).toBeTruthy()
+    const details = within(card).getByRole('button', { name: 'Discord setup details' })
+    expect(details.className).toContain('bg-background/50')
+    expect(details.className).not.toContain('bg-primary text-primary-foreground')
   })
 
   it('shows linked startup progress without offering a premature reconnect', async () => {

@@ -542,6 +542,15 @@ external adapters remain optional projections rather than sources of truth.
     into view and lets a keyboard user activate it, while performing no external
     action itself. Auto-save, replacement, removal, and unrelated runtime updates
     do not claim focus.
+47. **The overview emphasizes the action that actually advances each setup
+    stage.** A Ready-to-link card currently pairs the real runtime switch with a
+    primary `Finish setting up` button that only reopens configuration. Making
+    that button start the adapter would hide an external-state change; removing
+    the switch would discard the operator's persistent on/off control. The
+    chosen hierarchy labels the switch `Start <platform>` before first launch,
+    styles the configuration entry as neutral setup details, and promotes the
+    dialog entry only after the adapter is running and the user needs the
+    external `/link` instructions. The lifecycle model and APIs do not change.
 
 ## Ordered Work
 
@@ -640,6 +649,8 @@ external adapters remain optional projections rather than sources of truth.
         concise, accessible inline recovery.
   - [x] Hand a successful first credential save to the corresponding Ready to
         link runtime control without auto-starting it.
+  - [x] Make the overview's Ready-to-link action hierarchy match the actual
+        lifecycle transition.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -1133,6 +1144,22 @@ remained exactly 390 px. At 1,052 x 734, saving simulated Discord credentials
 moved focus to its unchecked 40 px runtime switch at y 310.43, with document
 width exactly 1,052 px. A rejected short Discord token kept focus on its invalid
 field instead. No Connector, external platform, or real credential action was
+invoked. The temporary tab and demo runtime were closed, and the viewport was
+reset.
+
+The setup-action-hierarchy increment passed 44 focused Overview/demo-route
+tests, UI and root typechecking, the demo production build, and all 5,132
+repository tests. Ready-to-link cards now label the persistent runtime control
+`Start <platform>` and render setup details as a neutral action; awaiting-link
+cards restore emphasis to the dialog entry and name it as linking steps. This
+keeps configuration and process start as distinct operator decisions, matching
+the staged setup/start distinction in the reviewed Hermes gateway workflow
+without adopting its configuration-file interaction. In the isolated
+current-source route at 1,052 x 734, the Slack start control and neutral details
+action shared one action rail. At 390 x 844, the English and Chinese cards both
+measured 352 px wide; the switch and details action remained 40 px high, the
+Chinese details action measured 156.92 px wide, and document width remained
+exactly 390 px. No Connector, external platform, or real credential action was
 invoked. The temporary tab and demo runtime were closed, and the viewport was
 reset.
 

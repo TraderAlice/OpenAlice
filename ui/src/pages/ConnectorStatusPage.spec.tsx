@@ -176,6 +176,51 @@ describe('Connector overview state hierarchy', () => {
     await waitFor(() => expect(mocks.toggle).toHaveBeenCalledWith('discord', true))
   })
 
+  it('makes starting the channel the only emphasized ready-to-link action', () => {
+    const snapshot = createDemoConnectorSnapshot()
+    snapshot.config.adapters.discord = {
+      enabled: false,
+      settings: { applicationId: 'discord-app' },
+      configuredSecrets: ['botToken'],
+    }
+    mocks.state.current = loaded(snapshot)
+    render(<ConnectorStatusPage />)
+
+    const discord = screen.getByRole('heading', { name: 'Discord' }).closest('article') as HTMLElement
+    expect(within(discord).getByText('Start Discord').className).toContain('text-primary')
+    expect(within(discord).getByRole('switch', { name: 'Turn Discord on or off' })).toBeTruthy()
+    const details = within(discord).getByRole('button', { name: 'Discord setup details' })
+    expect(details.className).toContain('bg-background/50')
+    expect(details.className).not.toContain('bg-primary text-primary-foreground')
+  })
+
+  it('promotes linking instructions only after the channel is awaiting /link', () => {
+    const snapshot = createDemoConnectorSnapshot()
+    snapshot.config.serviceEnabled = true
+    snapshot.config.adapters.discord = {
+      enabled: true,
+      settings: { applicationId: 'discord-app' },
+      configuredSecrets: ['botToken'],
+    }
+    snapshot.health = {
+      enabled: true,
+      status: 'healthy',
+      service: {
+        status: 'healthy',
+        startedAt: '2026-08-30T00:00:00.000Z',
+        adapters: [{ id: 'discord', enabled: true, status: 'awaiting_link' }],
+      },
+    }
+    mocks.state.current = loaded(snapshot)
+    render(<ConnectorStatusPage />)
+
+    const discord = screen.getByRole('heading', { name: 'Discord' }).closest('article') as HTMLElement
+    expect(within(discord).getByText('Waiting for /link')).toBeTruthy()
+    expect(within(discord).getByText('Use Discord')).toBeTruthy()
+    const linkingSteps = within(discord).getByRole('button', { name: 'Show Discord linking steps' })
+    expect(linkingSteps.className).toContain('bg-primary text-primary-foreground')
+  })
+
   it('announces a channel runtime change inside the affected card', async () => {
     let resolveToggle!: () => void
     mocks.toggle.mockReturnValueOnce(new Promise<void>((resolve) => { resolveToggle = resolve }))
