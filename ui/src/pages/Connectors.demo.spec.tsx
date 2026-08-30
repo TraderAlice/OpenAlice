@@ -160,6 +160,10 @@ describe('Connector demo routes', () => {
     expect(screen.getAllByText('收件箱投递')).toHaveLength(4)
     expect(screen.getAllByText('工作区聊天')).toHaveLength(2)
     expect(screen.queryByText('Delivery connectors')).toBeNull()
+    expect(i18n.t('connectorStatus.adapter.offDescription')).toBe('投递已暂停；开启此渠道即可恢复。')
+    expect(i18n.t('connectorStatus.adapter.connectedDescription')).toBe('收件箱动态正在通过此渠道投递。')
+    expect(i18n.t('connectorStatus.adapter.startingLinkedDescription', { name: 'Telegram' }))
+      .toBe('Telegram 正在重新连接；准备就绪后会恢复投递。')
 
     fireEvent.click(screen.getByRole('button', { name: '设置 Feishu' }))
     expect(within(await screen.findByRole('dialog')).getByRole('button', { name: '关闭' })).toBeTruthy()
@@ -193,6 +197,7 @@ describe('Connector demo routes', () => {
     render(<ConnectorStatusPage />)
 
     expect(await screen.findByText('Private chat linked')).toBeTruthy()
+    expect(screen.getByText('Inbox updates are being delivered through this channel.')).toBeTruthy()
     expect(screen.getByText('Delivered just now')).toBeTruthy()
     expect(screen.queryByText('ou_private_identifier')).toBeNull()
   })
@@ -222,7 +227,7 @@ describe('Connector demo routes', () => {
     const card = (await screen.findByRole('heading', { name: 'Discord' })).closest('article') as HTMLElement
     expect(within(card).getByText('Paused')).toBeTruthy()
     expect(within(card).getByText('Private chat linked')).toBeTruthy()
-    expect(within(card).getByText(/private chat remains linked/)).toBeTruthy()
+    expect(within(card).getByText('Delivery is paused. Turn this channel on to resume.')).toBeTruthy()
     expect(within(card).getByRole('button', { name: 'Manage Discord' })).toBeTruthy()
   })
 
@@ -268,7 +273,7 @@ describe('Connector demo routes', () => {
     await screen.findByRole('button', { name: 'View Telegram progress' })
     const card = (await screen.findByRole('heading', { name: 'Telegram' })).closest('article') as HTMLElement
     expect(within(card).getByText('Private chat linked')).toBeTruthy()
-    expect(within(card).getByText(/reconnecting to your linked private chat/)).toBeTruthy()
+    expect(within(card).getByText('Telegram is reconnecting. Delivery will resume when ready.')).toBeTruthy()
     expect(within(card).getByRole('button', { name: 'View Telegram progress' })).toBeTruthy()
     expect(within(card).queryByRole('button', { name: 'Reconnect' })).toBeNull()
   })

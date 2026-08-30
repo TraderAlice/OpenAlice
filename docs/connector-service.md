@@ -434,8 +434,11 @@ The surfaces deliberately have different jobs:
   lifecycle card without losing its configuration dialog. Cards omit the
   repeated generic delivery subtitle and do
   not impose a fixed minimum height: the state explanation is the primary body,
-  while evidence and the next action remain in stable document order. A channel
-  article is the single visual container. Platform glyphs use one neutral
+  while evidence and the next action remain in stable document order. State
+  explanations describe current delivery impact and the next useful action;
+  durable private-chat linkage and last delivery remain separate evidence, so
+  neither English nor Chinese cards repeat the same link fact in both layers. A
+  channel article is the single visual container. Platform glyphs use one neutral
   identity treatment across owned and pristine cards; interaction blue belongs
   to selection, focus, enabled switches, and primary actions, while lifecycle
   badges and copy own status. State copy is not wrapped in a nested

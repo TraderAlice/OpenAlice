@@ -468,6 +468,16 @@ external adapters remain optional projections rather than sources of truth.
     test delivery. Existing 44/48 px disclosures and Chat actions stay intact.
     Desktop uses the same minimum so configuration dialogs and the full Settings
     document cannot diverge again.
+40. **Overview state copy explains impact; evidence proves connection.** Paused,
+    connected, and linked-starting cards currently repeat the private-chat link
+    in both their primary sentence and the `Private chat linked` evidence row.
+    Removing the evidence row would discard durable linkage and last-delivery
+    diagnostics; leaving both makes the card feel longer without adding meaning.
+    The chosen model keeps the stable evidence row and rewrites those three
+    lifecycle sentences around present delivery impact and the next useful
+    action. Setup, link, and recovery stages retain their instructional copy,
+    where the link state is part of the task rather than repeated evidence. The
+    English and Chinese surfaces share this same information hierarchy.
 
 ## Ordered Work
 
@@ -552,6 +562,8 @@ external adapters remain optional projections rather than sources of truth.
         responsive action rail with 40 px targets.
   - [x] Give every Connector configuration field and explicit action a scoped
         40 px interaction target.
+  - [x] Separate overview lifecycle impact copy from persistent connection
+        evidence in English and Chinese.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -950,6 +962,19 @@ desktop buttons. The 390 px Feishu configuration dialog likewise had no visible
 control below 40 px and no horizontal overflow. No field, switch, send,
 reconnect, or external action was invoked; the temporary audit tab was closed
 and the viewport was reset.
+
+The overview-copy hierarchy increment passed 39 focused overview and demo-route
+tests, UI and root typechecking, the production build, and all 5,125 repository
+tests. English rendered-card coverage proves paused and connected impact copy
+beside retained private-chat evidence, while the localized route locks the same
+paused, connected, and linked-starting meanings in Chinese. In the real overview
+at 390 x 844, Discord rendered `Delivery is paused. Turn this channel on to
+resume.` once, with `Private chat linked` and `No delivery yet` preserved as
+separate evidence; its card height fell from 224.25 px to 204.25 px. Feishu
+rendered delivery impact without repeating its retained link evidence. At 1,052
+x 734 the same hierarchy remained legible, and document width exactly matched
+both viewports. No Connector control or external action was invoked; the
+temporary audit tab was closed and the viewport was reset.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.
