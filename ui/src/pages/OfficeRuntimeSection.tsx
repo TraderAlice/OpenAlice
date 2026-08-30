@@ -124,6 +124,13 @@ function officeReplaySummary(event: AgentRuntimeEvent, t: TFunction): string {
   return normalized.length > 180 ? `${normalized.slice(0, 179)}…` : normalized
 }
 
+function eventIndexTitle(event: AgentRuntimeEvent, t: TFunction): string {
+  if (event.type === 'inbox.received' || event.type === 'news.ingested') {
+    return officeReplaySummary(event, t)
+  }
+  return eventLabel(event, t)
+}
+
 function eventDetail(event: AgentRuntimeEvent): string | null {
   const payload = event.payload
   if (event.type === 'runtime.turn.text') {
@@ -134,7 +141,7 @@ function eventDetail(event: AgentRuntimeEvent): string | null {
   }
   if (event.type === 'runtime.turn.error') return payload.message ?? payload.error ?? null
   if (event.type === 'dev.sonner_test') return payload.message ?? null
-  if (event.type === 'inbox.received') return payload.summary ?? null
+  if (event.type === 'inbox.received') return payload.summary ?? payload.title ?? null
   if (event.type === 'news.ingested') return payload.title ?? null
   if (event.type === 'runtime.stopped' && payload.assistantText) {
     return officeRuntimeDialogue(payload.assistantText)
@@ -635,6 +642,12 @@ export function OfficeRuntimeSection({
             const event = beat.event
             const kind = officeLogAssetKind(event.type)
             const active = event.seq === selectedEvent.seq
+            const typeLabel = eventLabel(event, t)
+            const indexTitle = eventIndexTitle(event, t)
+            const hasContentTitle = indexTitle !== typeLabel
+            const indexFullTitle = hasContentTitle
+              ? eventDetail(event)?.replace(/\s+/g, ' ').trim()
+              : null
             return (
               <li key={event.seq}>
                 <button
@@ -657,7 +670,12 @@ export function OfficeRuntimeSection({
                   <img src={OFFICE_LOG_ASSETS[kind]} alt="" aria-hidden style={officePixelImg} />
                   <span className="oa-office-runtime__index-copy">
                     <span className="oa-office-runtime__index-primary">
-                      <strong>{eventLabel(event, t)}</strong>
+                      <strong title={hasContentTitle ? indexFullTitle ?? indexTitle : undefined}>
+                        {hasContentTitle && (
+                          <span className="sr-only">{typeLabel}: </span>
+                        )}
+                        {indexTitle}
+                      </strong>
                       <time dateTime={new Date(event.ts).toISOString()}>{formatRelativeTime(event.ts)}</time>
                     </span>
                     <span className="oa-office-runtime__index-meta">

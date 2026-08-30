@@ -4755,6 +4755,28 @@ Filing-cabinet record identity follow-up (2026-08-31):
   and 5,186 tests (one file and nine tests skipped); the production UI build passed with only the existing ports fallback
   and large-chunk advisory.
 
+Service-journal content identity follow-up (2026-08-31):
+
+- Followed a genuinely fresh News signal through the Live floor: the service `!`, auto-route panel, destination pointer,
+  arrival, exact News channel, and #5098 selection all worked. The journal itself exposed the next completion gap. Its
+  50 News rows mostly read `News added`; same-source items from the same hour were distinguishable only by internal
+  sequence numbers. Inbox had the same generic `Inbox received` index pattern.
+- Compared adding a taller preview line, treating sequence numbers as the record identity, and promoting service content
+  into the existing primary row. Chose content-first indexing. The News or Inbox tab already supplies category context,
+  so the one-line primary slot should answer what happened while source, relative time, and sequence remain metadata.
+- News headlines and Inbox summaries now become the visible journal-row title in both their family channel and Overview.
+  Agent story beats keep their authored event labels and grouping. Long service content reuses the existing normalized
+  180-character excerpt and one-line clipping; its full value is available as a pointer title. A visually hidden event
+  label preserves `News added` / `Inbox received` semantics in each row's accessible name and the detail header retains
+  the event type explicitly.
+- Real-browser acceptance replaced the repeated #5098/#5097 `News added` rows with their Trump/NBC and Uniqlo headlines;
+  six visible rows were immediately distinguishable without increasing row height. Arrow Down selected the Uniqlo row
+  and updated the detail pane to the same full headline. Arrow Left moved into Inbox, where six real deliveries exposed
+  their report summaries instead of a repeated generic label. The window then closed to a clean Live floor. Focused
+  Runtime tests passed all 17 cases. Root and UI TypeScript passed; the full suite passed all 618 test files and 5,186
+  tests (one file and nine tests skipped); the production UI build passed with only the existing ports fallback and
+  large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

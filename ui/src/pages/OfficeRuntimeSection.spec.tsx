@@ -354,12 +354,15 @@ describe('OfficeRuntimeSection', () => {
 
     await userEvent.click(screen.getByRole('tab', { name: /Inbox\s*1/ }))
     expect(screen.getByRole('list', { name: 'Activity log · Inbox' }).children).toHaveLength(1)
-    expect(screen.getByText('Agent report')).toBeTruthy()
+    expect(screen.getAllByText('Agent report')).toHaveLength(2)
     expect(screen.queryByText('Market headline')).toBeNull()
 
     await userEvent.click(screen.getByRole('tab', { name: /News\s*1/ }))
     expect(screen.getByRole('list', { name: 'Activity log · News' }).children).toHaveLength(1)
-    expect(screen.getByText('Market headline')).toBeTruthy()
+    expect(screen.getAllByText('Market headline')).toHaveLength(2)
+    const newsRow = screen.getByRole('button', { name: /News added:\s*Market headline.*#0004/i })
+    expect(newsRow.querySelector('strong')?.getAttribute('title')).toBe('Market headline')
+    expect(newsRow.querySelector('.sr-only')?.textContent).toBe('News added: ')
 
     await userEvent.click(screen.getByRole('tab', { name: /Agent\s*2/ }))
     expect(screen.getByRole('list', { name: 'Activity log · Agent' }).children).toHaveLength(2)
@@ -405,7 +408,7 @@ describe('OfficeRuntimeSection', () => {
     expect(screen.getByRole('list', { name: 'Activity log · Inbox' }).children).toHaveLength(2)
     expect(screen.getByRole('button', { name: /Inbox received.*#0007/i }).getAttribute('aria-pressed'))
       .toBe('true')
-    expect(screen.getByText('Requested dispatch')).toBeTruthy()
+    expect(screen.getAllByText('Requested dispatch')).toHaveLength(2)
     expect(screen.queryByText('Market headline')).toBeNull()
 
     const backToRecords = screen.getByRole('button', { name: 'Back to records' })
@@ -623,7 +626,7 @@ describe('OfficeRuntimeSection', () => {
       .not.toBeNull()
     expect(screen.getByRole('button', { name: /News added.*#0002/i }).getAttribute('aria-pressed'))
       .toBe('true')
-    expect(screen.getByText('Market opens')).toBeTruthy()
+    expect(screen.getAllByText('Market opens')).toHaveLength(2)
   })
 
   it('opens the complete family when replay leaves the balanced All overview', async () => {
@@ -660,7 +663,7 @@ describe('OfficeRuntimeSection', () => {
     expect(screen.getByTestId('runtime-log').hasAttribute('data-compact')).toBe(false)
     expect(screen.getByRole('button', { name: /News added.*#0060/i }).getAttribute('aria-pressed'))
       .toBe('true')
-    expect(screen.getByText('News 60')).toBeTruthy()
+    expect(screen.getAllByText('News 60')).toHaveLength(2)
   })
 
   it('presents runtime outcomes as player-facing activity language', async () => {
@@ -784,6 +787,6 @@ describe('OfficeRuntimeSection', () => {
     expect(screen.getByRole('tab', { name: /News\s*1/ })).toBeTruthy()
 
     await userEvent.click(screen.getByRole('tab', { name: /News\s*1/ }))
-    expect(screen.getByText('Only headline')).toBeTruthy()
+    expect(screen.getAllByText('Only headline')).toHaveLength(2)
   })
 })
