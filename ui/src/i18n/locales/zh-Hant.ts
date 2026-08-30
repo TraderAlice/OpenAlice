@@ -1967,6 +1967,7 @@ export const zhHant: Resources = {
     surface: '來源',
     deskDrawers: '工位抽屜',
     openSession: '打開 Session',
+    reviewActivity: '查看活動',
     showFullTitle: '展開完整標題',
     collapseTitle: '收起標題',
     showFullReport: '展開完整報告',

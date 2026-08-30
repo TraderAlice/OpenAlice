@@ -106,6 +106,7 @@ const OFFICE_PROMPT_SIGN_HALF_HEIGHT = 32
 export type OfficeLogOrigin =
   | 'menu'
   | 'operations'
+  | 'employee'
   | 'floor-terminal'
   | 'inbox-service'
   | 'news-service'

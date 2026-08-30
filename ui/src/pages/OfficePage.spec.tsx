@@ -299,6 +299,50 @@ describe('OfficePage localization', () => {
     expect(await screen.findByRole('dialog', { name: /Codex/ })).toBeTruthy()
   })
 
+  it('opens a failed coworker activity at its last event and returns to the Agent file', async () => {
+    officeFloorMock.mockReturnValue({
+      ...defaultOfficeFloor(),
+      building: {
+        ...defaultOfficeFloor().building,
+        lastSeq: 42,
+        offices: [{
+          ...defaultOfficeFloor().building.offices[0],
+          employees: [{
+            resumeId: 'resume-grok-failed',
+            agent: 'grok',
+            name: 'g20',
+            title: 'Inspect failed Office work',
+            mood: 'failed' as const,
+            awake: false,
+            surface: 'headless' as const,
+            bubble: null,
+            lastSeq: 37,
+            lastInteractionAt: 1,
+            drawers: [],
+          }],
+        }],
+      },
+    })
+
+    render(<OfficePage />)
+
+    await userEvent.click(screen.getByTestId('office-desk-resume-grok-failed'))
+    const reviewActivity = await screen.findByRole('button', { name: '查看活动' })
+    expect(document.activeElement).toBe(reviewActivity)
+    await userEvent.keyboard('{Enter}')
+
+    const runtime = screen.getByTestId('office-runtime-section')
+    expect(runtime.dataset.channel).toBe('agent')
+    expect(runtime.dataset.selectedSeq).toBe('37')
+    expect(acknowledgeMock).toHaveBeenCalledWith('agent')
+
+    await userEvent.keyboard('{Escape}')
+    expect(screen.getByRole('dialog', { name: /Grok/ })).toBeTruthy()
+    await vi.waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: '查看活动' }))
+    })
+  })
+
   it('localizes the Office HUD and opens logs on request', async () => {
     const { container } = render(<OfficePage />)
 

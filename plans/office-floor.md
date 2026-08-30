@@ -4616,6 +4616,26 @@ Powered-down outcome handoff follow-up (2026-08-31):
   tests (one file and nine tests skipped); the production UI build passed with only the existing ports fallback and
   large-chunk advisory.
 
+Outcome-to-evidence action follow-up (2026-08-31):
+
+- Followed the newly visible failed emote on real G20 from the Live floor. Clicking the desk correctly auto-walked and
+  opened the Agent File, but the file reduced the problem to `The last run needs attention.` and offered only
+  `Open session`. The player could see the abnormal NPC yet had to leave Office and rediscover the reason elsewhere.
+- Compared copying failure payloads into the floor projection, lengthening the generic dialogue, and linking the Agent
+  File back to the product Activity Log that already owns structured evidence. Chose the log link: powered-down
+  `failed`, `waiting`, and held `review` files with a valid `lastSeq` gain a secondary `Review activity` command beside
+  the still-primary `Open session`; quiet and currently working files retain the single full-width command.
+- The new command opens the Agent channel at that exact employee sequence and preserves the Agent File underneath it.
+  Closing Activity Log restores both the file and focus to `Review activity`, so investigation behaves like an RPG
+  submenu rather than a one-way route. Enter/Space, pointer, Tab/Shift-Tab, roster-origin Back, and the existing fixed
+  command row remain deterministic; all four Office locales own the new action label.
+- Real-browser acceptance followed G20's red failed emote to its file, pressed Enter on the focused secondary command,
+  and landed on `Task failed #4984`. The detail identified Grok Analyst, `grok · g20`, the exact Assignment, `headless`
+  Surface, Failed Status, and output summary. Escape restored the same Agent File with `Review activity` focused.
+- Focused Agent-file/style/Page suites passed 25 tests. Root and UI TypeScript passed; the full suite passed all 618 test
+  files and 5,183 tests (one file and nine tests skipped); the production UI build passed with only the existing ports
+  fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

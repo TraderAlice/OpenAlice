@@ -153,6 +153,8 @@ export function OfficePage() {
     requestAnimationFrame(() => {
       if (origin === 'operations') {
         document.getElementById('office-operations-board')?.focus()
+      } else if (origin === 'employee') {
+        document.querySelector<HTMLElement>('.oa-office-inspect__activity')?.focus()
       } else if (origin === 'floor-terminal') {
         document.getElementById('office-floor-terminal')?.focus()
       } else if (origin === 'inbox-service' || origin === 'news-service') {
@@ -429,6 +431,21 @@ export function OfficePage() {
                 coworkerAsset={selectedCoworkerAsset}
                 roomName={selectedSeat.roomName}
                 onOpen={() => openEmployee(selectedSeat.office.workspace.id, selectedSeat.employee)}
+                onReviewActivity={selectedSeat.employee.lastSeq > 0 && (
+                  selectedSeat.employee.mood === 'failed'
+                  || selectedSeat.employee.mood === 'waiting'
+                  || selectedSeat.employee.mood === 'review'
+                )
+                  ? () => {
+                    productActivity.acknowledge('agent')
+                    setLogView({
+                      origin: 'employee',
+                      channel: 'agent',
+                      focusSeq: selectedSeat.employee.lastSeq,
+                    })
+                    setReplayPanelOpen(false)
+                  }
+                  : undefined}
                 onOpenDrawer={(item) => openDrawer(selectedSeat.office.workspace.id, selectedSeat.employee, item)}
                 onClose={closeEmployee}
                 returnToRoster={employeeOriginRef.current.kind === 'roster'}

@@ -1959,6 +1959,7 @@ export const zh: Resources = {
     surface: '来源',
     deskDrawers: '工位抽屉',
     openSession: '打开 Session',
+    reviewActivity: '查看活动',
     showFullTitle: '展开完整标题',
     collapseTitle: '收起标题',
     showFullReport: '展开完整报告',

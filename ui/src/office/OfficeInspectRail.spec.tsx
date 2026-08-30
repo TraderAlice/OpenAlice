@@ -155,12 +155,14 @@ describe('OfficeInspectRail', () => {
     expect(screen.getByText('headless')).toBeTruthy()
   })
 
-  it('keeps a stopped failure actionable while preserving asleep power state', () => {
+  it('keeps a stopped failure actionable while preserving asleep power state', async () => {
+    const onReviewActivity = vi.fn()
     render(
       <OfficeInspectRail
         employee={{ ...employee, awake: false, mood: 'failed', bubble: null, surface: 'headless' }}
         roomName="Chat"
         onOpen={vi.fn()}
+        onReviewActivity={onReviewActivity}
         onOpenDrawer={vi.fn()}
         onClose={vi.fn()}
       />,
@@ -171,6 +173,17 @@ describe('OfficeInspectRail', () => {
     expect(status.getAttribute('data-mood')).toBe('failed')
     expect(status.getAttribute('data-power')).toBe('asleep')
     expect(screen.getByTestId('office-inspect').dataset.awake).toBe('false')
+    const reviewActivity = screen.getByRole('button', { name: 'Review activity' })
+    expect(reviewActivity.querySelector('img')?.getAttribute('src'))
+      .toBe('/office/hud/occupancy-log-v2.png')
+    expect(document.activeElement).toBe(reviewActivity)
+    await userEvent.keyboard('{Enter}')
+    await userEvent.keyboard(' ')
+    expect(onReviewActivity).toHaveBeenCalledTimes(2)
+    await userEvent.keyboard('{Tab}')
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Open session' }))
+    await userEvent.keyboard('{Shift>}{Tab}{/Shift}')
+    expect(document.activeElement).toBe(reviewActivity)
   })
 
   it('collapses a long Session title without moving the primary commands', async () => {

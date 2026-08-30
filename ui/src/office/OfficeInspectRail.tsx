@@ -21,6 +21,7 @@ export function OfficeInspectRail({
   coworkerAsset,
   roomName,
   onOpen,
+  onReviewActivity,
   onOpenDrawer,
   onClose,
   returnToRoster = false,
@@ -30,6 +31,7 @@ export function OfficeInspectRail({
   coworkerAsset?: OfficeCoworkerSpriteAsset
   roomName?: string
   onOpen: () => void
+  onReviewActivity?: () => void
   onOpenDrawer: (item: OfficeDrawerItem) => void
   onClose?: () => void
   returnToRoster?: boolean
@@ -43,6 +45,7 @@ export function OfficeInspectRail({
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const profileRef = useRef<HTMLDivElement>(null)
   const titleToggleRef = useRef<HTMLButtonElement>(null)
+  const reviewActivityRef = useRef<HTMLButtonElement>(null)
   const openButtonRef = useRef<HTMLButtonElement>(null)
   const drawerListRef = useRef<HTMLUListElement>(null)
   const drawerButtons = () => Array.from(
@@ -108,7 +111,7 @@ export function OfficeInspectRail({
             if (event.key !== 'Tab' || !employee) return
             event.preventDefault()
             if (event.shiftKey) (focusedDrawerButton() ?? openButtonRef.current)?.focus()
-            else (titleToggleRef.current ?? openButtonRef.current)?.focus()
+            else (titleToggleRef.current ?? reviewActivityRef.current ?? openButtonRef.current)?.focus()
           }}
         >
           <OfficeWindowControlGlyph kind={returnToRoster ? 'back' : 'close'} />
@@ -160,7 +163,7 @@ export function OfficeInspectRail({
                       if (event.key !== 'Tab') return
                       event.preventDefault()
                       if (event.shiftKey) closeButtonRef.current?.focus()
-                      else openButtonRef.current?.focus()
+                      else (reviewActivityRef.current ?? openButtonRef.current)?.focus()
                     }}
                   >
                     {titleExpanded ? t('office.collapseTitle') : t('office.showFullTitle')}
@@ -293,11 +296,37 @@ export function OfficeInspectRail({
         )}
       </div>
       {employee && (
-        <div className="oa-office-inspect__actions">
+        <div
+          className="oa-office-inspect__actions"
+          data-has-activity={Boolean(onReviewActivity) || undefined}
+        >
+          {onReviewActivity && (
+            <button
+              type="button"
+              ref={reviewActivityRef}
+              autoFocus={!returnToRoster}
+              className="oa-office-inspect__activity"
+              onClick={onReviewActivity}
+              onKeyDown={(event) => {
+                if (isOfficeConfirmKey(event.key)) {
+                  event.preventDefault()
+                  onReviewActivity()
+                  return
+                }
+                if (event.key !== 'Tab') return
+                event.preventDefault()
+                if (event.shiftKey) (titleToggleRef.current ?? closeButtonRef.current)?.focus()
+                else openButtonRef.current?.focus()
+              }}
+            >
+              {t('office.reviewActivity')}
+              <img src={OFFICE_HUD_ASSETS.occupancyLog} alt="" aria-hidden style={officePixelImg} />
+            </button>
+          )}
           <button
             type="button"
             ref={openButtonRef}
-            autoFocus={!returnToRoster}
+            autoFocus={!returnToRoster && !onReviewActivity}
             className="oa-office-inspect__open"
             onClick={onOpen}
             onKeyDown={(event) => {
@@ -308,7 +337,9 @@ export function OfficeInspectRail({
               }
               if (event.key !== 'Tab' || !onClose) return
               event.preventDefault()
-              if (event.shiftKey) (titleToggleRef.current ?? closeButtonRef.current)?.focus()
+              if (event.shiftKey) {
+                (reviewActivityRef.current ?? titleToggleRef.current ?? closeButtonRef.current)?.focus()
+              }
               else (focusedDrawerButton() ?? closeButtonRef.current)?.focus()
             }}
           >

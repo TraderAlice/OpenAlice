@@ -34,6 +34,9 @@ describe('Office Agent-file style contract', () => {
     expect(css).toMatch(
       /\.oa-office-inspect__actions\s*\{[\s\S]*?grid-column: 1 \/ -1;[\s\S]*?flex: none/,
     )
+    expect(css).toMatch(
+      /\.oa-office-inspect__actions\[data-has-activity="true"\]\s*\{[^}]*grid-template-columns: minmax\(0, 0\.9fr\) minmax\(0, 1\.1fr\)/s,
+    )
   })
 
   it('keeps callsigns short, clamps optional Assignments, and uses a simple DOM-owned close mark', () => {

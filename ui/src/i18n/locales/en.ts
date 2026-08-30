@@ -1992,6 +1992,7 @@ export const en = {
     surface: 'Surface',
     deskDrawers: 'Desk drawers',
     openSession: 'Open session',
+    reviewActivity: 'Review activity',
     showFullTitle: 'Show full title',
     collapseTitle: 'Collapse title',
     showFullReport: 'Show full report',

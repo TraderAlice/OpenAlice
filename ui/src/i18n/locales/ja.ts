@@ -1960,6 +1960,7 @@ export const ja: Resources = {
     surface: 'サーフェス',
     deskDrawers: '机の引き出し',
     openSession: 'Session を開く',
+    reviewActivity: 'アクティビティを確認',
     showFullTitle: 'タイトルをすべて表示',
     collapseTitle: 'タイトルを折りたたむ',
     showFullReport: 'レポートをすべて表示',
