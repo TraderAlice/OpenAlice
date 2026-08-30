@@ -4341,6 +4341,25 @@ Persistent control-reference follow-up (2026-08-31):
   UI TypeScript passed, the full suite passed all 617 test files and 5,176 tests (one file and nine tests skipped), and
   the production UI build passed with only the existing ports fallback and large-chunk advisory.
 
+Walkable spawn-inlay follow-up (2026-08-31):
+
+- Replayed employee approach, auto-walk, Agent File, close, turning-in-place, and dense-pod target changes against the
+  real 22-Session floor. Those interactions retained one readable target and matched the established GBA field grammar;
+  a suspected day-to-night first-frame flash did not reproduce across a hard reload and was not converted into code.
+- The stable world inconsistency was the central spawn marker: an 80px brass-ring asset read as a raised machine, but
+  intentionally had no collision and allowed Alice to cross it. Compared making it a new obstacle and interaction,
+  dimming the same raised silhouette with CSS, and replacing it with an authored walkable floor inlay. Chose the inlay:
+  the marker has spawn/reset meaning but no product action, so its visual affordance should tell the same truth.
+- Used the built-in image generator with the existing compass as the edit reference. Rejected the first over-detailed
+  stone-and-brass result, then generated and alpha-checked `spawn-inlay-v1.png`: a shadowless teal mosaic with one thin
+  brass perimeter. It ships on an 80px RGBA canvas, renders at 64px and 0.76 opacity, and replaces both the registry
+  concept and the superseded `spawn-compass-v2.png` asset rather than carrying a compatibility alias.
+- Real-browser acceptance moved Alice away to inspect the full emblem, then crossed it from x528 through x480 to x408
+  in six manual beats with `data-bumped=false` throughout. Focused furniture, Building, and responsive-style suites
+  passed 48 tests. Root and UI TypeScript passed; the production UI build passed. The first full test run had one
+  unrelated WebPi compaction timing failure, which passed alone; a fresh full run then passed all 617 test files and
+  5,176 tests (one file and nine tests skipped).
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

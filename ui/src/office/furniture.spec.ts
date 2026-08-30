@@ -32,7 +32,7 @@ describe('OFFICE_FURNITURE', () => {
       personnelBoard: [48, 48],
       operationsBoard: [176, 132],
       workspaceSign: [264, 64],
-      spawnCompass: [80, 80],
+      spawnInlay: [80, 80],
       routeFootsteps: [12, 12],
       routeDestination: [20, 20],
       collisionImpact: [96, 24],

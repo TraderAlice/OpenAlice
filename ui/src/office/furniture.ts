@@ -25,7 +25,7 @@ export const OFFICE_FURNITURE = {
     personnelBoard: '/office/furniture/personnel-board-v2.png',
     operationsBoard: '/office/furniture/operations-board-v2.png',
     workspaceSign: '/office/furniture/workspace-sign-v2.png',
-    spawnCompass: '/office/furniture/spawn-compass-v2.png',
+    spawnInlay: '/office/furniture/spawn-inlay-v1.png',
     routeFootsteps: '/office/furniture/route-footsteps-v1.png',
     routeDestination: '/office/furniture/route-destination-v1.png',
     collisionImpact: '/office/furniture/collision-impact-v1.png',

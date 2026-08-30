@@ -4126,12 +4126,13 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
     );
 }
 
-.oa-office-spawn-compass {
+.oa-office-spawn-inlay {
   position: absolute;
   z-index: 1;
-  width: 80px;
-  height: 80px;
+  width: 64px;
+  height: 64px;
   object-fit: contain;
+  opacity: 0.76;
   pointer-events: none;
   transform: translate(-50%, -50%);
 }

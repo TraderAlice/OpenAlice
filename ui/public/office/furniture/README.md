@@ -59,7 +59,8 @@ machine light instead of dimming the whole Office scene.
 - `personnel-board-v2.png` — interactive roster prop for groups with more than four Sessions
 - `operations-board-v2.png` — floor landmark that opens the live occupancy log and replay
 - `workspace-sign-v2.png` — blank physical placard behind live Workspace, Harness, and agent text
-- `spawn-compass-v2.png` — flush four-direction Operations medallion beneath Alice's neutral reset point
+- `spawn-inlay-v1.png` — flat four-direction floor mosaic beneath Alice's neutral reset point; its thin brass line,
+  muted teal field, and shadowless silhouette read as walkable inlay rather than a raised interactive prop
 - `route-footsteps-v1.png` — generated 12px low-contrast floor breadcrumbs for click-to-interact paths
 - `route-destination-v1.png` — generated 20px quiet destination diamond for click-to-interact routes
 - `collision-impact-v1.png` — generated four-frame blocked-movement sparkle at native 24px cells

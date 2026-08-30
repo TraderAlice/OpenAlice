@@ -1581,11 +1581,11 @@ export function OfficeBuilding({
               )}
             </button>
             <img
-              src={OFFICE_FURNITURE.generated.spawnCompass}
+              src={OFFICE_FURNITURE.generated.spawnInlay}
               alt=""
               aria-hidden
-              data-testid="office-spawn-compass"
-              className="oa-office-spawn-compass"
+              data-testid="office-spawn-inlay"
+              className="oa-office-spawn-inlay"
               style={{
                 ...officePixelImg,
                 left: mapLayout.alice.x,
