@@ -215,10 +215,14 @@ export function OfficeBuilding({
   const manualMoveHasRepeatedRef = useRef(false)
   const manualMoveTickRef = useRef<() => void>(() => {})
   const routeTimerRef = useRef<number | null>(null)
+  const routeContinuationRef = useRef<(() => void) | null>(null)
+  const routeContinuationDelayRef = useRef(0)
+  const floorInteractionSuspendedRef = useRef(floorInteractionSuspended)
   const departureTimerRef = useRef<number | null>(null)
   const routeGenerationRef = useRef(0)
   const replayFocusKeyRef = useRef<string | null>(null)
   const restoreFloorFocusRef = useRef(true)
+  floorInteractionSuspendedRef.current = floorInteractionSuspended
   const recentGroups = useMemo(
     () => building.offices.filter((office) => !office.sleeping),
     [building.offices],
@@ -711,8 +715,36 @@ export function OfficeBuilding({
     routeGenerationRef.current += 1
     if (routeTimerRef.current != null) window.clearTimeout(routeTimerRef.current)
     routeTimerRef.current = null
+    routeContinuationRef.current = null
+    routeContinuationDelayRef.current = 0
     setRouteTargetId(null)
     setRouteTrail([])
+  }
+  function pauseAutoWalk() {
+    if (routeTimerRef.current != null) window.clearTimeout(routeTimerRef.current)
+    routeTimerRef.current = null
+  }
+  function scheduleAutoWalk(continuation: () => void, delay: number) {
+    if (routeTimerRef.current != null) window.clearTimeout(routeTimerRef.current)
+    routeTimerRef.current = null
+    routeContinuationRef.current = continuation
+    routeContinuationDelayRef.current = delay
+    if (floorInteractionSuspendedRef.current) return
+    routeTimerRef.current = window.setTimeout(() => {
+      routeTimerRef.current = null
+      if (
+        floorInteractionSuspendedRef.current
+        || routeContinuationRef.current !== continuation
+      ) return
+      routeContinuationRef.current = null
+      routeContinuationDelayRef.current = 0
+      continuation()
+    }, delay)
+  }
+  function resumeAutoWalk() {
+    const continuation = routeContinuationRef.current
+    if (!continuation || routeTimerRef.current != null || floorInteractionSuspendedRef.current) return
+    scheduleAutoWalk(continuation, routeContinuationDelayRef.current)
   }
   const requestTargetInteraction = (
     targetId: string,
@@ -738,9 +770,8 @@ export function OfficeBuilding({
       setAliceDirection(path.facing)
       setAliceWalking(false)
       setRouteTargetId(null)
-      routeTimerRef.current = window.setTimeout(() => {
+      scheduleAutoWalk(() => {
         if (routeGenerationRef.current !== generation) return
-        routeTimerRef.current = null
         setRouteTrail([])
         const action = options.activate ?? (() => activateTarget(target))
         action()
@@ -766,10 +797,14 @@ export function OfficeBuilding({
       }
       stepIndex += 1
       setRouteTrail(stepIndex < path.steps.length ? path.steps.slice(stepIndex) : [step])
-      routeTimerRef.current = window.setTimeout(advance, reducedMotion ? 0 : 96)
+      scheduleAutoWalk(advance, reducedMotion ? 0 : 96)
     }
     advance()
   }
+  useEffect(() => {
+    if (floorInteractionSuspended) pauseAutoWalk()
+    else resumeAutoWalk()
+  }, [floorInteractionSuspended])
   const movementForDirections = (
     directions: OfficeAliceDirection[],
     lastDirection?: OfficeAliceDirection | null,
@@ -941,6 +976,7 @@ export function OfficeBuilding({
     if (walkTimerRef.current != null) window.clearTimeout(walkTimerRef.current)
     routeGenerationRef.current += 1
     if (routeTimerRef.current != null) window.clearTimeout(routeTimerRef.current)
+    routeContinuationRef.current = null
     if (departureTimerRef.current != null) window.clearTimeout(departureTimerRef.current)
     stopManualMove()
     stopTouchMove()
@@ -1100,7 +1136,7 @@ export function OfficeBuilding({
             open={menuOpen}
             onOpenChange={(open) => {
               if (open) {
-                cancelAutoWalk()
+                pauseAutoWalk()
                 stopTouchMove()
                 setPanning(false)
               }

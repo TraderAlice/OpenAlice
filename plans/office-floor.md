@@ -4262,6 +4262,22 @@ Dense-pod interaction-identity follow-up (2026-08-30):
   suite passed all 617 test files and 5,174 tests (one file and nine tests skipped), and the production UI build passed
   with only the existing ports fallback and large-chunk advisories.
 
+Paused-world route-continuity follow-up (2026-08-30):
+
+- Started a long real route to the Floor terminal and opened the game menu mid-walk. The world correctly stopped
+  moving behind its dimmed layer, but opening the menu permanently canceled the target, trail, and pending activation;
+  closing it left Alice stranded halfway through the player's explicit command.
+- Compared retaining the cancellation, polling the suspension state from every 96ms route tick, and giving the route
+  controller an explicit next-beat continuation. Chose the continuation: the menu and owning Office windows clear the
+  active timer while preserving the exact remaining path and final action, then reschedule that beat only after the
+  floor is interactive again. Manual movement, Escape, a new target, Replay exit, and map reframing still cancel.
+- Real-browser acceptance froze Alice at x648/y336 for 850ms with the menu open and kept the Floor terminal route
+  active; closing resumed her to x768/y336. Activity Log then froze her at x792/y336 for another 850ms; closing it
+  resumed the same route, reached x816/y192, cleared the route, and completed the original terminal interaction. The
+  focused Building suite passed 20 tests. Root and UI TypeScript passed, the full suite passed all 617 test files and
+  5,174 tests (one file and nine tests skipped), and the production UI build passed with only the existing ports
+  fallback and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

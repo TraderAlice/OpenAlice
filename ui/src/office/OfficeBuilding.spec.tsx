@@ -855,6 +855,20 @@ describe('OfficeBuilding', () => {
       expect(`${alice.style.left}:${alice.style.top}`).toBe(routePosition)
       expect(sign.dataset.route).toBe('true')
       expect(screen.getByTestId('office-route-trail')).toBeTruthy()
+
+      const menuTrigger = screen.getByRole('button', { name: 'Menu' })
+      fireEvent.click(menuTrigger)
+      expect(screen.getByTestId('office-floor').dataset.menuOpen).toBe('true')
+      act(() => vi.advanceTimersByTime(1_000))
+      expect(`${alice.style.left}:${alice.style.top}`).toBe(routePosition)
+      expect(sign.dataset.route).toBe('true')
+      expect(screen.getByTestId('office-route-trail')).toBeTruthy()
+      fireEvent.click(menuTrigger)
+      expect(screen.queryByRole('menu', { name: 'Menu' })).toBeNull()
+      act(() => vi.advanceTimersByTime(96))
+      expect(`${alice.style.left}:${alice.style.top}`).not.toBe(routePosition)
+      expect(sign.dataset.route).toBe('true')
+
       for (let index = 0; index < 100 && !screen.queryByTestId('office-departure'); index += 1) {
         act(() => vi.advanceTimersToNextTimer())
       }
