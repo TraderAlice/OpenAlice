@@ -24,6 +24,7 @@ describe('OFFICE_HUD_ASSETS', () => {
     expect(OFFICE_HUD_ASSETS.windowBack).toBe('/office/hud/window-back-v2.png')
     expect(OFFICE_HUD_ASSETS.journalCursor).toBe('/office/hud/journal-cursor-v1.png')
     expect(OFFICE_HUD_ASSETS.replayLatch).toBe('/office/hud/replay-latch-v1.png')
+    expect(OFFICE_HUD_ASSETS.replayVisitor).toBe('/office/hud/replay-visitor-v1.png')
 
     for (const [name, url] of Object.entries(OFFICE_HUD_ASSETS)) {
       const bytes = readFileSync(resolve(publicRoot, url.replace(/^\//, '')))
@@ -34,7 +35,7 @@ describe('OFFICE_HUD_ASSETS', () => {
         ? 96
         : name === 'actionButton'
           ? 72
-          : name === 'journalCursor' || name === 'replayLatch'
+          : name === 'journalCursor' || name === 'replayLatch' || name === 'replayVisitor'
             ? 32
             : 48
       expect(bytes.readUInt32BE(16)).toBe(expectedSize)

@@ -82,6 +82,8 @@ describe('Office responsive style contract', () => {
     expect(css).toMatch(/\.oa-office-route-target-pointer\s*\{[\s\S]*?width: 20px;[\s\S]*?height: 20px;[\s\S]*?opacity: 0\.78;/)
     expect(css).not.toContain('@keyframes oa-office-route-step')
     expect(css).not.toContain('@keyframes oa-office-route-target-pointer')
+    expect(css).toMatch(/\.oa-office-replay-visitor\s*\{[\s\S]*?width: 20px;[\s\S]*?height: 20px;[\s\S]*?translate\(-50%, -46px\);/)
+    expect(css).not.toContain('@keyframes oa-office-replay-visitor')
   })
 
   it('anchors normalized coworker emotes beside the character instead of over room signs', () => {

@@ -1278,6 +1278,20 @@ export function OfficeBuilding({
                 />
               </span>
             </div>
+            {replaySeq !== null && (
+              <span
+                className="oa-office-replay-visitor"
+                data-testid="office-replay-visitor"
+                aria-hidden="true"
+                style={{
+                  left: alice.x,
+                  top: alice.y,
+                  zIndex: officeDepthAt(alice.y) + 1400,
+                }}
+              >
+                <img src={OFFICE_HUD_ASSETS.replayVisitor} alt="" style={officePixelImg} />
+              </span>
+            )}
             {collisionImpact && (
               <OfficeCollisionImpact
                 key={collisionImpact.serial}

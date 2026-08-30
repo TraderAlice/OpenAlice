@@ -14,4 +14,5 @@ export const OFFICE_HUD_ASSETS = {
   windowBack: '/office/hud/window-back-v2.png',
   journalCursor: '/office/hud/journal-cursor-v1.png',
   replayLatch: '/office/hud/replay-latch-v1.png',
+  replayVisitor: '/office/hud/replay-visitor-v1.png',
 } as const

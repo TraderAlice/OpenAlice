@@ -18,12 +18,13 @@ Live labels, button behavior, focus rings, and accessible names remain DOM-owned
 - `window-back-v2.png` — return from an Agent file to its originating team roster
 - `journal-cursor-v1.png` — selected-event pointer in the Occupancy log menu
 - `replay-latch-v1.png` — mechanical disclosure latch for the Occupancy replay deck
+- `replay-visitor-v1.png` — replay-only locator for the present-day Alice visitor
 
 All assets use `docs/assets/office/style-master-v1.png` as their visual reference.
 The command glyphs are separate transparent images so their silhouettes remain
 legible at UI size and their accessible labels stay DOM-owned. The generated
 masters are packaged onto native RGBA canvases with nearest-neighbor sampling and
 hard alpha. Command icons use 48x48 canvases; the primary touch action uses 72x72;
-the movement pad uses its exact 96x96 touch-control canvas; the journal cursor and
-replay latch use compact 32x32 canvases. Full-resolution
+the movement pad uses its exact 96x96 touch-control canvas; the journal cursor,
+replay latch, and replay visitor use compact 32x32 canvases. Full-resolution
 generated sources are not shipped.

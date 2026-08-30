@@ -79,6 +79,12 @@ describe('OfficeBuilding', () => {
 
     expect(screen.getByTestId('office-building').getAttribute('data-replay')).toBe('true')
     expect(screen.getByText('Replay floor · Seq 2')).toBeTruthy()
+    const replayVisitor = screen.getByTestId('office-replay-visitor')
+    const replayAlice = screen.getByRole('img', { name: 'Alice on the office map' })
+    expect(replayVisitor.querySelector('img')?.getAttribute('src'))
+      .toBe('/office/hud/replay-visitor-v1.png')
+    expect(replayVisitor.style.left).toBe(replayAlice.style.left)
+    expect(replayVisitor.style.top).toBe(replayAlice.style.top)
     expect(container.querySelector<HTMLImageElement>('.oa-office-hud__signal img')?.src)
       .toContain('/office/hud/occupancy-log-v2.png')
     expect(screen.getByLabelText('Replay floor. Move Alice to inspect the snapshot; use Operations board to review it or Live to return.')).toBeTruthy()
@@ -198,6 +204,7 @@ describe('OfficeBuilding', () => {
     expect(building.querySelector<HTMLImageElement>('.oa-office-quiet__radar img')?.src)
       .toContain('/office/hud/signal-receiver-v2.png')
     expect(building.querySelector('svg')).toBeNull()
+    expect(screen.queryByTestId('office-replay-visitor')).toBeNull()
   })
 
   it('combines held direction keys into an equal-speed diagonal walk', () => {

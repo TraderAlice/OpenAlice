@@ -3118,6 +3118,25 @@ Empty-cabinet command follow-up (2026-08-30):
   passing; one file and nine tests skipped), and the production build also passed; the existing direct-eval and
   large-chunk advisories are unchanged.
 
+Replay visitor visibility follow-up (2026-08-30):
+
+- Replayed real News event #2818 from the News Activity Log. The event beacon correctly found the News terminal, but
+  the retained live Alice position landed fully behind that terminal: her 48x56 sprite was present and moving at
+  depth 466 while the terminal covered it at depth 544. The replay HUD still taught movement, so the player received
+  a valid control with no visible avatar.
+- Compared lifting Alice above every prop, relocating her when replay starts, fading the selected prop, and marking the
+  present-day visitor separately from the historical snapshot. Chose the visitor marker: furniture keeps truthful
+  depth, replay does not rewrite player position, and a small persistent locator distinguishes Alice from the frozen
+  historical floor even when her body is occluded.
+- Added a generated 16-bit cyan-and-gold downward locator as a replay-only, noninteractive layer above scene depth. It
+  is static rather than pulsing, uses no text, and is absent from Live, keeping the already animated event beacon as
+  the sole attention-demanding replay cue.
+- Browser-replayed News #2818 after hot reload. Alice remained correctly occluded by the terminal, while the 20px
+  visitor marker rendered just above its edge at scene depth 1866, tracked Alice's exact map coordinates, and stayed
+  visually separate from the event's paper beacon. Focused building, HUD-asset, and responsive-style specs passed
+  (3 files / 31 tests). Root/UI TypeScript, the full 617-file Vitest run (5,135 passing; one file and nine tests
+  skipped), and the production build also passed; the existing direct-eval and large-chunk advisories are unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

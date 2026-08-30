@@ -3250,6 +3250,22 @@
   box-shadow: none;
 }
 
+.oa-office-replay-visitor {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  pointer-events: none;
+  transform: translate(-50%, -46px);
+  filter: drop-shadow(0 2px 0 color-mix(in srgb, var(--gba-ink) 30%, transparent));
+}
+
+.oa-office-replay-visitor img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 .oa-office-map-controls {
   position: absolute;
   right: 8px;
