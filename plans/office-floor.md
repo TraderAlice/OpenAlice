@@ -4918,6 +4918,28 @@ Adaptive spatial-dialogue prompt follow-up (2026-08-31):
   5,191 tests (one file and nine tests skipped); the production UI build passed with only the existing ports fallback
   and large-chunk advisory.
 
+Player-facing cabinet record names follow-up (2026-08-31):
+
+- Walked the real Live floor into Chat's Filing cabinet. Six of its twelve records triggered middle compaction, and the
+  first four visual plus accessible names remained machine slugs such as `office-live-state-qa-20260831`; the current
+  `office-live-state-qa ... -20260831` rendering preserved uniqueness but did not read like a game quest/file title.
+- Compared widening every record card, exposing the raw title only through a tooltip, and translating only obvious
+  machine slugs at the shared Office drawer-presentation boundary. Chose player-facing formatting. Width cannot make a
+  machine name feel authored, while tooltip-only meaning excludes touch and burdens keyboard discovery.
+- The chosen contract preserves already-authored natural-language labels, formats delimiter-only Issue/Report names as
+  title-like player copy, promotes common product/QA acronyms, removes redundant report extensions, and separates
+  compact YYYYMMDD/HHMM suffixes into readable date/time beats. Agent files and Filing cabinets consume the same title
+  function so visual copy and accessible action names remain identical.
+- Replaced the cabinet's legacy middle-splice renderer after real HMR validation showed it still produced
+  `Offic...2026...18:36`. Record cards now spend their existing vertical budget on a bounded two-line title; extreme
+  copy truncates only after the second line, while title attributes and action names retain the complete formatted name.
+- Real-browser acceptance reopened all twelve Chat records. The first six now read as authored names including
+  `Office Live State QA · 2026-08-31`, `Office Live Working QA · 2026-08-30 · 18:36`, and
+  `Office Navigation Playtest`. Arrow Right/Down moved through matching accessible names, and Escape restored focus to
+  the Chat cabinet. Focused drawer, cabinet, and Agent-file suites passed all 13 tests. Root and UI TypeScript passed;
+  the full suite passed all 620 test files and 5,192 tests (one file and nine tests skipped); the production UI build
+  passed with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

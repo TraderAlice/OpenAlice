@@ -206,10 +206,10 @@ describe('OfficeCabinetWindow', () => {
     const title = container.querySelector<HTMLElement>(
       '.oa-office-cabinet-window__record-copy strong',
     )
-    expect(title?.dataset.compacted).toBe('true')
-    expect(title?.textContent).toBe('office-live-state-qa…-20260831')
-    expect(title?.getAttribute('title')).toBe(longTitle)
-    expect(screen.getByRole('button', { name: /Open office-live-state-qa-20260831/ })).toBeTruthy()
+    expect(title?.dataset.compacted).toBeUndefined()
+    expect(title?.textContent).toBe('Office Live State QA · 2026-08-31')
+    expect(title?.getAttribute('title')).toBe('Office Live State QA · 2026-08-31')
+    expect(screen.getByRole('button', { name: /Open Office Live State QA · 2026-08-31/ })).toBeTruthy()
   })
 
   it('presents Inbox artifacts as deliveries instead of raw record ids', () => {

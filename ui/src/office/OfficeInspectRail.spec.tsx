@@ -71,7 +71,7 @@ describe('OfficeInspectRail', () => {
     const openSession = screen.getByRole('button', { name: 'Open session' })
     expect(openSession.querySelector('img')?.getAttribute('src'))
       .toBe('/office/hud/session-portal-v2.png')
-    const drawerExit = screen.getByRole('button', { name: /Open desk-note\.md, Report, .* in Workspace/ })
+    const drawerExit = screen.getByRole('button', { name: /Open Desk Note, Report, .* in Workspace/ })
     const handoffExit = screen.getByRole('button', { name: /Open handoff\.md, Report, .* in Workspace/ })
     expect(drawerExit.querySelector('img')?.getAttribute('src')).toBe('/office/hud/drawer-record-v2.png')
     expect(drawerExit.querySelector('.oa-office-drawer__destination img')?.getAttribute('src'))

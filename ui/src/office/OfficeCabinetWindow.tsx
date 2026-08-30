@@ -18,29 +18,6 @@ interface CabinetRecord {
   item: OfficeDrawerItem
 }
 
-const CABINET_TITLE_COMPACT_AT = 28
-const CABINET_TITLE_SUFFIX_BUDGET = 14
-
-function cabinetRecordTitleParts(title: string) {
-  if (title.length <= CABINET_TITLE_COMPACT_AT) return null
-  const datedSuffix = title.match(/(-\d{8}(?:-\d{4})?)$/)?.[1]
-  let suffix = datedSuffix ?? ''
-  if (!suffix) {
-    const tokens = Array.from(title.matchAll(/[-_.][^-_.\s]+/g))
-    for (let index = tokens.length - 1; index >= 0; index -= 1) {
-      const token = tokens[index]?.[0] ?? ''
-      if (suffix && token.length + suffix.length > CABINET_TITLE_SUFFIX_BUDGET) break
-      if (!suffix && token.length > CABINET_TITLE_SUFFIX_BUDGET) break
-      suffix = `${token}${suffix}`
-    }
-  }
-  if (!suffix || title.length - suffix.length < 8) suffix = title.slice(-10)
-  return {
-    leading: title.slice(0, -suffix.length),
-    trailing: suffix,
-  }
-}
-
 export function OfficeCabinetWindow({
   group,
   roomName,
@@ -175,7 +152,6 @@ export function OfficeCabinetWindow({
               const { employee, item } = record
               const key = recordKey(record)
               const title = officeDrawerTitle(item, t)
-              const titleParts = cabinetRecordTitleParts(title)
               const kind = officeDrawerKindLabel(item, t)
               const relativeTime = formatRelativeTime(item.at)
               return (
@@ -197,16 +173,9 @@ export function OfficeCabinetWindow({
                     <img src={OFFICE_HUD_ASSETS.drawerRecord} alt="" aria-hidden style={officePixelImg} />
                     <span className="oa-office-cabinet-window__record-copy">
                       <strong
-                        title={titleParts ? title : undefined}
-                        data-compacted={titleParts ? true : undefined}
+                        title={title.length > 28 ? title : undefined}
                       >
-                        {titleParts ? (
-                          <>
-                            <span data-title-leading>{titleParts.leading}</span>
-                            <i aria-hidden>…</i>
-                            <span data-title-trailing>{titleParts.trailing}</span>
-                          </>
-                        ) : title}
+                        {title}
                       </strong>
                       <small className="oa-office-cabinet-window__record-meta">
                         <b>{kind}</b>
