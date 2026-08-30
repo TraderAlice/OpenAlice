@@ -1828,7 +1828,7 @@ export const zhHant: Resources = {
     replayMapLabel: '重放樓層。移動 Alice 查看快照；使用營運面板回看，或返回直播。',
     replaySnapshot: '快照',
     replayLockedHint: '這是歷史快照。返回直播後才能使用。',
-    mapHint: '移動 · WASD / 方向鍵',
+    mapHint: '移動 · WASD / 方向鍵 · Shift 奔跑',
     touchControls: '移動 Alice',
     moveAliceUp: '向上移動 Alice',
     moveAliceRight: '向右移動 Alice',

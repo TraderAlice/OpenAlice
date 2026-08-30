@@ -3669,7 +3669,7 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
 
 .oa-office-map-controls__move {
   display: flex;
-  max-width: 220px;
+  max-width: 330px;
   align-items: center;
   gap: 5px;
   overflow: hidden;

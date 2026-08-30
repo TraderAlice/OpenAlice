@@ -4295,6 +4295,22 @@ Stable-world geometry ownership follow-up (2026-08-31):
   passed all 617 test files and 5,175 tests (one file and nine tests skipped), and the production UI build passed with
   only the existing ports fallback and large-chunk advisories.
 
+Collision-safe desktop sprint follow-up (2026-08-31):
+
+- Compared the current floor controls with Nintendo's Golden Sun GBA manual: Office already had diagonal walking,
+  pause, world examine/speak, confirm, and cancel equivalents, but large-floor manual traversal had only one precision
+  speed. Adding another on-screen B control would duplicate touch click-to-walk and increase the HUD's visual load.
+- Compared globally increasing movement, adding a touch/desktop B asset, and translating the optional run modifier to
+  desktop Shift. Chose Shift: ordinary movement remains a precise 24px beat, while sprint executes two independent
+  collision-checked substeps per beat. Ordered key chords are still rebased into one normalized 34x34 diagonal sprint,
+  and modifier release or window blur returns control to the ordinary pace without leaving sticky input state.
+- Real-browser acceptance measured x480 -> x504 for an ordinary right beat, x504 -> x552 for Shift+right, and
+  x552/y336 -> x586/y370 for Shift+right+down. Repeated sprint stopped at x912 with Alice's rendered right edge still
+  24px inside the map wall. The first-run hint was widened only after DOM QA found its new copy clipped at 216/309px;
+  the final plate measured 309/309px and still retires after the player moves. The focused Building suite passed 22
+  tests. Root and UI TypeScript passed, the full suite passed all 617 test files and 5,176 tests (one file and nine
+  tests skipped), and the production UI build passed with only the existing ports fallback and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

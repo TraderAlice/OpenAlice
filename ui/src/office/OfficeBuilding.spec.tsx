@@ -406,6 +406,51 @@ describe('OfficeBuilding', () => {
     }
   })
 
+  it('uses Shift to sprint through collision-safe normalized substeps', () => {
+    vi.useFakeTimers()
+    try {
+      render(
+        <OfficeBuilding
+          building={{
+            config: {
+              workspaceSleepAfterMs: 1,
+              harnessMinimumVisibleGroups: { chat: 0, 'auto-quant': 0, prediction: 0, other: 0 },
+            },
+            firstSeq: 0,
+            lastSeq: 0,
+            offices: [],
+          }}
+          onSelectEmployee={vi.fn()}
+          onOpenEmployee={vi.fn()}
+          onOpenWorkspace={vi.fn()}
+          onOpenFiles={vi.fn()}
+          onOpenRoster={vi.fn()}
+          onOpenLog={vi.fn()}
+        />,
+      )
+
+      expect(screen.getByText('MOVE · WASD / ARROWS · SHIFT RUN')).toBeTruthy()
+      const map = screen.getByTestId('office-floor')
+      const alice = screen.getByRole('img', { name: 'Alice on the office map' })
+      fireEvent.keyDown(map, { key: 'Shift' })
+      fireEvent.keyDown(map, { key: 'd', shiftKey: true })
+      expect(`${alice.style.left}:${alice.style.top}`).toBe('528px:336px')
+      fireEvent.keyDown(map, { key: 's', shiftKey: true })
+      expect(`${alice.style.left}:${alice.style.top}`).toBe('514px:370px')
+      act(() => vi.advanceTimersByTime(96))
+      expect(`${alice.style.left}:${alice.style.top}`).toBe('548px:404px')
+      fireEvent.keyUp(map, { key: 's', shiftKey: true })
+      fireEvent.keyUp(map, { key: 'd', shiftKey: true })
+      fireEvent.keyUp(map, { key: 'Shift' })
+
+      fireEvent.keyDown(map, { key: 'a' })
+      fireEvent.keyUp(map, { key: 'a' })
+      expect(`${alice.style.left}:${alice.style.top}`).toBe('524px:404px')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('restores a remembered walkable player position and facing', async () => {
     const onPlayerStateChange = vi.fn()
     render(

@@ -210,6 +210,7 @@ export function OfficeBuilding({
   const lastTouchMoveDirectionRef = useRef<OfficeAliceDirection | null>(null)
   const manualMoveRepeatRef = useRef<number | null>(null)
   const manualMoveKeysRef = useRef(new Set<string>())
+  const manualMoveSprintRef = useRef(false)
   const lastManualMoveKeyRef = useRef<string | null>(null)
   const manualMoveOriginRef = useRef<{ x: number; y: number } | null>(null)
   const manualMoveHasRepeatedRef = useRef(false)
@@ -881,9 +882,15 @@ export function OfficeBuilding({
       : undefined
     return movementForDirections(held.map(({ direction }) => direction), lastDirection)
   }
+  const moveAliceAtManualPace = (movement: OfficeMovement) => {
+    const steps = manualMoveSprintRef.current ? 2 : 1
+    for (let index = 0; index < steps; index += 1) {
+      if (!moveAlice(movement)) break
+    }
+  }
   const moveAliceFromHeldKeys = () => {
     const movement = movementForHeldKeys()
-    if (movement) moveAlice(movement)
+    if (movement) moveAliceAtManualPace(movement)
   }
   manualMoveTickRef.current = () => {
     if (floorInteractionSuspended || departingWorkspace || selected) {
@@ -913,6 +920,10 @@ export function OfficeBuilding({
         && target.dataset.nearby === 'true'
       if (!fromIdlePage && !fromFloor) return
       const key = event.key.toLowerCase()
+      if (key === 'shift') {
+        manualMoveSprintRef.current = true
+        return
+      }
       if (key === 'escape' && routeTargetId) {
         event.preventDefault()
         cancelAutoWalk()
@@ -930,6 +941,7 @@ export function OfficeBuilding({
       const movement = OFFICE_MOVEMENT_KEYS[key]
       if (!movement) return
       event.preventDefault()
+      manualMoveSprintRef.current = event.shiftKey
       if (fromFloor && target !== viewport) viewport?.focus({ preventScroll: true })
       if (manualMoveKeysRef.current.has(key)) return
       const beginsMove = manualMoveKeysRef.current.size === 0
@@ -946,7 +958,7 @@ export function OfficeBuilding({
         const movement = movementForHeldKeys()
         if (movement && movement.x !== 0 && movement.y !== 0) {
           aliceRef.current = manualMoveOriginRef.current
-          moveAlice(movement)
+          moveAliceAtManualPace(movement)
         }
       }
       if (manualMoveRepeatRef.current == null) {
@@ -958,6 +970,10 @@ export function OfficeBuilding({
     }
     const handleAmbientKeyUp = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase()
+      if (key === 'shift') {
+        manualMoveSprintRef.current = false
+        return
+      }
       if (!OFFICE_MOVEMENT_KEYS[key]) return
       manualMoveKeysRef.current.delete(key)
       if (lastManualMoveKeyRef.current === key) {
@@ -965,13 +981,17 @@ export function OfficeBuilding({
       }
       if (manualMoveKeysRef.current.size === 0) stopManualMove()
     }
+    const handleWindowBlur = () => {
+      manualMoveSprintRef.current = false
+      stopManualMove()
+    }
     document.addEventListener('keydown', handleAmbientKeyDown)
     document.addEventListener('keyup', handleAmbientKeyUp)
-    window.addEventListener('blur', stopManualMove)
+    window.addEventListener('blur', handleWindowBlur)
     return () => {
       document.removeEventListener('keydown', handleAmbientKeyDown)
       document.removeEventListener('keyup', handleAmbientKeyUp)
-      window.removeEventListener('blur', stopManualMove)
+      window.removeEventListener('blur', handleWindowBlur)
     }
   })
   useEffect(() => () => {

@@ -1853,7 +1853,7 @@ export const en = {
     replayMapLabel: 'Replay floor. Move Alice to inspect the snapshot; use Operations board to review it or Live to return.',
     replaySnapshot: 'Snapshot',
     replayLockedHint: 'Historical snapshot. Return to Live to use this.',
-    mapHint: 'MOVE · WASD / ARROWS',
+    mapHint: 'MOVE · WASD / ARROWS · SHIFT RUN',
     touchControls: 'Move Alice',
     moveAliceUp: 'Move Alice up',
     moveAliceRight: 'Move Alice right',

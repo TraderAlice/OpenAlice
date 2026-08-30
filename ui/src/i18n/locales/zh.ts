@@ -1820,7 +1820,7 @@ export const zh: Resources = {
     replayMapLabel: '重放楼层。移动 Alice 查看快照；使用运营面板回看，或返回直播。',
     replaySnapshot: '快照',
     replayLockedHint: '这是历史快照。返回直播后才能使用。',
-    mapHint: '移动 · WASD / 方向键',
+    mapHint: '移动 · WASD / 方向键 · Shift 奔跑',
     touchControls: '移动 Alice',
     moveAliceUp: '向上移动 Alice',
     moveAliceRight: '向右移动 Alice',

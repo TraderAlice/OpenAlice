@@ -1821,7 +1821,7 @@ export const ja: Resources = {
     replayMapLabel: 'リプレイフロア。Alice を動かしてスナップショットを確認し、運用ボードで見直すか Live に戻ります。',
     replaySnapshot: 'スナップショット',
     replayLockedHint: '過去のスナップショットです。Live に戻ると使用できます。',
-    mapHint: '移動 · WASD / 矢印キー',
+    mapHint: '移動 · WASD / 矢印キー · Shift ダッシュ',
     touchControls: 'Aliceを移動',
     moveAliceUp: 'Aliceを上へ移動',
     moveAliceRight: 'Aliceを右へ移動',
