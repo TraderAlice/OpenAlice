@@ -76,6 +76,7 @@ describe('OfficeCabinetWindow', () => {
     const dialog = screen.getByRole('dialog', { name: 'Filing cabinet · Semis' })
     expect(dialog.getAttribute('data-record-count')).toBe('2')
     expect(dialog.hasAttribute('data-empty')).toBe(false)
+    expect(dialog.hasAttribute('data-dense')).toBe(false)
     expect(screen.getByText('2 filed records')).toBeTruthy()
     expect(screen.getByText('Arrows choose · Enter to open').getAttribute('data-input')).toBe('keyboard')
     expect(screen.getByText('Desk records stay in Office until you choose where to go.').getAttribute('data-input'))
@@ -127,6 +128,36 @@ describe('OfficeCabinetWindow', () => {
 
     await userEvent.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('marks a cabinet with five or more records as dense', () => {
+    const denseGroup: OfficeRoomSnapshot = {
+      ...group,
+      employees: [{
+        ...group.employees[0],
+        drawers: Array.from({ length: 5 }, (_, index) => ({
+          id: `report-${index}`,
+          kind: 'report' as const,
+          action: 'open_report' as const,
+          at: index,
+          label: `Report ${index + 1}`,
+          path: `reports/${index + 1}.md`,
+        })),
+      }],
+    }
+    render(
+      <OfficeCabinetWindow
+        group={denseGroup}
+        roomName="Semis"
+        onOpenWorkspaceFiles={vi.fn()}
+        onOpenRecord={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+
+    const dialog = screen.getByRole('dialog', { name: 'Filing cabinet · Semis' })
+    expect(dialog.getAttribute('data-record-count')).toBe('5')
+    expect(dialog.getAttribute('data-dense')).toBe('true')
   })
 
   it('presents Inbox artifacts as deliveries instead of raw record ids', () => {

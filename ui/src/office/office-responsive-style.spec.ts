@@ -140,6 +140,15 @@ describe('Office responsive style contract', () => {
     )
   })
 
+  it('expands only dense narrow-screen filing cabinets into the available floor height', () => {
+    expect(css).toMatch(
+      /@container \(max-width: 680px\) \{[\s\S]*?\.oa-office-cabinet-window\[data-dense="true"\]\s*\{\s*bottom: 12px;\s*height: auto;/,
+    )
+    expect(css).toMatch(
+      /\.oa-office-cabinet-window__body\s*\{[\s\S]*?grid-template-rows: auto minmax\(0, 1fr\) auto;[\s\S]*?overflow: hidden;/,
+    )
+  })
+
   it('shrink-wraps the desktop occupancy journal without weakening narrow-stage containment', () => {
     expect(css).toMatch(/\.oa-office-window--log\s*\{[\s\S]*?bottom: auto;[\s\S]*?max-height: calc\(100% - 92px\)/)
     expect(css).toMatch(

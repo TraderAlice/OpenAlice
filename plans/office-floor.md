@@ -3624,6 +3624,25 @@ Narrow activity-journal master/detail follow-up (2026-08-30):
   tests (one file and nine tests skipped), and the production UI build passed with only the existing jsdom canvas and
   large-chunk advisories.
 
+Dense filing-cabinet follow-up (2026-08-30):
+
+- Auto-walked Alice to the real nine-record Chat filing cabinet and played its keyboard/list loop at desktop and
+  390x844. The desktop two-column cabinet was already coherent, but the narrow window retained a 438px desktop cap:
+  its 265px record viewport exposed only about three rows while roughly 200px of usable map remained below.
+- Compared leaving every cabinet fixed, stretching every sparse/empty cabinet, and expanding only a full cabinet.
+  Chose the density-aware model: cabinets with fewer than five records keep their compact pickup-window proportions;
+  a cabinet with five or more records becomes a near-full-height archive menu on narrow screens. The header, count,
+  close control, and Enter Workspace files command remain fixed while only the record shelf scrolls.
+- OfficeCabinetWindow now marks its derived five-plus state explicitly. At container widths up to 680px only that state
+  anchors 12px above the Office floor bottom and derives height from the existing 78px top inset; desktop and every
+  sparse record-count override remain untouched.
+- Real-browser acceptance at 390x844 expanded the nine-record dialog from 438px to 630px and its record viewport from
+  265px to 457px, showing roughly five archive rows. At 390x600 it collapsed safely to 386px with both Close and the
+  Workspace files footer visible; at 1052x734 the desktop dialog remained exactly 438px. Focused cabinet and responsive
+  style tests passed (2 files / 25 tests). Root and UI TypeScript passed, the full suite passed all 617 test files and
+  5,161 tests (one file and nine tests skipped), and the production UI build passed with only the existing jsdom canvas
+  and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

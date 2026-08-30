@@ -5567,6 +5567,11 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
     height: auto;
   }
 
+  .oa-office-cabinet-window[data-dense="true"] {
+    bottom: 12px;
+    height: auto;
+  }
+
   .oa-office-roster ul,
   .oa-office-cabinet-window__records {
     grid-template-columns: 1fr;

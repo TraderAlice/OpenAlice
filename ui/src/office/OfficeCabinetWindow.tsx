@@ -54,6 +54,7 @@ export function OfficeCabinetWindow({
       aria-label={`${t('office.cabinet')} · ${roomName}`}
       data-testid="office-cabinet-window"
       data-empty={records.length === 0 || undefined}
+      data-dense={records.length >= 5 || undefined}
       data-record-count={records.length}
       className="oa-office-window oa-office-cabinet-window"
       onKeyDown={(event) => {
