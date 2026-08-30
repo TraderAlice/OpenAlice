@@ -230,6 +230,8 @@ export function OfficeBuilding({
   const replayFocusKeyRef = useRef<string | null>(null)
   const restoreFloorFocusRef = useRef(true)
   const handledMenuResumeTokenRef = useRef(menuResumeToken)
+  const activityLogMenuItemRef = useRef<HTMLDivElement | null>(null)
+  const resumeActivityLogFocusRef = useRef(false)
   floorInteractionSuspendedRef.current = floorInteractionSuspended
 
   useLayoutEffect(() => {
@@ -860,6 +862,7 @@ export function OfficeBuilding({
       || departingWorkspace
     ) return
     handledMenuResumeTokenRef.current = menuResumeToken
+    resumeActivityLogFocusRef.current = true
     openFloorMenu()
   }, [departingWorkspace, floorInteractionSuspended, menuResumeToken, selected])
   const movementForDirections = (
@@ -1224,7 +1227,13 @@ export function OfficeBuilding({
               }
             }}
             onOpenChangeComplete={(open) => {
-              if (open) return
+              if (open) {
+                if (resumeActivityLogFocusRef.current) {
+                  resumeActivityLogFocusRef.current = false
+                  activityLogMenuItemRef.current?.focus({ preventScroll: true })
+                }
+                return
+              }
               const shouldRestoreFocus = restoreFloorFocusRef.current
               restoreFloorFocusRef.current = true
               if (!shouldRestoreFocus) return
@@ -1339,6 +1348,7 @@ export function OfficeBuilding({
                 </div>
               )}
               <DropdownMenuItem
+                ref={activityLogMenuItemRef}
                 onClick={() => {
                   closeFloorMenu(false)
                   onOpenLog('menu')

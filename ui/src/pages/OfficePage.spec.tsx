@@ -379,7 +379,7 @@ describe('OfficePage localization', () => {
     expect(container.querySelector('.oa-office-window-scrim')).toBeNull()
     const floor = screen.getByTestId('office-floor')
     await vi.waitFor(() => {
-      expect(document.activeElement).toBe(screen.getByRole('menu', { name: '菜单' }))
+      expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: '活动日志' }))
     })
     await userEvent.keyboard('{Escape}')
     await vi.waitFor(() => expect(document.activeElement).toBe(floor))

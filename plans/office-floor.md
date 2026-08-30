@@ -4717,6 +4717,23 @@ Pause-submenu return stack follow-up (2026-08-31):
   618 test files and 5,185 tests (one file and nine tests skipped); root and UI TypeScript and the production UI build also
   passed, with only the existing ports fallback and large-chunk advisory.
 
+Pause-submenu cursor provenance follow-up (2026-08-31):
+
+- Continued from the restored Menu stack in replay, where the pause menu has two actionable rows: `Live map` and
+  `Activity log`. Returning from Activity Log reopened the correct parent but focused only the menu container; the next
+  Arrow Down selected `Live map`, so an immediate Enter could accidentally leave replay instead of revisiting the log.
+- Compared accepting the menu primitive's first-item behavior, recording a generic item index, and restoring the one
+  explicit child command that currently owns a submenu relationship. Chose explicit Activity Log provenance. It keeps
+  navigation intent concrete and testable without introducing a generalized menu router for a single parent-child edge.
+- A Menu-origin Log close now waits for the pause menu to finish opening, then focuses its `Activity log` item. Normal
+  first opens retain the menu primitive's keyboard model, while `Find on floor`, Operations, employee, Inbox, News, and
+  floor origins retain their existing scene or window focus behavior.
+- Real-browser acceptance entered Seq 5096 replay, opened Activity Log from the two-item pause menu, and closed it. The
+  reopened menu retained both commands and marked `Activity log` active; `Live map` no longer stole the next keyboard
+  action. The page was then returned to an unpaused Live floor. Focused OfficePage and Building suites passed all 38
+  tests. Root and UI TypeScript passed; the full suite passed all 618 test files and 5,185 tests (one file and nine tests
+  skipped); the production UI build passed with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
