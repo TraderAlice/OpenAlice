@@ -2617,7 +2617,7 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
   right: max(24px, calc(50% - 340px));
   bottom: auto;
   left: max(24px, calc(50% - 340px));
-  height: min(438px, calc(100% - 102px));
+  height: min(438px, calc(100% - 86px));
   overflow: hidden;
   color: var(--gba-ink);
 }

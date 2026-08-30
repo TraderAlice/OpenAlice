@@ -3700,6 +3700,24 @@ Agent-result dialogue cleanup follow-up (2026-08-30):
   passed all 617 test files and 5,162 tests (one file and nine tests skipped), and the production UI build passed with
   only the existing jsdom canvas and large-chunk advisories.
 
+Landscape cabinet complete-row follow-up (2026-08-30):
+
+- Auto-walked to the real nine-record Chat filing cabinet at 844x390. Its two-column layout and fixed Workspace-files
+  command were correct, but the dense window inherited a 102px bottom reserve: the records viewport measured 81px
+  against an 87px focused card, visibly cutting 5px from the first selectable row above the footer.
+- Compared accepting the partial-row scroll hint, compressing the record/footer touch targets, and spending the unused
+  bottom safe area on the dense window. Chose the safe-area option: full menu rows are a stronger game affordance than
+  web-style clipped content, while the existing 78px records and 44px primary command retain their size.
+- Dense desktop/landscape cabinets now reserve 86px rather than 102px below their top anchor. The 438px desktop cap is
+  unchanged, sparse zero-to-four-record cabinets keep their dedicated heights, and the max-680px rule still owns
+  portrait phones with `bottom: 12px; height: auto`.
+- Real-browser acceptance gave the 844x390 cabinet 16px more usable height. The first row gained 11px of clearance
+  below its focused card, and ArrowDown scrolled 84px to expose the next complete two-card row. At 390x844 the existing
+  630px dense cabinet and 457px records viewport remained unchanged with its fixed footer visible. Focused cabinet and
+  responsive-style tests passed (2 files / 26 tests). Root and UI TypeScript passed, the full suite passed all 617 test
+  files and 5,162 tests (one file and nine tests skipped), and the production UI build passed with only the existing
+  jsdom canvas and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
