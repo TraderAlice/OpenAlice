@@ -514,7 +514,11 @@ export function OfficeRuntimeSection({
   if (!selectedBeat) {
     return (
       <div className="oa-office-runtime">
-        <Tabs value={channel} onValueChange={(value) => setChannel(value as OfficeLogChannel)}>
+        <Tabs
+          value={channel}
+          className="oa-office-runtime__tabs"
+          onValueChange={(value) => setChannel(value as OfficeLogChannel)}
+        >
           <TabsList className="oa-office-runtime__channels" aria-label={t('office.logChannels')}>
             {OFFICE_LOG_CHANNELS.map((item) => (
               <TabsTrigger key={item} value={item}>
@@ -665,7 +669,10 @@ export function OfficeRuntimeSection({
     if (nextIndex == null || nextIndex === index) return
     keyboardEvent.preventDefault()
     const next = buttons[nextIndex]
-    next.focus()
+    if (journalIndexRef.current) {
+      revealOfficeJournalRow(journalIndexRef.current, next)
+    }
+    next.focus({ preventScroll: true })
     setSelectedSeq(Number(next.dataset.seq))
   }
 
@@ -698,7 +705,7 @@ export function OfficeRuntimeSection({
           {t('office.paused')}: {error}
         </div>
       )}
-      <Tabs value={channel} onValueChange={changeChannel}>
+      <Tabs value={channel} className="oa-office-runtime__tabs" onValueChange={changeChannel}>
         <TabsList className="oa-office-runtime__channels" aria-label={t('office.logChannels')}>
           {OFFICE_LOG_CHANNELS.map((item) => (
             <TabsTrigger key={item} value={item}>

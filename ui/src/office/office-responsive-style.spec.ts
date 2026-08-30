@@ -240,10 +240,10 @@ describe('Office responsive style contract', () => {
 
   it('compacts sparse desktop channels without reducing the phone journal', () => {
     expect(css).toMatch(
-      /@container \(min-width: 761px\) \{[\s\S]*?\.oa-office-runtime__journal\[data-compact="true"\] \.oa-office-runtime__index\s*\{[\s\S]*?max-height: 320px;[\s\S]*?\.oa-office-runtime__journal\[data-compact="true"\] \.oa-office-runtime__event\s*\{[\s\S]*?min-height: 320px;/,
+      /@container \(min-width: 761px\) \{[\s\S]*?\.oa-office-runtime__journal\[data-compact="true"\]\s*\{[\s\S]*?height: 320px;/,
     )
     expect(css).toMatch(
-      /@container \(max-width: 760px\) \{[\s\S]*?\.oa-office-runtime__index\s*\{[\s\S]*?max-height: 156px;[\s\S]*?\.oa-office-runtime__event\s*\{[\s\S]*?min-height: 156px;/,
+      /@container \(max-width: 760px\) \{[\s\S]*?\.oa-office-runtime__index\s*\{[\s\S]*?height: 156px;[\s\S]*?\.oa-office-runtime__event\s*\{[\s\S]*?height: 100%;/,
     )
   })
 
@@ -252,7 +252,7 @@ describe('Office responsive style contract', () => {
       /@container \(max-width: 760px\) \{[\s\S]*?data-mobile-view="index"\] \.oa-office-runtime__event,[\s\S]*?data-mobile-view="detail"\] \.oa-office-runtime__index\s*\{\s*display: none;/,
     )
     expect(css).toMatch(
-      /data-mobile-view="index"\] \.oa-office-runtime__index\s*\{\s*max-height: none;/,
+      /data-mobile-view="index"\] \.oa-office-runtime__index\s*\{\s*height: 100%;/,
     )
     expect(css).toMatch(
       /\.oa-office-runtime__back\s*\{[\s\S]*?display: flex;[\s\S]*?grid-column: 1 \/ -1;/,
@@ -283,7 +283,7 @@ describe('Office responsive style contract', () => {
 
   it('keeps long journal reports summarized without losing the command row', () => {
     expect(css).toMatch(
-      /\.oa-office-runtime__event\s*\{[\s\S]*?grid-template-rows: minmax\(min-content, 1fr\) auto;[\s\S]*?min-height: 400px;/,
+      /\.oa-office-runtime__event\s*\{[\s\S]*?grid-template-rows: minmax\(min-content, 1fr\) auto;[\s\S]*?overflow-y: auto;/,
     )
     expect(css).toMatch(
       /\.oa-office-runtime__detail\s*\{[\s\S]*?overflow: visible;/,
@@ -298,8 +298,21 @@ describe('Office responsive style contract', () => {
       /\.oa-office-runtime__actions::after\s*\{[\s\S]*?top: 100%;[\s\S]*?height: 11px;[\s\S]*?background: var\(--gba-paper\);/,
     )
     expect(css).toMatch(
-      /@container \(max-width: 760px\) \{[\s\S]*?\.oa-office-runtime__event\s*\{[\s\S]*?min-height: 156px;/,
+      /@container \(max-width: 760px\) \{[\s\S]*?\.oa-office-runtime__event\s*\{[\s\S]*?height: 100%;/,
     )
+  })
+
+  it('pins activity-log chrome while the record and detail panes own overflow', () => {
+    expect(css).toMatch(
+      /\.oa-office-window--log \.oa-office-window__body\s*\{[\s\S]*?display: flex;[\s\S]*?overflow: clip;/,
+    )
+    expect(css).toMatch(/\.oa-office-runtime__tabs\s*\{[\s\S]*?overflow: clip;/)
+    expect(css).toMatch(/\.oa-office-runtime__panel\s*\{[\s\S]*?overflow: clip;/)
+    expect(css).toMatch(
+      /\.oa-office-runtime__journal\s*\{[\s\S]*?height: clamp\(220px, calc\(100cqh - 300px\), 400px\);/,
+    )
+    expect(css).toMatch(/\.oa-office-runtime__index\s*\{[\s\S]*?overflow: auto;/)
+    expect(css).toMatch(/\.oa-office-runtime__event\s*\{[\s\S]*?overflow-y: auto;/)
   })
 
   it('lets input capability own touch controls independently of stage width', () => {

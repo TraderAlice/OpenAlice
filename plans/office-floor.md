@@ -5100,6 +5100,27 @@ Fresh-result action-priority follow-up (2026-08-31):
   passed all 620 test files and 5,195 tests (one file and nine tests skipped); the production UI build passed with only
   the existing ports fallback and large-chunk advisory.
 
+Activity-log scroll-ownership follow-up (2026-08-31):
+
+- Selected the real failed Grok Researcher #5153 record deep in Agent history. The record index correctly revealed the
+  selected row, but the shared window body also scrolled, clipping most of Replay above the visible Activity Log frame.
+- Compared sticky Replay/channel controls, preventing scroll on each selection input, and assigning scrolling only to
+  the record index and event detail. Sticky chrome would add overlapping layers, while selection-specific prevention
+  would remain pointer- and automation-dependent. Chose explicit internal scroll ownership: the frame, Replay control,
+  channel tabs, and keyboard hint stay fixed; the two journal panes absorb their own overflow.
+- Desktop keeps the existing two-pane inventory and 320/400px sparse/dense rhythm. Narrow layouts retain the existing
+  records-to-detail transition, with the visible pane owning overflow and the detail command row remaining reachable.
+  Keyboard focus must continue using `preventScroll` and the selected-row reveal helper so focus never moves the outer
+  Activity Log frame.
+- Implemented a clipped, non-scrollable frame chain and container-height journal budget; the index and event pane are
+  now the only scroll owners. Keyboard selection reveals its next record explicitly before focusing with
+  `preventScroll`, so mouse, keyboard, and automation no longer hand scrolling to an ancestor.
+- Real-browser acceptance reopened Agent history, started at #5174, and pressed ArrowDown ten times to real failed
+  #5153. The selected row settled inside the internally scrolled record list while Replay, all four channel tabs, the
+  keyboard hint, failure detail, and both commands remained fully visible. Focused runtime/style suites passed all 48
+  tests. Root and UI TypeScript passed; the full suite passed all 620 test files and 5,196 tests (one file and nine tests
+  skipped); the production UI build passed with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
