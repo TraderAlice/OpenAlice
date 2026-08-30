@@ -3522,6 +3522,29 @@ Persistent coworker-result follow-up (2026-08-30):
   5,153 tests (one file and nine tests skipped), and the production UI build passed with only the existing jsdom canvas
   and large-chunk advisories.
 
+Replay-target auto-walk follow-up (2026-08-30):
+
+- Replayed the real Grok Diplomat completion at Seq 4737 through Operations board → Find on floor, then personally
+  navigated the historical floor. The beacon correctly identified the old desk and the camera framed it, but Alice
+  remained at Operations board; every snapshot object was intentionally disabled, so clicking the marked coworker
+  could not reuse live auto-walk. Manual travel required threading the central console, compass, rug, and filing cabinet,
+  and the cabinet's right side became a dead-end approach. `Find` therefore located a label without taking the player
+  to it.
+- Compared teleporting Alice, moving only the camera, and reusing the established cancelable route. Chose auto-walk for
+  employee milestones: it preserves spatial continuity, teaches the same footsteps / target-pointer language as Live,
+  and keeps Esc or any manual direction as an immediate opt-out. Non-employee replay targets retain camera framing.
+- The replay-focus effect now starts a one-shot route to an employee target even though historical objects remain
+  read-only. Arrival deliberately performs no live action: Alice stops at the target's valid interaction cell and faces
+  the coworker, while the beacon and Replay HUD remain the authoritative historical context. The focus key prevents live
+  polling or rerenders from restarting a canceled or completed trip.
+- Real-browser acceptance ran the full Seq 4737 route at 1200x800: fourteen initial footsteps resolved around the room
+  geometry and Alice stopped at x312/y504, facing left toward Grok Diplomat, with route HUD and trail cleared. At 390x844,
+  Esc canceled the moving route, removed every remaining step, and left the `↩ Live` command visible; the page was then
+  restored to the desktop Live floor. The focused building spec adds the same route-start, manual-cancel, and no-live-
+  activation contract. Root and UI TypeScript passed, the full suite passed all 617 test files and 5,154 tests (one file
+  and nine tests skipped), and the production UI build passed with only the existing jsdom canvas and large-chunk
+  advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

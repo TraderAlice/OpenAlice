@@ -30,7 +30,7 @@ describe('OfficeBuilding', () => {
         building={{
           config: {
             workspaceSleepAfterMs: 1,
-            harnessMinimumVisibleGroups: { chat: 0, 'auto-quant': 0, prediction: 0, other: 0 },
+            harnessMinimumVisibleGroups: { chat: 1, 'auto-quant': 1, prediction: 1, other: 0 },
           },
           lastSeq: 6,
           firstSeq: 1,
@@ -160,6 +160,85 @@ describe('OfficeBuilding', () => {
 
     expect(screen.getByText('Replay · Seq 2')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Return live' })).toBeNull()
+  })
+
+  it('turns Find on floor into a cancelable auto-walk to the replayed coworker', async () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })))
+    const onSelectEmployee = vi.fn()
+    const { container } = render(
+      <OfficeBuilding
+        building={{
+          config: {
+            workspaceSleepAfterMs: 1,
+            harnessMinimumVisibleGroups: { chat: 0, 'auto-quant': 0, prediction: 0, other: 0 },
+          },
+          lastSeq: 2,
+          firstSeq: 1,
+          asOfSeq: 2,
+          offices: [
+            {
+              workspace: { id: 'prediction-replay', tag: 'prediction', harness: 'prediction' },
+              lastInteractionAt: 1,
+              sleeping: false,
+              employees: [],
+            },
+            {
+              workspace: { id: 'quant-replay', tag: 'auto-quant', harness: 'auto-quant' },
+              lastInteractionAt: 1,
+              sleeping: false,
+              employees: [],
+            },
+            {
+              workspace: { id: 'chat-replay', tag: 'chat', harness: 'chat' },
+              lastInteractionAt: 1,
+              sleeping: false,
+              employees: [{
+                resumeId: 'resume-target',
+                agent: 'grok',
+                name: 'g1',
+                title: 'Replay target',
+                awake: false,
+                mood: 'review',
+                bubble: { kind: 'text', text: 'Finished the historical run.' },
+                lastSeq: 2,
+                lastInteractionAt: 1,
+                drawers: [],
+              }],
+            },
+          ],
+        }}
+        replaySeq={2}
+        replayFocus={{
+          seq: 2,
+          workspaceId: 'chat-replay',
+          resumeId: 'resume-target',
+          targetIds: ['employee:chat-replay:resume-target'],
+          label: 'Replay target',
+          summary: 'Finished the historical run.',
+          channel: 'agent',
+        }}
+        onSelectEmployee={onSelectEmployee}
+        onOpenEmployee={vi.fn()}
+        onOpenWorkspace={vi.fn()}
+        onOpenFiles={vi.fn()}
+        onOpenRoster={vi.fn()}
+        onOpenLog={vi.fn()}
+        onReturnLive={vi.fn()}
+      />,
+    )
+
+    const target = screen.getByTestId('office-desk-resume-target')
+    expect(target.dataset.route).toBe('true')
+    expect(container.querySelector('.oa-office-route-trail__step')).toBeTruthy()
+
+    await userEvent.keyboard('{ArrowRight}')
+    expect(target.dataset.route).toBe('false')
+    expect(container.querySelector('.oa-office-route-trail__step')).toBeNull()
+    expect(onSelectEmployee).not.toHaveBeenCalled()
   })
 
   it('keeps an empty Office inside the game world with Alice centered', () => {

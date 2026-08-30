@@ -603,11 +603,14 @@ export function OfficeBuilding({
     setRouteTargetId(null)
     setRouteTrail([])
   }
-  const requestTargetInteraction = (targetId: string, activate?: () => void) => {
+  const requestTargetInteraction = (
+    targetId: string,
+    options: { activate?: () => void; allowReplay?: boolean } = {},
+  ) => {
     if (selected || departingWorkspace || floorInteractionSuspended) return
     const target = interactionTargetById.get(targetId)
     if (!target) return
-    if (replaySeq != null && target.kind !== 'operations') return
+    if (replaySeq != null && target.kind !== 'operations' && !options.allowReplay) return
     cancelAutoWalk()
     const generation = routeGenerationRef.current
     const path = officeInteractionPath(aliceRef.current, target, mapLayout, collisionRects)
@@ -627,7 +630,7 @@ export function OfficeBuilding({
         if (routeGenerationRef.current !== generation) return
         routeTimerRef.current = null
         setRouteTrail([])
-        const action = activate ?? (() => activateTarget(target))
+        const action = options.activate ?? (() => activateTarget(target))
         action()
       }, reducedMotion ? 0 : 80)
     }
@@ -863,11 +866,24 @@ export function OfficeBuilding({
     }
     const focusKey = `${replayFocus.seq}:${building.asOfSeq ?? 'loading'}:${replayFocusTarget.id}`
     if (replayFocusKeyRef.current === focusKey) return
-    const viewport = viewportRef.current?.getBoundingClientRect()
-    if (!viewport || viewport.width <= 0 || viewport.height <= 0) return
     replayFocusKeyRef.current = focusKey
-    setCamera(officeCameraCenteredOn(replayFocusTarget, viewport, mapLayout))
     viewportRef.current?.focus({ preventScroll: true })
+    if (replayFocusTarget.kind === 'employee') {
+      requestTargetInteraction(replayFocusTarget.id, {
+        allowReplay: true,
+        activate: () => {},
+      })
+      return
+    }
+    const viewport = viewportRef.current?.getBoundingClientRect()
+    if (!viewport || viewport.width <= 0 || viewport.height <= 0) {
+      replayFocusKeyRef.current = null
+      return
+    }
+    setCamera(officeCameraCenteredOn(replayFocusTarget, viewport, mapLayout))
+  // Route creation is intentionally keyed by replayFocusKeyRef rather than by
+  // the request function identity; a live poll must not restart the same trip.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [building.asOfSeq, mapLayout, replayFocus, replayFocusTarget, replaySeq])
 
   useEffect(() => {
@@ -1397,7 +1413,7 @@ export function OfficeBuilding({
                 )}
                 onOpenEmployee={(workspaceId, employee) => requestTargetInteraction(
                   `employee:${workspaceId}:${employee.resumeId}`,
-                  () => onOpenEmployee(workspaceId, employee),
+                  { activate: () => onOpenEmployee(workspaceId, employee) },
                 )}
                 onOpenWorkspace={(workspaceId) => requestTargetInteraction(`sign:${workspaceId}`)}
                 onOpenFiles={(workspaceId) => requestTargetInteraction(`cabinet:${workspaceId}`)}
