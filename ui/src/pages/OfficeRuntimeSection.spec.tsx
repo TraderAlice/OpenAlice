@@ -240,11 +240,18 @@ describe('OfficeRuntimeSection', () => {
     expect(detail?.getAttribute('data-expanded')).toBeNull()
 
     await userEvent.click(toggle)
-    expect(screen.getByRole('button', { name: 'Collapse report' }).getAttribute('aria-expanded'))
+    const collapseReport = screen.getByRole('button', { name: 'Collapse report' })
+    expect(collapseReport.getAttribute('aria-expanded'))
       .toBe('true')
     expect(detail?.getAttribute('data-expanded')).toBe('true')
-    expect(screen.getByRole('button', { name: 'Collapse report' }).nextElementSibling).toBe(detail)
+    expect(collapseReport.nextElementSibling).toBe(detail)
 
+    await userEvent.keyboard('{Escape}')
+    expect(screen.getByRole('button', { name: 'Show full report' }).getAttribute('aria-expanded'))
+      .toBe('false')
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Show full report' }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Show full report' }))
     await userEvent.click(screen.getByRole('button', { name: 'Collapse report' }))
     expect(screen.getByRole('button', { name: 'Show full report' }).getAttribute('aria-expanded'))
       .toBe('false')
@@ -363,7 +370,12 @@ describe('OfficeRuntimeSection', () => {
       },
     ])
 
-    render(<OfficeRuntimeSection initialChannel="inbox" initialSelectedSeq={7} />)
+    const onParentKeyDown = vi.fn()
+    render(
+      <div onKeyDown={onParentKeyDown}>
+        <OfficeRuntimeSection initialChannel="inbox" initialSelectedSeq={7} />
+      </div>,
+    )
 
     const inboxTab = await screen.findByRole('tab', { name: /Inbox\s*2/ })
     expect(inboxTab.getAttribute('data-active')).not.toBeNull()
@@ -386,8 +398,13 @@ describe('OfficeRuntimeSection', () => {
       configurable: true,
       value: journal,
     })
-    await userEvent.click(backToRecords)
+    await userEvent.keyboard('{Escape}')
     expect(journal.getAttribute('data-mobile-view')).toBe('index')
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: /Inbox received.*#0007/i }))
+    expect(onParentKeyDown).not.toHaveBeenCalled()
+
+    await userEvent.keyboard('{Escape}')
+    expect(onParentKeyDown).toHaveBeenCalledOnce()
 
     await userEvent.click(screen.getByRole('button', { name: /Inbox received.*#0007/i }))
     expect(journal.getAttribute('data-mobile-view')).toBe('detail')

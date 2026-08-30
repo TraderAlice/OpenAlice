@@ -3960,6 +3960,24 @@ Agent-file power-state follow-up (2026-08-30):
   33 tests). Root and UI TypeScript passed, the full suite passed all 617 test files and 5,166 tests (one file and nine
   tests skipped), and the production UI build passed with only the existing ports fallback and large-chunk advisories.
 
+Activity-journal return-stack follow-up (2026-08-30):
+
+- Entered the real Operations board at 844x390 and initially suspected that reopening on Grok Librarian's two-hour-old
+  detail was stale UI state. Code inspection disproved that: the board intentionally focuses the latest Agent outcome,
+  preserving the product goal that completed work should be visible before the user browses the journal.
+- The actual game-loop break was Escape. From the focused detail it closed the entire Activity log and returned to the
+  board, skipping the record index. Compared flattening the journal, adding another visible Back control, and giving
+  Escape a nested menu stack. Chose the stack: expanded report → event detail → channel index → Office floor.
+- `OfficeRuntimeSection` now owns Escape only while it has a deeper state. It collapses an expanded report first,
+  preserves focus across the toggle's DOM reorder, then returns detail to the exact selected record. Once already at
+  the index it deliberately lets Escape bubble to the existing Office-window close contract.
+- Real-browser acceptance kept Operations board opening directly on the latest `Task complete`; the first Escape left
+  the window open, restored record `#4807`, and showed the index, while the second closed the window and focused the
+  Operations board. The focused runtime suite passed all 16 tests, including report-focus preservation and parent
+  Escape propagation. Root and UI TypeScript passed, the full suite passed all 617 test files and 5,166 tests (one file
+  and nine tests skipped), and the production UI build passed with only the existing ports fallback and large-chunk
+  advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

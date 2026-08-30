@@ -255,6 +255,8 @@ export function OfficeRuntimeSection({
   const [loading, setLoading] = useState(true)
   const journalIndexRef = useRef<HTMLOListElement>(null)
   const journalBackRef = useRef<HTMLButtonElement>(null)
+  const reportToggleRef = useRef<HTMLButtonElement>(null)
+  const reportToggleFocusPendingRef = useRef(false)
   const journalInitialFocusPendingRef = useRef(true)
   const journalChannelFocusPendingRef = useRef(false)
   const appliedReplaySeqRef = useRef<number | null>(null)
@@ -355,6 +357,12 @@ export function OfficeRuntimeSection({
   useEffect(() => {
     setDetailExpanded(false)
   }, [selectedSeq])
+
+  useLayoutEffect(() => {
+    if (!reportToggleFocusPendingRef.current) return
+    reportToggleFocusPendingRef.current = false
+    reportToggleRef.current?.focus({ preventScroll: true })
+  }, [detailExpanded])
 
   useEffect(() => {
     if (initialSelectedSeq != null) setMobileView('detail')
@@ -490,10 +498,14 @@ export function OfficeRuntimeSection({
   const reportToggle = detailCanExpand ? (
     <button
       type="button"
+      ref={reportToggleRef}
       className="oa-office-runtime__detail-toggle"
       aria-controls={selectedDetailId}
       aria-expanded={detailExpanded}
-      onClick={() => setDetailExpanded((expanded) => !expanded)}
+      onClick={() => {
+        reportToggleFocusPendingRef.current = true
+        setDetailExpanded((expanded) => !expanded)
+      }}
     >
       {detailExpanded ? t('office.collapseReport') : t('office.showFullReport')}
     </button>
@@ -536,8 +548,23 @@ export function OfficeRuntimeSection({
     setSelectedSeq(Number(next.dataset.seq))
   }
 
+  const handleJournalEscape = (keyboardEvent: KeyboardEvent<HTMLDivElement>) => {
+    if (keyboardEvent.key !== 'Escape') return
+    if (detailExpanded) {
+      keyboardEvent.preventDefault()
+      keyboardEvent.stopPropagation()
+      reportToggleFocusPendingRef.current = true
+      setDetailExpanded(false)
+      return
+    }
+    if (mobileView !== 'detail') return
+    keyboardEvent.preventDefault()
+    keyboardEvent.stopPropagation()
+    returnToJournalIndex()
+  }
+
   return (
-    <div className="oa-office-runtime">
+    <div className="oa-office-runtime" onKeyDown={handleJournalEscape}>
       {error && (
         <div role="status" className="oa-office-runtime__error">
           {t('office.paused')}: {error}
