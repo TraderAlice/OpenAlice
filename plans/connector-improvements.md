@@ -560,6 +560,180 @@ external adapters remain optional projections rather than sources of truth.
     Chat configuration, labels it Waiting while the Connector is offline, and
     says that conversations resume when the transport is online. An unbound Chat
     remains configurable offline but promises only preparation, not activity.
+49. **Test delivery confirms the human outcome before exposing diagnostics.**
+    The healthy-state success message currently leads with an internal probe id
+    and asks the operator to confirm it in chat. Removing the reference entirely
+    would weaken support evidence, while leaving it inline makes an ordinary
+    success feel like a developer check. The chosen feedback says the test was
+    sent and names the private destination first, then keeps the exact delivery
+    reference in a collapsed, 40 px Test details disclosure. Failure feedback
+    remains visible and adapter-scoped.
+50. **Connector configuration is a correctness boundary, not whole-document
+    UI state.** Real Default AliceProject use showed that one channel edit can
+    restart every adapter, overlap another restart, and make an unrelated
+    channel appear to change. Three repairs were compared. Keeping the current
+    whole-config PUT and adding only debounce/revision handling would reduce UI
+    bounce but retain cross-process lost updates and process-wide downtime. A
+    shared file lock plus the existing restart flag would preserve writes but
+    still disconnect every channel and discard process-memory work. The
+    recommended architecture replaces those paths with adapter-scoped mutation
+    commands serialized by one cross-process config mutation boundary, followed
+    by an adapter-scoped in-process reconcile. Guardian remains the authority
+    only for the global service start/stop boundary and service-level recovery.
+    The UI merges only the affected service/adapter response and ignores an
+    older completion for the same mutation key. Restart safety is not claimed
+    until Connector-to-Alice inbound, artifact, and UTA requests use a durable
+    claim/ack queue with idempotent completion; the diagnostic I/O journal does
+    not substitute for that queue.
+
+## Reliability Investigation: Cross-adapter Interference
+
+### Confirmed evidence
+
+1. **Every Settings save is a service restart.**
+   `writePublicConnectorConfig()` rewrites `connectors.json` and
+   `connector-service.json`, then always touches `restart-connector.flag`.
+   Dev Guardian, production Guardian, and Electron all interpret that flag as
+   stop-the-process then spawn-the-process when the service remains enabled.
+   The real Default AliceProject log between 06:42:41 and 06:42:58 showed
+   repeated `restarting connector`, `SIGTERM`, and bootstrap cycles, including
+   `connector restart already in progress` and Alice-side request failures.
+2. **Both UI surfaces send a stale-able whole document.** The overview loads a
+   snapshot, changes one adapter, and PUTs the complete config. The shared
+   configuration panel autosaves the complete local config after 700 ms and
+   replaces current form state with the complete response. A response that
+   began before a later local edit can therefore overwrite that edit; another
+   browser tab can do the same without sharing the in-memory debounce.
+3. **Alice and Connector Service are concurrent config writers.** UI writes run
+   in Alice. `/link` and adapter-owned `/settings` handlers run in Connector
+   Service and call `updateConnectorAdapterSettings()`. Both paths independently
+   read, merge, seal, and atomically rename the same complete
+   `connectors.json`; there is no shared lock, compare-and-swap token, or
+   mutation log. Atomic rename prevents a torn file but not a lost update.
+4. **The runtime already has an adapter lifecycle boundary but configuration
+   bypasses it.** `DeliveryManager.reconnect(id)` stops and starts one adapter,
+   contains its failure, and leaves peers installed. Configuration changes do
+   not use that boundary; they ask Guardian to replace the complete process.
+5. **Process replacement destroys accepted Connector-to-Alice work.** Owner
+   messages, file requests, and UTA requests live in three arrays inside
+   `DeliveryManager`. Alice polls them every 1.5 seconds. `manager.stop()` stops
+   adapters but neither persists nor hands off those arrays. Telegram and
+   Feishu await `forwardOwnerText()`, but that promise currently resolves after
+   an in-memory push, allowing the platform handler to acknowledge work that a
+   subsequent process restart can erase.
+6. **The I/O journal is evidence, not recovery.** It is best-effort, bounded,
+   and records normalized events for deterministic test/manual replay. Startup
+   never reconstructs the three work queues from it. Ordinary Inbox and owner-
+   chat projections also remain documented best-effort outputs: their Alice
+   source records are durable, but a failed external send is not automatically
+   replayed. This plan does not silently change them to at-least-once delivery
+   without a duplicate-message policy.
+7. **The current durable config shape need not change.** The repair can retain
+   the released `connectors.json` and `connector-service.json` schemas, replace
+   the private BFF mutation API directly, and add a separately versioned queue
+   state from the absent state. Before implementation, re-check the release
+   boundary; register a migration only if a shipped persisted shape is altered.
+
+### Required invariants
+
+- Updating, enabling, disabling, linking, unlinking, or replacing credentials
+  for adapter A never stops, reconnects, or rewrites adapter B.
+- Only the explicit global Delivery-service control may start or stop the
+  Connector process. A process-level restart is recovery, never the ordinary
+  apply mechanism for an adapter edit.
+- Every config mutation merges against the latest sealed file while holding one
+  cross-process mutation lease. Different adapters and different keys cannot
+  lose each other's writes; secrets never appear in public responses or logs.
+- A UI completion may update only the service/adapter/key it owns. An older
+  response cannot replace a newer draft, another channel, or a bot-learned
+  owner/chat binding.
+- An external inbound event or Connector action is acknowledged only after its
+  durable queue record exists. Claim without ack is recoverable after lease
+  expiry; ack is idempotent.
+- Retrying a durable UTA request cannot submit the same write twice. Existing
+  `requestId`, `utaId`, and `pendingHash` validation remain mandatory, and the
+  queue completion path must persist its terminal state before removal.
+- A failed adapter reconcile degrades that adapter and preserves its desired
+  config; peers and the Connector HTTP control plane stay available.
+
+### Recommended implementation increments
+
+1. **Lock the defect in with failing concurrency and lifecycle tests.** Add
+   deterministic gates that reproduce: delayed adapter-A response followed by
+   adapter-B edit; overview and dialog writes crossing; bot `/link` racing a UI
+   preference change; and an adapter config save causing a peer stop under the
+   current restart path. Record the current process-wide restart as the failing
+   expectation rather than exercising live external accounts.
+2. **Introduce one atomic, adapter-scoped config mutation store.** Replace the
+   public whole-document write with validated commands for global service state
+   and one adapter: `enabled`, non-secret `set`/`unset`, and explicit secret
+   set/remove actions. Hold a short-lived cross-process lease across latest-read,
+   merge, seal, and atomic rename so Alice and Connector Service share the same
+   serialization boundary. Return only `{ serviceEnabled, adapter }`. Remove the
+   old full PUT after all internal callers move; do not retain a dual-write or
+   compatibility path for this private UI API.
+3. **Reconcile one adapter inside Connector Service.** Add a loopback control
+   operation that rereads the just-persisted adapter and asks
+   `DeliveryManager` to start, stop, or replace only that adapter. Serialize
+   concurrent reconciles per id; preserve parallel independence across ids;
+   reuse the existing start-failure classification and health tracking. A
+   stopped adapter is removed without touching peer queues or transports. A
+   changed credential/config restarts only that adapter. If the service is
+   unreachable, Alice may touch the Guardian flag once as bounded service-level
+   recovery; a reachable adapter failure must not escalate to process restart.
+4. **Move both UI surfaces to mutation-keyed saves.** Overview switches call the
+   adapter endpoint directly. The configuration dialog coalesces ordinary field
+   edits per adapter while credential creation/replacement/removal remain
+   explicit commands. Track a client generation for each adapter/key and merge
+   only matching responses. Keep drafts through refresh/conflict, show scoped
+   SaveIndicator/error state, and refresh runtime health independently. Starting
+   an adapter may also enable the global service through one coordinated backend
+   mutation; stopping it never changes service or peers.
+5. **Make Connector-to-Alice work restart-safe.** Replace the three process
+   arrays with a private, bounded, versioned durable queue. Persist inbound
+   owner text before the platform callback resolves; make artifact and UTA
+   enqueue APIs asynchronous so their request IDs are durable before controls
+   advance. Replace destructive drain with claim/lease, ack, and release. Carry
+   stable external event IDs into inbound records and use deterministic Issue
+   comment identity so a crash after append but before ack cannot duplicate a
+   conversation. Keep TTL/cap enforcement, seal or otherwise protect private
+   text at rest, and never store credentials in queue payloads. The existing I/O
+   journal remains audit/replay evidence, not queue state.
+6. **Constrain the remaining global lifecycle.** Global pause performs a
+   graceful stop after queue state is durable and journal writes are flushed.
+   Dev Guardian, production Guardian, and Electron must coalesce repeated flags
+   and agree on start/stop/recovery semantics. Ordinary adapter mutations must
+   produce no flag write in any carrier.
+7. **Document and accept the new contract.** Update the Connector owner guide,
+   protocol/API tests, and operator diagnostics. Verify the real Default
+   AliceProject read-only first, then use an isolated Project for rapid toggles,
+   process kill/restart, queue recovery, and package/Electron acceptance. Live
+   Telegram/Feishu test messages remain an explicitly authorized final lane.
+
+### Reliability acceptance matrix
+
+- **Config store:** gated concurrent mutations across two processes retain both
+  adapters, same-adapter different keys, bot-learned owner/chat fields, sealed
+  secrets, and explicit unsets; stale lease recovery is bounded and tested.
+- **BFF/protocol:** unknown adapter/field rejection, secret omission, explicit
+  removal, service-enable-plus-adapter-start coordination, and no whole-config
+  PUT remain covered.
+- **DeliveryManager:** start, stop, credential replacement, reconnect failure,
+  and simultaneous different-adapter reconciles prove peer adapters receive no
+  `stop()` or `start()` call and retain health/delivery.
+- **UI:** delayed responses and rapid cross-adapter switches converge without
+  bounce or overwrite in overview, dialog, two-tab, and bot-write simulations;
+  loading/error/focus/accessibility behavior remains intact.
+- **Durable work:** kill between enqueue/claim/side effect/ack recovers inbound,
+  artifact, and UTA requests; lease expiry requeues; terminal ack is idempotent;
+  duplicate UTA writes remain impossible under pending-hash checks.
+- **Guardian carriers:** source dev, production CLI/Docker, and Electron prove
+  zero process restart for adapter edits, one bounded reconcile for global
+  enable/disable or unreachable-service recovery, and no restart storm.
+- **Required gates:** focused specs, `pnpm test:connector-replay`,
+  `pnpm test:connector-service`, `npx tsc --noEmit`, `pnpm test`,
+  `cd ui && npx tsc -b`, real-route browser verification, an isolated Guardian
+  recovery smoke, and the matching unsigned Electron/package smoke.
 
 ## Ordered Work
 
@@ -661,6 +835,16 @@ external adapters remain optional projections rather than sources of truth.
   - [x] Make the overview's Ready-to-link action hierarchy match the actual
         lifecycle transition.
   - [x] Distinguish durable Chat configuration from live Connector availability.
+  - [ ] Move successful test references behind progressive disclosure.
+  - [ ] Replace whole-document Connector writes with atomic adapter-scoped
+        mutations shared by Alice and Connector Service.
+  - [ ] Apply adapter configuration through an in-process per-adapter lifecycle
+        reconcile; reserve Guardian restart for global lifecycle and recovery.
+  - [ ] Make overview and dialog saves mutation-keyed and stale-response-safe.
+  - [ ] Persist Connector-to-Alice inbound, artifact, and UTA work behind an
+        idempotent claim/ack queue before declaring restart safety.
+  - [ ] Verify adapter isolation and queue recovery across dev, production, and
+        Electron carriers without using real external accounts.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
