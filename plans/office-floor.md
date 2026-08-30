@@ -4896,6 +4896,28 @@ Expandable latest-result dialogue follow-up (2026-08-31):
   tests. Root and UI TypeScript passed; the full suite passed all 620 test files and 5,191 tests (one file and nine tests
   skipped); the production UI build passed with only the existing ports fallback and large-chunk advisory.
 
+Adaptive spatial-dialogue prompt follow-up (2026-08-31):
+
+- Replayed the real #5096 Agent event through Activity Log -> Find on floor -> auto-route to Grok Artificer. Arrival
+  produced a 210x41px spatial prompt whose 104px detail lane had 372px of content; the browser rendered only
+  `Grok Artifice...`, hiding both the event summary and most of the coworker's identity at the moment of interaction.
+- Compared retaining the compact object tooltip, replacing all interactions with a Pokemon/MOTHER-style bottom
+  dialogue box, and promoting only substantive coworker/replay copy into a two-line spatial dialogue prompt. Chose the
+  adaptive spatial prompt. It borrows the GBA dialogue hierarchy without making short Files/Roster/Workspace actions
+  heavy or severing the prompt's visual attachment to its world object.
+- The intended interaction model keeps compact prompts for commands, gives replay events and real coworker dialogue a
+  wider two-line reading lane, preserves object-aware placement and Enter/Touch affordances, and retains the complete
+  accessible label. Narrow layouts receive the same hierarchy at a smaller bounded width.
+- Implemented separate prompt layouts rather than keying presentation to domain names: service summaries remain 280px,
+  substantive replay/coworker dialogue receives a 320px two-line lane, and both converge to 240px in the narrow
+  container. Compact no-dialogue coworker, Files, Roster, and Workspace prompts keep their existing lightweight size.
+- Real-browser acceptance replayed #5096 again. The prompt now displayed the complete `Grok Artificer · WORKING STATE
+  OBSERVED QA COMPLETE` copy, stayed attached to the historical coworker, and Enter reopened the selected Activity Log
+  record. Returning Live produced the original compact TALK prompt for the same now-silent coworker. Focused Building
+  and placement suites passed all 32 tests. Root and UI TypeScript passed; the full suite passed all 620 test files and
+  5,191 tests (one file and nine tests skipped); the production UI build passed with only the existing ports fallback
+  and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

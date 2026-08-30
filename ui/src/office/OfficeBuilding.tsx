@@ -41,7 +41,9 @@ import {
 import {
   OFFICE_PROMPT_DESTINATION_MAX_WIDTH,
   OFFICE_PROMPT_DETAIL_MAX_WIDTH,
+  OFFICE_PROMPT_DIALOGUE_MAX_WIDTH,
   OFFICE_PROMPT_NARROW_DETAIL_MAX_WIDTH,
+  OFFICE_PROMPT_NARROW_DIALOGUE_MAX_WIDTH,
   OFFICE_PROMPT_NARROW_SERVICE_MAX_WIDTH,
   OFFICE_PROMPT_SERVICE_MAX_HEIGHT,
   OFFICE_PROMPT_SERVICE_MAX_WIDTH,
@@ -429,6 +431,9 @@ export function OfficeBuilding({
   const nearbyService = nearbyTarget?.kind === 'inbox-service'
     || nearbyTarget?.kind === 'news-service'
     || nearbyTarget?.kind === 'operations'
+  const nearbyDialogue = replaySeq != null
+    || (nearbyTarget?.kind === 'employee' && Boolean(nearbyTarget.employee.bubble))
+  const nearbyRichPrompt = nearbyService || nearbyDialogue
   const replayFocusIsNearby = replayFocusTarget != null
     && nearbyTarget?.id === replayFocusTarget.id
   const promptAvoidBounds = useMemo<OfficePromptAvoidBounds[]>(() => {
@@ -477,10 +482,14 @@ export function OfficeBuilding({
             height: viewportSize.height || mapLayout.height,
           },
           camera,
-          nearbyService
+          nearbyDialogue
             ? viewportSize.width > 0 && viewportSize.width <= 520
-              ? OFFICE_PROMPT_NARROW_SERVICE_MAX_WIDTH
-              : OFFICE_PROMPT_SERVICE_MAX_WIDTH
+              ? OFFICE_PROMPT_NARROW_DIALOGUE_MAX_WIDTH
+              : OFFICE_PROMPT_DIALOGUE_MAX_WIDTH
+            : nearbyService
+              ? viewportSize.width > 0 && viewportSize.width <= 520
+                ? OFFICE_PROMPT_NARROW_SERVICE_MAX_WIDTH
+                : OFFICE_PROMPT_SERVICE_MAX_WIDTH
             : nearbyTarget.kind === 'sign'
             ? OFFICE_PROMPT_DESTINATION_MAX_WIDTH
             : nearbyTarget.kind === 'employee' && nearbyTarget.employee.bubble
@@ -488,12 +497,12 @@ export function OfficeBuilding({
                 ? OFFICE_PROMPT_NARROW_DETAIL_MAX_WIDTH
                 : OFFICE_PROMPT_DETAIL_MAX_WIDTH
               : undefined,
-          nearbyService ? OFFICE_PROMPT_SERVICE_MAX_HEIGHT : undefined,
+          nearbyRichPrompt ? OFFICE_PROMPT_SERVICE_MAX_HEIGHT : undefined,
           promptAvoidBounds,
           promptTargetBounds,
         )
       : null,
-    [alice, camera, mapLayout.height, mapLayout.width, nearbyService, nearbyTarget, promptAvoidBounds, promptTargetBounds, viewportSize],
+    [alice, camera, mapLayout.height, mapLayout.width, nearbyRichPrompt, nearbyTarget, promptAvoidBounds, promptTargetBounds, viewportSize],
   )
   const promptPresentation: {
     icon: string
@@ -1774,6 +1783,7 @@ export function OfficeBuilding({
                   : ''}${promptPresentation.detail}`
                 : promptPresentation.label}
               data-kind={nearbyTarget.kind}
+              data-layout={nearbyDialogue ? 'dialogue' : nearbyService ? 'service' : undefined}
               data-side={promptPlacement.side}
               data-has-detail={Boolean(promptPresentation.detail) || undefined}
               style={{

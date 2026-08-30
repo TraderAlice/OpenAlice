@@ -4005,20 +4005,16 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
   white-space: nowrap;
 }
 
-.oa-office-interact-prompt:is(
-  [data-kind="inbox-service"],
-  [data-kind="news-service"],
-  [data-kind="operations"]
-) {
+.oa-office-interact-prompt:is([data-layout="dialogue"], [data-layout="service"]) {
   min-height: 58px;
   max-width: 280px;
 }
 
-.oa-office-interact-prompt:is(
-  [data-kind="inbox-service"],
-  [data-kind="news-service"],
-  [data-kind="operations"]
-) .oa-office-interact-prompt__action {
+.oa-office-interact-prompt[data-layout="dialogue"] {
+  max-width: 320px;
+}
+
+.oa-office-interact-prompt:is([data-layout="dialogue"], [data-layout="service"]) .oa-office-interact-prompt__action {
   min-height: 58px;
   align-items: center;
   grid-template-columns: 42px minmax(0, 1fr) auto;
@@ -4026,28 +4022,16 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
   padding: 5px 6px 5px 4px;
 }
 
-.oa-office-interact-prompt:is(
-  [data-kind="inbox-service"],
-  [data-kind="news-service"],
-  [data-kind="operations"]
-) .oa-office-interact-prompt__action > img {
+.oa-office-interact-prompt:is([data-layout="dialogue"], [data-layout="service"]) .oa-office-interact-prompt__action > img {
   width: 42px;
   height: 42px;
 }
 
-.oa-office-interact-prompt:is(
-  [data-kind="inbox-service"],
-  [data-kind="news-service"],
-  [data-kind="operations"]
-) .oa-office-interact-prompt__copy {
+.oa-office-interact-prompt:is([data-layout="dialogue"], [data-layout="service"]) .oa-office-interact-prompt__copy {
   gap: 2px;
 }
 
-.oa-office-interact-prompt:is(
-  [data-kind="inbox-service"],
-  [data-kind="news-service"],
-  [data-kind="operations"]
-) .oa-office-interact-prompt__copy small {
+.oa-office-interact-prompt:is([data-layout="dialogue"], [data-layout="service"]) .oa-office-interact-prompt__copy small {
   display: -webkit-box;
   overflow: hidden;
   line-height: 1.25;
@@ -4057,11 +4041,7 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
   -webkit-line-clamp: 2;
 }
 
-.oa-office-interact-prompt:is(
-  [data-kind="inbox-service"],
-  [data-kind="news-service"],
-  [data-kind="operations"]
-) .oa-office-interact-prompt__copy small b {
+.oa-office-interact-prompt:is([data-layout="dialogue"], [data-layout="service"]) .oa-office-interact-prompt__copy small b {
   color: var(--office-gba-water-seed);
   font-size: 0.9em;
   letter-spacing: 0.04em;
@@ -5983,11 +5963,7 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
     max-width: 168px;
   }
 
-  .oa-office-interact-prompt:is(
-    [data-kind="inbox-service"],
-    [data-kind="news-service"],
-    [data-kind="operations"]
-  ) {
+  .oa-office-interact-prompt:is([data-layout="dialogue"], [data-layout="service"]) {
     max-width: 240px;
   }
 
