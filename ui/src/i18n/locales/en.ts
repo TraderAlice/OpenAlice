@@ -1981,6 +1981,7 @@ export const en = {
     rosterHint: 'View every Session assigned to this Workspace group.',
     rosterCount_one: '{{count}} team member',
     rosterCount_other: '{{count}} team members',
+    rosterPosition: 'Member {{index}} of {{count}}',
     rosterSelectHint: 'Choose a teammate to inspect their Agent file.',
     rosterKeyboardHint: 'Arrows choose · PgUp/PgDn page · Home/End jump · Enter inspect',
     backToRoster: 'Back to team roster',

@@ -2563,6 +2563,12 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
   color: var(--gba-ink);
 }
 
+.oa-office-roster .oa-office-window__title-count {
+  display: grid;
+  min-width: 54px;
+  padding-inline: 4px;
+}
+
 .oa-office-roster__body {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);

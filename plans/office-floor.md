@@ -4940,6 +4940,26 @@ Player-facing cabinet record names follow-up (2026-08-31):
   the full suite passed all 620 test files and 5,192 tests (one file and nine tests skipped); the production UI build
   passed with only the existing ports fallback and large-chunk advisory.
 
+Large-roster selection counter follow-up (2026-08-31):
+
+- Reopened Chat's real 24-member Team roster and paged from g20 to g18. The six visible cards and cursor changed, but
+  both header and summary still only said `24 team members`; with no persistent visible scrollbar, the player could not
+  tell whether g18 was near the beginning, middle, or end of the roster.
+- Compared strengthening the scrollbar, introducing explicit page state, and deriving a GBA-style slot counter from the
+  already-owned focused teammate. Chose focus-derived position. A scrollbar only communicates approximate depth, while
+  synthetic pages would drift from arrow navigation, partial rows, pointer focus, and nested Agent-file returns.
+- The selected-member counter will live in the roster header as a compact `07/24` badge with a localized accessible
+  label. It must update from every focus path without another state machine, remain visible when the wide keyboard hint
+  disappears, and preserve the existing cards, paging geometry, and cursor ownership.
+- Implemented the badge directly from `focusedResumeId` and the current roster ordering, with two-digit minimum padding
+  and localized `Member N of M` semantics. The header badge is always visible on desktop and narrow layouts; the existing
+  total-member summary remains unchanged, so position and roster size are no longer conflated.
+- Real-browser acceptance walked the actual 24-member roster through `01/24` at g20, PageDown to `07/24` at g18, and
+  End to `24/24` at g1. Opening g1's Agent file and returning preserved `24/24`, the g1 focus, and the scrolled list.
+  Focused roster/grid suites passed all 4 tests. Root and UI TypeScript passed; the full suite passed all 620 test files
+  and 5,192 tests (one file and nine tests skipped); the production UI build passed with only the existing ports fallback
+  and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

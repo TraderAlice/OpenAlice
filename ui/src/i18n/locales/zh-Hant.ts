@@ -1956,6 +1956,7 @@ export const zhHant: Resources = {
     rosterHint: '查看分配到這個 Workspace 小組的全部 Session。',
     rosterCount_one: '{{count}} 名成員',
     rosterCount_other: '{{count}} 名成員',
+    rosterPosition: '第 {{index}} 名，共 {{count}} 名',
     rosterSelectHint: '選擇一名同事，查看 Agent 檔案。',
     rosterKeyboardHint: '方向鍵選擇 · PgUp/PgDn 翻頁 · Home/End 跳轉 · Enter 查看',
     backToRoster: '返回小組名冊',

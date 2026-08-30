@@ -1949,6 +1949,7 @@ export const ja: Resources = {
     rosterHint: 'この Workspace グループに所属するすべての Session を表示します。',
     rosterCount_one: '{{count}} 人のメンバー',
     rosterCount_other: '{{count}} 人のメンバー',
+    rosterPosition: '{{count}} 人中 {{index}} 人目',
     rosterSelectHint: 'メンバーを選んで Agent ファイルを確認します。',
     rosterKeyboardHint: '方向キーで選択 · PgUp/PgDn でページ移動 · Home/End で端へ · Enter で確認',
     backToRoster: 'チーム名簿に戻る',

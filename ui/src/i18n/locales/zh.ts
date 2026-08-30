@@ -1948,6 +1948,7 @@ export const zh: Resources = {
     rosterHint: '查看分配到这个 Workspace 小组的全部 Session。',
     rosterCount_one: '{{count}} 名成员',
     rosterCount_other: '{{count}} 名成员',
+    rosterPosition: '第 {{index}} 名，共 {{count}} 名',
     rosterSelectHint: '选择一名同事，查看 Agent 档案。',
     rosterKeyboardHint: '方向键选择 · PgUp/PgDn 翻页 · Home/End 跳转 · Enter 查看',
     backToRoster: '返回小组名册',

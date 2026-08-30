@@ -34,6 +34,11 @@ export function OfficeRosterWindow({
   const coworkerCast = useMemo(() => officeCoworkerCast(group.employees), [group.employees])
   const initialFocusResumeId = focusResumeId ?? employees[0]?.resumeId ?? null
   const [focusedResumeId, setFocusedResumeId] = useState(initialFocusResumeId)
+  const focusedIndex = Math.max(0, employees.findIndex((employee) => employee.resumeId === focusedResumeId))
+  const positionWidth = Math.max(2, String(employees.length).length)
+  const positionLabel = employees.length > 0
+    ? `${String(focusedIndex + 1).padStart(positionWidth, '0')}/${String(employees.length).padStart(positionWidth, '0')}`
+    : '00/00'
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
 
@@ -59,9 +64,11 @@ export function OfficeRosterWindow({
         </div>
         <span
           className="oa-office-window__title-count"
-          aria-label={t('office.rosterCount', { count: employees.length })}
+          aria-label={employees.length > 0
+            ? t('office.rosterPosition', { index: focusedIndex + 1, count: employees.length })
+            : t('office.rosterCount', { count: employees.length })}
         >
-          {employees.length}
+          {positionLabel}
         </span>
         <button
           type="button"
