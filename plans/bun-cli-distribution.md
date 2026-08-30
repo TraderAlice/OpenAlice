@@ -1,16 +1,15 @@
 # Bun-native CLI Distribution
 
-Status: Active — macOS/Linux dev preview accepted; stable channels pending;
-Windows deferred
+Status: Active — macOS/Linux native CLI is public in v0.90.2; v0.91.0-beta.1
+acceptance is next; native PowerShell and external package-manager activation
+remain deferred
 
-Delivery mode: Serial / interactive on the dedicated
-`codex/usability-improvements` integration branch. This changes a released
-install and long-running Runtime entry path. Each increment starts from the
-latest accepted integration tip, lands through one focused PR to that branch,
-and updates this plan with the verification actually completed. Keep only one
-implementation PR active at a time. After end-to-end acceptance, promote the
-coherent usability branch to `dev` through one reviewable PR; do not drip
-partially usable packaging internals directly into `dev`.
+Delivery mode: Serial / interactive from current `dev`. The accepted native CLI
+increments have already reached `dev`; the old `codex/usability-improvements`
+tip contains superseded release-flow experiments and must not be promoted as a
+whole. New implementation increments use focused branches back to `dev`.
+Human-directed source promotion and the focused version-only branch continue to
+follow [[docs/development-workflow.md]].
 
 Parent product plan: [[plans/shell-first-cli-supervisor.md]]. This plan
 supersedes only that plan's CLI distribution mechanics: managed Pi, the host
@@ -531,11 +530,11 @@ artifacts.
 
 ### 9. Release acceptance
 
-- [ ] Build every required target from the accepted tagged tree.
-- [ ] Verify archive checksum and internal release metadata before upload.
-- [ ] Run clean non-admin Bash installs on macOS and Linux.
+- [x] Build every required target from the accepted tagged tree.
+- [x] Verify archive checksum and internal release metadata before upload.
+- [x] Run clean non-admin Bash installs on macOS and Linux.
 - [ ] Deferred Windows lane: run a clean standard-user PowerShell install.
-- [ ] Install and run the accepted release through npm, Bun, Homebrew, and
+- [x] Install and run the accepted release through npm, Bun, Homebrew, and
   `paru`, then verify manager-owned update and uninstall guidance.
 - [x] Exercise the documented old-to-new cutover once on a currently supported
   v0.90.1 CLI host; this is evidence for the guidance, not a cross-platform
@@ -547,6 +546,22 @@ artifacts.
   installer, managed remote, and relevant Electron regression lanes.
 - [x] Publish `dev` preview artifacts and exercise their network path before a
   human-directed `dev` to `master` promotion.
+
+### 10. Publish the 0.91 beta checkpoint
+
+- [ ] Capture the current stable manifest, updater feeds, aliases, and shared
+  installer before beta publication.
+- [ ] Promote the exact accepted `dev` tip, including the GitHub-safe AUR
+  metadata asset contract, to `master` through the full promotion gate.
+- [ ] Use a focused `master` branch and PR to set both product manifests to
+  `0.91.0-beta.1`; do not merge that version-only commit back to `dev`.
+- [ ] Dispatch one `beta` release for `v0.91.0-beta.1`. Do not produce or queue
+  a stable release from the same run.
+- [ ] Externally verify the beta GitHub Release, updater feeds, CLI manifest,
+  installer, native Runtime, and Broker Packs while proving every stable-owned
+  mutable surface stayed byte-for-byte unchanged.
+- [ ] Leave later fixes on `dev`. A `beta.2` checkpoint is optional; stable is
+  a separate later decision after tomorrow's testing.
 
 ## Verification Matrix
 
@@ -913,3 +928,17 @@ This plan is complete only when:
   credentials; Tap/AUR commits are idempotent. Package-name reservation, Tap
   creation, AUR key enrollment, enabling the switches, and the first public
   install journeys remain explicit maintainer actions.
+- 2026-08-31: Published `v0.90.2-beta.1` and later `v0.90.2` as independent
+  release intents. The stable run built and accepted all native CLI targets,
+  Bash installers, npm/Bun/Homebrew/Linuxbrew/AUR mechanics, desktop packages,
+  and Broker Packs; external package-manager activation remained intentionally
+  disabled. Public GitHub/R2 bytes and a clean native Runtime journey passed
+  independent verification. GitHub normalized the hidden `.SRCINFO` asset name,
+  leaving the original run red only at its final metadata-name comparison; PR
+  #1268 now stages the exact accepted bytes as `openalice-bin.SRCINFO` while AUR
+  keeps its repository-local `.SRCINFO` contract.
+- 2026-08-31: Maintainer selected `v0.91.0-beta.1` as the next public checkpoint
+  and explicitly deferred stable until later testing. Beta and stable are
+  separate serial intents: fixes may accumulate on `dev` between them, another
+  beta is optional, and unchanged-source stable promotion is the exception
+  rather than an automatic second output.
