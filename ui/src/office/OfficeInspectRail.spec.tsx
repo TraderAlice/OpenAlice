@@ -142,6 +142,24 @@ describe('OfficeInspectRail', () => {
     expect(screen.getByText('headless')).toBeTruthy()
   })
 
+  it('keeps a stopped failure actionable while preserving asleep power state', () => {
+    render(
+      <OfficeInspectRail
+        employee={{ ...employee, awake: false, mood: 'failed', bubble: null, surface: 'headless' }}
+        roomName="Chat"
+        onOpen={vi.fn()}
+        onOpenDrawer={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('The last run needs attention.')).toBeTruthy()
+    const status = screen.getByText('failed')
+    expect(status.getAttribute('data-mood')).toBe('failed')
+    expect(status.getAttribute('data-power')).toBe('asleep')
+    expect(screen.getByTestId('office-inspect').dataset.awake).toBe('false')
+  })
+
   it('collapses a long Session title without moving the primary commands', async () => {
     const longTitle = 'Research question: Is NVDA in a buyable technical setup right now, and does the broader semiconductor sector support it?'
     const { container } = render(

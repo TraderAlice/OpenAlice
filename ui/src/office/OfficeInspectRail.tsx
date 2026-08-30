@@ -12,7 +12,7 @@ import { OFFICE_HUD_ASSETS } from './hud-assets'
 import { OfficeCoworkerSprite } from './OfficeCoworkerSprite'
 import type { OfficeCoworkerSpriteAsset } from './coworker-sprites'
 import { OfficeWindowControlGlyph } from './OfficeWindowControlGlyph'
-import { officeCoworkerAssignment, officeCoworkerCallsign } from './label'
+import { officeCoworkerAssignment, officeCoworkerCallsign, officeCoworkerStatusKey } from './label'
 import { useReducedMotion } from './use-reduced-motion'
 
 export function OfficeInspectRail({
@@ -174,7 +174,7 @@ export function OfficeInspectRail({
                   data-power={employee.awake ? 'awake' : 'asleep'}
                 >
                   <span aria-hidden />
-                  {t(employee.awake ? `office.mood.${employee.mood}` : 'office.power.asleep')}
+                  {t(officeCoworkerStatusKey(employee))}
                 </dd>
               </div>
               <div>

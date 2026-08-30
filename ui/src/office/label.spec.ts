@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import { OFFICE_COWORKER_SPRITES } from './coworker-sprites'
-import { officeCoworkerAssignment, officeCoworkerCallsign, officeCoworkerLabel } from './label'
+import {
+  officeCoworkerAssignment,
+  officeCoworkerCallsign,
+  officeCoworkerLabel,
+  officeCoworkerStatusKey,
+} from './label'
 
 describe('officeCoworkerLabel', () => {
   it('prefers displayName, then title, then the sticky name', () => {
@@ -23,5 +28,13 @@ describe('officeCoworkerLabel', () => {
     expect(officeCoworkerAssignment(employee)).toBe(employee.title)
     expect(officeCoworkerCallsign({ ...employee, displayName: 'Mina' }, OFFICE_COWORKER_SPRITES['grok-architect']))
       .toBe('Mina')
+  })
+
+  it('keeps actionable failure and waiting states visible after power-down', () => {
+    expect(officeCoworkerStatusKey({ awake: false, mood: 'idle' })).toBe('office.power.asleep')
+    expect(officeCoworkerStatusKey({ awake: false, mood: 'review' })).toBe('office.power.asleep')
+    expect(officeCoworkerStatusKey({ awake: false, mood: 'failed' })).toBe('office.mood.failed')
+    expect(officeCoworkerStatusKey({ awake: false, mood: 'waiting' })).toBe('office.mood.waiting')
+    expect(officeCoworkerStatusKey({ awake: true, mood: 'working' })).toBe('office.mood.working')
   })
 })

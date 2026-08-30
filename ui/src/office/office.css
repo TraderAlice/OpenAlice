@@ -748,6 +748,16 @@
   background: transparent;
 }
 
+.oa-office-inspect__facts dd[data-power="asleep"][data-mood="waiting"] > span {
+  border: 0;
+  background: var(--office-amber);
+}
+
+.oa-office-inspect__facts dd[data-power="asleep"][data-mood="failed"] > span {
+  border: 0;
+  background: var(--office-danger);
+}
+
 .oa-office-inspect__open {
   display: flex;
   width: 100%;
@@ -2664,6 +2674,23 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
   box-shadow:
     inset 0 0 0 1px var(--gba-paper),
     1px 1px 0 var(--gba-ink);
+}
+
+.oa-office-roster__status[data-power="asleep"][data-mood="waiting"] {
+  color: color-mix(in srgb, var(--office-amber) 68%, var(--gba-ink));
+  background: color-mix(in srgb, var(--office-amber) 14%, var(--gba-paper));
+}
+
+.oa-office-roster__status[data-power="asleep"][data-mood="failed"] {
+  color: color-mix(in srgb, var(--gba-alert) 72%, var(--gba-ink));
+  background: color-mix(in srgb, var(--gba-alert) 12%, var(--gba-paper));
+}
+
+.oa-office-roster__status[data-power="asleep"][data-mood="waiting"] i,
+.oa-office-roster__status[data-power="asleep"][data-mood="failed"] i {
+  border-color: currentColor;
+  background: currentColor;
+  box-shadow: 1px 1px 0 var(--gba-ink);
 }
 
 .oa-office-roster__cursor {

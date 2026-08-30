@@ -8,7 +8,7 @@ import { OfficeCoworkerSprite } from './OfficeCoworkerSprite'
 import { OfficeWindowControlGlyph } from './OfficeWindowControlGlyph'
 import { officePixelImg } from './furniture'
 import { OFFICE_HUD_ASSETS } from './hud-assets'
-import { officeCoworkerAssignment, officeCoworkerCallsign } from './label'
+import { officeCoworkerAssignment, officeCoworkerCallsign, officeCoworkerStatusKey } from './label'
 import { nextOfficeGridIndex } from './grid-navigation'
 import { useReducedMotion } from './use-reduced-motion'
 
@@ -161,7 +161,7 @@ export function OfficeRosterWindow({
                   data-power={employee.awake ? 'awake' : 'asleep'}
                 >
                   <i aria-hidden />
-                  {t(employee.awake ? `office.mood.${employee.mood}` : 'office.power.asleep')}
+                  {t(officeCoworkerStatusKey(employee))}
                 </span>
                 <img
                   className="oa-office-roster__cursor"

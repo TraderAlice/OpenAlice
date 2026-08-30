@@ -26,7 +26,13 @@ describe('OfficeRosterWindow', () => {
       name: index === 5 ? 'c1' : `x${index + 1}`,
       title: `Research session ${index + 1}`,
       awake: index < 2,
-      mood: index < 2 ? 'working' as const : 'idle' as const,
+      mood: index < 2
+        ? 'working' as const
+        : index === 2
+          ? 'failed' as const
+          : index === 3
+            ? 'waiting' as const
+            : 'idle' as const,
       bubble: null,
       lastSeq: 1,
       lastInteractionAt: 1,
@@ -79,7 +85,9 @@ describe('OfficeRosterWindow', () => {
     expect(container.querySelector('svg')).toBeNull()
     expect(screen.getAllByText('working')).toHaveLength(2)
     expect(screen.queryByText('idle')).toBeNull()
-    expect(screen.getAllByText('asleep')).toHaveLength(4)
+    expect(screen.getByText('failed')).toBeTruthy()
+    expect(screen.getByText('waiting')).toBeTruthy()
+    expect(screen.getAllByText('asleep')).toHaveLength(2)
     expect(container.querySelectorAll('.oa-office-roster__status[data-power="awake"]')).toHaveLength(2)
     expect(container.querySelectorAll('.oa-office-roster__status[data-power="asleep"]')).toHaveLength(4)
     expect(container.querySelectorAll('.oa-office-roster li button[data-awake="false"]')).toHaveLength(4)

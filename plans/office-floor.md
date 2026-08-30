@@ -4089,6 +4089,24 @@ Roster-callout scene-avoidance follow-up (2026-08-30):
   files and 5,169 tests (one file and nine tests skipped), and the production UI build passed with only the existing
   ports fallback and large-chunk advisories.
 
+Actionable dormant-state follow-up (2026-08-30):
+
+- Replayed cabinet and News-terminal round trips before inspecting the real g20 probe that had exceeded its timeout.
+  Cabinet and service callouts kept Alice and their primary interactions legible, but the failed Session exposed a
+  more important contradiction: its floor label said `failed, asleep` and Agent dialogue said the last run needed
+  attention, while both the Roster chip and Agent-file Status reduced it to `ASLEEP`.
+- Compared leaving actionability in dialogue only, composing `failed · asleep`, and letting exceptional action state
+  own the single RPG status slot while power remains visible elsewhere. Chose the third option: `failed` and `waiting`
+  outrank asleep in inspection menus; idle, working, talking, and review still collapse to asleep after power-down.
+  The dim portrait, powered-down workstation, `data-power=asleep`, and room awake count continue to tell the power truth.
+- Real-browser acceptance showed g20 first in the 21-member Chat roster with a restrained red `FAILED` chip while all
+  ordinary dormant coworkers remained `ASLEEP`. Agent File paired the red `failed` fact with `The last run needs
+  attention.`, retained `headless`, and kept the room at `0/21 awake`. The shared rule also gives a stopped rejection
+  the amber `WAITING` priority without making successful review or stale work look live.
+- Focused label, Roster, Agent-file, inspect-style, and responsive-style suites passed 38 tests. Root and UI TypeScript
+  passed, the full suite passed all 617 test files and 5,171 tests (one file and nine tests skipped), and the production
+  UI build passed with only the existing ports fallback and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

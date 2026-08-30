@@ -33,3 +33,14 @@ export function officeCoworkerAssignment(
   if (!title || title === employee.displayName?.trim() || title === employee.name) return null
   return title
 }
+
+/** Actionable states outrank power state in inspection menus. The powered-down
+ * portrait and room awake count still communicate that the runtime has stopped. */
+export function officeCoworkerStatusKey(
+  employee: Pick<OfficeFloorEmployee, 'awake' | 'mood'>,
+): 'office.power.asleep' | `office.mood.${OfficeFloorEmployee['mood']}` {
+  if (!employee.awake && employee.mood !== 'failed' && employee.mood !== 'waiting') {
+    return 'office.power.asleep'
+  }
+  return `office.mood.${employee.mood}`
+}
