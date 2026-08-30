@@ -71,6 +71,17 @@ const OFFICE_MOVEMENTS = {
   down: { x: 0, y: 24, direction: 'down' as const },
 }
 
+export function officeRouteStatusEdge(
+  alicePosition: { x: number; y: number },
+  cameraPosition: { x: number; y: number },
+  viewport: { width: number; height: number },
+  mapHeight: number,
+): 'top' | 'bottom' {
+  return alicePosition.y + cameraPosition.y >= (viewport.height || mapHeight) / 2
+    ? 'top'
+    : 'bottom'
+}
+
 type OfficeMovement = { x: number; y: number; direction: OfficeAliceDirection }
 const OFFICE_MOVEMENT_KEYS: Record<string, OfficeMovement> = {
   arrowleft: OFFICE_MOVEMENTS.left,
@@ -344,6 +355,7 @@ export function OfficeBuilding({
                   ? `${t('office.roster')} · ${routeTarget.roomName}`
                   : routeTarget.roomName
     : null
+  const routeStatusEdge = officeRouteStatusEdge(alice, camera, viewportSize, mapLayout.height)
   const operationsBoard = useMemo(
     () => officeOperationsBoardPosition(mapLayout.width),
     [mapLayout.width],
@@ -1567,6 +1579,7 @@ export function OfficeBuilding({
             role="status"
             aria-live="polite"
             data-testid="office-route-status"
+            data-edge={routeStatusEdge}
           >
             <img
               src={OFFICE_FURNITURE.generated.routeDestination}

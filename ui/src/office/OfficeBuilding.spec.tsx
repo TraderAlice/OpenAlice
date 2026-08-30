@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../i18n'
-import { OfficeBuilding } from './OfficeBuilding'
+import { OfficeBuilding, officeRouteStatusEdge } from './OfficeBuilding'
 
 afterEach(cleanup)
 
@@ -739,6 +739,7 @@ describe('OfficeBuilding', () => {
       const routeStatus = screen.getByTestId('office-route-status')
       expect(routeStatus.textContent).toContain('Auto move')
       expect(routeStatus.textContent).toContain('Walking to chat')
+      expect(routeStatus.dataset.edge).toBe('bottom')
       expect(routeStatus.textContent).toContain('Esc')
       expect(routeStatus.textContent).toContain('Cancel')
       expect(routeStatus.querySelector('.oa-office-route-status__cancel')?.hasAttribute('aria-hidden')).toBe(false)
@@ -804,6 +805,27 @@ describe('OfficeBuilding', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('keeps the auto-route status on the screen edge opposite Alice', () => {
+    expect(officeRouteStatusEdge(
+      { x: 120, y: 600 },
+      { x: 0, y: 0 },
+      { width: 960, height: 672 },
+      672,
+    )).toBe('top')
+    expect(officeRouteStatusEdge(
+      { x: 840, y: 164 },
+      { x: 0, y: 0 },
+      { width: 960, height: 672 },
+      672,
+    )).toBe('bottom')
+    expect(officeRouteStatusEdge(
+      { x: 480, y: 600 },
+      { x: 0, y: -320 },
+      { width: 844, height: 390 },
+      672,
+    )).toBe('top')
   })
 
   it('offers sleeping groups from the in-world quiet notice', async () => {

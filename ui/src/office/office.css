@@ -3552,6 +3552,11 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
   animation: oa-office-route-status-in 140ms steps(3, end);
 }
 
+.oa-office-route-status[data-edge='top'] {
+  top: 14px;
+  bottom: auto;
+}
+
 .oa-office-route-status > img {
   display: block;
   width: 20px;
@@ -5626,6 +5631,11 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
     right: 10px;
     bottom: 122px;
     max-width: calc(100% - 20px);
+  }
+
+  .oa-office-route-status[data-edge='top'] {
+    top: 10px;
+    bottom: auto;
   }
 
   .oa-office-route-status [data-input='keyboard'] {

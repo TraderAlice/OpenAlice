@@ -4013,6 +4013,26 @@ Replay character-state semantics follow-up (2026-08-30):
   and 5,166 tests (one file and nine tests skipped), and the production UI build passed with only the existing ports
   fallback and large-chunk advisories.
 
+Auto-route HUD occlusion follow-up (2026-08-30):
+
+- Replayed the real route from the News terminal to the Chat personnel board. The current 12px footsteps were centered
+  at y667 beside Alice's roughly y665 foot line, so the old Inbox QA note about a 24px vertical offset no longer
+  described the live floor. The remaining defect was visible during the same walk: The fixed lower-right `AUTO MOVE`
+  panel covered Alice at the south edge until only her hair remained visible.
+- Compared moving the route panel permanently north, attaching it to Alice, and letting the panel use the screen edge
+  opposite the player like a classic JRPG message window. Chose the opposing edge: It preserves the existing status
+  hierarchy and cancel affordance, avoids a second moving object around Alice, and does not merely transfer the
+  occlusion to north-side destinations.
+- Route status now derives `top` or `bottom` from Alice's camera-adjusted screen half and exposes the result as an
+  explicit presentation state. Desktop and coarse-pointer layouts both keep their established safe-area offsets;
+  reduced motion and cancellation behavior are unchanged.
+- Real-browser geometry measured the south-side route with Alice at y581–637 and the panel at y83–138, then the
+  north-side route with Alice at y305–361 and the panel at y648–703; both reported no intersection. A physical key
+  chord still changed both movement axes in open floor space, while repeated west and north input kept Alice inside
+  the map boundary. Focused Building/style suites passed 43 tests. Root and UI TypeScript passed, the full suite passed
+  all 617 test files and 5,167 tests (one file and nine tests skipped), and the production UI build passed with only
+  the existing ports fallback and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
