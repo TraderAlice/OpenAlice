@@ -4325,6 +4325,22 @@ Sprint gait-cadence follow-up (2026-08-31):
   TypeScript passed, the full suite passed all 617 test files and 5,176 tests (one file and nine tests skipped), and the
   production UI build passed with only the existing ports fallback and large-chunk advisories.
 
+Persistent control-reference follow-up (2026-08-31):
+
+- Replayed the dense Chat workstation route and first ruled out an apparent dead destination: Agent File was still open
+  and correctly suspending world input. After closing it, Alice left x312/y504 with one 24px upward beat; the collision
+  and path model therefore stayed unchanged instead of gaining a false escape exception.
+- Audited sprint discoverability after the first-run map hint had retired. Compared restoring a permanent floor HUD,
+  keeping Shift as a one-time secret, and adding the conventional control reference to the pause menu. Chose the menu:
+  it now keeps movement, Shift run, Enter/Space interaction, and Escape cancellation available without adding map noise.
+  The reference is descriptive rather than focusable, so arrow-key navigation still visits only actionable menu items;
+  coarse-pointer devices hide the keyboard legend and retain their existing D-pad and touch action controls.
+- Real-browser acceptance measured the desktop menu at 224x273px and the control panel at 208x121px with no horizontal
+  overflow. The live map remains visible under the single paused-world layer, all four command rows are readable, and
+  closing the menu removes the layer normally. Focused Building and responsive-style suites passed 47 tests. Root and
+  UI TypeScript passed, the full suite passed all 617 test files and 5,176 tests (one file and nine tests skipped), and
+  the production UI build passed with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

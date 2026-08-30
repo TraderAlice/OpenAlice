@@ -1311,6 +1311,32 @@ export function OfficeBuilding({
                 <img src={OFFICE_HUD_ASSETS.occupancyLog} alt="" aria-hidden style={officePixelImg} />
                 <span>{t('office.timeline')}</span>
               </DropdownMenuItem>
+              <div
+                className="oa-office-pause-menu__controls"
+                role="group"
+                aria-label={t('office.controls')}
+                data-input="keyboard"
+              >
+                <strong>{t('office.controls')}</strong>
+                <dl>
+                  <div>
+                    <dt><kbd>WASD</kbd><span aria-hidden>/</span><kbd>↑←↓→</kbd></dt>
+                    <dd>{t('office.controlMove')}</dd>
+                  </div>
+                  <div>
+                    <dt><kbd>Shift</kbd></dt>
+                    <dd>{t('office.controlRun')}</dd>
+                  </div>
+                  <div>
+                    <dt><kbd>Enter</kbd><span aria-hidden>/</span><kbd>Space</kbd></dt>
+                    <dd>{t('office.controlInteract')}</dd>
+                  </div>
+                  <div>
+                    <dt><kbd>Esc</kbd></dt>
+                    <dd>{t('office.controlCancel')}</dd>
+                  </div>
+                </dl>
+              </div>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

@@ -296,6 +296,9 @@ describe('Office responsive style contract', () => {
     expect(coarseTouchCss).toContain("[data-input='touch']")
     expect(coarseTouchCss).toContain('.oa-office-map-controls__move')
     expect(coarseTouchCss).toContain('.oa-office-route-status')
+    expect(coarseTouchCss).toMatch(
+      /\.oa-office-pause-menu__controls\s*\{\s*display: none;/,
+    )
     expect(coarseTouchCss).toContain('bottom: 122px')
     expect(css).toMatch(
       /\.oa-office-window__input-hint \[data-input='touch'\]\s*\{\s*display: none;/,

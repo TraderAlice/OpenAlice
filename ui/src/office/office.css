@@ -5081,6 +5081,69 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
   display: none;
 }
 
+.oa-office-pause-menu__controls {
+  display: grid;
+  gap: 5px;
+  margin-top: 1px;
+  padding: 7px 8px 8px;
+  border: 2px solid var(--gba-ink-soft);
+  color: var(--gba-ink);
+  background: color-mix(in srgb, var(--gba-cream) 58%, var(--gba-paper));
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.oa-office-pause-menu__controls > strong {
+  color: var(--gba-ink-soft);
+  font-size: var(--text-xs);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.oa-office-pause-menu__controls dl {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.oa-office-pause-menu__controls dl > div {
+  display: grid;
+  grid-template-columns: minmax(104px, auto) 1fr;
+  align-items: center;
+  gap: 6px;
+}
+
+.oa-office-pause-menu__controls :is(dt, dd) {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.15;
+}
+
+.oa-office-pause-menu__controls dt {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.oa-office-pause-menu__controls kbd {
+  min-width: 0;
+  padding: 2px 3px;
+  border: 1px solid var(--gba-ink-soft);
+  border-bottom-width: 2px;
+  border-radius: 1px;
+  color: var(--gba-ink);
+  background: var(--gba-paper);
+  font: inherit;
+  font-weight: 900;
+  text-align: center;
+}
+
+.oa-office-pause-menu__controls dd {
+  color: var(--gba-ink-soft);
+  font-weight: 800;
+  text-align: right;
+}
+
 .oa-office-map-wall {
   position: absolute;
   top: 0;
@@ -5674,6 +5737,10 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
 
 @media (hover: none), (pointer: coarse) {
   .oa-office-runtime__input-hint {
+    display: none;
+  }
+
+  .oa-office-pause-menu__controls {
     display: none;
   }
 
