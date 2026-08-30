@@ -1271,16 +1271,21 @@
 }
 
 .oa-office-runtime__detail {
-  display: -webkit-box;
+  display: block;
   margin: 7px 0 0;
   padding: 6px 8px;
   border-left: 3px solid var(--gba-water);
   color: var(--gba-ink);
   background: color-mix(in srgb, var(--gba-water) 9%, var(--gba-cream));
   line-height: 1.35;
-  overflow: hidden;
+  overflow: visible;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+}
+
+.oa-office-runtime__detail[data-expandable="true"]:not([data-expanded="true"]) {
+  display: -webkit-box;
+  overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 5;
 }
@@ -2037,6 +2042,12 @@
     .oa-office-runtime__input-hint
   ) {
     display: none;
+  }
+
+  .oa-office-window--log:has(
+    .oa-office-runtime__journal[data-mobile-view="detail"]
+  ) .oa-office-runtime__actions {
+    position: static;
   }
 }
 

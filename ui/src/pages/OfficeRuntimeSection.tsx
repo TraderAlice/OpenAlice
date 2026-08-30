@@ -654,6 +654,7 @@ export function OfficeRuntimeSection({
                 <p
                   id={selectedDetailId}
                   className="oa-office-runtime__detail"
+                  data-expandable={detailCanExpand || undefined}
                   data-expanded={detailExpanded || undefined}
                 >
                   {selectedDetail}

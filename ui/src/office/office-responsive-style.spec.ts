@@ -191,6 +191,9 @@ describe('Office responsive style contract', () => {
     expect(css).toMatch(
       /@container \(max-width: 760px\) and \(max-height: 420px\) \{[\s\S]*?\.oa-office-window--log:has\([\s\S]*?data-mobile-view="detail"[\s\S]*?\.oa-office-replay-panel,[\s\S]*?\.oa-office-runtime__channels,[\s\S]*?\.oa-office-runtime__input-hint[\s\S]*?display: none;/,
     )
+    expect(css).toMatch(
+      /@container \(max-width: 760px\) and \(max-height: 420px\) \{[\s\S]*?data-mobile-view="detail"[\s\S]*?\.oa-office-runtime__actions\s*\{\s*position: static;/,
+    )
   })
 
   it('keeps four log channels on one game-menu row until a phone needs two rows', () => {
@@ -205,7 +208,10 @@ describe('Office responsive style contract', () => {
       /\.oa-office-runtime__event\s*\{[\s\S]*?grid-template-rows: minmax\(min-content, 1fr\) auto;[\s\S]*?min-height: 400px;/,
     )
     expect(css).toMatch(
-      /\.oa-office-runtime__detail\s*\{[\s\S]*?overflow: hidden;[\s\S]*?-webkit-line-clamp: 5/,
+      /\.oa-office-runtime__detail\s*\{[\s\S]*?overflow: visible;/,
+    )
+    expect(css).toMatch(
+      /\.oa-office-runtime__detail\[data-expandable="true"\]:not\(\[data-expanded="true"\]\)\s*\{[\s\S]*?overflow: hidden;[\s\S]*?-webkit-line-clamp: 5/,
     )
     expect(css).toMatch(
       /\.oa-office-runtime__actions\s*\{[\s\S]*?position: sticky;[\s\S]*?bottom: 0;/,

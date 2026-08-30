@@ -234,6 +234,7 @@ describe('OfficeRuntimeSection', () => {
     ].join('\n'))
     expect(detail?.textContent).toContain('• Preserve the action bar after a detailed report.')
     expect(detail?.textContent).not.toMatch(/\*\*|`|\]\(|~~|^#/)
+    expect(detail?.getAttribute('data-expandable')).toBe('true')
     const toggle = screen.getByRole('button', { name: 'Show full report' })
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
     expect(detail?.getAttribute('data-expanded')).toBeNull()
@@ -247,6 +248,35 @@ describe('OfficeRuntimeSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Collapse report' }))
     expect(screen.getByRole('button', { name: 'Show full report' }).getAttribute('aria-expanded'))
       .toBe('false')
+  })
+
+  it('never clamps a report that has no expand command', async () => {
+    const mediumReport = [
+      'Office keyboard playtest is recorded, no code changed.',
+      'Alice walks off-grid on diagonals, overlaps the map bezel and north wall,',
+      'disappears into the news desk, and the auto-path footsteps sit above her feet.',
+      'Full log and frames remain available in the delivered report.',
+    ].join(' ')
+    query.mockResolvedValue({
+      lastSeq: 1,
+      total: 1,
+      page: 1,
+      pageSize: 50,
+      totalPages: 1,
+      entries: [{
+        seq: 1,
+        ts: Date.now(),
+        type: 'inbox.received',
+        payload: { inboxEntryId: 'inbox-medium', summary: mediumReport },
+      }],
+    })
+    const { container } = render(<OfficeRuntimeSection initialChannel="inbox" />)
+
+    await screen.findByRole('button', { name: /Inbox received.*#0001/i })
+    const detail = container.querySelector('.oa-office-runtime__detail')
+    expect(detail?.textContent).toBe(mediumReport)
+    expect(detail?.getAttribute('data-expandable')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Show full report' })).toBeNull()
   })
 
   it('keeps story events while switching between product activity channels', async () => {

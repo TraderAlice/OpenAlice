@@ -3760,6 +3760,27 @@ Short-landscape journal-detail follow-up (2026-08-30):
   test files and 5,162 tests (one file and nine tests skipped), and the production UI build passed with only the
   existing jsdom canvas and large-chunk advisories.
 
+Readable medium-report follow-up (2026-08-30):
+
+- Walked from the live floor into the unread Inbox terminal and opened Inbox Seq 4254. Its 239-character report
+  measured 106px of visible height against 182px of scroll content on desktop, visibly ended in an ellipsis, and had
+  no Show full report command. The component offered expansion only above 320 characters or eight source lines while
+  CSS independently clamped every report to five rendered lines, so a medium product log could be permanently hidden.
+- Compared lowering the character guess, measuring every paragraph through responsive DOM state, and making visual
+  clamping conditional on the existing expand capability. Chose the single-source contract: only a report that owns
+  the expand command receives `data-expandable` and the five-line clamp; every report without that command renders
+  its full available text. This avoids locale/width guesses and keeps long reports compact.
+- The real Inbox detail now measures 201px on desktop with equal client/scroll height and no false toggle. At 390x844
+  its complete 163px text block, Assignment, and both commands are readable in the portrait journal. The same report
+  also exposed that short-landscape sticky actions still covered its opening lines, so the existing <=760x420 detail
+  mode now places actions after content; its first frame shows the report opening, and a 141.5px body scroll reaches
+  the complete report, Documents value, and both 48px commands without overlap. Desktop and portrait keep sticky
+  commands.
+- Focused runtime and responsive-style tests passed (2 files / 38 tests), including a medium Inbox report with no
+  clamp attribute and a long report that must own one. Root and UI TypeScript passed, the full suite passed all 617
+  test files and 5,163 tests (one file and nine tests skipped), and the production UI build passed with only the
+  existing jsdom canvas and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
