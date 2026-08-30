@@ -4176,6 +4176,25 @@ Activity-log event-priority follow-up (2026-08-30):
   skipped), and the production UI build passed with only the existing ports fallback, jsdom canvas, and large-chunk
   advisories.
 
+Replay exit-route ownership follow-up (2026-08-30):
+
+- Replayed the latest real Grok Curator completion (`#5018`) and used `Find on floor` while Alice was still several
+  route steps from the historical coworker. Pressing Live changed the HUD and floor data immediately, but the replay
+  route timer retained ownership of Alice and silently continued moving her across the live floor.
+- Compared disabling Live until arrival, snapping Alice to the destination before returning, and treating Live as an
+  atomic historical-context exit. Chose the atomic exit: cancel and clear the historical route first, then switch the
+  floor to Live and restore map focus. The player can always leave Replay immediately, and no historical controller
+  survives into current state.
+- A two-line nearby coworker prompt with the full callsign was also prototyped during this playthrough, but its 92x46px
+  plate obscured the adjacent workstation and duplicated accessible identity. It failed visual acceptance and was
+  removed rather than adding another dense label to the world.
+- Real-browser acceptance triggered the active route at Alice x480/y432, returned Live after one route step at
+  x456/y432, and confirmed both the route marker and trail cleared immediately. Alice remained at x456/y432 for the
+  following 3.2 seconds. The focused Building suite passed all 19 tests, including a regression that waits after Live
+  return and proves the canceled route cannot move Alice or select the historical coworker. Root and UI TypeScript
+  passed, the full suite passed all 617 test files and 5,172 tests (one file and nine tests skipped), and the production
+  UI build passed with only the existing ports fallback and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

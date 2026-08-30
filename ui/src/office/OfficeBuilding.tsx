@@ -645,6 +645,7 @@ export function OfficeBuilding({
     setMenuOpen(false)
   }
   const returnToLiveFloor = () => {
+    cancelAutoWalk()
     onReturnLive?.()
     requestAnimationFrame(() => viewportRef.current?.focus({ preventScroll: true }))
   }

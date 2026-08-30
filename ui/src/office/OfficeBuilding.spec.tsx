@@ -178,13 +178,14 @@ describe('OfficeBuilding', () => {
     expect(screen.queryByRole('button', { name: 'Return live' })).toBeNull()
   })
 
-  it('turns Find on floor into a cancelable auto-walk to the replayed coworker', async () => {
+  it('cancels the historical auto-walk before returning to the Live floor', async () => {
     vi.stubGlobal('matchMedia', vi.fn(() => ({
       matches: false,
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
     })))
     const onSelectEmployee = vi.fn()
+    const onReturnLive = vi.fn()
     const { container } = render(
       <OfficeBuilding
         building={{
@@ -243,17 +244,22 @@ describe('OfficeBuilding', () => {
         onOpenFiles={vi.fn()}
         onOpenRoster={vi.fn()}
         onOpenLog={vi.fn()}
-        onReturnLive={vi.fn()}
+        onReturnLive={onReturnLive}
       />,
     )
 
     const target = screen.getByTestId('office-desk-resume-target')
+    const alice = screen.getByRole('img', { name: 'Alice on the office map' })
     expect(target.dataset.route).toBe('true')
     expect(container.querySelector('.oa-office-route-trail__step')).toBeTruthy()
 
-    await userEvent.keyboard('{ArrowRight}')
+    fireEvent.click(screen.getByRole('button', { name: 'Return live' }))
+    const positionAfterReturn = `${alice.style.left}:${alice.style.top}`
+    expect(onReturnLive).toHaveBeenCalledTimes(1)
     expect(target.dataset.route).toBe('false')
     expect(container.querySelector('.oa-office-route-trail__step')).toBeNull()
+    await new Promise((resolve) => setTimeout(resolve, 250))
+    expect(`${alice.style.left}:${alice.style.top}`).toBe(positionAfterReturn)
     expect(onSelectEmployee).not.toHaveBeenCalled()
   })
 
