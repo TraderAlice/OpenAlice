@@ -14,6 +14,7 @@ import { OfficeCoworkerSprite } from './OfficeCoworkerSprite'
 import type { OfficeCoworkerSpriteAsset } from './coworker-sprites'
 import { OfficeWindowControlGlyph } from './OfficeWindowControlGlyph'
 import { officeCoworkerAssignment, officeCoworkerCallsign, officeCoworkerStatusKey } from './label'
+import { officeRunModeLabel } from './runtime-presentation'
 import { useReducedMotion } from './use-reduced-motion'
 
 export function OfficeInspectRail({
@@ -204,8 +205,8 @@ export function OfficeInspectRail({
                 <dd>{roomName || '—'}</dd>
               </div>
               <div>
-                <dt>{t('office.surface')}</dt>
-                <dd>{employee.surface || '—'}</dd>
+                <dt>{t('office.eventRunMode')}</dt>
+                <dd>{officeRunModeLabel(employee.surface, t) || '—'}</dd>
               </div>
             </dl>
             {employee.drawers.length > 0 && (

@@ -34,6 +34,7 @@ import {
   type OfficeReplayChannel,
   type OfficeReplayFocus,
 } from '../office/replay-focus'
+import { officeRunModeLabel } from '../office/runtime-presentation'
 import { useWorkspace } from '../tabs/store'
 
 export type OfficeLogChannel = OfficeReplayChannel
@@ -96,16 +97,6 @@ function eventStatusLabel(status: AgentRuntimeEvent['payload']['status'], t: TFu
   if (status === 'failed') return t('office.logStatusFailed')
   if (status === 'interrupted') return t('office.logStatusInterrupted')
   if (status === 'paused') return t('office.logStatusPaused')
-  return null
-}
-
-function eventRunModeLabel(
-  surface: AgentRuntimeEvent['payload']['surface'],
-  t: TFunction,
-): string | null {
-  if (surface === 'headless') return t('office.runModeBackground')
-  if (surface === 'terminal') return t('office.runModeTerminal')
-  if (surface === 'webpi') return t('office.runModeWorkspace')
   return null
 }
 
@@ -510,7 +501,7 @@ export function OfficeRuntimeSection({
   const addMeta = (label: string, value: string | null | undefined) => {
     if (value) selectedMeta.push({ label, value })
   }
-  addMeta(t('office.eventRunMode'), eventRunModeLabel(selectedPayload.surface, t))
+  addMeta(t('office.eventRunMode'), officeRunModeLabel(selectedPayload.surface, t))
   addMeta(t('office.eventTrigger'), causeLabel(selectedEvent, actors, t))
   addMeta(t('office.status'), eventStatusLabel(selectedPayload.status, t))
   if (selectedPayload.metrics) {

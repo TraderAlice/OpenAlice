@@ -152,7 +152,9 @@ describe('OfficeInspectRail', () => {
     expect(screen.queryByText('idle')).toBeNull()
     expect(screen.getByText('asleep').getAttribute('data-power')).toBe('asleep')
     expect(screen.getByTestId('office-inspect').dataset.awake).toBe('false')
-    expect(screen.getByText('headless')).toBeTruthy()
+    expect(screen.getByText('Run mode')).toBeTruthy()
+    expect(screen.getByText('Background run')).toBeTruthy()
+    expect(container.textContent).not.toContain('headless')
   })
 
   it('keeps a stopped failure actionable while preserving asleep power state', async () => {

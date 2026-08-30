@@ -4845,6 +4845,22 @@ Large-roster paging follow-up (2026-08-31):
   passed; the full suite passed all 618 test files and 5,188 tests (one file and nine tests skipped); the production UI
   build passed with only the existing ports fallback and large-chunk advisory.
 
+Shared Agent-file run-mode follow-up (2026-08-31):
+
+- Tested the paged roster's nested return path before changing it: g12 reopened at the same focus with `scrollTop=449`,
+  and its card remained fully visible. That behavior was already correct. The returned Agent file exposed the actual new
+  gap instead: it still rendered `Surface · headless` even though the Activity Log now called the same fact
+  `Run mode · Background run`.
+- Compared duplicating labels in the Agent file, leaving the technical value for diagnosis, and extracting one Office
+  presentation primitive. Chose shared ownership. Runtime data remains exact, while every game-facing Office window now
+  resolves headless, terminal, and WebPi through the same localized player vocabulary.
+- Moved run-mode presentation into `office/runtime-presentation.ts`, kept the Activity Log on that helper, and changed
+  the Agent file fact from Surface to Run mode. No compatibility branch or backend schema change was added.
+- Real-browser acceptance reopened g12 as `Background run`, returned to the 24-member roster, moved to real terminal
+  coworker g23, and confirmed `Terminal session`. Focused Agent-file and Runtime suites passed all 23 tests. Root and UI
+  TypeScript passed; the full suite passed all 618 test files and 5,188 tests (one file and nine tests skipped); the
+  production UI build passed with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
