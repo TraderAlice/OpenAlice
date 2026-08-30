@@ -228,10 +228,18 @@ describe('OfficePage localization', () => {
       .toBeTruthy()
     expect(container.querySelector<HTMLImageElement>('.oa-office-replay-panel summary img')?.src)
       .toContain('/office/hud/replay-latch-v1.png')
+    const replayPanel = container.querySelector<HTMLDetailsElement>('.oa-office-replay-panel')
+    expect(replayPanel?.open).toBe(false)
+    expect(replayPanel?.querySelector('.oa-office-replay-panel__state')?.textContent).toBe('直播')
+    await userEvent.click(replayPanel!.querySelector('summary')!)
+    await vi.waitFor(() => expect(replayPanel?.open).toBe(true))
     expect(container.querySelector<HTMLElement>('.oa-office-scene')?.hasAttribute('inert')).toBe(true)
     expect(container.querySelectorAll('.oa-office-window-scrim')).toHaveLength(1)
+    fireEvent.keyDown(replayPanel!, { key: 'Escape' })
+    await vi.waitFor(() => expect(replayPanel?.open).toBe(false))
+    expect(screen.queryByText('Office occupancy')).toBeTruthy()
     await userEvent.keyboard('{Escape}')
-    expect(screen.queryByText('Office occupancy')).toBeNull()
+    await vi.waitFor(() => expect(screen.queryByText('Office occupancy')).toBeNull())
     expect(container.querySelector('.oa-office-window-scrim')).toBeNull()
     await vi.waitFor(() => {
       expect(document.activeElement).toBe(menuTrigger)
@@ -304,6 +312,28 @@ describe('OfficePage localization', () => {
     const runtime = await screen.findByTestId('office-runtime-section')
     expect(runtime.dataset.channel).toBe('news')
     expect(runtime.dataset.selectedSeq).toBe('12')
+    const replayPanel = container.querySelector<HTMLDetailsElement>('.oa-office-replay-panel')
+    expect(replayPanel?.open).toBe(true)
+    expect(replayPanel?.querySelector('.oa-office-replay-panel__state')?.textContent).toBe('序号 12')
+  })
+
+  it('does not offer an empty Replay drawer before the floor has history', async () => {
+    officeFloorMock.mockReturnValue({
+      ...defaultOfficeFloor(),
+      building: {
+        ...defaultOfficeFloor().building,
+        lastSeq: 0,
+        firstSeq: 0,
+      },
+    })
+    const { container } = render(<OfficePage />)
+
+    const menuTrigger = screen.getByRole('button', { name: '菜单' })
+    menuTrigger.focus()
+    await userEvent.keyboard('{ArrowDown}')
+    await userEvent.click(await screen.findByRole('menuitem', { name: '活动日志' }))
+
+    expect(container.querySelector('.oa-office-replay-panel')).toBeNull()
   })
 
   it('enters from the Workspace sign while keeping filed records on the cabinet', async () => {

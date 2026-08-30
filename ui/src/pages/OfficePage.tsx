@@ -48,6 +48,7 @@ export function OfficePage() {
   const initialPlayerStateRef = useRef(readOfficePlayerState())
   const [asOfSeq, setAsOfSeq] = useState<number | null>(null)
   const [replayFocus, setReplayFocus] = useState<OfficeReplayFocus | null>(null)
+  const [replayPanelOpen, setReplayPanelOpen] = useState(false)
   const [selected, setSelected] = useState<{ workspaceId: string; resumeId: string } | null>(null)
   const [logView, setLogView] = useState<{
     origin: OfficeLogOrigin
@@ -316,12 +317,14 @@ export function OfficePage() {
                     focusSeq: replayLogView?.focusSeq
                       ?? (origin === 'operations' ? productActivity.agent?.seq ?? null : null),
                   })
+                  setReplayPanelOpen(asOfSeq != null)
                   setCabinetWorkspaceId(null)
                 }}
                 productActivity={productActivity}
                 onOpenService={(kind, seq) => {
                   productActivity.acknowledge(kind)
                   setLogView({ origin: `${kind}-service`, channel: kind, focusSeq: seq ?? null })
+                  setReplayPanelOpen(asOfSeq != null)
                   setSelected(null)
                   setRosterWorkspaceId(null)
                   setCabinetWorkspaceId(null)
@@ -353,22 +356,44 @@ export function OfficePage() {
                   </button>
                 </header>
                 <div className="oa-office-window__body">
-                  <details className="oa-office-replay-panel">
-                    <summary>
-                      <img src={OFFICE_HUD_ASSETS.replayLatch} alt="" aria-hidden style={officePixelImg} />
-                      <span>{t('office.replay')}</span>
-                    </summary>
-                    <OfficeReplayBar
-                      firstSeq={building.firstSeq}
-                      lastSeq={building.lastSeq}
-                      asOfSeq={asOfSeq}
-                      onAsOfSeq={(seq) => {
-                        setReplayFocus(null)
-                        setAsOfSeq(seq)
+                  {building.lastSeq > 0 && (
+                    <details
+                      className="oa-office-replay-panel"
+                      open={replayPanelOpen}
+                      onToggle={(event) => setReplayPanelOpen(event.currentTarget.open)}
+                      onKeyDown={(event) => {
+                        if (event.key !== 'Escape' || !replayPanelOpen) return
+                        event.preventDefault()
+                        event.stopPropagation()
+                        setReplayPanelOpen(false)
+                        event.currentTarget.querySelector('summary')?.focus()
                       }}
-                      onViewFloor={closeLog}
-                    />
-                  </details>
+                    >
+                      <summary>
+                        <img src={OFFICE_HUD_ASSETS.replayLatch} alt="" aria-hidden style={officePixelImg} />
+                        <span className="oa-office-replay-panel__title">{t('office.replay')}</span>
+                        <span
+                          className="oa-office-replay-panel__state"
+                          data-live={asOfSeq == null}
+                        >
+                          {asOfSeq == null && <span className="oa-office-live-dot" aria-hidden />}
+                          {asOfSeq == null
+                            ? t('office.replayLive')
+                            : t('office.replayAt', { seq: asOfSeq })}
+                        </span>
+                      </summary>
+                      <OfficeReplayBar
+                        firstSeq={building.firstSeq}
+                        lastSeq={building.lastSeq}
+                        asOfSeq={asOfSeq}
+                        onAsOfSeq={(seq) => {
+                          setReplayFocus(null)
+                          setAsOfSeq(seq)
+                        }}
+                        onViewFloor={closeLog}
+                      />
+                    </details>
+                  )}
                   <OfficeRuntimeSection
                     actors={activityActors}
                     initialChannel={logView.channel}

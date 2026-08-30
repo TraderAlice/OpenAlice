@@ -3276,6 +3276,26 @@ Twelve-person Grok party follow-up (2026-08-30):
   Vitest run (5,142 passing; one file and nine tests skipped), and the production build passed; the existing canvas
   and large-chunk advisories are unchanged.
 
+Replay-drawer signposting follow-up (2026-08-30):
+
+- Replayed the real Office Lab Activity Log after the twelve-person cast work. Its collapsed `Replay` strip looked like
+  a static blue section label even though it was the entrance to the floor-history controls; it also gave no visible
+  indication whether the player was viewing LIVE or a historical sequence. Returning to the journal from a replay
+  collapsed the controls again, hiding the most relevant commands in that state.
+- Compared a separate replay screen, permanently exposing the transport, and preserving the compact drawer with
+  game-menu signposting. Chose the drawer: a separate surface would fragment the journal loop, while a permanently
+  open transport would take space from the event list on every live visit. The summary now carries a bordered LIVE or
+  `SEQ n` status cartridge, a stronger hover/focus state, and the existing latch visibly rotates when expanded.
+- The Replay drawer now defaults closed on LIVE visits, automatically opens whenever the journal is entered from a
+  historical floor, and is omitted when the floor has no event history. Escape backs out one game-menu layer at a
+  time: it first folds an open transport, then closes the journal. This keeps the spatial window hierarchy legible for
+  both pointer and keyboard players.
+- Real-browser acceptance expanded LIVE, stepped from sequence 4043 to 4042, closed the journal, and reopened it from
+  the Operations Board. The re-entered journal was already expanded and labeled `SEQ 4042`; returning LIVE restored
+  the green LIVE cartridge and the page was left on the live floor. The focused page spec passed (10 tests), Root/UI
+  TypeScript passed, all 617 test files passed (5,143 tests; one file and nine tests skipped), and the production build
+  passed with only the existing jsdom canvas and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

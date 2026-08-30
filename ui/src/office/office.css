@@ -1443,6 +1443,13 @@
   cursor: pointer;
 }
 
+.oa-office-replay-panel summary:is(:hover, :focus-visible) {
+  color: var(--gba-cream);
+  background: color-mix(in srgb, var(--gba-water) 54%, var(--gba-ink));
+  outline: 3px solid var(--gba-paper);
+  outline-offset: -6px;
+}
+
 .oa-office-replay-panel[open] summary {
   border-bottom: 1px solid var(--office-line);
 }
@@ -1776,6 +1783,33 @@
   image-rendering: pixelated;
   transform-origin: center;
   transition: transform 100ms steps(2, end);
+}
+
+.oa-office-replay-panel__title {
+  flex: 1;
+}
+
+.oa-office-replay-panel__state {
+  display: inline-flex;
+  min-width: 82px;
+  min-height: 24px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 2px 7px;
+  border: 2px solid var(--gba-paper);
+  color: var(--gba-paper);
+  background: var(--gba-ink);
+  box-shadow: inset -2px -2px color-mix(in srgb, var(--gba-paper) 14%, transparent);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.oa-office-replay-panel__state[data-live="true"] {
+  color: var(--gba-cream);
+  background: var(--gba-moss-dark);
 }
 
 .oa-office-replay-panel[open] summary > img {
