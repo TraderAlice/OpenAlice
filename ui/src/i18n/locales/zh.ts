@@ -1948,7 +1948,7 @@ export const zh: Resources = {
     rosterCount_one: '{{count}} 名成员',
     rosterCount_other: '{{count}} 名成员',
     rosterSelectHint: '选择一名同事，查看 Agent 档案。',
-    rosterKeyboardHint: '方向键选择 · Enter 查看',
+    rosterKeyboardHint: '方向键选择 · Enter / Space 查看',
     backToRoster: '返回小组名册',
     emptyDesk: '{{name}} 办公室的空工位',
     selectDesk: '点一张桌子，查看这名员工。',

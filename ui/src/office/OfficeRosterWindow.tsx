@@ -137,6 +137,11 @@ export function OfficeRosterWindow({
                 tabIndex={employee.resumeId === focusedResumeId ? 0 : -1}
                 onFocus={() => setFocusedResumeId(employee.resumeId)}
                 onClick={() => onSelect(employee)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter' && event.key !== ' ') return
+                  event.preventDefault()
+                  onSelect(employee)
+                }}
               >
                 <span className="oa-office-roster__portrait" aria-hidden>
                   <OfficeCoworkerSprite

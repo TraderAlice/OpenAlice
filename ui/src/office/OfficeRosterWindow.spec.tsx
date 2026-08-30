@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -56,7 +56,7 @@ describe('OfficeRosterWindow', () => {
     )
 
     expect(screen.getByText('6 team members')).toBeTruthy()
-    expect(screen.getByText('Arrows choose · Enter to inspect').getAttribute('data-input')).toBe('keyboard')
+    expect(screen.getByText('Arrows choose · Enter / Space inspect').getAttribute('data-input')).toBe('keyboard')
     expect(screen.getByText('Choose a teammate to inspect their Agent file.').getAttribute('data-input')).toBe('touch')
     expect(screen.getAllByRole('button')).toHaveLength(7)
     const coworkerImages = screen.getByTestId('office-roster-window')
@@ -121,8 +121,13 @@ describe('OfficeRosterWindow', () => {
     expect(memberButtons[5]?.tabIndex).toBe(-1)
     await userEvent.keyboard('{End}')
     expect(document.activeElement).toBe(memberButtons[5])
-    await userEvent.keyboard('{Enter}')
+    fireEvent.keyDown(memberButtons[5]!, { key: 'Enter' })
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ resumeId: 'resume-5' }))
+    expect(onSelect).toHaveBeenCalledTimes(1)
+    onSelect.mockClear()
+    fireEvent.keyDown(memberButtons[5]!, { key: ' ' })
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ resumeId: 'resume-5' }))
+    expect(onSelect).toHaveBeenCalledTimes(1)
     onSelect.mockClear()
     await userEvent.click(focusedMember)
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ resumeId: 'resume-5' }))

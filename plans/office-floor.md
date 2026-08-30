@@ -4360,6 +4360,25 @@ Walkable spawn-inlay follow-up (2026-08-31):
   unrelated WebPi compaction timing failure, which passed alone; a fresh full run then passed all 617 test files and
   5,176 tests (one file and nine tests skipped).
 
+Deterministic roster-confirm follow-up (2026-08-31):
+
+- Played the real 22-member Chat roster from its physical `+18` board through auto-walk, two-column selection,
+  employee inspection, and return. The roster's compact portraits, actionable failed priority, scroll density, and
+  spatial window all held up; Arrow Right/Down/Left/Up moved through the expected neighboring cells and restored the
+  first row without list-order surprises.
+- The header promised `Enter to inspect`, but the in-app browser keyboard path did not deliver a native button click:
+  Enter and Space left the focused Grok Analyst row in place while pointer click opened Agent File. Compared removing
+  the keyboard promise, continuing to depend on host-native default activation, and letting roster rows explicitly own
+  game confirm. Chose explicit ownership so Office has the same deterministic Enter/Space contract on every surface.
+- Each roster row now consumes Enter or Space on keydown, prevents the later native click, and selects exactly once;
+  pointer click remains unchanged. The localized hint now advertises both keys, matching the persistent pause-menu
+  Controls reference instead of silently narrowing interaction inside one window.
+- Real-browser acceptance reopened the physical Chat roster, confirmed Enter and Space independently open Grok
+  Analyst, and confirmed Back restores focus to the same `resumeId`. The longer desktop hint measured 245px client and
+  scroll width with no clipping. Focused Roster, Office-page, and Building suites passed 37 tests. Root and UI
+  TypeScript passed; the production UI build passed; the full suite passed all 617 test files and 5,176 tests (one file
+  and nine tests skipped).
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

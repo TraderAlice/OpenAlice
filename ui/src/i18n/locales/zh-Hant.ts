@@ -1956,7 +1956,7 @@ export const zhHant: Resources = {
     rosterCount_one: '{{count}} 名成員',
     rosterCount_other: '{{count}} 名成員',
     rosterSelectHint: '選擇一名同事，查看 Agent 檔案。',
-    rosterKeyboardHint: '方向鍵選擇 · Enter 查看',
+    rosterKeyboardHint: '方向鍵選擇 · Enter / Space 查看',
     backToRoster: '返回小組名冊',
     emptyDesk: '{{name}} 辦公室的空工位',
     selectDesk: '點一張桌子，查看這名員工。',
