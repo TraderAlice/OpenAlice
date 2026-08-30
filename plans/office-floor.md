@@ -3318,6 +3318,24 @@ In-world floor connection follow-up (2026-08-30):
   passed, all 617 test files passed (5,146 tests; one file and nine tests skipped), and the production build passed with
   only the existing jsdom canvas and large-chunk advisories.
 
+Touch D-pad parity follow-up (2026-08-30):
+
+- Replayed the real Office Lab at a 390x844 touch viewport. The HUD, pause menu, Activity Log, Alice camera, and the
+  generated map assets remained usable, but the four-direction D-pad behaved as mutually exclusive buttons even
+  though the same game surface already supports normalized diagonal movement from held keyboard directions.
+- Compared keeping cardinal-only touch controls, adding four diagonal corner buttons, and treating the existing pad
+  as a chorded multi-touch control. Chose chorded input: it preserves the authored HUD asset and familiar game-pad
+  language without adding visual targets, while giving touch and keyboard players the same eight-way movement model.
+- Each active pointer now owns its held cardinal direction. Two held directions combine into a 17px normalized
+  diagonal step; lifting one pointer leaves the other direction repeating, and cancellation, menu entry, or unmount
+  still clears the complete touch state. Keyboard and touch now share one direction-composition rule.
+- Real-browser acceptance covered the narrow touch layout and one-finger movement, then restored non-touch controls.
+  The in-app browser prevents direct multi-touch CDP injection, so the two-pointer chord, diagonal coordinates,
+  continued movement after one pointer lifts, and final stop are covered by the focused OfficeBuilding spec.
+- Root and UI TypeScript passed, as did the production UI build. The first full run exposed one unrelated transient
+  Connector demo timing failure; that file passed alone, then the clean full rerun passed all 617 test files and 5,147
+  tests (one file and nine tests skipped). The existing jsdom canvas and large-chunk advisories are unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

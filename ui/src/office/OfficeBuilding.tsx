@@ -184,6 +184,8 @@ export function OfficeBuilding({
   const walkTimerRef = useRef<number | null>(null)
   const touchMoveDelayRef = useRef<number | null>(null)
   const touchMoveRepeatRef = useRef<number | null>(null)
+  const touchMovePointersRef = useRef(new Map<number, OfficeAliceDirection>())
+  const lastTouchMoveDirectionRef = useRef<OfficeAliceDirection | null>(null)
   const manualMoveRepeatRef = useRef<number | null>(null)
   const manualMoveKeysRef = useRef(new Set<string>())
   const lastManualMoveKeyRef = useRef<string | null>(null)
@@ -637,20 +639,57 @@ export function OfficeBuilding({
     }
     advance()
   }
-  const stopTouchMove = () => {
+  const movementForDirections = (
+    directions: OfficeAliceDirection[],
+    lastDirection?: OfficeAliceDirection | null,
+  ): OfficeMovement | null => {
+    const horizontal = Number(directions.includes('right')) - Number(directions.includes('left'))
+    const vertical = Number(directions.includes('down')) - Number(directions.includes('up'))
+    if (horizontal === 0 && vertical === 0) return null
+    const diagonal = horizontal !== 0 && vertical !== 0
+    const direction = lastDirection
+      ?? (horizontal < 0 ? 'left' : horizontal > 0 ? 'right' : vertical < 0 ? 'up' : 'down')
+    return {
+      x: horizontal * (diagonal ? OFFICE_DIAGONAL_STEP : 24),
+      y: vertical * (diagonal ? OFFICE_DIAGONAL_STEP : 24),
+      direction,
+    }
+  }
+  const moveAliceFromTouchPointers = () => {
+    const movement = movementForDirections(
+      Array.from(touchMovePointersRef.current.values()),
+      lastTouchMoveDirectionRef.current,
+    )
+    if (movement) moveAlice(movement)
+  }
+  const stopTouchMove = (pointerId?: number) => {
+    if (pointerId != null) {
+      touchMovePointersRef.current.delete(pointerId)
+      if (touchMovePointersRef.current.size > 0) {
+        lastTouchMoveDirectionRef.current = Array.from(touchMovePointersRef.current.values()).at(-1) ?? null
+        return
+      }
+    } else {
+      touchMovePointersRef.current.clear()
+    }
     if (touchMoveDelayRef.current != null) window.clearTimeout(touchMoveDelayRef.current)
     if (touchMoveRepeatRef.current != null) window.clearInterval(touchMoveRepeatRef.current)
     touchMoveDelayRef.current = null
     touchMoveRepeatRef.current = null
+    lastTouchMoveDirectionRef.current = null
   }
-  const startTouchMove = (movement: OfficeMovement) => {
+  const startTouchMove = (direction: OfficeAliceDirection, pointerId: number) => {
     if (floorInteractionSuspended || departingWorkspace) return
     cancelAutoWalk()
-    stopTouchMove()
-    moveAlice(movement)
-    touchMoveDelayRef.current = window.setTimeout(() => {
-      touchMoveRepeatRef.current = window.setInterval(() => moveAlice(movement), 96)
-    }, 220)
+    touchMovePointersRef.current.set(pointerId, direction)
+    lastTouchMoveDirectionRef.current = direction
+    moveAliceFromTouchPointers()
+    if (touchMoveDelayRef.current == null && touchMoveRepeatRef.current == null) {
+      touchMoveDelayRef.current = window.setTimeout(() => {
+        touchMoveDelayRef.current = null
+        touchMoveRepeatRef.current = window.setInterval(moveAliceFromTouchPointers, 96)
+      }, 220)
+    }
   }
   const stopManualMove = () => {
     if (manualMoveRepeatRef.current != null) window.clearInterval(manualMoveRepeatRef.current)
@@ -662,22 +701,10 @@ export function OfficeBuilding({
     const held = Array.from(manualMoveKeysRef.current)
       .map((key) => OFFICE_MOVEMENT_KEYS[key])
       .filter((movement): movement is OfficeMovement => Boolean(movement))
-    const horizontal = Number(held.some(({ direction }) => direction === 'right'))
-      - Number(held.some(({ direction }) => direction === 'left'))
-    const vertical = Number(held.some(({ direction }) => direction === 'down'))
-      - Number(held.some(({ direction }) => direction === 'up'))
-    if (horizontal === 0 && vertical === 0) return null
-    const diagonal = horizontal !== 0 && vertical !== 0
     const lastDirection = lastManualMoveKeyRef.current
       ? OFFICE_MOVEMENT_KEYS[lastManualMoveKeyRef.current]?.direction
       : undefined
-    const direction = lastDirection
-      ?? (horizontal < 0 ? 'left' : horizontal > 0 ? 'right' : vertical < 0 ? 'up' : 'down')
-    return {
-      x: horizontal * (diagonal ? OFFICE_DIAGONAL_STEP : 24),
-      y: vertical * (diagonal ? OFFICE_DIAGONAL_STEP : 24),
-      direction,
-    }
+    return movementForDirections(held.map(({ direction }) => direction), lastDirection)
   }
   const moveAliceFromHeldKeys = () => {
     const movement = movementForHeldKeys()
@@ -1498,11 +1525,11 @@ export function OfficeBuilding({
                 event.preventDefault()
                 event.stopPropagation()
                 event.currentTarget.setPointerCapture?.(event.pointerId)
-                startTouchMove(OFFICE_MOVEMENTS[direction])
+                startTouchMove(direction, event.pointerId)
               }}
-              onPointerUp={stopTouchMove}
-              onPointerCancel={stopTouchMove}
-              onLostPointerCapture={stopTouchMove}
+              onPointerUp={(event) => stopTouchMove(event.pointerId)}
+              onPointerCancel={(event) => stopTouchMove(event.pointerId)}
+              onLostPointerCapture={(event) => stopTouchMove(event.pointerId)}
               onClick={(event) => {
                 if (event.detail === 0) moveAlice(OFFICE_MOVEMENTS[direction])
               }}

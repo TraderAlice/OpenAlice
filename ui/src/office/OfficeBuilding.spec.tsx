@@ -415,6 +415,51 @@ describe('OfficeBuilding', () => {
     }
   })
 
+  it('combines held touch-pad directions and keeps moving after one pointer lifts', () => {
+    vi.useFakeTimers()
+    try {
+      render(
+        <OfficeBuilding
+          building={{
+            config: {
+              workspaceSleepAfterMs: 1,
+              harnessMinimumVisibleGroups: { chat: 0, 'auto-quant': 0, prediction: 0, other: 0 },
+            },
+            lastSeq: 0,
+            firstSeq: 0,
+            offices: [],
+          }}
+          onSelectEmployee={vi.fn()}
+          onOpenEmployee={vi.fn()}
+          onOpenWorkspace={vi.fn()}
+          onOpenFiles={vi.fn()}
+          onOpenRoster={vi.fn()}
+          onOpenLog={vi.fn()}
+        />,
+      )
+
+      const alice = screen.getByRole('img', { name: 'Alice on the office map' })
+      const initialTop = Number.parseInt(alice.style.top, 10)
+      const moveRight = screen.getByRole('button', { name: 'Move Alice right' })
+      const moveDown = screen.getByRole('button', { name: 'Move Alice down' })
+      fireEvent.pointerDown(moveRight, { pointerId: 3 })
+      fireEvent.pointerDown(moveDown, { pointerId: 4 })
+      expect(alice.style.left).toBe('521px')
+      expect(alice.style.top).toBe(`${initialTop + 17}px`)
+
+      fireEvent.pointerUp(moveDown, { pointerId: 4 })
+      act(() => vi.advanceTimersByTime(320))
+      expect(alice.style.left).toBe('545px')
+      expect(alice.style.top).toBe(`${initialTop + 17}px`)
+
+      fireEvent.pointerUp(moveRight, { pointerId: 3 })
+      act(() => vi.advanceTimersByTime(500))
+      expect(alice.style.left).toBe('545px')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('restarts and clears a directional impact when movement is blocked', () => {
     vi.useFakeTimers()
     try {
