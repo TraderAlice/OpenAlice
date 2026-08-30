@@ -3432,6 +3432,25 @@ Sixteen-member Grok party follow-up (2026-08-30):
   13 tests). Root and UI TypeScript passed, the full suite passed all 617 test files and 5,150 tests (one file and nine
   tests skipped), and the production UI build passed with only the existing jsdom canvas and large-chunk advisories.
 
+Front-facing service-terminal follow-up (2026-08-30):
+
+- Reproduced the Grok navigation report by walking Alice behind the News cabinet at 1200x800. The old collision covered
+  only its lower 48px while the 110px-tall opaque sprite occupied almost the whole landmark, so Alice could disappear
+  inside the cabinet and still acquire the terminal through the generic facing cone.
+- Compared outlining an occluded Alice, making the terminals translucent, and treating the complete cabinet as a solid
+  top-down RPG object with a front interaction side. Chose the third model: both service sprites keep their authored
+  opacity, their collision now matches the visible cabinet body, and Inbox / News can only be acquired while facing up
+  from the clear aisle below them.
+- The single-row map previously pinned service furniture to the floor edge and therefore had no front approach cell.
+  It now reserves a 56px service aisle, so click-to-walk and keyboard interaction use the same reachable geometry in
+  sparse and multi-row floors.
+- Real-browser acceptance blocked Alice outside the News sprite when approaching from behind, confirmed that no News
+  prompt leaked through the cabinet, then clicked the terminal and observed Alice stop visibly in front, facing up.
+  The same auto-walk, journal open/close, prompt containment, and front-facing pose passed at 390x844. Focused Office
+  geometry, path, interaction, and building specs passed (4 files / 41 tests). Root and UI TypeScript passed, the full
+  suite passed all 617 test files and 5,152 tests (one file and nine tests skipped), and the production UI build passed
+  with only the existing jsdom canvas and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

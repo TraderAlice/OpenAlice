@@ -112,6 +112,8 @@ describe('Office interaction path', () => {
     expect(path).not.toBeNull()
     expect(path!.steps.length).toBeGreaterThan(20)
     const destination = path!.steps.at(-1)!
+    expect(destination.y).toBeGreaterThanOrEqual(inbox.y + inbox.collision.y + inbox.collision.height)
+    expect(path!.facing).toBe('up')
     expect(nearestOfficeInteractionTarget(destination, path!.facing, [target])?.id)
       .toBe('inbox-service')
   })

@@ -20,6 +20,14 @@ export const OFFICE_INTERACTION_BACK_REACH = 8
 
 export type OfficeFacingDirection = 'up' | 'right' | 'down' | 'left'
 
+function requiredApproachFacing(
+  target: OfficeInteractionTarget,
+): OfficeFacingDirection | null {
+  return target.kind === 'inbox-service' || target.kind === 'news-service'
+    ? 'up'
+    : null
+}
+
 export type OfficeInteractionTarget =
   | {
     id: string
@@ -176,6 +184,8 @@ export function nearestOfficeInteractionTarget(
   }[facing]
 
   for (const target of targets) {
+    const requiredFacing = requiredApproachFacing(target)
+    if (requiredFacing && facing !== requiredFacing) continue
     const dx = target.x - alice.x
     const dy = target.y - alice.y
     const distanceSquared = dx ** 2 + dy ** 2

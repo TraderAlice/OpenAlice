@@ -131,6 +131,20 @@ describe('Office interaction targets', () => {
     expect(nearestOfficeInteractionTarget({ x: 0, y: 0 }, 'left', targets)).toBeNull()
   })
 
+  it('serves Inbox and News only from the player-facing side', () => {
+    const service = {
+      id: 'news-service' as const,
+      kind: 'news-service' as const,
+      x: 100,
+      y: 100,
+    }
+
+    expect(nearestOfficeInteractionTarget({ x: 100, y: 52 }, 'down', [service])).toBeNull()
+    expect(nearestOfficeInteractionTarget({ x: 100, y: 148 }, 'up', [service])?.id)
+      .toBe('news-service')
+    expect(nearestOfficeInteractionTarget({ x: 52, y: 100 }, 'right', [service])).toBeNull()
+  })
+
   it('starts outside interaction range but keeps every object reachable from a safe approach', () => {
     const twoGroupLayout = layoutOfficeMap([
       { id: 'chat-1', harness: 'chat' },

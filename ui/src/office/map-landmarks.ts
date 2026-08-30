@@ -15,6 +15,8 @@ export interface OfficeServiceLandmark {
 
 const SERVICE_WIDTH = 136
 const SERVICE_HEIGHT = 116
+const SERVICE_FRONT_AISLE = 56
+const SERVICE_COLLISION = { x: 12, y: 16, width: 112, height: 94 } as const
 
 function serviceLandmarksAt(inboxX: number, newsX: number, y: number): OfficeServiceLandmark[] {
   return [
@@ -25,7 +27,7 @@ function serviceLandmarksAt(inboxX: number, newsX: number, y: number): OfficeSer
       y,
       width: SERVICE_WIDTH,
       height: SERVICE_HEIGHT,
-      collision: { x: 12, y: 62, width: 112, height: 48 },
+      collision: { ...SERVICE_COLLISION },
     },
     {
       id: 'news-service',
@@ -34,7 +36,7 @@ function serviceLandmarksAt(inboxX: number, newsX: number, y: number): OfficeSer
       y,
       width: SERVICE_WIDTH,
       height: SERVICE_HEIGHT,
-      collision: { x: 12, y: 62, width: 112, height: 48 },
+      collision: { ...SERVICE_COLLISION },
     },
   ]
 }
@@ -55,7 +57,7 @@ export function officeFloorTerminalPosition(mapWidth: number): { x: number; y: n
 
 export function officeServiceLandmarks(layout: OfficeMapLayout): OfficeServiceLandmark[] {
   if (layout.rows <= 1) {
-    const y = layout.height - 124
+    const y = layout.height - SERVICE_HEIGHT - SERVICE_FRONT_AISLE
     const centerX = Math.round(layout.width / 2)
     const centerGap = 72
     return serviceLandmarksAt(

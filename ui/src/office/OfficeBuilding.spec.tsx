@@ -1108,7 +1108,7 @@ describe('OfficeBuilding', () => {
 
   it('turns Inbox and News activity into navigable floor landmarks', async () => {
     const onOpenService = vi.fn()
-    const { container } = render(
+    render(
       <OfficeBuilding
         building={{
           config: {
@@ -1147,7 +1147,7 @@ describe('OfficeBuilding', () => {
           attention: { agent: true, inbox: true, news: true },
           freshKind: 'news',
         }}
-        initialPlayerState={{ position: { x: 340, y: 570 }, direction: 'down' }}
+        initialPlayerState={{ position: { x: 340, y: 624 }, direction: 'up' }}
         onSelectEmployee={vi.fn()}
         onOpenEmployee={vi.fn()}
         onOpenWorkspace={vi.fn()}
@@ -1185,6 +1185,7 @@ describe('OfficeBuilding', () => {
     await waitFor(() => expect(onOpenService).toHaveBeenCalledWith('inbox', 11))
     await userEvent.click(news)
     await waitFor(() => expect(onOpenService).toHaveBeenCalledWith('news', 12))
-    expect(container.querySelector('[data-kind="news-service"]')).toBeTruthy()
+    expect(screen.getByRole('img', { name: 'Alice on the office map' }).dataset.direction)
+      .toBe('up')
   })
 })

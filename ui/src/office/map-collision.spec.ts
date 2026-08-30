@@ -8,6 +8,7 @@ import {
   officeCollisionRects,
 } from './map-collision'
 import { OFFICE_CABINET_CENTER, OFFICE_DESK_CENTERS } from './pod-geometry'
+import { officeServiceLandmarks } from './map-landmarks'
 
 const layout = layoutOfficeMap([
   { id: 'chat-1', harness: 'chat' },
@@ -39,6 +40,19 @@ describe('Office map collision', () => {
     expect(ids).toContain('landmark:inbox-service')
     expect(ids).toContain('landmark:news-service')
     expect(ids).toContain('operations')
+  })
+
+  it('keeps Alice out of the visible service cabinet body', () => {
+    const service = officeServiceLandmarks(layout)[1]!
+    const current = { x: service.x, y: service.y + 48 }
+    const move = moveAliceOnOfficeMap(current, { x: 24, y: 0 }, layout)
+
+    expect(service.collision).toEqual({ x: 12, y: 16, width: 112, height: 94 })
+    expect(move).toMatchObject({
+      position: current,
+      bumped: true,
+      obstacleId: 'landmark:news-service',
+    })
   })
 
   it('stops Alice before a workstation while keeping its employee interactable', () => {
