@@ -360,6 +360,23 @@ external adapters remain optional projections rather than sources of truth.
     to it. The first channel is the deterministic initial/fallback selection,
     the last channel wins at the scroll boundary, and no route, field state,
     focus order, or shared navigation primitive changes.
+32. **Service availability and channel attention are different layers.** The
+    current aggregate health marks the complete Delivery service surface red
+    whenever one reachable adapter is degraded, then repeats the same problem
+    and raw diagnostic on that channel card. Removing the service summary would
+    eliminate duplication but also hide pause-all and process-outage context.
+    The chosen model keeps the summary and distinguishes the two degraded states
+    in the existing health payload: a returned `service` body means the
+    process is reachable, so degraded adapters produce a restrained warning
+    labelled Running and direct the user to the flagged channel below; a
+    degraded bridge without a `service` body means the delivery process is
+    unavailable and retains the destructive treatment plus service-level
+    diagnostics; healthy and globally paused states keep their existing meaning.
+    Reachable adapter errors render technical detail only on the owning channel
+    card. Status remains textual as well as colored, count pills retain aggregate
+    context, and the same compact summary wraps without hierarchy changes on
+    narrow screens. Protocol, polling, recovery actions, and adapter state do not
+    change.
 
 ## Ordered Work
 
@@ -428,6 +445,8 @@ external adapters remain optional projections rather than sources of truth.
         Settings form after navigator jumps.
   - [x] Keep the full Settings channel navigator synchronized with the section
         currently being read.
+  - [x] Separate service availability from per-channel attention in the
+        overview summary and diagnostics.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -719,6 +738,19 @@ navigator remained static and fully scrolled out of view while the selected
 Feishu heading landed at y=166.75; document width stayed exactly 390 px. No
 Connector control or external action was invoked, and the viewport was reset
 after acceptance.
+
+The service/channel hierarchy increment passed 37 focused overview and demo-
+route tests, UI and root typechecking, the production build, and all 5,122
+repository tests. Component contracts exercise both protocol shapes: a
+reachable degraded service renders an amber
+Running summary with no duplicated service diagnostic while the owning Discord
+card retains Needs attention and Technical details; an unreachable degraded
+bridge renders the destructive Unavailable summary with its `ECONNREFUSED`
+diagnostic. The real Default AliceProject at 1,052 x 734 verified the recovered
+Healthy branch with zero summary disclosures and channel-local Telegram progress.
+At 390 x 844, the summary wrapped to 352 x 112.25 px, retained both aggregate
+counts, and kept document width exactly 390 px. No Connector action was invoked,
+and the viewport was reset after acceptance.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.

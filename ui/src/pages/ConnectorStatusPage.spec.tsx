@@ -183,6 +183,43 @@ describe('Connector overview state hierarchy', () => {
     expect(alert.textContent).toBe('Couldn’t reconnect Discord: socket closed')
     expect(screen.getAllByText(/socket closed/)).toHaveLength(1)
   })
+
+  it('keeps reachable channel degradation on the owning channel card', () => {
+    const snapshot = readyDiscordSnapshot({ degraded: true })
+    snapshot.health.lastError = 'discord: connection lost'
+    mocks.state.current = loaded(snapshot)
+    render(<ConnectorStatusPage />)
+
+    const service = screen.getByRole('heading', { name: 'Delivery service' }).closest('section') as HTMLElement
+    expect(within(service).getByText('Running')).toBeTruthy()
+    expect(within(service).getByText(
+      'Delivery remains available for healthy channels. Review the flagged channel below.',
+    )).toBeTruthy()
+    expect(service.className).toContain('border-warning/25')
+    expect(within(service).queryByText('Technical details')).toBeNull()
+
+    const discord = screen.getByRole('heading', { name: 'Discord' }).closest('article') as HTMLElement
+    expect(within(discord).getByText('Needs attention')).toBeTruthy()
+    expect(within(discord).getByText('Technical details')).toBeTruthy()
+  })
+
+  it('reserves the service-level error treatment for an unreachable service', () => {
+    const snapshot = readyDiscordSnapshot({ degraded: true })
+    snapshot.health.service = undefined
+    snapshot.health.reason = 'unreachable'
+    snapshot.health.lastError = 'ECONNREFUSED'
+    mocks.state.current = loaded(snapshot)
+    render(<ConnectorStatusPage />)
+
+    const service = screen.getByRole('heading', { name: 'Delivery service' }).closest('section') as HTMLElement
+    expect(within(service).getByText('Unavailable')).toBeTruthy()
+    expect(within(service).getByText(
+      'OpenAlice could not reach the delivery service. Your Inbox keeps working.',
+    )).toBeTruthy()
+    expect(service.className).toContain('border-destructive/25')
+    expect(within(service).getByText('Technical details')).toBeTruthy()
+    expect(within(service).getByText('ECONNREFUSED')).toBeTruthy()
+  })
 })
 
 function loaded(snapshot: ReturnType<typeof createDemoConnectorSnapshot>) {

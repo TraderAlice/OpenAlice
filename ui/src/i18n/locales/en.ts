@@ -2331,8 +2331,10 @@ export const en = {
       offDescription: 'All external delivery is paused. Your OpenAlice Inbox keeps working.',
       healthy: 'Healthy',
       healthyDescription: 'Delivery is available for every active channel.',
-      needsAttention: 'Needs attention',
-      needsAttentionDescription: 'One or more active channels need attention. Your OpenAlice Inbox keeps working.',
+      running: 'Running',
+      runningDescription: 'Delivery remains available for healthy channels. Review the flagged channel below.',
+      unavailable: 'Unavailable',
+      unavailableDescription: 'OpenAlice could not reach the delivery service. Your Inbox keeps working.',
     },
     adapter: {
       off: 'Paused',

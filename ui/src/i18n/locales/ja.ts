@@ -2299,8 +2299,10 @@ export const ja: Resources = {
       offDescription: 'すべての外部配信は一時停止中です。OpenAlice の受信箱は引き続き利用できます。',
       healthy: '正常',
       healthyDescription: '有効なすべてのチャネルへ配信できます。',
-      needsAttention: '要確認',
-      needsAttentionDescription: '一部の有効なチャネルに確認が必要です。OpenAlice の受信箱は引き続き利用できます。',
+      running: '稼働中',
+      runningDescription: '正常なチャネルへの配信は継続しています。下の要確認チャネルを確認してください。',
+      unavailable: '利用不可',
+      unavailableDescription: 'OpenAlice は配信サービスに接続できませんが、受信箱は引き続き利用できます。',
     },
     adapter: {
       off: '一時停止',

@@ -406,7 +406,12 @@ The surfaces deliberately have different jobs:
   error. Runtime owner presence is supporting health evidence, not the source of
   truth for a saved link. The reconnect is adapter-scoped while the
   service answers; if the process is unreachable, Alice asks Guardian to restart
-  the optional service instead. The overview keeps linked, credentialed,
+  the optional service instead. Its service summary distinguishes process
+  availability from adapter health: a returned health body with degraded
+  adapters stays a Running warning and directs attention to the owning channel
+  card, while a degraded bridge with no service body is Unavailable and retains
+  the service-level diagnostic. Reachable adapter errors are not repeated in the
+  summary. The overview keeps linked, credentialed,
   enabled, and partially configured adapters in stable definition order under
   Your channels. Only pristine adapters appear under Available channels, so
   transient runtime changes never reorder established targets and empty groups

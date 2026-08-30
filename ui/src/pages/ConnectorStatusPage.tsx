@@ -304,6 +304,8 @@ function ConnectorOverview({
     <>
       <section className={`oa-status-surface rounded-xl border px-4 py-3.5 ${service.tone === 'danger'
         ? 'border-destructive/25 bg-destructive/[0.035]'
+        : service.tone === 'warning'
+          ? 'border-warning/25 bg-warning/[0.035]'
         : 'border-border bg-secondary/25'
       }`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -312,6 +314,8 @@ function ConnectorOverview({
               ? 'border-destructive/20 bg-destructive/10 text-destructive'
               : service.tone === 'healthy'
                 ? 'border-success/20 bg-success/10 text-success'
+                : service.tone === 'warning'
+                  ? 'border-warning/20 bg-warning/10 text-warning'
                 : 'border-border bg-background text-muted-foreground'
             }`}>
               <Plug size={17} aria-hidden />
@@ -334,7 +338,7 @@ function ConnectorOverview({
             )}
           </div>
         </div>
-        {snapshot.health.lastError && (
+        {snapshot.health.lastError && !snapshot.health.service && (
           <DiagnosticDetails summary={t('connectorStatus.technicalDetails')}>
             {snapshot.health.lastError}
           </DiagnosticDetails>
@@ -595,9 +599,16 @@ function servicePresentation(health: ConnectorHealth, t: TFunction): {
       tone: 'healthy',
     }
   }
+  if (health.service) {
+    return {
+      label: t('connectorStatus.service.running'),
+      description: t('connectorStatus.service.runningDescription'),
+      tone: 'warning',
+    }
+  }
   return {
-    label: t('connectorStatus.service.needsAttention'),
-    description: t('connectorStatus.service.needsAttentionDescription'),
+    label: t('connectorStatus.service.unavailable'),
+    description: t('connectorStatus.service.unavailableDescription'),
     tone: 'danger',
   }
 }

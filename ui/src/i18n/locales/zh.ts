@@ -2298,8 +2298,10 @@ export const zh: Resources = {
       offDescription: '所有外部投递均已暂停，OpenAlice 收件箱不受影响。',
       healthy: '正常',
       healthyDescription: '所有已启用渠道均可正常投递。',
-      needsAttention: '需要处理',
-      needsAttentionDescription: '一个或多个已启用渠道需要处理，OpenAlice 收件箱不受影响。',
+      running: '运行中',
+      runningDescription: '服务仍会为正常渠道投递；请检查下方标记的渠道。',
+      unavailable: '不可用',
+      unavailableDescription: 'OpenAlice 无法连接投递服务，但收件箱仍可正常使用。',
     },
     adapter: {
       off: '已暂停',

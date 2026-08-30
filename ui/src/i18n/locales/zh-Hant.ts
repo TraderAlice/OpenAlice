@@ -2306,8 +2306,10 @@ export const zhHant: Resources = {
       offDescription: '所有外部投遞均已暫停，OpenAlice 收件匣不受影響。',
       healthy: '正常',
       healthyDescription: '所有已啟用管道均可正常投遞。',
-      needsAttention: '需要處理',
-      needsAttentionDescription: '一個或多個已啟用管道需要處理，OpenAlice 收件匣不受影響。',
+      running: '運行中',
+      runningDescription: '服務仍會為正常管道投遞；請檢查下方標記的管道。',
+      unavailable: '不可用',
+      unavailableDescription: 'OpenAlice 無法連接投遞服務，但收件匣仍可正常使用。',
     },
     adapter: {
       off: '已暫停',
