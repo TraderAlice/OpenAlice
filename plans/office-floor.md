@@ -4654,6 +4654,25 @@ Short-landscape evidence commands follow-up (2026-08-31):
   and 5,183 tests (one file and nine tests skipped); the production UI build passed with only the existing ports fallback
   and large-chunk advisory.
 
+Initial game-focus handoff follow-up (2026-08-31):
+
+- Replayed the current desktop Live Office through the pause menu, Overview Activity Log, Inbox station, News terminal,
+  auto-walk, and the older collision QA report. Current diagonal normalization, collidable walls/services, route trail,
+  menu hierarchy, and service journals held up in source, focused tests, and the rendered scene, so none received a
+  speculative patch.
+- The real entry handoff still failed: activating Office from the application navigation left focus on the sidebar button.
+  The floor immediately advertised WASD/arrows, but the first direction key did not move Alice because the game had not
+  acquired keyboard ownership.
+- Compared globally intercepting direction keys outside Office, special-casing the shell navigation button, and letting
+  the composite floor claim focus when its live scene mounts. Chose the scene-owned focus handoff. It matches the existing
+  single-tab-stop map model, avoids coupling Office to shell markup, and exposes the floor's authored movement/interaction
+  label to assistive technology. A floor mounted behind a suspended interaction intentionally does not claim focus.
+- Real-browser acceptance reloaded `/office` and found `document.activeElement` on the `office-floor` composite. The first
+  Arrow Down moved Alice from y=336 to y=360. Opening Menu transferred focus to the `Floor view` menu, and Escape restored
+  it to `office-floor`, preserving the existing modal provenance. The focused Building suite passed all 23 tests. Root
+  and UI TypeScript passed; the full suite passed all 618 test files and 5,184 tests (one file and nine tests skipped);
+  the production UI build passed with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

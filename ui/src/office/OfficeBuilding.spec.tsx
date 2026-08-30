@@ -19,6 +19,35 @@ beforeEach(async () => {
 })
 
 describe('OfficeBuilding', () => {
+  it('claims the initial keyboard focus so the first direction key enters the game', async () => {
+    render(
+      <OfficeBuilding
+        building={{
+          config: {
+            workspaceSleepAfterMs: 1,
+            harnessMinimumVisibleGroups: { chat: 0, 'auto-quant': 0, prediction: 0, other: 0 },
+          },
+          lastSeq: 0,
+          firstSeq: 0,
+          offices: [],
+        }}
+        onSelectEmployee={vi.fn()}
+        onOpenEmployee={vi.fn()}
+        onOpenWorkspace={vi.fn()}
+        onOpenFiles={vi.fn()}
+        onOpenRoster={vi.fn()}
+        onOpenLog={vi.fn()}
+      />,
+    )
+
+    const floor = screen.getByTestId('office-floor')
+    const alice = screen.getByRole('img', { name: 'Alice on the office map' })
+    expect(document.activeElement).toBe(floor)
+    const topBeforeMove = alice.style.top
+    await userEvent.keyboard('{ArrowDown}')
+    expect(alice.style.top).not.toBe(topBeforeMove)
+  })
+
   it('keeps historical floors visibly in replay mode with a direct return to Live', async () => {
     const onReturnLive = vi.fn()
     const onSelectEmployee = vi.fn()
@@ -202,6 +231,7 @@ describe('OfficeBuilding', () => {
 
     expect(screen.getByText('Replay · Seq 2')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Return live' })).toBeNull()
+    expect(document.activeElement).toBe(document.body)
   })
 
   it('cancels the historical auto-walk before returning to the Live floor', async () => {
@@ -1238,7 +1268,7 @@ describe('OfficeBuilding', () => {
     fireEvent.pointerMove(map, { pointerId: 2, clientX: 404, clientY: 300 })
     expect(controls?.dataset.learned).toBe('true')
     fireEvent.pointerUp(map, { pointerId: 2 })
-    expect(document.activeElement).toBe(document.body)
+    expect(document.activeElement).toBe(map)
     fireEvent.keyDown(document.body, { key: 'd' })
     expect(alice.style.left).toBe('504px')
     fireEvent.keyUp(document.body, { key: 'd' })

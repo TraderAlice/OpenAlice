@@ -192,6 +192,7 @@ export function OfficeBuilding({
   const controlsSuspended = floorInteractionSuspended || Boolean(departingWorkspace)
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 })
   const viewportRef = useRef<HTMLDivElement>(null)
+  const shouldClaimInitialFocusRef = useRef(!interactionSuspended && !selected)
   const mapRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<{
     pointerId: number
@@ -222,10 +223,17 @@ export function OfficeBuilding({
   const routeContinuationDelayRef = useRef(0)
   const floorInteractionSuspendedRef = useRef(floorInteractionSuspended)
   const departureTimerRef = useRef<number | null>(null)
+
   const routeGenerationRef = useRef(0)
   const replayFocusKeyRef = useRef<string | null>(null)
   const restoreFloorFocusRef = useRef(true)
   floorInteractionSuspendedRef.current = floorInteractionSuspended
+
+  useLayoutEffect(() => {
+    if (!shouldClaimInitialFocusRef.current) return
+    viewportRef.current?.focus({ preventScroll: true })
+  }, [])
+
   const recentGroups = useMemo(
     () => building.offices.filter((office) => !office.sleeping),
     [building.offices],
