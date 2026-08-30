@@ -2757,7 +2757,7 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
   grid-row: 1 / 3;
   width: 20px;
   height: 20px;
-  opacity: 0.42;
+  opacity: 0;
   object-fit: contain;
   transform: translateX(-2px);
   transition: opacity 80ms steps(2, end), transform 80ms steps(2, end);

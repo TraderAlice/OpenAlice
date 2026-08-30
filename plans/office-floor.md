@@ -4580,6 +4580,23 @@ High-density roster legibility follow-up (2026-08-31):
   618 test files and 5,179 tests (one file and nine tests skipped); the production UI build passed with only the existing
   ports fallback and large-chunk advisory.
 
+Single-selection roster cursor follow-up (2026-08-31):
+
+- Continued playing the Live map through nearby-prompt dismissal, repeated boundary collision, camera following, the
+  pause menu, and Activity Log return. Collision sparks, bump state, prompt ownership, menu arrows, and floor-focus
+  restoration all held up, so those systems were left unchanged instead of receiving speculative polish.
+- The reopened 24-person Chat roster exposed a simpler hierarchy problem: every unselected card retained a 42%-opacity
+  journal arrow. With six cards visible at once, the repeated glyph competed with the one real selection and recreated
+  the over-complex control-asset problem this Office direction is intended to remove.
+- Compared retaining ghost cursors, removing the cursor in favor of border color alone, and revealing the authored cursor
+  only for the keyboard-focused or pointer-hovered card. Chose local reveal: the game cursor remains explicit, but there
+  is no permanent arrow wallpaper and pointer users still receive immediate pre-click feedback.
+- Real-browser acceptance measured opacity `1` for focused G20 and `0` for the other five visible cards; moving the pointer
+  over G24 raised only its local hover cursor to `1`. The cleaned roster retained its 82px rows, two-line assignments, and
+  roving keyboard model. Focused Roster/style suites passed 27 tests. Root and UI TypeScript passed; the full suite passed
+  all 618 test files and 5,179 tests (one file and nine tests skipped); the production UI build passed with only the
+  existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

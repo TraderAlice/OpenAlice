@@ -85,6 +85,10 @@ describe('Office responsive style contract', () => {
     expect(css).toMatch(
       /\.oa-office-roster__meta\s*\{[^}]*overflow-wrap:\s*anywhere;[^}]*-webkit-line-clamp:\s*2;/s,
     )
+    expect(css).toMatch(/\.oa-office-roster__cursor\s*\{[^}]*opacity:\s*0;/s)
+    expect(css).toMatch(
+      /\.oa-office-roster li button:is\(:hover, :focus-visible\) \.oa-office-roster__cursor\s*\{[^}]*opacity:\s*1;/s,
+    )
   })
 
   it('keeps auto-route markers small, static, and anchored to Alice feet', () => {
