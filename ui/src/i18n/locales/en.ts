@@ -2056,6 +2056,15 @@ export const en = {
       review: 'review',
       failed: 'failed',
     },
+    moodDialogue: {
+      resting: 'Off duty. Ready when the floor wakes.',
+      idle: 'Standing by for the next assignment.',
+      working: 'Working through the current assignment.',
+      talking: 'Reporting progress from the current assignment.',
+      waiting: 'Waiting for the next instruction.',
+      review: 'Reviewing the latest result.',
+      failed: 'The last run needs attention.',
+    },
   },
   tradingModeGate: {
     liteMode: 'Lite mode',

@@ -2024,6 +2024,15 @@ export const ja: Resources = {
       review: '確認',
       failed: '失敗',
     },
+    moodDialogue: {
+      resting: '勤務を終えました。フロアが起きれば戻れます。',
+      idle: '次の割り当てを待っています。',
+      working: '現在の割り当てを進めています。',
+      talking: '現在の進捗を報告しています。',
+      waiting: '次の指示を待っています。',
+      review: '最新の結果を確認しています。',
+      failed: '前回の実行を確認する必要があります。',
+    },
   },
   tradingModeGate: {
     liteMode: 'Lite モード',

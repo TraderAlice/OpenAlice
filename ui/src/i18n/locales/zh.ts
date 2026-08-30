@@ -2023,6 +2023,15 @@ export const zh: Resources = {
       review: '待审',
       failed: '失败',
     },
+    moodDialogue: {
+      resting: '已经下班。楼层唤醒时随时回来。',
+      idle: '正在待命，等候下一项任务。',
+      working: '正在推进当前任务。',
+      talking: '正在汇报当前任务的进展。',
+      waiting: '正在等待下一步指令。',
+      review: '正在检查最新结果。',
+      failed: '上一次运行需要处理。',
+    },
   },
   tradingModeGate: {
     liteMode: '精简模式',

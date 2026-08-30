@@ -107,6 +107,29 @@ describe('OfficeInspectRail', () => {
     expect(onClose).toHaveBeenCalledOnce()
   })
 
+  it('gives a quiet coworker in-world dialogue instead of repeating machine facts', () => {
+    const { container } = render(
+      <OfficeInspectRail
+        employee={{
+          ...employee,
+          awake: false,
+          mood: 'idle',
+          bubble: null,
+          surface: 'headless',
+        }}
+        roomName="Prediction"
+        onOpen={vi.fn()}
+        onOpenDrawer={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Off duty. Ready when the floor wakes.')).toBeTruthy()
+    expect(container.querySelector('blockquote')?.textContent).not.toContain('idle · headless')
+    expect(screen.getByText('idle')).toBeTruthy()
+    expect(screen.getByText('headless')).toBeTruthy()
+  })
+
   it('collapses a long Session title without moving the primary commands', async () => {
     const longTitle = 'Research question: Is NVDA in a buyable technical setup right now, and does the broader semiconductor sector support it?'
     const { container } = render(

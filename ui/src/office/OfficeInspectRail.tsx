@@ -149,7 +149,9 @@ export function OfficeInspectRail({
               <blockquote>
                 {employee.bubble
                   ? officeBubbleText(employee.bubble, t)
-                  : `${t(`office.mood.${employee.mood}`)} · ${employee.surface || roomName || '—'}`}
+                  : t(employee.mood === 'idle' && !employee.awake
+                    ? 'office.moodDialogue.resting'
+                    : `office.moodDialogue.${employee.mood}`)}
               </blockquote>
             </div>
             <dl className="oa-office-inspect__facts">

@@ -2031,6 +2031,15 @@ export const zhHant: Resources = {
       review: '待審',
       failed: '失敗',
     },
+    moodDialogue: {
+      resting: '已經下班。樓層喚醒時隨時回來。',
+      idle: '正在待命，等候下一項任務。',
+      working: '正在推進目前任務。',
+      talking: '正在回報目前任務的進度。',
+      waiting: '正在等待下一步指令。',
+      review: '正在檢查最新結果。',
+      failed: '上一次執行需要處理。',
+    },
   },
   tradingModeGate: {
     liteMode: '精簡模式',

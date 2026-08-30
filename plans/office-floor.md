@@ -3069,6 +3069,22 @@ In-world activity-copy cleanup follow-up (2026-08-30):
   (5,134 passing; one file and nine tests skipped), and the production build also passed; the existing direct-eval and
   large-chunk advisories are unchanged.
 
+Quiet-coworker dialogue follow-up (2026-08-30):
+
+- Opened the real eight-person Prediction roster and drilled into sleeping Grok Architect g8. With no live activity
+  bubble, the Agent file used `idle · headless` as dialogue and immediately repeated those same machine facts under
+  Status and Surface. The card was structurally polished but the character still spoke like a debug inspector.
+- Compared retaining the fallback, removing empty dialogue entirely, and giving each runtime mood a short localized
+  in-world line. Chose mood dialogue: the speech plate explains the coworker's situation while the adjacent fact table
+  remains the precise operational source. Sleeping idle is distinct from awake idle; working, talking, waiting,
+  review, and failed each have their own line in English, Simplified/Traditional Chinese, and Japanese.
+- Browser-opened g8 again from the real roster. The speech plate now reads `Off duty. Ready when the floor wakes.` while
+  Status still reads idle and Surface still reads headless. The new copy fits the existing one-line dialogue plate,
+  agrees with the map's sleep treatment, and does not change the character card height or primary command hierarchy.
+- Focused Agent-file and roster specs passed (2 files / 5 tests), including the resting fallback contract, and UI
+  TypeScript passed. Root TypeScript, the full 617-file Vitest run (5,135 passing; one file and nine tests skipped),
+  and the production build also passed; the existing direct-eval and large-chunk advisories are unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
