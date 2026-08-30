@@ -4398,6 +4398,26 @@ Shared cabinet-confirm follow-up (2026-08-31):
   Cabinet, Roster, and Office-page suites passed 20 tests. Root and UI TypeScript passed; the production UI build
   passed; the full suite passed all 618 test files and 5,177 tests (one file and nine tests skipped).
 
+Readable activity-beat follow-up (2026-08-31):
+
+- Played the real Operations board through Overview, Agent, Inbox, and News selection. Arrow Left/Right changed channel,
+  Arrow Up/Down changed the selected record and the detail rail followed focus correctly. The remaining information gap
+  was stable and visible: folded rows such as `Agent report ×10 #5008–5017` advertised ten updates but exposed only the
+  newest payload, so the Activity Log could not actually replay the work it claimed to retain.
+- Compared keeping one representative payload, removing folding and restoring every raw event, and adding an inline
+  update trajectory to folded beats. Chose the trajectory: compact rows still protect the journal from streaming-event
+  noise, while the detail rail can reveal all retained updates on demand without introducing another modal or route.
+- Activity beats now retain their constituent events. Aggregated details expose a localized `Show N updates` command and
+  an oldest-to-newest, sequence-labelled trajectory; Enter or Space on the selected row opens it directly, while Escape
+  collapses only the trajectory and preserves row focus. The list advertises the expanded keyboard shortcuts to assistive
+  technology, and ordinary single-event rows, channel navigation, replay, and product exits remain unchanged.
+- Real-browser acceptance selected the live Grok Curator `×10` row with Arrow Down, expanded all `#5008–5017` updates
+  independently with Enter and Space, and collapsed with Escape while focus stayed on the same row. The 259px detail rail
+  and 175px update list had no horizontal overflow, and sticky `Find on floor` / `Open Runs` actions remained visible.
+  Focused Activity-beat and Runtime-section suites passed 20 tests. Root and UI TypeScript passed; the full suite passed
+  all 618 test files and 5,177 tests (one file and nine tests skipped); the production UI build passed with only the
+  existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

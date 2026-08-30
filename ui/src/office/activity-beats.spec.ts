@@ -36,6 +36,11 @@ describe('officeActivityBeats', () => {
 
     expect(beats).toEqual([{
       event: event(13, 'runtime.turn.text', { text: 'Newest' }),
+      events: [
+        event(13, 'runtime.turn.text', { text: 'Newest' }),
+        event(12, 'runtime.turn.text', { text: 'Middle' }),
+        event(11, 'runtime.turn.text', { text: 'Oldest' }),
+      ],
       count: 3,
       oldestSeq: 11,
       oldestTs: 1_000_000 - 11,

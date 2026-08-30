@@ -325,7 +325,7 @@ describe('OfficeRuntimeSection', () => {
     expect(screen.getByText('←/→ channels · ↑/↓ records')).toBeTruthy()
     const overviewToolRow = screen.getByRole('button', { name: /Tool action.*#0002/i })
     expect(overviewToolRow.closest('ol')?.getAttribute('aria-keyshortcuts'))
-      .toBe('ArrowUp ArrowDown ArrowLeft ArrowRight Home End')
+      .toBe('ArrowUp ArrowDown ArrowLeft ArrowRight Home End Enter Space')
 
     await userEvent.click(overviewToolRow)
     await userEvent.keyboard('{ArrowRight}')
@@ -542,6 +542,22 @@ describe('OfficeRuntimeSection', () => {
     await userEvent.click(progress)
     expect(screen.getByText('Latest progress.')).toBeTruthy()
     expect(screen.queryByText('Earlier progress.')).toBeNull()
+
+    const showUpdates = screen.getByRole('button', { name: 'Show 3 updates' })
+    expect(showUpdates.getAttribute('aria-expanded')).toBe('false')
+    await userEvent.keyboard('{Enter}')
+    expect(screen.getByRole('list', { name: '3 updates' })).toBeTruthy()
+    expect(screen.getByText('Earlier progress.')).toBeTruthy()
+    expect(screen.getByText('First progress.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Collapse updates' }).getAttribute('aria-expanded'))
+      .toBe('true')
+
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('list', { name: '3 updates' })).toBeNull()
+    expect(document.activeElement).toBe(progress)
+
+    await userEvent.keyboard(' ')
+    expect(screen.getByRole('list', { name: '3 updates' })).toBeTruthy()
 
     await userEvent.keyboard('{ArrowDown}')
     expect(screen.getByRole('button', { name: /Task started.*#0001/i }).getAttribute('aria-pressed'))

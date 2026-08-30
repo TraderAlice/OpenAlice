@@ -2,6 +2,7 @@ import type { AgentRuntimeEvent } from '../api/agentRuntimeLog'
 
 export interface OfficeActivityBeat {
   event: AgentRuntimeEvent
+  events: AgentRuntimeEvent[]
   count: number
   oldestSeq: number
   oldestTs: number
@@ -38,6 +39,7 @@ export function officeActivityBeats(events: readonly AgentRuntimeEvent[]): Offic
       : false
 
     if (key && key === previousKey && closeEnough && previous) {
+      previous.events.push(event)
       previous.count += 1
       previous.oldestSeq = event.seq
       previous.oldestTs = event.ts
@@ -46,6 +48,7 @@ export function officeActivityBeats(events: readonly AgentRuntimeEvent[]): Offic
 
     beats.push({
       event,
+      events: [event],
       count: 1,
       oldestSeq: event.seq,
       oldestTs: event.ts,

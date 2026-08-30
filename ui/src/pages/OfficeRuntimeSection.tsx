@@ -27,6 +27,7 @@ import {
 import { OfficeCoworkerSprite } from '../office/OfficeCoworkerSprite'
 import { officePixelImg } from '../office/furniture'
 import { OFFICE_HUD_ASSETS } from '../office/hud-assets'
+import { isOfficeConfirmKey } from '../office/input'
 import { OFFICE_LOG_ASSETS, officeLogAssetKind } from '../office/log-assets'
 import {
   officeReplayFocusForEvent,
@@ -251,6 +252,7 @@ export function OfficeRuntimeSection({
     initialSelectedSeq == null ? 'index' : 'detail',
   )
   const [detailExpanded, setDetailExpanded] = useState(false)
+  const [beatExpanded, setBeatExpanded] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const journalIndexRef = useRef<HTMLOListElement>(null)
@@ -356,6 +358,7 @@ export function OfficeRuntimeSection({
 
   useEffect(() => {
     setDetailExpanded(false)
+    setBeatExpanded(false)
   }, [selectedSeq])
 
   useLayoutEffect(() => {
@@ -438,6 +441,7 @@ export function OfficeRuntimeSection({
     )
   }
   const selectedEvent = selectedBeat.event
+  const selectedBeatEvents = [...selectedBeat.events].reverse()
   const selectedPayload = selectedEvent.payload
   const selectedDetail = eventDetail(selectedEvent)
   const selectedDetailId = `office-runtime-detail-${selectedEvent.seq}`
@@ -550,6 +554,12 @@ export function OfficeRuntimeSection({
 
   const handleJournalEscape = (keyboardEvent: KeyboardEvent<HTMLDivElement>) => {
     if (keyboardEvent.key !== 'Escape') return
+    if (beatExpanded) {
+      keyboardEvent.preventDefault()
+      keyboardEvent.stopPropagation()
+      setBeatExpanded(false)
+      return
+    }
     if (detailExpanded) {
       keyboardEvent.preventDefault()
       keyboardEvent.stopPropagation()
@@ -592,7 +602,7 @@ export function OfficeRuntimeSection({
               ref={journalIndexRef}
               className="oa-office-runtime__index"
               aria-label={`${t('office.timeline')} · ${channelLabel}`}
-              aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home End"
+              aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home End Enter Space"
             >
           {visibleBeats.map((beat) => {
             const event = beat.event
@@ -606,7 +616,15 @@ export function OfficeRuntimeSection({
                   data-kind={kind}
                   data-seq={event.seq}
                   onClick={() => selectJournalEvent(event.seq)}
-                  onKeyDown={moveJournalSelection}
+                  onKeyDown={(keyboardEvent) => {
+                    if (isOfficeConfirmKey(keyboardEvent.key)) {
+                      keyboardEvent.preventDefault()
+                      selectJournalEvent(event.seq)
+                      if (beat.count > 1) setBeatExpanded(true)
+                      return
+                    }
+                    moveJournalSelection(keyboardEvent)
+                  }}
                 >
                   <img src={OFFICE_LOG_ASSETS[kind]} alt="" aria-hidden style={officePixelImg} />
                   <span className="oa-office-runtime__index-copy">
@@ -704,6 +722,40 @@ export function OfficeRuntimeSection({
                 </p>
                 {!detailExpanded && reportToggle}
               </>
+            )}
+            {selectedBeat.count > 1 && (
+              <div className="oa-office-runtime__beat">
+                <button
+                  type="button"
+                  className="oa-office-runtime__detail-toggle"
+                  aria-controls={`office-runtime-beat-${selectedEvent.seq}`}
+                  aria-expanded={beatExpanded}
+                  onClick={() => setBeatExpanded((expanded) => !expanded)}
+                >
+                  {beatExpanded
+                    ? t('office.collapseBeatUpdates')
+                    : t('office.showBeatUpdates', { count: selectedBeat.count })}
+                </button>
+                {beatExpanded && (
+                  <ol
+                    id={`office-runtime-beat-${selectedEvent.seq}`}
+                    className="oa-office-runtime__beat-list"
+                    aria-label={t('office.logBeatUpdates', { count: selectedBeat.count })}
+                  >
+                    {selectedBeatEvents.map((event) => (
+                      <li key={event.seq}>
+                        <span>
+                          <b>#{String(event.seq).padStart(4, '0')}</b>
+                          <time dateTime={new Date(event.ts).toISOString()}>
+                            {formatRelativeTime(event.ts)}
+                          </time>
+                        </span>
+                        <p>{officeReplaySummary(event, t)}</p>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
             )}
             <ul className="oa-office-runtime__meta" aria-label={t('office.eventDetails')}>
               {selectedMeta.map((item) => (
