@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 
 import type { OfficeDrawerItem, OfficeFloorEmployee } from '../api/office'
 import { formatRelativeTime } from '../lib/intl'
+import { officeActivityExcerpt } from './activity-text'
 import { officeDrawerKindLabel, officeDrawerTitle } from './drawer-presentation'
 import { officeBubbleText } from './bubble-text'
 import { officePixelImg } from './furniture'
@@ -63,6 +64,7 @@ export function OfficeInspectRail({
 
   const employeeLabel = employee ? officeCoworkerCallsign(employee, coworkerAsset) : ''
   const employeeAssignment = employee ? officeCoworkerAssignment(employee) : null
+  const latestResultText = officeActivityExcerpt(employee?.latestResult?.text)
   const employeeByline = employee
     ? [employee.agent, employee.name].filter(Boolean).join(' · ')
     : ''
@@ -153,10 +155,10 @@ export function OfficeInspectRail({
                     ? 'office.moodDialogue.resting'
                     : `office.moodDialogue.${employee.mood}`)}
               </blockquote>
-              {!employee.bubble && employee.latestResult && (
+              {!employee.bubble && employee.latestResult && latestResultText && (
                 <div className="oa-office-inspect__latest-result">
                   <small>{t('office.latestResult')}</small>
-                  <p title={employee.latestResult.text}>{employee.latestResult.text}</p>
+                  <p title={latestResultText}>{latestResultText}</p>
                   <time dateTime={new Date(employee.latestResult.at).toISOString()}>
                     {formatRelativeTime(employee.latestResult.at)}
                   </time>

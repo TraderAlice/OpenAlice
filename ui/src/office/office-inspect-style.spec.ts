@@ -48,6 +48,15 @@ describe('Office Agent-file style contract', () => {
     expect(compactCss).toContain('grid-template-columns: 64px minmax(0, 1fr)')
     expect(compactCss).toContain('.oa-office-inspect__facts,')
     expect(compactCss).toContain('grid-column: 1 / -1')
+    expect(compactCss).toMatch(
+      /\.oa-office-inspect__latest-result\s*\{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) auto/,
+    )
+    expect(compactCss).toMatch(
+      /\.oa-office-inspect__latest-result time\s*\{[\s\S]*?position: static;[\s\S]*?grid-column: 2;[\s\S]*?grid-row: 1;[\s\S]*?justify-self: end/,
+    )
+    expect(compactCss).toMatch(
+      /\.oa-office-inspect__latest-result p\s*\{[\s\S]*?grid-column: 1 \/ -1;[\s\S]*?grid-row: 2/,
+    )
   })
 
   it('keeps completed records legible as a responsive reward grid', () => {

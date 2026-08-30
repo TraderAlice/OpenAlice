@@ -117,7 +117,7 @@ describe('OfficeInspectRail', () => {
           bubble: null,
           surface: 'headless',
           latestResult: {
-            text: 'Filed the finished report.',
+            text: '## Result\n**Filed** the [finished report](/tracked/report.md).',
             at: Date.now() - 60_000,
           },
         }}
@@ -130,7 +130,9 @@ describe('OfficeInspectRail', () => {
 
     expect(screen.getByText('Off duty. Ready when the floor wakes.')).toBeTruthy()
     expect(screen.getByText('Latest result')).toBeTruthy()
-    expect(screen.getByText('Filed the finished report.')).toBeTruthy()
+    expect(screen.getByText('Result Filed the finished report.')).toBeTruthy()
+    expect(container.textContent).not.toContain('**')
+    expect(container.textContent).not.toContain('/tracked/report.md')
     expect(container.querySelector('blockquote')?.textContent).not.toContain('idle · headless')
     expect(screen.getByText('idle')).toBeTruthy()
     expect(screen.getByText('headless')).toBeTruthy()

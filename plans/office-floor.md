@@ -3681,6 +3681,25 @@ Replay pause-menu truth follow-up (2026-08-30):
   TypeScript passed, the full suite passed all 617 test files and 5,162 tests (one file and nine tests skipped), and the
   production UI build passed with only the existing jsdom canvas and large-chunk advisories.
 
+Agent-result dialogue cleanup follow-up (2026-08-30):
+
+- Walked to the real Grok Tactician desk and opened its Agent File on desktop and 390x600. `Latest result` displayed
+  the assistant preview verbatim, including `**No code was changed.**`; on the short layout its absolute-positioned
+  timestamp also collided with the label as `LATEST RESULT2h ago`.
+- Compared rendering complete Markdown, stripping only bold markers, and projecting one compact Office-native plain
+  text excerpt. Chose the shared excerpt: a game character sheet should present one readable result sentence rather
+  than introduce headings, links, code blocks, or a second document interaction model. The existing product-activity
+  landmark projection now consumes the same Office helper instead of owning a duplicate parser.
+- Agent File normalizes Markdown-rich results, removes links and inline formatting, collapses whitespace, and caps the
+  result at 180 characters. Empty normalized results omit the reward card. At up to 680px, the result header uses an
+  explicit two-column grid: label and relative time share row one with an 8px gap, and the excerpt owns row two.
+- Real-browser acceptance showed the live result as `Walked live /office with arrows and WASD. No code was changed…`
+  with no raw `**` markers. At 390x600 the label/time top coordinates matched exactly, measured 8px apart, and the
+  excerpt began on the next row; the fixed Open session command and all three drawers stayed usable. Focused text,
+  Agent File, and responsive-style tests passed (3 files / 15 tests). Root and UI TypeScript passed, the full suite
+  passed all 617 test files and 5,162 tests (one file and nine tests skipped), and the production UI build passed with
+  only the existing jsdom canvas and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

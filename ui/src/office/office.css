@@ -3145,6 +3145,25 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
     min-height: 30px;
   }
 
+  .oa-office-inspect__latest-result {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 8px;
+    padding-right: 8px;
+  }
+
+  .oa-office-inspect__latest-result time {
+    position: static;
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+  }
+
+  .oa-office-inspect__latest-result p {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
   .oa-office-drawers ul {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

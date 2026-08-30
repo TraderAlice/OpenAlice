@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import type { AgentRuntimeEvent } from '../api/agentRuntimeLog'
 import { GLOBAL_ACTIVITY_REFRESH_EVENT } from '../hooks/useGlobalAgentActivity'
+import { officeActivityExcerpt } from './activity-text'
 
 const POLL_MS = 4_000
 const FRESH_MS = 12_000
@@ -58,7 +59,7 @@ export function projectOfficeProductActivity(
       ? {
           seq: agent.seq,
           occurredAt: agent.ts,
-          detail: activityExcerpt(
+          detail: officeActivityExcerpt(
             agent.payload.error
               ?? agent.payload.message
               ?? agent.payload.reason
@@ -75,7 +76,7 @@ export function projectOfficeProductActivity(
       ? {
           seq: inbox.seq,
           occurredAt: inbox.ts,
-          detail: activityExcerpt(inbox.payload.summary),
+          detail: officeActivityExcerpt(inbox.payload.summary),
           source: inbox.payload.agent ?? inbox.payload.workspaceLabel,
           inboxEntryId: inbox.payload.inboxEntryId,
         }
@@ -84,29 +85,11 @@ export function projectOfficeProductActivity(
       ? {
           seq: news.seq,
           occurredAt: news.ts,
-          detail: activityExcerpt(news.payload.title),
+          detail: officeActivityExcerpt(news.payload.title),
           source: news.payload.source,
         }
       : null,
   }
-}
-
-function activityExcerpt(value: string | undefined): string | undefined {
-  const normalized = value
-    ?.replace(/```(?:[^\n]*)\n?([\s\S]*?)```/g, '$1')
-    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .replace(/^\s{0,3}(?:#{1,6}\s+|>\s?|[-+*]\s+|\d+[.)]\s+)/gm, '')
-    .replace(/`([^`\n]+)`/g, '$1')
-    .replace(/(\*\*|__)(.*?)\1/g, '$2')
-    .replace(/(\*|_)(.*?)\1/g, '$2')
-    .replace(/~~(.*?)~~/g, '$1')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\\([\\`*{}[\]()#+\-.!_>])/g, '$1')
-    .replace(/\s+/g, ' ')
-    .trim()
-  if (!normalized) return undefined
-  return normalized.length > 180 ? `${normalized.slice(0, 179)}…` : normalized
 }
 
 function activityKindForEvent(event: AgentRuntimeEvent): OfficeActivityKind | null {
