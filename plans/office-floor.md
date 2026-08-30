@@ -3477,6 +3477,27 @@ Visible floor-perimeter follow-up (2026-08-30):
   and 5,153 tests (one file and nine tests skipped), and the production UI build passed with only the existing jsdom
   canvas and large-chunk advisories.
 
+Sustained collision-feedback follow-up (2026-08-30):
+
+- Continued the same real Grok navigation report at the top wall and recorded every movement state. Alice walked from
+  y=528 to y=144 normally; the next four Up inputs kept her at y=144 but forced `walking=false` and remounted collision
+  impact serials 1, 2, 3, and 4. The existing effect was therefore not merely a bump cue: the 96ms repeat loop kept
+  resetting the cue and snapping the avatar to idle while input was still held.
+- Compared replaying the spark continuously, looping an ordinary walk without contact state, and using one initial
+  impact followed by a sustained braced walk pose. Chose the third model: it tells the player that input remains active
+  and the world is blocking displacement, without turning a wall into a flashing notification source.
+- Manual keyboard and touch-pointer movement now enter an explicit `pushing` state on first blocked contact. That first
+  contact still emits the directional four-frame impact and 140ms nudge; later repeat ticks in the same direction keep
+  the existing directional walk atlas running but do not restart either effect. A successful step, direction release,
+  pointer release, blur, suspended floor, or map reframe clears the push state. Click-to-walk and isolated clicks retain
+  the bounded one-shot collision behavior rather than becoming persistent pushes.
+- Real-browser acceptance walked Alice to x=816/y=144, held Up, and sampled the live sprite after 260ms and 480ms. Her
+  position remained y=144, `pose=walk-up`, and `pushing/walking=true`; the first impact expired without a replacement.
+  Releasing Up immediately restored `pose=idle-up` and both flags false. The held-key timer spec additionally proves the
+  impact serial stays stable across repeat ticks. Focused building, sprite, and collision specs passed (3 files / 29
+  tests). Root and UI TypeScript passed, the full suite passed all 617 test files and 5,153 tests (one file and nine
+  tests skipped), and the production UI build passed with only the existing jsdom canvas and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

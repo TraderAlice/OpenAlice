@@ -156,6 +156,7 @@ export function OfficeBuilding({
     initialPlayerState?.direction ?? 'down',
   )
   const [aliceWalking, setAliceWalking] = useState(false)
+  const [alicePushing, setAlicePushing] = useState(false)
   const [aliceBumped, setAliceBumped] = useState(false)
   const [collisionImpact, setCollisionImpact] = useState<OfficeCollisionImpactState | null>(null)
   const [panning, setPanning] = useState(false)
@@ -180,6 +181,7 @@ export function OfficeBuilding({
   const bumpTimerRef = useRef<number | null>(null)
   const impactTimerRef = useRef<number | null>(null)
   const impactSerialRef = useRef(0)
+  const pushDirectionRef = useRef<OfficeAliceDirection | null>(null)
   const bumpFrameRef = useRef<number | null>(null)
   const walkTimerRef = useRef<number | null>(null)
   const touchMoveDelayRef = useRef<number | null>(null)
@@ -482,9 +484,23 @@ export function OfficeBuilding({
     if (!viewport || viewport.width <= 0 || viewport.height <= 0) return
     setCamera(officeCameraCenteredOn(aliceRef.current, viewport, mapLayout))
   }
-  const showCollisionBump = (movement: OfficeMovement = OFFICE_MOVEMENTS[aliceDirection]) => {
+  const clearAlicePushFeedback = () => {
+    if (pushDirectionRef.current == null) return
+    pushDirectionRef.current = null
     if (walkTimerRef.current != null) window.clearTimeout(walkTimerRef.current)
+    walkTimerRef.current = null
+    setAlicePushing(false)
     setAliceWalking(false)
+  }
+  const showCollisionBump = (movement: OfficeMovement = OFFICE_MOVEMENTS[aliceDirection]) => {
+    const sustainedInput = manualMoveKeysRef.current.size > 0
+      || touchMovePointersRef.current.size > 0
+    if (walkTimerRef.current != null) window.clearTimeout(walkTimerRef.current)
+    walkTimerRef.current = null
+    setAlicePushing(sustainedInput)
+    setAliceWalking(sustainedInput)
+    if (sustainedInput && pushDirectionRef.current === movement.direction) return
+    pushDirectionRef.current = sustainedInput ? movement.direction : null
     if (bumpFrameRef.current != null) window.cancelAnimationFrame(bumpFrameRef.current)
     if (bumpTimerRef.current != null) window.clearTimeout(bumpTimerRef.current)
     setAliceBumped(false)
@@ -516,6 +532,7 @@ export function OfficeBuilding({
       showCollisionBump(movement)
       return
     }
+    clearAlicePushFeedback()
     const next = move.position
     aliceRef.current = next
     setAlice(next)
@@ -666,6 +683,7 @@ export function OfficeBuilding({
     touchMoveDelayRef.current = null
     touchMoveRepeatRef.current = null
     lastTouchMoveDirectionRef.current = null
+    clearAlicePushFeedback()
   }
   const startTouchMove = (direction: OfficeAliceDirection, pointerId: number) => {
     if (floorInteractionSuspended || departingWorkspace) return
@@ -685,6 +703,7 @@ export function OfficeBuilding({
     manualMoveRepeatRef.current = null
     manualMoveKeysRef.current.clear()
     lastManualMoveKeyRef.current = null
+    clearAlicePushFeedback()
   }
   const movementForHeldKeys = (): OfficeMovement | null => {
     const held = Array.from(manualMoveKeysRef.current)
@@ -827,6 +846,8 @@ export function OfficeBuilding({
     setAlice(nextPosition)
     setAliceDirection(nextDirection)
     setAliceWalking(false)
+    setAlicePushing(false)
+    pushDirectionRef.current = null
     const viewport = viewportRef.current?.getBoundingClientRect()
     setCamera(viewport && viewport.width > 0 && viewport.height > 0
       ? officeCameraCenteredOn(nextPosition, viewport, mapLayout)
@@ -1294,6 +1315,7 @@ export function OfficeBuilding({
               aria-label={t('office.aliceAvatar')}
               data-direction={aliceDirection}
               data-walking={aliceWalking}
+              data-pushing={alicePushing}
               data-bumped={aliceBumped}
               style={{ left: alice.x, top: alice.y, zIndex: officeDepthAt(alice.y) }}
             >
