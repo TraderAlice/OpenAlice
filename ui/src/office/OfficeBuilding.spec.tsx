@@ -690,6 +690,87 @@ describe('OfficeBuilding', () => {
     }
   })
 
+  it('executes an off-grid route entry before activating the employee', () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })))
+    try {
+      const onSelectEmployee = vi.fn()
+      render(
+        <OfficeBuilding
+          building={{
+            config: {
+              workspaceSleepAfterMs: 1,
+              harnessMinimumVisibleGroups: { chat: 1, 'auto-quant': 1, prediction: 1, other: 0 },
+            },
+            lastSeq: 1,
+            firstSeq: 1,
+            offices: [
+              {
+                workspace: { id: 'prediction-route', tag: 'prediction', harness: 'prediction' },
+                lastInteractionAt: 1,
+                sleeping: false,
+                employees: [],
+              },
+              {
+                workspace: { id: 'quant-route', tag: 'quant', harness: 'auto-quant' },
+                lastInteractionAt: 1,
+                sleeping: false,
+                employees: [],
+              },
+              {
+                workspace: { id: 'chat-route', tag: 'chat', harness: 'chat' },
+                lastInteractionAt: 1,
+                sleeping: false,
+                employees: [{
+                  resumeId: 'resume-route',
+                  agent: 'grok',
+                  name: 'g1',
+                  title: 'Off-grid route target',
+                  awake: false,
+                  mood: 'idle',
+                  bubble: null,
+                  lastSeq: 1,
+                  lastInteractionAt: 1,
+                  drawers: [],
+                }],
+              },
+            ],
+          }}
+          initialPlayerState={{ position: { x: 325, y: 589 }, direction: 'down' }}
+          onSelectEmployee={onSelectEmployee}
+          onOpenEmployee={vi.fn()}
+          onOpenWorkspace={vi.fn()}
+          onOpenFiles={vi.fn()}
+          onOpenRoster={vi.fn()}
+          onOpenLog={vi.fn()}
+        />,
+      )
+
+      const alice = screen.getByRole('img', { name: 'Alice on the office map' })
+      const target = screen.getByTestId('office-desk-resume-route')
+      fireEvent.click(target)
+      expect(`${alice.style.left}:${alice.style.top}`).toBe('336px:600px')
+      expect(target.dataset.route).toBe('true')
+      expect(onSelectEmployee).not.toHaveBeenCalled()
+
+      act(() => vi.advanceTimersByTime(600))
+      expect(`${alice.style.left}:${alice.style.top}`).toBe('312px:504px')
+      expect(target.dataset.nearby).toBe('true')
+      expect(target.dataset.route).toBe('false')
+      act(() => vi.advanceTimersByTime(100))
+      expect(onSelectEmployee).toHaveBeenCalledWith(
+        'chat-route',
+        expect.objectContaining({ resumeId: 'resume-route' }),
+      )
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('walks Alice to a distant world object before activating it', () => {
     vi.useFakeTimers()
     vi.stubGlobal('matchMedia', vi.fn(() => ({

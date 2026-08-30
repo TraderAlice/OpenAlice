@@ -612,13 +612,13 @@ export function OfficeBuilding({
     setAliceWalking(true)
     walkTimerRef.current = window.setTimeout(() => setAliceWalking(false), 150)
   }
-  const moveAlice = (movement: OfficeMovement, learnsManualControls = true) => {
+  const moveAlice = (movement: OfficeMovement, learnsManualControls = true): boolean => {
     if (learnsManualControls) setControlsLearned(true)
     setAliceDirection(movement.direction)
     const move = moveAliceOnOfficeMap(aliceRef.current, movement, mapLayout, collisionRects)
     if (move.bumped) {
       showCollisionBump(movement)
-      return
+      return false
     }
     clearAlicePushFeedback()
     const next = move.position
@@ -634,6 +634,7 @@ export function OfficeBuilding({
         mapLayout,
       ))
     }
+    return true
   }
   const activateTarget = (target: OfficeInteractionTarget) => {
     if (target.kind === 'employee') {
@@ -730,7 +731,17 @@ export function OfficeBuilding({
         finish()
         return
       }
-      moveAlice(OFFICE_MOVEMENTS[step.direction], false)
+      const movement = {
+        x: step.x - aliceRef.current.x,
+        y: step.y - aliceRef.current.y,
+        direction: step.direction,
+      }
+      const moved = moveAlice(movement, false)
+      if (!moved || aliceRef.current.x !== step.x || aliceRef.current.y !== step.y) {
+        if (moved) showCollisionBump(movement)
+        cancelAutoWalk()
+        return
+      }
       stepIndex += 1
       setRouteTrail(stepIndex < path.steps.length ? path.steps.slice(stepIndex) : [step])
       routeTimerRef.current = window.setTimeout(advance, reducedMotion ? 0 : 96)

@@ -4227,6 +4227,25 @@ Diagonal first-beat normalization follow-up (2026-08-30):
   and 5,173 tests (one file and nine tests skipped), and the production UI build passed with only the existing ports
   fallback and large-chunk advisories.
 
+Off-grid route-execution follow-up (2026-08-30):
+
+- Clicked the real Grok Analyst after diagonal movement had left Alice off the 24px route grid. The destination pointer
+  matched the rendered desk exactly at x258/y457, but Alice remained around x325/y589 while the remaining trail ticks
+  disappeared and Agent File opened anyway. The path planner had correctly emitted a safe non-cardinal grid-entry
+  coordinate; the executor discarded its x/y values, attempted a nominal 24px cardinal move, and advanced the trail
+  even when that substitute movement collided.
+- Compared snapping before planning, restricting manual movement back to the route grid, and making route execution
+  honor the path it already validated. Chose exact execution: each auto-walk beat now moves by the delta to the planned
+  coordinate, verifies that Alice actually reached it, and cancels the entire route on any collision or clamped result.
+  Diagonal freedom remains intact, and a failed world transition can no longer consume a ghost path or activate afar.
+- Real-browser acceptance started at x480/y336, watched Alice traverse every visible trail beat, and opened Grok
+  Analyst only after reaching x312/y504 inside the interaction radius. The focused Building, collision, and path suites
+  passed 37 tests, including a reproduced off-grid entry and delayed activation. Closing Agent File then selected a
+  neighboring dense-pod coworker as the nearest prompt; that is recorded as the next distinct interaction-identity
+  increment rather than being conflated with route execution. Root and UI TypeScript passed, the full suite passed all
+  617 test files and 5,174 tests (one file and nine tests skipped), and the production UI build passed with only the
+  existing ports fallback and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
