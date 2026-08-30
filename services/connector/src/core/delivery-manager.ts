@@ -144,9 +144,15 @@ export class DeliveryManager {
   }
 
   async reconnect(id: string): Promise<ConnectorAdapterHealth> {
+    const config = this.options.config.adapters[id]
+    if (!config?.enabled) throw new Error(`Connector is not enabled: ${id}`)
+    return this.reconcile(id, config)
+  }
+
+  async reconcile(id: string, config: ConnectorAdapterConfig): Promise<ConnectorAdapterHealth> {
     const active = this.reconnects.get(id)
     if (active) return active
-    const operation = this.reconnectAdapter(id)
+    const operation = this.reconcileAdapter(id, config)
     this.reconnects.set(id, operation)
     try {
       return await operation
@@ -155,15 +161,23 @@ export class DeliveryManager {
     }
   }
 
-  private async reconnectAdapter(id: string): Promise<ConnectorAdapterHealth> {
-    const config = this.options.config.adapters[id]
-    if (!config?.enabled) throw new Error(`Connector is not enabled: ${id}`)
+  private async reconcileAdapter(id: string, config: ConnectorAdapterConfig): Promise<ConnectorAdapterHealth> {
     if (!this.options.registry.has(id)) throw new Error(`Unknown connector adapter: ${id}`)
     this.clearAdapterStartRetry(id)
     const previous = this.adapters.get(id)
-    if (previous) await previous.stop()
-    this.adapters.delete(id)
-    this.commands.delete(id)
+    try {
+      if (previous) await previous.stop()
+    } finally {
+      this.adapters.delete(id)
+      this.commands.delete(id)
+    }
+    this.options.config.adapters[id] = {
+      enabled: config.enabled,
+      settings: { ...config.settings },
+    }
+    if (!config.enabled) {
+      return { id, enabled: false, status: 'disabled' }
+    }
     this.installAdapter(id)
     try {
       await this.bootAdapter(id, config)

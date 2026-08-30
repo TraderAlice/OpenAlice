@@ -124,6 +124,61 @@ describe('DeliveryManager connector registry', () => {
     await manager.stop()
   })
 
+  it('reconciles one adapter without stopping or recreating its peers', async () => {
+    const calls = new Map<string, { starts: ReturnType<typeof vi.fn>; stops: ReturnType<typeof vi.fn>; created: number }>()
+    const registry = new ConnectorRegistry()
+    for (const id of ['alpha', 'beta']) {
+      const state = { starts: vi.fn(), stops: vi.fn(), created: 0 }
+      calls.set(id, state)
+      registry.register({
+        definition: { id, label: id, description: `${id} adapter`, fields: [], commands: [] },
+        create: () => {
+          state.created += 1
+          let status: ConnectorAdapterHealth['status'] = 'stopped'
+          return {
+            id,
+            start: async () => { state.starts(); status = 'healthy' },
+            stop: async () => { state.stops(); status = 'stopped' },
+            deliver: async () => undefined,
+            sendOwnerText: async () => undefined,
+            health: () => ({ id, enabled: true, status }),
+          }
+        },
+      })
+    }
+    const manager = new DeliveryManager({
+      registry,
+      config: {
+        version: 1,
+        adapters: {
+          alpha: { enabled: true, settings: { inboxPush: true } },
+          beta: { enabled: true, settings: { inboxPush: true } },
+        },
+      },
+      updateAdapterSettings: vi.fn(),
+    })
+
+    await manager.start()
+    expect(calls.get('alpha')).toMatchObject({ created: 1 })
+    expect(calls.get('beta')).toMatchObject({ created: 1 })
+
+    expect(await manager.reconcile('alpha', { enabled: false, settings: {} })).toEqual({
+      id: 'alpha',
+      enabled: false,
+      status: 'disabled',
+    })
+    expect(calls.get('alpha')?.stops).toHaveBeenCalledOnce()
+    expect(calls.get('beta')?.stops).not.toHaveBeenCalled()
+    expect(calls.get('beta')).toMatchObject({ created: 1 })
+
+    await manager.reconcile('alpha', { enabled: true, settings: { inboxPush: false } })
+    expect(calls.get('alpha')).toMatchObject({ created: 2 })
+    expect(calls.get('alpha')?.starts).toHaveBeenCalledTimes(2)
+    expect(calls.get('beta')?.starts).toHaveBeenCalledOnce()
+    expect(calls.get('beta')?.stops).not.toHaveBeenCalled()
+    await manager.stop()
+  })
+
   it('reports starting adapters before external startup finishes', async () => {
     let release!: () => void
     const gate = new Promise<void>((resolve) => { release = resolve })

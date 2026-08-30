@@ -73,19 +73,7 @@ export async function reconnectConnector(id: string): Promise<'adapter' | 'servi
 }
 
 export async function setConnectorEnabled(id: string, enabled: boolean): Promise<void> {
-  const latest = await api.connectors.load()
-  const adapter = latest.config.adapters[id]
-  if (!adapter || !latest.definitions.some((definition) => definition.id === id)) {
-    throw new Error(`Unknown Connector: ${id}`)
-  }
-  await api.connectors.save({
-    ...latest.config,
-    serviceEnabled: enabled ? true : latest.config.serviceEnabled,
-    adapters: {
-      ...latest.config.adapters,
-      [id]: { ...adapter, enabled },
-    },
-  })
+  await api.connectors.mutateAdapter(id, { enabled })
   await refreshConnectorHealth()
 }
 

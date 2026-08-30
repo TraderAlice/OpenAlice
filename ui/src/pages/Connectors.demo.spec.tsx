@@ -2,7 +2,6 @@
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { PublicConnectorConfig } from '../api'
 import { createDemoConnectorSnapshot } from '../demo/fixtures/connectors'
 import { i18n } from '../i18n'
 import { ConnectorStatusPage } from './ConnectorStatusPage'
@@ -10,7 +9,8 @@ import { ConnectorsPage } from './ConnectorsPage'
 
 const mocks = vi.hoisted(() => ({
   load: vi.fn(),
-  save: vi.fn(),
+  mutateAdapter: vi.fn(),
+  setService: vi.fn(),
   test: vi.fn(),
   reconnect: vi.fn(),
   deskLoad: vi.fn(),
@@ -31,7 +31,8 @@ vi.mock('../api', async (importOriginal) => {
       ...actual.api,
       connectors: {
         load: mocks.load,
-        save: mocks.save,
+        mutateAdapter: mocks.mutateAdapter,
+        setService: mocks.setService,
         test: mocks.test,
         reconnect: mocks.reconnect,
         desk: {
@@ -67,8 +68,38 @@ vi.mock('../live/connector-health', async (importOriginal) => {
 beforeEach(async () => {
   vi.clearAllMocks()
   await i18n.changeLanguage('en')
-  mocks.load.mockImplementation(async () => createDemoConnectorSnapshot())
-  mocks.save.mockImplementation(async (config) => ({ config: redactSecrets(config) }))
+  const connectorSnapshot = createDemoConnectorSnapshot()
+  mocks.load.mockImplementation(async () => connectorSnapshot)
+  mocks.mutateAdapter.mockImplementation(async (id, mutation) => {
+    const current = connectorSnapshot.config.adapters[id] ?? { enabled: false, settings: {}, configuredSecrets: [] }
+    const settings = { ...current.settings, ...(mutation.set ?? {}) }
+    for (const key of mutation.unset ?? []) delete settings[key]
+    const configuredSecrets = new Set(current.configuredSecrets)
+    for (const key of Object.keys(mutation.setSecrets ?? {})) configuredSecrets.add(key)
+    for (const key of mutation.removeSecrets ?? []) configuredSecrets.delete(key)
+    const adapter = {
+      enabled: mutation.enabled ?? current.enabled,
+      settings,
+      configuredSecrets: [...configuredSecrets],
+    }
+    const serviceChanged = adapter.enabled && !connectorSnapshot.config.serviceEnabled
+    connectorSnapshot.config = {
+      serviceEnabled: serviceChanged ? true : connectorSnapshot.config.serviceEnabled,
+      adapters: { ...connectorSnapshot.config.adapters, [id]: adapter },
+    }
+    return {
+      serviceEnabled: connectorSnapshot.config.serviceEnabled,
+      serviceChanged,
+      adapterChanged: true,
+      adapter,
+      runtime: { scope: serviceChanged ? 'service' : 'adapter', status: serviceChanged ? 'starting' : 'reconciled' },
+    }
+  })
+  mocks.setService.mockImplementation(async (enabled) => {
+    const serviceChanged = connectorSnapshot.config.serviceEnabled !== enabled
+    connectorSnapshot.config = { ...connectorSnapshot.config, serviceEnabled: enabled }
+    return { serviceEnabled: enabled, serviceChanged }
+  })
   mocks.test.mockResolvedValue({ ok: true, probeId: 'connector-probe-demo' })
   mocks.reconnect.mockResolvedValue({ ok: true, scope: 'adapter', adapterId: 'telegram' })
   mocks.deskLoad.mockResolvedValue({ desk: null })
@@ -413,9 +444,8 @@ describe('Connector demo routes', () => {
     expect(feishu.checked).toBe(false)
     expect(lark.checked).toBe(true)
 
-    await waitFor(() => expect(mocks.save).toHaveBeenCalled(), { timeout: 1_200 })
-    const saved = mocks.save.mock.calls.at(-1)?.[0] as PublicConnectorConfig
-    expect(saved.adapters.feishu.settings.domain).toBe('lark')
+    await waitFor(() => expect(mocks.mutateAdapter).toHaveBeenCalled(), { timeout: 1_200 })
+    expect(mocks.mutateAdapter.mock.calls.at(-1)).toEqual(['feishu', { set: { domain: 'lark' } }])
   })
 
   it('saves all missing Slack credentials as one connection', async () => {
@@ -460,17 +490,19 @@ describe('Connector demo routes', () => {
     expect(saveConnection.disabled).toBe(false)
     fireEvent.click(saveConnection)
 
-    await waitFor(() => expect(mocks.save).toHaveBeenCalledTimes(1))
-    const saved = mocks.save.mock.calls[0][0] as PublicConnectorConfig
-    expect(saved.adapters.slack.settings.botToken).toBe('xoxb-plausible-slack-bot-token')
-    expect(saved.adapters.slack.settings.appToken).toBe('xapp-plausible-slack-app-token')
-    expect(saved.adapters.slack.configuredSecrets).toEqual(['botToken', 'appToken'])
+    await waitFor(() => expect(mocks.mutateAdapter).toHaveBeenCalledTimes(1))
+    expect(mocks.mutateAdapter).toHaveBeenCalledWith('slack', {
+      setSecrets: {
+        botToken: 'xoxb-plausible-slack-bot-token',
+        appToken: 'xapp-plausible-slack-app-token',
+      },
+    })
     await waitFor(() => expect(within(dialog).queryByRole('button', { name: 'Save connection' })).toBeNull())
     const runtimeToggle = within(dialog).getByRole('switch', { name: 'Turn Slack on or off' })
     await waitFor(() => expect(document.activeElement).toBe(runtimeToggle))
     expect(runtimeToggle.getAttribute('aria-checked')).toBe('false')
     expect(within(dialog).getByText('Ready to link')).toBeTruthy()
-    expect(mocks.save).toHaveBeenCalledTimes(1)
+    expect(mocks.mutateAdapter).toHaveBeenCalledTimes(1)
   })
 
   it('localizes the exact missing Feishu connection fields', async () => {
@@ -498,7 +530,7 @@ describe('Connector demo routes', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save connection' }))
 
     await waitFor(() => expect(document.activeElement).toBe(botToken))
-    expect(mocks.save).not.toHaveBeenCalled()
+    expect(mocks.mutateAdapter).not.toHaveBeenCalled()
     expect(botToken.getAttribute('aria-invalid')).toBe('true')
     expect(appToken.getAttribute('aria-invalid')).toBe('true')
     expect(botToken.className).toContain('!border-destructive/60')
@@ -532,10 +564,8 @@ describe('Connector demo routes', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
 
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-    await waitFor(() => expect(mocks.save).toHaveBeenCalled(), { timeout: 1_200 })
-    const saved = mocks.save.mock.calls.at(-1)?.[0] as PublicConnectorConfig
-    expect(saved.serviceEnabled).toBe(true)
-    expect(saved.adapters.discord.enabled).toBe(true)
+    await waitFor(() => expect(mocks.mutateAdapter).toHaveBeenCalled(), { timeout: 1_200 })
+    expect(mocks.mutateAdapter).toHaveBeenCalledWith('discord', { enabled: true })
   })
 
   it('keeps auto-save feedback in the configuration dialog header', async () => {
@@ -546,7 +576,7 @@ describe('Connector demo routes', () => {
       configuredSecrets: ['botToken'],
     }
     mocks.load.mockResolvedValue(snapshot)
-    mocks.save.mockReturnValue(new Promise(() => {}))
+    mocks.mutateAdapter.mockReturnValue(new Promise(() => {}))
     render(<ConnectorStatusPage />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Manage Discord' }))
@@ -555,7 +585,7 @@ describe('Connector demo routes', () => {
       name: 'Turn Discord on or off',
     }))
 
-    await waitFor(() => expect(mocks.save).toHaveBeenCalled(), { timeout: 1_200 })
+    await waitFor(() => expect(mocks.mutateAdapter).toHaveBeenCalled(), { timeout: 1_200 })
     const status = await within(dialog).findByRole('status')
     expect(status.textContent).toBe('Saving…')
     expect(status.closest('[data-slot="dialog-header"]')).toBeTruthy()
@@ -829,10 +859,8 @@ describe('Connector demo routes', () => {
     expect(runtimeSwitch.getAttribute('aria-checked')).toBe('false')
     fireEvent.click(runtimeSwitch)
 
-    await waitFor(() => expect(mocks.save).toHaveBeenCalled(), { timeout: 1_200 })
-    const saved = mocks.save.mock.calls.at(-1)?.[0] as PublicConnectorConfig
-    expect(saved.serviceEnabled).toBe(true)
-    expect(saved.adapters.discord.enabled).toBe(true)
+    await waitFor(() => expect(mocks.mutateAdapter).toHaveBeenCalled(), { timeout: 1_200 })
+    expect(mocks.mutateAdapter).toHaveBeenCalledWith('discord', { enabled: true })
   })
 
   it('confirms before unlinking a learned owner and keeps the token', async () => {
@@ -866,21 +894,18 @@ describe('Connector demo routes', () => {
     fireEvent.click(unlink)
     expect(screen.getByRole('heading', { name: 'Unlink Discord?' })).toBeTruthy()
     await new Promise((resolve) => window.setTimeout(resolve, 800))
-    expect(mocks.save).not.toHaveBeenCalled()
+    expect(mocks.mutateAdapter).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.queryByRole('heading', { name: 'Unlink Discord?' })).toBeNull()
     await new Promise((resolve) => window.setTimeout(resolve, 800))
-    expect(mocks.save).not.toHaveBeenCalled()
+    expect(mocks.mutateAdapter).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: 'Unlink' }))
     fireEvent.click(screen.getAllByRole('button', { name: 'Unlink' }).at(-1)!)
 
-    await waitFor(() => expect(mocks.save).toHaveBeenCalled(), { timeout: 1_200 })
-    const saved = mocks.save.mock.calls.at(-1)?.[0] as PublicConnectorConfig
-    expect(saved.adapters.discord.settings.ownerUserId).toBe('')
-    expect(saved.adapters.discord.settings.applicationId).toBe('discord-app')
-    expect(saved.adapters.discord.configuredSecrets).toEqual(['botToken'])
+    await waitFor(() => expect(mocks.mutateAdapter).toHaveBeenCalled(), { timeout: 1_200 })
+    expect(mocks.mutateAdapter).toHaveBeenCalledWith('discord', { unset: ['ownerUserId'] })
   })
 
   it('keeps a secret as a local draft until the user saves a plausible token', async () => {
@@ -895,13 +920,13 @@ describe('Connector demo routes', () => {
     fireEvent.change(input, { target: { value: 'a' } })
     expect(input.value).toBe('a')
     await new Promise((resolve) => window.setTimeout(resolve, 800))
-    expect(mocks.save).not.toHaveBeenCalled()
+    expect(mocks.mutateAdapter).not.toHaveBeenCalled()
     expect(input.value).toBe('a')
 
     fireEvent.change(input, { target: { value: 'qweqw' } })
     fireEvent.click(screen.getAllByRole('button', { name: 'Save connection' })[0])
     expect((await screen.findByRole('alert')).textContent).toContain('at least 20 non-whitespace characters')
-    expect(mocks.save).not.toHaveBeenCalled()
+    expect(mocks.mutateAdapter).not.toHaveBeenCalled()
 
     expect(input.type).toBe('password')
     fireEvent.click(screen.getAllByRole('button', { name: 'Show draft' })[0])
@@ -912,9 +937,10 @@ describe('Connector demo routes', () => {
     fireEvent.change(input, { target: { value: '123456789:AAHplausible-bot-token' } })
     fireEvent.click(screen.getAllByRole('button', { name: 'Save connection' })[0])
 
-    await waitFor(() => expect(mocks.save).toHaveBeenCalled())
-    const saved = mocks.save.mock.calls.at(-1)?.[0] as PublicConnectorConfig
-    expect(saved.adapters.discord.settings.botToken).toBe('123456789:AAHplausible-bot-token')
+    await waitFor(() => expect(mocks.mutateAdapter).toHaveBeenCalled())
+    expect(mocks.mutateAdapter).toHaveBeenCalledWith('discord', {
+      setSecrets: { botToken: '123456789:AAHplausible-bot-token' },
+    })
     await waitFor(() => expect(input.value).toBe(''))
     expect(input.placeholder).toBe('Configured — enter a new value to replace')
     fireEvent.click(screen.getByRole('button', { name: 'Manage Discord connection details' }))
@@ -925,7 +951,7 @@ describe('Connector demo routes', () => {
     const snapshot = createDemoConnectorSnapshot()
     snapshot.config.adapters.discord.settings.applicationId = 'discord-app'
     mocks.load.mockResolvedValue(snapshot)
-    mocks.save.mockRejectedValueOnce(new Error('Connector settings unavailable'))
+    mocks.mutateAdapter.mockRejectedValueOnce(new Error('Connector settings unavailable'))
     render(<ConnectorsPage />)
 
     await screen.findByText('Allow external delivery')
@@ -973,12 +999,13 @@ describe('Connector demo routes', () => {
     expect(remove.className).toContain('min-h-10')
     fireEvent.click(replace)
     expect(screen.getByRole('heading', { name: 'Replace Discord token?' })).toBeTruthy()
-    expect(mocks.save).not.toHaveBeenCalled()
+    expect(mocks.mutateAdapter).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Replace token' }).at(-1)!)
-    await waitFor(() => expect(mocks.save).toHaveBeenCalled())
-    expect(mocks.save.mock.calls.at(-1)?.[0].adapters.discord.settings.botToken)
-      .toBe('123456789:AAHreplacement-bot-token')
+    await waitFor(() => expect(mocks.mutateAdapter).toHaveBeenCalled())
+    expect(mocks.mutateAdapter.mock.calls.at(-1)).toEqual(['discord', {
+      setSecrets: { botToken: '123456789:AAHreplacement-bot-token' },
+    }])
   })
 
   it('rejects a short replacement draft before asking for confirmation', async () => {
@@ -994,7 +1021,7 @@ describe('Connector demo routes', () => {
 
     expect((await screen.findByRole('alert')).textContent).toContain('at least 20 non-whitespace characters')
     expect(screen.queryByRole('heading', { name: 'Replace Discord token?' })).toBeNull()
-    expect(mocks.save).not.toHaveBeenCalled()
+    expect(mocks.mutateAdapter).not.toHaveBeenCalled()
   })
 
   it('requires confirmation before removing a configured secret', async () => {
@@ -1009,37 +1036,18 @@ describe('Connector demo routes', () => {
     expect(screen.getByRole('heading', { name: 'Remove Discord token?' })).toBeTruthy()
     expect(screen.getByText(/OpenAlice cannot recover this token after removal/)).toBeTruthy()
     await new Promise((resolve) => window.setTimeout(resolve, 800))
-    expect(mocks.save).not.toHaveBeenCalled()
+    expect(mocks.mutateAdapter).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.queryByRole('heading', { name: 'Remove Discord token?' })).toBeNull()
     await new Promise((resolve) => window.setTimeout(resolve, 800))
-    expect(mocks.save).not.toHaveBeenCalled()
+    expect(mocks.mutateAdapter).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Remove token' })).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove token' }))
     fireEvent.click(screen.getAllByRole('button', { name: 'Remove token' }).at(-1)!)
 
-    await waitFor(() => expect(mocks.save).toHaveBeenCalled(), { timeout: 1_200 })
-    const saved = mocks.save.mock.calls.at(-1)?.[0] as PublicConnectorConfig
-    expect(saved.adapters.discord.configuredSecrets).toEqual([])
-    expect(saved.adapters.discord.settings.botToken).toBe('')
+    await waitFor(() => expect(mocks.mutateAdapter).toHaveBeenCalled(), { timeout: 1_200 })
+    expect(mocks.mutateAdapter).toHaveBeenCalledWith('discord', { removeSecrets: ['botToken'] })
   })
 })
-
-function redactSecrets(config: PublicConnectorConfig): PublicConnectorConfig {
-  return {
-    ...config,
-    adapters: Object.fromEntries(Object.entries(config.adapters).map(([id, adapter]) => {
-      const secretKeys = id === 'slack' ? ['botToken', 'appToken'] : id === 'discord' || id === 'telegram' ? ['botToken'] : []
-      const configuredSecrets = new Set(adapter.configuredSecrets)
-      const settings = { ...adapter.settings }
-      for (const key of secretKeys) {
-        const value = settings[key]
-        if (typeof value === 'string' && value.length > 0) configuredSecrets.add(key)
-        delete settings[key]
-      }
-      return [id, { ...adapter, settings, configuredSecrets: [...configuredSecrets] }]
-    })),
-  }
-}

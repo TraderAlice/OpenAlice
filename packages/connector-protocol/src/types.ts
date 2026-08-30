@@ -80,6 +80,41 @@ export const publicConnectorConfigSchema = z.object({
 })
 export type PublicConnectorConfig = z.infer<typeof publicConnectorConfigSchema>
 
+const connectorSettingValueSchema = z.union([z.string(), z.number(), z.boolean()])
+
+/** Adapter-scoped configuration command. Public callers never send a complete
+ * Connector document or secret-presence markers: each mutation owns only the
+ * named adapter and the explicit fields in this payload. */
+export const connectorAdapterMutationSchema = z.object({
+  enabled: z.boolean().optional(),
+  set: z.record(z.string(), connectorSettingValueSchema).default({}),
+  unset: z.array(z.string().min(1)).max(32).default([]),
+  setSecrets: z.record(z.string(), z.string()).default({}),
+  removeSecrets: z.array(z.string().min(1)).max(16).default([]),
+}).superRefine((value, context) => {
+  if (
+    value.enabled === undefined
+    && Object.keys(value.set).length === 0
+    && value.unset.length === 0
+    && Object.keys(value.setSecrets).length === 0
+    && value.removeSecrets.length === 0
+  ) {
+    context.addIssue({ code: 'custom', message: 'Connector adapter mutation is empty.' })
+  }
+})
+export type ConnectorAdapterMutation = z.infer<typeof connectorAdapterMutationSchema>
+
+export const connectorServiceMutationSchema = z.object({ enabled: z.boolean() })
+export type ConnectorServiceMutation = z.infer<typeof connectorServiceMutationSchema>
+
+export const publicConnectorAdapterMutationResultSchema = z.object({
+  serviceEnabled: z.boolean(),
+  serviceChanged: z.boolean(),
+  adapterChanged: z.boolean(),
+  adapter: publicConnectorAdapterConfigSchema,
+})
+export type PublicConnectorAdapterMutationResult = z.infer<typeof publicConnectorAdapterMutationResultSchema>
+
 /** Keep inline delivery bounded below both Discord's ordinary upload limit and
  * Telegram's document limit. Alice reads only the small Markdown reports that
  * Inbox already exposes; Connector Service never reaches back into a Workspace. */

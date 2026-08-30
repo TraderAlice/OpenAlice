@@ -2,7 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObjec
 import type { TFunction } from 'i18next'
 import { Bot, CheckCircle2, ChevronDown, CircleAlert, ExternalLink, Eye, EyeOff, KeyRound, Link2, ListChecks, Power, RefreshCw, Send, ShieldCheck } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { api, type ConnectorDefinition, type ConnectorHealth, type PublicConnectorConfig } from '../api'
+import {
+  api,
+  type ConnectorAdapterMutation,
+  type ConnectorDefinition,
+  type ConnectorHealth,
+  type PublicConnectorConfig,
+} from '../api'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ConnectorDiagnosticDetails } from '../components/ConnectorDiagnosticDetails'
 import { PageHeader } from '../components/PageHeader'
@@ -92,12 +98,16 @@ function ConnectorSettingsSurface({
   const [reconnecting, setReconnecting] = useState<string | null>(null)
   const [actionFeedback, setActionFeedback] = useState<ConnectorActionFeedback | null>(null)
   const [credentialEditors, setCredentialEditors] = useState<Record<string, boolean>>({})
+  const savedConfigRef = useRef<PublicConnectorConfig | null>(null)
 
   const load = useCallback(async () => {
     try {
       const snapshot = await api.connectors.load()
       setDefinitions(snapshot.definitions)
-      setConfig((current) => JSON.stringify(current) === JSON.stringify(snapshot.config) ? current : snapshot.config)
+      setConfig((current) => {
+        if (current === null) savedConfigRef.current = snapshot.config
+        return JSON.stringify(current) === JSON.stringify(snapshot.config) ? current : snapshot.config
+      })
       setHealth(snapshot.health)
       setLoadError(false)
     } catch {
@@ -140,9 +150,29 @@ function ConnectorSettingsSurface({
   }, [])
 
   const save = useCallback(async (next: PublicConnectorConfig) => {
-    const response = await api.connectors.save(omitSecretSettings(next, definitions))
+    let saved = savedConfigRef.current
+    if (!saved) return
+    for (const definition of definitions) {
+      const mutation = adapterMutation(
+        definition,
+        saved.adapters[definition.id] ?? emptyAdapter(),
+        next.adapters[definition.id] ?? emptyAdapter(),
+      )
+      if (!mutation) continue
+      const response = await api.connectors.mutateAdapter(definition.id, mutation)
+      saved = {
+        ...saved,
+        serviceEnabled: response.serviceEnabled,
+        adapters: { ...saved.adapters, [definition.id]: response.adapter },
+      }
+      savedConfigRef.current = saved
+    }
+    if (saved.serviceEnabled !== next.serviceEnabled) {
+      const response = await api.connectors.setService(next.serviceEnabled)
+      saved = { ...saved, serviceEnabled: response.serviceEnabled }
+      savedConfigRef.current = saved
+    }
     if (!mountedRef.current) return
-    setConfig((current) => JSON.stringify(current) === JSON.stringify(response.config) ? current : response.config)
     scheduleRuntimeRefresh()
   }, [definitions, scheduleRuntimeRefresh])
 
@@ -282,33 +312,27 @@ function ConnectorSettingsSurface({
       return
     }
 
-    const existing = config.adapters[id] ?? emptyAdapter()
-    const draftSettings = Object.fromEntries(drafts.map((draft) => [draft.key, draft.value]))
-    const next: PublicConnectorConfig = {
-      ...config,
-      adapters: {
-        ...config.adapters,
-        [id]: {
-          ...existing,
-          settings: { ...existing.settings, ...draftSettings },
-          configuredSecrets: [...new Set([...existing.configuredSecrets, ...drafts.map((draft) => draft.key)])],
-        },
-      },
-    }
-
     const savingKey = grouped ? connectorFieldKey(id, '__connection__') : drafts[0].draftKey
     const errorKeys = [...drafts.map((draft) => draft.draftKey), connectorFieldKey(id, '__connection__')]
     setSavingSecret(savingKey)
     setSecretErrors((current) => omitRecordKeys(current, errorKeys))
     try {
-      const response = await api.connectors.save(next)
+      const response = await api.connectors.mutateAdapter(id, {
+        setSecrets: Object.fromEntries(drafts.map((draft) => [draft.key, draft.value])),
+      })
+      const baseline = savedConfigRef.current
+      if (baseline) {
+        savedConfigRef.current = {
+          ...baseline,
+          serviceEnabled: response.serviceEnabled,
+          adapters: { ...baseline.adapters, [id]: response.adapter },
+        }
+      }
       if (!mountedRef.current) return
       setConfig((current) => {
-        if (!current) return response.config
+        if (!current) return current
         const currentAdapter = current.adapters[id] ?? emptyAdapter()
-        const savedAdapter = response.config.adapters[id]
-        if (!savedAdapter) return current
-        const configuredSecrets = savedAdapter.configuredSecrets
+        const configuredSecrets = response.adapter.configuredSecrets
         if (sameStrings(currentAdapter.configuredSecrets, configuredSecrets)) return current
         return {
           ...current,
@@ -1686,27 +1710,31 @@ function isPlausibleConnectorSecret(value: string): boolean {
   return next.length >= MIN_CONNECTOR_SECRET_LENGTH && !/\s/.test(next)
 }
 
-function omitSecretSettings(
-  config: PublicConnectorConfig,
-  definitions: ConnectorDefinition[],
-): PublicConnectorConfig {
-  const secretKeys = new Map(definitions.map((definition) => [
-    definition.id,
-    new Set(definition.fields.filter((field) => field.kind === 'secret').map((field) => field.key)),
-  ]))
-  return {
-    ...config,
-    adapters: Object.fromEntries(Object.entries(config.adapters).map(([id, adapter]) => {
-      const secrets = secretKeys.get(id) ?? new Set<string>()
-      return [id, {
-        ...adapter,
-        // Empty secret values stay: they are the explicit "remove token" signal.
-        settings: Object.fromEntries(
-          Object.entries(adapter.settings).filter(([key, value]) => !secrets.has(key) || value === ''),
-        ),
-      }]
-    })),
+function adapterMutation(
+  definition: ConnectorDefinition,
+  saved: PublicConnectorConfig['adapters'][string],
+  next: PublicConnectorConfig['adapters'][string],
+): ConnectorAdapterMutation | null {
+  const mutation: ConnectorAdapterMutation = {}
+  if (saved.enabled !== next.enabled) mutation.enabled = next.enabled
+  const set: Record<string, string | number | boolean> = {}
+  const unset: string[] = []
+  for (const field of definition.fields) {
+    if (field.kind === 'secret') continue
+    const before = saved.settings[field.key]
+    const after = next.settings[field.key]
+    if (before === after) continue
+    if (after === undefined || (field.learnedBy && typeof after === 'string' && after.trim() === '')) {
+      unset.push(field.key)
+    } else {
+      set[field.key] = after
+    }
   }
+  if (Object.keys(set).length > 0) mutation.set = set
+  if (unset.length > 0) mutation.unset = unset
+  const removeSecrets = saved.configuredSecrets.filter((key) => !next.configuredSecrets.includes(key))
+  if (removeSecrets.length > 0) mutation.removeSecrets = removeSecrets
+  return Object.keys(mutation).length > 0 ? mutation : null
 }
 
 function connectorFieldKey(connectorId: string, fieldKey: string): string {

@@ -3,18 +3,18 @@ import type { ConnectorSettingsSnapshot } from '../api'
 
 const mocks = vi.hoisted(() => ({
   load: vi.fn(),
-  save: vi.fn(),
+  mutateAdapter: vi.fn(),
 }))
 
 vi.mock('../api', () => ({
-  api: { connectors: { load: mocks.load, save: mocks.save } },
+  api: { connectors: { load: mocks.load, mutateAdapter: mocks.mutateAdapter } },
 }))
 
 import { connectorWarningCount, setConnectorEnabled } from './connector-health'
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.save.mockResolvedValue({ config: {} })
+  mocks.mutateAdapter.mockResolvedValue({})
 })
 
 function snapshot(input: {
@@ -92,34 +92,14 @@ describe('connectorWarningCount', () => {
 
 describe('setConnectorEnabled', () => {
   it('turns on the shared service when starting one channel', async () => {
-    const latest = snapshot({ serviceEnabled: false, adapterEnabled: false })
-    mocks.load.mockResolvedValue(latest)
-
     await setConnectorEnabled('telegram', true)
 
-    expect(mocks.save).toHaveBeenCalledWith({
-      ...latest.config,
-      serviceEnabled: true,
-      adapters: {
-        ...latest.config.adapters,
-        telegram: { ...latest.config.adapters.telegram, enabled: true },
-      },
-    })
+    expect(mocks.mutateAdapter).toHaveBeenCalledWith('telegram', { enabled: true })
   })
 
   it('pauses one channel without disabling the shared service or changing its settings', async () => {
-    const latest = snapshot({ serviceEnabled: true, adapterEnabled: true })
-    latest.config.adapters.telegram.settings = { inboxPush: true }
-    mocks.load.mockResolvedValue(latest)
-
     await setConnectorEnabled('telegram', false)
 
-    expect(mocks.save).toHaveBeenCalledWith({
-      ...latest.config,
-      adapters: {
-        ...latest.config.adapters,
-        telegram: { ...latest.config.adapters.telegram, enabled: false },
-      },
-    })
+    expect(mocks.mutateAdapter).toHaveBeenCalledWith('telegram', { enabled: false })
   })
 })

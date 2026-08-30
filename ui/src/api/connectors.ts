@@ -38,6 +38,26 @@ export interface PublicConnectorConfig {
   }>
 }
 
+export interface ConnectorAdapterMutation {
+  enabled?: boolean
+  set?: Record<string, string | number | boolean>
+  unset?: string[]
+  setSecrets?: Record<string, string>
+  removeSecrets?: string[]
+}
+
+export interface ConnectorAdapterMutationResult {
+  serviceEnabled: boolean
+  serviceChanged: boolean
+  adapterChanged: boolean
+  adapter: PublicConnectorConfig['adapters'][string]
+  runtime: {
+    scope: 'adapter' | 'service'
+    status: 'unchanged' | 'reconciled' | 'degraded' | 'starting'
+    message?: string
+  }
+}
+
 export interface ConnectorHealth {
   enabled: boolean
   status: 'disabled' | 'healthy' | 'degraded'
@@ -95,11 +115,18 @@ export const connectorsApi = {
   async load(): Promise<ConnectorSettingsSnapshot> {
     return decodeConnectorSettingsSnapshot(await fetchJson<unknown>('/api/connectors'))
   },
-  save(config: PublicConnectorConfig): Promise<{ config: PublicConnectorConfig }> {
-    return fetchJson('/api/connectors', {
-      method: 'PUT',
+  setService(enabled: boolean): Promise<{ serviceEnabled: boolean; serviceChanged: boolean }> {
+    return fetchJson('/api/connectors/service', {
+      method: 'PATCH',
       headers,
-      body: JSON.stringify(config),
+      body: JSON.stringify({ enabled }),
+    })
+  },
+  mutateAdapter(id: string, mutation: ConnectorAdapterMutation): Promise<ConnectorAdapterMutationResult> {
+    return fetchJson(`/api/connectors/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(mutation),
     })
   },
   test(id: string): Promise<{ ok: boolean; probeId: string }> {

@@ -112,6 +112,12 @@ export async function startConnectorService(): Promise<void> {
     const adapter = await manager.reconnect(c.req.param('id'))
     return c.json({ ok: true, adapter })
   })
+  app.post('/v1/connectors/:id/reconcile', async (c) => {
+    const id = c.req.param('id')
+    const latest = await configStore.read()
+    const adapter = await manager.reconcile(id, latest.adapters[id] ?? { enabled: false, settings: {} })
+    return c.json({ ok: true, adapter })
+  })
   app.onError((error, c) => {
     console.warn('[connector] request failed:', error instanceof Error ? error.message : error)
     return c.json({ error: error instanceof Error ? error.message : String(error) }, 400)

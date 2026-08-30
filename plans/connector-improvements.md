@@ -836,17 +836,37 @@ external adapters remain optional projections rather than sources of truth.
         lifecycle transition.
   - [x] Distinguish durable Chat configuration from live Connector availability.
   - [ ] Move successful test references behind progressive disclosure.
-  - [ ] Replace whole-document Connector writes with atomic adapter-scoped
+  - [x] Replace whole-document Connector writes with atomic adapter-scoped
         mutations shared by Alice and Connector Service.
-  - [ ] Apply adapter configuration through an in-process per-adapter lifecycle
+  - [x] Apply adapter configuration through an in-process per-adapter lifecycle
         reconcile; reserve Guardian restart for global lifecycle and recovery.
-  - [ ] Make overview and dialog saves mutation-keyed and stale-response-safe.
+  - [x] Make overview and dialog saves mutation-keyed and stale-response-safe.
   - [ ] Persist Connector-to-Alice inbound, artifact, and UTA work behind an
         idempotent claim/ack queue before declaring restart safety.
   - [ ] Verify adapter isolation and queue recovery across dev, production, and
         Electron carriers without using real external accounts.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
+
+### Adapter-isolation implementation evidence (2026-08-30)
+
+- The private whole-config PUT and UI client were removed. Global service and
+  adapter mutations now use distinct PATCH commands; secrets require explicit
+  set/remove commands and adapter responses cannot overwrite peer state.
+- Alice and Connector Service serialize latest-read/merge/seal/rename through
+  one cross-process lease. Focused specs cover concurrent cross-adapter writes
+  and a bot-learned owner/chat update racing a UI preference write.
+- DeliveryManager now reconciles one adapter under a per-id operation gate.
+  Focused lifecycle specs prove disabling and re-enabling adapter A performs no
+  `start()` or `stop()` call on adapter B.
+- Real Default AliceProject verification changed and restored the disabled
+  Discord application ID through the targeted API. Both responses reported
+  adapter-scoped reconcile; Connector Service `startedAt` stayed
+  `2026-08-30T07:06:44.643Z`, and the live Telegram and Feishu peers remained
+  healthy. No credential or owner identifier was logged in this plan.
+- Focused acceptance: 76 specs passed; root `npx tsc --noEmit` and UI
+  `npx tsc -b` passed. Durable work queues and cross-carrier lifecycle smokes
+  remain open and are the next reliability increment.
 
 ## Verification
 
