@@ -1954,7 +1954,7 @@ export const ja: Resources = {
     amenityPlant: '観葉植物',
     timeline: 'アクティビティログ',
     logChannels: 'アクティビティチャンネル',
-    logChannelAll: 'すべて',
+    logChannelOverview: '概要',
     logChannelAgent: 'Agent',
     logChannelInbox: 'Inbox',
     logChannelNews: 'ニュース',

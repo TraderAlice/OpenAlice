@@ -15,7 +15,7 @@ describe('Office replay focus', () => {
     expect(officeReplayFocusForEvent(event('runtime.stopped', {
       workspaceId: 'prediction-1',
       resumeId: 'resume-scout',
-    }), 'Scout', 'Task complete', 'all')).toEqual({
+    }), 'Scout', 'Task complete', 'overview')).toEqual({
       seq: 42,
       workspaceId: 'prediction-1',
       resumeId: 'resume-scout',
@@ -26,7 +26,7 @@ describe('Office replay focus', () => {
       ],
       label: 'Scout',
       summary: 'Task complete',
-      channel: 'all',
+      channel: 'overview',
     })
   })
 

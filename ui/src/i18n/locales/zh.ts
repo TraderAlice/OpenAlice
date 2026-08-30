@@ -1953,7 +1953,7 @@ export const zh: Resources = {
     amenityPlant: '盆栽',
     timeline: '活动日志',
     logChannels: '动态频道',
-    logChannelAll: '全部',
+    logChannelOverview: '概览',
     logChannelAgent: 'Agent',
     logChannelInbox: 'Inbox',
     logChannelNews: '新闻',

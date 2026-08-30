@@ -37,13 +37,13 @@ import { useWorkspace } from '../tabs/store'
 
 export type OfficeLogChannel = OfficeReplayChannel
 
-const OFFICE_LOG_CHANNELS: readonly OfficeLogChannel[] = ['all', 'agent', 'inbox', 'news']
+const OFFICE_LOG_CHANNELS: readonly OfficeLogChannel[] = ['overview', 'agent', 'inbox', 'news']
 const OFFICE_AGENT_BEAT_TARGET = 12
 const OFFICE_AGENT_PAGE_SIZE = 100
 const OFFICE_AGENT_MAX_PAGES = 5
 const OFFICE_SERVICE_PAGE_SIZE = 50
 const OFFICE_LOG_CHANNEL_LABEL_KEYS = {
-  all: 'office.logChannelAll',
+  overview: 'office.logChannelOverview',
   agent: 'office.logChannelAgent',
   inbox: 'office.logChannelInbox',
   news: 'office.logChannelNews',
@@ -225,7 +225,7 @@ async function loadOfficeAgentWindow(query: ActivityQuery): Promise<AgentRuntime
 
 export function OfficeRuntimeSection({
   actors = new Map(),
-  initialChannel = 'all',
+  initialChannel = 'overview',
   initialSelectedSeq = null,
   replaySeq = null,
   onReplay,
@@ -239,7 +239,7 @@ export function OfficeRuntimeSection({
   const { t } = useTranslation()
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
   const [entriesByChannel, setEntriesByChannel] = useState<Record<OfficeLogChannel, AgentRuntimeEvent[]>>({
-    all: [],
+    overview: [],
     agent: [],
     inbox: [],
     news: [],
@@ -263,7 +263,7 @@ export function OfficeRuntimeSection({
       const inbox = inboxPage.entries
       const news = newsPage.entries
       setEntriesByChannel({
-        all: mergeOfficeLogFamilies([agent, inbox, news]),
+        overview: mergeOfficeLogFamilies([agent, inbox, news]),
         agent,
         inbox,
         news,
@@ -287,14 +287,14 @@ export function OfficeRuntimeSection({
     const inbox = officeActivityBeats(entriesByChannel.inbox)
     const news = officeActivityBeats(entriesByChannel.news)
     return {
-      all: officeActivityOverview([agent, inbox, news]),
+      overview: officeActivityOverview([agent, inbox, news]),
       agent,
       inbox,
       news,
     }
   }, [entriesByChannel])
   const channelCounts = useMemo(() => ({
-    all: beatsByChannel.all.length,
+    overview: beatsByChannel.overview.length,
     agent: beatsByChannel.agent.length,
     inbox: beatsByChannel.inbox.length,
     news: beatsByChannel.news.length,
@@ -321,17 +321,17 @@ export function OfficeRuntimeSection({
       return
     }
     if (appliedReplaySeqRef.current === replaySeq) return
-    const replayEvent = entriesByChannel.all.find((event) => event.seq === replaySeq)
+    const replayEvent = entriesByChannel.overview.find((event) => event.seq === replaySeq)
     if (!replayEvent) return
-    let replayChannel: OfficeLogChannel = channel === 'all'
-      ? 'all'
+    let replayChannel: OfficeLogChannel = channel === 'overview'
+      ? 'overview'
       : officeLogFamilyForEvent(replayEvent)
     let replayBeat = beatsByChannel[replayChannel].find((beat) => {
       const lower = Math.min(beat.oldestSeq, beat.event.seq)
       const upper = Math.max(beat.oldestSeq, beat.event.seq)
       return replaySeq >= lower && replaySeq <= upper
     })
-    if (!replayBeat && replayChannel === 'all') {
+    if (!replayBeat && replayChannel === 'overview') {
       replayChannel = officeLogFamilyForEvent(replayEvent)
       replayBeat = beatsByChannel[replayChannel].find((beat) => {
         const lower = Math.min(beat.oldestSeq, beat.event.seq)
@@ -343,7 +343,7 @@ export function OfficeRuntimeSection({
     appliedReplaySeqRef.current = replaySeq
     setChannel(replayChannel)
     setSelectedSeq(replayBeat.event.seq)
-  }, [beatsByChannel, channel, entriesByChannel.all, replaySeq])
+  }, [beatsByChannel, channel, entriesByChannel.overview, replaySeq])
 
   useEffect(() => {
     setDetailExpanded(false)
@@ -356,11 +356,11 @@ export function OfficeRuntimeSection({
     selectedRow?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   }, [channel, selectedSeq])
 
-  if (loading && entriesByChannel.all.length === 0) {
+  if (loading && entriesByChannel.overview.length === 0) {
     return <div className="oa-office-runtime__empty">{t('office.loading')}</div>
   }
 
-  if (error && entriesByChannel.all.length === 0) {
+  if (error && entriesByChannel.overview.length === 0) {
     return (
       <div role="alert" className="oa-office-runtime__error">
         {t('office.loadFailed')}: {error}
@@ -368,7 +368,7 @@ export function OfficeRuntimeSection({
     )
   }
 
-  if (entriesByChannel.all.length === 0) {
+  if (entriesByChannel.overview.length === 0) {
     return (
       <div className="oa-office-runtime__empty">
         {t('office.empty')}

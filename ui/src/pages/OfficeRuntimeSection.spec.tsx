@@ -272,12 +272,12 @@ describe('OfficeRuntimeSection', () => {
     ])
     render(<OfficeRuntimeSection />)
 
-    const allTab = await screen.findByRole('tab', { name: /All\s*4/ })
-    expect(allTab.getAttribute('data-active')).not.toBeNull()
+    const overviewTab = await screen.findByRole('tab', { name: /Overview\s*4/ })
+    expect(overviewTab.getAttribute('data-active')).not.toBeNull()
     expect(screen.getByRole('tab', { name: /Agent\s*2/ })).toBeTruthy()
     expect(screen.getByRole('tab', { name: /Inbox\s*1/ })).toBeTruthy()
     expect(screen.getByRole('tab', { name: /News\s*1/ })).toBeTruthy()
-    expect(screen.getByRole('list', { name: 'Activity log · All' }).children).toHaveLength(4)
+    expect(screen.getByRole('list', { name: 'Activity log · Overview' }).children).toHaveLength(4)
 
     await userEvent.click(screen.getByRole('tab', { name: /Inbox\s*1/ }))
     expect(screen.getByRole('list', { name: 'Activity log · Inbox' }).children).toHaveLength(1)
@@ -365,12 +365,12 @@ describe('OfficeRuntimeSection', () => {
     ])
     render(<OfficeRuntimeSection />)
 
-    expect(await screen.findByRole('tab', { name: /All\s*3/ })).toBeTruthy()
+    expect(await screen.findByRole('tab', { name: /Overview\s*3/ })).toBeTruthy()
     expect(screen.getByRole('tab', { name: /Agent\s*1/ })).toBeTruthy()
     expect(screen.getByRole('tab', { name: /Inbox\s*1/ })).toBeTruthy()
     expect(screen.getByRole('tab', { name: /News\s*1/ })).toBeTruthy()
-    const allLog = screen.getByRole('list', { name: 'Activity log · All' })
-    expect(allLog.children).toHaveLength(3)
+    const overviewLog = screen.getByRole('list', { name: 'Activity log · Overview' })
+    expect(overviewLog.children).toHaveLength(3)
     expect(screen.getByRole('button', { name: /Inbox received.*#0100/i })).toBeTruthy()
     expect(screen.getByRole('button', { name: /News added.*#0099/i })).toBeTruthy()
   })
@@ -446,9 +446,9 @@ describe('OfficeRuntimeSection', () => {
     ])
     render(<OfficeRuntimeSection />)
 
-    expect(await screen.findByRole('tab', { name: /All\s*3/ })).toBeTruthy()
+    expect(await screen.findByRole('tab', { name: /Overview\s*3/ })).toBeTruthy()
     expect(screen.getByRole('tab', { name: /Agent\s*3/ })).toBeTruthy()
-    expect(screen.getByRole('list', { name: 'Activity log · All' }).children).toHaveLength(3)
+    expect(screen.getByRole('list', { name: 'Activity log · Overview' }).children).toHaveLength(3)
 
     const progress = screen.getByRole('button', { name: /Agent report.*3 updates.*#0002–0004/i })
     expect(progress).toBeTruthy()
@@ -534,7 +534,7 @@ describe('OfficeRuntimeSection', () => {
       },
     ])
 
-    render(<OfficeRuntimeSection initialChannel="all" replaySeq={60} />)
+    render(<OfficeRuntimeSection initialChannel="overview" replaySeq={60} />)
 
     expect((await screen.findByRole('tab', { name: /News\s*50/ })).getAttribute('data-active'))
       .not.toBeNull()
@@ -620,7 +620,7 @@ describe('OfficeRuntimeSection', () => {
       targetIds: ['operations'],
       label: 'A',
       summary: 'Earlier report.',
-      channel: 'all',
+      channel: 'overview',
     })
   })
 

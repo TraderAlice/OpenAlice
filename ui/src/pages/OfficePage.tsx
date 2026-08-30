@@ -307,7 +307,7 @@ export function OfficePage() {
                     : null
                   setLogView({
                     origin,
-                    channel: replayLogView?.channel ?? 'all',
+                    channel: replayLogView?.channel ?? 'overview',
                     focusSeq: replayLogView?.focusSeq
                       ?? (origin === 'operations' ? productActivity.agent?.seq ?? null : null),
                   })

@@ -1,6 +1,6 @@
 import type { AgentRuntimeEvent } from '../api/agentRuntimeLog'
 
-export type OfficeReplayChannel = 'all' | 'agent' | 'inbox' | 'news'
+export type OfficeReplayChannel = 'overview' | 'agent' | 'inbox' | 'news'
 
 export interface OfficeReplayFocus {
   seq: number

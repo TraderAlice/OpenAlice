@@ -3032,9 +3032,27 @@ Balanced world-journal overview follow-up (2026-08-30):
   617-file Vitest run (5,133 passing; one file and nine tests skipped), and the production build also passed; the
   existing direct-eval and large-chunk advisories are unchanged.
 
+Truthful journal-channel vocabulary follow-up (2026-08-30):
+
+- Reopened the bounded journal and found its new tab labels contradicted one another: `All 30` sat beside `News 50`.
+  The data was correct, but “All” still promised an exhaustive set and made the deliberate overview curation look like
+  a counting or loading defect.
+- Compared showing the hidden total as `30/65`, restoring all 65 rows, and naming the curated surface for what it is.
+  Chose `Overview`: it preserves the readable 30-beat world summary without adding counter chrome or weakening the
+  full Agent, Inbox, and News archives.
+- Replaced the transient Office channel identifier directly from `all` to `overview`; this state is not persisted, so
+  there is no compatibility parser or dual vocabulary. The UI now says Overview, 概览, 概覽, and 概要 in the four
+  shipped locales, and replay fallback retains the same ability to reveal omitted events in their complete family.
+- Browser-reopened the real Operations board and confirmed the truthful `Overview 30 / Agent 10 / Inbox 5 / News 50`
+  hierarchy with 30 chronologically ordered overview rows. Locating real Grok #2815 on the floor produced Replay
+  `Seq 2815`; reopening Operations restored the active Overview tab and exact event selection. Focused replay,
+  activity, journal, and page specs passed (4 files / 30 tests), together with root/UI TypeScript, the full 617-file
+  Vitest run (5,133 passing; one file and nine tests skipped), and the production build; the existing direct-eval and
+  large-chunk advisories are unchanged.
+
 ## Completion
 
-计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
+计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
 四个状态后删除。完成标准不是“CSS 编译通过”，而是：
 
 - 看起来是一张连续的俯视游戏地图；
