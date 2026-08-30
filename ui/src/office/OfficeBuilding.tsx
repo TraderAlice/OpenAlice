@@ -18,6 +18,7 @@ import { officeBubbleText } from './bubble-text'
 import { OFFICE_FURNITURE, officePixelImg } from './furniture'
 import { OFFICE_HUD_ASSETS } from './hud-assets'
 import { officeInteractionPath, type OfficeInteractionPathStep } from './interaction-path'
+import { OFFICE_LOG_ASSETS } from './log-assets'
 import { OfficeAliceSprite, type OfficeAliceDirection } from './OfficeAliceSprite'
 import { officeCoworkerCast, type OfficeCoworkerSpriteAsset } from './coworker-sprites'
 import {
@@ -551,11 +552,27 @@ export function OfficeBuilding({
         nearbyTarget.employee,
         coworkerAssets.get(nearbyTarget.employee.resumeId),
       )
+      const failed = nearbyTarget.employee.mood === 'failed'
       const canTalk = nearbyTarget.employee.awake
+      const interaction = failed
+        ? {
+            icon: OFFICE_LOG_ASSETS.alert,
+            action: t('office.interactActionReview'),
+            label: t('office.interactFailure', { name: target }),
+          }
+        : canTalk
+          ? {
+              icon: OFFICE_HUD_ASSETS.talkBubble,
+              action: t('office.interactActionTalk'),
+              label: t('office.interactTalk', { name: target }),
+            }
+          : {
+              icon: OFFICE_HUD_ASSETS.rosterBadge,
+              action: t('office.interactActionCheck'),
+              label: t('office.interactCheck', { name: target }),
+            }
       return {
-        icon: canTalk ? OFFICE_HUD_ASSETS.talkBubble : OFFICE_HUD_ASSETS.rosterBadge,
-        action: t(canTalk ? 'office.interactActionTalk' : 'office.interactActionCheck'),
-        label: t(canTalk ? 'office.interactTalk' : 'office.interactCheck', { name: target }),
+        ...interaction,
         detail: nearbyTarget.employee.bubble
           ? officeBubbleText(nearbyTarget.employee.bubble, t)
           : null,

@@ -5067,6 +5067,22 @@ Dormant coworker interaction-language follow-up (2026-08-31):
   passed all 620 test files and 5,195 tests (one file and nine tests skipped); the production UI build passed with only
   the existing ports fallback and large-chunk advisory.
 
+Failed coworker action-priority follow-up (2026-08-31):
+
+- Played real failed g20 after the dormant-language pass. Its jagged warning emote and Agent file both said the last
+  run needs attention, and the file's first command was `Review activity`, but the nearby floor prompt still grouped
+  the failure with a resting coworker as `CHECK`.
+- Compared leaving every powered-down coworker neutral, turning all stopped coworkers into alerts, and prioritizing
+  only the explicit failed mood. The first hides an actionable exception; the second makes normal rest noisy. Chose a
+  three-level RPG interaction grammar: awake coworkers `TALK`, ordinary dormant coworkers `CHECK`, and failed coworkers
+  `REVIEW` with the existing generated activity-alert badge.
+- Implemented the priority in the shared floor prompt model with localized accessible labels and regression coverage.
+  Real-floor acceptance auto-routed to g20, reopened the failed Agent file, returned to the map, and confirmed one
+  alert-badge `REVIEW` prompt while the jagged failure emote remained visible above the same coworker. The focused
+  floor suite passed all 24 tests. Root and UI TypeScript passed; the full suite passed all 620 test files and 5,195
+  tests (one file and nine tests skipped); the production UI build passed with only the existing ports fallback and
+  large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

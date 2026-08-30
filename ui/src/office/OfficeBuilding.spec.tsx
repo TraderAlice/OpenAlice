@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import type { OfficeBuildingSnapshot } from '../api/office'
 import { i18n } from '../i18n'
 import { OfficeBuilding, officeRouteStatusEdge } from './OfficeBuilding'
 
@@ -1503,42 +1504,46 @@ describe('OfficeBuilding', () => {
     await waitFor(() => expect(onOpenLog).toHaveBeenCalledWith('operations'))
   }, 15_000)
 
-  it('offers a truthful check action for a dormant coworker', async () => {
+  it('offers truthful check and review actions for dormant coworkers', async () => {
     vi.useFakeTimers()
     try {
-      render(
-        <OfficeBuilding
-          building={{
-            config: {
-              workspaceSleepAfterMs: 1,
-              harnessMinimumVisibleGroups: { chat: 0, 'auto-quant': 1, prediction: 0, other: 0 },
-            },
+      const building: OfficeBuildingSnapshot = {
+        config: {
+          workspaceSleepAfterMs: 1,
+          harnessMinimumVisibleGroups: { chat: 0, 'auto-quant': 1, prediction: 0, other: 0 },
+        },
+        lastSeq: 1,
+        firstSeq: 1,
+        offices: [{
+          workspace: { id: 'quant-dormant', tag: 'quant-dormant', harness: 'auto-quant' },
+          lastInteractionAt: 1,
+          sleeping: false,
+          employees: [{
+            resumeId: 'resume-dormant',
+            agent: 'grok',
+            name: 'g1',
+            title: 'Dormant researcher',
+            awake: false,
+            mood: 'idle',
+            bubble: null,
             lastSeq: 1,
-            firstSeq: 1,
-            offices: [{
-              workspace: { id: 'quant-dormant', tag: 'quant-dormant', harness: 'auto-quant' },
-              lastInteractionAt: 1,
-              sleeping: false,
-              employees: [{
-                resumeId: 'resume-dormant',
-                agent: 'grok',
-                name: 'g1',
-                title: 'Dormant researcher',
-                awake: false,
-                mood: 'idle',
-                bubble: null,
-                lastSeq: 1,
-                lastInteractionAt: 1,
-                drawers: [],
-              }],
-            }],
-          }}
-          onSelectEmployee={vi.fn()}
-          onOpenEmployee={vi.fn()}
-          onOpenWorkspace={vi.fn()}
-          onOpenFiles={vi.fn()}
-          onOpenRoster={vi.fn()}
-          onOpenLog={vi.fn()}
+            lastInteractionAt: 1,
+            drawers: [],
+          }],
+        }],
+      }
+      const callbacks = {
+        onSelectEmployee: vi.fn(),
+        onOpenEmployee: vi.fn(),
+        onOpenWorkspace: vi.fn(),
+        onOpenFiles: vi.fn(),
+        onOpenRoster: vi.fn(),
+        onOpenLog: vi.fn(),
+      }
+      const view = render(
+        <OfficeBuilding
+          building={building}
+          {...callbacks}
         />,
       )
 
@@ -1554,6 +1559,25 @@ describe('OfficeBuilding', () => {
         .toBe('/office/hud/roster-badge-v2.png')
       expect(checkPrompt?.textContent).toContain('Check')
       expect(screen.queryByRole('status', { name: /Talk to Grok Strategist/ })).toBeNull()
+
+      view.rerender(
+        <OfficeBuilding
+          building={{
+            ...building,
+            offices: building.offices.map((office) => ({
+              ...office,
+              employees: office.employees.map((employee) => ({ ...employee, mood: 'failed' })),
+            })),
+          }}
+          {...callbacks}
+        />,
+      )
+
+      const reviewPrompt = screen.getByRole('status', { name: 'Review Grok Strategist’s failed run' })
+      expect(reviewPrompt.querySelector('img')?.getAttribute('src'))
+        .toBe('/office/log/alert-v1.png')
+      expect(reviewPrompt.textContent).toContain('Review')
+      expect(screen.queryByRole('status', { name: /Check Grok Strategist/ })).toBeNull()
     } finally {
       vi.useRealTimers()
     }
