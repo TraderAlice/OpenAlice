@@ -4861,6 +4861,23 @@ Shared Agent-file run-mode follow-up (2026-08-31):
   TypeScript passed; the full suite passed all 618 test files and 5,188 tests (one file and nine tests skipped); the
   production UI build passed with only the existing ports fallback and large-chunk advisory.
 
+Repeated drawer-record identity follow-up (2026-08-31):
+
+- Located the real employee with the richest Desk drawers: Prediction g2 had one Issue, one Report, and two distinct
+  Inbox deliveries. Both Inbox cards rendered the same `Inbox delivery · Inbox · 1d ago` text and identical accessible
+  names, so neither sighted nor assistive-technology navigation could tell which delivery was selected before opening it.
+- Compared exposing each Inbox UUID, adding an opaque badge, and numbering only repeated player-facing records. Chose
+  contextual ordinals. UUIDs would restore developer noise, while `1/2` and `2/2` create stable slot identity without
+  changing unique Issue/Report titles or leaking implementation data.
+- `officeDrawerTitles` now groups records by kind and player-facing base title, assigns ordinals only when a collision
+  exists, and localizes the repeated-record format. Agent-file labels and accessible action names consume the same title
+  map, so visual and keyboard/screen-reader identity cannot diverge.
+- Real-browser acceptance reopened Prediction g2 and confirmed `Inbox delivery · 1/2` and `Inbox delivery · 2/2` as
+  distinct cards and action names. All four real drawer labels measured 194px client/scroll width without overflow.
+  Focused drawer-presentation and Agent-file suites passed all 6 tests. Root and UI TypeScript passed; the full suite
+  passed all 619 test files and 5,189 tests (one file and nine tests skipped); the production UI build passed with only
+  the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

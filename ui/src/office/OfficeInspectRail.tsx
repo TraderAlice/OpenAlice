@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import type { OfficeDrawerItem, OfficeFloorEmployee } from '../api/office'
 import { formatRelativeTime } from '../lib/intl'
 import { officeActivityExcerpt } from './activity-text'
-import { officeDrawerKindLabel, officeDrawerTitle } from './drawer-presentation'
+import { officeDrawerKindLabel, officeDrawerTitles } from './drawer-presentation'
 import { officeBubbleText } from './bubble-text'
 import { officePixelImg } from './furniture'
 import { nextOfficeGridIndex } from './grid-navigation'
@@ -74,6 +74,7 @@ export function OfficeInspectRail({
     ? [employee.agent, employee.name].filter(Boolean).join(' · ')
     : ''
   const titleCanExpand = (employeeAssignment?.length ?? 0) > 72
+  const drawerTitles = officeDrawerTitles(employee?.drawers ?? [], t)
 
   return (
     <aside
@@ -249,7 +250,7 @@ export function OfficeInspectRail({
                   }}
                 >
                   {employee.drawers.map((item, index) => {
-                    const title = officeDrawerTitle(item, t)
+                    const title = drawerTitles.get(item.id)!
                     const kind = officeDrawerKindLabel(item, t)
                     const relativeTime = formatRelativeTime(item.at)
                     return (

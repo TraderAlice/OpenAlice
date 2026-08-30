@@ -1909,6 +1909,7 @@ export const zhHant: Resources = {
     drawerKindInbox: 'Inbox',
     drawerKindTradeDecision: '決策',
     drawerInboxRecord: 'Inbox 交付',
+    drawerRepeatedRecord: '{{record}} · {{index}}/{{count}}',
     drawerTradeDecisionRecord: '交易決策',
     cabinetEmpty: '這裡還沒有歸檔任何工位記錄。',
     openWorkspaceFiles: '進入 Workspace 檔案',

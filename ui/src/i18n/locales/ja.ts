@@ -1902,6 +1902,7 @@ export const ja: Resources = {
     drawerKindInbox: 'Inbox',
     drawerKindTradeDecision: '判断',
     drawerInboxRecord: 'Inbox 配信',
+    drawerRepeatedRecord: '{{record}} · {{index}}/{{count}}',
     drawerTradeDecisionRecord: '取引判断',
     cabinetEmpty: 'まだデスク記録は保管されていません。',
     openWorkspaceFiles: 'Workspace ファイルへ進む',

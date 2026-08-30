@@ -1934,6 +1934,7 @@ export const en = {
     drawerKindInbox: 'Inbox',
     drawerKindTradeDecision: 'Decision',
     drawerInboxRecord: 'Inbox delivery',
+    drawerRepeatedRecord: '{{record}} · {{index}}/{{count}}',
     drawerTradeDecisionRecord: 'Trade decision',
     cabinetEmpty: 'No desk records have been filed here yet.',
     openWorkspaceFiles: 'Enter Workspace files',
