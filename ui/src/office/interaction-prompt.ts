@@ -21,6 +21,7 @@ const OFFICE_PROMPT_MAX_HEIGHT = 56
 const OFFICE_PROMPT_VIEWPORT_MARGIN = 12
 const OFFICE_PROMPT_ALICE_HALF_WIDTH = 24
 const OFFICE_PROMPT_ALICE_HALF_HEIGHT = 30
+const OFFICE_PROMPT_TARGET_GAP = 8
 export const OFFICE_PROMPT_DETAIL_MAX_WIDTH = 216
 export const OFFICE_PROMPT_NARROW_DETAIL_MAX_WIDTH = 168
 export const OFFICE_PROMPT_DESTINATION_MAX_WIDTH = 200
@@ -35,41 +36,68 @@ interface OfficePromptBounds {
   bottom: number
 }
 
+function promptAnchor(
+  side: OfficeInteractionPromptSide,
+  target: { x: number; y: number },
+  targetBounds?: OfficePromptAvoidBounds,
+): { x: number; y: number } {
+  if (!targetBounds) {
+    return {
+      x: target.x + (side === 'left' ? -OFFICE_PROMPT_GAP : side === 'right' ? OFFICE_PROMPT_GAP : 0),
+      y: target.y + (side === 'above' ? -OFFICE_PROMPT_GAP : side === 'below' ? OFFICE_PROMPT_GAP : 0),
+    }
+  }
+  return {
+    x: side === 'left'
+      ? targetBounds.left - OFFICE_PROMPT_TARGET_GAP
+      : side === 'right'
+        ? targetBounds.right + OFFICE_PROMPT_TARGET_GAP
+        : target.x,
+    y: side === 'above'
+      ? targetBounds.top - OFFICE_PROMPT_TARGET_GAP
+      : side === 'below'
+        ? targetBounds.bottom + OFFICE_PROMPT_TARGET_GAP
+        : target.y,
+  }
+}
+
 function promptBounds(
   side: OfficeInteractionPromptSide,
   target: { x: number; y: number },
   maxWidth: number,
   maxHeight: number,
+  targetBounds?: OfficePromptAvoidBounds,
 ): OfficePromptBounds {
+  const anchor = promptAnchor(side, target, targetBounds)
   if (side === 'left') {
     return {
-      left: target.x - OFFICE_PROMPT_GAP - maxWidth,
-      top: target.y - maxHeight / 2,
-      right: target.x - OFFICE_PROMPT_GAP,
-      bottom: target.y + maxHeight / 2,
+      left: anchor.x - maxWidth,
+      top: anchor.y - maxHeight / 2,
+      right: anchor.x,
+      bottom: anchor.y + maxHeight / 2,
     }
   }
   if (side === 'right') {
     return {
-      left: target.x + OFFICE_PROMPT_GAP,
-      top: target.y - maxHeight / 2,
-      right: target.x + OFFICE_PROMPT_GAP + maxWidth,
-      bottom: target.y + maxHeight / 2,
+      left: anchor.x,
+      top: anchor.y - maxHeight / 2,
+      right: anchor.x + maxWidth,
+      bottom: anchor.y + maxHeight / 2,
     }
   }
   if (side === 'above') {
     return {
-      left: target.x - maxWidth / 2,
-      top: target.y - OFFICE_PROMPT_GAP - maxHeight,
-      right: target.x + maxWidth / 2,
-      bottom: target.y - OFFICE_PROMPT_GAP,
+      left: anchor.x - maxWidth / 2,
+      top: anchor.y - maxHeight,
+      right: anchor.x + maxWidth / 2,
+      bottom: anchor.y,
     }
   }
   return {
-    left: target.x - maxWidth / 2,
-    top: target.y + OFFICE_PROMPT_GAP,
-    right: target.x + maxWidth / 2,
-    bottom: target.y + OFFICE_PROMPT_GAP + maxHeight,
+    left: anchor.x - maxWidth / 2,
+    top: anchor.y,
+    right: anchor.x + maxWidth / 2,
+    bottom: anchor.y + maxHeight,
   }
 }
 
@@ -165,6 +193,7 @@ export function officeInteractionPromptPlacement(
   maxWidth = OFFICE_PROMPT_MAX_WIDTH,
   maxHeight = OFFICE_PROMPT_MAX_HEIGHT,
   avoidBounds: readonly OfficePromptAvoidBounds[] = [],
+  targetBounds?: OfficePromptAvoidBounds,
 ): OfficeInteractionPromptPlacement {
   const dx = target.x - alice.x
   const dy = target.y - alice.y
@@ -194,6 +223,14 @@ export function officeInteractionPromptPlacement(
     right: bounds.right + camera.x,
     bottom: bounds.bottom + camera.y,
   }))
+  const screenTargetBounds = targetBounds
+    ? {
+        left: targetBounds.left + camera.x,
+        top: targetBounds.top + camera.y,
+        right: targetBounds.right + camera.x,
+        bottom: targetBounds.bottom + camera.y,
+      }
+    : undefined
   const candidates = [
     side,
     ...perpendicularSides(side, screenTarget, viewport),
@@ -201,7 +238,7 @@ export function officeInteractionPromptPlacement(
   ].map((candidateSide) => {
     const fitted = fitPromptCrossAxis(
       candidateSide,
-      promptBounds(candidateSide, screenTarget, promptWidth, maxHeight),
+      promptBounds(candidateSide, screenTarget, promptWidth, maxHeight, screenTargetBounds),
       viewport,
     )
     return { side: candidateSide, ...fitted }
@@ -227,14 +264,13 @@ export function officeInteractionPromptPlacement(
     return overlap < bestOverlap ? candidate : best
   }, preferredCandidates[0] ?? candidates[candidates.length - 1]!)
   side = chosen.side
+  const anchor = promptAnchor(side, target, targetBounds)
 
   return {
     side,
-    x: target.x
-      + (side === 'left' ? -OFFICE_PROMPT_GAP : side === 'right' ? OFFICE_PROMPT_GAP : 0)
+    x: anchor.x
       + (side === 'above' || side === 'below' ? chosen.shift : 0),
-    y: target.y
-      + (side === 'above' ? -OFFICE_PROMPT_GAP : side === 'below' ? OFFICE_PROMPT_GAP : 0)
+    y: anchor.y
       + (side === 'left' || side === 'right' ? chosen.shift : 0),
     width: promptWidth,
     tailShift: chosen.shift === 0 ? 0 : -chosen.shift,

@@ -4195,6 +4195,21 @@ Replay exit-route ownership follow-up (2026-08-30):
   passed, the full suite passed all 617 test files and 5,172 tests (one file and nine tests skipped), and the production
   UI build passed with only the existing ports fallback and large-chunk advisories.
 
+Service-prompt object-clearance follow-up (2026-08-30):
+
+- Auto-walked from the Chat roster to News, opened the live News journal, and returned to the focused terminal. The
+  two-line world prompt was readable, but it covered the terminal's entire 136px width and its top 31px, hiding the
+  screen and signal details that identify the object being offered.
+- Compared shrinking the headline, moving service prompts into fixed HUD chrome, and anchoring the prompt to the
+  rendered object's outside edge. Chose object-aware anchoring: the full two-line product event remains legible and
+  spatially attached, while an 8px target clearance keeps the world object visible. Viewport fitting, Alice avoidance,
+  obstacle scoring, responsive widths, and the existing prompt-tail adjustment continue to own the remaining layout.
+- Real-browser acceptance repeated both News and Inbox round trips with current product events. Each prompt remained
+  above its terminal with zero geometric overlap and a measured 6px rendered gap after borders, while the 280px copy,
+  source, two-line truncation, and Enter affordance remained intact. Focused prompt and Building suites passed 28
+  tests. Root and UI TypeScript passed, the full suite passed all 617 test files and 5,173 tests (one file and nine
+  tests skipped), and the production UI build passed with only the existing ports fallback and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

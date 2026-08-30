@@ -406,6 +406,17 @@ export function OfficeBuilding({
       return []
     })
   }, [availableInteractionTargets, nearbyTarget])
+  const promptTargetBounds = useMemo<OfficePromptAvoidBounds | undefined>(() => {
+    if (nearbyTarget?.kind !== 'inbox-service' && nearbyTarget?.kind !== 'news-service') return undefined
+    const landmark = serviceLandmarks.find((item) => item.id === nearbyTarget.id)
+    if (!landmark) return undefined
+    return {
+      left: landmark.x,
+      top: landmark.y,
+      right: landmark.x + landmark.width,
+      bottom: landmark.y + landmark.height,
+    }
+  }, [nearbyTarget, serviceLandmarks])
   const promptPlacement = useMemo(
     () => nearbyTarget
       ? officeInteractionPromptPlacement(
@@ -429,9 +440,10 @@ export function OfficeBuilding({
               : undefined,
           nearbyService ? OFFICE_PROMPT_SERVICE_MAX_HEIGHT : undefined,
           promptAvoidBounds,
+          promptTargetBounds,
         )
       : null,
-    [alice, camera, mapLayout.height, mapLayout.width, nearbyService, nearbyTarget, promptAvoidBounds, viewportSize],
+    [alice, camera, mapLayout.height, mapLayout.width, nearbyService, nearbyTarget, promptAvoidBounds, promptTargetBounds, viewportSize],
   )
   const promptPresentation: {
     icon: string

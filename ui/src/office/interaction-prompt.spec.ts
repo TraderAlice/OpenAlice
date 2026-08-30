@@ -103,6 +103,25 @@ describe('officeInteractionPromptPlacement', () => {
     })
   })
 
+  it('anchors a service callout outside the rendered terminal instead of covering it', () => {
+    expect(officeInteractionPromptPlacement(
+      { x: 844, y: 610 },
+      { x: 844, y: 530 },
+      { width: 1052, height: 648 },
+      camera,
+      OFFICE_PROMPT_SERVICE_MAX_WIDTH,
+      OFFICE_PROMPT_SERVICE_MAX_HEIGHT,
+      [],
+      { left: 776, top: 467, right: 912, bottom: 583 },
+    )).toEqual({
+      side: 'above',
+      x: 844,
+      y: 459,
+      width: 280,
+      tailShift: 0,
+    })
+  })
+
   it('slides a perpendicular prompt along the camera edge and keeps its tail on the target', () => {
     expect(officeInteractionPromptPlacement(
       { x: 100, y: 200 },
