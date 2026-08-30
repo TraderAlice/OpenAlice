@@ -4777,6 +4777,22 @@ Service-journal content identity follow-up (2026-08-31):
   tests (one file and nine tests skipped); the production UI build passed with only the existing ports fallback and
   large-chunk advisory.
 
+Historical Agent assignment provenance follow-up (2026-08-31):
+
+- Continued through the real Operations board after the service-content pass. Agent story beats already formed a useful
+  game-like sequence, but selecting the older #5083 completion displayed the coworker's current `Office Visual-State QA
+  Sleep Command` assignment. Runtime evidence showed #5083 belonged to `run-CyqyjZwu`, while #5084–#5096 belonged to
+  `run-xRV2oUOL`: the historical log was borrowing mutable floor state from a later run.
+- Compared leaving current coworker context on every historical event, hiding Assignment from all journal records, and
+  binding the current floor assignment to its runtime task identity. Chose task-bound provenance. It preserves useful
+  assignment context across the current run's started/tool/report/completed beats without falsely relabeling older runs.
+- Office activity actors now carry their floor `lastSeq`. The journal resolves that sequence back to the current runtime
+  task and only renders Assignment when the selected event has the same task ID (or is the exact current sequence).
+- Real-browser acceptance confirmed #5083 no longer exposes the current assignment, while the grouped #5089–#5095 report
+  still does. Focused actor and Runtime suites passed all 20 tests. Root and UI TypeScript passed; the full suite passed
+  all 618 test files and 5,187 tests (one file and nine tests skipped); the production UI build passed with only the
+  existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

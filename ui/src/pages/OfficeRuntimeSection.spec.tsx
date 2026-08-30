@@ -108,6 +108,7 @@ describe('OfficeRuntimeSection', () => {
     const actors = new Map([['resume-alice', {
       resumeId: 'resume-alice',
       agent: 'pi',
+      lastSeq: 1,
       label: 'Market Scout',
       assignment: 'Watch the semiconductor desk for a clean entry.',
       secondary: 'pi · g1 · Chat Lab',
@@ -213,6 +214,56 @@ describe('OfficeRuntimeSection', () => {
     await userEvent.keyboard('{ArrowRight}')
     expect(screen.getByRole('tab', { name: /Agent\s*2/ }).getAttribute('data-active')).not.toBeNull()
     expect(document.activeElement).toBe(screen.getByRole('button', { name: /Task complete.*#0002/i }))
+  })
+
+  it('shows the current assignment only on events from the actor current run', async () => {
+    const now = Date.now()
+    mockJournal([
+      {
+        seq: 6,
+        ts: now,
+        type: 'runtime.stopped',
+        payload: { resumeId: 'resume-a', taskId: 'task-current', status: 'done' },
+      },
+      {
+        seq: 5,
+        ts: now - 1_000,
+        type: 'runtime.turn.text',
+        payload: { resumeId: 'resume-a', taskId: 'task-current', text: 'Current run report.' },
+      },
+      {
+        seq: 4,
+        ts: now - 2_000,
+        type: 'runtime.started',
+        payload: { resumeId: 'resume-a', taskId: 'task-current' },
+      },
+      {
+        seq: 3,
+        ts: now - 3_000,
+        type: 'runtime.stopped',
+        payload: { resumeId: 'resume-a', taskId: 'task-old', status: 'done' },
+      },
+    ])
+    const actors = new Map([['resume-a', {
+      resumeId: 'resume-a',
+      agent: 'grok',
+      lastSeq: 6,
+      label: 'Grok Artificer',
+      assignment: 'Office Visual-State QA Sleep Command',
+      secondary: 'grok · Office QA',
+      asset: OFFICE_COWORKER_SPRITES['grok-artificer'],
+    }]])
+    render(<OfficeRuntimeSection actors={actors} initialChannel="agent" />)
+
+    await screen.findByRole('button', { name: /Task complete.*#0006/i })
+    expect(screen.getByText('Office Visual-State QA Sleep Command')).toBeTruthy()
+
+    await userEvent.click(screen.getByRole('button', { name: /Agent report.*#0005/i }))
+    expect(screen.getByText('Office Visual-State QA Sleep Command')).toBeTruthy()
+
+    await userEvent.click(screen.getByRole('button', { name: /Task complete.*#0003/i }))
+    expect(screen.queryByText('Office Visual-State QA Sleep Command')).toBeNull()
+    expect(screen.queryByText('Assignment')).toBeNull()
   })
 
   it('presents long agent Markdown as expandable game dialogue', async () => {

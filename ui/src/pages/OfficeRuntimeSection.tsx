@@ -499,6 +499,18 @@ export function OfficeRuntimeSection({
       : undefined)
   }
   const selectedActor = actorForEvent(selectedEvent, actors)
+  const currentActorEvent = selectedActor
+    ? entriesByChannel.agent.find((event) => event.seq === selectedActor.lastSeq)
+    : undefined
+  const selectedAssignment = selectedActor?.assignment && (
+    selectedEvent.seq === selectedActor.lastSeq
+    || (
+      selectedPayload.taskId != null
+      && selectedPayload.taskId === currentActorEvent?.payload.taskId
+    )
+  )
+    ? selectedActor.assignment
+    : undefined
   const selectedIdentity = eventIdentity(selectedEvent, actors)
   const selectJournalEvent = (seq: number) => {
     setSelectedSeq(seq)
@@ -750,10 +762,10 @@ export function OfficeRuntimeSection({
               <strong>{selectedIdentity.primary}</strong>
               <span>{selectedIdentity.secondary}</span>
             </div>
-            {selectedActor?.assignment && (
+            {selectedAssignment && (
               <div className="oa-office-runtime__assignment">
                 <small>{t('office.assignment')}</small>
-                <p title={selectedActor.assignment}>{selectedActor.assignment}</p>
+                <p title={selectedAssignment}>{selectedAssignment}</p>
               </div>
             )}
             {selectedDetail && (

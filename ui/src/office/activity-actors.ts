@@ -5,6 +5,7 @@ import { officeCoworkerAssignment, officeCoworkerCallsign } from './label'
 export interface OfficeActivityActor {
   resumeId: string
   agent: string
+  lastSeq: number
   label: string
   assignment?: string
   secondary: string
@@ -27,6 +28,7 @@ export function officeActivityActors(
       actors.set(employee.resumeId, {
         resumeId: employee.resumeId,
         agent: employee.agent,
+        lastSeq: employee.lastSeq,
         label,
         ...(assignment ? { assignment } : {}),
         secondary: [

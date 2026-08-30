@@ -37,6 +37,7 @@ describe('Office activity actors', () => {
       .get('resume-crisp-slate-terrace-d82wad')
 
     expect(actor).toMatchObject({
+      lastSeq: 1,
       label: 'Grok Sentinel',
       assignment: 'Roster scout two ready.',
       secondary: 'grok · g5 · Prediction Lab',
