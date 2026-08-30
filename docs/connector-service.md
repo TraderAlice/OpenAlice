@@ -376,7 +376,12 @@ The surfaces deliberately have different jobs:
   invalid field receives focus, bringing recovery back into view on long or
   narrow forms. Editing a draft clears only that field's error. Client-side
   length guidance stays concise while backend save failures retain their
-  existing scoped error surface.
+  existing scoped error surface. After a successful grouped first save, the
+  preparation guide disappears, Connection details collapses, and the newly
+  rendered Ready to link panel receives the interaction handoff: focus moves to
+  that channel's runtime switch. The switch remains off and no external action
+  occurs until the operator activates it. Auto-save and later credential
+  maintenance do not move focus.
   Every later lifecycle stage retains its panel for runtime, linking, test, or
   recovery actions. Error panels keep the primary sentence actionable and put
   raw adapter messages plus retry timing in the same 40 px Technical details

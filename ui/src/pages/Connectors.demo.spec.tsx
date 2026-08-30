@@ -463,6 +463,11 @@ describe('Connector demo routes', () => {
     expect(saved.adapters.slack.settings.appToken).toBe('xapp-plausible-slack-app-token')
     expect(saved.adapters.slack.configuredSecrets).toEqual(['botToken', 'appToken'])
     await waitFor(() => expect(within(dialog).queryByRole('button', { name: 'Save connection' })).toBeNull())
+    const runtimeToggle = within(dialog).getByRole('switch', { name: 'Turn Slack on or off' })
+    await waitFor(() => expect(document.activeElement).toBe(runtimeToggle))
+    expect(runtimeToggle.getAttribute('aria-checked')).toBe('false')
+    expect(within(dialog).getByText('Ready to link')).toBeTruthy()
+    expect(mocks.save).toHaveBeenCalledTimes(1)
   })
 
   it('localizes the exact missing Feishu connection fields', async () => {

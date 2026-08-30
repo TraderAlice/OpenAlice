@@ -84,6 +84,7 @@ function ConnectorSettingsSurface({
   const [secretDrafts, setSecretDrafts] = useState<Record<string, string>>({})
   const [savingSecret, setSavingSecret] = useState<string | null>(null)
   const [secretErrors, setSecretErrors] = useState<Record<string, string>>({})
+  const [pendingRuntimeFocus, setPendingRuntimeFocus] = useState<string | null>(null)
   const [pendingSecretRemoval, setPendingSecretRemoval] = useState<PendingSecretRemoval | null>(null)
   const [pendingSecretReplace, setPendingSecretReplace] = useState<PendingSecretReplace | null>(null)
   const [pendingUnlink, setPendingUnlink] = useState<PendingUnlink | null>(null)
@@ -155,6 +156,14 @@ function ConnectorSettingsSurface({
   useEffect(() => {
     onSaveFeedback?.(status, retry)
   }, [onSaveFeedback, retry, status])
+
+  useEffect(() => {
+    if (!pendingRuntimeFocus) return
+    const target = document.getElementById(`connector-${pendingRuntimeFocus}-runtime-toggle`)
+    if (!target) return
+    target.focus()
+    setPendingRuntimeFocus(null)
+  }, [config, pendingRuntimeFocus])
 
   useEffect(() => {
     if (!flushRef) return
@@ -311,6 +320,7 @@ function ConnectorSettingsSurface({
       })
       setSecretDrafts((current) => omitRecordKeys(current, drafts.map((draft) => draft.draftKey)))
       scheduleRuntimeRefresh()
+      if (grouped) setPendingRuntimeFocus(id)
     } catch (error) {
       if (!mountedRef.current) return
       const errorKey = grouped ? connectorFieldKey(id, '__connection__') : drafts[0].draftKey
@@ -902,7 +912,7 @@ function ConnectorPreferences({
               </div>
               <Toggle
                 size="sm"
-              checked={field.kind === 'boolean' ? checked : Boolean(value)}
+                checked={field.kind === 'boolean' ? checked : Boolean(value)}
                 ariaLabel={fieldLabel}
                 onChange={(next) => onSettingChange(field.key, next)}
               />
@@ -1425,6 +1435,7 @@ function SetupStatePanel({
                 {t('connectorSettings.useConnector', { name: definition.label })}
               </span>
               <Toggle
+                id={`connector-${definition.id}-runtime-toggle`}
                 size="sm"
                 checked={running}
                 disabled={saving}

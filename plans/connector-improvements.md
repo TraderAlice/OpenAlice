@@ -531,6 +531,17 @@ external adapters remain optional projections rather than sources of truth.
     back into view, and uses a concise actionable minimum-length sentence. A
     subsequent edit clears only that field's error. API/save failures retain
     their existing scoped presentation and no credential boundary changes.
+46. **Successful first save hands focus to the explicit linking control.**
+    Once grouped credentials save, the long preparation guide disappears, the
+    Connection disclosure collapses, and Ready to link is inserted above it,
+    but the removed Save connection button currently drops focus to `body`.
+    Automatically starting the Connector would erase the intentional user
+    boundary; focusing only the status copy would still leave the action to be
+    rediscovered. The chosen transition focuses the newly rendered per-channel
+    runtime switch after the successful grouped save. This scrolls the next step
+    into view and lets a keyboard user activate it, while performing no external
+    action itself. Auto-save, replacement, removal, and unrelated runtime updates
+    do not claim focus.
 
 ## Ordered Work
 
@@ -627,6 +638,8 @@ external adapters remain optional projections rather than sources of truth.
         field-specific missing requirements.
   - [x] Return grouped credential validation to the first invalid field with
         concise, accessible inline recovery.
+  - [x] Hand a successful first credential save to the corresponding Ready to
+        link runtime control without auto-starting it.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -1108,6 +1121,20 @@ measured 684 x 40 px at y 369.42 and document width remained exact. Editing one
 draft cleared only its own field error in the focused contract. No save API,
 real credential, Connector, or external platform action was invoked. The
 temporary tab and demo runtime were closed, and the viewport was reset.
+
+The first-save-focus-handoff increment passed all 32 demo-route tests, UI and
+root typechecking, the demo production build, and all 5,130 repository tests.
+The generic grouped save records a pending channel only after the API succeeds;
+a post-commit effect focuses that channel's newly rendered runtime switch and
+clears the request. At 390 x 844, saving simulated Slack credentials collapsed
+preparation, rendered Ready to link, and moved focus from the removed footer
+button to the unchecked 40 px runtime switch at y 200.28. Document width
+remained exactly 390 px. At 1,052 x 734, saving simulated Discord credentials
+moved focus to its unchecked 40 px runtime switch at y 310.43, with document
+width exactly 1,052 px. A rejected short Discord token kept focus on its invalid
+field instead. No Connector, external platform, or real credential action was
+invoked. The temporary tab and demo runtime were closed, and the viewport was
+reset.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.
