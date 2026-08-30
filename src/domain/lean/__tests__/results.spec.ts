@@ -244,4 +244,131 @@ describe("parseLeanResults", () => {
     expect(res.status).toBe("failed");
     expect(res.error).toMatch(/Failed to parse/);
   });
+
+  it("parses the current LEAN engine output shape (lowerCamel keys)", () => {
+    const currentLeanOutput = {
+      statistics: {
+        "Total Trades": "5",
+        "Win Rate": "60.0%",
+        "Loss Rate": "40.0%",
+        "Drawdown": "2.1%",
+        "Net Profit": "$1,200.00",
+        "Sharpe Ratio": "1.80"
+      },
+      runtimeStatistics: {
+        "Equity": "$101,200.00",
+        "Return": "1.2%"
+      },
+      totalPerformance: {
+        tradeStatistics: {
+          totalNumberOfTrades: 5,
+          numberOfWinningTrades: 3,
+          numberOfLosingTrades: 2,
+          winRate: "0.6",
+          lossRate: "0.4",
+          profitLossRatio: "2.0",
+          totalProfitLoss: "1200"
+        },
+        portfolioStatistics: {
+          compoundingAnnualReturn: "0.25",
+          drawdown: "0.021",
+          sharpeRatio: "1.8",
+          sortinoRatio: "2.4",
+          probabilisticSharpeRatio: "0.78",
+          expectancy: "0.65",
+          totalFees: "10",
+          alpha: "0.04",
+          beta: "0.9",
+          annualStandardDeviation: "0.11",
+          annualVariance: "0.012",
+          informationRatio: "1.3",
+          trackingError: "0.02"
+        },
+        closedTrades: [
+          {
+            symbol: { value: "EURUSD", id: "EURUSD 8G", permtick: "EURUSD" },
+            entryTime: "2024-01-02T10:00:00Z",
+            entryPrice: 1.085,
+            exitTime: "2024-01-02T14:30:00Z",
+            exitPrice: 1.088,
+            quantity: 100000,
+            profitLoss: 300,
+            totalFees: 2,
+            mae: -50,
+            mfe: 320,
+            duration: "04:30:00"
+          }
+        ]
+      },
+      charts: {
+        "Strategy Equity": {
+          name: "Strategy Equity",
+          chartType: "Overlay",
+          series: {
+            Equity: {
+              name: "Equity",
+              unit: "$",
+              seriesType: "Line",
+              index: 0,
+              values: [
+                [1704153600, 100000],
+                [1704240000, 102450.5]
+              ]
+            }
+          }
+        }
+      },
+      orders: {
+        "1": {
+          id: 1,
+          symbol: { value: "EURUSD", id: "EURUSD 8G", permtick: "EURUSD" },
+          price: 1.085,
+          quantity: 100000,
+          direction: 0,
+          type: 0,
+          status: 3,
+          time: "2024-01-02T10:00:00Z",
+          tag: "",
+          value: 108500
+        }
+      }
+    };
+
+    const req = { strategyName: "CurrentShape", symbol: "EURUSD", startDate: "2024-01-01", endDate: "2024-01-05" };
+    const res = parseLeanResults(currentLeanOutput, "bt_current", req, { exitCode: 0 });
+
+    expect(res.status).toBe("completed");
+    expect(res.statistics?.totalTrades).toBe(5);
+    expect(res.statistics?.winningTrades).toBe(3);
+    expect(res.statistics?.losingTrades).toBe(2);
+    expect(res.statistics?.winRate).toBeCloseTo(0.6);
+    expect(res.statistics?.netProfit).toBe(1200);
+    expect(res.statistics?.sharpeRatio).toBe(1.8);
+    expect(res.statistics?.sortinoRatio).toBe(2.4);
+    expect(res.statistics?.drawdown).toBeCloseTo(0.021);
+    expect(res.statistics?.compoundingAnnualReturn).toBeCloseTo(0.25);
+    expect(res.statistics?.totalFees).toBe(10);
+    expect(res.statistics?.alpha).toBeCloseTo(0.04);
+
+    expect(res.runtimeStatistics?.equity).toBe(101200);
+    expect(res.runtimeStatistics?.returnPct).toBeCloseTo(0.012);
+
+    expect(res.closedTrades).toHaveLength(1);
+    expect(res.closedTrades[0].symbol).toBe("EURUSD");
+    expect(res.closedTrades[0].profitLoss).toBe(300);
+    expect(res.closedTrades[0].entryPrice).toBe(1.085);
+
+    expect(res.orders).toHaveLength(1);
+    expect(res.orders[0].id).toBe(1);
+    expect(res.orders[0].symbol).toBe("EURUSD");
+    expect(res.orders[0].direction).toBe("Buy");
+    expect(res.orders[0].status).toBe("Filled");
+
+    expect(res.charts["Strategy Equity - Equity"]).toBeDefined();
+    expect(res.charts["Strategy Equity - Equity"].unit).toBe("$");
+    expect(res.charts["Strategy Equity - Equity"].values).toEqual([
+      { x: 1704153600, y: 100000 },
+      { x: 1704240000, y: 102450.5 }
+    ]);
+  });
 });

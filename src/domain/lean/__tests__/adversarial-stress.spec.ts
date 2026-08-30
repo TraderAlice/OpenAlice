@@ -363,7 +363,7 @@ describe("Adversarial Stress Testing: Results Parser, Config Generator & LeanSer
         "node",
         ["-e", "console.log('Subprocess STDOUT test'); console.error('Subprocess STDERR test'); process.exit(0);"],
         5000,
-        "test-container-success"
+        {}
       );
 
       expect(result.exitCode).toBe(0);
@@ -378,7 +378,7 @@ describe("Adversarial Stress Testing: Results Parser, Config Generator & LeanSer
         "node",
         ["-e", "console.error('Fatal Python Runtime Exception'); process.exit(137);"],
         5000,
-        "test-container-fail"
+        {}
       );
 
       expect(result.exitCode).toBe(137);
@@ -393,7 +393,7 @@ describe("Adversarial Stress Testing: Results Parser, Config Generator & LeanSer
         "node",
         ["-e", "setInterval(() => {}, 1000);"],
         150, // 150ms timeout
-        "test-container-timeout"
+        {}
       );
       const elapsed = performance.now() - t0;
 
@@ -409,7 +409,7 @@ describe("Adversarial Stress Testing: Results Parser, Config Generator & LeanSer
         "__non_existent_lean_binary_12345__",
         ["arg1"],
         1000,
-        "test-container-enoent"
+        {}
       );
 
       expect(result.exitCode).toBe(-1);
@@ -431,12 +431,12 @@ describe("Adversarial Stress Testing: Results Parser, Config Generator & LeanSer
 
         // Override executeSubprocess to simulate hanging Docker container
         const originalExec = (service as any).executeSubprocess.bind(service);
-        (service as any).executeSubprocess = (cmd: string, args: string[], timeoutMs: number, name: string) => {
+        (service as any).executeSubprocess = (cmd: string, args: string[], timeoutMs: number, opts: any) => {
           return originalExec(
             "node",
             ["-e", "setInterval(() => {}, 1000);"],
             100, // 100ms
-            name
+            opts
           );
         };
 
@@ -470,12 +470,12 @@ describe("Adversarial Stress Testing: Results Parser, Config Generator & LeanSer
         }))!;
 
         const originalExec = (service as any).executeSubprocess.bind(service);
-        (service as any).executeSubprocess = (cmd: string, args: string[], timeoutMs: number, name: string) => {
+        (service as any).executeSubprocess = (cmd: string, args: string[], timeoutMs: number, opts: any) => {
           return originalExec(
             "node",
             ["-e", "console.error('LEAN Engine initialization failed: Memory limit exceeded'); process.exit(1);"],
             5000,
-            name
+            opts
           );
         };
 

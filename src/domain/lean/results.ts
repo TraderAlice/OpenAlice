@@ -1,6 +1,7 @@
 import type {
   BacktestRequest,
   BacktestResult,
+  ChartPoint,
   ChartSeries,
   ClosedTrade,
   LeanOrder,
@@ -34,6 +35,41 @@ export function parseNumber(val: unknown, fallback = 0): number {
   return isNaN(num) ? fallback : num;
 }
 
+/**
+ * Ratio values from the engine JSON (e.g. `"winRate": "0.6"`). Accepts both
+ * fraction strings ("0.6") and percent strings ("60%", "60") and normalizes
+ * them to a 0..1 fraction.
+ */
+export function parseRatio(val: unknown): number {
+  if (typeof val === "number") {
+    return Math.abs(val) <= 1 ? val : val / 100;
+  }
+  if (typeof val !== "string") return 0;
+  const cleaned = val.replace(/%/g, "").trim();
+  const num = parseFloat(cleaned);
+  if (isNaN(num)) return 0;
+  return Math.abs(num) <= 1 ? num : num / 100;
+}
+
+/** First value among the candidate keys that is defined and non-null. */
+function pick(src: Record<string, unknown>, keys: string[]): unknown {
+  for (const key of keys) {
+    const value = src[key];
+    if (value !== undefined && value !== null) return value;
+  }
+  return undefined;
+}
+
+function asRecord(value: unknown): Record<string, any> {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, any>) : {};
+}
+
+function symbolOf(o: any): string {
+  const sym = o?.Symbol ?? o?.symbol ?? "";
+  if (typeof sym === "string") return sym;
+  return String(sym?.Value ?? sym?.value ?? sym?.permtick ?? "");
+}
+
 export function parseLeanResults(
   rawInput: string | Record<string, unknown>,
   backtestId: string,
@@ -62,35 +98,65 @@ export function parseLeanResults(
     };
   }
 
-  const rawStats: Record<string, string> = raw.Statistics ?? {};
-  const rawRuntime: Record<string, string> = raw.RuntimeStatistics ?? {};
-  const totalPerf = raw.TotalPerformance ?? {};
-  const tradeStats = totalPerf.TradeStatistics ?? {};
-  const portStats = totalPerf.PortfolioStatistics ?? {};
+  // Classic LEAN output uses PascalCase keys; current LEAN engine output uses
+  // lowerCamelCase for the same data. Both shapes are accepted here.
+  const rawRoot = asRecord(raw);
+  const rawStats: Record<string, string> = asRecord(pick(rawRoot, ["Statistics", "statistics"]));
+  const rawRuntime: Record<string, string> = asRecord(pick(rawRoot, ["RuntimeStatistics", "runtimeStatistics"]));
+  const totalPerf = asRecord(pick(rawRoot, ["TotalPerformance", "totalPerformance"]));
+  const tradeStats = asRecord(pick(totalPerf, ["TradeStatistics", "tradeStatistics"]));
+  const portStats = asRecord(pick(totalPerf, ["PortfolioStatistics", "portfolioStatistics"]));
 
   const statistics: LeanStatistics = {
-    totalTrades: tradeStats.TotalNumberOfTrades ?? (parseInt(rawStats["Total Trades"] ?? "0", 10) || 0),
-    winningTrades: tradeStats.NumberOfWinningTrades ?? 0,
-    losingTrades: tradeStats.NumberOfLosingTrades ?? 0,
-    winRate: tradeStats.WinRate ?? parsePercent(rawStats["Win Rate"]),
-    lossRate: tradeStats.LossRate ?? parsePercent(rawStats["Loss Rate"]),
-    averageWin: tradeStats.AverageWin ?? parsePercent(rawStats["Average Win"]),
-    averageLoss: tradeStats.AverageLoss ?? parsePercent(rawStats["Average Loss"]),
-    profitLossRatio: tradeStats.WinLossRatio ?? parseNumber(rawStats["Profit-Loss Ratio"]),
-    compoundingAnnualReturn: portStats.CompoundingAnnualReturn ?? parsePercent(rawStats["Compounding Annual Return"]),
-    drawdown: portStats.Drawdown ?? parsePercent(rawStats["Drawdown"]),
-    netProfit: tradeStats.TotalProfitLoss ?? parseCurrency(rawStats["Net Profit"]),
-    sharpeRatio: portStats.SharpeRatio ?? parseNumber(rawStats["Sharpe Ratio"]),
-    sortinoRatio: portStats.SortinoRatio ?? parseNumber(rawStats["Sortino Ratio"]),
-    probabilisticSharpeRatio: portStats.ProbabilisticSharpeRatio ?? parsePercent(rawStats["Probabilistic Sharpe Ratio"]),
-    expectancy: portStats.Expectancy ?? parseNumber(rawStats["Expectancy"]),
-    totalFees: portStats.TotalFees ?? parseCurrency(rawStats["Total Fees"]),
-    alpha: portStats.Alpha ?? parseNumber(rawStats["Alpha"]),
-    beta: portStats.Beta ?? parseNumber(rawStats["Beta"]),
-    annualStandardDeviation: portStats.AnnualStandardDeviation ?? parseNumber(rawStats["Annual Standard Deviation"]),
-    annualVariance: portStats.AnnualVariance ?? parseNumber(rawStats["Annual Variance"]),
-    informationRatio: portStats.InformationRatio ?? parseNumber(rawStats["Information Ratio"]),
-    trackingError: portStats.TrackingError ?? parseNumber(rawStats["Tracking Error"]),
+    totalTrades:
+      parseNumber(pick(tradeStats, ["TotalNumberOfTrades", "totalNumberOfTrades"]), 0) ||
+      (parseInt(rawStats["Total Trades"] ?? "0", 10) || 0),
+    winningTrades: parseNumber(pick(tradeStats, ["NumberOfWinningTrades", "numberOfWinningTrades"]), 0),
+    losingTrades: parseNumber(pick(tradeStats, ["NumberOfLosingTrades", "numberOfLosingTrades"]), 0),
+    winRate:
+      parseRatio(pick(tradeStats, ["WinRate", "winRate"])) || parsePercent(rawStats["Win Rate"]),
+    lossRate:
+      parseRatio(pick(tradeStats, ["LossRate", "lossRate"])) || parsePercent(rawStats["Loss Rate"]),
+    averageWin:
+      parseRatio(pick(tradeStats, ["AverageWin", "averageWin"])) || parsePercent(rawStats["Average Win"]),
+    averageLoss:
+      parseRatio(pick(tradeStats, ["AverageLoss", "averageLoss"])) || parsePercent(rawStats["Average Loss"]),
+    profitLossRatio:
+      parseNumber(pick(tradeStats, ["WinLossRatio", "winLossRatio", "ProfitLossRatio", "profitLossRatio"])) ||
+      parseNumber(rawStats["Profit-Loss Ratio"]),
+    compoundingAnnualReturn:
+      parseRatio(pick(portStats, ["CompoundingAnnualReturn", "compoundingAnnualReturn"])) ||
+      parsePercent(rawStats["Compounding Annual Return"]),
+    drawdown:
+      parseRatio(pick(portStats, ["Drawdown", "drawdown"])) || parsePercent(rawStats["Drawdown"]),
+    netProfit:
+      parseCurrency(pick(tradeStats, ["TotalProfitLoss", "totalProfitLoss"])) ||
+      parseCurrency(pick(portStats, ["TotalNetProfit", "totalNetProfit"])) ||
+      parseCurrency(rawStats["Net Profit"]),
+    sharpeRatio:
+      parseNumber(pick(portStats, ["SharpeRatio", "sharpeRatio"])) || parseNumber(rawStats["Sharpe Ratio"]),
+    sortinoRatio:
+      parseNumber(pick(portStats, ["SortinoRatio", "sortinoRatio"])) || parseNumber(rawStats["Sortino Ratio"]),
+    probabilisticSharpeRatio:
+      parseRatio(pick(portStats, ["ProbabilisticSharpeRatio", "probabilisticSharpeRatio"])) ||
+      parsePercent(rawStats["Probabilistic Sharpe Ratio"]),
+    expectancy:
+      parseNumber(pick(portStats, ["Expectancy", "expectancy"])) || parseNumber(rawStats["Expectancy"]),
+    totalFees:
+      parseCurrency(pick(tradeStats, ["TotalFees", "totalFees"])) ||
+      parseCurrency(pick(portStats, ["TotalFees", "totalFees"])) ||
+      parseCurrency(rawStats["Total Fees"]),
+    alpha: parseNumber(pick(portStats, ["Alpha", "alpha"])) || parseNumber(rawStats["Alpha"]),
+    beta: parseNumber(pick(portStats, ["Beta", "beta"])) || parseNumber(rawStats["Beta"]),
+    annualStandardDeviation:
+      parseNumber(pick(portStats, ["AnnualStandardDeviation", "annualStandardDeviation"])) ||
+      parseNumber(rawStats["Annual Standard Deviation"]),
+    annualVariance:
+      parseNumber(pick(portStats, ["AnnualVariance", "annualVariance"])) || parseNumber(rawStats["Annual Variance"]),
+    informationRatio:
+      parseNumber(pick(portStats, ["InformationRatio", "informationRatio"])) || parseNumber(rawStats["Information Ratio"]),
+    trackingError:
+      parseNumber(pick(portStats, ["TrackingError", "trackingError"])) || parseNumber(rawStats["Tracking Error"]),
     raw: rawStats
   };
 
@@ -106,29 +172,34 @@ export function parseLeanResults(
   };
 
   const charts: Record<string, ChartSeries> = {};
-  if (raw.Charts && typeof raw.Charts === "object") {
-    for (const [chartName, chartData] of Object.entries<any>(raw.Charts)) {
-      if (chartData && chartData.Series && typeof chartData.Series === "object") {
-        for (const [seriesName, sData] of Object.entries<any>(chartData.Series)) {
-          const key = chartName === seriesName ? chartName : `${chartName} - ${seriesName}`;
-          charts[key] = {
-            name: sData.Name ?? seriesName,
-            unit: sData.Unit ?? "",
-            values: Array.isArray(sData.Values)
-              ? sData.Values.map((pt: any) => ({
-                  x: pt.x ?? pt.Time ?? 0,
-                  y: pt.y ?? pt.Value ?? 0
-                }))
-              : []
-          };
+  const rawCharts = asRecord(pick(rawRoot, ["Charts", "charts"]));
+  for (const [chartName, chartData] of Object.entries<any>(rawCharts)) {
+    const series = asRecord(pick(asRecord(chartData), ["Series", "series"]));
+    for (const [seriesName, sData] of Object.entries<any>(series)) {
+      const key = chartName === seriesName ? chartName : `${chartName} - ${seriesName}`;
+      const values: ChartPoint[] = [];
+      const rawValues = pick(asRecord(sData), ["Values", "values"]);
+      if (Array.isArray(rawValues)) {
+        for (const pt of rawValues) {
+          if (Array.isArray(pt)) {
+            values.push({ x: pt[0] ?? 0, y: pt[1] ?? 0 });
+          } else if (pt && typeof pt === "object") {
+            values.push({ x: pt.x ?? pt.Time ?? 0, y: pt.y ?? pt.Value ?? 0 });
+          }
         }
       }
+      charts[key] = {
+        name: sData?.Name ?? sData?.name ?? seriesName,
+        unit: sData?.Unit ?? sData?.unit ?? "",
+        values
+      };
     }
   }
 
   const orders: LeanOrder[] = [];
-  if (raw.Orders && typeof raw.Orders === "object") {
-    const orderEntries = Array.isArray(raw.Orders) ? raw.Orders : Object.values(raw.Orders);
+  const rawOrders = pick(rawRoot, ["Orders", "orders"]);
+  if (rawOrders && typeof rawOrders === "object") {
+    const orderEntries = Array.isArray(rawOrders) ? rawOrders : Object.values(rawOrders);
     for (const o of orderEntries as any[]) {
       if (!o) continue;
       const dirMap = ["Buy", "Sell", "Hold"];
@@ -142,40 +213,47 @@ export function parseLeanResults(
         6: "Invalid"
       };
 
+      const direction = o.Direction ?? o.direction;
+      const type = o.Type ?? o.type;
+      const status = o.Status ?? o.status;
       orders.push({
-        id: o.Id ?? 0,
-        symbol: typeof o.Symbol === "object" ? o.Symbol?.Value ?? "" : String(o.Symbol ?? ""),
-        price: o.Price ?? 0,
-        quantity: o.Quantity ?? 0,
-        direction: (typeof o.Direction === "number" ? dirMap[o.Direction] ?? "Buy" : o.Direction ?? "Buy") as any,
-        type: (typeof o.Type === "number" ? typeMap[o.Type] ?? "Market" : o.Type ?? "Market") as any,
-        status: (typeof o.Status === "number" ? statusMap[o.Status] ?? (o.Status === 3 ? "Filled" : "Other") : o.Status ?? "Filled") as any,
-        time: o.Time ?? o.CreatedTime ?? "",
-        createdTime: o.CreatedTime,
-        lastFillTime: o.LastFillTime,
-        tag: o.Tag ?? "",
-        fee: o.OrderFee?.Value?.Amount ?? 0,
-        feeCurrency: o.OrderFee?.Value?.Currency ?? "USD",
-        value: o.Value ?? 0
+        id: parseNumber(o.Id ?? o.id, 0),
+        symbol: symbolOf(o),
+        price: parseNumber(o.Price ?? o.price, 0),
+        quantity: parseNumber(o.Quantity ?? o.quantity, 0),
+        direction:
+          (typeof direction === "number" ? dirMap[direction] ?? "Buy" : direction ?? "Buy") as any,
+        type: (typeof type === "number" ? typeMap[type] ?? "Market" : type ?? "Market") as any,
+        status:
+          (typeof status === "number" ? statusMap[status] ?? (status === 3 ? "Filled" : "Other") : status ?? "Filled") as any,
+        time: o.Time ?? o.time ?? o.CreatedTime ?? o.createdTime ?? "",
+        createdTime: o.CreatedTime ?? o.createdTime,
+        lastFillTime: o.LastFillTime ?? o.lastFillTime,
+        tag: o.Tag ?? o.tag ?? "",
+        fee: parseNumber(o.OrderFee?.Value?.Amount ?? o.orderFee?.value?.amount, 0),
+        feeCurrency: o.OrderFee?.Value?.Currency ?? o.orderFee?.value?.currency ?? "USD",
+        value: parseNumber(o.Value ?? o.value, 0)
       });
     }
   }
 
   const closedTrades: ClosedTrade[] = [];
-  if (Array.isArray(totalPerf.ClosedTrades)) {
-    for (const t of totalPerf.ClosedTrades) {
+  const rawClosedTrades =
+    pick(totalPerf, ["ClosedTrades", "closedTrades"]) ?? pick(rawRoot, ["ClosedTrades", "closedTrades"]) ?? [];
+  if (Array.isArray(rawClosedTrades)) {
+    for (const t of rawClosedTrades) {
       closedTrades.push({
-        symbol: typeof t.Symbol === "object" ? t.Symbol?.Value ?? "" : String(t.Symbol ?? ""),
-        entryTime: t.EntryTime ?? "",
-        entryPrice: t.EntryPrice ?? 0,
-        exitTime: t.ExitTime ?? "",
-        exitPrice: t.ExitPrice ?? 0,
-        quantity: t.Quantity ?? 0,
-        profitLoss: t.ProfitLoss ?? 0,
-        totalFees: t.TotalFees ?? 0,
-        mae: t.MAE ?? 0,
-        mfe: t.MFE ?? 0,
-        duration: t.Duration ?? ""
+        symbol: symbolOf(t),
+        entryTime: t.EntryTime ?? t.entryTime ?? "",
+        entryPrice: parseNumber(t.EntryPrice ?? t.entryPrice, 0),
+        exitTime: t.ExitTime ?? t.exitTime ?? "",
+        exitPrice: parseNumber(t.ExitPrice ?? t.exitPrice, 0),
+        quantity: parseNumber(t.Quantity ?? t.quantity, 0),
+        profitLoss: parseNumber(t.ProfitLoss ?? t.profitLoss, 0),
+        totalFees: parseNumber(t.TotalFees ?? t.totalFees, 0),
+        mae: parseNumber(t.MAE ?? t.mae, 0),
+        mfe: parseNumber(t.MFE ?? t.mfe, 0),
+        duration: t.Duration ?? t.duration ?? ""
       });
     }
   }

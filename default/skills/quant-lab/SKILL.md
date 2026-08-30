@@ -1,26 +1,31 @@
 ---
 name: quant-lab
 description: >
-  Quant Lab & LEAN Quantitative Research Engine — scaffold Python QCAlgorithm strategies,
+  LEAN GUI & QuantConnect LEAN Research Engine — scaffold Python QCAlgorithm strategies,
   execute isolated event-driven LEAN backtests, optimize parameters across grid sweeps,
   perform academic research integrity audits (Deflated Sharpe Ratio, Walk-Forward Efficiency,
   Monte Carlo trade resampling, data snooping adjustments), and formalize trade journal hypotheses.
-  Use via the `alice-quant` CLI or when the user mentions Quant Lab, LEAN backtesting,
+  Use via the `alice-quant` CLI, the native `lean` CLI when installed, or when the user mentions LEAN GUI, Quant Lab, LEAN backtesting,
   Forex algorithms, or quantitative strategy research.
 ---
 
-# Quant Lab — LEAN Quantitative Research Engine
+# LEAN GUI — QuantConnect LEAN Research Engine
 
-Quant Lab is OpenAlice's institutional-grade quantitative backtesting and research environment powered by QuantConnect LEAN (`quantconnect/lean:latest`) and an evidence-first research integrity framework.
+LEAN GUI is OpenAlice's managed quantitative backtesting and research interface powered by QuantConnect LEAN (`quantconnect/lean:latest`) and an evidence-first research integrity framework.
 
 ## CLI Surface (`alice-quant`)
 
 Every OpenAlice workspace agent has access to `alice-quant` on its shell PATH (backed by the loopback CLI gateway). Output is JSON on stdout.
 
 ```bash
-alice-quant --help                      # Strategy, backtest, experiment, integrity, journal
+alice-quant --help                      # System, strategy, backtest, experiment, integrity, journal
 alice-quant <group> <verb> --help       # Inspect parameter schemas for a specific command
+alice-quant system status               # Check Docker, native LEAN CLI, and managed paths
 ```
+
+## Native LEAN CLI (`lean`)
+
+When the machine has QuantConnect's LEAN CLI installed, it is OpenAlice's engine executor: managed backtests (`alice-quant backtest run`) launch the engine through `lean backtest` against OpenAlice's data directory, and results are captured back into `data/lean/runs/`. Workspace shells can also use `lean` directly for native project commands, local data workflows, and CLI-managed LEAN operations. Prefer `alice-quant` when the result should stay inside OpenAlice's LEAN GUI state (`data/lean/*`, experiments, journal, and research integrity). Use `lean --help` before native commands because the installed CLI version owns that surface.
 
 ### 1. Scaffold & Manage Strategies
 
