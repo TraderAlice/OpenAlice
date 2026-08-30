@@ -364,7 +364,11 @@ The surfaces deliberately have different jobs:
   a channel moves keyboard focus to that section's semantic heading and scrolls
   the labelled region without changing route, hiding another adapter's draft,
   or adding browser history. The compact heading ring identifies the destination
-  without outlining the complete long form.
+  without outlining the complete long form. The navigator also tracks the
+  channel nearest the reading edge while the Settings document scrolls, marking
+  it visually and with `aria-current="location"`; its reading anchor shares the
+  section's responsive scroll margin so click and manual-scroll state cannot
+  disagree at the sticky boundary.
   On desktop the sticky navigator sits exactly on the Settings scrollport edge,
   so controls from the preceding channel cannot scroll through above it. Initial
   page breathing room comes from a normal-flow spacer that scrolls away; the

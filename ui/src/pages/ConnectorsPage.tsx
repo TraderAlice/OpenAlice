@@ -663,8 +663,74 @@ function ConnectorSectionNav({
   adapterHealth: Map<string, ConnectorRuntime>
   t: TFunction
 }) {
+  const navigationRef = useRef<HTMLElement | null>(null)
+  const [activeId, setActiveId] = useState<string | null>(definitions[0]?.id ?? null)
+
+  useEffect(() => {
+    if (activeId && definitions.some((definition) => definition.id === activeId)) return
+    setActiveId(definitions[0]?.id ?? null)
+  }, [activeId, definitions])
+
+  useEffect(() => {
+    const navigation = navigationRef.current
+    const scrollArea = navigation?.closest('[data-settings-scroll-area]')
+    if (!(navigation instanceof HTMLElement) || !(scrollArea instanceof HTMLElement)) return
+
+    const syncActiveSection = () => {
+      const lastDefinition = definitions.at(-1)
+      if (!lastDefinition) return
+      const atScrollEnd = scrollArea.scrollTop > 0
+        && scrollArea.scrollTop + scrollArea.clientHeight >= scrollArea.scrollHeight - 2
+      if (atScrollEnd && scrollArea.scrollHeight > scrollArea.clientHeight) {
+        setActiveId((current) => current === lastDefinition.id ? current : lastDefinition.id)
+        return
+      }
+
+      const scrollAreaTop = scrollArea.getBoundingClientRect().top
+      const firstSection = document.getElementById(connectorSectionId(definitions[0].id))
+      const sectionScrollMargin = firstSection
+        ? Number.parseFloat(window.getComputedStyle(firstSection).scrollMarginTop) || 0
+        : 0
+      const stickyOffset = window.getComputedStyle(navigation).position === 'sticky'
+        ? Math.max(navigation.getBoundingClientRect().height + 16, sectionScrollMargin + 1)
+        : 16
+      const readingAnchor = scrollAreaTop + stickyOffset
+      const sectionPositions = definitions.map((definition) => ({
+        id: definition.id,
+        top: document.getElementById(connectorSectionId(definition.id))?.getBoundingClientRect().top,
+      }))
+      const measuredPositions = sectionPositions
+        .map(({ top }) => top)
+        .filter((top): top is number => top !== undefined)
+      if (measuredPositions.length > 1 && measuredPositions.every((top) => top === measuredPositions[0])) {
+        setActiveId((current) => current ?? definitions[0]?.id ?? null)
+        return
+      }
+      let nextId = definitions[0]?.id ?? null
+      for (const position of sectionPositions) {
+        if (position.top === undefined || position.top > readingAnchor) break
+        nextId = position.id
+      }
+      setActiveId((current) => current === nextId ? current : nextId)
+    }
+
+    syncActiveSection()
+    scrollArea.addEventListener('scroll', syncActiveSection, { passive: true })
+    const resizeObserver = typeof ResizeObserver === 'undefined'
+      ? null
+      : new ResizeObserver(syncActiveSection)
+    resizeObserver?.observe(scrollArea)
+    resizeObserver?.observe(navigation)
+
+    return () => {
+      scrollArea.removeEventListener('scroll', syncActiveSection)
+      resizeObserver?.disconnect()
+    }
+  }, [definitions])
+
   return (
     <nav
+      ref={navigationRef}
       aria-label={t('connectorSettings.channelNavigation')}
       className="mb-2 rounded-xl border border-border/70 bg-background/95 p-3 shadow-sm backdrop-blur-sm md:sticky md:top-0 md:z-20"
     >
@@ -693,18 +759,28 @@ function ConnectorSectionNav({
             runtime,
             t,
           ).badge
+          const active = activeId === definition.id
           return (
             <button
               key={definition.id}
               type="button"
+              aria-current={active ? 'location' : undefined}
               aria-label={t('connectorSettings.channelNavigationAction', {
                 name: definition.label,
                 status: badge,
               })}
-              className="oa-pressable flex min-w-0 items-center justify-between gap-2 rounded-lg border border-border/70 bg-secondary/20 px-3 py-2 text-left hover:border-primary/35 hover:bg-primary/[0.035]"
-              onClick={() => focusConnectorSection(definition.id)}
+              className={`oa-pressable flex min-w-0 items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left ${active
+                ? 'border-primary/40 bg-primary/[0.06] ring-1 ring-primary/10'
+                : 'border-border/70 bg-secondary/20 hover:border-primary/35 hover:bg-primary/[0.035]'
+              }`}
+              onClick={() => {
+                setActiveId(definition.id)
+                focusConnectorSection(definition.id)
+              }}
             >
-              <span className="truncate text-[12px] font-medium text-foreground">{definition.label}</span>
+              <span className={`truncate text-[12px] font-medium ${active ? 'text-primary' : 'text-foreground'}`}>
+                {definition.label}
+              </span>
               <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide ${connectorNavBadgeClass(setup.stage)}`}>
                 {badge}
               </span>

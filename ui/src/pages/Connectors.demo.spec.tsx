@@ -422,19 +422,53 @@ describe('Connector demo routes', () => {
     expect(scrollArea.className).not.toContain('py-5')
     expect(scrollArea.querySelector('[data-connector-settings-top-spacer]')?.className).toContain('h-5')
     expect(within(navigation).getAllByRole('button')).toHaveLength(4)
+    const discordNavigation = within(navigation).getByRole('button', { name: /^Discord settings,/ })
+    const slackNavigation = within(navigation).getByRole('button', { name: /^Slack settings,/ })
+    const feishuNavigation = within(navigation).getByRole('button', { name: /^Feishu settings,/ })
+    expect(discordNavigation.getAttribute('aria-current')).toBe('location')
+    expect(slackNavigation.hasAttribute('aria-current')).toBe(false)
+    const discordSection = screen.getByRole('region', { name: 'Discord' })
+    const telegramSection = screen.getByRole('region', { name: 'Telegram' })
     const slackSection = screen.getByRole('region', { name: 'Slack' })
+    const feishuSection = screen.getByRole('region', { name: 'Feishu' })
     const slackHeading = within(slackSection).getByRole('heading', { name: 'Slack' })
     expect(slackSection.className).toContain('md:scroll-mt-[9.5rem]')
     expect(slackSection.hasAttribute('tabindex')).toBe(false)
     expect(slackHeading.getAttribute('tabindex')).toBe('-1')
     expect(slackHeading.className).toContain('focus:ring-2')
+    navigation.style.position = 'sticky'
+    discordSection.style.scrollMarginTop = '152px'
+    scrollArea.getBoundingClientRect = () => ({ top: 101 }) as DOMRect
+    navigation.getBoundingClientRect = () => ({ height: 132 }) as DOMRect
+    discordSection.getBoundingClientRect = () => ({ top: -900 }) as DOMRect
+    telegramSection.getBoundingClientRect = () => ({ top: -240 }) as DOMRect
+    slackSection.getBoundingClientRect = () => ({ top: 253 }) as DOMRect
+    feishuSection.getBoundingClientRect = () => ({ top: 820 }) as DOMRect
+    Object.defineProperties(scrollArea, {
+      scrollTop: { configurable: true, value: 500 },
+      clientHeight: { configurable: true, value: 600 },
+      scrollHeight: { configurable: true, value: 2_000 },
+    })
+    fireEvent.scroll(scrollArea)
+
+    expect(slackNavigation.getAttribute('aria-current')).toBe('location')
+    expect(discordNavigation.hasAttribute('aria-current')).toBe(false)
+
     const scrollIntoView = vi.fn()
     slackSection.scrollIntoView = scrollIntoView
 
-    fireEvent.click(within(navigation).getByRole('button', { name: 'Slack settings, Setup' }))
+    fireEvent.click(slackNavigation)
 
     expect(document.activeElement).toBe(slackHeading)
     expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start' })
+    expect(slackNavigation.getAttribute('aria-current')).toBe('location')
+    expect(discordNavigation.hasAttribute('aria-current')).toBe(false)
+
+    Object.defineProperty(scrollArea, 'scrollTop', { configurable: true, value: 1_500 })
+    fireEvent.scroll(scrollArea)
+
+    expect(feishuNavigation.getAttribute('aria-current')).toBe('location')
+    expect(slackNavigation.hasAttribute('aria-current')).toBe(false)
   })
 
   it('recovers when connection settings fail to load', async () => {

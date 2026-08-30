@@ -345,6 +345,21 @@ external adapters remain optional projections rather than sources of truth.
     becoming a tab stop. Dialog content does not enable the option. Screen-reader
     destination context, keyboard focus, mobile/desktop positioning, and route
     history are preserved with a much more precise visual affordance.
+31. **The channel navigator reports the section currently being read.** A
+    static jump list keeps implementation small but loses its orientation value
+    as soon as the user scrolls manually. Replacing the complete document with
+    tabs would make the selected platform obvious, but would hide other channel
+    states and drafts behind view changes. The chosen scroll-spy model keeps all
+    forms mounted and observes only the existing Settings scroll owner. It marks
+    the section nearest the reading anchor with `aria-current="location"` and a
+    restrained primary selection treatment; a click updates that state
+    immediately before focus and native scrolling move to the heading. On
+    desktop the anchor accounts for the sticky navigator itself. On narrow
+    screens the navigator remains normal-flow content and can scroll away, while
+    its current state still reflects the document position if the user returns
+    to it. The first channel is the deterministic initial/fallback selection,
+    the last channel wins at the scroll boundary, and no route, field state,
+    focus order, or shared navigation primitive changes.
 
 ## Ordered Work
 
@@ -411,6 +426,8 @@ external adapters remain optional projections rather than sources of truth.
         controls from preceding channels cannot show through above it.
   - [x] Focus the destination channel heading instead of outlining the complete
         Settings form after navigator jumps.
+  - [x] Keep the full Settings channel navigator synchronized with the section
+        currently being read.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -689,6 +706,19 @@ top 253 px below the sticky navigator. At 390 x 844, the same H3 began at y=191,
 the section at y=167, the static navigator had fully scrolled above the viewport,
 and the document width remained exactly 390 px. No form or Connector control was
 invoked, and the viewport was reset.
+
+The scroll-aware navigation increment passed all 27 Connector demo-route tests,
+UI and root typechecking, the production build, and all 5,120 repository tests.
+Its contract covers the deterministic first selection, click-driven
+`aria-current="location"`, a measured manual-scroll anchor that shares the
+section's 152 px desktop scroll margin, and last-channel selection at the scroll
+boundary. In the real Default AliceProject at 1,052 x 734, Slack remained current
+after its heading landed at y=253 below the sticky navigator's y=233.5 bottom
+edge; the focused heading and selected navigation row agreed. At 390 x 844, the
+navigator remained static and fully scrolled out of view while the selected
+Feishu heading landed at y=166.75; document width stayed exactly 390 px. No
+Connector control or external action was invoked, and the viewport was reset
+after acceptance.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.
