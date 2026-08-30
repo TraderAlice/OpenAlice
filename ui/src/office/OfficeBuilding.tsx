@@ -28,7 +28,7 @@ import {
 import { OfficeMapPod } from './OfficeMapPod'
 import { OfficeRouteTrail } from './OfficeRouteTrail'
 import { OfficeRouteTargetPointer } from './OfficeRouteTargetPointer'
-import { OfficeReplayBeacon } from './OfficeReplayBeacon'
+import { OfficeReplayBeacon, officeReplayBeaconAvoidBounds } from './OfficeReplayBeacon'
 import type { OfficeReplayFocus } from './replay-focus'
 import {
   clampOfficeCamera,
@@ -339,12 +339,6 @@ export function OfficeBuilding({
     () => officeInteractionTargets(groups, mapLayout, resolveGroupTitle, deskSlotsByWorkspace),
     [deskSlotsByWorkspace, groups, mapLayout, resolveGroupTitle],
   )
-  const availableInteractionTargets = useMemo(
-    () => replaySeq == null
-      ? interactionTargets
-      : interactionTargets.filter((target) => target.kind === 'operations'),
-    [interactionTargets, replaySeq],
-  )
   const interactionTargetById = useMemo(
     () => new Map(interactionTargets.map((target) => [target.id, target])),
     [interactionTargets],
@@ -357,6 +351,14 @@ export function OfficeBuilding({
     }
     return null
   }, [interactionTargetById, replayFocus, replaySeq])
+  const availableInteractionTargets = useMemo(
+    () => replaySeq == null
+      ? interactionTargets
+      : interactionTargets.filter((target) => (
+          target.kind === 'operations' || target.id === replayFocusTarget?.id
+        )),
+    [interactionTargets, replayFocusTarget?.id, replaySeq],
+  )
   const routeTarget = routeTargetId ? interactionTargetById.get(routeTargetId) : null
   const routeTargetName = routeTarget
     ? routeTarget.kind === 'employee'
@@ -414,8 +416,16 @@ export function OfficeBuilding({
     || nearbyTarget?.kind === 'news-service'
     || nearbyTarget?.kind === 'operations'
   const promptAvoidBounds = useMemo<OfficePromptAvoidBounds[]>(() => {
-    if (nearbyTarget?.kind !== 'roster') return []
-    return availableInteractionTargets.flatMap((target) => {
+    const bounds: OfficePromptAvoidBounds[] = []
+    if (
+      replaySeq != null
+      && replayFocusTarget
+      && nearbyTarget?.id === replayFocusTarget.id
+    ) {
+      bounds.push(officeReplayBeaconAvoidBounds(replayFocusTarget))
+    }
+    if (nearbyTarget?.kind !== 'roster') return bounds
+    bounds.push(...availableInteractionTargets.flatMap((target) => {
       if (!('workspaceId' in target) || target.workspaceId !== nearbyTarget.workspaceId) return []
       if (target.kind === 'sign') {
         return [{
@@ -434,8 +444,9 @@ export function OfficeBuilding({
         }]
       }
       return []
-    })
-  }, [availableInteractionTargets, nearbyTarget])
+    }))
+    return bounds
+  }, [availableInteractionTargets, nearbyTarget, replayFocusTarget, replaySeq])
   const promptTargetBounds = useMemo<OfficePromptAvoidBounds | undefined>(() => {
     if (nearbyTarget?.kind !== 'inbox-service' && nearbyTarget?.kind !== 'news-service') return undefined
     const landmark = serviceLandmarks.find((item) => item.id === nearbyTarget.id)
@@ -483,6 +494,16 @@ export function OfficeBuilding({
     source?: string | null
   } | null = (() => {
     if (!nearbyTarget) return null
+    if (replaySeq != null) {
+      const focusedReplay = replayFocus?.seq === replaySeq ? replayFocus : null
+      return {
+        icon: OFFICE_HUD_ASSETS.occupancyLog,
+        action: t('office.replayInspectAction'),
+        label: t('office.replayInspect', { seq: replaySeq }),
+        detail: focusedReplay?.summary ?? null,
+        source: focusedReplay?.label,
+      }
+    }
     if (nearbyTarget.kind === 'employee') {
       const target = officeCoworkerCallsign(
         nearbyTarget.employee,
@@ -545,16 +566,6 @@ export function OfficeBuilding({
         label: t('office.interactNews'),
         detail: productActivity.news?.detail ?? productActivity.news?.source ?? null,
         source: productActivity.news?.source,
-      }
-    }
-    if (replaySeq != null) {
-      const focusedReplay = replayFocus?.seq === replaySeq ? replayFocus : null
-      return {
-        icon: OFFICE_HUD_ASSETS.occupancyLog,
-        action: t('office.replayAt', { seq: replaySeq }),
-        label: `${t('office.replay')} · ${t('office.replayAt', { seq: replaySeq })}`,
-        detail: focusedReplay?.summary ?? null,
-        source: focusedReplay?.label,
       }
     }
     const agentDetail = (() => {
@@ -682,7 +693,9 @@ export function OfficeBuilding({
   }
   const activateTarget = (target: OfficeInteractionTarget) => {
     setInteractionAnchorTargetId(target.id)
-    if (target.kind === 'employee') {
+    if (replaySeq != null) {
+      onOpenLog('operations')
+    } else if (target.kind === 'employee') {
       onSelectEmployee(target.workspaceId, target.employee)
     } else if (target.kind === 'sign') {
       enterWorkspace(target)

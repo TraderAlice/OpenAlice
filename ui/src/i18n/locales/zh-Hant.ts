@@ -2024,6 +2024,8 @@ export const zhHant: Resources = {
     eventToolFailures_other: '{{count}} 次失敗',
     log: '日誌',
     replay: '重放',
+    replayInspectAction: '查看事件',
+    replayInspect: '在活動日誌中查看序號 {{seq}}',
     replayLive: '直播',
     replayReturnLive: '返回直播',
     replayAt: '序號 {{seq}}',

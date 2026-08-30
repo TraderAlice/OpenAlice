@@ -2017,6 +2017,8 @@ export const ja: Resources = {
     eventToolFailures_other: '失敗 {{count}} 件',
     log: 'ログ',
     replay: '再生',
+    replayInspectAction: 'イベントを見る',
+    replayInspect: 'アクティビティログで Seq {{seq}} を見る',
     replayLive: 'ライブ',
     replayReturnLive: 'ライブへ戻る',
     replayAt: 'Seq {{seq}}',

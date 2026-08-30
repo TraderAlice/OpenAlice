@@ -2,6 +2,23 @@ import { OFFICE_FURNITURE, officePixelImg } from './furniture'
 import type { OfficeInteractionTarget } from './interaction-targets'
 import { officeRouteTargetPointerPosition } from './OfficeRouteTargetPointer'
 
+export function officeReplayBeaconAvoidBounds(target: OfficeInteractionTarget) {
+  const position = officeRouteTargetPointerPosition(target)
+  return target.kind === 'employee'
+    ? {
+        left: position.x - 212,
+        top: position.y - 52,
+        right: position.x - 8,
+        bottom: position.y + 4,
+      }
+    : {
+        left: position.x - 102,
+        top: position.y - 52,
+        right: position.x + 102,
+        bottom: position.y + 4,
+      }
+}
+
 export function OfficeReplayBeacon({
   target,
   label,

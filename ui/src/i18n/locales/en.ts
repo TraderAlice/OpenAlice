@@ -2049,6 +2049,8 @@ export const en = {
     eventToolFailures_other: '{{count}} failed',
     log: 'Log',
     replay: 'Replay',
+    replayInspectAction: 'Review event',
+    replayInspect: 'Review Seq {{seq}} in Activity Log',
     replayLive: 'Live',
     replayReturnLive: 'Return live',
     replayAt: 'Seq {{seq}}',

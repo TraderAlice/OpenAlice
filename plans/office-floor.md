@@ -4418,6 +4418,26 @@ Readable activity-beat follow-up (2026-08-31):
   all 618 test files and 5,177 tests (one file and nine tests skipped); the production UI build passed with only the
   existing ports fallback and large-chunk advisory.
 
+Playable replay-target follow-up (2026-08-31):
+
+- Followed a real Operations `Task complete` record through `Find on floor`. Camera framing, auto-walk, historical
+  occupancy, Alice's destination, and the `Seq 5018 · Grok Curator` beacon all resolved correctly, but Enter did nothing
+  after arrival. The floor visually presented a current target while withholding the game's established confirm action.
+- Compared keeping Replay as a non-interactive exhibit, opening the live Agent File from the historical snapshot, and
+  treating confirm as `Review event`. Chose review: Replay remains read-only and cannot activate live employees,
+  Workspaces, cabinets, rosters, or service desks, while its focused target becomes an interaction anchor that returns to
+  the exact replayed Activity Log event. This preserves historical truth and closes the floor-to-journal game loop.
+- Replay focus targets now join Operations as the only available historical interaction targets. Once Alice arrives, the
+  localized prompt reads `Review event`, Enter/Space and the touch action reopen Operations at the retained sequence, and
+  the same path applies to employee, Inbox, News, and fallback Workspace targets without invoking their live handlers.
+- The new prompt initially overlapped the existing Replay beacon in the real floor. Added authored beacon avoidance bounds
+  to the shared prompt-placement input instead of hard-positioning one screenshot: the final live target kept the beacon
+  at 341–450px / 493–530px and placed the 216px prompt below at 356–572px / 566–612px with zero overlap. Enter and Space
+  independently reopened `Seq 5018`, with the Task-complete row still selected and Replay state retained. Focused Building,
+  Replay-beacon, and prompt-placement suites passed 32 tests. Root and UI TypeScript passed; the full suite passed all 618
+  test files and 5,177 tests (one file and nine tests skipped); the production UI build passed with only the existing ports
+  fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

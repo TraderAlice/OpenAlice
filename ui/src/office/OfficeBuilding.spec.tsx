@@ -25,6 +25,7 @@ describe('OfficeBuilding', () => {
     const onOpenWorkspace = vi.fn()
     const onOpenFiles = vi.fn()
     const onOpenRoster = vi.fn()
+    const onOpenLog = vi.fn()
     const { container } = render(
       <OfficeBuilding
         building={{
@@ -72,7 +73,7 @@ describe('OfficeBuilding', () => {
         onOpenWorkspace={onOpenWorkspace}
         onOpenFiles={onOpenFiles}
         onOpenRoster={onOpenRoster}
-        onOpenLog={vi.fn()}
+        onOpenLog={onOpenLog}
         onReturnLive={onReturnLive}
       />,
     )
@@ -111,13 +112,16 @@ describe('OfficeBuilding', () => {
     expect(screen.getByTestId('office-desk-resume-5').dataset.replayFocus).toBe('true')
     expect(replayBeacon.querySelector('img')?.getAttribute('src'))
       .toBe('/office/furniture/route-destination-v1.png')
-    await userEvent.click(operations)
     const replayPrompt = await screen.findByRole('status', {
-      name: 'Replay · Seq 2 · Session 6 · Earlier Session completed its assignment.',
+      name: 'Review Seq 2 in Activity Log · Session 6 · Earlier Session completed its assignment.',
     })
-    expect(replayPrompt.textContent).toContain('Seq 2')
+    expect(replayPrompt.textContent).toContain('Review event')
     expect(replayPrompt.textContent).toContain('Session 6 · Earlier Session completed its assignment.')
+    await userEvent.keyboard('{Enter}')
+    expect(onOpenLog).toHaveBeenCalledWith('operations')
+    expect(onSelectEmployee).not.toHaveBeenCalled()
     expect(screen.queryByRole('status', { name: /Check live operations/ })).toBeNull()
+    await userEvent.click(operations)
     fireEvent.click(workspaceSign)
     fireEvent.click(occupiedDesks[0])
     fireEvent.click(cabinet)

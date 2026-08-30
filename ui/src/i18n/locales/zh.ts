@@ -2016,6 +2016,8 @@ export const zh: Resources = {
     eventToolFailures_other: '{{count}} 次失败',
     log: '日志',
     replay: '重放',
+    replayInspectAction: '查看事件',
+    replayInspect: '在活动日志中查看序号 {{seq}}',
     replayLive: '直播',
     replayReturnLive: '返回直播',
     replayAt: '序号 {{seq}}',
