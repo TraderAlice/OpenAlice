@@ -884,7 +884,7 @@ external adapters remain optional projections rather than sources of truth.
   UTA retries keep the existing pending-hash check at the write boundary.
 - The real Default AliceProject exposed healthy empty claim endpoints for all
   three work kinds after hot reload; Telegram and Feishu remained healthy.
-  Full acceptance passed: 620 test files plus one skipped (5,144 tests plus
+  Final full acceptance passed: 620 test files plus one skipped (5,147 tests plus
   nine skipped), root and UI typechecks, 16 Connector replay specs, and the
   Connector Service smoke. The isolated Guardian recovery smoke also passed
   healthy takeover, crashed-owner reclaim, and forced stubborn-tree recovery.
