@@ -3137,6 +3137,23 @@ Replay visitor visibility follow-up (2026-08-30):
   (3 files / 31 tests). Root/UI TypeScript, the full 617-file Vitest run (5,135 passing; one file and nine tests
   skipped), and the production build also passed; the existing direct-eval and large-chunk advisories are unchanged.
 
+Stable journal-detail frame follow-up (2026-08-30):
+
+- Played the real Operations journal across News #2818 and Agent completion #2815. The desktop index was a stable
+  400px game-menu column, but the selected detail frame changed from 299px to 498px; its two primary commands jumped
+  about 140px vertically between adjacent records.
+- Compared forcing every detail into a nested fixed-height scroller, fixing only the command strip, and giving the
+  desktop detail frame the index's 400px minimum while still allowing long reports to grow. Chose the shared minimum:
+  short records now preserve the two-column RPG menu frame and command position, long reports retain natural document
+  flow and the existing sticky command strip, and <=760px stacked layouts return to content-sized 156px minimums. A
+  two-row detail grid assigns spare height to the story content and anchors the command strip to the frame's foot.
+- Browser-reopened real News #2818 after hot reload. Its index and detail frames both measured exactly 400px, and the
+  command strip moved from y493 to the frame foot at y594–642. Switching back to long Agent #2815 preserved its
+  natural 498px report card, full-report disclosure, sticky commands, and outer-window scrolling. Focused runtime and
+  responsive-style specs passed (2 files / 31 tests). Root/UI TypeScript, the full 617-file Vitest run (5,135 passing;
+  one file and nine tests skipped), and the production build also passed; the existing direct-eval and large-chunk
+  advisories are unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

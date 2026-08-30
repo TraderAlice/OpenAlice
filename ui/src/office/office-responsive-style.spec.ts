@@ -134,10 +134,16 @@ describe('Office responsive style contract', () => {
 
   it('keeps long journal reports summarized without losing the command row', () => {
     expect(css).toMatch(
+      /\.oa-office-runtime__event\s*\{[\s\S]*?grid-template-rows: minmax\(min-content, 1fr\) auto;[\s\S]*?min-height: 400px;/,
+    )
+    expect(css).toMatch(
       /\.oa-office-runtime__detail\s*\{[\s\S]*?overflow: hidden;[\s\S]*?-webkit-line-clamp: 5/,
     )
     expect(css).toMatch(
       /\.oa-office-runtime__actions\s*\{[\s\S]*?position: sticky;[\s\S]*?bottom: 0;/,
+    )
+    expect(css).toMatch(
+      /@container \(max-width: 760px\) \{[\s\S]*?\.oa-office-runtime__event\s*\{[\s\S]*?min-height: 156px;/,
     )
   })
 

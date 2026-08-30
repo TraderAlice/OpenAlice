@@ -1134,10 +1134,11 @@
   position: relative;
   display: grid;
   grid-template-columns: 58px minmax(0, 1fr);
+  grid-template-rows: minmax(min-content, 1fr) auto;
   gap: 10px;
   align-items: start;
   min-width: 0;
-  min-height: 156px;
+  min-height: 400px;
   padding: 8px;
   border: 3px solid var(--gba-ink);
   border-radius: 3px;
@@ -1906,6 +1907,7 @@
 
   .oa-office-runtime__event {
     grid-template-columns: 50px minmax(0, 1fr);
+    min-height: 156px;
   }
 
   .oa-office-runtime__badge {
