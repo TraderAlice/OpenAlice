@@ -1,10 +1,9 @@
-import { useLayoutEffect, useMemo, useRef } from 'react'
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { OfficeFloorEmployee, OfficeRoomSnapshot } from '../api/office'
 import { OfficeDesk } from './OfficeDesk'
 import { officeCoworkerCast, type OfficeCoworkerSpriteAsset } from './coworker-sprites'
-import { stableDeskSlotsForOffice } from './desk-slots'
 import { OFFICE_FURNITURE, officePixelImg } from './furniture'
 import { OFFICE_CABINET_CENTER, OFFICE_DESK_CENTERS, officeRosterCenter } from './pod-geometry'
 import { officeDepthAt } from './scene-depth'
@@ -27,6 +26,7 @@ export function OfficeMapPod({
   routeTargetId,
   replayFocusResumeId,
   coworkerAssets,
+  slots,
 }: {
   group: OfficeRoomSnapshot
   layout: { x: number; y: number; width: number; height: number }
@@ -45,17 +45,10 @@ export function OfficeMapPod({
   routeTargetId?: string | null
   replayFocusResumeId?: string | null
   coworkerAssets?: ReadonlyMap<string, OfficeCoworkerSpriteAsset>
+  slots: readonly (OfficeFloorEmployee | null)[]
 }) {
   const { t } = useTranslation()
   const localCoworkerCast = useMemo(() => officeCoworkerCast(group.employees), [group.employees])
-  const previousSeatIdsRef = useRef<readonly (string | null)[]>([])
-  const slots = useMemo(
-    () => stableDeskSlotsForOffice(group.employees, previousSeatIdsRef.current, 4),
-    [group.employees],
-  )
-  useLayoutEffect(() => {
-    previousSeatIdsRef.current = slots.map((employee) => employee?.resumeId ?? null)
-  }, [slots])
   const additionalCount = Math.max(0, group.employees.length - slots.filter(Boolean).length)
   const activeCount = group.employees.filter((employee) => employee.mood !== 'idle').length
   const awakeCount = group.employees.filter((employee) => employee.awake).length

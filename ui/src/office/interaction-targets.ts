@@ -93,6 +93,7 @@ export function officeInteractionTargets(
   groups: readonly OfficeRoomSnapshot[],
   layout: OfficeMapLayout,
   groupTitle: (workspaceId: string, tag: string) => string,
+  deskSlotsByWorkspace?: ReadonlyMap<string, readonly (OfficeFloorEmployee | null)[]>,
 ): OfficeInteractionTarget[] {
   const groupsById = new Map(groups.map((group) => [group.workspace.id, group]))
   const targets: OfficeInteractionTarget[] = []
@@ -110,7 +111,10 @@ export function officeInteractionTargets(
       roomName,
       harness: group.workspace.harness,
     })
-    visibleEmployeesForOffice(group.employees).forEach((employee, index) => {
+    const deskSlots = deskSlotsByWorkspace?.get(group.workspace.id)
+      ?? visibleEmployeesForOffice(group.employees)
+    deskSlots.forEach((employee, index) => {
+      if (!employee) return
       const center = OFFICE_DESK_CENTERS[index]
       if (!center) return
       targets.push({
@@ -140,7 +144,7 @@ export function officeInteractionTargets(
         y: pod.y + rosterCenter.y,
         workspaceId: group.workspace.id,
         roomName,
-        additionalCount: group.employees.length - visibleEmployeesForOffice(group.employees).length,
+        additionalCount: group.employees.length - deskSlots.filter(Boolean).length,
       })
     }
   }

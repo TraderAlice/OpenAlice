@@ -3545,6 +3545,27 @@ Replay-target auto-walk follow-up (2026-08-30):
   and nine tests skipped), and the production UI build passed with only the existing jsdom canvas and large-chunk
   advisories.
 
+Replay-focused seat-plan follow-up (2026-08-30):
+
+- Continued the real 14-person Chat replay and audited the overflow contract behind its four rendered desks and `+10`
+  roster. The visual pod retained stable seat ids, but interaction targets independently re-sorted the employee array;
+  when activity moved a coworker into or out of the visible four, a route could therefore point at a different chair
+  than the sprite. A replay event for the fifth-or-later coworker degraded to the roster stack, so Find on floor could
+  not show the historical actor at all.
+- Compared opening the roster during replay, drawing a detached ghost portrait, and temporarily seating the focused
+  coworker. Chose the focused seat: it keeps one spatial language, uses the authored desk pose and beacon, and preserves
+  the room's four-desk composition. The final visible seat is borrowed only for that replay; the displaced teammate
+  remains represented by the unchanged overflow count.
+- OfficeBuilding now owns one stable seat plan per Workspace. OfficeMapPod renders it and the interaction/path projector
+  consumes the same array, eliminating visual-versus-navigation drift. A replay focus may require one hidden resume id;
+  stable slot selection then replaces the fourth visible employee with that exact historical coworker. Returning Live
+  removes the requirement and restores the retained live seats.
+- Focused tests cover the hidden fifth employee, shared seat geometry, unchanged desk count, employee beacon projection,
+  and cancelable replay routing (3 files / 32 tests). In the real 14-person room, Live remained g14/g13/g12/g10 with
+  `+10`; Seq 4737 focused the actual g14 desk, Alice arrived at x312/y504 facing left, and Live restored the same four
+  seats afterward. Root and UI TypeScript passed, the full suite passed all 617 test files and 5,156 tests (one file and
+  nine tests skipped), and the production UI build passed with only the existing jsdom canvas and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

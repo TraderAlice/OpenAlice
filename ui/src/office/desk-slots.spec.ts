@@ -82,4 +82,17 @@ describe('deskSlotsForOffice', () => {
     expect(slots[2]?.mood).toBe('review')
     expect(slots[2]?.awake).toBe(true)
   })
+
+  it('temporarily seats a hidden replay target without changing the desk count', () => {
+    const employees = ['g4', 'g3', 'g2', 'g1', 'g0'].map((resumeId) => ({
+      ...employee,
+      resumeId,
+      awake: false,
+    }))
+    const slots = stableDeskSlotsForOffice(employees, ['g4', 'g3', 'g2', 'g1'], 4, 'g0')
+
+    expect(slots.map((item) => item?.resumeId)).toEqual(['g4', 'g3', 'g2', 'g0'])
+    expect(visibleEmployeesForOffice(employees, 4, 'g0').map((item) => item.resumeId))
+      .toEqual(['g4', 'g3', 'g2', 'g0'])
+  })
 })

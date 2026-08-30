@@ -48,6 +48,7 @@ import {
   officeInteractionPromptPlacement,
 } from './interaction-prompt'
 import { officeCoworkerCallsign } from './label'
+import { stableDeskSlotsForOffice } from './desk-slots'
 import {
   isOfficePositionWalkable,
   moveAliceOnOfficeMap,
@@ -273,9 +274,31 @@ export function OfficeBuilding({
     () => groupTitle ?? ((_workspaceId: string, tag: string) => tag),
     [groupTitle],
   )
+  const previousDeskSeatIdsRef = useRef(new Map<string, readonly (string | null)[]>())
+  const replaySeatFocus = replaySeq != null && replayFocus?.seq === replaySeq
+    ? { workspaceId: replayFocus.workspaceId, resumeId: replayFocus.resumeId }
+    : null
+  const deskSlotsByWorkspace = useMemo(
+    () => new Map(groups.map((group) => [
+      group.workspace.id,
+      stableDeskSlotsForOffice(
+        group.employees,
+        previousDeskSeatIdsRef.current.get(group.workspace.id) ?? [],
+        4,
+        replaySeatFocus?.workspaceId === group.workspace.id ? replaySeatFocus.resumeId : null,
+      ),
+    ])),
+    [groups, replaySeatFocus?.resumeId, replaySeatFocus?.workspaceId],
+  )
+  useLayoutEffect(() => {
+    previousDeskSeatIdsRef.current = new Map(Array.from(deskSlotsByWorkspace, ([workspaceId, slots]) => [
+      workspaceId,
+      slots.map((employee) => employee?.resumeId ?? null),
+    ]))
+  }, [deskSlotsByWorkspace])
   const interactionTargets = useMemo(
-    () => officeInteractionTargets(groups, mapLayout, resolveGroupTitle),
-    [groups, mapLayout, resolveGroupTitle],
+    () => officeInteractionTargets(groups, mapLayout, resolveGroupTitle, deskSlotsByWorkspace),
+    [deskSlotsByWorkspace, groups, mapLayout, resolveGroupTitle],
   )
   const availableInteractionTargets = useMemo(
     () => replaySeq == null
@@ -1425,6 +1448,7 @@ export function OfficeBuilding({
                   ? replayFocus.resumeId
                   : null}
                 coworkerAssets={coworkerAssets}
+                slots={deskSlotsByWorkspace.get(group.workspace.id) ?? []}
               />
             )
           })}

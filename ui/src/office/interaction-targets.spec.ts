@@ -94,6 +94,28 @@ describe('Office interaction targets', () => {
       .toMatchObject({ id: 'roster:chat-1', additionalCount: 3 })
   })
 
+  it('uses the rendered seat plan as the single employee interaction geometry', () => {
+    const second = { ...group.employees[0]!, resumeId: 'resume-2' }
+    const crowded = { ...group, employees: [group.employees[0]!, second] }
+    const layout = layoutOfficeMap([{ id: 'chat-1', harness: 'chat' }])
+    const seatPlan = new Map([['chat-1', [second, group.employees[0]!, null, null]]])
+    const employees = officeInteractionTargets(
+      [crowded],
+      layout,
+      (_id, tag) => tag,
+      seatPlan,
+    ).filter((target) => target.kind === 'employee')
+
+    expect(employees.map((target) => target.id)).toEqual([
+      'employee:chat-1:resume-2',
+      'employee:chat-1:resume-1',
+    ])
+    expect(employees[0]).toMatchObject({
+      x: layout.pods[0]!.x + 90,
+      y: layout.pods[0]!.y + 97,
+    })
+  })
+
   it('selects only an object in Alice’s facing cone', () => {
     const targets = [
       {
