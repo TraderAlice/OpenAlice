@@ -2,25 +2,23 @@ import { createHash } from 'node:crypto'
 import { describe, expect, it, vi } from 'vitest'
 import { ConnectorClient } from './client.js'
 
-describe('ConnectorClient inbound return', () => {
-  it('posts drained owner messages back to the connector queue', async () => {
+describe('ConnectorClient inbound claims', () => {
+  it('releases selected owner messages by queue id', async () => {
     const fetchImpl = vi.fn(async (url: URL, init?: RequestInit) => {
-      expect(url.pathname).toBe('/v1/inbound/return')
-      expect(JSON.parse(String(init?.body))).toEqual({
-        messages: [{ connectorId: 'telegram', userId: '1', text: 'Hold this' }],
-      })
+      expect(url.pathname).toBe('/v1/inbound/claim-1/release')
+      expect(JSON.parse(String(init?.body))).toEqual({ itemIds: ['in-1'] })
       return new Response(JSON.stringify({ ok: true }), { status: 200 })
     })
     const client = new ConnectorClient('http://127.0.0.1:47334', fetchImpl)
-    await client.returnInbound([{ connectorId: 'telegram', userId: '1', text: 'Hold this' }])
+    await client.releaseInbound('claim-1', ['in-1'])
     expect(fetchImpl).toHaveBeenCalledOnce()
   })
 })
 
 describe('ConnectorClient artifact control plane', () => {
-  it('drains only schema-valid artifact requests and ignores a raw path field', async () => {
+  it('claims only schema-valid artifact requests and ignores a raw path field', async () => {
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify({
-      requests: [
+      claimId: 'claim-art', requests: [
         {
           requestId: 'art-1',
           connectorId: 'telegram',
@@ -33,20 +31,21 @@ describe('ConnectorClient artifact control plane', () => {
       ],
     }), { status: 200 }))
     const client = new ConnectorClient('http://127.0.0.1:47334', fetchImpl)
-    const requests = await client.drainActions()
-    expect(requests).toEqual([{
+    const claim = await client.claimActions()
+    expect(claim.claimId).toBe('claim-art')
+    expect(claim.items).toEqual([{
       requestId: 'art-1',
       connectorId: 'telegram',
       entryId: 'entry-1',
       docIndex: 0,
       createdAt: '2026-08-14T15:02:00.000Z',
     }])
-    expect(requests[0]).not.toHaveProperty('path')
+    expect(claim.items[0]).not.toHaveProperty('path')
   })
 
-  it('drains only schema-valid UTA requests and ignores extra fields', async () => {
+  it('claims only schema-valid UTA requests and ignores extra fields', async () => {
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify({
-      requests: [
+      claimId: 'claim-uta', requests: [
         {
           requestId: 'uta-1',
           connectorId: 'telegram',
@@ -60,8 +59,8 @@ describe('ConnectorClient artifact control plane', () => {
       ],
     }), { status: 200 }))
     const client = new ConnectorClient('http://127.0.0.1:47334', fetchImpl)
-    const requests = await client.drainUtaActions()
-    expect(requests).toEqual([{
+    const claim = await client.claimUtaActions()
+    expect(claim.items).toEqual([{
       requestId: 'uta-1',
       connectorId: 'telegram',
       createdAt: '2026-08-14T15:02:00.000Z',
@@ -69,7 +68,7 @@ describe('ConnectorClient artifact control plane', () => {
       utaId: 'alpaca-paper',
       pendingHash: 'abc12345',
     }])
-    expect(requests[0]).not.toHaveProperty('reason')
+    expect(claim.items[0]).not.toHaveProperty('reason')
   })
 
   it('posts a directed artifact delivery without an Inbox notification body', async () => {

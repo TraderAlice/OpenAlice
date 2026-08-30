@@ -215,11 +215,14 @@ export type OwnerChatMessage = z.infer<typeof ownerChatMessageSchema>
 
 export const inboundOwnerMessageSchema = z.object({
   connectorId: z.string().min(1),
+  eventId: z.string().min(1).max(128).optional(),
   userId: z.string().min(1),
   chatId: z.string().min(1).optional(),
   text: z.string().min(1).max(OWNER_CHAT_TEXT_MAX),
 })
 export type InboundOwnerMessage = z.infer<typeof inboundOwnerMessageSchema>
+export type ClaimedInboundOwnerMessage = InboundOwnerMessage & { queueId: string }
+export interface ConnectorWorkClaim<T> { claimId: string; items: T[] }
 export type ConnectorDeliveryReceipt = z.infer<typeof connectorDeliveryReceiptSchema>
 
 /** Bounded Connector → Alice work that is not phone-desk inbound chat. */

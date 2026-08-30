@@ -84,6 +84,38 @@ describe('compactUtaOperation', () => {
 })
 
 describe('processConnectorUtaRequests', () => {
+  it('acks a presented claim and releases it when no terminal response reaches the connector', async () => {
+    const ackUtaActions = vi.fn(async () => undefined)
+    const releaseUtaActions = vi.fn(async () => undefined)
+    const base = {
+      isEnabled: async () => true,
+      drainUtaActions: async () => [],
+      claimUtaActions: async () => ({ claimId: 'claim-uta', items: [request()] }),
+      ackUtaActions,
+      releaseUtaActions,
+      warn: vi.fn(),
+      utaManager: { listUTAs: vi.fn() } as unknown as UTAManagerSDK,
+      tradingModePolicy: () => LITE,
+    }
+
+    await processConnectorUtaRequests({
+      ...base,
+      presentUta: async () => undefined,
+      failUta: async () => undefined,
+    })
+    expect(ackUtaActions).toHaveBeenCalledWith('claim-uta', ['uta-1'])
+    expect(releaseUtaActions).not.toHaveBeenCalled()
+
+    ackUtaActions.mockClear()
+    await processConnectorUtaRequests({
+      ...base,
+      presentUta: async () => { throw new Error('connector offline') },
+      failUta: async () => { throw new Error('connector offline') },
+    })
+    expect(releaseUtaActions).toHaveBeenCalledWith('claim-uta', ['uta-1'])
+    expect(ackUtaActions).not.toHaveBeenCalled()
+  })
+
   it('returns lite mode without touching accounts', async () => {
     const presentUta = vi.fn(async (_presentation: ConnectorUtaPresentation) => undefined)
     const listUTAs = vi.fn()

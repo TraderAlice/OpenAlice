@@ -835,13 +835,13 @@ external adapters remain optional projections rather than sources of truth.
   - [x] Make the overview's Ready-to-link action hierarchy match the actual
         lifecycle transition.
   - [x] Distinguish durable Chat configuration from live Connector availability.
-  - [ ] Move successful test references behind progressive disclosure.
+  - [x] Move successful test references behind progressive disclosure.
   - [x] Replace whole-document Connector writes with atomic adapter-scoped
         mutations shared by Alice and Connector Service.
   - [x] Apply adapter configuration through an in-process per-adapter lifecycle
         reconcile; reserve Guardian restart for global lifecycle and recovery.
   - [x] Make overview and dialog saves mutation-keyed and stale-response-safe.
-  - [ ] Persist Connector-to-Alice inbound, artifact, and UTA work behind an
+  - [x] Persist Connector-to-Alice inbound, artifact, and UTA work behind an
         idempotent claim/ack queue before declaring restart safety.
   - [ ] Verify adapter isolation and queue recovery across dev, production, and
         Electron carriers without using real external accounts.
@@ -864,9 +864,32 @@ external adapters remain optional projections rather than sources of truth.
   adapter-scoped reconcile; Connector Service `startedAt` stayed
   `2026-08-30T07:06:44.643Z`, and the live Telegram and Feishu peers remained
   healthy. No credential or owner identifier was logged in this plan.
-- Focused acceptance: 76 specs passed; root `npx tsc --noEmit` and UI
-  `npx tsc -b` passed. Durable work queues and cross-carrier lifecycle smokes
-  remain open and are the next reliability increment.
+- Focused acceptance for that increment: 76 specs passed; root
+  `npx tsc --noEmit` and UI `npx tsc -b` passed. Durable work queues were the
+  next increment recorded below; cross-carrier lifecycle smokes remain open.
+
+### Restart-safe work implementation evidence (2026-08-30)
+
+- Connector inbound owner text, artifact requests, and UTA requests now commit
+  to one bounded, versioned, sealed queue before an adapter callback returns.
+  The old in-memory arrays and destructive HTTP drains were removed.
+- Alice claims work under a bounded lease and explicitly acks or releases item
+  ids. Queue specs cover restart while claimed, lease expiry, idempotent ack,
+  explicit release, stable-id dedupe, capacity rejection, and encrypted text at
+  rest. Artifact and UTA bridge specs prove terminal success acks while an
+  unreachable terminal response releases for retry.
+- Telegram and Feishu attach their platform message ids. Issue comment ids are
+  derived from those stable events, and replay coverage proves a crash after
+  append but before ack does not append or dispatch a second human comment.
+  UTA retries keep the existing pending-hash check at the write boundary.
+- The real Default AliceProject exposed healthy empty claim endpoints for all
+  three work kinds after hot reload; Telegram and Feishu remained healthy.
+  Full acceptance passed: 620 test files plus one skipped (5,144 tests plus
+  nine skipped), root and UI typechecks, 16 Connector replay specs, and the
+  Connector Service smoke. The isolated Guardian recovery smoke also passed
+  healthy takeover, crashed-owner reclaim, and forced stubborn-tree recovery.
+  Electron/package and production-carrier acceptance remain open; no live
+  external message was sent.
 
 ## Verification
 

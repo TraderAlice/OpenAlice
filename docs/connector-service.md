@@ -41,7 +41,7 @@ categories.
 - On-demand file pull is not phone-desk inbound and is not an ordinary
   Inbox `deliver`. The originating Connector enqueues a bounded, TTL-limited
   artifact request (`requestId`, `connectorId`, `entryId`, `docIndex`).
-  Alice’s resident action bridge drains that queue, re-reads the Inbox
+  Alice’s resident action bridge claims that queue, re-reads the Inbox
   entry, resolves the Workspace, materializes the selected current file
   through the existing attachment safety path, and posts a directed
   artifact delivery back to that Connector only. Cancel does not enqueue.
@@ -54,8 +54,8 @@ categories.
   indexes; account ids and pending hashes stay in the Connector session
   and the Alice-validated action request.
 - Connector Service never interprets chat. Alice owns one phone-desk Issue
-  per `desk`-capable connector. Connector queues owner text keyed by
-  `connectorId`; Alice drains that stack only while that connector's live
+  per `desk`-capable connector. Connector durably queues owner text keyed by
+  `connectorId`; Alice claims that stack only while that connector's live
   desk exists and no generation is running on it. Several stacked DMs become
   one quoted comment on that Issue. Alice suppresses a desk comment only when
   its run carries the `connector-cron-issue` trigger metadata and its text
@@ -132,23 +132,25 @@ Workspace agent
 
 Telegram owner DM
   -> Telegram adapter (linked private chat only)
-  -> Connector inbound queue
-  -> Alice drain only while a live phone-desk Issue exists and no
+  -> sealed Connector inbound queue; platform event id is the dedupe key
+  -> Alice claim only while a live phone-desk Issue exists and no
      desk generation is running; later DMs stay stacked
-  -> one Issue comment (via: telegram); several stacked DMs are
+  -> one idempotent Issue comment (via: telegram); several stacked DMs are
      quoted into that one comment
+  -> ack after append; failure releases immediately and process loss waits for
+     claim-lease expiry
   -> existing comment-reply dispatch
   -> owner-chat projection unless [[no-reply]]
 
 Telegram /inbox detail -> "view files" confirm
   -> Connector action queue (requestId, connectorId, entryId, docIndex)
-  -> Alice connector action bridge drain (not the phone-desk inbound drain)
+  -> Alice connector action bridge claim (separate from owner-chat claims)
   -> Alice re-reads Inbox entry and materializes one Workspace file
   -> Connector directed artifact delivery to the requesting adapter only
 
 Telegram /uta (or an Approve/Reject button)
   -> Connector UTA action queue (review, or push/reject with required utaId + pendingHash)
-  -> Alice connector action bridge drain
+  -> Alice connector action bridge claim
   -> Alice UTAManagerSDK list/status/push/reject (lite/readonly honored here)
   -> UTA push/reject require expectedPendingHash and validate it in the same
      request before mutation; mismatch or absence is 409 and does not write
@@ -164,14 +166,14 @@ Load-bearing paths:
 
 - `packages/connector-protocol/` — shared schemas, definitions, public config,
   delivery and health client.
-- `services/connector/src/core/` — adapter/command registry and isolated
-  delivery manager.
+- `services/connector/src/core/` — adapter/command registry, isolated delivery
+  manager, and sealed claim/ack work queue.
 - `services/connector/src/adapters/` — one file per platform implementation.
 - `src/core/connector-config.ts` — sealed config and Guardian enable/restart
   control.
 - `src/services/connector-client/` — Inbox projection, on-demand single-doc
   materialization, Alice-side health, and the resident artifact-request bridge.
-- `src/workspaces/issues/telegram-desk-chat.ts` — phone-desk inbound drain
+- `src/workspaces/issues/telegram-desk-chat.ts` — phone-desk inbound claim
   and scheduled-fire comment stamp.
 - `src/workspaces/issues/telegram-desk-project.ts` — `[[no-reply]]` filter
   and owner-chat projection.
@@ -225,9 +227,25 @@ Saving an empty secret keeps the stored value; explicitly removing its presence 
 A non-empty secret body is accepted only when it is a plausible token (at
 least 20 non-whitespace characters); a short draft cannot replace a sealed
 value. Generic Settings auto-save must omit secret fields so enable/unlink
-writes cannot carry a password-manager draft. Changes touch
-`data/control/restart-connector.flag`, and Guardian reconciles the process
-from the same startup path.
+writes cannot carry a password-manager draft. The private UI API accepts only
+one global-service command or one adapter-scoped mutation (`enabled`,
+non-secret `set`/`unset`, explicit secret set/remove). Alice and adapter-owned
+`/link` or `/settings` writes merge under the same cross-process lease. A
+reachable Connector Service reconciles only the affected adapter; it never
+restarts peer adapters. Guardian starts or stops the optional process for an
+explicit global service change and remains the bounded recovery fallback when
+the loopback service is unreachable.
+
+`data/state/connector-work-queue.json` is a versioned AES-256-GCM sealed
+envelope for inbound owner text, artifact requests, and UTA requests. External
+handlers return success only after enqueue commits through atomic rename.
+Alice uses bounded claim leases plus item-level ack/release; a crash after
+claim cannot erase work, terminal ack is idempotent, and lease expiry makes
+unacked items visible again. Artifact and UTA TTL checks still run in Alice
+after claim. UTA push/reject retries retain `utaId` plus `pendingHash`, so the
+UTA boundary rejects a replay after the pending commit changes instead of
+repeating the write. Queue payloads never contain Connector credentials. The
+I/O journal remains diagnostic/replay evidence, not queue recovery state.
 
 Ordinary non-secret auto-save uses the shared localized SaveIndicator. It
 announces Saving, Saved, and Save failed through one polite atomic live region,
