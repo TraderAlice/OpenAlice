@@ -516,13 +516,17 @@ export function OfficeRuntimeSection({
         </TabsList>
         <small className="oa-office-runtime__input-hint">{t('office.logKeyboardHint')}</small>
         <TabsContent value={channel} className="oa-office-runtime__panel">
-        <div data-testid="runtime-log" className="oa-office-runtime__journal">
-        <ol
-          ref={journalIndexRef}
-          className="oa-office-runtime__index"
-          aria-label={`${t('office.timeline')} · ${channelLabel}`}
-          aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home End"
-        >
+          <div
+            data-testid="runtime-log"
+            data-compact={visibleBeats.length <= 5 ? 'true' : undefined}
+            className="oa-office-runtime__journal"
+          >
+            <ol
+              ref={journalIndexRef}
+              className="oa-office-runtime__index"
+              aria-label={`${t('office.timeline')} · ${channelLabel}`}
+              aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home End"
+            >
           {visibleBeats.map((beat) => {
             const event = beat.event
             const kind = officeLogAssetKind(event.type)

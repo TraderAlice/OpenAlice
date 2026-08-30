@@ -148,6 +148,15 @@ describe('Office responsive style contract', () => {
     expect(css).toMatch(/@container \(max-width: 760px\) \{\s*\.oa-office-window--log\s*\{[^}]*bottom: 8px;[^}]*max-height: none;/)
   })
 
+  it('compacts sparse desktop channels without reducing the phone journal', () => {
+    expect(css).toMatch(
+      /@container \(min-width: 761px\) \{[\s\S]*?\.oa-office-runtime__journal\[data-compact="true"\] \.oa-office-runtime__index\s*\{[\s\S]*?max-height: 320px;[\s\S]*?\.oa-office-runtime__journal\[data-compact="true"\] \.oa-office-runtime__event\s*\{[\s\S]*?min-height: 320px;/,
+    )
+    expect(css).toMatch(
+      /@container \(max-width: 760px\) \{[\s\S]*?\.oa-office-runtime__index\s*\{[\s\S]*?max-height: 156px;[\s\S]*?\.oa-office-runtime__event\s*\{[\s\S]*?min-height: 156px;/,
+    )
+  })
+
   it('keeps four log channels on one game-menu row until a phone needs two rows', () => {
     expect(css).toMatch(/\.oa-office-runtime__channels\s*\{[\s\S]*?grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/)
     expect(css).toMatch(/\.oa-office-runtime__input-hint\s*\{[\s\S]*?text-align: right;/)

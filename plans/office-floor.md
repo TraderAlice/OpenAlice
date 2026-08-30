@@ -3392,6 +3392,22 @@ Floor-terminal direct command follow-up (2026-08-30):
   617 test files and 5,148 tests (one file and nine tests skipped), and the production UI build passed with only the
   existing jsdom canvas and large-chunk advisories.
 
+Sparse activity-channel follow-up (2026-08-30):
+
+- Replayed the real News and Inbox terminals on the Office Lab floor. News used its 400px journal well, but Inbox had
+  only five records and still reserved the same height, leaving a large empty parchment panel between its detail and
+  commands. The low-density service view read like a fixed dashboard rather than a game menu shaped by its contents.
+- Compared globally shortening the journal, using viewport width alone, and letting the current channel density select
+  the desktop height. Chose channel density: five or fewer visible beats now mark the journal compact and reduce both
+  columns to 320px, which fits five authored rows. Dense Agent and News channels retain the 400px browsing surface.
+- The compact rule is deliberately desktop-only. At 760px and below the existing stacked 156px list/detail layout
+  remains authoritative, preserving touch scrolling and command reachability instead of shrinking the phone modal.
+- Real-browser acceptance opened Inbox at 1200x800, confirmed all five rows plus both commands in the tighter window,
+  switched to News 50 and observed the full-height journal return, then repeated Inbox at 390x844. The phone kept its
+  stacked list, detail, and full-width commands. Focused runtime and responsive-style specs passed (2 files / 34 tests).
+  Root and UI TypeScript passed, the full suite passed all 617 test files and 5,149 tests (one file and nine tests
+  skipped), and the production UI build passed with only the existing jsdom canvas and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

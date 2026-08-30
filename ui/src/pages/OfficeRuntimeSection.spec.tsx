@@ -337,6 +337,7 @@ describe('OfficeRuntimeSection', () => {
 
     const inboxTab = await screen.findByRole('tab', { name: /Inbox\s*2/ })
     expect(inboxTab.getAttribute('data-active')).not.toBeNull()
+    expect(screen.getByTestId('runtime-log').getAttribute('data-compact')).toBe('true')
     expect(screen.getByRole('list', { name: 'Activity log · Inbox' }).children).toHaveLength(2)
     expect(screen.getByRole('button', { name: /Inbox received.*#0007/i }).getAttribute('aria-pressed'))
       .toBe('true')
@@ -554,6 +555,7 @@ describe('OfficeRuntimeSection', () => {
 
     expect((await screen.findByRole('tab', { name: /News\s*50/ })).getAttribute('data-active'))
       .not.toBeNull()
+    expect(screen.getByTestId('runtime-log').hasAttribute('data-compact')).toBe(false)
     expect(screen.getByRole('button', { name: /News added.*#0060/i }).getAttribute('aria-pressed'))
       .toBe('true')
     expect(screen.getByText('News 60')).toBeTruthy()

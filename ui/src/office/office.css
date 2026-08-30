@@ -1952,6 +1952,16 @@
   box-shadow: inset -3px -3px color-mix(in srgb, var(--gba-moss) 28%, transparent);
 }
 
+@container (min-width: 761px) {
+  .oa-office-runtime__journal[data-compact="true"] .oa-office-runtime__index {
+    max-height: 320px;
+  }
+
+  .oa-office-runtime__journal[data-compact="true"] .oa-office-runtime__event {
+    min-height: 320px;
+  }
+}
+
 @container (max-width: 760px) {
   .oa-office-runtime__journal {
     grid-template-columns: 1fr;
