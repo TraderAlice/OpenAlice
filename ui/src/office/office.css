@@ -3127,6 +3127,13 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
 
   .oa-office-inspect__profile {
     grid-template-columns: 64px minmax(0, 1fr);
+    grid-auto-rows: max-content;
+    align-content: start;
+    align-items: start;
+  }
+
+  .oa-office-inspect__portrait {
+    align-self: center;
   }
 
   .oa-office-inspect__facts,

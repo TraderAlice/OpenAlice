@@ -3643,6 +3643,26 @@ Dense filing-cabinet follow-up (2026-08-30):
   5,161 tests (one file and nine tests skipped), and the production UI build passed with only the existing jsdom canvas
   and large-chunk advisories.
 
+Short-screen Agent-file flow follow-up (2026-08-30):
+
+- Opened the real three-record Grok Tactician Agent File through the Chat roster and compared 390x844 with 390x600.
+  The long phone layout fit cleanly, but the short viewport compressed implicit CSS Grid rows inside the scrollable
+  profile: dialogue overlapped facts by 31px, facts overlapped the first drawer by another 31px, and the resulting text
+  and Open command visibly painted through one another above the fixed Open session command.
+- Compared hiding facts or shrinking type against restoring natural document flow inside the existing scroll region.
+  Chose natural flow: the Agent File is a character sheet, so short screens should scroll complete information rather
+  than silently delete it. The primary Open session command remains fixed and the generated Back/Close control remains
+  outside the profile scroll.
+- At container widths up to 680px the two-column profile now gives every implicit grid row `max-content` height, starts
+  track packing at the top, and top-aligns content. Only the portrait keeps centered alignment within the dialogue row.
+  This converts height pressure into profile overflow instead of item overlap.
+- Real-browser acceptance at 390x600 changed both previous -31px intersections into 7px gaps. The profile became a
+  460px viewport over 578px of content; keyboard End scrolled to 117.5px and left the third drawer fully visible while
+  Open session stayed fixed at y529–565. At 390x844 the full 578px profile fit without scrolling, retained the same 7px
+  gaps, and displayed all three drawers. Focused Agent File and responsive-style tests passed (2 files / 26 tests).
+  Root and UI TypeScript passed, the full suite passed all 617 test files and 5,162 tests (one file and nine tests
+  skipped), and the production UI build passed with only the existing jsdom canvas and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

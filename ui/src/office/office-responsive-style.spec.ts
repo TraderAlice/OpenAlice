@@ -149,6 +149,15 @@ describe('Office responsive style contract', () => {
     )
   })
 
+  it('keeps narrow Agent file grid rows at natural height instead of overlapping records', () => {
+    expect(css).toMatch(
+      /@container \(max-width: 680px\) \{[\s\S]*?\.oa-office-inspect__profile\s*\{[\s\S]*?grid-auto-rows: max-content;[\s\S]*?align-content: start;[\s\S]*?align-items: start;/,
+    )
+    expect(css).toMatch(
+      /@container \(max-width: 680px\) \{[\s\S]*?\.oa-office-inspect__portrait\s*\{\s*align-self: center;/,
+    )
+  })
+
   it('shrink-wraps the desktop occupancy journal without weakening narrow-stage containment', () => {
     expect(css).toMatch(/\.oa-office-window--log\s*\{[\s\S]*?bottom: auto;[\s\S]*?max-height: calc\(100% - 92px\)/)
     expect(css).toMatch(
