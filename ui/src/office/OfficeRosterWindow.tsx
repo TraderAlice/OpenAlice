@@ -10,6 +10,7 @@ import { officePixelImg } from './furniture'
 import { OFFICE_HUD_ASSETS } from './hud-assets'
 import { officeCoworkerAssignment, officeCoworkerCallsign, officeCoworkerStatusKey } from './label'
 import { nextOfficeGridIndex } from './grid-navigation'
+import { isOfficeConfirmKey } from './input'
 import { useReducedMotion } from './use-reduced-motion'
 
 export function OfficeRosterWindow({
@@ -138,7 +139,7 @@ export function OfficeRosterWindow({
                 onFocus={() => setFocusedResumeId(employee.resumeId)}
                 onClick={() => onSelect(employee)}
                 onKeyDown={(event) => {
-                  if (event.key !== 'Enter' && event.key !== ' ') return
+                  if (!isOfficeConfirmKey(event.key)) return
                   event.preventDefault()
                   onSelect(employee)
                 }}

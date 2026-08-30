@@ -4379,6 +4379,25 @@ Deterministic roster-confirm follow-up (2026-08-31):
   TypeScript passed; the production UI build passed; the full suite passed all 617 test files and 5,176 tests (one file
   and nine tests skipped).
 
+Shared cabinet-confirm follow-up (2026-08-31):
+
+- Continued from the physical Chat filing cabinet through its 11-record two-column grid and Workspace-files exit.
+  Arrow Right/Down/Left/Up moved between the rendered neighboring records correctly, but the visible `Enter to open`
+  promise failed on the same real keyboard path as the pre-fix roster: focus stayed on the first Issue while pointer
+  click left Office normally.
+- Compared repairing only record buttons, copying the roster's literal key checks to every exit, and establishing one
+  Office-owned confirm-key predicate. Chose the shared predicate: `isOfficeConfirmKey` defines Enter and Space once;
+  both roster rows and cabinet controls consume it on keydown and prevent the later native click, preserving exactly
+  one activation across browser and desktop hosts.
+- Cabinet record rows and the main `Enter Workspace files` exit now share that contract. Dense and empty-cabinet hints
+  advertise Enter/Space in all four locales, matching the pause-menu control reference; pointer clicks and the existing
+  Tab/Shift+Tab focus loop remain unchanged.
+- Real-browser acceptance confirmed Enter and Space independently opened the first filed Issue from `/office`, and Tab
+  followed by Enter opened the correct Workspace; each external route was observed and immediately returned without
+  operating outside Office. The expanded hint measured 230px client and scroll width with no clipping. Focused input,
+  Cabinet, Roster, and Office-page suites passed 20 tests. Root and UI TypeScript passed; the production UI build
+  passed; the full suite passed all 618 test files and 5,177 tests (one file and nine tests skipped).
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

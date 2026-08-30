@@ -8,6 +8,7 @@ import { officeDrawerKindLabel, officeDrawerTitle } from './drawer-presentation'
 import { OFFICE_FURNITURE, officePixelImg } from './furniture'
 import { nextOfficeGridIndex } from './grid-navigation'
 import { OFFICE_HUD_ASSETS } from './hud-assets'
+import { isOfficeConfirmKey } from './input'
 import { OfficeWindowControlGlyph } from './OfficeWindowControlGlyph'
 import { officeCoworkerCast, type OfficeCoworkerSpriteAsset } from './coworker-sprites'
 import { officeCoworkerCallsign } from './label'
@@ -163,6 +164,11 @@ export function OfficeCabinetWindow({
                     aria-label={t('office.drawerOpenRecord', { record: title, kind, time: relativeTime })}
                     onFocus={() => setFocusedRecordKey(key)}
                     onClick={() => onOpenRecord(employee, item)}
+                    onKeyDown={(event) => {
+                      if (!isOfficeConfirmKey(event.key)) return
+                      event.preventDefault()
+                      onOpenRecord(employee, item)
+                    }}
                   >
                     <img src={OFFICE_HUD_ASSETS.drawerRecord} alt="" aria-hidden style={officePixelImg} />
                     <span className="oa-office-cabinet-window__record-copy">
@@ -201,6 +207,11 @@ export function OfficeCabinetWindow({
           className="oa-office-cabinet-window__open"
           onClick={onOpenWorkspaceFiles}
           onKeyDown={(event) => {
+            if (isOfficeConfirmKey(event.key)) {
+              event.preventDefault()
+              onOpenWorkspaceFiles()
+              return
+            }
             if (event.key !== 'Tab') return
             event.preventDefault()
             if (event.shiftKey && records.length > 0) focusedRecordButton()?.focus()

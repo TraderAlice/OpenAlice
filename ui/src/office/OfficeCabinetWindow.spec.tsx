@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -78,7 +78,7 @@ describe('OfficeCabinetWindow', () => {
     expect(dialog.hasAttribute('data-empty')).toBe(false)
     expect(dialog.hasAttribute('data-dense')).toBe(false)
     expect(screen.getByText('2 filed records')).toBeTruthy()
-    expect(screen.getByText('Arrows choose · Enter to open').getAttribute('data-input')).toBe('keyboard')
+    expect(screen.getByText('Arrows choose · Enter / Space open').getAttribute('data-input')).toBe('keyboard')
     expect(screen.getByText('Desk records stay in Office until you choose where to go.').getAttribute('data-input'))
       .toBe('touch')
     const recordText = screen.getAllByRole('listitem').map((item) => item.textContent ?? '')
@@ -122,10 +122,24 @@ describe('OfficeCabinetWindow', () => {
     const recordExit = screen.getByRole('button', { name: /Open Review queue, Issue, .* in Workspace/ })
     expect(recordExit.querySelector<HTMLImageElement>('.oa-office-cabinet-window__destination img')?.src)
       .toContain('/office/hud/session-portal-v2.png')
+    fireEvent.keyDown(recordExit, { key: 'Enter' })
+    expect(onOpenRecord).toHaveBeenCalledWith(group.employees[1], group.employees[1].drawers[0])
+    expect(onOpenRecord).toHaveBeenCalledTimes(1)
+    onOpenRecord.mockClear()
+    fireEvent.keyDown(recordExit, { key: ' ' })
+    expect(onOpenRecord).toHaveBeenCalledWith(group.employees[1], group.employees[1].drawers[0])
+    expect(onOpenRecord).toHaveBeenCalledTimes(1)
+    onOpenRecord.mockClear()
     await userEvent.click(recordExit)
     expect(onOpenRecord).toHaveBeenCalledWith(group.employees[1], group.employees[1].drawers[0])
     expect(onOpenWorkspaceFiles).not.toHaveBeenCalled()
 
+    fireEvent.keyDown(workspaceFiles, { key: 'Enter' })
+    expect(onOpenWorkspaceFiles).toHaveBeenCalledTimes(1)
+    onOpenWorkspaceFiles.mockClear()
+    fireEvent.keyDown(workspaceFiles, { key: ' ' })
+    expect(onOpenWorkspaceFiles).toHaveBeenCalledTimes(1)
+    onOpenWorkspaceFiles.mockClear()
     await userEvent.click(workspaceFiles)
     expect(onOpenWorkspaceFiles).toHaveBeenCalledTimes(1)
 
@@ -213,8 +227,8 @@ describe('OfficeCabinetWindow', () => {
     expect(dialog.getAttribute('data-empty')).toBe('true')
     expect(dialog.getAttribute('data-record-count')).toBe('0')
     expect(screen.getByText('No desk records have been filed here yet.')).toBeTruthy()
-    expect(screen.getByText('Enter opens Workspace files').getAttribute('data-input')).toBe('keyboard')
-    expect(screen.queryByText('Arrows choose · Enter to open')).toBeNull()
+    expect(screen.getByText('Enter / Space opens Workspace files').getAttribute('data-input')).toBe('keyboard')
+    expect(screen.queryByText('Arrows choose · Enter / Space open')).toBeNull()
     expect(container.querySelector<HTMLImageElement>('.oa-office-cabinet-window__empty img')?.src)
       .toContain('/office/furniture/empty-cabinet-v1.png')
     const workspaceFiles = screen.getByRole('button', { name: 'Enter Workspace files' })
