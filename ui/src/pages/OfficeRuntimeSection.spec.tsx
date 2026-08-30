@@ -337,7 +337,9 @@ describe('OfficeRuntimeSection', () => {
 
     const inboxTab = await screen.findByRole('tab', { name: /Inbox\s*2/ })
     expect(inboxTab.getAttribute('data-active')).not.toBeNull()
-    expect(screen.getByTestId('runtime-log').getAttribute('data-compact')).toBe('true')
+    const journal = screen.getByTestId('runtime-log')
+    expect(journal.getAttribute('data-compact')).toBe('true')
+    expect(journal.getAttribute('data-mobile-view')).toBe('detail')
     expect(screen.getByRole('list', { name: 'Activity log · Inbox' }).children).toHaveLength(2)
     expect(screen.getByRole('button', { name: /Inbox received.*#0007/i }).getAttribute('aria-pressed'))
       .toBe('true')
@@ -348,6 +350,12 @@ describe('OfficeRuntimeSection', () => {
     expect(scrollIntoView.mock.instances.at(-1)).toBe(
       screen.getByRole('button', { name: /Inbox received.*#0007/i }),
     )
+
+    await userEvent.click(screen.getByRole('button', { name: 'Back to records' }))
+    expect(journal.getAttribute('data-mobile-view')).toBe('index')
+
+    await userEvent.click(screen.getByRole('button', { name: /Inbox received.*#0007/i }))
+    expect(journal.getAttribute('data-mobile-view')).toBe('detail')
 
     await userEvent.click(screen.getByRole('button', { name: 'Open Inbox' }))
     expect(useInboxSelection.getState().selectedEntryId).toBe('inbox-7')

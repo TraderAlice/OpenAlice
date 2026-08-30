@@ -1996,6 +1996,7 @@ export const en = {
     timeline: 'Activity log',
     logChannels: 'Activity channels',
     logKeyboardHint: '←/→ channels · ↑/↓ records',
+    logBackToRecords: 'Back to records',
     logChannelOverview: 'Overview',
     logChannelAgent: 'Agent',
     logChannelInbox: 'Inbox',

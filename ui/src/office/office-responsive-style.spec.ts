@@ -157,6 +157,18 @@ describe('Office responsive style contract', () => {
     )
   })
 
+  it('turns the narrow activity journal into a records-to-detail game menu', () => {
+    expect(css).toMatch(
+      /@container \(max-width: 760px\) \{[\s\S]*?data-mobile-view="index"\] \.oa-office-runtime__event,[\s\S]*?data-mobile-view="detail"\] \.oa-office-runtime__index\s*\{\s*display: none;/,
+    )
+    expect(css).toMatch(
+      /data-mobile-view="index"\] \.oa-office-runtime__index\s*\{\s*max-height: none;/,
+    )
+    expect(css).toMatch(
+      /\.oa-office-runtime__back\s*\{[\s\S]*?display: flex;[\s\S]*?grid-column: 1 \/ -1;/,
+    )
+  })
+
   it('keeps four log channels on one game-menu row until a phone needs two rows', () => {
     expect(css).toMatch(/\.oa-office-runtime__channels\s*\{[\s\S]*?grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/)
     expect(css).toMatch(/\.oa-office-runtime__input-hint\s*\{[\s\S]*?text-align: right;/)

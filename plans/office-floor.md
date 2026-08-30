@@ -3603,6 +3603,27 @@ Replay service auto-walk follow-up (2026-08-30):
   files and 5,158 tests (one file and nine tests skipped), and the production UI build passed with only the existing
   jsdom canvas and large-chunk advisories.
 
+Narrow activity-journal master/detail follow-up (2026-08-30):
+
+- Walked Alice to the live News terminal at 390x844 and opened its selected event. The terminal prompt itself was
+  clean, but the Activity Log stacked a 150px nested record scroller above the full event card, leaving Published
+  clipped against a sticky two-button command row and making one phone screen own three vertical scroll contexts.
+- Compared increasing the stacked heights, launching another full-screen modal, and adopting the classic handheld
+  records-to-detail menu. Chose master/detail: ordinary narrow-screen log entry opens the record list, while a terminal
+  deep link with a selected sequence opens the event detail immediately. Selecting a record swaps to one full detail
+  page with a plain Back to records command; desktop keeps its existing simultaneous two-column journal.
+- The journal now publishes an explicit narrow view state. At up to 760px, record mode removes the artificial 156px
+  cap and hides the detail, while detail mode hides the index and exposes the event card. Returning restores focus and
+  scrolls the selected record back into view, including deep records; changing channels returns to the corresponding
+  record list.
+- Real-browser acceptance at 390x844 showed the Overview list as one continuous game menu, then rendered News #4740
+  with Source, Published, Find on floor, and Open News all visible without body overflow. Returning from deep Inbox
+  #4254 restored its focused row at the bottom of the viewport with body scrollTop 1089. At 1052x734 both panes stayed
+  visible in 300px/316px columns and the mobile Back command stayed hidden. Focused component and responsive-style
+  tests passed (2 files / 35 tests). Root and UI TypeScript passed, the full suite passed all 617 test files and 5,159
+  tests (one file and nine tests skipped), and the production UI build passed with only the existing jsdom canvas and
+  large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

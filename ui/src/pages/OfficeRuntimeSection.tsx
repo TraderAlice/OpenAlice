@@ -36,6 +36,7 @@ import {
 import { useWorkspace } from '../tabs/store'
 
 export type OfficeLogChannel = OfficeReplayChannel
+type OfficeLogMobileView = 'index' | 'detail'
 
 const OFFICE_LOG_CHANNELS: readonly OfficeLogChannel[] = ['overview', 'agent', 'inbox', 'news']
 const OFFICE_AGENT_BEAT_TARGET = 12
@@ -246,6 +247,9 @@ export function OfficeRuntimeSection({
   })
   const [selectedSeq, setSelectedSeq] = useState<number | null>(null)
   const [channel, setChannel] = useState<OfficeLogChannel>(initialChannel)
+  const [mobileView, setMobileView] = useState<OfficeLogMobileView>(
+    initialSelectedSeq == null ? 'index' : 'detail',
+  )
   const [detailExpanded, setDetailExpanded] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -351,6 +355,10 @@ export function OfficeRuntimeSection({
     setDetailExpanded(false)
   }, [selectedSeq])
 
+  useEffect(() => {
+    if (initialSelectedSeq != null) setMobileView('detail')
+  }, [initialSelectedSeq])
+
   useLayoutEffect(() => {
     if (selectedSeq == null) return
     const selectedRow = journalIndexRef.current
@@ -450,6 +458,23 @@ export function OfficeRuntimeSection({
   }
   const selectedActor = actorForEvent(selectedEvent, actors)
   const selectedIdentity = eventIdentity(selectedEvent, actors)
+  const selectJournalEvent = (seq: number) => {
+    setSelectedSeq(seq)
+    setMobileView('detail')
+  }
+  const returnToJournalIndex = () => {
+    setMobileView('index')
+    requestAnimationFrame(() => {
+      const selectedRow = journalIndexRef.current
+        ?.querySelector<HTMLButtonElement>(`button[data-seq="${selectedEvent.seq}"]`)
+      selectedRow?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+      selectedRow?.focus({ preventScroll: true })
+    })
+  }
+  const changeChannel = (value: string) => {
+    setChannel(value as OfficeLogChannel)
+    setMobileView('index')
+  }
   const reportToggle = detailCanExpand ? (
     <button
       type="button"
@@ -474,6 +499,7 @@ export function OfficeRuntimeSection({
         if (beatsByChannel[nextChannel].length === 0) continue
         journalChannelFocusPendingRef.current = true
         setChannel(nextChannel)
+        setMobileView('index')
         return
       }
     }
@@ -505,7 +531,7 @@ export function OfficeRuntimeSection({
           {t('office.paused')}: {error}
         </div>
       )}
-      <Tabs value={channel} onValueChange={(value) => setChannel(value as OfficeLogChannel)}>
+      <Tabs value={channel} onValueChange={changeChannel}>
         <TabsList className="oa-office-runtime__channels" aria-label={t('office.logChannels')}>
           {OFFICE_LOG_CHANNELS.map((item) => (
             <TabsTrigger key={item} value={item}>
@@ -519,6 +545,7 @@ export function OfficeRuntimeSection({
           <div
             data-testid="runtime-log"
             data-compact={visibleBeats.length <= 5 ? 'true' : undefined}
+            data-mobile-view={mobileView}
             className="oa-office-runtime__journal"
           >
             <ol
@@ -538,7 +565,7 @@ export function OfficeRuntimeSection({
                   aria-pressed={active}
                   data-kind={kind}
                   data-seq={event.seq}
-                  onClick={() => setSelectedSeq(event.seq)}
+                  onClick={() => selectJournalEvent(event.seq)}
                   onKeyDown={moveJournalSelection}
                 >
                   <img src={OFFICE_LOG_ASSETS[kind]} alt="" aria-hidden style={officePixelImg} />
@@ -574,6 +601,14 @@ export function OfficeRuntimeSection({
         </ol>
 
         <article className="oa-office-runtime__event" data-kind={selectedKind}>
+          <button
+            type="button"
+            className="oa-office-runtime__back"
+            onClick={returnToJournalIndex}
+          >
+            <span aria-hidden>←</span>
+            {t('office.logBackToRecords')}
+          </button>
           <div className="oa-office-runtime__badge" data-actor={selectedActor ? '' : undefined} aria-hidden>
             {selectedActor ? (
               <>

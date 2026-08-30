@@ -1971,6 +1971,7 @@ export const zhHant: Resources = {
     timeline: '活動日誌',
     logChannels: '動態頻道',
     logKeyboardHint: '←/→ 切換頻道 · ↑/↓ 選擇記錄',
+    logBackToRecords: '返回記錄列表',
     logChannelOverview: '概覽',
     logChannelAgent: 'Agent',
     logChannelInbox: 'Inbox',

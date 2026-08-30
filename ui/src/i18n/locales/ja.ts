@@ -1964,6 +1964,7 @@ export const ja: Resources = {
     timeline: 'アクティビティログ',
     logChannels: 'アクティビティチャンネル',
     logKeyboardHint: '←/→ チャンネル · ↑/↓ 記録を選択',
+    logBackToRecords: '記録一覧に戻る',
     logChannelOverview: '概要',
     logChannelAgent: 'Agent',
     logChannelInbox: 'Inbox',
