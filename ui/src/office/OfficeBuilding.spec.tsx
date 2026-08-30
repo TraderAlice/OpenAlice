@@ -115,6 +115,7 @@ describe('OfficeBuilding', () => {
     const replayPrompt = await screen.findByRole('status', {
       name: 'Review Seq 2 in Activity Log · Session 6 · Earlier Session completed its assignment.',
     })
+    expect(screen.queryByRole('status', { name: 'Seq 2 · Session 6' })).toBeNull()
     expect(replayPrompt.textContent).toContain('Review event')
     expect(replayPrompt.textContent).toContain('Session 6 · Earlier Session completed its assignment.')
     await userEvent.keyboard('{Enter}')

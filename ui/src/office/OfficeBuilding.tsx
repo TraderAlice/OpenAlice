@@ -28,7 +28,7 @@ import {
 import { OfficeMapPod } from './OfficeMapPod'
 import { OfficeRouteTrail } from './OfficeRouteTrail'
 import { OfficeRouteTargetPointer } from './OfficeRouteTargetPointer'
-import { OfficeReplayBeacon, officeReplayBeaconAvoidBounds } from './OfficeReplayBeacon'
+import { OfficeReplayBeacon } from './OfficeReplayBeacon'
 import type { OfficeReplayFocus } from './replay-focus'
 import {
   clampOfficeCamera,
@@ -415,15 +415,10 @@ export function OfficeBuilding({
   const nearbyService = nearbyTarget?.kind === 'inbox-service'
     || nearbyTarget?.kind === 'news-service'
     || nearbyTarget?.kind === 'operations'
+  const replayFocusIsNearby = replayFocusTarget != null
+    && nearbyTarget?.id === replayFocusTarget.id
   const promptAvoidBounds = useMemo<OfficePromptAvoidBounds[]>(() => {
     const bounds: OfficePromptAvoidBounds[] = []
-    if (
-      replaySeq != null
-      && replayFocusTarget
-      && nearbyTarget?.id === replayFocusTarget.id
-    ) {
-      bounds.push(officeReplayBeaconAvoidBounds(replayFocusTarget))
-    }
     if (nearbyTarget?.kind !== 'roster') return bounds
     bounds.push(...availableInteractionTargets.flatMap((target) => {
       if (!('workspaceId' in target) || target.workspaceId !== nearbyTarget.workspaceId) return []
@@ -446,7 +441,7 @@ export function OfficeBuilding({
       return []
     }))
     return bounds
-  }, [availableInteractionTargets, nearbyTarget, replayFocusTarget, replaySeq])
+  }, [availableInteractionTargets, nearbyTarget])
   const promptTargetBounds = useMemo<OfficePromptAvoidBounds | undefined>(() => {
     if (nearbyTarget?.kind !== 'inbox-service' && nearbyTarget?.kind !== 'news-service') return undefined
     const landmark = serviceLandmarks.find((item) => item.id === nearbyTarget.id)
@@ -1613,7 +1608,7 @@ export function OfficeBuilding({
                 zIndex={officeDepthAt(routeTarget.y) + 1200}
               />
             )}
-            {replayFocus && replayFocusTarget && replayFocus.seq === replaySeq && (
+            {replayFocus && replayFocusTarget && replayFocus.seq === replaySeq && !replayFocusIsNearby && (
               <OfficeReplayBeacon
                 target={replayFocusTarget}
                 label={replayFocus.label}

@@ -4511,6 +4511,23 @@ Layered Agent-file cancel follow-up (2026-08-31):
   and 5,178 tests (one file and nine tests skipped); the production UI build passed with only the existing ports fallback
   and large-chunk advisory.
 
+Replay-arrival hierarchy follow-up (2026-08-31):
+
+- Replayed the live News `Seq 5033` event from its journal row to the physical News terminal. During travel, the event
+  beacon correctly identified the destination, but after arrival it remained beside the full `Review event` prompt. The
+  two overlays repeated sequence, source, and event identity around one target and made the final interaction read like
+  stacked diagnostics instead of a resolved game action.
+- Compared keeping both overlays with tighter placement, collapsing the beacon to an icon, and handing ownership from
+  navigation to interaction at arrival. Chose the handoff: the labelled beacon exists while Alice is still finding or
+  facing away from the target; once the exact replay target is interactable, the contextual prompt becomes the single
+  owner. Turning away naturally restores the beacon because the action is no longer ready.
+- Removed the now-obsolete beacon avoidance rectangle from prompt placement instead of preserving dead layout logic.
+  Real-browser acceptance reached the News terminal with zero replay beacons and exactly one prompt containing
+  `Review event`, `scmp-business`, the headline excerpt, and Enter/A; Enter reopened Activity Log at Replay `Seq 5033`.
+- Focused Building, Replay-beacon, and prompt-placement suites passed 32 tests. Root and UI TypeScript passed; the full
+  suite passed all 618 test files and 5,178 tests (one file and nine tests skipped); the production UI build passed with
+  only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

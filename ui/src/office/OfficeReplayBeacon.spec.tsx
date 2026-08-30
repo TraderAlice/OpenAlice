@@ -4,7 +4,7 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import type { OfficeInteractionTarget } from './interaction-targets'
-import { OfficeReplayBeacon, officeReplayBeaconAvoidBounds } from './OfficeReplayBeacon'
+import { OfficeReplayBeacon } from './OfficeReplayBeacon'
 
 describe('OfficeReplayBeacon', () => {
   it('marks a historical actor with readable event context', () => {
@@ -44,11 +44,5 @@ describe('OfficeReplayBeacon', () => {
     expect(beacon.style.zIndex).toBe('1480')
     expect(beacon.querySelector('img')?.getAttribute('src'))
       .toBe('/office/furniture/route-destination-v1.png')
-    expect(officeReplayBeaconAvoidBounds(target)).toEqual({
-      left: 148,
-      top: 226,
-      right: 352,
-      bottom: 282,
-    })
   })
 })
