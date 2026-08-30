@@ -4999,6 +4999,23 @@ Truthful journal-inventory follow-up (2026-08-31):
   and UI TypeScript passed; the full suite passed all 620 test files and 5,194 tests (one file and nine tests skipped);
   the production UI build passed with only the existing ports fallback and large-chunk advisory.
 
+Roster portrait framing follow-up (2026-08-31):
+
+- Cross-floor auto-route playtesting showed the existing 24px/96ms route cadence, trail, cancel affordance, and camera
+  follow complete a typical long interaction in roughly three seconds, so automatic sprinting would add animation and
+  movement-semantic complexity without fixing the most visible completion gap.
+- The same real 24-member Chat roster showed that its formal 72×104 portrait assets were rendered only about 46px tall
+  inside a 54px frame, leaving a large sky band and reducing several slim characters to dark vertical marks. Compared
+  enlarging every card, generating a second headshot set, and reframing the existing portraits. Larger cards would lose
+  the deliberate six-member viewport, while new headshots would duplicate an already coherent character registry.
+  Chose a closer in-frame crop: render the existing portrait about 56px tall, preserve face/hair/outfit identity, and
+  let the frame trim only the lowest shoe pixels like a compact GBA party menu.
+- Implemented the closer framing without changing the 48×54 portrait frame or 82px card rhythm. Real-browser checks
+  compared `01/24` and PageDown `07/24`: all twelve sampled archetypes retained their hair and face silhouettes, the
+  six-card viewport stayed intact, and the selected cursor plus failed/asleep chips remained clear. The focused roster
+  spec passed. Root and UI TypeScript passed; the full suite passed all 620 test files and 5,194 tests (one file and nine
+  tests skipped); the production UI build passed with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

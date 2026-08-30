@@ -82,6 +82,10 @@ describe('OfficeRosterWindow', () => {
       .toBe('Member 6 of 6')
     expect(container.querySelector('.oa-office-roster__cursor')?.getAttribute('src'))
       .toBe('/office/hud/journal-cursor-v1.png')
+    expect(Number.parseFloat(
+      (container.querySelector('.oa-office-roster__portrait .oa-office-coworker') as HTMLElement)
+        ?.style.height ?? '',
+    )).toBeCloseTo(56.16)
     expect(container.textContent).not.toContain('▶')
     expect(container.querySelector('svg')).toBeNull()
     expect(screen.getAllByText('working')).toHaveLength(2)

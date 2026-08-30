@@ -169,7 +169,7 @@ export function OfficeRosterWindow({
                     mood={employee.mood}
                     reducedMotion={reducedMotion}
                     label={callsign}
-                    scale={0.22}
+                    scale={0.27}
                   />
                 </span>
                 <span className="oa-office-roster__identity">
