@@ -46,6 +46,7 @@ import {
   OFFICE_PROMPT_SERVICE_MAX_HEIGHT,
   OFFICE_PROMPT_SERVICE_MAX_WIDTH,
   officeInteractionPromptPlacement,
+  type OfficePromptAvoidBounds,
 } from './interaction-prompt'
 import { officeCoworkerCallsign } from './label'
 import { stableDeskSlotsForOffice } from './desk-slots'
@@ -97,6 +98,11 @@ const OFFICE_MANUAL_MOVE_INTERVAL_MS = 96
 const OFFICE_DIAGONAL_STEP = 17
 const OFFICE_DEPARTURE_MS = 520
 const OFFICE_CAMERA_RECENTER_THRESHOLD = 48
+const OFFICE_PROMPT_DESK_HALF_WIDTH = 46
+const OFFICE_PROMPT_DESK_TOP = 35
+const OFFICE_PROMPT_DESK_BOTTOM = 36
+const OFFICE_PROMPT_SIGN_HALF_WIDTH = 132
+const OFFICE_PROMPT_SIGN_HALF_HEIGHT = 32
 export type OfficeLogOrigin =
   | 'menu'
   | 'operations'
@@ -377,6 +383,29 @@ export function OfficeBuilding({
   const nearbyService = nearbyTarget?.kind === 'inbox-service'
     || nearbyTarget?.kind === 'news-service'
     || nearbyTarget?.kind === 'operations'
+  const promptAvoidBounds = useMemo<OfficePromptAvoidBounds[]>(() => {
+    if (nearbyTarget?.kind !== 'roster') return []
+    return availableInteractionTargets.flatMap((target) => {
+      if (!('workspaceId' in target) || target.workspaceId !== nearbyTarget.workspaceId) return []
+      if (target.kind === 'sign') {
+        return [{
+          left: target.x - OFFICE_PROMPT_SIGN_HALF_WIDTH,
+          top: target.y - OFFICE_PROMPT_SIGN_HALF_HEIGHT,
+          right: target.x + OFFICE_PROMPT_SIGN_HALF_WIDTH,
+          bottom: target.y + OFFICE_PROMPT_SIGN_HALF_HEIGHT,
+        }]
+      }
+      if (target.kind === 'employee') {
+        return [{
+          left: target.x - OFFICE_PROMPT_DESK_HALF_WIDTH,
+          top: target.y - OFFICE_PROMPT_DESK_TOP,
+          right: target.x + OFFICE_PROMPT_DESK_HALF_WIDTH,
+          bottom: target.y + OFFICE_PROMPT_DESK_BOTTOM,
+        }]
+      }
+      return []
+    })
+  }, [availableInteractionTargets, nearbyTarget])
   const promptPlacement = useMemo(
     () => nearbyTarget
       ? officeInteractionPromptPlacement(
@@ -399,9 +428,10 @@ export function OfficeBuilding({
                 : OFFICE_PROMPT_DETAIL_MAX_WIDTH
               : undefined,
           nearbyService ? OFFICE_PROMPT_SERVICE_MAX_HEIGHT : undefined,
+          promptAvoidBounds,
         )
       : null,
-    [alice, camera, mapLayout.height, mapLayout.width, nearbyService, nearbyTarget, viewportSize],
+    [alice, camera, mapLayout.height, mapLayout.width, nearbyService, nearbyTarget, promptAvoidBounds, viewportSize],
   )
   const promptPresentation: {
     icon: string

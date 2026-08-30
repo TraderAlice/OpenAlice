@@ -118,4 +118,25 @@ describe('officeInteractionPromptPlacement', () => {
       tailShift: -46,
     })
   })
+
+  it('chooses the least-obscuring side when a roster is boxed in by its room', () => {
+    expect(officeInteractionPromptPlacement(
+      { x: 144, y: 480 },
+      { x: 186, y: 443 },
+      { width: 866, height: 648 },
+      { x: 0, y: -24 },
+      undefined,
+      undefined,
+      [
+        { left: 180, top: 360, right: 444, bottom: 424 },
+        { left: 212, top: 423, right: 304, bottom: 494 },
+      ],
+    )).toEqual({
+      side: 'above',
+      x: 186,
+      y: 409,
+      width: 176,
+      tailShift: 0,
+    })
+  })
 })

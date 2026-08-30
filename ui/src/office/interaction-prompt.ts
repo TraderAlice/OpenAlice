@@ -8,6 +8,13 @@ export interface OfficeInteractionPromptPlacement {
   tailShift: number
 }
 
+export interface OfficePromptAvoidBounds {
+  left: number
+  top: number
+  right: number
+  bottom: number
+}
+
 const OFFICE_PROMPT_GAP = 34
 const OFFICE_PROMPT_MAX_WIDTH = 176
 const OFFICE_PROMPT_MAX_HEIGHT = 56
@@ -78,6 +85,11 @@ function boundsOverlap(left: OfficePromptBounds, right: OfficePromptBounds) {
     && left.right > right.left
     && left.top < right.bottom
     && left.bottom > right.top
+}
+
+function boundsOverlapArea(left: OfficePromptBounds, right: OfficePromptBounds) {
+  return Math.max(0, Math.min(left.right, right.right) - Math.max(left.left, right.left))
+    * Math.max(0, Math.min(left.bottom, right.bottom) - Math.max(left.top, right.top))
 }
 
 function fitPromptCrossAxis(
@@ -152,6 +164,7 @@ export function officeInteractionPromptPlacement(
   camera: { x: number; y: number },
   maxWidth = OFFICE_PROMPT_MAX_WIDTH,
   maxHeight = OFFICE_PROMPT_MAX_HEIGHT,
+  avoidBounds: readonly OfficePromptAvoidBounds[] = [],
 ): OfficeInteractionPromptPlacement {
   const dx = target.x - alice.x
   const dy = target.y - alice.y
@@ -175,6 +188,12 @@ export function officeInteractionPromptPlacement(
     right: screenAlice.x + OFFICE_PROMPT_ALICE_HALF_WIDTH,
     bottom: screenAlice.y + OFFICE_PROMPT_ALICE_HALF_HEIGHT,
   }
+  const screenAvoidBounds = avoidBounds.map((bounds) => ({
+    left: bounds.left + camera.x,
+    top: bounds.top + camera.y,
+    right: bounds.right + camera.x,
+    bottom: bounds.bottom + camera.y,
+  }))
   const candidates = [
     side,
     ...perpendicularSides(side, screenTarget, viewport),
@@ -187,11 +206,26 @@ export function officeInteractionPromptPlacement(
     )
     return { side: candidateSide, ...fitted }
   })
-  const chosen = candidates.find((candidate) => (
-    boundsFitViewport(candidate.bounds, viewport)
-      && !boundsOverlap(candidate.bounds, aliceBounds)
-  )) ?? candidates.find((candidate) => boundsFitViewport(candidate.bounds, viewport))
-    ?? candidates[candidates.length - 1]!
+  const visibleCandidates = candidates.filter((candidate) => boundsFitViewport(candidate.bounds, viewport))
+  const playerClearCandidates = visibleCandidates.filter(
+    (candidate) => !boundsOverlap(candidate.bounds, aliceBounds),
+  )
+  const preferredCandidates = playerClearCandidates.length > 0
+    ? playerClearCandidates
+    : visibleCandidates
+  const chosen = preferredCandidates.find((candidate) => (
+    screenAvoidBounds.every((bounds) => !boundsOverlap(candidate.bounds, bounds))
+  )) ?? preferredCandidates.reduce((best, candidate) => {
+    const overlap = screenAvoidBounds.reduce(
+      (total, bounds) => total + boundsOverlapArea(candidate.bounds, bounds),
+      0,
+    )
+    const bestOverlap = screenAvoidBounds.reduce(
+      (total, bounds) => total + boundsOverlapArea(best.bounds, bounds),
+      0,
+    )
+    return overlap < bestOverlap ? candidate : best
+  }, preferredCandidates[0] ?? candidates[candidates.length - 1]!)
   side = chosen.side
 
   return {

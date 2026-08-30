@@ -4070,6 +4070,25 @@ Interactive awake-state follow-up (2026-08-30):
   passed all 617 test files and 5,168 tests (one file and nine tests skipped), and the production UI build passed with
   only the existing ports fallback and large-chunk advisories.
 
+Roster-callout scene-avoidance follow-up (2026-08-30):
+
+- Started a real read-only Grok headless run and stood Alice beside the 20-member Chat personnel board. The new worker
+  was correctly promoted into a visible desk and the HUD reported `1 working · 1 awake`, but the fixed far-side
+  `ROSTER · 16 more… · ENTER` callout covered 84x42.5px of the workstation and 32x30.5px of its working emote. The
+  data was true while the most important live state was visually erased.
+- Compared shrinking the callout, moving every prompt to a screen-edge HUD, and teaching the world callout about scene
+  occupancy. Chose scene avoidance: it preserves the target tail, action label, count, and keyboard command, while a
+  roster prompt scores the four viable sides against its room sign and occupied desks after first protecting Alice
+  and the camera safe area. If no side is completely clear, the lowest-overlap composition wins.
+- Real-browser acceptance repeated the run with the active employee in the top-left desk. The prompt moved below the
+  roster, kept Alice and the 32px working emote at zero overlap, and reduced unavoidable desk contact to a quiet
+  62x16.5px strip at the furniture base. A second active employee in the bottom-right slot likewise retained a fully
+  visible emote and character. The 45-second fresh QA completed normally; a resumed probe exceeded its 60-second guard
+  after visual capture and was terminated, with final headless capacity confirmed at zero running tasks.
+- Focused prompt and Building suites passed 27 tests. Root and UI TypeScript passed, the full suite passed all 617 test
+  files and 5,169 tests (one file and nine tests skipped), and the production UI build passed with only the existing
+  ports fallback and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
