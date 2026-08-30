@@ -551,10 +551,11 @@ export function OfficeBuilding({
         nearbyTarget.employee,
         coworkerAssets.get(nearbyTarget.employee.resumeId),
       )
+      const canTalk = nearbyTarget.employee.awake
       return {
-        icon: OFFICE_HUD_ASSETS.talkBubble,
-        action: t('office.interactActionTalk'),
-        label: t('office.interactTalk', { name: target }),
+        icon: canTalk ? OFFICE_HUD_ASSETS.talkBubble : OFFICE_HUD_ASSETS.rosterBadge,
+        action: t(canTalk ? 'office.interactActionTalk' : 'office.interactActionCheck'),
+        label: t(canTalk ? 'office.interactTalk' : 'office.interactCheck', { name: target }),
         detail: nearbyTarget.employee.bubble
           ? officeBubbleText(nearbyTarget.employee.bubble, t)
           : null,

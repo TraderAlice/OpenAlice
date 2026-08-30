@@ -5051,6 +5051,22 @@ Cabinet record-cursor follow-up (2026-08-31):
   files and 5,194 tests (one file and nine tests skipped); the production UI build passed with only the existing ports
   fallback and large-chunk advisory.
 
+Dormant coworker interaction-language follow-up (2026-08-31):
+
+- Opened real AutoQuant g1, whose sleep emote and Agent file both described an off-duty coworker, then returned to the
+  floor and found the nearby prompt still promised `TALK`. The action opens the Agent file rather than a conversation,
+  so the floor language contradicted both the character state and the resulting interaction.
+- Compared retaining `Talk` for every coworker, replacing every coworker action with a generic inspect verb, and making
+  the prompt state-aware. The first keeps the false promise; the second discards the useful social signal for active
+  coworkers. Chose state-aware language: awake coworkers retain the speech bubble and `Talk`, while dormant coworkers
+  use the personnel badge and `Check` before opening the same Agent file.
+- Implemented the state-aware prompt in the shared floor interaction model, with matching English, Simplified Chinese,
+  Traditional Chinese, and Japanese copy plus regression coverage for both active and dormant coworkers. Real-floor
+  acceptance reopened g1, returned to the map, and confirmed a single personnel-badge `CHECK` prompt with the Agent
+  file as its destination. The focused floor suite passed all 24 tests. Root and UI TypeScript passed; the full suite
+  passed all 620 test files and 5,195 tests (one file and nine tests skipped); the production UI build passed with only
+  the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

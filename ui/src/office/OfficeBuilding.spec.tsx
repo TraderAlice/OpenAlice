@@ -1503,6 +1503,62 @@ describe('OfficeBuilding', () => {
     await waitFor(() => expect(onOpenLog).toHaveBeenCalledWith('operations'))
   }, 15_000)
 
+  it('offers a truthful check action for a dormant coworker', async () => {
+    vi.useFakeTimers()
+    try {
+      render(
+        <OfficeBuilding
+          building={{
+            config: {
+              workspaceSleepAfterMs: 1,
+              harnessMinimumVisibleGroups: { chat: 0, 'auto-quant': 1, prediction: 0, other: 0 },
+            },
+            lastSeq: 1,
+            firstSeq: 1,
+            offices: [{
+              workspace: { id: 'quant-dormant', tag: 'quant-dormant', harness: 'auto-quant' },
+              lastInteractionAt: 1,
+              sleeping: false,
+              employees: [{
+                resumeId: 'resume-dormant',
+                agent: 'grok',
+                name: 'g1',
+                title: 'Dormant researcher',
+                awake: false,
+                mood: 'idle',
+                bubble: null,
+                lastSeq: 1,
+                lastInteractionAt: 1,
+                drawers: [],
+              }],
+            }],
+          }}
+          onSelectEmployee={vi.fn()}
+          onOpenEmployee={vi.fn()}
+          onOpenWorkspace={vi.fn()}
+          onOpenFiles={vi.fn()}
+          onOpenRoster={vi.fn()}
+          onOpenLog={vi.fn()}
+        />,
+      )
+
+      fireEvent.click(screen.getByTestId('office-desk-resume-dormant'))
+      let checkPrompt: HTMLElement | null = null
+      for (let step = 0; step < 20 && !checkPrompt; step += 1) {
+        act(() => vi.advanceTimersByTime(96))
+        checkPrompt = screen.queryByRole('status', { name: 'Check Grok Strategist' })
+      }
+
+      expect(checkPrompt).not.toBeNull()
+      expect(checkPrompt?.querySelector('img')?.getAttribute('src'))
+        .toBe('/office/hud/roster-badge-v2.png')
+      expect(checkPrompt?.textContent).toContain('Check')
+      expect(screen.queryByRole('status', { name: /Talk to Grok Strategist/ })).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('renders an interactive personnel board for groups larger than the four-desk map', async () => {
     const onOpenRoster = vi.fn()
     const building = {
