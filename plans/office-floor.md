@@ -4156,6 +4156,26 @@ World-object confirm-key continuity follow-up (2026-08-30):
   skipped), and the production UI build passed with only the existing ports fallback, jsdom canvas, and large-chunk
   advisories.
 
+Activity-log event-priority follow-up (2026-08-30):
+
+- Ran a real bounded Grok headless Session (`run-SHkIz3nY`) through birth, working, tool use, completion, and rest while
+  staying on the Office floor. HUD, Chat occupancy, promoted visible seat, working emote, latest result, Operations
+  attention, and selected completion detail all agreed. The resulting high-volume journal exposed the remaining break:
+  exact aggregate ranges such as `×17 #4989–5005` squeezed `AGENT REPORT` and `TOOL ACTION` into indistinguishable
+  `AGEN…` / `TOOL…` labels in the left game-log list.
+- Compared shrinking the bitmap typography, hiding exact ranges, and rebuilding the row as two independent information
+  lines. Chose the two-line hierarchy: event type + relative time owns the first row; actor + exact count/range owns the
+  second. Icon and selection cursor keep their existing edge positions. No evidence is removed, but the player-facing
+  event kind can no longer be sized by the longest technical sequence range.
+- The first shared-grid draft still failed visual QA because its long second-row range sized the first-row grid column;
+  it was replaced rather than accepted. The final independent flex rows measured every visible event label at
+  `scrollWidth <= clientWidth`, including both Agent report beats and Tool action, while exact ranges remained visible.
+  Real-browser screenshot acceptance retained six readable rows and the complete selected detail. Focused runtime and
+  Office-page suites passed 30 tests, and the QA task finished `done` without an error or another running headless task.
+  Root and UI TypeScript passed, the full suite passed all 617 test files and 5,172 tests (one file and nine tests
+  skipped), and the production UI build passed with only the existing ports fallback, jsdom canvas, and large-chunk
+  advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

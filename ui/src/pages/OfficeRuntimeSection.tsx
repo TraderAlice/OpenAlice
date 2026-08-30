@@ -610,22 +610,24 @@ export function OfficeRuntimeSection({
                 >
                   <img src={OFFICE_LOG_ASSETS[kind]} alt="" aria-hidden style={officePixelImg} />
                   <span className="oa-office-runtime__index-copy">
-                    <strong>{eventLabel(event, t)}</strong>
-                    <small>{eventActor(event, actors)}</small>
-                  </span>
-                  <span className="oa-office-runtime__index-meta">
-                    <span className="oa-office-runtime__index-seq">
-                      {beat.count > 1 && (
-                        <span
-                          className="oa-office-runtime__beat-count"
-                          aria-label={t('office.logBeatUpdates', { count: beat.count })}
-                        >
-                          ×{beat.count}
-                        </span>
-                      )}
-                      <b>{officeActivityBeatSeq(beat)}</b>
+                    <span className="oa-office-runtime__index-primary">
+                      <strong>{eventLabel(event, t)}</strong>
+                      <time dateTime={new Date(event.ts).toISOString()}>{formatRelativeTime(event.ts)}</time>
                     </span>
-                    <time dateTime={new Date(event.ts).toISOString()}>{formatRelativeTime(event.ts)}</time>
+                    <span className="oa-office-runtime__index-meta">
+                      <small>{eventActor(event, actors)}</small>
+                      <span className="oa-office-runtime__index-seq">
+                        {beat.count > 1 && (
+                          <span
+                            className="oa-office-runtime__beat-count"
+                            aria-label={t('office.logBeatUpdates', { count: beat.count })}
+                          >
+                            ×{beat.count}
+                          </span>
+                        )}
+                        <b>{officeActivityBeatSeq(beat)}</b>
+                      </span>
+                    </span>
                   </span>
                   <img
                     className="oa-office-runtime__cursor"

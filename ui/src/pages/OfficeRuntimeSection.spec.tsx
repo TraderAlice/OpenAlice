@@ -535,6 +535,10 @@ describe('OfficeRuntimeSection', () => {
 
     const progress = screen.getByRole('button', { name: /Agent report.*3 updates.*#0002–0004/i })
     expect(progress).toBeTruthy()
+    const progressCopy = progress.querySelector('.oa-office-runtime__index-copy')
+    expect(progressCopy?.querySelector('strong')?.textContent).toBe('Agent report')
+    expect(progressCopy?.querySelector('.oa-office-runtime__index-seq')?.textContent)
+      .toBe('×3#0002–0004')
     await userEvent.click(progress)
     expect(screen.getByText('Latest progress.')).toBeTruthy()
     expect(screen.queryByText('Earlier progress.')).toBeNull()
