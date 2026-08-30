@@ -155,6 +155,12 @@ appropriate.
 - Stable N-1 acceptance and release notes must select the previous stable tag,
   not the latest tag of any kind; otherwise a beta immediately before stable
   would reduce the only stable upgrade proof to beta-to-stable.
+- The first stable version PR after publishing beta correctly used the newest
+  published app, `v0.90.2-beta.1`, for its ordinary package smoke, but the
+  derived temporary Workspace tag exceeded the product's 33-character limit.
+  Smoke Workspace tags are now bounded so both beta-to-stable PR acceptance and
+  future numbered-beta release acceptance can exercise the real product path.
+  The formal Release workflow still supplies its explicit same-channel N-1 tag.
 - The Windows failure observed on the earlier workflow PR predates the release
   change: three real `npm pack` subprocesses exceeded Vitest's default five
   seconds. That integration test now has an explicit 30-second timeout; the
@@ -229,19 +235,20 @@ appropriate.
 - [x] Merge the serial PR to `dev` and verify the post-merge dev-channel
   publication plus live installer path (PR #1257; `CLI Installer Smoke`
   run `33311979583`).
-- [ ] Promote the accepted `dev` source to `master` under the full promotion
-  gate. PR #1259 promoted the first accepted source, but subsequent release
-  rehearsal repairs on `dev` supersede it; repeat the promotion from the final
-  green preview SHA.
+- [x] Promote the accepted `dev` source to `master` under the full promotion
+  gate. PR #1262 promoted final preview SHA `7b730d6c` after the Guardian port
+  probe repair; all promotion lanes passed before the beta version-only PR.
 
 ### 5. Prove 0.90.2
 
-- [ ] Set both product package versions to `0.90.2-beta.1` on the release
-  source and dispatch `beta` + `v0.90.2-beta.1`.
-- [ ] Verify the GitHub prerelease, expected assets, beta updater feeds,
-  beta CLI manifest, shared installer, and unchanged stable product aliases.
-- [ ] Record any beta fix on `dev`, promote it normally, and repeat beta only if
-  the accepted source changes materially.
+- [x] Set both product package versions to `0.90.2-beta.1` on the release
+  source and dispatch `beta` + `v0.90.2-beta.1` (PR #1264; Release workflow
+  `33317533910`).
+- [x] Verify the GitHub prerelease and all 49 assets, beta updater feeds, beta
+  CLI manifest, shared installer, a clean external install/Runtime/uninstall,
+  and byte-for-byte unchanged stable feeds and download aliases.
+- [ ] Merge the bounded Workspace-tag repair to `dev`, promote it normally, and
+  refresh the stable version-only PR #1265 from the repaired `master` source.
 - [ ] Set both product package versions to `0.90.2`, dispatch `stable` +
   `v0.90.2`, and verify GitHub, updater, CDN, installer, Broker Pack, and opted-in
   package-manager publication evidence.
