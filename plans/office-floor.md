@@ -3172,6 +3172,21 @@ Journal shoulder-navigation follow-up (2026-08-30):
   and nine tests skipped), and the production build also passed; the existing direct-eval and large-chunk advisories
   are unchanged.
 
+Journal content-first focus follow-up (2026-08-30):
+
+- Closed and reopened the real Operations journal after adding its arrow model. Even after #2815 had loaded and was
+  visibly selected, DOM focus remained on the top-right Close button, so the newly taught arrows still did nothing
+  until the player tabbed through the Replay controls and channel strip or clicked a record.
+- Compared removing immediate dialog focus, keeping Close as the permanent modal convention, and using Close only as
+  the asynchronous loading fallback before handing unclaimed focus to the selected record. Chose the fallback handoff:
+  the dialog remains immediately keyboard-safe, loaded journals open with the RPG cursor ready, and a user who moves
+  focus during a slow load is respected rather than pulled back into the record list.
+- Browser-closed and reopened the real Operations journal after hot reload. Once the journal resolved, #2815 was both
+  the selected row and `document.activeElement`, with focus inside the journal rather than Close; the existing arrow
+  legend and shoulder navigation were immediately operable. Focused page/runtime specs passed (2 files / 23 tests).
+  Root/UI TypeScript, the full 617-file Vitest run (5,135 passing; one file and nine tests skipped), and the production
+  build also passed; the existing direct-eval and large-chunk advisories are unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

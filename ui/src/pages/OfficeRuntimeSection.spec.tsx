@@ -107,6 +107,9 @@ describe('OfficeRuntimeSection', () => {
     expect(screen.getByRole('button', { name: 'Open Runs' })).toBeTruthy()
     expect(screen.getByRole('button', { name: /Task started.*Market Scout.*#0001/i }).getAttribute('aria-pressed'))
       .toBe('true')
+    expect(document.activeElement).toBe(
+      screen.getByRole('button', { name: /Task started.*Market Scout.*#0001/i }),
+    )
     expect(container.querySelector<HTMLElement>('.oa-office-runtime__badge .oa-office-coworker')?.dataset.agent)
       .toBe('pi')
     expect(container.querySelector<HTMLImageElement>('.oa-office-runtime__event-mark')?.src)

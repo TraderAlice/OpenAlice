@@ -250,6 +250,7 @@ export function OfficeRuntimeSection({
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const journalIndexRef = useRef<HTMLOListElement>(null)
+  const journalInitialFocusPendingRef = useRef(true)
   const journalChannelFocusPendingRef = useRef(false)
   const appliedReplaySeqRef = useRef<number | null>(null)
 
@@ -355,6 +356,13 @@ export function OfficeRuntimeSection({
     const selectedRow = journalIndexRef.current
       ?.querySelector<HTMLButtonElement>(`button[data-seq="${selectedSeq}"]`)
     selectedRow?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    if (journalInitialFocusPendingRef.current && selectedRow) {
+      journalInitialFocusPendingRef.current = false
+      const activeElement = document.activeElement
+      const focusIsUnclaimed = activeElement === document.body
+        || activeElement?.matches('.oa-office-window--log .oa-office-window__header button')
+      if (focusIsUnclaimed) selectedRow.focus({ preventScroll: true })
+    }
     if (journalChannelFocusPendingRef.current && selectedRow) {
       journalChannelFocusPendingRef.current = false
       selectedRow.focus({ preventScroll: true })
