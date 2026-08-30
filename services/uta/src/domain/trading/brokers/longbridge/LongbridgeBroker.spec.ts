@@ -230,17 +230,18 @@ describe('mapLbOrderStatus', () => {
   it('Canceled → Cancelled', () => expect(mapLbOrderStatus(15)).toBe('Cancelled'))
   it('PartialFilled → Submitted (still active)', () => expect(mapLbOrderStatus(11)).toBe('Submitted'))
   it('New → Submitted', () => expect(mapLbOrderStatus(7)).toBe('Submitted'))
-  // Expired(16) is ambiguous: broker marks US-equity GTC/GTD orders Expired
-  // between trading sessions (transient), while Day orders really expire at
-  // close. The timeInForce argument keeps GTC/GTD alive for re-observation.
-  it('Expired without TIF → Submitted (conservative, avoids false rejection)',
-    () => expect(mapLbOrderStatus(16)).toBe('Submitted'))
+  // Expired(16) is ambiguous: Longbridge marks US-equity GTC orders Expired
+  // between trading sessions (transient — reverts to New after reopen), while
+  // Day orders really expire at close and GTD eventually expires on its
+  // configured date. Only the verified long-lived GTC value overrides Expired.
+  it('Expired without TIF → Inactive (conservative: do not keep truly-dead orders alive)',
+    () => expect(mapLbOrderStatus(16)).toBe('Inactive'))
   it('Expired + Day TIF → Inactive (real close-time expiry)',
     () => expect(mapLbOrderStatus(16, 1 /* Day */)).toBe('Inactive'))
   it('Expired + GTC TIF → Submitted (transient between sessions)',
     () => expect(mapLbOrderStatus(16, 2 /* GoodTilCanceled */)).toBe('Submitted'))
-  it('Expired + GTD TIF → Submitted (transient between sessions)',
-    () => expect(mapLbOrderStatus(16, 3 /* GoodTilDate */)).toBe('Submitted'))
+  it('Expired + GTD TIF → Inactive (expires on its configured date; no evidence of transient GTD)',
+    () => expect(mapLbOrderStatus(16, 3 /* GoodTilDate */)).toBe('Inactive'))
 })
 
 // ==================== init() ====================

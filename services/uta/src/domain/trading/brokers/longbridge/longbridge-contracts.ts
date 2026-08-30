@@ -110,15 +110,18 @@ export function marketToSuffix(market: number): string {
  * Map Longbridge's `OrderStatus` enum (numeric) to IBKR-style status string.
  * IBKR statuses we emit: Submitted, Filled, Cancelled, Inactive.
  *
- * `timeInForce` disambiguates Expired(16): US equities outside trading hours
- * are briefly marked Expired by the broker for GTC/GTD orders — a transient
- * state that reverts to New once the market reopens. Treating it as terminal
- * ("Inactive") makes the UTA state machine declare the order rejected and stop
- * tracking it, while the order is still alive at the broker (observed against
- * longbridge-main live account: NVDA GTC limit filled later and NET GTC limit
- * remained open, both misreported as rejected). Only Day orders reach a true
- * terminal Expired (unfilled at close); GTC/GTD Expired stays a candidate for
- * re-observation until the next sync pass.
+ * `timeInForce` disambiguates Expired(16): Longbridge marks US-equity GTC
+ * orders as Expired between trading sessions — a transient venue state that
+ * reverts once the market reopens. Treating it as terminal ("Inactive") makes
+ * the UTA sync loop declare the order rejected and drop it from the pending
+ * queue, even though it is still alive at the broker (observed live against
+ * longbridge-main: an NVDA GTC limit filled later and a NET GTC limit stayed
+ * open, both misreported as rejected).
+ *
+ * Only the verified long-lived TIF value (GoodTilCanceled = 2) overrides
+ * Expired. Day(1) orders truly expire at close; GTD(3) eventually expires on
+ * its configured date, and Unknown(0)/missing TIF is left conservative, so we
+ * do not convert genuinely-dead orders into permanently-pending UTA orders.
  */
 export function mapLbOrderStatus(status: number, timeInForce?: number): string {
   switch (status) {
@@ -128,9 +131,9 @@ export function mapLbOrderStatus(status: number, timeInForce?: number): string {
       return 'Inactive'
     case 16:                        // Expired
       // Longbridge TimeInForceType: Unknown=0, Day=1, GoodTilCanceled=2, GoodTilDate=3.
-      // Day orders expire for real at close; GTC/GTD Expired between sessions is
-      // a transient broker-venue state, not a termination.
-      return timeInForce === 1 ? 'Inactive' : 'Submitted'
+      // Day orders expire for real at close; GTD expires on its configured date.
+      // Only GTC (2) Expired between sessions is a transient venue state.
+      return timeInForce === 2 ? 'Submitted' : 'Inactive'
     case 15:                        // Canceled
     case 17:                        // PartialWithdrawal
       return 'Cancelled'

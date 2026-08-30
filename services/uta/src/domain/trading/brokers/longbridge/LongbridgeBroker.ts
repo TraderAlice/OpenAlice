@@ -709,6 +709,12 @@ export class LongbridgeBroker implements IBroker {
       orderState: makeOrderState(o.status, o.msg, o.timeInForce),
     }
     if (o.executedPrice) ret.avgFillPrice = new Decimal(o.executedPrice.toString()).toString()
+    // Map executedQuantity → order.filledQuantity so a recovered fill carries
+    // its full cost basis (qty + price), not just the price. Longbridge returns
+    // executedQuantity on every non-zero fill; the previous mapping dropped it.
+    if (o.executedQuantity && o.executedQuantity.toString() !== '0') {
+      ret.order.filledQuantity = new Decimal(o.executedQuantity.toString())
+    }
     return ret
   }
 }
