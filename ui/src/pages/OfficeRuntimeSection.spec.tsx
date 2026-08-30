@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -381,11 +381,17 @@ describe('OfficeRuntimeSection', () => {
       screen.getByRole('button', { name: /Inbox received.*#0007/i }),
     )
 
-    await userEvent.click(screen.getByRole('button', { name: 'Back to records' }))
+    const backToRecords = screen.getByRole('button', { name: 'Back to records' })
+    Object.defineProperty(backToRecords, 'offsetParent', {
+      configurable: true,
+      value: journal,
+    })
+    await userEvent.click(backToRecords)
     expect(journal.getAttribute('data-mobile-view')).toBe('index')
 
     await userEvent.click(screen.getByRole('button', { name: /Inbox received.*#0007/i }))
     expect(journal.getAttribute('data-mobile-view')).toBe('detail')
+    await waitFor(() => expect(document.activeElement).toBe(backToRecords))
 
     await userEvent.click(screen.getByRole('button', { name: 'Open Inbox' }))
     expect(useInboxSelection.getState().selectedEntryId).toBe('inbox-7')

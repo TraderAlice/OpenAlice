@@ -254,6 +254,7 @@ export function OfficeRuntimeSection({
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const journalIndexRef = useRef<HTMLOListElement>(null)
+  const journalBackRef = useRef<HTMLButtonElement>(null)
   const journalInitialFocusPendingRef = useRef(true)
   const journalChannelFocusPendingRef = useRef(false)
   const appliedReplaySeqRef = useRef<number | null>(null)
@@ -369,13 +370,20 @@ export function OfficeRuntimeSection({
       const activeElement = document.activeElement
       const focusIsUnclaimed = activeElement === document.body
         || activeElement?.matches('.oa-office-window--log .oa-office-window__header button')
-      if (focusIsUnclaimed) selectedRow.focus({ preventScroll: true })
+      if (focusIsUnclaimed) {
+        const visibleBack = mobileView === 'detail'
+          && journalBackRef.current?.offsetParent != null
+          ? journalBackRef.current
+          : null
+        const initialTarget = visibleBack ?? selectedRow
+        initialTarget.focus({ preventScroll: true })
+      }
     }
     if (journalChannelFocusPendingRef.current && selectedRow) {
       journalChannelFocusPendingRef.current = false
       selectedRow.focus({ preventScroll: true })
     }
-  }, [channel, selectedSeq])
+  }, [channel, mobileView, selectedSeq])
 
   if (loading && entriesByChannel.overview.length === 0) {
     return <div className="oa-office-runtime__empty">{t('office.loading')}</div>
@@ -461,6 +469,10 @@ export function OfficeRuntimeSection({
   const selectJournalEvent = (seq: number) => {
     setSelectedSeq(seq)
     setMobileView('detail')
+    requestAnimationFrame(() => {
+      const backButton = journalBackRef.current
+      if (backButton?.offsetParent != null) backButton.focus({ preventScroll: true })
+    })
   }
   const returnToJournalIndex = () => {
     setMobileView('index')
@@ -603,6 +615,7 @@ export function OfficeRuntimeSection({
         <article className="oa-office-runtime__event" data-kind={selectedKind}>
           <button
             type="button"
+            ref={journalBackRef}
             className="oa-office-runtime__back"
             onClick={returnToJournalIndex}
           >

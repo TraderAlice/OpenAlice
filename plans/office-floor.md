@@ -3781,6 +3781,28 @@ Readable medium-report follow-up (2026-08-30):
   test files and 5,163 tests (one file and nine tests skipped), and the production UI build passed with only the
   existing jsdom canvas and large-chunk advisories.
 
+Narrow journal focus-handoff follow-up (2026-08-30):
+
+- Played the 844x390 pause menu and initially suspected its directional navigation because mouse-open followed by
+  ArrowDown left focus on the menu surface. Re-ran the intended pure-keyboard path—Escape returns to Menu, then
+  ArrowDown opens and focuses Activity log—and confirmed the Base UI menu contract and existing tests were correct.
+  No compensating menu change was made for a mixed pointer/keyboard sequence.
+- Continued into the record master/detail loop and found the real keyboard break: at narrow widths, selecting a record
+  changes `data-mobile-view` to detail and hides the focused index, but focus fell back to the document body. Compared
+  retaining the hidden row, focusing the first exit action, and focusing Back. Chose Back: it is the first visible
+  detail command, preserves content before external actions, and mirrors the existing return path that restores the
+  exact selected record.
+- The journal now owns a Back ref. Initial service-terminal detail and later record selection hand focus to it only
+  when CSS actually lays it out (`offsetParent` is present); desktop Back remains `display: none`, so the established
+  selected-row focus and left/right channel navigation are untouched. Returning still scrolls and focuses the source
+  record through the existing requestAnimationFrame path.
+- Real-browser acceptance at 390x844 focused the 310x38 Back command after opening the News terminal, then restored
+  Seq 4811 on return. At 844x390 the Back target measured 665x38 and showed the game-menu focus frame. At 1052x734
+  Back stayed hidden and Seq 4811 remained the active element in the simultaneous index/detail journal. Focused
+  runtime/style tests passed (2 files / 38 tests). Root and UI TypeScript passed, the full suite passed all 617 test
+  files and 5,163 tests (one file and nine tests skipped), and the production UI build passed with only the existing
+  jsdom canvas and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
