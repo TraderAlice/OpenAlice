@@ -5739,6 +5739,45 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
 }
 
 @container (max-width: 760px) and (max-height: 420px) {
+  .oa-office-inspect__profile {
+    grid-template-columns: 76px minmax(0, 1fr);
+    grid-auto-rows: max-content;
+    align-content: start;
+    align-items: start;
+  }
+
+  .oa-office-inspect__portrait {
+    align-self: center;
+  }
+
+  .oa-office-inspect__identity {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .oa-office-inspect__identity p {
+    min-width: 0;
+    overflow: hidden;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    -webkit-line-clamp: unset;
+  }
+
+  .oa-office-inspect__identity span:not(.oa-office-inspect__avatar) {
+    flex: none;
+    line-height: 1.2;
+  }
+
+  .oa-office-inspect__latest-result {
+    margin-top: 5px;
+  }
+
+  .oa-office-inspect__facts {
+    grid-column: 1 / -1;
+  }
+
   .oa-office-roster .oa-office-window__title-count,
   .oa-office-cabinet-window .oa-office-window__title-count {
     display: grid;

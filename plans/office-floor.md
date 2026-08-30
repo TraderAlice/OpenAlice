@@ -3868,6 +3868,26 @@ World-callout and camera-ownership follow-up (2026-08-30):
   nine tests skipped), and the production UI build passed with only the existing jsdom canvas and large-chunk
   advisories.
 
+Short-landscape Agent-story follow-up (2026-08-30):
+
+- Continued the real 844x390 floor from the Chat aisle through click-to-walk into Grok Engineer's Agent File. The
+  route correctly crossed Workspace rows, but the file's 718x216 profile viewport spent a 388px third column on
+  Status/Office/Surface. Its 232px story column grew to 275px, placing `Latest result` completely below the fixed
+  `Open session` command even before drawers were present.
+- Compared clamping Assignment to one line, hiding the diagnostic facts, and changing only short landscape to a
+  story-first two-column RPG profile. Chose the two-column profile: the 76px portrait stays beside a 557px narrative,
+  the identity/byline share one ellipsizing line, and the three facts remain available as a full-width row after the
+  result. Desktop keeps its simultaneous three-column dossier and portrait phone keeps its established vertical
+  character sheet.
+- Browser measurement at 844x390 changed the narrative from 275px to 212px. The complete two-line result paragraph
+  now ends at y310.8 immediately above the fixed command at y311; the facts follow in the profile scroll instead of
+  displacing the character's outcome. At 1052x734 the original 76/288/388 three-column grid remained intact with no
+  scroll, and at 390x844 the original 64/202 phone grid still showed assignment, dialogue, result, facts, and command.
+  Closing returned focus to `office-floor` and map-stage scrollTop stayed zero.
+- Focused Agent-file and responsive-style tests passed (2 files / 28 tests). Root and UI TypeScript passed, the full
+  suite passed all 617 test files and 5,166 tests (one file and nine tests skipped), and the production UI build passed
+  with only the existing ports fallback and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

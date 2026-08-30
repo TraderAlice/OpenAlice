@@ -147,6 +147,24 @@ describe('Office responsive style contract', () => {
     )
   })
 
+  it('keeps the Agent story ahead of diagnostic facts on short landscape screens', () => {
+    expect(css).toMatch(
+      /@container \(max-width: 760px\) and \(max-height: 420px\) \{[\s\S]*?\.oa-office-inspect__profile\s*\{[\s\S]*?grid-template-columns: 76px minmax\(0, 1fr\);[\s\S]*?grid-auto-rows: max-content;[\s\S]*?align-content: start;[\s\S]*?align-items: start;/,
+    )
+    expect(css).toMatch(
+      /@container \(max-width: 760px\) and \(max-height: 420px\) \{[\s\S]*?\.oa-office-inspect__facts\s*\{\s*grid-column: 1 \/ -1;/,
+    )
+    expect(css).toMatch(
+      /@container \(max-width: 760px\) and \(max-height: 420px\) \{[\s\S]*?\.oa-office-inspect__identity\s*\{[\s\S]*?display: flex;[\s\S]*?align-items: baseline;/,
+    )
+    expect(css).toMatch(
+      /@container \(max-width: 760px\) and \(max-height: 420px\) \{[\s\S]*?\.oa-office-inspect__identity p\s*\{[\s\S]*?text-overflow: ellipsis;[\s\S]*?white-space: nowrap;/,
+    )
+    expect(css).toMatch(
+      /@container \(max-width: 760px\) and \(max-height: 420px\) \{[\s\S]*?\.oa-office-inspect__latest-result\s*\{\s*margin-top: 5px;/,
+    )
+  })
+
   it('moves top notifications below the live Office HUD without affecting modal windows', () => {
     expect(css).toContain(
       'body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause-menu))',
