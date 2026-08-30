@@ -101,7 +101,7 @@ describe('OfficeRuntimeSection', () => {
           agent: 'pi',
           surface: 'webpi',
           taskId: 'run-1',
-          cause: { kind: 'ui' },
+          cause: { kind: 'issue', workspaceId: 'desk-a', issueId: 'office-playtest' },
         },
       }],
     })
@@ -118,7 +118,10 @@ describe('OfficeRuntimeSection', () => {
     expect((await screen.findAllByText('Market Scout')).length).toBeGreaterThan(0)
     expect(container.textContent).not.toContain('resume-alice')
     expect(screen.getAllByText('#0001').length).toBeGreaterThan(0)
-    expect(screen.getByText(/webpi/)).toBeTruthy()
+    expect(screen.getByText('Run mode')).toBeTruthy()
+    expect(screen.getByText('Workspace session')).toBeTruthy()
+    expect(screen.getByText('Started by')).toBeTruthy()
+    expect(screen.getByText('Issue · office-playtest')).toBeTruthy()
     expect(screen.getByText('Assignment')).toBeTruthy()
     expect(screen.getByText('Watch the semiconductor desk for a clean entry.')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Open Runs' })).toBeTruthy()
@@ -181,7 +184,8 @@ describe('OfficeRuntimeSection', () => {
     })
     const { container } = render(<OfficeRuntimeSection />)
     expect(await screen.findByText('Desk is clear.')).toBeTruthy()
-    expect(screen.getByText('Surface')).toBeTruthy()
+    expect(screen.getByText('Run mode')).toBeTruthy()
+    expect(screen.getByText('Background run')).toBeTruthy()
     expect(screen.getByText('Status')).toBeTruthy()
     expect(screen.getByText('Output')).toBeTruthy()
     expect(screen.getByText('1 text block · 1 tool call')).toBeTruthy()

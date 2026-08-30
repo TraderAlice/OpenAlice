@@ -99,6 +99,16 @@ function eventStatusLabel(status: AgentRuntimeEvent['payload']['status'], t: TFu
   return null
 }
 
+function eventRunModeLabel(
+  surface: AgentRuntimeEvent['payload']['surface'],
+  t: TFunction,
+): string | null {
+  if (surface === 'headless') return t('office.runModeBackground')
+  if (surface === 'terminal') return t('office.runModeTerminal')
+  if (surface === 'webpi') return t('office.runModeWorkspace')
+  return null
+}
+
 function officeRuntimeDialogue(value: string): string {
   return value
     .replace(/\r\n?/g, '\n')
@@ -220,20 +230,22 @@ function eventIdentity(
 function causeLabel(
   event: AgentRuntimeEvent,
   actors: ReadonlyMap<string, OfficeActivityActor>,
+  t: TFunction,
 ): string | null {
   const cause = event.payload.cause
   if (!cause) return null
-  if (cause.kind === 'issue') return `issue ${cause.issueId}`
+  if (cause.kind === 'issue') return t('office.eventTriggerIssue', { id: cause.issueId })
   if (cause.kind === 'conversation') {
     const from = cause.from?.kind === 'session'
       ? actors.get(cause.from.resumeId ?? '')?.label
         ?? officeActivityFallbackLabel(cause.from.resumeId, cause.from.agent)
       : cause.from?.kind === 'workspace'
-        ? cause.from.workspaceId
+        ? cause.from.workspaceId ?? 'workspace'
         : cause.from?.kind ?? 'human'
-    return `ask ${from}`
+    return t('office.eventTriggerConversation', { from })
   }
-  return cause.kind
+  if (cause.kind === 'ui') return t('office.eventTriggerManual')
+  return t('office.eventTriggerExternal')
 }
 
 function mergeOfficeLogFamilies(
@@ -498,8 +510,8 @@ export function OfficeRuntimeSection({
   const addMeta = (label: string, value: string | null | undefined) => {
     if (value) selectedMeta.push({ label, value })
   }
-  addMeta(t('office.surface'), selectedPayload.surface)
-  addMeta(t('office.eventCause'), causeLabel(selectedEvent, actors))
+  addMeta(t('office.eventRunMode'), eventRunModeLabel(selectedPayload.surface, t))
+  addMeta(t('office.eventTrigger'), causeLabel(selectedEvent, actors, t))
   addMeta(t('office.status'), eventStatusLabel(selectedPayload.status, t))
   if (selectedPayload.metrics) {
     const metrics: string[] = [

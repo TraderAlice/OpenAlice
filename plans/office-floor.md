@@ -4811,6 +4811,22 @@ Tool-action player language follow-up (2026-08-31):
   passed all 18 tests. Root and UI TypeScript passed; the full suite passed all 618 test files and 5,187 tests (one file
   and nine tests skipped); the production UI build passed with only the existing ports fallback and large-chunk advisory.
 
+Run-provenance player language follow-up (2026-08-31):
+
+- Continued from the real Operations board into #5084. Its useful provenance was still rendered as runtime internals:
+  `Surface · headless` and `Cause · issue office-live-state-qa-20260831`. The same journal contained terminal/UI and
+  headless/HTTP starts, so this was not decorative metadata: it was the player's only explanation of how work began.
+- Compared hiding the fields, preserving diagnostic tokens, and expressing the same facts as a game-journal run mode
+  plus trigger. Chose the semantic translation. `Run mode` now reads Background run, Terminal session, or Workspace
+  session; `Started by` reads Issue, Manual start, External request, or Request from the initiating actor.
+- Added localized Office vocabulary for all four shipped UI languages and removed the now-unused generic Cause label.
+  The runtime event schema and non-Office logs remain unchanged; this is a product-language boundary owned by the Office
+  journal rather than a compatibility parser.
+- Real-browser acceptance verified #5084 as `Background run / Issue · office-live-state-qa-20260831`, #5035 as
+  `Terminal session / Manual start`, and #4988 as `Background run / External request`. The focused Runtime suite passed
+  all 18 tests. Root and UI TypeScript passed; the full suite passed all 618 test files and 5,187 tests (one file and nine
+  tests skipped); the production UI build passed with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
