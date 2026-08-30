@@ -352,6 +352,10 @@ The surfaces deliberately have different jobs:
   and the Settings navigator already establish that state. The section keeps a
   short platform checklist and official console links beside the fields; those
   links open without dismissing the configuration dialog or losing its drafts.
+  Connector-owned fields, secret reveal controls, setup links, and explicit
+  credential, recovery, and test actions keep a 40 px interaction minimum in
+  both the dialog and full Settings document; larger disclosures and Chat
+  actions retain their 44–48 px targets.
   Every later lifecycle stage retains its panel for runtime, linking, test, or
   recovery actions. The shared dialog sizes to short content on desktop and
   bounds long forms with internal scrolling; narrow viewports keep a near-full-

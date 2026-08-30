@@ -1035,7 +1035,7 @@ function ConnectorCredentialsEditor({
                       <input
                         id={inputId}
                         aria-label={`${definition.label} ${fieldLabel}`}
-                        className={`${inputClass} pr-10`}
+                        className={`${inputClass} min-h-10 pr-10`}
                         type={secretMasked ? 'password' : 'text'}
                         value={secretDraft}
                         placeholder={configured
@@ -1049,7 +1049,7 @@ function ConnectorCredentialsEditor({
                       />
                       <button
                         type="button"
-                        className="oa-pressable absolute inset-y-0 right-0 flex items-center px-2.5 text-muted-foreground hover:text-foreground"
+                        className="oa-pressable absolute inset-y-0 right-0 flex min-w-10 items-center justify-center px-2.5 text-muted-foreground hover:text-foreground"
                         aria-label={secretMasked
                           ? t('connectorSettings.showDraft')
                           : t('connectorSettings.hideDraft')}
@@ -1068,7 +1068,7 @@ function ConnectorCredentialsEditor({
                       <>
                         <button
                           type="button"
-                          className="shrink-0 rounded-lg border border-border px-3 py-2 text-[12px] text-foreground hover:border-primary/50 disabled:opacity-50"
+                          className="oa-pressable inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg border border-border px-3 py-2 text-[12px] text-foreground hover:border-primary/50 disabled:opacity-50"
                           disabled={!secretDraft || savingSecret !== null}
                           onClick={() => onReplaceSecret(field.key, fieldLabel)}
                         >
@@ -1076,7 +1076,7 @@ function ConnectorCredentialsEditor({
                         </button>
                         <button
                           type="button"
-                          className="shrink-0 rounded-lg border border-border px-3 py-2 text-[12px] text-muted-foreground hover:text-destructive"
+                          className="oa-pressable inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg border border-border px-3 py-2 text-[12px] text-muted-foreground hover:text-destructive"
                           disabled={savingSecret !== null}
                           onClick={() => onRemoveSecret(field.key, fieldLabel)}
                         >
@@ -1095,7 +1095,7 @@ function ConnectorCredentialsEditor({
                 <input
                   id={inputId}
                   aria-label={`${definition.label} ${fieldLabel}`}
-                  className={inputClass}
+                  className={`${inputClass} min-h-10`}
                   type={field.kind}
                   value={String(value ?? '')}
                   placeholder={t(`connectorSettings.placeholders.${field.key}`, { defaultValue: field.placeholder ?? '' })}
@@ -1117,7 +1117,7 @@ function ConnectorCredentialsEditor({
               </p>
               <button
                 type="button"
-                className="oa-pressable w-full shrink-0 rounded-lg bg-primary px-4 py-2 text-[12px] font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                className="oa-pressable inline-flex min-h-10 w-full shrink-0 items-center justify-center rounded-lg bg-primary px-4 py-2 text-[12px] font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                 disabled={!requiredConnectionComplete || enteredMissingSecretKeys.length === 0 || savingSecret !== null}
                 onClick={() => onSaveConnection(enteredMissingSecretKeys)}
               >
@@ -1146,7 +1146,7 @@ function ConnectorCredentialsEditor({
               </div>
               <button
                 type="button"
-                className="oa-pressable w-full shrink-0 rounded-lg border border-border px-3 py-2 text-[12px] text-muted-foreground hover:border-destructive/40 hover:text-destructive disabled:opacity-50 sm:w-auto"
+                className="oa-pressable inline-flex min-h-10 w-full shrink-0 items-center justify-center rounded-lg border border-border px-3 py-2 text-[12px] text-muted-foreground hover:border-destructive/40 hover:text-destructive disabled:opacity-50 sm:w-auto"
                 disabled={savingSecret !== null}
                 onClick={onUnlink}
               >
@@ -1207,7 +1207,7 @@ function ConnectorSetupGuide({ definition, t }: { definition: ConnectorDefinitio
                 target="_blank"
                 rel="noreferrer"
                 aria-label={t('connectorSettings.setupGuide.openSetupAria', { label })}
-                className="oa-pressable inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-background/65 px-2.5 py-1.5 text-[11px] font-medium text-primary hover:border-primary/40 hover:bg-primary/5"
+                className="oa-pressable inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-primary/20 bg-background/65 px-2.5 py-1.5 text-[11px] font-medium text-primary hover:border-primary/40 hover:bg-primary/5"
               >
                 {label}
                 <ExternalLink size={12} aria-hidden />
@@ -1292,7 +1292,7 @@ function SetupStatePanel({
             {setup.stage === 'error' && (
               <button
                 type="button"
-                className="oa-pressable inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-[12px] text-foreground hover:border-primary/50 disabled:opacity-50"
+                className="oa-pressable inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 py-2 text-[12px] text-foreground hover:border-primary/50 disabled:opacity-50"
                 disabled={reconnecting === definition.id || saving}
                 onClick={onReconnect}
               >
@@ -1305,7 +1305,7 @@ function SetupStatePanel({
             {setup.stage === 'linked' && runtime?.status === 'healthy' && (
             <button
               type="button"
-              className="oa-pressable inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-[12px] text-foreground hover:border-primary/50 disabled:opacity-50"
+              className="oa-pressable inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 py-2 text-[12px] text-foreground hover:border-primary/50 disabled:opacity-50"
               disabled={testing !== null}
               onClick={onTest}
             >

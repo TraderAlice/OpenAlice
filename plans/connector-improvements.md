@@ -457,6 +457,17 @@ external adapters remain optional projections rather than sources of truth.
     cards may wrap their Reconnect and Review actions without reordering them.
     Every footer action is at least 40 px high, and progress or failure feedback
     remains below the complete rail in the owning card.
+39. **Connector configuration owns a scoped 40 px interaction floor.** The
+    narrow real Settings route still measures connection inputs and draft
+    reveals at 38 px, Reconnect and Send test at 36 px, and Save connection at
+    34 px, beside existing 40–48 px controls. Raising the shared Settings input
+    primitive would alter unrelated categories; fixing only the visible test
+    button would preserve inconsistency inside the same credential flow. The
+    chosen contract applies locally to Connector fields, draft reveals,
+    credential save/replace/remove/unlink actions, setup links, reconnect, and
+    test delivery. Existing 44/48 px disclosures and Chat actions stay intact.
+    Desktop uses the same minimum so configuration dialogs and the full Settings
+    document cannot diverge again.
 
 ## Ordered Work
 
@@ -539,6 +550,8 @@ external adapters remain optional projections rather than sources of truth.
         reducing touch targets.
   - [x] Consolidate owned-channel runtime and management controls into one
         responsive action rail with 40 px targets.
+  - [x] Give every Connector configuration field and explicit action a scoped
+        40 px interaction target.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -922,6 +935,21 @@ action rails while Telegram's Reconnect and Review actions occupied a second
 row. Every measured switch and button was 40 px high, and document width exactly
 matched both viewports. No Connector control or external action was invoked;
 the temporary audit tab was closed and the viewport was reset.
+
+The Connector interaction-floor increment passed all 28 demo-route tests, UI
+and root typechecking, the production build, and all 5,125 repository tests.
+The contract covers Connector text and secret fields, draft reveals, setup
+links, Save/Replace/Remove/Unlink, Reconnect, and Send test without altering the
+shared Settings input primitive. In the real full Settings route at 390 x 844,
+Slack token fields, Save connection, Telegram Reconnect, and Feishu Send test
+all measured 40 px; a complete visible-control audit found no Connector-content
+button, link, field, or switch below 40 px and document width remained exactly
+390 px. The same scoped audit at 1,052 x 734 found no undersized Connector
+content control. The global Settings chrome retains its separately owned compact
+desktop buttons. The 390 px Feishu configuration dialog likewise had no visible
+control below 40 px and no horizontal overflow. No field, switch, send,
+reconnect, or external action was invoked; the temporary audit tab was closed
+and the viewport was reset.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.

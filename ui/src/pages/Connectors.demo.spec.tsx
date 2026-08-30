@@ -138,7 +138,9 @@ describe('Connector demo routes', () => {
     mocks.load.mockResolvedValue(snapshot)
 
     render(<ConnectorsPage />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Reconnect' }))
+    const reconnect = await screen.findByRole('button', { name: 'Reconnect' })
+    expect(reconnect.className).toContain('min-h-10')
+    fireEvent.click(reconnect)
 
     await waitFor(() => expect(mocks.reconnect).toHaveBeenCalledWith('telegram'))
   })
@@ -350,7 +352,14 @@ describe('Connector demo routes', () => {
     const saveConnection = await within(dialog).findByRole('button', { name: 'Save connection' }) as HTMLButtonElement
     const botToken = within(dialog).getByLabelText('Slack Bot token') as HTMLInputElement
     const appToken = within(dialog).getByLabelText('Slack App-level token') as HTMLInputElement
+    const draftToggles = within(dialog).getAllByRole('button', { name: 'Show draft' })
+    const setupLinks = within(dialog).getAllByRole('link')
 
+    expect(botToken.className).toContain('min-h-10')
+    expect(appToken.className).toContain('min-h-10')
+    draftToggles.forEach((button) => expect(button.className).toContain('min-w-10'))
+    setupLinks.forEach((link) => expect(link.className).toContain('min-h-10'))
+    expect(saveConnection.className).toContain('min-h-10')
     expect(saveConnection.disabled).toBe(true)
     expect(within(dialog).queryByRole('button', { name: 'Save token' })).toBeNull()
     fireEvent.change(botToken, { target: { value: 'xoxb-plausible-slack-bot-token' } })
@@ -607,6 +616,7 @@ describe('Connector demo routes', () => {
     const lifecycle = sendTest.closest('section') as HTMLElement
     const runtimeToggle = within(lifecycle).getByRole('switch', { name: 'Turn Discord on or off' })
     expect(sendTest).toBeTruthy()
+    expect(sendTest.className).toContain('min-h-10')
     expect(runtimeToggle.parentElement?.className).not.toContain('border')
     expect(runtimeToggle.parentElement?.className).not.toContain('rounded')
     expect(screen.queryByText('owner-1')).toBeNull()
@@ -707,7 +717,9 @@ describe('Connector demo routes', () => {
     render(<ConnectorsPage />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Manage Discord connection details' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Unlink' }))
+    const unlink = await screen.findByRole('button', { name: 'Unlink' })
+    expect(unlink.className).toContain('min-h-10')
+    fireEvent.click(unlink)
     expect(screen.getByRole('heading', { name: 'Unlink Discord?' })).toBeTruthy()
     await new Promise((resolve) => window.setTimeout(resolve, 800))
     expect(mocks.save).not.toHaveBeenCalled()
@@ -811,7 +823,11 @@ describe('Connector demo routes', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Manage Discord connection details' }))
     const input = screen.getByLabelText('Discord Bot token') as HTMLInputElement
     fireEvent.change(input, { target: { value: '123456789:AAHreplacement-bot-token' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Replace token' }))
+    const replace = screen.getByRole('button', { name: 'Replace token' })
+    const remove = screen.getByRole('button', { name: 'Remove token' })
+    expect(replace.className).toContain('min-h-10')
+    expect(remove.className).toContain('min-h-10')
+    fireEvent.click(replace)
     expect(screen.getByRole('heading', { name: 'Replace Discord token?' })).toBeTruthy()
     expect(mocks.save).not.toHaveBeenCalled()
 
