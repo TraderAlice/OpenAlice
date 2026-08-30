@@ -371,6 +371,14 @@ the channel and tag:
 version that disagrees with either the root or `packages/cli` package. It binds
 the accepted candidates and eventual tag to the dispatch commit SHA.
 
+Beta and stable are serial public checkpoints, not paired outputs from one
+release run. After a beta, fixes may continue on `dev`, pass the ordinary
+promotion gate, and then ship either as another optional numbered beta or
+directly as stable. Only when the beta source needs no change may a later stable
+intent use that exact source. Even then, stable remains a separate human version
+decision and workflow dispatch; never create beta and stable together merely
+because one candidate build passed.
+
 The release workflow repeats the deterministic installer and managed-remote
 acceptance against that exact master candidate before it can create the tag and
 GitHub Release. The previous release and notes baseline come from the same

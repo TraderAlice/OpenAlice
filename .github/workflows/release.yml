@@ -957,6 +957,13 @@ jobs:
           name: cli-package-channels
           path: dist/release-cli-packages
 
+      - name: Stage GitHub-safe AUR metadata asset
+        if: needs.release.outputs.channel == 'stable'
+        run: >-
+          cp
+          dist/release-cli-packages/cli-package-channels/aur/.SRCINFO
+          dist/release-cli-packages/cli-package-channels/aur/openalice-bin.SRCINFO
+
       - name: Create beta tag and GitHub prerelease from accepted candidates
         if: needs.release.outputs.channel == 'beta'
         uses: softprops/action-gh-release@v2
@@ -1007,7 +1014,7 @@ jobs:
             dist/release-cli-packages/cli-package-channels/cli-package-channels.json
             dist/release-cli-packages/cli-package-channels/homebrew/openalice.rb
             dist/release-cli-packages/cli-package-channels/aur/PKGBUILD
-            dist/release-cli-packages/cli-package-channels/aur/.SRCINFO
+            dist/release-cli-packages/cli-package-channels/aur/openalice-bin.SRCINFO
             dist/release-cli-packages/cli-npm-tarballs/*.tgz
             dist/release-cli-packages/cli-npm-tarballs/npm-publish-order.json
 
@@ -1082,12 +1089,12 @@ jobs:
             --pattern cli-package-channels.json \
             --pattern openalice.rb \
             --pattern PKGBUILD \
-            --pattern .SRCINFO \
+            --pattern openalice-bin.SRCINFO \
             --pattern npm-publish-order.json
           cmp dist/cli-package-channels/cli-package-channels/cli-package-channels.json dist/public-cli-channels/cli-package-channels.json
           cmp dist/cli-package-channels/cli-package-channels/homebrew/openalice.rb dist/public-cli-channels/openalice.rb
           cmp dist/cli-package-channels/cli-package-channels/aur/PKGBUILD dist/public-cli-channels/PKGBUILD
-          cmp dist/cli-package-channels/cli-package-channels/aur/.SRCINFO dist/public-cli-channels/.SRCINFO
+          cmp dist/cli-package-channels/cli-package-channels/aur/.SRCINFO dist/public-cli-channels/openalice-bin.SRCINFO
           cmp dist/cli-package-channels/cli-npm-tarballs/npm-publish-order.json dist/public-cli-channels/npm-publish-order.json
 
       - name: Preserve public channel verification receipt
