@@ -4546,6 +4546,25 @@ Agent-drawer title legibility follow-up (2026-08-31):
   passed all 618 test files and 5,178 tests (one file and nine tests skipped); the production UI build passed with only
   the existing ports fallback and large-chunk advisory.
 
+Composite-map focus follow-up (2026-08-31):
+
+- Rechecked the complete Day and Night floor after the live-state increment; authored windows, ambient floor, machine
+  glow, and game-window palette remained coherent, so no speculative lighting patch was applied. The DOM audit instead
+  exposed a contract violation: the composite `office-floor` was a Tab stop, but all signs, desks, cabinets, rosters,
+  service terminals, Operations, recenter, D-pad, and touch A were also default Tab stops. A real keyboard could therefore
+  traverse dozens of world objects even though Office teaches movement plus local Enter/Space interaction.
+- Compared retaining native document-order traversal, adding a second geometry-aware focus cursor, and making the whole
+  map the single sequential focus target. Chose the composite-map model: world objects remain pointer controls and
+  programmatically focusable return origins, while direction keys, click-to-walk, Enter/Space, and touch retain ownership
+  of spatial play. The Menu trigger stays in the normal application Tab sequence.
+- Every physical world object and pointer-only map control now declares `tabIndex=-1`; the map remains `tabIndex=0`.
+  Real-browser acceptance found 29 floor buttons and zero sequential-focus leaks. Opening the physical Chat cabinet,
+  selecting its newest Issue record, and pressing Escape still restored focus to that exact cabinet with `tabIndex=-1`,
+  proving that modal provenance was preserved rather than traded away.
+- Focused Building and Desk suites passed 33 tests. Root and UI TypeScript passed; the full suite passed all 618 test
+  files and 5,178 tests (one file and nine tests skipped); the production UI build passed with only the existing ports
+  fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

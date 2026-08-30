@@ -98,6 +98,27 @@ describe('OfficeBuilding', () => {
     }) as HTMLButtonElement
     const terminal = screen.getByRole('button', { name: 'Floor terminal' }) as HTMLButtonElement
     const operations = screen.getByRole('button', { name: 'Operations board' }) as HTMLButtonElement
+    const map = screen.getByTestId('office-floor')
+
+    expect(map.tabIndex).toBe(0)
+    expect([
+      workspaceSign,
+      ...occupiedDesks,
+      cabinet,
+      roster,
+      terminal,
+      operations,
+      screen.getByRole('button', { name: 'Inbox station' }),
+      screen.getByRole('button', { name: 'News terminal' }),
+      screen.getByRole('button', { name: 'Move Alice up' }),
+      screen.getByRole('button', { name: 'Move Alice left' }),
+      screen.getByRole('button', { name: 'Move Alice right' }),
+      screen.getByRole('button', { name: 'Move Alice down' }),
+      container.querySelector<HTMLButtonElement>('.oa-office-touch-action'),
+    ].every((control) => control?.tabIndex === -1)).toBe(true)
+    operations.focus()
+    expect(document.activeElement).toBe(operations)
+    map.focus()
 
     expect(workspaceSign.disabled).toBe(true)
     expect(workspaceSign.textContent).toContain('2/6 active')
@@ -133,6 +154,7 @@ describe('OfficeBuilding', () => {
     expect(onOpenRoster).not.toHaveBeenCalled()
 
     const menuTrigger = screen.getByRole('button', { name: 'Menu' })
+    expect(menuTrigger.tabIndex).toBe(0)
     menuTrigger.focus()
     await userEvent.keyboard('{ArrowDown}')
     expect(screen.getByLabelText('Current floor view: Replay · Seq 2').textContent)
@@ -140,7 +162,6 @@ describe('OfficeBuilding', () => {
     expect(screen.queryByLabelText('Current floor view: Live map')).toBeNull()
     await userEvent.click(screen.getByRole('menuitem', { name: 'Live map' }))
     expect(onReturnLive).toHaveBeenCalledTimes(1)
-    const map = screen.getByTestId('office-floor')
     await waitFor(() => expect(document.activeElement).toBe(map))
 
     const returnLive = screen.getByRole('button', { name: 'Return live' })

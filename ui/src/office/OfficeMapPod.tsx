@@ -82,6 +82,7 @@ export function OfficeMapPod({
       <button
         id={`office-sign-${group.workspace.id}`}
         type="button"
+        tabIndex={-1}
         className="oa-office-pod__sign"
         style={{ zIndex: officeDepthAt(layout.y + 62) }}
         data-route={routeTargetId === `sign:${group.workspace.id}`}
@@ -162,6 +163,7 @@ export function OfficeMapPod({
         <button
           id={`office-cabinet-${group.workspace.id}`}
           type="button"
+          tabIndex={-1}
           className="oa-office-pod__cabinet"
           style={{ zIndex: officeDepthAt(layout.y + OFFICE_CABINET_CENTER.y + 24) }}
           data-nearby={nearbyTargetId === `cabinet:${group.workspace.id}`}
@@ -177,6 +179,7 @@ export function OfficeMapPod({
           <button
             id={`office-roster-${group.workspace.id}`}
             type="button"
+            tabIndex={-1}
             className="oa-office-pod__roster"
             style={{
               left: rosterCenter.x - 21,

@@ -73,6 +73,7 @@ export function OfficeDesk({
     <li>
       <button
         type="button"
+        tabIndex={-1}
         data-testid={employee ? `office-desk-${employee.resumeId}` : 'office-desk-empty'}
         aria-label={label}
         aria-pressed={employee ? selected : undefined}

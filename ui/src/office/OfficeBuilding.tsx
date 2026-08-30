@@ -1464,6 +1464,7 @@ export function OfficeBuilding({
             <button
               id="office-floor-terminal"
               type="button"
+              tabIndex={-1}
               className="oa-office-map-landmark oa-office-map-landmark--terminal"
               aria-label={t('office.floorTerminal')}
               title={replaySeq == null ? t('office.floorTerminalHint') : t('office.replayLockedHint')}
@@ -1517,6 +1518,7 @@ export function OfficeBuilding({
                 key={landmark.id}
                 id={`office-${landmark.id}`}
                 type="button"
+                tabIndex={-1}
                 className="oa-office-map-service"
                 data-kind={landmark.kind}
                 data-fresh={fresh || undefined}
@@ -1560,6 +1562,7 @@ export function OfficeBuilding({
             <button
               id="office-operations-board"
               type="button"
+              tabIndex={-1}
               className="oa-office-operations-board"
               data-live={(replaySeq == null ? stats.working : stats.active) > 0}
               data-has-activity={Boolean(productActivity.agent) || undefined}
@@ -1829,7 +1832,12 @@ export function OfficeBuilding({
             <span>{t('office.mapHint')}</span>
           </span>
           {cameraRecenterAvailable && (
-            <button type="button" onClick={centerCameraOnAlice} aria-label={t('office.centerMapOnAlice')}>
+            <button
+              type="button"
+              tabIndex={-1}
+              onClick={centerCameraOnAlice}
+              aria-label={t('office.centerMapOnAlice')}
+            >
               <img
                 src={OFFICE_HUD_ASSETS.resetCompass}
                 alt=""
@@ -1856,6 +1864,7 @@ export function OfficeBuilding({
             <button
               key={direction}
               type="button"
+              tabIndex={-1}
               data-direction={direction}
               aria-label={label}
               disabled={floorInteractionSuspended || Boolean(departingWorkspace)}
@@ -1876,6 +1885,7 @@ export function OfficeBuilding({
         </div>
         <button
           type="button"
+          tabIndex={-1}
           className="oa-office-touch-action"
           aria-hidden={controlsSuspended || undefined}
           data-ready={Boolean(nearbyTarget) && !selected && !departingWorkspace && !floorInteractionSuspended}
