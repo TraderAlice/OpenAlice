@@ -173,7 +173,7 @@ describe('OfficeRuntimeSection', () => {
             surface: 'headless',
             taskId: 'run-1',
             toolId: 't1',
-            toolName: 'workspace_list',
+            toolName: 'get_command_or_subagent_output',
             toolStatus: 'completed',
           },
         },
@@ -196,7 +196,8 @@ describe('OfficeRuntimeSection', () => {
     ])
 
     await userEvent.click(screen.getByRole('button', { name: /Tool action.*#0001/i }))
-    expect(screen.getByText('workspace_list · completed')).toBeTruthy()
+    expect(screen.getByText('Read command result · Complete')).toBeTruthy()
+    expect(container.textContent).not.toContain('get_command_or_subagent_output')
     expect(screen.queryByText('Desk is clear.')).toBeNull()
     expect(screen.getByRole('button', { name: /Tool action.*#0001/i }).getAttribute('aria-pressed'))
       .toBe('true')

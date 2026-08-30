@@ -118,8 +118,29 @@ function officeRuntimeDialogue(value: string): string {
     .trim()
 }
 
+function officeToolActionName(value: string, t: TFunction): string {
+  if (value === 'run_terminal_command') return t('office.toolActionRunCommand')
+  if (value === 'get_command_or_subagent_output') return t('office.toolActionReadResult')
+  const words = value
+    .replace(/([a-z\d])([A-Z])/g, '$1 $2')
+    .replace(/[_./-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return words ? `${words.charAt(0).toUpperCase()}${words.slice(1)}` : value
+}
+
+function officeToolStatusLabel(
+  status: AgentRuntimeEvent['payload']['toolStatus'],
+  t: TFunction,
+): string | null {
+  if (status === 'running') return t('office.logToolStatusRunning')
+  if (status === 'completed') return t('office.logStatusDone')
+  if (status === 'failed') return t('office.logStatusFailed')
+  return null
+}
+
 function officeReplaySummary(event: AgentRuntimeEvent, t: TFunction): string {
-  const value = eventDetail(event) ?? eventLabel(event, t)
+  const value = eventDetail(event, t) ?? eventLabel(event, t)
   const normalized = value.replace(/\s+/g, ' ').trim()
   return normalized.length > 180 ? `${normalized.slice(0, 179)}…` : normalized
 }
@@ -131,13 +152,16 @@ function eventIndexTitle(event: AgentRuntimeEvent, t: TFunction): string {
   return eventLabel(event, t)
 }
 
-function eventDetail(event: AgentRuntimeEvent): string | null {
+function eventDetail(event: AgentRuntimeEvent, t: TFunction): string | null {
   const payload = event.payload
   if (event.type === 'runtime.turn.text') {
     return payload.text ? officeRuntimeDialogue(payload.text) : null
   }
   if (event.type === 'runtime.turn.tool') {
-    return [payload.toolName, payload.toolStatus].filter(Boolean).join(' · ') || null
+    return [
+      payload.toolName ? officeToolActionName(payload.toolName, t) : null,
+      officeToolStatusLabel(payload.toolStatus, t),
+    ].filter(Boolean).join(' · ') || null
   }
   if (event.type === 'runtime.turn.error') return payload.message ?? payload.error ?? null
   if (event.type === 'dev.sonner_test') return payload.message ?? null
@@ -465,7 +489,7 @@ export function OfficeRuntimeSection({
   const selectedEvent = selectedBeat.event
   const selectedBeatEvents = [...selectedBeat.events].reverse()
   const selectedPayload = selectedEvent.payload
-  const selectedDetail = eventDetail(selectedEvent)
+  const selectedDetail = eventDetail(selectedEvent, t)
   const selectedDetailId = `office-runtime-detail-${selectedEvent.seq}`
   const detailCanExpand = selectedDetail != null
     && (selectedDetail.length > 320 || selectedDetail.split('\n').length > 8)
@@ -658,7 +682,7 @@ export function OfficeRuntimeSection({
             const indexTitle = eventIndexTitle(event, t)
             const hasContentTitle = indexTitle !== typeLabel
             const indexFullTitle = hasContentTitle
-              ? eventDetail(event)?.replace(/\s+/g, ' ').trim()
+              ? eventDetail(event, t)?.replace(/\s+/g, ' ').trim()
               : null
             return (
               <li key={event.seq}>

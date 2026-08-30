@@ -4793,6 +4793,24 @@ Historical Agent assignment provenance follow-up (2026-08-31):
   all 618 test files and 5,187 tests (one file and nine tests skipped); the production UI build passed with only the
   existing ports fallback and large-chunk advisory.
 
+Tool-action player language follow-up (2026-08-31):
+
+- Played the real failed-agent loop through Grok Analyst's Agent file, `Review activity`, the #4980–#4983 grouped Tool
+  action, and its expanded updates. The journal still exposed raw runtime tokens such as
+  `get_command_or_subagent_output · completed` and `run_terminal_command · running`, which made the game-styled window
+  read like a developer trace at the exact point where a player was trying to understand what the coworker did.
+- Compared retaining raw identifiers, collapsing every tool into the generic `Tool action`, and translating identifiers
+  into short action phrases while preserving status and sequence. Chose the readable action layer: it retains useful
+  operational detail without requiring players to parse snake case, and unknown future tools still receive a safe
+  word-splitting fallback.
+- Office now gives its two real high-frequency tools localized action names (`Run terminal command` and
+  `Read command result`) and renders tool states through the existing localized Complete/Failed vocabulary plus a new
+  Running label. The product journal payload and non-Office developer logs remain unchanged.
+- Real-browser acceptance expanded the same four historical records and confirmed all four now read as short action
+  sentences with no raw identifier, and every 284–298px text row measured without overflow. The focused Runtime suite
+  passed all 18 tests. Root and UI TypeScript passed; the full suite passed all 618 test files and 5,187 tests (one file
+  and nine tests skipped); the production UI build passed with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
