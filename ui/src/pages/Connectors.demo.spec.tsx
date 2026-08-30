@@ -15,6 +15,12 @@ const mocks = vi.hoisted(() => ({
   reconnect: vi.fn(),
   deskLoad: vi.fn(),
   openOrFocus: vi.fn(),
+  liveRuntime: {
+    current: { health: null, error: null } as {
+      health: ReturnType<typeof createDemoConnectorSnapshot>['health'] | null
+      error: string | null
+    },
+  },
 }))
 
 vi.mock('../api', async (importOriginal) => {
@@ -50,6 +56,14 @@ vi.mock('../contexts/workspaces-context', () => ({
   }),
 }))
 
+vi.mock('../live/connector-health', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../live/connector-health')>()
+  return {
+    ...actual,
+    useConnectorRuntimeHealthState: () => mocks.liveRuntime.current,
+  }
+})
+
 beforeEach(async () => {
   vi.clearAllMocks()
   await i18n.changeLanguage('en')
@@ -58,6 +72,7 @@ beforeEach(async () => {
   mocks.test.mockResolvedValue({ ok: true, probeId: 'connector-probe-demo' })
   mocks.reconnect.mockResolvedValue({ ok: true, scope: 'adapter', adapterId: 'telegram' })
   mocks.deskLoad.mockResolvedValue({ desk: null })
+  mocks.liveRuntime.current = { health: null, error: null }
 })
 
 afterEach(() => cleanup())
@@ -488,6 +503,50 @@ describe('Connector demo routes', () => {
 
     expect(await screen.findByText('Allow external delivery')).toBeTruthy()
     expect(mocks.load).toHaveBeenCalledTimes(2)
+  })
+
+  it('accepts shared live health without replacing a credential draft', async () => {
+    const snapshot = createDemoConnectorSnapshot()
+    snapshot.config.serviceEnabled = true
+    snapshot.health = {
+      enabled: true,
+      status: 'degraded',
+    }
+    mocks.load.mockResolvedValue(snapshot)
+
+    const { rerender } = render(<ConnectorsPage />)
+    await screen.findByRole('heading', { name: 'Delivery service' })
+    expect(screen.getByText('Unavailable')).toBeTruthy()
+
+    const draft = screen.getByLabelText('Slack Bot token') as HTMLInputElement
+    fireEvent.change(draft, { target: { value: 'xoxb-unsaved-local-draft' } })
+
+    mocks.liveRuntime.current = {
+      health: {
+        enabled: true,
+        status: 'degraded',
+        service: {
+          status: 'degraded',
+          startedAt: '2026-08-30T00:00:00.000Z',
+          adapters: [],
+        },
+      },
+      error: null,
+    }
+    rerender(<ConnectorsPage />)
+
+    await waitFor(() => expect(screen.getByText('Running')).toBeTruthy())
+    expect(draft.value).toBe('xoxb-unsaved-local-draft')
+
+    mocks.liveRuntime.current = {
+      ...mocks.liveRuntime.current,
+      error: 'socket closed',
+    }
+    rerender(<ConnectorsPage />)
+
+    expect(await screen.findByText('Couldn’t refresh live connection status. Your current settings are still shown.')).toBeTruthy()
+    expect(screen.getByText('Running')).toBeTruthy()
+    expect(draft.value).toBe('xoxb-unsaved-local-draft')
   })
 
   it('localizes Connector setup state and credential controls', async () => {

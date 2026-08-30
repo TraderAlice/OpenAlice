@@ -419,6 +419,20 @@ external adapters remain optional projections rather than sources of truth.
     leaves the viewport at the start of the document without adding a tab stop.
     Normal Tab navigation stays trapped inside the modal, and close/Escape still
     restores the exact overview trigger.
+36. **Overview and Settings share one live health authority without sharing
+    mutable form state.** A fresh current-build audit showed Overview reporting
+    Healthy/Starting while the full Settings document remained on an earlier
+    Unavailable/error snapshot. Extending Settings' conditional link poll into a
+    second permanent timer would still duplicate transport ownership; replacing
+    its complete snapshot every 15 seconds could erase in-progress non-secret
+    edits or initiate redundant saves. The chosen model makes Settings subscribe
+    to the existing Connector health live store. Definitions and local form
+    configuration initialize through the Settings load and thereafter change
+    only through the form and save responses; runtime health converges with
+    Overview through the shared store. Manual recovery, reconnect, test
+    delivery, and post-save actions retain their immediate runtime-only refresh.
+    The shared domain remains the periodic authority. This preserves drafts while
+    removing contradictory runtime truth and duplicate permanent polling.
 
 ## Ordered Work
 
@@ -495,6 +509,8 @@ external adapters remain optional projections rather than sources of truth.
         owned and pristine cards.
   - [x] Move initial focus from the obscured overview trigger to the current
         configuration-dialog heading.
+  - [x] Make Overview and full Settings consume one live runtime-health source
+        without replacing in-progress configuration drafts.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -836,6 +852,21 @@ Set up Slack and Manage Feishu respectively, and document width remained exactly
 focused Configure Discord at scroll position zero and restored Manage Discord
 on Escape. No field, switch, send, reconnect, or external action was invoked,
 and the viewport was reset.
+
+The shared-runtime-health increment passed 50 focused Settings, overview,
+lifecycle, and live-domain tests, UI and root typechecking, the production
+build, and all 5,125 repository tests. A
+new Settings contract drives health from Unavailable to Running while retaining
+an unsaved Slack token draft, and the shared lifecycle contract distinguishes a
+reachable degraded service from a missing process. In the real Default
+AliceProject, a 15-second refresh left Discord Offline/Paused, Telegram
+Unavailable/Needs attention, and Feishu Ready/Connected aligned across full
+Settings and Overview. Both service cards rendered Running for the same reachable
+degraded process rather than Settings claiming Unavailable. At 390 x 844, the
+Settings service card remained 352 px wide, its switch retained a 40 px target,
+and document width remained exactly 390 px. No field, switch, send, reconnect,
+or external action was invoked; the temporary audit tab was closed and the
+viewport was reset.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.

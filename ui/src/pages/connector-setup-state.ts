@@ -1,6 +1,7 @@
 import type { ConnectorDefinition, ConnectorHealth, PublicConnectorConfig } from '../api'
 
 export type ConnectorRuntime = NonNullable<ConnectorHealth['service']>['adapters'][number]
+export type ConnectorServiceState = 'stopped' | 'healthy' | 'running' | 'unavailable'
 export type ConnectorSetupStage =
   | 'needs_credentials'
   | 'ready_to_link'
@@ -15,6 +16,12 @@ export interface ConnectorSetupState {
   ready: boolean
   linked: boolean
   linkCommand?: string
+}
+
+export function getConnectorServiceState(health: ConnectorHealth | null): ConnectorServiceState {
+  if (!health?.enabled || health.status === 'disabled') return 'stopped'
+  if (health.status === 'healthy') return 'healthy'
+  return health.service ? 'running' : 'unavailable'
 }
 
 export function getConnectorSetupState(input: {

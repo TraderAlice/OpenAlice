@@ -35,6 +35,7 @@ import {
   useConnectorHealthState,
 } from '../live/connector-health'
 import {
+  getConnectorServiceState,
   getConnectorSetupState,
   type ConnectorRuntime,
   type ConnectorSetupState,
@@ -645,31 +646,31 @@ function servicePresentation(health: ConnectorHealth, t: TFunction): {
   description: string
   tone: StatusTone
 } {
-  if (!health.enabled || health.status === 'disabled') {
-    return {
-      label: t('connectorStatus.service.off'),
-      description: t('connectorStatus.service.offDescription'),
-      tone: 'neutral',
-    }
-  }
-  if (health.status === 'healthy') {
-    return {
-      label: t('connectorStatus.service.healthy'),
-      description: t('connectorStatus.service.healthyDescription'),
-      tone: 'healthy',
-    }
-  }
-  if (health.service) {
-    return {
-      label: t('connectorStatus.service.running'),
-      description: t('connectorStatus.service.runningDescription'),
-      tone: 'warning',
-    }
-  }
-  return {
-    label: t('connectorStatus.service.unavailable'),
-    description: t('connectorStatus.service.unavailableDescription'),
-    tone: 'danger',
+  switch (getConnectorServiceState(health)) {
+    case 'stopped':
+      return {
+        label: t('connectorStatus.service.off'),
+        description: t('connectorStatus.service.offDescription'),
+        tone: 'neutral',
+      }
+    case 'healthy':
+      return {
+        label: t('connectorStatus.service.healthy'),
+        description: t('connectorStatus.service.healthyDescription'),
+        tone: 'healthy',
+      }
+    case 'running':
+      return {
+        label: t('connectorStatus.service.running'),
+        description: t('connectorStatus.service.runningDescription'),
+        tone: 'warning',
+      }
+    case 'unavailable':
+      return {
+        label: t('connectorStatus.service.unavailable'),
+        description: t('connectorStatus.service.unavailableDescription'),
+        tone: 'danger',
+      }
   }
 }
 

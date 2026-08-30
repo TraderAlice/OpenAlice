@@ -11,7 +11,9 @@ import { ConfigSection, Field, SettingsScrollArea, inputClass } from '../compone
 import { useAutoSave, type SaveStatus } from '../hooks/useAutoSave'
 import { TelegramDeskPanel } from '../components/TelegramDeskPanel'
 import { Toggle } from '../components/Toggle'
+import { useConnectorRuntimeHealthState } from '../live/connector-health'
 import {
+  getConnectorServiceState,
   getConnectorSetupState,
   type ConnectorRuntime,
   type ConnectorSetupState,
@@ -71,6 +73,7 @@ function ConnectorSettingsSurface({
   onSaveFeedback?: (status: SaveStatus, retry: () => void) => void
 }) {
   const { t } = useTranslation()
+  const liveRuntime = useConnectorRuntimeHealthState()
   const [definitions, setDefinitions] = useState<ConnectorDefinition[]>([])
   const [config, setConfig] = useState<PublicConnectorConfig | null>(null)
   const [health, setHealth] = useState<ConnectorHealth | null>(null)
@@ -103,9 +106,7 @@ function ConnectorSettingsSurface({
   const refreshRuntime = useCallback(async () => {
     try {
       const snapshot = await api.connectors.load()
-      // `/link` updates adapter state inside Connector Service immediately.
-      // Poll only runtime health here so an external command can never
-      // overwrite a credential draft or trigger a redundant auto-save/restart.
+      // Runtime refresh never replaces form configuration or credential drafts.
       setHealth(snapshot.health)
       setLoadError(false)
     } catch {
@@ -114,6 +115,11 @@ function ConnectorSettingsSurface({
   }, [])
 
   useEffect(() => { void load() }, [load])
+
+  useEffect(() => {
+    if (liveRuntime.health) setHealth(liveRuntime.health)
+    if (liveRuntime.health || liveRuntime.error) setLoadError(liveRuntime.error !== null)
+  }, [liveRuntime.error, liveRuntime.health])
 
   const scheduleRuntimeRefresh = useCallback(() => {
     refreshTimerIdsRef.current.forEach((timerId) => window.clearTimeout(timerId))
@@ -1446,7 +1452,8 @@ function runtimeErrorDescription(
 }
 
 function HealthBadge({ health, t }: { health: ConnectorHealth | null; t: TFunction }) {
-  if (!health || health.status === 'disabled') {
+  const state = getConnectorServiceState(health)
+  if (state === 'stopped') {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
         <ShieldCheck size={12} aria-hidden />
@@ -1454,11 +1461,22 @@ function HealthBadge({ health, t }: { health: ConnectorHealth | null; t: TFuncti
       </span>
     )
   }
-  if (health.status === 'healthy') {
+  if (state === 'healthy') {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-success">
         <ShieldCheck size={12} aria-hidden />
         {t('connectorSettings.serviceOnline')}
+      </span>
+    )
+  }
+  if (state === 'running') {
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 rounded-full bg-warning/12 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-warning"
+        title={t('connectorStatus.service.runningDescription')}
+      >
+        <CircleAlert size={12} aria-hidden />
+        {t('connectorStatus.service.running')}
       </span>
     )
   }

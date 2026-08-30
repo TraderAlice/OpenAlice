@@ -455,6 +455,15 @@ error. When last-known data exists, a refresh failure keeps it visible with an
 explicit stale-state notice. In-dialog runtime retry refreshes health only so it
 cannot replace unsaved credential drafts.
 
+Overview and Settings consume the same live runtime-health domain. The Settings
+form still owns its initially loaded configuration and save responses, so a
+background health refresh cannot replace an in-progress field or credential
+draft. Service presentation is derived by one shared lifecycle rule: disabled is
+Stopped/Off, healthy is Online/Healthy, degraded with a returned service body is
+Running because healthy channels remain available, and degraded without a
+service body is Unavailable. Adapter errors remain on their owning channel in
+both surfaces.
+
 The Connector Service switch is a secondary pause-all control. Starting an
 adapter from the setup flow enables the service automatically, so it is not a
 separate first-use prerequisite; pausing the global service never deletes sealed
