@@ -4169,6 +4169,7 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
 }
 
 .oa-office-replay-beacon {
+  --office-replay-beacon-shift-x: -50%;
   position: absolute;
   display: grid;
   width: max-content;
@@ -4183,8 +4184,12 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
   background: var(--gba-paper);
   box-shadow: 2px 2px 0 color-mix(in srgb, var(--gba-ink) 34%, transparent);
   pointer-events: none;
-  transform: translate(-50%, -100%);
+  transform: translate(var(--office-replay-beacon-shift-x), -100%);
   animation: oa-office-replay-beacon 560ms steps(2, end) 3;
+}
+
+.oa-office-replay-beacon[data-kind="employee"] {
+  --office-replay-beacon-shift-x: calc(-100% - 14px);
 }
 
 .oa-office-replay-beacon > img {
@@ -4220,7 +4225,7 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
 }
 
 @keyframes oa-office-replay-beacon {
-  50% { transform: translate(-50%, calc(-100% - 3px)); }
+  50% { transform: translate(var(--office-replay-beacon-shift-x), calc(-100% - 3px)); }
 }
 
 .oa-office-collision-impact {

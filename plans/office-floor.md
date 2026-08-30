@@ -4107,6 +4107,21 @@ Actionable dormant-state follow-up (2026-08-30):
   passed, the full suite passed all 617 test files and 5,171 tests (one file and nine tests skipped), and the production
   UI build passed with only the existing ports fallback and large-chunk advisories.
 
+Replay actor-state composition follow-up (2026-08-30):
+
+- Walked the complete real failure loop from the Chat roster through Agent File, Operations, and `Find on floor` for
+  Grok Analyst Seq 4984. The menus preserved the actionable failed state, but the historical-event beacon then covered
+  48x37px of the 48px failed emote at the focused desk, visually erasing the very live actor state the player followed.
+- Compared hiding the emote, merging failure into the event marker, and reserving separate world anchors. Chose separate
+  anchors: current coworker state and historical event identity answer different questions and both remain useful in
+  Replay. Non-employee beacons retain their centered service/landmark composition; employee beacons attach to the outer
+  left edge of the desk with a 14px anchor gap, and the stepped animation reuses the same horizontal anchor.
+- Real-browser geometry after the three-beat animation measured the beacon at x258-366 and the failed emote at x370-418:
+  overlap fell from 48x37px to 0x37px with a visible 4px gap, while Alice still arrived facing the marked coworker and
+  the sequence/callsign label remained readable. Focused beacon and responsive-style suites passed 26 tests. Root and
+  UI TypeScript passed, the full suite passed all 617 test files and 5,172 tests (one file and nine tests skipped), and
+  the production UI build passed with only the existing ports fallback, jsdom canvas, and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

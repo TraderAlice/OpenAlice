@@ -102,6 +102,15 @@ describe('Office responsive style contract', () => {
     )
   })
 
+  it('keeps employee replay beacons beside current coworker state', () => {
+    expect(css).toMatch(
+      /\.oa-office-replay-beacon\[data-kind="employee"\]\s*\{[^}]*--office-replay-beacon-shift-x:\s*calc\(-100% - 14px\);/s,
+    )
+    expect(css).toMatch(
+      /@keyframes oa-office-replay-beacon\s*\{[^}]*translate\(var\(--office-replay-beacon-shift-x\),/s,
+    )
+  })
+
   it('stacks window location and type as deliberate phone title lines', () => {
     expect(css).toMatch(/\.oa-office-window__title-copy\s*\{[\s\S]*?display: flex/)
     expect(css).toMatch(/\.oa-office-window__title-room\s*\{[\s\S]*?text-overflow: ellipsis/)
