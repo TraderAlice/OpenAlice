@@ -430,6 +430,13 @@ The surfaces deliberately have different jobs:
   can edit the scheduled check-in prompt and cadence, then open the ordinary
   Issue detail for comments. Generic Issue create/update cannot set
   `connectorDesk`.
+- Chat setup is durable configuration, not proof that its transport is live.
+  A linked-but-offline adapter may still bind Chat to a Workspace so the
+  operator can prepare it without starting external delivery. In that state the
+  Chat switch remains checked when a desk exists, but its visible state reads
+  Waiting rather than On; the bound-Workspace copy says conversations resume
+  only after that connector is online. Turning Chat on while the adapter is
+  offline likewise describes preparation, never an already active conversation.
 - Each connector-chat Issue is hidden from the Issue board and Tracked list. It
   still fires on `when`. Extra desks for the same connector in other
   Workspaces do not fire. Owner DMs become comments on that connector's

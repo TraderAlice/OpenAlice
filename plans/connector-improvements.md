@@ -551,6 +551,15 @@ external adapters remain optional projections rather than sources of truth.
     styles the configuration entry as neutral setup details, and promotes the
     dialog entry only after the adapter is running and the user needs the
     external `/link` instructions. The lifecycle model and APIs do not change.
+48. **Chat configuration and transport availability stay independently
+    truthful.** A linked-but-stopped Telegram currently allows Chat setup, which
+    is useful, but a created desk then reads `On` even though no owner message
+    can arrive. Disabling Chat setup would prevent harmless Workspace
+    preparation; starting the Connector from the Chat switch would hide an
+    external-state change. The chosen state keeps the checked switch as durable
+    Chat configuration, labels it Waiting while the Connector is offline, and
+    says that conversations resume when the transport is online. An unbound Chat
+    remains configurable offline but promises only preparation, not activity.
 
 ## Ordered Work
 
@@ -651,6 +660,7 @@ external adapters remain optional projections rather than sources of truth.
         link runtime control without auto-starting it.
   - [x] Make the overview's Ready-to-link action hierarchy match the actual
         lifecycle transition.
+  - [x] Distinguish durable Chat configuration from live Connector availability.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -1162,6 +1172,22 @@ Chinese details action measured 156.92 px wide, and document width remained
 exactly 390 px. No Connector, external platform, or real credential action was
 invoked. The temporary tab and demo runtime were closed, and the viewport was
 reset.
+
+The Chat-availability-truth increment passed 40 focused Chat/demo-route tests,
+UI and root typechecking, the demo production build, and all 5,134 repository
+tests. `TelegramDeskPanel` now receives the shared lifecycle's online truth:
+a configured desk keeps its checked switch but reads Waiting while the linked
+Connector is offline, and the bound-Workspace sentence says conversations
+resume only after that Connector is online. An unbound desk can still be
+prepared offline without promising an active conversation. A temporary demo
+fixture exposed the linked-offline state for current-source acceptance and was
+restored before testing and commit. At 1,052 x 734, the lifecycle panel and Chat
+card showed the offline/waiting distinction together without another warning
+box. At 390 x 844, English and Chinese Chat cards measured 336 x 273.57 px;
+their switch remained 40 px, their two actions remained 44 px, and document
+width remained exactly 390 px. No real Connector, external platform, or
+credential action was invoked. The temporary tab and demo runtime were closed,
+and the viewport was reset.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.

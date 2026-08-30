@@ -17,10 +17,12 @@ export function TelegramDeskPanel({
   connectorId = 'telegram',
   label,
   linked,
+  online,
 }: {
   connectorId?: string
   label?: string
   linked: boolean
+  online: boolean
 }) {
   const { t } = useTranslation()
   const { workspaces } = useWorkspaces()
@@ -75,7 +77,9 @@ export function TelegramDeskPanel({
         {linked ? (
           <div className="flex min-h-10 items-center gap-2">
             <span className="text-[12px] font-medium text-foreground">
-              {desk ? t('connectorSettings.desk.on') : t('connectorSettings.desk.off')}
+              {desk
+                ? t(online ? 'connectorSettings.desk.on' : 'connectorSettings.desk.waiting')
+                : t('connectorSettings.desk.off')}
             </span>
             <Toggle
               size="sm"
@@ -108,8 +112,11 @@ export function TelegramDeskPanel({
       ) : desk ? (
         <div className="mt-3 space-y-3 border-t border-border/60 pt-3">
           <p className="mt-1 text-[12px] leading-5 text-muted-foreground">
-            {t('connectorSettings.desk.boundWorkspace', {
+            {t(online
+              ? 'connectorSettings.desk.boundWorkspace'
+              : 'connectorSettings.desk.waitingForConnector', {
               workspace: boundWorkspace ? workspaceDisplayName(boundWorkspace) : desk.wsId,
+              name: deskName,
             })}
           </p>
           <button
@@ -201,7 +208,9 @@ export function TelegramDeskPanel({
             </Field>
           )}
           <p className="text-[11.5px] leading-5 text-muted-foreground">
-            {t('connectorSettings.desk.turnOnHint', { name: deskName })}
+            {t(online
+              ? 'connectorSettings.desk.turnOnHint'
+              : 'connectorSettings.desk.turnOnWhileOfflineHint', { name: deskName })}
           </p>
         </div>
       )}

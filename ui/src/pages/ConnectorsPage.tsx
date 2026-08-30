@@ -557,6 +557,7 @@ function ConnectorSettingsSurface({
                           connectorId={definition.id}
                           label={definition.label}
                           linked={setup.linked}
+                          online={setup.stage === 'linked'}
                         />
                       )}
 
