@@ -15,6 +15,10 @@ export type OfficeCoworkerIdentity =
   | 'grok-navigator'
   | 'grok-synthesist'
   | 'grok-sentinel'
+  | 'grok-cartographer'
+  | 'grok-alchemist'
+  | 'grok-curator'
+  | 'grok-strategist'
 
 export interface OfficeCoworkerSpriteAsset {
   id: OfficeCoworkerIdentity
@@ -64,6 +68,10 @@ export const OFFICE_COWORKER_SPRITES: Record<OfficeCoworkerIdentity, OfficeCowor
   'grok-navigator': coworkerAsset('grok-navigator', 'var(--terminal-cyan)', -1_030),
   'grok-synthesist': coworkerAsset('grok-synthesist', 'var(--terminal-cyan)', -1_090),
   'grok-sentinel': coworkerAsset('grok-sentinel', 'var(--terminal-cyan)', -1_150),
+  'grok-cartographer': coworkerAsset('grok-cartographer', 'var(--terminal-cyan)', -1_210),
+  'grok-alchemist': coworkerAsset('grok-alchemist', 'var(--terminal-cyan)', -1_270),
+  'grok-curator': coworkerAsset('grok-curator', 'var(--terminal-cyan)', -1_330),
+  'grok-strategist': coworkerAsset('grok-strategist', 'var(--terminal-cyan)', -1_390),
 }
 
 export const OFFICE_COWORKER_EMOTES = {
@@ -100,6 +108,10 @@ const ARCHETYPE_POOL: Record<OfficeCoworkerArchetype, readonly OfficeCoworkerIde
     'grok-navigator',
     'grok-synthesist',
     'grok-sentinel',
+    'grok-cartographer',
+    'grok-alchemist',
+    'grok-curator',
+    'grok-strategist',
   ],
 }
 

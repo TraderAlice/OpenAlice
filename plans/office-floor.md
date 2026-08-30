@@ -3252,6 +3252,30 @@ Persistent coworker-cast follow-up (2026-08-30):
   Root/UI TypeScript, the full 617-file Vitest run (5,141 passing; one file and nine tests skipped), and the production
   build passed; the existing canvas and large-chunk advisories are unchanged.
 
+Twelve-person Grok party follow-up (2026-08-30):
+
+- Continued playing the real three-Workspace Office Lab after the persistent-cast fix. Prediction and Chat had both
+  reached eight Grok coworkers: the authored pool was complete at that size, but a ninth Session would necessarily
+  repeat a portrait and callsign. Appending a hash suffix would only rename the duplicate rather than make the Session
+  feel like another game character.
+- Compared accepting repeats after eight, generating palette swaps, and extending the authored party. Chose four new
+  identity-locked women because distinct hair, silhouette, clothing, standing portrait, seated pose, and typing frame
+  add durable character memory; palette swaps and labels cannot provide that. The additions are an auburn
+  Cartographer, mint Alchemist, burgundy Curator, and platinum Strategist.
+- Used the built-in image generator with the Office style master and the existing Navigator's three runtime poses as
+  references. Each source sheet preserves one identity across standing / seated / typing panels. Cartographer and
+  Strategist required a background-extraction pass after their first generations baked a checkerboard; all four then
+  passed the existing hard-alpha packager into 72x104 portraits and shared-anchor 176x176 desk pairs. No generated
+  full-resolution master ships in the UI.
+- The Grok family now exhausts twelve authored characters before repeating. Four scheduled, read-only Grok Issues in
+  the real Chat group created g9-g12 without reusing an original. The live map reported `0/12 awake`, Team roster showed
+  twelve members and twelve unique 72x104 portraits, and its first screen contained Cartographer, Alchemist, Curator,
+  and Strategist together. Strategist's Agent File retained the same callsign and portrait while exposing the matching
+  Assignment, Issue drawer, and Session command.
+- Focused sprite, storage, desk, and page specs passed (4 files / 32 tests). Root/UI TypeScript, the full 617-file
+  Vitest run (5,142 passing; one file and nine tests skipped), and the production build passed; the existing canvas
+  and large-chunk advisories are unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
