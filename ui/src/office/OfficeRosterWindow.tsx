@@ -56,6 +56,12 @@ export function OfficeRosterWindow({
             <span className="oa-office-window__title-kind">{t('office.roster')}</span>
           </span>
         </div>
+        <span
+          className="oa-office-window__title-count"
+          aria-label={t('office.rosterCount', { count: employees.length })}
+        >
+          {employees.length}
+        </span>
         <button
           type="button"
           ref={closeButtonRef}

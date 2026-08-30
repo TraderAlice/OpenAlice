@@ -91,6 +91,9 @@ describe('OfficeCabinetWindow', () => {
     expect(container.querySelector('.oa-office-window__title-room')?.textContent).toBe('Semis')
     expect(container.querySelector('.oa-office-window__title-kind')?.textContent).toBe('Filing cabinet')
     expect(container.querySelector('.oa-office-window__title-separator')?.textContent).toBe('·')
+    expect(container.querySelector('.oa-office-window__title-count')?.textContent).toBe('2')
+    expect(container.querySelector('.oa-office-window__title-count')?.getAttribute('aria-label'))
+      .toBe('2 filed records')
 
     const recordButtons = screen.getAllByRole('button', { name: /Open .*, (Issue|Report), .* in Workspace/ })
     expect(document.activeElement).toBe(recordButtons[0])

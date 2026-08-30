@@ -70,6 +70,12 @@ export function OfficeCabinetWindow({
             <span className="oa-office-window__title-kind">{t('office.cabinet')}</span>
           </span>
         </div>
+        <span
+          className="oa-office-window__title-count"
+          aria-label={t('office.cabinetRecords', { count: records.length })}
+        >
+          {records.length}
+        </span>
         <button
           type="button"
           ref={closeButtonRef}

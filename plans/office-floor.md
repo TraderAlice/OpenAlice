@@ -3803,6 +3803,28 @@ Narrow journal focus-handoff follow-up (2026-08-30):
   files and 5,163 tests (one file and nine tests skipped), and the production UI build passed with only the existing
   jsdom canvas and large-chunk advisories.
 
+Short-landscape party-window hierarchy follow-up (2026-08-30):
+
+- Replayed the real 844x390 Team roster and Filing cabinet after checking the single-title-band, content-first rhythm
+  of classic GBA interior and dialogue menus. Both Office windows still spent a complete bordered row on a count plus
+  input legend, even though short landscape is the one layout where that duplicate chrome removes an entire party or
+  record row.
+- Compared deleting the summary everywhere, merely reducing its padding, and moving only short-landscape counts into
+  the existing title band. Chose the third model: desktop and portrait retain their keyboard/touch guidance, while
+  stages at up to 760x420 use one RPG title band and give the rest of the window back to selectable content.
+- Team roster and Filing cabinet now expose an accessible numeric title badge in that layout and remove the duplicate
+  summary from grid flow. Three/four-record cabinets also reclaim the same 16px bottom allowance already proven by the
+  dense cabinet and tighten only line rhythm/padding—not the 14px type or metadata—so their 66px record targets keep
+  title, kind, time, owner, and destination visible.
+- Real-browser acceptance at 844x390 changed the 16-member roster from one complete row plus clipped cards to two
+  complete rows. The four-record cabinet now renders both rows and its fixed Workspace-files command in one frame;
+  its 145px list has equal client/scroll height rather than a false partial-row scroll. At 1052x734 and 390x844 the
+  title badge remains hidden, the original summary/legend remains visible, body width stays within the viewport, and
+  the established desktop/portrait heights are unchanged. Focused cabinet, roster, and responsive-style tests passed
+  (3 files / 28 tests). Root and UI TypeScript passed, the full suite passed all 617 test files and 5,164 tests (one
+  file and nine tests skipped), and the production UI build passed with only the existing jsdom canvas and large-chunk
+  advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

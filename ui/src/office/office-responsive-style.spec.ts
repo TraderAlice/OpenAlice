@@ -119,6 +119,34 @@ describe('Office responsive style contract', () => {
     expect(compactWindowCss).toContain('.oa-office-roster__summary small')
   })
 
+  it('moves party counts into the title on short landscape screens', () => {
+    expect(css).toMatch(/\.oa-office-window__title-count\s*\{[\s\S]*?display: none/)
+    expect(css).toMatch(
+      /@container \(max-width: 760px\) and \(max-height: 420px\) \{[\s\S]*?\.oa-office-roster \.oa-office-window__title-count,[\s\S]*?\.oa-office-cabinet-window \.oa-office-window__title-count\s*\{\s*display: grid;/,
+    )
+    expect(css).toMatch(
+      /@container \(max-width: 760px\) and \(max-height: 420px\) \{[\s\S]*?\.oa-office-roster__body\s*\{\s*grid-template-rows: minmax\(0, 1fr\);/,
+    )
+    expect(css).toMatch(
+      /@container \(max-width: 760px\) and \(max-height: 420px\) \{[\s\S]*?\.oa-office-cabinet-window__body\s*\{\s*grid-template-rows: minmax\(0, 1fr\) auto;/,
+    )
+    expect(css).toMatch(
+      /@container \(max-width: 760px\) and \(max-height: 420px\) \{[\s\S]*?\.oa-office-cabinet-window\[data-record-count="3"\],[\s\S]*?data-record-count="4"\][\s\S]*?height: min\(358px, calc\(100% - 86px\)\);/,
+    )
+    expect(css).toMatch(
+      /@container \(max-width: 760px\) and \(max-height: 420px\) \{[\s\S]*?\.oa-office-cabinet-window__records li button\s*\{[\s\S]*?min-height: 66px;[\s\S]*?padding-block: 4px;/,
+    )
+    expect(css).toMatch(
+      /@container \(max-width: 760px\) and \(max-height: 420px\) \{[\s\S]*?\.oa-office-cabinet-window__records \.oa-office-cabinet-window__record-copy\s*\{\s*gap: 1px;/,
+    )
+    expect(css).toMatch(
+      /@container \(max-width: 760px\) and \(max-height: 420px\) \{[\s\S]*?\.oa-office-cabinet-window__record-copy :is\(strong, small\)\s*\{\s*line-height: 1\.15;/,
+    )
+    expect(css).toMatch(
+      /@container \(max-width: 760px\) and \(max-height: 420px\) \{[\s\S]*?\.oa-office-roster__summary,[\s\S]*?\.oa-office-cabinet-window__summary\s*\{\s*display: none;/,
+    )
+  })
+
   it('moves top notifications below the live Office HUD without affecting modal windows', () => {
     expect(css).toContain(
       'body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause-menu))',
