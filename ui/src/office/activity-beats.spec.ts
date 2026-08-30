@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import type { AgentRuntimeEvent } from '../api/agentRuntimeLog'
-import { officeActivityBeats, officeActivityBeatSeq } from './activity-beats'
+import {
+  officeActivityBeats,
+  officeActivityBeatSeq,
+  officeActivityOverview,
+} from './activity-beats'
 
 function event(
   seq: number,
@@ -63,5 +67,26 @@ describe('officeActivityBeats', () => {
 
     expect(beats).toHaveLength(2)
     expect(officeActivityBeatSeq(beats[0])).toBe('#0002')
+  })
+
+  it('keeps every product family visible in a bounded chronological overview', () => {
+    const agent = officeActivityBeats(
+      Array.from({ length: 12 }, (_, index) => event(120 - index, 'runtime.stopped')),
+    )
+    const inbox = officeActivityBeats(
+      Array.from({ length: 5 }, (_, index) => event(80 - index, 'inbox.received')),
+    )
+    const news = officeActivityBeats(
+      Array.from({ length: 50 }, (_, index) => event(200 - index, 'news.ingested')),
+    )
+
+    const overview = officeActivityOverview([agent, inbox, news])
+
+    expect(overview).toHaveLength(30)
+    expect(overview.every((beat, index) => index === 0 || overview[index - 1].event.seq > beat.event.seq))
+      .toBe(true)
+    expect(overview.filter((beat) => beat.event.type === 'runtime.stopped')).toHaveLength(8)
+    expect(overview.filter((beat) => beat.event.type === 'inbox.received')).toHaveLength(5)
+    expect(overview.filter((beat) => beat.event.type === 'news.ingested')).toHaveLength(17)
   })
 })

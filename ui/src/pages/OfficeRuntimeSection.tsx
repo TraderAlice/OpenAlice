@@ -19,7 +19,11 @@ import {
   officeActivityFallbackLabel,
   type OfficeActivityActor,
 } from '../office/activity-actors'
-import { officeActivityBeats, officeActivityBeatSeq } from '../office/activity-beats'
+import {
+  officeActivityBeats,
+  officeActivityBeatSeq,
+  officeActivityOverview,
+} from '../office/activity-beats'
 import { OfficeCoworkerSprite } from '../office/OfficeCoworkerSprite'
 import { officePixelImg } from '../office/furniture'
 import { OFFICE_HUD_ASSETS } from '../office/hud-assets'
@@ -278,12 +282,17 @@ export function OfficeRuntimeSection({
     return () => clearInterval(id)
   }, [load])
 
-  const beatsByChannel = useMemo(() => ({
-    all: officeActivityBeats(entriesByChannel.all),
-    agent: officeActivityBeats(entriesByChannel.agent),
-    inbox: officeActivityBeats(entriesByChannel.inbox),
-    news: officeActivityBeats(entriesByChannel.news),
-  }), [entriesByChannel])
+  const beatsByChannel = useMemo(() => {
+    const agent = officeActivityBeats(entriesByChannel.agent)
+    const inbox = officeActivityBeats(entriesByChannel.inbox)
+    const news = officeActivityBeats(entriesByChannel.news)
+    return {
+      all: officeActivityOverview([agent, inbox, news]),
+      agent,
+      inbox,
+      news,
+    }
+  }, [entriesByChannel])
   const channelCounts = useMemo(() => ({
     all: beatsByChannel.all.length,
     agent: beatsByChannel.agent.length,
@@ -314,12 +323,22 @@ export function OfficeRuntimeSection({
     if (appliedReplaySeqRef.current === replaySeq) return
     const replayEvent = entriesByChannel.all.find((event) => event.seq === replaySeq)
     if (!replayEvent) return
-    const replayChannel = channel === 'all' ? 'all' : officeLogFamilyForEvent(replayEvent)
-    const replayBeat = beatsByChannel[replayChannel].find((beat) => {
+    let replayChannel: OfficeLogChannel = channel === 'all'
+      ? 'all'
+      : officeLogFamilyForEvent(replayEvent)
+    let replayBeat = beatsByChannel[replayChannel].find((beat) => {
       const lower = Math.min(beat.oldestSeq, beat.event.seq)
       const upper = Math.max(beat.oldestSeq, beat.event.seq)
       return replaySeq >= lower && replaySeq <= upper
     })
+    if (!replayBeat && replayChannel === 'all') {
+      replayChannel = officeLogFamilyForEvent(replayEvent)
+      replayBeat = beatsByChannel[replayChannel].find((beat) => {
+        const lower = Math.min(beat.oldestSeq, beat.event.seq)
+        const upper = Math.max(beat.oldestSeq, beat.event.seq)
+        return replaySeq >= lower && replaySeq <= upper
+      })
+    }
     if (!replayBeat) return
     appliedReplaySeqRef.current = replaySeq
     setChannel(replayChannel)

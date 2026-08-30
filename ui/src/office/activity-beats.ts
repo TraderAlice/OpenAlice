@@ -55,6 +55,33 @@ export function officeActivityBeats(events: readonly AgentRuntimeEvent[]): Offic
   return beats
 }
 
+export function officeActivityOverview(
+  families: readonly (readonly OfficeActivityBeat[])[],
+  limit = 30,
+  minimumPerFamily = 8,
+): OfficeActivityBeat[] {
+  if (limit <= 0) return []
+  const selected = new Map<number, OfficeActivityBeat>()
+  for (const family of families) {
+    for (const beat of family.slice(0, minimumPerFamily)) {
+      selected.set(beat.event.seq, beat)
+    }
+  }
+
+  const remaining = families
+    .flatMap((family) => family)
+    .filter((beat) => !selected.has(beat.event.seq))
+    .sort((a, b) => b.event.seq - a.event.seq)
+  for (const beat of remaining) {
+    if (selected.size >= limit) break
+    selected.set(beat.event.seq, beat)
+  }
+
+  return Array.from(selected.values())
+    .sort((a, b) => b.event.seq - a.event.seq)
+    .slice(0, limit)
+}
+
 export function officeActivityBeatSeq(beat: OfficeActivityBeat): string {
   const newest = String(beat.event.seq).padStart(4, '0')
   if (beat.count === 1) return `#${newest}`

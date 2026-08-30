@@ -507,6 +507,42 @@ describe('OfficeRuntimeSection', () => {
     expect(screen.getByText('Market opens')).toBeTruthy()
   })
 
+  it('opens the complete family when replay leaves the balanced All overview', async () => {
+    const now = Date.now()
+    mockJournal([
+      ...Array.from({ length: 50 }, (_, index) => ({
+        seq: 100 - index,
+        ts: now - index,
+        type: 'news.ingested',
+        payload: {
+          newsItemId: 100 - index,
+          source: 'Wire',
+          title: `News ${100 - index}`,
+        },
+      })),
+      ...Array.from({ length: 8 }, (_, index) => ({
+        seq: 50 - index,
+        ts: now - 50 - index,
+        type: 'runtime.stopped',
+        payload: { resumeId: `resume-${index}`, status: 'done' },
+      })),
+      {
+        seq: 42,
+        ts: now - 58,
+        type: 'inbox.received',
+        payload: { inboxEntryId: 'inbox-42', title: 'Desk note' },
+      },
+    ])
+
+    render(<OfficeRuntimeSection initialChannel="all" replaySeq={60} />)
+
+    expect((await screen.findByRole('tab', { name: /News\s*50/ })).getAttribute('data-active'))
+      .not.toBeNull()
+    expect(screen.getByRole('button', { name: /News added.*#0060/i }).getAttribute('aria-pressed'))
+      .toBe('true')
+    expect(screen.getByText('News 60')).toBeTruthy()
+  })
+
   it('presents runtime outcomes as player-facing activity language', async () => {
     const now = Date.now()
     mockJournal([

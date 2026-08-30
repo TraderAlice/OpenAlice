@@ -3014,6 +3014,24 @@ Stable coworker spatial identity follow-up (2026-08-30):
   Vitest run (5,131 passing; one file and nine tests skipped), and the production build; the existing direct-eval and
   large-chunk advisories are unchanged.
 
+Balanced world-journal overview follow-up (2026-08-30):
+
+- Opened Operations after the three real Grok identity runs. All contained 65 story rows because it directly merged
+  Agent 10, Inbox 5, and News 50; the latest work remained visible at the top, but scrolling quickly became a 50-item
+  news wall that displaced the other product systems from the combined world history.
+- Compared a global hard cutoff, folding individual News records into batches, and reserving category representation
+  before filling a bounded overview by recency. Chose the balanced overview: All owns at most 30 readable beats, takes
+  up to eight from each nonempty Agent/Inbox/News family first, then fills remaining slots with the newest unselected
+  beats and restores one descending chronological order. Individual category windows remain unchanged.
+- Kept the complete raw merged event set behind replay rather than mistaking the overview for history storage. If a raw
+  replay step is outside the curated All window, the journal switches to that event's full Agent, Inbox, or News channel
+  and selects the exact containing beat, preserving the existing single-time-pointer contract.
+- Browser-reopened the real Operations board. All changed from 65 to 30 while retaining all 10 current Agent beats,
+  all five Inbox beats, and the 15 most relevant News beats in sequence order; News still showed 50. Focused overview
+  and journal specs passed (2 files / 19 tests), including omitted-event replay fallback. Root/UI TypeScript, the full
+  617-file Vitest run (5,133 passing; one file and nine tests skipped), and the production build also passed; the
+  existing direct-eval and large-chunk advisories are unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
