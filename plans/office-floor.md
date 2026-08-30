@@ -3739,6 +3739,27 @@ Complete Agent reward-row follow-up (2026-08-30):
   5,162 tests (one file and nine tests skipped), and the production UI build passed with only the existing jsdom
   canvas and large-chunk advisories.
 
+Short-landscape journal-detail follow-up (2026-08-30):
+
+- Entered the current News terminal through the real live floor, opened fresh News Seq 4809, and resized its detail
+  loop to 844x390. The 288px Activity Log gave its body 242px, but Replay, four channels, and the keyboard legend
+  consumed the first 139px. The 264px event began at y258 and extended to y522 while its sticky actions occupied
+  y301–349, so the initial frame showed Back and two commands but none of the headline, source, summary, or time.
+- Compared making the actions non-sticky, rebuilding the event around a second inner scroller, and letting the
+  established narrow master/detail model own short landscape. Chose the latter: once a record is selected, Back is
+  already the route to navigation, so duplicating Replay and channel navigation above the detail is lower priority
+  than showing the record the player selected. Desktop and portrait retain the complete simultaneous controls.
+- At stage widths up to 760px and heights up to 420px, only detail mode now hides the Replay deck, channel strip, and
+  keyboard legend. Back to records restores all three immediately; index mode still opens with the first complete
+  record row and the existing channel keyboard loop.
+- Real-browser acceptance moved the event top from y258 to y131. News type, source identity, headline, summary, and
+  the fixed Find/Open commands are now visible in the first frame; the remaining Source/Published values require at
+  most 46px of ordinary body scroll. At 390x844 Replay and the two-row channel strip remained visible with the full
+  detail and actions, while 1052x734 retained its 300px/316px simultaneous index/detail columns. Focused runtime and
+  responsive-style tests passed (2 files / 37 tests). Root and UI TypeScript passed, the full suite passed all 617
+  test files and 5,162 tests (one file and nine tests skipped), and the production UI build passed with only the
+  existing jsdom canvas and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

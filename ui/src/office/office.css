@@ -2028,6 +2028,18 @@
   }
 }
 
+@container (max-width: 760px) and (max-height: 420px) {
+  .oa-office-window--log:has(
+    .oa-office-runtime__journal[data-mobile-view="detail"]
+  ) :is(
+    .oa-office-replay-panel,
+    .oa-office-runtime__channels,
+    .oa-office-runtime__input-hint
+  ) {
+    display: none;
+  }
+}
+
 @container (max-width: 480px) {
   .oa-office-window--log .oa-office-window__body {
     padding: 8px;

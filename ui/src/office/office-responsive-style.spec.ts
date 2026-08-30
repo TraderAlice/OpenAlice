@@ -188,6 +188,9 @@ describe('Office responsive style contract', () => {
     expect(css).toMatch(
       /\.oa-office-runtime__back\s*\{[\s\S]*?display: flex;[\s\S]*?grid-column: 1 \/ -1;/,
     )
+    expect(css).toMatch(
+      /@container \(max-width: 760px\) and \(max-height: 420px\) \{[\s\S]*?\.oa-office-window--log:has\([\s\S]*?data-mobile-view="detail"[\s\S]*?\.oa-office-replay-panel,[\s\S]*?\.oa-office-runtime__channels,[\s\S]*?\.oa-office-runtime__input-hint[\s\S]*?display: none;/,
+    )
   })
 
   it('keeps four log channels on one game-menu row until a phone needs two rows', () => {
