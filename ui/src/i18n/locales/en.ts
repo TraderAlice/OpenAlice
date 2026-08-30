@@ -1989,6 +1989,7 @@ export const en = {
     amenityPlant: 'Plant',
     timeline: 'Activity log',
     logChannels: 'Activity channels',
+    logKeyboardHint: '←/→ channels · ↑/↓ records',
     logChannelOverview: 'Overview',
     logChannelAgent: 'Agent',
     logChannelInbox: 'Inbox',

@@ -129,7 +129,9 @@ describe('Office responsive style contract', () => {
 
   it('keeps four log channels on one game-menu row until a phone needs two rows', () => {
     expect(css).toMatch(/\.oa-office-runtime__channels\s*\{[\s\S]*?grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/)
+    expect(css).toMatch(/\.oa-office-runtime__input-hint\s*\{[\s\S]*?text-align: right;/)
     expect(css).toMatch(/@container \(max-width: 480px\) \{[\s\S]*?\.oa-office-runtime__channels\s*\{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/)
+    expect(coarseTouchCss).toMatch(/\.oa-office-runtime__input-hint\s*\{\s*display: none;/)
   })
 
   it('keeps long journal reports summarized without losing the command row', () => {

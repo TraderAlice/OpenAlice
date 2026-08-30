@@ -188,6 +188,10 @@ describe('OfficeRuntimeSection', () => {
     expect(screen.getByText('Desk is clear.')).toBeTruthy()
     expect(screen.getByRole('button', { name: /Task complete.*#0002/i }).getAttribute('aria-pressed'))
       .toBe('true')
+
+    await userEvent.keyboard('{ArrowRight}')
+    expect(screen.getByRole('tab', { name: /Agent\s*2/ }).getAttribute('data-active')).not.toBeNull()
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: /Task complete.*#0002/i }))
   })
 
   it('presents long agent Markdown as expandable game dialogue', async () => {
@@ -278,6 +282,15 @@ describe('OfficeRuntimeSection', () => {
     expect(screen.getByRole('tab', { name: /Inbox\s*1/ })).toBeTruthy()
     expect(screen.getByRole('tab', { name: /News\s*1/ })).toBeTruthy()
     expect(screen.getByRole('list', { name: 'Activity log · Overview' }).children).toHaveLength(4)
+    expect(screen.getByText('←/→ channels · ↑/↓ records')).toBeTruthy()
+    const overviewToolRow = screen.getByRole('button', { name: /Tool action.*#0002/i })
+    expect(overviewToolRow.closest('ol')?.getAttribute('aria-keyshortcuts'))
+      .toBe('ArrowUp ArrowDown ArrowLeft ArrowRight Home End')
+
+    await userEvent.click(overviewToolRow)
+    await userEvent.keyboard('{ArrowRight}')
+    expect(screen.getByRole('tab', { name: /Agent\s*2/ }).getAttribute('data-active')).not.toBeNull()
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: /Tool action.*#0002/i }))
 
     await userEvent.click(screen.getByRole('tab', { name: /Inbox\s*1/ }))
     expect(screen.getByRole('list', { name: 'Activity log · Inbox' }).children).toHaveLength(1)

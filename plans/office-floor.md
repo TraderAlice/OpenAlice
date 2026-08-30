@@ -3154,6 +3154,24 @@ Stable journal-detail frame follow-up (2026-08-30):
   one file and nine tests skipped), and the production build also passed; the existing direct-eval and large-chunk
   advisories are unchanged.
 
+Journal shoulder-navigation follow-up (2026-08-30):
+
+- Continued playing the real Operations journal with keyboard focus inside Overview #2815. Up/Down, Home, and End
+  already navigated records, and the channel tabs supported Left/Right only while the tab strip itself owned focus;
+  once the player entered the journal, Right did nothing and the window exposed no control legend.
+- Compared documenting the fragmented focus model, adding Q/E shoulder-key aliases, and making Left/Right switch among
+  nonempty channels directly from any journal row. Chose spatial arrows: it matches the visible horizontal channel
+  strip, requires no unfamiliar bindings, skips dead empty categories, and restores focus to the retained or first
+  record so repeated shoulder navigation never drops the player out of the game menu.
+- Added a localized desktop legend (`←/→ channels · ↑/↓ records`) and the corresponding `aria-keyshortcuts` contract;
+  coarse-pointer layouts hide the keyboard-only line rather than spending touch space on irrelevant instructions.
+- Browser-focused real Overview report #2622–2814 and pressed Right. The active tab changed to Agent, the same report
+  remained selected, and DOM focus stayed inside its journal row for immediate Up/Down or another channel move. The
+  hint fit beneath the four-tab strip without disturbing the stabilized detail frame. Focused runtime and responsive-
+  style specs passed (2 files / 31 tests). Root/UI TypeScript, the full 617-file Vitest run (5,135 passing; one file
+  and nine tests skipped), and the production build also passed; the existing direct-eval and large-chunk advisories
+  are unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

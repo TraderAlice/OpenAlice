@@ -1964,6 +1964,7 @@ export const zhHant: Resources = {
     amenityPlant: '盆栽',
     timeline: '活動日誌',
     logChannels: '動態頻道',
+    logKeyboardHint: '←/→ 切換頻道 · ↑/↓ 選擇記錄',
     logChannelOverview: '概覽',
     logChannelAgent: 'Agent',
     logChannelInbox: 'Inbox',

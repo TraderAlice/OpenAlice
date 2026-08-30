@@ -250,6 +250,7 @@ export function OfficeRuntimeSection({
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const journalIndexRef = useRef<HTMLOListElement>(null)
+  const journalChannelFocusPendingRef = useRef(false)
   const appliedReplaySeqRef = useRef<number | null>(null)
 
   const load = useCallback(async () => {
@@ -354,6 +355,10 @@ export function OfficeRuntimeSection({
     const selectedRow = journalIndexRef.current
       ?.querySelector<HTMLButtonElement>(`button[data-seq="${selectedSeq}"]`)
     selectedRow?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    if (journalChannelFocusPendingRef.current && selectedRow) {
+      journalChannelFocusPendingRef.current = false
+      selectedRow.focus({ preventScroll: true })
+    }
   }, [channel, selectedSeq])
 
   if (loading && entriesByChannel.overview.length === 0) {
@@ -390,6 +395,7 @@ export function OfficeRuntimeSection({
               </TabsTrigger>
             ))}
           </TabsList>
+          <small className="oa-office-runtime__input-hint">{t('office.logKeyboardHint')}</small>
           <TabsContent value={channel} className="oa-office-runtime__panel">
             <div className="oa-office-runtime__empty">
               {t('office.logChannelEmpty', { channel: channelLabel })}
@@ -448,6 +454,21 @@ export function OfficeRuntimeSection({
     </button>
   ) : null
   const moveJournalSelection = (keyboardEvent: KeyboardEvent<HTMLButtonElement>) => {
+    if (keyboardEvent.key === 'ArrowLeft' || keyboardEvent.key === 'ArrowRight') {
+      keyboardEvent.preventDefault()
+      const direction = keyboardEvent.key === 'ArrowLeft' ? -1 : 1
+      const currentChannelIndex = OFFICE_LOG_CHANNELS.indexOf(channel)
+      for (let offset = 1; offset <= OFFICE_LOG_CHANNELS.length; offset += 1) {
+        const nextIndex = (
+          currentChannelIndex + direction * offset + OFFICE_LOG_CHANNELS.length
+        ) % OFFICE_LOG_CHANNELS.length
+        const nextChannel = OFFICE_LOG_CHANNELS[nextIndex]
+        if (beatsByChannel[nextChannel].length === 0) continue
+        journalChannelFocusPendingRef.current = true
+        setChannel(nextChannel)
+        return
+      }
+    }
     const buttons = Array.from(
       keyboardEvent.currentTarget.closest('ol')
         ?.querySelectorAll<HTMLButtonElement>('button') ?? [],
@@ -485,12 +506,14 @@ export function OfficeRuntimeSection({
             </TabsTrigger>
           ))}
         </TabsList>
+        <small className="oa-office-runtime__input-hint">{t('office.logKeyboardHint')}</small>
         <TabsContent value={channel} className="oa-office-runtime__panel">
         <div data-testid="runtime-log" className="oa-office-runtime__journal">
         <ol
           ref={journalIndexRef}
           className="oa-office-runtime__index"
           aria-label={`${t('office.timeline')} · ${channelLabel}`}
+          aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home End"
         >
           {visibleBeats.map((beat) => {
             const event = beat.event
