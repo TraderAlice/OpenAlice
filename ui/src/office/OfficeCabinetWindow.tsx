@@ -41,6 +41,11 @@ export function OfficeCabinetWindow({
   const recordKey = ({ employee, item }: CabinetRecord) => `${employee.resumeId}:${item.id}`
   const initialFocusKey = records[0] ? recordKey(records[0]) : null
   const [focusedRecordKey, setFocusedRecordKey] = useState(initialFocusKey)
+  const focusedRecordIndex = Math.max(0, records.findIndex((record) => recordKey(record) === focusedRecordKey))
+  const positionWidth = Math.max(2, String(records.length).length)
+  const positionLabel = records.length > 0
+    ? `${String(focusedRecordIndex + 1).padStart(positionWidth, '0')}/${String(records.length).padStart(positionWidth, '0')}`
+    : '00/00'
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const recordListRef = useRef<HTMLUListElement>(null)
   const workspaceFilesRef = useRef<HTMLButtonElement>(null)
@@ -73,9 +78,11 @@ export function OfficeCabinetWindow({
         </div>
         <span
           className="oa-office-window__title-count"
-          aria-label={t('office.cabinetRecords', { count: records.length })}
+          aria-label={records.length > 0
+            ? t('office.cabinetPosition', { index: focusedRecordIndex + 1, count: records.length })
+            : t('office.cabinetRecords', { count: records.length })}
         >
-          {records.length}
+          {positionLabel}
         </span>
         <button
           type="button"
@@ -145,7 +152,9 @@ export function OfficeCabinetWindow({
                 return
               }
               event.preventDefault()
-              buttons[nextIndex]?.focus()
+              const nextButton = buttons[nextIndex]
+              nextButton?.focus({ preventScroll: true })
+              nextButton?.scrollIntoView?.({ block: 'nearest' })
             }}
           >
             {records.map((record: CabinetRecord) => {

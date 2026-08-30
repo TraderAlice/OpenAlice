@@ -1898,6 +1898,7 @@ export const zhHant: Resources = {
     cabinetHint: '查看這間辦公室歸檔的記錄與 Workspace 檔案。',
     cabinetRecords_one: '{{count}} 份歸檔記錄',
     cabinetRecords_other: '{{count}} 份歸檔記錄',
+    cabinetPosition: '第 {{index}} 份，共 {{count}} 份',
     cabinetInspectHint: '工位記錄會留在 Office，直到你選擇繼續前往。',
     cabinetKeyboardHint: '方向鍵選擇 · Enter / Space 開啟',
     cabinetEmptyKeyboardHint: 'Enter / Space 開啟 Workspace 檔案',

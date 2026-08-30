@@ -1890,6 +1890,7 @@ export const zh: Resources = {
     cabinetHint: '查看这间办公室归档的记录与 Workspace 文件。',
     cabinetRecords_one: '{{count}} 份归档记录',
     cabinetRecords_other: '{{count}} 份归档记录',
+    cabinetPosition: '第 {{index}} 份，共 {{count}} 份',
     cabinetInspectHint: '工位记录会留在 Office，直到你选择继续前往。',
     cabinetKeyboardHint: '方向键选择 · Enter / Space 打开',
     cabinetEmptyKeyboardHint: 'Enter / Space 打开 Workspace 文件',

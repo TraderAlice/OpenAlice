@@ -5121,6 +5121,28 @@ Activity-log scroll-ownership follow-up (2026-08-31):
   tests. Root and UI TypeScript passed; the full suite passed all 620 test files and 5,196 tests (one file and nine tests
   skipped); the production UI build passed with only the existing ports fallback and large-chunk advisory.
 
+Filing-cabinet selection-position follow-up (2026-08-31):
+
+- Reopened the real 12-record Chat Filing cabinet. Its authored record names, two-column inventory, selection cursor,
+  and fixed Workspace-files exit were clear, but the window only exposed the total count and a subtle scrollbar. Once
+  keyboard focus moved below the first six visible records, the player could not tell the selected record's position.
+- Compared strengthening the scrollbar, displaying synthetic pages, and reusing the roster's focus-derived `01/12`
+  counter. A scrollbar communicates only approximate depth, while pages would drift from the continuous two-column
+  arrow order. Chose the position counter: derive it from the existing focused record key, keep one record-navigation
+  state machine, and expose localized `Record N of M` semantics.
+- The compact counter belongs in the cabinet header beside the close command and remains visible on desktop and narrow
+  layouts. Arrow/Home/End navigation should focus without scrolling ancestors, then reveal the chosen record within
+  the cabinet list; empty cabinets retain their Workspace-files focus and report `00/00` without inventing a record.
+- Implemented the counter from `focusedRecordKey`, with two-digit minimum padding and localized `Record N of M`
+  semantics in all four Office locales. Cabinet navigation now mirrors the roster's explicit `preventScroll` plus
+  nearest-record reveal, while the empty state reports `00/00` and keeps its existing Workspace-files focus loop.
+- Real-browser acceptance reopened the actual 12-record Chat cabinet at `01/12`, used End to reveal the final card at
+  `12/12` above the fixed Workspace-files command, then used ArrowLeft to select `11/12`. The header badge, journal
+  cursor, authored titles, two-column scroll, and exit command remained synchronized. Focused cabinet/style suites
+  passed all 33 tests, plus the final 28-test style contract. Root and UI TypeScript passed; the full suite passed all
+  620 test files and 5,196 tests (one file and nine tests skipped); the production UI build passed with only the
+  existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

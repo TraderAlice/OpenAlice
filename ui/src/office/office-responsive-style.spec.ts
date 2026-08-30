@@ -145,6 +145,12 @@ describe('Office responsive style contract', () => {
   it('moves party counts into the title on short landscape screens', () => {
     expect(css).toMatch(/\.oa-office-window__title-count\s*\{[\s\S]*?display: none/)
     expect(css).toMatch(
+      /\.oa-office-roster \.oa-office-window__title-count\s*\{[\s\S]*?display: grid;[\s\S]*?min-width: 54px;/,
+    )
+    expect(css).toMatch(
+      /\.oa-office-cabinet-window \.oa-office-window__title-count\s*\{[\s\S]*?display: grid;[\s\S]*?min-width: 54px;/,
+    )
+    expect(css).toMatch(
       /@container \(max-width: 760px\) and \(max-height: 420px\) \{[\s\S]*?\.oa-office-roster \.oa-office-window__title-count,[\s\S]*?\.oa-office-cabinet-window \.oa-office-window__title-count\s*\{\s*display: grid;/,
     )
     expect(css).toMatch(

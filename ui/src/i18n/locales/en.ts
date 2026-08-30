@@ -1923,6 +1923,7 @@ export const en = {
     cabinetHint: 'Inspect this office’s filed records and Workspace files.',
     cabinetRecords_one: '{{count}} filed record',
     cabinetRecords_other: '{{count}} filed records',
+    cabinetPosition: 'Record {{index}} of {{count}}',
     cabinetInspectHint: 'Desk records stay in Office until you choose where to go.',
     cabinetKeyboardHint: 'Arrows choose · Enter / Space open',
     cabinetEmptyKeyboardHint: 'Enter / Space opens Workspace files',

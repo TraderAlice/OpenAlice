@@ -1891,6 +1891,7 @@ export const ja: Resources = {
     cabinetHint: 'このオフィスに保管された記録と Workspace ファイルを確認します。',
     cabinetRecords_one: '保管記録 {{count}} 件',
     cabinetRecords_other: '保管記録 {{count}} 件',
+    cabinetPosition: '{{count}} 件中 {{index}} 件目',
     cabinetInspectHint: '移動先を選ぶまで、デスク記録は Office 内に表示されます。',
     cabinetKeyboardHint: '方向キーで選択 · Enter / Space で開く',
     cabinetEmptyKeyboardHint: 'Enter / Space で Workspace ファイルを開く',
