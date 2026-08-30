@@ -51,10 +51,13 @@ export function OfficeDesk({
   )
     ? { kind: 'sleeping' as const, src: OFFICE_COWORKER_EMOTES.sleeping }
     : null
+  const poweredDownOutcome = moodEmote && moodEmote.kind !== 'working'
+    ? moodEmote
+    : null
   const emote = replayFocused && moodEmote
     ? moodEmote
     : employee && !employee.awake
-      ? sleepingCue
+      ? poweredDownOutcome ?? sleepingCue
       : moodEmote
   const label = employee
     ? t('office.employeeLabel', {

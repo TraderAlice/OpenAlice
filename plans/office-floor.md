@@ -4597,6 +4597,25 @@ Single-selection roster cursor follow-up (2026-08-31):
   all 618 test files and 5,179 tests (one file and nine tests skipped); the production UI build passed with only the
   existing ports fallback and large-chunk advisory.
 
+Powered-down outcome handoff follow-up (2026-08-31):
+
+- Reused the terminal Grok Issue `office-live-state-qa-20260831` as a no-file-write visual carrier and watched its whole
+  Live-floor cycle. Startup was legible: the HUD changed to `1 WORKING · 1 AWAKE`, G24's workstation powered on, its work
+  sprite appeared, and the restrained working bubble identified the exact desk. The original completion handoff was not:
+  the HUD returned to `0/0` and the desk powered down while the employee still projected `mood=review`, but the review
+  emote was discarded solely because `awake=false`; only the generic Operations alert remained.
+- Compared permanent outcome badges, relying on the global Operations signal, and allowing actionable/held outcomes to
+  outrank the generic sleeping cue. Chose the last option. A powered-down `review`, `failed`, or `waiting` coworker now
+  keeps its authored outcome emote; ordinary idle coworkers remain visually quiet and reveal sleep only in local context.
+- Real-browser acceptance reran Grok task `run-xRV2oUOL`: G24 progressed from working/awake with the talk bubble to
+  review/asleep with `/office/coworkers/review-emote-v1.png` visibly rendered as the green completion check. The existing
+  30-second review hold then settled G24 to idle and removed the check on the next four-second floor refresh. G20's older
+  unresolved failed state retained its red alert, preserving the intended priority of transient success versus actionable
+  failure. The reused Issue is back to terminal `done`; no recurring schedule or awake Session remains.
+- Focused Desk tests passed 14 cases. Root and UI TypeScript passed; the full suite passed all 618 test files and 5,182
+  tests (one file and nine tests skipped); the production UI build passed with only the existing ports fallback and
+  large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

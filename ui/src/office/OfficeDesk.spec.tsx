@@ -157,7 +157,7 @@ describe('OfficeDesk', () => {
     expect(screen.queryByTestId('office-emote-sleeping')).toBeNull()
   })
 
-  it('shows the selected historical event state over the generic sleep cue', () => {
+  it('keeps a powered-down outcome visible above the generic sleep cue', () => {
     const replayEmployee = { ...employee, awake: false, mood: 'review' as const, bubble: null }
     const props = {
       employee: replayEmployee,
@@ -179,7 +179,29 @@ describe('OfficeDesk', () => {
 
     rerender(<OfficeDesk {...props} />)
     expect(screen.queryByTestId('office-emote-sleeping')).toBeNull()
-    expect(screen.queryByTestId('office-emote-review')).toBeNull()
+    expect(screen.getByTestId('office-emote-review')).toBeTruthy()
+  })
+
+  it.each([
+    ['waiting', '/office/coworkers/waiting-emote-v1.png'],
+    ['failed', '/office/coworkers/failed-emote-v1.png'],
+    ['review', '/office/coworkers/review-emote-v1.png'],
+  ] as const)('keeps a powered-down %s outcome attached to its coworker', (mood, src) => {
+    const poweredDownEmployee = { ...employee, awake: false, mood, bubble: null }
+    render(
+      <OfficeDesk
+        employee={poweredDownEmployee}
+        roomName="Chat"
+        selected={false}
+        depth={107}
+        reducedMotion={false}
+        onSelect={() => undefined}
+      />,
+    )
+
+    expect(screen.getByTestId(`office-emote-${mood}`).querySelector('img')?.getAttribute('src'))
+      .toBe(src)
+    expect(screen.queryByTestId('office-emote-sleeping')).toBeNull()
   })
 
   it.each([
