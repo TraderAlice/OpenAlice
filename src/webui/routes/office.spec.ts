@@ -12,6 +12,13 @@ function directory(
     lifecycle?: string
     presence?: string
     updatedAt?: number
+    latestExecution?: {
+      taskId: string
+      status: 'done' | 'running' | 'failed' | 'interrupted'
+      startedAt: number
+      finishedAt?: number
+      assistantPreview?: string
+    }
   }[],
 ) {
   return {
@@ -126,7 +133,18 @@ describe('GET /api/office/floor', () => {
         get: (id: string) => id === 'office-1' ? { id, tag: 'chat', template: 'chat' } : undefined,
       },
       sessionDirectory: vi.fn(async () => directory('office-1', 'chat', [
-        { resumeId: 'resume-alice', agent: 'codex', lifecycle: 'active' },
+        {
+          resumeId: 'resume-alice',
+          agent: 'codex',
+          lifecycle: 'active',
+          latestExecution: {
+            taskId: 'run-1',
+            status: 'done',
+            startedAt: now - 20_000,
+            finishedAt: now,
+            assistantPreview: 'Filed the finished report.',
+          },
+        },
         { resumeId: 'resume-archived', agent: 'pi', lifecycle: 'active', presence: 'archived' },
       ])),
       sessionRegistry: {
@@ -165,7 +183,14 @@ describe('GET /api/office/floor', () => {
     } as never))
 
     const live = await (await app.request('/floor')).json() as {
-      offices: { employees: { resumeId: string; mood: string; drawers: { label: string }[] }[] }[]
+      offices: {
+        employees: {
+          resumeId: string
+          mood: string
+          latestResult?: { text: string; at: number }
+          drawers: { label: string }[]
+        }[]
+      }[]
       lastSeq: number
     }
     expect(live.lastSeq).toBe(3)
@@ -173,12 +198,19 @@ describe('GET /api/office/floor', () => {
     expect(live.offices[0]?.employees).toHaveLength(1)
     expect(live.offices[0]?.employees[0]).toMatchObject({
       resumeId: 'resume-alice',
+      latestResult: { text: 'Filed the finished report.', at: now },
       drawers: [expect.objectContaining({ label: 'note.md' })],
     })
     expect(read).not.toHaveBeenCalled()
 
     const replay = await (await app.request('/floor?asOfSeq=2')).json() as {
-      offices: { employees: { mood: string; bubble: { name?: string } | null }[] }[]
+      offices: {
+        employees: {
+          mood: string
+          bubble: { name?: string } | null
+          latestResult?: { text: string; at: number }
+        }[]
+      }[]
       asOfSeq: number
     }
     expect(replay.asOfSeq).toBe(2)
@@ -186,6 +218,7 @@ describe('GET /api/office/floor', () => {
       mood: 'working',
       bubble: { kind: 'tool', name: 'workspace_list' },
     })
+    expect(replay.offices[0]?.employees[0]?.latestResult).toBeUndefined()
     expect(read).toHaveBeenCalledTimes(1)
   })
 })

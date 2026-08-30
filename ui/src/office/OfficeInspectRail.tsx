@@ -153,6 +153,15 @@ export function OfficeInspectRail({
                     ? 'office.moodDialogue.resting'
                     : `office.moodDialogue.${employee.mood}`)}
               </blockquote>
+              {!employee.bubble && employee.latestResult && (
+                <div className="oa-office-inspect__latest-result">
+                  <small>{t('office.latestResult')}</small>
+                  <p title={employee.latestResult.text}>{employee.latestResult.text}</p>
+                  <time dateTime={new Date(employee.latestResult.at).toISOString()}>
+                    {formatRelativeTime(employee.latestResult.at)}
+                  </time>
+                </div>
+              )}
             </div>
             <dl className="oa-office-inspect__facts">
               <div>

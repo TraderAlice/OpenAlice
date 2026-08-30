@@ -2024,6 +2024,7 @@ export const en = {
     logStatusPaused: 'Paused',
     eventDetails: 'Event details',
     assignment: 'Assignment',
+    latestResult: 'Latest result',
     eventCause: 'Cause',
     eventOutput: 'Output',
     eventReason: 'Reason',

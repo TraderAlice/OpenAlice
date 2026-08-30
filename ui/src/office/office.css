@@ -2940,6 +2940,44 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
   transform: rotate(45deg);
 }
 
+.oa-office-inspect__latest-result {
+  position: relative;
+  margin-top: 6px;
+  padding: 6px 42px 6px 8px;
+  border-left: 3px solid var(--gba-moss);
+  color: var(--gba-ink);
+  background: color-mix(in srgb, var(--gba-moss) 10%, var(--gba-cream));
+}
+
+.oa-office-inspect__latest-result small {
+  display: block;
+  color: var(--gba-moss-dark);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.oa-office-inspect__latest-result p {
+  display: -webkit-box;
+  margin: 2px 0 0;
+  overflow: hidden;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.oa-office-inspect__latest-result time {
+  position: absolute;
+  top: 6px;
+  right: 7px;
+  color: var(--gba-ink-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 7px;
+}
+
 .oa-office-inspect__facts {
   margin: 0;
   border: 3px solid var(--gba-ink);

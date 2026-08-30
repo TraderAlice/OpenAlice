@@ -40,6 +40,7 @@ async function projectRoom(
   harness: ReturnType<typeof officeHarnessForTemplate>,
   events: Parameters<typeof projectOfficeFloor>[2],
   now: number,
+  includeLatestResult: boolean,
 ) {
   const directory = await svc.sessionDirectory(workspaceId, 200)
   if (!directory) return null
@@ -59,12 +60,24 @@ async function projectRoom(
     }
   })
   const floor = projectOfficeFloor(workspaceId, roster, events, now)
+  const directoryByResumeId = new Map(directory.sessions.map((entry) => [entry.resumeId, entry]))
   return {
     workspace: { ...directory.workspace, harness },
     lastInteractionAt: floor.lastInteractionAt,
     sleeping: floor.sleeping,
     employees: floor.employees.map((employee) => ({
       ...employee,
+      ...(() => {
+        const execution = directoryByResumeId.get(employee.resumeId)?.latestExecution
+        const finishedAt = execution?.finishedAt
+        return includeLatestResult
+          && execution?.status === 'done'
+          && execution.assistantPreview
+          && finishedAt !== undefined
+          && finishedAt <= now
+          ? { latestResult: { text: execution.assistantPreview, at: finishedAt } }
+          : {}
+      })(),
       drawers: projectOfficeDrawers(
         workspaceId,
         employee.resumeId,
@@ -107,7 +120,14 @@ export function createOfficeRoutes(svc: WorkspaceService): Hono {
     if (requested && rooms.length === 0) return c.json({ error: 'workspace_not_found' }, 404)
     const offices = []
     for (const room of rooms) {
-      const office = await projectRoom(svc, room.id, room.harness, sliced, now)
+      const office = await projectRoom(
+        svc,
+        room.id,
+        room.harness,
+        sliced,
+        now,
+        asOfSeq === undefined,
+      )
       if (office) offices.push(office)
     }
     return c.json({

@@ -74,6 +74,10 @@ export interface OfficeFloorEmployee {
   readonly awake: boolean
   readonly surface?: AgentRuntimeSurface
   readonly bubble: OfficeBubble | null
+  readonly latestResult?: {
+    readonly text: string
+    readonly at: number
+  }
   readonly lastSeq: number
   readonly lastInteractionAt: number
   readonly drawers: readonly OfficeDrawerItem[]

@@ -1992,6 +1992,7 @@ export const ja: Resources = {
     logStatusPaused: '一時停止',
     eventDetails: 'イベント詳細',
     assignment: '担当任務',
+    latestResult: '最新の結果',
     eventCause: '起点',
     eventOutput: '出力',
     eventReason: '理由',

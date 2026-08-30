@@ -1999,6 +1999,7 @@ export const zhHant: Resources = {
     logStatusPaused: '已暫停',
     eventDetails: '事件詳情',
     assignment: '目前委託',
+    latestResult: '最近結果',
     eventCause: '原因',
     eventOutput: '輸出',
     eventReason: '說明',

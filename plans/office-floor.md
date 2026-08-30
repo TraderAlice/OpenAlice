@@ -3498,6 +3498,30 @@ Sustained collision-feedback follow-up (2026-08-30):
   tests). Root and UI TypeScript passed, the full suite passed all 617 test files and 5,153 tests (one file and nine
   tests skipped), and the production UI build passed with only the existing jsdom canvas and large-chunk advisories.
 
+Persistent coworker-result follow-up (2026-08-30):
+
+- Created the bounded `office-live-state-qa-20260830` Issue in the dedicated Office Lab Chat Workspace and ran it with
+  Grok low effort. The new g14 Diplomat visibly crossed born, working, tool, reporting, completion-review, and idle
+  states; its two successful runs remained attributable in the Operations board, and the QA Issue was then marked done
+  so it will not keep firing.
+- The live state chain was correct, but the durable coworker inspection was not: once the 30-second review celebration
+  elapsed, reopening the completed employee showed only `Off duty. Ready when the floor wakes.` The result still
+  existed in the Activity Log and Issue, yet the person who produced it no longer carried even a quiet summary.
+- Compared extending the review animation, persisting the speech bubble, and adding an idle-only result preview to the
+  Agent File. Chose the preview: map celebration stays bounded and sleeping coworkers do not look like they are still
+  talking, while the player can recover the latest successful headless output directly from the responsible desk.
+- The live Office projection now joins the Session directory's latest successful execution into `latestResult` only
+  after it has finished; replay deliberately omits that live-only field so a future result cannot leak backward. The Agent File renders
+  that preview as a compact two-line, time-stamped field only when there is no current bubble; full output remains owned
+  by Runs / Issue rather than turning the profile into another log reader.
+- Real-browser acceptance reopened Grok Diplomat after the review hold at 1200x800 and 390x844. Both layouts preserved
+  the resting dialogue, showed `ARRIVED WORKING DONE` with relative time, kept the three facts, Issue drawer, close
+  control, and Open session command reachable, and did not expand the map bubble or move the primary action. Live
+  replay tests also prove a future completion preview is not leaked into an earlier floor snapshot. Focused route and
+  profile specs passed (3 files / 19 tests). Root and UI TypeScript passed, the full suite passed all 617 test files and
+  5,153 tests (one file and nine tests skipped), and the production UI build passed with only the existing jsdom canvas
+  and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

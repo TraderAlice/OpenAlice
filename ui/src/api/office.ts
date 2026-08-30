@@ -41,6 +41,10 @@ export interface OfficeFloorEmployee {
   awake: boolean
   surface?: AgentRuntimeSurface
   bubble: OfficeBubble | null
+  latestResult?: {
+    text: string
+    at: number
+  }
   lastSeq: number
   lastInteractionAt: number
   drawers: OfficeDrawerItem[]

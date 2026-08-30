@@ -1991,6 +1991,7 @@ export const zh: Resources = {
     logStatusPaused: '已暂停',
     eventDetails: '事件详情',
     assignment: '当前委托',
+    latestResult: '最近结果',
     eventCause: '原因',
     eventOutput: '输出',
     eventReason: '说明',
