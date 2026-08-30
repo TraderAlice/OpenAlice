@@ -818,6 +818,8 @@ export function OfficeBuilding({
       const target = event.target
       const fromIdlePage = target === document.body
       const fromFloor = target instanceof Node && Boolean(viewport?.contains(target))
+      const fromNearbyWorldTarget = target instanceof HTMLElement
+        && target.dataset.nearby === 'true'
       if (!fromIdlePage && !fromFloor) return
       const key = event.key.toLowerCase()
       if (key === 'escape' && routeTargetId) {
@@ -825,7 +827,11 @@ export function OfficeBuilding({
         cancelAutoWalk()
         return
       }
-      if ((key === 'enter' || key === ' ') && nearbyTarget && (fromIdlePage || target === viewport)) {
+      if (
+        (key === 'enter' || key === ' ')
+        && nearbyTarget
+        && (fromIdlePage || target === viewport || fromNearbyWorldTarget)
+      ) {
         event.preventDefault()
         activateNearbyTarget()
         return

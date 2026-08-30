@@ -1380,6 +1380,16 @@ describe('OfficeBuilding', () => {
     expect(inboxPrompt.textContent).toContain('Check mail')
     expect(inboxPrompt.textContent).toContain('codex · Agent report delivered')
 
+    expect(inbox.dataset.nearby).toBe('true')
+    inbox.focus()
+    fireEvent.keyDown(inbox, { key: 'Enter' })
+    await waitFor(() => expect(onOpenService).toHaveBeenCalledWith('inbox', 11))
+    expect(document.activeElement).toBe(inbox)
+    onOpenService.mockClear()
+    fireEvent.keyDown(inbox, { key: ' ' })
+    await waitFor(() => expect(onOpenService).toHaveBeenCalledWith('inbox', 11))
+    onOpenService.mockClear()
+
     await userEvent.click(inbox)
     await waitFor(() => expect(onOpenService).toHaveBeenCalledWith('inbox', 11))
     await userEvent.click(news)

@@ -4139,6 +4139,23 @@ Visible journal-exit hierarchy follow-up (2026-08-30):
   passed, the full suite passed all 617 test files and 5,172 tests (one file and nine tests skipped), and the production
   UI build passed with only the existing ports fallback, jsdom canvas, and large-chunk advisories.
 
+World-object confirm-key continuity follow-up (2026-08-30):
+
+- Continued the real News-terminal loop after the journal Escape repair. Closing Activity Log correctly restored focus
+  to the nearby terminal, but both Enter and Space then did nothing; clicking the same focused terminal reopened it.
+  Moving focus back to the floor also made Enter work, proving that exact world-object focus restoration and the
+  map-owned game-confirm handler had become incompatible interaction models.
+- Compared always restoring the broad floor, relying on browser-native button activation, and admitting nearby focused
+  world objects into the existing confirm pipeline. Chose the shared pipeline: exact object focus preserves spatial and
+  assistive provenance, while Office now recognizes only a focused object already marked as the current nearby target,
+  prevents the browser default, and activates it once through the same Enter/Space path as the floor and touch A button.
+- Real-browser acceptance auto-walked to News, closed the journal, confirmed `focus=News terminal` and
+  `nearby=News terminal`, then reopened the News channel independently with Enter and Space. Both runs selected the
+  newest news record and produced one Activity Log window. Focused Building and Office-page suites passed 33 tests.
+  Root and UI TypeScript passed, the full suite passed all 617 test files and 5,172 tests (one file and nine tests
+  skipped), and the production UI build passed with only the existing ports fallback, jsdom canvas, and large-chunk
+  advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
