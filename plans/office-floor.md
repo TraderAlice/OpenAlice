@@ -4528,6 +4528,24 @@ Replay-arrival hierarchy follow-up (2026-08-31):
   suite passed all 618 test files and 5,178 tests (one file and nine tests skipped); the production UI build passed with
   only the existing ports fallback and large-chunk advisory.
 
+Agent-drawer title legibility follow-up (2026-08-31):
+
+- Started one interactive Grok Session and the one-shot Grok Issue `office-live-state-qa-20260831` in the real Office Lab
+  to exercise both occupancy contracts. The floor correctly distinguished `0 working / 1 awake` for the standing Session,
+  then `1 working / 2 awake` for the headless Issue, showed the generated work frame and active screen, and returned the
+  Issue coworker to sleep at completion. The interactive QA Session was paused afterward; the final floor is back at
+  `0 working / 0 awake`, and the Issue is terminal `done` with no scheduled recurrence.
+- The completed G24 Agent File exposed the actual presentation gap: its uniquely useful drawer id
+  `office-live-state-qa-20260831` rendered as `office-live-state…`, hiding the date and making similarly prefixed Issues
+  indistinguishable. Compared widening the window, expanding records on demand, and using a bounded two-line menu label.
+  Chose two lines so identity improves without moving the fixed primary command or creating another disclosure level.
+- Drawer labels now wrap anywhere inside a strict two-line clamp. Real-browser acceptance rendered the complete id in a
+  114px-wide, 34px-high label; the card settled at 74px, retained Issue/time/Open metadata, and left the full-width
+  `Open session` command visible. The authored line clamp computed to `2`, so still-long records cannot grow unbounded.
+- Focused Inspect-rail and Agent-file style suites passed ten tests. Root and UI TypeScript passed; the full suite
+  passed all 618 test files and 5,178 tests (one file and nine tests skipped); the production UI build passed with only
+  the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

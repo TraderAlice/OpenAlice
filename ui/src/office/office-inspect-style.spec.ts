@@ -13,6 +13,8 @@ const compactStart = css.indexOf('@container (max-width: 680px)', mediumStart)
 const phoneStart = css.indexOf('@media (max-width: 580px)', compactStart)
 const mediumCss = css.slice(mediumStart, compactStart)
 const compactCss = css.slice(compactStart, phoneStart)
+const drawerLabelRules = [...css.matchAll(/\.oa-office-drawer__label\s*\{([^}]*)\}/g)]
+const drawerLabelCss = drawerLabelRules.at(-1)?.[1] ?? ''
 
 describe('Office Agent-file style contract', () => {
   it('opens game windows as opaque stepped panels instead of blending with the floor', () => {
@@ -69,5 +71,8 @@ describe('Office Agent-file style contract', () => {
     expect(css.slice(phoneStart)).toMatch(
       /\.oa-office-drawers ul\s*\{[\s\S]*?grid-template-columns: 1fr/,
     )
+    expect(drawerLabelCss).toContain('white-space: normal')
+    expect(drawerLabelCss).toContain('overflow-wrap: anywhere')
+    expect(drawerLabelCss).toContain('-webkit-line-clamp: 2')
   })
 })

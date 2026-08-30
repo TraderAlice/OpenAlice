@@ -3238,6 +3238,16 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
   background: var(--gba-cream);
 }
 
+.oa-office-drawer__label {
+  display: -webkit-box;
+  overflow: hidden;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .oa-office-drawer__destination {
   color: var(--gba-water);
 }
