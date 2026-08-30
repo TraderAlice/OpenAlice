@@ -1352,6 +1352,17 @@
   box-shadow: 0 -3px 0 color-mix(in srgb, var(--gba-ink) 16%, transparent);
 }
 
+.oa-office-runtime__actions::after {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: 0;
+  height: 11px;
+  content: "";
+  background: var(--gba-paper);
+  pointer-events: none;
+}
+
 .oa-office-runtime__actions > .oa-office-runtime__open {
   min-width: 0;
   flex: 1 1 0;

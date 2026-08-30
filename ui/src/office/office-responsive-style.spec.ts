@@ -145,6 +145,9 @@ describe('Office responsive style contract', () => {
       /\.oa-office-runtime__actions\s*\{[\s\S]*?position: sticky;[\s\S]*?bottom: 0;/,
     )
     expect(css).toMatch(
+      /\.oa-office-runtime__actions::after\s*\{[\s\S]*?top: 100%;[\s\S]*?height: 11px;[\s\S]*?background: var\(--gba-paper\);/,
+    )
+    expect(css).toMatch(
       /@container \(max-width: 760px\) \{[\s\S]*?\.oa-office-runtime__event\s*\{[\s\S]*?min-height: 156px;/,
     )
   })

@@ -3187,6 +3187,22 @@ Journal content-first focus follow-up (2026-08-30):
   Root/UI TypeScript, the full 617-file Vitest run (5,135 passing; one file and nine tests skipped), and the production
   build also passed; the existing direct-eval and large-chunk advisories are unchanged.
 
+Sticky journal-footer safe-area follow-up (2026-08-30):
+
+- Continued reading real Agent completion #2815 at the top of the Operations window. Its metadata extended about 66px
+  behind the sticky command strip; the strip ended at y681 while the last `tool calls` line continued to y699, leaving
+  a fragment visibly leaking below the two primary buttons.
+- Compared removing sticky commands, forcing a fixed nested detail scroller, padding the document, and extending the
+  footer's opaque material through the detail frame's existing bottom slot. Chose the material extension: commands
+  remain immediately available, reports keep natural outer-window scrolling, and the mask covers only the 11px paper
+  inset between the command strip and frame border rather than hiding additional content.
+- Added that 11px paper-material extension as a pointer-transparent pseudo-element and locked the contract in the
+  responsive style spec. Real-browser QA confirmed the leaked `calls` fragment is gone at the top of the report; at
+  maximum scroll the mask bottom and event-frame bottom both measured y680.76 (zero delta), with the full Output block
+  still readable. The focused 16-test Office style spec, root/UI TypeScript, the full 617-file Vitest run (5,135
+  passing; one file and nine tests skipped), and the production build passed; the existing direct-eval and large-chunk
+  advisories are unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
