@@ -180,6 +180,7 @@ export function OfficeBuilding({
   const [collisionImpact, setCollisionImpact] = useState<OfficeCollisionImpactState | null>(null)
   const [panning, setPanning] = useState(false)
   const [controlsLearned, setControlsLearned] = useState(false)
+  const [interactionAnchorTargetId, setInteractionAnchorTargetId] = useState<string | null>(null)
   const [routeTargetId, setRouteTargetId] = useState<string | null>(null)
   const [routeTrail, setRouteTrail] = useState<readonly OfficeInteractionPathStep[]>([])
   const [departingWorkspace, setDepartingWorkspace] = useState<{
@@ -377,10 +378,26 @@ export function OfficeBuilding({
     [mapLayout],
   )
   const nearbyTarget = useMemo(
-    () => floorInteractionSuspended || departingWorkspace || selected
-      ? null
-      : nearestOfficeInteractionTarget(alice, aliceDirection, availableInteractionTargets),
-    [alice, aliceDirection, availableInteractionTargets, departingWorkspace, floorInteractionSuspended, selected],
+    () => {
+      if (floorInteractionSuspended || departingWorkspace || selected) return null
+      const anchoredTarget = interactionAnchorTargetId
+        ? availableInteractionTargets.find((target) => target.id === interactionAnchorTargetId)
+        : null
+      const anchoredNearbyTarget = anchoredTarget
+        ? nearestOfficeInteractionTarget(alice, aliceDirection, [anchoredTarget])
+        : null
+      return anchoredNearbyTarget
+        ?? nearestOfficeInteractionTarget(alice, aliceDirection, availableInteractionTargets)
+    },
+    [
+      alice,
+      aliceDirection,
+      availableInteractionTargets,
+      departingWorkspace,
+      floorInteractionSuspended,
+      interactionAnchorTargetId,
+      selected,
+    ],
   )
   const nearbyService = nearbyTarget?.kind === 'inbox-service'
     || nearbyTarget?.kind === 'news-service'
@@ -613,7 +630,10 @@ export function OfficeBuilding({
     walkTimerRef.current = window.setTimeout(() => setAliceWalking(false), 150)
   }
   const moveAlice = (movement: OfficeMovement, learnsManualControls = true): boolean => {
-    if (learnsManualControls) setControlsLearned(true)
+    if (learnsManualControls) {
+      setControlsLearned(true)
+      setInteractionAnchorTargetId(null)
+    }
     setAliceDirection(movement.direction)
     const move = moveAliceOnOfficeMap(aliceRef.current, movement, mapLayout, collisionRects)
     if (move.bumped) {
@@ -637,6 +657,7 @@ export function OfficeBuilding({
     return true
   }
   const activateTarget = (target: OfficeInteractionTarget) => {
+    setInteractionAnchorTargetId(target.id)
     if (target.kind === 'employee') {
       onSelectEmployee(target.workspaceId, target.employee)
     } else if (target.kind === 'sign') {
@@ -701,6 +722,7 @@ export function OfficeBuilding({
     const target = interactionTargetById.get(targetId)
     if (!target) return
     if (replaySeq != null && target.kind !== 'operations' && !options.allowReplay) return
+    setInteractionAnchorTargetId(null)
     cancelAutoWalk()
     const generation = routeGenerationRef.current
     const path = officeInteractionPath(aliceRef.current, target, mapLayout, collisionRects)
@@ -972,6 +994,7 @@ export function OfficeBuilding({
     setAliceDirection(nextDirection)
     setAliceWalking(false)
     setAlicePushing(false)
+    setInteractionAnchorTargetId(null)
     pushDirectionRef.current = null
     const viewport = viewportRef.current?.getBoundingClientRect()
     setCamera(viewport && viewport.width > 0 && viewport.height > 0

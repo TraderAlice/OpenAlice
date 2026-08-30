@@ -4246,6 +4246,22 @@ Off-grid route-execution follow-up (2026-08-30):
   617 test files and 5,174 tests (one file and nine tests skipped), and the production UI build passed with only the
   existing ports fallback and large-chunk advisories.
 
+Dense-pod interaction-identity follow-up (2026-08-30):
+
+- Continued the same real Grok Analyst route after exact arrival at x312/y504. Closing Agent File immediately changed
+  the prompt to Grok Synthesist because the generic nearest-target score preferred an adjacent dense-pod seat, even
+  though the player had explicitly selected and just interacted with Grok Analyst.
+- Compared globally biasing target scores, forcing route destinations to be geometrically unambiguous, and retaining a
+  short-lived activation anchor. Chose the interaction anchor: an explicitly activated target remains preferred only
+  while it is still a valid target in Alice's facing cone. Manual movement intent, choosing another target, or a map
+  reframe releases the anchor, so free exploration continues to use ordinary nearest-target behavior.
+- Real-browser acceptance closed Grok Analyst's file at x312/y504 and retained `Talk to Grok Analyst` with that desk
+  marked nearby. A subsequent left input collided and did not change Alice's position, but still released the anchor
+  and naturally changed the prompt to the nearer Grok Synthesist. The dense four-seat regression covers both retention
+  and release. Focused Building and interaction-target suites passed 31 tests. Root and UI TypeScript passed, the full
+  suite passed all 617 test files and 5,174 tests (one file and nine tests skipped), and the production UI build passed
+  with only the existing ports fallback and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

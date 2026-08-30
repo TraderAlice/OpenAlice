@@ -725,18 +725,18 @@ describe('OfficeBuilding', () => {
                 workspace: { id: 'chat-route', tag: 'chat', harness: 'chat' },
                 lastInteractionAt: 1,
                 sleeping: false,
-                employees: [{
-                  resumeId: 'resume-route',
+                employees: Array.from({ length: 4 }, (_, index) => ({
+                  resumeId: index === 0 ? 'resume-route' : `resume-neighbor-${index}`,
                   agent: 'grok',
-                  name: 'g1',
-                  title: 'Off-grid route target',
+                  name: `g${index + 1}`,
+                  title: index === 0 ? 'Off-grid route target' : `Dense neighbor ${index}`,
                   awake: false,
-                  mood: 'idle',
+                  mood: 'idle' as const,
                   bubble: null,
                   lastSeq: 1,
                   lastInteractionAt: 1,
                   drawers: [],
-                }],
+                })),
               },
             ],
           }}
@@ -752,6 +752,7 @@ describe('OfficeBuilding', () => {
 
       const alice = screen.getByRole('img', { name: 'Alice on the office map' })
       const target = screen.getByTestId('office-desk-resume-route')
+      const closerNeighbor = screen.getByTestId('office-desk-resume-neighbor-2')
       fireEvent.click(target)
       expect(`${alice.style.left}:${alice.style.top}`).toBe('336px:600px')
       expect(target.dataset.route).toBe('true')
@@ -759,13 +760,20 @@ describe('OfficeBuilding', () => {
 
       act(() => vi.advanceTimersByTime(600))
       expect(`${alice.style.left}:${alice.style.top}`).toBe('312px:504px')
-      expect(target.dataset.nearby).toBe('true')
       expect(target.dataset.route).toBe('false')
       act(() => vi.advanceTimersByTime(100))
       expect(onSelectEmployee).toHaveBeenCalledWith(
         'chat-route',
         expect.objectContaining({ resumeId: 'resume-route' }),
       )
+      expect(target.dataset.nearby).toBe('true')
+      expect(closerNeighbor.dataset.nearby).toBe('false')
+
+      const map = screen.getByTestId('office-floor')
+      fireEvent.keyDown(map, { key: 'a' })
+      fireEvent.keyUp(map, { key: 'a' })
+      expect(target.dataset.nearby).toBe('false')
+      expect(closerNeighbor.dataset.nearby).toBe('true')
     } finally {
       vi.useRealTimers()
     }
