@@ -127,11 +127,21 @@ describe('OfficeBuilding', () => {
     expect(onOpenFiles).not.toHaveBeenCalled()
     expect(onOpenRoster).not.toHaveBeenCalled()
 
+    const menuTrigger = screen.getByRole('button', { name: 'Menu' })
+    menuTrigger.focus()
+    await userEvent.keyboard('{ArrowDown}')
+    expect(screen.getByLabelText('Current floor view: Replay · Seq 2').textContent)
+      .toContain('Current')
+    expect(screen.queryByLabelText('Current floor view: Live map')).toBeNull()
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Live map' }))
+    expect(onReturnLive).toHaveBeenCalledTimes(1)
+    expect(document.activeElement).toBe(menuTrigger)
+
     const returnLive = screen.getByRole('button', { name: 'Return live' })
     expect(returnLive.textContent).toContain('↩')
     expect(returnLive.textContent).toContain('Live')
     await userEvent.click(returnLive)
-    expect(onReturnLive).toHaveBeenCalledTimes(1)
+    expect(onReturnLive).toHaveBeenCalledTimes(2)
   })
 
   it('leaves the active Replay menu as the only Live exit while the floor is suspended', () => {

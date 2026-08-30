@@ -3663,6 +3663,24 @@ Short-screen Agent-file flow follow-up (2026-08-30):
   Root and UI TypeScript passed, the full suite passed all 617 test files and 5,162 tests (one file and nine tests
   skipped), and the production UI build passed with only the existing jsdom canvas and large-chunk advisories.
 
+Replay pause-menu truth follow-up (2026-08-30):
+
+- Replayed News Seq 4743 at 390x844 and opened the pause menu after Alice reached the News terminal. The HUD and map
+  were visibly historical, but the menu still labeled `Live map` as `Current`; its state description contradicted the
+  dedicated Live exit immediately beside it.
+- Compared changing only the text, removing the duplicate Live shortcut, and making the menu describe the actual floor
+  layer with a matching exit action. Chose the latter: replay now owns a non-interactive `Replay · Seq N / Current`
+  row, while `Live map` is a real menu item that returns to the live floor. The compact HUD Live button remains as the
+  fastest exit.
+- Clicking the menu Live action closes the menu, restores focus to its trigger, and returns the route to live mode.
+  Live mode retains its existing current-map or Live/All group controls, so replay state no longer masquerades as a
+  group-filter selection.
+- Real-browser acceptance covered the complete narrow loop from Activity Log record to Find on floor, service-terminal
+  arrival, replay menu, and Live return. The final menu showed `Replay · Seq 4743 / Current`, `Live map`, and
+  `Activity log`; focus returned to Menu after exit. The focused OfficeBuilding suite passed all 18 tests. Root and UI
+  TypeScript passed, the full suite passed all 617 test files and 5,162 tests (one file and nine tests skipped), and the
+  production UI build passed with only the existing jsdom canvas and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

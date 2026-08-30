@@ -1016,7 +1016,31 @@ export function OfficeBuilding({
                 <img src={OFFICE_HUD_ASSETS.menuTerminal} alt="" style={officePixelImg} />
                 <span>{t('office.floorView')}</span>
               </div>
-              {hiddenGroupCount > 0 ? (
+              {replaySeq != null ? (
+                <>
+                  <div
+                    className="oa-office-pause-menu__current"
+                    aria-label={t('office.currentFloorView', {
+                      view: t('office.replayFloor', { seq: replaySeq }),
+                    })}
+                  >
+                    <img src={OFFICE_HUD_ASSETS.occupancyLog} alt="" aria-hidden style={officePixelImg} />
+                    <span>{t('office.replayFloor', { seq: replaySeq })}</span>
+                    <small>{t('office.currentView')}</small>
+                  </div>
+                  {onReturnLive && (
+                    <DropdownMenuItem
+                      onClick={() => {
+                        closeFloorMenu(false)
+                        onReturnLive()
+                      }}
+                    >
+                      <img src={OFFICE_HUD_ASSETS.resetCompass} alt="" aria-hidden style={officePixelImg} />
+                      <span>{t('office.liveMap')}</span>
+                    </DropdownMenuItem>
+                  )}
+                </>
+              ) : hiddenGroupCount > 0 ? (
                 <DropdownMenuRadioGroup
                   value={showingAll ? 'all' : 'live'}
                   onValueChange={(value) => {
