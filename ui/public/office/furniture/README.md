@@ -38,6 +38,9 @@ Current runtime assets:
 - `wall-utility-v1.png` — archive shelving and network-control module centered behind Operations
 - `wall-utility-night-v1.png` — geometry-matched after-hours utility module
 - `building-foundation-v1.png` — seamless dark structural material outside the playable floor
+- `floor-edge-bottom-v1.png` and `floor-edge-side-v1.png` — generated low structural curb tiles that make the
+  left, right, and bottom walkable boundary visible; the left edge mirrors the side asset while preserving one
+  authored collision footprint
 - `floor-tile-v2.png`
 - `workspace-rug-v2.png`
 - `coffee-station-v2.png` — Chat neighborhood social prop

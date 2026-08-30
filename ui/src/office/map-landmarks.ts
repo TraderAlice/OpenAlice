@@ -15,7 +15,7 @@ export interface OfficeServiceLandmark {
 
 const SERVICE_WIDTH = 136
 const SERVICE_HEIGHT = 116
-const SERVICE_FRONT_AISLE = 56
+const SERVICE_FRONT_AISLE = 80
 const SERVICE_COLLISION = { x: 12, y: 16, width: 112, height: 94 } as const
 
 function serviceLandmarksAt(inboxX: number, newsX: number, y: number): OfficeServiceLandmark[] {

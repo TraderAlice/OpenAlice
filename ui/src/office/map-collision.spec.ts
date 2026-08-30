@@ -3,6 +3,10 @@ import { describe, expect, it } from 'vitest'
 import { nearestOfficeInteractionTarget } from './interaction-targets'
 import { layoutOfficeMap } from './map-layout'
 import {
+  OFFICE_ALICE_VISUAL_HALF_HEIGHT,
+  OFFICE_ALICE_VISUAL_HALF_WIDTH,
+  OFFICE_FLOOR_BOTTOM_EDGE,
+  OFFICE_FLOOR_SIDE_EDGE,
   isOfficePositionWalkable,
   moveAliceOnOfficeMap,
   officeCollisionRects,
@@ -129,6 +133,38 @@ describe('Office map collision', () => {
       bumped: true,
       obstacleId: 'wall',
     })
+  })
+
+  it('keeps Alice inside the visible side and bottom floor barriers', () => {
+    const right = moveAliceOnOfficeMap(
+      { x: layout.width - 48, y: layout.height - 96 },
+      { x: 48, y: 0 },
+      layout,
+    )
+    const bottom = moveAliceOnOfficeMap(
+      { x: layout.width / 2, y: layout.height - 72 },
+      { x: 0, y: 48 },
+      layout,
+    )
+
+    expect(right).toEqual({
+      position: {
+        x: layout.width - OFFICE_FLOOR_SIDE_EDGE - OFFICE_ALICE_VISUAL_HALF_WIDTH,
+        y: layout.height - 96,
+      },
+      bumped: true,
+    })
+    expect(bottom).toEqual({
+      position: {
+        x: layout.width / 2,
+        y: layout.height - OFFICE_FLOOR_BOTTOM_EDGE - OFFICE_ALICE_VISUAL_HALF_HEIGHT,
+      },
+      bumped: false,
+    })
+    expect(isOfficePositionWalkable({ x: layout.width - 24, y: layout.height - 96 }, layout))
+      .toBe(false)
+    expect(isOfficePositionWalkable({ x: layout.width / 2, y: layout.height - 24 }, layout))
+      .toBe(false)
   })
 
   it('stops Alice at the operations board while keeping its log interaction in range', () => {

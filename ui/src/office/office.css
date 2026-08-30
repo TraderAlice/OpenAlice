@@ -4881,6 +4881,42 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
   object-fit: contain;
 }
 
+.oa-office-floor-edge {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+  image-rendering: pixelated;
+}
+
+.oa-office-floor-edge--left,
+.oa-office-floor-edge--right {
+  top: 102px;
+  bottom: 0;
+  width: 24px;
+  background-image: var(--office-floor-edge-side);
+  background-repeat: repeat-y;
+  background-size: 24px 360px;
+}
+
+.oa-office-floor-edge--left {
+  left: 0;
+  transform: scaleX(-1);
+}
+
+.oa-office-floor-edge--right {
+  right: 0;
+}
+
+.oa-office-floor-edge--bottom {
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 24px;
+  background-image: var(--office-floor-edge-bottom);
+  background-repeat: repeat-x;
+  background-size: 360px 24px;
+}
+
 .oa-office-building[data-office-time="night"] .oa-office-map-wall {
   background-image: var(--office-wall-night);
   box-shadow:

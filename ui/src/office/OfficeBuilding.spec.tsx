@@ -755,6 +755,12 @@ describe('OfficeBuilding', () => {
     const utilityWall = mapWall?.querySelector<HTMLImageElement>('[data-kind="operations-utility"]')
     expect(utilityWall?.src).toContain('/office/furniture/wall-utility-night-v1.png')
     expect(utilityWall?.style.left).toBe('408px')
+    const floorEdges = map.querySelectorAll('.oa-office-floor-edge')
+    expect(floorEdges).toHaveLength(3)
+    expect(map.querySelector('.oa-office-map')?.getAttribute('style'))
+      .toContain('/office/furniture/floor-edge-bottom-v1.png')
+    expect(map.querySelector('.oa-office-map')?.getAttribute('style'))
+      .toContain('/office/furniture/floor-edge-side-v1.png')
     const controls = map.parentElement?.querySelector<HTMLElement>('.oa-office-map-controls')
     expect(controls?.dataset.learned).toBe('false')
     expect(controls?.dataset.actionReady).toBeUndefined()
@@ -1147,7 +1153,7 @@ describe('OfficeBuilding', () => {
           attention: { agent: true, inbox: true, news: true },
           freshKind: 'news',
         }}
-        initialPlayerState={{ position: { x: 340, y: 624 }, direction: 'up' }}
+        initialPlayerState={{ position: { x: 340, y: 600 }, direction: 'up' }}
         onSelectEmployee={vi.fn()}
         onOpenEmployee={vi.fn()}
         onOpenWorkspace={vi.fn()}

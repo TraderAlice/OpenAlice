@@ -3451,6 +3451,32 @@ Front-facing service-terminal follow-up (2026-08-30):
   suite passed all 617 test files and 5,152 tests (one file and nine tests skipped), and the production UI build passed
   with only the existing jsdom canvas and large-chunk advisories.
 
+Visible floor-perimeter follow-up (2026-08-30):
+
+- Continued the Grok navigation report against the real Office instead of treating every note as a defect. The first
+  route marker was correctly the next 24px path cell, but holding Right still put Alice at x=936 on a 960px map: her
+  48px silhouette touched the structural bezel because the map had only an invisible center-point clamp. The same
+  foot-box rule let her lower body disappear behind the bottom frame.
+- Compared adding a larger invisible clamp, outlining Alice at the edge, and authoring a visible low structural curb
+  whose collision matches the complete character silhouette. Chose the third model: classic top-down maps should make
+  their world boundary legible, while outline/transparency assists would preserve the false walkable geometry.
+- Used the built-in image generator with `style-master-v1.png`, `floor-tile-v2.png`, and
+  `building-foundation-v1.png` as locked references. One prompt authored a seamless horizontal cream/walnut/charcoal
+  bottom curb with restrained teal fasteners; a second authored its vertical side counterpart with the playable floor
+  on the left and foundation on the right. Both prompts prohibited floor fill, text, UI, characters, glow, and
+  perspective convergence. The selected masters were cropped into `floor-edge-bottom-v1.png` (360x24) and
+  `floor-edge-side-v1.png` (24x360), then deterministically packaged with hard 0/255 alpha and at most 64 opaque colors.
+- The right and mirrored-left tiles now repeat below the authored window wall; the bottom tile closes both corners in
+  front. Outer bounds reserve Alice's complete 48x56 visual footprint, while desks and furniture retain the smaller
+  foot-box collision that keeps indoor movement agile. A sparse one-row floor now reserves an 80px service aisle so
+  the front-only Inbox/News approach remains reachable inside the new bottom perimeter.
+- Real-browser acceptance at 390x844 walked from spawn to the lower-right corner. Right stopped at x=912 instead of
+  936, Down stopped at y=620 instead of 636, the complete sprite and foot shadow remained above and left of the curb,
+  all three repeated edge assets loaded, and no image broke. Focused furniture, collision, path, interaction, and
+  building specs passed (5 files / 43 tests). Root and UI TypeScript passed, the full suite passed all 617 test files
+  and 5,153 tests (one file and nine tests skipped), and the production UI build passed with only the existing jsdom
+  canvas and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

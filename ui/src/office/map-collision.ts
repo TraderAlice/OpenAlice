@@ -8,8 +8,12 @@ import {
 } from './pod-geometry'
 
 export const OFFICE_WALL_FLOOR_EDGE = 112
+export const OFFICE_FLOOR_SIDE_EDGE = 24
+export const OFFICE_FLOOR_BOTTOM_EDGE = 24
 export const OFFICE_ALICE_HALF_WIDTH = 10
 export const OFFICE_ALICE_HALF_HEIGHT = 12
+export const OFFICE_ALICE_VISUAL_HALF_WIDTH = 24
+export const OFFICE_ALICE_VISUAL_HALF_HEIGHT = 28
 
 export interface OfficeCollisionRect {
   id: string
@@ -114,10 +118,10 @@ export function isOfficePositionWalkable(
   layout: OfficeMapLayout,
   collisionRects: readonly OfficeCollisionRect[] = officeCollisionRects(layout),
 ): boolean {
-  return position.x >= 24
-    && position.x <= layout.width - 24
+  return position.x >= OFFICE_FLOOR_SIDE_EDGE + OFFICE_ALICE_VISUAL_HALF_WIDTH
+    && position.x <= layout.width - OFFICE_FLOOR_SIDE_EDGE - OFFICE_ALICE_VISUAL_HALF_WIDTH
     && position.y >= 24
-    && position.y <= layout.height - 24
+    && position.y <= layout.height - OFFICE_FLOOR_BOTTOM_EDGE - OFFICE_ALICE_VISUAL_HALF_HEIGHT
     && !collisionRects.some((rect) => intersectsAlice(position, rect))
 }
 
@@ -128,8 +132,14 @@ export function moveAliceOnOfficeMap(
   collisionRects: readonly OfficeCollisionRect[] = officeCollisionRects(layout),
 ): OfficeMoveResult {
   const candidateFor = (step: { x: number; y: number }) => ({
-    x: Math.min(layout.width - 24, Math.max(24, current.x + step.x)),
-    y: Math.min(layout.height - 24, Math.max(24, current.y + step.y)),
+    x: Math.min(
+      layout.width - OFFICE_FLOOR_SIDE_EDGE - OFFICE_ALICE_VISUAL_HALF_WIDTH,
+      Math.max(OFFICE_FLOOR_SIDE_EDGE + OFFICE_ALICE_VISUAL_HALF_WIDTH, current.x + step.x),
+    ),
+    y: Math.min(
+      layout.height - OFFICE_FLOOR_BOTTOM_EDGE - OFFICE_ALICE_VISUAL_HALF_HEIGHT,
+      Math.max(24, current.y + step.y),
+    ),
   })
   const candidate = candidateFor(movement)
   const obstacle = collisionRects.find((rect) => intersectsAlice(candidate, rect))

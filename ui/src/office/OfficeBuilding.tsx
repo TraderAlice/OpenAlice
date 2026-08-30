@@ -1085,7 +1085,9 @@ export function OfficeBuilding({
               height: mapLayout.height,
               transform: `translate3d(${camera.x}px, ${camera.y}px, 0)`,
               backgroundImage: `url(${OFFICE_FURNITURE.generated.floorTile})`,
-            }}
+              '--office-floor-edge-bottom': `url(${OFFICE_FURNITURE.generated.floorEdgeBottom})`,
+              '--office-floor-edge-side': `url(${OFFICE_FURNITURE.generated.floorEdgeSide})`,
+            } as CSSProperties}
           >
             <div
               className="oa-office-map-wall"
@@ -1108,6 +1110,21 @@ export function OfficeBuilding({
                 }}
               />
             </div>
+            <span
+              className="oa-office-floor-edge oa-office-floor-edge--left"
+              aria-hidden
+              style={{ zIndex: officeDepthAt(mapLayout.height) + 400 }}
+            />
+            <span
+              className="oa-office-floor-edge oa-office-floor-edge--right"
+              aria-hidden
+              style={{ zIndex: officeDepthAt(mapLayout.height) + 400 }}
+            />
+            <span
+              className="oa-office-floor-edge oa-office-floor-edge--bottom"
+              aria-hidden
+              style={{ zIndex: officeDepthAt(mapLayout.height) + 401 }}
+            />
             <div
               className="oa-office-map-landmark oa-office-map-landmark--plant"
               aria-hidden
