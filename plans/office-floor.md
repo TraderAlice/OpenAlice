@@ -3584,6 +3584,25 @@ Responsive team-roster follow-up (2026-08-30):
   Root and UI TypeScript passed, the full suite passed all 617 test files and 5,156 tests (one file and nine tests
   skipped), and the production UI build passed with only the existing jsdom canvas and large-chunk advisories.
 
+Replay service auto-walk follow-up (2026-08-30):
+
+- Opened the real Activity Log, selected the latest News event, and used Find on floor. The replay beacon and camera
+  correctly located the News terminal, but Alice stayed beside the Chat pod. Agent events already walked her to the
+  responsible coworker, so the same command had two different meanings depending on the event channel.
+- Compared teleporting Alice, retaining camera-only focus, and extending the established cancelable route to service
+  terminals. Chose the route: it preserves spatial continuity and makes Inbox/News first-class places in the Office
+  world. Replay arrival still supplies an empty activation callback, so historical navigation cannot open or mutate a
+  live product surface.
+- Replay focus now starts auto-walk for Inbox and News service targets as well as employees. The existing required
+  approach geometry brings Alice to the front of each terminal facing upward; Esc or manual movement cancels the route,
+  while the replay beacon remains as historical context.
+- Real-browser acceptance replayed News Seq 4740 from the Operations log. The route HUD named `News terminal`, the
+  trail and target pointer remained visible during travel, and Alice arrived at x696/y552 directly below the terminal
+  without opening a live dialog. Focused tests cover both Inbox and News route creation, cancellation, and the
+  no-live-service invariant (1 file / 18 tests). Root and UI TypeScript passed, the full suite passed all 617 test
+  files and 5,158 tests (one file and nine tests skipped), and the production UI build passed with only the existing
+  jsdom canvas and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

@@ -242,6 +242,58 @@ describe('OfficeBuilding', () => {
     expect(onSelectEmployee).not.toHaveBeenCalled()
   })
 
+  it.each([
+    ['inbox-service', 'Inbox station'],
+    ['news-service', 'News terminal'],
+  ] as const)('auto-walks to the replayed %s without opening the live service', async (targetId, label) => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })))
+    const onOpenService = vi.fn()
+    const { container } = render(
+      <OfficeBuilding
+        building={{
+          config: {
+            workspaceSleepAfterMs: 1,
+            harnessMinimumVisibleGroups: { chat: 0, 'auto-quant': 0, prediction: 0, other: 0 },
+          },
+          lastSeq: 2,
+          firstSeq: 1,
+          asOfSeq: 2,
+          offices: [],
+        }}
+        replaySeq={2}
+        replayFocus={{
+          seq: 2,
+          targetIds: [targetId],
+          label,
+          summary: `Historical ${label}`,
+          channel: targetId === 'inbox-service' ? 'inbox' : 'news',
+        }}
+        onSelectEmployee={vi.fn()}
+        onOpenEmployee={vi.fn()}
+        onOpenWorkspace={vi.fn()}
+        onOpenFiles={vi.fn()}
+        onOpenRoster={vi.fn()}
+        onOpenLog={vi.fn()}
+        onOpenService={onOpenService}
+        onReturnLive={vi.fn()}
+      />,
+    )
+
+    const service = screen.getByRole('button', { name: label }) as HTMLButtonElement
+    expect(service.disabled).toBe(true)
+    expect(service.dataset.route).toBe('true')
+    expect(container.querySelector('.oa-office-route-trail__step')).toBeTruthy()
+
+    await userEvent.keyboard('{Escape}')
+    expect(service.dataset.route).toBeUndefined()
+    expect(container.querySelector('.oa-office-route-trail__step')).toBeNull()
+    expect(onOpenService).not.toHaveBeenCalled()
+  })
+
   it('keeps an empty Office inside the game world with Alice centered', () => {
     render(
       <OfficeBuilding

@@ -891,7 +891,11 @@ export function OfficeBuilding({
     if (replayFocusKeyRef.current === focusKey) return
     replayFocusKeyRef.current = focusKey
     viewportRef.current?.focus({ preventScroll: true })
-    if (replayFocusTarget.kind === 'employee') {
+    if (
+      replayFocusTarget.kind === 'employee'
+      || replayFocusTarget.kind === 'inbox-service'
+      || replayFocusTarget.kind === 'news-service'
+    ) {
       requestTargetInteraction(replayFocusTarget.id, {
         allowReplay: true,
         activate: () => {},
