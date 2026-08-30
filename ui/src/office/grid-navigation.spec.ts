@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { nextOfficeGridIndex, type OfficeGridFocusRect } from './grid-navigation'
+import {
+  nextOfficeGridIndex,
+  nextOfficeGridPageIndex,
+  type OfficeGridFocusRect,
+} from './grid-navigation'
 
 const grid: OfficeGridFocusRect[] = [
   { left: 0, right: 100, top: 0, bottom: 60 },
@@ -23,5 +27,11 @@ describe('Office grid spatial navigation', () => {
     expect(nextOfficeGridIndex(grid, 0, 'left')).toBe(0)
     expect(nextOfficeGridIndex(grid, 0, 'up')).toBe(0)
     expect(nextOfficeGridIndex(grid, 4, 'down')).toBe(4)
+  })
+
+  it('pages toward the nearest same-column item one viewport away', () => {
+    expect(nextOfficeGridPageIndex(grid, 0, 'down', 150)).toBe(4)
+    expect(nextOfficeGridPageIndex(grid, 4, 'up', 150)).toBe(0)
+    expect(nextOfficeGridPageIndex(grid, 0, 'up', 150)).toBe(0)
   })
 })

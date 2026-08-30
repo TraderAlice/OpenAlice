@@ -1,4 +1,5 @@
 export type OfficeGridDirection = 'left' | 'right' | 'up' | 'down'
+export type OfficeGridPageDirection = 'up' | 'down'
 
 export interface OfficeGridFocusRect {
   left: number
@@ -36,6 +37,34 @@ export function nextOfficeGridIndex(
     if (primary <= 1) return
     const secondary = Math.abs(horizontal ? dy : dx)
     const score = primary + secondary * 4
+    if (score < bestScore) {
+      bestIndex = index
+      bestScore = score
+    }
+  })
+
+  return bestIndex
+}
+
+export function nextOfficeGridPageIndex(
+  rects: readonly OfficeGridFocusRect[],
+  currentIndex: number,
+  direction: OfficeGridPageDirection,
+  viewportHeight: number,
+) {
+  const current = rects[currentIndex]
+  if (!current || viewportHeight <= 0) return currentIndex
+  const origin = rectCenter(current)
+  const sign = direction === 'up' ? -1 : 1
+  const targetY = origin.y + viewportHeight * sign
+  let bestIndex = currentIndex
+  let bestScore = Number.POSITIVE_INFINITY
+
+  rects.forEach((rect, index) => {
+    if (index === currentIndex) return
+    const center = rectCenter(rect)
+    if ((center.y - origin.y) * sign <= 1) return
+    const score = Math.abs(center.y - targetY) + Math.abs(center.x - origin.x) * 4
     if (score < bestScore) {
       bestIndex = index
       bestScore = score

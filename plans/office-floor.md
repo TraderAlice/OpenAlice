@@ -4827,6 +4827,24 @@ Run-provenance player language follow-up (2026-08-31):
   all 18 tests. Root and UI TypeScript passed; the full suite passed all 618 test files and 5,187 tests (one file and nine
   tests skipped); the production UI build passed with only the existing ports fallback and large-chunk advisory.
 
+Large-roster paging follow-up (2026-08-31):
+
+- Walked the real Live floor into Chat's 24-member Team roster and exercised the full roster-to-Agent-file path. Spatial
+  arrows worked, but reaching g1 from the initial g20 selection required 23 single-item inputs; Home/End existed in code
+  yet were absent from the window's player instructions. The roster had outgrown a small-party menu without gaining a
+  large-party navigation model.
+- Compared accelerated repeat, adding search/filter chrome, and game-menu paging. Chose PageUp/PageDown plus discoverable
+  Home/End. Search would turn the roster back into a dashboard, while paging preserves the authored two-column party
+  layout and lets arrows remain precise local movement.
+- Added a geometry-based page navigator that targets the nearest same-column teammate one visible viewport away, with
+  safe edge behavior for incomplete rows. Focus now scrolls the chosen card to the nearest visible edge; the list exposes
+  its complete keyboard shortcut contract and all four locales explain paging, edge jumps, and inspection.
+- Real-browser acceptance moved g20 → g18 → g12 with two PageDown presses, then End → g1 and Home → g20. After the first
+  page, the selected card remained fully visible at the list's bottom edge with `scrollTop=89`; the expanded 684px hint
+  exactly fit its 684px container. Focused grid-navigation and roster suites passed all 4 tests. Root and UI TypeScript
+  passed; the full suite passed all 618 test files and 5,188 tests (one file and nine tests skipped); the production UI
+  build passed with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

@@ -9,7 +9,7 @@ import { OfficeWindowControlGlyph } from './OfficeWindowControlGlyph'
 import { officePixelImg } from './furniture'
 import { OFFICE_HUD_ASSETS } from './hud-assets'
 import { officeCoworkerAssignment, officeCoworkerCallsign, officeCoworkerStatusKey } from './label'
-import { nextOfficeGridIndex } from './grid-navigation'
+import { nextOfficeGridIndex, nextOfficeGridPageIndex } from './grid-navigation'
 import { isOfficeConfirmKey } from './input'
 import { useReducedMotion } from './use-reduced-motion'
 
@@ -91,6 +91,7 @@ export function OfficeRosterWindow({
         <ul
           ref={listRef}
           aria-label={t('office.roster')}
+          aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown PageUp PageDown Home End Enter Space"
           onKeyDown={(event) => {
             if (event.key === 'Tab') {
               event.preventDefault()
@@ -113,6 +114,13 @@ export function OfficeRosterWindow({
                 currentIndex,
                 direction,
               )
+            } else if (event.key === 'PageUp' || event.key === 'PageDown') {
+              nextIndex = nextOfficeGridPageIndex(
+                buttons.map((button) => button.getBoundingClientRect()),
+                currentIndex,
+                event.key === 'PageUp' ? 'up' : 'down',
+                event.currentTarget.clientHeight,
+              )
             } else if (event.key === 'Home') {
               nextIndex = 0
             } else if (event.key === 'End') {
@@ -121,7 +129,9 @@ export function OfficeRosterWindow({
               return
             }
             event.preventDefault()
-            buttons[nextIndex]?.focus()
+            const nextButton = buttons[nextIndex]
+            nextButton?.focus({ preventScroll: true })
+            nextButton?.scrollIntoView?.({ block: 'nearest' })
           }}
         >
           {employees.map((employee) => {

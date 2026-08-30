@@ -56,7 +56,8 @@ describe('OfficeRosterWindow', () => {
     )
 
     expect(screen.getByText('6 team members')).toBeTruthy()
-    expect(screen.getByText('Arrows choose · Enter / Space inspect').getAttribute('data-input')).toBe('keyboard')
+    expect(screen.getByText('Arrows choose · PgUp/PgDn page · Home/End jump · Enter inspect').getAttribute('data-input'))
+      .toBe('keyboard')
     expect(screen.getByText('Choose a teammate to inspect their Agent file.').getAttribute('data-input')).toBe('touch')
     expect(screen.getAllByRole('button')).toHaveLength(7)
     const coworkerImages = screen.getByTestId('office-roster-window')
@@ -103,6 +104,7 @@ describe('OfficeRosterWindow', () => {
       name: new RegExp(`${employee.name}.*${employee.title}`, 'i'),
     }))
     memberButtons.forEach((button, index) => {
+      button.scrollIntoView = vi.fn()
       const row = Math.floor(index / 2)
       const column = index % 2
       vi.spyOn(button, 'getBoundingClientRect').mockReturnValue({
@@ -117,10 +119,19 @@ describe('OfficeRosterWindow', () => {
         toJSON: () => ({}),
       })
     })
+    const roster = screen.getByRole('list', { name: 'Team roster' })
+    Object.defineProperty(roster, 'clientHeight', { configurable: true, value: 150 })
+    expect(roster.getAttribute('aria-keyshortcuts'))
+      .toBe('ArrowLeft ArrowRight ArrowUp ArrowDown PageUp PageDown Home End Enter Space')
     await userEvent.keyboard('{Home}{ArrowRight}{ArrowDown}')
     expect(document.activeElement).toBe(memberButtons[3])
     expect(memberButtons[3]?.tabIndex).toBe(0)
     expect(memberButtons[5]?.tabIndex).toBe(-1)
+    await userEvent.keyboard('{Home}{PageDown}')
+    expect(document.activeElement).toBe(memberButtons[4])
+    expect(memberButtons[4]?.scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
+    await userEvent.keyboard('{PageUp}')
+    expect(document.activeElement).toBe(memberButtons[0])
     await userEvent.keyboard('{End}')
     expect(document.activeElement).toBe(memberButtons[5])
     fireEvent.keyDown(memberButtons[5]!, { key: 'Enter' })

@@ -1981,7 +1981,7 @@ export const en = {
     rosterCount_one: '{{count}} team member',
     rosterCount_other: '{{count}} team members',
     rosterSelectHint: 'Choose a teammate to inspect their Agent file.',
-    rosterKeyboardHint: 'Arrows choose · Enter / Space inspect',
+    rosterKeyboardHint: 'Arrows choose · PgUp/PgDn page · Home/End jump · Enter inspect',
     backToRoster: 'Back to team roster',
     emptyDesk: 'Empty desk in {{name}} office',
     selectDesk: 'Select a desk to inspect that employee.',

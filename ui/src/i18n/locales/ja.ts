@@ -1949,7 +1949,7 @@ export const ja: Resources = {
     rosterCount_one: '{{count}} 人のメンバー',
     rosterCount_other: '{{count}} 人のメンバー',
     rosterSelectHint: 'メンバーを選んで Agent ファイルを確認します。',
-    rosterKeyboardHint: '方向キーで選択 · Enter / Space で確認',
+    rosterKeyboardHint: '方向キーで選択 · PgUp/PgDn でページ移動 · Home/End で端へ · Enter で確認',
     backToRoster: 'チーム名簿に戻る',
     emptyDesk: '{{name}} オフィスの空き机',
     selectDesk: '机を選ぶと、その従業員を確認できます。',
