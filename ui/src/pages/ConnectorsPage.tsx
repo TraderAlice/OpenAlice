@@ -911,6 +911,90 @@ function ConnectorPreferences({
   )
 }
 
+function ConnectorChoiceField({
+  id,
+  fieldKey,
+  label,
+  description,
+  options,
+  value,
+  onChange,
+  t,
+}: {
+  id: string
+  fieldKey: string
+  label: string
+  description?: string
+  options: NonNullable<ConnectorDefinition['fields'][number]['options']>
+  value: string
+  onChange: (value: string) => void
+  t: TFunction
+}) {
+  const descriptionId = description ? `${id}-description` : undefined
+  return (
+    <fieldset className="mb-3.5 last:mb-0" aria-describedby={descriptionId}>
+      <legend className="mb-1.5 text-[13px] font-medium text-foreground">{label}</legend>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {options.map((option) => {
+          const optionId = `${id}-${option.value}`
+          const selected = value === option.value
+          const optionLabel = t(`connectorSettings.fieldOptions.${fieldKey}.${option.value}.label`, {
+            defaultValue: option.label,
+          })
+          const optionDescription = option.description
+            ? t(`connectorSettings.fieldOptions.${fieldKey}.${option.value}.description`, {
+                defaultValue: option.description,
+              })
+            : undefined
+          return (
+            <label key={option.value} className="relative min-w-0">
+              <input
+                id={optionId}
+                type="radio"
+                name={id}
+                value={option.value}
+                checked={selected}
+                className="peer sr-only"
+                aria-label={optionLabel}
+                onChange={(event) => {
+                  if (event.target.checked) onChange(option.value)
+                }}
+              />
+              <span className={`oa-pressable flex min-h-14 items-center gap-2.5 rounded-lg border px-3 py-2 text-left peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-primary/45 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background ${
+                selected
+                  ? 'border-primary/45 bg-primary/[0.07] text-foreground'
+                  : 'border-border bg-background/60 text-foreground hover:border-primary/25 hover:bg-secondary/35'
+              }`}>
+                <span
+                  className={`flex size-4 shrink-0 items-center justify-center rounded-full border ${
+                    selected ? 'border-primary' : 'border-muted-foreground/45'
+                  }`}
+                  aria-hidden
+                >
+                  <span className={`size-2 rounded-full ${selected ? 'bg-primary' : 'bg-transparent'}`} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[12px] font-semibold">{optionLabel}</span>
+                  {optionDescription && (
+                    <span className="mt-0.5 block break-words text-[10.5px] leading-4 text-muted-foreground">
+                      {optionDescription}
+                    </span>
+                  )}
+                </span>
+              </span>
+            </label>
+          )
+        })}
+      </div>
+      {description && (
+        <p id={descriptionId} className="mt-1 text-[12px] text-muted-foreground/60">
+          {description}
+        </p>
+      )}
+    </fieldset>
+  )
+}
+
 function ConnectorCredentialsEditor({
   definition,
   adapter,
@@ -1014,11 +1098,29 @@ function ConnectorCredentialsEditor({
           const secretMasked = maskedSecrets[draftKey] ?? true
           const inputId = `connector-${definition.id}-${field.key}`
           const fieldLabel = t(`connectorSettings.fields.${field.key}`, { defaultValue: field.label })
+          const fieldDescription = field.description
+            ? t(`connectorSettings.fieldDescriptions.${field.key}`, { defaultValue: field.description })
+            : undefined
+          if (field.options && field.options.length > 0) {
+            return (
+              <ConnectorChoiceField
+                key={field.key}
+                id={inputId}
+                fieldKey={field.key}
+                label={fieldLabel}
+                description={fieldDescription}
+                options={field.options}
+                value={String(value ?? field.defaultValue ?? '')}
+                onChange={(next) => onSettingChange(field.key, next)}
+                t={t}
+              />
+            )
+          }
           return (
             <Field
               key={field.key}
               label={fieldLabel}
-              description={field.description}
+              description={fieldDescription}
               controlId={inputId}
             >
               {field.kind === 'boolean' ? (

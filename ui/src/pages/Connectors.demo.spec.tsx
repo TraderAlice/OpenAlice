@@ -392,6 +392,29 @@ describe('Connector demo routes', () => {
     expect(within(dialog).queryByText('Connection, delivery, and chat settings for Slack.')).toBeNull()
   })
 
+  it('uses visible platform choices instead of free text for Feishu and Lark', async () => {
+    render(<ConnectorStatusPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Set up Feishu' }))
+    const dialog = await screen.findByRole('dialog')
+    const feishu = within(dialog).getByRole('radio', { name: 'Feishu' }) as HTMLInputElement
+    const lark = within(dialog).getByRole('radio', { name: 'Lark' }) as HTMLInputElement
+    const group = feishu.closest('fieldset')?.querySelector('[class*="grid-cols-1"]')
+
+    expect(feishu.checked).toBe(true)
+    expect(lark.checked).toBe(false)
+    expect(group?.className).toContain('sm:grid-cols-2')
+    expect(within(dialog).queryByRole('textbox', { name: 'Feishu Open platform' })).toBeNull()
+
+    fireEvent.click(lark)
+    expect(feishu.checked).toBe(false)
+    expect(lark.checked).toBe(true)
+
+    await waitFor(() => expect(mocks.save).toHaveBeenCalled(), { timeout: 1_200 })
+    const saved = mocks.save.mock.calls.at(-1)?.[0] as PublicConnectorConfig
+    expect(saved.adapters.feishu.settings.domain).toBe('lark')
+  })
+
   it('saves all missing Slack credentials as one connection', async () => {
     render(<ConnectorStatusPage />)
 

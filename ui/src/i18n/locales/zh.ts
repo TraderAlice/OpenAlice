@@ -2119,10 +2119,18 @@ export const zh: Resources = {
       applicationId: '应用 ID',
       botToken: '机器人令牌',
       appToken: '应用级令牌',
+      domain: '开放平台',
       inboxPush: '推送 Inbox 通知',
     },
     fieldDescriptions: {
+      domain: '选择创建这个应用时使用的平台。',
       inboxPush: '关闭后，新的 Inbox 条目留在 OpenAlice，需要时再查看。',
+    },
+    fieldOptions: {
+      domain: {
+        feishu: { label: '飞书', description: 'open.feishu.cn · 中国' },
+        lark: { label: 'Lark', description: 'open.larksuite.com · 全球' },
+      },
     },
     placeholders: {
       applicationId: 'Discord 应用 ID',

@@ -3,6 +3,13 @@ import { z } from 'zod'
 export const connectorFieldKindSchema = z.enum(['text', 'secret', 'number', 'boolean'])
 export type ConnectorFieldKind = z.infer<typeof connectorFieldKindSchema>
 
+export const connectorFieldOptionSchema = z.object({
+  value: z.string().min(1),
+  label: z.string().min(1),
+  description: z.string().optional(),
+})
+export type ConnectorFieldOption = z.infer<typeof connectorFieldOptionSchema>
+
 export const connectorFieldDefinitionSchema = z.object({
   key: z.string().min(1),
   label: z.string().min(1),
@@ -16,6 +23,8 @@ export const connectorFieldDefinitionSchema = z.object({
   /** Settings card section. `preferences` stays out of connection details. */
   group: z.enum(['credentials', 'preferences']).optional(),
   defaultValue: z.union([z.string(), z.number(), z.boolean()]).optional(),
+  /** Finite values rendered as an explicit choice instead of free-form input. */
+  options: z.array(connectorFieldOptionSchema).min(2).max(6).optional(),
 })
 export type ConnectorFieldDefinition = z.infer<typeof connectorFieldDefinitionSchema>
 

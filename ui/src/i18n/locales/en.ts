@@ -2152,10 +2152,18 @@ export const en = {
       applicationId: 'Application ID',
       botToken: 'Bot token',
       appToken: 'App-level token',
+      domain: 'Open platform',
       inboxPush: 'Push Inbox notifications',
     },
     fieldDescriptions: {
+      domain: 'Choose the platform where you created this app.',
       inboxPush: 'When off, new Inbox items stay in OpenAlice until you look them up.',
+    },
+    fieldOptions: {
+      domain: {
+        feishu: { label: 'Feishu', description: 'open.feishu.cn · China' },
+        lark: { label: 'Lark', description: 'open.larksuite.com · Global' },
+      },
     },
     placeholders: {
       applicationId: 'Discord application ID',

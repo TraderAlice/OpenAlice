@@ -2127,10 +2127,18 @@ export const zhHant: Resources = {
       applicationId: '應用程式 ID',
       botToken: '機器人權杖',
       appToken: '應用層權杖',
+      domain: '開放平台',
       inboxPush: '推送 Inbox 通知',
     },
     fieldDescriptions: {
+      domain: '選擇建立此應用程式時使用的平台。',
       inboxPush: '關閉後，新的 Inbox 條目留在 OpenAlice，需要時再查看。',
+    },
+    fieldOptions: {
+      domain: {
+        feishu: { label: '飛書', description: 'open.feishu.cn · 中國' },
+        lark: { label: 'Lark', description: 'open.larksuite.com · 全球' },
+      },
     },
     placeholders: {
       applicationId: 'Discord 應用程式 ID',

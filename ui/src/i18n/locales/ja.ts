@@ -2120,10 +2120,18 @@ export const ja: Resources = {
       applicationId: 'アプリケーション ID',
       botToken: 'Bot トークン',
       appToken: 'アプリレベル トークン',
+      domain: 'オープンプラットフォーム',
       inboxPush: 'Inbox 通知をプッシュ',
     },
     fieldDescriptions: {
+      domain: 'このアプリを作成したプラットフォームを選択します。',
       inboxPush: 'オフにすると、新しい Inbox は OpenAlice に残り、必要なときに見られます。',
+    },
+    fieldOptions: {
+      domain: {
+        feishu: { label: 'Feishu', description: 'open.feishu.cn · 中国' },
+        lark: { label: 'Lark', description: 'open.larksuite.com · グローバル' },
+      },
     },
     placeholders: {
       applicationId: 'Discord アプリケーション ID',

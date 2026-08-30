@@ -182,8 +182,11 @@ export const demoConnectorSnapshot: ConnectorSettingsSnapshot = {
           kind: 'text',
           required: false,
           defaultValue: 'feishu',
-          placeholder: 'feishu or lark',
-          description: 'feishu is open.feishu.cn (China). lark is open.larksuite.com. Do not mix them.',
+          description: 'Choose the platform where you created this app.',
+          options: [
+            { value: 'feishu', label: 'Feishu', description: 'open.feishu.cn (China)' },
+            { value: 'lark', label: 'Lark', description: 'open.larksuite.com (Global)' },
+          ],
         },
         {
           key: 'ownerUserId',

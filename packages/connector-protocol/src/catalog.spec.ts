@@ -22,4 +22,12 @@ describe('built-in connector setup metadata', () => {
       expect(definition.setupLinks?.every((link) => link.url.startsWith('https://'))).toBe(true)
     }
   })
+
+  it('constrains Feishu and Lark to catalog-owned platform choices', () => {
+    const definition = BUILTIN_CONNECTOR_DEFINITIONS.find((item) => item.id === 'feishu')
+    const domain = definition?.fields.find((field) => field.key === 'domain')
+
+    expect(domain?.options?.map((option) => option.value)).toEqual(['feishu', 'lark'])
+    expect(domain?.defaultValue).toBe('feishu')
+  })
 })

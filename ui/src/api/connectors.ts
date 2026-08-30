@@ -18,6 +18,11 @@ export interface ConnectorDefinition {
     learnedBy?: string
     group?: 'credentials' | 'preferences'
     defaultValue?: string | number | boolean
+    options?: Array<{
+      value: string
+      label: string
+      description?: string
+    }>
   }>
   commands: Array<{ name: string; description: string }>
   capabilities?: Array<'inbox' | 'settings' | 'uta' | 'desk'>
@@ -162,7 +167,17 @@ function isConnectorDefinition(value: unknown): boolean {
       && (field.defaultValue === undefined
         || typeof field.defaultValue === 'string'
         || typeof field.defaultValue === 'number'
-        || typeof field.defaultValue === 'boolean'))
+        || typeof field.defaultValue === 'boolean')
+      && (field.options === undefined
+        || (Array.isArray(field.options)
+          && field.options.length >= 2
+          && field.options.length <= 6
+          && field.options.every((option) => isRecord(option)
+            && typeof option.value === 'string'
+            && option.value.length > 0
+            && typeof option.label === 'string'
+            && option.label.length > 0
+            && isOptionalString(option.description)))))
     && Array.isArray(value.commands)
     && value.commands.every((command) => isRecord(command)
       && typeof command.name === 'string'

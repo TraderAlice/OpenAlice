@@ -499,6 +499,17 @@ external adapters remain optional projections rather than sources of truth.
     platform description and before the numbered checklist. It remains fully
     data-driven, supports one or two official destinations, keeps 40 px targets,
     and leaves credential fields and save semantics unchanged.
+43. **Finite Connector settings render as visible choices, not free text.**
+    Feishu setup currently asks the operator to choose between two official
+    consoles, then exposes `domain` as a text box that accepts arbitrary input
+    and requires the exact implementation values `feishu` or `lark`. A select
+    would constrain the value but hide the two important destinations until it
+    opens; inferring the value from an external-link click would silently turn
+    navigation into configuration. The chosen contract lets a definition own a
+    small option list and renders it as an always-visible native radio group with
+    localized labels and destination hints. The field remains catalog-driven,
+    preserves ordinary non-secret auto-save, supports keyboard navigation, and
+    stacks cleanly on narrow screens without adapter-specific renderer branches.
 
 ## Ordered Work
 
@@ -589,6 +600,8 @@ external adapters remain optional projections rather than sources of truth.
         states without exposing raw failures as primary copy.
   - [x] Move official platform setup actions before the first-use checklist
         without hard-coding adapter-specific UI.
+  - [x] Replace Feishu/Lark free-text platform entry with a catalog-driven,
+        accessible finite-choice field.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -1026,6 +1039,20 @@ used an isolated demo runtime with no real credentials or Connector actions. At
 step began at y 307.85. At 390 x 844, the link remained before the checklist in
 the 306 px guide with document width exactly 390 px. Feishu and Lark rendered as
 two 40 px rows without overflow at the same width. The temporary tabs and demo
+runtime were closed, and the viewport was reset.
+
+The finite-choice-field increment passed 32 focused protocol/API/demo-route
+tests, protocol, UI, and root typechecking, the demo production build, all 16
+Connector replay tests, the isolated Connector Service smoke, and all 5,128
+repository tests. The protocol and UI decoder now carry catalog-owned option
+metadata; Feishu uses it for `feishu` and `lark`, while the generic renderer
+keeps native radio semantics, localized copy, and existing non-secret
+auto-save. In the isolated current-source route at 1,052 x 734, both choices
+rendered side by side at 338 x 56 px; choosing Lark selected it and produced the
+shared Saved feedback. At 390 x 844, the choices stacked into a 306 px-wide,
+165.7 px-high fieldset, each option remained 56 px high, the dialog measured
+374 x 828 px, and document width remained exactly 390 px. No real credential,
+Connector, or external-platform action was invoked. The temporary tabs and demo
 runtime were closed, and the viewport was reset.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless

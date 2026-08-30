@@ -208,8 +208,14 @@ optional official `setupLinks`, non-secret values, and `configuredSecrets`
 presence markers. Setup links are definition-owned metadata rather than
 hard-coded adapter branches in the renderer; built-in localized checklists may
 enrich them, while an external adapter still receives the generic guide. The
-Settings draft field is masked by default to keep tokens out of screenshots and
-screenshares; an explicit reveal control lets the operator verify a paste.
+same definition may declare a small `options` list for a finite non-secret
+setting. Settings renders those values as an always-visible native radio group
+instead of accepting implementation strings as free text; option labels and
+hints localize through the generic field key while external definitions retain
+their catalog copy. Feishu uses this contract for its `feishu` / `lark` platform
+choice. The Settings draft field is masked by default to keep tokens out of
+screenshots and screenshares; an explicit reveal control lets the operator
+verify a paste.
 Missing secret fields belong to one first-time connection save: the UI sends all
 entered missing credentials together only after every required connection field
 is present. This gives multi-token adapters such as Slack one completion point.
