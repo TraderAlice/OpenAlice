@@ -1,5 +1,5 @@
 /**
- * AI LEAN Tools — Vercel AI SDK Tool Registry.
+ * LEAN GUI Tools — Vercel AI SDK Tool Registry.
  *
  * Exposes event-driven backtesting, strategy creation, parameter optimization,
  * experiment memory, manual trade journaling, and evidence-first research integrity
@@ -37,6 +37,30 @@ export function createLeanTools(deps: LeanToolDeps) {
   const jnlStore = deps.journalStore ?? new TradeJournalStore(resolve(projectRoot, "data/lean/journal"));
 
   return {
+    leanStatus: tool({
+      description: `Inspect LEAN GUI readiness: managed data directories, Docker runtime status, and native QuantConnect LEAN CLI availability.`,
+      inputSchema: z.object({}),
+      execute: async () => {
+        const [docker, leanCli, backtests] = await Promise.all([
+          leanService.checkDocker(),
+          leanService.checkLeanCli(),
+          leanService.listBacktests().catch(() => [])
+        ]);
+        return {
+          success: true,
+          enabled: leanService.enabled,
+          docker,
+          leanCli,
+          paths: {
+            data: leanService.dataPath,
+            algorithms: leanService.algorithmsPath,
+            runs: leanService.runsPath
+          },
+          backtestCount: backtests.length
+        };
+      }
+    }),
+
     leanCreateStrategy: tool({
       description: `Create or update a Python LEAN trading algorithm strategy from template or custom Python code.
 Templates available:

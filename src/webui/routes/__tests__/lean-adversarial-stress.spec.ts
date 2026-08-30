@@ -96,6 +96,7 @@ describe('LEAN WebUI Routes — Adversarial & Empirical Stress Suite', () => {
     mockLeanService = {
       enabled: true,
       checkDocker: vi.fn().mockResolvedValue({ available: true, version: 'Docker 27.0.0' }),
+      checkLeanCli: vi.fn().mockResolvedValue({ available: true, version: 'lean 1.0.229' }),
       runBacktest: vi.fn().mockImplementation(async (req) => {
         if (req.strategyName === 'THROW_ERROR') {
           throw new Error('Simulated LEAN engine crash')
@@ -177,11 +178,13 @@ describe('LEAN WebUI Routes — Adversarial & Empirical Stress Suite', () => {
       const data = await res.json()
       expect(data.config.enabled).toBe(false)
       expect(data.docker.available).toBe(true)
+      expect(data.leanCli.available).toBe(true)
 
       const statusRes = await app.request('/status')
       expect(statusRes.status).toBe(200)
       const statusData = await statusRes.json()
       expect(statusData.enabled).toBe(false)
+      expect(statusData.leanCliAvailable).toBe(true)
     })
 
     it('gracefully handles missing lean.json and creates default fallback config', async () => {
@@ -191,7 +194,7 @@ describe('LEAN WebUI Routes — Adversarial & Empirical Stress Suite', () => {
       expect(res.status).toBe(200)
       const data = await res.json()
       expect(data.config).toBeDefined()
-      expect(data.config.engineType).toBe('docker')
+      expect(data.config.dockerImage).toBe(DEFAULT_LEAN_CONFIG.dockerImage)
     })
 
     it('updates partial config via POST /config and persists to disk', async () => {
@@ -486,7 +489,7 @@ describe('LEAN WebUI Routes — Adversarial & Empirical Stress Suite', () => {
       const compData = await compRes.json()
       expect(compData.comparison.experimentA.id).toBe(expA.id)
       expect(compData.comparison.experimentB.id).toBe(expB.id)
-      expect(compData.comparison.parameterDiff).toBeDefined()
+      expect(compData.comparison.parameterDiffs).toBeDefined()
     })
   })
 
@@ -516,10 +519,10 @@ describe('LEAN WebUI Routes — Adversarial & Empirical Stress Suite', () => {
       expect(evalRes.status).toBe(200)
       const evalData = await evalRes.json()
       expect(evalData.report).toBeDefined()
-      expect(evalData.report.oosValidation).toBeDefined()
-      expect(evalData.report.oosValidation.degradation.sharpeRatioDegradationPct).toBeDefined()
+      expect(evalData.report.outOfSample).toBeDefined()
+      expect(evalData.report.outOfSample.sharpeDegradationPct).toBeDefined()
       // Evidence-based check: raw metrics present, no arbitrary single composite score
-      expect(evalData.report.oosValidation.degradation.sharpeRatioDegradationPct).toBeGreaterThan(0)
+      expect(evalData.report.outOfSample.sharpeDegradationPct).toBeGreaterThan(0)
     })
 
     it('retrieves and dynamically generates integrity report for experiment', async () => {
@@ -548,7 +551,7 @@ describe('LEAN WebUI Routes — Adversarial & Empirical Stress Suite', () => {
       expect(reportRes.status).toBe(200)
       const reportData = await reportRes.json()
       expect(reportData.report.experimentId).toBe(exp.id)
-      expect(reportData.report.oosValidation).toBeDefined()
+      expect(reportData.report.outOfSample).toBeDefined()
     })
   })
 
@@ -599,9 +602,10 @@ describe('LEAN WebUI Routes — Adversarial & Empirical Stress Suite', () => {
       expect(formRes.status).toBe(200)
       const formData = await formRes.json()
       expect(formData.proposal).toBeDefined()
-      expect(formData.proposal.formalizationStatus).toBe('formalized')
-      expect(formData.proposal.systematicRules).toBeDefined()
-      expect(formData.proposal.systematicRules.entryRules.length).toBeGreaterThan(0)
+      expect(formData.proposal.entry.formalizationStatus).toBe('formalized')
+      expect(formData.proposal.suggestedTemplateId).toBeDefined()
+      expect(formData.proposal.suggestedParameters).toBeDefined()
+      expect(formData.proposal.suggestedRanges).toBeDefined()
     })
   })
 

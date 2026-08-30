@@ -32,6 +32,8 @@ import { provenanceShowFactory } from '../tool/provenance-show.js'
 import { conversationToolFactories } from '../tool/conversation.js'
 import { artifactConversationToolFactories } from '../tool/conversation-artifacts.js'
 import { createTradingTools } from '../tool/trading.js'
+import { createLeanTools } from '../tool/lean.js'
+import { DEFAULT_LEAN_CONFIG, LeanService } from '../domain/lean/service.js'
 
 /**
  * Anti-rot: each export's alias map is hand-authored, so guard it against drift —
@@ -85,6 +87,23 @@ describe('CLI_EXPORTS — uta export (global trading tools)', () => {
   it('binary alice-uta resolves to the uta export', () => {
     expect(exportKeyForBinary('alice-uta')).toBe('uta')
     expect(getExport('uta')?.scope).toBe('global')
+  })
+})
+
+describe('CLI_EXPORTS — quant export (global LEAN tools)', () => {
+  const tc = new ToolCenter()
+  const leanService = new LeanService({ ...DEFAULT_LEAN_CONFIG, enabled: true }, '/tmp')
+  tc.register(createLeanTools({ leanService }), 'lean')
+
+  it('every mapped verb resolves to a registered LEAN tool', () => {
+    for (const name of mappedToolNames('quant')) {
+      expect(tc.get(name), `quant CLI maps to missing LEAN tool: ${name}`).not.toBeNull()
+    }
+  })
+
+  it('binary alice-quant resolves to the quant export', () => {
+    expect(exportKeyForBinary('alice-quant')).toBe('quant')
+    expect(getExport('quant')?.scope).toBe('global')
   })
 })
 
@@ -153,6 +172,7 @@ describe('CLI_EXPORTS — structure', () => {
       ...mappedToolNames('data'),
       ...mappedToolNames('traderhub'),
       ...mappedToolNames('uta'),
+      ...mappedToolNames('quant'),
     ]))
     expect(scoped).toEqual(mappedToolNames('workspace'))
     for (const name of scoped) expect(global.has(name)).toBe(false)

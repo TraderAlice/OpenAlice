@@ -27,7 +27,7 @@ export const en = {
       tradingAsGit: 'Trading as Git',
       trading: 'Trading',
       portfolio: 'Portfolio',
-      quantLab: 'Quant Lab',
+      quantLab: 'LEAN GUI',
       connectors: 'Connectors',
       issue: 'Issues',
       automation: 'Automation',

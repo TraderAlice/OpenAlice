@@ -641,7 +641,7 @@ const fileViewerModule: ViewModule<'file-viewer'> = {
 
 const quantLabModule: ViewModule<'quant-lab'> = {
   kind: 'quant-lab',
-  title: () => 'Quant Lab',
+  title: () => 'LEAN GUI',
   toUrl: () => '/quant-lab',
   Component: ({ spec }) => <QuantLabPage spec={spec} />,
 }

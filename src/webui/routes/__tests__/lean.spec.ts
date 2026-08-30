@@ -96,6 +96,7 @@ describe('LEAN WebUI Routes (/api/lean)', () => {
     mockLeanService = {
       enabled: true,
       checkDocker: vi.fn().mockResolvedValue({ available: true, version: 'Docker 27.0.0' }),
+      checkLeanCli: vi.fn().mockResolvedValue({ available: true, version: 'lean 1.0.229' }),
       runBacktest: vi.fn().mockResolvedValue(mockBacktestResult),
       getBacktest: vi.fn().mockImplementation(async (id: string) => {
         if (id === 'bt_test_123') return mockBacktestResult
@@ -144,7 +145,7 @@ describe('LEAN WebUI Routes (/api/lean)', () => {
   }
 
   describe('Config & Status', () => {
-    it('GET /config returns current config and docker status', async () => {
+    it('GET /config returns current config, docker status, and LEAN CLI status', async () => {
       const app = createTestApp()
       const res = await app.request('/config')
       expect(res.status).toBe(200)
@@ -153,6 +154,8 @@ describe('LEAN WebUI Routes (/api/lean)', () => {
       expect(data.config.enabled).toBe(true)
       expect(data.docker.available).toBe(true)
       expect(data.docker.version).toBe('Docker 27.0.0')
+      expect(data.leanCli.available).toBe(true)
+      expect(data.leanCli.version).toBe('lean 1.0.229')
     })
 
     it('POST /config updates configuration', async () => {

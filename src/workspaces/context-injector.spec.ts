@@ -121,13 +121,13 @@ describe('injectWorkspaceContext — skills', () => {
     }
   });
 
-  it('injects the per-CLI playbooks (alice* + traderhub) for a tool-bearing template', async () => {
+  it('injects the per-CLI playbooks (alice* + traderhub + LEAN GUI) for a tool-bearing template', async () => {
     await injectWorkspaceContext({
       template: makeTemplate({ injectTools: true, bundledSkills: ['scan-value-chain'] }),
       wsId: 'ws-abc',
       dir,
     });
-    for (const name of ['alice', 'alice-analysis', 'alice-uta', 'alice-workspace', 'traderhub', 'scan-value-chain']) {
+    for (const name of ['alice', 'alice-analysis', 'alice-uta', 'alice-workspace', 'traderhub', 'quant-lab', 'scan-value-chain']) {
       expect(existsSync(join(dir, '.claude/skills', name, 'SKILL.md')), name).toBe(true);
       expect(existsSync(join(dir, '.agents/skills', name, 'SKILL.md')), name).toBe(true);
     }

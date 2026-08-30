@@ -144,7 +144,7 @@ export function StrategyDetailPage({ spec }: StrategyDetailPageProps) {
     return (
       <PageSidebarLayout
         storageKey="quant-lab-sidebar"
-        title="Quant Lab"
+        title="LEAN GUI"
         defaultWidth={260}
         sidebar={<QuantLabSidebar />}
       >
@@ -160,7 +160,7 @@ export function StrategyDetailPage({ spec }: StrategyDetailPageProps) {
     return (
       <PageSidebarLayout
         storageKey="quant-lab-sidebar"
-        title="Quant Lab"
+        title="LEAN GUI"
         defaultWidth={260}
         sidebar={<QuantLabSidebar />}
       >
@@ -174,7 +174,7 @@ export function StrategyDetailPage({ spec }: StrategyDetailPageProps) {
   return (
     <PageSidebarLayout
       storageKey="quant-lab-sidebar"
-      title="Quant Lab"
+      title="LEAN GUI"
       defaultWidth={260}
       sidebar={<QuantLabSidebar />}
     >

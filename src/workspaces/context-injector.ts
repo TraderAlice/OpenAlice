@@ -23,7 +23,7 @@ import type { TemplateMeta } from './template-registry.js';
  * workspaces at all (no `.mcp.json`, no Pi bridge); these skills are how the
  * agent learns the CLI surface that is now its ONLY path to OpenAlice's tools.
  */
-const CLI_TOOLS_SKILLS = ['alice', 'alice-analysis', 'alice-uta', 'alice-workspace', 'traderhub'];
+const CLI_TOOLS_SKILLS = ['alice', 'alice-analysis', 'alice-uta', 'alice-workspace', 'traderhub', 'quant-lab'];
 
 /**
  * Skills injected into EVERY new workspace, regardless of template — generic

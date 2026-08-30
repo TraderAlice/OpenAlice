@@ -297,8 +297,9 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
   quant: {
     binary: 'alice-quant',
     scope: 'global',
-    description: 'Quant Lab — LEAN trading algorithm strategies, backtesting, experiments, and research integrity',
+    description: 'LEAN GUI — QuantConnect LEAN strategies, backtesting, experiments, and research integrity',
     groupDescriptions: {
+      system: 'Inspect LEAN GUI readiness, Docker, native LEAN CLI, and managed paths',
       strategy: 'Scaffold, inspect, and manage Python LEAN trading strategies',
       backtest: 'Execute isolated backtests and fetch execution metrics and equity curves',
       experiment: 'Explore and audit parameter sweeps and experiment lineage',
@@ -306,6 +307,9 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
       journal: 'Record trade hypotheses and formalize them into systematic algorithms',
     },
     commands: {
+      system: {
+        status: 'leanStatus',
+      },
       strategy: {
         create: 'leanCreateStrategy',
       },

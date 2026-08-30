@@ -91,6 +91,21 @@ describe("LEAN AI Tool Registry", () => {
     }
   });
 
+  describe("leanStatus", () => {
+    it("reports LEAN GUI readiness, native CLI status, and managed paths", async () => {
+      vi.spyOn(leanService, "checkDocker").mockResolvedValueOnce({ available: true, version: "Docker 29.7.2" });
+      vi.spyOn(leanService, "checkLeanCli").mockResolvedValueOnce({ available: true, version: "lean 1.0.229" });
+
+      const res: any = await tools.leanStatus.execute!({} as any, {} as any);
+
+      expect(res.success).toBe(true);
+      expect(res.enabled).toBe(true);
+      expect(res.docker.version).toBe("Docker 29.7.2");
+      expect(res.leanCli.version).toBe("lean 1.0.229");
+      expect(res.paths.algorithms).toContain("algorithms");
+    });
+  });
+
   describe("leanCreateStrategy", () => {
     it("creates a strategy from template via AI tool", async () => {
       const res: any = await tools.leanCreateStrategy.execute!(

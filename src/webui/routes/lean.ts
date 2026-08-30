@@ -1,7 +1,7 @@
 /**
  * LEAN Engine REST API Routes — `/api/lean/*`.
  *
- * Exposes full management and execution endpoints for Quant Lab:
+ * Exposes full management and execution endpoints for LEAN GUI:
  * - Engine status & configuration
  * - QCAlgorithm templates and custom strategies
  * - Event-driven backtesting execution & results
@@ -82,13 +82,16 @@ export function createLeanRoutes(ctx?: EngineContext, deps: LeanRouteDeps = {}):
     try {
       const config = await loadCurrentConfig()
       let dockerStatus: { available: boolean; version?: string; error?: string } = { available: false }
+      let leanCliStatus: { available: boolean; version?: string; error?: string } = { available: false }
       if (deps.leanService) {
         dockerStatus = await deps.leanService.checkDocker()
+        leanCliStatus = await deps.leanService.checkLeanCli()
       } else {
         const tempService = new LeanService(config, projectRoot)
         dockerStatus = await tempService.checkDocker()
+        leanCliStatus = await tempService.checkLeanCli()
       }
-      return c.json({ config, docker: dockerStatus })
+      return c.json({ config, docker: dockerStatus, leanCli: leanCliStatus })
     } catch (err: any) {
       return c.json({ error: err.message || 'Failed to read config' }, 500)
     }
@@ -110,11 +113,14 @@ export function createLeanRoutes(ctx?: EngineContext, deps: LeanRouteDeps = {}):
     try {
       const config = await loadCurrentConfig()
       let dockerStatus: { available: boolean; version?: string; error?: string } = { available: false }
+      let leanCliStatus: { available: boolean; version?: string; error?: string } = { available: false }
       if (deps.leanService) {
         dockerStatus = await deps.leanService.checkDocker()
+        leanCliStatus = await deps.leanService.checkLeanCli()
       } else {
         const tempService = new LeanService(config, projectRoot)
         dockerStatus = await tempService.checkDocker()
+        leanCliStatus = await tempService.checkLeanCli()
       }
 
       const templates = await algoManager.listTemplates()
@@ -132,6 +138,9 @@ export function createLeanRoutes(ctx?: EngineContext, deps: LeanRouteDeps = {}):
         dockerAvailable: dockerStatus.available,
         dockerVersion: dockerStatus.version,
         dockerError: dockerStatus.error,
+        leanCliAvailable: leanCliStatus.available,
+        leanCliVersion: leanCliStatus.version,
+        leanCliError: leanCliStatus.error,
         templateCount: templates.length,
         strategyCount: strategies.length,
         experimentCount: experiments.length,

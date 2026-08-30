@@ -75,7 +75,7 @@ export function UrlAdopter() {
         <Route path="/trading-as-git" element={<AdoptTraderStatic spec={{ kind: 'trading-as-git', params: {} }} />} />
         <Route path="/connectors" element={<AdoptStatic spec={{ kind: 'connectors', params: {} }} />} />
 
-        {/* Quant Lab (LEAN Engine Quantitative Research) */}
+        {/* LEAN GUI (QuantConnect LEAN Engine quantitative research) */}
         <Route path="/quant-lab" element={<AdoptStatic spec={{ kind: 'quant-lab', params: {} }} />} />
         <Route path="/quant-lab/strategy/:id" element={<AdoptQuantLabStrategy />} />
         <Route path="/quant-lab/results/:id" element={<AdoptQuantLabResults />} />

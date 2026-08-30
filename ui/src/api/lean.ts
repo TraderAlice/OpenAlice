@@ -1,5 +1,5 @@
 /**
- * Frontend Typed API Client for LEAN Engine & Quant Lab (`/api/lean/*`).
+ * Frontend Typed API Client for LEAN Engine & LEAN GUI (`/api/lean/*`).
  */
 
 import { fetchJson, headers } from './client'
@@ -32,6 +32,9 @@ export interface LeanStatus {
   dockerAvailable: boolean
   dockerVersion?: string
   dockerError?: string
+  leanCliAvailable: boolean
+  leanCliVersion?: string
+  leanCliError?: string
   templateCount: number
   strategyCount: number
   experimentCount: number

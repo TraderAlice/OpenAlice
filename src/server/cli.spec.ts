@@ -135,6 +135,78 @@ describe('CLI gateway — export scope isolation', () => {
   })
 })
 
+describe('CLI gateway — quant export', () => {
+  function makeQuantApp() {
+    const toolCenter = new ToolCenter()
+    toolCenter.register({
+      leanStatus: tool({
+        description: 'fake LEAN GUI status',
+        inputSchema: z.object({}),
+        execute: async () => ({ enabled: true, leanCli: { available: true } }),
+      }),
+      leanListExperiments: tool({
+        description: 'fake LEAN experiment list',
+        inputSchema: z.object({ limit: z.number().optional() }),
+        execute: async ({ limit }) => ({ experiments: [], limit }),
+      }),
+      leanRunBacktest: tool({
+        description: 'fake LEAN backtest run',
+        inputSchema: z.object({ startDate: z.string(), endDate: z.string() }),
+        execute: async () => ({ backtestId: 'bt-test', status: 'completed' }),
+      }),
+    }, 'lean')
+
+    const fakeSvc = {
+      registry: {
+        get: (id: string) => (id === 'ws1' ? { id: 'ws1', tag: 'demo' } : undefined),
+      },
+    }
+    const app = new Hono()
+    registerCliRoutes(app, {
+      toolCenter,
+      workspaceToolCenter: new WorkspaceToolCenter(),
+      inboxStore: {} as never,
+      entityStore: {} as never,
+      getWorkspaceService: () => fakeSvc as never,
+    })
+    return app
+  }
+
+  it('manifest exposes alice-quant groups through the quant export', async () => {
+    const res = await makeQuantApp().request('/cli/ws1/quant/manifest')
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      export: string
+      groups: Record<string, Record<string, { tool: string }>>
+      unmapped: string[]
+    }
+    expect(body.export).toBe('quant')
+    expect(body.groups['system']?.['status']?.tool).toBe('leanStatus')
+    expect(body.groups['backtest']?.['run']?.tool).toBe('leanRunBacktest')
+    expect(body.groups['experiment']?.['list']?.tool).toBe('leanListExperiments')
+    expect(body.unmapped).toEqual([])
+  })
+
+  it('invokes mapped LEAN GUI commands and rejects non-quant tools', async () => {
+    const app = makeQuantApp()
+    const ok = await app.request('/cli/ws1/quant/invoke', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tool: 'leanListExperiments', args: { limit: 3 } }),
+    })
+    expect(ok.status).toBe(200)
+    const body = (await ok.json()) as { content: Array<{ text?: string }> }
+    expect(body.content.map((b) => b.text ?? '').join('')).toContain('"limit":3')
+
+    const rejected = await app.request('/cli/ws1/quant/invoke', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tool: 'calculate', args: { expression: '1 + 1' } }),
+    })
+    expect(rejected.status).toBe(404)
+  })
+})
+
 describe('CLI gateway — UTA decision provenance', () => {
   function makeTradeApp() {
     const append = vi.fn(async (input) => ({ id: 'p-1', ...input }))
