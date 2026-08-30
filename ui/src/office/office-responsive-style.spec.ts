@@ -119,6 +119,18 @@ describe('Office responsive style contract', () => {
     expect(compactWindowCss).toContain('.oa-office-roster__summary small')
   })
 
+  it('moves top notifications below the live Office HUD without affecting modal windows', () => {
+    expect(css).toContain(
+      'body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause-menu))',
+    )
+    expect(css).toMatch(
+      /\[data-sonner-toaster\]\[data-y-position="top"\]\s*\{\s*--offset-top: 82px !important;\s*--mobile-offset-top: 82px !important;/,
+    )
+    expect(css).toMatch(
+      /@media \(max-width: 700px\) \{[\s\S]*?\[data-sonner-toaster\]\[data-y-position="top"\]\s*\{\s*--offset-top: 96px !important;/,
+    )
+  })
+
   it('keeps the roster command legend fixed while only the teammate grid scrolls', () => {
     expect(css).toMatch(
       /\.oa-office-roster__body\s*\{[\s\S]*?display: grid;[\s\S]*?grid-template-rows: auto minmax\(0, 1fr\);[\s\S]*?overflow: hidden;/,

@@ -2064,6 +2064,20 @@
     10px 12px 0 color-mix(in srgb, var(--gba-ink) 24%, transparent);
 }
 
+body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause-menu))
+  [data-sonner-toaster][data-y-position="top"] {
+  --offset-top: 82px !important;
+  --mobile-offset-top: 82px !important;
+}
+
+@media (max-width: 700px) {
+  body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause-menu))
+    [data-sonner-toaster][data-y-position="top"] {
+    --offset-top: 96px !important;
+    --mobile-offset-top: 96px !important;
+  }
+}
+
 .oa-office-building {
   min-height: 0;
   color: var(--gba-ink);

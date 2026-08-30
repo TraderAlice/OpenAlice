@@ -3218,6 +3218,23 @@ Persistent roster-command legend follow-up (2026-08-30):
   together with UI TypeScript. Root TypeScript, the full 617-file Vitest run (5,136 passing; one file and nine tests
   skipped), and the production build also passed; the existing direct-eval and large-chunk advisories are unchanged.
 
+Live-floor notification safe-area follow-up (2026-08-30):
+
+- Created one short, read-only Grok Issue in the dedicated Office Lab and reused its resulting Session for follow-up
+  turns. The real floor correctly moved from `0 working / 0 awake` to `1 working / 1 awake`, updated Chat from `0/8`
+  to `1/8`, lit the occupied desk and working emote, then returned the same coworker to rest while retaining its Agent
+  file, Issue drawer, completion journal entry, and Operations attention signal.
+- That live run exposed a cross-layer collision inside Office: the persistent conversation Sonner occupied y24–77.5
+  while the game HUD occupied y17–69, completely covering the working/awake counters and Menu exactly when activity
+  began. Compared moving every app toast, permanently lowering the HUD, and reserving a route-scoped safe area.
+  Chose the safe area so no non-Office surface changes and the normal floor keeps its full composition when quiet.
+- Top-positioned Sonner now receives an Office-only 82px top offset while the live floor is unobstructed, plus 96px on
+  phone viewports where the HUD uses two rows. Existing Office windows and the pause menu opt out because they already
+  own the foreground hierarchy. Real-browser replay of a long Grok follow-up measured the HUD bottom at y69, the toast
+  top at y82, and a 13px gap with all HUD commands visible. The focused 18-test responsive-style spec and UI TypeScript
+  passed. Root TypeScript, the full 617-file Vitest run (5,137 passing; one file and nine tests skipped), and the
+  production build also passed; the existing direct-eval and large-chunk advisories are unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
