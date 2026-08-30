@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../i18n'
+import { OFFICE_COWORKER_CAST_STORAGE_KEY } from '../office/coworker-cast-storage'
 import { clearOfficePlayerState } from '../office/office-excursion'
 import { OfficePage } from './OfficePage'
 
@@ -126,6 +127,7 @@ beforeEach(async () => {
     acknowledge: acknowledgeMock,
   })
   clearOfficePlayerState()
+  window.localStorage.clear()
   vi.stubGlobal('matchMedia', vi.fn(() => ({
     matches: true,
     addEventListener: vi.fn(),
@@ -172,6 +174,41 @@ describe('OfficePage localization', () => {
     const returnedAlice = screen.getByRole('img', { name: 'Office 地图上的 Alice' })
     expect(returnedAlice.style.top).toBe(rememberedTop)
     expect(returnedAlice.dataset.direction).toBe('down')
+  })
+
+  it('restores a coworker identity from the persistent Office cast', () => {
+    window.localStorage.setItem(OFFICE_COWORKER_CAST_STORAGE_KEY, JSON.stringify({
+      version: 1,
+      workspaces: {
+        'chat-1': { 'resume-grok': 'grok-analyst' },
+      },
+    }))
+    officeFloorMock.mockReturnValue({
+      ...defaultOfficeFloor(),
+      building: {
+        ...defaultOfficeFloor().building,
+        offices: [{
+          ...defaultOfficeFloor().building.offices[0],
+          employees: [{
+            resumeId: 'resume-grok',
+            agent: 'grok',
+            name: 'g8',
+            title: 'Office identity QA',
+            mood: 'idle' as const,
+            awake: false,
+            bubble: null,
+            lastSeq: 1,
+            lastInteractionAt: 1,
+            drawers: [],
+          }],
+        }],
+      },
+    })
+
+    render(<OfficePage />)
+
+    expect(screen.getByTestId('office-desk-resume-grok').getAttribute('aria-label'))
+      .toContain('Grok Analyst')
   })
 
   it('localizes the Office HUD and opens logs on request', async () => {

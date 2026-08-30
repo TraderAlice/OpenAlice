@@ -12,6 +12,7 @@ import { OfficeBuilding, type OfficeLogOrigin } from '../office/OfficeBuilding'
 import { OfficeCabinetWindow } from '../office/OfficeCabinetWindow'
 import { officeActivityActors } from '../office/activity-actors'
 import { officeCoworkerCast, type OfficeCoworkerSpriteAsset } from '../office/coworker-sprites'
+import { readOfficeCoworkerCasts, writeOfficeCoworkerCasts } from '../office/coworker-cast-storage'
 import { officePixelImg } from '../office/furniture'
 import { OfficeInspectRail } from '../office/OfficeInspectRail'
 import { OfficeWindowControlGlyph } from '../office/OfficeWindowControlGlyph'
@@ -78,25 +79,29 @@ export function OfficePage() {
       roomName: workspace ? workspaceDisplayName(workspace) : office.workspace.tag,
     }
   }, [building, selected, workspaces])
+  const initialCoworkerCasts = useMemo(readOfficeCoworkerCasts, [])
   const committedCastsRef = useRef<ReadonlyMap<
     string,
     ReadonlyMap<string, OfficeCoworkerSpriteAsset>
-  >>(new Map())
+  >>(initialCoworkerCasts)
   const coworkerCastSnapshot = useMemo(() => {
-    const byWorkspace = new Map<string, ReadonlyMap<string, OfficeCoworkerSpriteAsset>>()
+    const byWorkspace = new Map(committedCastsRef.current)
     const assets = new Map<string, OfficeCoworkerSpriteAsset>()
     for (const office of building?.offices ?? []) {
       const cast = officeCoworkerCast(
         office.employees,
         committedCastsRef.current.get(office.workspace.id),
       )
-      byWorkspace.set(office.workspace.id, cast)
+      const rememberedCast = new Map(committedCastsRef.current.get(office.workspace.id))
+      for (const [resumeId, asset] of cast) rememberedCast.set(resumeId, asset)
+      byWorkspace.set(office.workspace.id, rememberedCast)
       for (const [resumeId, asset] of cast) assets.set(resumeId, asset)
     }
     return { assets, byWorkspace }
   }, [building])
   useLayoutEffect(() => {
     committedCastsRef.current = coworkerCastSnapshot.byWorkspace
+    writeOfficeCoworkerCasts(coworkerCastSnapshot.byWorkspace)
   }, [coworkerCastSnapshot])
   const rosterOffice = useMemo(() => {
     if (!building || !rosterWorkspaceId) return null

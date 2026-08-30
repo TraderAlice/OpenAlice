@@ -3235,6 +3235,23 @@ Live-floor notification safe-area follow-up (2026-08-30):
   passed. Root TypeScript, the full 617-file Vitest run (5,137 passing; one file and nine tests skipped), and the
   production build also passed; the existing direct-eval and large-chunk advisories are unchanged.
 
+Persistent coworker-cast follow-up (2026-08-30):
+
+- The same live Grok resume identity first appeared as Grok Analyst, then changed to Grok Architect after an Office
+  remount. The per-agent hash was stable; the collision-free Workspace cast existed only in a React ref, so a reload
+  recast the complete party and also changed the callsign derived from the selected sprite.
+- Compared isolated hashing (stable but duplicate-prone), deterministic whole-roster casting (new joins reshuffle old
+  coworkers), and an Office-only Workspace + resumeId cast registry. Chose the registry: it preserves the authored
+  no-repeat party model while keeping the backend Session identity contract free of presentation state.
+- The versioned local registry stores only sprite IDs, reconstructs assets through the checked-in registry, drops
+  obsolete or invalid records without migration, and retains departed identities as reservations so a newcomer cannot
+  take a returning coworker's role while an authored family still has room.
+- Real-browser QA refreshed `/office` as a complete page with the live Grok QA Session present. Its map label remained
+  `Grok Architect` before and after reload, and opening its Agent file resolved the same identity, portrait, g8 name,
+  assignment, Issue drawer, and Session command. Focused cast, storage, and page specs passed (3 files / 20 tests).
+  Root/UI TypeScript, the full 617-file Vitest run (5,141 passing; one file and nine tests skipped), and the production
+  build passed; the existing canvas and large-chunk advisories are unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

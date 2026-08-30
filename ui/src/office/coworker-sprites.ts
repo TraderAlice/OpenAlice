@@ -169,6 +169,10 @@ export function officeCoworkerCast(
     const pool = ARCHETYPE_POOL[archetype]
     const pending: OfficeCoworkerCastMember[] = []
     const claimed = new Set<number>()
+    for (const retained of retainedCast.values()) {
+      const retainedIndex = pool.indexOf(retained.id)
+      if (retainedIndex >= 0) claimed.add(retainedIndex)
+    }
     for (const member of family) {
       const retained = retainedCast.get(member.resumeId)
       const retainedIndex = retained ? pool.indexOf(retained.id) : -1

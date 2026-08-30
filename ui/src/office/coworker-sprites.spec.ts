@@ -78,6 +78,31 @@ describe('Office coworker sprite registry', () => {
     expect(new Set(Array.from(joined.values(), (asset) => asset.id)).size).toBe(5)
   })
 
+  it('reserves a departed coworker identity for a later return', () => {
+    const departedResumeId = 'former-grok'
+    const departedAsset = OFFICE_COWORKER_SPRITES['grok-oracle']
+    const collidingResumeId = Array.from({ length: 100 }, (_, index) => `new-grok-${index}`)
+      .find((resumeId) => officeCoworkerSpriteForAgent('grok', resumeId) === departedAsset)
+    expect(collidingResumeId).toBeTruthy()
+
+    const retained = new Map([[departedResumeId, departedAsset]])
+    const newcomer = officeCoworkerCast(
+      [{ resumeId: collidingResumeId!, agent: 'grok' }],
+      retained,
+    )
+    expect(newcomer.get(collidingResumeId!)).not.toBe(departedAsset)
+
+    const reunited = officeCoworkerCast(
+      [
+        { resumeId: departedResumeId, agent: 'grok' },
+        { resumeId: collidingResumeId!, agent: 'grok' },
+      ],
+      new Map([...retained, ...newcomer]),
+    )
+    expect(reunited.get(departedResumeId)).toBe(departedAsset)
+    expect(reunited.get(collidingResumeId!)).toBe(newcomer.get(collidingResumeId!))
+  })
+
   it('keeps aliases intentional and unknown runtimes stable without returning Alice', () => {
     expect(officeCoworkerSpriteForAgent('cursor-agent')).toBe(OFFICE_COWORKER_SPRITES.codex)
     expect(officeCoworkerSpriteForAgent('omp')).toBe(OFFICE_COWORKER_SPRITES.opencode)
