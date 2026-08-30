@@ -175,13 +175,14 @@ describe('OfficeInspectRail', () => {
 
   it('collapses a long Session title without moving the primary commands', async () => {
     const longTitle = 'Research question: Is NVDA in a buyable technical setup right now, and does the broader semiconductor sector support it?'
+    const onClose = vi.fn()
     const { container } = render(
       <OfficeInspectRail
         employee={{ ...employee, title: longTitle, bubble: null }}
         roomName="Auto Quant"
         onOpen={vi.fn()}
         onOpenDrawer={vi.fn()}
-        onClose={vi.fn()}
+        onClose={onClose}
       />,
     )
 
@@ -198,6 +199,14 @@ describe('OfficeInspectRail', () => {
     await userEvent.keyboard('{Tab}')
     expect(document.activeElement).toBe(toggle)
     await userEvent.keyboard('{Enter}')
+    expect(title.dataset.expanded).toBe('true')
+    await userEvent.keyboard('{Escape}')
+    expect(screen.getByRole('button', { name: 'Show full title' })).toBeTruthy()
+    expect(document.activeElement).toBe(toggle)
+    expect(onClose).not.toHaveBeenCalled()
+    await userEvent.keyboard('{Escape}')
+    expect(onClose).toHaveBeenCalledOnce()
+    await userEvent.keyboard(' ')
     expect(title.dataset.expanded).toBe('true')
     await userEvent.keyboard(' ')
     expect(title.dataset.expanded).toBeUndefined()

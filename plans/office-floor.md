@@ -4493,6 +4493,24 @@ Roving service-journal follow-up (2026-08-31):
   suite passed all 618 test files and 5,178 tests (one file and nine tests skipped); the production UI build passed with
   only the existing ports fallback and large-chunk advisory.
 
+Layered Agent-file cancel follow-up (2026-08-31):
+
+- Audited the real Escape hierarchy across ordinary News, expanded Replay, Agent File, roster, filing cabinet, and the
+  pause menu. Journal, Replay, roster, cabinet, and menu already followed the expected game rule: dismiss the nearest
+  local layer first, then restore focus to the exact world object that opened it. A long Grok Artificer Assignment was
+  the exception: after expanding its title, Escape discarded the whole Agent File and returned to the roster.
+- Compared keeping Escape as an unconditional window close, adding a separate collapse shortcut, and aligning Agent File
+  with the journal's layered cancellation. Chose the shared game hierarchy: the first Escape collapses an expanded title
+  and restores focus to its toggle; a second Escape returns to the roster. An ordinary unexpanded file still exits in one
+  step, so the common path gains no ceremony.
+- Real-browser acceptance opened the physical Chat roster and the live `resume-modest-amber-bridge-zlciqj` Grok Artificer
+  file. The first Escape changed `Collapse title` back to `Show full title` while retaining the file and toggle focus; the
+  second returned to the same roster row; the third returned focus to Chat's physical `+18` roster object. Cabinet Escape
+  likewise restored its physical cabinet, and menu Escape restored the Floor-view command.
+- Focused Inspect-rail tests passed five cases. Root and UI TypeScript passed; the full suite passed all 618 test files
+  and 5,178 tests (one file and nine tests skipped); the production UI build passed with only the existing ports fallback
+  and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

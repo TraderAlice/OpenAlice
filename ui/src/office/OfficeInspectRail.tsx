@@ -80,7 +80,15 @@ export function OfficeInspectRail({
       data-awake={employee?.awake}
       className="oa-office-inspect oa-office-window"
       onKeyDown={(event) => {
-        if (event.key === 'Escape') onClose?.()
+        if (event.key !== 'Escape') return
+        if (titleExpanded) {
+          event.preventDefault()
+          event.stopPropagation()
+          setTitleExpanded(false)
+          requestAnimationFrame(() => titleToggleRef.current?.focus({ preventScroll: true }))
+          return
+        }
+        onClose?.()
       }}
     >
       {onClose && (
