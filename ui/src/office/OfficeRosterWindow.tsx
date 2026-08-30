@@ -76,7 +76,10 @@ export function OfficeRosterWindow({
       <div className="oa-office-roster__body">
         <div className="oa-office-roster__summary">
           <span>{t('office.rosterCount', { count: employees.length })}</span>
-          <small>{t('office.rosterSelectHint')}</small>
+          <small className="oa-office-window__input-hint">
+            <span data-input="keyboard">{t('office.rosterKeyboardHint')}</span>
+            <span data-input="touch">{t('office.rosterSelectHint')}</span>
+          </small>
         </div>
         <ul
           ref={listRef}

@@ -89,7 +89,10 @@ export function OfficeCabinetWindow({
       <div className="oa-office-cabinet-window__body">
         <div className="oa-office-cabinet-window__summary">
           <span>{t('office.cabinetRecords', { count: records.length })}</span>
-          <small>{t('office.cabinetInspectHint')}</small>
+          <small className="oa-office-window__input-hint">
+            <span data-input="keyboard">{t('office.cabinetKeyboardHint')}</span>
+            <span data-input="touch">{t('office.cabinetInspectHint')}</span>
+          </small>
         </div>
 
         {records.length > 0 ? (

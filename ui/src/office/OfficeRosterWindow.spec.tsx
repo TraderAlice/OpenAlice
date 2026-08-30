@@ -50,6 +50,8 @@ describe('OfficeRosterWindow', () => {
     )
 
     expect(screen.getByText('6 team members')).toBeTruthy()
+    expect(screen.getByText('Arrows choose · Enter to inspect').getAttribute('data-input')).toBe('keyboard')
+    expect(screen.getByText('Choose a teammate to inspect their Agent file.').getAttribute('data-input')).toBe('touch')
     expect(screen.getAllByRole('button')).toHaveLength(7)
     const coworkerImages = screen.getByTestId('office-roster-window')
       .querySelectorAll<HTMLImageElement>('.oa-office-coworker img')

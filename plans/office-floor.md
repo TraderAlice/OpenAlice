@@ -3085,6 +3085,25 @@ Quiet-coworker dialogue follow-up (2026-08-30):
   TypeScript passed. Root TypeScript, the full 617-file Vitest run (5,135 passing; one file and nine tests skipped),
   and the production build also passed; the existing direct-eval and large-chunk advisories are unchanged.
 
+Contextual window-control legend follow-up (2026-08-30):
+
+- Replayed the real roster and filing cabinet with keyboard navigation, then reviewed classic GBA interior dialogue and
+  character/inventory menus. Their transferable pattern was not decorative chrome: a menu names its active A/B/L/R
+  controls beside the current content. Office already had geometry-aware arrows, Home/End, Enter, and Escape, but its
+  summary bars described the destination without revealing the spatial input model.
+- Compared a persistent footer under every Office window, repeating key badges inside every row, and reusing the
+  existing summary hint. Chose the summary hint: desktop/fine-pointer layouts now say `Arrows choose · Enter to
+  inspect` in the roster and `Arrows choose · Enter to open` in the cabinet; coarse pointers retain the existing plain
+  touch instruction, and <=680px keeps hiding the secondary hint entirely.
+- The input variant uses the same `data-input` capability seam as route cancellation and contextual action prompts.
+  No new window, icon, animation, or focus behavior was introduced; count hierarchy and the existing two-column game
+  menu remain unchanged.
+- Browser-opened both real Prediction windows at the current 1024-pixel app viewport. The legend fit on one summary
+  line, g8 retained the initial RPG cursor, and ArrowRight moved the cabinet cursor from the Issue to the adjacent Inbox
+  delivery exactly as advertised. Focused roster, cabinet, and responsive-style specs passed (3 files / 20 tests), and
+  UI TypeScript passed. Root TypeScript, the full 617-file Vitest run (5,135 passing; one file and nine tests skipped),
+  and the production build also passed; the existing direct-eval and large-chunk advisories are unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

@@ -153,6 +153,15 @@ describe('Office responsive style contract', () => {
     expect(coarseTouchCss).toContain('.oa-office-map-controls__move')
     expect(coarseTouchCss).toContain('.oa-office-route-status')
     expect(coarseTouchCss).toContain('bottom: 122px')
+    expect(css).toMatch(
+      /\.oa-office-window__input-hint \[data-input='touch'\]\s*\{\s*display: none;/,
+    )
+    expect(coarseTouchCss).toMatch(
+      /\.oa-office-window__input-hint \[data-input='keyboard'\]\s*\{\s*display: none;/,
+    )
+    expect(coarseTouchCss).toMatch(
+      /\.oa-office-window__input-hint \[data-input='touch'\]\s*\{\s*display: inline;/,
+    )
     expect(css.match(/\.oa-office-map-controls\[data-action-ready='true'\]/g)).toHaveLength(2)
     expect(css.match(/\.oa-office-map-controls\[data-routing='true'\]/g)).toHaveLength(2)
     expect(css).toContain(".oa-office-building[data-controls-suspended='true'] :is(")
