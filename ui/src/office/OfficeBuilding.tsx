@@ -198,7 +198,7 @@ export function OfficeBuilding({
   const departureTimerRef = useRef<number | null>(null)
   const routeGenerationRef = useRef(0)
   const replayFocusKeyRef = useRef<string | null>(null)
-  const menuTriggerRef = useRef<HTMLButtonElement>(null)
+  const restoreFloorFocusRef = useRef(true)
   const recentGroups = useMemo(
     () => building.offices.filter((office) => !office.sleeping),
     [building.offices],
@@ -599,12 +599,8 @@ export function OfficeBuilding({
     }
   }
   const closeFloorMenu = (restoreFocus = true) => {
+    if (!restoreFocus) restoreFloorFocusRef.current = false
     setMenuOpen(false)
-    if (!restoreFocus) return
-    requestAnimationFrame(() => {
-      if (document.querySelector('.oa-office-window[aria-modal="true"]')) return
-      menuTriggerRef.current?.focus()
-    })
   }
   const activateNearbyTarget = () => {
     if (!nearbyTarget || selected || departingWorkspace || floorInteractionSuspended) return
@@ -992,16 +988,24 @@ export function OfficeBuilding({
                 setPanning(false)
               }
               if (open) {
+                restoreFloorFocusRef.current = true
                 setMenuOpen(true)
               } else {
-                closeFloorMenu()
+                setMenuOpen(false)
               }
+            }}
+            onOpenChangeComplete={(open) => {
+              if (open) return
+              const shouldRestoreFocus = restoreFloorFocusRef.current
+              restoreFloorFocusRef.current = true
+              if (!shouldRestoreFocus) return
+              if (document.querySelector('.oa-office-window[aria-modal="true"]')) return
+              viewportRef.current?.focus({ preventScroll: true })
             }}
           >
             <DropdownMenuTrigger
               render={<button
                 type="button"
-                ref={menuTriggerRef}
                 className="oa-office-pause-trigger"
                 aria-label={t('office.pauseMenu')}
                 data-open={menuOpen}

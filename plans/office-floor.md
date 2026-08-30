@@ -3908,6 +3908,24 @@ Contextual camera-command follow-up (2026-08-30):
   TypeScript passed, the full suite passed all 617 test files and 5,166 tests (one file and nine tests skipped), and the
   production UI build passed with only the existing ports fallback and large-chunk advisories.
 
+Pause-to-play focus follow-up (2026-08-30):
+
+- Tested the real 844x390 route from Grok Researcher toward Grok Architect and opened Menu mid-route. The route
+  correctly cancelled and Alice remained in place, but closing Menu with Escape restored browser focus to the HUD
+  trigger. The next Arrow key therefore did nothing until the player manually clicked the floor.
+- Compared retaining trigger focus and intercepting movement globally, adding a dedicated Resume command, and making
+  ordinary menu closure resume the world surface. Chose the world-surface handoff: Escape and view selection now
+  behave like leaving a game pause menu, while commands that immediately open Activity log or return to Live preserve
+  the destination surface's focus ownership.
+- The controlled menu records whether its selected action owns a follow-up surface and restores `office-floor` only
+  from Base UI's post-close completion callback. This runs after the primitive's own trigger restoration without a
+  timing race, and the modal guard prevents the map from stealing focus from an Office window.
+- Real-browser acceptance closed Menu with `office-floor` active and the next ArrowLeft moved Alice from x480 to x456.
+  Opening Activity log from the same menu left focus on a log-window button rather than the map. The focused Building
+  suite passed all 18 tests. Root and UI TypeScript passed, the full suite passed all 617 test files and 5,166 tests
+  (one file and nine tests skipped), and the production UI build passed with only the existing ports fallback and
+  large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
