@@ -6,6 +6,8 @@ import { describe, expect, it } from 'vitest'
 const uiRoot = basename(process.cwd()) === 'ui' ? process.cwd() : resolve(process.cwd(), 'ui')
 const css = readFileSync(resolve(uiRoot, 'src/office/office.css'), 'utf8')
 const gameWindowStart = css.indexOf('@keyframes oa-office-gba-window')
+const gameWindowEnd = css.indexOf('\n}', gameWindowStart)
+const gameWindowCss = css.slice(gameWindowStart, gameWindowEnd)
 const mediumStart = css.indexOf('@container (max-width: 760px)', gameWindowStart)
 const compactStart = css.indexOf('@container (max-width: 680px)', mediumStart)
 const phoneStart = css.indexOf('@media (max-width: 580px)', compactStart)
@@ -13,6 +15,13 @@ const mediumCss = css.slice(mediumStart, compactStart)
 const compactCss = css.slice(compactStart, phoneStart)
 
 describe('Office Agent-file style contract', () => {
+  it('opens game windows as opaque stepped panels instead of blending with the floor', () => {
+    expect(gameWindowStart).toBeGreaterThan(-1)
+    expect(gameWindowEnd).toBeGreaterThan(gameWindowStart)
+    expect(gameWindowCss).toContain('transform: scaleY(0.85)')
+    expect(gameWindowCss).not.toContain('opacity')
+  })
+
   it('keeps character information ahead of the full-width command row', () => {
     expect(css).toMatch(
       /\.oa-office-inspect\s*\{[\s\S]*?max-height: min\(356px, calc\(100% - 84px\)\);[\s\S]*?overflow: hidden/,

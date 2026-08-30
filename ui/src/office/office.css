@@ -3022,7 +3022,6 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
 
 @keyframes oa-office-gba-window {
   from {
-    opacity: 0;
     transform: scaleY(0.85);
   }
 }

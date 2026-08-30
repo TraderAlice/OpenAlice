@@ -3356,6 +3356,23 @@ Replay HUD command hierarchy follow-up (2026-08-30):
   suite passed all 617 test files and 5,147 tests (one file and nine tests skipped), and the production UI build passed
   with only the existing jsdom canvas and large-chunk advisories.
 
+Opaque game-window opening follow-up (2026-08-30):
+
+- Played the real twelve-person Chat roster into an Agent file, returned to the roster, then auto-walked to the Chat
+  filing cabinet at desktop and phone sizes. The settled menus were readable, but the shared 120ms window entrance
+  animated from opacity zero; when auto-walk finished, the first cabinet frame blended five record cards with the
+  Workspace signs and furniture behind it before becoming opaque.
+- Compared strengthening the whole-floor scrim, overriding only the cabinet body, and removing alpha blending from the
+  shared game-window keyframe. Chose the shared opaque two-step unfold: every Office foreground window now owns a solid
+  paper plane from its first frame while retaining the existing `scaleY` game-menu pop. No extra overlay or cabinet-only
+  exception was added.
+- Real-browser acceptance polled for the actual dialog mount and captured its first available frame at 390x844 and
+  1200x800. Both frames showed an opaque header, summary, record grid, and command row with no map text bleeding through;
+  the final layout and Close return path remained unchanged.
+- The focused shared-window style spec passed (5 tests). Root and UI TypeScript passed, the full suite passed all 617
+  test files and 5,148 tests (one file and nine tests skipped), and the production UI build passed with only the existing
+  jsdom canvas and large-chunk advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
