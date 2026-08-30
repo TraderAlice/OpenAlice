@@ -120,8 +120,10 @@ describe('OfficeCabinetWindow', () => {
     expect(document.activeElement).toBe(recordButtons[1])
 
     const recordExit = screen.getByRole('button', { name: /Open Review queue, Issue, .* in Workspace/ })
-    expect(recordExit.querySelector<HTMLImageElement>('.oa-office-cabinet-window__destination img')?.src)
+    expect(recordExit.querySelector<HTMLImageElement>('.oa-office-cabinet-window__destination-portal')?.src)
       .toContain('/office/hud/session-portal-v2.png')
+    expect(recordExit.querySelector<HTMLImageElement>('.oa-office-cabinet-window__cursor')?.src)
+      .toContain('/office/hud/journal-cursor-v1.png')
     fireEvent.keyDown(recordExit, { key: 'Enter' })
     expect(onOpenRecord).toHaveBeenCalledWith(group.employees[1], group.employees[1].drawers[0])
     expect(onOpenRecord).toHaveBeenCalledTimes(1)

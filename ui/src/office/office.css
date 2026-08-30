@@ -2927,6 +2927,20 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
   object-fit: contain;
 }
 
+.oa-office-cabinet-window__cursor {
+  display: none;
+}
+
+.oa-office-cabinet-window__records li button:is(:hover, :focus-visible)
+  .oa-office-cabinet-window__destination-portal {
+  display: none;
+}
+
+.oa-office-cabinet-window__records li button:is(:hover, :focus-visible)
+  .oa-office-cabinet-window__cursor {
+  display: block;
+}
+
 .oa-office-cabinet-window__destination small {
   max-width: 62px;
   color: currentColor;

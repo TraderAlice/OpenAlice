@@ -189,7 +189,18 @@ export function OfficeCabinetWindow({
                       })}</small>
                     </span>
                     <span className="oa-office-cabinet-window__destination" aria-hidden>
-                      <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" style={officePixelImg} />
+                      <img
+                        className="oa-office-cabinet-window__destination-portal"
+                        src={OFFICE_HUD_ASSETS.sessionPortal}
+                        alt=""
+                        style={officePixelImg}
+                      />
+                      <img
+                        className="oa-office-cabinet-window__cursor"
+                        src={OFFICE_HUD_ASSETS.journalCursor}
+                        alt=""
+                        style={officePixelImg}
+                      />
                       <small>{t('office.drawerRecordAction')}</small>
                     </span>
                   </button>

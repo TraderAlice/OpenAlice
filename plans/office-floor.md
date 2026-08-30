@@ -5034,6 +5034,23 @@ Agent-file portrait framing follow-up (2026-08-31):
   file and nine tests skipped); the production UI build passed with only the existing ports fallback and large-chunk
   advisory.
 
+Cabinet record-cursor follow-up (2026-08-31):
+
+- Opened the real 12-record Chat Filing cabinet and moved from the first to second card with ArrowRight. The data,
+  player-facing record titles, owner provenance, two-column grid, and explicit Workspace exit were already strong, but
+  keyboard selection changed only from cream to a very light green. Unlike the roster and Activity Log, the cabinet
+  had no shared pixel cursor, so the active record was not immediately legible in a dense grid.
+- Compared a heavier focus border, a dedicated cursor column, and reusing the existing destination slot. A heavier
+  border would add noise to every card; another column would steal long-title width. Chose an in-place RPG selection
+  swap: unselected records keep the session-portal icon above `OPEN`, while hover/focus replaces that icon with the
+  same journal arrow used by other Office inventories. No card geometry or exit semantics change.
+- Implemented and replayed the real dense cabinet. The first record opened with a single arrow in its existing exit
+  slot; ArrowRight transferred that arrow to `Office Live Working QA` while the previous card restored its portal.
+  Titles, owner lines, OPEN labels, grid width, scroll position, and Workspace-files command remained unchanged. The
+  focused cabinet/style suites passed all 32 tests. Root and UI TypeScript passed; the full suite passed all 620 test
+  files and 5,194 tests (one file and nine tests skipped); the production UI build passed with only the existing ports
+  fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
