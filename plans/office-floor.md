@@ -3825,6 +3825,26 @@ Short-landscape party-window hierarchy follow-up (2026-08-30):
   file and nine tests skipped), and the production UI build passed with only the existing jsdom canvas and large-chunk
   advisories.
 
+Agent-file world-focus follow-up (2026-08-30):
+
+- Continued the real 844x390 map loop from click-to-walk into Grok Librarian's Agent File and back. Alice stopped among
+  the four Chat desks; after closing, the facing cone correctly presented `Talk to Grok Diplomat`, but focus returned
+  to the old Librarian desk. The game prompt and browser activation target therefore described different worlds until
+  the player moved once.
+- Compared intercepting Enter on every focused floor object, pinning the old employee as the nearby target, and
+  returning map-origin Agent Files to the floor itself. Chose the floor: Tab users can still focus and activate an
+  explicit object, spatial selection remains authoritative, and the next game action follows the visible facing-cone
+  prompt instead of stale dialog provenance.
+- `closeEmployee` now distinguishes the existing roster origin from map origin. Roster-origin files still restore the
+  exact teammate row; map-origin files focus the native `office-floor` world surface after the modal unmounts. The
+  ambient Enter/Space contract therefore resumes without broad document-level interception or another focus state.
+- Real-browser acceptance closed Librarian with `office-floor` focused while the prompt named Diplomat, then confirmed
+  both Enter and Space opened Grok Diplomat. The separate Team roster → Grok Artificer → Back loop restored the exact
+  Artificer button by resumeId. The focused OfficePage suite passed all 14 tests, including a map Agent-file close and
+  immediate Enter reopen. Root and UI TypeScript passed, the full suite passed all 617 test files and 5,165 tests (one
+  file and nine tests skipped), and the production UI build passed with only the existing jsdom canvas and large-chunk
+  advisories.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

@@ -163,7 +163,6 @@ export function OfficePage() {
     })
   }
   const closeEmployee = () => {
-    const resumeId = selected?.resumeId
     setSelected(null)
     if (employeeOriginRef.current.kind === 'roster') {
       setRosterWorkspaceId(employeeOriginRef.current.workspaceId)
@@ -171,9 +170,7 @@ export function OfficePage() {
       return
     }
     requestAnimationFrame(() => {
-      const desks = document.querySelectorAll<HTMLElement>('[data-testid^="office-desk-"]')
-      Array.from(desks).find((desk) =>
-        desk.dataset.testid === `office-desk-${resumeId}`)?.focus()
+      document.querySelector<HTMLElement>('[data-testid="office-floor"]')?.focus()
     })
   }
   const closeRoster = () => {

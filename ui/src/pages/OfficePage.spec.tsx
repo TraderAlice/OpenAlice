@@ -263,6 +263,42 @@ describe('OfficePage localization', () => {
       .toContain('Grok Analyst')
   })
 
+  it('returns a map Agent file to the floor so the next action follows the nearby prompt', async () => {
+    officeFloorMock.mockReturnValue({
+      ...defaultOfficeFloor(),
+      building: {
+        ...defaultOfficeFloor().building,
+        offices: [{
+          ...defaultOfficeFloor().building.offices[0],
+          employees: [{
+            resumeId: 'resume-codex',
+            agent: 'codex',
+            name: 'x1',
+            title: 'Inspect the Office return loop',
+            mood: 'idle' as const,
+            awake: false,
+            bubble: null,
+            lastSeq: 1,
+            lastInteractionAt: 1,
+            drawers: [],
+          }],
+        }],
+      },
+    })
+
+    render(<OfficePage />)
+
+    const floor = screen.getByTestId('office-floor')
+    await userEvent.click(screen.getByTestId('office-desk-resume-codex'))
+    expect(await screen.findByRole('dialog', { name: /Codex/ })).toBeTruthy()
+
+    await userEvent.click(screen.getByRole('button', { name: '关闭' }))
+    await vi.waitFor(() => expect(document.activeElement).toBe(floor))
+
+    await userEvent.keyboard('{Enter}')
+    expect(await screen.findByRole('dialog', { name: /Codex/ })).toBeTruthy()
+  })
+
   it('localizes the Office HUD and opens logs on request', async () => {
     const { container } = render(<OfficePage />)
 
