@@ -5466,6 +5466,23 @@ Filing-cabinet page-navigation follow-up (2026-08-31):
   full suite passed all 620 test files and 5,207 tests (one file and nine tests skipped); the production UI build passed
   with only the existing ports fallback and large-chunk advisory.
 
+Activity-log position-and-paging follow-up (2026-08-31):
+
+- Played the real 30+ Overview journal through channel changes, record selection, Home/End, and long-list scrolling.
+  The channel tabs disclosed the available inventory, but the selected record had no visible position and PgUp/PgDn
+  were unclaimed. Players therefore had neither a sense of depth nor a fast way to traverse a busy operational day.
+- Compared adding only a position label, adding scrollbar buttons, and adopting the same complete long-list grammar as
+  the Team roster and filing cabinet. Chose the shared grammar: arrows move one record, PgUp/PgDn move one visible page,
+  Home/End jump to the ends, and left/right change channels. It improves traversal without adding another command row.
+- Added a compact, tabular `01/30+` game-menu counter beside the keyboard guide; its localized accessible name retains
+  the full `Record 1 of 30+` meaning. Page jumps reuse the shared spatial navigation helper and the journal's measured
+  viewport height, while the selected detail, roving focus, nearest-item scroll, and channel inventory stay synchronized.
+- Real-browser acceptance moved PgDn from the newest Nepal-floods story at `01/30+` to Grok Engineer's New agent beat at
+  `07/30+`, then PgUp returned exactly to the first story. The complete key set is exposed through
+  `aria-keyshortcuts`. Focused journal/navigation suites passed all 26 tests; root and UI TypeScript passed; the full
+  suite passed all 620 test files and 5,207 tests (one file and nine tests skipped); the production UI build passed with
+  only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

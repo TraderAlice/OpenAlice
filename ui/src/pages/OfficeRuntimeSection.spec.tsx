@@ -521,13 +521,15 @@ describe('OfficeRuntimeSection', () => {
     expect(screen.getByRole('tab', { name: /Inbox\s*1/ })).toBeTruthy()
     expect(screen.getByRole('tab', { name: /News\s*1/ })).toBeTruthy()
     expect(screen.getByRole('list', { name: 'Activity log · Overview' }).children).toHaveLength(4)
-    expect(screen.getByText('←/→ channels · ↑/↓ records')).toBeTruthy()
+    expect(screen.getByText('←/→ channels · ↑/↓ records · PgUp/PgDn page')).toBeTruthy()
+    expect(screen.getByLabelText('Record 1 of 4').textContent).toBe('1/4')
     const overviewToolRow = screen.getByRole('button', { name: /Tool action.*#0002/i })
     expect(overviewToolRow.closest('ol')?.getAttribute('aria-keyshortcuts'))
-      .toBe('ArrowUp ArrowDown ArrowLeft ArrowRight Home End Enter Space')
+      .toBe('ArrowUp ArrowDown ArrowLeft ArrowRight PageUp PageDown Home End Enter Space')
 
     await userEvent.click(overviewToolRow)
     expect(overviewToolRow.tabIndex).toBe(0)
+    expect(screen.getByLabelText('Record 3 of 4').textContent).toBe('3/4')
     expect(screen.getByRole('button', { name: /News added.*#0004/i }).tabIndex).toBe(-1)
     await userEvent.keyboard('{ArrowRight}')
     expect(screen.getByRole('tab', { name: /Agent\s*2/ }).getAttribute('data-active')).not.toBeNull()
@@ -575,6 +577,25 @@ describe('OfficeRuntimeSection', () => {
     expect(screen.getByRole('tab', { name: /Agent\s*100\+/ })).toBeTruthy()
     expect(screen.getByRole('tab', { name: /Inbox\s*0/ })).toBeTruthy()
     expect(screen.getByRole('tab', { name: /News\s*50\+/ })).toBeTruthy()
+
+    const journal = screen.getByRole('list', { name: 'Activity log · Overview' })
+    Object.defineProperty(journal, 'clientHeight', { configurable: true, value: 180 })
+    const rows = Array.from(journal.querySelectorAll<HTMLButtonElement>('button[data-seq]'))
+    rows.forEach((row, index) => {
+      vi.spyOn(row, 'getBoundingClientRect').mockReturnValue({
+        left: 0,
+        right: 280,
+        top: index * 64,
+        bottom: index * 64 + 58,
+      } as DOMRect)
+    })
+    expect(document.activeElement).toBe(rows[0])
+    expect(screen.getByLabelText('Record 1 of 30+').textContent).toBe('01/30+')
+    await userEvent.keyboard('{PageDown}')
+    expect(document.activeElement).toBe(rows[3])
+    expect(screen.getByLabelText('Record 4 of 30+').textContent).toBe('04/30+')
+    await userEvent.keyboard('{PageUp}')
+    expect(document.activeElement).toBe(rows[0])
   })
 
   it('opens a service channel on its requested event', async () => {

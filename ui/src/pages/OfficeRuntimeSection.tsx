@@ -27,6 +27,7 @@ import {
 } from '../office/activity-beats'
 import { OfficeCoworkerSprite } from '../office/OfficeCoworkerSprite'
 import { officePixelImg } from '../office/furniture'
+import { nextOfficeGridPageIndex } from '../office/grid-navigation'
 import { OFFICE_HUD_ASSETS } from '../office/hud-assets'
 import { isOfficeConfirmKey } from '../office/input'
 import { OFFICE_LOG_ASSETS, officeLogAssetKind } from '../office/log-assets'
@@ -604,6 +605,9 @@ export function OfficeRuntimeSection({
     )
   }
   const selectedEvent = selectedBeat.event
+  const selectedBeatIndex = Math.max(0, visibleBeats.indexOf(selectedBeat))
+  const positionWidth = String(visibleBeats.length).length
+  const selectedPositionLabel = `${String(selectedBeatIndex + 1).padStart(positionWidth, '0')}/${channelCountLabels[channel]}`
   const selectedBeatEvents = [...selectedBeat.events].reverse()
   const selectedPayload = selectedEvent.payload
   const selectedDetail = eventDetail(selectedEvent, t)
@@ -732,20 +736,26 @@ export function OfficeRuntimeSection({
         return
       }
     }
-    const buttons = Array.from(
-      keyboardEvent.currentTarget.closest('ol')
-        ?.querySelectorAll<HTMLButtonElement>('button') ?? [],
-    )
+    const journal = keyboardEvent.currentTarget.closest('ol')
+    const buttons = Array.from(journal?.querySelectorAll<HTMLButtonElement>('button') ?? [])
     const index = buttons.indexOf(keyboardEvent.currentTarget)
-    const nextIndex = keyboardEvent.key === 'ArrowDown'
-      ? Math.min(buttons.length - 1, index + 1)
-      : keyboardEvent.key === 'ArrowUp'
-        ? Math.max(0, index - 1)
-        : keyboardEvent.key === 'Home'
-          ? 0
-          : keyboardEvent.key === 'End'
-            ? buttons.length - 1
-            : null
+    let nextIndex: number | null = null
+    if (keyboardEvent.key === 'ArrowDown') {
+      nextIndex = Math.min(buttons.length - 1, index + 1)
+    } else if (keyboardEvent.key === 'ArrowUp') {
+      nextIndex = Math.max(0, index - 1)
+    } else if (keyboardEvent.key === 'PageUp' || keyboardEvent.key === 'PageDown') {
+      nextIndex = nextOfficeGridPageIndex(
+        buttons.map((button) => button.getBoundingClientRect()),
+        index,
+        keyboardEvent.key === 'PageUp' ? 'up' : 'down',
+        journal?.clientHeight ?? 0,
+      )
+    } else if (keyboardEvent.key === 'Home') {
+      nextIndex = 0
+    } else if (keyboardEvent.key === 'End') {
+      nextIndex = buttons.length - 1
+    }
     if (nextIndex == null || nextIndex === index) return
     keyboardEvent.preventDefault()
     const next = buttons[nextIndex]
@@ -801,7 +811,18 @@ export function OfficeRuntimeSection({
             </TabsTrigger>
           ))}
         </TabsList>
-        <small className="oa-office-runtime__input-hint">{t('office.logKeyboardHint')}</small>
+        <div className="oa-office-runtime__navigation">
+          <span
+            className="oa-office-runtime__position"
+            aria-label={t('office.logPosition', {
+              index: selectedBeatIndex + 1,
+              total: channelCountLabels[channel],
+            })}
+          >
+            {selectedPositionLabel}
+          </span>
+          <small className="oa-office-runtime__input-hint">{t('office.logKeyboardHint')}</small>
+        </div>
         <TabsContent value={channel} className="oa-office-runtime__panel">
           <div
             data-testid="runtime-log"
@@ -813,7 +834,7 @@ export function OfficeRuntimeSection({
               ref={journalIndexRef}
               className="oa-office-runtime__index"
               aria-label={`${t('office.timeline')} · ${channelLabel}`}
-              aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home End Enter Space"
+              aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight PageUp PageDown Home End Enter Space"
             >
           {visibleBeats.map((beat) => {
             const event = beat.event
