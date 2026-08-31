@@ -47,6 +47,18 @@ describe('Office Agent-file style contract', () => {
     expect(css).toMatch(/\.oa-office-window__close-mark\s*\{[\s\S]*?clip-path: polygon/)
   })
 
+  it('marks replay Agent files as one explicit historical character state', () => {
+    expect(css).toMatch(
+      /\.oa-office-inspect__replay-icon\s*\{[\s\S]*?width: 16px;[\s\S]*?height: 16px;/,
+    )
+    expect(css).toMatch(
+      /\.oa-office-inspect__replay-seq\s*\{[\s\S]*?margin-left: auto;[\s\S]*?background: var\(--gba-water\);/,
+    )
+    expect(css).toMatch(
+      /\.oa-office-inspect__facts dd\[data-power="replay"\]\s*\{[\s\S]*?font-weight: 900;/,
+    )
+  })
+
   it('keeps the three-column character card in landscape windows', () => {
     expect(mediumStart).toBeGreaterThan(gameWindowStart)
     expect(compactStart).toBeGreaterThan(mediumStart)

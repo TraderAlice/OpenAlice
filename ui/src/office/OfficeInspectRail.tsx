@@ -14,6 +14,7 @@ import { OfficeCoworkerSprite } from './OfficeCoworkerSprite'
 import type { OfficeCoworkerSpriteAsset } from './coworker-sprites'
 import { OfficeWindowControlGlyph } from './OfficeWindowControlGlyph'
 import { officeCoworkerAssignment, officeCoworkerCallsign, officeCoworkerStatusKey } from './label'
+import type { OfficeReplayFocus } from './replay-focus'
 import { officeRunModeLabel } from './runtime-presentation'
 import { useReducedMotion } from './use-reduced-motion'
 
@@ -21,6 +22,7 @@ export function OfficeInspectRail({
   employee,
   coworkerAsset,
   roomName,
+  replayFocus = null,
   onOpen,
   onReviewActivity,
   onOpenDrawer,
@@ -31,6 +33,7 @@ export function OfficeInspectRail({
   employee: OfficeFloorEmployee | null
   coworkerAsset?: OfficeCoworkerSpriteAsset
   roomName?: string
+  replayFocus?: OfficeReplayFocus | null
   onOpen: () => void
   onReviewActivity?: () => void
   onOpenDrawer: (item: OfficeDrawerItem) => void
@@ -87,6 +90,15 @@ export function OfficeInspectRail({
   const employeeLabel = employee ? officeCoworkerCallsign(employee, coworkerAsset) : ''
   const employeeAssignment = employee ? officeCoworkerAssignment(employee) : null
   const latestResultText = officeActivityText(employee?.latestResult?.text)
+  const replayActive = replayFocus != null
+  const employeeDialogue = replayFocus?.summary
+    ?? (employee?.bubble
+      ? officeBubbleText(employee.bubble, t)
+      : employee
+        ? t(employee.mood === 'idle' && !employee.awake
+          ? 'office.moodDialogue.resting'
+          : `office.moodDialogue.${employee.mood}`)
+        : '')
   const employeeByline = employee
     ? [employee.agent, employee.name].filter(Boolean).join(' · ')
     : ''
@@ -106,6 +118,7 @@ export function OfficeInspectRail({
       aria-label={employee ? employeeLabel : t('office.employeeFile')}
       data-testid="office-inspect"
       data-awake={employee?.awake}
+      data-replay={replayActive || undefined}
       className="oa-office-inspect oa-office-window"
       onKeyDown={(event) => {
         if (event.key !== 'Escape') return
@@ -168,8 +181,23 @@ export function OfficeInspectRail({
             </div>
             <div className="oa-office-inspect__dialogue">
               <div className="oa-office-inspect__kicker">
-                <span className="oa-office-live-dot" aria-hidden />
+                {replayFocus ? (
+                  <img
+                    className="oa-office-inspect__replay-icon"
+                    src={OFFICE_HUD_ASSETS.replayLatch}
+                    alt=""
+                    aria-hidden
+                    style={officePixelImg}
+                  />
+                ) : (
+                  <span className="oa-office-live-dot" aria-hidden />
+                )}
                 {t('office.employeeFile')}
+                {replayFocus && (
+                  <span className="oa-office-inspect__replay-seq">
+                    {t('office.replayAt', { seq: replayFocus.seq })}
+                  </span>
+                )}
               </div>
               <div className="oa-office-inspect__identity">
                 <p>{employeeLabel}</p>
@@ -222,14 +250,8 @@ export function OfficeInspectRail({
                 )}
                 </div>
               )}
-              <blockquote>
-                {employee.bubble
-                  ? officeBubbleText(employee.bubble, t)
-                  : t(employee.mood === 'idle' && !employee.awake
-                    ? 'office.moodDialogue.resting'
-                    : `office.moodDialogue.${employee.mood}`)}
-              </blockquote>
-              {!employee.bubble && employee.latestResult && latestResultText && (
+              <blockquote>{employeeDialogue}</blockquote>
+              {!replayFocus && !employee.bubble && employee.latestResult && latestResultText && (
                 <div className="oa-office-inspect__latest-result">
                   <small>{t('office.latestResult')}</small>
                   {resultCanExpand && (
@@ -280,10 +302,10 @@ export function OfficeInspectRail({
                 <dt>{t('office.status')}</dt>
                 <dd
                   data-mood={employee.mood}
-                  data-power={employee.awake ? 'awake' : 'asleep'}
+                  data-power={replayActive ? 'replay' : employee.awake ? 'awake' : 'asleep'}
                 >
                   <span aria-hidden />
-                  {t(officeCoworkerStatusKey(employee))}
+                  {t(replayActive ? 'office.power.replayActive' : officeCoworkerStatusKey(employee))}
                 </dd>
               </div>
               <div>

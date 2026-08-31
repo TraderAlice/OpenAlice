@@ -161,6 +161,50 @@ describe('OfficeInspectRail', () => {
     expect(container.textContent).not.toContain('headless')
   })
 
+  it('keeps a replay-focused coworker inside the historical event narrative', async () => {
+    const onReviewActivity = vi.fn()
+    const { container } = render(
+      <OfficeInspectRail
+        employee={{
+          ...employee,
+          awake: false,
+          mood: 'idle',
+          bubble: null,
+          latestResult: { text: 'Current result outside the replay beat.', at: Date.now() },
+        }}
+        roomName="Chat"
+        replayFocus={{
+          seq: 5530,
+          targetIds: ['employee:chat-1:demo-resume-chat'],
+          workspaceId: 'chat-1',
+          resumeId: 'demo-resume-chat',
+          label: 'Grok Alchemist',
+          summary: 'LIVE PRESENCE COMPLETE',
+          channel: 'agent',
+        }}
+        onOpen={vi.fn()}
+        onReviewActivity={onReviewActivity}
+        onOpenDrawer={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByTestId('office-inspect').dataset.replay).toBe('true')
+    expect(screen.getByText('Seq 5530')).toBeTruthy()
+    expect(container.querySelector<HTMLImageElement>('.oa-office-inspect__replay-icon')?.src)
+      .toContain('/office/hud/replay-latch-v1.png')
+    expect(container.querySelector('blockquote')?.textContent).toBe('LIVE PRESENCE COMPLETE')
+    expect(screen.queryByText('Off duty. Ready when the floor wakes.')).toBeNull()
+    expect(screen.queryByText('Latest result')).toBeNull()
+    expect(screen.queryByText('Current result outside the replay beat.')).toBeNull()
+    const status = screen.getByText('active in replay')
+    expect(status.getAttribute('data-power')).toBe('replay')
+    const reviewActivity = screen.getByRole('button', { name: 'Review activity' })
+    expect(document.activeElement).toBe(reviewActivity)
+    await userEvent.click(reviewActivity)
+    expect(onReviewActivity).toHaveBeenCalledOnce()
+  })
+
   it('lets keyboard players read and collapse a complete latest result', async () => {
     const onClose = vi.fn()
     const result = `The full shift report is ready. ${'Detailed evidence remains visible. '.repeat(12)}`

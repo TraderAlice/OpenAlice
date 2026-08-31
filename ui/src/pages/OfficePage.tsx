@@ -128,6 +128,12 @@ export function OfficePage() {
   const selectedCoworkerAsset = selectedSeat
     ? coworkerCastSnapshot.assets.get(selectedSeat.employee.resumeId)
     : undefined
+  const selectedReplayFocus = selectedSeat
+    && replayFocus?.seq === asOfSeq
+    && replayFocus.workspaceId === selectedSeat.office.workspace.id
+    && replayFocus.resumeId === selectedSeat.employee.resumeId
+    ? replayFocus
+    : null
   const activityActors = useMemo(() => building
     ? officeActivityActors(building.offices, (workspaceId, tag) => {
         const workspace = workspaces.find((item) => item.id === workspaceId)
@@ -266,6 +272,32 @@ export function OfficePage() {
       openOrFocus({ kind: 'trading-as-git', params: {} })
     }
   }
+
+  const reviewSelectedActivity = selectedSeat && selectedReplayFocus
+    ? () => {
+      productActivity.acknowledge('agent')
+      setLogView({
+        origin: 'employee',
+        channel: selectedReplayFocus.channel,
+        focusSeq: selectedReplayFocus.seq,
+      })
+      setReplayPanelOpen(true)
+    }
+    : selectedSeat && selectedSeat.employee.lastSeq > 0 && (
+      selectedSeat.employee.mood === 'failed'
+      || selectedSeat.employee.mood === 'waiting'
+      || selectedSeat.employee.mood === 'review'
+    )
+      ? () => {
+        productActivity.acknowledge('agent')
+        setLogView({
+          origin: 'employee',
+          channel: 'agent',
+          focusSeq: selectedSeat.employee.lastSeq,
+        })
+        setReplayPanelOpen(false)
+      }
+      : undefined
 
   return (
     <div className="oa-office-page">
@@ -438,22 +470,9 @@ export function OfficePage() {
                 employee={selectedSeat.employee}
                 coworkerAsset={selectedCoworkerAsset}
                 roomName={selectedSeat.roomName}
+                replayFocus={selectedReplayFocus}
                 onOpen={() => openEmployee(selectedSeat.office.workspace.id, selectedSeat.employee)}
-                onReviewActivity={selectedSeat.employee.lastSeq > 0 && (
-                  selectedSeat.employee.mood === 'failed'
-                  || selectedSeat.employee.mood === 'waiting'
-                  || selectedSeat.employee.mood === 'review'
-                )
-                  ? () => {
-                    productActivity.acknowledge('agent')
-                    setLogView({
-                      origin: 'employee',
-                      channel: 'agent',
-                      focusSeq: selectedSeat.employee.lastSeq,
-                    })
-                    setReplayPanelOpen(false)
-                  }
-                  : undefined}
+                onReviewActivity={reviewSelectedActivity}
                 onOpenDrawer={(item) => openDrawer(selectedSeat.office.workspace.id, selectedSeat.employee, item)}
                 onClose={closeEmployee}
                 returnToRoster={employeeOriginRef.current.kind === 'roster'}

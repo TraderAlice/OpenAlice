@@ -5240,6 +5240,32 @@ Dormant-cast legibility follow-up (2026-08-31):
   and UI TypeScript passed; the full suite passed all 620 test files and 5,200 tests (one file and nine tests skipped);
   the production UI build passed with only the existing ports fallback and large-chunk advisory.
 
+Replay Agent-file narrative follow-up (2026-08-31):
+
+- Ran real Grok headless task `run-HTEb5kFM` on the Night floor and watched it move the HUD and Chat sign from zero to
+  one working/awake coworker, render g28 with its active workstation and reporting emote, then settle back to sleep with
+  `LIVE PRESENCE COMPLETE`. Activity Log selected Task complete Seq 5530 with the correct Assignment, result, and run
+  facts. `Find on floor` entered Replay and found g28, but the automatically opened Agent File then said `asleep` and
+  `Off duty`, hid Review activity, and described neither Seq 5530 nor the event the player had just followed.
+- Compared leaving the current-state Agent File unchanged, returning directly to Activity Log on arrival, and giving
+  the same Agent File an explicit Replay narrative. Current state contradicts the replay HUD; immediate log return
+  removes the spatial payoff. Chose the contextual Agent File: it remains the single character window, but replaces
+  current dialogue with the focused event summary, labels the exact sequence and `active in replay`, and offers a
+  route back to that same event/channel.
+- Replay Agent File must not show the current `Latest result` beside a historical summary. Its current Session exit and
+  historical drawers remain reachable, while the event-review command is the primary focused action. Live Agent files
+  retain their existing awake/asleep, latest-result, failure, and roster-return behavior.
+- Implemented the contextual state by matching the selected coworker, Workspace, Replay sequence, and focus identity
+  before passing Replay narrative into Agent File. The window swaps its live dot for the existing Replay latch, adds a
+  compact sequence cartridge, speaks the event summary in the dialogue bubble, labels power as `active in replay`, and
+  suppresses current Latest result. Review activity preserves the focus channel/sequence and opens the Replay controls.
+- Real-browser acceptance replayed the complete g25 failure path: Live Agent File -> Review activity -> Task failed
+  #5153 -> Find on floor -> Replay Agent File. The arrival window showed Seq 5153, the historical prompt excerpt, and
+  `active in replay` with no Off duty or Latest result; Review activity returned to selected #5153 with Replay still
+  open. Focused Agent-file/page/style suites passed all 28 tests; root and UI TypeScript passed; the full suite passed
+  all 620 test files and 5,202 tests (one file and nine tests skipped); the production UI build passed with only the
+  existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
