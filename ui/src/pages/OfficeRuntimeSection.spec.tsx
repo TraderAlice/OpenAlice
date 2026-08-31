@@ -251,6 +251,7 @@ describe('OfficeRuntimeSection', () => {
     })
     const { container } = render(<OfficeRuntimeSection />)
     expect(await screen.findByText('Desk is clear.')).toBeTruthy()
+    expect(screen.getByText('Result')).toBeTruthy()
     expect(screen.getByText('Run mode')).toBeTruthy()
     expect(screen.getByText('Background run')).toBeTruthy()
     expect(screen.getByText('Status')).toBeTruthy()
@@ -268,6 +269,7 @@ describe('OfficeRuntimeSection', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /Tool action.*#0001/i }))
     expect(screen.getByText('Read command result · Complete')).toBeTruthy()
+    expect(screen.queryByText('Result')).toBeNull()
     expect(container.textContent).not.toContain('get_command_or_subagent_output')
     expect(screen.queryByText('Desk is clear.')).toBeNull()
     expect(screen.getByRole('button', { name: /Tool action.*#0001/i }).getAttribute('aria-pressed'))

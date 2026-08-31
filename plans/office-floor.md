@@ -5622,6 +5622,30 @@ Agent-file exceptional-status hierarchy follow-up (2026-08-31):
   passed all 620 test files and 5,211 tests (one file and nine tests skipped); the production UI build passed with only
   the existing ports fallback and large-chunk advisory.
 
+Visible-work result-label follow-up (2026-08-31):
+
+- Started real low-cost Grok run `run-El9Zrnij` in the Chat Office with a 20-second read-only command. Within the next
+  floor refresh, the header showed `1 working / 1 awake`, Chat showed `1/36 awake`, the desk powered on, and g36 gained
+  its working sprite plus typing bubble. Completion raised Operations attention and selected exact event `#6234`.
+- The dynamic lifecycle itself was coherent. Its evidence screen exposed the remaining hierarchy gap: `ASSIGNMENT` had
+  an explicit heading while the actual two-bullet answer was an anonymous paper block, forcing the player to infer where
+  background work became a result. Compared relying on color alone, labelling every event detail, and labelling only
+  Agent output. Color remains ambiguous and generic labels would duplicate News, Inbox, tool, and error event headers.
+- Chose a dedicated `RESULT` kicker only for Agent text/final assistant output. It mirrors Assignment's compact game-menu
+  language, does not duplicate tool or service details, and leaves report expansion plus the sticky action rail intact.
+- Real-browser selection of the newly inserted `#6234` also exposed a scroll-containment failure: the record list moved
+  to 45px as intended, but the 551px Activity Log window itself acquired `scrollTop=87` across 2,024px of descendant
+  content. Its title, Replay strip, and close command disappeared above the frame despite the inner panes being visible.
+- Compared resetting outer scroll after every selection, rebuilding the modal DOM, and making the outer game window a
+  non-scroll-container. Chose `overflow: clip` on the Activity Log shell: the index and event panes remain the only
+  explicit scroll owners, while browser focus/scroll-into-view can no longer move the permanent window chrome.
+- Real-browser acceptance reselected `#6234`: the index retained its intentional 45px position, the detail remained an
+  independent 351/493px scroll pane, and the 551/2,024px outer shell stayed at `scrollTop=0` with title, Replay, close,
+  `RESULT`, and both bottom actions visible. Selecting Tool action `#6196` removed the Result kicker, then returning to
+  `#6234` restored it without moving the shell. Focused Runtime/style suites passed all 56 tests; root and UI TypeScript
+  passed; the full suite passed all 620 test files and 5,211 tests (one file and nine tests skipped); the production UI
+  build passed with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

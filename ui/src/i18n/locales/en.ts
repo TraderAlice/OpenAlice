@@ -2054,6 +2054,7 @@ export const en = {
     runModeWorkspace: 'Workspace session',
     assignment: 'Assignment',
     latestResult: 'Latest result',
+    eventResult: 'Result',
     showFullResult: 'Read full result',
     collapseResult: 'Collapse result',
     eventTrigger: 'Started by',

@@ -611,6 +611,10 @@ export function OfficeRuntimeSection({
   const selectedBeatEvents = [...selectedBeat.events].reverse()
   const selectedPayload = selectedEvent.payload
   const selectedDetail = eventDetail(selectedEvent, t)
+  const selectedDetailIsResult = selectedDetail != null && (
+    selectedEvent.type === 'runtime.turn.text'
+    || (selectedEvent.type === 'runtime.stopped' && Boolean(selectedPayload.assistantText))
+  )
   const selectedDetailId = `office-runtime-detail-${selectedEvent.seq}`
   const detailCanExpand = selectedDetail != null
     && (selectedDetail.length > 320 || selectedDetail.split('\n').length > 8)
@@ -982,6 +986,11 @@ export function OfficeRuntimeSection({
             )}
             {selectedDetail && (
               <>
+                {selectedDetailIsResult && (
+                  <small className="oa-office-runtime__detail-label">
+                    {t('office.eventResult')}
+                  </small>
+                )}
                 {detailExpanded && reportToggle}
                 <p
                   id={selectedDetailId}

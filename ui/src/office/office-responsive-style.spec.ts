@@ -362,6 +362,9 @@ describe('Office responsive style contract', () => {
       /\.oa-office-runtime__detail\[data-expandable="true"\]:not\(\[data-expanded="true"\]\)\s*\{[\s\S]*?overflow: hidden;[\s\S]*?-webkit-line-clamp: 5/,
     )
     expect(css).toMatch(
+      /\.oa-office-runtime__detail-label\s*\{[\s\S]*?color: var\(--gba-moss-dark\);[\s\S]*?font-weight: 900;[\s\S]*?text-transform: uppercase;/,
+    )
+    expect(css).toMatch(
       /\.oa-office-runtime__actions\s*\{[\s\S]*?position: sticky;[\s\S]*?bottom: 0;/,
     )
     expect(css).toMatch(
@@ -397,6 +400,9 @@ describe('Office responsive style contract', () => {
   })
 
   it('pins activity-log chrome while the record and detail panes own overflow', () => {
+    expect(css).toMatch(
+      /\.oa-office-window--log\s*\{[\s\S]*?top: 72px;[\s\S]*?overflow: clip;/,
+    )
     expect(css).toMatch(
       /\.oa-office-window--log \.oa-office-window__body\s*\{[\s\S]*?display: flex;[\s\S]*?overflow: clip;/,
     )

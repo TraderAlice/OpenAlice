@@ -1403,6 +1403,21 @@
   overflow: visible;
 }
 
+.oa-office-runtime__detail-label {
+  display: block;
+  margin-top: 7px;
+  color: var(--gba-moss-dark);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.oa-office-runtime__detail-label + :is(.oa-office-runtime__detail, .oa-office-runtime__detail-toggle) {
+  margin-top: 4px;
+}
+
 .oa-office-runtime__detail-toggle {
   margin-top: 4px;
   padding: 0;
@@ -2609,6 +2624,7 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
   bottom: auto;
   width: 76%;
   max-height: calc(100% - 92px);
+  overflow: clip;
   color: var(--gba-ink);
 }
 
