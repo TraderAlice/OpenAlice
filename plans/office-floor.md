@@ -5803,6 +5803,22 @@ Agent-file activity-focus follow-up (2026-08-31):
   and nine tests skipped); the production UI build passed with only the existing ports fallback and large-chunk
   advisory.
 
+Replay-status fact containment follow-up (2026-08-31):
+
+- Followed the real Grok Prototyper `#6370` Activity Log event through `Find on floor` while preserving its Agent File.
+  Replay changed the short Live status into `ACTIVE IN REPLAY`; the anonymous flex text then crossed the STATUS fact
+  divider and visually collided with the OFFICE value.
+- Compared shortening the replay label, rebalancing all three fact columns, and containing the exceptional state as a
+  compact two-line game badge. Chose containment: it preserves the exact state language and leaves Office and Run mode
+  space untouched while giving Replay a deliberate cartridge-UI treatment.
+- Agent-file fact values now own their wrapping boundary, and Replay alone receives a bounded uppercase badge with the
+  existing water-color state mark. The accessible fact text and DOM ordering remain unchanged.
+- Real-browser acceptance measured the two-line badge at 106.3x35.8px with matching client/scroll widths, `normal`
+  white-space, `anywhere` value wrapping, and 0px overlap against the OFFICE column. The complete Agent File remained
+  contained at 279px client/scroll height with both actions visible. Focused inspect/style suites passed all 17 tests;
+  root and UI TypeScript passed; the full suite passed 620 test files and 5,218 tests (one file and nine tests skipped);
+  the production UI build passed with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

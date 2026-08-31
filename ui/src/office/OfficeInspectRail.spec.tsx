@@ -83,7 +83,7 @@ describe('OfficeInspectRail', () => {
       .toBe('/office/hud/session-portal-v2.png')
     expect(drawerExit.querySelector('.oa-office-drawer__destination')?.textContent).toBe('Open')
     expect(container.querySelector('svg')).toBeNull()
-    expect(screen.getByText('working').getAttribute('data-power')).toBe('awake')
+    expect(screen.getByText('working').closest('dd')?.getAttribute('data-power')).toBe('awake')
     expect(screen.getByTestId('office-inspect').dataset.awake).toBe('true')
 
     expect(document.activeElement).toBe(openSession)
@@ -150,7 +150,7 @@ describe('OfficeInspectRail', () => {
     expect(screen.getByText('Result')).toBeTruthy()
     expect(screen.getByText('NORTH DESK CLEAR FLOOR SIGNAL CLEAR')).toBeTruthy()
     expect(container.querySelector('blockquote')?.dataset.result).toBe('true')
-    expect(screen.getByText('review').getAttribute('data-power')).toBe('asleep')
+    expect(screen.getByText('review').closest('dd')?.getAttribute('data-power')).toBe('asleep')
     expect(screen.queryByText('Latest result')).toBeNull()
   })
 
@@ -182,7 +182,7 @@ describe('OfficeInspectRail', () => {
     expect(container.textContent).not.toContain('/tracked/report.md')
     expect(container.querySelector('blockquote')?.textContent).not.toContain('idle · headless')
     expect(screen.queryByText('idle')).toBeNull()
-    expect(screen.getByText('asleep').getAttribute('data-power')).toBe('asleep')
+    expect(screen.getByText('asleep').closest('dd')?.getAttribute('data-power')).toBe('asleep')
     expect(screen.getByTestId('office-inspect').dataset.awake).toBe('false')
     expect(screen.getByText('Run mode')).toBeTruthy()
     expect(screen.getByText('Background run')).toBeTruthy()
@@ -225,8 +225,9 @@ describe('OfficeInspectRail', () => {
     expect(screen.queryByText('Off duty. Ready when the floor wakes.')).toBeNull()
     expect(screen.queryByText('Latest result')).toBeNull()
     expect(screen.queryByText('Current result outside the replay beat.')).toBeNull()
-    const status = screen.getByText('active in replay')
-    expect(status.getAttribute('data-power')).toBe('replay')
+    const statusValue = screen.getByText('active in replay')
+    expect(statusValue.classList.contains('oa-office-inspect__fact-value')).toBe(true)
+    expect(statusValue.closest('dd')?.getAttribute('data-power')).toBe('replay')
     const reviewActivity = screen.getByRole('button', { name: 'Review activity' })
     expect(document.activeElement).toBe(reviewActivity)
     await userEvent.click(reviewActivity)
@@ -288,7 +289,7 @@ describe('OfficeInspectRail', () => {
     )
 
     expect(screen.getByText('The last run needs attention.')).toBeTruthy()
-    const status = screen.getByText('failed')
+    const status = screen.getByText('failed').closest('dd')!
     expect(status.getAttribute('data-mood')).toBe('failed')
     expect(status.getAttribute('data-power')).toBe('asleep')
     expect(screen.getByTestId('office-inspect').dataset.awake).toBe('false')

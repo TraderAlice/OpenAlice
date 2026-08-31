@@ -73,8 +73,9 @@ describe('Office Agent-file style contract', () => {
       /\.oa-office-inspect__replay-seq\s*\{[\s\S]*?margin-left: auto;[\s\S]*?background: var\(--gba-water\);/,
     )
     expect(css).toMatch(
-      /\.oa-office-inspect__facts dd\[data-power="replay"\]\s*\{[\s\S]*?font-weight: 900;/,
+      /\.oa-office-inspect__facts dd\[data-power="replay"\]\s*\{[^}]*width: fit-content;[^}]*max-width: 100%;[^}]*border: 1px solid currentColor;[^}]*white-space: normal;/s,
     )
+    expect(css).toMatch(/\.oa-office-inspect__fact-value\s*\{[^}]*min-width: 0;[^}]*overflow-wrap: anywhere;/s)
   })
 
   it('keeps actionable Agent states as pixel status badges inside the file', () => {

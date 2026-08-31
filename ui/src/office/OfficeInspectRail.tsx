@@ -326,7 +326,9 @@ export function OfficeInspectRail({
                   data-power={replayActive ? 'replay' : employee.awake ? 'awake' : 'asleep'}
                 >
                   <span aria-hidden />
-                  {t(replayActive ? 'office.power.replayActive' : officeCoworkerStatusKey(employee))}
+                  <b className="oa-office-inspect__fact-value">
+                    {t(replayActive ? 'office.power.replayActive' : officeCoworkerStatusKey(employee))}
+                  </b>
                 </dd>
               </div>
               <div>
