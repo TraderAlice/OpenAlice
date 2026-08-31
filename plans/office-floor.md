@@ -5987,8 +5987,9 @@ Scheduled cadence-duty first increment (2026-09-01):
   Operations/HUD coherence, focus containment, and responsive rules. Real-browser acceptance covered the current Default
   AliceProject at 500×420: Step 1 keeps its heading and close control visible, Step 2 folds the long BOJ task brief, full
   Issue return resumes at Evidence, and both HUD and Operations open the same candidate.
-- Final verification passed root `npx tsc --noEmit`, UI `npx tsc -b`, all 122 focused tests, the complete 645-file / 5,458-
-  test suite (one file and nine tests skipped), and the production UI build. The build retained only the existing missing
+- Final verification passed root `npx tsc --noEmit`, UI `npx tsc -b`, all 122 focused tests, and the production UI build.
+  After merging current `origin/dev`, the complete suite passed 646 files / 5,535 tests (one file and nine tests skipped).
+  The build retained only the existing missing
   local ports fallback and large-chunk advisory. A 390×844 real-browser pass additionally confirmed that the collapsed
   task brief, exact facts, receipt note, and all three actions remain scrollable and reachable; stamping advanced the
   live HUD from the BOJ exception to News and produced the Operations `REVIEWED` acknowledgement.
