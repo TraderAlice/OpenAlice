@@ -2857,6 +2857,11 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
     1px 1px 0 var(--gba-ink);
 }
 
+.oa-office-roster__status[data-power="asleep"][data-mood="review"] {
+  color: var(--gba-moss-dark);
+  background: color-mix(in srgb, var(--gba-moss) 12%, var(--gba-paper));
+}
+
 .oa-office-roster__status[data-power="asleep"][data-mood="waiting"] {
   color: color-mix(in srgb, var(--office-amber) 68%, var(--gba-ink));
   background: color-mix(in srgb, var(--office-amber) 14%, var(--gba-paper));
@@ -2867,6 +2872,7 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
   background: color-mix(in srgb, var(--gba-alert) 12%, var(--gba-paper));
 }
 
+.oa-office-roster__status[data-power="asleep"][data-mood="review"] i,
 .oa-office-roster__status[data-power="asleep"][data-mood="waiting"] i,
 .oa-office-roster__status[data-power="asleep"][data-mood="failed"] i {
   border-color: currentColor;
@@ -3458,7 +3464,7 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
     1px 1px 0 var(--gba-ink);
 }
 
-.oa-office-inspect__facts dd:is([data-mood="waiting"], [data-mood="failed"]) {
+.oa-office-inspect__facts dd:is([data-mood="waiting"], [data-mood="review"], [data-mood="failed"]) {
   width: fit-content;
   max-width: 100%;
   padding: 2px 5px 1px;
@@ -3468,6 +3474,11 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
   line-height: 1;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+.oa-office-inspect__facts dd[data-mood="review"] {
+  color: var(--gba-moss-dark);
+  background: color-mix(in srgb, var(--gba-moss) 12%, var(--gba-paper));
 }
 
 .oa-office-inspect__facts dd[data-mood="waiting"] {
@@ -3480,7 +3491,7 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
   background: color-mix(in srgb, var(--gba-alert) 12%, var(--gba-paper));
 }
 
-.oa-office-inspect__facts dd:is([data-mood="waiting"], [data-mood="failed"]) > span {
+.oa-office-inspect__facts dd:is([data-mood="waiting"], [data-mood="review"], [data-mood="failed"]) > span {
   border-color: currentColor;
   background: currentColor;
   box-shadow: 1px 1px 0 var(--gba-ink);

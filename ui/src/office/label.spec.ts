@@ -30,9 +30,9 @@ describe('officeCoworkerLabel', () => {
       .toBe('Mina')
   })
 
-  it('keeps actionable failure and waiting states visible after power-down', () => {
+  it('keeps actionable failure, waiting, and fresh-result states visible after power-down', () => {
     expect(officeCoworkerStatusKey({ awake: false, mood: 'idle' })).toBe('office.power.asleep')
-    expect(officeCoworkerStatusKey({ awake: false, mood: 'review' })).toBe('office.power.asleep')
+    expect(officeCoworkerStatusKey({ awake: false, mood: 'review' })).toBe('office.mood.review')
     expect(officeCoworkerStatusKey({ awake: false, mood: 'failed' })).toBe('office.mood.failed')
     expect(officeCoworkerStatusKey({ awake: false, mood: 'waiting' })).toBe('office.mood.waiting')
     expect(officeCoworkerStatusKey({ awake: true, mood: 'working' })).toBe('office.mood.working')

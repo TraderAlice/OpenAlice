@@ -150,6 +150,7 @@ describe('OfficeInspectRail', () => {
     expect(screen.getByText('Result')).toBeTruthy()
     expect(screen.getByText('NORTH DESK CLEAR FLOOR SIGNAL CLEAR')).toBeTruthy()
     expect(container.querySelector('blockquote')?.dataset.result).toBe('true')
+    expect(screen.getByText('review').getAttribute('data-power')).toBe('asleep')
     expect(screen.queryByText('Latest result')).toBeNull()
   })
 

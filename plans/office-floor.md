@@ -5682,6 +5682,24 @@ Fresh-result identity follow-up (2026-08-31):
   files and 5,215 tests (one file and nine tests skipped); the production UI build passed with only the existing ports
   fallback and large-chunk advisory.
 
+Fresh-result status follow-up (2026-08-31):
+
+- The same real `run-YJQn58zZ` transition exposed a second semantic break: the Agent File showed a fresh `RESULT` and
+  changed its primary command to `Review activity`, yet its status fact still said `asleep`. Runtime power truth had
+  displaced the decision-relevant state at exactly the moment the player was invited to act.
+- Compared retaining asleep, combining `asleep · result ready`, and promoting the existing 30-second review mood.
+  Chose review: the powered-down coworker art, hollow power mark, room awake count, and `data-power="asleep"` retain
+  runtime truth, while the compact status text can finally agree with the result and action.
+- `officeCoworkerStatusKey` now treats review like waiting and failed: actionable state outranks stopped power in Agent
+  File and Team roster. Both surfaces give asleep review a restrained moss badge and filled square state mark; ordinary
+  idle coworkers still collapse to low-noise asleep.
+- Real-browser acceptance followed Grok Cartographer `run-LuF1gZjI` from one working/awake through completion. The floor
+  resolved to `0/40 awake` while its exact employee label became `review, asleep`; Agent File simultaneously showed
+  `RESULT`, an uppercase moss `REVIEW` badge, `Review activity`, and `Open session`. After the review hold, the employee
+  correctly returned to idle/asleep. Focused label/Agent-file/roster/style suites passed all 21 tests; root and UI
+  TypeScript passed; the full suite passed all 620 test files and 5,215 tests (one file and nine tests skipped); the
+  production UI build passed with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

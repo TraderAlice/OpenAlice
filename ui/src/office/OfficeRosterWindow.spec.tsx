@@ -32,7 +32,9 @@ describe('OfficeRosterWindow', () => {
           ? 'failed' as const
           : index === 3
             ? 'waiting' as const
-            : 'idle' as const,
+            : index === 4
+              ? 'review' as const
+              : 'idle' as const,
       bubble: null,
       lastSeq: 1,
       lastInteractionAt: 1,
@@ -92,7 +94,8 @@ describe('OfficeRosterWindow', () => {
     expect(screen.queryByText('idle')).toBeNull()
     expect(screen.getByText('failed')).toBeTruthy()
     expect(screen.getByText('waiting')).toBeTruthy()
-    expect(screen.getAllByText('asleep')).toHaveLength(2)
+    expect(screen.getByText('review')).toBeTruthy()
+    expect(screen.getByText('asleep')).toBeTruthy()
     expect(container.querySelectorAll('.oa-office-roster__status[data-power="awake"]')).toHaveLength(2)
     expect(container.querySelectorAll('.oa-office-roster__status[data-power="asleep"]')).toHaveLength(4)
     expect(container.querySelectorAll('.oa-office-roster__identity > .oa-office-roster__status')).toHaveLength(6)

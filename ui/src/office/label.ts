@@ -39,7 +39,12 @@ export function officeCoworkerAssignment(
 export function officeCoworkerStatusKey(
   employee: Pick<OfficeFloorEmployee, 'awake' | 'mood'>,
 ): 'office.power.asleep' | `office.mood.${OfficeFloorEmployee['mood']}` {
-  if (!employee.awake && employee.mood !== 'failed' && employee.mood !== 'waiting') {
+  if (
+    !employee.awake
+    && employee.mood !== 'failed'
+    && employee.mood !== 'waiting'
+    && employee.mood !== 'review'
+  ) {
     return 'office.power.asleep'
   }
   return `office.mood.${employee.mood}`
