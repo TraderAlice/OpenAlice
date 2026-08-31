@@ -81,7 +81,12 @@ export function AboutOpenAliceSection() {
   const releaseUrl = nativeStatus && 'releaseUrl' in nativeStatus && nativeStatus.releaseUrl
     ? nativeStatus.releaseUrl
     : versionInfo?.releaseUrl ?? RELEASES_URL
-  const channel = versionInfo?.current.includes('-') ? 'beta' : 'stable'
+  const channel = versionInfo?.channel ?? 'stable'
+  const webUpdateCheckOwned = versionInfo === null || (
+    versionInfo.updateAuthority === 'source'
+    || versionInfo.updateAuthority === 'desktop'
+    || (versionInfo.updateAuthority === 'cli' && versionInfo.channel !== 'dev')
+  )
 
   const status = useMemo(() => {
     if (checking) {
@@ -117,6 +122,15 @@ export function AboutOpenAliceSection() {
     }
     if (nativeStatus?.phase === 'error' || versionInfo?.error || error) {
       return { kind: 'error' as const, text: t('settings.about.status.error') }
+    }
+    if (versionInfo?.updateAuthority === 'service') {
+      return { kind: 'current' as const, text: t('settings.about.status.serviceManaged') }
+    }
+    if (versionInfo?.updateAuthority === 'none') {
+      return { kind: 'current' as const, text: t('settings.about.status.noUpdater') }
+    }
+    if (versionInfo?.updateAuthority === 'cli' && versionInfo.channel === 'dev') {
+      return { kind: 'current' as const, text: t('settings.about.status.cliManaged') }
     }
     if (versionInfo) {
       return { kind: 'current' as const, text: t('settings.about.status.current') }
@@ -256,7 +270,7 @@ export function AboutOpenAliceSection() {
                 ? t('settings.about.installing')
                 : t('settings.about.installAndRestart')}
             </button>
-          ) : (
+          ) : webUpdateCheckOwned ? (
             <button
               type="button"
               onClick={() => void checkForUpdates()}
@@ -266,7 +280,7 @@ export function AboutOpenAliceSection() {
               <RefreshCw className={`h-3.5 w-3.5 ${checking ? 'animate-spin motion-reduce:animate-none' : ''}`} />
               {checking ? t('settings.about.checking') : t('settings.about.check')}
             </button>
-          )}
+          ) : null}
           <button
             type="button"
             onClick={() => void openRelease()}

@@ -44,6 +44,8 @@ beforeEach(async () => {
   await i18n.changeLanguage('en')
   mocks.getVersion.mockResolvedValue({
     current: '0.0.0',
+    channel: 'stable',
+    updateAuthority: 'source',
     latest: '0.0.0',
     hasUpdate: false,
     releaseUrl: '',

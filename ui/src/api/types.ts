@@ -1,11 +1,18 @@
 // ==================== Version / Update awareness ====================
 
+export type UpdateChannel = 'stable' | 'beta' | 'dev' | 'pinned' | 'custom'
+export type UpdateAuthority = 'source' | 'desktop' | 'cli' | 'service' | 'none'
+
 export interface VersionInfo {
   /** App version from package.json. */
   current: string
+  /** Running installation's normalized update channel. */
+  channel: UpdateChannel
+  /** Surface that owns update discovery and application. */
+  updateAuthority: UpdateAuthority
   /** Latest version from the installed channel's release manifest. */
   latest: string | null
-  /** True when latest > current (semver). */
+  /** True when the update owner reports a newer release. */
   hasUpdate: boolean
   /** Release notes URL supplied by the channel manifest. */
   releaseUrl: string | null
