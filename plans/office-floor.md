@@ -5538,6 +5538,21 @@ Auto-route footprint-contrast follow-up (2026-08-31):
   (one file and nine tests skipped); the production UI build passed with only the existing ports fallback and
   large-chunk advisory.
 
+Auto-route cancel-control follow-up (2026-08-31):
+
+- Cancelled a real long route with Escape while Alice was still walking toward Grok Architect. Route state, trail, and
+  eventual activation all stopped correctly, but keyboard focus remained on the now-distant coworker. The map had
+  visually returned to manual play while the browser control point still belonged to the abandoned destination.
+- Compared retaining target focus, moving focus into the non-interactive route HUD, and handing control back to the
+  map. Chose the map handoff: cancellation is already communicated by the disappearing trail and does not need a toast,
+  while the Office map is the player-control surface for the next movement, interaction, or menu command.
+- Escape cancellation now clears walking and sprinting immediately, removes the route, and focuses the map without
+  scrolling. Real-browser acceptance measured a focused, routing Grok Architect target with five trail markers and
+  Alice walking; 30ms after Escape, the map owned focus, walking was false, trail and target were empty, and no menu or
+  dialog opened. The focused Building suite passed all 26 tests; root and UI TypeScript passed; the full suite passed
+  all 620 test files and 5,209 tests (one file and nine tests skipped); the production UI build passed with only the
+  existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

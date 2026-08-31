@@ -1067,11 +1067,15 @@ describe('OfficeBuilding', () => {
       const map = screen.getByLabelText(
         'Office map. Drag to pan; use arrows or WASD to move Alice; press Enter or Space to interact nearby.',
       )
-      fireEvent.keyDown(map, { key: 'Escape' })
+      quantSign.focus()
+      expect(document.activeElement).toBe(quantSign)
+      fireEvent.keyDown(quantSign, { key: 'Escape' })
       expect(screen.queryByTestId('office-route-status')).toBeNull()
       expect(screen.queryByTestId('office-route-trail')).toBeNull()
       expect(quantSign.dataset.route).toBe('false')
       expect(screen.queryByRole('menu', { name: 'Menu' })).toBeNull()
+      expect(document.activeElement).toBe(map)
+      expect(alice.dataset.walking).toBe('false')
 
       fireEvent.click(quantSign)
       expect(screen.getByTestId('office-route-status').textContent).toContain('Walking to quant')

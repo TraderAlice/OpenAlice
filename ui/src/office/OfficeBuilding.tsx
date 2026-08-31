@@ -917,6 +917,8 @@ export function OfficeBuilding({
     routeTimerRef.current = null
     routeContinuationRef.current = null
     routeContinuationDelayRef.current = 0
+    setAliceWalking(false)
+    setAliceSprinting(false)
     setRouteTargetId(null)
     setRouteTrail([])
   }
@@ -1134,6 +1136,7 @@ export function OfficeBuilding({
         event.preventDefault()
         if (routeTargetId) {
           cancelAutoWalk()
+          viewport?.focus({ preventScroll: true })
         } else {
           openFloorMenu()
         }
