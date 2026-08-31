@@ -23,6 +23,10 @@ export type OfficeCoworkerIdentity =
   | 'grok-diplomat'
   | 'grok-artificer'
   | 'grok-librarian'
+  | 'grok-astronomer'
+  | 'grok-cryptographer'
+  | 'grok-geometer'
+  | 'grok-prototyper'
 
 export interface OfficeCoworkerSpriteAsset {
   id: OfficeCoworkerIdentity
@@ -80,6 +84,10 @@ export const OFFICE_COWORKER_SPRITES: Record<OfficeCoworkerIdentity, OfficeCowor
   'grok-diplomat': coworkerAsset('grok-diplomat', 'var(--terminal-cyan)', -1_510),
   'grok-artificer': coworkerAsset('grok-artificer', 'var(--terminal-cyan)', -1_570),
   'grok-librarian': coworkerAsset('grok-librarian', 'var(--terminal-cyan)', -1_630),
+  'grok-astronomer': coworkerAsset('grok-astronomer', 'var(--terminal-cyan)', -1_690),
+  'grok-cryptographer': coworkerAsset('grok-cryptographer', 'var(--terminal-cyan)', -1_750),
+  'grok-geometer': coworkerAsset('grok-geometer', 'var(--terminal-cyan)', -1_810),
+  'grok-prototyper': coworkerAsset('grok-prototyper', 'var(--terminal-cyan)', -1_870),
 }
 
 export const OFFICE_COWORKER_EMOTES = {
@@ -124,6 +132,10 @@ const ARCHETYPE_POOL: Record<OfficeCoworkerArchetype, readonly OfficeCoworkerIde
     'grok-diplomat',
     'grok-artificer',
     'grok-librarian',
+    'grok-astronomer',
+    'grok-cryptographer',
+    'grok-geometer',
+    'grok-prototyper',
   ],
 }
 
@@ -193,6 +205,7 @@ export function officeCoworkerCast(
     const pool = ARCHETYPE_POOL[archetype]
     const pending: OfficeCoworkerCastMember[] = []
     const claimed = new Set<number>()
+    const usage = Array.from({ length: pool.length }, () => 0)
     const currentResumeIds = new Set(family.map((member) => member.resumeId))
     const retainedOwnerByIndex = new Map<number, string>()
     for (const [resumeId, retained] of retainedCast) {
@@ -221,6 +234,7 @@ export function officeCoworkerCast(
       }
       cast.set(member.resumeId, retained)
       claimed.add(retainedIndex)
+      usage[retainedIndex] += 1
     }
     const ordered = pending.sort((a, b) => {
       const aHash = stableCoworkerHash(`${archetype}:${a.resumeId}`)
@@ -234,7 +248,11 @@ export function officeCoworkerCast(
       if (claimed.size < pool.length) {
         while (claimed.has(selectedIndex)) selectedIndex = (selectedIndex + 1) % pool.length
         claimed.add(selectedIndex)
+      } else {
+        const leastUsed = Math.min(...usage)
+        while (usage[selectedIndex] > leastUsed) selectedIndex = (selectedIndex + 1) % pool.length
       }
+      usage[selectedIndex] += 1
       const selected = pool[selectedIndex] ?? ARCHETYPE_DEFAULT[archetype]
       cast.set(member.resumeId, OFFICE_COWORKER_SPRITES[selected])
     }

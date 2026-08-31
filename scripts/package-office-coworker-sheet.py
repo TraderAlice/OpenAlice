@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from collections import deque
 from pathlib import Path
 
 from PIL import Image
@@ -14,6 +15,45 @@ POSES = (
     ("desk-v1", (176, 176), (164, 164)),
     ("desk-work-v1", (176, 176), (164, 164)),
 )
+
+
+def remove_baked_checkerboard(image: Image.Image) -> Image.Image:
+    """Turn an edge-connected neutral checkerboard into real transparency."""
+    rgba = image.convert("RGBA")
+    if rgba.getchannel("A").getextrema()[0] < 255:
+        return rgba
+
+    pixels = rgba.load()
+    width, height = rgba.size
+
+    def is_background(x: int, y: int) -> bool:
+        red, green, blue, _alpha = pixels[x, y]
+        return min(red, green, blue) >= 235 and max(red, green, blue) - min(red, green, blue) <= 10
+
+    queue: deque[tuple[int, int]] = deque()
+    visited: set[tuple[int, int]] = set()
+    for x in range(width):
+        queue.extend(((x, 0), (x, height - 1)))
+    for y in range(height):
+        queue.extend(((0, y), (width - 1, y)))
+
+    while queue:
+        x, y = queue.popleft()
+        if (x, y) in visited or not is_background(x, y):
+            continue
+        visited.add((x, y))
+        red, green, blue, _alpha = pixels[x, y]
+        pixels[x, y] = (red, green, blue, 0)
+        if x > 0:
+            queue.append((x - 1, y))
+        if x + 1 < width:
+            queue.append((x + 1, y))
+        if y > 0:
+            queue.append((x, y - 1))
+        if y + 1 < height:
+            queue.append((x, y + 1))
+
+    return rgba
 
 
 def hard_matte(image: Image.Image, threshold: int = 88) -> Image.Image:
@@ -70,7 +110,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    sheet = Image.open(args.sheet).convert("RGBA")
+    sheet = remove_baked_checkerboard(Image.open(args.sheet))
     args.out_dir.mkdir(parents=True, exist_ok=True)
     poses = [trim_pose(sheet, index) for index in range(len(POSES))]
     desk_fit = POSES[1][2]

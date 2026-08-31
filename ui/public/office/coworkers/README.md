@@ -24,7 +24,7 @@ transparent sources, fit each full silhouette into a native 72x104 canvas with
 nearest-neighbor sampling, and hard-mat alpha for crisp GBA-scale cards. The
 generated full-resolution masters are intentionally not shipped at runtime.
 
-The roster now contains twenty-six curated identities. Six additional feminine coworkers were generated as transparent
+The roster now contains thirty curated identities. Six additional feminine coworkers were generated as transparent
 three-pose sheets: two Codex variants (field mechanic and cyber scout), a Claude botanical archivist, a Pi field
 mathematician, and two OpenCode variants (workshop hacker and systems analyst). Each sheet keeps one identity across a
 standing portrait, seated idle pose, and seated typing pose. `scripts/package-office-coworker-sheet.py` splits those
@@ -39,7 +39,7 @@ never changes appearance after refresh. The original four coworkers remain veter
 the default population feminine-led without deleting the original cast. Unknown future runtime names receive a stable
 hash-selected family; they never fall back to Alice.
 
-Grok Build owns a separate twelve-woman runtime family instead of borrowing the
+Grok Build owns a separate feminine runtime family instead of borrowing the
 Codex pool: a night-sky systems oracle, copper signal engineer, violet inference
 analyst, teal star-network researcher, ivory lattice architect, silver-blue
 navigator, rose-gold synthesist, and emerald-black operations sentinel. Each was
@@ -52,12 +52,18 @@ Four later arrivals extend the party for larger Office teams: an auburn field
 cartographer, mint technical alchemist, burgundy museum curator, and platinum
 operations strategist. Their sheets use the same standing / seated / typing
 contract and the same native packager. A violet tactician, coral diplomat,
-copper artificer, and blue-black librarian now extend that party to sixteen;
+copper artificer, and blue-black librarian first extended that party to sixteen. Four more complete identities—a
+midnight astronomer, silver-lilac cryptographer, copper-braided geometer, and coral-haired prototyper—bring the Grok
+family to twenty. Each addition ships the same standing portrait, seated idle, and seated typing contract rather than
+recoloring an existing silhouette. The packager also strips an edge-connected neutral checkerboard when a generated
+source bakes its transparency preview into RGB, before applying the normal hard-alpha and native-canvas pass;
 the cast repair path also replaces an already-retained duplicate as soon as a
 new authored identity becomes available. Grok uses its own deterministic
-identity hash, so a sixteen-person party exhausts the authored feminine cast
+identity hash, so a twenty-person party exhausts the authored feminine cast
 before any appearance repeats while retaining each Session's appearance after
-refresh.
+refresh. Larger teams reuse the least-used identity first; the real forty-person
+Chat team therefore forms two balanced rounds instead of clustering repeated
+archetypes.
 
 The four `*-desk-v1.png` files are a separate generated map-scale pose family.
 Each employee is seated, seen from a top-down three-quarter rear view, and faces

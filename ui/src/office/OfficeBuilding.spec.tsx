@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OfficeBuildingSnapshot } from '../api/office'
 import { i18n } from '../i18n'
 import { OfficeBuilding, officeRouteStatusEdge } from './OfficeBuilding'
+import { officeCoworkerSpriteForAgent } from './coworker-sprites'
+import { officeCoworkerCallsign } from './label'
 
 afterEach(cleanup)
 
@@ -1615,6 +1617,11 @@ describe('OfficeBuilding', () => {
         onOpenRoster: vi.fn(),
         onOpenLog: vi.fn(),
       }
+      const dormantEmployee = building.offices[0]!.employees[0]!
+      const dormantCallsign = officeCoworkerCallsign(
+        dormantEmployee,
+        officeCoworkerSpriteForAgent(dormantEmployee.agent, dormantEmployee.resumeId),
+      )
       const view = render(
         <OfficeBuilding
           building={building}
@@ -1626,14 +1633,14 @@ describe('OfficeBuilding', () => {
       let checkPrompt: HTMLElement | null = null
       for (let step = 0; step < 20 && !checkPrompt; step += 1) {
         act(() => vi.advanceTimersByTime(96))
-        checkPrompt = screen.queryByRole('status', { name: 'Check Grok Strategist' })
+        checkPrompt = screen.queryByRole('status', { name: `Check ${dormantCallsign}` })
       }
 
       expect(checkPrompt).not.toBeNull()
       expect(checkPrompt?.querySelector('img')?.getAttribute('src'))
         .toBe('/office/hud/roster-badge-v2.png')
       expect(checkPrompt?.textContent).toContain('Check')
-      expect(screen.queryByRole('status', { name: /Talk to Grok Strategist/ })).toBeNull()
+      expect(screen.queryByRole('status', { name: `Talk to ${dormantCallsign}` })).toBeNull()
 
       view.rerender(
         <OfficeBuilding
@@ -1648,12 +1655,12 @@ describe('OfficeBuilding', () => {
         />,
       )
 
-      const reviewPrompt = screen.getByRole('status', { name: 'Review Grok Strategist’s failed run' })
+      const reviewPrompt = screen.getByRole('status', { name: `Review ${dormantCallsign}’s failed run` })
       expect(screen.getByTestId('office-pod-quant-dormant').dataset.powered).toBe('false')
       expect(reviewPrompt.querySelector('img')?.getAttribute('src'))
         .toBe('/office/log/alert-v1.png')
       expect(reviewPrompt.textContent).toContain('Review')
-      expect(screen.queryByRole('status', { name: /Check Grok Strategist/ })).toBeNull()
+      expect(screen.queryByRole('status', { name: `Check ${dormantCallsign}` })).toBeNull()
 
       view.rerender(
         <OfficeBuilding
@@ -1668,7 +1675,7 @@ describe('OfficeBuilding', () => {
         />,
       )
 
-      const resultPrompt = screen.getByRole('status', { name: 'Review Grok Strategist’s latest result' })
+      const resultPrompt = screen.getByRole('status', { name: `Review ${dormantCallsign}’s latest result` })
       expect(screen.getByTestId('office-pod-quant-dormant').dataset.powered).toBe('false')
       expect(resultPrompt.querySelector('img')?.getAttribute('src'))
         .toBe('/office/coworkers/review-emote-v1.png')

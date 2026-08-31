@@ -5752,6 +5752,31 @@ Dense-cabinet row-composition follow-up (2026-08-31):
   passed all 620 test files and 5,216 tests (one file and nine tests skipped); the production UI build passed with only
   the existing ports fallback and large-chunk advisory.
 
+Expanded Grok cast follow-up (2026-08-31):
+
+- Played the real 40-person Chat Team after the Session suffix fix. Identity remained readable, but the authored Grok
+  pool still contained only sixteen characters, so four silhouettes necessarily appeared a third time and the cast
+  could cluster repeats after its first complete round.
+- Compared accepting the repeats, recoloring existing sprites, and authoring four complete identities. Chose complete
+  identities: recolors would inflate nominal variety without improving silhouette, clothing, or Agent-file identity,
+  while the established portrait / seated idle / seated typing contract can carry a real character through every
+  Office surface.
+- Generated Astronomer, Cryptographer, Geometer, and Prototyper as feminine late-GBA three-pose sheets against the
+  Office style master and Librarian pose family, then packaged native 72x104 portraits and 176x176 seated frames. The
+  source generator sometimes baked its checkerboard preview into RGB, so the standard packager now removes only an
+  edge-connected bright neutral background before its existing hard-alpha, shared-scale, and bottom-anchor pass.
+- The Grok pool now contains twenty full identities. Once the unique round is exhausted, party casting selects from
+  the least-used identities instead of accepting an unbounded preferred-hash collision; retained Session identities
+  stay stable and an exactly forty-person team resolves into two complete rounds.
+- Real-browser acceptance opened the actual Chat Team and counted 40 members, 20 unique callsigns, and exactly two
+  appearances per callsign. All four new callsigns appeared twice. Grok Prototyper's real Agent File rendered its
+  generated portrait at the same native card scale as the veteran cast, with Assignment, result, status, and both
+  commands still fitting the authored game window.
+- The asset audit confirmed all twelve new runtime files are RGBA with genuine 0–255 alpha and exact native canvases.
+  Focused Office suites passed all 38 tests after replacing one stale hard-coded callsign expectation with the registry
+  contract; root and UI TypeScript passed; the full suite passed 620 test files and 5,217 tests (one file and nine tests
+  skipped); the production UI build passed with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
