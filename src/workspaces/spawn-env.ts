@@ -23,6 +23,7 @@ import { runtimeProfileFromEnv } from '@/core/runtime-profile.js';
 const PRIVILEGED_RUNTIME_ENV = [
   'OPENALICE_RAILWAY_FENCE_FD',
   'OPENALICE_RAILWAY_ENTRYPOINT_OWNER',
+  'OPENALICE_RAILWAY_INSTANCE_ID',
 ] as const;
 
 const STRIP_EXACT = new Set<string>([

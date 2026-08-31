@@ -538,6 +538,7 @@ describe('OpenAlice Runtime lifecycle core', () => {
       env: {
         OPENALICE_RAILWAY_ENTRYPOINT_OWNER: '1',
         OPENALICE_RAILWAY_FENCE_FD: '9',
+        OPENALICE_RAILWAY_INSTANCE_ID: '22222222-2222-4222-8222-222222222222',
         OPENALICE_SERVICE_MANAGER: 'railway',
         OPENALICE_MACHINE_ID: 'railway-service-service-test',
         RAILWAY_ENVIRONMENT_ID: 'environment-test',
@@ -559,6 +560,10 @@ describe('OpenAlice Runtime lifecycle core', () => {
     const spawnedEnvironment = spawnProcess.mock.calls[0][2].env
     expect(spawnedEnvironment).not.toHaveProperty('OPENALICE_RAILWAY_ENTRYPOINT_OWNER')
     expect(spawnedEnvironment).toHaveProperty('OPENALICE_RAILWAY_FENCE_FD', '3')
+    expect(spawnedEnvironment).toHaveProperty(
+      'OPENALICE_RAILWAY_INSTANCE_ID',
+      '22222222-2222-4222-8222-222222222222',
+    )
     expect(spawnProcess.mock.calls[0][2].stdio).toEqual(['inherit', 'inherit', 'inherit', 9])
   })
 

@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { fstatSync, readFileSync, realpathSync, statSync } from 'node:fs'
-import { readFile } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
 import { homedir, hostname, tmpdir } from 'node:os'
 import { createConnection } from 'node:net'
 import { resolve } from 'node:path'
@@ -335,7 +335,24 @@ async function inspectGuardianOwner(homeRoot, options = {}) {
     try {
       owner = JSON.parse(await readFile(ownerPath, 'utf8'))
     } catch (error) {
-      if (error?.code === 'ENOENT') continue
+      if (error?.code === 'ENOENT') {
+        const lockPath = resolve(ownerPath, '..')
+        try {
+          await stat(lockPath)
+          return {
+            active: true,
+            publicOwner: null,
+            detail: `Runtime lock exists without published owner metadata at ${lockPath}`,
+          }
+        } catch (lockError) {
+          if (lockError?.code === 'ENOENT') continue
+          return {
+            active: true,
+            publicOwner: null,
+            detail: `Runtime lock metadata is unreadable at ${lockPath}`,
+          }
+        }
+      }
       return {
         active: true,
         publicOwner: null,
@@ -350,7 +367,7 @@ async function inspectGuardianOwner(homeRoot, options = {}) {
       }
     }
     const resolvedMachineId = await currentMachineId()
-    const railwayScope = railwayOwnerScope(owner, resolvedMachineId, localHostname, env, homeRoot, options)
+    const railwayScope = railwayOwnerScope(owner, resolvedMachineId, env, homeRoot, options)
     let active
     if (railwayScope === 'cross-container-fenced') {
       active = false
@@ -389,7 +406,7 @@ async function inspectGuardianOwner(homeRoot, options = {}) {
     : null
 }
 
-function railwayOwnerScope(owner, currentMachineId, localHostname, env, homeRoot, options) {
+function railwayOwnerScope(owner, currentMachineId, env, homeRoot, options) {
   const serviceId = env['RAILWAY_SERVICE_ID']?.trim()
   const environmentId = env['RAILWAY_ENVIRONMENT_ID']?.trim()
   const configuredMachineId = env['OPENALICE_MACHINE_ID']?.trim()
@@ -403,10 +420,15 @@ function railwayOwnerScope(owner, currentMachineId, localHostname, env, homeRoot
   ) {
     return null
   }
-  if (typeof owner.hostname !== 'string' || owner.hostname.length === 0) return 'foreign'
   if (owner.machineId !== currentMachineId) return 'foreign'
-  if (owner.hostname === localHostname) return 'same-container'
   if (owner.fencingProtocol !== 'railway-flock-v1') return 'foreign'
+  if (
+    owner.fencingInstanceId !== undefined
+    && !/^[A-Za-z0-9-]{16,128}$/.test(owner.fencingInstanceId)
+  ) return 'foreign'
+  const currentInstanceId = env['OPENALICE_RAILWAY_INSTANCE_ID']?.trim()
+  if (!/^[A-Za-z0-9-]{16,128}$/.test(currentInstanceId ?? '')) return 'foreign'
+  if (owner.fencingInstanceId === currentInstanceId) return 'same-container'
   const fenceValid = options.railwayFenceValid
     ?? hasValidRailwayFence(env, homeRoot)
   return fenceValid ? 'cross-container-fenced' : 'cross-container-observer'

@@ -139,7 +139,20 @@ and Connector validate and retain their own lifetime duplicates while removing
 the capability from descendant environments; ordinary child processes, adapters,
 Agents, and PTYs do not inherit them. Thus Guardian and every Project writer must
 be gone before a replacement can acquire the fence. Ordinary Railway SSH shells are observer-only and
-cannot start or reclaim a Runtime owner.
+cannot start or reclaim a Runtime owner. Each service start gives the trusted
+writer tree a fresh fencing-instance identity, so a replacement stays distinct
+even when Railway reuses its hostname and PIDs. Lock release atomically retires
+the canonical directory under the shared recoverable lock-mutation claim before
+cleanup. Claim ownership is generation-specific: the UUID in its filename must
+match its JSON token, and a recoverer can atomically retire only that exact
+generation before canonical mutation. The Runtime must advertise `railway-runtime-lock-v2` in addition to
+the retained-owner `railway-flock-v1` capability, so bootstrap cannot fall back
+to an older binary that does not understand instance fencing. If a hard kill from older code left a
+known ownerless directory, or v2 dies while publishing/releasing a claim,
+preflight recovers only the exact empty/UUID-marker/write-temp shape after the
+full Volume scan has no other blocker and descriptor-relative identity checks
+still match. Unknown entries, duplicate claim markers or write temps, and
+symlinked/malformed nodes fail closed.
 
 For the first fenced deployment against a retained pre-fence Project, first
 verify the old deployment is stopped. Inspect and move only these directories
@@ -148,11 +161,19 @@ when present: `state/guardian.lock`, `state/runtime.lock`,
 relative to that exact Project Home. Preserve those relative paths beneath a
 timestamped `/data/quarantine/<project>-<timestamp>/` directory so the cutover
 is reversible. That quarantine tree is never a valid `OPENALICE_HOME`. Never
+make `/data/quarantine` a symlink or file: it must be absent or a real directory
+at that exact Volume-root path, and startup fails closed otherwise. Never
 clear the Project or Volume; if an owner still matches a
 running deployment, stop instead of quarantining it.
 
-The default service variables install the latest stable native release. Use
-only the selectors needed for the intended host:
+The default service variables select the latest stable native release, but the
+currently public stable `v0.90.2` and beta `v0.91.0-beta.1` do not advertise the
+required `railway-runtime-lock-v2` capability and are therefore rejected by
+this profile. The dev manifest current before this change is also v1-only. Do
+not deploy until this change has merged and its matching completed dev manifest
+advertises v2; that later artifact may be used for candidate acceptance. Stable
+or beta still requires a later explicit release, which this guide does not
+authorize or perform. Use only the selectors needed for the intended host:
 
 ```text
 OPENALICE_RAILWAY_CHANNEL=stable

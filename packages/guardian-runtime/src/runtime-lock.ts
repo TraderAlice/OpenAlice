@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { fstatSync, readFileSync, realpathSync, statSync } from 'node:fs'
-import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, rename, rm, rmdir, stat, writeFile } from 'node:fs/promises'
 import { hostname } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 
@@ -14,7 +14,12 @@ import {
 
 const OWNER_FILE = 'owner.json'
 const RECLAIM_DIR = 'reclaiming'
+const MUTATION_CLAIM_OWNER_PATTERN = /^owner\.([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.json$/i
+const UUID_PATTERN_SOURCE = '[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
+const MUTATION_CLAIM_TEMP_PATTERN = new RegExp(`^\\.owner\\.(${UUID_PATTERN_SOURCE})\\.(${UUID_PATTERN_SOURCE})\\.tmp$`, 'i')
+const ACQUIRE_RETRY_DELAY_MS = 25
 const WINDOWS_RENAME_RETRY_DELAYS_MS = [10, 25, 50, 100] as const
+const RAILWAY_FENCING_INSTANCE_PATTERN = /^[A-Za-z0-9-]{16,128}$/
 
 export const DEFAULT_HEARTBEAT_MS = 30_000
 export const DEFAULT_STALE_HEARTBEAT_MS = 90_000
@@ -30,6 +35,7 @@ export interface RuntimeLockOwner {
   readonly acquiredAt: string
   readonly heartbeatAt: string
   readonly fencingProtocol?: 'railway-flock-v1'
+  readonly fencingInstanceId?: string
   readonly processStartedAt?: string
   readonly guardianPid?: number
   readonly guardianStartedAt?: string
@@ -62,6 +68,7 @@ export interface RuntimeLockOptions {
   readonly staleHeartbeatMs?: number
   readonly initializationGraceMs?: number
   readonly ownerAuthority?: RuntimeLockOwnerAuthority
+  readonly fencingInstanceId?: string
   readonly processController?: ProcessController
   readonly onOwnershipLost?: (error: Error) => void
 }
@@ -97,6 +104,7 @@ export interface PrepareOpenAliceRuntimeOptions {
   readonly launcherRoot: string
   readonly takeover?: boolean
   readonly ownerAuthority?: RuntimeLockOwnerAuthority
+  readonly fencingInstanceId?: string
   readonly processController?: ProcessController
   readonly staleHeartbeatMs?: number
   readonly initializationGraceMs?: number
@@ -152,7 +160,16 @@ export function resolveRuntimeLockOwnerAuthority(
     || !/^[A-Za-z0-9-]{1,128}$/.test(serviceId ?? '')
     || machineId !== `railway-service-${serviceId}`
   ) return 'process'
-  return resolveRailwayRuntimeFence(env) ? 'railway-fenced-handoff' : 'railway-observer'
+  return resolveRailwayRuntimeFence(env) && resolveRailwayFencingInstanceId(env)
+    ? 'railway-fenced-handoff'
+    : 'railway-observer'
+}
+
+function resolveRailwayFencingInstanceId(
+  env: NodeJS.ProcessEnv = process.env,
+): string | undefined {
+  const value = env['OPENALICE_RAILWAY_INSTANCE_ID']?.trim()
+  return value && RAILWAY_FENCING_INSTANCE_PATTERN.test(value) ? value : undefined
 }
 
 export function resolveRailwayRuntimeFence(
@@ -257,7 +274,7 @@ function railwayFenceMatches(fence: RailwayRuntimeFence): boolean {
 
 export async function inspectRuntimeLock(
   lockDir: string,
-  opts: Pick<RuntimeLockOptions, 'processController' | 'staleHeartbeatMs' | 'initializationGraceMs' | 'ownerAuthority'> = {},
+  opts: Pick<RuntimeLockOptions, 'processController' | 'staleHeartbeatMs' | 'initializationGraceMs' | 'ownerAuthority' | 'fencingInstanceId'> = {},
 ): Promise<RuntimeLockInspection> {
   const controller = opts.processController ?? defaultProcessController
   const staleMs = opts.staleHeartbeatMs ?? DEFAULT_STALE_HEARTBEAT_MS
@@ -289,7 +306,12 @@ export async function inspectRuntimeLock(
   const heartbeatStale = heartbeatAgeMs === null || heartbeatAgeMs > staleMs
   const currentMachineId = await controller.machineId()
   const ownerAuthority = opts.ownerAuthority ?? resolveRuntimeLockOwnerAuthority()
-  const railwayScope = railwayOwnerScope(owner, currentMachineId, ownerAuthority)
+  const railwayScope = railwayOwnerScope(
+    owner,
+    currentMachineId,
+    ownerAuthority,
+    opts.fencingInstanceId ?? resolveRailwayFencingInstanceId(),
+  )
   if (railwayScope === 'cross-container-fenced') {
     return inspection(
       lockDir,
@@ -359,6 +381,7 @@ function railwayOwnerScope(
   owner: RuntimeLockOwner,
   currentMachineId: string,
   ownerAuthority: RuntimeLockOwnerAuthority | undefined,
+  currentFencingInstanceId: string | undefined,
 ): 'same-container' | 'cross-container-observer' | 'cross-container-fenced' | 'foreign' | null {
   if (
     ownerAuthority !== 'railway-observer'
@@ -366,11 +389,15 @@ function railwayOwnerScope(
     && ownerAuthority !== 'railway-fenced-handoff'
   ) return null
   if (!/^env:railway-service-[A-Za-z0-9-]+$/.test(currentMachineId)) return 'foreign'
-  if (owner.hostname.length === 0) return 'foreign'
-  const sameContainer = owner.hostname === hostname()
   if (owner.machineId !== currentMachineId) return 'foreign'
-  if (sameContainer) return 'same-container'
   if (owner.fencingProtocol !== 'railway-flock-v1') return 'foreign'
+  if (
+    owner.fencingInstanceId !== undefined
+    && !RAILWAY_FENCING_INSTANCE_PATTERN.test(owner.fencingInstanceId)
+  ) return 'foreign'
+  if (ownerAuthority === 'railway-observer') return 'cross-container-observer'
+  if (!currentFencingInstanceId) return 'foreign'
+  if (owner.fencingInstanceId === currentFencingInstanceId) return 'same-container'
   return ownerAuthority === 'railway-fenced-handoff'
     ? 'cross-container-fenced'
     : 'cross-container-observer'
@@ -382,6 +409,13 @@ export async function acquireRuntimeLock(
 ): Promise<RuntimeProcessLock> {
   const controller = opts.processController ?? defaultProcessController
   const ownerAuthority = opts.ownerAuthority ?? resolveRuntimeLockOwnerAuthority()
+  const fencingInstanceId = opts.fencingInstanceId ?? resolveRailwayFencingInstanceId()
+  if (
+    (ownerAuthority === 'railway-fenced-handoff' || ownerAuthority === 'railway-fenced-owner')
+    && !fencingInstanceId
+  ) {
+    throw new Error('missing or invalid Railway fencing instance identity')
+  }
   const processStartedAt = opts.processStartedAt ?? currentProcessStartedAt()
   const machineId = await controller.machineId()
   const now = new Date().toISOString()
@@ -397,24 +431,62 @@ export async function acquireRuntimeLock(
     ...(ownerAuthority === 'railway-fenced-handoff' || ownerAuthority === 'railway-fenced-owner'
       ? { fencingProtocol: 'railway-flock-v1' as const }
       : {}),
+    ...(fencingInstanceId ? { fencingInstanceId } : {}),
     processStartedAt: new Date(processStartedAt).toISOString(),
     ...(opts.guardianPid ? { guardianPid: opts.guardianPid } : {}),
     ...(opts.guardianStartedAt ? { guardianStartedAt: new Date(opts.guardianStartedAt).toISOString() } : {}),
   }
 
   await mkdir(dirname(lockDir), { recursive: true })
-  for (let attempt = 0; attempt < 40; attempt++) {
+  const acquireAttempts = Math.max(
+    40,
+    Math.ceil(((opts.initializationGraceMs ?? DEFAULT_INITIALIZATION_GRACE_MS) + 2_000) / ACQUIRE_RETRY_DELAY_MS),
+  )
+  for (let attempt = 0; attempt < acquireAttempts; attempt++) {
+    let created = false
     try {
       await mkdir(lockDir)
-      await writeOwnerAtomic(lockDir, owner, controller)
-      return makeLock(lockDir, owner, { ...opts, ownerAuthority })
+      created = true
     } catch (err) {
       if (!isErrno(err, 'EEXIST')) throw err
     }
 
+    if (created) {
+      const directoryIdentity = await readLockDirectoryIdentity(lockDir)
+      const claim = await acquireLockMutationClaim(lockDir, owner, {
+        ...opts,
+        ownerAuthority,
+        fencingInstanceId,
+      })
+      if (!directoryIdentity || !claim) {
+        await controller.sleep(ACQUIRE_RETRY_DELAY_MS)
+        continue
+      }
+      let published = false
+      let claimReleased = false
+      try {
+        const latestIdentity = await readLockDirectoryIdentity(lockDir)
+        const latestOwner = await readOwner(lockDir).catch(() => null)
+        if (latestIdentity === directoryIdentity && !latestOwner && await claim.isCurrent()) {
+          await writeOwnerAtomic(lockDir, owner, controller)
+          const verifiedIdentity = await readLockDirectoryIdentity(lockDir)
+          const verifiedOwner = await readOwner(lockDir).catch(() => null)
+          published = verifiedIdentity === directoryIdentity
+            && verifiedOwner?.token === owner.token
+            && await claim.isCurrent()
+        }
+      } finally {
+        claimReleased = await claim.release()
+      }
+      if (!claimReleased) throw new Error(`runtime mutation claim could not be released at ${lockDir}`)
+      if (published) return makeLock(lockDir, owner, { ...opts, ownerAuthority, fencingInstanceId })
+      await controller.sleep(ACQUIRE_RETRY_DELAY_MS)
+      continue
+    }
+
     const current = await inspectRuntimeLock(lockDir, { ...opts, ownerAuthority })
     if (current.state === 'missing' || current.state === 'initializing') {
-      await controller.sleep(25)
+      await controller.sleep(ACQUIRE_RETRY_DELAY_MS)
       continue
     }
     if (current.state === 'active') {
@@ -422,13 +494,14 @@ export async function acquireRuntimeLock(
       await recoverRuntimeOwner(current.owner, {
         processController: controller,
         ownerAuthority,
+        fencingInstanceId,
       })
-      await controller.sleep(25)
+      await controller.sleep(ACQUIRE_RETRY_DELAY_MS)
       continue
     }
 
-    if (await claimAndRemove(current)) continue
-    await controller.sleep(25)
+    if (await claimAndRemove(current, owner, { ...opts, ownerAuthority, fencingInstanceId })) continue
+    await controller.sleep(ACQUIRE_RETRY_DELAY_MS)
   }
 
   throw new RuntimeAlreadyRunningError(await inspectRuntimeLock(lockDir, { ...opts, ownerAuthority }))
@@ -493,6 +566,7 @@ export async function prepareOpenAliceRuntime(opts: PrepareOpenAliceRuntimeOptio
     await recoverRuntimeOwner(row.owner!, {
       processController: opts.processController,
       ownerAuthority: opts.ownerAuthority,
+      fencingInstanceId: opts.fencingInstanceId,
     })
   }
   return inspections
@@ -503,12 +577,18 @@ export async function recoverRuntimeOwner(
   opts: {
     readonly processController?: ProcessController
     readonly ownerAuthority?: RuntimeLockOwnerAuthority
+    readonly fencingInstanceId?: string
   } = {},
 ): Promise<void> {
   const controller = opts.processController ?? defaultProcessController
   const currentMachineId = await controller.machineId()
   const ownerAuthority = opts.ownerAuthority ?? resolveRuntimeLockOwnerAuthority()
-  const railwayScope = railwayOwnerScope(owner, currentMachineId, ownerAuthority)
+  const railwayScope = railwayOwnerScope(
+    owner,
+    currentMachineId,
+    ownerAuthority,
+    opts.fencingInstanceId ?? resolveRailwayFencingInstanceId(),
+  )
   if (railwayScope === 'cross-container-observer' || railwayScope === 'cross-container-fenced') {
     throw new Error(`OpenAlice owner ${owner.pid} belongs to another Railway container; refusing to signal it`)
   }
@@ -583,37 +663,272 @@ function makeLock(lockDir: string, initialOwner: RuntimeLockOwner, opts: Runtime
       while (updating) await (opts.processController ?? defaultProcessController).sleep(5)
       const current = await readOwner(lockDir).catch(() => null)
       if (current?.token !== owner.token) return
-      await rm(lockDir, { recursive: true, force: true })
+      const directoryIdentity = await readLockDirectoryIdentity(lockDir)
+      if (!directoryIdentity) return
+      let retiredDir: string | null = null
+      for (let attempt = 0; attempt < 40 && !retiredDir; attempt++) {
+        retiredDir = await retireLockDirectory(
+          lockDir,
+          directoryIdentity,
+          current,
+          owner,
+          opts,
+          'released',
+        )
+        if (retiredDir) break
+        const latest = await readOwner(lockDir).catch(() => null)
+        if (latest?.token !== owner.token) return
+        await (opts.processController ?? defaultProcessController).sleep(25)
+      }
+      if (!retiredDir) return
+      await rm(retiredDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 10 }).catch(() => undefined)
     },
   }
 }
 
-async function claimAndRemove(current: RuntimeLockInspection): Promise<boolean> {
+async function claimAndRemove(
+  current: RuntimeLockInspection,
+  claimant: RuntimeLockOwner,
+  opts: RuntimeLockOptions,
+): Promise<boolean> {
   if (!current.directoryIdentity) return current.state === 'missing'
-  const claimDir = join(current.lockDir, RECLAIM_DIR)
-  const quarantineDir = `${current.lockDir}.reaped-${randomUUID()}`
-  let quarantined = false
+  const retiredDir = await retireLockDirectory(
+    current.lockDir,
+    current.directoryIdentity,
+    current.owner,
+    claimant,
+    opts,
+    'reaped',
+  )
+  if (!retiredDir) return false
+  await rm(retiredDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 10 }).catch(() => undefined)
+  return true
+}
+
+async function readLockDirectoryIdentity(lockDir: string): Promise<string | null> {
+  try {
+    const lockStat = await stat(lockDir)
+    return lockDirectoryIdentity(lockStat)
+  } catch (err) {
+    if (isErrno(err, 'ENOENT')) return null
+    throw err
+  }
+}
+
+function lockDirectoryIdentity(lockStat: { dev: number; ino: number; birthtimeMs: number }): string {
+  return `${lockStat.dev}:${lockStat.ino}:${lockStat.birthtimeMs}`
+}
+
+async function retireLockDirectory(
+  lockDir: string,
+  expectedIdentity: string,
+  expectedOwner: RuntimeLockOwner | null,
+  claimant: RuntimeLockOwner,
+  opts: RuntimeLockOptions,
+  reason: 'released' | 'reaped',
+): Promise<string | null> {
+  const claim = await acquireLockMutationClaim(lockDir, claimant, opts)
+  if (!claim) return null
+  const retiredDir = `${lockDir}.${reason}-${randomUUID()}`
+  let retired = false
+  try {
+    const latestIdentity = await readLockDirectoryIdentity(lockDir)
+    if (latestIdentity !== expectedIdentity) return null
+    const latestOwner = await readOwner(lockDir).catch(() => null)
+    if (expectedOwner && !sameReclaimEvidence(expectedOwner, latestOwner)) return null
+    if (!expectedOwner && latestOwner) return null
+    if (!(await claim.isCurrent())) return null
+    await renameAtomic(lockDir, retiredDir, opts.processController ?? defaultProcessController)
+    retired = true
+    return retiredDir
+  } catch (err) {
+    if (isErrno(err, 'ENOENT')) return null
+    throw err
+  } finally {
+    if (!retired && !(await claim.release())) {
+      throw new Error(`runtime mutation claim could not be released at ${lockDir}`)
+    }
+  }
+}
+
+interface LockMutationClaim {
+  isCurrent(): Promise<boolean>
+  release(): Promise<boolean>
+}
+
+async function acquireLockMutationClaim(
+  lockDir: string,
+  claimant: RuntimeLockOwner,
+  opts: RuntimeLockOptions,
+): Promise<LockMutationClaim | null> {
+  const claimDir = join(lockDir, RECLAIM_DIR)
+  const ownerFileName = mutationClaimOwnerFileName(claimant.token)
   try {
     await mkdir(claimDir)
   } catch (err) {
-    if (isErrno(err, 'ENOENT') || isErrno(err, 'EEXIST')) return false
+    if (isErrno(err, 'ENOENT')) return null
+    if (isErrno(err, 'EEXIST')) {
+      await recoverAbandonedMutationClaim(lockDir, opts)
+      return null
+    }
+    throw err
+  }
+  const claimDirectoryIdentity = await readLockDirectoryIdentity(claimDir)
+  if (!claimDirectoryIdentity) return null
+
+  const tempPath = join(claimDir, `.owner.${claimant.token}.${randomUUID()}.tmp`)
+  const ownerPath = join(claimDir, ownerFileName)
+  try {
+    await writeFile(tempPath, JSON.stringify(claimant, null, 2) + '\n', 'utf8')
+    await renameAtomic(tempPath, ownerPath, opts.processController ?? defaultProcessController)
+  } catch (err) {
+    await rm(tempPath, { force: true }).catch(() => undefined)
+    await rmdir(claimDir).catch(() => undefined)
+    if (isErrno(err, 'ENOENT')) return null
     throw err
   }
 
-  try {
-    const currentStat = await stat(current.lockDir)
-    const identity = `${currentStat.dev}:${currentStat.ino}:${currentStat.birthtimeMs}`
-    if (identity !== current.directoryIdentity) return false
-    const latest = await readOwner(current.lockDir).catch(() => null)
-    if (current.owner && !sameReclaimEvidence(current.owner, latest)) return false
-    if (!current.owner && latest) return false
-    await rename(current.lockDir, quarantineDir)
-    quarantined = true
-    await rm(quarantineDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 10 }).catch(() => undefined)
-    return true
-  } finally {
-    if (!quarantined) await rm(claimDir, { recursive: true, force: true }).catch(() => undefined)
+  const claim: LockMutationClaim = {
+    isCurrent: async () => {
+      if (await readLockDirectoryIdentity(claimDir) !== claimDirectoryIdentity) return false
+      const entries = await readdir(claimDir).catch(() => null)
+      if (entries === null || entries.length !== 1 || entries[0] !== ownerFileName) return false
+      const latest = await readOwnerFile(ownerPath).catch(() => null)
+      return sameReclaimEvidence(claimant, latest)
+    },
+    release: async () => {
+      return retireMutationClaimMarker(lockDir, claimDirectoryIdentity, claimant, opts).catch(() => false)
+    },
   }
+  if (!(await claim.isCurrent())) {
+    await claim.release()
+    return null
+  }
+  return claim
+}
+
+async function recoverAbandonedMutationClaim(
+  lockDir: string,
+  opts: RuntimeLockOptions,
+): Promise<boolean> {
+  const controller = opts.processController ?? defaultProcessController
+  const claimDir = join(lockDir, RECLAIM_DIR)
+  let claimStat
+  try {
+    claimStat = await stat(claimDir)
+  } catch (err) {
+    if (isErrno(err, 'ENOENT')) return true
+    throw err
+  }
+
+  const entries = await readdir(claimDir).catch(() => null)
+  if (entries === null) return false
+  const ownerEntry = entries.length === 1 && MUTATION_CLAIM_OWNER_PATTERN.test(entries[0]!)
+    ? entries[0]!
+    : null
+  if (!ownerEntry) {
+    const ageMs = Math.max(0, Date.now() - claimStat.mtimeMs)
+    const initializationGraceMs = opts.initializationGraceMs ?? DEFAULT_INITIALIZATION_GRACE_MS
+    const incompleteTemp = entries.length === 1 && MUTATION_CLAIM_TEMP_PATTERN.test(entries[0]!)
+      ? entries[0]!
+      : null
+    if ((entries.length > 0 && !incompleteTemp) || ageMs < initializationGraceMs) return false
+    try {
+      if (incompleteTemp) await rm(join(claimDir, incompleteTemp), { force: true })
+      await rmdir(claimDir)
+      return true
+    } catch (err) {
+      if (isErrno(err, 'ENOENT')) return true
+      if (isErrno(err, 'ENOTEMPTY') || isErrno(err, 'EEXIST')) return false
+      throw err
+    }
+  }
+
+  let claimant: RuntimeLockOwner
+  try {
+    claimant = await readOwnerFile(join(claimDir, ownerEntry))
+  } catch {
+    return false
+  }
+  const fileToken = MUTATION_CLAIM_OWNER_PATTERN.exec(ownerEntry)?.[1]
+  if (!fileToken || fileToken.toLowerCase() !== claimant.token.toLowerCase()) return false
+
+  const currentMachineId = await controller.machineId()
+  const ownerAuthority = opts.ownerAuthority ?? resolveRuntimeLockOwnerAuthority()
+  const railwayScope = railwayOwnerScope(
+    claimant,
+    currentMachineId,
+    ownerAuthority,
+    opts.fencingInstanceId ?? resolveRailwayFencingInstanceId(),
+  )
+  if (railwayScope === 'cross-container-observer' || railwayScope === 'foreign') return false
+  let abandoned = railwayScope === 'cross-container-fenced'
+  if (!abandoned) {
+    if (claimant.machineId && claimant.machineId !== currentMachineId && railwayScope !== 'same-container') return false
+    abandoned = !controller.isAlive(claimant.pid)
+      || !(await isSameProcess(claimant.pid, claimant.processStartedAt, controller))
+  }
+  if (!abandoned) return false
+
+  return retireMutationClaimMarker(lockDir, lockDirectoryIdentity(claimStat), claimant, opts)
+}
+
+function mutationClaimOwnerFileName(token: string): string {
+  const ownerFileName = `owner.${token}.json`
+  if (!MUTATION_CLAIM_OWNER_PATTERN.test(ownerFileName)) {
+    throw new Error('runtime mutation claim token is not a UUID')
+  }
+  return ownerFileName
+}
+
+async function retireMutationClaimMarker(
+  lockDir: string,
+  expectedClaimDirectoryIdentity: string,
+  claimant: RuntimeLockOwner,
+  opts: RuntimeLockOptions,
+): Promise<boolean> {
+  const controller = opts.processController ?? defaultProcessController
+  const claimDir = join(lockDir, RECLAIM_DIR)
+  const ownerPath = join(claimDir, mutationClaimOwnerFileName(claimant.token))
+  const retiredOwnerPath = `${lockDir}.mutation-${claimant.token}-${randomUUID()}.retired`
+  if (await readLockDirectoryIdentity(claimDir) !== expectedClaimDirectoryIdentity) return false
+  const entries = await readdir(claimDir).catch(() => null)
+  if (entries === null || entries.length !== 1 || entries[0] !== mutationClaimOwnerFileName(claimant.token)) {
+    return false
+  }
+  try {
+    await renameAtomic(ownerPath, retiredOwnerPath, controller)
+  } catch (err) {
+    if (isErrno(err, 'ENOENT')) return false
+    throw err
+  }
+
+  const movedOwner = await readOwnerFile(retiredOwnerPath).catch(() => null)
+  if (!sameReclaimEvidence(claimant, movedOwner)) {
+    return false
+  }
+
+  // The marker move fences this exact claim generation. Correctness must not
+  // depend on uninterrupted cleanup: another contender may remove the now-empty
+  // directory after its grace and create a new generation at the same path.
+  await controller.sleep(0)
+  try {
+    await rmdir(claimDir)
+  } catch (err) {
+    if (!isErrno(err, 'ENOENT')) {
+      if (isErrno(err, 'ENOTEMPTY') || isErrno(err, 'EEXIST')) {
+        const latestIdentity = await readLockDirectoryIdentity(claimDir)
+        if (latestIdentity !== expectedClaimDirectoryIdentity) {
+          await rm(retiredOwnerPath, { force: true }).catch(() => undefined)
+          return true
+        }
+        return false
+      }
+      throw err
+    }
+  }
+  await rm(retiredOwnerPath, { force: true }).catch(() => undefined)
+  return true
 }
 
 async function writeOwnerAtomic(
@@ -625,22 +940,30 @@ async function writeOwnerAtomic(
   const tempPath = join(lockDir, `.${OWNER_FILE}.${owner.token}.${randomUUID()}.tmp`)
   try {
     await writeFile(tempPath, JSON.stringify(owner, null, 2) + '\n', 'utf8')
-    for (let attempt = 0; ; attempt++) {
-      try {
-        await rename(tempPath, ownerPath)
-        break
-      } catch (error) {
-        const retryDelay = WINDOWS_RENAME_RETRY_DELAYS_MS[attempt]
-        if (
-          process.platform !== 'win32' ||
-          retryDelay === undefined ||
-          !isTransientWindowsRenameError(error)
-        ) throw error
-        await controller.sleep(retryDelay)
-      }
-    }
+    await renameAtomic(tempPath, ownerPath, controller)
   } finally {
     await rm(tempPath, { force: true }).catch(() => undefined)
+  }
+}
+
+async function renameAtomic(
+  source: string,
+  destination: string,
+  controller: ProcessController,
+): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await rename(source, destination)
+      return
+    } catch (error) {
+      const retryDelay = WINDOWS_RENAME_RETRY_DELAYS_MS[attempt]
+      if (
+        process.platform !== 'win32'
+        || retryDelay === undefined
+        || !isTransientWindowsRenameError(error)
+      ) throw error
+      await controller.sleep(retryDelay)
+    }
   }
 }
 
@@ -654,7 +977,11 @@ interface ParsedRuntimeLockOwner {
 }
 
 async function readOwnerRecord(lockDir: string): Promise<ParsedRuntimeLockOwner> {
-  const parsed = JSON.parse(await readFile(join(lockDir, OWNER_FILE), 'utf8')) as Record<string, unknown>
+  return readOwnerFileRecord(join(lockDir, OWNER_FILE))
+}
+
+async function readOwnerFileRecord(ownerPath: string): Promise<ParsedRuntimeLockOwner> {
+  const parsed = JSON.parse(await readFile(ownerPath, 'utf8')) as Record<string, unknown>
   if (
     typeof parsed['pid'] !== 'number' ||
     typeof parsed['hostname'] !== 'string' ||
@@ -678,6 +1005,9 @@ async function readOwnerRecord(lockDir: string): Promise<ParsedRuntimeLockOwner>
       ...(parsed['fencingProtocol'] === 'railway-flock-v1'
         ? { fencingProtocol: 'railway-flock-v1' as const }
         : {}),
+      ...(typeof parsed['fencingInstanceId'] === 'string'
+        ? { fencingInstanceId: parsed['fencingInstanceId'] }
+        : {}),
       ...(typeof parsed['processStartedAt'] === 'string' ? { processStartedAt: parsed['processStartedAt'] } : {}),
       ...(typeof parsed['guardianPid'] === 'number' ? { guardianPid: parsed['guardianPid'] } : {}),
       ...(typeof parsed['guardianStartedAt'] === 'string' ? { guardianStartedAt: parsed['guardianStartedAt'] } : {}),
@@ -687,6 +1017,10 @@ async function readOwnerRecord(lockDir: string): Promise<ParsedRuntimeLockOwner>
 
 async function readOwner(lockDir: string): Promise<RuntimeLockOwner> {
   return (await readOwnerRecord(lockDir)).owner
+}
+
+async function readOwnerFile(ownerPath: string): Promise<RuntimeLockOwner> {
+  return (await readOwnerFileRecord(ownerPath)).owner
 }
 
 function sameReclaimEvidence(
@@ -703,6 +1037,7 @@ function sameReclaimEvidence(
     && latest.acquiredAt === inspected.acquiredAt
     && latest.heartbeatAt === inspected.heartbeatAt
     && latest.fencingProtocol === inspected.fencingProtocol
+    && latest.fencingInstanceId === inspected.fencingInstanceId
     && latest.processStartedAt === inspected.processStartedAt
     && latest.guardianPid === inspected.guardianPid
     && latest.guardianStartedAt === inspected.guardianStartedAt
