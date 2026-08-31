@@ -552,7 +552,7 @@ signals a guessed PID, exposes the Guardian socket, or performs trading writes.
   them under a new destination key.
 - [x] Validate the complete receipt and exact published entry set before an
   idempotent registration retry, including receiver-created credential files.
-- [ ] Apply the reviewed transfer to the retained Railway Volume, select the
+- [x] Apply the reviewed transfer to the retained Railway Volume, select the
   imported Project, and verify portable Workspace/configuration state plus a
   new user-owned Agent Runtime turn without importing native Session state.
 
@@ -640,7 +640,20 @@ destination; native Agent login/config/session state remains excluded. Receipt
 validation covers the exact manifest, credentials policy, and published entry
 set, including idempotent recovery when the receiver created an AI vault before
 registry registration failed. Hosted Railway apply and real Project selection
-remain the acceptance step shared with the Bun CLI distribution plan.
+were the acceptance step shared with the Bun CLI distribution plan.
+
+Increment 6 hosted acceptance (2026-09-01): the stopped local Default
+AliceProject transferred through the production SSH path into
+`/data/projects/main-cloud` on the retained Railway Volume. The destination
+published 10,702 files and 222,635,304 bytes, registered and selected its new
+AliceProject identity, retained portable Workspace/configuration state, copied
+no native Sessions, and left transfer staging clean. OpenCode 1.18.25 was then
+installed as user-owned persistent state outside the OpenAlice release, and
+Workspace `chat-solid-coral-ridge` completed a real headless turn returning
+`OPENALICE_REMOTE_OK`. The local source remains stopped to avoid divergent
+writes. Restart/resume and hard-kill persistence are owned by the Bun CLI
+distribution plan's still-open Railway acceptance, not by this transfer
+increment.
 
 Always:
 

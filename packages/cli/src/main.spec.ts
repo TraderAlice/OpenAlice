@@ -16,7 +16,7 @@ describe('OpenAlice TypeScript application entry', () => {
     }
 
     expect(JSON.parse(output)).toMatchObject({
-      runtimeCapabilities: expect.arrayContaining(['railway-flock-v1']),
+      runtimeCapabilities: expect.arrayContaining(['railway-flock-v1', 'railway-runtime-lock-v2']),
     })
   })
 

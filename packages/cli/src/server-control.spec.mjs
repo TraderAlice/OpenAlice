@@ -14,6 +14,8 @@ import {
 } from './server-control.mjs'
 
 const temporaryPaths = []
+const PRIOR_RAILWAY_INSTANCE_ID = '11111111-1111-4111-8111-111111111111'
+const CURRENT_RAILWAY_INSTANCE_ID = '22222222-2222-4222-8222-222222222222'
 
 afterEach(async () => {
   await Promise.all(temporaryPaths.splice(0).map((path) => rm(path, { recursive: true, force: true })))
@@ -230,6 +232,18 @@ describe('OpenAlice Guardian control protocol', () => {
     expect(legacyPidProbe).not.toHaveBeenCalled()
   })
 
+  it('does not report a claim-only Runtime lock as absent', async () => {
+    const home = await makeTempDir()
+    const lock = join(home, 'state', 'guardian.lock')
+    await mkdir(join(lock, 'reclaiming'), { recursive: true })
+
+    const status = await readRuntimeStatus({ homeRoot: home })
+
+    expect(status.class).toBe('owned_elsewhere')
+    expect(status.owner).toBeNull()
+    expect(status.detail).toContain('ownership is active')
+  })
+
   it('reclaims a dead same-machine owner after its hostname changes', async () => {
     const home = await makeTempDir()
     const lock = join(home, 'state', 'guardian.lock')
@@ -258,8 +272,9 @@ describe('OpenAlice Guardian control protocol', () => {
     expect(readProcessStartedAt).not.toHaveBeenCalled()
   })
 
-  it('keeps cross-container Railway owners observer-only and lets a valid fence reclaim the cooperative protocol', async () => {
+  it('uses the Railway instance identity even when hostname, PID, and start time are reused', async () => {
     const env = {
+      OPENALICE_RAILWAY_INSTANCE_ID: CURRENT_RAILWAY_INSTANCE_ID,
       OPENALICE_SERVICE_MANAGER: 'railway',
       OPENALICE_MACHINE_ID: 'railway-service-service-test',
       RAILWAY_ENVIRONMENT_ID: 'environment-test',
@@ -271,15 +286,18 @@ describe('OpenAlice Guardian control protocol', () => {
     const ownerPath = join(lock, 'owner.json')
     const owner = {
       pid: 4242,
-      hostname: 'prior-container',
+      hostname: 'current-container',
       machineId: 'env:railway-service-service-test',
       launcher: 'guardian-cli-server',
       acquiredAt: new Date().toISOString(),
       heartbeatAt: new Date().toISOString(),
       fencingProtocol: 'railway-flock-v1',
+      fencingInstanceId: PRIOR_RAILWAY_INSTANCE_ID,
+      processStartedAt: '2026-07-15T00:00:00.000Z',
     }
     await writeFile(ownerPath, JSON.stringify(owner))
-    const isProcessAlive = vi.fn(() => false)
+    const isProcessAlive = vi.fn(() => true)
+    const readProcessStartedAt = vi.fn(async () => Date.parse('2026-07-15T00:00:00.000Z'))
 
     for (const heartbeatAt of [new Date().toISOString(), new Date(0).toISOString()]) {
       await writeFile(ownerPath, JSON.stringify({ ...owner, heartbeatAt }))
@@ -287,6 +305,7 @@ describe('OpenAlice Guardian control protocol', () => {
         env,
         hostname: 'current-container',
         isProcessAlive,
+        readProcessStartedAt,
       })
       expect(observer.class).toBe('owned_elsewhere')
 
@@ -294,12 +313,14 @@ describe('OpenAlice Guardian control protocol', () => {
         env,
         hostname: 'current-container',
         isProcessAlive,
+        readProcessStartedAt,
         railwayFenceValid: true,
       })
       expect(fenced.class).toBe('absent')
       expect(fenced.detail).toContain('stale')
     }
     expect(isProcessAlive).not.toHaveBeenCalled()
+    expect(readProcessStartedAt).not.toHaveBeenCalled()
   })
 
   it('keeps a legacy cross-container Railway owner blocked even for a fenced entrypoint', async () => {
@@ -317,6 +338,7 @@ describe('OpenAlice Guardian control protocol', () => {
     const isProcessAlive = vi.fn(() => false)
     const status = await readRuntimeStatus({ homeRoot: home }, {
       env: {
+        OPENALICE_RAILWAY_INSTANCE_ID: CURRENT_RAILWAY_INSTANCE_ID,
         OPENALICE_SERVICE_MANAGER: 'railway',
         OPENALICE_MACHINE_ID: 'railway-service-service-test',
         RAILWAY_ENVIRONMENT_ID: 'environment-test',
@@ -331,6 +353,37 @@ describe('OpenAlice Guardian control protocol', () => {
     expect(isProcessAlive).not.toHaveBeenCalled()
   })
 
+  it('keeps a malformed Railway fencing instance blocked', async () => {
+    const home = await makeTempDir()
+    const lock = join(home, 'state', 'guardian.lock')
+    await mkdir(lock, { recursive: true })
+    await writeFile(join(lock, 'owner.json'), JSON.stringify({
+      pid: 4242,
+      hostname: 'current-container',
+      machineId: 'env:railway-service-service-test',
+      launcher: 'guardian-cli-server',
+      acquiredAt: new Date(0).toISOString(),
+      heartbeatAt: new Date(0).toISOString(),
+      fencingProtocol: 'railway-flock-v1',
+      fencingInstanceId: 'not valid',
+    }))
+
+    const status = await readRuntimeStatus({ homeRoot: home }, {
+      env: {
+        OPENALICE_RAILWAY_INSTANCE_ID: CURRENT_RAILWAY_INSTANCE_ID,
+        OPENALICE_SERVICE_MANAGER: 'railway',
+        OPENALICE_MACHINE_ID: 'railway-service-service-test',
+        RAILWAY_ENVIRONMENT_ID: 'environment-test',
+        RAILWAY_SERVICE_ID: 'service-test',
+      },
+      hostname: 'current-container',
+      isProcessAlive: vi.fn(() => false),
+      railwayFenceValid: true,
+    })
+
+    expect(status.class).toBe('owned_elsewhere')
+  })
+
   it('keeps same-container PID identity authoritative under Railway', async () => {
     const home = await makeTempDir()
     const lock = join(home, 'state', 'guardian.lock')
@@ -342,6 +395,8 @@ describe('OpenAlice Guardian control protocol', () => {
       launcher: 'guardian-cli-server',
       acquiredAt: new Date(0).toISOString(),
       heartbeatAt: new Date(0).toISOString(),
+      fencingProtocol: 'railway-flock-v1',
+      fencingInstanceId: CURRENT_RAILWAY_INSTANCE_ID,
       processStartedAt: '2026-07-15T00:00:00.000Z',
     }))
     const isProcessAlive = vi.fn(() => true)
@@ -349,6 +404,7 @@ describe('OpenAlice Guardian control protocol', () => {
 
     const status = await readRuntimeStatus({ homeRoot: home }, {
       env: {
+        OPENALICE_RAILWAY_INSTANCE_ID: CURRENT_RAILWAY_INSTANCE_ID,
         OPENALICE_SERVICE_MANAGER: 'railway',
         OPENALICE_MACHINE_ID: 'railway-service-service-test',
         RAILWAY_ENVIRONMENT_ID: 'environment-test',

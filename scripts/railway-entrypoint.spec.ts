@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { chmod, mkdir, mkdtemp, readFile, readlink, realpath, rm, symlink, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, readlink, realpath, rm, symlink, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
@@ -114,7 +114,7 @@ describe('Railway native CLI host entrypoint', () => {
         OPENALICE_HOME: join(fixture.volume, 'quarantine', 'old-project'),
       },
     })).rejects.toMatchObject({
-      stderr: expect.stringContaining('cannot select the reserved Railway quarantine tree'),
+      stderr: expect.stringContaining('quarantine path must be an actual directory'),
     })
     await expect(readFile(fixture.installCalled, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
   })
@@ -244,6 +244,482 @@ describe('Railway native CLI host entrypoint', () => {
     })
   })
 
+  it('accepts a missing legacy fencing instance id but rejects a malformed present value', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-railway-retained-instance-id-'))
+    temporaryPaths.push(root)
+    const project = join(root, 'project')
+    const launcher = join(project, 'workspaces')
+    const ownerPath = join(project, 'state', 'guardian.lock', 'owner.json')
+    const owner = {
+      schemaVersion: 1,
+      pid: 101,
+      hostname: 'previous-container',
+      machineId: 'env:railway-service-service-test',
+      token: 'fenced-owner',
+      launcher: 'guardian-cli-server',
+      acquiredAt: new Date().toISOString(),
+      heartbeatAt: new Date().toISOString(),
+      fencingProtocol: 'railway-flock-v1',
+    }
+    await mkdir(join(project, 'state', 'guardian.lock'), { recursive: true })
+    await writeFile(ownerPath, JSON.stringify(owner))
+
+    await expect(execFileAsync('python3', [
+      retainedLockPreflight,
+      root,
+      project,
+      launcher,
+      'env:railway-service-service-test',
+    ])).resolves.toMatchObject({ stderr: '' })
+
+    await writeFile(ownerPath, JSON.stringify({
+      ...owner,
+      fencingInstanceId: 'bad/id',
+    }))
+    await expect(execFileAsync('python3', [
+      retainedLockPreflight,
+      root,
+      project,
+      launcher,
+      'env:railway-service-service-test',
+    ])).rejects.toMatchObject({
+      stderr: expect.stringContaining('project/state/guardian.lock'),
+    })
+
+    await writeFile(ownerPath, JSON.stringify({
+      ...owner,
+      fencingInstanceId: 'railway-fence-1234',
+    }))
+    await expect(execFileAsync('python3', [
+      retainedLockPreflight,
+      root,
+      project,
+      launcher,
+      'env:railway-service-service-test',
+    ])).resolves.toMatchObject({ stderr: '' })
+  })
+
+  it('rejects boolean schema and pid values instead of treating them as valid integers', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-railway-retained-bool-'))
+    temporaryPaths.push(root)
+    const project = join(root, 'project')
+    const lockDir = join(project, 'state', 'guardian.lock')
+    await mkdir(lockDir, { recursive: true })
+    await writeFile(join(lockDir, 'owner.json'), JSON.stringify({
+      schemaVersion: true,
+      pid: true,
+      hostname: 'previous-container',
+      machineId: 'env:railway-service-service-test',
+      token: 'malformed-owner',
+      launcher: 'guardian-cli-server',
+      acquiredAt: new Date().toISOString(),
+      heartbeatAt: new Date().toISOString(),
+      fencingProtocol: 'railway-flock-v1',
+    }))
+
+    await expect(execFileAsync('python3', [
+      retainedLockPreflight,
+      root,
+      project,
+      join(project, 'workspaces'),
+      'env:railway-service-service-test',
+    ])).rejects.toMatchObject({
+      stderr: expect.stringContaining('project/state/guardian.lock'),
+    })
+  })
+
+  it('checks the historical Volume-root Project before switching to a nested Project', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-railway-root-project-'))
+    temporaryPaths.push(root)
+    const selectedProject = join(root, 'projects', 'selected')
+    const lockDir = join(root, 'state', 'guardian.lock')
+    await mkdir(lockDir, { recursive: true })
+    await writeFile(join(lockDir, 'owner.json'), JSON.stringify({
+      schemaVersion: 1,
+      pid: 101,
+      hostname: 'legacy-root-container',
+      machineId: 'env:railway-service-service-test',
+      token: 'legacy-root-owner',
+      launcher: 'guardian-cli-server',
+      acquiredAt: new Date().toISOString(),
+      heartbeatAt: new Date().toISOString(),
+    }))
+
+    await expect(execFileAsync('python3', [
+      retainedLockPreflight,
+      root,
+      selectedProject,
+      join(selectedProject, 'workspaces'),
+      'env:railway-service-service-test',
+    ])).rejects.toMatchObject({
+      stderr: expect.stringContaining('state/guardian.lock'),
+    })
+    expect(existsSync(selectedProject)).toBe(false)
+  })
+
+  it.runIf(process.platform !== 'win32')('rejects symlinked lock parents without deleting outside the Volume', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-railway-lock-symlink-'))
+    const outside = await mkdtemp(join(tmpdir(), 'openalice-railway-lock-outside-'))
+    temporaryPaths.push(root, outside)
+    const project = join(root, 'project')
+    const outsideLock = join(outside, 'state', 'config-bootstrap.lock')
+    await mkdir(project, { recursive: true })
+    await mkdir(outsideLock, { recursive: true })
+    await symlink(outside, join(project, 'data'))
+    const old = new Date(Date.now() - 5_000)
+    await utimes(outsideLock, old, old)
+
+    await expect(execFileAsync('python3', [
+      retainedLockPreflight,
+      root,
+      project,
+      join(project, 'workspaces'),
+      'env:railway-service-service-test',
+    ])).rejects.toMatchObject({
+      stderr: expect.stringContaining('project/data/state/config-bootstrap.lock'),
+    })
+    expect(existsSync(outsideLock)).toBe(true)
+  })
+
+  it.runIf(
+    process.platform !== 'win32'
+      && typeof process.getuid === 'function'
+      && process.getuid() !== 0,
+  )('fails closed when a Volume subtree cannot be traversed', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-railway-walk-error-'))
+    temporaryPaths.push(root)
+    const hidden = join(root, 'hidden')
+    const legacyLock = join(hidden, 'project', 'state', 'guardian.lock')
+    const selectedProject = join(root, 'projects', 'selected')
+    await mkdir(legacyLock, { recursive: true })
+    await writeFile(join(legacyLock, 'owner.json'), '{}')
+    await chmod(hidden, 0o000)
+    try {
+      await expect(execFileAsync('python3', [
+        retainedLockPreflight,
+        root,
+        selectedProject,
+        join(selectedProject, 'workspaces'),
+        'env:railway-service-service-test',
+      ])).rejects.toMatchObject({
+        stderr: expect.stringContaining('could not inspect the complete Volume'),
+      })
+    } finally {
+      await chmod(hidden, 0o700)
+    }
+  })
+
+  it('reports a directory-shaped owner as malformed without a Python traceback', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-railway-owner-directory-'))
+    temporaryPaths.push(root)
+    const project = join(root, 'project')
+    const lockDir = join(project, 'state', 'guardian.lock')
+    await mkdir(join(lockDir, 'owner.json'), { recursive: true })
+
+    const result = execFileAsync('python3', [
+      retainedLockPreflight,
+      root,
+      project,
+      join(project, 'workspaces'),
+      'env:railway-service-service-test',
+    ])
+    await expect(result).rejects.toMatchObject({
+      stderr: expect.stringContaining('project/state/guardian.lock'),
+    })
+    await expect(result).rejects.not.toMatchObject({
+      stderr: expect.stringContaining('Traceback'),
+    })
+  })
+
+  it.runIf(process.platform !== 'win32')('opens a FIFO owner nonblocking and rejects it as malformed', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-railway-owner-fifo-'))
+    temporaryPaths.push(root)
+    const project = join(root, 'project')
+    const lockDir = join(project, 'state', 'guardian.lock')
+    const ownerPath = join(lockDir, 'owner.json')
+    await mkdir(lockDir, { recursive: true })
+    await execFileAsync('mkfifo', [ownerPath])
+
+    await expect(execFileAsync('python3', [
+      retainedLockPreflight,
+      root,
+      project,
+      join(project, 'workspaces'),
+      'env:railway-service-service-test',
+    ], { timeout: 2_000 })).rejects.toMatchObject({
+      stderr: expect.stringContaining('project/state/guardian.lock'),
+      killed: false,
+    })
+  })
+
+  it('recovers an aged empty lock only after every retained owner passes validation', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-railway-empty-lock-'))
+    temporaryPaths.push(root)
+    const project = join(root, 'project')
+    const launcher = join(project, 'workspaces')
+    const validLock = join(project, 'state', 'guardian.lock')
+    const emptyLock = join(project, 'data', 'state', 'config-bootstrap.lock')
+    const owner = {
+      schemaVersion: 1,
+      pid: 101,
+      hostname: 'previous-container',
+      machineId: 'env:railway-service-service-test',
+      token: 'fenced-owner',
+      launcher: 'guardian-cli-server',
+      acquiredAt: new Date().toISOString(),
+      heartbeatAt: new Date().toISOString(),
+      fencingProtocol: 'railway-flock-v1',
+    }
+    await mkdir(validLock, { recursive: true })
+    await writeFile(join(validLock, 'owner.json'), JSON.stringify(owner))
+    await mkdir(emptyLock, { recursive: true })
+    const old = new Date(Date.now() - 5_000)
+    await utimes(emptyLock, old, old)
+
+    await expect(execFileAsync('python3', [
+      retainedLockPreflight,
+      root,
+      project,
+      launcher,
+      'env:railway-service-service-test',
+    ])).resolves.toMatchObject({ stderr: '' })
+    expect(existsSync(emptyLock)).toBe(false)
+    expect(existsSync(join(validLock, 'owner.json'))).toBe(true)
+
+    await mkdir(emptyLock, { recursive: true })
+    await utimes(emptyLock, old, old)
+    const malformedLock = join(project, 'state', 'runtime.lock')
+    await mkdir(malformedLock, { recursive: true })
+    await writeFile(join(malformedLock, 'owner.json'), '{}')
+    await expect(execFileAsync('python3', [
+      retainedLockPreflight,
+      root,
+      project,
+      launcher,
+      'env:railway-service-service-test',
+    ])).rejects.toMatchObject({
+      stderr: expect.stringContaining('state/runtime.lock'),
+    })
+    expect(existsSync(emptyLock)).toBe(true)
+  })
+
+  it('recovers a hard-killed v2 claim-only publication window', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-railway-claim-only-'))
+    temporaryPaths.push(root)
+    const project = join(root, 'project')
+    const launcher = join(project, 'workspaces')
+    const lockDir = join(project, 'state', 'guardian.lock')
+    const claimDir = join(lockDir, 'reclaiming')
+    const token = '44444444-4444-4444-8444-444444444444'
+    const writeId = '55555555-5555-4555-8555-555555555555'
+    const owner = {
+      schemaVersion: 1,
+      pid: 404,
+      hostname: 'hard-killed-container',
+      machineId: 'env:railway-service-service-test',
+      token,
+      launcher: 'guardian-cli-server',
+      acquiredAt: new Date().toISOString(),
+      heartbeatAt: new Date().toISOString(),
+      fencingProtocol: 'railway-flock-v1',
+      fencingInstanceId: '11111111-1111-4111-8111-111111111111',
+    }
+    await mkdir(claimDir, { recursive: true })
+    await writeFile(join(claimDir, `owner.${token}.json`), JSON.stringify(owner))
+    await writeFile(join(lockDir, `.owner.json.${token}.${writeId}.tmp`), JSON.stringify(owner))
+
+    await expect(execFileAsync('python3', [
+      retainedLockPreflight,
+      root,
+      project,
+      launcher,
+      'env:railway-service-service-test',
+    ])).resolves.toMatchObject({ stderr: '' })
+    expect(existsSync(lockDir)).toBe(false)
+  })
+
+  it('cleans a valid residual v2 claim after owner publication without removing the owner', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-railway-published-claim-'))
+    temporaryPaths.push(root)
+    const project = join(root, 'project')
+    const launcher = join(project, 'workspaces')
+    const lockDir = join(project, 'state', 'guardian.lock')
+    const claimDir = join(lockDir, 'reclaiming')
+    const ownerToken = '66666666-6666-4666-8666-666666666666'
+    const claimToken = '77777777-7777-4777-8777-777777777777'
+    const baseOwner = {
+      schemaVersion: 1,
+      pid: 606,
+      hostname: 'published-container',
+      machineId: 'env:railway-service-service-test',
+      launcher: 'guardian-cli-server',
+      acquiredAt: new Date().toISOString(),
+      heartbeatAt: new Date().toISOString(),
+      fencingProtocol: 'railway-flock-v1',
+      fencingInstanceId: '11111111-1111-4111-8111-111111111111',
+    }
+    await mkdir(claimDir, { recursive: true })
+    await writeFile(join(lockDir, 'owner.json'), JSON.stringify({ ...baseOwner, token: ownerToken }))
+    await writeFile(join(claimDir, `owner.${claimToken}.json`), JSON.stringify({
+      ...baseOwner,
+      pid: 707,
+      token: claimToken,
+    }))
+
+    await expect(execFileAsync('python3', [
+      retainedLockPreflight,
+      root,
+      project,
+      launcher,
+      'env:railway-service-service-test',
+    ])).resolves.toMatchObject({ stderr: '' })
+    expect(JSON.parse(await readFile(join(lockDir, 'owner.json'), 'utf8'))).toMatchObject({ token: ownerToken })
+    expect(existsSync(claimDir)).toBe(false)
+  })
+
+  it('cleans a selected Project Workspace lock only once when discovery also sees its launcher root', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-railway-workspace-lock-dedup-'))
+    temporaryPaths.push(root)
+    const project = join(root, 'project')
+    const launcher = join(project, 'workspaces')
+    const lockDir = join(launcher, 'state', 'runtime.lock')
+    const claimDir = join(lockDir, 'reclaiming')
+    const ownerToken = '66666666-6666-4666-8666-666666666666'
+    const claimToken = '77777777-7777-4777-8777-777777777777'
+    const baseOwner = {
+      schemaVersion: 1,
+      pid: 606,
+      hostname: 'published-container',
+      machineId: 'env:railway-service-service-test',
+      launcher: 'guardian-cli-server',
+      acquiredAt: new Date().toISOString(),
+      heartbeatAt: new Date().toISOString(),
+      fencingProtocol: 'railway-flock-v1',
+      fencingInstanceId: '11111111-1111-4111-8111-111111111111',
+    }
+    await mkdir(claimDir, { recursive: true })
+    await writeFile(join(lockDir, 'owner.json'), JSON.stringify({ ...baseOwner, token: ownerToken }))
+    await writeFile(join(claimDir, `owner.${claimToken}.json`), JSON.stringify({
+      ...baseOwner,
+      pid: 707,
+      token: claimToken,
+    }))
+
+    await expect(execFileAsync('python3', [
+      retainedLockPreflight,
+      root,
+      project,
+      launcher,
+      'env:railway-service-service-test',
+    ])).resolves.toMatchObject({ stderr: '' })
+    expect(JSON.parse(await readFile(join(lockDir, 'owner.json'), 'utf8'))).toMatchObject({ token: ownerToken })
+    expect(existsSync(claimDir)).toBe(false)
+  })
+
+  it.runIf(process.platform !== 'win32')('fails closed when quarantine is a symlink to a live legacy Project', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-railway-quarantine-symlink-'))
+    temporaryPaths.push(root)
+    const legacyProject = join(root, 'projects', 'legacy-live')
+    const selectedProject = join(root, 'projects', 'selected')
+    const lockDir = join(legacyProject, 'state', 'guardian.lock')
+    await mkdir(lockDir, { recursive: true })
+    await writeFile(join(lockDir, 'owner.json'), JSON.stringify({
+      schemaVersion: 1,
+      pid: 101,
+      hostname: 'legacy-live-container',
+      machineId: 'env:railway-service-service-test',
+      token: 'legacy-live-owner',
+      launcher: 'guardian-cli-server',
+      acquiredAt: new Date().toISOString(),
+      heartbeatAt: new Date().toISOString(),
+    }))
+    await symlink(join('projects', 'legacy-live'), join(root, 'quarantine'))
+
+    await expect(execFileAsync('python3', [
+      retainedLockPreflight,
+      root,
+      selectedProject,
+      join(selectedProject, 'workspaces'),
+      'env:railway-service-service-test',
+    ])).rejects.toMatchObject({
+      stderr: expect.stringMatching(/could not inspect the complete Volume.*quarantine path/s),
+    })
+    expect(existsSync(join(lockDir, 'owner.json'))).toBe(true)
+  })
+
+  it('fails closed on an unknown v2 claim entry before cleaning another retained lock', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-railway-claim-invalid-'))
+    temporaryPaths.push(root)
+    const project = join(root, 'project')
+    const launcher = join(project, 'workspaces')
+    const invalidLock = join(project, 'state', 'guardian.lock')
+    const recoverableLock = join(project, 'data', 'state', 'config-bootstrap.lock')
+    const recoverableClaim = join(recoverableLock, 'reclaiming')
+    const token = '88888888-8888-4888-8888-888888888888'
+    const owner = {
+      schemaVersion: 1,
+      pid: 808,
+      hostname: 'hard-killed-container',
+      machineId: 'env:railway-service-service-test',
+      token,
+      launcher: 'alice-config-bootstrap',
+      acquiredAt: new Date().toISOString(),
+      heartbeatAt: new Date().toISOString(),
+      fencingProtocol: 'railway-flock-v1',
+      fencingInstanceId: '11111111-1111-4111-8111-111111111111',
+    }
+    await mkdir(join(invalidLock, 'reclaiming'), { recursive: true })
+    await writeFile(join(invalidLock, 'reclaiming', 'unexpected'), 'do not remove')
+    await mkdir(recoverableClaim, { recursive: true })
+    await writeFile(join(recoverableClaim, `owner.${token}.json`), JSON.stringify(owner))
+
+    await expect(execFileAsync('python3', [
+      retainedLockPreflight,
+      root,
+      project,
+      launcher,
+      'env:railway-service-service-test',
+    ])).rejects.toMatchObject({
+      stderr: expect.stringContaining('state/guardian.lock'),
+    })
+    expect(existsSync(recoverableLock)).toBe(true)
+    expect(existsSync(join(recoverableClaim, `owner.${token}.json`))).toBe(true)
+  })
+
+  it('does not remove an initializing lock that publishes its owner during the grace window', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-railway-lock-race-'))
+    temporaryPaths.push(root)
+    const project = join(root, 'project')
+    const launcher = join(project, 'workspaces')
+    const lockDir = join(project, 'data', 'state', 'config-bootstrap.lock')
+    await mkdir(lockDir, { recursive: true })
+
+    const preflight = execFileAsync('python3', [
+      retainedLockPreflight,
+      root,
+      project,
+      launcher,
+      'env:railway-service-service-test',
+    ])
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    await writeFile(join(lockDir, 'owner.json'), JSON.stringify({
+      schemaVersion: 1,
+      pid: 101,
+      hostname: 'initializing-container',
+      machineId: 'env:railway-service-service-test',
+      token: 'initializing-owner',
+      launcher: 'alice-config-bootstrap',
+      acquiredAt: new Date().toISOString(),
+      heartbeatAt: new Date().toISOString(),
+      fencingProtocol: 'railway-flock-v1',
+    }))
+
+    await expect(preflight).rejects.toMatchObject({
+      stderr: expect.stringContaining('data/state/config-bootstrap.lock'),
+    })
+    expect(existsSync(join(lockDir, 'owner.json'))).toBe(true)
+  })
+
   it('discovers a nested legacy owner beyond another Project marker before an A-to-B cutover', async () => {
     const volume = await mkdtemp(join(tmpdir(), 'openalice-railway-volume-scan-'))
     temporaryPaths.push(volume)
@@ -353,7 +829,9 @@ describe('Railway native CLI host entrypoint', () => {
     expect(dockerfile).toContain('scripts/railway/command-wrapper.sh')
     expect(dockerfile).toContain('scripts/railway/preflight-retained-locks.py')
     expect(dockerfile).toContain('scripts/railway/shell-env.sh')
-    expect(await readFile(entrypoint, 'utf8')).toContain('/usr/bin/flock --exclusive --timeout "$wait_seconds" 9')
+    const entrypointSource = await readFile(entrypoint, 'utf8')
+    expect(entrypointSource).toContain('/usr/bin/flock --exclusive --timeout "$wait_seconds" 9')
+    expect(entrypointSource).toContain('export OPENALICE_RAILWAY_INSTANCE_ID')
     expect(dockerfile).toContain('ENTRYPOINT ["/usr/bin/tini", "-s", "-g", "--"')
   })
 
@@ -537,6 +1015,18 @@ exit 1
     await expect(readFile(fixture.runtimeCalled, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
+  it('rejects the old fence-only capability as a fallback for the v2 lock protocol', async () => {
+    const fixture = await makeFixture({
+      installer: 'failure',
+      existing: true,
+      existingRuntimeCapabilities: ['railway-flock-v1'],
+    })
+
+    await expect(execFileAsync('bash', [entrypoint], { env: fixture.env }))
+      .rejects.toMatchObject({ stderr: expect.stringContaining('no previously verified OpenAlice release') })
+    await expect(readFile(fixture.runtimeCalled, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
 })
 
 async function makeFixture(options: {
@@ -544,6 +1034,7 @@ async function makeFixture(options: {
   existing?: boolean
   existingChannel?: 'beta' | 'dev'
   existingFenceCapability?: boolean
+  existingRuntimeCapabilities?: string[]
 }) {
   const root = await mkdtemp(join(tmpdir(), 'openalice-railway-entrypoint-'))
   temporaryPaths.push(root)
@@ -562,6 +1053,7 @@ async function makeFixture(options: {
         ? { version: '0.91.0-dev.1', channel: 'dev' as const }
         : {}),
       ...(options.existingFenceCapability === false ? { runtimeCapabilities: [] } : {}),
+      ...(options.existingRuntimeCapabilities ? { runtimeCapabilities: options.existingRuntimeCapabilities } : {}),
     })
   }
   return {
@@ -657,7 +1149,7 @@ cat >"$OPENALICE_INSTALL_DIR/cli/current/bin/openalice" <<'LAUNCHER'
 #!/usr/bin/env bash
 if [[ "\${1:-}" == --version ]]; then printf '0.91.0-beta.1\\n'; exit 0; fi
 if [[ "\${1:-}" == version && "\${2:-}" == --json ]]; then
-  printf '{"version":"0.91.0-beta.1","installSource":{"schemaVersion":3,"repository":"TraderAlice/OpenAlice","cliVersion":"0.91.0-beta.1","selector":{"kind":"version","value":"v0.91.0-beta.1"},"installerUrl":"https://openalice.ai/install","updateChannel":"beta","method":"direct","artifact":{"platform":"linux","arch":"x64","sha256":"%s"},"installedAt":"2026-08-31T00:00:00.000Z"},"contentIdentity":"aaaaaaaaaaaaaaaa","managedRuntime":{"productVersion":"0.91.0-beta.1","platform":"linux","arch":"x64","path":"%s","contentIdentity":"aaaaaaaaaaaaaaaa"},"runtimeCapabilities":["railway-flock-v1"]}\\n' \\
+  printf '{"version":"0.91.0-beta.1","installSource":{"schemaVersion":3,"repository":"TraderAlice/OpenAlice","cliVersion":"0.91.0-beta.1","selector":{"kind":"version","value":"v0.91.0-beta.1"},"installerUrl":"https://openalice.ai/install","updateChannel":"beta","method":"direct","artifact":{"platform":"linux","arch":"x64","sha256":"%s"},"installedAt":"2026-08-31T00:00:00.000Z"},"contentIdentity":"aaaaaaaaaaaaaaaa","managedRuntime":{"productVersion":"0.91.0-beta.1","platform":"linux","arch":"x64","path":"%s","contentIdentity":"aaaaaaaaaaaaaaaa"},"runtimeCapabilities":["railway-flock-v1","railway-runtime-lock-v2"]}\\n' \\
     "$(printf '0%.0s' {1..64})" "$OPENALICE_INSTALL_DIR/cli/releases/0.91.0-beta.1-linux-x64-aaaaaaaaaaaaaaaa"
   exit 0
 fi
@@ -756,7 +1248,7 @@ function versionPayload(
       installedAt: profile.installedAt ?? '2026-08-31T00:00:00.000Z',
     },
     contentIdentity: identity,
-    runtimeCapabilities: profile.runtimeCapabilities ?? ['railway-flock-v1'],
+    runtimeCapabilities: profile.runtimeCapabilities ?? ['railway-flock-v1', 'railway-runtime-lock-v2'],
     managedRuntime: {
       productVersion: version,
       platform: 'linux',

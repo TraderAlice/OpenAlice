@@ -4,8 +4,9 @@ Status: Active — macOS/Linux native CLI is public in v0.90.2 and the separatel
 dispatched v0.91.0-beta.1 is externally verified; stable remains v0.90.2 while
 stable/beta discovery authority is converged on the OpenAlice CDN;
 the Railway native CLI SSH host passes local empty-Volume, normal replacement,
-hard-kill recovery, and real Project offline planning while hosted deploy/apply
-acceptance remains pending; native PowerShell and external
+hard-kill recovery, real retained-Volume transfer, and one hosted Agent turn;
+the v2 crash-safe lock repair still needs live restart/hard-kill reacceptance;
+native PowerShell and external
 package-manager activation remain deferred
 
 Delivery mode: Serial / interactive from current `dev`. The accepted native CLI
@@ -687,6 +688,14 @@ source-built Docker image.
   Linux installer and SSH-remote Docker smokes, Guardian recovery smoke, and a
   rebuilt Railway image with the required tools but no Node, Bun, or Agent
   Runtime.
+- [x] Replace recursive mutation-claim cleanup with a UUID generation marker
+  shared by publication, release, and stale reaping. Atomically retire only the
+  exact marker generation, recheck it before canonical mutation, distinguish
+  Railway replacements with a per-start instance id, require the
+  `railway-runtime-lock-v2` capability, and let the Volume-fenced preflight
+  recover only exact claim-only/published-owner intermediate shapes after a
+  blocker-free full scan. Unknown entries, duplicate claim markers/write temps,
+  and malformed or symlinked nodes remain fail-closed.
 - [ ] On a disposable Railway service and empty `/data` Volume, pass clean
   bootstrap and empty-host install-failure/fail-closed acceptance without using
   or clearing the retained real Volume.
@@ -695,21 +704,18 @@ source-built Docker image.
   Serverless disabled, Restart Policy set to Always, one replica, at least 30
   seconds of draining, fixed SSH `HOME=/data/home` plus persistent user `PATH`,
   an OpenSSH alias from `railway ssh config`, and a successful inspection-only
-  `openalice remote` browser/tunnel journey. A beta candidate has now booted
-  successfully against an isolated diagnostic Home on the retained Volume and
-  exposed no public domain. Its first attempt against the existing Project Home
-  reproduced the legacy-machine-identity handoff failure above. Prove the new
-  lifecycle fence on the diagnostic Home first; then, after showing the old
-  deployment is stopped, quarantine only the exact retained legacy lock
-  directories before selecting that original Home.
-- [ ] Repeat `openalice project transfer --plan` through the deployed Railway
+  `openalice remote` browser/tunnel journey. The no-domain service, fixed Home,
+  one-replica/Always policy, tunnel, and retained Project have been exercised;
+  final completion remains blocked on redeploying the v2 crash-safe lock repair
+  and repeating restart/hard-kill recovery without manual lock deletion.
+- [x] Repeat `openalice project transfer --plan` through the deployed Railway
   candidate so SSH compatibility, destination absence, and free-space
   preflight are proven before apply.
-- [ ] Apply the reviewed real AliceProject transfer into a new
+- [x] Apply the reviewed real AliceProject transfer into a new
   `/data/projects/<name>` Home, select that Home for the service, and verify its
   portable Workspace/configuration state after redeploy without copied install
   bytes or machine-local symlinks.
-- [ ] Install and authenticate one Agent Runtime through Railway SSH, then prove
+- [x] Install and authenticate one Agent Runtime through Railway SSH, then prove
   a real Workspace turn without treating those Agent bytes as an OpenAlice
   release artifact.
 - [ ] Restart and redeploy against the same Volume, verify install/Home/Agent
@@ -1219,3 +1225,27 @@ This plan is complete only when:
   full build, and the local native Bun release smoke pass. A fresh dev archive
   and Railway restart/redeploy acceptance remain required before Project
   transfer.
+- 2026-09-01: PR #1281 merged the immutable Workspace-log repair to `dev` at
+  `50f3d49f`, and run 33435309446 published the matching native archives. The
+  retained no-domain Railway service then installed that dev archive under the
+  persistent SSH Home, selected `/data/projects/main-cloud`, and received the
+  stopped local Default AliceProject through the production transfer path:
+  10,702 files and 222,635,304 bytes, with zero native Sessions copied. OpenCode
+  1.18.25 was installed separately under `/data/home`, and Workspace
+  `chat-solid-coral-ridge` completed a real headless turn with
+  `OPENALICE_REMOTE_OK`. A following service restart exposed two crash-recovery
+  defects not covered by the earlier container drill: recursive release could
+  strand an empty canonical directory, and reused Railway hostname/PID identity
+  could misclassify the prior container. The current v2 repair adds a fresh
+  per-start instance id, requires both Railway Runtime capabilities, and uses a
+  UUID generation marker for publication/release/reaping. Exact-marker atomic
+  retirement prevents an old recoverer from deleting a new claim; the
+  Volume-fenced preflight validates every Project before cleaning only known
+  claim-only, owner-write-temp, or published-owner intermediates. Claim-only
+  status is no longer reported as absent. Focused Runtime/CLI/entrypoint tests
+  pass 133 tests with four platform skips; root, Guardian, and CLI TypeScript,
+  diff checks, Guardian recovery, and the full 5,319-test suite with 13 skips
+  are green. Linux installer, native SSH-remote, and full Docker Runtime smokes
+  also pass on OrbStack. A new dev archive, live automatic recovery, persisted
+  resume, and restart/hard-kill acceptance remain pending; no stable/beta
+  release or channel promotion was performed.

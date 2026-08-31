@@ -44,6 +44,7 @@ printf 'FENCE_RELEASED\\n'
         RAILWAY_SERVICE_ID: 'fence-pty-test',
         RAILWAY_ENVIRONMENT_ID: 'fence-pty-environment',
         OPENALICE_RAILWAY_ENTRYPOINT_OWNER: '1',
+        OPENALICE_RAILWAY_INSTANCE_ID: '22222222-2222-4222-8222-222222222222',
         OPENALICE_TEST_NODE: process.execPath,
         OPENALICE_TEST_FIXTURE: fixture,
         NODE_OPTIONS: '--conditions=openalice-source',
