@@ -1818,6 +1818,8 @@ export const zh: Resources = {
     shiftLabel: '本班',
     shiftDutyPending: '本班第 {{position}}/{{total}} 项：{{name}}，剩余约 {{minutes}} 分钟',
     shiftTimeRemaining: '约 {{minutes}} 分钟',
+    shiftDeferredNext: '已将“{{deferred}}”排到本班稍后。下一项是“{{next}}”，进度仍为 {{position}}/{{total}}。',
+    shiftDeferredOnly: '本班只剩“{{name}}”这一项。已返回楼层，它仍是当前功课。',
     shiftQuiet: '本班暂无到期功课',
     shiftComplete: '本班完成',
     shiftCarryover: '本班已复核 · {{count}} 项仍待处理',

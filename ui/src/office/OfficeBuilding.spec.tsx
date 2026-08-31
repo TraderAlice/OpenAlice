@@ -47,6 +47,37 @@ function agentDuty(input: {
   }
 }
 
+function cadenceDuty(id = 'weekly-review'): OfficeDutyCandidate {
+  return {
+    id: `scheduled-issue-health:chat-1:${id}`,
+    registrationId: 'scheduled-issue-health',
+    kind: 'cadence',
+    count: 1,
+    destination: {
+      kind: 'issue',
+      workspaceId: 'chat-1',
+      issueId: id,
+      targetId: 'operations',
+    },
+    receipt: {
+      kind: 'evidence',
+      subjectKey: `chat-1:${id}`,
+      fingerprint: `evidence-${id}`,
+      scope: 'session',
+    },
+    cadence: {
+      workspaceId: 'chat-1',
+      workspaceTag: 'chat',
+      issueId: id,
+      title: 'Review the weekly cadence',
+      priority: 'high',
+      assignee: '@new-each-run',
+      when: { kind: 'every', every: '1w' },
+      health: { state: 'blocked', message: 'Owner is unavailable.' },
+    },
+  }
+}
+
 function activeShift(input: {
   total?: number
   completed?: number
@@ -2142,6 +2173,9 @@ describe('OfficeBuilding', () => {
     expect(activeDuty.textContent).toContain('This shift')
     expect(activeDuty.textContent).toContain('≈ 9 min')
     expect(activeDuty.textContent).toContain('2/4')
+    const beacon = screen.getByTestId('office-duty-target-beacon')
+    expect(beacon.classList.contains('oa-office-duty-target-beacon')).toBe(true)
+    expect(beacon.dataset.kind).toBe('inbox-service')
     expect(screen.getByRole('button', { name: 'Inbox station · 8 pending' }))
       .toBeTruthy()
 
@@ -2204,6 +2238,74 @@ describe('OfficeBuilding', () => {
       />,
     )
     expect(screen.getByText('Shift clear')).toBeTruthy()
+    expect(screen.queryByTestId('office-duty-target-beacon')).toBeNull()
+  })
+
+  it('opens ambient Inbox instead of a later duty while cadence leads the shift', async () => {
+    const [inboxDuty] = inboxUnreadDutyRegistration(
+      [{
+        title: 'Weekly evidence packet',
+        entry: {
+          id: 'inbox-later',
+          ts: 1_100,
+          workspaceId: 'chat-1',
+          workspaceLabel: 'Semis desk',
+          docs: [{ path: 'reports/weekly.md', revision: 'rev-weekly' }],
+        },
+      }],
+      'ready',
+    ).candidates
+    const onOpenDuty = vi.fn()
+    const onOpenService = vi.fn()
+
+    render(
+      <OfficeBuilding
+        building={{
+          config: {
+            workspaceSleepAfterMs: 1,
+            harnessMinimumVisibleGroups: { chat: 0, 'auto-quant': 0, prediction: 0, other: 0 },
+          },
+          lastSeq: 12,
+          firstSeq: 1,
+          offices: [],
+        }}
+        productActivity={{
+          agent: null,
+          inbox: {
+            seq: 12,
+            occurredAt: 1_200,
+            detail: 'A newer delivery arrived',
+            source: 'codex',
+          },
+          news: null,
+          attention: { agent: false, inbox: true, news: false },
+          pending: { agent: 0, inbox: 1, news: 0 },
+          freshKind: null,
+        }}
+        dutyCandidates={[cadenceDuty(), inboxDuty!]}
+        dutyShift={activeShift({ total: 2, remainingMinutes: 6 })}
+        inboxBacklogCount={1}
+        initialPlayerState={{ position: { x: 340, y: 600 }, direction: 'up' }}
+        onSelectEmployee={vi.fn()}
+        onOpenEmployee={vi.fn()}
+        onOpenWorkspace={vi.fn()}
+        onOpenFiles={vi.fn()}
+        onOpenRoster={vi.fn()}
+        onOpenLog={vi.fn()}
+        onOpenDuty={onOpenDuty}
+        onOpenService={onOpenService}
+      />,
+    )
+
+    expect(screen.getByTestId('office-duty-target-beacon').dataset.kind).toBe('operations')
+    const inboxPrompt = screen.getByRole('status', {
+      name: 'Open Inbox · codex · A newer delivery arrived',
+    })
+    expect(inboxPrompt.textContent).not.toContain('Weekly evidence packet')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Inbox station · 1 pending' }))
+    await waitFor(() => expect(onOpenService).toHaveBeenCalledWith('inbox', 12))
+    expect(onOpenDuty).not.toHaveBeenCalled()
   })
 
   it('keeps Inbox, News, and Agent journals ambient while the full Inbox backlog stays visible', async () => {

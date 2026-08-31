@@ -45,6 +45,7 @@ import {
 } from '../office/useOfficeProductActivity'
 import type {
   OfficeCadenceDutyCandidate,
+  OfficeDutyCandidate,
   OfficeInboxDutyCandidate,
   OfficeDutyTargetId,
   OfficeResolvedDuty,
@@ -133,6 +134,10 @@ export function OfficePage() {
     reviewed: string
     dutyKey: string
     announcement: string | null
+  } | null>(null)
+  const [dutyHandoffAnnouncement, setDutyHandoffAnnouncement] = useState<{
+    token: number
+    text: string
   } | null>(null)
   const retryFloor = async () => {
     setRetryingFloor(true)
@@ -350,33 +355,63 @@ export function OfficePage() {
     }
   }
 
-  const closeCadenceDuty = () => {
+  const closeCadenceDuty = (returnFocus: 'target' | 'floor' = 'target') => {
     clearOfficeCadenceExcursion()
     cadenceExcursionRef.current = null
     setCadenceDuty(null)
     setCadenceInitialStep('exception')
     requestAnimationFrame(() => {
-      document.getElementById('office-operations-board')?.focus()
+      if (returnFocus === 'target') document.getElementById('office-operations-board')?.focus()
+      else document.querySelector<HTMLElement>('[data-testid="office-floor"]')?.focus()
     })
   }
 
-  const closeInboxDuty = () => {
+  const closeInboxDuty = (returnFocus: 'target' | 'floor' = 'target') => {
     clearOfficeInboxDutyExcursion()
     inboxExcursionRef.current = null
     setInboxDuty(null)
     requestAnimationFrame(() => {
-      document.getElementById('office-inbox-service')?.focus()
+      if (returnFocus === 'target') document.getElementById('office-inbox-service')?.focus()
+      else document.querySelector<HTMLElement>('[data-testid="office-floor"]')?.focus()
     })
   }
 
+  const dutyName = (duty: OfficeDutyCandidate): string => {
+    if (duty.kind === 'cadence') return duty.cadence.title
+    if (duty.kind === 'inbox') return duty.delivery.title
+    return t('office.logChannelAgent')
+  }
+
+  const announceDutyHandoff = (duty: OfficeDutyCandidate) => {
+    const next = officeShift.candidates[1]
+    const text = next
+      ? t('office.shiftDeferredNext', {
+          deferred: dutyName(duty),
+          next: dutyName(next),
+          position: officeShift.position ?? 1,
+          total: officeShift.total,
+        })
+      : t('office.shiftDeferredOnly', { name: dutyName(duty) })
+    setDutyHandoffAnnouncement((current) => ({
+      token: (current?.token ?? 0) + 1,
+      text,
+    }))
+  }
+
   const deferInboxDuty = () => {
-    if (inboxDuty) officeShift.defer(inboxDuty)
-    closeInboxDuty()
+    if (inboxDuty) {
+      announceDutyHandoff(inboxDuty)
+      officeShift.defer(inboxDuty)
+    }
+    closeInboxDuty('floor')
   }
 
   const deferCadenceDuty = () => {
-    if (cadenceDuty) officeShift.defer(cadenceDuty)
-    closeCadenceDuty()
+    if (cadenceDuty) {
+      announceDutyHandoff(cadenceDuty)
+      officeShift.defer(cadenceDuty)
+    }
+    closeCadenceDuty('floor')
   }
 
   const finishInboxDuty = (duty: OfficeInboxDutyCandidate) => {
@@ -613,6 +648,16 @@ export function OfficePage() {
           {dutyAcknowledgement.announcement}
         </p>
       )}
+      {dutyHandoffAnnouncement && (
+        <p
+          key={dutyHandoffAnnouncement.token}
+          className="sr-only"
+          role="status"
+          aria-live="polite"
+        >
+          {dutyHandoffAnnouncement.text}
+        </p>
+      )}
       {!building && (
         <OfficeConnectionScreen
           error={error}
@@ -687,7 +732,7 @@ export function OfficePage() {
                   setLogView(null)
                 }}
                 onOpenLog={(origin) => {
-                  const registeredDuty = officeShift.candidates.find((candidate) => candidate.kind === 'cadence')
+                  const registeredDuty = officeShift.candidates[0]
                   if (asOfSeq == null && origin === 'operations' && registeredDuty?.kind === 'cadence') {
                     openRegisteredDuty({ ...registeredDuty, targetId: 'operations' })
                     return

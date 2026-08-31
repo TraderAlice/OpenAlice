@@ -865,7 +865,7 @@ describe('OfficePage localization', () => {
       .toContain('weekly-review')
   })
 
-  it('keeps a deferred cadence duty reachable from Operations while Inbox leads the shift', async () => {
+  it('hands a deferred cadence duty to Inbox without letting Operations bypass the shift lead', async () => {
     issuesMock.mockReturnValue(cadenceIssues(blockedCadenceHealth))
     inboxDutiesMock.mockReturnValue({
       status: 'ready',
@@ -883,8 +883,22 @@ describe('OfficePage localization', () => {
     expect(screen.getByRole('button', {
       name: /本班第 1\/2 项：.*NVDA weekly evidence brief/,
     })).toBeTruthy()
+    const operationsPrompt = document.querySelector<HTMLElement>(
+      '.oa-office-interaction-prompt[data-kind="operations"]',
+    )
+    expect(operationsPrompt?.textContent ?? '').not.toContain('检查周报排期')
+    expect(screen.getByTestId('office-duty-target-beacon').dataset.kind).toBe('inbox-service')
+    expect(screen.getByText(
+      '已将“检查周报排期”排到本班稍后。下一项是“NVDA weekly evidence brief”，进度仍为 1/2。',
+    )).toBeTruthy()
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('office-floor')))
+
     await userEvent.click(screen.getByRole('button', { name: '行动看板 · 待处理 1 条' }))
-    expect(await screen.findByRole('dialog', { name: '检查周报排期' })).toBeTruthy()
+    expect(await screen.findByRole('dialog', { name: '活动日志' })).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: '检查周报排期' })).toBeNull()
+    const runtime = screen.getByTestId('office-runtime-section')
+    expect(runtime.dataset.channel).toBe('overview')
+    expect(runtime.dataset.dutyKind).toBeUndefined()
     expect(markInboxReadMock).not.toHaveBeenCalled()
   })
 

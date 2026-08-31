@@ -6028,9 +6028,10 @@ Scheduled cadence-duty first increment (2026-09-01):
   resolves it says no stamp is needed; if the source fails it keeps the evidence readable but disables confirmation.
   A full-Issue excursion stores the captured candidate, then restores Step 2 against the live candidate on return, so
   A→B, A→healthy, and stale-source transitions cannot silently skip the receipt boundary.
-- Operations board, nearby prompt, and the HUD queue head all open the same cadence dossier in Live mode. Map landmarks
-  remain freely explorable out of order; this priority system guides attention rather than locking the rest of Office.
-  Replay continues to own its historical log and never opens a live cadence duty.
+- Operations board, nearby prompt, and the HUD queue head open the same cadence dossier only while cadence is the
+  current shift head. Other landmarks remain freely explorable through their ordinary log/service surfaces, but a
+  later duty cannot expose a receipt that skips the guided order. Replay continues to own its historical log and never
+  opens a live cadence duty.
 - The game window has a persistent simple close control, stable accessible dialog name/description, heading-first focus,
   trapped Tab order, two-stage Escape behavior, 44px actions, a collapsible long Issue brief, single-column phone facts,
   and a short-landscape layout whose inner panel owns scrolling. Receipt copy states clearly that Office acknowledgement
@@ -6115,6 +6116,33 @@ Frozen diligence-shift follow-up (2026-09-01):
   44px actions. A fresh-tab reload produced no console errors.
 - Focused Office verification passed 14 files / 230 tests. Root and UI TypeScript passed; the complete suite passed
   651 files / 5,615 tests (one file and nine tests skipped); the production UI build passed with only the existing
+  local-ports fallback and large-chunk advisory.
+
+Shift-handoff world coherence follow-up (2026-09-01):
+
+- Replayed the real Default AliceProject through `cadence → Later → Inbox` and found a direct guidance contradiction:
+  the HUD moved to Inbox while Alice remained beside Operations with the old exact cadence `Review / Enter` prompt.
+  The queue truth had changed, but the world still instructed the player to do the former task; on a 390px viewport
+  that stale prompt also occupied most of the top of the map.
+- Compared merely clearing the old prompt, automatically walking Alice to the new target, and making every shift-head
+  change an explicit world handoff. Chose the world handoff: the first option fixes the bug but leaves the next action
+  spatially invisible, while forced movement removes player agency. The chosen model clears the former anchor/route,
+  returns focus to the floor, and gives the new landmark a short stepped cue without moving Alice.
+- Split ambient landmark signal from receipt authority. Inbox keeps its full durable backlog and Operations keeps a
+  cadence/Agent attention badge, but only the current shift head may open an exact duty dossier. Clicking a non-head
+  landmark still opens ordinary Inbox or Activity Log exploration and can never stamp a later slot from `1/2` directly
+  to `2/2`. Nearby copy follows the same rule, so a later duty title never masquerades as the current instruction.
+- Added an `aria-live` handoff sentence that names the deferred and next duties while explicitly retaining `n/N`.
+  The generated route-destination diamond is reused as a 24px current-duty beacon with a finite 660ms stepped entrance,
+  a cream pixel outline for Day/Night legibility, and a static reduced-motion fallback. Auto-route temporarily replaces
+  the beacon with its existing trail and destination marker; arrival or a modal removes duplicate cues.
+- Real browser acceptance covered the Default AliceProject at 1280×720 and 390×844. Later changed BOJ cadence to the
+  exact seven-day-old Inbox delivery, removed the old cadence prompt, focused the map, and moved the cue to the Inbox
+  terminal while progress stayed `1/4`. Operations opened generic Activity Log rather than the deferred dossier; the
+  new HUD route opened the exact Inbox row and restored its matching receipt on return. Close left all seven rows unread.
+  The narrow page measured 390px client/scroll width with no horizontal overflow, and the browser recorded no warnings
+  or errors. Focused Office tests passed 4 files / 97 tests; root and UI TypeScript passed; the complete suite passed
+  652 files / 5,618 tests (one file and nine tests skipped); the production UI build passed with only the existing
   local-ports fallback and large-chunk advisory.
 
 ## Completion

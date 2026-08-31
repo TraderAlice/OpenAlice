@@ -1819,6 +1819,8 @@ export const ja: Resources = {
     shiftLabel: '今回の当番',
     shiftDutyPending: '今回の {{position}}/{{total}} 件目: {{name}}、残り約 {{minutes}} 分',
     shiftTimeRemaining: '約 {{minutes}} 分',
+    shiftDeferredNext: '{{deferred}} を今回の当番の後ろへ回しました。次は {{next}}。進捗は {{position}}/{{total}} のままです。',
+    shiftDeferredOnly: '残っている当番は {{name}} だけです。フロアへ戻りましたが、現在の課題のままです。',
     shiftQuiet: '今回の当番に期限の来た課題はありません',
     shiftComplete: '今回の当番は完了',
     shiftCarryover: '確認済み · 未解決 {{count}} 件',

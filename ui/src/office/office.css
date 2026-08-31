@@ -5207,7 +5207,8 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
   opacity: 0.86;
 }
 
-.oa-office-route-target-pointer {
+.oa-office-route-target-pointer,
+.oa-office-duty-target-beacon {
   position: absolute;
   width: 20px;
   height: 20px;
@@ -5217,7 +5218,8 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
   filter: drop-shadow(0 2px 0 color-mix(in srgb, var(--gba-ink) 22%, transparent));
 }
 
-.oa-office-route-target-pointer img {
+.oa-office-route-target-pointer img,
+.oa-office-duty-target-beacon img {
   display: block;
   width: 100%;
   height: 100%;
@@ -5226,6 +5228,36 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
 
 .oa-office-route-target-pointer[data-reduced-motion="true"] {
   animation: none;
+}
+
+.oa-office-duty-target-beacon {
+  width: 24px;
+  height: 24px;
+  opacity: 0.96;
+  filter:
+    drop-shadow(1px 0 0 var(--gba-paper))
+    drop-shadow(-1px 0 0 var(--gba-paper))
+    drop-shadow(0 1px 0 var(--gba-paper))
+    drop-shadow(0 -1px 0 var(--gba-paper))
+    drop-shadow(0 2px 0 color-mix(in srgb, var(--gba-ink) 28%, transparent));
+  animation: oa-office-duty-target-beacon 220ms steps(2, end) 3;
+}
+
+.oa-office-duty-target-beacon img {
+  filter: brightness(1.2) saturate(1.1);
+}
+
+.oa-office-duty-target-beacon[data-reduced-motion="true"] {
+  animation: none;
+}
+
+@keyframes oa-office-duty-target-beacon {
+  0%, 100% {
+    transform: translate(-50%, -50%);
+  }
+  50% {
+    transform: translate(-50%, calc(-50% - 4px));
+  }
 }
 
 .oa-office-replay-beacon {

@@ -1851,6 +1851,8 @@ export const en = {
     shiftLabel: 'This shift',
     shiftDutyPending: 'Shift duty {{position}}/{{total}}: {{name}}, about {{minutes}} minutes remaining',
     shiftTimeRemaining: '≈ {{minutes}} min',
+    shiftDeferredNext: 'Moved {{deferred}} to later in this shift. Next: {{next}}. Still duty {{position}}/{{total}}.',
+    shiftDeferredOnly: '{{name}} is the only remaining duty. Returned to the floor; it remains current.',
     shiftQuiet: 'No duties are due this shift',
     shiftComplete: 'Shift complete',
     shiftCarryover: 'Shift reviewed · {{count}} still unresolved',

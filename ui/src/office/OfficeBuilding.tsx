@@ -30,6 +30,7 @@ import {
   officeCollisionImpactPosition,
   type OfficeCollisionImpactState,
 } from './OfficeCollisionImpact'
+import { OfficeDutyTargetBeacon } from './OfficeDutyTargetBeacon'
 import { OfficeMapPod } from './OfficeMapPod'
 import { OfficeRouteTrail } from './OfficeRouteTrail'
 import { OfficeRouteTargetPointer } from './OfficeRouteTargetPointer'
@@ -255,6 +256,7 @@ export function OfficeBuilding({
   const pendingAcknowledgementRef = useRef<OfficeAcknowledgementTarget | null>(null)
   const acknowledgementTimerRef = useRef<number | null>(null)
   const lastDutyAcknowledgementTokenRef = useRef(dutyAcknowledgement?.token ?? 0)
+  const previousNextDutyIdRef = useRef<string | null | undefined>(undefined)
   const [routeTargetId, setRouteTargetId] = useState<string | null>(null)
   const [routeTrail, setRouteTrail] = useState<readonly OfficeInteractionPathStep[]>([])
   const [departingWorkspace, setDepartingWorkspace] = useState<{
@@ -480,9 +482,10 @@ export function OfficeBuilding({
       ? 'active'
       : currentDutyStatus === 'ready' ? 'quiet'
         : currentDutyStatus === 'loading' ? 'planning' : 'degraded')
-  const nextDuty = replaySeq == null && currentDutyCandidates[0]
+  const currentDutyCandidate = currentDutyCandidates[0] ?? null
+  const nextDuty = replaySeq == null && currentDutyCandidate
     ? resolveOfficeDutyTarget(
-        currentDutyCandidates[0],
+        currentDutyCandidate,
         (targetId) => interactionTargetById.has(targetId),
       )
     : null
@@ -513,16 +516,24 @@ export function OfficeBuilding({
         ? nextDuty.delivery.entry.workspaceLabel ?? nextDuty.delivery.entry.workspaceId
         : nextDuty.landmark.source
     : null
-  const inboxBacklogDutyCandidate = currentDutyCandidates.find((duty) => duty.kind === 'inbox')
-  const inboxBacklogDuty = inboxBacklogDutyCandidate?.kind === 'inbox'
-    ? resolveOfficeDutyTarget(inboxBacklogDutyCandidate)
+  const currentInboxDutyCandidate = currentDutyCandidate?.kind === 'inbox'
+    ? currentDutyCandidate
     : null
-  const cadenceDutyCandidate = currentDutyCandidates.find((duty) => duty.kind === 'cadence')
-  const operationsCadenceDuty = cadenceDutyCandidate?.kind === 'cadence'
-    ? resolveOfficeDutyTarget(cadenceDutyCandidate)
+  const currentInboxDuty = currentInboxDutyCandidate
+    ? resolveOfficeDutyTarget(currentInboxDutyCandidate)
     : null
-  const operationsNeedsAttention = productActivity.attention.agent || Boolean(operationsCadenceDuty)
-  const operationsPending = operationsCadenceDuty?.count ?? productActivity.pending.agent
+  const currentCadenceDutyCandidate = currentDutyCandidate?.kind === 'cadence'
+    ? currentDutyCandidate
+    : null
+  const currentOperationsCadenceDuty = currentCadenceDutyCandidate
+    ? resolveOfficeDutyTarget(currentCadenceDutyCandidate)
+    : null
+  const queuedCadenceDutyCandidate = currentDutyCandidates.find((duty) => duty.kind === 'cadence')
+  const queuedOperationsCadenceDuty = queuedCadenceDutyCandidate?.kind === 'cadence'
+    ? resolveOfficeDutyTarget(queuedCadenceDutyCandidate)
+    : null
+  const operationsNeedsAttention = productActivity.attention.agent || Boolean(queuedOperationsCadenceDuty)
+  const operationsPending = queuedOperationsCadenceDuty?.count ?? productActivity.pending.agent
   const routeStatusEdge = officeRouteStatusEdge(alice, camera, viewportSize, mapLayout.height)
   const operationsBoard = useMemo(
     () => officeOperationsBoardPosition(mapLayout.width),
@@ -854,12 +865,12 @@ export function OfficeBuilding({
         icon: OFFICE_FURNITURE.generated.inboxTerminal,
         action: t('office.interactActionInbox'),
         label: t('office.interactInbox'),
-        detail: inboxBacklogDutyCandidate?.delivery.title
+        detail: currentInboxDutyCandidate?.delivery.title
           ?? productActivity.inbox?.detail
           ?? productActivity.inbox?.source
           ?? null,
-        source: inboxBacklogDutyCandidate?.delivery.entry.workspaceLabel
-          ?? inboxBacklogDutyCandidate?.delivery.entry.workspaceId
+        source: currentInboxDutyCandidate?.delivery.entry.workspaceLabel
+          ?? currentInboxDutyCandidate?.delivery.entry.workspaceId
           ?? productActivity.inbox?.source,
       }
     }
@@ -872,13 +883,13 @@ export function OfficeBuilding({
         source: productActivity.news?.source,
       }
     }
-    if (operationsCadenceDuty) {
+    if (currentOperationsCadenceDuty) {
       return {
         icon: OFFICE_HUD_ASSETS.occupancyLog,
         action: t('office.interactActionOperations'),
         label: t('office.cadenceReview'),
-        detail: cadenceDutyCandidate?.cadence.title ?? null,
-        source: cadenceDutyCandidate?.cadence.workspaceTag,
+        detail: currentCadenceDutyCandidate?.cadence.title ?? null,
+        source: currentCadenceDutyCandidate?.cadence.workspaceTag,
       }
     }
     const agentDetail = (() => {
@@ -1019,7 +1030,7 @@ export function OfficeBuilding({
     } else if (target.kind === 'floor-terminal') {
       onOpenLog('floor-terminal')
     } else if (target.kind === 'inbox-service') {
-      if (inboxBacklogDuty && onOpenDuty) onOpenDuty(inboxBacklogDuty)
+      if (currentInboxDuty && onOpenDuty) onOpenDuty(currentInboxDuty)
       else onOpenService?.('inbox', productActivity.inbox?.seq)
     } else if (target.kind === 'news-service') {
       onOpenService?.('news', productActivity.news?.seq)
@@ -1178,6 +1189,19 @@ export function OfficeBuilding({
     }
     advance()
   }
+  useLayoutEffect(() => {
+    const nextDutyId = nextDuty?.id ?? null
+    const previousDutyId = previousNextDutyIdRef.current
+    previousNextDutyIdRef.current = nextDutyId
+    if (previousDutyId === undefined || previousDutyId === nextDutyId) return
+
+    // A shift handoff changes the world objective in the same frame as the HUD.
+    // Never leave the former landmark anchored or keep walking toward stale work.
+    cancelAutoWalk()
+    setInteractionAnchorTargetId(null)
+  // The route canceler intentionally follows the finite duty identity, not each render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nextDuty?.id])
   useEffect(() => {
     if (floorInteractionSuspended) pauseAutoWalk()
     else resumeAutoWalk()
@@ -2135,7 +2159,7 @@ export function OfficeBuilding({
               tabIndex={-1}
               className="oa-office-operations-board"
               data-live={(replaySeq == null ? stats.working : stats.active) > 0}
-              data-has-activity={Boolean(productActivity.agent) || Boolean(operationsCadenceDuty) || undefined}
+              data-has-activity={Boolean(productActivity.agent) || Boolean(queuedOperationsCadenceDuty) || undefined}
               data-attention={operationsNeedsAttention || undefined}
               data-fresh={productActivity.freshKind === 'agent' || undefined}
               data-nearby={nearbyTarget?.kind === 'operations'}
@@ -2187,6 +2211,19 @@ export function OfficeBuilding({
               }}
             />
             <OfficeRouteTrail steps={routeTrail} />
+            {!routeTarget
+              && nextDuty
+              && nextDutyTarget
+              && !floorInteractionSuspended
+              && acknowledgedTargetId !== nextDuty.targetId
+              && nearbyTarget?.id !== nextDutyTarget.id && (
+              <OfficeDutyTargetBeacon
+                key={nextDuty.id}
+                target={nextDutyTarget}
+                reducedMotion={reducedMotion}
+                zIndex={officeDepthAt(nextDutyTarget.y) + 1180}
+              />
+            )}
             {routeTarget && (
               <OfficeRouteTargetPointer
                 target={routeTarget}
