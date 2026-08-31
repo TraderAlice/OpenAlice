@@ -5336,6 +5336,29 @@ Update-banner notification safe-area follow-up (2026-08-31):
   and UI TypeScript passed; the full suite passed all 620 test files and 5,203 tests (one file and nine tests skipped);
   the production UI build passed with only the existing ports fallback and large-chunk advisory.
 
+Non-disruptive live-journal follow-up (2026-08-31):
+
+- Played the real News terminal while fresh RSS activity arrived. The terminal correctly remembered its new-activity
+  signal and reopened on latest News #5626, but three newer records that arrived while the Activity Log was already
+  open left selection and detail on the previous head. Top Sonner intentionally stays behind Office windows, the
+  capped `50+` tab count did not change, and a player following the live head therefore had almost no visible response
+  to current background work.
+- Compared always jumping to the newest record, adding another permanent `NEW` ornament, and following only while the
+  player remains on the previous head. Always jumping interrupts historical reading; another flashing badge adds
+  chrome without resolving the stale detail. Chose conditional live-tail semantics: a newly loaded head replaces the
+  selection only when the selected record was the prior head. Any deliberate move to an older record pins that reading
+  position.
+- The Activity Log now consumes the shared product-activity refresh event as well as its existing four-second safety
+  poll. Conditional head following keeps index selection, detail, scroll reveal, roving tab stop, and keyboard focus on
+  one record; focus moves only when it previously belonged to the followed head. Channel switches, explicit replay
+  sequences, mobile detail mode, and manually selected older records retain their existing ownership.
+- Real-browser acceptance opened News on #5626, appended real product-activity News #5627, and observed head,
+  selection, detail, and focus advance together to #5627. After deliberately selecting older #5626, appending #5628
+  placed it at the top while selection, detail, and focus remained on #5626. The focused Activity Log suite passed all
+  23 tests, including direct refresh and selection-policy coverage; root and UI TypeScript passed; the full suite
+  passed all 620 test files and 5,205 tests (one file and nine tests skipped); the production UI build passed with only
+  the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

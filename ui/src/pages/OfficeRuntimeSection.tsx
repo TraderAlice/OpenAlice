@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next'
 import { api } from '../api'
 import type { AgentRuntimeEvent } from '../api/agentRuntimeLog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
+import { GLOBAL_ACTIVITY_REFRESH_EVENT } from '../hooks/useGlobalAgentActivity'
 import { formatRelativeTime } from '../lib/intl'
 import { useInboxSelection } from '../live/inbox-selection'
 import {
@@ -51,6 +52,32 @@ const OFFICE_LOG_CHANNEL_LABEL_KEYS = {
   inbox: 'office.logChannelInbox',
   news: 'office.logChannelNews',
 } as const satisfies Record<OfficeLogChannel, string>
+
+export function officeJournalSelectionAfterRefresh({
+  currentSeq,
+  initialSelectedSeq,
+  previousHeadSeq,
+  visibleSeqs,
+}: {
+  currentSeq: number | null
+  initialSelectedSeq: number | null
+  previousHeadSeq: number | null
+  visibleSeqs: readonly number[]
+}): number | null {
+  const nextHeadSeq = visibleSeqs[0] ?? null
+  if (nextHeadSeq == null) return null
+  if (currentSeq != null && visibleSeqs.includes(currentSeq)) {
+    return previousHeadSeq != null
+      && currentSeq === previousHeadSeq
+      && nextHeadSeq !== previousHeadSeq
+      ? nextHeadSeq
+      : currentSeq
+  }
+  if (initialSelectedSeq != null && visibleSeqs.includes(initialSelectedSeq)) {
+    return initialSelectedSeq
+  }
+  return nextHeadSeq
+}
 
 export function revealOfficeJournalRow(
   journal: HTMLOListElement,
@@ -338,6 +365,8 @@ export function OfficeRuntimeSection({
   const reportToggleFocusPendingRef = useRef(false)
   const journalInitialFocusPendingRef = useRef(true)
   const journalChannelFocusPendingRef = useRef(false)
+  const journalLiveFollowFocusPendingRef = useRef(false)
+  const previousHeadSeqByChannelRef = useRef<Partial<Record<OfficeLogChannel, number>>>({})
   const appliedReplaySeqRef = useRef<number | null>(null)
 
   const load = useCallback(async () => {
@@ -375,7 +404,12 @@ export function OfficeRuntimeSection({
   useEffect(() => {
     void load()
     const id = setInterval(() => void load(), 4000)
-    return () => clearInterval(id)
+    const refreshFromActivity = () => void load()
+    window.addEventListener(GLOBAL_ACTIVITY_REFRESH_EVENT, refreshFromActivity)
+    return () => {
+      clearInterval(id)
+      window.removeEventListener(GLOBAL_ACTIVITY_REFRESH_EVENT, refreshFromActivity)
+    }
   }, [load])
 
   const beatsByChannel = useMemo(() => {
@@ -408,18 +442,29 @@ export function OfficeRuntimeSection({
   const visibleBeats = beatsByChannel[channel]
 
   useEffect(() => {
-    if (visibleBeats.length === 0) {
-      setSelectedSeq(null)
-      return
-    }
-    setSelectedSeq((current) => {
-      if (visibleBeats.some((beat) => beat.event.seq === current)) return current
-      if (visibleBeats.some((beat) => beat.event.seq === initialSelectedSeq)) {
-        return initialSelectedSeq
-      }
-      return visibleBeats[0].event.seq
+    const visibleSeqs = visibleBeats.map((beat) => beat.event.seq)
+    const nextHeadSeq = visibleSeqs[0] ?? null
+    const previousHeadSeq = previousHeadSeqByChannelRef.current[channel] ?? null
+    if (nextHeadSeq == null) delete previousHeadSeqByChannelRef.current[channel]
+    else previousHeadSeqByChannelRef.current[channel] = nextHeadSeq
+    const nextSelectedSeq = officeJournalSelectionAfterRefresh({
+      currentSeq: selectedSeq,
+      initialSelectedSeq,
+      previousHeadSeq: replaySeq == null ? previousHeadSeq : null,
+      visibleSeqs,
     })
-  }, [initialSelectedSeq, visibleBeats])
+    if (
+      selectedSeq != null
+      && nextSelectedSeq === nextHeadSeq
+      && selectedSeq === previousHeadSeq
+      && nextSelectedSeq !== selectedSeq
+    ) {
+      const currentRow = journalIndexRef.current
+        ?.querySelector<HTMLButtonElement>(`button[data-seq="${selectedSeq}"]`)
+      journalLiveFollowFocusPendingRef.current = document.activeElement === currentRow
+    }
+    if (nextSelectedSeq !== selectedSeq) setSelectedSeq(nextSelectedSeq)
+  }, [channel, initialSelectedSeq, replaySeq, selectedSeq, visibleBeats])
 
   useEffect(() => {
     if (replaySeq == null) {
@@ -484,6 +529,11 @@ export function OfficeRuntimeSection({
       ?.querySelector<HTMLButtonElement>(`button[data-seq="${selectedSeq}"]`)
     if (journalIndexRef.current && selectedRow) {
       revealOfficeJournalRow(journalIndexRef.current, selectedRow)
+    }
+    if (journalLiveFollowFocusPendingRef.current && selectedRow) {
+      journalLiveFollowFocusPendingRef.current = false
+      selectedRow.focus({ preventScroll: true })
+      return
     }
     if (journalInitialFocusPendingRef.current && selectedRow) {
       journalInitialFocusPendingRef.current = false

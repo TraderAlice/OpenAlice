@@ -5,9 +5,14 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../i18n'
+import { GLOBAL_ACTIVITY_REFRESH_EVENT } from '../hooks/useGlobalAgentActivity'
 import { useInboxSelection } from '../live/inbox-selection'
 import { OFFICE_COWORKER_SPRITES } from '../office/coworker-sprites'
-import { OfficeRuntimeSection, revealOfficeJournalRow } from './OfficeRuntimeSection'
+import {
+  OfficeRuntimeSection,
+  officeJournalSelectionAfterRefresh,
+  revealOfficeJournalRow,
+} from './OfficeRuntimeSection'
 
 const query = vi.fn()
 const openOrFocus = vi.fn()
@@ -58,6 +63,67 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('OfficeRuntimeSection', () => {
+  it('follows a newly arrived head only while the previous head remains selected', () => {
+    expect(officeJournalSelectionAfterRefresh({
+      currentSeq: 12,
+      initialSelectedSeq: null,
+      previousHeadSeq: 12,
+      visibleSeqs: [15, 12, 9],
+    })).toBe(15)
+    expect(officeJournalSelectionAfterRefresh({
+      currentSeq: 9,
+      initialSelectedSeq: null,
+      previousHeadSeq: 12,
+      visibleSeqs: [15, 12, 9],
+    })).toBe(9)
+    expect(officeJournalSelectionAfterRefresh({
+      currentSeq: 12,
+      initialSelectedSeq: 12,
+      previousHeadSeq: null,
+      visibleSeqs: [15, 12, 9],
+    })).toBe(12)
+  })
+
+  it('live-follows new product activity without pulling a reader off an older record', async () => {
+    const now = Date.now()
+    const entries = [{
+      seq: 1,
+      ts: now - 2_000,
+      type: 'news.ingested',
+      payload: { newsItemId: 1, source: 'Wire', title: 'First headline' },
+    }]
+    mockJournal(entries)
+    render(<OfficeRuntimeSection initialChannel="news" />)
+
+    const first = await screen.findByRole('button', { name: /First headline.*#0001/i })
+    expect(first.getAttribute('aria-pressed')).toBe('true')
+    expect(document.activeElement).toBe(first)
+
+    entries.unshift({
+      seq: 2,
+      ts: now - 1_000,
+      type: 'news.ingested',
+      payload: { newsItemId: 2, source: 'Wire', title: 'Second headline' },
+    })
+    window.dispatchEvent(new Event(GLOBAL_ACTIVITY_REFRESH_EVENT))
+
+    const second = await screen.findByRole('button', { name: /Second headline.*#0002/i })
+    await waitFor(() => expect(second.getAttribute('aria-pressed')).toBe('true'))
+    expect(document.activeElement).toBe(second)
+
+    await userEvent.click(first)
+    entries.unshift({
+      seq: 3,
+      ts: now,
+      type: 'news.ingested',
+      payload: { newsItemId: 3, source: 'Wire', title: 'Third headline' },
+    })
+    window.dispatchEvent(new Event(GLOBAL_ACTIVITY_REFRESH_EVENT))
+
+    await screen.findByRole('button', { name: /Third headline.*#0003/i })
+    await waitFor(() => expect(first.getAttribute('aria-pressed')).toBe('true'))
+  })
+
   it('reveals a selected record by scrolling only the journal index', () => {
     const journal = document.createElement('ol')
     const row = document.createElement('button')
