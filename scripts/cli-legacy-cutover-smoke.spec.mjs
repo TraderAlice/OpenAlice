@@ -21,11 +21,12 @@ describe('legacy CLI cutover smoke', () => {
     expect(source).toContain('fixture.assertRequests()')
     for (const pathname of [
       "'/manifest.json'",
-      "'/releases/latest'",
       'installerPath,',
       'archivePath,',
       '`${archivePath}.sha256`',
     ]) expect(source).toContain(pathname)
+    expect(source).toContain('OPENALICE_STABLE_MANIFEST_URL')
+    expect(source).not.toContain("pathname === '/releases/latest'")
   })
 
   it('defaults to the published v0.90.1 installer', () => {

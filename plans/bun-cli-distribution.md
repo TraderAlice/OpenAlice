@@ -2,6 +2,7 @@
 
 Status: Active — macOS/Linux native CLI is public in v0.90.2 and the separately
 dispatched v0.91.0-beta.1 is externally verified; stable remains v0.90.2 while
+stable/beta discovery authority is converged on the OpenAlice CDN;
 native PowerShell and external package-manager activation remain deferred
 
 Delivery mode: Serial / interactive from current `dev`. The accepted native CLI
@@ -563,6 +564,31 @@ artifacts.
 - [x] Leave later fixes on `dev`. A `beta.2` checkpoint is optional; stable is
   a separate later decision after beta testing and maintainer acceptance.
 
+### 11. Converge channel discovery authority
+
+The release workflow already publishes same-schema stable and beta manifests
+to the OpenAlice CDN. Those manifests are the mutable channel pointers;
+versioned GitHub Releases remain the immutable artifact and release-notes host.
+Runtime discovery must not depend on GitHub's anonymous API quota.
+
+- [x] Select the stable and beta CDN manifests as the single discovery
+  authority shared by fresh installation, CLI updates, and Settings checks.
+- [x] Make the Bash installer resolve stable from `manifest.json` and beta from
+  `beta/manifest.json`, with strict channel/version validation and no GitHub
+  Releases API lookup.
+- [x] Make `GET /api/version` and its explicit refresh select and validate the
+  manifest matching the installed product channel while retaining per-channel
+  success and failure caches.
+- [x] Keep the v0.90.1 installer bridge only for an explicit 0.90.1 selector or
+  a stable manifest that explicitly advertises 0.90.1; default stable discovery
+  no longer uses that bridge now that stable has a native CLI release.
+- [x] Remove the unused desktop GitHub API checker, require explicit channel
+  identity in the CLI updater, and make the release gate reject a shared
+  installer that falls back to legacy stable behavior.
+- [x] Update the legacy-cutover fixture and owner guides, then verify fixture
+  tests, the public stable install plan, clean Linux installer acceptance, and
+  the real Settings route without GitHub API access.
+
 ## Verification Matrix
 
 Every code increment runs:
@@ -956,3 +982,15 @@ This plan is complete only when:
   stable manifest, feeds, aliases, and default installer route remained
   unchanged at `v0.90.2`; npm, Homebrew Tap, and AUR publication stayed
   disabled. No stable release was produced or queued.
+- 2026-08-31: Converged stable and beta discovery on the existing OpenAlice CDN
+  manifests. The Bash bootstrap, native CLI updater, Web Settings route, and
+  release acceptance now require explicit matching channel/version metadata;
+  GitHub remains the immutable archive and release-notes host rather than the
+  anonymous discovery API. The explicit v0.90.1 bridge remains bounded, while
+  an unused desktop GitHub checker and the beta-release legacy-default
+  tolerance were removed. Local acceptance passed root and UI/Desktop type
+  checks, 359 CLI tests, 5,189 root tests, the non-root OrbStack Linux installer
+  smoke, a public stable plan resolving v0.90.2 despite a deliberately dead old
+  GitHub API seam, and the real Settings card plus forced refresh. A direct
+  public beta manifest read resolved v0.91.0-beta.1. No release or channel
+  promotion was performed.

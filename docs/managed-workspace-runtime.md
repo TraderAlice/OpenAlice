@@ -481,10 +481,11 @@ and warns before writing it.
 
 **Settings → General → About OpenAlice** is the user-facing source for the
 running version and update state on every distribution surface. The passive
-read uses `GET /api/version`, whose GitHub release lookup is cached. An
-explicit **Check for updates** uses the authenticated
-`POST /api/version/check` route to bypass that cache without exposing a public
-rate-limit bypass.
+read uses `GET /api/version`, whose channel-specific OpenAlice CDN manifest
+lookup is cached. An explicit **Check for updates** uses the authenticated
+`POST /api/version/check` route to bypass that application cache. Stable and
+beta installations read their matching manifests; GitHub remains the immutable
+release-asset and release-notes host rather than the runtime discovery API.
 
 Packaged Electron also invokes the existing `electron-updater` check through
 the narrow preload bridge. That check starts the native download path when an

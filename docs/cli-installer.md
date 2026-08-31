@@ -86,9 +86,9 @@ symlink target, with `release.json` excluded to avoid self-reference. It is not
 an executable-only checksum; UI, default assets, templates, and release-owned
 Git changes all produce a new identity.
 
-The channel-neutral installer defaults to the latest non-prerelease GitHub
-Release. `--channel beta` resolves `beta/manifest.json`, while `--channel dev`
-downloads the fixed per-commit preview aliases:
+The channel-neutral installer defaults to the OpenAlice-owned stable
+`manifest.json`. `--channel beta` resolves `beta/manifest.json`, while
+`--channel dev` downloads the fixed per-commit preview aliases:
 
 ```text
 https://download.openalice.ai/cli/dev/openalice-cli-dev-<platform>-<arch>.tar.gz
@@ -244,11 +244,11 @@ change channels or trust boundaries.
 ## Update and rollback
 
 `openalice update --check` reads the manifest owned by the installed stable,
-beta, or dev channel. Stable never accepts a prerelease manifest and beta
-accepts only beta versions. Dev compares the complete platform archive
-SHA-256, because multiple dev commits may carry the same package version.
-Pinned and custom installs remain non-updating unless the user explicitly
-selects a channel.
+beta, or dev channel. Every manifest must identify its channel explicitly;
+stable never accepts a prerelease manifest and beta accepts only beta versions.
+Dev compares the complete platform archive SHA-256, because multiple dev
+commits may carry the same package version. Pinned and custom installs remain
+non-updating unless the user explicitly selects a channel.
 
 For a direct install, `openalice update` downloads the channel manifest's
 immutable snapshot of the shared Bash installer, verifies its SHA-256, and
@@ -317,20 +317,19 @@ user-supplied `--version` remains `pinned`.
 
 A native beta/dev installation cannot safely downgrade in place to the old
 Node-managed v0.90.1 layout: the historical installer does not own
-`cli/current` or all native helper launchers. While v0.90.1 is the latest
-stable, both `openalice update --channel stable` and the Supervisor channel
-picker therefore report the transition as unsupported and leave the native
-installation unchanged. Once stable is native, ordinary channel switching
-resumes through the shared installer.
+`cli/current` or all native helper launchers. During the first beta rollout,
+while v0.90.1 was the latest stable, both `openalice update --channel stable`
+and the Supervisor channel picker therefore reported the transition as
+unsupported and left the native installation unchanged. Native stable releases
+resume ordinary channel switching through the shared installer.
 
-The v0.90.1 GitHub Release predates native CLI archives. While v0.90.1 remains
-the latest stable release during the first beta rollout, a fresh default
-stable install therefore verifies the immutable published v0.90.1 installer
-by its pinned SHA-256 and delegates to it. Exact v0.90.1 selection does the
-same for a fresh or already-legacy root, retaining `pinned` ownership when
-`--version` was used alone. The bridge refuses a root containing a native
-release or pointer. Beta/dev and every native stable release use the ordinary
-native artifact transaction.
+The v0.90.1 GitHub Release predates native CLI archives. If the stable manifest
+or an exact selector names v0.90.1, a fresh install therefore verifies the
+immutable published v0.90.1 installer by its pinned SHA-256 and delegates to
+it. Exact v0.90.1 selection retains `pinned` ownership when `--version` was used
+alone. The bridge refuses a root containing a native release or pointer.
+Current native stable releases, beta, and dev use the ordinary native artifact
+transaction.
 
 ## Uninstall
 
@@ -371,8 +370,8 @@ Bounded environment seams:
 |---|---|
 | `OPENALICE_INSTALL_DIR` | Alternate install root |
 | `OPENALICE_INSTALL_URL` | Recorded HTTP(S) installer source for a trusted mirror/test |
-| `OPENALICE_DOWNLOAD_BASE_URL` | Default beta-manifest and dev-preview artifact base |
-| `OPENALICE_RELEASES_API_URL` | Stable release discovery endpoint |
+| `OPENALICE_DOWNLOAD_BASE_URL` | Default stable/beta-manifest and dev-preview artifact base |
+| `OPENALICE_STABLE_MANIFEST_URL` | Stable release discovery manifest |
 | `OPENALICE_BETA_MANIFEST_URL` | Beta release discovery manifest |
 | `OPENALICE_RELEASE_ASSET_BASE_URL` | Versioned release asset base for release tests/mirrors |
 | `OPENALICE_LEGACY_STABLE_INSTALLER_URL` | Test override for the pinned v0.90.1 transition installer |

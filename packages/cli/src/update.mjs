@@ -348,12 +348,9 @@ async function fetchReleaseManifest(options, dependencies) {
 }
 
 function requireReleaseManifest(value) {
-  const channel = value?.channel === undefined && /^\d+\.\d+\.\d+$/.test(value?.version ?? '')
-    ? 'stable'
-    : value?.channel
   if (
     !value
-    || !['stable', 'beta'].includes(channel)
+    || !['stable', 'beta'].includes(value.channel)
     || typeof value.version !== 'string'
     || !isVersion(value.version)
     || typeof value.releaseNotesUrl !== 'string'
@@ -362,7 +359,7 @@ function requireReleaseManifest(value) {
     throw new Error('release manifest does not contain a valid CLI installer')
   }
   return {
-    channel,
+    channel: value.channel,
     version: value.version,
     releaseNotesUrl: value.releaseNotesUrl,
     installer: requireInstaller(value.installer, 'release'),
