@@ -12,6 +12,7 @@ import {
   resolveOfficeDutyTarget,
   scheduledIssueHealthDutyRegistration,
   type OfficeDutyCandidate,
+  type OfficeInboxDutyEvidence,
   type OfficeDutyRegistration,
 } from './duty-registry'
 import type { OfficeProductActivityState } from './useOfficeProductActivity'
@@ -51,6 +52,23 @@ function scheduledIssue(
 function snapshot(...issues: IssueListItem[]): IssueSnapshot {
   return {
     workspaces: [{ wsId: 'ws-a', tag: 'alpha', status: 'ok', issues }],
+  }
+}
+
+function inboxDelivery(
+  id: string,
+  overrides: Partial<OfficeInboxDutyEvidence> = {},
+): OfficeInboxDutyEvidence {
+  return {
+    title: `Delivery ${id}`,
+    entry: {
+      id,
+      ts: NOW,
+      workspaceId: 'chat-1',
+      workspaceLabel: 'Semis desk',
+      docs: [{ path: `reports/${id}.md`, revision: `rev-${id}` }],
+    },
+    ...overrides,
   }
 }
 
@@ -166,132 +184,259 @@ describe('Office duty registry', () => {
       .not.toBe(officeScheduledIssueFingerprint(NOW, 'ws-a', second))
   })
 
-  it('fences lower-priority duties behind a loading or degraded higher source', () => {
-    const agentActivity = activity({
-      agent: { seq: 2, occurredAt: NOW },
-      attention: { agent: true, inbox: false, news: false },
-      pending: { agent: 1, inbox: 0, news: 0 },
-    })
-    const loadingInbox = coreOfficeDutyRegistrations({
-      now: NOW,
-      activity: agentActivity,
-      activityStatus: 'loading',
-      issues: snapshot(),
-      issueStatus: 'ready',
-    })
-    expect(projectOfficeDutyQueue(loadingInbox)).toEqual({ candidates: [], status: 'loading' })
+  it.each(['loading', 'error'] as const)(
+    'keeps a known cadence duty visible while Inbox is %s',
+    (inboxStatus) => {
+      const registrations = coreOfficeDutyRegistrations({
+        now: NOW,
+        inboxDeliveries: [],
+        inboxStatus,
+        issues: snapshot(scheduledIssue('failed')),
+        issueStatus: 'ready',
+      })
 
-    const degradedCadence = coreOfficeDutyRegistrations({
-      now: NOW,
-      activity: agentActivity,
-      activityStatus: 'ready',
-      issues: snapshot(),
-      issueStatus: 'error',
-    })
-    expect(projectOfficeDutyQueue(degradedCadence)).toEqual({ candidates: [], status: 'error' })
-  })
+      expect(projectOfficeDutyQueue(registrations)).toMatchObject({
+        candidates: [{ kind: 'cadence', destination: { issueId: 'review-risk' } }],
+        status: inboxStatus,
+      })
+    },
+  )
 
-  it('keeps Inbox > Cadence > Agent > News and can accept a normalized future provider', () => {
-    const allActivity = activity({
-      agent: { seq: 3, occurredAt: NOW },
-      inbox: { seq: 4, occurredAt: NOW },
-      news: { seq: 2, occurredAt: NOW },
-      attention: { agent: true, inbox: true, news: true },
-      pending: { agent: 1, inbox: 1, news: 1 },
+  it.each(['loading', 'error'] as const)(
+    'keeps a known Inbox duty visible while cadence is %s',
+    (issueStatus) => {
+      const registrations = coreOfficeDutyRegistrations({
+        now: NOW,
+        inboxDeliveries: [inboxDelivery('known-inbox')],
+        inboxStatus: 'ready',
+        issues: snapshot(),
+        issueStatus,
+      })
+
+      expect(projectOfficeDutyQueue(registrations)).toMatchObject({
+        candidates: [{ kind: 'inbox', destination: { inboxEntryId: 'known-inbox' } }],
+        status: issueStatus,
+      })
+    },
+  )
+
+  it('orders urgent/high cadence, declared urgent/high Inbox, other cadence, then other Inbox', () => {
+    const issueData = snapshot(
+      scheduledIssue('failed', { id: 'urgent-cadence', priority: 'urgent' }),
+      scheduledIssue('healthy', { id: 'priority-report', priority: 'high' }),
+      scheduledIssue('interrupted', { id: 'other-cadence', priority: 'medium' }),
+    )
+    const priorityInbox = inboxDelivery('priority-inbox', {
+      entry: {
+        ...inboxDelivery('priority-inbox').entry,
+        workspaceId: 'execution-ws',
+        origin: {
+          kind: 'headless',
+          runId: 'run-priority',
+          issueId: 'priority-report',
+          issueWorkspaceId: 'ws-a',
+        },
+      },
     })
     const registrations = coreOfficeDutyRegistrations({
       now: NOW,
-      activity: allActivity,
+      activity: activity({
+        agent: { seq: 3, occurredAt: NOW },
+        news: { seq: 4, occurredAt: NOW },
+        attention: { agent: true, inbox: false, news: true },
+        pending: { agent: 1, inbox: 0, news: 1 },
+      }),
       activityStatus: 'ready',
-      issues: snapshot(scheduledIssue('blocked')),
+      inboxDeliveries: [inboxDelivery('ordinary-inbox'), priorityInbox],
+      inboxStatus: 'ready',
+      issues: issueData,
       issueStatus: 'ready',
     })
-    expect(projectOfficeDutyQueue(registrations).candidates[0]?.kind).toBe('inbox')
-    expect(projectOfficeDutyQueue(registrations, (duty) => duty.kind !== 'inbox').candidates[0]?.kind)
-      .toBe('cadence')
 
-    const futureProvider: OfficeDutyRegistration = {
-      id: 'future-domain',
-      order: 50,
-      status: 'loading',
-      candidates: [],
-    }
-    expect(projectOfficeDutyQueue([futureProvider, ...registrations])).toEqual({
-      candidates: [],
-      status: 'loading',
-    })
+    expect(projectOfficeDutyQueue(registrations).candidates.map((candidate) => candidate.id)).toEqual([
+      'scheduled-issue-health:ws-a:urgent-cadence',
+      'inbox-unread:priority-inbox',
+      'scheduled-issue-health:ws-a:other-cadence',
+      'inbox-unread:ordinary-inbox',
+    ])
   })
 
-  it('preserves one exact documented Inbox subject through the duty destination', () => {
-    const inboxActivity = activity({
-      inbox: {
-        seq: 8,
-        occurredAt: NOW,
-        detail: 'NVDA weekly evidence brief',
-        subject: {
-          kind: 'inbox-entry',
-          workspaceId: 'chat-1',
-          inboxEntryId: 'inbox-8',
-          documentCount: 1,
-        },
-      },
-      attention: { agent: false, inbox: true, news: false },
-      pending: { agent: 0, inbox: 1, news: 0 },
+  it('keeps Agent and raw News journal activity out of the mandatory duty queue', () => {
+    const ambientActivity = activity({
+      agent: { seq: 8, occurredAt: NOW, eventType: 'runtime.stopped', status: 'done' },
+      news: { seq: 7, occurredAt: NOW, detail: 'NVDA closes at a record high', source: 'Wire' },
+      attention: { agent: true, inbox: false, news: true },
+      pending: { agent: 1, inbox: 0, news: 1 },
+      freshKind: 'news',
     })
-
-    const candidate = coreOfficeDutyRegistrations({
+    const registrations = coreOfficeDutyRegistrations({
       now: NOW,
-      activity: inboxActivity,
+      activity: ambientActivity,
       activityStatus: 'ready',
+      inboxDeliveries: [],
+      inboxStatus: 'ready',
       issues: snapshot(),
       issueStatus: 'ready',
-    }).find((registration) => registration.id === 'inbox-arrival')!.candidates[0]!
+    })
+
+    expect(ambientActivity.agent).toMatchObject({ seq: 8, eventType: 'runtime.stopped' })
+    expect(ambientActivity.news).toMatchObject({
+      seq: 7,
+      detail: 'NVDA closes at a record high',
+      source: 'Wire',
+    })
+    expect(registrations.flatMap((registration) => registration.candidates))
+      .not.toContainEqual(expect.objectContaining({ kind: expect.stringMatching(/^(agent|news)$/) }))
+    expect(projectOfficeDutyQueue(registrations)).toEqual({ candidates: [], status: 'ready' })
+  })
+
+  it('projects durable unread Inbox evidence without a journal watermark', () => {
+    const candidate = coreOfficeDutyRegistrations({
+      now: NOW,
+      activity: activity(),
+      activityStatus: 'ready',
+      inboxDeliveries: [inboxDelivery('inbox-8', { title: 'NVDA weekly evidence brief' })],
+      inboxStatus: 'ready',
+      issues: snapshot(),
+      issueStatus: 'ready',
+    }).find((registration) => registration.id === 'inbox-unread')!.candidates[0]!
 
     expect(candidate).toMatchObject({
       kind: 'inbox',
       count: 1,
       destination: {
-        kind: 'journal',
-        channel: 'inbox',
+        kind: 'inbox-entry',
         targetId: 'inbox-service',
-        subject: {
-          kind: 'inbox-entry',
-          workspaceId: 'chat-1',
-          inboxEntryId: 'inbox-8',
-          documentCount: 1,
-        },
+        workspaceId: 'chat-1',
+        inboxEntryId: 'inbox-8',
       },
-      receipt: { kind: 'event-watermark', family: 'inbox', throughSeq: 8 },
+      receipt: { kind: 'inbox-read', workspaceId: 'chat-1', inboxEntryId: 'inbox-8' },
+      delivery: { title: 'NVDA weekly evidence brief' },
     })
   })
 
-  it('deduplicates logical candidates first-win and resolves exact Agent subjects spatially', () => {
-    const agentActivity = activity({
-      agent: {
-        seq: 3,
-        occurredAt: NOW,
-        subject: { kind: 'session', workspaceId: 'ws-a', resumeId: 'resume-a' },
-      },
-      attention: { agent: true, inbox: false, news: false },
-      pending: { agent: 2, inbox: 0, news: 0 },
-    })
-    const agent = coreOfficeDutyRegistrations({
+  it('orders documented Inbox work before messages and drains oldest first', () => {
+    const candidates = coreOfficeDutyRegistrations({
       now: NOW,
-      activity: agentActivity,
+      activity: activity(),
       activityStatus: 'ready',
+      inboxDeliveries: [
+        inboxDelivery('new-doc', { entry: { ...inboxDelivery('new-doc').entry, ts: NOW + 20 } }),
+        inboxDelivery('message', { entry: { ...inboxDelivery('message').entry, ts: NOW - 20, docs: [] } }),
+        inboxDelivery('old-doc', { entry: { ...inboxDelivery('old-doc').entry, ts: NOW - 10 } }),
+      ],
+      inboxStatus: 'ready',
       issues: snapshot(),
       issueStatus: 'ready',
-    }).find((item) => item.id === 'agent-review')!.candidates[0]!
+    })[0]!.candidates
+
+    expect(candidates.map((candidate) => candidate.id)).toEqual([
+      'inbox-unread:old-doc',
+      'inbox-unread:new-doc',
+      'inbox-unread:message',
+    ])
+    expect(candidates.every((candidate) => candidate.count === 3)).toBe(true)
+  })
+
+  it('uses issueWorkspaceId to resolve an exact declared Issue across Workspace boundaries', () => {
+    const issueData: IssueSnapshot = {
+      workspaces: [
+        {
+          wsId: 'ws-a',
+          tag: 'alpha',
+          status: 'ok',
+          issues: [scheduledIssue('healthy', { id: 'shared-report', priority: 'urgent' })],
+        },
+        {
+          wsId: 'ws-b',
+          tag: 'beta',
+          status: 'ok',
+          issues: [scheduledIssue('healthy', { id: 'shared-report', priority: 'low' })],
+        },
+      ],
+    }
+    const delivery = inboxDelivery('cross-workspace', {
+      entry: {
+        ...inboxDelivery('cross-workspace').entry,
+        workspaceId: 'execution-ws',
+        origin: {
+          kind: 'headless',
+          runId: 'run-cross',
+          issueId: 'shared-report',
+          issueWorkspaceId: 'ws-b',
+        },
+      },
+    })
+    const candidate = coreOfficeDutyRegistrations({
+      now: NOW,
+      inboxDeliveries: [delivery],
+      inboxStatus: 'ready',
+      issues: issueData,
+      issueStatus: 'ready',
+    })[0]!.candidates[0]!
+
+    expect(candidate).toMatchObject({
+      kind: 'inbox',
+      delivery: {
+        declaredIssue: {
+          workspaceId: 'ws-b',
+          issueId: 'shared-report',
+          priority: 'low',
+        },
+      },
+    })
+  })
+
+  it('does not guess a declared Issue when an issueId is ambiguous and has no issueWorkspaceId', () => {
+    const issueData: IssueSnapshot = {
+      workspaces: [
+        {
+          wsId: 'ws-a',
+          tag: 'alpha',
+          status: 'ok',
+          issues: [scheduledIssue('healthy', { id: 'shared-report', priority: 'urgent' })],
+        },
+        {
+          wsId: 'ws-b',
+          tag: 'beta',
+          status: 'ok',
+          issues: [scheduledIssue('healthy', { id: 'shared-report', priority: 'high' })],
+        },
+      ],
+    }
+    const candidate = coreOfficeDutyRegistrations({
+      now: NOW,
+      inboxDeliveries: [inboxDelivery('ambiguous', {
+        entry: {
+          ...inboxDelivery('ambiguous').entry,
+          origin: { kind: 'headless', runId: 'run-ambiguous', issueId: 'shared-report' },
+        },
+      })],
+      inboxStatus: 'ready',
+      issues: issueData,
+      issueStatus: 'ready',
+    })[0]!.candidates[0]!
+
+    expect(candidate.kind).toBe('inbox')
+    if (candidate.kind !== 'inbox') throw new Error('Expected Inbox duty')
+    expect(candidate.delivery.declaredIssue).toBeUndefined()
+  })
+
+  it('deduplicates logical candidates first-win and resolves an Inbox target', () => {
+    const inbox = coreOfficeDutyRegistrations({
+      now: NOW,
+      inboxDeliveries: [inboxDelivery('dedup')],
+      inboxStatus: 'ready',
+      issues: snapshot(),
+      issueStatus: 'ready',
+    })[0]!.candidates[0]!
     const duplicateRegistration: OfficeDutyRegistration = {
       id: 'duplicates',
       order: 1,
       status: 'ready',
-      candidates: [agent, { ...agent, count: 99 } as OfficeDutyCandidate],
+      candidates: [inbox, { ...inbox, count: 99 } as OfficeDutyCandidate],
     }
     expect(projectOfficeDutyQueue([duplicateRegistration]).candidates).toHaveLength(1)
-    expect(resolveOfficeDutyTarget(agent, (id) => id === 'employee:ws-a:resume-a')).toMatchObject({
-      targetId: 'employee:ws-a:resume-a',
-      fallbackTargetId: 'operations',
-    })
+    expect(resolveOfficeDutyTarget(inbox)).toMatchObject({ targetId: 'inbox-service' })
   })
 })

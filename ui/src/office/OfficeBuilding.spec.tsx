@@ -6,9 +6,64 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { OfficeBuildingSnapshot } from '../api/office'
 import { i18n } from '../i18n'
-import { nextOfficeDuty, OfficeBuilding, officeRouteStatusEdge } from './OfficeBuilding'
+import { OfficeBuilding, officeRouteStatusEdge } from './OfficeBuilding'
 import { officeCoworkerSpriteForAgent } from './coworker-sprites'
+import {
+  inboxUnreadDutyRegistration,
+  type OfficeDutyCandidate,
+} from './duty-registry'
 import { officeCoworkerCallsign } from './label'
+
+function agentDuty(input: {
+  workspaceId: string
+  resumeId: string
+  seq?: number
+  source?: string
+}): OfficeDutyCandidate {
+  const seq = input.seq ?? 45
+  const subject = {
+    kind: 'session' as const,
+    workspaceId: input.workspaceId,
+    resumeId: input.resumeId,
+  }
+  return {
+    id: `agent-review:${seq}`,
+    registrationId: 'agent-review',
+    kind: 'agent',
+    count: 1,
+    landmark: {
+      seq,
+      occurredAt: 4_500,
+      source: input.source ?? 'grok',
+      subject,
+    },
+    destination: {
+      kind: 'journal',
+      channel: 'agent',
+      targetId: 'operations',
+      subject,
+    },
+    receipt: { kind: 'event-watermark', family: 'agent', throughSeq: seq },
+  }
+}
+
+function activeShift(input: {
+  total?: number
+  completed?: number
+  position?: number
+  remainingMinutes?: number
+  backlogCount?: number
+} = {}) {
+  return {
+    state: 'active' as const,
+    total: input.total ?? 1,
+    completed: input.completed ?? 0,
+    position: input.position ?? 1,
+    remainingMinutes: input.remainingMinutes ?? 2,
+    backlogCount: input.backlogCount ?? 0,
+    canStartNext: false,
+  }
+}
 
 afterEach(cleanup)
 
@@ -22,67 +77,6 @@ beforeEach(async () => {
 })
 
 describe('OfficeBuilding', () => {
-  it('turns pending product activity into one ordered next duty', () => {
-    const activity = {
-      agent: null,
-      inbox: null,
-      news: null,
-      attention: { agent: true, inbox: true, news: true },
-      pending: { agent: 2, inbox: 1, news: 9 },
-      freshKind: null,
-    }
-
-    expect(nextOfficeDuty(activity)).toEqual({
-      kind: 'inbox',
-      targetId: 'inbox-service',
-      count: 1,
-    })
-    expect(nextOfficeDuty({
-      ...activity,
-      attention: { ...activity.attention, inbox: false },
-    })).toEqual({
-      kind: 'agent',
-      targetId: 'operations',
-      count: 2,
-    })
-    expect(nextOfficeDuty({
-      ...activity,
-      attention: { agent: false, inbox: false, news: false },
-    })).toBeNull()
-  })
-
-  it('routes Agent review to an exact visible session and otherwise falls back to Operations', () => {
-    const activity = {
-      agent: {
-        seq: 45,
-        occurredAt: 4_500,
-        subject: {
-          kind: 'session' as const,
-          workspaceId: 'chat-1',
-          resumeId: 'resume-grok',
-        },
-      },
-      inbox: null,
-      news: null,
-      attention: { agent: true, inbox: false, news: false },
-      pending: { agent: 3, inbox: 0, news: 0 },
-      freshKind: null,
-    }
-    const exactTarget = 'employee:chat-1:resume-grok'
-
-    expect(nextOfficeDuty(activity, (targetId) => targetId === exactTarget)).toEqual({
-      kind: 'agent',
-      targetId: exactTarget,
-      count: 3,
-    })
-    expect(nextOfficeDuty(activity, (targetId) => targetId === 'employee:other:resume-grok'))
-      .toEqual({ kind: 'agent', targetId: 'operations', count: 3 })
-    expect(nextOfficeDuty({
-      ...activity,
-      agent: { seq: 45, occurredAt: 4_500 },
-    }, () => true)).toEqual({ kind: 'agent', targetId: 'operations', count: 3 })
-  })
-
   it('walks the Agent duty to its visible coworker and returns the receipt to that desk', async () => {
     const employee = {
       resumeId: 'resume-duty-grok',
@@ -130,9 +124,15 @@ describe('OfficeBuilding', () => {
       freshKind: null,
     }
     const onSelectEmployee = vi.fn()
+    const currentDuty = agentDuty({
+      workspaceId: 'chat-duty',
+      resumeId: 'resume-duty-grok',
+    })
     const props = {
       building,
       productActivity: activity,
+      dutyCandidates: [currentDuty],
+      dutyShift: activeShift(),
       onSelectEmployee,
       onOpenEmployee: vi.fn(),
       onOpenWorkspace: vi.fn(),
@@ -142,7 +142,9 @@ describe('OfficeBuilding', () => {
     }
     const view = render(<OfficeBuilding {...props} />)
 
-    const duty = screen.getByRole('button', { name: /Next duty: .*3 pending/ })
+    const duty = screen.getByRole('button', {
+      name: 'Shift duty 1/1: Agent · Grok Synthesist · grok, about 2 minutes remaining',
+    })
     expect(duty.textContent).not.toContain('Operations board')
     await userEvent.click(duty)
     await waitFor(() => expect(onSelectEmployee).toHaveBeenCalledWith(
@@ -154,9 +156,9 @@ describe('OfficeBuilding', () => {
     view.rerender(
       <OfficeBuilding
         {...props}
-        productActivity={{
-          ...activity,
-          attention: { ...activity.attention, agent: false },
+        dutyAcknowledgement={{
+          token: 1,
+          targetId: 'employee:chat-duty:resume-duty-grok',
         }}
       />,
     )
@@ -211,6 +213,11 @@ describe('OfficeBuilding', () => {
           pending: { agent: 1, inbox: 0, news: 0 },
           freshKind: null,
         }}
+        dutyCandidates={[agentDuty({
+          workspaceId: 'chat-full',
+          resumeId: 'resume-4',
+        })]}
+        dutyShift={activeShift()}
         onSelectEmployee={vi.fn()}
         onOpenEmployee={vi.fn()}
         onOpenWorkspace={vi.fn()}
@@ -222,7 +229,9 @@ describe('OfficeBuilding', () => {
 
     expect(screen.getAllByTestId(/^office-desk-/)).toHaveLength(4)
     expect(screen.queryByTestId('office-desk-resume-4')).toBeNull()
-    expect(screen.getByRole('button', { name: 'Next duty: Agent · Operations board, 1 pending' }))
+    expect(screen.getByRole('button', {
+      name: 'Shift duty 1/1: Agent · Operations board · grok, about 2 minutes remaining',
+    }))
       .toBeTruthy()
   })
 
@@ -282,6 +291,11 @@ describe('OfficeBuilding', () => {
       const props = {
         building,
         productActivity,
+        dutyCandidates: [agentDuty({
+          workspaceId: 'chat-duty',
+          resumeId: 'resume-departing-duty',
+        })],
+        dutyShift: activeShift(),
         initialPlayerState: { position: { x: 480, y: 600 }, direction: 'up' as const },
         onSelectEmployee,
         onOpenEmployee: vi.fn(),
@@ -292,7 +306,7 @@ describe('OfficeBuilding', () => {
       }
       const view = render(<OfficeBuilding {...props} />)
 
-      fireEvent.click(screen.getByRole('button', { name: /Next duty:/ }))
+      fireEvent.click(screen.getByRole('button', { name: /Shift duty 1\/1:/ }))
       expect(screen.getByTestId('office-route-status')).toBeTruthy()
       view.rerender(
         <OfficeBuilding
@@ -2074,7 +2088,125 @@ describe('OfficeBuilding', () => {
     await waitFor(() => expect(onOpenRoster).toHaveBeenCalledWith('chat-full'))
   })
 
-  it('turns Inbox and News activity into navigable floor landmarks', async () => {
+  it('reports frozen shift progress, estimate, completion, and carryover independently from Inbox backlog', async () => {
+    const [candidate] = inboxUnreadDutyRegistration(
+      [{
+        title: 'Weekly evidence packet',
+        entry: {
+          id: 'inbox-shift-1',
+          ts: 1_100,
+          workspaceId: 'chat-1',
+          workspaceLabel: 'Semis desk',
+          docs: [{ path: 'reports/weekly.md', revision: 'rev-weekly' }],
+        },
+      }],
+      'ready',
+    ).candidates
+    const onStartNextShift = vi.fn()
+    const props = {
+      building: {
+        config: {
+          workspaceSleepAfterMs: 1,
+          harnessMinimumVisibleGroups: { chat: 0, 'auto-quant': 0, prediction: 0, other: 0 },
+        },
+        lastSeq: 0,
+        firstSeq: 0,
+        offices: [],
+      },
+      onSelectEmployee: vi.fn(),
+      onOpenEmployee: vi.fn(),
+      onOpenWorkspace: vi.fn(),
+      onOpenFiles: vi.fn(),
+      onOpenRoster: vi.fn(),
+      onOpenLog: vi.fn(),
+      onStartNextShift,
+    }
+    const view = render(
+      <OfficeBuilding
+        {...props}
+        dutyCandidates={[candidate!]}
+        dutyShift={activeShift({
+          total: 4,
+          completed: 1,
+          position: 2,
+          remainingMinutes: 9,
+          backlogCount: 5,
+        })}
+        inboxBacklogCount={8}
+      />,
+    )
+
+    const activeDuty = screen.getByRole('button', {
+      name: 'Shift duty 2/4: Inbox · Weekly evidence packet · Semis desk, about 9 minutes remaining',
+    })
+    expect(activeDuty.textContent).toContain('This shift')
+    expect(activeDuty.textContent).toContain('≈ 9 min')
+    expect(activeDuty.textContent).toContain('2/4')
+    expect(screen.getByRole('button', { name: 'Inbox station · 8 pending' }))
+      .toBeTruthy()
+
+    view.rerender(
+      <OfficeBuilding
+        {...props}
+        dutyCandidates={[]}
+        dutyShift={{
+          state: 'complete',
+          total: 4,
+          completed: 4,
+          position: null,
+          remainingMinutes: 0,
+          backlogCount: 3,
+          canStartNext: true,
+        }}
+        inboxBacklogCount={3}
+      />,
+    )
+    const nextShift = screen.getByRole('button', {
+      name: 'This shift is complete with 3 more waiting. Start the next shift',
+    })
+    expect(nextShift.textContent).toContain('Shift complete')
+    expect(nextShift.textContent).toContain('+3')
+    await userEvent.click(nextShift)
+    expect(onStartNextShift).toHaveBeenCalledTimes(1)
+
+    view.rerender(
+      <OfficeBuilding
+        {...props}
+        dutyCandidates={[]}
+        dutyShift={{
+          state: 'complete',
+          total: 4,
+          completed: 4,
+          position: null,
+          remainingMinutes: 0,
+          backlogCount: 2,
+          canStartNext: false,
+        }}
+        inboxBacklogCount={2}
+      />,
+    )
+    expect(screen.getByText('Shift reviewed · 2 still unresolved')).toBeTruthy()
+
+    view.rerender(
+      <OfficeBuilding
+        {...props}
+        dutyCandidates={[]}
+        dutyShift={{
+          state: 'clear',
+          total: 4,
+          completed: 4,
+          position: null,
+          remainingMinutes: 0,
+          backlogCount: 0,
+          canStartNext: false,
+        }}
+        inboxBacklogCount={0}
+      />,
+    )
+    expect(screen.getByText('Shift clear')).toBeTruthy()
+  })
+
+  it('keeps Inbox, News, and Agent journals ambient while the full Inbox backlog stays visible', async () => {
     const onOpenService = vi.fn()
     render(
       <OfficeBuilding
@@ -2121,6 +2253,7 @@ describe('OfficeBuilding', () => {
           pending: { agent: 1, inbox: 2, news: 9 },
           freshKind: 'news',
         }}
+        inboxBacklogCount={12}
         initialPlayerState={{ position: { x: 340, y: 600 }, direction: 'up' }}
         onSelectEmployee={vi.fn()}
         onOpenEmployee={vi.fn()}
@@ -2132,24 +2265,21 @@ describe('OfficeBuilding', () => {
       />,
     )
 
-    const inbox = screen.getByRole('button', { name: 'Inbox station · 2 pending' })
-    const news = screen.getByRole('button', { name: 'News terminal · 9+ pending' })
-    const nextDuty = screen.getByRole('button', {
-      name: 'Next duty: Inbox · Agent report delivered · codex, 2 pending',
-    })
-    expect(nextDuty.dataset.kind).toBe('inbox')
-    expect(nextDuty.textContent).toContain('Next duty')
-    expect(nextDuty.textContent).toContain('Inbox')
-    expect(nextDuty.textContent).toContain('Agent report delivered')
+    const inbox = screen.getByRole('button', { name: 'Inbox station · 9+ pending' })
+    const news = screen.getByRole('button', { name: 'News terminal' })
+    expect(screen.queryByRole('button', { name: /Shift duty/ })).toBeNull()
+    expect(screen.getByText('No duties are due this shift')).toBeTruthy()
     const serviceZone = screen.getByTestId('office-service-zone')
     expect(serviceZone.querySelector('img')?.getAttribute('src'))
       .toBe('/office/furniture/workspace-rug-v2.png')
     expect(inbox.dataset.hasActivity).toBe('true')
     expect(inbox.dataset.attention).toBe('true')
     expect(inbox.dataset.fresh).toBeUndefined()
-    expect(inbox.querySelector('.oa-office-map-service__signal')?.textContent).toBe('2')
+    expect(inbox.querySelector('.oa-office-map-service__signal')?.textContent).toBe('9+')
+    expect(news.dataset.hasActivity).toBe('true')
+    expect(news.dataset.attention).toBeUndefined()
     expect(news.dataset.fresh).toBe('true')
-    expect(news.querySelector('.oa-office-map-service__signal')?.textContent).toBe('9+')
+    expect(news.querySelector('.oa-office-map-service__signal')).toBeNull()
     const operations = screen.getByRole('button', { name: 'Operations board · 1 pending' })
     expect(operations.dataset.hasActivity).toBe('true')
     expect(operations.dataset.attention).toBe('true')
@@ -2181,7 +2311,7 @@ describe('OfficeBuilding', () => {
       .toBe('up')
   })
 
-  it('returns a one-shot landmark receipt after a guided HUD duty is acknowledged', async () => {
+  it('returns a one-shot landmark receipt after a durable Inbox duty is acknowledged', async () => {
     const onOpenService = vi.fn()
     const onOpenDuty = vi.fn()
     const building = {
@@ -2217,6 +2347,20 @@ describe('OfficeBuilding', () => {
       pending: { agent: 0, inbox: 1, news: 0 },
       freshKind: null,
     }
+    const inboxDuties = inboxUnreadDutyRegistration(
+      [{
+        title: 'Agent report delivered',
+        entry: {
+          id: 'inbox-11',
+          ts: 1_100,
+          workspaceId: 'chat-1',
+          workspaceLabel: 'codex',
+          comments: 'Agent report delivered',
+          docs: [{ path: 'reports/inbox-11.md', revision: 'rev-inbox-11' }],
+        },
+      }],
+      'ready',
+    ).candidates
     const props = {
       building,
       initialPlayerState: { position: { x: 340, y: 600 }, direction: 'up' as const },
@@ -2229,11 +2373,19 @@ describe('OfficeBuilding', () => {
       onOpenService,
       onOpenDuty,
     }
-    const view = render(<OfficeBuilding {...props} productActivity={activity} />)
+    const view = render(
+      <OfficeBuilding
+        {...props}
+        productActivity={activity}
+        dutyCandidates={inboxDuties}
+        dutyShift={activeShift({ remainingMinutes: 3 })}
+        inboxBacklogCount={7}
+      />,
+    )
 
-    const inbox = screen.getByRole('button', { name: 'Inbox station · 1 pending' })
+    const inbox = screen.getByRole('button', { name: 'Inbox station · 7 pending' })
     await userEvent.click(screen.getByRole('button', {
-      name: 'Next duty: Inbox · Agent report delivered · codex, 1 pending',
+      name: 'Shift duty 1/1: Inbox · Agent report delivered · codex, about 3 minutes remaining',
     }))
     await waitFor(() => expect(onOpenDuty).toHaveBeenCalledWith(expect.objectContaining({
       kind: 'inbox',
@@ -2241,21 +2393,37 @@ describe('OfficeBuilding', () => {
     })))
     expect(onOpenService).not.toHaveBeenCalled()
 
-    const acknowledgedActivity = {
-      ...activity,
-      attention: { ...activity.attention, inbox: false },
-    }
     view.rerender(
       <OfficeBuilding
         {...props}
         interactionSuspended
         productActivity={activity}
+        dutyCandidates={inboxDuties}
+        dutyShift={activeShift({ remainingMinutes: 3 })}
+        inboxBacklogCount={7}
       />,
     )
     expect(inbox.querySelector('.oa-office-landmark-ack')).toBeNull()
 
-    // The real receipt closes the modal in the same React batch that clears attention.
-    view.rerender(<OfficeBuilding {...props} productActivity={acknowledgedActivity} />)
+    // The durable Inbox source reports the exact read receipt after the modal closes.
+    view.rerender(
+      <OfficeBuilding
+        {...props}
+        productActivity={activity}
+        dutyCandidates={[]}
+        dutyShift={{
+          state: 'clear',
+          total: 1,
+          completed: 1,
+          position: null,
+          remainingMinutes: 0,
+          backlogCount: 0,
+          canStartNext: false,
+        }}
+        inboxBacklogCount={6}
+        dutyAcknowledgement={{ token: 1, targetId: 'inbox-service' }}
+      />,
+    )
     await waitFor(() => expect(inbox.dataset.acknowledged).toBe('true'))
     expect(inbox.querySelector('.oa-office-landmark-ack')?.textContent).toBe('OK')
     await waitFor(() => expect(inbox.dataset.acknowledged).toBeUndefined(), { timeout: 1_500 })

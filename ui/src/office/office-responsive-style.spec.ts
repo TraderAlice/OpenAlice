@@ -136,6 +136,15 @@ describe('Office responsive style contract', () => {
     }
   })
 
+  it('shows fresh News as ambient placard motion without manufacturing a pending badge', () => {
+    expect(css).toMatch(
+      /\.oa-office-map-service\[data-kind="news"\]\[data-fresh="true"\] \.oa-office-map-service__placard\s*\{[^}]*drop-shadow[^}]*animation:\s*oa-office-service-fresh 920ms steps\(2, end\) infinite;/s,
+    )
+    expect(css).toMatch(
+      /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\[data-kind="news"\]\[data-fresh="true"\] \.oa-office-map-service__placard,[\s\S]*?animation: none;/,
+    )
+  })
+
   it('keeps roster state beside identity and gives assignments two stable lines', () => {
     const dormantCardStart = css.indexOf('.oa-office-roster li button[data-awake="false"]')
     const focusedCardStart = css.indexOf('.oa-office-roster li button:focus-visible {')

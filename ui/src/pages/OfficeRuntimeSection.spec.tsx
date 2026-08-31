@@ -81,31 +81,31 @@ describe('OfficeRuntimeSection', () => {
     mockJournal([{
       seq: 12,
       ts: Date.now(),
-      type: 'news.ingested',
-      payload: { newsItemId: 12, source: 'Wire', title: 'Review this headline' },
+      type: 'runtime.turn.error',
+      payload: { agent: 'grok', error: 'Review this failure' },
     }])
 
     render(
       <OfficeRuntimeSection
-        initialChannel="news"
+        initialChannel="agent"
         initialSelectedSeq={12}
-        dutyReview={{ kind: 'news', throughSeq: 12, count: 2 }}
+        dutyReview={{ kind: 'agent', throughSeq: 12, count: 2 }}
         onConfirmDuty={onConfirmDuty}
       />,
     )
 
     const receipt = await screen.findByRole('button', {
-      name: 'Stamp reviewed · News ×2',
+      name: 'Stamp reviewed · Agent ×2',
     })
     expect(receipt.closest('.oa-office-runtime__content')).toBeTruthy()
     expect(onConfirmDuty).not.toHaveBeenCalled()
 
-    await userEvent.click(screen.getByRole('tab', { name: /^Agent/ }))
-    expect(screen.queryByRole('button', { name: /Stamp reviewed/ })).toBeNull()
     await userEvent.click(screen.getByRole('tab', { name: /^News/ }))
+    expect(screen.queryByRole('button', { name: /Stamp reviewed/ })).toBeNull()
+    await userEvent.click(screen.getByRole('tab', { name: /^Agent/ }))
 
     await userEvent.click(screen.getByRole('button', {
-      name: 'Stamp reviewed · News ×2',
+      name: 'Stamp reviewed · Agent ×2',
     }))
     expect(onConfirmDuty).toHaveBeenCalledTimes(1)
   })
@@ -194,21 +194,21 @@ describe('OfficeRuntimeSection', () => {
     mockJournal([{
       seq: 22,
       ts: Date.now(),
-      type: 'news.ingested',
-      payload: { newsItemId: 22, source: 'Wire', title: 'Newest of a large batch' },
+      type: 'runtime.turn.error',
+      payload: { agent: 'grok', error: 'Newest of a large batch' },
     }])
 
     render(
       <OfficeRuntimeSection
-        initialChannel="news"
+        initialChannel="agent"
         initialSelectedSeq={22}
-        dutyReview={{ kind: 'news', throughSeq: 22, count: 9 }}
+        dutyReview={{ kind: 'agent', throughSeq: 22, count: 9 }}
         onConfirmDuty={() => undefined}
       />,
     )
 
     expect(await screen.findByRole('button', {
-      name: 'Stamp reviewed · News ×9+',
+      name: 'Stamp reviewed · Agent ×9+',
     })).toBeTruthy()
   })
 
@@ -278,35 +278,35 @@ describe('OfficeRuntimeSection', () => {
     const entries = [{
       seq: 1,
       ts: now - 1_000,
-      type: 'news.ingested',
-      payload: { newsItemId: 1, source: 'Wire', title: 'Captured headline' },
+      type: 'runtime.turn.error',
+      payload: { agent: 'grok', error: 'Captured failure' },
     }]
     mockJournal(entries)
     render(
       <OfficeRuntimeSection
-        initialChannel="news"
+        initialChannel="agent"
         initialSelectedSeq={1}
-        dutyReview={{ kind: 'news', throughSeq: 1, count: 1 }}
+        dutyReview={{ kind: 'agent', throughSeq: 1, count: 1 }}
         onConfirmDuty={() => undefined}
       />,
     )
 
-    const captured = await screen.findByRole('button', { name: /Captured headline.*#0001/i })
+    const captured = await screen.findByRole('button', { name: /Task error.*#0001/i })
     expect(captured.getAttribute('aria-pressed')).toBe('true')
-    expect(screen.getByRole('button', { name: 'Stamp reviewed · News ×1' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Stamp reviewed · Agent ×1' })).toBeTruthy()
 
     entries.unshift({
       seq: 2,
       ts: now,
-      type: 'news.ingested',
-      payload: { newsItemId: 2, source: 'Wire', title: 'Arrived during review' },
+      type: 'runtime.turn.error',
+      payload: { agent: 'grok', error: 'Arrived during review' },
     })
     window.dispatchEvent(new Event(GLOBAL_ACTIVITY_REFRESH_EVENT))
 
-    const newer = await screen.findByRole('button', { name: /Arrived during review.*#0002/i })
+    const newer = await screen.findByRole('button', { name: /Task error.*#0002/i })
     await waitFor(() => expect(captured.getAttribute('aria-pressed')).toBe('true'))
     expect(newer.getAttribute('aria-pressed')).toBe('false')
-    expect(screen.getByRole('button', { name: 'Stamp reviewed · News ×1' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Stamp reviewed · Agent ×1' })).toBeTruthy()
 
     await userEvent.click(newer)
     await waitFor(() => expect(newer.getAttribute('aria-pressed')).toBe('true'))

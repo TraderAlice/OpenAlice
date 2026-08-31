@@ -297,8 +297,9 @@ describe('OfficeCadenceDutyDossier', () => {
       .toBe(true)
   })
 
-  it('treats Escape and close as postponement', async () => {
+  it('keeps Later separate from Escape and the window close control', async () => {
     const onClose = vi.fn()
+    const onLater = vi.fn()
     render(
       <OfficeCadenceDutyDossier
         duty={duty()}
@@ -307,15 +308,28 @@ describe('OfficeCadenceDutyDossier', () => {
         onOpenIssue={vi.fn()}
         onConfirm={vi.fn()}
         onReviewLatest={vi.fn()}
+        onLater={onLater}
         onClose={onClose}
       />,
     )
+
+    await userEvent.click(screen.getByRole('button', { name: 'Later' }))
+    expect(onLater).toHaveBeenCalledTimes(1)
+    expect(onClose).not.toHaveBeenCalled()
+
     await userEvent.click(screen.getByRole('button', { name: 'Review evidence' }))
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
     expect(screen.getByRole('button', { name: 'Review evidence' })).toBeTruthy()
     expect(onClose).not.toHaveBeenCalled()
+    expect(onLater).toHaveBeenCalledTimes(1)
+
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
     expect(onClose).toHaveBeenCalledTimes(1)
+    expect(onLater).toHaveBeenCalledTimes(1)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(onClose).toHaveBeenCalledTimes(2)
+    expect(onLater).toHaveBeenCalledTimes(1)
   })
 
   it('pins captured evidence and refuses to stamp after the live fingerprint changes', async () => {

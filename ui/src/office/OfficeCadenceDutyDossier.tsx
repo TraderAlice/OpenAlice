@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 
@@ -14,6 +14,7 @@ import { officePixelImg } from './furniture'
 import { OFFICE_HUD_ASSETS } from './hud-assets'
 import { OFFICE_LOG_ASSETS } from './log-assets'
 import { OfficeWindowControlGlyph } from './OfficeWindowControlGlyph'
+import { trapOfficeDialogTab } from './office-dialog-focus'
 
 function scheduleLabel(when: ScheduleWhen, t: TFunction): string {
   switch (when.kind) {
@@ -64,39 +65,6 @@ function runStatusLabel(status: string, t: TFunction): string {
 
 function timeLabel(value: number | null | undefined, empty: string): string {
   return value == null ? empty : formatRelativeTime(value)
-}
-
-const DIALOG_FOCUSABLE_SELECTOR = [
-  'a[href]',
-  'button:not([disabled])',
-  'input:not([disabled])',
-  'select:not([disabled])',
-  'textarea:not([disabled])',
-  '[tabindex]:not([tabindex="-1"])',
-].join(',')
-
-function trapDialogTab(event: ReactKeyboardEvent<HTMLElement>) {
-  const dialog = event.currentTarget
-  const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(DIALOG_FOCUSABLE_SELECTOR))
-    .filter((element) => element.tabIndex >= 0 && element.closest('[hidden], [aria-hidden="true"]') === null)
-  if (focusable.length === 0) {
-    event.preventDefault()
-    dialog.focus()
-    return
-  }
-  const first = focusable[0]!
-  const last = focusable[focusable.length - 1]!
-  const active = document.activeElement
-  if (!dialog.contains(active)) {
-    event.preventDefault()
-    first.focus()
-  } else if (event.shiftKey && active === first) {
-    event.preventDefault()
-    last.focus()
-  } else if (!event.shiftKey && active === last) {
-    event.preventDefault()
-    first.focus()
-  }
 }
 
 function isCadenceException(state: string | undefined): state is 'blocked' | 'failed' | 'interrupted' {
@@ -309,6 +277,7 @@ export function OfficeCadenceDutyDossier({
   onConfirm,
   onReviewLatest,
   onClose,
+  onLater = onClose,
 }: {
   duty: OfficeCadenceDutyCandidate
   latestDuty: OfficeCadenceDutyCandidate | null
@@ -317,6 +286,7 @@ export function OfficeCadenceDutyDossier({
   onOpenIssue: () => void
   onConfirm: () => void
   onReviewLatest: (duty: OfficeCadenceDutyCandidate) => void
+  onLater?: () => void
   onClose: () => void
 }) {
   const { t } = useTranslation()
@@ -345,7 +315,7 @@ export function OfficeCadenceDutyDossier({
           else onClose()
           return
         }
-        if (event.key === 'Tab') trapDialogTab(event)
+        if (event.key === 'Tab') trapOfficeDialogTab(event)
       }}
     >
       <header className="oa-office-window__header">
@@ -413,14 +383,19 @@ export function OfficeCadenceDutyDossier({
               {t('office.cadenceSignalStale')}
             </p>
           )}
-          <button
-            type="button"
-            className="oa-office-cadence__review"
-            onClick={() => setStep('evidence')}
-          >
-            <img src={OFFICE_HUD_ASSETS.occupancyLog} alt="" aria-hidden style={officePixelImg} />
-            {t('office.cadenceReviewEvidence')}
-          </button>
+          <div className="oa-office-cadence__actions oa-office-cadence__actions--entry">
+            <button type="button" className="oa-office-cadence__back" onClick={onLater}>
+              {t('office.inboxBacklogLater')}
+            </button>
+            <button
+              type="button"
+              className="oa-office-cadence__review"
+              onClick={() => setStep('evidence')}
+            >
+              <img src={OFFICE_HUD_ASSETS.occupancyLog} alt="" aria-hidden style={officePixelImg} />
+              {t('office.cadenceReviewEvidence')}
+            </button>
+          </div>
         </div>
       ) : (
         <OfficeCadenceEvidence

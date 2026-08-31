@@ -32,7 +32,10 @@ import { useWorkspaces } from '../contexts/workspaces-context'
 import { readWorkspaceFile, type ReadFileResult } from '../components/workspace/api'
 import { workspaceDisplayName, workspaceDisplayTitle } from '../components/workspace/display'
 import { presentInboxEntry } from '../lib/inbox-presentation'
-import { markOfficeInboxDutyPresented } from '../office/inbox-duty-excursion'
+import {
+  markOfficeInboxDutyPresented,
+  readOfficeInboxDutyExcursion,
+} from '../office/inbox-duty-excursion'
 import type { InboxEntry, InboxDoc } from '../api/inbox'
 
 interface InboxPageProps {
@@ -65,7 +68,10 @@ export function InboxPage({ visible }: InboxPageProps) {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
-  const selected = entries.find((e) => e.id === selectedId) ?? null
+  const capturedOfficeEntry = readOfficeInboxDutyExcursion()?.duty.delivery.entry ?? null
+  const selectedFromLive = entries.find((e) => e.id === selectedId) ?? null
+  const selected = selectedFromLive
+    ?? (capturedOfficeEntry?.id === selectedId ? capturedOfficeEntry : null)
   const pendingDelete = entries.find((e) => e.id === pendingDeleteId) ?? null
 
   useEffect(() => {
@@ -120,6 +126,7 @@ export function InboxPage({ visible }: InboxPageProps) {
   useEffect(() => {
     if (!visible) return
     if (!selectedId) return
+    if (!entries.some((entry) => entry.id === selectedId)) return
     function onKey(e: KeyboardEvent) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
       if (e.metaKey || e.ctrlKey || e.altKey) return
@@ -129,7 +136,7 @@ export function InboxPage({ visible }: InboxPageProps) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [visible, selectedId, requestDelete])
+  }, [entries, visible, selectedId, requestDelete])
 
   return (
     <>
@@ -139,9 +146,9 @@ export function InboxPage({ visible }: InboxPageProps) {
           description={t('inbox.pageDescription', { count: entries.length })}
         />
         <div className="flex-1 overflow-y-auto min-h-0">
-          {loading && entries.length === 0 ? (
+          {loading && entries.length === 0 && !selected ? (
             <InboxLoadingSkeleton />
-          ) : entries.length === 0 ? (
+          ) : entries.length === 0 && !selected ? (
             <EmptyState />
           ) : !selected ? (
             <div className="px-6 py-8 text-muted-foreground text-sm">
@@ -151,7 +158,7 @@ export function InboxPage({ visible }: InboxPageProps) {
             <Detail
               key={selected.id}
               entry={selected}
-              onDelete={() => requestDelete(selected.id)}
+              onDelete={selectedFromLive ? () => requestDelete(selected.id) : undefined}
             />
           )}
         </div>
@@ -224,7 +231,7 @@ function EmptyState() {
 
 // ==================== Detail (single push) ====================
 
-function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }) {
+function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete?: () => void }) {
   const { t } = useTranslation()
   const hasDocs = (entry.docs?.length ?? 0) > 0
   const hasComments = (entry.comments ?? '').trim().length > 0
@@ -467,15 +474,17 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
                 </span>
               </button>
             )}
-            <button
-              type="button"
-              onClick={onDelete}
-              className="oa-pressable inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground/55 hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive sm:h-8 sm:w-8 sm:border-transparent sm:bg-transparent"
-              title={t('inbox.deleteEntryTitle')}
-              aria-label={t('inbox.deleteEntryAriaLabel')}
-            >
-              <Trash2 size={14} strokeWidth={1.75} />
-            </button>
+            {onDelete && (
+              <button
+                type="button"
+                onClick={onDelete}
+                className="oa-pressable inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground/55 hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive sm:h-8 sm:w-8 sm:border-transparent sm:bg-transparent"
+                title={t('inbox.deleteEntryTitle')}
+                aria-label={t('inbox.deleteEntryAriaLabel')}
+              >
+                <Trash2 size={14} strokeWidth={1.75} />
+              </button>
+            )}
           </div>
         </div>
       </header>

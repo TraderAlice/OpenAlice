@@ -4,10 +4,12 @@ import type { UseIssues } from '../hooks/useIssues'
 import {
   coreOfficeDutyRegistrations,
   projectOfficeDutyQueue,
+  type OfficeDutyAcknowledgementResult,
   type OfficeDutyCandidate,
   type OfficeDutySourceStatus,
 } from './duty-registry'
 import type { OfficeProductActivity } from './useOfficeProductActivity'
+import { useOfficeInboxDuties } from './useOfficeInboxDuties'
 
 const EVIDENCE_RECEIPTS_KEY = 'openalice:office-duty:evidence-receipts:v2'
 const MAX_SESSION_RECEIPTS = 256
@@ -38,11 +40,17 @@ function writeEvidenceReceipts(receipts: ReadonlyMap<string, string>) {
 }
 
 export interface OfficeDutyQueue {
+  /** Every currently actionable duty, before the Office freezes a finite shift. */
   readonly candidates: readonly OfficeDutyCandidate[]
   readonly status: OfficeDutySourceStatus
+  readonly inboxStatus: OfficeDutySourceStatus
   readonly cadenceStatus: OfficeDutySourceStatus
+  /** Domain facts that still block an honest clear, including reviewed cadence exceptions. */
+  readonly unresolvedCount: number
+  readonly inboxCount: number
   readonly evidenceBySubject: ReadonlyMap<string, OfficeDutyCandidate>
-  acknowledge(duty: OfficeDutyCandidate): void
+  readonly inboxByEntryId: ReadonlyMap<string, OfficeDutyCandidate>
+  acknowledge(duty: OfficeDutyCandidate): Promise<OfficeDutyAcknowledgementResult>
 }
 
 /** Combines registered read-only product sources into the Office duty queue. */
@@ -51,6 +59,10 @@ export function useOfficeDuties(
   issues: UseIssues,
 ): OfficeDutyQueue {
   const [evidenceReceipts, setEvidenceReceipts] = useState(readEvidenceReceipts)
+  const inboxDuties = useOfficeInboxDuties(activity.inbox?.seq)
+  const inboxStatus = inboxDuties.status
+  const inboxDeliveries = inboxDuties.deliveries
+  const markInboxReadConfirmed = inboxDuties.markReadConfirmed
   const cadenceStatus = issues.error
     ? 'error' as const
     : issues.loading ? 'loading' as const
@@ -61,11 +73,15 @@ export function useOfficeDuties(
       : issues.data ? 'ready' as const : 'loading' as const
   const registrations = useMemo(() => coreOfficeDutyRegistrations({
     now: Date.now(),
-    activity,
-    activityStatus: activity.sourceStatus ?? 'ready',
+    inboxDeliveries,
+    inboxStatus,
     issues: issues.data,
     issueStatus,
-  }), [activity, issueStatus, issues.data])
+  }), [inboxDeliveries, inboxStatus, issueStatus, issues.data])
+  const unresolvedProjection = useMemo(
+    () => projectOfficeDutyQueue(registrations),
+    [registrations],
+  )
   const projection = useMemo(() => projectOfficeDutyQueue(registrations, (duty) => (
     duty.receipt.kind !== 'evidence'
       || evidenceReceipts.get(duty.receipt.subjectKey) !== duty.receipt.fingerprint
@@ -93,6 +109,11 @@ export function useOfficeDuties(
       ? [[duty.receipt.subjectKey, duty] as const]
       : [])
   ))), [registrations])
+  const inboxByEntryId = useMemo(() => new Map(registrations.flatMap((registration) => (
+    registration.candidates.flatMap((duty) => duty.receipt.kind === 'inbox-read'
+      ? [[duty.receipt.inboxEntryId, duty] as const]
+      : [])
+  ))), [registrations])
   useEffect(() => {
     if (issueStatus !== 'ready') return
     setEvidenceReceipts((current) => {
@@ -105,11 +126,14 @@ export function useOfficeDuties(
     })
   }, [currentExceptionReceipts, issueStatus])
 
-  const acknowledge = useCallback((duty: OfficeDutyCandidate) => {
+  const acknowledge = useCallback(async (duty: OfficeDutyCandidate) => {
     const receipt = duty.receipt
+    if (receipt.kind === 'inbox-read') {
+      return markInboxReadConfirmed(receipt.inboxEntryId)
+    }
     if (receipt.kind === 'event-watermark') {
       activity.acknowledgeThrough(receipt.family, receipt.throughSeq)
-      return
+      return 'acknowledged'
     }
     setEvidenceReceipts((current) => {
       if (current.get(receipt.subjectKey) === receipt.fingerprint) return current
@@ -119,13 +143,18 @@ export function useOfficeDuties(
       writeEvidenceReceipts(next)
       return next
     })
-  }, [activity])
+    return 'acknowledged'
+  }, [activity, markInboxReadConfirmed])
 
   return {
     candidates,
     status: projection.status,
+    inboxStatus,
     cadenceStatus,
+    unresolvedCount: unresolvedProjection.candidates.length,
+    inboxCount: inboxDeliveries.length,
     evidenceBySubject,
+    inboxByEntryId,
     acknowledge,
   }
 }

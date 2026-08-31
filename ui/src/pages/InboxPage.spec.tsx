@@ -5,11 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../i18n'
 import { api } from '../api'
+import type { InboxEntry } from '../api/inbox'
 import { useInboxSelection } from '../live/inbox-selection'
 import {
   readOfficeInboxDutyExcursion,
   rememberOfficeInboxDutyExcursion,
 } from '../office/inbox-duty-excursion'
+import { inboxUnreadDutyRegistration, type OfficeInboxDutyCandidate } from '../office/duty-registry'
 import { readWorkspaceFile } from '../components/workspace/api'
 import { InboxAttachment, InboxPage } from './InboxPage'
 
@@ -17,6 +19,13 @@ const workspaceMocks = vi.hoisted(() => ({
   openHeadlessRun: vi.fn(),
   resumeSession: vi.fn(),
 }))
+
+function officeInboxDuty(entry: InboxEntry): OfficeInboxDutyCandidate {
+  return inboxUnreadDutyRegistration([{
+    title: entry.comments ?? entry.docs?.[0]?.path ?? 'Inbox delivery',
+    entry,
+  }], 'ready').candidates[0] as OfficeInboxDutyCandidate
+}
 
 vi.mock('../contexts/workspaces-context', () => ({
   useWorkspaces: () => ({
@@ -199,11 +208,7 @@ describe('InboxPage Office presentation handshake', () => {
     }
     vi.spyOn(api.inbox, 'history').mockResolvedValue({ entries: [entry], hasMore: false })
     rememberOfficeInboxDutyExcursion({
-      throughSeq: 42,
-      count: 1,
-      workspaceId: 'ws-1',
-      inboxEntryId: entry.id,
-      documentCount: 1,
+      duty: officeInboxDuty(entry),
       phase: 'away',
     })
     useInboxSelection.getState().select(entry.id)
@@ -226,11 +231,14 @@ describe('InboxPage Office presentation handshake', () => {
     }
     vi.spyOn(api.inbox, 'history').mockResolvedValue({ entries: [entry], hasMore: false })
     rememberOfficeInboxDutyExcursion({
-      throughSeq: 42,
-      count: 1,
-      workspaceId: 'ws-1',
-      inboxEntryId: 'inbox-office-a',
-      documentCount: 1,
+      duty: officeInboxDuty({
+        id: 'inbox-office-a',
+        ts: entry.ts - 1,
+        workspaceId: 'ws-1',
+        workspaceLabel: 'research',
+        comments: 'Captured delivery A.',
+        docs: [{ path: 'research/a.md' }],
+      }),
       phase: 'away',
     })
     useInboxSelection.getState().select(entry.id)
@@ -238,6 +246,35 @@ describe('InboxPage Office presentation handshake', () => {
     render(<InboxPage visible />)
     expect(await screen.findByText('A newer default-selected delivery.')).toBeTruthy()
     expect(readOfficeInboxDutyExcursion()?.phase).toBe('away')
+  })
+
+  it('renders an exact captured duty older than the live feed without exposing Delete', async () => {
+    const captured = {
+      id: 'inbox-office-older-than-feed',
+      ts: Date.now() - 10_000,
+      workspaceId: 'ws-1',
+      workspaceLabel: 'research',
+      comments: '# Older weekly report\n\nThis exact report still needs review.',
+      docs: [{ path: 'research/older-weekly-report.md', revision: 'rev-old' }],
+    }
+    const newest = {
+      id: 'inbox-office-newest-live',
+      ts: Date.now(),
+      workspaceId: 'ws-1',
+      workspaceLabel: 'research',
+      comments: 'A newer live-feed row.',
+    }
+    vi.spyOn(api.inbox, 'history').mockResolvedValue({ entries: [newest], hasMore: false })
+    rememberOfficeInboxDutyExcursion({ duty: officeInboxDuty(captured), phase: 'away' })
+    useInboxSelection.getState().select(captured.id)
+
+    render(<InboxPage visible />)
+
+    expect(await screen.findAllByRole('heading', { level: 1, name: 'Older weekly report' }))
+      .toHaveLength(2)
+    expect(screen.getByText('This exact report still needs review.')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Delete this inbox entry' })).toBeNull()
+    await waitFor(() => expect(readOfficeInboxDutyExcursion()?.phase).toBe('presented'))
   })
 })
 

@@ -48,7 +48,7 @@ export interface OfficeInboxDeliveryReview {
   readonly phase: 'required' | 'returned'
 }
 export interface OfficeDutyReview {
-  kind: OfficeActivityKind
+  kind: Exclude<OfficeActivityKind, 'news'>
   throughSeq: number
   count: number
   inboxDelivery?: OfficeInboxDeliveryReview

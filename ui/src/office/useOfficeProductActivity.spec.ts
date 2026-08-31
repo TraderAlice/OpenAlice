@@ -177,6 +177,62 @@ describe('projectOfficeProductActivity', () => {
 })
 
 describe('useOfficeProductActivity', () => {
+  it('publishes Agent authority while a slow News journal page is still loading', async () => {
+    const completed = event(13, 'runtime.stopped', {
+      agent: 'grok',
+      workspaceId: 'office-lab',
+      resumeId: 'resume-grok-13',
+      status: 'done',
+      assistantText: 'Report ready.',
+    })
+    const slowNews = deferredPage()
+    window.sessionStorage.setItem('openalice:office-product-activity:ack:agent', '0')
+    queryRuntime
+      .mockResolvedValueOnce({ entries: [completed], lastSeq: 13 })
+      .mockResolvedValueOnce({ entries: [], lastSeq: 13 })
+      .mockReturnValueOnce(slowNews.promise)
+
+    const hook = renderHook(() => useOfficeProductActivity())
+
+    await waitFor(() => expect(hook.result.current.agentSourceStatus).toBe('ready'))
+    expect(hook.result.current.agent?.seq).toBe(13)
+    expect(hook.result.current.attention.agent).toBe(true)
+    expect(hook.result.current.sourceStatus).toBe('loading')
+    expect(hook.result.current.news).toBeNull()
+
+    await act(async () => {
+      slowNews.resolve({ entries: [newsEleven], lastSeq: 13 })
+      await slowNews.promise
+    })
+    await waitFor(() => expect(hook.result.current.sourceStatus).toBe('ready'))
+    expect(hook.result.current.news?.seq).toBe(11)
+    hook.unmount()
+  })
+
+  it('keeps Agent authority ready when the ambient News journal query fails', async () => {
+    const completed = event(13, 'runtime.stopped', {
+      agent: 'grok',
+      workspaceId: 'office-lab',
+      resumeId: 'resume-grok-13',
+      status: 'done',
+      assistantText: 'Report ready.',
+    })
+    window.sessionStorage.setItem('openalice:office-product-activity:ack:agent', '0')
+    queryRuntime
+      .mockResolvedValueOnce({ entries: [completed], lastSeq: 13 })
+      .mockResolvedValueOnce({ entries: [], lastSeq: 13 })
+      .mockRejectedValueOnce(new Error('news unavailable'))
+
+    const hook = renderHook(() => useOfficeProductActivity())
+
+    await waitFor(() => expect(hook.result.current.sourceStatus).toBe('error'))
+    expect(hook.result.current.agentSourceStatus).toBe('ready')
+    expect(hook.result.current.agent?.seq).toBe(13)
+    expect(hook.result.current.attention.agent).toBe(true)
+    expect(hook.result.current.news).toBeNull()
+    hook.unmount()
+  })
+
   it('baselines existing history, then remembers activity that happened while away', async () => {
     queueRefresh([inboxNine, newsEleven], 11)
     const firstVisit = renderHook(() => useOfficeProductActivity())

@@ -506,15 +506,19 @@
   right: max(24px, calc(50% - 340px));
   bottom: auto;
   left: max(24px, calc(50% - 340px));
+  display: flex;
   max-height: calc(100% - 100px);
+  flex-direction: column;
   overflow: hidden;
   color: var(--gba-ink);
 }
 
 .oa-office-cadence__panel {
   display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
   gap: 10px;
-  max-height: calc(100% - 38px);
+  max-height: none;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -827,6 +831,91 @@
   display: grid;
   grid-template-columns: minmax(0, 0.62fr) minmax(0, 1fr) minmax(0, 1.45fr);
   gap: 7px;
+}
+
+.oa-office-cadence__actions--entry {
+  grid-template-columns: minmax(0, 0.62fr) minmax(0, 1.45fr);
+}
+
+.oa-office-inbox-duty__queue {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 7px;
+  border: 2px solid var(--gba-moss-dark);
+  color: var(--gba-moss-dark);
+  background: color-mix(in srgb, var(--gba-water) 16%, var(--gba-paper));
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-xs);
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.oa-office-inbox-duty__queue i {
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--gba-ink);
+  background: var(--gba-water);
+  box-shadow: 1px 1px 0 var(--gba-ink);
+}
+
+.oa-office-inbox-duty__documents {
+  display: grid;
+  gap: 7px;
+  padding: 9px;
+  border: 3px solid var(--gba-ink);
+  background: var(--gba-paper);
+  box-shadow: 3px 3px 0 color-mix(in srgb, var(--gba-ink) 22%, transparent);
+}
+
+.oa-office-inbox-duty__documents > span {
+  color: var(--gba-moss-dark);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-xs);
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.oa-office-inbox-duty__documents ul {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.oa-office-inbox-duty__documents li {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 7px;
+  border: 2px solid color-mix(in srgb, var(--gba-ink) 34%, transparent);
+  background: var(--gba-cream);
+}
+
+.oa-office-inbox-duty__documents img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.oa-office-inbox-duty__documents strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--gba-ink);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oa-office-inbox-duty__documents small {
+  color: var(--gba-ink-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-xs);
+  font-weight: 800;
 }
 
 .oa-office-inspect {
@@ -5900,6 +5989,11 @@ button.oa-office-hud__duty:active {
   opacity: 0.72;
 }
 
+.oa-office-hud__duty--complete {
+  border-color: var(--office-gba-ink-seed);
+  background: color-mix(in srgb, var(--gba-alert) 18%, var(--office-gba-cream-seed));
+}
+
 .oa-office-hud__status {
   display: flex;
   align-items: center;
@@ -6662,8 +6756,12 @@ button.oa-office-hud__duty:active {
   animation: oa-office-service-signal 920ms steps(2, end) infinite;
 }
 
-.oa-office-map-service[data-kind="news"] .oa-office-map-service__signal {
-  background: var(--gba-water);
+.oa-office-map-service[data-kind="news"][data-fresh="true"] .oa-office-map-service__placard {
+  filter:
+    drop-shadow(-2px 0 0 color-mix(in srgb, var(--gba-water) 72%, transparent))
+    drop-shadow(2px 0 0 color-mix(in srgb, var(--gba-water) 72%, transparent))
+    brightness(1.12);
+  animation: oa-office-service-fresh 920ms steps(2, end) infinite;
 }
 
 .oa-office-map-service:disabled {
@@ -6725,8 +6823,13 @@ button.oa-office-hud__duty:active {
   50% { transform: translateY(-3px); }
 }
 
+@keyframes oa-office-service-fresh {
+  50% { opacity: 0.82; transform: translateY(-2px); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .oa-office-map-service__signal,
+  .oa-office-map-service[data-kind="news"][data-fresh="true"] .oa-office-map-service__placard,
   .oa-office-landmark-ack { animation: none; }
 }
 
@@ -7010,6 +7113,10 @@ button.oa-office-hud__duty:active {
   }
 
   .oa-office-cadence__actions {
+    grid-template-columns: 1fr;
+  }
+
+  .oa-office-inbox-duty__documents ul {
     grid-template-columns: 1fr;
   }
 

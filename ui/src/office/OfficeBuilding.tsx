@@ -80,6 +80,7 @@ import {
 import { layoutOfficeMap } from './map-layout'
 import { officeDepthAt } from './scene-depth'
 import { useReducedMotion } from './use-reduced-motion'
+import type { OfficeShift } from './useOfficeShift'
 import type { OfficeActivityKind, OfficeProductActivityState } from './useOfficeProductActivity'
 
 const OFFICE_MOVEMENTS = {
@@ -142,40 +143,10 @@ type OfficeAcknowledgementTarget =
   | 'operations'
   | 'floor-terminal'
   | 'inbox-service'
-  | 'news-service'
   | OfficeEmployeeDutyTargetId
 
 function isOfficeEmployeeTargetId(targetId: string): targetId is OfficeEmployeeDutyTargetId {
   return targetId.startsWith('employee:')
-}
-
-export interface OfficeNextDuty {
-  kind: OfficeActivityKind
-  targetId: OfficeDutyTargetId
-  count: number
-}
-
-export function nextOfficeDuty(
-  activity: OfficeProductActivityState,
-  targetAvailable: (targetId: string) => boolean = () => false,
-): OfficeNextDuty | null {
-  if (activity.attention.inbox) {
-    return { kind: 'inbox', targetId: 'inbox-service', count: activity.pending.inbox }
-  }
-  if (activity.attention.agent) {
-    const subject = activity.agent?.subject
-    if (subject?.kind === 'session') {
-      const employeeTargetId = `employee:${subject.workspaceId}:${subject.resumeId}` as const
-      if (targetAvailable(employeeTargetId)) {
-        return { kind: 'agent', targetId: employeeTargetId, count: activity.pending.agent }
-      }
-    }
-    return { kind: 'agent', targetId: 'operations', count: activity.pending.agent }
-  }
-  if (activity.attention.news) {
-    return { kind: 'news', targetId: 'news-service', count: activity.pending.news }
-  }
-  return null
 }
 
 export interface OfficePlayerState {
@@ -209,8 +180,11 @@ export function OfficeBuilding({
   },
   dutyCandidates,
   dutyStatus = 'ready',
+  dutyShift,
+  inboxBacklogCount = 0,
   dutyAcknowledgement,
   onOpenDuty,
+  onStartNextShift,
   onOpenService,
   onReturnLive,
   coworkerAssets: retainedCoworkerAssets,
@@ -233,12 +207,16 @@ export function OfficeBuilding({
   productActivity?: OfficeProductActivityState
   dutyCandidates?: readonly OfficeDutyCandidate[]
   dutyStatus?: OfficeDutySourceStatus
+  dutyShift?: Pick<OfficeShift,
+    'state' | 'total' | 'completed' | 'position' | 'remainingMinutes' | 'backlogCount' | 'canStartNext'>
+  inboxBacklogCount?: number
   dutyAcknowledgement?: {
     readonly token: number
     readonly targetId: OfficeDutyTargetId
     readonly label?: string
   } | null
   onOpenDuty?: (duty: OfficeResolvedDuty) => void
+  onStartNextShift?: () => void
   onOpenService?: (kind: 'inbox' | 'news', seq?: number) => void
   onReturnLive?: () => void
   coworkerAssets?: ReadonlyMap<string, OfficeCoworkerSpriteAsset>
@@ -490,13 +468,18 @@ export function OfficeBuilding({
     : null
   const legacyDutyCandidates = useMemo(() => projectOfficeDutyQueue(coreOfficeDutyRegistrations({
     now: Date.now(),
-    activity: productActivity,
-    activityStatus: 'ready',
+    inboxDeliveries: [],
+    inboxStatus: 'ready',
     issues: null,
     issueStatus: 'ready',
   })).candidates, [productActivity])
   const currentDutyCandidates = dutyCandidates ?? legacyDutyCandidates
   const currentDutyStatus = dutyCandidates ? dutyStatus : 'ready'
+  const currentShiftState = dutyShift?.state
+    ?? (currentDutyCandidates.length > 0
+      ? 'active'
+      : currentDutyStatus === 'ready' ? 'quiet'
+        : currentDutyStatus === 'loading' ? 'planning' : 'degraded')
   const nextDuty = replaySeq == null && currentDutyCandidates[0]
     ? resolveOfficeDutyTarget(
         currentDutyCandidates[0],
@@ -508,32 +491,35 @@ export function OfficeBuilding({
     ? nextDuty.kind === 'cadence'
       ? nextDuty.cadence.title
       : nextDuty.kind === 'inbox'
-      ? nextDuty.landmark.detail ?? t('office.inboxStation')
-      : nextDuty.kind === 'agent'
-        ? nextDutyTarget?.kind === 'employee'
-          ? officeCoworkerCallsign(
-              nextDutyTarget.employee,
-              coworkerAssets.get(nextDutyTarget.employee.resumeId),
-            )
-          : t('office.operationsBoard')
-        : nextDuty.landmark.detail ?? t('office.newsStation')
+      ? nextDuty.delivery.title
+      : nextDutyTarget?.kind === 'employee'
+        ? officeCoworkerCallsign(
+            nextDutyTarget.employee,
+            coworkerAssets.get(nextDutyTarget.employee.resumeId),
+          )
+        : t('office.operationsBoard')
     : null
   const nextDutyCategory = nextDuty
     ? nextDuty.kind === 'cadence'
       ? t('office.cadenceReview')
       : t(nextDuty.kind === 'inbox'
         ? 'office.logChannelInbox'
-        : nextDuty.kind === 'agent'
-          ? 'office.logChannelAgent'
-          : 'office.logChannelNews')
+        : 'office.logChannelAgent')
     : null
   const nextDutyContext = nextDuty
     ? nextDuty.kind === 'cadence'
       ? nextDuty.cadence.workspaceTag
-      : nextDuty.landmark.source
+      : nextDuty.kind === 'inbox'
+        ? nextDuty.delivery.entry.workspaceLabel ?? nextDuty.delivery.entry.workspaceId
+        : nextDuty.landmark.source
     : null
-  const operationsCadenceDuty = nextDuty?.kind === 'cadence' && nextDuty.targetId === 'operations'
-    ? nextDuty
+  const inboxBacklogDutyCandidate = currentDutyCandidates.find((duty) => duty.kind === 'inbox')
+  const inboxBacklogDuty = inboxBacklogDutyCandidate?.kind === 'inbox'
+    ? resolveOfficeDutyTarget(inboxBacklogDutyCandidate)
+    : null
+  const cadenceDutyCandidate = currentDutyCandidates.find((duty) => duty.kind === 'cadence')
+  const operationsCadenceDuty = cadenceDutyCandidate?.kind === 'cadence'
+    ? resolveOfficeDutyTarget(cadenceDutyCandidate)
     : null
   const operationsNeedsAttention = productActivity.attention.agent || Boolean(operationsCadenceDuty)
   const operationsPending = operationsCadenceDuty?.count ?? productActivity.pending.agent
@@ -553,19 +539,13 @@ export function OfficeBuilding({
   useEffect(() => {
     const previous = previousAttentionRef.current
     const current = productActivity.attention
-    const targetForKind = {
-      agent: interactionAnchorTargetId === 'operations'
-        || interactionAnchorTargetId === 'floor-terminal'
-        || (interactionAnchorTargetId != null && isOfficeEmployeeTargetId(interactionAnchorTargetId))
-        ? interactionAnchorTargetId
-        : null,
-      inbox: interactionAnchorTargetId === 'inbox-service' ? interactionAnchorTargetId : null,
-      news: interactionAnchorTargetId === 'news-service' ? interactionAnchorTargetId : null,
-    } as const
-    for (const kind of ['agent', 'inbox', 'news'] as const) {
-      if (previous[kind] && !current[kind] && targetForKind[kind]) {
-        pendingAcknowledgementRef.current = targetForKind[kind]
-      }
+    const agentTarget = interactionAnchorTargetId === 'operations'
+      || interactionAnchorTargetId === 'floor-terminal'
+      || (interactionAnchorTargetId != null && isOfficeEmployeeTargetId(interactionAnchorTargetId))
+      ? interactionAnchorTargetId
+      : null
+    if (previous.agent && !current.agent && agentTarget) {
+      pendingAcknowledgementRef.current = agentTarget
     }
     previousAttentionRef.current = current
   }, [interactionAnchorTargetId, interactionSuspended, productActivity.attention])
@@ -874,8 +854,13 @@ export function OfficeBuilding({
         icon: OFFICE_FURNITURE.generated.inboxTerminal,
         action: t('office.interactActionInbox'),
         label: t('office.interactInbox'),
-        detail: productActivity.inbox?.detail ?? productActivity.inbox?.source ?? null,
-        source: productActivity.inbox?.source,
+        detail: inboxBacklogDutyCandidate?.delivery.title
+          ?? productActivity.inbox?.detail
+          ?? productActivity.inbox?.source
+          ?? null,
+        source: inboxBacklogDutyCandidate?.delivery.entry.workspaceLabel
+          ?? inboxBacklogDutyCandidate?.delivery.entry.workspaceId
+          ?? productActivity.inbox?.source,
       }
     }
     if (nearbyTarget.kind === 'news-service') {
@@ -892,8 +877,8 @@ export function OfficeBuilding({
         icon: OFFICE_HUD_ASSETS.occupancyLog,
         action: t('office.interactActionOperations'),
         label: t('office.cadenceReview'),
-        detail: operationsCadenceDuty.cadence.title,
-        source: operationsCadenceDuty.cadence.workspaceTag,
+        detail: cadenceDutyCandidate?.cadence.title ?? null,
+        source: cadenceDutyCandidate?.cadence.workspaceTag,
       }
     }
     const agentDetail = (() => {
@@ -1034,7 +1019,8 @@ export function OfficeBuilding({
     } else if (target.kind === 'floor-terminal') {
       onOpenLog('floor-terminal')
     } else if (target.kind === 'inbox-service') {
-      onOpenService?.('inbox', productActivity.inbox?.seq)
+      if (inboxBacklogDuty && onOpenDuty) onOpenDuty(inboxBacklogDuty)
+      else onOpenService?.('inbox', productActivity.inbox?.seq)
     } else if (target.kind === 'news-service') {
       onOpenService?.('news', productActivity.news?.seq)
     } else {
@@ -1579,11 +1565,13 @@ export function OfficeBuilding({
               type="button"
               className="oa-office-hud__duty"
               data-kind={nextDuty.kind}
-              aria-label={t('office.nextDutyPending', {
+              aria-label={t('office.shiftDutyPending', {
                 name: [nextDutyCategory, nextDutyName, nextDutyContext]
                   .filter(Boolean)
                   .join(' · '),
-                countLabel: nextDuty.count >= 9 ? '9+' : nextDuty.count,
+                position: dutyShift?.position ?? 1,
+                total: dutyShift?.total ?? currentDutyCandidates.length,
+                minutes: dutyShift?.remainingMinutes ?? 0,
               })}
               onClick={() => requestTargetInteraction(
                 nextDuty.targetId,
@@ -1591,7 +1579,8 @@ export function OfficeBuilding({
                   ...(onOpenDuty
                     ? {
                         activate: () => onOpenDuty(nextDuty),
-                        anchorTarget: nextDuty.receipt.kind === 'event-watermark',
+                        anchorTarget: nextDuty.receipt.kind === 'event-watermark'
+                          || nextDuty.receipt.kind === 'inbox-read',
                       }
                     : {}),
                   ...(nextDuty.fallbackTargetId
@@ -1613,7 +1602,15 @@ export function OfficeBuilding({
               )}
             >
               <span className="oa-office-hud__duty-meta">
-                <span className="oa-office-hud__duty-kicker">{t('office.nextDuty')}</span>
+                <span className="oa-office-hud__duty-kicker">{t('office.shiftLabel')}</span>
+                {dutyShift && (
+                  <>
+                    <i className="oa-office-hud__duty-separator" aria-hidden>·</i>
+                    <span>{t('office.shiftTimeRemaining', {
+                      minutes: dutyShift.remainingMinutes,
+                    })}</span>
+                  </>
+                )}
                 <i className="oa-office-hud__duty-separator" aria-hidden>·</i>
                 <span className="oa-office-hud__duty-category">{nextDutyCategory}</span>
                 {nextDutyContext && (
@@ -1624,11 +1621,32 @@ export function OfficeBuilding({
                 )}
               </span>
               <strong title={nextDutyName}>{nextDutyName}</strong>
-              {nextDuty.count > 0 && <em>{nextDuty.count >= 9 ? '9+' : nextDuty.count}</em>}
+              <em>{dutyShift?.position ?? 1}/{dutyShift?.total ?? currentDutyCandidates.length}</em>
             </button>
-          ) : currentDutyStatus === 'ready' ? (
+          ) : currentShiftState === 'complete' && dutyShift?.canStartNext && onStartNextShift ? (
+            <button
+              type="button"
+              className="oa-office-hud__duty oa-office-hud__duty--complete"
+              aria-label={t('office.startNextShift', { count: dutyShift.backlogCount ?? 0 })}
+              onClick={onStartNextShift}
+            >
+              <span className="oa-office-hud__duty-meta">{t('office.startNextShiftShort')}</span>
+              <strong>{t('office.shiftComplete')}</strong>
+              <em>+{dutyShift.backlogCount ?? 0}</em>
+            </button>
+          ) : currentShiftState === 'complete' ? (
+            <div className="oa-office-hud__duty oa-office-hud__duty--complete" role="status">
+              <span className="oa-office-hud__duty-meta">{t('office.shiftLabel')}</span>
+              <strong>{t('office.shiftCarryover', { count: dutyShift?.backlogCount ?? 0 })}</strong>
+            </div>
+          ) : currentShiftState === 'quiet' ? (
             <div className="oa-office-hud__duty oa-office-hud__duty--clear">
-              <span className="oa-office-hud__duty-meta">{t('office.nextDuty')}</span>
+              <span className="oa-office-hud__duty-meta">{t('office.shiftLabel')}</span>
+              <strong>{t('office.shiftQuiet')}</strong>
+            </div>
+          ) : currentShiftState === 'clear' ? (
+            <div className="oa-office-hud__duty oa-office-hud__duty--clear">
+              <span className="oa-office-hud__duty-meta">{t('office.shiftLabel')}</span>
               <strong>{t('office.shiftClear')}</strong>
             </div>
           ) : (
@@ -1637,8 +1655,8 @@ export function OfficeBuilding({
               data-status={currentDutyStatus}
               role="status"
             >
-              <span className="oa-office-hud__duty-meta">{t('office.nextDuty')}</span>
-              <strong>{t(currentDutyStatus === 'loading'
+              <span className="oa-office-hud__duty-meta">{t('office.shiftLabel')}</span>
+              <strong>{t(currentShiftState === 'planning'
                 ? 'office.dutySyncing'
                 : 'office.dutySignalInterrupted')}</strong>
             </div>
@@ -2033,8 +2051,12 @@ export function OfficeBuilding({
                 ? 'inbox-service'
                 : 'news-service'
               const fresh = productActivity.freshKind === landmark.kind
-              const needsAttention = productActivity.attention[landmark.kind]
-              const pendingCount = productActivity.pending[landmark.kind]
+              const needsAttention = landmark.kind === 'inbox'
+                ? inboxBacklogCount > 0
+                : false
+              const pendingCount = landmark.kind === 'inbox'
+                ? inboxBacklogCount
+                : 0
               const pendingLabel = pendingCount >= 9 ? '9+' : String(pendingCount || '!')
               const serviceName = landmark.kind === 'inbox'
                 ? t('office.inboxStation')

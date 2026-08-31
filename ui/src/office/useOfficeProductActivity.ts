@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { api } from '../api'
-import type { AgentRuntimeEvent } from '../api/agentRuntimeLog'
+import type { AgentRuntimeEvent, AgentRuntimePage } from '../api/agentRuntimeLog'
 import { GLOBAL_ACTIVITY_REFRESH_EVENT } from '../hooks/useGlobalAgentActivity'
 import { officeActivityExcerpt } from './activity-text'
 import type { OfficeDutySourceStatus } from './duty-registry'
@@ -56,7 +56,9 @@ export interface OfficeProductActivityState {
   readonly attention: Readonly<Record<OfficeActivityKind, boolean>>
   readonly pending: Readonly<Record<OfficeActivityKind, number>>
   readonly freshKind: OfficeActivityKind | null
-  /** Optional for fixture compatibility; the live hook always reports it. */
+  /** Agent-review authority only; raw Inbox/News journal health must not fence Agent duty. */
+  readonly agentSourceStatus?: OfficeDutySourceStatus
+  /** Aggregate raw journal status. Optional for fixture compatibility; the live hook reports it. */
   readonly sourceStatus?: OfficeDutySourceStatus
 }
 
@@ -158,8 +160,11 @@ function writeAcknowledgedSeq(kind: OfficeActivityKind, seq: number) {
 
 /** Office-specific projection: persistent landmark copy, attention, and fresh-event motion. */
 export function useOfficeProductActivity(): OfficeProductActivity {
-  const [events, setEvents] = useState<AgentRuntimeEvent[]>([])
+  const [eventsByKind, setEventsByKind] = useState<
+    Record<OfficeActivityKind, readonly AgentRuntimeEvent[]>
+  >({ agent: [], inbox: [], news: [] })
   const [sourceStatus, setSourceStatus] = useState<OfficeDutySourceStatus>('loading')
+  const [agentSourceStatus, setAgentSourceStatus] = useState<OfficeDutySourceStatus>('loading')
   const [freshKind, setFreshKind] = useState<OfficeActivityKind | null>(null)
   const [attention, setAttention] = useState<Record<OfficeActivityKind, boolean>>({
     agent: false,
@@ -171,10 +176,22 @@ export function useOfficeProductActivity(): OfficeProductActivity {
     inbox: 0,
     news: 0,
   })
-  const initializedRef = useRef(false)
+  const initializedByKindRef = useRef<Record<OfficeActivityKind, boolean>>({
+    agent: false,
+    inbox: false,
+    news: false,
+  })
   const freshTimerRef = useRef<number | null>(null)
-  const refreshGenerationRef = useRef(0)
+  const lifecycleGenerationRef = useRef(0)
+  const issuedRequestRef = useRef<Record<OfficeActivityKind, number>>({ agent: 0, inbox: 0, news: 0 })
+  const settledRequestRef = useRef<Record<OfficeActivityKind, number>>({ agent: 0, inbox: 0, news: 0 })
+  const sourceStatusByKindRef = useRef<Record<OfficeActivityKind, OfficeDutySourceStatus>>({
+    agent: 'loading',
+    inbox: 'loading',
+    news: 'loading',
+  })
   const freshKindRef = useRef<OfficeActivityKind | null>(null)
+  const freshSeqRef = useRef(0)
   const acknowledgedSeqRef = useRef<Record<OfficeActivityKind, number>>({ agent: 0, inbox: 0, news: 0 })
   const latestSeqRef = useRef<Record<OfficeActivityKind, number>>({ agent: 0, inbox: 0, news: 0 })
   const entriesByKindRef = useRef<Record<OfficeActivityKind, readonly AgentRuntimeEvent[]>>({
@@ -183,65 +200,44 @@ export function useOfficeProductActivity(): OfficeProductActivity {
     news: [],
   })
 
-  const refresh = useCallback(async () => {
-    const generation = ++refreshGenerationRef.current
-    const activityApi = api.productActivity ?? api.agentRuntime
-    const pages = await Promise.all([
-      activityApi.query({ page: 1, pageSize: PENDING_COUNT_CAP, types: [...OFFICE_AGENT_REVIEW_TYPES] }),
-      activityApi.query({ page: 1, pageSize: PENDING_COUNT_CAP, family: 'inbox' }),
-      activityApi.query({ page: 1, pageSize: PENDING_COUNT_CAP, family: 'news' }),
-    ]).catch(() => null)
-    if (!pages) {
-      if (generation === refreshGenerationRef.current) setSourceStatus('error')
-      return
-    }
-    if (generation !== refreshGenerationRef.current) return
-    const nextEvents = pages.flatMap((page) => page.entries).sort((a, b) => a.seq - b.seq)
-    const journalLastSeq = Math.max(0, ...pages.map((page) => page.lastSeq))
-    const previousLatest = { ...latestSeqRef.current }
-    const nextProjected = projectOfficeProductActivity(nextEvents)
-    latestSeqRef.current = {
-      agent: nextProjected.agent?.seq ?? 0,
-      inbox: nextProjected.inbox?.seq ?? 0,
-      news: nextProjected.news?.seq ?? 0,
-    }
-    const entriesByKind: Record<OfficeActivityKind, readonly AgentRuntimeEvent[]> = {
-      agent: pages[0].entries,
-      inbox: pages[1].entries,
-      news: pages[2].entries,
-    }
-    entriesByKindRef.current = entriesByKind
+  const updateSourceStatus = useCallback((
+    kind: OfficeActivityKind,
+    status: OfficeDutySourceStatus,
+  ) => {
+    sourceStatusByKindRef.current = { ...sourceStatusByKindRef.current, [kind]: status }
+    if (kind === 'agent') setAgentSourceStatus(status)
+    const statuses = OFFICE_ACTIVITY_KINDS.map((family) => sourceStatusByKindRef.current[family])
+    setSourceStatus(statuses.includes('error')
+      ? 'error'
+      : statuses.includes('loading') ? 'loading' : 'ready')
+  }, [])
 
-    if (!initializedRef.current) {
-      const nextAttention = { agent: false, inbox: false, news: false }
-      for (const kind of OFFICE_ACTIVITY_KINDS) {
-        const stored = readAcknowledgedSeq(kind)
-        const latest = latestSeqRef.current[kind]
-        const acknowledged = stored == null || stored > journalLastSeq ? latest : stored
-        acknowledgedSeqRef.current[kind] = acknowledged
-        writeAcknowledgedSeq(kind, acknowledged)
-        nextAttention[kind] = latest > acknowledged
-      }
-      setAttention(nextAttention)
+  const applyActivityPage = useCallback((kind: OfficeActivityKind, page: AgentRuntimePage) => {
+    const entries = [...page.entries].sort((left, right) => left.seq - right.seq)
+    const previousLatest = latestSeqRef.current[kind]
+    const latest = projectOfficeProductActivity(entries)[kind]?.seq ?? 0
+    latestSeqRef.current[kind] = latest
+    entriesByKindRef.current[kind] = entries
+
+    if (!initializedByKindRef.current[kind]) {
+      const stored = readAcknowledgedSeq(kind)
+      const acknowledged = stored == null || stored > page.lastSeq ? latest : stored
+      acknowledgedSeqRef.current[kind] = acknowledged
+      writeAcknowledgedSeq(kind, acknowledged)
+      initializedByKindRef.current[kind] = true
+      setAttention((current) => ({ ...current, [kind]: latest > acknowledged }))
     } else {
       setAttention((current) => ({
-        agent: current.agent
-          || latestSeqRef.current.agent > acknowledgedSeqRef.current.agent,
-        inbox: current.inbox
-          || latestSeqRef.current.inbox > acknowledgedSeqRef.current.inbox,
-        news: current.news
-          || latestSeqRef.current.news > acknowledgedSeqRef.current.news,
+        ...current,
+        [kind]: current[kind] || latest > acknowledgedSeqRef.current[kind],
       }))
-      const notable = [...nextEvents]
+      const notable = [...entries]
         .reverse()
-        .find((event) => {
-          const kind = activityKindForEvent(event)
-          return kind != null && event.seq > previousLatest[kind]
-        })
-      if (notable) {
-        const nextFreshKind = activityKindForEvent(notable) as OfficeActivityKind
-        freshKindRef.current = nextFreshKind
-        setFreshKind(nextFreshKind)
+        .find((event) => event.seq > previousLatest && activityKindForEvent(event) === kind)
+      if (notable && notable.seq > freshSeqRef.current) {
+        freshSeqRef.current = notable.seq
+        freshKindRef.current = kind
+        setFreshKind(kind)
         if (freshTimerRef.current != null) window.clearTimeout(freshTimerRef.current)
         freshTimerRef.current = window.setTimeout(() => {
           freshTimerRef.current = null
@@ -251,19 +247,53 @@ export function useOfficeProductActivity(): OfficeProductActivity {
       }
     }
 
-    setPending({
-      agent: Math.min(PENDING_COUNT_CAP, entriesByKind.agent
-        .filter((event) => event.seq > acknowledgedSeqRef.current.agent).length),
-      inbox: Math.min(PENDING_COUNT_CAP, entriesByKind.inbox
-        .filter((event) => event.seq > acknowledgedSeqRef.current.inbox).length),
-      news: Math.min(PENDING_COUNT_CAP, entriesByKind.news
-        .filter((event) => event.seq > acknowledgedSeqRef.current.news).length),
-    })
-
-    setEvents(nextEvents)
-    initializedRef.current = true
-    setSourceStatus('ready')
+    setPending((current) => ({
+      ...current,
+      [kind]: Math.min(PENDING_COUNT_CAP, entries
+        .filter((event) => event.seq > acknowledgedSeqRef.current[kind]).length),
+    }))
+    setEventsByKind((current) => ({ ...current, [kind]: entries }))
   }, [])
+
+  const refreshSource = useCallback(async (
+    kind: OfficeActivityKind,
+    query: () => Promise<AgentRuntimePage>,
+  ) => {
+    const lifecycleGeneration = lifecycleGenerationRef.current
+    const request = ++issuedRequestRef.current[kind]
+    try {
+      const page = await query()
+      if (lifecycleGeneration !== lifecycleGenerationRef.current
+        || request < settledRequestRef.current[kind]) return
+      settledRequestRef.current[kind] = request
+      applyActivityPage(kind, page)
+      updateSourceStatus(kind, 'ready')
+    } catch {
+      if (lifecycleGeneration !== lifecycleGenerationRef.current
+        || request < settledRequestRef.current[kind]) return
+      settledRequestRef.current[kind] = request
+      updateSourceStatus(kind, 'error')
+    }
+  }, [applyActivityPage, updateSourceStatus])
+
+  const refresh = useCallback(() => {
+    const activityApi = api.productActivity ?? api.agentRuntime
+    void refreshSource('agent', () => activityApi.query({
+      page: 1,
+      pageSize: PENDING_COUNT_CAP,
+      types: [...OFFICE_AGENT_REVIEW_TYPES],
+    }))
+    void refreshSource('inbox', () => activityApi.query({
+      page: 1,
+      pageSize: PENDING_COUNT_CAP,
+      family: 'inbox',
+    }))
+    void refreshSource('news', () => activityApi.query({
+      page: 1,
+      pageSize: PENDING_COUNT_CAP,
+      family: 'news',
+    }))
+  }, [refreshSource])
 
   const acknowledgeThrough = useCallback((kind: OfficeActivityKind, requestedSeq: number) => {
     const latest = latestSeqRef.current[kind]
@@ -295,11 +325,21 @@ export function useOfficeProductActivity(): OfficeProductActivity {
     return () => {
       window.clearInterval(poll)
       window.removeEventListener(GLOBAL_ACTIVITY_REFRESH_EVENT, refreshFromActivity)
-      refreshGenerationRef.current += 1
+      lifecycleGenerationRef.current += 1
       if (freshTimerRef.current != null) window.clearTimeout(freshTimerRef.current)
     }
   }, [refresh])
 
-  const projected = useMemo(() => projectOfficeProductActivity(events), [events])
-  return { ...projected, attention, pending, freshKind, sourceStatus, acknowledgeThrough }
+  const projected = useMemo(() => projectOfficeProductActivity(
+    OFFICE_ACTIVITY_KINDS.flatMap((kind) => eventsByKind[kind]),
+  ), [eventsByKind])
+  return {
+    ...projected,
+    attention,
+    pending,
+    freshKind,
+    agentSourceStatus,
+    sourceStatus,
+    acknowledgeThrough,
+  }
 }

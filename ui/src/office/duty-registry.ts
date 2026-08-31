@@ -4,22 +4,21 @@ import type {
   IssuePriority,
   IssueSnapshot,
 } from '../api/issues'
+import type { InboxEntry } from '../api/inbox'
 import type { ScheduleWhen } from '../api/schedule'
 import type {
   OfficeActivityKind,
-  OfficeActivityInboxSubject,
   OfficeActivityLandmark,
   OfficeActivitySessionSubject,
-  OfficeProductActivityState,
 } from './useOfficeProductActivity'
 
 export type OfficeDutySourceStatus = 'loading' | 'ready' | 'error'
-export type OfficeDutyKind = OfficeActivityKind | 'cadence'
+export type OfficeDutyAcknowledgementResult = 'acknowledged' | 'already-resolved'
+export type OfficeDutyKind = 'agent' | 'inbox' | 'cadence'
 export type OfficeEmployeeDutyTargetId = `employee:${string}:${string}`
 export type OfficeDutyTargetId =
   | 'operations'
   | 'inbox-service'
-  | 'news-service'
   | OfficeEmployeeDutyTargetId
 
 export interface OfficeCadenceDutyEvidence {
@@ -39,25 +38,39 @@ export interface OfficeCadenceDutyEvidence {
   readonly nextDueAtMs?: number | null
 }
 
+export interface OfficeInboxDutyEvidence {
+  readonly title: string
+  readonly excerpt?: string
+  /** Explicit priority declared by the exact Scheduled Issue that produced this delivery. */
+  readonly declaredIssue?: {
+    readonly workspaceId: string
+    readonly issueId: string
+    readonly title: string
+    readonly priority: IssuePriority
+  }
+  /** Captured server row used only to make an exact older Inbox entry addressable. */
+  readonly entry: InboxEntry
+}
+
 interface OfficeDutyCandidateBase {
   readonly id: string
   readonly registrationId: string
   readonly count: number
 }
 
+type OfficeJournalDutyKind = Extract<OfficeActivityKind, 'agent'>
+
 type OfficeEventDutyCandidate = {
-  [K in OfficeActivityKind]: OfficeDutyCandidateBase & {
+  [K in OfficeJournalDutyKind]: OfficeDutyCandidateBase & {
     readonly kind: K
     readonly landmark: OfficeActivityLandmark
     readonly destination: {
       readonly kind: 'journal'
       readonly channel: K
-      readonly targetId: K extends 'inbox'
-        ? 'inbox-service'
-        : K extends 'news' ? 'news-service' : 'operations'
+      readonly targetId: 'operations'
       readonly subject?: K extends 'agent'
         ? OfficeActivitySessionSubject
-        : K extends 'inbox' ? OfficeActivityInboxSubject : never
+        : never
     }
     readonly receipt: {
       readonly kind: 'event-watermark'
@@ -65,7 +78,24 @@ type OfficeEventDutyCandidate = {
       readonly throughSeq: number
     }
   }
-}[OfficeActivityKind]
+}[OfficeJournalDutyKind]
+
+export type OfficeInboxDutyCandidate = OfficeDutyCandidateBase & {
+  readonly kind: 'inbox'
+  readonly destination: {
+    readonly kind: 'inbox-entry'
+    readonly workspaceId: string
+    readonly inboxEntryId: string
+    readonly targetId: 'inbox-service'
+  }
+  readonly receipt: {
+    readonly kind: 'inbox-read'
+    readonly workspaceId: string
+    readonly inboxEntryId: string
+    readonly fingerprint: string
+  }
+  readonly delivery: OfficeInboxDutyEvidence
+}
 
 export type OfficeCadenceDutyCandidate = OfficeDutyCandidateBase & {
   readonly kind: 'cadence'
@@ -84,7 +114,10 @@ export type OfficeCadenceDutyCandidate = OfficeDutyCandidateBase & {
   readonly cadence: OfficeCadenceDutyEvidence
 }
 
-export type OfficeDutyCandidate = OfficeEventDutyCandidate | OfficeCadenceDutyCandidate
+export type OfficeDutyCandidate =
+  | OfficeEventDutyCandidate
+  | OfficeInboxDutyCandidate
+  | OfficeCadenceDutyCandidate
 
 /** Normalized registration boundary consumed by the Office queue resolver. */
 export interface OfficeDutyRegistration {
@@ -184,61 +217,80 @@ export function officeScheduledIssueFingerprint(
   ])
 }
 
-function eventDutyDescriptor(
-  id: string,
-  order: number,
-  family: OfficeActivityKind,
-  activity: OfficeProductActivityState,
+export function inboxUnreadDutyRegistration(
+  deliveries: readonly OfficeInboxDutyEvidence[],
   status: OfficeDutySourceStatus,
+  issues: IssueSnapshot | null = null,
 ): OfficeDutyRegistration {
-  let candidate: OfficeDutyCandidate | null = null
-  if (family === 'inbox' && activity.attention.inbox && activity.inbox) {
-    candidate = {
-      id: `${id}:${activity.inbox.seq}`,
-      registrationId: id,
-      kind: 'inbox',
-      landmark: activity.inbox,
-      count: activity.pending.inbox,
-      destination: {
-        kind: 'journal',
-        channel: 'inbox',
-        targetId: 'inbox-service',
-        ...(activity.inbox.subject?.kind === 'inbox-entry'
-          ? { subject: activity.inbox.subject }
-          : {}),
-      },
-      receipt: { kind: 'event-watermark', family: 'inbox', throughSeq: activity.inbox.seq },
-    }
-  } else if (family === 'agent' && activity.attention.agent && activity.agent) {
-    candidate = {
-      id: `${id}:${activity.agent.seq}`,
-      registrationId: id,
-      kind: 'agent',
-      landmark: activity.agent,
-      count: activity.pending.agent,
-      destination: {
-        kind: 'journal',
-        channel: 'agent',
-        targetId: 'operations',
-        ...(activity.agent.subject?.kind === 'session'
-          ? { subject: activity.agent.subject }
-          : {}),
-      },
-      receipt: { kind: 'event-watermark', family: 'agent', throughSeq: activity.agent.seq },
-    }
-  } else if (family === 'news' && activity.attention.news && activity.news) {
-    candidate = {
-      id: `${id}:${activity.news.seq}`,
-      registrationId: id,
-      kind: 'news',
-      landmark: activity.news,
-      count: activity.pending.news,
-      destination: { kind: 'journal', channel: 'news', targetId: 'news-service' },
-      receipt: { kind: 'event-watermark', family: 'news', throughSeq: activity.news.seq },
+  const exactIssues = new Map<string, {
+    readonly workspaceId: string
+    readonly issueId: string
+    readonly title: string
+    readonly priority: IssuePriority
+  }>()
+  const issueIds = new Map<string, Array<{
+    readonly workspaceId: string
+    readonly issueId: string
+    readonly title: string
+    readonly priority: IssuePriority
+  }>>()
+  for (const workspace of issues?.workspaces ?? []) {
+    if (workspace.status !== 'ok') continue
+    for (const issue of workspace.issues) {
+      if (!issue.when) continue
+      const declaredIssue = {
+        workspaceId: workspace.wsId,
+        issueId: issue.id,
+        title: issue.title,
+        priority: issue.priority,
+      }
+      exactIssues.set(`${workspace.wsId}\u0000${issue.id}`, declaredIssue)
+      issueIds.set(issue.id, [...(issueIds.get(issue.id) ?? []), declaredIssue])
     }
   }
-  const candidates = candidate ? [candidate] : []
-  return { id, order, status, candidates }
+  const enriched = deliveries.map((delivery) => {
+    const issueId = delivery.entry.origin?.issueId
+    if (!issueId) return delivery
+    const issueWorkspaceId = delivery.entry.origin?.issueWorkspaceId
+    const declaredIssue = issueWorkspaceId
+      ? exactIssues.get(`${issueWorkspaceId}\u0000${issueId}`)
+      : issueIds.get(issueId)?.length === 1 ? issueIds.get(issueId)?.[0] : undefined
+    return declaredIssue ? { ...delivery, declaredIssue } : delivery
+  })
+  const ordered = [...enriched].sort((left, right) => {
+    const documented = Number((right.entry.docs?.length ?? 0) > 0)
+      - Number((left.entry.docs?.length ?? 0) > 0)
+    if (documented !== 0) return documented
+    const occurredAt = left.entry.ts - right.entry.ts
+    return occurredAt !== 0 ? occurredAt : left.entry.id.localeCompare(right.entry.id)
+  })
+  const count = ordered.length
+  const candidates: OfficeInboxDutyCandidate[] = ordered.map((delivery) => ({
+    id: `inbox-unread:${delivery.entry.id}`,
+    registrationId: 'inbox-unread',
+    kind: 'inbox',
+    count,
+    destination: {
+      kind: 'inbox-entry',
+      workspaceId: delivery.entry.workspaceId,
+      inboxEntryId: delivery.entry.id,
+      targetId: 'inbox-service',
+    },
+    receipt: {
+      kind: 'inbox-read',
+      workspaceId: delivery.entry.workspaceId,
+      inboxEntryId: delivery.entry.id,
+      fingerprint: JSON.stringify([
+        'inbox-read-v1',
+        delivery.entry.workspaceId,
+        delivery.entry.id,
+        delivery.entry.ts,
+        (delivery.entry.docs ?? []).map((document) => [document.path, document.revision ?? null]),
+      ]),
+    },
+    delivery,
+  }))
+  return { id: 'inbox-unread', order: 200, status, candidates }
 }
 
 export function scheduledIssueHealthDutyRegistration(
@@ -309,22 +361,23 @@ export function scheduledIssueHealthDutyRegistration(
     const workspace = leftCadence.workspaceId.localeCompare(rightCadence.workspaceId)
     return workspace !== 0 ? workspace : leftCadence.issueId.localeCompare(rightCadence.issueId)
   })
-  return { id: 'scheduled-issue-health', order: 200, status, candidates }
+  return { id: 'scheduled-issue-health', order: 100, status, candidates }
 }
 
 /** Current providers normalize their domain hooks before entering the queue. */
 export function coreOfficeDutyRegistrations(input: {
   readonly now: number
-  readonly activity: OfficeProductActivityState
-  readonly activityStatus: OfficeDutySourceStatus
+  /** Ambient journal inputs are accepted for callers but never create mandatory duties. */
+  readonly activity?: unknown
+  readonly activityStatus?: OfficeDutySourceStatus
+  readonly inboxDeliveries: readonly OfficeInboxDutyEvidence[]
+  readonly inboxStatus: OfficeDutySourceStatus
   readonly issues: IssueSnapshot | null
   readonly issueStatus: OfficeDutySourceStatus
 }): readonly OfficeDutyRegistration[] {
   return [
-    eventDutyDescriptor('inbox-arrival', 100, 'inbox', input.activity, input.activityStatus),
+    inboxUnreadDutyRegistration(input.inboxDeliveries, input.inboxStatus, input.issues),
     scheduledIssueHealthDutyRegistration(input.now, input.issues, input.issueStatus),
-    eventDutyDescriptor('agent-review', 300, 'agent', input.activity, input.activityStatus),
-    eventDutyDescriptor('news-arrival', 400, 'news', input.activity, input.activityStatus),
   ]
 }
 
@@ -334,9 +387,8 @@ export interface OfficeDutyProjection {
 }
 
 /**
- * Scan descriptors in product order. An unready empty source is a hard fence:
- * lower-priority work cannot be called "next" while a higher-priority source
- * is still unknown. Known work from a degraded source remains actionable.
+ * Collect every known mandatory provider. Unknown providers prevent an honest
+ * clear state, but they do not hide a concrete duty from another provider.
  */
 export function projectOfficeDutyQueue(
   registrations: readonly OfficeDutyRegistration[],
@@ -345,17 +397,47 @@ export function projectOfficeDutyQueue(
   const ordered = registrations
     .map((registration, index) => ({ registration, index }))
     .sort((left, right) => left.registration.order - right.registration.order || left.index - right.index)
+  const seen = new Set<string>()
+  const candidates: OfficeDutyCandidate[] = []
+  let status: OfficeDutySourceStatus = 'ready'
   for (const { registration } of ordered) {
-    const seen = new Set<string>()
-    const candidates = registration.candidates.filter((candidate) => {
-      if (!includeCandidate(candidate) || seen.has(candidate.id)) return false
+    if (registration.status === 'error') status = 'error'
+    else if (registration.status === 'loading' && status === 'ready') status = 'loading'
+    for (const candidate of registration.candidates) {
+      if (!includeCandidate(candidate) || seen.has(candidate.id)) continue
       seen.add(candidate.id)
-      return true
-    })
-    if (candidates.length > 0) return { candidates, status: registration.status }
-    if (registration.status !== 'ready') return { candidates: [], status: registration.status }
+      candidates.push(candidate)
+    }
   }
-  return { candidates: [], status: 'ready' }
+  candidates.sort((left, right) => {
+    const tier = officeDutyTier(left) - officeDutyTier(right)
+    if (tier !== 0) return tier
+    const leftRegistration = ordered.findIndex(({ registration }) => registration.id === left.registrationId)
+    const rightRegistration = ordered.findIndex(({ registration }) => registration.id === right.registrationId)
+    return leftRegistration - rightRegistration
+  })
+  return { candidates, status }
+}
+
+/** Product-policy tier. It uses only exact user-declared Issue priority. */
+export function officeDutyTier(duty: OfficeDutyCandidate): number {
+  if (duty.kind === 'cadence') {
+    return duty.cadence.priority === 'urgent' || duty.cadence.priority === 'high' ? 0 : 2
+  }
+  if (duty.kind === 'inbox') {
+    const priority = duty.delivery.declaredIssue?.priority
+    return priority === 'urgent' || priority === 'high' ? 1 : 3
+  }
+  return 4
+}
+
+export function officeDutyEstimateMinutes(duty: OfficeDutyCandidate): number {
+  if (duty.kind === 'cadence') return 3
+  if (duty.kind === 'inbox') {
+    const documents = duty.delivery.entry.docs?.length ?? 0
+    return documents > 0 ? Math.min(8, 2 + documents) : 1
+  }
+  return 2
 }
 
 export function resolveOfficeDutyTarget(

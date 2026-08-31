@@ -5,6 +5,8 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../i18n'
+import type { OfficeInboxDutyEvidence } from '../office/duty-registry'
+import { inboxUnreadDutyRegistration, type OfficeInboxDutyCandidate } from '../office/duty-registry'
 import { useInboxSelection } from '../live/inbox-selection'
 import { OFFICE_COWORKER_CAST_STORAGE_KEY } from '../office/coworker-cast-storage'
 import {
@@ -20,6 +22,8 @@ const {
   navigateMock,
   issuesMock,
   issueDetailMock,
+  inboxDutiesMock,
+  markInboxReadMock,
   officeFloorMock,
   openOrFocusMock,
   productActivityMock,
@@ -29,6 +33,8 @@ const {
   navigateMock: vi.fn(),
   issuesMock: vi.fn(),
   issueDetailMock: vi.fn(),
+  inboxDutiesMock: vi.fn(),
+  markInboxReadMock: vi.fn(async () => 'acknowledged'),
   officeFloorMock: vi.fn(),
   openOrFocusMock: vi.fn(),
   productActivityMock: vi.fn(),
@@ -129,6 +135,10 @@ vi.mock('../office/useOfficeProductActivity', () => ({
   useOfficeProductActivity: productActivityMock,
 }))
 
+vi.mock('../office/useOfficeInboxDuties', () => ({
+  useOfficeInboxDuties: inboxDutiesMock,
+}))
+
 const defaultOfficeFloor = () => ({
   building: {
     config: {
@@ -200,10 +210,32 @@ function cadenceIssueDetail(automationHealth: Parameters<typeof cadenceIssue>[0]
   }
 }
 
+function inboxEvidence(
+  id: string,
+  title: string,
+  ts = Date.UTC(2026, 7, 31, 12),
+): OfficeInboxDutyEvidence {
+  return {
+    title,
+    entry: {
+      id,
+      ts,
+      workspaceId: 'chat-1',
+      workspaceLabel: '研究台',
+      comments: title,
+      docs: [{ path: `reports/${id}.md`, revision: `rev-${id}` }],
+    },
+  }
+}
+
+function inboxCandidate(evidence: OfficeInboxDutyEvidence): OfficeInboxDutyCandidate {
+  return inboxUnreadDutyRegistration([evidence], 'ready').candidates[0] as OfficeInboxDutyCandidate
+}
+
 async function leaveCadenceDossierForFullIssue() {
   const view = render(<OfficePage />)
   await userEvent.click(screen.getByRole('button', {
-    name: /下一值班项：.*检查周报排期.*待处理 1 条/,
+    name: /本班第 1\/1 项：.*检查周报排期/,
   }))
   await screen.findByRole('dialog', { name: '检查周报排期' })
   await userEvent.click(screen.getByRole('button', { name: '复核证据' }))
@@ -222,9 +254,16 @@ beforeEach(async () => {
   navigateMock.mockClear()
   openOrFocusMock.mockClear()
   acknowledgeMock.mockClear()
+  markInboxReadMock.mockReset()
+  markInboxReadMock.mockResolvedValue('acknowledged')
   refreshMock.mockClear()
   useInboxSelection.getState().select(null)
   issuesMock.mockReturnValue({ data: { workspaces: [] }, error: null, loading: false })
+  inboxDutiesMock.mockReturnValue({
+    status: 'ready',
+    deliveries: [],
+    markReadConfirmed: markInboxReadMock,
+  })
   issueDetailMock.mockReturnValue({
     data: {
       issue: {
@@ -618,158 +657,144 @@ describe('OfficePage localization', () => {
     expect(acknowledgeMock).toHaveBeenCalledWith('agent', 45)
   })
 
-  it('requires an exact Inbox report excursion before stamping captured delivery A', async () => {
-    productActivityMock.mockReturnValue({
-      agent: null,
-      inbox: {
-        seq: 51,
-        occurredAt: 5_100,
-        detail: 'NVDA weekly evidence brief',
-        source: 'codex',
-        subject: {
-          kind: 'inbox-entry',
-          workspaceId: 'chat-1',
-          inboxEntryId: 'inbox-a',
-          documentCount: 1,
-        },
-      },
-      news: null,
-      attention: { agent: false, inbox: true, news: false },
-      pending: { agent: 0, inbox: 1, news: 0 },
-      freshKind: null,
-      sourceStatus: 'ready',
-      acknowledgeThrough: acknowledgeMock,
+  it('guides exact durable Inbox A, waits for its server receipt, then advances to B', async () => {
+    const deliveryA = inboxEvidence('inbox-a', 'NVDA weekly evidence brief', 5_100)
+    const deliveryB = inboxEvidence('inbox-b', 'Risk desk follow-up', 5_200)
+    inboxDutiesMock.mockReturnValue({
+      status: 'ready',
+      deliveries: [deliveryA, deliveryB],
+      markReadConfirmed: markInboxReadMock,
     })
     const first = render(<OfficePage />)
 
-    const inboxStation = screen.getByRole('button', { name: 'Inbox 收件台 · 待处理 1 条' })
-    await userEvent.click(inboxStation)
-    let runtime = await screen.findByTestId('office-runtime-section', {}, { timeout: 10_000 })
-    expect(runtime.dataset.dutyInboxPhase).toBe('required')
-    expect(screen.queryByRole('button', { name: 'Mock confirm duty' })).toBeNull()
-    await userEvent.keyboard('{Escape}')
-    await vi.waitFor(() => expect(document.activeElement).toBe(inboxStation))
-
     await userEvent.click(screen.getByRole('button', {
-      name: /下一值班项：.*NVDA weekly evidence brief.*待处理 1 条/,
+      name: /本班第 1\/2 项：.*NVDA weekly evidence brief/,
     }))
-    runtime = await screen.findByTestId('office-runtime-section', {}, { timeout: 10_000 })
-    expect(runtime.dataset.channel).toBe('inbox')
-    expect(runtime.dataset.selectedSeq).toBe('51')
-    expect(runtime.dataset.dutyInboxPhase).toBe('required')
-    expect(screen.queryByRole('button', { name: 'Mock confirm duty' })).toBeNull()
-
-    await userEvent.click(screen.getByRole('button', { name: 'Mock review exact delivery' }))
+    await waitFor(() => expect(openOrFocusMock).toHaveBeenLastCalledWith({ kind: 'inbox', params: {} }), {
+      timeout: 10_000,
+    })
     expect(readOfficeInboxDutyExcursion()).toMatchObject({
-      throughSeq: 51,
-      inboxEntryId: 'inbox-a',
+      duty: { id: 'inbox-unread:inbox-a' },
       phase: 'away',
     })
     expect(useInboxSelection.getState().selectedEntryId).toBe('inbox-a')
     expect(navigateMock).toHaveBeenLastCalledWith('/office/return', {
       state: { officeExcursion: true },
     })
-    expect(openOrFocusMock).toHaveBeenLastCalledWith({ kind: 'inbox', params: {} })
-    expect(acknowledgeMock).not.toHaveBeenCalled()
+    expect(markInboxReadMock).not.toHaveBeenCalled()
 
     first.unmount()
     expect(markOfficeInboxDutyPresented({
       workspaceId: 'chat-1',
       inboxEntryId: 'inbox-a',
     })).toBe(true)
-    expect(readOfficeInboxDutyExcursion()?.phase).toBe('presented')
 
-    const bActivity = {
-      agent: null,
-      inbox: {
-        seq: 52,
-        occurredAt: 5_200,
-        detail: 'Risk desk follow-up',
-        source: 'pi',
-        subject: {
-          kind: 'inbox-entry',
-          workspaceId: 'chat-1',
-          inboxEntryId: 'inbox-b',
-          documentCount: 1,
-        },
-      },
-      news: null,
-      attention: { agent: false, inbox: true, news: false },
-      pending: { agent: 0, inbox: 2, news: 0 },
-      freshKind: null,
-      sourceStatus: 'ready',
-      acknowledgeThrough: acknowledgeMock,
-    }
-    productActivityMock.mockReturnValue({ ...bActivity, sourceStatus: 'error' })
-    const returning = render(<OfficePage />)
-    expect(screen.queryByTestId('office-runtime-section')).toBeNull()
-    expect(readOfficeInboxDutyExcursion()?.phase).toBe('presented')
-
-    productActivityMock.mockReturnValue(bActivity)
-    returning.rerender(<OfficePage />)
-
-    runtime = await screen.findByTestId('office-runtime-section')
-    expect(runtime.dataset.selectedSeq).toBe('51')
-    expect(runtime.dataset.dutyInboxEntry).toBe('inbox-a')
-    expect(runtime.dataset.dutyInboxPhase).toBe('returned')
-    acknowledgeMock.mockImplementationOnce(() => {
-      productActivityMock.mockReturnValue({
-        ...bActivity,
-        pending: { ...bActivity.pending, inbox: 1 },
-      })
+    inboxDutiesMock.mockReturnValue({
+      status: 'ready',
+      deliveries: [deliveryA, deliveryB],
+      markReadConfirmed: markInboxReadMock,
     })
-    await userEvent.click(screen.getByRole('button', { name: 'Mock confirm duty' }))
+    const returning = render(<OfficePage />)
+    expect(await screen.findByRole('dialog', { name: 'NVDA weekly evidence brief' })).toBeTruthy()
+    expect(screen.getByText('Inbox 共有 2 条待阅')).toBeTruthy()
+    expect(readOfficeInboxDutyExcursion()?.phase).toBe('returned')
 
-    expect(acknowledgeMock).toHaveBeenCalledWith('inbox', 51)
+    markInboxReadMock.mockImplementationOnce(async () => {
+      inboxDutiesMock.mockReturnValue({
+        status: 'ready',
+        deliveries: [deliveryB],
+        markReadConfirmed: markInboxReadMock,
+      })
+      return 'acknowledged'
+    })
+    await userEvent.click(screen.getByRole('button', { name: '盖章：已复核' }))
+
+    await waitFor(() => expect(markInboxReadMock).toHaveBeenCalledWith('inbox-a'))
+    expect(acknowledgeMock).not.toHaveBeenCalledWith('inbox', expect.anything())
     expect(readOfficeInboxDutyExcursion()).toBeNull()
     expect(await screen.findByRole('button', {
-      name: /下一值班项：.*Risk desk follow-up.*待处理 1 条/,
+      name: /本班第 2\/2 项：.*Risk desk follow-up/,
     })).toBeTruthy()
+    returning.unmount()
   })
 
-  it('cancels a returned Inbox receipt on Escape and restores the station focus', async () => {
-    rememberOfficeInboxDutyExcursion({
-      throughSeq: 51,
-      count: 1,
-      workspaceId: 'chat-1',
-      inboxEntryId: 'inbox-a',
-      documentCount: 1,
-      phase: 'presented',
+  it('advances an externally resolved Inbox duty without forging a reviewed receipt', async () => {
+    const delivery = inboxEvidence('inbox-a', 'NVDA weekly evidence brief', 5_100)
+    rememberOfficeInboxDutyExcursion({ duty: inboxCandidate(delivery), phase: 'presented' })
+    inboxDutiesMock.mockReturnValue({
+      status: 'ready',
+      deliveries: [delivery],
+      markReadConfirmed: markInboxReadMock,
     })
-    productActivityMock.mockReturnValue({
-      agent: null,
-      inbox: {
-        seq: 51,
-        occurredAt: 5_100,
-        detail: 'NVDA weekly evidence brief',
-        subject: {
-          kind: 'inbox-entry',
-          workspaceId: 'chat-1',
-          inboxEntryId: 'inbox-a',
-          documentCount: 1,
-        },
-      },
-      news: null,
-      attention: { agent: false, inbox: true, news: false },
-      pending: { agent: 0, inbox: 1, news: 0 },
-      freshKind: null,
-      sourceStatus: 'ready',
-      acknowledgeThrough: acknowledgeMock,
+    markInboxReadMock.mockImplementationOnce(async () => {
+      inboxDutiesMock.mockReturnValue({
+        status: 'ready',
+        deliveries: [],
+        markReadConfirmed: markInboxReadMock,
+      })
+      return 'already-resolved'
     })
     render(<OfficePage />)
 
-    const runtime = await screen.findByTestId('office-runtime-section')
-    expect(runtime.dataset.dutyInboxPhase).toBe('returned')
+    expect(await screen.findByRole('dialog', { name: 'NVDA weekly evidence brief' })).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: '盖章：已复核' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog', {
+      name: 'NVDA weekly evidence brief',
+    })).toBeNull())
+    expect(markInboxReadMock).toHaveBeenCalledWith('inbox-a')
+    expect(document.querySelector('.oa-office-landmark-ack')).toBeNull()
+    expect(document.querySelector('.oa-office-page > p[role="status"]')).toBeNull()
+    expect(screen.getByText('值班已清')).toBeTruthy()
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('office-floor')))
+  })
+
+  it('dismisses a returned durable Inbox duty on Escape without changing its order or read state', async () => {
+    const delivery = inboxEvidence('inbox-a', 'NVDA weekly evidence brief', 5_100)
+    rememberOfficeInboxDutyExcursion({ duty: inboxCandidate(delivery), phase: 'presented' })
+    inboxDutiesMock.mockReturnValue({
+      status: 'ready',
+      deliveries: [delivery],
+      markReadConfirmed: markInboxReadMock,
+    })
+    render(<OfficePage />)
+
+    expect(await screen.findByRole('dialog', { name: 'NVDA weekly evidence brief' })).toBeTruthy()
     await userEvent.keyboard('{Escape}')
 
-    expect(screen.queryByTestId('office-runtime-section')).toBeNull()
+    expect(screen.queryByRole('dialog', { name: 'NVDA weekly evidence brief' })).toBeNull()
     expect(readOfficeInboxDutyExcursion()).toBeNull()
-    expect(acknowledgeMock).not.toHaveBeenCalled()
+    expect(markInboxReadMock).not.toHaveBeenCalled()
     await vi.waitFor(() => {
       expect(document.activeElement).toBe(screen.getByRole('button', {
         name: 'Inbox 收件台 · 待处理 1 条',
       }))
     })
+    expect(screen.getByRole('button', {
+      name: /本班第 1\/1 项：.*NVDA weekly evidence brief/,
+    })).toBeTruthy()
+  })
+
+  it('rotates a returned Inbox duty to the end on Later without marking it read', async () => {
+    const deliveryA = inboxEvidence('inbox-a', 'NVDA weekly evidence brief', 5_100)
+    const deliveryB = inboxEvidence('inbox-b', 'Risk desk follow-up', 5_200)
+    rememberOfficeInboxDutyExcursion({ duty: inboxCandidate(deliveryA), phase: 'presented' })
+    inboxDutiesMock.mockReturnValue({
+      status: 'ready',
+      deliveries: [deliveryA, deliveryB],
+      markReadConfirmed: markInboxReadMock,
+    })
+    render(<OfficePage />)
+
+    expect(await screen.findByRole('dialog', { name: 'NVDA weekly evidence brief' })).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: '稍后处理' }))
+
+    expect(screen.queryByRole('dialog', { name: 'NVDA weekly evidence brief' })).toBeNull()
+    expect(markInboxReadMock).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', {
+      name: /本班第 1\/2 项：.*Risk desk follow-up/,
+    })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Inbox 收件台 · 待处理 2 条' })).toBeTruthy()
   })
 
   it('guides a scheduled Issue exception through evidence and an explicit Office receipt', async () => {
@@ -810,7 +835,7 @@ describe('OfficePage localization', () => {
     expect(screen.queryByRole('dialog', { name: '检查周报排期' })).toBeNull()
 
     await userEvent.click(screen.getByRole('button', {
-      name: /下一值班项：.*检查周报排期.*待处理 1 条/,
+      name: /本班第 1\/1 项：.*检查周报排期/,
     }))
     await screen.findByRole('dialog', { name: '检查周报排期' })
 
@@ -832,12 +857,35 @@ describe('OfficePage localization', () => {
 
     await userEvent.click(screen.getByRole('button', { name: '盖章：本次值班已复核' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '检查周报排期' })).toBeNull())
-    expect(screen.getByText('值班已清')).toBeTruthy()
+    expect(screen.getByText('本班已复核 · 1 项仍待处理')).toBeTruthy()
     expect(screen.getByText('已复核')).toBeTruthy()
-    expect(screen.getByText('已复核“检查周报排期”。值班已清。')).toBeTruthy()
+    expect(screen.getByText('已复核“检查周报排期”。本班完成，仍有 1 项待处理。')).toBeTruthy()
     expect(acknowledgeMock).not.toHaveBeenCalled()
     expect(window.sessionStorage.getItem('openalice:office-duty:evidence-receipts:v2'))
       .toContain('weekly-review')
+  })
+
+  it('keeps a deferred cadence duty reachable from Operations while Inbox leads the shift', async () => {
+    issuesMock.mockReturnValue(cadenceIssues(blockedCadenceHealth))
+    inboxDutiesMock.mockReturnValue({
+      status: 'ready',
+      deliveries: [inboxEvidence('inbox-a', 'NVDA weekly evidence brief', 5_100)],
+      markReadConfirmed: markInboxReadMock,
+    })
+    render(<OfficePage />)
+
+    await userEvent.click(screen.getByRole('button', {
+      name: /本班第 1\/2 项：.*检查周报排期/,
+    }))
+    await screen.findByRole('dialog', { name: '检查周报排期' })
+    await userEvent.click(screen.getByRole('button', { name: '稍后处理' }))
+
+    expect(screen.getByRole('button', {
+      name: /本班第 1\/2 项：.*NVDA weekly evidence brief/,
+    })).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: '行动看板 · 待处理 1 条' }))
+    expect(await screen.findByRole('dialog', { name: '检查周报排期' })).toBeTruthy()
+    expect(markInboxReadMock).not.toHaveBeenCalled()
   })
 
   it('returns from a full Issue to the captured evidence when the live exception changed', async () => {
@@ -894,7 +942,7 @@ describe('OfficePage localization', () => {
       .toBe(true)
   })
 
-  it('carries an exact visible Agent duty through the coworker file and returns its stamp to the floor', async () => {
+  it('keeps exact visible Agent activity ambient instead of turning it into mandatory shift work', async () => {
     officeFloorMock.mockReturnValue({
       ...defaultOfficeFloor(),
       building: {
@@ -936,64 +984,40 @@ describe('OfficePage localization', () => {
       freshKind: null,
       acknowledgeThrough: acknowledgeMock,
     })
-    const { container } = render(<OfficePage />)
+    render(<OfficePage />)
 
-    const duty = screen.getByRole('button', { name: /下一值班项：.*待处理 3 条/ })
-    expect(duty.textContent).not.toContain('行动看板')
-    await userEvent.click(duty)
+    expect(screen.getByText('本班暂无到期功课')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /本班第 .* 项/ })).toBeNull()
+
+    await userEvent.click(screen.getByTestId('office-desk-resume-grok-duty'))
     const file = await screen.findByRole('dialog', { name: /Grok/ }, { timeout: 10_000 })
-    const actions = file.querySelector<HTMLElement>('.oa-office-inspect__actions')
-    expect(actions?.dataset.dutyPending).toBe('true')
-    const reviewDuty = screen.getByRole('button', { name: '复核这次结果' })
-    expect(document.activeElement).toBe(reviewDuty)
-
-    await userEvent.keyboard('{Escape}')
-    expect(screen.queryByRole('dialog', { name: /Grok/ })).toBeNull()
+    expect(file.querySelector<HTMLElement>('.oa-office-inspect__actions')?.dataset.dutyPending)
+      .toBe('true')
+    expect(screen.getByRole('button', { name: '复核这次结果' })).toBeTruthy()
     expect(acknowledgeMock).not.toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: /下一值班项：.*待处理 3 条/ })).toBeTruthy()
-
-    await userEvent.click(duty)
-    await userEvent.click(await screen.findByRole('button', { name: '复核这次结果' }))
-    let runtime = await screen.findByTestId('office-runtime-section')
-    expect(runtime.dataset.channel).toBe('agent')
-    expect(runtime.dataset.selectedSeq).toBe('45')
-    expect(runtime.dataset.dutyKind).toBe('agent')
-    expect(runtime.dataset.dutyThroughSeq).toBe('45')
-    expect(runtime.dataset.dutyCount).toBe('3')
-
-    await userEvent.keyboard('{Escape}')
-    expect(screen.getByRole('dialog', { name: /Grok/ })).toBeTruthy()
-    expect(acknowledgeMock).not.toHaveBeenCalled()
-    await userEvent.click(screen.getByRole('button', { name: '复核这次结果' }))
-    runtime = await screen.findByTestId('office-runtime-section')
-    await userEvent.click(screen.getByRole('button', { name: 'Mock confirm duty' }))
-    expect(acknowledgeMock).toHaveBeenCalledWith('agent', 45)
-    await vi.waitFor(() => expect(screen.queryByTestId('office-runtime-section')).toBeNull())
-    expect(screen.queryByRole('dialog', { name: /Grok/ })).toBeNull()
-    expect(container.querySelector<HTMLElement>('.oa-office-scene')?.hasAttribute('inert')).toBe(false)
-    await vi.waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('office-floor')))
   })
 
-  it('keeps Inbox and News station visits inside the Office journal', async () => {
+  it('keeps ambient Inbox and News station visits inside the Office journal', async () => {
     productActivityMock.mockReturnValue({
       agent: null,
       inbox: { seq: 11, occurredAt: 1_100, inboxEntryId: 'inbox-11' },
       news: { seq: 12, occurredAt: 1_200 },
       attention: { agent: false, inbox: true, news: true },
       pending: { agent: 0, inbox: 1, news: 2 },
-      freshKind: null,
+      freshKind: 'news',
       acknowledgeThrough: acknowledgeMock,
     })
     const { container } = render(<OfficePage />)
 
-    const inbox = screen.getByRole('button', { name: 'Inbox 收件台 · 待处理 1 条' })
+    const inbox = screen.getByRole('button', { name: 'Inbox 收件台' })
     await userEvent.click(inbox)
     const runtime = await screen.findByTestId('office-runtime-section', {}, { timeout: 10_000 })
     expect(runtime.dataset.channel).toBe('inbox')
     expect(runtime.dataset.selectedSeq).toBe('11')
-    expect(runtime.dataset.dutyKind).toBe('inbox')
-    expect(runtime.dataset.dutyThroughSeq).toBe('11')
-    expect(runtime.dataset.dutyCount).toBe('1')
+    expect(runtime.dataset.dutyKind).toBeUndefined()
+    expect(runtime.dataset.dutyThroughSeq).toBeUndefined()
+    expect(runtime.dataset.dutyCount).toBeUndefined()
+    expect(screen.queryByRole('button', { name: 'Mock confirm duty' })).toBeNull()
     expect(acknowledgeMock).not.toHaveBeenCalled()
     expect(openOrFocusMock).not.toHaveBeenCalled()
     expect(navigateMock).not.toHaveBeenCalled()
@@ -1002,19 +1026,15 @@ describe('OfficePage localization', () => {
     await userEvent.keyboard('{Escape}')
     await vi.waitFor(() => expect(document.activeElement).toBe(inbox))
 
-    await userEvent.click(inbox)
-    await userEvent.click(await screen.findByRole('button', { name: 'Mock confirm duty' }))
-    expect(acknowledgeMock).toHaveBeenCalledWith('inbox', 11)
-    await vi.waitFor(() => expect(screen.queryByTestId('office-runtime-section')).toBeNull())
-    acknowledgeMock.mockClear()
-
-    const news = screen.getByRole('button', { name: '新闻终端 · 待处理 2 条' })
+    const news = screen.getByRole('button', { name: '新闻终端' })
     await userEvent.click(news)
     const newsRuntime = await screen.findByTestId('office-runtime-section', {}, { timeout: 10_000 })
     expect(newsRuntime.dataset.channel).toBe('news')
     expect(newsRuntime.dataset.selectedSeq).toBe('12')
-    expect(newsRuntime.dataset.dutyKind).toBe('news')
-    expect(newsRuntime.dataset.dutyThroughSeq).toBe('12')
+    expect(newsRuntime.dataset.dutyKind).toBeUndefined()
+    expect(newsRuntime.dataset.dutyThroughSeq).toBeUndefined()
+    expect(newsRuntime.dataset.dutyCount).toBeUndefined()
+    expect(screen.queryByRole('button', { name: 'Mock confirm duty' })).toBeNull()
     expect(acknowledgeMock).not.toHaveBeenCalled()
     expect(openOrFocusMock).not.toHaveBeenCalled()
     expect(navigateMock).not.toHaveBeenCalled()

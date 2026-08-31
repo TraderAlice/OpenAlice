@@ -30,6 +30,8 @@ export interface InboxOrigin {
   runId?: string
   /** The scheduled issue that fired the run, when applicable (filename stem). */
   issueId?: string
+  /** The Issue's home Workspace; may differ from the executing Session's Workspace. */
+  issueWorkspaceId?: string
   /** The interactive session's pre-allocated record id (navigable to its tab). */
   sessionId?: string
   /** Stable product conversation identity. Native runtime ids stay server-side. */

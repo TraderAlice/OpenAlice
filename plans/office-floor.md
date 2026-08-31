@@ -11,9 +11,11 @@
 一张可读、可操作的 4:3 俯视地图，还要把用户此刻应该完成的研究、阅读、复核和记录
 变成世界里的可见事项，让用户不必先知道该去哪个传统金融页面。
 
-Office 奖励的是流程勤勉，而不是交易频率或盈亏：到岗后先处理报告与 Inbox、复核 Agent
-结果、阅读需要关注的 News，再进入判断和决策。地图本身就是任务清单；完成一项后，世界
-状态收敛并把下一项交给用户。未来 Trading、NanoAlice 或其他领域通过主动注册各自的值班
+Office 奖励的是流程勤勉，而不是交易频率或盈亏。它像农场每天提示收菜一样，把用户容易
+忘记但有明确依据的研究功课排成一个有限班次：先处理显式高优先级的定时异常，再逐份复核
+持久未读交付，然后由用户回到自己的判断和决策。Agent 活动和原始 News 先承担环境反馈，
+不能只因“系统发生了事情”就制造功课。地图本身就是引导动线；完成一项后，世界状态收敛
+并把下一项交给用户。未来 Trading、NanoAlice 或其他领域通过主动注册各自可确认的值班
 事项接入同一投影，不在 `src/` 里生长第二套工作流引擎。
 
 产品层级固定为：
@@ -24,32 +26,45 @@ Office 奖励的是流程勤勉，而不是交易频率或盈亏：到岗后先�
 - **product Session 员工**：围绕小组工位活动，身份仍由 `resumeId` 决定
 - **Alice**：地图角色和镜头锚点
 
-### Inbox 交付复核闭环（2026-09-01）
+### 持久 Inbox 值班合同（2026-09-01）
 
-把刚刚对齐的“正确的勤快”落到第一个正向班次：单条、带文档的 Inbox 交付不能仅靠
-打开 Activity Log 或 Inbox 就被算作完成。Office 必须冻结准确的交付事件，引导用户
-打开对应 Inbox 条目，等用户真实返回 Office 后，才允许对该次交付显式盖章。
+真实运行暴露了第一条不能妥协的职责不变量：Activity Bar 有 7 条持久未读 Inbox 交付时，
+Office 却因为首次访问自动 baseline activity journal 而显示 `Shift clear`。Journal 只证明
+“系统刚刚发生过什么”，不能证明“用户还有什么功课没做”；两者必须分层。
 
 | 方案 | 用户影响 | 结论 |
 |---|---|---|
-| 进入 Inbox 终端即确认 | 路径短，但把发现误当成复核，后台仍然“看起来做完了” | 否 |
-| 在 Office 内复制完整报告 | 不必离开地图，但制造第二个 Inbox/文档阅读器 | 否 |
-| 精确交付往返：Log → Inbox 条目 → 返回 → 盖章 | 用户亲自阅读真实产物，Office 只负责节奏、身份和回执 | **是** |
+| 继续修 journal watermark | 能保留现有代码，但历史交付不一定有 journal，批量盖章还会吞掉未逐条复核的内容 | 否 |
+| 只把未读数作为 `Shift clear` 门槛 | 不再撒谎，但用户只得到红点，仍然不知道先看哪一份、如何完成 | 否 |
+| 持久逐条职责：未读条目 → 精确 Inbox → 返回 → 服务端盖章 | 给出有限、准确、可恢复的值班循环，完成真相由领域状态持有 | **是** |
 
-第一切片只特化 `pending === 1`、拥有准确 `workspaceId + inboxEntryId`、且事件时
-`documentCount > 0` 的 Inbox duty。激活时冻结 `throughSeq` 和交付 subject；出门期间到达
-的新事件不会替换当前交付，返回后的盖章也只确认冻结水位。批量、无文档或字段不完整的
-Inbox 仍走现有中性 journal receipt，不猜测“报告”语义。Activity Log 的盖章必须绑定
-冻结事件本身，浏览更旧记录不能确认它；被最新 50 条服务日志挤出的冻结事件由 Office
-自己的 bounded focus window 补回。Inbox 阅读面只负责在“精确条目已于可见 reading surface
-呈现”后写入一次 presentation handshake；它不持有值班、回执或优先级语义，也不修改 API、
-后端或 Inbox 数据契约。导航 intent、后台标签、条目缺失和 Activity 源错误都不能开放盖章。
+Office 新增主动注册的 `inbox-unread` provider，直接读取与 Activity Bar 同一服务器
+`readAt` 事实，并独立暴露 `loading / ready / error`。它按“带文档优先、同层最旧优先”
+生成逐条 exact candidate；Inbox 地标显示总 backlog，HUD 只显示冻结班次的 `n/N` 和
+估时。首次访问绝不 baseline 未读。任一来源未知时不能声称 `Shift clear`，但另一来源已知
+的真实候选仍然可见，不能因为同步中的低层信号把眼前功课藏掉。
 
-第一阶段的引导闭环复用现有可消费活动日志，并允许其他产品域主动注册规范化值班源：
-`Agent / Inbox / News` 与 Scheduled Issue 健康信号都只提供候选、来源状态和确认语义，
-Office 按产品优先级投影成一个“下一值班项”。用户点击后 Alice 必须走到对应地标并完成
-原交互或 Office 原生复核，明确确认后才切换下一项；无待处理事项且所有更高优先级来源
-已知时，才低调显示值班已清。产品度量关注报告、消息、节奏检查与新闻的复核和确认，
+交互固定为：点击 HUD 后 Alice 通过真实碰撞寻路到 Inbox 终端，打开准确条目；只有该条目
+在可见 reading surface 呈现并返回 Office，才出现像素回执单。回执单保留准确标题、
+Workspace、到达时间和文档清单，提供“再次打开 / 暂后 / 盖章”三种明确动作。盖章等待
+服务器 `markRead(entryId)` 成功后才移除 A；期间到达的 B、另一标签页仍未读的条目以及
+失败的 mutation 均不会被吞掉。若另一入口已经把 A 标为已读，Office 显示已处理状态并
+继续下一项，不伪造第二次回执。Inbox journal 到达事件退回环境动画和 Activity Log，
+不再生成 mandatory receipt，也不再与持久未读重复计数。
+
+宽屏回执单保持地图可见；窄屏复用 Cadence dossier 的单列事实与 44px 动作，短横屏由内部
+滚动区保住标题、关闭和盖章。准确标题使用两行/容器截断而不挤压控制。对话框以标题取得
+初始焦点，Tab 困在窗口内，Escape 只暂后且不确认，异步盖章使用 `aria-live` 报告状态。
+共享所有权仍在 `oa-office-window` 和现有像素 dossier 视觉语法；只抽取两种职责窗口共用的
+焦点陷阱，不新造 portal、第二套 Inbox 阅读器或通用工作流引擎。Escape / 关闭只收起窗口，
+不改变顺序；明确的 `Later` 才把当前项轮转到本班队尾，并且绝不增加完成数。
+
+第一阶段的 mandatory 闭环只消费有领域真相和明确确认语义的来源：持久未读 Inbox 与
+Scheduled Issue cadence 异常。Agent / Inbox / News 的活动日志仍驱动角色、地标和世界
+反馈；其他产品域可以主动注册新的规范化值班源，但必须提供候选、来源状态和确认语义，
+不能把供应侧吞吐量直接当成人类功课。用户点击后 Alice 必须走到对应地标并完成原交互或
+Office 原生复核，明确确认后才切换下一项；来源均 ready、冻结班次已完成且底层 mandatory
+事实也为零时，才低调显示值班已清。产品度量关注报告、消息和节奏检查的复核与确认，
 不以 Office 停留时长、点击量、下单次数或盈亏代替勤勉。
 
 ### 值班引导方案
@@ -60,10 +75,27 @@ Office 按产品优先级投影成一个“下一值班项”。用户点击后 
 | 只保留地标角标 | 环境感强，但用户仍需自己猜测先后顺序 | 否 |
 | 一次只显示一个下一值班项，并指向现有地标 | 给出明确动线，同时保留走动、发现和空间记忆 | **是** |
 
-第一版优先级为 Inbox（已送达的产物）→ cadence（Scheduled Issue 节奏异常）→ Agent
-（运行结果与异常）→ News（新信息）。优先级是“下一步”的引导契约，不是地图访问控制：
+第一版只使用可证明的用户声明优先级，跨来源顺序为：`urgent/high` cadence 异常 → 精确关联
+`urgent/high` Scheduled Issue 的未读 Inbox → 其余 cadence 异常 → 其余未读 Inbox。
+不能用标题、年龄或文档路径猜测交易价值；原始 `agent`、`news.ingested` 与 Inbox arrival
+只属于环境活动，不能因为供应侧发生了事情就自动制造功课。优先级是“下一步”的引导契约，不是地图访问控制：
 用户仍可自由探索地标和历史记录，但只有当前队首事项的明确确认会推进 HUD。后续把周报、
 风险检查、thesis 复核等正向节奏事项注册进同一投影，而不是在 HUD 里堆更多卡片。
+
+### 冻结班次合同（2026-09-01）
+
+- 所有 mandatory 来源 ready 后，Office 冻结当前排序前最多 4 项；不足 4 项时显示真实数量，
+  绝不为了“游戏感”补造任务。
+- HUD 只显示当前一项、`n/N` 与剩余约分钟数。新到事项不插队，超出冻结成员的事实只计入
+  backlog；用户完成本班后可以明确开始下一班。
+- `Later` 只把当前项轮转到队尾；Escape / 关闭只收起 dossier。两者都不调用领域回执，
+  不增加 `n`。
+- 只有 Inbox 服务端 `readAt` 确认、cadence session evidence receipt，或 ready 来源证明事项
+  已在别处解决，才能推进冻结班次。
+- `本班完成` 只表示有限冻结槽位已复核；只要仍有未读 Inbox、仍存在 cadence 异常或任一
+  来源未知，就不能称为 `值班已清`。cadence 的“已复核”也不等于异常已修复。
+- 冻结顺序和 Later 轮转只保存到当前 tab 的 `sessionStorage`；它不是跨设备日计划，也不
+  改写 Inbox、Issue 或活动日志的领域所有权。
 
 ## Current diagnosis
 
@@ -6018,28 +6050,72 @@ Scheduled cadence-duty first increment (2026-09-01):
   overlapping refresh from replacing a newer snapshot. The Office projector fails closed while loading/error state is
   visible, but the shared hook should eventually adopt the same out-of-order protection used by Product Activity.
 
-Exact Inbox delivery round trip (2026-09-01):
+Durable Inbox shift contract (2026-09-01):
 
-- Replaced “enter the Inbox station and stamp” for one documented delivery with an exact two-step shift: select the
-  captured journal event, open that exact Inbox entry, return to Office, then explicitly stamp it reviewed. The HUD and
-  the map station share one review constructor, so neither entrance can bypass the excursion.
-- The activity projection and duty registry now retain `workspaceId + inboxEntryId + documentCount` as a typed subject.
-  Only one pending entry with a positive document count gets the specialized route; batch, zero-document, unknown-count,
-  and incomplete legacy events keep the generic journal receipt instead of pretending to be reports.
-- Navigation intent is not proof of arrival. Inbox writes a presentation handshake only after the matching entry has
-  rendered in its visible reading surface. A background tab, default-selected B, missing A, reload, or activity-source
-  error leaves the excursion unconfirmed and cannot expose the stamp.
-- The return keeps A's sequence frozen and loads it through a bounded service focus window even after it falls outside
-  the latest fifty entries. Stamping acknowledges only through A; an Inbox B arriving during the excursion remains one
-  pending duty across the Office remount. Escape clears the unfinished return without acknowledging anything.
-- The HUD now names the concrete duty plus category/context, clamps long copy, and collapses short-landscape layout to
-  only the exact title plus count. Meaningful meta text uses opaque game ink (5.76:1 on the duty green); 390×844 and
-  500×420 real-browser passes showed no title/button clipping, while the existing desktop cadence duty still walked
-  Alice into its real two-step dossier. The live project did not contain an eligible new single-document Inbox event,
-  so the exact cross-tab path is verified by component integration rather than a fabricated production-log mutation.
-- Root and UI TypeScript passed; 168 focused Office/Inbox tests passed; the complete suite passed 647 files and 5,567
-  tests (one file and nine tests skipped); and the production UI build passed with only the existing local-ports fallback
-  and large-chunk advisory.
+- Replaced the journal-watermark experiment with an Office-owned, fail-closed Inbox source. It reads the complete
+  paginated server history, projects every entry without `readAt`, and registers one exact duty per durable unread row.
+  Documented deliveries lead comments-only updates; each layer is oldest-first. The HUD and station show the full
+  backlog while Alice guides only the queue head.
+- Loading, pagination failure, a cursor that does not advance, and an oversized history all fence lower priorities and
+  `Shift clear`. Overlapping refreshes are generation-guarded. A confirmed A is removed only after the server returns
+  the same entry id with a valid `readAt`; a slower older read cannot resurrect it, a failed write leaves A intact, and
+  B remains pending. The shared Inbox count is synchronized only after that server confirmation.
+- Inbox journal events remain useful ambient world activity and Activity Log history, but no longer manufacture a
+  second mandatory receipt. Manual interaction, the world landmark, and the HUD all enter the same durable candidate.
+  The exact captured server row keeps duties older than the live latest-100 sidebar window addressable without exposing
+  Delete, while presentation of a different Inbox row cannot unlock the return receipt.
+- Raw News is ambient world motion and journal history, not a diligence receipt. Its terminal has no pending badge or
+  review stamp, and Agent duty authority now resolves from its own independently loaded source: a slow or failed News
+  query can leave the ambient journal loading/degraded without blocking a known Agent duty or `Shift clear`.
+- Returning to Office opens a pixel dossier with the exact title, Workspace, arrival time, document count, and bounded
+  file/revision list. Escape and `Later` postpone without changing `readAt`; `Open again` returns to the exact row; only
+  `Stamp reviewed` calls the server. Source loss disables the stamp, an externally completed row offers Continue, and
+  changed evidence must be reopened rather than stamped from stale context.
+- Real Default AliceProject acceptance found 157 Inbox rows and seven durable unread documented deliveries. Office now
+  opens with the same count instead of the previous false `Shift clear`, leads with the oldest documented report, walks
+  Alice to the real Inbox terminal, opens that exact 7-day-old entry, and restores the matching dossier on return.
+  `Later` kept all seven unread and restored Inbox focus; no browser errors were recorded. No real row was stamped during
+  QA, so persisted user review state was left untouched.
+- Desktop, 390×844, and 500×420 passes exposed and fixed a genuine responsive defect: the dossier panel previously had
+  a percentage `max-height` under an auto-height parent, so the action row was clipped with no scroll range. Cadence and
+  Inbox dossiers now share a flex-constrained window; the heading and simple close control stay fixed while the inner
+  panel scrolls from exact evidence to all 44px actions.
+- Focused registry, source, excursion, dossier, Inbox, Building, Page, and runtime-journal suites pass 166 tests. They cover pagination,
+  hard readiness fences, dedupe, stale-request resurrection, exact per-entry receipts, mutation failure, double stamps,
+  source drift, independently degraded News, focus containment, older-feed fallback, ambient journal semantics, and the
+  complete A→Inbox→Office→B loop. Root and UI TypeScript pass; the complete suite passes 649 files / 5,587 tests (one
+  file and nine tests skipped),
+  and the production UI build passes with only the existing local-ports fallback and large-chunk advisory.
+
+Frozen diligence-shift follow-up (2026-09-01):
+
+- Reframed the queue around the QQ-Farm-like product mission: Office should make a small set of neglected but
+  evidence-backed reviews easy to remember and finish, not maximize product motion, time-on-page, or trade count.
+  Mandatory v1 work is therefore limited to durable unread Inbox facts and Scheduled Issue cadence exceptions;
+  Agent and raw News activity remain ambient world feedback.
+- Replaced provider exclusivity with a cross-source pool whose policy uses only explicit domain facts: urgent/high
+  cadence, exact urgent/high Scheduled-Issue Inbox, other cadence, then other Inbox. An Inbox without an exact or
+  globally unambiguous Issue relation stays unspecified; age, title, and document path never masquerade as trading
+  value. A loading/error source prevents an honest clear but no longer hides a concrete duty from another source.
+- Added an Office-only frozen shift capped at four real candidates. The HUD shows one current duty, `n/N`, and a
+  bounded estimated time; new arrivals and overflow remain backlog until the player explicitly starts another shift.
+  `Later` rotates the current member to the tail without changing progress, while Escape and Close only dismiss the
+  dossier. Same-tab `sessionStorage` preserves membership and rotation through exact Inbox/Issue excursions.
+- Split finite-shift completion from domain clear. A reviewed cadence exception still counts as unresolved until its
+  underlying health fact disappears, so the HUD reports `Shift complete · N still pending` instead of claiming the
+  Issue was repaired. Inbox clear still requires the exact server `readAt`; loading/error states remain degraded.
+- The Inbox landmark keeps the full durable backlog while the HUD stays finite. Dossier copy now calls that number
+  Inbox-wide rather than pretending all seven rows belong to the four-item shift. Four locales and accessible labels
+  carry the same semantics.
+- Real Default AliceProject acceptance showed a four-item shift led by the high-priority BOJ cadence exception and a
+  seven-row Inbox backlog. `Later` changed the head to the oldest documented Inbox while progress remained `1/4` and
+  the estimate remained 12 minutes. Alice walked to the Inbox station, opened the exact seven-day-old delivery, and
+  restored its matching dossier; Close left both the sidebar and station at seven unread. No real receipt was written.
+  At 390×844 the long title truncates without displacing `1/4`, and the internal dossier scroller reaches all three
+  44px actions. A fresh-tab reload produced no console errors.
+- Focused Office verification passed 14 files / 230 tests. Root and UI TypeScript passed; the complete suite passed
+  651 files / 5,615 tests (one file and nine tests skipped); the production UI build passed with only the existing
+  local-ports fallback and large-chunk advisory.
 
 ## Completion
 
