@@ -1982,6 +1982,8 @@ export const en = {
     newsStation: 'News terminal',
     newsStationHint: 'Walk over to review newly ingested news.',
     serviceNeedsAttention: '{{name}} · New activity',
+    servicePendingActivity: '{{name}} · {{count}} pending',
+    servicePendingActivityMore: '{{name}} · {{count}}+ pending',
     roster: 'Team roster',
     rosterAdditional: '{{count}} more teammates',
     rosterHint: 'View every Session assigned to this Workspace group.',

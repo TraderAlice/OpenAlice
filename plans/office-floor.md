@@ -5646,6 +5646,23 @@ Visible-work result-label follow-up (2026-08-31):
   passed; the full suite passed all 620 test files and 5,211 tests (one file and nine tests skipped); the production UI
   build passed with only the existing ports fallback and large-chunk advisory.
 
+Pending-landmark count follow-up (2026-08-31):
+
+- Played three consecutive News arrivals `#6235`–`#6237` and found that the Office correctly raised News attention but
+  flattened every unseen item into one `!`. The destination and exact latest record were trustworthy, yet the floor
+  could not tell the player whether one item or a burst of work was waiting.
+- Compared retaining the boolean signal, adding a permanent unread list to the map, and replacing only the landmark
+  signal with a bounded count. A map-level list would duplicate the Activity Log and overwhelm the floor; chose a
+  compact count sourced from the same session-scoped acknowledgement sequence, capped at `9+`.
+- Inbox, News, and Operations now inspect at most nine recent family records and count records newer than their own
+  acknowledged sequence. Entering the landmark still acknowledges the batch, while every item remains permanently
+  available in Activity Log; the brief `OK` receipt and fresh-arrival animation retain their separate roles.
+- Real-browser acceptance added News records `#6239`–`#6241` on top of one genuinely pending arrival. The News prop
+  displayed `4`, exposed `News terminal · 4 pending`, opened exact latest record `#6241`, and returned to an unbadged
+  landmark plus the one-shot `OK` receipt after closing the log. Focused hook/building/page/style suites passed all 83
+  tests; root and UI TypeScript passed; the full suite passed all 620 test files and 5,213 tests (one file and nine tests
+  skipped); the production UI build passed with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

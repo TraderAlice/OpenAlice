@@ -7,6 +7,7 @@ import { officeActivityExcerpt } from './activity-text'
 
 const POLL_MS = 4_000
 const FRESH_MS = 12_000
+const PENDING_COUNT_CAP = 9
 const ACK_STORAGE_PREFIX = 'openalice:office-product-activity:ack:'
 const OFFICE_ACTIVITY_KINDS = ['agent', 'inbox', 'news'] as const
 type OfficeActivityKind = typeof OFFICE_ACTIVITY_KINDS[number]
@@ -39,6 +40,7 @@ export interface OfficeProductActivityState {
   readonly inbox: OfficeActivityLandmark | null
   readonly news: OfficeActivityLandmark | null
   readonly attention: Readonly<Record<OfficeActivityKind, boolean>>
+  readonly pending: Readonly<Record<OfficeActivityKind, number>>
   readonly freshKind: OfficeActivityKind | null
 }
 
@@ -126,6 +128,11 @@ export function useOfficeProductActivity(): OfficeProductActivity {
     inbox: false,
     news: false,
   })
+  const [pending, setPending] = useState<Record<OfficeActivityKind, number>>({
+    agent: 0,
+    inbox: 0,
+    news: 0,
+  })
   const initializedRef = useRef(false)
   const freshTimerRef = useRef<number | null>(null)
   const freshKindRef = useRef<OfficeActivityKind | null>(null)
@@ -135,9 +142,9 @@ export function useOfficeProductActivity(): OfficeProductActivity {
   const refresh = useCallback(async () => {
     const activityApi = api.productActivity ?? api.agentRuntime
     const pages = await Promise.all([
-      activityApi.query({ page: 1, pageSize: 1, types: [...OFFICE_AGENT_MILESTONE_TYPES] }),
-      activityApi.query({ page: 1, pageSize: 1, family: 'inbox' }),
-      activityApi.query({ page: 1, pageSize: 1, family: 'news' }),
+      activityApi.query({ page: 1, pageSize: PENDING_COUNT_CAP, types: [...OFFICE_AGENT_MILESTONE_TYPES] }),
+      activityApi.query({ page: 1, pageSize: PENDING_COUNT_CAP, family: 'inbox' }),
+      activityApi.query({ page: 1, pageSize: PENDING_COUNT_CAP, family: 'news' }),
     ]).catch(() => null)
     if (!pages) return
     const nextEvents = pages.flatMap((page) => page.entries).sort((a, b) => a.seq - b.seq)
@@ -148,6 +155,11 @@ export function useOfficeProductActivity(): OfficeProductActivity {
       agent: nextProjected.agent?.seq ?? 0,
       inbox: nextProjected.inbox?.seq ?? 0,
       news: nextProjected.news?.seq ?? 0,
+    }
+    const entriesByKind: Record<OfficeActivityKind, readonly AgentRuntimeEvent[]> = {
+      agent: pages[0].entries,
+      inbox: pages[1].entries,
+      news: pages[2].entries,
     }
 
     if (!initializedRef.current) {
@@ -189,6 +201,15 @@ export function useOfficeProductActivity(): OfficeProductActivity {
       }
     }
 
+    setPending({
+      agent: Math.min(PENDING_COUNT_CAP, entriesByKind.agent
+        .filter((event) => event.seq > acknowledgedSeqRef.current.agent).length),
+      inbox: Math.min(PENDING_COUNT_CAP, entriesByKind.inbox
+        .filter((event) => event.seq > acknowledgedSeqRef.current.inbox).length),
+      news: Math.min(PENDING_COUNT_CAP, entriesByKind.news
+        .filter((event) => event.seq > acknowledgedSeqRef.current.news).length),
+    })
+
     setEvents(nextEvents)
     initializedRef.current = true
   }, [])
@@ -198,6 +219,7 @@ export function useOfficeProductActivity(): OfficeProductActivity {
     acknowledgedSeqRef.current[kind] = seq
     writeAcknowledgedSeq(kind, seq)
     setAttention((current) => ({ ...current, [kind]: false }))
+    setPending((current) => ({ ...current, [kind]: 0 }))
     if (freshKindRef.current === kind) {
       freshKindRef.current = null
       setFreshKind(null)
@@ -221,5 +243,5 @@ export function useOfficeProductActivity(): OfficeProductActivity {
   }, [refresh])
 
   const projected = useMemo(() => projectOfficeProductActivity(events), [events])
-  return { ...projected, attention, freshKind, acknowledge }
+  return { ...projected, attention, pending, freshKind, acknowledge }
 }

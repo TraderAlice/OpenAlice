@@ -155,6 +155,7 @@ export function OfficeBuilding({
     inbox: null,
     news: null,
     attention: { agent: false, inbox: false, news: false },
+    pending: { agent: 0, inbox: 0, news: 0 },
     freshKind: null,
   },
   onOpenService,
@@ -1767,6 +1768,8 @@ export function OfficeBuilding({
                 : 'news-service'
               const fresh = productActivity.freshKind === landmark.kind
               const needsAttention = productActivity.attention[landmark.kind]
+              const pendingCount = productActivity.pending[landmark.kind]
+              const pendingLabel = pendingCount >= 9 ? '9+' : String(pendingCount || '!')
               const serviceName = landmark.kind === 'inbox'
                 ? t('office.inboxStation')
                 : t('office.newsStation')
@@ -1786,7 +1789,14 @@ export function OfficeBuilding({
                 data-acknowledged={acknowledgedTargetId === landmark.id || undefined}
                 data-replay-locked={replaySeq != null || undefined}
                 aria-label={needsAttention
-                  ? t('office.serviceNeedsAttention', { name: serviceName })
+                  ? pendingCount > 0
+                    ? t(pendingCount >= 9
+                        ? 'office.servicePendingActivityMore'
+                        : 'office.servicePendingActivity', {
+                      name: serviceName,
+                      count: Math.min(9, pendingCount),
+                    })
+                    : t('office.serviceNeedsAttention', { name: serviceName })
                   : serviceName}
                 title={replaySeq == null
                   ? landmark.kind === 'inbox'
@@ -1823,7 +1833,7 @@ export function OfficeBuilding({
                     : 'office.logChannelNews')}</span>
                 </span>
                 {needsAttention && (
-                  <span className="oa-office-map-service__signal" aria-hidden>!</span>
+                  <span className="oa-office-map-service__signal" aria-hidden>{pendingLabel}</span>
                 )}
                 {acknowledgedTargetId === landmark.id && (
                   <span className="oa-office-landmark-ack" aria-hidden>OK</span>
@@ -1844,7 +1854,14 @@ export function OfficeBuilding({
               data-route={routeTargetId === 'operations'}
               data-acknowledged={acknowledgedTargetId === 'operations' || undefined}
               aria-label={productActivity.attention.agent
-                ? t('office.serviceNeedsAttention', { name: t('office.operationsBoard') })
+                ? productActivity.pending.agent > 0
+                  ? t(productActivity.pending.agent >= 9
+                      ? 'office.servicePendingActivityMore'
+                      : 'office.servicePendingActivity', {
+                      name: t('office.operationsBoard'),
+                      count: Math.min(9, productActivity.pending.agent),
+                    })
+                  : t('office.serviceNeedsAttention', { name: t('office.operationsBoard') })
                 : t('office.operationsBoard')}
               title={t('office.operationsBoardHint')}
               onClick={() => requestTargetInteraction('operations')}
@@ -1861,7 +1878,9 @@ export function OfficeBuilding({
                 style={officePixelImg}
               />
               {productActivity.attention.agent && (
-                <span className="oa-office-operations-board__signal" aria-hidden>!</span>
+                <span className="oa-office-operations-board__signal" aria-hidden>
+                  {productActivity.pending.agent >= 9 ? '9+' : productActivity.pending.agent || '!'}
+                </span>
               )}
               {acknowledgedTargetId === 'operations' && (
                 <span className="oa-office-landmark-ack" aria-hidden>OK</span>

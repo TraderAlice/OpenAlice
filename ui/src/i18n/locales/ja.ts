@@ -1950,6 +1950,8 @@ export const ja: Resources = {
     newsStation: 'ニュース端末',
     newsStationHint: '近づいて新しく取り込まれたニュースを確認します。',
     serviceNeedsAttention: '{{name}} · 新しいアクティビティ',
+    servicePendingActivity: '{{name}} · 未確認 {{count}} 件',
+    servicePendingActivityMore: '{{name}} · 未確認 {{count}}+ 件',
     roster: 'チーム名簿',
     rosterAdditional: 'ほか {{count}} 人',
     rosterHint: 'この Workspace グループに所属するすべての Session を表示します。',

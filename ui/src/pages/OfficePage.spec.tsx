@@ -126,6 +126,7 @@ beforeEach(async () => {
     inbox: null,
     news: null,
     attention: { agent: false, inbox: false, news: false },
+    pending: { agent: 0, inbox: 0, news: 0 },
     freshKind: null,
     acknowledge: acknowledgeMock,
   })
@@ -456,12 +457,13 @@ describe('OfficePage localization', () => {
       inbox: { seq: 11, occurredAt: 1_100, inboxEntryId: 'inbox-11' },
       news: { seq: 12, occurredAt: 1_200 },
       attention: { agent: false, inbox: true, news: true },
+      pending: { agent: 0, inbox: 1, news: 2 },
       freshKind: null,
       acknowledge: acknowledgeMock,
     })
     const { container } = render(<OfficePage />)
 
-    const inbox = screen.getByRole('button', { name: 'Inbox 收件台 · 有新动态' })
+    const inbox = screen.getByRole('button', { name: 'Inbox 收件台 · 待处理 1 条' })
     await userEvent.click(inbox)
     const runtime = await screen.findByTestId('office-runtime-section', {}, { timeout: 10_000 })
     expect(runtime.dataset.channel).toBe('inbox')
@@ -474,7 +476,7 @@ describe('OfficePage localization', () => {
     await userEvent.keyboard('{Escape}')
     await vi.waitFor(() => expect(document.activeElement).toBe(inbox))
 
-    const news = screen.getByRole('button', { name: '新闻终端 · 有新动态' })
+    const news = screen.getByRole('button', { name: '新闻终端 · 待处理 2 条' })
     await userEvent.click(news)
     const newsRuntime = await screen.findByTestId('office-runtime-section', {}, { timeout: 10_000 })
     expect(newsRuntime.dataset.channel).toBe('news')

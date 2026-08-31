@@ -1818,6 +1818,7 @@ describe('OfficeBuilding', () => {
             source: 'Wire',
           },
           attention: { agent: true, inbox: true, news: true },
+          pending: { agent: 1, inbox: 2, news: 9 },
           freshKind: 'news',
         }}
         initialPlayerState={{ position: { x: 340, y: 600 }, direction: 'up' }}
@@ -1831,21 +1832,21 @@ describe('OfficeBuilding', () => {
       />,
     )
 
-    const inbox = screen.getByRole('button', { name: 'Inbox station · New activity' })
-    const news = screen.getByRole('button', { name: 'News terminal · New activity' })
+    const inbox = screen.getByRole('button', { name: 'Inbox station · 2 pending' })
+    const news = screen.getByRole('button', { name: 'News terminal · 9+ pending' })
     const serviceZone = screen.getByTestId('office-service-zone')
     expect(serviceZone.querySelector('img')?.getAttribute('src'))
       .toBe('/office/furniture/workspace-rug-v2.png')
     expect(inbox.dataset.hasActivity).toBe('true')
     expect(inbox.dataset.attention).toBe('true')
     expect(inbox.dataset.fresh).toBeUndefined()
-    expect(inbox.querySelector('.oa-office-map-service__signal')?.textContent).toBe('!')
+    expect(inbox.querySelector('.oa-office-map-service__signal')?.textContent).toBe('2')
     expect(news.dataset.fresh).toBe('true')
-    expect(news.querySelector('.oa-office-map-service__signal')?.textContent).toBe('!')
-    const operations = screen.getByRole('button', { name: 'Operations board · New activity' })
+    expect(news.querySelector('.oa-office-map-service__signal')?.textContent).toBe('9+')
+    const operations = screen.getByRole('button', { name: 'Operations board · 1 pending' })
     expect(operations.dataset.hasActivity).toBe('true')
     expect(operations.dataset.attention).toBe('true')
-    expect(operations.querySelector('.oa-office-operations-board__signal')?.textContent).toBe('!')
+    expect(operations.querySelector('.oa-office-operations-board__signal')?.textContent).toBe('1')
     const inboxPrompt = screen.getByRole('status', {
       name: 'Open Inbox · codex · Agent report delivered',
     })
@@ -1900,6 +1901,7 @@ describe('OfficeBuilding', () => {
       },
       news: null,
       attention: { agent: false, inbox: true, news: false },
+      pending: { agent: 0, inbox: 1, news: 0 },
       freshKind: null,
     }
     const props = {
@@ -1915,7 +1917,7 @@ describe('OfficeBuilding', () => {
     }
     const view = render(<OfficeBuilding {...props} productActivity={activity} />)
 
-    const inbox = screen.getByRole('button', { name: 'Inbox station · New activity' })
+    const inbox = screen.getByRole('button', { name: 'Inbox station · 1 pending' })
     inbox.focus()
     fireEvent.keyDown(inbox, { key: 'Enter' })
     await waitFor(() => expect(onOpenService).toHaveBeenCalledWith('inbox', 11))

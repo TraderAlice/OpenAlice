@@ -93,6 +93,24 @@ describe('Office responsive style contract', () => {
     )
   })
 
+  it('keeps pending landmark counts compact and game-readable', () => {
+    for (const selector of [
+      '.oa-office-map-service__signal',
+      '.oa-office-operations-board__signal',
+    ]) {
+      const start = css.indexOf(`${selector} {`)
+      const end = css.indexOf('\n}', start)
+      const block = css.slice(start, end)
+
+      expect(start).toBeGreaterThan(-1)
+      expect(block).toContain('width: auto')
+      expect(block).toContain('min-width: 26px')
+      expect(block).toContain('padding: 0 4px')
+      expect(block).toContain('border-radius: 2px')
+      expect(block).toContain('font-size: 11px')
+    }
+  })
+
   it('keeps roster state beside identity and gives assignments two stable lines', () => {
     const dormantCardStart = css.indexOf('.oa-office-roster li button[data-awake="false"]')
     const focusedCardStart = css.indexOf('.oa-office-roster li button:focus-visible {')

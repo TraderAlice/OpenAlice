@@ -37,7 +37,7 @@ function queueRefresh(entries: AgentRuntimeEvent[], lastSeq: number) {
   const newest = (matches: (entry: AgentRuntimeEvent) => boolean) => entries
     .filter(matches)
     .sort((a, b) => b.seq - a.seq)
-    .slice(0, 1)
+    .slice(0, 9)
   queryRuntime
     .mockResolvedValueOnce({
       entries: newest((entry) => entry.type !== 'inbox.received' && entry.type !== 'news.ingested'),
@@ -141,12 +141,13 @@ describe('useOfficeProductActivity', () => {
     const firstVisit = renderHook(() => useOfficeProductActivity())
     await waitFor(() => expect(firstVisit.result.current.news?.seq).toBe(11))
     expect(queryRuntime).toHaveBeenCalledWith(expect.objectContaining({
-      pageSize: 1,
+      pageSize: 9,
       types: expect.arrayContaining(['runtime.started', 'runtime.stopped']),
     }))
-    expect(queryRuntime).toHaveBeenCalledWith({ page: 1, pageSize: 1, family: 'inbox' })
-    expect(queryRuntime).toHaveBeenCalledWith({ page: 1, pageSize: 1, family: 'news' })
+    expect(queryRuntime).toHaveBeenCalledWith({ page: 1, pageSize: 9, family: 'inbox' })
+    expect(queryRuntime).toHaveBeenCalledWith({ page: 1, pageSize: 9, family: 'news' })
     expect(firstVisit.result.current.attention).toEqual({ agent: false, inbox: false, news: false })
+    expect(firstVisit.result.current.pending).toEqual({ agent: 0, inbox: 0, news: 0 })
     firstVisit.unmount()
 
     const newsTwelve = event(12, 'news.ingested', {
@@ -156,10 +157,12 @@ describe('useOfficeProductActivity', () => {
     const returnVisit = renderHook(() => useOfficeProductActivity())
     await waitFor(() => expect(returnVisit.result.current.news?.seq).toBe(12))
     expect(returnVisit.result.current.attention).toEqual({ agent: false, inbox: false, news: true })
+    expect(returnVisit.result.current.pending).toEqual({ agent: 0, inbox: 0, news: 1 })
     expect(returnVisit.result.current.freshKind).toBeNull()
 
     act(() => returnVisit.result.current.acknowledge('news'))
     expect(returnVisit.result.current.attention.news).toBe(false)
+    expect(returnVisit.result.current.pending.news).toBe(0)
     returnVisit.unmount()
 
     queueRefresh([inboxNine, newsEleven, newsTwelve], 12)
@@ -181,6 +184,7 @@ describe('useOfficeProductActivity', () => {
     act(() => window.dispatchEvent(new Event(GLOBAL_ACTIVITY_REFRESH_EVENT)))
     await waitFor(() => expect(hook.result.current.inbox?.seq).toBe(12))
     expect(hook.result.current.attention.inbox).toBe(true)
+    expect(hook.result.current.pending.inbox).toBe(1)
     expect(hook.result.current.freshKind).toBe('inbox')
 
     act(() => hook.result.current.acknowledge('news'))
@@ -188,7 +192,27 @@ describe('useOfficeProductActivity', () => {
 
     act(() => hook.result.current.acknowledge('inbox'))
     expect(hook.result.current.attention.inbox).toBe(false)
+    expect(hook.result.current.pending.inbox).toBe(0)
     expect(hook.result.current.freshKind).toBeNull()
+    hook.unmount()
+  })
+
+  it('counts several unseen product events up to a compact landmark cap', async () => {
+    queueRefresh([newsEleven], 11)
+    const hook = renderHook(() => useOfficeProductActivity())
+    await waitFor(() => expect(hook.result.current.news?.seq).toBe(11))
+
+    const newNews = Array.from({ length: 11 }, (_, index) => event(12 + index, 'news.ingested', {
+      newsItemId: 12 + index,
+      title: `Headline ${index + 1}`,
+      source: 'Wire',
+    }))
+    queueRefresh([newsEleven, ...newNews], 22)
+    act(() => window.dispatchEvent(new Event(GLOBAL_ACTIVITY_REFRESH_EVENT)))
+
+    await waitFor(() => expect(hook.result.current.news?.seq).toBe(22))
+    expect(hook.result.current.attention.news).toBe(true)
+    expect(hook.result.current.pending.news).toBe(9)
     hook.unmount()
   })
 

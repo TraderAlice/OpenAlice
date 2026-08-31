@@ -1957,6 +1957,8 @@ export const zhHant: Resources = {
     newsStation: '新聞終端',
     newsStationHint: '走過去查看剛剛入庫的新聞。',
     serviceNeedsAttention: '{{name}} · 有新動態',
+    servicePendingActivity: '{{name}} · 待處理 {{count}} 條',
+    servicePendingActivityMore: '{{name}} · 待處理 {{count}}+ 條',
     roster: '小組名冊',
     rosterAdditional: '另有 {{count}} 位同事',
     rosterHint: '查看分配到這個 Workspace 小組的全部 Session。',
