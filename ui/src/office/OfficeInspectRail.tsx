@@ -245,7 +245,7 @@ export function OfficeInspectRail({
                       )?.focus()
                     }}
                   >
-                    {titleExpanded ? t('office.collapseTitle') : t('office.showFullTitle')}
+                    {titleExpanded ? t('office.collapseAssignment') : t('office.showFullAssignment')}
                   </button>
                 )}
                 </div>

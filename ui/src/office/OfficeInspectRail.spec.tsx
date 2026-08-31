@@ -290,7 +290,7 @@ describe('OfficeInspectRail', () => {
     )
 
     const title = screen.getByText(longTitle)
-    const toggle = screen.getByRole('button', { name: 'Show full title' })
+    const toggle = screen.getByRole('button', { name: 'Read full assignment' })
     expect(screen.getByText('Assignment')).toBeTruthy()
     expect(screen.getByRole('dialog').getAttribute('aria-label')).toMatch(/^Codex/)
     expect(title.getAttribute('data-expanded')).toBeNull()
@@ -318,7 +318,7 @@ describe('OfficeInspectRail', () => {
     expect(title.dataset.expanded).toBe('true')
     expect(document.activeElement).toBe(title)
     await userEvent.keyboard('{Escape}')
-    expect(screen.getByRole('button', { name: 'Show full title' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Read full assignment' })).toBeTruthy()
     expect(title.getAttribute('tabindex')).toBeNull()
     expect(title.getAttribute('role')).toBeNull()
     await vi.waitFor(() => expect(document.activeElement).toBe(toggle))
@@ -343,7 +343,7 @@ describe('OfficeInspectRail', () => {
     expect(title.dataset.expanded).toBe('true')
     expect(profile?.scrollTop).toBe(0)
     expect(document.activeElement).toBe(title)
-    expect(screen.getByRole('button', { name: 'Collapse title' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Collapse assignment' })).toBeTruthy()
   })
 
   it('uses the generated roster-return control when opened from the team list', async () => {

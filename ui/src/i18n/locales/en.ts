@@ -2003,6 +2003,8 @@ export const en = {
     reviewActivity: 'Review activity',
     showFullTitle: 'Show full title',
     collapseTitle: 'Collapse title',
+    showFullAssignment: 'Read full assignment',
+    collapseAssignment: 'Collapse assignment',
     showFullReport: 'Show full report',
     collapseReport: 'Collapse report',
     amenityCoffee: 'Coffee',

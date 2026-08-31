@@ -1970,6 +1970,8 @@ export const zh: Resources = {
     reviewActivity: '查看活动',
     showFullTitle: '展开完整标题',
     collapseTitle: '收起标题',
+    showFullAssignment: '阅读完整委托',
+    collapseAssignment: '收起委托',
     showFullReport: '展开完整报告',
     collapseReport: '收起报告',
     amenityCoffee: '茶水车',

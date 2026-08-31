@@ -1978,6 +1978,8 @@ export const zhHant: Resources = {
     reviewActivity: '查看活動',
     showFullTitle: '展開完整標題',
     collapseTitle: '收起標題',
+    showFullAssignment: '閱讀完整委託',
+    collapseAssignment: '收起委託',
     showFullReport: '展開完整報告',
     collapseReport: '收起報告',
     amenityCoffee: '茶水車',

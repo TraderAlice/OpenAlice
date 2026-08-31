@@ -1971,6 +1971,8 @@ export const ja: Resources = {
     reviewActivity: 'アクティビティを確認',
     showFullTitle: 'タイトルをすべて表示',
     collapseTitle: 'タイトルを折りたたむ',
+    showFullAssignment: '担当任務をすべて読む',
+    collapseAssignment: '担当任務を折りたたむ',
     showFullReport: 'レポートをすべて表示',
     collapseReport: 'レポートを折りたたむ',
     amenityCoffee: 'ティーカート',

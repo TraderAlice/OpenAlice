@@ -5417,6 +5417,22 @@ Harness-landmark power-cycle follow-up (2026-08-31):
   passed; the full suite passed all 620 test files and 5,206 tests (one file and nine tests skipped); the production UI
   build passed with only the existing ports fallback and large-chunk advisory.
 
+Agent-file assignment-language follow-up (2026-08-31):
+
+- Continued through the real 33-member Chat roster into the two Grok coworkers created by the Harness power-cycle QA.
+  Both g32 and g33 correctly retained Latest result and Review activity, so the result-to-log chain needed no repair.
+  Their Agent Files instead exposed a player-language contradiction: the content section was labelled `Assignment`,
+  while its disclosure action said `Show full title`, implying it controlled the character or window title.
+- Compared retaining the shared title label, using generic More/Less copy, and giving the disclosure assignment-specific
+  language. Chose `Read full assignment` / `Collapse assignment`; Activity Log keeps `Show full title` for actual event
+  titles, so each disclosure now names the object it controls without changing layout or keyboard order.
+- Real-browser acceptance opened g33, expanded the complete assignment, and pressed Escape. The label changed in both
+  directions, Escape collapsed only the assignment, the Agent File stayed open, and focus returned to the disclosure.
+  English, Simplified Chinese, Traditional Chinese, and Japanese ship matching copy. Focused Agent-file and runtime-log
+  suites passed all 30 tests; root and UI TypeScript passed; the full suite passed all 620 test files and 5,206 tests
+  (one file and nine tests skipped); the production UI build passed with only the existing ports fallback and
+  large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
