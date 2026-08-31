@@ -21,7 +21,7 @@ const envLevel = (process.env['WEB_TERMINAL_LOG_LEVEL'] ?? 'info').toLowerCase()
 const minLevel: number = LEVELS[envLevel as Level] ?? LEVELS.info;
 
 const FILE_PATH = resolve(userDataHome, 'logs', 'workspace-sessions.log');
-const fileStream = openFileSink(FILE_PATH);
+let fileStream: WriteStream | null | undefined;
 
 function openFileSink(path: string): WriteStream | null {
   try {
@@ -32,6 +32,14 @@ function openFileSink(path: string): WriteStream | null {
   } catch {
     return null;
   }
+}
+
+function getFileSink(): WriteStream | null {
+  // Importing Alice modules must stay read-only until the Runtime lifecycle
+  // fence has been validated and acquired. Defer the first filesystem write
+  // until Alice actually emits a Workspace log record after that gate.
+  if (fileStream === undefined) fileStream = openFileSink(FILE_PATH);
+  return fileStream;
 }
 
 function write(level: Level, msg: string, fields: Record<string, unknown>, toConsole: boolean): void {
@@ -49,8 +57,9 @@ function write(level: Level, msg: string, fields: Record<string, unknown>, toCon
       process.stdout.write(line);
     }
   }
-  if (fileStream) {
-    try { fileStream.write(line); } catch { /* swallow */ }
+  const sink = getFileSink();
+  if (sink) {
+    try { sink.write(line); } catch { /* swallow */ }
   }
 }
 

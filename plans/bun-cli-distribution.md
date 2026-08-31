@@ -1211,8 +1211,11 @@ This plan is complete only when:
   `process.cwd()` and appended to the release-owned
   `share/openalice/logs/workspace-sessions.log`, so reinstall verification
   rejected the changed tree and safely fell back. The current fix routes that
-  sink to `<OPENALICE_HOME>/logs/workspace-sessions.log`, makes the real Bun
-  Workspace smoke require the Project-owned log, and rejects any before/after
-  release-tree mutation. Root TypeScript, the 5,294-test suite, full build, and
-  the local native Bun release smoke pass. A fresh dev archive and Railway
-  restart/redeploy acceptance remain required before Project transfer.
+  sink to `<OPENALICE_HOME>/logs/workspace-sessions.log` and opens it lazily so
+  a rejected pre-fence Alice process cannot create Project state. A direct
+  no-fence Alice regression now requires the whole Project Home to stay absent;
+  the real Bun Workspace smoke requires the Project-owned log and rejects any
+  before/after release-tree mutation. Root TypeScript, the 5,295-test suite,
+  full build, and the local native Bun release smoke pass. A fresh dev archive
+  and Railway restart/redeploy acceptance remain required before Project
+  transfer.
