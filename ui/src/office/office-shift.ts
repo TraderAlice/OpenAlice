@@ -18,11 +18,45 @@ function uniqueIds(values: readonly string[]): string[] {
   return [...new Set(values.filter((value) => value.trim().length > 0))]
 }
 
+function scheduledIssueRoutineKey(candidate: OfficeDutyCandidate): string | null {
+  if (candidate.kind === 'cadence') {
+    return `${candidate.destination.workspaceId}\u0000${candidate.destination.issueId}`
+  }
+  if (candidate.kind === 'inbox' && candidate.delivery.declaredIssue) {
+    const { workspaceId, issueId } = candidate.delivery.declaredIssue
+    return `${workspaceId}\u0000${issueId}`
+  }
+  return null
+}
+
 export function createOfficeShiftSnapshot(
   candidates: readonly OfficeDutyCandidate[],
   now = Date.now(),
 ): OfficeShiftSnapshot {
-  const slots = uniqueIds(candidates.slice(0, OFFICE_SHIFT_LIMIT).map((candidate) => candidate.id))
+  const candidateIds = new Set<string>()
+  const canonical = candidates.filter((candidate) => {
+    if (!candidate.id.trim() || candidateIds.has(candidate.id)) return false
+    candidateIds.add(candidate.id)
+    return true
+  })
+  const coveredRoutines = new Set<string>()
+  const firstCoverage: OfficeDutyCandidate[] = []
+  const repeatedVersions: OfficeDutyCandidate[] = []
+  for (const candidate of canonical) {
+    const routine = scheduledIssueRoutineKey(candidate)
+    if (routine && coveredRoutines.has(routine)) {
+      repeatedVersions.push(candidate)
+      continue
+    }
+    if (routine) coveredRoutines.add(routine)
+    firstCoverage.push(candidate)
+  }
+  // Cover distinct declared routines and all ungrouped facts first. If fewer
+  // than four exist, fill the finite batch with separate repeated deliveries
+  // in their original canonical order; no row or receipt is coalesced.
+  const slots = uniqueIds([...firstCoverage, ...repeatedVersions]
+    .slice(0, OFFICE_SHIFT_LIMIT)
+    .map((candidate) => candidate.id))
   return { version: 1, createdAt: now, slots, order: slots, cleared: false }
 }
 

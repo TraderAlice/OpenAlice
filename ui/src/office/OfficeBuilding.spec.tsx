@@ -12,6 +12,7 @@ import {
   inboxUnreadDutyRegistration,
   type OfficeCadenceDutyCandidate,
   type OfficeDutyCandidate,
+  type OfficeInboxDutyCandidate,
 } from './duty-registry'
 import { officeCoworkerCallsign } from './label'
 
@@ -78,6 +79,38 @@ function cadenceDuty(
       assignee: '@new-each-run',
       when: { kind: 'every', every: '1w' },
       health: { state: 'blocked', message: 'Owner is unavailable.' },
+    },
+  }
+}
+
+function routineInboxDuty(): OfficeInboxDutyCandidate {
+  const [candidate] = inboxUnreadDutyRegistration(
+    [{
+      title: 'Asian close delivery · September 1',
+      entry: {
+        id: 'inbox-routine-1',
+        ts: 1_100,
+        workspaceId: 'chat-1',
+        workspaceLabel: 'Macro desk',
+        docs: [{ path: 'reports/asian-close.md', revision: 'rev-close' }],
+      },
+    }],
+    'ready',
+  ).candidates
+  const inboxCandidate = candidate as OfficeInboxDutyCandidate
+  return {
+    ...inboxCandidate,
+    delivery: {
+      ...inboxCandidate.delivery,
+      declaredIssue: {
+        workspaceId: 'chat-1',
+        issueId: 'asian-close-routine',
+        title: 'Review the Asian close routine',
+        priority: 'high',
+        nextDueAtMs: 8_300,
+        unreadSiblingCount: 0,
+        olderUnreadCount: 0,
+      },
     },
   }
 }
@@ -2255,6 +2288,56 @@ describe('OfficeBuilding', () => {
     )
     expect(screen.getByText('Shift clear')).toBeTruthy()
     expect(screen.queryByTestId('office-duty-target-beacon')).toBeNull()
+  })
+
+  it('names a safely joined Inbox duty as the exact routine while ordinary Inbox stays unchanged', () => {
+    const routine = routineInboxDuty()
+    const ordinary: OfficeInboxDutyCandidate = {
+      ...routine,
+      id: 'inbox-unread:ordinary-delivery',
+      delivery: {
+        title: 'Unlinked analyst note',
+        entry: {
+          ...routine.delivery.entry,
+          id: 'ordinary-delivery',
+        },
+      },
+    }
+    const props = {
+      building: emptyBuilding(),
+      onSelectEmployee: vi.fn(),
+      onOpenEmployee: vi.fn(),
+      onOpenWorkspace: vi.fn(),
+      onOpenFiles: vi.fn(),
+      onOpenRoster: vi.fn(),
+      onOpenLog: vi.fn(),
+    }
+    const view = render(
+      <OfficeBuilding
+        {...props}
+        dutyCandidates={[routine]}
+        dutyShift={activeShift({ total: 2, remainingMinutes: 5 })}
+      />,
+    )
+
+    const routineHud = screen.getByRole('button', {
+      name: 'Shift duty 1/2: Routine report · Review the Asian close routine · Macro desk, about 5 minutes remaining',
+    })
+    expect(routineHud.textContent).toContain('Routine report')
+    expect(routineHud.textContent).toContain('Review the Asian close routine')
+    expect(routineHud.textContent).not.toContain('Asian close delivery · September 1')
+
+    view.rerender(
+      <OfficeBuilding
+        {...props}
+        dutyCandidates={[ordinary]}
+        dutyShift={activeShift({ total: 2, remainingMinutes: 5 })}
+      />,
+    )
+
+    expect(screen.getByRole('button', {
+      name: 'Shift duty 1/2: Inbox · Unlinked analyst note · Macro desk, about 5 minutes remaining',
+    })).toBeTruthy()
   })
 
   it('keeps an active Inbox duty on the HUD and beacon while Operations exposes an exact cadence follow-up', async () => {

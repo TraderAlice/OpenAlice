@@ -232,6 +232,45 @@ function inboxCandidate(evidence: OfficeInboxDutyEvidence): OfficeInboxDutyCandi
   return inboxUnreadDutyRegistration([evidence], 'ready').candidates[0] as OfficeInboxDutyCandidate
 }
 
+function routineInboxEvidence(input: {
+  id: string
+  title: string
+  issueId: string
+  ts: number
+}): OfficeInboxDutyEvidence {
+  const evidence = inboxEvidence(input.id, input.title, input.ts)
+  return {
+    ...evidence,
+    entry: {
+      ...evidence.entry,
+      origin: {
+        kind: 'headless',
+        runId: `run-${input.id}`,
+        issueId: input.issueId,
+        issueWorkspaceId: 'chat-1',
+      },
+    },
+  }
+}
+
+function healthyRoutineIssue(id: string, title: string) {
+  return {
+    id,
+    title,
+    what: `Produce ${title}.`,
+    status: 'todo' as const,
+    priority: 'medium' as const,
+    assignee: '@new-each-run',
+    when: { kind: 'every' as const, every: '1d' },
+    lastFiredAtMs: Date.UTC(2026, 7, 31, 11),
+    nextDueAtMs: Date.UTC(2026, 8, 1, 11),
+    automationHealth: {
+      state: 'healthy' as const,
+      message: 'Latest run completed.',
+    },
+  }
+}
+
 async function leaveCadenceDossierForFullIssue() {
   const view = render(<OfficePage />)
   await userEvent.click(screen.getByRole('button', {
@@ -716,6 +755,91 @@ describe('OfficePage localization', () => {
       name: /本班第 2\/2 项：.*Risk desk follow-up/,
     })).toBeTruthy()
     returning.unmount()
+  })
+
+  it('starts with the latest report from four distinct declared routines before older versions', async () => {
+    const deliveries = [
+      routineInboxEvidence({
+        id: 'asia-old',
+        title: 'Asia close · older report',
+        issueId: 'asia-close',
+        ts: 5_100,
+      }),
+      routineInboxEvidence({
+        id: 'us-close',
+        title: 'US close · latest report',
+        issueId: 'us-close',
+        ts: 5_200,
+      }),
+      routineInboxEvidence({
+        id: 'metals',
+        title: 'Metals watch · latest report',
+        issueId: 'metals-watch',
+        ts: 5_300,
+      }),
+      routineInboxEvidence({
+        id: 'macro',
+        title: 'Macro backdrop · latest report',
+        issueId: 'macro-backdrop',
+        ts: 5_400,
+      }),
+      routineInboxEvidence({
+        id: 'asia-new',
+        title: 'Asia close · newest report',
+        issueId: 'asia-close',
+        ts: 5_500,
+      }),
+    ]
+    issuesMock.mockReturnValue({
+      data: {
+        workspaces: [{
+          wsId: 'chat-1',
+          tag: 'chat',
+          status: 'ok',
+          issues: [
+            healthyRoutineIssue('asia-close', 'Asia close routine'),
+            healthyRoutineIssue('us-close', 'US close routine'),
+            healthyRoutineIssue('metals-watch', 'Metals watch routine'),
+            healthyRoutineIssue('macro-backdrop', 'Macro backdrop routine'),
+          ],
+        }],
+      },
+      error: null,
+      loading: false,
+    })
+    inboxDutiesMock.mockReturnValue({
+      status: 'ready',
+      deliveries,
+      markReadConfirmed: markInboxReadMock,
+    })
+
+    render(<OfficePage />)
+
+    const firstRoutine = screen.getByRole('button', {
+      name: /本班第 1\/4 项：.*Asia close routine/,
+    })
+    expect(firstRoutine.textContent).toContain('Asia close routine')
+    expect(firstRoutine.textContent).not.toContain('Asia close · older report')
+    await userEvent.click(firstRoutine)
+
+    await waitFor(() => expect(openOrFocusMock).toHaveBeenLastCalledWith({
+      kind: 'inbox',
+      params: {},
+    }), { timeout: 10_000 })
+    expect(useInboxSelection.getState().selectedEntryId).toBe('asia-new')
+    expect(readOfficeInboxDutyExcursion()).toMatchObject({
+      duty: {
+        id: 'inbox-unread:asia-new',
+        delivery: {
+          declaredIssue: {
+            issueId: 'asia-close',
+            olderUnreadCount: 1,
+          },
+        },
+      },
+      phase: 'away',
+    })
+    expect(markInboxReadMock).not.toHaveBeenCalled()
   })
 
   it('advances an externally resolved Inbox duty without forging a reviewed receipt', async () => {

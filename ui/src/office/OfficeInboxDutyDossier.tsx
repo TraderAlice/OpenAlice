@@ -50,6 +50,12 @@ export function OfficeInboxDutyDossier({
   const backlogCount = currentBacklogCount ?? duty.count
   const documents = duty.delivery.entry.docs ?? []
   const visibleDocuments = documents.slice(0, 4)
+  const routine = duty.delivery.declaredIssue
+  const routineNextRun = routine
+    ? routine.nextDueAtMs == null
+      ? t('office.routineNextRunNone')
+      : formatRelativeTime(routine.nextDueAtMs)
+    : null
 
   useEffect(() => {
     headingRef.current?.focus({ preventScroll: true })
@@ -122,6 +128,34 @@ export function OfficeInboxDutyDossier({
             {duty.delivery.excerpt ?? t('office.inboxBacklogReturnHint')}
           </p>
         </div>
+
+        {routine && (
+          <section
+            className="oa-office-inbox-duty__routine"
+            aria-label={t('office.routineReportDetails')}
+          >
+            <header>
+              <span>{t('office.routineReport')}</span>
+              <div>
+                <small>{t('office.routineScheduledIssue')}</small>
+                <strong>{routine.title}</strong>
+              </div>
+            </header>
+            <dl>
+              <div>
+                <dt>{t('office.routinePriority')}</dt>
+                <dd>{t(`issues.priority.${routine.priority}`)}</dd>
+              </div>
+              <div>
+                <dt>{t('office.routineNextRun')}</dt>
+                <dd>{routineNextRun}</dd>
+              </div>
+            </dl>
+            {routine.olderUnreadCount > 0 && (
+              <p>{t('office.routineOlderUnread', { count: routine.olderUnreadCount })}</p>
+            )}
+          </section>
+        )}
 
         <dl className="oa-office-cadence__facts">
           <div>

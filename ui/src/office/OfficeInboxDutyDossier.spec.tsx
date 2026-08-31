@@ -36,6 +36,30 @@ function duty(): OfficeInboxDutyCandidate {
   return { ...candidate, count: 3 }
 }
 
+function routineDuty(input: {
+  nextDueAtMs?: number | null
+  olderUnreadCount?: number
+  priority?: 'urgent' | 'high' | 'medium' | 'low' | 'none'
+} = {}): OfficeInboxDutyCandidate {
+  const candidate = duty()
+  const olderUnreadCount = input.olderUnreadCount ?? 2
+  return {
+    ...candidate,
+    delivery: {
+      ...candidate.delivery,
+      declaredIssue: {
+        workspaceId: 'ws-semis',
+        issueId: 'weekly-semis-review',
+        title: 'Weekly semiconductor evidence routine',
+        priority: input.priority ?? 'high',
+        nextDueAtMs: input.nextDueAtMs === undefined ? NOW + 7_200_000 : input.nextDueAtMs,
+        unreadSiblingCount: olderUnreadCount,
+        olderUnreadCount,
+      },
+    },
+  }
+}
+
 beforeEach(async () => {
   await i18n.changeLanguage('en')
   vi.spyOn(Date, 'now').mockReturnValue(NOW)
@@ -72,6 +96,7 @@ describe('OfficeInboxDutyDossier', () => {
     expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Step 2 · Confirm' }))
     expect(dialog.textContent).toContain('4 Inbox item(s) await review')
     expect(dialog.textContent).toContain('Durable delivery for the semiconductor duty desk.')
+    expect(screen.queryByRole('region', { name: 'Routine report details' })).toBeNull()
 
     const facts = dialog.querySelector('.oa-office-cadence__facts')
     expect(facts?.textContent).toContain('WorkspaceSemis desk')
@@ -98,6 +123,62 @@ describe('OfficeInboxDutyDossier', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Stamp reviewed' }))
     await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1))
     expect(onConfirmed).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows exact Scheduled Issue routine facts without broadening the Inbox receipt', () => {
+    const current = routineDuty()
+
+    render(
+      <OfficeInboxDutyDossier
+        duty={current}
+        latestDuty={current}
+        currentBacklogCount={4}
+        sourceStatus="ready"
+        onOpenInbox={vi.fn()}
+        onConfirm={vi.fn()}
+        onConfirmed={vi.fn()}
+        onContinue={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+
+    const routine = screen.getByRole('region', { name: 'Routine report details' })
+    expect(routine.textContent).toContain('Routine report')
+    expect(routine.textContent).toContain('Scheduled IssueWeekly semiconductor evidence routine')
+    expect(routine.textContent).toContain('PriorityHigh')
+    expect(routine.textContent).toContain('Next scheduled runin 2h')
+    expect(routine.textContent).toContain('2 earlier unread report versions still await review.')
+    expect(screen.getByText(
+      'This stamp marks only this exact Inbox item read. It never clears the rest of the queue.',
+    )).toBeTruthy()
+  })
+
+  it('omits the older-version warning at zero and localizes an unscheduled routine', async () => {
+    await i18n.changeLanguage('zh')
+    const current = routineDuty({
+      nextDueAtMs: null,
+      olderUnreadCount: 0,
+      priority: 'urgent',
+    })
+
+    render(
+      <OfficeInboxDutyDossier
+        duty={current}
+        latestDuty={current}
+        currentBacklogCount={1}
+        sourceStatus="ready"
+        onOpenInbox={vi.fn()}
+        onConfirm={vi.fn()}
+        onConfirmed={vi.fn()}
+        onContinue={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+
+    const routine = screen.getByRole('region', { name: '例行报告详情' })
+    expect(routine.textContent).toContain('优先级紧急')
+    expect(routine.textContent).toContain('下次计划运行尚未安排下次运行')
+    expect(routine.textContent).not.toContain('更早的未读报告版本')
   })
 
   it('keeps the receipt disabled when the Inbox source is unavailable', async () => {

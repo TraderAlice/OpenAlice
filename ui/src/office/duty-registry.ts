@@ -41,12 +41,17 @@ export interface OfficeCadenceDutyEvidence {
 export interface OfficeInboxDutyEvidence {
   readonly title: string
   readonly excerpt?: string
-  /** Explicit priority declared by the exact Scheduled Issue that produced this delivery. */
+  /** Metadata declared by the exact Scheduled Issue that produced this delivery. */
   readonly declaredIssue?: {
     readonly workspaceId: string
     readonly issueId: string
     readonly title: string
     readonly priority: IssuePriority
+    readonly nextDueAtMs: number | null
+    /** Other unread deliveries joined to this exact Workspace + Scheduled Issue. */
+    readonly unreadSiblingCount: number
+    /** Unread versions strictly earlier by the stable timestamp/id chronology. */
+    readonly olderUnreadCount: number
   }
   /** Captured server row used only to make an exact older Inbox entry addressable. */
   readonly entry: InboxEntry
@@ -227,13 +232,8 @@ export function inboxUnreadDutyRegistration(
     readonly issueId: string
     readonly title: string
     readonly priority: IssuePriority
+    readonly nextDueAtMs: number | null
   }>()
-  const issueIds = new Map<string, Array<{
-    readonly workspaceId: string
-    readonly issueId: string
-    readonly title: string
-    readonly priority: IssuePriority
-  }>>()
   for (const workspace of issues?.workspaces ?? []) {
     if (workspace.status !== 'ok') continue
     for (const issue of workspace.issues) {
@@ -243,26 +243,105 @@ export function inboxUnreadDutyRegistration(
         issueId: issue.id,
         title: issue.title,
         priority: issue.priority,
+        nextDueAtMs: issue.nextDueAtMs ?? null,
       }
       exactIssues.set(`${workspace.wsId}\u0000${issue.id}`, declaredIssue)
-      issueIds.set(issue.id, [...(issueIds.get(issue.id) ?? []), declaredIssue])
     }
   }
-  const enriched = deliveries.map((delivery) => {
+  const joined = deliveries.map((delivery) => {
     const issueId = delivery.entry.origin?.issueId
-    if (!issueId) return delivery
     const issueWorkspaceId = delivery.entry.origin?.issueWorkspaceId
-    const declaredIssue = issueWorkspaceId
-      ? exactIssues.get(`${issueWorkspaceId}\u0000${issueId}`)
-      : issueIds.get(issueId)?.length === 1 ? issueIds.get(issueId)?.[0] : undefined
-    return declaredIssue ? { ...delivery, declaredIssue } : delivery
+    if (!issueId || !issueWorkspaceId) return delivery
+    const declaredIssue = exactIssues.get(`${issueWorkspaceId}\u0000${issueId}`)
+    return declaredIssue ? {
+      ...delivery,
+      declaredIssue: {
+        ...declaredIssue,
+        unreadSiblingCount: 0,
+        olderUnreadCount: 0,
+      },
+    } : delivery
   })
-  const ordered = [...enriched].sort((left, right) => {
+
+  const routineKey = (delivery: OfficeInboxDutyEvidence): string | null => {
+    const issue = delivery.declaredIssue
+    return issue ? `${issue.workspaceId}\u0000${issue.issueId}` : null
+  }
+  const compareChronology = (left: OfficeInboxDutyEvidence, right: OfficeInboxDutyEvidence): number => {
+    const occurredAt = left.entry.ts - right.entry.ts
+    return occurredAt !== 0 ? occurredAt : left.entry.id.localeCompare(right.entry.id)
+  }
+  const routineGroups = new Map<string, OfficeInboxDutyEvidence[]>()
+  for (const delivery of joined) {
+    const key = routineKey(delivery)
+    if (!key) continue
+    const group = routineGroups.get(key)
+    if (group) group.push(delivery)
+    else routineGroups.set(key, [delivery])
+  }
+  const routineCounts = new Map<OfficeInboxDutyEvidence, {
+    readonly unreadSiblingCount: number
+    readonly olderUnreadCount: number
+  }>()
+  for (const group of routineGroups.values()) {
+    const chronological = [...group].sort(compareChronology)
+    let strictlyEarlier = 0
+    chronological.forEach((delivery, index) => {
+      if (index > 0 && compareChronology(chronological[index - 1]!, delivery) < 0) {
+        strictlyEarlier = index
+      }
+      routineCounts.set(delivery, {
+        unreadSiblingCount: Math.max(0, chronological.length - 1),
+        olderUnreadCount: strictlyEarlier,
+      })
+    })
+  }
+  const enriched = joined.map((delivery): OfficeInboxDutyEvidence => {
+    const key = routineKey(delivery)
+    if (!key || !delivery.declaredIssue) return delivery
+    const counts = routineCounts.get(delivery)
+    if (!counts) return delivery
+    return {
+      ...delivery,
+      declaredIssue: {
+        ...delivery.declaredIssue,
+        ...counts,
+      },
+    }
+  })
+
+  // Preserve the established documented-before-comments and oldest-first
+  // ordering for ordinary Inbox work. Exact Scheduled-Issue routines reuse
+  // those same layer positions but put their newest version first within each
+  // layer, so a finite shift sees current evidence without hiding older rows.
+  const baseline = [...enriched].sort((left, right) => {
     const documented = Number((right.entry.docs?.length ?? 0) > 0)
       - Number((left.entry.docs?.length ?? 0) > 0)
     if (documented !== 0) return documented
-    const occurredAt = left.entry.ts - right.entry.ts
-    return occurredAt !== 0 ? occurredAt : left.entry.id.localeCompare(right.entry.id)
+    return compareChronology(left, right)
+  })
+  const newestRoutineGroups = new Map<string, OfficeInboxDutyEvidence[]>()
+  for (const delivery of enriched) {
+    const key = routineKey(delivery)
+    if (!key) continue
+    const group = newestRoutineGroups.get(key)
+    if (group) group.push(delivery)
+    else newestRoutineGroups.set(key, [delivery])
+  }
+  for (const [key, group] of newestRoutineGroups) {
+    newestRoutineGroups.set(key, [...group].sort((left, right) => {
+      const documented = Number((right.entry.docs?.length ?? 0) > 0)
+        - Number((left.entry.docs?.length ?? 0) > 0)
+      return documented !== 0 ? documented : compareChronology(right, left)
+    }))
+  }
+  const routineOffsets = new Map<string, number>()
+  const ordered = baseline.map((delivery) => {
+    const key = routineKey(delivery)
+    if (!key) return delivery
+    const offset = routineOffsets.get(key) ?? 0
+    routineOffsets.set(key, offset + 1)
+    return newestRoutineGroups.get(key)?.[offset] ?? delivery
   })
   const count = ordered.length
   const candidates: OfficeInboxDutyCandidate[] = ordered.map((delivery) => ({

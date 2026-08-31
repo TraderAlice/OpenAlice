@@ -6174,6 +6174,28 @@ Reviewed cadence follow-up tail (2026-09-01):
   652 files / 5,625 tests (one file and nine tests skipped); the production UI build passed with only the existing local-
   ports fallback and large-chunk advisory.
 
+Routine-report harvest (2026-09-01, in progress):
+
+- Real Default AliceProject play exposed a north-star failure in the finite shift: after the BOJ cadence exception,
+  three historical deliveries from the same Asia close Scheduled Issue occupied the remaining three slots. The Office
+  was asking the player to clear repeated backlog before seeing another research routine, rather than guiding a broad
+  evidence pass before familiar charts.
+- Compared adding an explicit post-review disposition, exposing a provisional known duty while another provider is
+  unavailable, and making the first finite batch cover distinct server-declared routines. Chose routine coverage for
+  this increment because it fixes the concrete live shift composition without inventing a new provider or pretending
+  that opening, scrolling, dwell time, or a financial outcome proves diligence. The disposition decision remains the
+  natural next loop; provisional duties remain a separate source-readiness correction.
+- The chosen contract uses only exact Scheduled Issue provenance already joined by Workspace + Issue id. A finite shift
+  takes at most one candidate from a declared routine on its first coverage pass, including cadence health and Inbox
+  output from the same Issue, then fills unused slots with repeated versions only when distinct work is exhausted.
+  The newest documented exact Inbox delivery represents each routine first; comments-only deliveries retain their
+  lower layer, with its newest version first. Older rows stay unread and remain actionable backlog.
+  Confirming one report must still write only that entry's durable `readAt`; no coalescing, batch receipt, inferred
+  supersession, or ambiguous-title grouping is permitted.
+- The HUD and return dossier will present a safely joined delivery as a Routine report, name the exact Scheduled Issue,
+  show its declared priority and next scheduled run, and disclose how many earlier unread versions remain. Unlinked or
+  ambiguous Inbox rows keep the ordinary Inbox-duty language and ordering contract.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

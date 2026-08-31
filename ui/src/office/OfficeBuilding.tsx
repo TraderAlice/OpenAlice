@@ -495,11 +495,14 @@ export function OfficeBuilding({
       )
     : null
   const nextDutyTarget = nextDuty ? interactionTargetById.get(nextDuty.targetId) : null
+  const nextInboxRoutine = nextDuty?.kind === 'inbox'
+    ? nextDuty.delivery.declaredIssue
+    : null
   const nextDutyName = nextDuty
     ? nextDuty.kind === 'cadence'
       ? nextDuty.cadence.title
       : nextDuty.kind === 'inbox'
-      ? nextDuty.delivery.title
+      ? nextInboxRoutine?.title ?? nextDuty.delivery.title
       : nextDutyTarget?.kind === 'employee'
         ? officeCoworkerCallsign(
             nextDutyTarget.employee,
@@ -510,9 +513,9 @@ export function OfficeBuilding({
   const nextDutyCategory = nextDuty
     ? nextDuty.kind === 'cadence'
       ? t('office.cadenceReview')
-      : t(nextDuty.kind === 'inbox'
-        ? 'office.logChannelInbox'
-        : 'office.logChannelAgent')
+      : nextDuty.kind === 'inbox'
+        ? t(nextInboxRoutine ? 'office.routineReport' : 'office.logChannelInbox')
+        : t('office.logChannelAgent')
     : null
   const nextDutyContext = nextDuty
     ? nextDuty.kind === 'cadence'

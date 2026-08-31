@@ -338,6 +338,137 @@ describe('Office duty registry', () => {
     expect(candidates.every((candidate) => candidate.count === 3)).toBe(true)
   })
 
+  it('surfaces the newest unread delivery first inside one exact Scheduled-Issue routine', () => {
+    const issueData = snapshot(scheduledIssue('healthy', {
+      id: 'asia-close',
+      nextDueAtMs: NOW + 3_600_000,
+    }))
+    const routineDelivery = (id: string, ts: number) => inboxDelivery(id, {
+      entry: {
+        ...inboxDelivery(id).entry,
+        ts,
+        origin: {
+          kind: 'headless',
+          runId: `run-${id}`,
+          issueId: 'asia-close',
+          issueWorkspaceId: 'ws-a',
+        },
+      },
+    })
+    const candidates = coreOfficeDutyRegistrations({
+      now: NOW,
+      inboxDeliveries: [
+        inboxDelivery('ordinary-old', { entry: { ...inboxDelivery('ordinary-old').entry, ts: NOW - 40 } }),
+        routineDelivery('routine-old', NOW - 30),
+        routineDelivery('routine-new', NOW + 30),
+        inboxDelivery('ordinary-new', { entry: { ...inboxDelivery('ordinary-new').entry, ts: NOW + 40 } }),
+      ],
+      inboxStatus: 'ready',
+      issues: issueData,
+      issueStatus: 'ready',
+    })[0]!.candidates
+
+    expect(candidates.map((candidate) => candidate.id)).toEqual([
+      'inbox-unread:ordinary-old',
+      'inbox-unread:routine-new',
+      'inbox-unread:routine-old',
+      'inbox-unread:ordinary-new',
+    ])
+  })
+
+  it('keeps document deliveries ahead of comments while reversing each exact routine layer', () => {
+    const issueData = snapshot(scheduledIssue('healthy', { id: 'layered-report' }))
+    const routineDelivery = (id: string, ts: number, documented: boolean) => inboxDelivery(id, {
+      entry: {
+        ...inboxDelivery(id).entry,
+        ts,
+        docs: documented ? inboxDelivery(id).entry.docs : [],
+        origin: {
+          kind: 'headless',
+          runId: `run-${id}`,
+          issueId: 'layered-report',
+          issueWorkspaceId: 'ws-a',
+        },
+      },
+    })
+    const candidates = coreOfficeDutyRegistrations({
+      now: NOW,
+      inboxDeliveries: [
+        routineDelivery('old-comment', NOW - 40, false),
+        routineDelivery('new-document', NOW + 30, true),
+        routineDelivery('old-document', NOW - 30, true),
+        routineDelivery('new-comment', NOW + 40, false),
+      ],
+      inboxStatus: 'ready',
+      issues: issueData,
+      issueStatus: 'ready',
+    })[0]!.candidates
+
+    expect(candidates.map((candidate) => candidate.id)).toEqual([
+      'inbox-unread:new-document',
+      'inbox-unread:old-document',
+      'inbox-unread:new-comment',
+      'inbox-unread:old-comment',
+    ])
+  })
+
+  it('reports exact sibling and older-version counts only for the safely joined routine', () => {
+    const nextDueAtMs = NOW + 7_200_000
+    const issueData = snapshot(scheduledIssue('healthy', {
+      id: 'weekly-report',
+      nextDueAtMs,
+    }))
+    const delivery = (id: string, ts: number, issueWorkspaceId?: string) => inboxDelivery(id, {
+      entry: {
+        ...inboxDelivery(id).entry,
+        ts,
+        origin: {
+          kind: 'headless',
+          runId: `run-${id}`,
+          issueId: 'weekly-report',
+          ...(issueWorkspaceId ? { issueWorkspaceId } : {}),
+        },
+      },
+    })
+    const candidates = coreOfficeDutyRegistrations({
+      now: NOW,
+      inboxDeliveries: [
+        delivery('old', NOW - 20, 'ws-a'),
+        delivery('middle', NOW - 10, 'ws-a'),
+        delivery('new', NOW, 'ws-a'),
+        delivery('wrong-workspace', NOW + 10, 'ws-missing'),
+      ],
+      inboxStatus: 'ready',
+      issues: issueData,
+      issueStatus: 'ready',
+    })[0]!.candidates
+    const byId = new Map(candidates.map((candidate) => [candidate.id, candidate]))
+
+    expect(byId.get('inbox-unread:new')).toMatchObject({
+      kind: 'inbox',
+      delivery: {
+        declaredIssue: {
+          nextDueAtMs,
+          unreadSiblingCount: 2,
+          olderUnreadCount: 2,
+        },
+      },
+    })
+    expect(byId.get('inbox-unread:middle')).toMatchObject({
+      kind: 'inbox',
+      delivery: {
+        declaredIssue: {
+          unreadSiblingCount: 2,
+          olderUnreadCount: 1,
+        },
+      },
+    })
+    const wrongWorkspace = byId.get('inbox-unread:wrong-workspace')
+    expect(wrongWorkspace?.kind).toBe('inbox')
+    if (wrongWorkspace?.kind !== 'inbox') throw new Error('Expected Inbox duty')
+    expect(wrongWorkspace.delivery.declaredIssue).toBeUndefined()
+  })
+
   it('uses issueWorkspaceId to resolve an exact declared Issue across Workspace boundaries', () => {
     const issueData: IssueSnapshot = {
       workspaces: [
@@ -387,29 +518,17 @@ describe('Office duty registry', () => {
     })
   })
 
-  it('does not guess a declared Issue when an issueId is ambiguous and has no issueWorkspaceId', () => {
-    const issueData: IssueSnapshot = {
-      workspaces: [
-        {
-          wsId: 'ws-a',
-          tag: 'alpha',
-          status: 'ok',
-          issues: [scheduledIssue('healthy', { id: 'shared-report', priority: 'urgent' })],
-        },
-        {
-          wsId: 'ws-b',
-          tag: 'beta',
-          status: 'ok',
-          issues: [scheduledIssue('healthy', { id: 'shared-report', priority: 'high' })],
-        },
-      ],
-    }
+  it('does not guess a declared Issue from a globally unique issueId without issueWorkspaceId', () => {
+    const issueData = snapshot(scheduledIssue('healthy', {
+      id: 'unique-report',
+      priority: 'urgent',
+    }))
     const candidate = coreOfficeDutyRegistrations({
       now: NOW,
-      inboxDeliveries: [inboxDelivery('ambiguous', {
+      inboxDeliveries: [inboxDelivery('missing-workspace-provenance', {
         entry: {
-          ...inboxDelivery('ambiguous').entry,
-          origin: { kind: 'headless', runId: 'run-ambiguous', issueId: 'shared-report' },
+          ...inboxDelivery('missing-workspace-provenance').entry,
+          origin: { kind: 'headless', runId: 'run-unscoped', issueId: 'unique-report' },
         },
       })],
       inboxStatus: 'ready',
