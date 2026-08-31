@@ -2920,6 +2920,10 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
   color: var(--gba-ink);
 }
 
+.oa-office-cabinet-window[data-dense="true"] {
+  height: min(520px, calc(100% - 86px));
+}
+
 .oa-office-cabinet-window[data-record-count="0"] {
   height: min(286px, calc(100% - 102px));
 }

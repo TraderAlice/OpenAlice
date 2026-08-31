@@ -5734,6 +5734,24 @@ Replay-exit pixel-control follow-up (2026-08-31):
   5,216 tests (one file and nine tests skipped); the production UI build passed with only the existing ports fallback
   and large-chunk advisory.
 
+Dense-cabinet row-composition follow-up (2026-08-31):
+
+- Opened the real 12-record Chat filing cabinet and traversed from `01/12` to `12/12`. The keyboard model, selection
+  cursor, fixed Workspace-files command, and scrollbar worked, but the 265px record viewport cut a complete grid row
+  through its title at both ends. At the final record, rows 7-8 exposed only 67.8px of an 82.8px card; rows 11-12 also
+  lost their last 1.2px instead of presenting a clean game-menu page.
+- Compared compressing the authored record card, replacing continuous navigation with hard pagination, and using the
+  unused desktop floor height for dense cabinets. Chose the taller dense window: it preserves two-line titles, 44px+
+  targets, wheel/arrow/PageUp/PageDown navigation, and the fixed footer while allowing whole rows to compose like a
+  cartridge RPG inventory. Existing <=680px single-column sizing remains authoritative on narrow stages.
+- Cabinets with five or more records now use a bounded 520px desktop height while sparse zero-to-four record variants
+  retain their authored compact heights. Real-browser acceptance expanded the record viewport from 265px to 347px:
+  `01/12` now presents six complete records instead of four, while `12/12` keeps the selected 99.6px record entirely
+  readable with 0px overlap against the fixed Workspace-files command. Only an unselected continuation row peeks at
+  the scroll edge. Focused cabinet/style suites passed all 40 tests; root and UI TypeScript passed. The full suite
+  passed all 620 test files and 5,216 tests (one file and nine tests skipped); the production UI build passed with only
+  the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

@@ -311,9 +311,12 @@ describe('Office responsive style contract', () => {
     )
   })
 
-  it('expands only dense narrow-screen filing cabinets into the available floor height', () => {
+  it('gives dense filing cabinets complete desktop rows and the available narrow floor height', () => {
     expect(css).toMatch(
       /\.oa-office-cabinet-window\s*\{[\s\S]*?height: min\(438px, calc\(100% - 86px\)\);/,
+    )
+    expect(css).toMatch(
+      /\.oa-office-cabinet-window\[data-dense="true"\]\s*\{\s*height: min\(520px, calc\(100% - 86px\)\);/,
     )
     expect(css).toMatch(
       /@container \(max-width: 680px\) \{[\s\S]*?\.oa-office-cabinet-window\[data-dense="true"\]\s*\{\s*bottom: 12px;\s*height: auto;/,
