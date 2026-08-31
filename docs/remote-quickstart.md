@@ -7,8 +7,9 @@ optional trading services; the laptop owns only the browser and SSH tunnel.
 
 The lifecycle and security contract lives in [[docs/remote-access.md]]. For an
 always-on container exposed through HTTPS, Tailscale, or a private proxy, use
-[[docs/docker-deployment.md]]. Remote and Docker are parallel deployment
-choices: neither is a compatibility fallback for the other.
+the source-built server image in [[docs/docker-deployment.md]]. Railway also
+has a native CLI SSH-host profile described below. These are parallel
+deployment choices: none is a compatibility fallback for another.
 
 ## Choose a Deployment
 
@@ -17,6 +18,7 @@ choices: neither is a compatibility fallback for the other.
 | Complete packaged desktop app | Electron |
 | OpenAlice from a local source checkout | `openalice start` |
 | Existing private machine reached through SSH | `openalice remote` |
+| Railway service reached only through SSH | `Dockerfile.railway` + `openalice remote` |
 | Existing compatible Server; tunnel only | `openalice ssh` |
 | Container lifecycle, volume, healthcheck, and HTTPS | Docker |
 
@@ -37,8 +39,14 @@ On the laptop:
 On the remote host:
 
 - Linux or macOS;
-- `curl`, `tar`, and a SHA-256 utility;
+- Bash, `tar` with gzip support, `diff`, and a SHA-256 utility;
+- `curl` for a network install;
+- `lockf` on macOS or `flock` on Linux (normally from `util-linux`);
 - enough disk and memory for the installed Runtime.
+
+The same shared-installer prerequisites apply on the laptop when it installs
+its local CLI. The Railway image supplies them explicitly; OpenAlice does not
+silently add missing system packages on a generic host.
 
 The native release does not require Node.js, Bun, Git, an Agent Runtime, or
 source-build tools. If you explicitly select a source checkout, that separate
@@ -61,9 +69,14 @@ openalice version --json
 ```
 
 The installer records its channel/version, target, checksum, and immutable
-content identity. Managed remote reproduces that same native OpenAlice release
-on the target; it has no separate hidden release channel and does not install
-or change the target's Agent Runtime executables.
+content identity. On an ordinary SSH-managed host, managed remote selects the
+same logical OpenAlice release for the target, then verifies that target's own
+platform archive and content identity. Cross-platform archives are not expected
+to be byte-identical. Dev uses one completed latest manifest for both local and
+remote target selection and blocks mutation until the invoking dev CLI is
+current. Railway is different: its service variables and entrypoint select the
+release, while the laptop CLI only inspects the installed target-local Runtime
+before tunneling. Neither path installs or changes Agent Runtime executables.
 
 ## 2. Give the Host a Useful SSH Name
 
@@ -87,6 +100,99 @@ ssh openalice-box
 Exit that shell after it connects. OpenAlice will use the same host-key and
 authentication policy.
 
+### Railway host setup
+
+For a volume-backed Railway host, connect the OpenAlice repository as the
+service source and set `RAILWAY_DOCKERFILE_PATH` to:
+
+```text
+Dockerfile.railway
+```
+
+Attach a Railway Volume at `/data` before the first deploy. Do not configure a
+pre-deploy install step: Railway mounts the Volume only when the service starts,
+and the image entrypoint owns bootstrap on that mounted filesystem. Do not
+generate a public domain or TCP proxy for Alice. The only client path in this
+profile is Railway SSH plus OpenAlice's local loopback tunnel.
+
+Set the service lifecycle explicitly in the Railway Dashboard:
+
+- leave **Start Command** empty so Railway uses `Dockerfile.railway`'s
+  `ENTRYPOINT` rather than replacing it;
+- disable **Serverless** so an idle but persistent Agent Runtime is not put to
+  sleep;
+- set **Restart Policy** to **Always** so a foreground Guardian is restored
+  after either clean or failed exit (choose a Railway plan that exposes this
+  policy);
+- keep the volume-backed service at exactly one replica; Guardian and one
+  AliceProject Home are single-owner state, not a load-balanced workload; and
+- set `RAILWAY_DEPLOYMENT_DRAINING_SECONDS=30` or higher so Railway gives
+  Guardian at least 30 seconds between `SIGTERM` and forced termination.
+
+The default service variables install the latest stable native release. Use
+only the selectors needed for the intended host:
+
+```text
+OPENALICE_RAILWAY_CHANNEL=stable
+
+# Accepted beta checkpoint instead:
+OPENALICE_RAILWAY_CHANNEL=beta
+OPENALICE_RAILWAY_VERSION=<accepted-beta-version>
+
+# Rolling latest dev preview instead (no version variable):
+OPENALICE_RAILWAY_CHANNEL=dev
+
+# Optional Project selection; this is the only layout override:
+OPENALICE_HOME=/data/projects/research
+```
+
+On the first install or a forced refresh, stable and beta may omit the version
+to resolve the latest manifest or may pin an in-channel version. A later boot
+reuses an already valid install instead of treating every restart as an update.
+Dev always follows the completed latest dev manifest and refuses a version
+override. Installation and Project data survive service replacement under
+separate paths:
+
+```text
+/data/home                  fixed persistent Railway SSH HOME
+/data/home/.openalice       native OpenAlice install root
+/data/home/.local           persistent user-owned executable prefix
+/data/home/.bun             optional persistent user-owned Bun root
+/data/projects/default      OPENALICE_HOME
+```
+
+Those user paths and their persistent `PATH` are fixed by the image so Railway
+SSH and Guardian see the same installation. Do not override `HOME`,
+`OPENALICE_INSTALL_DIR`, `NPM_CONFIG_PREFIX`, `BUN_INSTALL`,
+`OPENALICE_RAILWAY_VOLUME_ROOT`, or `AQ_LAUNCHER_ROOT`. The only layout selector
+is `OPENALICE_HOME`; it must stay beneath `/data`, and the entrypoint always
+derives `<OPENALICE_HOME>/workspaces` as `AQ_LAUNCHER_ROOT`. During bootstrap
+the entrypoint uses system-only `PATH`, then restores the persistent user paths
+after validating the native CLI.
+
+Wait for the service log to report the foreground Runtime start, then add an
+OpenSSH alias on the laptop with the Railway CLI:
+
+```bash
+railway ssh config --service openalice --alias openalice-railway
+ssh openalice-railway 'openalice version --json'
+```
+
+Use the actual Railway service name in place of `openalice`. The generated
+OpenSSH block preserves Railway account and deployment routing, so
+`openalice-railway` can be used anywhere this guide shows `openalice-box`.
+OpenAlice never installs an Agent Runtime into the service. If one is needed,
+open a Railway SSH shell and install it into a persistent user location already
+on `PATH`, such as `/data/home/.local/bin` or `/data/home/.bun/bin`; its login,
+version, and updates remain yours.
+
+AliceProject transfer can reuse Alice-owned AI, market-data-provider, broker,
+and Connector credentials, but it does not copy Web authentication/sessions or
+native Agent login/configuration. Git-ignored dependencies and Alice-owned
+runtime, backup, Session, and install state are also excluded. Review the exact
+contract and run `--plan` before apply as described in
+[[docs/remote-access.md]].
+
 ## 3. Review the Plan
 
 ```bash
@@ -94,7 +200,8 @@ openalice remote openalice-box --plan
 ```
 
 The read-only plan reports the remote platform, CLI, Runtime owner/provider,
-ports, and every proposed change. On a new supported host it normally includes:
+ports, and every proposed change. On a new ordinary SSH-managed host it normally
+includes:
 
 1. install the matching native OpenAlice release;
 2. verify and start the detached OpenAlice Server from that immutable Runtime;
@@ -105,15 +212,22 @@ release directory. You do not need to SSH in, clone the repository, install a
 compiler, find an absolute source path, or repeat `--app-dir` on later
 connections. Nothing changes until you approve the plan.
 
+For a Railway target, the plan is inspection-only: it must not propose an
+install, update, start, takeover, or stop. If bootstrap or Runtime consistency
+is unhealthy, repair the service through Railway rather than approving a local
+mutation.
+
 ## 4. Connect
 
 ```bash
 openalice remote openalice-box
 ```
 
-Approve the displayed plan. The native archive downloads and activates as one
-bounded transaction; failures include a bounded diagnostic tail. When ready,
-OpenAlice opens a URL such as
+On an ordinary SSH-managed host, approve the displayed plan. The native archive
+downloads and activates as one bounded transaction; failures include a bounded
+diagnostic tail. On Railway there is no release or lifecycle approval at this
+step: `openalice remote` verifies the service-owned foreground Runtime and opens
+only the tunnel. When ready, OpenAlice opens a URL such as
 `http://127.0.0.1:49891` in the local browser.
 
 The browser, page APIs, and Workspace PTY WebSocket all cross the same SSH
@@ -131,7 +245,8 @@ OpenAlice prefers the last successful local port, so an existing browser tab
 can recover on the same localhost origin. If that port is genuinely occupied,
 the command chooses another one and tells you.
 
-Inspect or stop the remote Server without writing raw SSH commands:
+Inspect or stop a generic SSH-managed remote Server without writing raw SSH
+commands:
 
 ```bash
 openalice remote openalice-box --status
@@ -142,9 +257,21 @@ Status bundles the control lookup into one SSH round trip instead of repeating
 the full bootstrap prerequisite scan. Stop uses the same control-only probe
 before and after Guardian's structured shutdown.
 
-Closing the browser or pressing `Ctrl+C` closes only the local tunnel. The
-detached Server, Workspaces, PTYs, and Agent processes continue on the remote
-host until you run `--stop`, the host stops, or Guardian shuts them down.
+On an ordinary SSH-managed host, closing the browser or pressing `Ctrl+C`
+closes only the local tunnel. The detached Server, Workspaces, PTYs, and Agent
+processes continue until you run `--stop`, the host stops, or Guardian shuts
+them down.
+
+The Railway profile deliberately runs `server run` in the foreground rather
+than keeping a detached child. Closing the laptop tunnel still leaves it
+running, and Railway is the only release and lifecycle authority. For a
+Railway-identified target, `openalice remote` is status/connect-only and rejects
+`--stop`, `--takeover`, and `--app-dir`; stop, restart, or redeploy the service
+through Railway instead. On every start, the image-owned Railway wrapper
+replaces the persistent command shims and refuses `openalice update`,
+`rollback`, and `uninstall` before an installed release can mutate the
+persistent pointer; change the service channel/version variables and redeploy,
+or remove the service itself.
 
 Known transient SSH transport interruptions are retried with a short,
 platform-neutral message. Raw platform diagnostics are shown only when the
@@ -202,6 +329,10 @@ openalice remote openalice-box \
 - Use a least-privilege remote account and normal SSH host-key discipline.
 - Provider credentials, Workspace history, files, and Agent state live under
   the remote home; the browser is not a backup.
+- On Railway, the SSH Home and user install paths are fixed below `/data/home`.
+  Only `OPENALICE_HOME` may select a different Project beneath `/data`; the
+  entrypoint derives its Workspace root, rejects normalized escapes, and
+  rejects a Railway service that has no `/data` Volume.
 - For an ephemeral VM or container, place `--home` on persistent storage. The
   Runtime can be reinstalled; the home is the durable state that must survive.
 - A platform replacement can reattach a volume whose Guardian lock names the
@@ -224,3 +355,8 @@ expected to wrap their SSH host in Docker. Both surfaces run the same
 Guardian/Alice product with different operational ownership. Continue with
 [[docs/docker-deployment.md]] for authentication, backups, upgrades, and the
 full container acceptance contract.
+
+The Railway native CLI image is likewise not a replacement for this source
+server image. It intentionally omits bundled Agent Runtimes, public Web
+exposure, and the source-image health/auth deployment contract; its job is to
+keep one install root and AliceProject Home durable behind SSH.

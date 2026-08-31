@@ -28,6 +28,9 @@ Related active plan:
   lifecycle core, installer-managed Runtime, update model, and terminal
   acceptance. This plan owns the new machine fleet, remote AliceProject
   inventory, transfer transaction, and the TUI flows built on those services.
+- [[plans/bun-cli-distribution.md]] owns the Railway native host profile,
+  release authority, and hosted deployment acceptance. This plan continues to
+  own the AliceProject content/credential transaction used against that host.
 
 ## Objective
 
@@ -232,9 +235,13 @@ The default transfer includes:
 - AliceProject product birth (`trader` or `nano`);
 - portable product configuration and preferences under `data/`, subject to the
   exclusions and credential rules below;
-- active Workspace repositories, departed Workspace repositories, Git
-  metadata, uncommitted files, `.alice/settings.json`, Issues, comments,
-  Harness receipts, handoff artifacts, and other Workspace-owned files;
+- active Workspace repositories, departed Workspace repositories, portable Git
+  object/ref/index state, tracked files, and nonignored untracked files.
+  Ignored generated dependencies are omitted; linked worktrees, initialized
+  submodules/nested repositories, alternates, and promisor/partial-clone state
+  block transfer until the Workspace is materialized independently;
+- `.alice/settings.json`, Issues, comments, Harness receipts, handoff artifacts,
+  and other portable Workspace-owned files;
 - active Workspace registry and lifecycle Catalog semantics, reconstructed
   with remote absolute paths;
 - Inbox, trading history/snapshots, schedules, UI layout, and other portable
@@ -300,14 +307,16 @@ SSH encrypts transport, but that does not make every secret portable.
 
 - AI provider credentials owned by the selected complete home may transfer
   after the plan reports only their count/vendors and obtains confirmation.
-  Values travel only over the SSH process pipe and are never printed.
+  This includes the current credential records and supported legacy flat API
+  keys. Values are read once into the consented process-private snapshot,
+  travel only over the SSH process pipe, and are never printed.
 - An `OPENALICE_GLOBAL_DIR` outside the complete home remains user-global and
   is never traversed implicitly. The plan reports that those credentials stay
   on the source machine.
 - Broker account and Connector credentials are decrypted in source-process
   memory, sent through the authenticated SSH stdin channel, and sealed on the
   remote machine with a newly generated destination `sealing.key`.
-- Plaintext credential material never enters the archive, argv, environment,
+- Plaintext credential material never enters the portable file frames, argv, environment,
   logs, progress events, plan JSON, staging files, or test snapshots.
 - The source `sealing.key` is never copied. The destination key is mode `0600`
   and is created only by the remote importer.
@@ -327,6 +336,8 @@ Do not transfer:
 - local Supervisor registry/default selection or source `appDir`;
 - local machine logs, migration scratch files, update state, or installer
   content;
+- user-owned Agent Runtime executables, login/session stores, native config,
+  caches, and plugin state; shared portable Workspace skills remain eligible;
 - web/admin login sessions;
 - symlinks or archive entries that escape the declared source roots;
 - an externally overridden `AQ_LAUNCHER_ROOT` without a future explicit
@@ -354,12 +365,12 @@ are regenerated from destination configuration before first launch.
 7. Obtain consent for the exact manifest and any credential/session-owner
    policy. Re-probe before mutation so stale plans cannot overwrite new state.
 8. Create an owner-private sibling staging directory on the remote host and a
-   durable transaction receipt containing no secrets.
-9. Stream a versioned archive through SSH stdin. Use a Node archive library in
-   the standalone CLI rather than depending on GNU/BSD `tar` flag parity.
-   Validate entry type, normalized relative path, declared root, size bounds,
-   and symlink containment during receive.
-10. Stream credential frames separately from the archive and re-seal directly
+  durable transaction receipt containing no secrets.
+9. Stream a versioned, bounded file protocol through SSH stdin without a host
+   `tar` dependency. Validate entry order/type, normalized relative path,
+   declared root, size bounds, per-file checksum, and symlink containment
+   during receive.
+10. Stream credential frames separately from portable file frames and re-seal directly
     into destination files without plaintext staging.
 11. Verify file count, byte count, per-entry or content-tree SHA-256, product
     stamp, Workspace registry/catalog reconstruction, permissions, and the
@@ -371,9 +382,11 @@ are regenerated from destination configuration before first launch.
 13. Run read-only destination Doctor/inventory checks. Runtime start and tunnel
     open are separate post-transfer actions offered by CLI/TUI.
 14. On interruption, leave a bounded staging receipt. A retry with the same
-    manifest resumes verified chunks when supported or safely replaces only
-    that transaction's staging directory. Cleanup never targets an unresolved
-    path or another transaction.
+    manifest safely replaces only that transaction's staging directory. If
+    publish succeeded but registry registration failed, retry verifies the
+    exact published tree and credential bundle before idempotently repairing
+    registration. Cleanup never targets an unresolved path or another
+    transaction.
 
 The local source remains byte-for-byte untouched except for an explicitly
 approved graceful stop. A successful transfer report includes the remote
@@ -389,7 +402,7 @@ Keep the implementation split into presentation-neutral modules under
 - machine config parser/store;
 - fleet inventory types and local/SSH probes;
 - transfer inventory and policy planner;
-- versioned manifest and archive filter;
+- versioned manifest and framed-stream filter;
 - source exporter and secret-frame producer;
 - remote staging/import transaction and secret re-sealer;
 - connection/tunnel service that reuses existing `remote.mjs` behavior;
@@ -467,8 +480,8 @@ signals a guessed PID, exposes the Guardian socket, or performs trading writes.
 - [x] Add source/destination quiescence and ownership checks with isolated
   consent for source stop; refuse foreign owners and occupied destinations.
 - [x] Stream configuration and Workspace trees into owner-private remote
-  staging with bounded input, safe archive extraction, checksums, and durable
-  receipts.
+  staging with bounded framed input, normalized paths, checksums, safe
+  symlinks, and durable receipts.
 - [x] Rebase active/departed Workspace registry and Catalog paths while
   preserving Workspace ids, tags, lifecycle, Git state, and files.
 - [x] Exclude the complete Session/runtime/auth plane and verify the destination
@@ -479,7 +492,8 @@ signals a guessed PID, exposes the Guardian socket, or performs trading writes.
   with a new destination key; prove plaintext never reaches archive, argv,
   env, logs, progress, or fixture snapshots.
 - [x] Atomically publish and register the destination project; implement safe
-  retry/cancel/cleanup for only the resolved transaction staging path.
+  retry/cancel/cleanup for only the resolved transaction staging path, plus
+  exact-tree verification before repairing a post-publish registration retry.
 - [x] Add `openalice project transfer ... --plan|--yes`, concise human progress,
   and a stable machine-readable result.
 - [x] Extend the disposable Docker SSH acceptance through plan, default-no,
@@ -527,6 +541,20 @@ signals a guessed PID, exposes the Guardian socket, or performs trading writes.
 - [ ] Delete this plan and its [[PLANS.md]] bullet only after every acceptance
   criterion is repository truth and the maintainer accepts the completed
   product behavior.
+
+### Increment 6 — Railway-backed transfer hardening
+
+- [x] Make Workspace inclusion Git-aware: preserve tracked and nonignored
+  untracked content plus self-contained Git state, exclude ignored generated
+  dependencies, and fail closed on linked/nested/alternate/promisor layouts.
+- [x] Freeze Alice-owned AI/broker/Connector/provider credentials once at plan
+  consent, keep them out of plan JSON and portable file frames, and re-seal
+  them under a new destination key.
+- [x] Validate the complete receipt and exact published entry set before an
+  idempotent registration retry, including receiver-created credential files.
+- [ ] Apply the reviewed transfer to the retained Railway Volume, select the
+  imported Project, and verify portable Workspace/configuration state plus a
+  new user-owned Agent Runtime turn without importing native Session state.
 
 ## Verification Matrix
 
@@ -603,6 +631,17 @@ retry after transfer failure, and proves Escape cancellation aborts the active
 sender. README already links the remote quickstart, so no public positioning
 rewrite is needed.
 
+Increment 6 local progress (2026-08-31): the planner now preserves tracked and
+nonignored untracked Workspace content while rejecting Git layouts that depend
+on machine-local worktree, nested repository, alternate-object, or promisor
+state. Alice-owned credentials are frozen in a process-private consent
+snapshot, streamed separately from portable files, and re-sealed at the
+destination; native Agent login/config/session state remains excluded. Receipt
+validation covers the exact manifest, credentials policy, and published entry
+set, including idempotent recovery when the receiver created an AI vault before
+registry registration failed. Hosted Railway apply and real Project selection
+remain the acceptance step shared with the Bun CLI distribution plan.
+
 Always:
 
 ```bash
@@ -642,15 +681,15 @@ Targeted security/transaction tests cover:
 - malformed/unknown/newer machine registry schemas and atomic-write failure;
 - SSH host-key/auth/timeout/connection-loss classes without disabling
   verification;
-- hostile machine keys, targets, remote homes, archive paths, control bytes,
+- hostile machine keys, targets, remote homes, manifest paths, control bytes,
   oversized entries, symlink escapes, and destination collisions;
 - source/destination Runtime races between plan and apply;
 - dirty Git repositories, submodules, executable files, Unicode names, empty
   files, large files, and interrupted streams;
-- Session paths and global Agent homes absent from the archive/destination;
+- Session paths and global Agent homes absent from the stream/destination;
 - exact-Session Issues under both explicit policies;
 - synthetic AI/broker/Connector secrets absent from every stdout/stderr/log,
-  manifest, archive, receipt, error, and snapshot while destination unsealing
+  manifest, portable file frames, receipt, error, and snapshot while destination unsealing
   succeeds with a distinct key;
 - checksum mismatch, publish/register failure, retry, cancellation, bounded
   cleanup, and source byte-for-byte preservation.

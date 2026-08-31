@@ -97,17 +97,18 @@ try {
   await chmod(sshWrapper, 0o700)
 
   const remoteTarget = 'openalice-remote-smoke'
-  const smokeEnv = {
+  let smokeEnv = {
     ...process.env,
     HOME: localHome,
     PATH: `${fixtureBin}:${process.env.PATH ?? ''}`,
     OPENALICE_REMOTE_SMOKE_SSH_CONFIG: join(sshDir, 'config'),
-    OPENALICE_REMOTE_TEST_INSTALL_URL: 'http://127.0.0.1:18080/install',
-    OPENALICE_REMOTE_TEST_INSTALL_SELECTOR_KIND: 'branch',
-    OPENALICE_REMOTE_TEST_INSTALL_SELECTOR_VALUE: 'dev',
     OPENALICE_REMOTE_TEST_INSTALL_BASE_URL: 'http://127.0.0.1:18080',
   }
   await waitForSsh(remoteTarget, smokeEnv)
+  smokeEnv = {
+    ...smokeEnv,
+    ...await prepareLocalDevIdentityFixture(container, scratch),
+  }
 
   console.log('[remote-ssh-smoke] checking read-only missing-host plan')
   const initialPlan = run(process.execPath, [
@@ -378,6 +379,104 @@ async function prepareTransferSource(home) {
   }, null, 2)}\n`)
   await writeFile(join(home, 'workspaces', 'state', 'resume-identities.json'), '{"version":1,"records":{}}\n')
   return workspace
+}
+
+async function prepareLocalDevIdentityFixture(containerId, scratchRoot) {
+  const remoteArch = normalizeSmokeArchitecture(
+    run('docker', ['exec', containerId, 'uname', '-m']).trim(),
+  )
+  const remoteArchive = `/fixture/www/cli/dev/openalice-cli-dev-linux-${remoteArch}.tar.gz`
+  const remoteSha256 = run('docker', [
+    'exec', containerId, 'sh', '-c',
+    `awk 'NR == 1 { print $1 }' ${shellQuote(`${remoteArchive}.sha256`)}`,
+  ]).trim()
+  const metadata = JSON.parse(run('docker', [
+    'exec', containerId, 'sh', '-c',
+    `archive=${shellQuote(remoteArchive)}; root="$(tar -tzf "$archive" | sed -n '1{s#/.*##;p}')"; tar -xOzf "$archive" "$root/release.json"`,
+  ]))
+  if (
+    !/^[a-f0-9]{64}$/.test(remoteSha256)
+    || metadata?.platform !== 'linux'
+    || metadata?.arch !== remoteArch
+    || !/^[a-f0-9]{16}$/.test(metadata?.contentIdentity ?? '')
+    || typeof metadata?.version !== 'string'
+  ) {
+    throw new Error('Remote smoke artifact did not expose valid dev identity metadata')
+  }
+
+  const localPlatform = process.platform
+  const localArch = process.arch
+  if (!['darwin', 'linux'].includes(localPlatform) || !['arm64', 'x64'].includes(localArch)) {
+    throw new Error(`Remote smoke does not support local target ${localPlatform}-${localArch}`)
+  }
+  const remoteTarget = {
+    platform: 'linux',
+    arch: remoteArch,
+    archive: `openalice-cli-dev-linux-${remoteArch}.tar.gz`,
+    sha256: remoteSha256,
+    contentIdentity: metadata.contentIdentity,
+  }
+  const targetMatrix = [
+    ['darwin', 'arm64'],
+    ['darwin', 'x64'],
+    ['linux', 'arm64'],
+    ['linux', 'x64'],
+  ]
+  const targets = targetMatrix.map(([platform, arch], index) => {
+    if (platform === remoteTarget.platform && arch === remoteTarget.arch) return remoteTarget
+    const marker = (index + 4).toString(16)
+    return {
+      platform,
+      arch,
+      archive: `openalice-cli-dev-${platform}-${arch}.tar.gz`,
+      sha256: marker.repeat(64),
+      contentIdentity: marker.repeat(16),
+    }
+  })
+  const localTarget = targets.find((target) => (
+    target.platform === localPlatform && target.arch === localArch
+  ))
+  if (!localTarget) throw new Error(`Remote smoke did not synthesize local target ${localPlatform}-${localArch}`)
+  const manifest = {
+    schemaVersion: 1,
+    channel: 'dev',
+    repository: 'TraderAlice/OpenAlice',
+    version: metadata.version,
+    commit: run('git', ['rev-parse', 'HEAD'], { cwd: repoRoot }).trim(),
+    installer: {
+      url: 'http://127.0.0.1:18080/install',
+      versionedUrl: 'http://127.0.0.1:18080/install',
+      sha256: '3'.repeat(64),
+    },
+    targets,
+  }
+  const installSourcePath = join(scratchRoot, 'local-dev-install-source.json')
+  await writeFile(installSourcePath, `${JSON.stringify({
+    schemaVersion: 3,
+    repository: 'TraderAlice/OpenAlice',
+    cliVersion: metadata.version,
+    selector: { kind: 'branch', value: 'dev' },
+    installerUrl: 'http://127.0.0.1:18080/install',
+    updateChannel: 'development',
+    method: 'direct',
+    artifact: {
+      platform: localTarget.platform,
+      arch: localTarget.arch,
+      sha256: localTarget.sha256,
+    },
+    installedAt: '2026-08-31T00:00:00.000Z',
+  }, null, 2)}\n`)
+  return {
+    OPENALICE_INSTALL_SOURCE: installSourcePath,
+    OPENALICE_CONTENT_IDENTITY: localTarget.contentIdentity,
+    OPENALICE_REMOTE_TEST_DEV_MANIFEST_URL: `data:application/json;base64,${Buffer.from(JSON.stringify(manifest)).toString('base64')}`,
+  }
+}
+
+function normalizeSmokeArchitecture(value) {
+  if (value === 'aarch64' || value === 'arm64') return 'arm64'
+  if (value === 'x86_64' || value === 'amd64') return 'x64'
+  throw new Error(`Remote smoke does not support Docker architecture ${value}`)
 }
 
 async function waitForSsh(target, env) {

@@ -38,6 +38,11 @@ export async function runRollbackCommand(argv, dependencies = {}) {
   const stdout = dependencies.stdout ?? process.stdout
   const stdin = dependencies.stdin ?? process.stdin
   const env = dependencies.env ?? process.env
+  if (env['OPENALICE_SERVICE_MANAGER']?.trim() === 'railway') {
+    stdout.write('Railway service variables own this OpenAlice installation. Set OPENALICE_RAILWAY_CHANNEL and optional OPENALICE_RAILWAY_VERSION, then restart or redeploy the service.\n')
+    stdout.write('OpenAlice did not modify the persistent release pointer.\n')
+    return 0
+  }
   const layout = Object.hasOwn(dependencies, 'layout')
     ? dependencies.layout
     : resolveInstalledLayout(import.meta.url, { env })

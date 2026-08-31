@@ -5,6 +5,7 @@
 import { createInterface } from 'node:readline/promises'
 import { stdin as input, stdout as output } from 'node:process'
 import { posix, resolve } from 'node:path'
+import type { Readable } from 'node:stream'
 
 import {
   copyAiCredentials,
@@ -112,6 +113,7 @@ export interface ProjectCommandIo {
     stderr?: { write(chunk: string): void }
   }) => Promise<ProjectTransferReceipt>
   receiveTransfer?: () => Promise<ProjectTransferReceipt>
+  transferSource?: Readable
 }
 
 export async function runProjectCommand(
@@ -348,7 +350,7 @@ async function runProjectTransferReceive(argv: string[], io: ProjectCommandIo): 
   if (argv.length > 0) throw usageError('project transfer-receive does not accept arguments')
   const supervisorRoot = io.supervisorRoot ?? resolveSupervisorRootPath({ env: io.env })
   const receive = io.receiveTransfer ?? (() => receiveProjectTransferStream({
-    source: process.stdin,
+    source: io.transferSource ?? process.stdin,
     register: async (plan) => {
       const context = { supervisorRoot }
       const registry = await readSupervisorAliceProjectRegistry(context, { env: io.env })
@@ -424,6 +426,9 @@ export function formatProjectTransferPlan(plan: ProjectTransferPlan): string {
   const excludedSessions = plan.excluded
     .filter((entry) => entry.reason === 'session-plane' || entry.reason === 'untracked-session-dossier')
     .reduce((sum, entry) => sum + entry.files, 0)
+  const excludedMachineLocal = plan.excluded
+    .filter((entry) => entry.reason === 'machine-local')
+    .reduce((sum, entry) => sum + entry.files, 0)
   const credentials = plan.policy.credentials === 'omit'
     ? 'omitted by request'
     : `${plan.credentials.ai.count} AI, ${plan.credentials.broker.count} broker, ${plan.credentials.connector.count} Connector, ${plan.credentials.providerKeys.count} provider key(s)`
@@ -439,6 +444,7 @@ export function formatProjectTransferPlan(plan: ProjectTransferPlan): string {
     `  Free space   ${formatBytes(plan.destination.requiredFreeBytes)} required on destination`,
     `  Credentials  ${credentials}`,
     `  Sessions     0 imported; ${excludedSessions} runtime file(s) excluded`,
+    `  Machine      ${excludedMachineLocal} machine-local file(s) or link(s) excluded`,
     `  Issues       ${plan.scheduledIssues.length} exact-Session scheduled owner(s); policy ${plan.policy.scheduledIssues ?? 'required'}`,
   ]
   if (plan.blockers.length > 0) {

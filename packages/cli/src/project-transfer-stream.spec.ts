@@ -1,14 +1,18 @@
 import { Writable, Readable } from 'node:stream'
+import { execFile as execFileCallback } from 'node:child_process'
 import {
   mkdir,
   mkdtemp,
   readFile,
+  realpath,
   rm,
   stat,
+  symlink,
   writeFile,
 } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { promisify } from 'node:util'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -24,6 +28,7 @@ import {
 } from './project-transfer-stream.ts'
 
 const roots: string[] = []
+const execFile = promisify(execFileCallback)
 
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((path) => rm(path, { recursive: true, force: true })))
@@ -51,9 +56,12 @@ describe('AliceProject transfer stream', () => {
     expect(await readFile(join(destination, 'portable.txt'), 'utf8')).toBe('PORTABLE-CONTENT\n')
     const registry = JSON.parse(await readFile(join(destination, 'workspaces', 'workspaces.json'), 'utf8'))
     expect(registry.workspaces[0].dir).toBe(join(plan.destination.home, 'workspaces', 'workspaces', 'ws-one'))
+    const catalog = JSON.parse(await readFile(join(destination, 'workspaces', 'state', 'workspace-catalog.json'), 'utf8'))
+    expect(catalog.workspaces.map((workspace: { id: string }) => workspace.id)).toEqual(['ws-one'])
     await expect(stat(join(destination, 'workspaces', 'state', 'resume-identities.json'))).rejects.toMatchObject({ code: 'ENOENT' })
     const destinationCredentials = await readProjectTransferCredentialBundle(destination)
     expect(destinationCredentials.ai.credentials['openai-1']?.apiKey).toBe('sk-stream-secret')
+    expect(destinationCredentials.ai.apiKeys['google']).toBe('legacy-stream-secret')
     expect(destinationCredentials.brokerAccounts).toEqual([
       expect.objectContaining({ presetId: 'alpaca-paper' }),
     ])
@@ -61,6 +69,29 @@ describe('AliceProject transfer stream', () => {
       adapters: expect.objectContaining({ telegram: expect.any(Object) }),
     }))
     expect(await readFile(join(destination, 'sealing.key'), 'utf8')).not.toBe(sourceKey)
+  })
+
+  it('omits every credential and derived-backup canary outside the private bundle', async () => {
+    const { destination, plan } = await fixture('omit')
+    const stream = await serialize(plan)
+    const streamText = stream.toString('utf8')
+
+    for (const canary of [
+      'sk-stream-secret',
+      'legacy-stream-secret',
+      'fmp-stream-secret',
+      'backup-only-secret-canary',
+      'web-session-secret-canary',
+    ]) expect(streamText).not.toContain(canary)
+
+    const receipt = await receiveProjectTransferStream({ source: Readable.from(stream) })
+    expect(receipt.credentials).toBe('omitted')
+    const portableAi = JSON.parse(await readFile(join(destination, 'data', 'config', 'ai-provider-manager.json'), 'utf8'))
+    expect(portableAi.credentials).toEqual({})
+    expect(portableAi.apiKeys).toEqual({})
+    await expect(stat(join(destination, 'data', '_backup'))).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(stat(join(destination, 'data', 'config', 'sessions.json'))).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(stat(join(destination, 'sealing.key'))).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
   it('leaves only marked staging on checksum failure and safely retries the same transaction', async () => {
@@ -92,6 +123,19 @@ describe('AliceProject transfer stream', () => {
     const { source, plan } = await fixture()
     await writeFile(join(source, 'portable.txt'), 'CHANGED-AFTER-PLAN\n')
     await expect(serialize(plan)).rejects.toThrow('changed after planning')
+  })
+
+  it('sends the consented credential snapshot when source credentials change later', async () => {
+    const { source, destination, plan } = await fixture()
+    await sealProjectTransferJson(source, join('data', 'config', 'accounts.json'), [
+      { id: 'changed-after-consent', presetId: 'synthetic' },
+    ])
+    const stream = await serialize(plan)
+    await receiveProjectTransferStream({ source: Readable.from(stream) })
+    const received = await readProjectTransferCredentialBundle(destination)
+    expect(received.brokerAccounts).toEqual([
+      expect.objectContaining({ presetId: 'alpaca-paper' }),
+    ])
   })
 
   it('reports completed portable file and byte progress', async () => {
@@ -129,6 +173,74 @@ describe('AliceProject transfer stream', () => {
     await expect(stat(staging)).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
+  it.skipIf(process.platform === 'win32')('rejects a destination whose parent resolves through a symlink', async () => {
+    const { source } = await fixture('omit')
+    const destinationRoot = await mkdtemp(join(tmpdir(), 'oa-stream-canonical-destination-'))
+    roots.push(destinationRoot)
+    const canonicalParent = join(destinationRoot, 'canonical')
+    const aliasParent = join(destinationRoot, 'alias')
+    await mkdir(canonicalParent)
+    await symlink(canonicalParent, aliasParent)
+    const destination = join(aliasParent, 'remote-home')
+    const plan = await planProjectTransfer({
+      source: {
+        id: 'alice-project-source',
+        key: 'source',
+        displayName: 'Source',
+        home: source,
+        port: 47331,
+        portAutomatic: true,
+        isDefault: true,
+      },
+      destinationMachineKey: 'cloud',
+      destinationProjectKey: 'remote-copy',
+      destinationHome: destination,
+      scheduledIssues: 'keep-blocked',
+      credentials: 'omit',
+      isGitTracked: async () => false,
+    })
+    await expect(receiveProjectTransferStream({ source: Readable.from(await serialize(plan)) }))
+      .rejects.toThrow('resolves through a symlink')
+    await expect(stat(join(canonicalParent, 'remote-home'))).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('publishes a self-contained ordinary Git Workspace without local credentials', async () => {
+    const { source, destination } = await fixture('omit')
+    const workspace = join(source, 'workspaces', 'workspaces', 'ws-one')
+    await execFile('git', ['init', '-q'], { cwd: workspace })
+    await execFile('git', ['add', 'README.md'], { cwd: workspace })
+    await execFile('git', [
+      '-c', 'user.name=OpenAlice Test',
+      '-c', 'user.email=openalice@example.test',
+      'commit', '-qm', 'fixture',
+    ], { cwd: workspace })
+    await execFile('git', ['config', '--local', 'http.https://example.test/.extraHeader', 'Authorization: Bearer secret-canary'], { cwd: workspace })
+    const plan = await planProjectTransfer({
+      source: {
+        id: 'alice-project-source',
+        key: 'source',
+        displayName: 'Source',
+        home: source,
+        port: 47331,
+        portAutomatic: true,
+        isDefault: true,
+      },
+      destinationMachineKey: 'cloud',
+      destinationProjectKey: 'remote-copy',
+      destinationHome: destination,
+      scheduledIssues: 'keep-blocked',
+      credentials: 'omit',
+    })
+    expect(plan.readyToApply).toBe(true)
+    await receiveProjectTransferStream({ source: Readable.from(await serialize(plan)) })
+    const receivedWorkspace = join(destination, 'workspaces', 'workspaces', 'ws-one')
+    await expect(stat(join(receivedWorkspace, '.git', 'config'))).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(execFile('git', ['status', '--porcelain'], { cwd: receivedWorkspace }))
+      .resolves.toMatchObject({ stdout: '' })
+    await expect(execFile('git', ['fsck', '--connectivity-only', '--no-dangling'], { cwd: receivedWorkspace }))
+      .resolves.toMatchObject({ stderr: '' })
+  })
+
   it('retries registration idempotently after files were already published', async () => {
     const { destination, plan } = await fixture()
     const stream = await serialize(plan)
@@ -137,6 +249,32 @@ describe('AliceProject transfer stream', () => {
       register: async () => { throw new Error('synthetic registration failure') },
     })).rejects.toThrow('synthetic registration failure')
     expect(await readFile(join(destination, 'portable.txt'), 'utf8')).toBe('PORTABLE-CONTENT\n')
+    const receiptPath = join(destination, '.openalice-transfer-receipt.json')
+    const storedReceipt = JSON.parse(await readFile(receiptPath, 'utf8'))
+    await writeJson(receiptPath, { ...storedReceipt, secretCanary: 'must-not-return' })
+
+    let registrations = 0
+    const retried = await receiveProjectTransferStream({
+      source: Readable.from(stream),
+      register: async () => { registrations += 1 },
+    })
+    expect(retried).toMatchObject({ transferId: plan.transferId })
+    expect(JSON.stringify(retried)).not.toContain('secretCanary')
+    expect(registrations).toBe(1)
+  })
+
+  it('retries registration when credential import created a previously absent AI vault', async () => {
+    const { destination, plan } = await fixture('include', false, false)
+    expect(plan.portable.entries.some((entry) => (
+      entry.path === 'data/config/ai-provider-manager.json'
+    ))).toBe(false)
+    const stream = await serialize(plan)
+
+    await expect(receiveProjectTransferStream({
+      source: Readable.from(stream),
+      register: async () => { throw new Error('synthetic registration failure') },
+    })).rejects.toThrow('synthetic registration failure')
+    await expect(stat(join(destination, 'data', 'config', 'ai-provider-manager.json'))).resolves.toBeDefined()
 
     let registrations = 0
     await expect(receiveProjectTransferStream({
@@ -145,23 +283,102 @@ describe('AliceProject transfer stream', () => {
     })).resolves.toMatchObject({ transferId: plan.transferId })
     expect(registrations).toBe(1)
   })
+
+  it('re-plans the same transaction in a new process and repairs registration', async () => {
+    const { source, destination, plan } = await fixture('omit', true)
+    await expect(receiveProjectTransferStream({
+      source: Readable.from(await serialize(plan)),
+      register: async () => { throw new Error('synthetic registration failure') },
+    })).rejects.toThrow('synthetic registration failure')
+
+    const replanned = await planProjectTransfer({
+      source: {
+        id: 'alice-project-source',
+        key: 'source',
+        displayName: 'Source',
+        home: source,
+        port: 47331,
+        portAutomatic: true,
+        isDefault: true,
+      },
+      destinationMachineKey: 'cloud',
+      destinationProjectKey: 'remote-copy',
+      destinationHome: destination,
+      scheduledIssues: 'keep-blocked',
+      credentials: 'omit',
+      isGitTracked: async () => false,
+    })
+    expect(replanned.transferId).toBe(plan.transferId)
+    let registrations = 0
+    await expect(receiveProjectTransferStream({
+      source: Readable.from(await serialize(replanned)),
+      register: async () => { registrations += 1 },
+    })).resolves.toMatchObject({ transferId: plan.transferId })
+    expect(registrations).toBe(1)
+  })
+
+  it('refuses registration retry when published files changed after the receipt', async () => {
+    const { destination, plan } = await fixture()
+    const stream = await serialize(plan)
+    await expect(receiveProjectTransferStream({
+      source: Readable.from(stream),
+      register: async () => { throw new Error('synthetic registration failure') },
+    })).rejects.toThrow('synthetic registration failure')
+
+    await writeFile(join(destination, 'portable.txt'), 'TAMPERED-AFTER-PUBLISH\n')
+    let registrations = 0
+    await expect(receiveProjectTransferStream({
+      source: Readable.from(stream),
+      register: async () => { registrations += 1 },
+    })).rejects.toThrow('destination changed before registration retry')
+    expect(registrations).toBe(0)
+  })
+
+  it('refuses registration retry when an unexpected file was added after publish', async () => {
+    const { destination, plan } = await fixture('omit')
+    const stream = await serialize(plan)
+    await expect(receiveProjectTransferStream({
+      source: Readable.from(stream),
+      register: async () => { throw new Error('synthetic registration failure') },
+    })).rejects.toThrow('synthetic registration failure')
+
+    await writeJson(join(destination, 'data', 'config', 'auth.json'), { token: 'unexpected' })
+    await expect(receiveProjectTransferStream({ source: Readable.from(stream) }))
+      .rejects.toThrow('destination changed before registration retry')
+  })
 })
 
-async function fixture() {
+async function fixture(
+  credentials: 'include' | 'omit' = 'include',
+  deterministicTransferId = false,
+  includeAiVault = true,
+) {
   const source = await mkdtemp(join(tmpdir(), 'oa-stream-source-'))
-  const destinationParent = await mkdtemp(join(tmpdir(), 'oa-stream-destination-'))
+  const destinationParent = await realpath(await mkdtemp(join(tmpdir(), 'oa-stream-destination-')))
   roots.push(source, destinationParent)
   const destination = join(destinationParent, 'remote-home')
   await writeAliceProjectProductStamp(source, 'trader')
   await writeFile(join(source, 'portable.txt'), 'PORTABLE-CONTENT\n')
-  await writeJson(join(source, 'data', 'config', 'ai-provider-manager.json'), {
-    profiles: { default: { backend: 'native' } },
-    credentials: {
-      'openai-1': { vendor: 'openai', authType: 'api-key', apiKey: 'sk-stream-secret' },
-    },
-  })
+  if (includeAiVault) {
+    await writeJson(join(source, 'data', 'config', 'ai-provider-manager.json'), {
+      profiles: { default: { backend: 'native' } },
+      apiKeys: { google: 'legacy-stream-secret' },
+      credentials: {
+        'openai-1': { vendor: 'openai', authType: 'api-key', apiKey: 'sk-stream-secret' },
+      },
+    })
+  }
   await writeJson(join(source, 'data', 'config', 'market-data.json'), {
     providerKeys: { fmp: 'fmp-stream-secret' },
+  })
+  await writeJson(join(source, 'data', '_backup', 'before', 'config', 'ai-provider-manager.json'), {
+    apiKeys: { backup: 'backup-only-secret-canary' },
+  })
+  await writeJson(join(source, 'data', 'config', 'ai-provider-manager.json.backup'), {
+    apiKeys: { backup: 'backup-only-secret-canary' },
+  })
+  await writeJson(join(source, 'data', 'config', 'sessions.json'), {
+    sessions: [{ sid: 'web-session-secret-canary' }],
   })
   await sealProjectTransferJson(source, join('data', 'config', 'accounts.json'), [
     { id: 'paper', presetId: 'alpaca-paper', presetConfig: { apiKey: 'broker-stream-secret' } },
@@ -179,7 +396,17 @@ async function fixture() {
   })
   await writeJson(join(source, 'workspaces', 'state', 'workspace-catalog.json'), {
     version: 1,
-    workspaces: [{ id: 'ws-one', tag: 'One', activeDir: workspace, lifecycle: 'active' }],
+    workspaces: [
+      { id: 'ws-one', tag: 'One', activeDir: workspace, lifecycle: 'active' },
+      {
+        id: '.pi-agent',
+        tag: 'Pi Agent',
+        activeDir: join(source, 'workspaces', 'departed-workspaces', '.pi-agent'),
+        departedDir: join(source, 'workspaces', 'departed-workspaces', '.pi-agent'),
+        lifecycle: 'departed',
+        legacyImported: true,
+      },
+    ],
   })
   await writeJson(join(source, 'workspaces', 'state', 'resume-identities.json'), {
     version: 1,
@@ -199,7 +426,8 @@ async function fixture() {
     destinationProjectKey: 'remote-copy',
     destinationHome: destination,
     scheduledIssues: 'keep-blocked',
-    randomId: () => 'transfer-stream-test',
+    credentials,
+    ...(deterministicTransferId ? {} : { randomId: () => 'transfer-stream-test' }),
     now: () => new Date('2026-08-23T00:00:00Z'),
     isGitTracked: async () => false,
   })

@@ -7,7 +7,9 @@ import {
   mkdir,
   open,
   readFile,
+  readdir,
   readlink,
+  realpath,
   rename,
   rm,
   stat,
@@ -22,12 +24,15 @@ import { once } from 'node:events'
 import { parseAiProviderVault, writeAiProviderVault } from './ai-credential-copy.ts'
 import { transformProjectTransferFile } from './project-transfer-files.ts'
 import {
+  normalizeProjectTransferAiVault,
   readProjectTransferCredentialBundle,
   sealProjectTransferJson,
   type ProjectTransferCredentialBundle,
 } from './project-transfer-secrets.ts'
 import {
+  PROJECT_TRANSFER_RECEIPT_FILE,
   PROJECT_TRANSFER_SCHEMA_VERSION,
+  readProjectTransferCredentialSnapshot,
   validateManifestPath,
   type ProjectTransferEntry,
   type ProjectTransferPlan,
@@ -40,7 +45,6 @@ const MAX_FILE_BYTES = 64 * 1024 * 1024 * 1024
 const MAX_TOTAL_BYTES = 4 * 1024 * 1024 * 1024 * 1024
 const MAX_CREDENTIAL_BYTES = 16 * 1024 * 1024
 const MARKER_FILE = '.openalice-transfer-transaction.json'
-const RECEIPT_FILE = '.openalice-transfer-receipt.json'
 
 export interface ProjectTransferReceipt {
   schemaVersion: 1
@@ -59,7 +63,6 @@ export interface ProjectTransferReceipt {
 export async function writeProjectTransferStream(input: {
   plan: ProjectTransferPlan
   output: Writable
-  readCredentials?: (home: string) => Promise<ProjectTransferCredentialBundle>
   signal?: AbortSignal
   onProgress?: (progress: { files: number; bytes: number; totalFiles: number; totalBytes: number }) => void
 }): Promise<{ bytes: number }> {
@@ -126,8 +129,8 @@ export async function writeProjectTransferStream(input: {
   }
   if (input.plan.policy.credentials === 'include') {
     input.signal?.throwIfAborted()
-    const bundle = await (input.readCredentials ?? readProjectTransferCredentialBundle)(input.plan.source.home)
-    const bytes = Buffer.from(JSON.stringify(bundle), 'utf8')
+    const bytes = readProjectTransferCredentialSnapshot(input.plan)
+    if (!bytes) throw transferStreamError('Credential snapshot is unavailable; review a new transfer plan.')
     if (bytes.byteLength > MAX_CREDENTIAL_BYTES) throw transferStreamError('Credential payload is too large.')
     await writeChunk(input.output, Buffer.from(`${JSON.stringify({
       type: 'credentials',
@@ -152,18 +155,27 @@ export async function receiveProjectTransferStream(input: {
   assertTransferPlan(plan)
   if (!plan.readyToApply) throw transferStreamError('Transfer plan has unresolved blockers.')
   const destination = plan.destination.home
+  await assertCanonicalDestination(destination)
   const staging = join(dirname(destination), `.openalice-transfer-${plan.transferId}.staging`)
   const existingReceipt = await readPublishedReceipt(destination)
   if (existingReceipt) {
+    const expectedManifestSha256 = sha256(Buffer.from(JSON.stringify(plan.portable.entries), 'utf8'))
+    const expectedCredentials = plan.policy.credentials === 'include' ? 'included' : 'omitted'
     if (
       existingReceipt.transferId !== plan.transferId
       || existingReceipt.destinationHome !== destination
       || existingReceipt.destinationProjectId !== plan.destination.projectId
       || existingReceipt.sourceProjectId !== plan.source.projectId
+      || existingReceipt.files !== plan.portable.files
+      || existingReceipt.bytes !== plan.portable.bytes
+      || existingReceipt.manifestSha256 !== expectedManifestSha256
+      || existingReceipt.credentials !== expectedCredentials
+      || existingReceipt.sessionsImported !== 0
     ) {
       throw transferStreamError(`Destination already contains another AliceProject: ${destination}`)
     }
-    await verifyAndDiscardPayload(reader, plan)
+    const retryCredentialBytes = await verifyAndDiscardPayload(reader, plan)
+    await verifyPublishedDestination(destination, plan, retryCredentialBytes)
     await input.register?.(plan, existingReceipt)
     return existingReceipt
   }
@@ -239,7 +251,8 @@ export async function receiveProjectTransferStream(input: {
       sessionsImported: 0,
       publishedAt: (input.now ?? (() => new Date()))().toISOString(),
     }
-    await writePrivateJson(join(staging, RECEIPT_FILE), receipt)
+    await writePrivateJson(join(staging, PROJECT_TRANSFER_RECEIPT_FILE), receipt)
+    await rm(join(staging, MARKER_FILE), { force: true })
     await rename(staging, destination)
     await input.register?.(plan, receipt)
     return receipt
@@ -249,7 +262,24 @@ export async function receiveProjectTransferStream(input: {
   }
 }
 
-async function verifyAndDiscardPayload(reader: AsyncByteReader, plan: ProjectTransferPlan): Promise<void> {
+async function assertCanonicalDestination(destination: string): Promise<void> {
+  let existing = destination
+  const missing: string[] = []
+  while (!(await exists(existing))) {
+    const parent = dirname(existing)
+    if (parent === existing) break
+    missing.unshift(basename(existing))
+    existing = parent
+  }
+  const canonical = resolve(await realpath(existing), ...missing)
+  if (canonical !== resolve(destination)) {
+    throw transferStreamError(
+      'Destination Home resolves through a symlink; use its canonical path before planning the transfer.',
+    )
+  }
+}
+
+async function verifyAndDiscardPayload(reader: AsyncByteReader, plan: ProjectTransferPlan): Promise<Buffer | null> {
   for (let index = 0; index < plan.portable.entries.length; index += 1) {
     const entry = plan.portable.entries[index]!
     const header = parseRecord(await reader.readLine())
@@ -262,15 +292,21 @@ async function verifyAndDiscardPayload(reader: AsyncByteReader, plan: ProjectTra
     if (hash.digest('hex') !== entry.sha256) throw transferStreamError(`Checksum mismatch for ${entry.path}.`)
   }
   let final = parseRecord(await reader.readLine())
+  let credentialBytes: Buffer | null = null
   if (final['type'] === 'credentials') {
     if (plan.policy.credentials !== 'include') throw transferStreamError('Unexpected credential payload.')
     const size = requireBoundedInteger(final['size'], 0, MAX_CREDENTIAL_BYTES, 'credential size')
     const expected = requireSha(final['sha256'], 'credential checksum')
     const bytes = await reader.readBuffer(size)
     if (sha256(bytes) !== expected) throw transferStreamError('Credential payload checksum mismatch.')
+    credentialBytes = bytes
     final = parseRecord(await reader.readLine())
   }
   if (final['type'] !== 'end') throw transferStreamError('Transfer stream did not terminate cleanly.')
+  if (plan.policy.credentials === 'include' && !credentialBytes) {
+    throw transferStreamError('Credential payload is missing.')
+  }
+  return credentialBytes
 }
 
 function assertTransferPlan(plan: ProjectTransferPlan): void {
@@ -310,6 +346,95 @@ function assertTransferPlan(plan: ProjectTransferPlan): void {
     || directories !== plan.portable.directories
     || symlinkCount !== plan.portable.symlinks
   ) throw transferStreamError('Transfer manifest entry totals are inconsistent.')
+}
+
+async function verifyPublishedDestination(
+  destination: string,
+  plan: ProjectTransferPlan,
+  retryCredentialBytes: Buffer | null,
+): Promise<void> {
+  try {
+    for (const entry of plan.portable.entries) {
+      // Included credentials intentionally replace the stripped portable AI
+      // vault; the private bundle verification below owns its final bytes.
+      if (
+        plan.policy.credentials === 'include'
+        && entry.path === 'data/config/ai-provider-manager.json'
+      ) continue
+      const path = join(destination, ...entry.path.split('/'))
+      const info = await lstat(path)
+      if (entry.kind === 'directory') {
+        if (!info.isDirectory()) throw new Error(`${entry.path} changed type`)
+      } else if (entry.kind === 'symlink') {
+        if (!info.isSymbolicLink() || await readlink(path) !== entry.linkTarget) {
+          throw new Error(`${entry.path} changed symlink target`)
+        }
+      } else {
+        if (!info.isFile() || info.size !== entry.size) throw new Error(`${entry.path} changed size or type`)
+        const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW)
+        try {
+          const hash = createHash('sha256')
+          let size = 0
+          for await (const chunk of handle.createReadStream({ autoClose: false })) {
+            const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+            size += bytes.byteLength
+            hash.update(bytes)
+          }
+          if (size !== entry.size || hash.digest('hex') !== entry.sha256) {
+            throw new Error(`${entry.path} changed content`)
+          }
+        } finally {
+          await handle.close()
+        }
+      }
+    }
+    if (plan.policy.credentials === 'include') {
+      if (!retryCredentialBytes) throw new Error('credential payload is missing')
+      const expected = parseCredentialBundle(retryCredentialBytes)
+      const actual = await readProjectTransferCredentialBundle(destination)
+      if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error('credential bundle changed')
+    }
+    await assertPublishedEntrySet(destination, plan)
+  } catch (error: unknown) {
+    throw transferStreamError(
+      'Published transfer destination changed before registration retry; choose a new destination Home.',
+      error,
+    )
+  }
+}
+
+async function assertPublishedEntrySet(destination: string, plan: ProjectTransferPlan): Promise<void> {
+  const allowed = new Set(plan.portable.entries.map((entry) => entry.path))
+  allowed.add(PROJECT_TRANSFER_RECEIPT_FILE)
+  if (plan.policy.credentials === 'include') {
+    for (const path of [
+      'sealing.key',
+      'provider-keys.json',
+      'data/config/ai-provider-manager.json',
+      'data/config/accounts.json',
+      'data/config/connectors.json',
+    ]) allowed.add(path)
+  }
+  for (const path of [...allowed]) {
+    const parts = path.split('/')
+    for (let index = 1; index < parts.length; index += 1) {
+      allowed.add(parts.slice(0, index).join('/'))
+    }
+  }
+
+  const pending = ['']
+  while (pending.length > 0) {
+    const parent = pending.pop()!
+    const absoluteParent = parent
+      ? join(destination, ...parent.split('/'))
+      : destination
+    for (const name of await readdir(absoluteParent)) {
+      const path = parent ? `${parent}/${name}` : name
+      if (!allowed.has(path)) throw new Error(`unexpected published path ${path}`)
+      const info = await lstat(join(destination, ...path.split('/')))
+      if (info.isDirectory()) pending.push(path)
+    }
+  }
 }
 
 async function readAvailableBytes(path: string): Promise<number> {
@@ -363,7 +488,7 @@ async function writeCredentialBundle(home: string, bundle: ProjectTransferCreden
 
 async function readPublishedReceipt(destination: string): Promise<ProjectTransferReceipt | null> {
   try {
-    return parseReceipt(JSON.parse(await readFile(join(destination, RECEIPT_FILE), 'utf8')) as unknown)
+    return parseReceipt(JSON.parse(await readFile(join(destination, PROJECT_TRANSFER_RECEIPT_FILE), 'utf8')) as unknown)
   } catch (error: unknown) {
     if (isNodeError(error, 'ENOENT')) return null
     throw error
@@ -402,7 +527,7 @@ function parseCredentialBundle(bytes: Buffer): ProjectTransferCredentialBundle {
   const value = JSON.parse(bytes.toString('utf8')) as unknown
   const root = requireRecord(value, 'credential payload')
   return {
-    ai: parseAiProviderVault(root['ai']),
+    ai: normalizeProjectTransferAiVault(parseAiProviderVault(root['ai'])),
     brokerAccounts: Array.isArray(root['brokerAccounts']) ? root['brokerAccounts'] : [],
     connectors: requireRecord(root['connectors'], 'Connector credential payload'),
     providerKeys: Object.fromEntries(
@@ -414,20 +539,49 @@ function parseCredentialBundle(bytes: Buffer): ProjectTransferCredentialBundle {
 
 function parseReceipt(value: unknown): ProjectTransferReceipt {
   const root = requireRecord(value, 'transfer receipt')
+  const transferId = root['transferId']
+  const sourceProjectId = root['sourceProjectId']
+  const destinationProjectId = root['destinationProjectId']
+  const destinationHome = root['destinationHome']
+  const files = root['files']
+  const bytes = root['bytes']
+  const manifestSha256 = root['manifestSha256']
+  const credentials = root['credentials']
+  const publishedAt = root['publishedAt']
   if (
     root['schemaVersion'] !== 1
-    || typeof root['transferId'] !== 'string'
-    || typeof root['sourceProjectId'] !== 'string'
-    || typeof root['destinationProjectId'] !== 'string'
-    || typeof root['destinationHome'] !== 'string'
-    || !Number.isSafeInteger(root['files'])
-    || !Number.isSafeInteger(root['bytes'])
-    || typeof root['manifestSha256'] !== 'string'
-    || !['included', 'omitted'].includes(String(root['credentials']))
+    || typeof transferId !== 'string'
+    || transferId.length < 1
+    || typeof sourceProjectId !== 'string'
+    || sourceProjectId.length < 1
+    || typeof destinationProjectId !== 'string'
+    || destinationProjectId.length < 1
+    || typeof destinationHome !== 'string'
+    || destinationHome.length < 1
+    || !Number.isSafeInteger(files)
+    || Number(files) < 0
+    || !Number.isSafeInteger(bytes)
+    || Number(bytes) < 0
+    || typeof manifestSha256 !== 'string'
+    || !/^[a-f0-9]{64}$/u.test(manifestSha256)
+    || (credentials !== 'included' && credentials !== 'omitted')
     || root['sessionsImported'] !== 0
-    || typeof root['publishedAt'] !== 'string'
+    || typeof publishedAt !== 'string'
+    || !Number.isFinite(Date.parse(publishedAt))
   ) throw transferStreamError('Invalid transfer receipt.')
-  return value as ProjectTransferReceipt
+  return {
+    schemaVersion: 1,
+    transferId,
+    sourceProjectId,
+    destinationProjectId,
+    destinationHome,
+    files: Number(files),
+    bytes: Number(bytes),
+    manifestSha256,
+    credentials,
+    sessionsImported: 0,
+    publishedAt,
+  }
 }
 
 function parseRecord(value: string): Record<string, unknown> {
