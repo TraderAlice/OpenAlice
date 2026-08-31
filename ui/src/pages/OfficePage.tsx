@@ -287,6 +287,7 @@ export function OfficePage() {
       selectedSeat.employee.mood === 'failed'
       || selectedSeat.employee.mood === 'waiting'
       || selectedSeat.employee.mood === 'review'
+      || selectedSeat.employee.latestResult != null
     )
       ? () => {
         productActivity.acknowledge('agent')

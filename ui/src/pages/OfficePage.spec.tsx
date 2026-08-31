@@ -347,6 +347,50 @@ describe('OfficePage localization', () => {
     })
   })
 
+  it('keeps an aged latest result connected to its activity evidence', async () => {
+    officeFloorMock.mockReturnValue({
+      ...defaultOfficeFloor(),
+      building: {
+        ...defaultOfficeFloor().building,
+        lastSeq: 46,
+        offices: [{
+          ...defaultOfficeFloor().building.offices[0],
+          employees: [{
+            resumeId: 'resume-grok-complete',
+            agent: 'grok',
+            name: 'g29',
+            title: 'Finish the Night Office visual pass',
+            mood: 'idle' as const,
+            awake: false,
+            surface: 'headless' as const,
+            bubble: null,
+            latestResult: {
+              text: 'NIGHT SHIFT COMPLETE.',
+              at: Date.now() - 60_000,
+            },
+            lastSeq: 45,
+            lastInteractionAt: 1,
+            drawers: [],
+          }],
+        }],
+      },
+    })
+
+    render(<OfficePage />)
+
+    await userEvent.click(screen.getByTestId('office-desk-resume-grok-complete'))
+    await screen.findByRole('dialog', { name: /Grok/ }, { timeout: 10_000 })
+    expect(screen.getByText('NIGHT SHIFT COMPLETE.')).toBeTruthy()
+    const reviewActivity = await screen.findByRole('button', { name: '查看活动' })
+    expect(document.activeElement).toBe(reviewActivity)
+    await userEvent.keyboard('{Enter}')
+
+    const runtime = screen.getByTestId('office-runtime-section')
+    expect(runtime.dataset.channel).toBe('agent')
+    expect(runtime.dataset.selectedSeq).toBe('45')
+    expect(acknowledgeMock).toHaveBeenCalledWith('agent')
+  })
+
   it('localizes the Office HUD and opens logs on request', async () => {
     const { container } = render(<OfficePage />)
 

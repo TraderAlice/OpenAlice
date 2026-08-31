@@ -5288,6 +5288,31 @@ Roster focus-band follow-up (2026-08-31):
   and nine tests skipped); the production UI build passed with only the existing ports fallback and large-chunk
   advisory.
 
+Persistent latest-result evidence follow-up (2026-08-31):
+
+- Ran real Night-floor Grok task `run-_CLKxkuS` as new g29. The floor moved from zero to one working/awake coworker,
+  promoted g29 into Chat's visible seats and 29-member roster, rendered its working bubble, then produced the fresh
+  checkmark and `NIGHT SHIFT COMPLETE.` result. During the 30-second review hold its Agent File correctly offered
+  `Review activity`; after the transient mood aged to ordinary asleep, `LATEST RESULT` remained but that evidence
+  command disappeared, leaving only `Open session` beside a result the player could no longer trace.
+- Compared retaining the expiry, making the map's `REVIEW` prompt/checkmark permanent, and separating urgency from
+  evidence reachability. Expiry turns durable result copy into a dead end; permanent map urgency contradicts the
+  deliberately transient quest-return cue and would make an idle office noisy. Chose the split contract: map emote and
+  prompt still expire, while an Agent File that still presents Latest result keeps its route to Activity Log.
+- The Office projection only includes `latestResult` while the Session's latest execution is done. If another run
+  starts or fails, that completed-result field disappears; while it exists, the employee's `lastSeq` is the matching
+  stopped event. The persistent file action can therefore reuse the existing exact sequence without compatibility
+  data, duplicate state, a new product-log query, or a permanent attention signal.
+- Implemented the live Agent-file action predicate so failed, waiting, fresh-review, and aged-result coworkers all own
+  `Review activity`; replay continues using its separate exact focus. Existing command priority, keyboard autofocus,
+  responsive two-command rail, localized label, and Activity Log return behavior remain shared.
+- Real-browser acceptance reopened g29 more than three minutes after completion. Its ordinary asleep file showed both
+  `LATEST RESULT — NIGHT SHIFT COMPLETE.` and the focused `Review activity`; activating it selected exact Task complete
+  #5545 with the same Assignment, result, Background run mode, and complete output facts. Focused page and Agent-file
+  suites passed all 23 tests; root and UI TypeScript passed; the full suite passed all 620 test files and 5,203 tests
+  (one file and nine tests skipped); the production UI build passed with only the existing ports fallback and
+  large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
