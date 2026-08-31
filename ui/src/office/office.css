@@ -2671,15 +2671,24 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
   text-align: left;
 }
 
-.oa-office-roster li button:hover,
-.oa-office-roster li button:focus-visible {
+.oa-office-roster li button[data-awake="false"] {
+  background: color-mix(in srgb, var(--gba-ink-soft) 7%, var(--gba-paper));
+}
+
+.oa-office-roster li button:hover {
   outline: 0;
   background: color-mix(in srgb, var(--gba-water) 18%, var(--gba-paper));
   transform: translate(-1px, -1px);
 }
 
-.oa-office-roster li button[data-awake="false"] {
-  background: color-mix(in srgb, var(--gba-ink-soft) 7%, var(--gba-paper));
+.oa-office-roster li button:focus-visible {
+  outline: 0;
+  background: color-mix(in srgb, var(--gba-water) 26%, var(--gba-paper));
+  box-shadow:
+    inset 0 0 0 2px var(--gba-water),
+    inset -4px -4px color-mix(in srgb, var(--gba-moss) 17%, transparent),
+    3px 3px 0 color-mix(in srgb, var(--gba-ink) 28%, transparent);
+  transform: translate(-1px, -1px);
 }
 
 .oa-office-roster__portrait {
@@ -2811,6 +2820,10 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
 .oa-office-roster li button:is(:hover, :focus-visible) .oa-office-roster__cursor {
   opacity: 1;
   transform: translateX(1px);
+}
+
+.oa-office-roster li button:focus-visible .oa-office-roster__cursor {
+  filter: drop-shadow(1px 1px 0 var(--gba-paper));
 }
 
 .oa-office-cabinet-window {

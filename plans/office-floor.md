@@ -5266,6 +5266,28 @@ Replay Agent-file narrative follow-up (2026-08-31):
   all 620 test files and 5,202 tests (one file and nine tests skipped); the production UI build passed with only the
   existing ports fallback and large-chunk advisory.
 
+Roster focus-band follow-up (2026-08-31):
+
+- Played the real 28-member Chat roster from its `+24` map prop, used PageDown and End to reach member 28, opened g1's
+  Agent File, and returned to the exact `28/28` roster position. Navigation, scroll restoration, Agent-file return,
+  dialog ownership, and focus restoration were already correct. The remaining visual failure was that every current
+  coworker was asleep, and the later dormant-card background rule overrode the earlier `:focus-visible` tint. The
+  selected card therefore looked like its five neighbors except for one small cursor at the far edge.
+- Compared enlarging only the cursor, storing a second persistent selected-card state, and letting the real focus own a
+  classic RPG full-row selection band. A larger cursor still makes a 2-column, 28-person menu hard to scan; persistent
+  selection can contradict the actual keyboard target. Chose the focus-owned band so there remains one input truth.
+- Dormant styling now establishes the base card first. Hover may add a restrained water wash, while keyboard focus
+  paints the stronger 26% water selection band, a two-pixel inset water frame, and a paper-backed cursor. Failed,
+  waiting, asleep, portrait, and assignment presentation remain unchanged inside the selected row.
+- The treatment uses the existing roster component and HUD cursor asset, adds no parallel state or new control, and
+  remains compatible with the existing two-column, compact-window, touch, reduced-motion, and roving-tabindex
+  behavior. The focus band is semantic focus feedback rather than decorative animation.
+- Real-browser acceptance reopened the real roster after hot reload, pressed End, and showed g1 at `28/28` with the
+  complete water band and cursor while its `ASLEEP` status remained legible. Focused roster and responsive-style suites
+  passed all 31 tests; root and UI TypeScript passed; the full suite passed all 620 test files and 5,202 tests (one file
+  and nine tests skipped); the production UI build passed with only the existing ports fallback and large-chunk
+  advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

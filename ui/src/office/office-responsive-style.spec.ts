@@ -79,6 +79,9 @@ describe('Office responsive style contract', () => {
   })
 
   it('keeps roster state beside identity and gives assignments two stable lines', () => {
+    const dormantCardStart = css.indexOf('.oa-office-roster li button[data-awake="false"]')
+    const focusedCardStart = css.indexOf('.oa-office-roster li button:focus-visible {')
+
     expect(css).toMatch(
       /\.oa-office-roster__identity\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) auto;/s,
     )
@@ -88,6 +91,14 @@ describe('Office responsive style contract', () => {
     expect(css).toMatch(/\.oa-office-roster__cursor\s*\{[^}]*opacity:\s*0;/s)
     expect(css).toMatch(
       /\.oa-office-roster li button:is\(:hover, :focus-visible\) \.oa-office-roster__cursor\s*\{[^}]*opacity:\s*1;/s,
+    )
+    expect(dormantCardStart).toBeGreaterThan(-1)
+    expect(focusedCardStart).toBeGreaterThan(dormantCardStart)
+    expect(css).toMatch(
+      /\.oa-office-roster li button:focus-visible\s*\{[^}]*background:\s*color-mix\(in srgb, var\(--gba-water\) 26%, var\(--gba-paper\)\);[^}]*inset 0 0 0 2px var\(--gba-water\),/s,
+    )
+    expect(css).toMatch(
+      /\.oa-office-roster li button:focus-visible \.oa-office-roster__cursor\s*\{[^}]*drop-shadow\(1px 1px 0 var\(--gba-paper\)\);/s,
     )
   })
 
