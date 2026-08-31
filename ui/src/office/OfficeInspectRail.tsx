@@ -46,6 +46,7 @@ export function OfficeInspectRail({
   const titleId = useId()
   const resultId = useId()
   const [titleExpanded, setTitleExpanded] = useState(false)
+  const [assignmentHasMore, setAssignmentHasMore] = useState(false)
   const [resultExpanded, setResultExpanded] = useState(false)
   const [focusedDrawerId, setFocusedDrawerId] = useState(employee?.drawers[0]?.id ?? null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
@@ -58,6 +59,7 @@ export function OfficeInspectRail({
   const reviewActivityRef = useRef<HTMLButtonElement>(null)
   const openButtonRef = useRef<HTMLButtonElement>(null)
   const drawerListRef = useRef<HTMLUListElement>(null)
+  const employeeAssignment = employee ? officeCoworkerAssignment(employee) : null
   const drawerButtons = () => Array.from(
     drawerListRef.current?.querySelectorAll<HTMLButtonElement>('button[data-drawer-id]') ?? [],
   )
@@ -67,9 +69,19 @@ export function OfficeInspectRail({
     return buttons.find((button) => button.dataset.drawerId === focusedDrawerId) ?? buttons[0]
   }
 
+  const updateAssignmentScrollCue = () => {
+    const assignment = assignmentRef.current
+    setAssignmentHasMore(Boolean(
+      titleExpanded
+      && assignment
+      && assignment.scrollHeight - assignment.clientHeight - assignment.scrollTop > 1,
+    ))
+  }
+
   useEffect(() => {
     setFocusedDrawerId(employee?.drawers[0]?.id ?? null)
     setTitleExpanded(false)
+    setAssignmentHasMore(false)
     setResultExpanded(false)
   }, [employee?.resumeId])
 
@@ -81,13 +93,17 @@ export function OfficeInspectRail({
   }, [drawerIdentity])
 
   useLayoutEffect(() => {
-    if (!titleExpanded || !profileRef.current) return
+    if (!titleExpanded || !profileRef.current) {
+      setAssignmentHasMore(false)
+      return
+    }
     profileRef.current.scrollTop = 0
     if (assignmentRef.current) {
       assignmentRef.current.scrollTop = 0
       assignmentRef.current.focus({ preventScroll: true })
     }
-  }, [titleExpanded])
+    updateAssignmentScrollCue()
+  }, [employeeAssignment, titleExpanded])
 
   useLayoutEffect(() => {
     const wasExpanded = resultWasExpandedRef.current
@@ -102,7 +118,6 @@ export function OfficeInspectRail({
   }, [resultExpanded])
 
   const employeeLabel = employee ? officeCoworkerCallsign(employee, coworkerAsset) : ''
-  const employeeAssignment = employee ? officeCoworkerAssignment(employee) : null
   const latestResultText = officeActivityText(employee?.latestResult?.text)
   const replayActive = replayFocus != null
   const employeeDialogue = replayFocus?.summary
@@ -229,9 +244,19 @@ export function OfficeInspectRail({
                     data-expanded={titleExpanded || undefined}
                     tabIndex={titleExpanded ? 0 : undefined}
                     title={employeeAssignment}
+                    onScroll={updateAssignmentScrollCue}
                   >
                     {employeeAssignment}
                   </p>
+                {titleExpanded && assignmentHasMore && (
+                  <span
+                    className="oa-office-inspect__assignment-scroll-cue"
+                    data-reduced-motion={reducedMotion || undefined}
+                    aria-hidden
+                  >
+                    <i />
+                  </span>
+                )}
                 {titleCanExpand && (
                   <button
                     type="button"

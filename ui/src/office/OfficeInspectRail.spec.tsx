@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -322,6 +322,8 @@ describe('OfficeInspectRail', () => {
     )
 
     const title = screen.getByText(longTitle)
+    Object.defineProperty(title, 'clientHeight', { configurable: true, value: 100 })
+    Object.defineProperty(title, 'scrollHeight', { configurable: true, value: 260 })
     const toggle = screen.getByRole('button', { name: 'Read full assignment' })
     expect(screen.getByText('Assignment')).toBeTruthy()
     expect(screen.getByRole('dialog').getAttribute('aria-label')).toMatch(/^Codex/)
@@ -338,6 +340,13 @@ describe('OfficeInspectRail', () => {
     expect(title.getAttribute('tabindex')).toBe('0')
     expect(screen.getByRole('region', { name: 'Assignment' })).toBe(title)
     expect(document.activeElement).toBe(title)
+    expect(container.querySelector('.oa-office-inspect__assignment-scroll-cue')).toBeTruthy()
+    title.scrollTop = 160
+    fireEvent.scroll(title)
+    expect(container.querySelector('.oa-office-inspect__assignment-scroll-cue')).toBeNull()
+    title.scrollTop = 0
+    fireEvent.scroll(title)
+    expect(container.querySelector('.oa-office-inspect__assignment-scroll-cue')).toBeTruthy()
     rerender(
       <OfficeInspectRail
         employee={{ ...employee, title: longTitle, bubble: null, drawers: [...employee.drawers] }}
@@ -351,6 +360,7 @@ describe('OfficeInspectRail', () => {
     expect(document.activeElement).toBe(title)
     await userEvent.keyboard('{Escape}')
     expect(screen.getByRole('button', { name: 'Read full assignment' })).toBeTruthy()
+    expect(container.querySelector('.oa-office-inspect__assignment-scroll-cue')).toBeNull()
     expect(title.getAttribute('tabindex')).toBeNull()
     expect(title.getAttribute('role')).toBeNull()
     await vi.waitFor(() => expect(document.activeElement).toBe(toggle))

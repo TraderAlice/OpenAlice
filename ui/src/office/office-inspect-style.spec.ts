@@ -53,6 +53,12 @@ describe('Office Agent-file style contract', () => {
     expect(css).toMatch(
       /\.oa-office-inspect__assignment p\[data-expanded="true"\]\s*\{[\s\S]*?max-height: 7\.8em;[\s\S]*?overflow-y: auto;[\s\S]*?scrollbar-width: thin/,
     )
+    expect(css).toMatch(
+      /\.oa-office-inspect__assignment-scroll-cue\s*\{[^}]*position:\s*absolute;[^}]*background:\s*var\(--gba-water\);[^}]*animation:\s*oa-office-assignment-more 720ms steps\(2, end\) infinite;/s,
+    )
+    expect(css).toMatch(
+      /\.oa-office-inspect__assignment-scroll-cue i\s*\{[^}]*clip-path:\s*polygon\(0 0, 100% 0, 50% 100%\);/s,
+    )
     expect(css).toMatch(/\.oa-office-window__close-mark\s*\{[\s\S]*?clip-path: polygon/)
   })
 

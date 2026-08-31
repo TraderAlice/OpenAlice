@@ -3249,7 +3249,7 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 4px 6px;
+  padding: 4px 26px 4px 6px;
   border-left: 2px solid var(--gba-moss);
   outline-offset: 2px;
   background: color-mix(in srgb, var(--gba-moss) 9%, var(--gba-cream));
@@ -3258,8 +3258,39 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
 }
 
 .oa-office-inspect__assignment {
+  position: relative;
   min-width: 0;
   margin-top: 7px;
+}
+
+.oa-office-inspect__assignment-scroll-cue {
+  position: absolute;
+  right: 7px;
+  bottom: 18px;
+  display: grid;
+  width: 15px;
+  height: 15px;
+  place-items: center;
+  border: 1px solid var(--gba-ink);
+  background: var(--gba-water);
+  box-shadow: 1px 1px 0 var(--gba-ink);
+  pointer-events: none;
+  animation: oa-office-assignment-more 720ms steps(2, end) infinite;
+}
+
+.oa-office-inspect__assignment-scroll-cue i {
+  width: 7px;
+  height: 5px;
+  background: var(--gba-ink);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+.oa-office-inspect__assignment-scroll-cue[data-reduced-motion="true"] {
+  animation: none;
+}
+
+@keyframes oa-office-assignment-more {
+  50% { transform: translateY(2px); }
 }
 
 .oa-office-inspect__assignment > small,
