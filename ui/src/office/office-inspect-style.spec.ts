@@ -47,6 +47,12 @@ describe('Office Agent-file style contract', () => {
     expect(css).toMatch(/\.oa-office-window__close-mark\s*\{[\s\S]*?clip-path: polygon/)
   })
 
+  it('contains expanded results in a focusable game-text viewport', () => {
+    expect(css).toMatch(
+      /\.oa-office-inspect__latest-result p\[data-expanded="true"\]\s*\{[^}]*max-height:\s*12em;[^}]*overflow-y:\s*auto;[^}]*overscroll-behavior:\s*contain;[^}]*scrollbar-width:\s*thin;/s,
+    )
+  })
+
   it('marks replay Agent files as one explicit historical character state', () => {
     expect(css).toMatch(
       /\.oa-office-inspect__replay-icon\s*\{[\s\S]*?width: 16px;[\s\S]*?height: 16px;/,

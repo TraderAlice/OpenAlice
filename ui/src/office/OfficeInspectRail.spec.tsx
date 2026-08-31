@@ -235,6 +235,9 @@ describe('OfficeInspectRail', () => {
     await userEvent.click(toggle)
     expect(screen.getByRole('button', { name: 'Collapse result' }).getAttribute('aria-expanded')).toBe('true')
     expect(resultText.getAttribute('data-expanded')).toBe('true')
+    expect(screen.getByRole('region', { name: 'Latest result' })).toBe(resultText)
+    expect(resultText.getAttribute('tabindex')).toBe('0')
+    expect(document.activeElement).toBe(resultText)
     expect(container.querySelector('.oa-office-inspect__latest-result p')?.textContent).toBe(normalizedResult)
 
     await userEvent.keyboard('{Escape}')

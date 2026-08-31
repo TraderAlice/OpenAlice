@@ -3331,7 +3331,16 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
 
 .oa-office-inspect__latest-result p[data-expanded="true"] {
   display: block;
-  overflow: visible;
+  max-height: 12em;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 6px;
+  outline-offset: 2px;
+  background: color-mix(in srgb, var(--gba-paper) 72%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gba-moss-dark) 52%, transparent);
+  scrollbar-color: var(--gba-moss-dark) var(--gba-paper);
+  scrollbar-width: thin;
   -webkit-line-clamp: unset;
 }
 

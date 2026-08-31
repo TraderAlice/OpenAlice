@@ -5553,6 +5553,25 @@ Auto-route cancel-control follow-up (2026-08-31):
   all 620 test files and 5,209 tests (one file and nine tests skipped); the production UI build passed with only the
   existing ports fallback and large-chunk advisory.
 
+Agent-file result-reader follow-up (2026-08-31):
+
+- Ran real Grok headless QA `run-j-fxusdM` against `office-lab-chat` and watched the complete Live transition. Grok
+  Strategist g35 appeared working and awake, the Chat sign changed to `1/35 awake`, its coffee landmark powered on,
+  Operations gained attention, and the typing/emote animation played. The run completed while Alice was routing to the
+  desk; the same target safely changed to review/asleep, the room powered down, and the Agent File opened normally.
+- The new long result exposed a reading-state failure that fixtures had hidden. The collapsed summary fit, but `Read
+  full result` expanded the paragraph to 328px and the whole Profile to 618px while focus stayed on the toggle above it.
+  The player had to discover and scroll a browser-like outer page before any of the requested full result was readable.
+- Compared retaining whole-profile scrolling, opening another modal, and using an embedded RPG text viewport. Chose
+  the embedded reader: it keeps the character file and command row as stable context without adding a third window
+  level. Expanded result text is now a labelled, focusable region capped at 12em with contained thin-scroll behavior;
+  expansion scrolls that reader into view and starts at its first line.
+- Real-browser acceptance opened g35's 372px result in a 168px reader, kept both bottom commands fixed, and gave focus
+  to `Latest result`. Escape collapsed only the reader, reset the Profile scroll from 82.5 to zero, returned focus to
+  `Read full result`, and left the Agent File open. Focused Inspect/style suites passed all 14 tests; root and UI
+  TypeScript passed; the full suite passed all 620 test files and 5,210 tests (one file and nine tests skipped); the
+  production UI build passed with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

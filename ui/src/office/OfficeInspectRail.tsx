@@ -51,6 +51,8 @@ export function OfficeInspectRail({
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const profileRef = useRef<HTMLDivElement>(null)
   const assignmentRef = useRef<HTMLParagraphElement>(null)
+  const resultRef = useRef<HTMLParagraphElement>(null)
+  const resultWasExpandedRef = useRef(false)
   const titleToggleRef = useRef<HTMLButtonElement>(null)
   const resultToggleRef = useRef<HTMLButtonElement>(null)
   const reviewActivityRef = useRef<HTMLButtonElement>(null)
@@ -87,6 +89,18 @@ export function OfficeInspectRail({
     }
   }, [titleExpanded])
 
+  useLayoutEffect(() => {
+    const wasExpanded = resultWasExpandedRef.current
+    resultWasExpandedRef.current = resultExpanded
+    if (resultExpanded && resultRef.current) {
+      resultRef.current.scrollTop = 0
+      resultRef.current.scrollIntoView?.({ block: 'nearest' })
+      resultRef.current.focus({ preventScroll: true })
+    } else if (wasExpanded) {
+      resultToggleRef.current?.focus({ preventScroll: true })
+    }
+  }, [resultExpanded])
+
   const employeeLabel = employee ? officeCoworkerCallsign(employee, coworkerAsset) : ''
   const employeeAssignment = employee ? officeCoworkerAssignment(employee) : null
   const latestResultText = officeActivityText(employee?.latestResult?.text)
@@ -108,7 +122,6 @@ export function OfficeInspectRail({
   const toggleLatestResult = () => {
     setTitleExpanded(false)
     setResultExpanded((expanded) => !expanded)
-    requestAnimationFrame(() => resultToggleRef.current?.focus({ preventScroll: true }))
   }
 
   return (
@@ -127,7 +140,6 @@ export function OfficeInspectRail({
           event.stopPropagation()
           if (resultExpanded) {
             setResultExpanded(false)
-            requestAnimationFrame(() => resultToggleRef.current?.focus({ preventScroll: true }))
           } else {
             setTitleExpanded(false)
             requestAnimationFrame(() => titleToggleRef.current?.focus({ preventScroll: true }))
@@ -267,7 +279,6 @@ export function OfficeInspectRail({
                           event.preventDefault()
                           event.stopPropagation()
                           setResultExpanded(false)
-                          requestAnimationFrame(() => resultToggleRef.current?.focus({ preventScroll: true }))
                           return
                         }
                         if (isOfficeConfirmKey(event.key)) {
@@ -285,8 +296,12 @@ export function OfficeInspectRail({
                     </button>
                   )}
                   <p
+                    ref={resultRef}
                     id={resultId}
+                    role={resultExpanded ? 'region' : undefined}
+                    aria-label={resultExpanded ? t('office.latestResult') : undefined}
                     data-expanded={resultExpanded || undefined}
+                    tabIndex={resultExpanded ? 0 : undefined}
                     title={latestResultText}
                   >
                     {latestResultText}
