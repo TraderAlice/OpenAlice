@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react'
+import { ArrowUpRight } from 'lucide-react'
 
 interface DemoTerminalStubProps {
   readonly label: string
@@ -30,9 +31,10 @@ export function DemoTerminalStub({ label }: DemoTerminalStubProps): ReactElement
             href="https://github.com/TraderAlice/OpenAlice"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-xs font-medium text-warning hover:underline"
+            className="oa-demo-install oa-pressable inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-foreground"
           >
-            Install OpenAlice locally →
+            <span>Install OpenAlice</span>
+            <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
           </a>
         </div>
       </div>

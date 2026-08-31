@@ -202,7 +202,7 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     expect(document.activeElement).toBe(trigger)
 
     await user.keyboard('{ArrowDown}')
-    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: /Managed by OpenCode/ }))
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: /OpenCode account/ }))
     await user.keyboard('{End}')
     expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: /Backup/ }))
     await user.keyboard('{Enter}')
@@ -285,7 +285,7 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     expect(credentialTrigger.className).toContain('w-full')
     expect(inferenceTrigger.className).toContain('w-full')
     expect(inferenceTrigger.textContent).toContain('gpt-5')
-    expect(inferenceTrigger.textContent).toContain('Effort not specified')
+    expect(inferenceTrigger.textContent).toContain('Default effort')
   })
 
   it('combines model and reasoning into a nested toolbar menu', async () => {
@@ -321,12 +321,15 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     const trigger = screen.getByRole('button', { name: i18n.t('chatLanding.selectModelAndEffort') })
     expect(trigger.textContent).toContain('gpt-5')
     expect(trigger.textContent).toContain('high reasoning')
+    expect(trigger.textContent).not.toContain('·')
 
     trigger.focus()
     await user.keyboard('{ArrowDown}')
     await user.click(screen.getByRole('menuitem', { name: /Model/ }))
+    expect(document.body.textContent).not.toContain('·')
     fireEvent.click(await screen.findByRole('menuitemradio', { name: /GPT-5.6/ }))
     expect(selectModel).toHaveBeenCalledWith('gpt-5.6-sol')
+    expect(screen.getByRole('menuitem', { name: /Model/ })).toBeTruthy()
 
     await user.keyboard('{Escape}{Escape}')
     trigger.focus()

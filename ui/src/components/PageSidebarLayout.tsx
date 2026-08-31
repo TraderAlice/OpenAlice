@@ -736,12 +736,12 @@ export function PageSidebarLayout({
           collapsible
           groupResizeBehavior="preserve-pixel-size"
           onResize={handleSidebarResize}
-          className="h-full min-h-0 overflow-hidden bg-secondary"
+          className="h-full min-h-0 overflow-hidden bg-sidebar"
         >
           <div
             data-testid="page-sidebar-desktop"
             data-state={collapsed ? 'collapsed' : 'expanded'}
-            className="relative h-full min-h-0 w-full overflow-hidden bg-secondary"
+            className="relative h-full min-h-0 w-full overflow-hidden bg-sidebar"
           >
             <div
               data-testid="page-sidebar-expanded"
@@ -759,7 +759,7 @@ export function PageSidebarLayout({
               data-testid="page-sidebar-collapsed"
               aria-hidden={!collapsed}
               inert={!collapsed ? true : undefined}
-              className={`absolute inset-0 flex flex-col items-center bg-secondary py-1.5 transition-opacity duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-standard)] motion-reduce:delay-0 motion-reduce:transition-none ${
+              className={`absolute inset-0 flex flex-col items-center bg-sidebar py-1.5 transition-opacity duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-standard)] motion-reduce:delay-0 motion-reduce:transition-none ${
                 collapsed
                   ? 'opacity-100 delay-[80ms]'
                   : 'pointer-events-none opacity-0'
@@ -791,7 +791,7 @@ export function PageSidebarLayout({
           }}
           onKeyUp={finishUserResize}
           onBlur={finishUserResize}
-          className="z-10 bg-border/80 transition-colors hover:bg-primary/50 active:bg-primary/70"
+          className="z-10 bg-sidebar-border/70 transition-colors hover:bg-foreground/18 active:bg-foreground/28"
         />
         <ResizablePanel
           id={`page-sidebar-${storageKey}-content`}
@@ -848,7 +848,7 @@ export function PageSidebarLayout({
           aria-modal="true"
           aria-describedby={undefined}
           showCloseButton={false}
-          className="oa-page-sidebar-dialog h-dvh max-h-none w-[280px] max-w-[85vw] gap-0 overflow-hidden border-0 bg-transparent p-0 text-foreground"
+          className="oa-page-sidebar-dialog h-dvh max-h-none w-[280px] max-w-[85vw] gap-0 overflow-hidden border-r border-sidebar-border/70 bg-sidebar p-0 text-sidebar-foreground"
           initialFocus={() => {
             const drawer = mobileDrawerRef.current
             const current = drawer?.querySelector<HTMLElement>('[aria-current="page"]')
@@ -867,7 +867,7 @@ export function PageSidebarLayout({
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
-                className="oa-icon-action -ml-2 flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                className="oa-icon-action -ml-1 flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                 aria-label={t('common.closePanel', { title })}
               >
                 <X size={15} strokeWidth={1.75} aria-hidden />

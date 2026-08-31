@@ -9,10 +9,9 @@
  * this surface is for chatting, not workspace management.
  */
 
-import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  Check,
   AppWindow,
   ChevronDown,
   ChevronRight,
@@ -59,7 +58,16 @@ import { useWorkspaceSessionDirectories } from '../../hooks/useWorkspaceSessionD
 import { useReorderMotion } from './useReorderMotion'
 import { preferencesApi } from '../../api/preferences'
 import { useHarnessPreferences } from '../../hooks/useHarnessPreferences'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   Dialog,
   DialogClose,
@@ -71,6 +79,9 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import type { ChatDisplayMode } from './chat-display-mode'
+import { OverflowMarquee } from '../OverflowMarquee'
+import { SelectionIndicator } from '../SelectionIndicator'
+import { useScrollEdgeFade } from '../../hooks/useScrollEdgeFade'
 
 const CHAT_TEMPLATE = 'chat'
 const AUTO_QUANT_TEMPLATE = 'auto-quant-v2'
@@ -333,10 +344,7 @@ export function ChatWorkspaceSection({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* Starting a conversation is the primary action. Creating a Workspace is
-          a lower-frequency context-boundary action attached to the list it
-          affects, rather than a competing half-width CTA. */}
-      <div className="grid grid-cols-1 gap-2 px-2 pt-2 pb-1">
+      <div className="grid grid-cols-1 gap-1 px-1.5 pb-2 pt-2">
         <button
           type="button"
           onClick={() => navigate({
@@ -345,9 +353,9 @@ export function ChatWorkspaceSection({
               ? { targetWsId: focusedWorkspace.id }
               : {},
           })}
-          className="oa-pressable flex w-full items-center gap-2 rounded-lg border border-primary/25 bg-primary/10 px-3 py-2.5 text-left text-[13px] font-medium text-foreground hover:border-primary/45 hover:bg-primary/15"
+          className="oa-chat-new-action oa-pressable flex min-h-10 w-full items-center gap-2 rounded-[10px] bg-accent-strong px-2 py-2 text-left text-sm font-medium text-foreground hover:bg-muted"
         >
-          <MessageSquarePlus size={15} strokeWidth={2.15} className="shrink-0 text-primary" />
+          <MessageSquarePlus size={16} strokeWidth={2} className="shrink-0 text-primary" />
           <span>{mode === 'auto-quant'
             ? t('autoQuant.newResearch')
             : mode === 'prediction' ? t('autoPrediction.newResearch') : t('chat.newChat')}</span>
@@ -359,7 +367,7 @@ export function ChatWorkspaceSection({
               kind: 'harness-surface',
               params: { wsId: focusedWorkspace.id, capability: 'studio', source: mode },
             })}
-            className="oa-pressable flex w-full items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-left text-[13px] font-medium text-foreground hover:border-primary/35 hover:bg-muted"
+            className="oa-pressable flex min-h-9 w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             <AppWindow size={15} strokeWidth={2.05} className="shrink-0 text-primary" />
             <span>{t('harnessSurface.studio')}</span>
@@ -446,9 +454,9 @@ export function ChatWorkspaceSection({
       )}
 
       <div className="px-3 pb-1 pt-1.5">
-        <span className="min-w-0 truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">
+        <h3 className="min-w-0 truncate text-[12px] font-medium text-muted-foreground/70">
           {t('nav.item.workspaces')}
-        </span>
+        </h3>
       </div>
       <ul ref={workspaceListRef} className="py-0.5">
         {/* Cold load: the list is empty because it hasn't fetched yet, NOT
@@ -646,12 +654,10 @@ interface ChatWorkspaceContextFooterProps {
 function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): ReactElement {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
+  const contextMenuLabelId = useId()
+  const pendingActionRef = useRef<(() => void) | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
 
-  const closeAndRun = (action: () => void) => {
-    setOpen(false)
-    action()
-  }
   const title = props.displayMode === 'focused'
     ? (props.workspace ? workspaceDisplayName(props.workspace) : t('chat.currentWorkspace'))
     : props.displayMode === 'recent'
@@ -661,12 +667,11 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
             ? t('autoPrediction.recentResearch')
             : t('chat.recentConversations'))
       : t('nav.item.workspaces')
-  const subtitle = props.displayMode === 'focused'
-    ? t('chat.currentWorkspace')
-    : props.displayMode === 'recent'
-      ? t('chat.allWorkspaces')
-      : t('chat.multiModeDescription')
-  const TriggerIcon = props.displayMode === 'recent' ? Clock3 : LayoutGrid
+  const TriggerIcon = props.displayMode === 'recent'
+    ? Clock3
+    : props.displayMode === 'multi'
+      ? PanelsTopLeft
+      : LayoutGrid
   const upgrade = props.workspace?.upgradeAvailable ?? null
   const upgradeVersion = upgrade?.to.replace(/^v(?=\d)/, '') ?? ''
   const contextLabel = props.harness === 'auto-quant'
@@ -680,108 +685,119 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
       ? t('autoPrediction.workspaceContextMenu')
       : t('chat.workspaceContextMenu')
 
-  const modeOption = (
-    mode: ChatDisplayMode,
-    label: string,
-    icon: ReactElement,
-    disabled = false,
-  ) => (
-    <button
-      type="button"
-      onClick={() => closeAndRun(() => props.onRequestDisplayMode(mode))}
-      disabled={disabled}
-      aria-pressed={props.displayMode === mode}
-      className="flex min-h-9 w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-xs text-foreground transition-colors hover:bg-muted disabled:cursor-default disabled:opacity-40"
-    >
-      <span className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground" aria-hidden>
-        {icon}
-      </span>
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-      {props.displayMode === mode && <Check size={13} strokeWidth={2.2} className="shrink-0 text-primary" aria-hidden />}
-    </button>
-  )
+  const queueAction = (action: () => void) => {
+    pendingActionRef.current = action
+  }
+
+  const menuItemClass = 'oa-workspace-context-item min-h-7 gap-2 rounded-md px-2 py-1 text-xs text-muted-foreground focus:bg-muted focus:text-foreground'
+  const modeItemClass = `${menuItemClass} pr-7 text-foreground`
 
   return (
-    <div className="shrink-0 border-t border-border/60 bg-secondary p-2">
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger
+    <div className="shrink-0 border-t border-border/60 bg-secondary p-1.5">
+      <DropdownMenu
+        open={open}
+        onOpenChange={setOpen}
+        onOpenChangeComplete={(nextOpen) => {
+          if (nextOpen) return
+          const action = pendingActionRef.current
+          pendingActionRef.current = null
+          if (!action) return
+          triggerRef.current?.focus()
+          action()
+        }}
+      >
+        <DropdownMenuTrigger
           render={<button
             ref={triggerRef}
             type="button"
             aria-label={upgrade
               ? t('chat.workspaceContextUpdateLabel', { name: title, version: upgradeVersion })
               : contextLabel}
-            className="oa-pressable flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="oa-pressable flex min-h-8 w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
           />}
         >
           <TriggerIcon className="h-3.5 w-3.5 shrink-0" aria-hidden />
-          <span className="min-w-0 flex-1">
-            <span className="block truncate font-medium text-foreground" title={props.displayMode === 'focused' && props.workspace ? workspaceDisplayTitle(props.workspace) : title}>
-              {title}
-            </span>
-            <span className={`mt-0.5 block truncate text-[10px] ${upgrade ? 'font-medium text-primary' : 'text-muted-foreground/70'}`}>
-              {upgrade ? t('chat.workspaceUpdateAvailable', { version: upgradeVersion }) : subtitle}
-            </span>
+          <span
+            className="min-w-0 flex-1 truncate font-medium text-foreground"
+            title={props.displayMode === 'focused' && props.workspace ? workspaceDisplayTitle(props.workspace) : title}
+          >
+            {title}
           </span>
           {upgrade && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden />}
           <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
-        </PopoverTrigger>
+        </DropdownMenuTrigger>
 
-        <PopoverContent
-          role="dialog"
-          aria-label={contextMenuLabel}
+        <DropdownMenuContent
+          aria-labelledby={contextMenuLabelId}
           side="top"
           align="start"
           sideOffset={4}
-          initialFocus={false}
-          className="z-40 max-h-[min(34rem,calc(100vh-1rem))] w-72 max-w-[calc(100vw-1rem)] gap-0 overflow-y-auto overscroll-contain rounded-lg border border-border/70 bg-popover p-1.5 text-popover-foreground shadow-lg ring-0 [scrollbar-gutter:stable]"
+          className="z-40 max-h-[min(30rem,calc(100vh-1rem))] w-60 max-w-[calc(100vw-1rem)] overflow-y-auto overscroll-contain rounded-lg border border-border/70 bg-popover p-1 text-popover-foreground shadow-lg ring-0 [scrollbar-gutter:stable]"
         >
-          <p className="px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">
-            {t('chat.view')}
-          </p>
-          {modeOption('focused', t('chat.currentWorkspace'), <LayoutGrid size={14} strokeWidth={2} />, props.workspace === null)}
-          {modeOption('recent', t('chat.recentMode'), <Clock3 size={14} strokeWidth={2} />)}
-          {modeOption('multi', t('chat.multiMode'), <PanelsTopLeft size={14} strokeWidth={2} />)}
+          <span id={contextMenuLabelId} className="sr-only">{contextMenuLabel}</span>
+          <DropdownMenuRadioGroup
+            value={props.displayMode}
+            onValueChange={(value) => {
+              queueAction(() => props.onRequestDisplayMode(value as ChatDisplayMode))
+            }}
+          >
+            <DropdownMenuLabel className="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">
+              {t('chat.view')}
+            </DropdownMenuLabel>
+            <DropdownMenuRadioItem
+              value="focused"
+              closeOnClick
+              disabled={props.workspace === null}
+              className={modeItemClass}
+            >
+              <LayoutGrid size={14} strokeWidth={2} aria-hidden />
+              <span className="min-w-0 flex-1 truncate">{t('chat.currentWorkspace')}</span>
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="recent" closeOnClick className={modeItemClass}>
+              <Clock3 size={14} strokeWidth={2} aria-hidden />
+              <span className="min-w-0 flex-1 truncate">{t('chat.recentMode')}</span>
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="multi" closeOnClick className={modeItemClass}>
+              <PanelsTopLeft size={14} strokeWidth={2} aria-hidden />
+              <span className="min-w-0 flex-1 truncate">{t('chat.multiMode')}</span>
+            </DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
 
-          <div className="my-1 border-t border-border/60" />
+          <DropdownMenuSeparator className="mx-0 bg-border/60" />
 
-          <button
-            type="button"
-            onClick={() => closeAndRun(() => props.onOpenWorkspacePicker(triggerRef.current))}
+          <DropdownMenuItem
+            onClick={() => queueAction(() => props.onOpenWorkspacePicker(triggerRef.current))}
             disabled={props.workspaces.length === 0}
-            className="flex min-h-9 w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-default disabled:opacity-40"
+            className={menuItemClass}
           >
             <LayoutGrid size={14} strokeWidth={2} aria-hidden />
             <span className="min-w-0 flex-1 truncate">{t('chat.switchWorkspace')}</span>
             <ChevronRight size={13} strokeWidth={2} className="shrink-0 text-muted-foreground/60" aria-hidden />
-          </button>
+          </DropdownMenuItem>
 
-          <button
-            type="button"
-            onClick={() => closeAndRun(props.onConfigure)}
+          <DropdownMenuItem
+            onClick={() => queueAction(props.onConfigure)}
             disabled={!props.workspace}
-            className="flex min-h-9 w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-default disabled:opacity-40"
+            className={menuItemClass}
           >
             <SettingsIcon size={14} strokeWidth={2} aria-hidden />
             <span className="min-w-0 flex-1 truncate">{t('workspace.configure')}</span>
-          </button>
+          </DropdownMenuItem>
           {upgrade && (
-            <button
-              type="button"
-              onClick={() => closeAndRun(props.onUpgrade)}
+            <DropdownMenuItem
+              onClick={() => queueAction(props.onUpgrade)}
               aria-label={t('chat.reviewWorkspaceUpdateLabel', { version: upgradeVersion })}
-              className="flex min-h-9 w-full items-center gap-2.5 rounded-md bg-primary/10 px-2.5 py-2 text-left text-xs font-medium text-primary transition-colors hover:bg-primary/15"
+              className={`${menuItemClass} bg-primary/10 font-medium text-primary focus:bg-primary/15 focus:text-primary`}
             >
               <Layers3 size={14} strokeWidth={2} aria-hidden />
               <span className="min-w-0 flex-1 truncate">{t('chat.reviewWorkspaceUpdate')}</span>
               <span className="shrink-0 tabular-nums text-[10px] text-primary/75">v{upgradeVersion}</span>
-            </button>
+            </DropdownMenuItem>
           )}
-          <button
-            type="button"
-            onClick={() => closeAndRun(() => props.onBrowseSessions(triggerRef.current))}
+          <DropdownMenuItem
+            onClick={() => queueAction(() => props.onBrowseSessions(triggerRef.current))}
             disabled={props.workspaces.length === 0}
-            className="flex min-h-9 w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-default disabled:opacity-40"
+            className={menuItemClass}
           >
             <ChevronRight size={14} strokeWidth={2} aria-hidden />
             <span className="min-w-0 flex-1 truncate">
@@ -791,27 +807,25 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
                   ? t('autoPrediction.browseResearch')
                   : t('chat.browseWorkspace')}
             </span>
-          </button>
+          </DropdownMenuItem>
           {props.showManager && (
-            <button
-              type="button"
-              onClick={() => closeAndRun(props.onOpenManager)}
-              className="flex min-h-9 w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            <DropdownMenuItem
+              onClick={() => queueAction(props.onOpenManager)}
+              className={menuItemClass}
             >
               <Network size={14} strokeWidth={2} aria-hidden />
               <span className="min-w-0 flex-1 truncate">{t('workspaceManager.title')}</span>
-            </button>
+            </DropdownMenuItem>
           )}
-          <button
-            type="button"
-            onClick={() => closeAndRun(props.onCreateWorkspace)}
-            className="flex min-h-9 w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          <DropdownMenuItem
+            onClick={() => queueAction(props.onCreateWorkspace)}
+            className={menuItemClass}
           >
             <PanelsTopLeft size={14} strokeWidth={2} aria-hidden />
             <span className="min-w-0 flex-1 truncate">{props.createWorkspaceLabel}</span>
-          </button>
-        </PopoverContent>
-      </Popover>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   )
 }
@@ -875,6 +889,8 @@ function HarnessSessionRoster(props: HarnessSessionRosterProps): ReactElement {
   const visibleRecent = selectRecentSidebarWorkset(recent, props.isRowActive)
   const runningRef = useReorderMotion<HTMLDivElement>(running.map(props.keyFor))
   const recentRef = useReorderMotion<HTMLDivElement>(visibleRecent.map(props.keyFor))
+  const scrollRef = useRef<HTMLDivElement>(null)
+  useScrollEdgeFade(scrollRef)
   const renderRow = (row: HarnessSession) => (
     <HarnessSessionRow
       key={props.keyFor(row)}
@@ -891,7 +907,7 @@ function HarnessSessionRoster(props: HarnessSessionRosterProps): ReactElement {
   )
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto py-0.5">
+    <div ref={scrollRef} className="oa-scroll-edges min-h-0 flex-1 overflow-y-auto py-0.5">
       {running.length > 0 && (
         <section className="border-b border-border/55 pb-1" aria-label={t('chat.runningInBackground')}>
           <button
@@ -920,8 +936,8 @@ function HarnessSessionRoster(props: HarnessSessionRosterProps): ReactElement {
         </section>
       )}
 
-      <div className="flex items-center gap-2 px-3 pb-1 pt-1.5">
-        <span className="min-w-0 flex-1 truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">
+      <div className="flex min-h-8 items-center gap-2 px-3.5 pb-1 pt-2">
+        <span data-testid="harness-recent-heading" className="min-w-0 flex-1 truncate text-[12px] font-medium leading-4 text-muted-foreground/70">
           {props.harness === 'auto-quant'
             ? t('autoQuant.recentResearch')
             : props.harness === 'prediction'
@@ -929,17 +945,17 @@ function HarnessSessionRoster(props: HarnessSessionRosterProps): ReactElement {
               : t('chat.recentConversations')}
         </span>
         {recent.length > 0 && (
-          <span className="text-[10px] tabular-nums text-muted-foreground/45">{recent.length}</span>
+          <span className="text-[11px] leading-[15px] tabular-nums text-muted-foreground/50">{recent.length}</span>
         )}
       </div>
 
       <div ref={recentRef}>
         {props.sessions.length === 0 ? (
-          <p className="px-3 py-3 text-xs leading-relaxed text-muted-foreground/60">
+          <p className="px-3 py-3 text-[12px] leading-[18px] text-muted-foreground/60">
             {props.emptyCopy}
           </p>
         ) : recent.length === 0 ? (
-          <p className="px-3 py-2 text-[11px] leading-relaxed text-muted-foreground/55">
+          <p className="px-3 py-2 text-[12px] leading-[18px] text-muted-foreground/55">
             {t('chat.allConversationsRunning')}
           </p>
         ) : visibleRecent.map(renderRow)}
@@ -948,7 +964,7 @@ function HarnessSessionRoster(props: HarnessSessionRosterProps): ReactElement {
       {recent.length > visibleRecent.length && (
         <button
           type="button"
-          className="oa-nav-row group flex min-h-9 w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium text-primary hover:bg-primary/5"
+          className="oa-nav-row group mx-1.5 flex min-h-8 w-[calc(100%-0.75rem)] items-center gap-2 rounded-[10px] px-2 py-1 text-left text-[13px] leading-[18px] font-medium text-primary hover:bg-primary/5"
           onClick={(event) => props.onBrowseSessions(event.currentTarget)}
         >
           <span className="min-w-0 flex-1 truncate">
@@ -1319,13 +1335,11 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
   return (
     <li className="group relative" data-reorder-id={w.id}>
       <div
-        className={`flex items-center gap-1 pl-2 pr-2 py-1 text-[13px] cursor-pointer transition-colors ${
-          isSelected ? 'bg-muted text-foreground' : 'text-foreground hover:bg-muted/50'
+        className={`relative flex items-center gap-1 py-1 pl-2 pr-2 text-[13px] leading-[18px] transition-colors ${
+          isSelected ? 'bg-accent-strong text-foreground' : 'text-foreground hover:bg-accent'
         }`}
       >
-        {isSelected && (
-          <span aria-hidden="true" className="absolute left-0 top-0 bottom-0 w-[2px] bg-primary" />
-        )}
+        {isSelected && <SelectionIndicator />}
         <button
           type="button"
           onClick={(e) => {
@@ -1354,9 +1368,7 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
         >
           <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusClass}`} aria-hidden="true" />
           <span className="min-w-0 flex-1">
-            <span className="block truncate font-medium" title={workspaceDisplayTitle(w)}>
-              {props.label}
-            </span>
+            <OverflowMarquee text={props.label} className="font-medium" />
             {subtitle && (
               <span className="block truncate text-[11px] leading-3 text-muted-foreground/65" title={subtitle}>
                 {subtitle}

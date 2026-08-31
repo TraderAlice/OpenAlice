@@ -83,6 +83,7 @@ describe('ActivityBar current destination', () => {
     expect(screen.getByRole('button', { name: 'Settings' }).getAttribute('aria-current')).toBe('page')
     expect(screen.getByRole('button', { name: 'Ask Alice' }).getAttribute('aria-current')).toBeNull()
     expect(document.querySelectorAll('nav [aria-current="page"]')).toHaveLength(1)
+    expect(screen.getByTestId('activity-bar').getAttribute('data-rail-layout')).toBe('full')
 
     mocks.selectedSidebar = 'chat'
     rerender(<ActivityBar open onClose={vi.fn()} />)
@@ -90,6 +91,8 @@ describe('ActivityBar current destination', () => {
     expect(screen.getByRole('button', { name: 'Ask Alice' }).getAttribute('aria-current')).toBe('page')
     expect(screen.getByRole('button', { name: 'Settings' }).getAttribute('aria-current')).toBeNull()
     expect(document.querySelectorAll('nav [aria-current="page"]')).toHaveLength(1)
+    expect(screen.getByTestId('activity-bar').getAttribute('data-rail-layout')).toBe('compact')
+    expect(screen.getByTestId('activity-bar').className).toContain('md:w-[50px]')
   })
 
   it('shows configured connector degradation on the Connector activity item', () => {

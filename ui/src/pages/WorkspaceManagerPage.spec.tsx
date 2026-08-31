@@ -355,7 +355,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
 
     const picker = await screen.findByRole('button', { name: 'Select agent' })
     expect(picker.textContent).toContain('Codex')
-    expect(screen.getByText('Model, reasoning, and context are managed by Codex')).toBeTruthy()
+    expect(screen.getByText('Codex chooses the model, reasoning, and context limits')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Configure workspace AI' }))
     expect(mocks.openAgentConfig).toHaveBeenCalledWith('workspace-manager', 'codex', 'ai')
     fireEvent.click(picker)
@@ -571,7 +571,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
     render(<WorkspaceManagerPage spec={{ kind: 'workspace-manager', params: {} }} />)
 
     await waitFor(() => expect(mocks.listAgentCredentials).toHaveBeenCalled())
-    expect(screen.getByRole('button', { name: 'AI access' }).textContent).toContain('Managed by Pi')
+    expect(screen.getByRole('button', { name: 'AI access' }).textContent).toContain('Pi account')
     expect(screen.queryByText('Gemini')).toBeNull()
     expect((screen.getByRole('combobox', { name: 'AI model' }) as HTMLInputElement).placeholder)
       .not.toContain('gemini-3.1-flash-lite')

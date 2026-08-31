@@ -106,7 +106,7 @@ describe('Chat setup', () => {
     mocks.useWorkspaces.mockReturnValue(context([]))
     render(<ChatSetupPage />)
 
-    expect(screen.queryByPlaceholderText('Ask Alice…')).toBeNull()
+    expect(screen.queryByPlaceholderText('Describe the task, question, or decision…')).toBeNull()
     expect(screen.queryByText('v9.9.9')).toBeNull()
     expect(screen.queryByText('Pinned Harness version')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Initialize Ask Alice' }))

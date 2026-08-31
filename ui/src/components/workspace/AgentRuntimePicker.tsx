@@ -5,7 +5,7 @@ import {
   useState,
 } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Check, ChevronDown, Copy, ExternalLink, Search } from 'lucide-react'
+import { ChevronDown, Copy, ExternalLink, Search } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { inputClass } from '@/components/form'
+import { SelectionCheckIcon } from '@/components/ui/selection-check-icon'
 import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon'
 import { agentRuntimePickerStatusKey } from '../../lib/agentRuntimeReadiness'
 import { installHintFor } from './agentInstall'
@@ -40,6 +41,7 @@ export interface AgentRuntimePickerProps {
   readonly selectedId: string | null
   readonly readiness: AgentRuntimeReadinessSnapshot | null
   readonly disabled?: boolean
+  readonly toolbar?: boolean
   readonly menuPlacement?: 'up' | 'down'
   readonly onSelect: (agentId: string) => void
 }
@@ -84,7 +86,7 @@ function AgentRuntimeRow({
           )}
         </span>
       </span>
-      {selected && <Check className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
+      {selected && <span className="mt-0.5"><SelectionCheckIcon /></span>}
     </button>
   )
 }
@@ -154,6 +156,7 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
       selectedId,
       readiness,
       disabled = false,
+      toolbar = false,
       menuPlacement = 'up',
       onSelect,
     },
@@ -214,7 +217,7 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
               onClick={() => {
                 if (!menuOpen) setMenuOpen(true)
               }}
-              className="oa-pressable inline-flex min-h-8 max-w-[190px] items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              className={`oa-pressable inline-flex min-h-7 min-w-0 max-w-[190px] items-center gap-1.5 rounded-lg py-1 text-[12px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 ${toolbar ? 'bg-transparent px-2' : 'bg-muted px-2.5'}`}
             />}
           >
             <AgentRuntimeIcon agentId={selected?.id} className="h-3.5 w-3.5 shrink-0" />
@@ -247,7 +250,7 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
                       {t('chatLanding.agentNotInstalled')}
                     </span>
                   )}
-                  {active && <Check className="h-3.5 w-3.5 shrink-0" />}
+                  {active && <SelectionCheckIcon />}
                 </DropdownMenuItem>
               )
             })}
@@ -275,7 +278,7 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
                         {t('chatLanding.agentNotInstalled')}
                       </span>
                     )}
-                    <Check className="h-3.5 w-3.5 shrink-0" />
+                    <SelectionCheckIcon />
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
               </>

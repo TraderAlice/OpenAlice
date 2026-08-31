@@ -1,5 +1,13 @@
 # Third-Party Notices
 
+## Instrument Sans
+
+The OpenAlice interface bundles Instrument Sans from the
+[Instrument Sans project](https://github.com/Instrument/instrument-sans).
+Instrument Sans is licensed under the SIL Open Font License, Version 1.1. The
+license text accompanies the font at
+`ui/src/assets/fonts/LICENSE-Instrument-Sans.txt`.
+
 ## Git and Dugite
 
 Native OpenAlice CLI release archives for macOS and Linux redistribute a

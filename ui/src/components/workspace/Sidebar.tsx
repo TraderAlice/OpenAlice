@@ -19,6 +19,8 @@ import { orderSessionsForSidebar, orderWorkspacesForSidebar } from './sidebar-or
 import { useReorderMotion } from './useReorderMotion';
 import { SidebarActionMenu } from './SidebarActionMenu';
 import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon';
+import { OverflowMarquee } from '../OverflowMarquee';
+import { SelectionIndicator } from '../SelectionIndicator';
 
 /**
  * Workspace launcher sidebar.
@@ -249,7 +251,7 @@ function NavRow({
         active ? 'bg-muted text-foreground' : 'text-foreground hover:bg-muted/50'
       }`}
     >
-      {active && <span aria-hidden="true" className="absolute left-0 top-0 bottom-0 w-[2px] bg-primary" />}
+      {active && <SelectionIndicator />}
       <Icon size={14} strokeWidth={2} className="shrink-0 text-muted-foreground/70" aria-hidden="true" />
       <span className="truncate">{label}</span>
     </button>
@@ -301,7 +303,7 @@ function AgentBadgeGlyph({ agentId }: { agentId: string }): ReactElement {
 
 /** Compact high-frequency action used beside a Workspace or Session row. */
 function rowAction(): string {
-  return 'oa-icon-action oa-workspace-row-action shrink-0 w-5 h-5 rounded flex items-center justify-center text-muted-foreground/70 transition-colors hover:text-foreground hover:bg-secondary';
+  return 'oa-icon-action oa-workspace-row-action flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-secondary hover:text-foreground';
 }
 
 export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
@@ -380,7 +382,7 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
           isSelected ? 'bg-muted text-foreground' : 'text-foreground hover:bg-muted/50'
         }`}
       >
-        {isSelected && <span aria-hidden="true" className="absolute left-0 top-0 bottom-0 w-[2px] bg-primary" />}
+        {isSelected && <SelectionIndicator />}
         <button
           type="button"
           onClick={() => props.onSelectWorkspace(w.id)}
@@ -392,7 +394,7 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
             className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusClass}`}
             title={hasRunning ? t('workspace.runningCount', { count: runningCount }) : t('workspace.idle')}
           />
-          <span className="truncate font-medium">{label}</span>
+          <OverflowMarquee text={label} className="flex-1 font-medium" />
           <span className="text-[10px] text-muted-foreground/50 tabular-nums shrink-0">{formatRelativeTime(w.createdAt)}</span>
         </button>
         {props.agents.length > 0 && (
@@ -659,6 +661,18 @@ export function SessionRow(props: SessionRowProps): ReactElement {
   const restoreLabel = t('workspace.restoreSession', { title: display });
   const settingsLabel = t('workspace.sessionSettings.openFor', { title: display });
   const menuItems = [
+    ...(!headlessOccupying ? [isPaused ? {
+      label: resumeLabel,
+      ariaLabel: resumeLabel,
+      icon: <Play size={11} strokeWidth={0} fill="currentColor" />,
+      onSelect: props.onResume,
+      disabled: resumeLocked,
+    } : {
+      label: stopLabel,
+      ariaLabel: stopLabel,
+      icon: <Square size={10} strokeWidth={0} fill="currentColor" />,
+      onSelect: props.onPause,
+    }] : []),
     ...(props.onSettings ? [{
       label: t('workspace.sessionSettings.action'),
       ariaLabel: settingsLabel,
@@ -687,45 +701,34 @@ export function SessionRow(props: SessionRowProps): ReactElement {
     }] : []),
   ];
   const selectLabel = headlessOccupying ? t('workspace.sessionRunning', { title: display }) : display;
-  const metaParts: string[] = [`agent ${s.agent}`];
-  if (s.pid !== null) metaParts.push(`pid ${s.pid}`);
-  if (s.resumeId) metaParts.push(s.resumeId);
-  if (headlessOccupying) metaParts.push(t('workspace.running'));
-  else if (isPaused) metaParts.push(t('workspace.paused'));
-  const meta = metaParts.join(' · ');
-  // Full message on hover when it's been truncated, then the technical meta.
-  const tooltipParts = [display, props.subtitle, meta].filter(Boolean);
-  const tooltip = tooltipParts.join('\n');
-
   return (
     <div
       data-reorder-id={props.reorderId}
       data-active={props.isActive}
       aria-busy={headlessOccupying || undefined}
-      className={`oa-session-row group relative flex items-center gap-1.5 pl-3 pr-2 py-1.5 text-[12px] transition-colors ${
-        props.isActive ? 'bg-muted' : 'hover:bg-muted/50'
+      className={`oa-session-row group relative mx-1.5 flex min-h-9 items-center gap-1 rounded-[10px] px-2 py-1.5 text-[13px] leading-[18px] transition-colors ${
+        props.isActive ? 'bg-accent-strong' : 'hover:bg-accent'
       }`}
     >
-      {props.isActive && <span aria-hidden="true" className="absolute left-0 top-0 bottom-0 w-[2px] bg-primary" />}
+      {props.isActive && <SelectionIndicator />}
       <button
         type="button"
-        className="oa-session-row-main flex-1 min-w-0 flex items-center gap-1.5 text-left disabled:cursor-default"
+        className="oa-session-row-main flex-1 min-w-0 flex items-center gap-2 text-left outline-none disabled:cursor-default"
         onClick={headlessOccupying ? (props.onHeadlessBusy ?? props.onSelect) : props.onSelect}
-        title={tooltip}
         aria-label={selectLabel}
         aria-current={props.isActive ? 'page' : undefined}
       >
         {/* Runtime identity stays stable across Session state. The action at the
             right and the row treatment carry paused/running/selected state. */}
-        <span className="shrink-0 flex items-center justify-center w-3.5 text-foreground/80">
+        <span className="flex h-4 w-4 shrink-0 items-center justify-center text-foreground/80">
           <AgentBadgeGlyph agentId={s.agent} />
         </span>
         <span className="min-w-0 flex-1">
-          <span className={`block truncate ${
+          <OverflowMarquee text={display} className={
             props.failed ? 'text-muted-foreground/70'
               : isPaused && !headlessOccupying ? 'text-muted-foreground'
                 : 'text-foreground'
-          }`}>{display}</span>
+          } />
           {props.subtitle && (
             <span className="mt-0.5 block truncate text-[10px] leading-3 text-muted-foreground/55">
               {props.subtitle}
@@ -739,7 +742,7 @@ export function SessionRow(props: SessionRowProps): ReactElement {
       {headlessOccupying ? (
         <button
           type="button"
-          className={rowAction()}
+          className={`${rowAction()} oa-session-state-action`}
           title={resumeLabel}
           aria-label={resumeLabel}
           onClick={(e) => {
@@ -757,7 +760,7 @@ export function SessionRow(props: SessionRowProps): ReactElement {
       ) : isPaused ? (
         <button
           type="button"
-          className={`${rowAction()} disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground/70`}
+          className={`${rowAction()} oa-session-state-action disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground/70`}
           title={resumeLabel}
           aria-label={resumeLabel}
           disabled={resumeLocked}
@@ -771,7 +774,7 @@ export function SessionRow(props: SessionRowProps): ReactElement {
       ) : (
         <button
           type="button"
-          className={rowAction()}
+          className={`${rowAction()} oa-session-state-action`}
           title={stopLabel}
           aria-label={stopLabel}
           onClick={(e) => {
@@ -783,10 +786,12 @@ export function SessionRow(props: SessionRowProps): ReactElement {
         </button>
       )}
       {menuItems.length > 0 && (
-        <SidebarActionMenu
-          label={t('common.moreActions', { target: display })}
-          items={menuItems}
-        />
+        <span className="oa-session-overflow-action flex shrink-0">
+          <SidebarActionMenu
+            label={t('common.moreActions', { target: display })}
+            items={menuItems}
+          />
+        </span>
       )}
     </div>
   );

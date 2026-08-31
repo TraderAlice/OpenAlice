@@ -1,29 +1,51 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { layout, prepare } from '@chenglou/pretext'
+import {
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowUp,
-  Check,
+  BriefcaseBusiness,
+  CalendarClock,
+  ChartNoAxesCombined,
   ChevronDown,
+  CircleAlert,
+  Code2,
+  FileSearch,
+  FlaskConical,
+  Inbox,
   KeyRound,
   LayoutGrid,
   Loader2,
   MessageSquare,
-  Paperclip,
   RefreshCw,
-  Sparkles,
+  SearchCheck,
   X,
+  type LucideIcon,
 } from 'lucide-react'
 
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { installHintFor } from '../components/workspace/agentInstall'
-import { QuickChatError } from '../components/workspace/api'
+import { QuickChatError, type Workspace } from '../components/workspace/api'
 import {
   AgentLaunchDetails,
   AgentLaunchSelectors,
   type AgentLaunchSelectorsHandle,
 } from '../components/workspace/AgentLaunchControls'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu'
 import { RecoverySurface, RefreshNotice } from '../components/StateViews'
-import { workspaceDisplayTitle } from '../components/workspace/display'
+import { workspaceDisplayName, workspaceDisplayTitle } from '../components/workspace/display'
 import { useWorkspace } from '../tabs/store'
 import { useAliceProject } from '../hooks/useAliceProject'
 import { useAgentRuntimes } from '../hooks/useAgentRuntimes'
@@ -56,6 +78,172 @@ export { resolveChatWorkspaceTarget } from '../lib/chat-workspace-target'
  * fresh session seeded with that message, and focuses the session tab.
  */
 type HarnessLandingMode = 'chat' | 'auto-quant' | 'prediction'
+
+const WORKFLOW_ICONS: Readonly<Record<string, LucideIcon>> = {
+  market: ChartNoAxesCombined,
+  portfolio: BriefcaseBusiness,
+  thesis: FileSearch,
+  workspace: SearchCheck,
+  automation: CalendarClock,
+  quant: FlaskConical,
+  'code-review': Code2,
+  inbox: Inbox,
+}
+
+function ComposerNotice({
+  tone,
+  icon: Icon,
+  children,
+}: {
+  tone: 'warning' | 'error'
+  icon: LucideIcon
+  children: ReactNode
+}) {
+  return (
+    <div
+      role={tone === 'error' ? 'alert' : 'status'}
+      data-tone={tone}
+      className="oa-composer-notice mt-2 flex min-w-0 items-start gap-2.5 rounded-xl border px-3 py-2 text-[12px] leading-[18px] text-muted-foreground"
+    >
+      <Icon
+        aria-hidden
+        className="oa-composer-notice-icon mt-0.5 h-3.5 w-3.5 shrink-0"
+        strokeWidth={1.9}
+      />
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
+  )
+}
+
+function StableIntentLabel({ children }: { children: string }) {
+  const labelRef = useRef<HTMLSpanElement>(null)
+  const [measuredHeight, setMeasuredHeight] = useState<number>()
+
+  useLayoutEffect(() => {
+    const label = labelRef.current
+    if (!label) return
+    let disposed = false
+
+    const measure = () => {
+      if (disposed) return
+      const width = label.clientWidth
+      if (width <= 0) return
+      const style = window.getComputedStyle(label)
+      const lineHeight = Number.parseFloat(style.lineHeight)
+      if (!style.font || !Number.isFinite(lineHeight)) return
+      try {
+        setMeasuredHeight(Math.ceil(layout(prepare(children, style.font), width, lineHeight).height))
+      } catch {
+        setMeasuredHeight(undefined)
+      }
+    }
+
+    measure()
+    void document.fonts?.ready.then(measure)
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure)
+    observer?.observe(label)
+    return () => {
+      disposed = true
+      observer?.disconnect()
+    }
+  }, [children])
+
+  return (
+    <span
+      ref={labelRef}
+      className="min-w-0 flex-1 text-[14px] font-medium leading-5 text-muted-foreground transition-colors group-hover:text-foreground group-focus-visible:text-foreground"
+      style={measuredHeight === undefined ? undefined : { minHeight: measuredHeight }}
+    >
+      {children}
+    </span>
+  )
+}
+
+function HarnessWorkspacePicker({
+  mode,
+  workspace,
+  options,
+  locked,
+  onSelect,
+  onClear,
+}: {
+  readonly mode: HarnessLandingMode
+  readonly workspace: Workspace | null | undefined
+  readonly options: readonly Workspace[]
+  readonly locked: boolean
+  readonly onSelect: (workspaceId: string) => void
+  readonly onClear?: (() => void) | undefined
+}) {
+  const { t } = useTranslation()
+  const WorkspaceIcon = mode === 'chat' ? MessageSquare : LayoutGrid
+  const label = workspace
+    ? workspaceDisplayName(workspace)
+    : t(`${mode === 'chat' ? 'chatLanding' : mode === 'auto-quant' ? 'autoQuantLanding' : 'autoPredictionLanding'}.newWorkspaceTarget`)
+  const triggerContents = (
+    <>
+      <WorkspaceIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {!locked && options.length > 0 && (
+        <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
+      )}
+    </>
+  )
+
+  if (locked || options.length === 0) {
+    return (
+      <div className="flex min-h-7 min-w-0 max-w-[17rem] items-center gap-1.5 rounded-lg px-2 text-[12px] font-medium text-foreground">
+        {triggerContents}
+        {onClear && (
+          <button
+            type="button"
+            onClick={onClear}
+            aria-label={t('chatLanding.clearTarget')}
+            title={t('chatLanding.clearTarget')}
+            className="oa-icon-action -mr-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <X className="h-3 w-3" aria-hidden />
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={(
+          <button
+            type="button"
+            aria-label={`${t('chatLanding.startIn')}: ${label}`}
+            className="oa-pressable flex min-h-7 min-w-0 max-w-[17rem] items-center gap-1.5 rounded-lg px-2 text-[12px] font-medium text-foreground hover:bg-muted"
+          />
+        )}
+      >
+        {triggerContents}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        side="top"
+        sideOffset={8}
+        className="w-[min(18rem,calc(100vw-2rem))] rounded-xl border border-border/70 bg-popover p-1.5 shadow-lg ring-0"
+      >
+        <DropdownMenuRadioGroup value={workspace?.id ?? ''} onValueChange={(value) => onSelect(String(value))}>
+          {options.map((option) => (
+            <DropdownMenuRadioItem
+              key={option.id}
+              value={option.id}
+              closeOnClick
+              className="min-h-9 gap-2 px-2.5 pr-8 text-[12px]"
+            >
+              <LayoutGrid className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+              <span className="min-w-0 flex-1 truncate">{workspaceDisplayTitle(option)}</span>
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
 
 function HarnessLandingPage({
   spec,
@@ -94,9 +282,6 @@ function HarnessLandingPage({
   const targetWs = targetWsId ? workspaces.find((w) => w.id === targetWsId) : undefined
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null)
   const installationLaunchPreferences = useAgentLaunchPreferences()
-  const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
-  const workspaceBoxRef = useRef<HTMLDivElement>(null)
-  const activeWorkspaceOptionRef = useRef<HTMLButtonElement>(null)
   const selectedHarnessWorkspace = useMemo(
     () => mode !== 'chat'
       ? targetWs ?? null
@@ -164,27 +349,14 @@ function HarnessLandingPage({
   const canSend = value.trim().length > 0 && !launching && launchConfig.credentialSelectionReady
   const effectiveTargetWorkspaceId = targetWsId ?? workspaceTarget?.id
 
-  useEffect(() => {
-    if (!workspaceMenuOpen) return
-    const onDown = (e: MouseEvent) => {
-      if (workspaceBoxRef.current && !workspaceBoxRef.current.contains(e.target as Node)) {
-        setWorkspaceMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
-  }, [workspaceMenuOpen])
-
-  // The picker opens below the session-context row. Keep the active option inside
-  // its own scroll viewport so a long Workspace history cannot push recent or
-  // currently selected targets beyond the top of the window.
-  useEffect(() => {
-    if (!workspaceMenuOpen) return
-    const frame = requestAnimationFrame(() => {
-      activeWorkspaceOptionRef.current?.scrollIntoView({ block: 'nearest' })
-    })
-    return () => cancelAnimationFrame(frame)
-  }, [workspaceMenuOpen, workspaceTarget?.id])
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+    textarea.style.height = 'auto'
+    const nextHeight = Math.min(168, Math.max(44, textarea.scrollHeight))
+    textarea.style.height = `${nextHeight}px`
+    textarea.style.overflowY = textarea.scrollHeight > 168 ? 'auto' : 'hidden'
+  }, [value])
 
   const submit = async () => {
     const prompt = value.trim()
@@ -258,290 +430,211 @@ function HarnessLandingPage({
     )
   }
 
+  const showStarterIntents = value.trim().length === 0 && !launching
+
   return (
     <div
-      data-testid="harness-landing-scroll"
-      className="relative flex h-full w-full flex-col items-center justify-start overflow-x-hidden overflow-y-auto overscroll-contain bg-background px-4 py-4 md:px-6 md:py-10"
+      data-testid="harness-landing-root"
+      className="@container/harness flex h-full min-h-0 w-full flex-col overflow-hidden bg-background"
     >
-      {/* Ask-Alice backdrop — full-bleed, responsive-only layers (gradient wash
-          + faint grid). The #302 mock's %-positioned circle / diagonal bars were
-          dropped: they drift on portrait and read as pixel-placed art, not a
-          responsive surface. pointer-events-none so it never intercepts clicks. */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-accent to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 h-[38%] bg-gradient-to-t from-accent-strong to-transparent" />
-        <div className="absolute inset-0 opacity-[0.06] [background-image:linear-gradient(to_right,var(--foreground)_1px,transparent_1px),linear-gradient(to_bottom,var(--foreground)_1px,transparent_1px)] [background-size:96px_96px]" />
-      </div>
-
       <div
-        data-testid="harness-landing-stack"
-        className="relative z-10 my-auto flex w-full max-w-2xl flex-col gap-3 md:gap-5"
+        data-testid="harness-landing-scroll"
+        className="oa-harness-scroll flex min-h-0 flex-1 justify-start overflow-x-hidden overflow-y-auto overscroll-contain px-5 py-8 @min-[42rem]/harness:px-8 @min-[42rem]/harness:py-10"
       >
-        {listError !== null && (
-          <RefreshNotice
-            message={t('workspace.dataStale')}
-            actionLabel={t('common.retry')}
-            onAction={() => void refresh()}
-          />
-        )}
-        <div className="text-center space-y-1.5">
-          {targetWs && mode === 'chat' ? (
-            <>
-              <h1 className="text-xl md:text-2xl font-semibold text-foreground">
-                {t(`${copyKey}.targetHeading`)}
+        <div
+          data-testid="harness-landing-stack"
+          className="my-auto flex w-full flex-col items-center"
+        >
+          <div className="w-full max-w-[42rem]">
+            {listError !== null && (
+              <RefreshNotice
+                message={t('workspace.dataStale')}
+                actionLabel={t('common.retry')}
+                onAction={() => void refresh()}
+              />
+            )}
+            <header className="flex flex-col items-center text-center">
+              <img
+                src="/alice.ico"
+                alt=""
+                aria-hidden="true"
+                draggable={false}
+                className="oa-harness-hero-mark h-11 w-11 select-none [image-rendering:pixelated]"
+              />
+              <h1 className="oa-harness-title mt-3 max-w-[38rem] text-balance text-[24px] font-semibold leading-[30px] tracking-[-0.018em] text-foreground @min-[42rem]/harness:text-[28px] @min-[42rem]/harness:leading-[34px]">
+                {t(`${copyKey}.heading`)}
               </h1>
-              <div className="flex items-center justify-center gap-2 pt-1">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 pl-2.5 pr-1.5 py-1 text-[12.5px] font-medium text-primary">
-                  <LayoutGrid className="w-3.5 h-3.5 shrink-0" />
-                  {targetWs.tag}
+            </header>
+
+            <div
+              data-testid="harness-landing-suggestions"
+              data-state={showStarterIntents ? 'visible' : 'hidden'}
+              className={showStarterIntents ? 'oa-harness-starters mt-7' : 'hidden'}
+              inert={!showStarterIntents}
+            >
+              <div className="flex h-7 items-center justify-between px-1">
+                <span className="text-[12px] font-medium text-muted-foreground">
+                  {t(`${copyKey}.examplesLabel`)}
+                </span>
+                {mode === 'chat' && exampleGroups.length > 1 && (
                   <button
                     type="button"
-                    onClick={() => openOrFocus({ kind: landingKind, params: {} })}
-                    aria-label={t(`${copyKey}.clearTarget`)}
-                    title={t(`${copyKey}.clearTarget`)}
-                    className="oa-icon-action ml-0.5 rounded-full p-0.5 text-primary/70 hover:text-primary hover:bg-primary/20 transition-colors"
+                    onClick={() => setExamplePage((page) => (page + 1) % exampleGroups.length)}
+                    disabled={launching}
+                    className="oa-icon-action inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+                    aria-label={t('chatLanding.moreExamples')}
+                    title={t('chatLanding.moreExamples')}
                   >
-                    <X className="w-3 h-3" />
+                    <RefreshCw aria-hidden className="h-3.5 w-3.5" />
                   </button>
-                </span>
+                )}
               </div>
-            </>
-          ) : (
-            <>
-              <h1 className="text-[19px] md:text-2xl font-semibold text-foreground leading-tight">{t(`${copyKey}.heading`)}</h1>
-              <p className="text-[13px] md:text-sm text-muted-foreground leading-relaxed">{t(`${copyKey}.subheading`)}</p>
-            </>
-          )}
+              <div role="group" aria-label={t(`${copyKey}.examplesLabel`)}>
+                {examples.map((example) => {
+                  const IntentIcon = WORKFLOW_ICONS[example.id] ?? SearchCheck
+                  return (
+                    <button
+                      key={example.id}
+                      type="button"
+                      onClick={() => useExample(example.prompt)}
+                      disabled={launching}
+                      className="group flex min-h-11 w-full items-center gap-3 border-b border-border/70 px-1 text-left outline-none transition-colors duration-[var(--motion-fast)] hover:border-border hover:text-foreground focus-visible:border-ring disabled:opacity-40"
+                    >
+                      <IntentIcon
+                        aria-hidden
+                        className="h-[17px] w-[17px] shrink-0 text-muted-foreground transition-colors duration-[var(--motion-fast)] group-hover:text-foreground group-focus-visible:text-foreground"
+                      />
+                      <StableIntentLabel>{example.title}</StableIntentLabel>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
         </div>
+      </div>
 
-        <div
-          data-testid="harness-landing-context"
-          className="flex min-w-0 flex-wrap items-center justify-center gap-x-2 gap-y-1 px-1 text-[11px] text-muted-foreground"
-        >
-          {/* Session context stays outside the composer: it answers where the
-              Session will live and which native runtime will own it. */}
-          {mode === 'chat' && (
-            <>
-              <span className="shrink-0">{t('chatLanding.startIn')}</span>
-              <div ref={workspaceBoxRef} className="relative min-w-0">
+      <div className="shrink-0 px-3 pb-3 @min-[42rem]/harness:px-6 @min-[42rem]/harness:pb-5">
+        <div className="mx-auto w-full max-w-[46rem]">
+          <div className="oa-harness-composer isolate">
+            <div
+              data-testid="harness-landing-context"
+              className="oa-harness-context-tray relative z-0 mx-[13px] -mb-3 flex min-h-12 min-w-0 items-start gap-3 overflow-hidden rounded-t-[20px] px-3 pb-4 pt-2 text-[12px] leading-4 text-muted-foreground"
+            >
+              <div className="flex min-w-0 items-center gap-0.5 overflow-hidden">
+                <HarnessWorkspacePicker
+                  mode={mode}
+                  workspace={workspaceTarget}
+                  options={chatWorkspaceOptions}
+                  locked={targetWs !== undefined || mode !== 'chat'}
+                  onSelect={(workspaceId) => {
+                    setSelectedWorkspaceId(workspaceId)
+                    launchConfig.resetCredentialSelection()
+                  }}
+                  onClear={targetWs && mode === 'chat'
+                    ? () => openOrFocus({ kind: landingKind, params: {} })
+                    : undefined}
+                />
+                <AgentLaunchSelectors
+                  ref={launchSelectorsRef}
+                  config={launchConfig}
+                  onConfigureProvider={goConfigureProvider}
+                  showAi={false}
+                  menuPlacement="up"
+                  toolbar
+                />
+              </div>
+            </div>
+            <div
+              data-testid="harness-composer-shell"
+              className="oa-harness-composer-shell relative z-10 rounded-[26px] bg-card px-3 pb-2.5 pt-3"
+            >
+              <textarea
+                ref={textareaRef}
+                value={value}
+                onChange={(event) => setValue(event.target.value)}
+                onKeyDown={onKeyDown}
+                placeholder={t(`${copyKey}.placeholder`)}
+                rows={1}
+                autoFocus
+                className="block min-h-[68px] max-h-[168px] w-full resize-none bg-transparent px-1.5 py-1.5 text-[14px] leading-[21px] text-foreground outline-none placeholder:text-muted-foreground/70"
+              />
+              <div
+                data-testid="harness-landing-controls"
+                className="flex min-h-8 min-w-0 items-end justify-between gap-2 overflow-hidden px-0.5 pt-1"
+              >
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-0.5 overflow-hidden">
+                  <AgentLaunchSelectors
+                    config={launchConfig}
+                    onConfigureProvider={goConfigureProvider}
+                    showRuntime={false}
+                    toolbar
+                  />
+                </div>
                 <button
                   type="button"
-                  onClick={() => setWorkspaceMenuOpen((open) => !open)}
-                  disabled={chatWorkspaceOptions.length === 0 || targetWs !== undefined}
-                  aria-haspopup="menu"
-                  aria-expanded={workspaceMenuOpen}
-                  aria-label={t(`${copyKey}.selectWorkspace`)}
-                  className="oa-pressable inline-flex min-h-8 max-w-[220px] items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-[11px] text-foreground hover:bg-muted/80 disabled:cursor-default"
+                  onClick={() => void submit()}
+                  disabled={!canSend}
+                  title={t('chatLanding.send')}
+                  aria-label={t('chatLanding.send')}
+                  aria-busy={launching}
+                  className="oa-icon-action flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-foreground text-background hover:opacity-90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground/55 disabled:opacity-100"
                 >
-                  <MessageSquare className="h-3 w-3 shrink-0 text-muted-foreground" />
-                  <span className="truncate">
-                    {workspaceTarget
-                      ? workspaceDisplayTitle(workspaceTarget)
-                      : t(`${copyKey}.newWorkspaceTarget`)}
-                  </span>
-                  {chatWorkspaceOptions.length > 0 && targetWs === undefined && (
-                    <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
-                  )}
+                  {launching
+                    ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                    : <ArrowUp className="h-4 w-4" aria-hidden />}
                 </button>
-                {workspaceMenuOpen && targetWs === undefined && chatWorkspaceOptions.length > 0 && (
-                  <div
-                    role="menu"
-                    className="oa-popover-enter absolute left-0 top-full z-20 mt-1 max-h-[min(24rem,calc(100vh-8rem))] min-w-[220px] max-w-[320px] overflow-y-auto overscroll-contain rounded-lg border border-border/70 bg-secondary py-1 shadow-lg [scrollbar-gutter:stable]"
-                  >
-                    {chatWorkspaceOptions.map((workspace) => {
-                      const active = workspace.id === workspaceTarget?.id
-                      return (
-                        <button
-                          key={workspace.id}
-                          ref={active ? activeWorkspaceOptionRef : undefined}
-                          type="button"
-                          role="menuitem"
-                          onClick={() => {
-                            setSelectedWorkspaceId(workspace.id)
-                            launchConfig.resetCredentialSelection()
-                            setWorkspaceMenuOpen(false)
-                          }}
-                          className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] transition-colors hover:bg-muted ${active ? 'text-primary' : 'text-foreground'}`}
-                        >
-                          <LayoutGrid className="h-3.5 w-3.5 shrink-0" />
-                          <span className="min-w-0 flex-1 truncate">{workspaceDisplayTitle(workspace)}</span>
-                          {active && <Check className="h-3.5 w-3.5 shrink-0" />}
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
               </div>
-            </>
-          )}
-          <span className="shrink-0">{t('chatLanding.runWith')}</span>
-          <AgentLaunchSelectors
-            ref={launchSelectorsRef}
-            config={launchConfig}
-            onConfigureProvider={goConfigureProvider}
-            showAi={false}
-            menuPlacement="down"
-          />
-        </div>
-
-        <div
-          className={`rounded-xl px-3 pb-2 pt-3 shadow-[0_18px_50px_-40px_var(--foreground)] transition-[border-color,box-shadow] md:rounded-2xl ${
-            targetWs && mode === 'chat'
-              ? 'bg-primary/[0.04] border border-primary/45 ring-1 ring-primary/15 focus-within:border-primary/70'
-              : 'border border-border/80 bg-secondary/70 focus-within:border-primary/60 focus-within:shadow-[0_20px_55px_-38px_var(--primary)]'
-          }`}
-        >
-          <textarea
-            ref={textareaRef}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onKeyDown={onKeyDown}
-            placeholder={t(`${copyKey}.placeholder`)}
-            rows={3}
-            autoFocus
-            className="min-h-[72px] max-h-[40vh] w-full resize-none bg-transparent px-2 py-1.5 text-[15px] text-foreground outline-none placeholder:text-muted-foreground/70"
-          />
-          <div
-            data-testid="harness-landing-controls"
-            className="flex items-end justify-between gap-2 px-1 pt-1"
-          >
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
-              <AgentLaunchSelectors
+              <AgentLaunchDetails
                 config={launchConfig}
-                onConfigureProvider={goConfigureProvider}
-                showRuntime={false}
-                toolbar
+                hasWorkspaceTarget={credentialWorkspace !== null && credentialWorkspace !== undefined}
+                showScopeDisclosure={false}
+                className="mx-1 mt-1.5 border-t border-border/45 px-1 pt-2"
               />
             </div>
-            <div className="flex shrink-0 items-center justify-end gap-1.5">
-              <button
-                type="button"
-                disabled
-                title={t('chatLanding.attachSoon')}
-                aria-label={t('chatLanding.attach')}
-                className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-muted-foreground/50 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <Paperclip className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => void submit()}
-                disabled={!canSend}
-                title={t('chatLanding.send')}
-                aria-label={t('chatLanding.send')}
-                className="oa-icon-action w-10 h-10 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {launching ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUp className="w-4 h-4" />}
-              </button>
-            </div>
           </div>
-          <AgentLaunchDetails
-            config={launchConfig}
-            hasWorkspaceTarget={credentialWorkspace !== null && credentialWorkspace !== undefined}
-            showScopeDisclosure={false}
-            className="mx-1 mt-2 border-t border-border/50 px-1 pt-2"
-          />
-        </div>
 
-        {error !== null && <div className="text-[12px] text-destructive px-1">{error}</div>}
+          {error !== null && (
+            <ComposerNotice tone="error" icon={CircleAlert}>
+              <span className="text-foreground">{error}</span>
+            </ComposerNotice>
+          )}
 
-        {/* Runtime guidance. A normal packaged build should expose managed Pi;
-            no-runtime is now an abnormal setup/debug state, not a prompt to
-            make a fresh user install a CLI. */}
-        {launchConfig.agentsKnown && !launchConfig.anyInstalled ? (
-          <div className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2.5 text-[12px] space-y-1.5">
-            <div className="font-medium text-foreground">{t('chatLanding.noAgentsTitle')}</div>
-            <p className="text-muted-foreground">{t('chatLanding.noAgentsBody')}</p>
-          </div>
-        ) : launchConfig.selectedMissing && selectedInfo ? (
-          <div className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2.5 text-[12px] space-y-1.5">
-            <p className="text-muted-foreground">
-              {t('chatLanding.agentMissing', { name: selectedInfo.displayName })}
-            </p>
-            {installHint?.cmd && (
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">{t('chatLanding.installLabel')}</span>
-                <code className="font-mono text-[11px] text-foreground bg-muted rounded px-2 py-1 select-all">
-                  {installHint.cmd}
-                </code>
-              </div>
-            )}
-            {installHint?.url && (
-              <a
-                href={installHint.url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-block text-primary hover:underline"
-              >
-                {t('chatLanding.installDocs')} ↗
-              </a>
-            )}
-          </div>
-        ) : null}
-
-        {/* Loginless runtime has no provider configured — the conversion
-            dead-end. Guide the user to set one up instead of a silent failure. */}
-        {launchConfig.noCredentials && selectedInfo && (
-          <div className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2.5 text-[12px] space-y-1.5">
-            <p className="text-muted-foreground">
-              {t('chatLanding.noCredBody', { name: selectedInfo.displayName })}
-            </p>
-            <button
-              type="button"
-              onClick={goConfigureProvider}
-              className="inline-flex items-center gap-1.5 text-primary hover:underline"
-            >
-              <KeyRound className="w-3 h-3" />
-              {t('chatLanding.configureProvider')} ↗
-            </button>
-          </div>
-        )}
-
-        <div data-testid="harness-landing-suggestions" className="relative -mx-4 md:mx-0">
-          <div className="flex items-center gap-2 px-4 pb-2 md:px-1">
-            <Sparkles aria-hidden className="h-3 w-3 shrink-0 text-primary/75" />
-            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              {t(`${copyKey}.examplesLabel`)}
-            </span>
-            <span aria-hidden className="h-px min-w-4 flex-1 bg-border/45" />
-            {mode === 'chat' && exampleGroups.length > 1 && (
-              <button
-                type="button"
-                onClick={() => setExamplePage((page) => (page + 1) % exampleGroups.length)}
-                disabled={launching}
-                className="oa-pressable inline-flex min-h-7 shrink-0 items-center gap-1 rounded-md px-1.5 text-[10px] font-medium text-muted-foreground hover:bg-muted/55 hover:text-foreground disabled:opacity-40"
-                aria-label={t('chatLanding.moreExamples')}
-              >
-                <RefreshCw aria-hidden className="h-3 w-3" />
-                {t('chatLanding.moreExamples')}
-              </button>
-            )}
-          </div>
-          <div className="scrollbar-hide flex gap-2 overflow-x-auto px-4 pb-1 pr-14 md:overflow-visible md:px-1 md:pr-1 md:pb-0">
-            {examples.map((example, index) => (
-              <button
-                key={`${examplePage}-${example.id}`}
-                type="button"
-                onClick={() => useExample(example.prompt)}
-                disabled={launching}
-                style={{ animationDelay: `${index * 55}ms` }}
-                className="group oa-pressable oa-suggestion-enter flex min-h-[54px] w-[230px] shrink-0 flex-col justify-center rounded-lg border border-border/45 bg-secondary/45 px-3.5 py-2 text-left hover:border-border hover:bg-muted/70 focus-visible:border-primary/60 md:min-w-0 md:flex-1 disabled:opacity-40"
-              >
-                {example.label && (
-                  <span className="mb-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-primary/75">
-                    {example.label}
-                  </span>
+          {launchConfig.agentsKnown && !launchConfig.anyInstalled ? (
+            <ComposerNotice tone="warning" icon={KeyRound}>
+              <span>
+                <span className="font-medium text-foreground">{t('chatLanding.noAgentsTitle')}</span>
+                {' '}{t('chatLanding.noAgentsBody')}
+              </span>
+            </ComposerNotice>
+          ) : launchConfig.selectedMissing && selectedInfo ? (
+            <ComposerNotice tone="warning" icon={CircleAlert}>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span>{t('chatLanding.agentMissing', { name: selectedInfo.displayName })}</span>
+                {installHint?.cmd && (
+                  <code className="select-all rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground">
+                    {installHint.cmd}
+                  </code>
                 )}
-                <span className="line-clamp-2 text-[11.5px] leading-snug text-muted-foreground group-hover:text-foreground">
-                  {example.title}
-                </span>
-              </button>
-            ))}
-          </div>
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-bg via-bg/90 to-transparent md:hidden"
-          />
+                {installHint?.url && (
+                  <a href={installHint.url} target="_blank" rel="noreferrer" className="font-medium text-primary hover:underline">
+                    {t('chatLanding.installDocs')} ↗
+                  </a>
+                )}
+              </div>
+            </ComposerNotice>
+          ) : null}
+
+          {launchConfig.noCredentials && selectedInfo && (
+            <ComposerNotice tone="warning" icon={KeyRound}>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span>{t('chatLanding.noCredBody', { name: selectedInfo.displayName })}</span>
+                <button type="button" onClick={goConfigureProvider} className="font-medium text-primary hover:underline">
+                  {t('chatLanding.configureProvider')} ↗
+                </button>
+              </div>
+            </ComposerNotice>
+          )}
         </div>
       </div>
     </div>

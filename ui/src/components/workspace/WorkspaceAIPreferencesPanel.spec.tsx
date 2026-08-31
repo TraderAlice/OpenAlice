@@ -145,7 +145,7 @@ describe('WorkspaceAIPreferencesPanel', () => {
 
     fireEvent.click(access)
     expect(await screen.findByText('由谁管理 Codex 的 AI 访问？')).toBeTruthy()
-    expect(screen.getByRole('menuitem', { name: /由 Codex 管理/ })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: /Codex 账户/ })).toBeTruthy()
     fireEvent.click(screen.getByRole('menuitem', { name: /DeepSeek API/ }))
     await waitFor(() => expect(screen.queryByRole('menuitem', { name: /DeepSeek API/ })).toBeNull())
 

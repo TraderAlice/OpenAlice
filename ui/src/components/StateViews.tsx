@@ -143,7 +143,7 @@ export function RecoverySurface({
           {icon ?? <CloudOff aria-hidden className="h-6 w-6" />}
         </div>
         {eyebrow && (
-          <p className="mb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.15em] text-destructive">
+          <p className="mb-2 text-[12px] font-medium text-destructive">
             {eyebrow}
           </p>
         )}
@@ -179,7 +179,7 @@ export function RefreshNotice({
   return (
     <div
       role="status"
-      className={`flex flex-col gap-2 rounded-lg border border-warning/35 bg-warning/[0.08] px-3 py-2.5 text-[12px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between ${className}`}
+      className={`oa-status-surface flex flex-col gap-2 rounded-xl border border-border/70 bg-card/80 px-3 py-2.5 text-[12px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between ${className}`}
     >
       <span className="flex min-w-0 items-start gap-2 leading-5">
         <AlertTriangle aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
@@ -188,7 +188,7 @@ export function RefreshNotice({
       <button
         type="button"
         onClick={onAction}
-        className="oa-pressable inline-flex min-h-8 shrink-0 items-center justify-center gap-1.5 self-start rounded-md px-2 text-[12px] font-medium text-foreground hover:bg-warning/10 sm:self-auto"
+        className="oa-pressable inline-flex min-h-8 shrink-0 items-center justify-center gap-1.5 self-start rounded-md px-2 text-[12px] font-medium text-foreground hover:bg-accent sm:self-auto"
       >
         <RefreshCw aria-hidden className="h-3.5 w-3.5" />
         {actionLabel}

@@ -42,7 +42,7 @@ export function SidebarActionMenu({
         render={<button
           ref={triggerRef}
           type="button"
-          className="oa-icon-action oa-workspace-row-action flex h-5 w-5 shrink-0 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-secondary hover:text-foreground"
+          className="oa-icon-action oa-workspace-row-action flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-secondary hover:text-foreground"
           aria-label={label}
         />}
       >

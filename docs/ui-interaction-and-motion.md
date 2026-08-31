@@ -155,6 +155,9 @@ keyboard navigation, outside dismissal, scroll locking, and focus return.
 - Treat `data-slot` as the stable styling seam. Future selectable UI styles
   may vary geometry, elevation, density, typography, and motion through that
   seam; `data-palette` remains the color axis.
+- Selection indicators use the shared `SelectionCheckIcon`. The primitive owns
+  fixed optical geometry and neutral foreground ink. Menu callers supply the
+  selected state and retain no visual override surface.
 - Runtime-selectable component appearance is published as `data-ui-style` on
   the document root. Profiles may restyle owned `data-slot` primitives and
   shared `oa-*` shell/form seams, but must not branch product behavior, fork a
@@ -230,7 +233,7 @@ Motion tokens and primitives live in `ui/src/index.css`:
 | `--motion-fast` | direct press/icon feedback |
 | `--motion-standard` | page, disclosure, hover, and most state transitions |
 | `--motion-slow` | dialogs and visually larger state changes |
-| `.oa-pressable` | primary or bordered buttons that lift one pixel on hover |
+| `.oa-pressable` | primary or bordered controls with tonal hover and compact press feedback |
 | `.oa-icon-action` | compact icon/add/collapse controls |
 | `.oa-nav-item` / `.oa-nav-row` | rail and secondary-sidebar navigation |
 | `.oa-view-enter` | focused view entrance, owned by `TabHost` |
