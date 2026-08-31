@@ -1,11 +1,11 @@
 /**
- * Version awareness route — exposes current app version + latest GitHub
- * release for the UI's update banner.
+ * Version awareness route — exposes current app version + latest OpenAlice
+ * channel release for the UI's update banner.
  *
  * GET /api/version → VersionInfo (see core/version.ts)
  * POST /api/version/check → force a fresh release lookup for an authenticated UI
  *
- * Response is cheap because the GitHub fetch is cached server-side.
+ * Response is cheap because the CDN manifest fetch is cached server-side.
  */
 
 import { Hono } from 'hono'

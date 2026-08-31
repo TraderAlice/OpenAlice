@@ -41,7 +41,7 @@ categories.
 - On-demand file pull is not phone-desk inbound and is not an ordinary
   Inbox `deliver`. The originating Connector enqueues a bounded, TTL-limited
   artifact request (`requestId`, `connectorId`, `entryId`, `docIndex`).
-  Alice’s resident action bridge drains that queue, re-reads the Inbox
+  Alice’s resident action bridge claims that queue, re-reads the Inbox
   entry, resolves the Workspace, materializes the selected current file
   through the existing attachment safety path, and posts a directed
   artifact delivery back to that Connector only. Cancel does not enqueue.
@@ -54,8 +54,8 @@ categories.
   indexes; account ids and pending hashes stay in the Connector session
   and the Alice-validated action request.
 - Connector Service never interprets chat. Alice owns one phone-desk Issue
-  per `desk`-capable connector. Connector queues owner text keyed by
-  `connectorId`; Alice drains that stack only while that connector's live
+  per `desk`-capable connector. Connector durably queues owner text keyed by
+  `connectorId`; Alice claims that stack only while that connector's live
   desk exists and no generation is running on it. Several stacked DMs become
   one quoted comment on that Issue. Alice suppresses a desk comment only when
   its run carries the `connector-cron-issue` trigger metadata and its text
@@ -132,23 +132,25 @@ Workspace agent
 
 Telegram owner DM
   -> Telegram adapter (linked private chat only)
-  -> Connector inbound queue
-  -> Alice drain only while a live phone-desk Issue exists and no
+  -> sealed Connector inbound queue; platform event id is the dedupe key
+  -> Alice claim only while a live phone-desk Issue exists and no
      desk generation is running; later DMs stay stacked
-  -> one Issue comment (via: telegram); several stacked DMs are
+  -> one idempotent Issue comment (via: telegram); several stacked DMs are
      quoted into that one comment
+  -> ack after append; failure releases immediately and process loss waits for
+     claim-lease expiry
   -> existing comment-reply dispatch
   -> owner-chat projection unless [[no-reply]]
 
 Telegram /inbox detail -> "view files" confirm
   -> Connector action queue (requestId, connectorId, entryId, docIndex)
-  -> Alice connector action bridge drain (not the phone-desk inbound drain)
+  -> Alice connector action bridge claim (separate from owner-chat claims)
   -> Alice re-reads Inbox entry and materializes one Workspace file
   -> Connector directed artifact delivery to the requesting adapter only
 
 Telegram /uta (or an Approve/Reject button)
   -> Connector UTA action queue (review, or push/reject with required utaId + pendingHash)
-  -> Alice connector action bridge drain
+  -> Alice connector action bridge claim
   -> Alice UTAManagerSDK list/status/push/reject (lite/readonly honored here)
   -> UTA push/reject require expectedPendingHash and validate it in the same
      request before mutation; mismatch or absence is 409 and does not write
@@ -164,14 +166,14 @@ Load-bearing paths:
 
 - `packages/connector-protocol/` — shared schemas, definitions, public config,
   delivery and health client.
-- `services/connector/src/core/` — adapter/command registry and isolated
-  delivery manager.
+- `services/connector/src/core/` — adapter/command registry, isolated delivery
+  manager, and sealed claim/ack work queue.
 - `services/connector/src/adapters/` — one file per platform implementation.
 - `src/core/connector-config.ts` — sealed config and Guardian enable/restart
   control.
 - `src/services/connector-client/` — Inbox projection, on-demand single-doc
   materialization, Alice-side health, and the resident artifact-request bridge.
-- `src/workspaces/issues/telegram-desk-chat.ts` — phone-desk inbound drain
+- `src/workspaces/issues/telegram-desk-chat.ts` — phone-desk inbound claim
   and scheduled-fire comment stamp.
 - `src/workspaces/issues/telegram-desk-project.ts` — `[[no-reply]]` filter
   and owner-chat projection.
@@ -204,16 +206,54 @@ remain untouched rather than being silently misrouted. Proxy URLs and
 credentials must never be logged.
 
 The Settings API never returns a bot token. It returns field definitions,
-non-secret values, and `configuredSecrets` presence markers. The Settings
-draft field is masked by default to keep tokens out of screenshots and
-screenshares; an explicit reveal control lets the operator verify a paste.
+optional official `setupLinks`, non-secret values, and `configuredSecrets`
+presence markers. Setup links are definition-owned metadata rather than
+hard-coded adapter branches in the renderer; built-in localized checklists may
+enrich them, while an external adapter still receives the generic guide. The
+same definition may declare a small `options` list for a finite non-secret
+setting. Settings renders those values as an always-visible native radio group
+instead of accepting implementation strings as free text; option labels and
+hints localize through the generic field key while external definitions retain
+their catalog copy. Feishu uses this contract for its `feishu` / `lark` platform
+choice. The Settings draft field is masked by default to keep tokens out of
+screenshots and screenshares; an explicit reveal control lets the operator
+verify a paste.
+Missing secret fields belong to one first-time connection save: the UI sends all
+entered missing credentials together only after every required connection field
+is present. This gives multi-token adapters such as Slack one completion point.
+Once a secret is sealed, replacement and removal remain separate confirmed
+credential actions rather than joining the first-time group save.
 Saving an empty secret keeps the stored value; explicitly removing its presence clears it.
 A non-empty secret body is accepted only when it is a plausible token (at
 least 20 non-whitespace characters); a short draft cannot replace a sealed
 value. Generic Settings auto-save must omit secret fields so enable/unlink
-writes cannot carry a password-manager draft. Changes touch
-`data/control/restart-connector.flag`, and Guardian reconciles the process
-from the same startup path.
+writes cannot carry a password-manager draft. The private UI API accepts only
+one global-service command or one adapter-scoped mutation (`enabled`,
+non-secret `set`/`unset`, explicit secret set/remove). Alice and adapter-owned
+`/link` or `/settings` writes merge under the same cross-process lease. A
+reachable Connector Service reconciles only the affected adapter; it never
+restarts peer adapters. Guardian starts or stops the optional process for an
+explicit global service change and remains the bounded recovery fallback when
+the loopback service is unreachable.
+
+`data/state/connector-work-queue.json` is a versioned AES-256-GCM sealed
+envelope for inbound owner text, artifact requests, and UTA requests. External
+handlers return success only after enqueue commits through atomic rename.
+Alice uses bounded claim leases plus item-level ack/release; a crash after
+claim cannot erase work, terminal ack is idempotent, and lease expiry makes
+unacked items visible again. Artifact and UTA TTL checks still run in Alice
+after claim. UTA push/reject retries retain `utaId` plus `pendingHash`, so the
+UTA boundary rejects a replay after the pending commit changes instead of
+repeating the write. Queue payloads never contain Connector credentials. The
+I/O journal remains diagnostic/replay evidence, not queue recovery state.
+
+Ordinary non-secret auto-save uses the shared localized SaveIndicator. It
+announces Saving, Saved, and Save failed through one polite atomic live region,
+uses icons as well as color, and offers a native Retry button after failure. A
+full Settings page places that status in PageHeader; an in-context Connector
+dialog places the same primitive in its fixed header so scrolling never covers
+setup instructions. Credential creation, replacement, and removal remain
+explicit actions and do not report themselves through this auto-save status.
 
 The retired `web.port`, MCP-Ask state, and legacy Telegram connector shape
 predate the 0.89.2-beta baseline and are not supported upgrade inputs.
@@ -268,8 +308,9 @@ slash-command menu. Subscribe to `im.message.receive_v1`, keep availability
 limited to the owner, and leave IP allowlists empty unless the Connector
 egress IP is listed. Group custom-bot webhooks are send-only and are not this
 connector. `/inbox`, `/settings`, and `/uta` currently reply with placeholders;
-owner-chat desk and Inbox push are implemented. Each Feishu desk is its own
-Issue (`feishu-phone-desk`), not the Telegram phone desk.
+owner chat and Inbox push are implemented. Each platform chat is its own
+connector-chat Issue (for example, `feishu-phone-desk`), independent from the
+Telegram chat Issue.
 
 Saving valid bot credentials does not mean the connector is linked. Settings
 must present the lifecycle explicitly: credentials ready, bot online and
@@ -329,27 +370,154 @@ saved but no bot process exists to receive `/link`.
 The surfaces deliberately have different jobs:
 
 - **Settings → Connectors** owns credentials, the setup sequence, enable/stop,
-  unlink, linking instructions, and explicit test sends. The Telegram card also
-  binds that connector's phone-desk Issue when the adapter advertises `desk`:
+  unlink, linking instructions, and explicit test sends. While credentials are
+  missing, the expanded required Connection section is the first task; the
+  actionless `Credentials required` lifecycle panel is omitted because overview
+  and the Settings navigator already establish that state. The section keeps a
+  short platform checklist and official console links beside the fields; those
+  links form a wrapping 40 px action row immediately after the platform
+  description and before the numbered steps, so opening the official destination
+  is visibly the first task. One- and two-destination adapters share the same
+  data-driven layout. Links open without dismissing the configuration dialog or
+  losing its drafts.
+  Connector-owned fields, secret reveal controls, setup links, and explicit
+  credential, recovery, and test actions keep a 40 px interaction minimum in
+  both the dialog and full Settings document; larger disclosures and Chat
+  actions retain their 44–48 px targets. During first save, only currently
+  missing required fields carry a localized Required badge. The save footer
+  names those exact field labels in a polite live hint, then returns to the
+  ordinary grouped-save explanation once every requirement is present. Save
+  connection remains disabled until the same existing credential boundary is
+  satisfied; the hint explains that state without manufacturing a validation
+  error. If grouped secret validation fails after submission, every invalid
+  input exposes `aria-invalid` plus its own described inline error and the first
+  invalid field receives focus, bringing recovery back into view on long or
+  narrow forms. Editing a draft clears only that field's error. Client-side
+  length guidance stays concise while backend save failures retain their
+  existing scoped error surface. After a successful grouped first save, the
+  preparation guide disappears, Connection details collapses, and the newly
+  rendered Ready to link panel receives the interaction handoff: focus moves to
+  that channel's runtime switch. The switch remains off and no external action
+  occurs until the operator activates it. Auto-save and later credential
+  maintenance do not move focus.
+  Every later lifecycle stage retains its panel for runtime, linking, test, or
+  recovery actions. Error panels keep the primary sentence actionable and put
+  raw adapter messages plus retry timing in the same 40 px Technical details
+  disclosure used by Overview. The known configured-but-not-running state keeps
+  its dedicated product sentence without repeating the implementation string.
+  The shared dialog sizes to short content on desktop and bounds long forms with
+  internal scrolling; narrow viewports keep a near-full-height shell so controls
+  remain usable around virtual keyboards. Once linked,
+  the lifecycle panel keeps routine availability
+  and test controls visible; Unlink lives inside Connection details beside token
+  replacement/removal and explains that sealed credentials remain available.
+  The full Settings category keeps every adapter in one document and adds a
+  responsive in-page channel navigator with the same lifecycle badges. Choosing
+  a channel moves keyboard focus to that section's semantic heading and scrolls
+  the labelled region without changing route, hiding another adapter's draft,
+  or adding browser history. The compact heading ring identifies the destination
+  without outlining the complete long form. The navigator also tracks the
+  channel nearest the reading edge while the Settings document scrolls, marking
+  it visually and with `aria-current="location"`; its reading anchor shares the
+  section's responsive scroll margin so click and manual-scroll state cannot
+  disagree at the sticky boundary.
+  On desktop the sticky navigator sits exactly on the Settings scrollport edge,
+  so controls from the preceding channel cannot scroll through above it. Initial
+  page breathing room comes from a normal-flow spacer that scrolls away; the
+  narrow navigator stays static and consumes no persistent mobile height. At
+  380–639 px, its always-visible channel choices use a two-column grid with the
+  complete channel name above the lifecycle badge; narrower screens return to
+  one inline column, and desktop uses one inline row. Every navigation target is
+  at least 40 px high.
+  The adapter dialog moves initial focus to its semantic title so the selected
+  channel is announced without focusing a credential field or opening a mobile
+  keyboard. Its title is programmatically focusable rather than another Tab
+  stop. The dialog localizes its close control and gives that control a larger
+  mobile touch target while retaining the shared primitive's trigger focus
+  restoration, Escape, focus containment, and backdrop behavior.
+  Runtime and Chat switches use their localized label (and Chat's explicit
+  On/Off text) directly beside the shared Toggle; they are not wrapped in a
+  second bordered pseudo-button. The Toggle remains the only switch control and
+  owns its hit target, focus, disabled, and checked semantics.
+  Test-delivery progress, probe confirmation, and test/reconnect failures remain
+  inside the same lifecycle panel as their action; feedback is adapter-scoped and
+  announced without making the operator search below unrelated settings. A
+  successful test leads with the human outcome and destination; its internal
+  delivery reference stays available in a collapsed Test details disclosure
+  instead of requiring the operator to understand or confirm a probe id.
+  A desk-capable adapter also binds that connector's chat Issue when its
+  definition advertises `desk`:
   the Workspace picker defaults to the Ask Alice Chat workspace. The operator
-  can edit What and heartbeat cadence, then open the ordinary Issue detail
-  for comments. Generic Issue create/update cannot set `connectorDesk`.
-- Each phone-desk Issue is hidden from the Issue board and Tracked list. It
+  can edit the scheduled check-in prompt and cadence, then open the ordinary
+  Issue detail for comments. Generic Issue create/update cannot set
+  `connectorDesk`.
+- Chat setup is durable configuration, not proof that its transport is live.
+  A linked-but-offline adapter may still bind Chat to a Workspace so the
+  operator can prepare it without starting external delivery. In that state the
+  Chat switch remains checked when a desk exists, but its visible state reads
+  Waiting rather than On; the bound-Workspace copy says conversations resume
+  only after that connector is online. Turning Chat on while the adapter is
+  offline likewise describes preparation, never an already active conversation.
+- Each connector-chat Issue is hidden from the Issue board and Tracked list. It
   still fires on `when`. Extra desks for the same connector in other
   Workspaces do not fire. Owner DMs become comments on that connector's
   Issue; the desk is seeded with `commentPrompt: '{comment}'` so those
   comments are the reply Input Prompt as-is. Scheduled-fire `assistantText`
   is stamped as a comment. Connector projects those comments unless they
   contain the literal tag `[[no-reply]]` or arrived from that connector.
-  Pending comment replies also carry compact turn progress. The phone desk
+  Pending comment replies also carry compact turn progress. The connector chat
   ships sealed mid-turn `text` blocks (the last consecutive text before a
   tool or error) and skips tool/error blocks. A text already sent this way
   is not sent again as the final comment.
-- **Beta → Connectors** is the operations view: service health, adapter status,
-  linked owner, last delivery evidence, and an explicit reconnect action for an
-  unhealthy configured adapter. The reconnect is adapter-scoped while the
+- **Beta → Connectors** is the operations view: service health, the same
+  seven-stage setup lifecycle used by Settings, durable private-chat linkage,
+  last delivery evidence, and an explicit reconnect action only for an actual
+  error. Runtime owner presence is supporting health evidence, not the source of
+  truth for a saved link. The reconnect is adapter-scoped while the
   service answers; if the process is unreachable, Alice asks Guardian to restart
-  the optional service instead.
+  the optional service instead. Its service summary distinguishes process
+  availability from adapter health: a returned health body with degraded
+  adapters stays a Running warning and directs attention to the owning channel
+  card, while a degraded bridge with no service body is Unavailable and retains
+  the service-level diagnostic. Reachable adapter errors are not repeated in the
+  summary. The overview keeps linked, credentialed,
+  enabled, and partially configured adapters in stable definition order under
+  Your channels. Only pristine adapters appear under Available channels, so
+  transient runtime changes never reorder established targets and empty groups
+  do not add headings. Before any adapter is credential-ready or enabled, the
+  irrelevant Off/zero-count service summary is omitted and the pristine group
+  becomes Choose a channel. Pristine adapters use compact selection articles
+  with neutral 40 px setup actions plus localized Inbox delivery and capability-
+  gated Workspace chat labels; once setup starts, that adapter moves to the full
+  lifecycle card without losing its configuration dialog. Cards omit the
+  repeated generic delivery subtitle and do
+  not impose a fixed minimum height: the state explanation is the primary body,
+  while evidence and the next action remain in stable document order. State
+  explanations describe current delivery impact and the next useful action;
+  durable private-chat linkage and last delivery remain separate evidence, so
+  neither English nor Chinese cards repeat the same link fact in both layers. A
+  channel article is the single visual container. Platform glyphs use one neutral
+  identity treatment across owned and pristine cards; interaction blue belongs
+  to selection, focus, enabled switches, and primary actions, while lifecycle
+  badges and copy own status. State copy is not wrapped in a nested
+  status card, diagnostics use a thin native disclosure, and the non-clickable
+  article has no hover treatment. Every
+  credential-ready card also exposes the same runtime switch as Settings.
+  Before the first start, its visible label becomes `Start <platform>` and the
+  configuration action becomes a neutral setup-details affordance, so opening a
+  dialog does not compete visually with the control that actually advances the
+  lifecycle. Once the adapter is awaiting `/link`, the dialog action becomes the
+  emphasized link-instruction path. Turning the switch on enables the shared
+  service when needed; turning it off
+  preserves credentials, linkage, delivery preference, and Chat configuration.
+  The switch reflects actual runtime availability when the shared service is
+  paused, not merely the adapter's retained preference. Toggle/reconnect
+  progress and failures stay inside the affected card. The labelled runtime
+  switch and explicit management or recovery actions share one wrapping action
+  rail: ordinary one-action cards keep them on one row, recovery actions wrap
+  without reordering, and every action retains a 40 px target. The health domain
+  reloads current configuration before this whole-config write, then refreshes
+  the live snapshot so the overview does not own a second polling lifecycle.
 - **Activity Bar → Connectors** shows a warning count for enabled, configured
   adapters that are degraded, stopped, unreachable, or stuck in `starting`
   beyond the grace window. `awaiting_link` remains setup state and does not
@@ -357,9 +525,26 @@ The surfaces deliberately have different jobs:
 - **Dev Panel** may expose logs and replay tooling, but it is not a product
   configuration surface.
 
-The Connector Service switch is a global kill switch. Starting an adapter from
-the setup flow may enable the service and adapter together; stopping the global
-service never deletes sealed credentials or the learned owner. Health polling
+Both product surfaces distinguish absence from staleness. A first load uses a
+layout-matched skeleton; if no snapshot or configuration can be read, the
+surface shows a focused retry state instead of an empty pane or raw transport
+error. When last-known data exists, a refresh failure keeps it visible with an
+explicit stale-state notice. In-dialog runtime retry refreshes health only so it
+cannot replace unsaved credential drafts.
+
+Overview and Settings consume the same live runtime-health domain. The Settings
+form still owns its initially loaded configuration and save responses, so a
+background health refresh cannot replace an in-progress field or credential
+draft. Service presentation is derived by one shared lifecycle rule: disabled is
+Stopped/Off, healthy is Online/Healthy, degraded with a returned service body is
+Running because healthy channels remain available, and degraded without a
+service body is Unavailable. Adapter errors remain on their owning channel in
+both surfaces.
+
+The Connector Service switch is a secondary pause-all control. Starting an
+adapter from the setup flow enables the service automatically, so it is not a
+separate first-use prerequisite; pausing the global service never deletes sealed
+credentials or the learned account link. Health polling
 during linking updates runtime health only. It must not replace the current
 Settings draft, reveal secrets, or create an auto-save/restart loop.
 

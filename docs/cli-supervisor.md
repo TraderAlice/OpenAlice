@@ -3,17 +3,19 @@
 This guide owns the computer-level `openalice` command surface above Guardian:
 background and foreground lifecycle, status presentation, browser opening,
 machine-readable envelopes, shell completion, compatibility aliases, and the
-boundary of the planned Supervisor TUI.
+boundary of the Supervisor TUI.
 
 Installer transactions belong to [[docs/cli-installer.md]]. Source preparation
-and the future headless bundle provider belong to [[docs/local-runtime.md]].
+and the native headless bundle provider belong to [[docs/local-runtime.md]].
 Remote orchestration belongs to [[docs/remote-access.md]]. Guardian lock,
 takeover, and process-tree truth belong to [[docs/project-structure.md]] and
 `packages/guardian-runtime/`.
 
-The active multi-increment TUI and headless-release work is tracked in
-[[plans/shell-first-cli-supervisor.md]]. This guide describes only behavior
-already shipped in the current tree.
+Remaining Supervisor product work is tracked in
+[[plans/shell-first-cli-supervisor.md]]. Native Bun distribution and explicit
+release-channel work are tracked in [[plans/bun-cli-distribution.md]] and
+[[plans/release-channels-0.90.2.md]]. This guide describes only behavior already
+shipped in the current tree.
 
 ## Product Boundary
 
@@ -61,10 +63,10 @@ openalice project [list|use|copy-ai-creds|transfer] [options]
 | `machine inspect [key]` | Build a typed Machine → AliceProject inventory; each remote Machine uses one bounded aggregate SSH command. |
 | `project copy-ai-creds` | Copy AI credential rows from one complete home into another. Interactive unless `--from`, `--to`, and `--yes` are set. Matching vendor+key rows are skipped; colliding slugs are renamed. Workspace launch preferences, broker accounts, and `sealing.key` are never copied. Secrets are never printed. |
 | `project transfer` | Plan or copy a stopped local AliceProject to a new complete Home on a registered SSH Machine. Portable configuration and Workspace/Git state transfer; Session/runtime/auth state does not. Credentials use the SSH stream and are re-sealed with a new remote key. The source and remote default remain unchanged. |
-| `up` | Prepare the source provider when needed, start `cli-server` detached, and return only after Guardian control plus Alice HTTP readiness |
+| `up` | Prepare the selected provider when needed, start `cli-server` detached, and return only after Guardian control plus Alice HTTP readiness |
 | `run` | Start the same `cli-server` owner in the foreground without opening a browser; normal Ctrl+C/SIGTERM stops that self-owned tree |
 | `down` | Ask a matching Guardian to stop itself, then wait for endpoint and ownership release |
-| `status` | Read normalized status without mutation |
+| `status` | Read normalized status and activation state without mutation |
 | `logs` | Read a bounded, redacted tail from safe Runtime log rotations |
 | `doctor` | Run read-only provenance, ownership, readiness, component, provider, update-metadata, and log-layout checks |
 | `open` | Require an advertised Web endpoint and a successful `/api/auth/status` probe before invoking the platform browser opener |
@@ -74,7 +76,19 @@ when no owner exists. Ordinary start never signals another owner. `--takeover`
 delegates replacement to Guardian's established discover, TERM, grace, KILL,
 wait, then acquire ordering.
 
-Stable installs use the verified bundle provider. `up` and `run` remain
+Lifecycle inspection compares the installed native content identity with the
+running Guardian provider. `status`, TUI polling, and an idempotent `up` expose
+a pending activation when the installed package differs from the live Runtime.
+For direct Bash installs, first successful readiness confirms the installer's
+activation receipt; a first-start early exit, timeout, or execution failure
+restores the exact retained pointer without touching user data. A
+package-manager install is only reported as pending because its manager remains
+the sole owner of package files.
+
+Native CLI installs use the Bun standalone provider, which skips source
+preparation and re-enters one executable as distinct
+Guardian/Alice/UTA/Connector processes; its release gate lives in
+[[plans/bun-cli-distribution.md]]. `up` and `run` remain
 browserless lifecycle commands and accept home, port, wait, and takeover
 options; `--app-dir` is an advanced source override with the preparation and
 rebuild options documented in [[docs/local-runtime.md]]. `--open` performs a
@@ -132,11 +146,20 @@ explicit commands. Its ordinary path is intentionally parameter-free:
   confirmation;
 - `l` reads the bounded, redacted log tail;
 - `d` runs read-only Doctor checks;
-- `u` checks for a product update and, when one is available, can install it
-  after explicit confirmation through the same verified atomic installer path as
-  `openalice update --yes`. After a successful in-TUI install, the running
-  Supervisor is still the previous CLI and does not reload; the user must exit
-  and run `openalice` again;
+- `u` first chooses stable, beta, or dev, then probes that channel and, when a
+  candidate is available, can install it after explicit confirmation through
+  the same verified atomic installer path as `openalice update --yes`. The
+  choice is session-local until installation succeeds; installer provenance
+  makes the chosen channel the next launch's default. Package-manager-owned
+  installs are never overwritten by the TUI: a stable candidate shows the
+  matching manager command, while beta/dev explain that those channels require
+  an explicit switch to the direct installer. If an explicit selector or
+  channel manifest ever targets the legacy v0.90.1 layout, a native
+  installation refuses that downgrade and stays unchanged. Current native
+  stable releases switch through the ordinary direct-installer transaction.
+  After a successful in-TUI install, the running Supervisor is still the
+  previous CLI and does not reload; the user must exit and run `openalice`
+  again;
 - `i` lists the implicit default plus registered AliceProjects, selects one
   without stopping another project, or creates a separate named complete home.
   AI vault copy is a separate command: `openalice project copy-ai-creds`;
@@ -151,8 +174,13 @@ explicit commands. Its ordinary path is intentionally parameter-free:
 The TUI refuses to stop or restart Electron, development, incompatible, or
 otherwise foreign owners. Its stop/restart confirmation states that active Web
 and agent sessions will disconnect. Detaching never implies stopping. Update
-discovery runs in the background and cannot block lifecycle controls. Discovery
-never installs; only a confirmed `u` action may invoke the installer.
+discovery runs in the background against the installed channel and cannot block
+lifecycle controls. Discovery never opens the channel selector or installs;
+only a confirmed `u` action may invoke the installer. Stable/beta compare
+product versions; dev compares the complete native archive checksum and
+displays its commit as a diagnostic revision. The bounded startup cache is
+keyed by both channel and installed source fingerprint, so activating a new
+version or dev archive cannot reuse the previous installation's result.
 
 The installed Runtime is the default provider below stored configuration and
 above cwd discovery. TUI start therefore works from any directory and shows a
@@ -457,13 +485,14 @@ network request, takeover, restart, configuration write, credential read, or
 broker action. It checks:
 
 - CLI product version, install source, and installed content identity;
-- the Node.js minimum;
+- the execution engine: embedded Bun for a native CLI, or the Node.js minimum
+  for a source-backed CLI;
 - Guardian ownership, control compatibility, and lifecycle state;
 - the advertised loopback Web endpoint with a bounded auth-status probe;
 - Alice, UTA, and Connector state;
 - source-provider version and required built artifacts, or advertised bundle
   content identity;
-- locally cached stable-update metadata;
+- recorded cached update metadata and its reported channel;
 - safe Runtime log discovery.
 
 Human output uses explicit PASS/WARN/FAIL rows. JSON uses the same versioned

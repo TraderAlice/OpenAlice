@@ -1,1247 +1,709 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+PRODUCT="OpenAlice CLI"
 REPOSITORY="TraderAlice/OpenAlice"
-DEFAULT_BRANCH="master"
-OPENALICE_INSTALLER_RELEASE_VERSION="${OPENALICE_INSTALLER_RELEASE_VERSION:-}"
-OPENALICE_INSTALLER_UPDATE_CHANNEL="${OPENALICE_INSTALLER_UPDATE_CHANNEL:-}"
 PUBLIC_INSTALLER_URL="https://openalice.ai/install"
-VERSION=""
-REF_KIND=""
-REF_OPTION=""
-MINIMUM_NODE_VERSION="22.19.0"
-PI_VERSION="0.83.0"
-PI_RELEASE_BASE="${OPENALICE_PI_RELEASE_BASE_URL:-https://github.com/earendil-works/pi/releases/download/v${PI_VERSION}}"
-PI_RELEASE_BASE="${PI_RELEASE_BASE%/}"
-PI_PACKAGE_SHA256="41f07a3eb41227905ac436ad41d949e4589dcc34c15454d718f85f399b533cb6"
-PI_LOCK_SHA256="f5cb41dcfc60561ba54490b49c17beecec202900f73eb5f104b34f8b2a79a0af"
-PI_ASSET_SOURCE_DIR="${OPENALICE_PI_SOURCE_DIR:-}"
-NPM_BIN="${OPENALICE_NPM_BIN:-npm}"
-SOURCE_DIR=""
-RUNTIME_ARCHIVE="${OPENALICE_RUNTIME_ARCHIVE:-}"
-RUNTIME_ARCHIVE_SHA256="${OPENALICE_RUNTIME_ARCHIVE_SHA256:-}"
-RUNTIME_CONTENT_IDENTITY=""
-RUNTIME_PRODUCT_VERSION=""
-RUNTIME_PLATFORM=""
-RUNTIME_ARCH=""
-RUNTIME_AUTO_DOWNLOAD=0
-RUNTIME_RELEASE_BASE_URL=""
-RUNTIME_ARCHIVE_FILE=""
-RUNTIME_ARCHIVE_SIZE=0
-RUNTIME_ARCHIVE_SIZE_LABEL=""
-MODIFY_PATH=1
-ASSUME_YES=0
-PLAN_ONLY=0
-WITH_RUNTIME_DEPS=0
-INSTALL_ROOT="${OPENALICE_INSTALL_DIR:-${HOME}/.openalice}"
-INSTALL_CONTEXT="${OPENALICE_INSTALL_CONTEXT:-local}"
+DOWNLOAD_BASE_URL="${OPENALICE_DOWNLOAD_BASE_URL:-https://download.openalice.ai}"
+RELEASE_ASSET_BASE_URL="${OPENALICE_RELEASE_ASSET_BASE_URL:-https://github.com/${REPOSITORY}/releases/download}"
+STABLE_MANIFEST_URL="${OPENALICE_STABLE_MANIFEST_URL:-${DOWNLOAD_BASE_URL}/manifest.json}"
+BETA_MANIFEST_URL="${OPENALICE_BETA_MANIFEST_URL:-${DOWNLOAD_BASE_URL}/beta/manifest.json}"
+LEGACY_STABLE_VERSION="0.90.1"
+LEGACY_STABLE_INSTALLER_URL="${OPENALICE_LEGACY_STABLE_INSTALLER_URL:-${RELEASE_ASSET_BASE_URL}/v${LEGACY_STABLE_VERSION}/OpenAlice-${LEGACY_STABLE_VERSION}-install}"
+LEGACY_STABLE_INSTALLER_SHA256="${OPENALICE_LEGACY_STABLE_INSTALLER_SHA256:-a2f34a715cc4a089854fde18741e316953868c1685db592b67b2b4ea10ede0bb}"
+INSTALL_DIR="${OPENALICE_INSTALL_DIR:-$HOME/.openalice}"
+INSTALLER_URL="${OPENALICE_INSTALL_URL:-}"
+KEEP_RELEASES="${OPENALICE_INSTALL_KEEP_RELEASES:-3}"
 
-case "$INSTALL_CONTEXT" in
-  local|remote) ;;
-  *)
-    printf 'Error: OPENALICE_INSTALL_CONTEXT must be local or remote.\n' >&2
-    exit 1
-    ;;
-esac
+channel="stable"
+channel_set=false
+exact_version=""
+legacy_branch=""
+selector_kind=""
+selector_value=""
+archive_path=""
+archive_sha256=""
+plan_only=false
+assume_yes=false
+modify_path=true
 
-BOLD=""
-DIM=""
-CYAN=""
-GREEN=""
-YELLOW=""
-RED=""
-RESET=""
-
-STAGING=""
-LOCK_DIR=""
-LOCK_HELD=0
-TTY_OPEN=0
-SHELL_LAUNCHER_TEMP=""
-CMD_LAUNCHER_TEMP=""
-PI_SHELL_LAUNCHER_TEMP=""
-PI_CMD_LAUNCHER_TEMP=""
-RUNTIME_DEPS_MANAGER=""
-RUNTIME_DEPS_COMMAND=""
-RUNTIME_DEPS_BLOCKER=""
-RUNTIME_MISSING=()
-ELEVATE=()
-
-if [[ -t 1 && -z "${NO_COLOR:-}" && "${TERM:-}" != "dumb" ]]; then
-  BOLD=$'\033[1m'
-  DIM=$'\033[2m'
-  CYAN=$'\033[36m'
-  GREEN=$'\033[32m'
-  YELLOW=$'\033[33m'
-  RED=$'\033[31m'
-  RESET=$'\033[0m'
-fi
-
-cleanup() {
-  local status=$?
-  [[ -z "$STAGING" ]] || rm -rf "$STAGING"
-  [[ -z "$SHELL_LAUNCHER_TEMP" ]] || rm -f "$SHELL_LAUNCHER_TEMP"
-  [[ -z "$CMD_LAUNCHER_TEMP" ]] || rm -f "$CMD_LAUNCHER_TEMP"
-  [[ -z "$PI_SHELL_LAUNCHER_TEMP" ]] || rm -f "$PI_SHELL_LAUNCHER_TEMP"
-  [[ -z "$PI_CMD_LAUNCHER_TEMP" ]] || rm -f "$PI_CMD_LAUNCHER_TEMP"
-  if [[ "$LOCK_HELD" -eq 1 && -n "$LOCK_DIR" ]]; then
-    rm -rf "$LOCK_DIR"
-  fi
-  if [[ "$TTY_OPEN" -eq 1 ]]; then
-    exec 3>&- 3<&-
-  fi
-  return "$status"
-}
-
-trap cleanup EXIT
-trap 'exit 130' HUP INT TERM
-
-die() {
-  printf '\n%bError:%b %s\n' "${RED}${BOLD}" "$RESET" "$*" >&2
+fail() {
+  printf 'openalice installer: %s\n' "$*" >&2
   exit 1
-}
-
-step() {
-  printf '\n%b[%s/6]%b %s\n' "$CYAN" "$1" "$RESET" "$2"
-}
-
-ok() {
-  printf '      %b✓%b %s\n' "$GREEN" "$RESET" "$1"
-}
-
-warn() {
-  printf '      %b!%b %s\n' "$YELLOW" "$RESET" "$1"
 }
 
 usage() {
   cat <<'EOF'
-OpenAlice CLI installer
+OpenAlice CLI Installer
 
-Usage:
-  ./install
-  ./install --branch dev
-  ./install --version <tag-or-commit>
-  curl -fsSL https://openalice.ai/install | bash
+Usage: install [options]
 
 Options:
-  --branch <name>       Git branch to install (default: master)
-  --version <git-ref>   Git tag or commit to install
-  --install-dir <path>  OpenAlice user root (default: ~/.openalice)
-  --source <path>       Install CLI files from a local checkout (development)
-  --runtime-archive <path>
-                        Install a local platform Runtime archive (development)
-  --runtime-sha256 <hex>
-                        Require this SHA-256 for --runtime-archive
-  --with-runtime-deps   Install missing Linux source-build tools after consent
-  --no-modify-path      Do not update the shell profile
-  --plan                Show the install plan and exit without changing files
-  -y, --yes             Accept the install plan without an interactive prompt
-  -h, --help            Show this help
+  --channel <name>        Follow stable, beta, or dev (default: stable)
+  --version <x.y.z>       Install an exact release; alone it remains pinned
+  --branch <master|dev>   Compatibility alias for stable or dev
+  --archive <path>        Install a local Bun release archive
+  --sha256 <hex>          Required checksum for --archive
+  --install-dir <path>    Install root (default: ~/.openalice)
+  --no-modify-path        Do not edit a shell profile
+  --plan                  Show the transaction without changing files
+  -y, --yes               Approve non-interactively
+  -h, --help              Show this help
+
+The CLI installer manages OpenAlice release artifacts only. It does not install,
+update, pin, or remove Pi, OpenCode, Codex, Claude Code, or another Agent Runtime.
 EOF
-}
-
-open_tty() {
-  if { exec 3<>/dev/tty; } 2>/dev/null; then
-    TTY_OPEN=1
-    return 0
-  fi
-  return 1
-}
-
-prompt_yes_no() {
-  local message="$1"
-  local reply=""
-
-  while true; do
-    printf '\n%b%s%b [y/N] ' "$BOLD" "$message" "$RESET" >&3
-    if ! IFS= read -r reply <&3; then
-      return 2
-    fi
-    case "$reply" in
-      y|Y|yes|YES|Yes)
-        return 0
-        ;;
-      ""|n|N|no|NO|No)
-        return 1
-        ;;
-      *)
-        printf 'Please answer y or n. Press Enter to choose no.\n' >&3
-        ;;
-    esac
-  done
-}
-
-acquire_install_lock() {
-  local owner=""
-
-  mkdir -p "$INSTALL_ROOT"
-  LOCK_DIR="$INSTALL_ROOT/.cli-install.lock"
-  if mkdir "$LOCK_DIR" 2>/dev/null; then
-    printf '%s\n' "$$" > "$LOCK_DIR/pid"
-    LOCK_HELD=1
-    return
-  fi
-
-  if [[ -r "$LOCK_DIR/pid" ]]; then
-    IFS= read -r owner < "$LOCK_DIR/pid" || owner=""
-  fi
-  if [[ "$owner" =~ ^[0-9]+$ ]] && kill -0 "$owner" 2>/dev/null; then
-    die "Another OpenAlice CLI installer is running (pid $owner)."
-  fi
-
-  warn "Removing a stale CLI installer lock"
-  rm -rf "$LOCK_DIR"
-  mkdir "$LOCK_DIR" || die "Could not acquire the CLI installer lock at $LOCK_DIR"
-  printf '%s\n' "$$" > "$LOCK_DIR/pid"
-  LOCK_HELD=1
-}
-
-release_install_lock() {
-  if [[ "$LOCK_HELD" -eq 1 ]]; then
-    rm -rf "$LOCK_DIR"
-    LOCK_HELD=0
-  fi
-}
-
-content_id() {
-  local root="$1"
-  shift
-  node - "$root" "$@" <<'NODE'
-const { createHash } = require('node:crypto')
-const { readFileSync } = require('node:fs')
-const { join } = require('node:path')
-
-const [, , root, ...files] = process.argv
-const hash = createHash('sha256')
-for (const file of files) {
-  hash.update(file)
-  hash.update('\0')
-  hash.update(readFileSync(join(root, file)))
-  hash.update('\0')
-}
-process.stdout.write(hash.digest('hex').slice(0, 16))
-NODE
-}
-
-file_sha256() {
-  node - "$1" <<'NODE'
-const { createHash } = require('node:crypto')
-const { createReadStream } = require('node:fs')
-
-const hash = createHash('sha256')
-const input = createReadStream(process.argv[2])
-input.on('data', (chunk) => hash.update(chunk))
-input.on('end', () => process.stdout.write(hash.digest('hex')))
-input.on('error', (error) => {
-  console.error(error.message)
-  process.exitCode = 1
-})
-NODE
-}
-
-node_version_supported() {
-  node - "$MINIMUM_NODE_VERSION" <<'NODE'
-const minimum = process.argv[2].split('.').map(Number)
-const current = process.versions.node.split('.').map(Number)
-for (let index = 0; index < 3; index += 1) {
-  if (current[index] > minimum[index]) process.exit(0)
-  if (current[index] < minimum[index]) process.exit(1)
-}
-NODE
-}
-
-update_path_profile() {
-  local begin_marker="# >>> OpenAlice CLI >>>"
-  local end_marker="# <<< OpenAlice CLI <<<"
-  local temporary="${profile}.openalice.$$"
-
-  mkdir -p "$(dirname "$profile")" || return 1
-  touch "$profile" || return 1
-  awk -v begin="$begin_marker" -v end="$end_marker" -v legacy="$path_line" '
-    $0 == begin { skipping = 1; next }
-    $0 == end { skipping = 0; next }
-    !skipping && $0 != legacy { print }
-  ' "$profile" > "$temporary" || return 1
-  if [[ -s "$temporary" ]]; then
-    printf '\n' >> "$temporary" || return 1
-  fi
-  printf '%s\n%s\n%s\n' "$begin_marker" "$path_line" "$end_marker" >> "$temporary" || return 1
-
-  if [[ -L "$profile" ]]; then
-    command cat "$temporary" > "$profile" || return 1
-    rm -f "$temporary" || return 1
-  else
-    mv -f "$temporary" "$profile" || return 1
-  fi
-}
-
-find_openalice_checkout() {
-  node - "$PWD" <<'NODE'
-const { readFileSync } = require('node:fs')
-const { dirname, join, resolve } = require('node:path')
-
-let current = resolve(process.argv[2])
-while (true) {
-  try {
-    const manifest = JSON.parse(readFileSync(join(current, 'package.json'), 'utf8'))
-    if (manifest?.name === 'open-alice' && manifest?.scripts?.['build:server']) {
-      process.stdout.write(current)
-      process.exit(0)
-    }
-  } catch {
-    // Walking up from an arbitrary install directory normally encounters no manifest.
-  }
-  const parent = dirname(current)
-  if (parent === current) process.exit(1)
-  current = parent
-}
-NODE
-}
-
-probe_runtime_deps() {
-  RUNTIME_MISSING=()
-  command -v git >/dev/null 2>&1 || RUNTIME_MISSING+=("git")
-  command -v python3 >/dev/null 2>&1 || RUNTIME_MISSING+=("python3")
-  command -v make >/dev/null 2>&1 || RUNTIME_MISSING+=("make")
-  if ! command -v c++ >/dev/null 2>&1 \
-    && ! command -v g++ >/dev/null 2>&1 \
-    && ! command -v clang++ >/dev/null 2>&1; then
-    RUNTIME_MISSING+=("cxx")
-  fi
-}
-
-runtime_missing_text() {
-  local dependency
-  local label
-  local output=""
-  for dependency in "${RUNTIME_MISSING[@]}"; do
-    case "$dependency" in
-      git) label="Git" ;;
-      python3) label="Python 3" ;;
-      make) label="make" ;;
-      cxx) label="a C++ compiler" ;;
-    esac
-    [[ -z "$output" ]] || output+=", "
-    output+="$label"
-  done
-  printf '%s' "$output"
-}
-
-resolve_runtime_deps_plan() {
-  RUNTIME_DEPS_MANAGER=""
-  RUNTIME_DEPS_COMMAND=""
-  RUNTIME_DEPS_BLOCKER=""
-  ELEVATE=()
-  [[ ${#RUNTIME_MISSING[@]} -gt 0 ]] || return 0
-
-  if [[ "$(uname -s)" != "Linux" ]]; then
-    RUNTIME_DEPS_BLOCKER='Automatic source Runtime prerequisite setup is currently supported on Linux. On macOS, run "xcode-select --install" in a local session, then retry.'
-    return 1
-  fi
-  if [[ "$EUID" -ne 0 ]]; then
-    if command -v sudo >/dev/null 2>&1; then
-      ELEVATE=(sudo)
-    else
-      RUNTIME_DEPS_BLOCKER="Installing source Runtime prerequisites requires root or sudo on this Linux host."
-      return 1
-    fi
-  fi
-
-  local prefix=""
-  [[ ${#ELEVATE[@]} -eq 0 ]] || prefix="sudo "
-  if command -v apt-get >/dev/null 2>&1; then
-    RUNTIME_DEPS_MANAGER="apt-get"
-    RUNTIME_DEPS_COMMAND="${prefix}apt-get update && ${prefix}apt-get install -y git python3 make g++"
-  elif command -v dnf >/dev/null 2>&1; then
-    RUNTIME_DEPS_MANAGER="dnf"
-    RUNTIME_DEPS_COMMAND="${prefix}dnf install -y git python3 make gcc-c++"
-  elif command -v yum >/dev/null 2>&1; then
-    RUNTIME_DEPS_MANAGER="yum"
-    RUNTIME_DEPS_COMMAND="${prefix}yum install -y git python3 make gcc-c++"
-  elif command -v apk >/dev/null 2>&1; then
-    RUNTIME_DEPS_MANAGER="apk"
-    RUNTIME_DEPS_COMMAND="${prefix}apk add --no-cache git python3 make g++"
-  elif command -v pacman >/dev/null 2>&1; then
-    RUNTIME_DEPS_MANAGER="pacman"
-    RUNTIME_DEPS_COMMAND="${prefix}pacman -Sy --needed --noconfirm git python make gcc"
-  else
-    RUNTIME_DEPS_BLOCKER="No supported Linux package manager was found (apt-get, dnf, yum, apk, or pacman)."
-    return 1
-  fi
-}
-
-install_runtime_deps() {
-  case "$RUNTIME_DEPS_MANAGER" in
-    apt-get)
-      "${ELEVATE[@]}" apt-get update
-      "${ELEVATE[@]}" apt-get install -y git python3 make g++
-      ;;
-    dnf) "${ELEVATE[@]}" dnf install -y git python3 make gcc-c++ ;;
-    yum) "${ELEVATE[@]}" yum install -y git python3 make gcc-c++ ;;
-    apk) "${ELEVATE[@]}" apk add --no-cache git python3 make g++ ;;
-    pacman) "${ELEVATE[@]}" pacman -Sy --needed --noconfirm git python make gcc ;;
-    *) die "No source Runtime prerequisite install command is available." ;;
-  esac
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --channel)
+      [[ $# -ge 2 ]] || fail "--channel requires a value"
+      [[ -z "$archive_path" ]] || fail "--channel cannot be combined with --archive"
+      [[ "$channel_set" == false ]] || fail "Specify --channel only once"
+      case "$2" in
+        stable|beta|dev) channel="$2" ;;
+        *) fail "--channel must be stable, beta, or dev" ;;
+      esac
+      channel_set=true
+      shift 2
+      ;;
     --branch)
-      [[ $# -ge 2 ]] || { echo "openalice install: --branch requires a value" >&2; exit 1; }
-      [[ -z "$REF_OPTION" ]] || die "Use only one of --branch or --version."
-      VERSION="$2"
-      REF_KIND="branch"
-      REF_OPTION="--branch"
+      [[ $# -ge 2 ]] || fail "--branch requires a value"
+      [[ -z "$archive_path" ]] || fail "--branch cannot be combined with --archive"
+      [[ "$channel_set" == false ]] || fail "Use only one of --channel or --branch"
+      case "$2" in
+        master) channel="stable" ;;
+        dev) channel="dev" ;;
+        *) fail "Bun preview installs support only --branch master or --branch dev" ;;
+      esac
+      channel_set=true
+      legacy_branch="$2"
       shift 2
       ;;
     --version)
-      [[ $# -ge 2 ]] || { echo "openalice install: --version requires a value" >&2; exit 1; }
-      [[ -z "$REF_OPTION" ]] || die "Use only one of --branch or --version."
-      VERSION="$2"
-      REF_KIND="version"
-      REF_OPTION="--version"
+      [[ $# -ge 2 ]] || fail "--version requires a value"
+      [[ -z "$archive_path" ]] || fail "--version cannot be combined with --archive"
+      [[ -z "$exact_version" ]] || fail "Specify --version only once"
+      exact_version="${2#v}"
+      [[ "$exact_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]] \
+        || fail "--version must be an OpenAlice release version such as 0.91.0"
+      shift 2
+      ;;
+    --archive)
+      [[ $# -ge 2 ]] || fail "--archive requires a path"
+      [[ -z "$archive_path" && -z "$exact_version" && "$channel_set" == false ]] \
+        || fail "--archive cannot be combined with --channel, --branch, or --version"
+      archive_path="$2"
+      shift 2
+      ;;
+    --sha256)
+      [[ $# -ge 2 ]] || fail "--sha256 requires a value"
+      archive_sha256="$2"
       shift 2
       ;;
     --install-dir)
-      [[ $# -ge 2 ]] || { echo "openalice install: --install-dir requires a value" >&2; exit 1; }
-      INSTALL_ROOT="$2"
+      [[ $# -ge 2 ]] || fail "--install-dir requires a path"
+      INSTALL_DIR="$2"
       shift 2
       ;;
-    --source)
-      [[ $# -ge 2 ]] || { echo "openalice install: --source requires a value" >&2; exit 1; }
-      SOURCE_DIR="$2"
-      shift 2
-      ;;
-    --runtime-archive)
-      [[ $# -ge 2 ]] || { echo "openalice install: --runtime-archive requires a value" >&2; exit 1; }
-      RUNTIME_ARCHIVE="$2"
-      shift 2
-      ;;
-    --runtime-sha256)
-      [[ $# -ge 2 ]] || { echo "openalice install: --runtime-sha256 requires a value" >&2; exit 1; }
-      RUNTIME_ARCHIVE_SHA256="$2"
-      shift 2
-      ;;
-    --no-modify-path)
-      MODIFY_PATH=0
-      shift
-      ;;
-    --with-runtime-deps)
-      WITH_RUNTIME_DEPS=1
-      shift
-      ;;
-    --plan)
-      PLAN_ONLY=1
-      shift
-      ;;
-    -y|--yes)
-      ASSUME_YES=1
-      shift
-      ;;
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    *)
-      echo "openalice install: unknown option: $1" >&2
-      usage >&2
-      exit 1
-      ;;
+    --no-modify-path) modify_path=false; shift ;;
+    --plan) plan_only=true; shift ;;
+    -y|--yes) assume_yes=true; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) fail "Unknown option: $1" ;;
   esac
 done
 
-if [[ -z "$VERSION" ]]; then
-  if [[ -n "$OPENALICE_INSTALLER_RELEASE_VERSION" ]]; then
-    VERSION="v$OPENALICE_INSTALLER_RELEASE_VERSION"
-    REF_KIND="version"
-  else
-    VERSION="$DEFAULT_BRANCH"
-    REF_KIND="branch"
-  fi
-fi
-
-if [[ ${#VERSION} -gt 128 || "$VERSION" == *".."* || ! "$VERSION" =~ ^[A-Za-z0-9._/-]+$ ]]; then
-  die "Unsupported version/ref: $VERSION"
-fi
-
-DEFAULT_INSTALLER_URL="https://raw.githubusercontent.com/$REPOSITORY/$VERSION/install"
-if [[ "$REF_KIND" == "branch" && "$VERSION" == "$DEFAULT_BRANCH" ]]; then
-  DEFAULT_INSTALLER_URL="$PUBLIC_INSTALLER_URL"
-fi
-INSTALLER_URL="${OPENALICE_INSTALL_URL:-$DEFAULT_INSTALLER_URL}"
-
-if [[ -n "${OPENALICE_INSTALL_UPDATE_CHANNEL:-}" ]]; then
-  UPDATE_CHANNEL="$OPENALICE_INSTALL_UPDATE_CHANNEL"
-elif [[ -n "$REF_OPTION" ]]; then
-  if [[ "$REF_KIND" == "version" ]]; then
-    UPDATE_CHANNEL="pinned"
-  elif [[ "$VERSION" == "$DEFAULT_BRANCH" && "$INSTALLER_URL" == "$PUBLIC_INSTALLER_URL" ]]; then
-    UPDATE_CHANNEL="stable"
-  elif [[ "$VERSION" == "$DEFAULT_BRANCH" ]]; then
-    UPDATE_CHANNEL="custom"
-  else
-    UPDATE_CHANNEL="development"
-  fi
-elif [[ -n "$OPENALICE_INSTALLER_UPDATE_CHANNEL" ]]; then
-  UPDATE_CHANNEL="$OPENALICE_INSTALLER_UPDATE_CHANNEL"
-elif [[ "$REF_KIND" == "version" ]]; then
-  UPDATE_CHANNEL="pinned"
-elif [[ "$VERSION" == "$DEFAULT_BRANCH" && "$INSTALLER_URL" == "$PUBLIC_INSTALLER_URL" ]]; then
-  UPDATE_CHANNEL="stable"
-elif [[ "$VERSION" == "$DEFAULT_BRANCH" ]]; then
-  UPDATE_CHANNEL="custom"
-else
-  UPDATE_CHANNEL="development"
-fi
-case "$UPDATE_CHANNEL" in
-  stable|pinned|development|custom) ;;
-  *) die "Unsupported OpenAlice update channel: $UPDATE_CHANNEL" ;;
-esac
-
-INSTALL_ROOT="${INSTALL_ROOT/#\~/$HOME}"
-BIN_DIR="$INSTALL_ROOT/bin"
-VERSIONS_DIR="$INSTALL_ROOT/cli-versions"
-SAFE_VERSION="${VERSION//\//_}"
-
-if [[ -n "$SOURCE_DIR" ]]; then
-  source_argument="$SOURCE_DIR"
-  if ! SOURCE_DIR="$(cd "$SOURCE_DIR" 2>/dev/null && pwd)"; then
-    die "Local source checkout not found: $source_argument"
-  fi
-fi
-
-if [[ -n "$RUNTIME_ARCHIVE" ]]; then
-  runtime_archive_argument="$RUNTIME_ARCHIVE"
-  runtime_archive_dir="$(dirname "$RUNTIME_ARCHIVE")"
-  runtime_archive_name="$(basename "$RUNTIME_ARCHIVE")"
-  if ! runtime_archive_dir="$(cd "$runtime_archive_dir" 2>/dev/null && pwd)"; then
-    die "Runtime archive directory not found: $runtime_archive_argument"
-  fi
-  RUNTIME_ARCHIVE="$runtime_archive_dir/$runtime_archive_name"
-  [[ -f "$RUNTIME_ARCHIVE" ]] || die "Runtime archive not found: $runtime_archive_argument"
-fi
-if [[ -n "$RUNTIME_ARCHIVE_SHA256" && -z "$RUNTIME_ARCHIVE" ]]; then
-  die "--runtime-sha256 requires --runtime-archive."
-fi
-if [[ -n "$RUNTIME_ARCHIVE_SHA256" && ! "$RUNTIME_ARCHIVE_SHA256" =~ ^[a-fA-F0-9]{64}$ ]]; then
-  die "--runtime-sha256 must be exactly 64 hexadecimal characters."
-fi
-runtime_release_version="$OPENALICE_INSTALLER_RELEASE_VERSION"
-if [[ -z "$runtime_release_version" && -n "${OPENALICE_EXPECTED_CLI_VERSION:-}" ]]; then
-  runtime_release_version="$OPENALICE_EXPECTED_CLI_VERSION"
-fi
-if [[ -z "$RUNTIME_ARCHIVE" && -n "$runtime_release_version" ]]; then
-  RUNTIME_AUTO_DOWNLOAD=1
-  runtime_release_tag="v$runtime_release_version"
-  RUNTIME_RELEASE_BASE_URL="${OPENALICE_RUNTIME_RELEASE_BASE_URL:-https://github.com/$REPOSITORY/releases/download/$runtime_release_tag}"
-  RUNTIME_RELEASE_BASE_URL="${RUNTIME_RELEASE_BASE_URL%/}"
-fi
-
-path_present=0
-case ":$PATH:" in
-  *":$BIN_DIR:"*) path_present=1 ;;
-esac
-
-profile=""
-path_line=""
-printf -v quoted_bin '%q' "$BIN_DIR"
-current_path_command="export PATH=$quoted_bin:\$PATH"
-if [[ "$MODIFY_PATH" -eq 0 ]]; then
-  shell_setup="Skip (--no-modify-path)"
-elif [[ "$path_present" -eq 1 ]]; then
-  shell_setup="Already available on PATH"
-else
-  case "${SHELL:-}" in
-    */zsh)
-      if [[ "$(uname -s)" == "Darwin" ]]; then profile="$HOME/.zprofile"; else profile="$HOME/.zshrc"; fi
-      path_line="export PATH=$quoted_bin:\$PATH"
-      ;;
-    */bash)
-      if [[ "$(uname -s)" == "Darwin" ]]; then profile="$HOME/.bash_profile"; else profile="$HOME/.bashrc"; fi
-      path_line="export PATH=$quoted_bin:\$PATH"
-      ;;
-    */fish)
-      profile="$HOME/.config/fish/config.fish"
-      path_line="fish_add_path $quoted_bin"
-      current_path_command="fish_add_path $quoted_bin"
-      ;;
-  esac
-  if [[ -n "$profile" ]]; then
-    shell_setup="Manage OpenAlice PATH in $profile"
-  else
-    shell_setup="Manual PATH setup (shell profile not detected)"
-  fi
-fi
-
-existing_command="$(command -v openalice 2>/dev/null || true)"
-install_action="Install a new command"
-if [[ -e "$BIN_DIR/openalice" || -e "$BIN_DIR/openalice.cmd" ]]; then
-  install_action="Update the installed command"
-fi
-
-printf '\n%bOpenAlice%b\n' "${BOLD}${CYAN}" "$RESET"
-if [[ "$INSTALL_CONTEXT" == "remote" ]]; then
-  printf '%bRemote Runtime CLI installer%b\n\n' "$BOLD" "$RESET"
-  printf 'Install the matching OpenAlice command and ready-to-use Pi agent on this SSH host.\n'
-else
-  printf '%bLocal Runtime CLI installer%b\n\n' "$BOLD" "$RESET"
-  printf 'Install the OpenAlice command and its ready-to-use Pi agent, then run locally in your browser.\n'
-fi
-printf '%bPi stays inside the OpenAlice install root. System build tools are optional and listed before consent; your checkout, Electron app, credentials, and services otherwise stay untouched.%b\n' "$DIM" "$RESET"
-
-step 1 "Checking your system"
-if ! command -v node >/dev/null 2>&1; then
-  die "Node.js $MINIMUM_NODE_VERSION or newer is required. Install Node.js 22 LTS, then run this installer again."
-fi
-
-if ! node_version_supported; then
-  die "Node.js $MINIMUM_NODE_VERSION or newer is required for OpenAlice and managed Pi (found $(node --version))."
-fi
-ok "Node.js $(node --version)"
-RUNTIME_PLATFORM="$(node -p 'process.platform')"
-RUNTIME_ARCH="$(node -p 'process.arch')"
-case "$RUNTIME_PLATFORM-$RUNTIME_ARCH" in
-  darwin-arm64|darwin-x64|linux-arm64|linux-x64) ;;
-  *) RUNTIME_AUTO_DOWNLOAD=0 ;;
-esac
-
-if ! node -e '
-  const url = new URL(process.argv[1]);
-  if (url.protocol !== "https:" && url.protocol !== "http:") process.exit(1);
-' "$INSTALLER_URL" >/dev/null 2>&1; then
-  die "OPENALICE_INSTALL_URL must be an HTTP(S) URL."
-fi
-
-if [[ "$NPM_BIN" == *[[:space:]]* ]]; then
-  die "OPENALICE_NPM_BIN must name one executable without arguments."
-fi
-if [[ "$NPM_BIN" == */* ]]; then
-  [[ -x "$NPM_BIN" ]] || die "npm is required to install managed Pi (not executable: $NPM_BIN)."
-elif ! command -v "$NPM_BIN" >/dev/null 2>&1; then
-  die "npm is required to install managed Pi. Install the complete Node.js 22 LTS distribution, then retry."
-fi
-ok "npm is available for managed Pi"
-
-if [[ -n "$SOURCE_DIR" ]]; then
-  [[ -f "$SOURCE_DIR/packages/cli/package.json" ]] || die "OpenAlice CLI sources are missing under $SOURCE_DIR"
-  source_cli_version="$(node -e '
-    const manifest = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
-    if (manifest.name !== "@traderalice/openalice-cli" || typeof manifest.version !== "string") process.exit(1);
-    process.stdout.write(manifest.version);
-  ' "$SOURCE_DIR/packages/cli/package.json")" \
-    || die "The local package manifest is not an OpenAlice CLI package"
-  if [[ -n "${OPENALICE_EXPECTED_CLI_VERSION:-}" \
-    && "$source_cli_version" != "$OPENALICE_EXPECTED_CLI_VERSION" ]]; then
-    die "The downloaded CLI reported $source_cli_version instead of expected release $OPENALICE_EXPECTED_CLI_VERSION"
-  fi
-  ok "Local checkout is readable"
-  install_source="Local checkout: $SOURCE_DIR"
-else
-  ok "curl is available"
-  BASE_URL="${OPENALICE_INSTALL_BASE_URL:-https://raw.githubusercontent.com/$REPOSITORY/$VERSION/packages/cli}"
-  BASE_URL="${BASE_URL%/}"
-  if [[ -n "${OPENALICE_INSTALL_BASE_URL:-}" ]]; then
-    install_source="Download URL: $BASE_URL"
-  elif [[ "$REF_KIND" == "branch" ]]; then
-    install_source="GitHub branch: $REPOSITORY@$VERSION"
-  else
-    install_source="GitHub ref: $REPOSITORY@$VERSION"
-  fi
-fi
-
-if [[ ( -z "$SOURCE_DIR" || -z "$PI_ASSET_SOURCE_DIR" || "$RUNTIME_AUTO_DOWNLOAD" -eq 1 ) ]] && ! command -v curl >/dev/null 2>&1; then
-  die "curl is required to download the OpenAlice and managed Pi files."
-fi
-if [[ "$RUNTIME_AUTO_DOWNLOAD" -eq 1 ]]; then
-  runtime_metadata_file="openalice-runtime-${runtime_release_version}-${RUNTIME_PLATFORM}-${RUNTIME_ARCH}.json"
-  runtime_metadata_json="$(curl --fail --silent --show-error --location --retry 3 --connect-timeout 15 \
-    "$RUNTIME_RELEASE_BASE_URL/$runtime_metadata_file")" \
-    || die "Could not download OpenAlice Runtime release metadata"
-  RUNTIME_ARCHIVE_FILE="$(node -e '
-    const value = JSON.parse(process.argv[1]);
-    const [version, platform, arch] = process.argv.slice(2);
-    if (value.schemaVersion !== 1
-      || value.productVersion !== version
-      || value.platform !== platform
-      || value.arch !== arch
-      || typeof value.archive?.file !== "string"
-      || !/^openalice-runtime-[0-9A-Za-z.+_-]+-(darwin|linux)-(arm64|x64)-[a-f0-9]{16}\.tar\.gz$/.test(value.archive.file)
-      || !Number.isSafeInteger(value.archive.size)
-      || value.archive.size <= 0
-      || !/^[a-f0-9]{64}$/.test(value.archive.sha256 ?? "")) process.exit(1);
-    process.stdout.write(value.archive.file);
-  ' "$runtime_metadata_json" "$runtime_release_version" "$RUNTIME_PLATFORM" "$RUNTIME_ARCH")" \
-    || die "OpenAlice Runtime release metadata is invalid"
-  RUNTIME_ARCHIVE_SHA256="$(node -e '
-    process.stdout.write(JSON.parse(process.argv[1]).archive.sha256);
-  ' "$runtime_metadata_json")"
-  RUNTIME_ARCHIVE_SIZE="$(node -e '
-    process.stdout.write(String(JSON.parse(process.argv[1]).archive.size));
-  ' "$runtime_metadata_json")"
-  RUNTIME_ARCHIVE_SIZE_LABEL="$(node -e '
-    const bytes = Number(process.argv[1]);
-    const mib = bytes / 1024 / 1024;
-    process.stdout.write(`${mib.toFixed(mib >= 100 ? 0 : 1)} MiB`);
-  ' "$RUNTIME_ARCHIVE_SIZE")"
-fi
-
-if [[ -n "$PI_ASSET_SOURCE_DIR" ]]; then
-  pi_source_argument="$PI_ASSET_SOURCE_DIR"
-  if ! PI_ASSET_SOURCE_DIR="$(cd "$PI_ASSET_SOURCE_DIR" 2>/dev/null && pwd)"; then
-    die "Managed Pi asset directory not found: $pi_source_argument"
-  fi
-  [[ -f "$PI_ASSET_SOURCE_DIR/package.json" ]] || die "Managed Pi package.json is missing under $PI_ASSET_SOURCE_DIR"
-  [[ -f "$PI_ASSET_SOURCE_DIR/package-lock.json" ]] || die "Managed Pi package-lock.json is missing under $PI_ASSET_SOURCE_DIR"
-  pi_install_source="Local verified assets: $PI_ASSET_SOURCE_DIR"
-else
-  pi_install_source="Pinned release: $PI_RELEASE_BASE"
-fi
-
-probe_runtime_deps
-runtime_deps_ready=0
-[[ ${#RUNTIME_MISSING[@]} -gt 0 ]] || runtime_deps_ready=1
-resolve_runtime_deps_plan || true
-if [[ -n "$RUNTIME_ARCHIVE" || "$RUNTIME_AUTO_DOWNLOAD" -eq 1 ]]; then
-  runtime_deps_ready=1
-  RUNTIME_MISSING=()
-  RUNTIME_DEPS_BLOCKER=""
-fi
-if [[ -n "$RUNTIME_ARCHIVE" || "$RUNTIME_AUTO_DOWNLOAD" -eq 1 ]]; then
-  ok "Prebuilt Runtime selected; source build tools are not needed"
-elif [[ "$runtime_deps_ready" -eq 1 ]]; then
-  ok "Source Runtime build tools are available"
-else
-  warn "Source Runtime build tools are missing: $(runtime_missing_text)"
-fi
-
-if [[ "$WITH_RUNTIME_DEPS" -eq 0 && "$PLAN_ONLY" -eq 0 && "$ASSUME_YES" -eq 0 \
-  && "$runtime_deps_ready" -eq 0 && -z "$RUNTIME_DEPS_BLOCKER" ]]; then
-  if open_tty; then
-    printf '\nThe CLI can prepare a source checkout later, but native Node modules may need these tools.\n' >&3
-    runtime_choice=0
-    prompt_yes_no "Also install the missing source Runtime build tools?" || runtime_choice=$?
-    if [[ "$runtime_choice" -eq 0 ]]; then
-      WITH_RUNTIME_DEPS=1
+if [[ -n "$archive_path" ]]; then
+  selector_kind="local"
+  selector_value="local"
+elif [[ -n "$exact_version" ]]; then
+  [[ -z "$legacy_branch" ]] \
+    || fail "--branch cannot be combined with --version; use --channel to retain an update channel"
+  if [[ "$channel_set" == true ]]; then
+    if [[ "$channel" == stable ]]; then
+      [[ "$exact_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+        || fail "--channel stable requires a stable --version"
+    elif [[ "$channel" == beta ]]; then
+      [[ "$exact_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-beta(\.[1-9][0-9]*)?$ ]] \
+        || fail "--channel beta requires a beta --version"
+    else
+      fail "--channel dev cannot be combined with --version"
     fi
+    selector_kind="release"
+  else
+    selector_kind="pinned"
+  fi
+  selector_value="$exact_version"
+else
+  case "$channel" in
+    stable) selector_kind="stable"; selector_value="latest" ;;
+    beta) selector_kind="beta"; selector_value="latest" ;;
+    dev) selector_kind="development"; selector_value="dev" ;;
+  esac
+fi
+
+[[ "$INSTALL_DIR" == /* ]] || INSTALL_DIR="$PWD/${INSTALL_DIR#./}"
+[[ "$KEEP_RELEASES" =~ ^[1-9][0-9]*$ ]] || fail "OPENALICE_INSTALL_KEEP_RELEASES must be a positive integer"
+[[ "$INSTALL_DIR" != *$'\n'* && "$INSTALL_DIR" != *$'\r'* ]] || fail "--install-dir must not contain a newline"
+
+if [[ -z "$INSTALLER_URL" ]]; then
+  if [[ "$legacy_branch" == dev ]]; then
+    INSTALLER_URL="https://raw.githubusercontent.com/${REPOSITORY}/dev/install"
+  else
+    INSTALLER_URL="$PUBLIC_INSTALLER_URL"
+  fi
+fi
+case "$INSTALLER_URL" in
+  http://*|https://*) ;;
+  *) fail "OPENALICE_INSTALL_URL must be an HTTP(S) URL" ;;
+esac
+[[ "$INSTALLER_URL" != *'"'* && "$INSTALLER_URL" != *'\\'* \
+  && "$INSTALLER_URL" != *$'\n'* && "$INSTALLER_URL" != *$'\r'* ]] \
+  || fail "OPENALICE_INSTALL_URL contains unsupported characters"
+
+raw_os="$(uname -s)"
+case "$raw_os" in
+  Darwin*) platform="darwin" ;;
+  Linux*) platform="linux" ;;
+  *) fail "Unsupported OS: $raw_os. The Bun CLI currently supports macOS and Linux." ;;
+esac
+raw_arch="$(uname -m)"
+case "$raw_arch" in
+  arm64|aarch64) architecture="arm64" ;;
+  x86_64|amd64) architecture="x64" ;;
+  *) fail "Unsupported architecture: $raw_arch" ;;
+esac
+if [[ "$platform" == darwin && "$architecture" == x64 ]]; then
+  if [[ "$(sysctl -n sysctl.proc_translated 2>/dev/null || printf 0)" == 1 ]]; then
+    architecture="arm64"
   fi
 fi
 
-if [[ -n "$RUNTIME_ARCHIVE" || "$RUNTIME_AUTO_DOWNLOAD" -eq 1 ]]; then
-  runtime_setup="Not needed (prebuilt Runtime)"
-elif [[ "$runtime_deps_ready" -eq 1 ]]; then
-  runtime_setup="Already ready"
-elif [[ "$WITH_RUNTIME_DEPS" -eq 1 && -z "$RUNTIME_DEPS_BLOCKER" ]]; then
-  runtime_setup="Install $(runtime_missing_text)"
-elif [[ -n "$RUNTIME_DEPS_BLOCKER" ]]; then
-  runtime_setup="Manual setup required"
+command -v tar >/dev/null 2>&1 || fail "tar is required"
+if command -v sha256sum >/dev/null 2>&1; then
+  hash_file() { sha256sum "$1" | awk '{print $1}'; }
+elif command -v shasum >/dev/null 2>&1; then
+  hash_file() { shasum -a 256 "$1" | awk '{print $1}'; }
 else
-  runtime_setup="Skip (use --with-runtime-deps)"
+  fail "sha256sum or shasum is required"
 fi
 
-printf '\n%bInstall plan%b\n' "$BOLD" "$RESET"
-printf '  %-14s %s\n' "Action" "$install_action"
-printf '  %-14s %s\n' "Source" "$install_source"
-if [[ "$REF_KIND" == "branch" ]]; then
-  printf '  %-14s %s\n' "Branch" "$VERSION"
-else
-  printf '  %-14s %s\n' "Version" "$VERSION"
-fi
-printf '  %-14s %s\n' "Updates" "$UPDATE_CHANNEL"
-printf '  %-14s %s\n' "Install root" "$INSTALL_ROOT"
-printf '  %-14s %s\n' "Command" "$BIN_DIR/openalice"
-printf '  %-14s %s\n' "Managed agent" "Pi $PI_VERSION -> $BIN_DIR/pi"
-printf '  %-14s %s\n' "Pi source" "$pi_install_source"
-printf '  %-14s %s\n' "Pi install" "$NPM_BIN ci --omit=dev --ignore-scripts --no-audit --no-fund"
-if [[ -n "$RUNTIME_ARCHIVE" ]]; then
-  printf '  %-14s %s\n' "Runtime" "$RUNTIME_ARCHIVE"
-elif [[ "$RUNTIME_AUTO_DOWNLOAD" -eq 1 ]]; then
-  printf '  %-14s %s\n' "Runtime" "OpenAlice $runtime_release_version ($RUNTIME_PLATFORM-$RUNTIME_ARCH, $RUNTIME_ARCHIVE_SIZE_LABEL)"
-fi
-printf '  %-14s %s\n' "Shell setup" "$shell_setup"
-printf '  %-14s %s\n' "Runtime tools" "$runtime_setup"
-if [[ "$WITH_RUNTIME_DEPS" -eq 1 && "$runtime_deps_ready" -eq 0 && -n "$RUNTIME_DEPS_COMMAND" ]]; then
-  printf '  %-14s %s\n' "System command" "$RUNTIME_DEPS_COMMAND"
-elif [[ "$runtime_deps_ready" -eq 0 && -n "$RUNTIME_DEPS_BLOCKER" ]]; then
-  printf '  %-14s %s\n' "Runtime note" "$RUNTIME_DEPS_BLOCKER"
-fi
-if [[ -n "$existing_command" && "$existing_command" != "$BIN_DIR/openalice" ]]; then
-  printf '  %-14s %s\n' "PATH warning" "$existing_command currently resolves first"
-fi
-
-if [[ "$PLAN_ONLY" -eq 1 ]]; then
-  if [[ "$WITH_RUNTIME_DEPS" -eq 1 && "$runtime_deps_ready" -eq 0 && -n "$RUNTIME_DEPS_BLOCKER" ]]; then
-    printf '\n%bBlocked:%b %s\n' "${RED}${BOLD}" "$RESET" "$RUNTIME_DEPS_BLOCKER" >&2
-    exit 1
+delegate_legacy_stable_install() {
+  local legacy_update_channel="${1:-stable}"
+  local temporary legacy_installer actual_sha256 legacy_status
+  local -a legacy_args
+  case "$legacy_update_channel" in
+    stable|pinned) ;;
+    *) fail "Internal error: invalid legacy stable update channel $legacy_update_channel" ;;
+  esac
+  if [[ -e "$INSTALL_DIR/cli" || -L "$INSTALL_DIR/cli" ]]; then
+    fail "OpenAlice ${LEGACY_STABLE_VERSION} uses the legacy Node-managed layout and cannot safely replace a native CLI installation. Stay on beta/dev until a native stable release is available."
   fi
-  printf '\n%bPlan complete.%b No files were changed.\n\n' "$BOLD" "$RESET"
+  [[ "$LEGACY_STABLE_INSTALLER_SHA256" =~ ^[a-f0-9]{64}$ ]] \
+    || fail "Legacy stable installer checksum is invalid"
+  temporary="$(mktemp -d "${TMPDIR:-/tmp}/openalice-legacy-installer.XXXXXX")"
+  legacy_installer="$temporary/install"
+  if ! curl -fL --retry 2 --connect-timeout 10 --max-time 60 \
+    -o "$legacy_installer" "$LEGACY_STABLE_INSTALLER_URL"; then
+    rm -rf "$temporary"
+    fail "Could not download the verified OpenAlice ${LEGACY_STABLE_VERSION} installer"
+  fi
+  actual_sha256="$(hash_file "$legacy_installer")"
+  if [[ "$actual_sha256" != "$LEGACY_STABLE_INSTALLER_SHA256" ]]; then
+    rm -rf "$temporary"
+    fail "OpenAlice ${LEGACY_STABLE_VERSION} installer failed SHA-256 verification"
+  fi
+  legacy_args=(--install-dir "$INSTALL_DIR")
+  [[ "$modify_path" == true ]] || legacy_args+=(--no-modify-path)
+  [[ "$plan_only" == true ]] && legacy_args+=(--plan)
+  [[ "$assume_yes" == true ]] && legacy_args+=(--yes)
+  legacy_status=0
+  OPENALICE_INSTALL_URL="$INSTALLER_URL" \
+    OPENALICE_INSTALLER_RELEASE_VERSION="$LEGACY_STABLE_VERSION" \
+    OPENALICE_INSTALL_UPDATE_CHANNEL="$legacy_update_channel" \
+    OPENALICE_INSTALLER_UPDATE_CHANNEL="$legacy_update_channel" \
+    bash "$legacy_installer" "${legacy_args[@]}" \
+    || legacy_status=$?
+  rm -rf "$temporary"
+  exit "$legacy_status"
+}
+
+release_version=""
+artifact_url=""
+if [[ -n "$archive_path" ]]; then
+  [[ -f "$archive_path" ]] || fail "Archive not found: $archive_path"
+  [[ "$archive_sha256" =~ ^[a-f0-9]{64}$ ]] || fail "--archive requires --sha256 with 64 lowercase hex characters"
+  artifact_source="$archive_path"
+else
+  command -v curl >/dev/null 2>&1 || fail "curl is required for a network install"
+  if [[ "$selector_kind" == stable ]]; then
+    stable_json="$(curl -fsSL --max-time 15 "$STABLE_MANIFEST_URL")" \
+      || fail "Could not resolve the latest OpenAlice stable release"
+    stable_channel="$(printf '%s' "$stable_json" | sed -n 's/.*"channel"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)"
+    release_version="$(printf '%s' "$stable_json" | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)"
+    [[ "$stable_channel" == stable ]] \
+      || fail "Stable manifest did not identify the stable channel"
+    [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+      || fail "Stable manifest did not contain a valid stable version"
+    if [[ "$release_version" == "$LEGACY_STABLE_VERSION" ]]; then
+      delegate_legacy_stable_install stable
+    fi
+    artifact_url="${RELEASE_ASSET_BASE_URL}/v${release_version}/openalice-cli-${release_version}-${platform}-${architecture}.tar.gz"
+  elif [[ "$selector_kind" == beta ]]; then
+    beta_json="$(curl -fsSL --max-time 15 "$BETA_MANIFEST_URL")" \
+      || fail "Could not resolve the latest OpenAlice beta"
+    beta_channel="$(printf '%s' "$beta_json" | sed -n 's/.*"channel"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)"
+    release_version="$(printf '%s' "$beta_json" | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)"
+    [[ "$beta_channel" == beta ]] \
+      || fail "Beta manifest did not identify the beta channel"
+    [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-beta(\.[1-9][0-9]*)?$ ]] \
+      || fail "Beta manifest did not contain a valid beta version"
+    artifact_url="${RELEASE_ASSET_BASE_URL}/v${release_version}/openalice-cli-${release_version}-${platform}-${architecture}.tar.gz"
+  elif [[ "$selector_kind" == pinned || "$selector_kind" == release ]]; then
+    release_version="$selector_value"
+    if [[ "$release_version" == "$LEGACY_STABLE_VERSION" ]]; then
+      if [[ "$selector_kind" == pinned ]]; then
+        delegate_legacy_stable_install pinned
+      else
+        delegate_legacy_stable_install stable
+      fi
+    fi
+    artifact_url="${RELEASE_ASSET_BASE_URL}/v${release_version}/openalice-cli-${release_version}-${platform}-${architecture}.tar.gz"
+  else
+    artifact_url="${DOWNLOAD_BASE_URL}/cli/dev/openalice-cli-dev-${platform}-${architecture}.tar.gz"
+  fi
+  checksum_url="${artifact_url}.sha256"
+  checksum_text="$(curl -fsSL --max-time 15 "$checksum_url")" \
+    || fail "Could not download the release checksum: $checksum_url"
+  archive_sha256="$(printf '%s' "$checksum_text" | awk 'NR == 1 { print $1 }')"
+  [[ "$archive_sha256" =~ ^[a-f0-9]{64}$ ]] || fail "Release checksum metadata is invalid"
+  artifact_source="$artifact_url"
+fi
+[[ -z "${OPENALICE_EXPECTED_CLI_ARTIFACT_SHA256:-}" || "$archive_sha256" == "$OPENALICE_EXPECTED_CLI_ARTIFACT_SHA256" ]] \
+  || fail "Release checksum $archive_sha256 does not match expected $OPENALICE_EXPECTED_CLI_ARTIFACT_SHA256"
+
+action="Install"
+legacy_cli_root="$INSTALL_DIR/cli-versions"
+legacy_detected=false
+if [[ -d "$legacy_cli_root" ]]; then
+  legacy_detected=true
+fi
+if [[ -L "$INSTALL_DIR/cli/current" ]]; then
+  action="Update"
+  if [[ "$legacy_detected" == true ]]; then
+    action="Update and remove legacy CLI"
+  fi
+elif [[ "$legacy_detected" == true ]]; then
+  action="Replace legacy CLI"
+fi
+cat <<EOF
+$PRODUCT install plan
+
+Action          $action
+Channel         $selector_kind ($selector_value)
+Platform        $platform-$architecture
+Artifact        $artifact_source
+SHA-256         $archive_sha256
+Install root    $INSTALL_DIR
+Active pointer  $INSTALL_DIR/cli/current
+Command         $INSTALL_DIR/bin/openalice
+Retention       $KEEP_RELEASES releases (including the active release)
+Legacy cutover  $legacy_detected
+
+OpenAlice manages: the native CLI release, release-owned Git, launch shims,
+activation pointer, provenance, installer lock, and PATH entry.
+OpenAlice does not manage: Agent Runtime executables, their versions,
+credentials, native configuration, or user data.
+EOF
+
+if [[ "$plan_only" == true ]]; then
+  printf '\nPlan complete. No files were changed.\n'
   exit 0
 fi
 
-if [[ "$WITH_RUNTIME_DEPS" -eq 1 && "$runtime_deps_ready" -eq 0 && -n "$RUNTIME_DEPS_BLOCKER" ]]; then
-  die "$RUNTIME_DEPS_BLOCKER"
-fi
-
-if [[ "$ASSUME_YES" -eq 0 ]]; then
-  if ! open_tty; then
-    printf '\n%bNo interactive terminal is available.%b\n' "${RED}${BOLD}" "$RESET" >&2
-    printf 'Review the install plan above, then re-run with %b--yes%b to approve it.\n' "$BOLD" "$RESET" >&2
+if [[ "$assume_yes" != true ]]; then
+  if ! { exec 3<>/dev/tty; } 2>/dev/null; then
+    printf 'No interactive terminal is available. Review --plan, then re-run with --yes.\n' >&2
     exit 2
   fi
-  confirmation_status=0
-  prompt_yes_no "Continue with this install?" || confirmation_status=$?
-  case "$confirmation_status" in
-    0) ;;
-    1)
-      printf '\nNo changes made. You can run the installer again whenever you are ready.\n'
-      exit 0
-      ;;
-    *)
-      printf '\nNo confirmation received. No changes made.\n' >&2
-      exit 2
-      ;;
+  printf '\nContinue with this install? [y/N] ' >&3
+  IFS= read -r answer <&3 || answer=""
+  exec 3>&- 3<&-
+  [[ "$answer" =~ ^[Yy]([Ee][Ss])?$ ]] || { printf '\nNo changes made.\n'; exit 0; }
+fi
+
+cli_root="$INSTALL_DIR/cli"
+releases_dir="$cli_root/releases"
+provenance_dir="$cli_root/provenance"
+activation_path="$cli_root/activation.json"
+bin_dir="$INSTALL_DIR/bin"
+lock_dir="$INSTALL_DIR/.cli-install.lock"
+staging_dir=""
+lock_owned=false
+previous_release_name=""
+activation_receipt_written=false
+activation_switched=false
+install_complete=false
+legacy_launcher_backup=""
+legacy_launchers_backed_up=false
+
+cleanup() {
+  cleanup_status=$?
+  trap - EXIT INT TERM HUP
+  if [[ "$cleanup_status" -ne 0 && "$install_complete" != true ]]; then
+    set +e
+    if [[ "$activation_receipt_written" == true ]]; then
+      rollback_restored=true
+      if [[ "$activation_switched" == true ]]; then
+        if [[ -n "$previous_release_name" ]]; then
+          rollback_link="$cli_root/current.rollback.$$"
+          rm -f "$rollback_link"
+          if ! ln -s "releases/$previous_release_name" "$rollback_link"; then
+            rollback_restored=false
+          elif [[ "$platform" == darwin ]]; then
+            mv -fh "$rollback_link" "$cli_root/current" || rollback_restored=false
+          else
+            mv -Tf "$rollback_link" "$cli_root/current" || rollback_restored=false
+          fi
+        else
+          rm -f "$cli_root/current" || rollback_restored=false
+        fi
+      fi
+      if [[ "$rollback_restored" == true ]]; then
+        rollback_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        activation_next="$activation_path.next.$$"
+        cat >"$activation_next" <<EOF
+{
+  "schemaVersion": 1,
+  "activeRelease": "$release_name",
+  "previousRelease": $([[ -n "$previous_release_name" ]] && printf '"%s"' "$previous_release_name" || printf 'null'),
+  "productVersion": "$artifact_version",
+  "state": "rolled_back",
+  "activatedAt": "$activated_at",
+  "rolledBackAt": "$rollback_at",
+  "failureCode": "EINSTALL"
+}
+EOF
+        chmod 600 "$activation_next" && mv -f "$activation_next" "$activation_path" \
+          || printf 'Warning: restored the previous release but could not record rollback metadata.\n' >&2
+      else
+        printf 'Warning: automatic restoration of the previous OpenAlice release failed; inspect %s before retrying.\n' "$cli_root/current" >&2
+      fi
+      [[ -z "${rollback_link:-}" ]] || rm -f "$rollback_link"
+    fi
+    if [[ "$legacy_launchers_backed_up" == true ]]; then
+      launcher_restore_ok=true
+      for launcher_name in openalice alice alice-workspace alice-uta traderhub pi pi.cmd openalice.cmd; do
+        rm -f "$bin_dir/$launcher_name" || launcher_restore_ok=false
+        if [[ -e "$legacy_launcher_backup/$launcher_name" || -L "$legacy_launcher_backup/$launcher_name" ]]; then
+          mv "$legacy_launcher_backup/$launcher_name" "$bin_dir/$launcher_name" \
+            || launcher_restore_ok=false
+        fi
+      done
+      if [[ "$launcher_restore_ok" != true ]]; then
+        printf 'Warning: automatic restoration of one or more legacy OpenAlice launchers failed; inspect %s before retrying.\n' "$bin_dir" >&2
+      fi
+    fi
+    set -e
+  fi
+  [[ -z "$staging_dir" ]] || rm -rf "$staging_dir"
+  if [[ "$lock_owned" == true ]]; then rm -rf "$lock_dir"; fi
+  exit "$cleanup_status"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+
+mkdir -p "$INSTALL_DIR"
+if [[ -d "$lock_dir" ]]; then
+  lock_pid="$(cat "$lock_dir/pid" 2>/dev/null || true)"
+  if [[ "$lock_pid" =~ ^[1-9][0-9]*$ ]] && kill -0 "$lock_pid" 2>/dev/null; then
+    fail "Another OpenAlice CLI installer is running (pid $lock_pid)"
+  fi
+  printf 'Removing a stale CLI installer lock.\n'
+  rm -rf "$lock_dir"
+fi
+mkdir "$lock_dir"
+printf '%s\n' "$$" >"$lock_dir/pid"
+lock_owned=true
+mkdir -p "$releases_dir" "$provenance_dir" "$bin_dir" "$cli_root/staging"
+releases_dir="$(CDPATH= cd -- "$releases_dir" && pwd -P)"
+staging_dir="$(mktemp -d "$cli_root/staging/install.XXXXXX")"
+downloaded_archive="$staging_dir/release.tar.gz"
+
+if [[ -n "$archive_path" ]]; then
+  cp "$archive_path" "$downloaded_archive"
+else
+  printf '\nDownloading OpenAlice for %s-%s...\n' "$platform" "$architecture"
+  curl -fL --retry 2 --connect-timeout 10 --max-time 300 -o "$downloaded_archive" "$artifact_url"
+fi
+actual_sha256="$(hash_file "$downloaded_archive")"
+[[ "$actual_sha256" == "$archive_sha256" ]] \
+  || fail "Downloaded archive failed SHA-256 verification (expected $archive_sha256, got $actual_sha256)"
+
+archive_root=""
+while IFS= read -r archive_entry; do
+  archive_entry="${archive_entry#./}"
+  case "$archive_entry" in
+    /*|../*|*/../*|*/..) fail "Archive contains an unsafe path: $archive_entry" ;;
   esac
-fi
+  entry_root="${archive_entry%%/*}"
+  [[ -n "$entry_root" ]] || continue
+  if [[ -z "$archive_root" ]]; then archive_root="$entry_root"; fi
+  [[ "$entry_root" == "$archive_root" ]] || fail "Archive contains multiple top-level entries"
+done < <(tar -tzf "$downloaded_archive")
+[[ "$archive_root" == openalice-cli-* ]] || fail "Archive root is not an OpenAlice CLI release"
 
-step 2 "Preparing source Runtime tools"
-if [[ "$WITH_RUNTIME_DEPS" -eq 1 && "$runtime_deps_ready" -eq 0 ]]; then
-  install_runtime_deps
-  probe_runtime_deps
-  if [[ ${#RUNTIME_MISSING[@]} -gt 0 ]]; then
-    die "The package manager finished, but source Runtime build tools are still missing: $(runtime_missing_text)"
-  fi
-  runtime_deps_ready=1
-  ok "Source Runtime build tools are ready"
-else
-  printf '      No system packages were changed.\n'
-fi
+unpack_dir="$staging_dir/unpack"
+mkdir "$unpack_dir"
+tar -xzf "$downloaded_archive" -C "$unpack_dir"
+candidate="$(find "$unpack_dir" -mindepth 1 -maxdepth 1 -type d -name 'openalice-cli-*' -print -quit)"
+[[ -n "$candidate" ]] || fail "Archive did not contain one OpenAlice CLI release directory"
+[[ "$(find "$unpack_dir" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')" == 1 ]] \
+  || fail "Archive contained multiple top-level directories"
+release_json="$candidate/release.json"
+executable="$candidate/bin/openalice"
+[[ -f "$release_json" && -x "$executable" && -f "$candidate/share/openalice/ui/dist/index.html" ]] \
+  || fail "Archive is missing the executable, release metadata, or Web UI"
 
-FILES=(
-  "package.json"
-  "bin/openalice.ts"
-  "bin/openalice.mjs"
-  "src/alice-project.ts"
-  "src/alice-project-product.ts"
-  "src/ai-credential-copy.ts"
-  "src/create-alice-project.ts"
-  "src/project-command.ts"
-  "src/project-transfer.ts"
-  "src/project-transfer-files.ts"
-  "src/project-transfer-secrets.ts"
-  "src/project-transfer-ssh.ts"
-  "src/project-transfer-stream.ts"
-  "src/machine-command.ts"
-  "src/machine-inventory.ts"
-  "src/machine-registry.ts"
-  "src/launch-context.ts"
-  "src/main.ts"
-  "src/managed-source.ts"
-  "src/pi-tui-loader.ts"
-  "src/supervisor-config.ts"
-  "src/supervisor-fleet.ts"
-  "src/supervisor-transfer.ts"
-  "src/supervisor-tui.ts"
-  "src/doctor.mjs"
-  "src/install-layout.mjs"
-  "src/install-source.mjs"
-  "src/lifecycle-command.mjs"
-  "src/lifecycle.mjs"
-  "src/local-start.mjs"
-  "src/logs.mjs"
-  "src/observability-command.mjs"
-  "src/remote.mjs"
-  "src/runtime-deps.mjs"
-  "src/runtime-bundle.mjs"
-  "src/runtime-client.mjs"
-  "src/server.mjs"
-  "src/server-control.mjs"
-  "src/ssh-connect.mjs"
-  "src/uninstall.mjs"
-  "src/update.mjs"
-)
+json_field() {
+  sed -n "s/.*\"$2\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" "$1" | head -n 1
+}
+artifact_version="$(json_field "$release_json" version)"
+artifact_platform="$(json_field "$release_json" platform)"
+artifact_arch="$(json_field "$release_json" arch)"
+content_identity="$(json_field "$release_json" contentIdentity)"
+[[ "$artifact_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]] || fail "release.json has an invalid version"
+[[ "$artifact_platform" == "$platform" && "$artifact_arch" == "$architecture" ]] \
+  || fail "Archive target $artifact_platform-$artifact_arch does not match $platform-$architecture"
+[[ "$content_identity" =~ ^[a-f0-9]{16}$ ]] || fail "release.json has an invalid content identity"
+[[ -z "${OPENALICE_EXPECTED_CLI_CONTENT_IDENTITY:-}" || "$content_identity" == "$OPENALICE_EXPECTED_CLI_CONTENT_IDENTITY" ]] \
+  || fail "Archive content identity $content_identity does not match expected $OPENALICE_EXPECTED_CLI_CONTENT_IDENTITY"
+[[ -z "$release_version" || "$artifact_version" == "$release_version" ]] \
+  || fail "Archive version $artifact_version does not match requested $release_version"
+[[ -z "${OPENALICE_EXPECTED_CLI_VERSION:-}" || "$artifact_version" == "$OPENALICE_EXPECTED_CLI_VERSION" ]] \
+  || fail "Archive contains $artifact_version instead of expected release $OPENALICE_EXPECTED_CLI_VERSION"
 
-step 3 "Downloading OpenAlice and managed Pi"
-acquire_install_lock
-STAGING="$(mktemp -d "${TMPDIR:-/tmp}/openalice-cli.XXXXXX")"
-mkdir -p "$STAGING/bin" "$STAGING/src" "$STAGING/managed/pi"
+reported_version="$(OPENALICE_APP_HOME="$candidate/share/openalice" "$executable" --version)"
+[[ "$reported_version" == "$artifact_version" ]] \
+  || fail "Executable reports $reported_version but release.json reports $artifact_version"
 
-if [[ -n "$SOURCE_DIR" ]]; then
-  for file in "${FILES[@]}"; do
-    cp "$SOURCE_DIR/packages/cli/$file" "$STAGING/$file"
-  done
-else
-  for file in "${FILES[@]}"; do
-    curl --fail --silent --show-error --location --retry 3 --connect-timeout 15 \
-      "$BASE_URL/$file" --output "$STAGING/$file"
-  done
-fi
-ok "CLI files are ready"
-
-if [[ -n "$PI_ASSET_SOURCE_DIR" ]]; then
-  cp "$PI_ASSET_SOURCE_DIR/package.json" "$STAGING/managed/pi/package.json"
-  cp "$PI_ASSET_SOURCE_DIR/package-lock.json" "$STAGING/managed/pi/package-lock.json"
-else
-  curl --fail --silent --show-error --location --retry 3 --connect-timeout 15 \
-    "$PI_RELEASE_BASE/pi-coding-agent-install-package.json" \
-    --output "$STAGING/managed/pi/package.json"
-  curl --fail --silent --show-error --location --retry 3 --connect-timeout 15 \
-    "$PI_RELEASE_BASE/pi-coding-agent-install-package-lock.json" \
-    --output "$STAGING/managed/pi/package-lock.json"
-fi
-[[ "$(file_sha256 "$STAGING/managed/pi/package.json")" == "$PI_PACKAGE_SHA256" ]] \
-  || die "Managed Pi package.json failed SHA-256 verification"
-[[ "$(file_sha256 "$STAGING/managed/pi/package-lock.json")" == "$PI_LOCK_SHA256" ]] \
-  || die "Managed Pi package-lock.json failed SHA-256 verification"
-ok "Pinned Pi $PI_VERSION assets passed SHA-256 verification"
-
-if [[ "$RUNTIME_AUTO_DOWNLOAD" -eq 1 ]]; then
-  RUNTIME_ARCHIVE="$STAGING/$RUNTIME_ARCHIVE_FILE"
-  curl --fail --silent --show-error --location --retry 3 --connect-timeout 15 \
-    "$RUNTIME_RELEASE_BASE_URL/$RUNTIME_ARCHIVE_FILE" \
-    --output "$RUNTIME_ARCHIVE"
-  [[ "$(node -p "require('node:fs').statSync(process.argv[1]).size" "$RUNTIME_ARCHIVE")" == "$RUNTIME_ARCHIVE_SIZE" ]] \
-    || die "OpenAlice Runtime archive size does not match release metadata"
-fi
-
-if [[ -n "$RUNTIME_ARCHIVE" ]]; then
-  runtime_archive_actual_sha256="$(file_sha256 "$RUNTIME_ARCHIVE")"
-  runtime_archive_expected_sha256="$(printf '%s' "$RUNTIME_ARCHIVE_SHA256" | tr 'A-F' 'a-f')"
-  if [[ -n "$RUNTIME_ARCHIVE_SHA256" \
-    && "$runtime_archive_actual_sha256" != "$runtime_archive_expected_sha256" ]]; then
-    die "OpenAlice Runtime archive failed SHA-256 verification"
-  fi
-  mkdir -p "$STAGING/managed/runtime"
-  if ! tar -tzf "$RUNTIME_ARCHIVE" | node -e '
-    let input = "";
-    process.stdin.setEncoding("utf8");
-    process.stdin.on("data", (chunk) => { input += chunk; });
-    process.stdin.on("end", () => {
-      const entries = input.split(/\r?\n/).filter(Boolean);
-      if (entries.length === 0) process.exit(1);
-      for (const entry of entries) {
-        const normalized = entry.replace(/^\.\//, "");
-        if (normalized !== "openalice-runtime"
-          && normalized !== "openalice-runtime/"
-          && !normalized.startsWith("openalice-runtime/")) process.exit(1);
-        if (normalized.split("/").includes("..") || normalized.startsWith("/")) process.exit(1);
-      }
-    });
-  '; then
-    die "OpenAlice Runtime archive contains an unsafe or unexpected path"
-  fi
-  tar -xzf "$RUNTIME_ARCHIVE" \
-    -C "$STAGING/managed/runtime" \
-    --strip-components 1
-  runtime_manifest_json="$(node "$STAGING/src/runtime-bundle.mjs" verify \
-    "$STAGING/managed/runtime" \
-    --platform "$RUNTIME_PLATFORM" \
-    --arch "$RUNTIME_ARCH")" \
-    || die "OpenAlice Runtime bundle verification failed"
-  RUNTIME_CONTENT_IDENTITY="$(node -e '
-    const value = JSON.parse(process.argv[1]);
-    if (!/^[a-f0-9]{16}$/.test(value.contentIdentity ?? "")) process.exit(1);
-    process.stdout.write(value.contentIdentity);
-  ' "$runtime_manifest_json")" \
-    || die "OpenAlice Runtime bundle did not report a valid content identity"
-  RUNTIME_PRODUCT_VERSION="$(node -e '
-    const value = JSON.parse(process.argv[1]);
-    if (typeof value.productVersion !== "string") process.exit(1);
-    process.stdout.write(value.productVersion);
-  ' "$runtime_manifest_json")" \
-    || die "OpenAlice Runtime bundle did not report a product version"
-  ok "OpenAlice Runtime $RUNTIME_PLATFORM-$RUNTIME_ARCH passed verification ($RUNTIME_CONTENT_IDENTITY)"
-fi
-
-step 4 "Installing the managed Pi runtime"
-(
-  cd "$STAGING/managed/pi"
-  npm_config_update_notifier=false "$NPM_BIN" ci \
-    --omit=dev \
-    --ignore-scripts \
-    --no-audit \
-    --no-fund
-)
-PI_RELATIVE_ENTRY="managed/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js"
-PI_STAGED_ENTRY="$STAGING/$PI_RELATIVE_ENTRY"
-[[ -f "$PI_STAGED_ENTRY" ]] || die "npm completed without the managed Pi CLI"
-node -e '
-  const { createRequire } = require("node:module");
-  createRequire(process.argv[1]).resolve("@earendil-works/pi-tui");
-' "$PI_STAGED_ENTRY" \
-  || die "npm completed without the managed Pi TUI dependency"
-PI_STAGED_VERSION="$(node "$PI_STAGED_ENTRY" --version)"
-[[ "$PI_STAGED_VERSION" == "$PI_VERSION" ]] || die "Managed Pi reported $PI_STAGED_VERSION instead of $PI_VERSION"
-ok "Managed Pi $PI_VERSION is ready"
-
-step 5 "Verifying the OpenAlice CLI"
-chmod +x "$STAGING/bin/openalice.ts"
-chmod +x "$STAGING/bin/openalice.mjs"
-node --check "$STAGING/bin/openalice.ts"
-node --check "$STAGING/bin/openalice.mjs"
-node --check "$STAGING/src/alice-project.ts"
-node --check "$STAGING/src/alice-project-product.ts"
-node --check "$STAGING/src/ai-credential-copy.ts"
-node --check "$STAGING/src/create-alice-project.ts"
-node --check "$STAGING/src/project-command.ts"
-node --check "$STAGING/src/project-transfer.ts"
-node --check "$STAGING/src/project-transfer-files.ts"
-node --check "$STAGING/src/project-transfer-secrets.ts"
-node --check "$STAGING/src/project-transfer-ssh.ts"
-node --check "$STAGING/src/project-transfer-stream.ts"
-node --check "$STAGING/src/machine-command.ts"
-node --check "$STAGING/src/machine-inventory.ts"
-node --check "$STAGING/src/machine-registry.ts"
-node --check "$STAGING/src/managed-source.ts"
-node --check "$STAGING/src/supervisor-config.ts"
-node --check "$STAGING/src/supervisor-fleet.ts"
-node --check "$STAGING/src/supervisor-transfer.ts"
-node --check "$STAGING/src/doctor.mjs"
-node --check "$STAGING/src/install-layout.mjs"
-node --check "$STAGING/src/install-source.mjs"
-node --check "$STAGING/src/lifecycle-command.mjs"
-node --check "$STAGING/src/lifecycle.mjs"
-node --check "$STAGING/src/local-start.mjs"
-node --check "$STAGING/src/logs.mjs"
-node --check "$STAGING/src/observability-command.mjs"
-node --check "$STAGING/src/remote.mjs"
-node --check "$STAGING/src/runtime-deps.mjs"
-node --check "$STAGING/src/runtime-bundle.mjs"
-node --check "$STAGING/src/runtime-client.mjs"
-node --check "$STAGING/src/server.mjs"
-node --check "$STAGING/src/server-control.mjs"
-node --check "$STAGING/src/ssh-connect.mjs"
-node --check "$STAGING/src/uninstall.mjs"
-node --check "$STAGING/src/update.mjs"
-
-CLI_VERSION="$(node -e '
-  const manifest = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
-  if (manifest.name !== "@traderalice/openalice-cli" || typeof manifest.version !== "string") process.exit(1);
-  process.stdout.write(manifest.version);
-' "$STAGING/package.json")" || die "The downloaded package manifest is not an OpenAlice CLI package"
-if [[ -n "${OPENALICE_EXPECTED_CLI_VERSION:-}" \
-  && "$CLI_VERSION" != "$OPENALICE_EXPECTED_CLI_VERSION" ]]; then
-  die "The downloaded CLI reported $CLI_VERSION instead of expected release $OPENALICE_EXPECTED_CLI_VERSION"
-fi
-if [[ -n "$RUNTIME_PRODUCT_VERSION" && "$RUNTIME_PRODUCT_VERSION" != "$CLI_VERSION" ]]; then
-  die "The Runtime bundle reports OpenAlice $RUNTIME_PRODUCT_VERSION, but the CLI reports $CLI_VERSION"
-fi
-STAGED_VERSION="$(node "$STAGING/bin/openalice.ts" --version)"
-[[ "$STAGED_VERSION" == "$CLI_VERSION" ]] || die "The downloaded CLI did not report its package version"
-node -e '
-  const { writeFileSync } = require("node:fs");
-  const [path, repository, cliVersion, kind, value, installerUrl, updateChannel] = process.argv.slice(1);
-  writeFileSync(path, `${JSON.stringify({
-    schemaVersion: 2,
-    repository,
-    cliVersion,
-    selector: { kind, value },
-    installerUrl,
-    updateChannel,
-  }, null, 2)}\n`, { mode: 0o644 });
-' "$STAGING/install-source.json" "$REPOSITORY" "$CLI_VERSION" "$REF_KIND" "$VERSION" "$INSTALLER_URL" "$UPDATE_CHANNEL"
-node "$STAGING/bin/openalice.ts" version --json | node -e '
-  let input = "";
-  process.stdin.setEncoding("utf8");
-  process.stdin.on("data", (chunk) => { input += chunk; });
-  process.stdin.on("end", () => {
-    const [kind, value, installerUrl, cliVersion, updateChannel] = process.argv.slice(1);
-    const info = JSON.parse(input);
-    if (info.version !== cliVersion
-      || info.installSource?.schemaVersion !== 2
-      || info.installSource?.cliVersion !== cliVersion
-      || info.installSource?.selector?.kind !== kind
-      || info.installSource?.selector?.value !== value
-      || info.installSource?.installerUrl !== installerUrl
-      || info.installSource?.updateChannel !== updateChannel) process.exit(1);
-  });
-' "$REF_KIND" "$VERSION" "$INSTALLER_URL" "$CLI_VERSION" "$UPDATE_CHANNEL" \
-  || die "The downloaded CLI did not preserve its installation source"
-CONTENT_FILES=("${FILES[@]}" "install-source.json" "managed/pi/package.json" "managed/pi/package-lock.json")
-# Keep the CLI identity stable across operating systems. The platform-specific
-# Runtime has its own manifest identity and is verified independently below.
-CONTENT_ID="$(content_id "$STAGING" "${CONTENT_FILES[@]}")"
-ok "OpenAlice CLI $CLI_VERSION passed validation ($CONTENT_ID)"
-
-step 6 "Installing the commands"
-mkdir -p "$BIN_DIR" "$VERSIONS_DIR"
-DESTINATION="$VERSIONS_DIR/${SAFE_VERSION}-${CONTENT_ID}"
-if [[ -e "$DESTINATION" ]]; then
-  destination_pi_version="$(node "$DESTINATION/$PI_RELATIVE_ENTRY" --version 2>/dev/null || true)"
-  destination_pi_tui_ready=0
-  if node -e '
-    const { createRequire } = require("node:module");
-    createRequire(process.argv[1]).resolve("@earendil-works/pi-tui");
-  ' "$DESTINATION/$PI_RELATIVE_ENTRY" >/dev/null 2>&1; then
-    destination_pi_tui_ready=1
-  fi
-  if [[ -d "$DESTINATION" \
-    && "$(content_id "$DESTINATION" "${CONTENT_FILES[@]}" 2>/dev/null || true)" == "$CONTENT_ID" \
-    && "$destination_pi_version" == "$PI_VERSION" \
-    && "$destination_pi_tui_ready" -eq 1 \
-    && ( -z "$RUNTIME_CONTENT_IDENTITY" \
-      || "$(node "$DESTINATION/src/runtime-bundle.mjs" verify \
-        "$DESTINATION/managed/runtime" \
-        --platform "$RUNTIME_PLATFORM" \
-        --arch "$RUNTIME_ARCH" 2>/dev/null \
-        | node -e '
-          let input = "";
-          process.stdin.setEncoding("utf8");
-          process.stdin.on("data", (chunk) => { input += chunk; });
-          process.stdin.on("end", () => {
-            try {
-              process.stdout.write(JSON.parse(input).contentIdentity ?? "");
-            } catch {}
-          });
-        ')" == "$RUNTIME_CONTENT_IDENTITY" ) ]]; then
-    rm -rf "$STAGING"
-    STAGING=""
-    ok "Reusing the already-verified OpenAlice and Pi release"
-  else
-    damaged_destination="${DESTINATION}.damaged.$$"
-    warn "Preserving a damaged prior release at $damaged_destination"
-    mv "$DESTINATION" "$damaged_destination"
-    mv "$STAGING" "$DESTINATION"
-    STAGING=""
-  fi
-else
-  mv "$STAGING" "$DESTINATION"
-  STAGING=""
-fi
-
-CLI_ENTRY="$DESTINATION/bin/openalice.ts"
-PI_ENTRY="$DESTINATION/$PI_RELATIVE_ENTRY"
-RUNTIME_ENTRY="$DESTINATION/managed/runtime"
-printf -v quoted_cli_entry '%q' "$CLI_ENTRY"
-printf -v quoted_pi_entry '%q' "$PI_ENTRY"
-printf -v quoted_runtime_entry '%q' "$RUNTIME_ENTRY"
-SHELL_LAUNCHER_TEMP="$BIN_DIR/.openalice.$$.tmp"
-CMD_LAUNCHER_TEMP="$BIN_DIR/.openalice.$$.cmd.tmp"
-PI_SHELL_LAUNCHER_TEMP="$BIN_DIR/.pi.$$.tmp"
-PI_CMD_LAUNCHER_TEMP="$BIN_DIR/.pi.$$.cmd.tmp"
-if [[ -n "$RUNTIME_CONTENT_IDENTITY" ]]; then
-  printf '#!/usr/bin/env bash\n# OpenAlice CLI launcher with managed Pi and Runtime\nnode_binary="$(command -v node)" || { printf "OpenAlice requires Node.js.\\n" >&2; exit 1; }\nexport OPENALICE_MANAGED_PI_PATH=%s\nexport OPENALICE_MANAGED_PI_NODE_PATH="$node_binary"\nexport OPENALICE_MANAGED_RUNTIME_PATH=%s\nexport OPENALICE_MANAGED_RUNTIME_CONTENT_IDENTITY=%q\nexec "$node_binary" %s "$@"\n' \
-    "$quoted_pi_entry" "$quoted_runtime_entry" "$RUNTIME_CONTENT_IDENTITY" "$quoted_cli_entry" > "$SHELL_LAUNCHER_TEMP"
-else
-  printf '#!/usr/bin/env bash\n# OpenAlice CLI launcher with managed Pi\nnode_binary="$(command -v node)" || { printf "OpenAlice requires Node.js.\\n" >&2; exit 1; }\nexport OPENALICE_MANAGED_PI_PATH=%s\nexport OPENALICE_MANAGED_PI_NODE_PATH="$node_binary"\nexec "$node_binary" %s "$@"\n' \
-    "$quoted_pi_entry" "$quoted_cli_entry" > "$SHELL_LAUNCHER_TEMP"
-fi
-chmod +x "$SHELL_LAUNCHER_TEMP"
-printf '#!/usr/bin/env bash\n# OpenAlice-managed Pi launcher\nnode_binary="$(command -v node)" || { printf "Pi requires Node.js.\\n" >&2; exit 1; }\nexec "$node_binary" %s "$@"\n' \
-  "$quoted_pi_entry" > "$PI_SHELL_LAUNCHER_TEMP"
-chmod +x "$PI_SHELL_LAUNCHER_TEMP"
-
-WINDOWS_CLI_ENTRY="$CLI_ENTRY"
-WINDOWS_PI_ENTRY="$PI_ENTRY"
-if command -v cygpath >/dev/null 2>&1; then
-  WINDOWS_CLI_ENTRY="$(cygpath -w "$CLI_ENTRY")"
-  WINDOWS_PI_ENTRY="$(cygpath -w "$PI_ENTRY")"
-fi
-WINDOWS_CLI_ENTRY="${WINDOWS_CLI_ENTRY//%/%%}"
-WINDOWS_PI_ENTRY="${WINDOWS_PI_ENTRY//%/%%}"
-printf '@echo off\r\nrem OpenAlice CLI launcher with managed Pi\r\nwhere node >nul 2>nul || (echo OpenAlice requires Node.js. 1>&2 & exit /b 1)\r\nfor %%%%I in (node.exe) do set "OPENALICE_MANAGED_PI_NODE_PATH=%%%%~$PATH:I"\r\nset "OPENALICE_MANAGED_PI_PATH=%s"\r\n"%%OPENALICE_MANAGED_PI_NODE_PATH%%" "%s" %%*\r\n' \
-  "$WINDOWS_PI_ENTRY" "$WINDOWS_CLI_ENTRY" > "$CMD_LAUNCHER_TEMP"
-printf '@echo off\r\nrem OpenAlice-managed Pi launcher\r\nnode "%s" %%*\r\n' \
-  "$WINDOWS_PI_ENTRY" > "$PI_CMD_LAUNCHER_TEMP"
-
-LAUNCHER_VERSION="$("$SHELL_LAUNCHER_TEMP" --version)"
-[[ "$LAUNCHER_VERSION" == "$CLI_VERSION" ]] || die "The staged OpenAlice launcher is not runnable"
-PI_LAUNCHER_VERSION="$("$PI_SHELL_LAUNCHER_TEMP" --version)"
-[[ "$PI_LAUNCHER_VERSION" == "$PI_VERSION" ]] || die "The staged managed Pi launcher is not runnable"
-
-# Every launcher points to an immutable, validated release before any visible
-# command is replaced. A failed update therefore leaves each visible launcher
-# pointing to a complete old or new release rather than a half-written tree.
-mv -f "$PI_CMD_LAUNCHER_TEMP" "$BIN_DIR/pi.cmd"
-PI_CMD_LAUNCHER_TEMP=""
-mv -f "$CMD_LAUNCHER_TEMP" "$BIN_DIR/openalice.cmd"
-CMD_LAUNCHER_TEMP=""
-mv -f "$PI_SHELL_LAUNCHER_TEMP" "$BIN_DIR/pi"
-PI_SHELL_LAUNCHER_TEMP=""
-mv -f "$SHELL_LAUNCHER_TEMP" "$BIN_DIR/openalice"
-SHELL_LAUNCHER_TEMP=""
-
-path_updated=0
-if [[ "$MODIFY_PATH" -eq 1 && "$path_present" -eq 0 && -n "$profile" ]]; then
-  if update_path_profile; then
-    path_updated=1
-  else
-    rm -f "${profile}.openalice.$$"
-    warn "Could not update $profile; the command is installed and can be added to PATH manually"
-  fi
-fi
-
-INSTALLED_VERSION="$("$BIN_DIR/openalice" --version)"
-[[ "$INSTALLED_VERSION" == "$CLI_VERSION" ]] || die "The installed OpenAlice command failed its version check"
-INSTALLED_PI_VERSION="$("$BIN_DIR/pi" --version)"
-[[ "$INSTALLED_PI_VERSION" == "$PI_VERSION" ]] || die "The installed Pi command failed its version check"
-ok "Installed and verified $BIN_DIR/openalice"
-ok "Installed and verified $BIN_DIR/pi"
-release_install_lock
-
-printf '\n%bOpenAlice and Pi are ready.%b\n' "${GREEN}${BOLD}" "$RESET"
-printf '  %-12s %s\n' "Command" "$BIN_DIR/openalice"
-printf '  %-12s %s\n' "CLI version" "$CLI_VERSION"
-printf '  %-12s %s\n' "Agent" "$BIN_DIR/pi"
-printf '  %-12s %s\n' "Pi version" "$PI_VERSION"
-if [[ -n "$RUNTIME_CONTENT_IDENTITY" ]]; then
-  printf '  %-12s %s\n' "Runtime" "$RUNTIME_PRODUCT_VERSION ($RUNTIME_PLATFORM-$RUNTIME_ARCH)"
-  printf '  %-12s %s\n' "Runtime ID" "$RUNTIME_CONTENT_IDENTITY"
-fi
-if [[ "$REF_KIND" == "branch" ]]; then
-  printf '  %-12s %s\n' "Branch" "$VERSION"
-else
-  printf '  %-12s %s\n' "Source ref" "$VERSION"
-fi
-if [[ "$path_updated" -eq 1 ]]; then
-  printf '  %-12s %s\n' "Shell" "Future terminals will load the managed block in $profile"
-fi
-if [[ "$path_present" -eq 0 ]]; then
-  printf '\nActivate OpenAlice in this terminal now (no restart required):\n  %s\n' "$current_path_command"
-fi
-if [[ -n "$existing_command" && "$existing_command" != "$BIN_DIR/openalice" ]]; then
-  printf '\n%bPATH note:%b this terminal still resolves %s first.\n' "$YELLOW" "$RESET" "$existing_command"
-  printf 'Use %s now, or apply the PATH command above.\n' "$BIN_DIR/openalice"
-fi
-
-checkout=""
-if [[ -n "$RUNTIME_CONTENT_IDENTITY" && "$INSTALL_CONTEXT" != "remote" ]]; then
-  printf '\n%bReady to launch%b\n' "$BOLD" "$RESET"
-  printf '  Local UI     Starts on an available loopback port\n'
-  printf '  Supervisor   Starts and manages the installed Runtime\n'
-  if [[ "$TTY_OPEN" -eq 1 ]]; then
-    start_status=0
-    prompt_yes_no "Open the OpenAlice Supervisor now?" || start_status=$?
-    if [[ "$start_status" -eq 0 ]]; then
-      exec 3>&- 3<&-
-      TTY_OPEN=0
-      printf '\nOpening the OpenAlice Supervisor...\n\n'
-      exec "$BIN_DIR/openalice"
+tree_metadata() {
+  local root="$1" path relative entry_type entry_mode link_target
+  while IFS= read -r -d '' path; do
+    relative="${path#"$root"}"
+    relative="${relative#/}"
+    [[ -n "$relative" ]] || relative="."
+    link_target=""
+    if [[ -L "$path" ]]; then
+      entry_type="link"
+      entry_mode="-"
+      link_target="$(readlink "$path")"
+    elif [[ -d "$path" ]]; then
+      entry_type="directory"
+      if [[ "$platform" == darwin ]]; then
+        entry_mode="$(stat -f '%Lp' "$path")"
+      else
+        entry_mode="$(stat -c '%a' "$path")"
+      fi
+    elif [[ -f "$path" ]]; then
+      entry_type="file"
+      if [[ "$platform" == darwin ]]; then
+        entry_mode="$(stat -f '%Lp' "$path")"
+      else
+        entry_mode="$(stat -c '%a' "$path")"
+      fi
+    else
+      entry_type="other"
+      entry_mode="-"
     fi
-  fi
-  printf '\nStart it when you are ready from any directory:\n  %s\n\n' "$BIN_DIR/openalice"
-elif [[ "$INSTALL_CONTEXT" == "remote" ]]; then
-  printf '\nReturning to the approved remote setup plan.\n\n'
+    printf '%s\t%s\t%s\t%s\n' "$relative" "$entry_type" "$entry_mode" "$link_target"
+  done < <(find "$root" -print0)
+}
+
+release_name="${artifact_version}-${platform}-${architecture}-${content_identity}"
+final_release="$releases_dir/$release_name"
+if [[ -e "$final_release" ]]; then
+  [[ -d "$final_release" && ! -L "$final_release" ]] \
+    || fail "Existing release $release_name is damaged; preserve it and reinstall after inspection"
+  command -v diff >/dev/null 2>&1 \
+    || fail "diff is required to verify the existing OpenAlice release"
+  diff -qr "$candidate" "$final_release" >/dev/null \
+    || fail "Existing release $release_name is damaged; preserve it and reinstall after inspection"
+  diff -u \
+    <(tree_metadata "$candidate" | LC_ALL=C sort) \
+    <(tree_metadata "$final_release" | LC_ALL=C sort) >/dev/null \
+    || fail "Existing release $release_name is damaged; preserve it and reinstall after inspection"
+  printf 'Reusing verified release %s.\n' "$release_name"
 else
-  checkout="$(find_openalice_checkout 2>/dev/null || true)"
+  mv "$candidate" "$final_release"
 fi
-if [[ -z "$RUNTIME_CONTENT_IDENTITY" && -n "$checkout" ]]; then
-  printf '\n%bReady to launch%b\n' "$BOLD" "$RESET"
-  printf '  Checkout     %s\n' "$checkout"
-  printf '  Local UI     http://127.0.0.1:47331\n'
-  printf '  Supervisor   Starts and manages a persistent background Runtime\n'
-  if [[ "$TTY_OPEN" -eq 1 ]]; then
-    start_status=0
-    prompt_yes_no "Open the OpenAlice Supervisor now?" || start_status=$?
-    if [[ "$start_status" -eq 0 ]]; then
-      exec 3>&- 3<&-
-      TTY_OPEN=0
-      printf '\nOpening the OpenAlice Supervisor...\n\n'
-      cd "$checkout"
-      exec "$BIN_DIR/openalice"
+
+case "$selector_kind" in
+  stable) update_channel="stable"; selector_json_kind="version"; selector_json_value="v$artifact_version" ;;
+  beta) update_channel="beta"; selector_json_kind="version"; selector_json_value="v$artifact_version" ;;
+  release) update_channel="$channel"; selector_json_kind="version"; selector_json_value="v$artifact_version" ;;
+  pinned) update_channel="pinned"; selector_json_kind="version"; selector_json_value="v$artifact_version" ;;
+  development) update_channel="development"; selector_json_kind="branch"; selector_json_value="dev" ;;
+  local) update_channel="custom"; selector_json_kind="version"; selector_json_value="local-$artifact_version" ;;
+esac
+cat >"$provenance_dir/$release_name.json" <<EOF
+{
+  "schemaVersion": 3,
+  "repository": "$REPOSITORY",
+  "cliVersion": "$artifact_version",
+  "selector": { "kind": "$selector_json_kind", "value": "$selector_json_value" },
+  "installerUrl": "$INSTALLER_URL",
+  "updateChannel": "$update_channel",
+  "method": "direct",
+  "artifact": { "platform": "$platform", "arch": "$architecture", "sha256": "$archive_sha256" },
+  "installedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOF
+
+if [[ -L "$cli_root/current" ]]; then
+  previous_release_path="$(CDPATH= cd -- "$cli_root/current" && pwd -P)"
+  canonical_releases_dir="$(CDPATH= cd -- "$releases_dir" && pwd -P)"
+  [[ "$(dirname "$previous_release_path")" == "$canonical_releases_dir" ]] \
+    || fail "The active OpenAlice release pointer leaves the installer-owned releases directory"
+  previous_release_name="$(basename "$previous_release_path")"
+  [[ "$previous_release_name" =~ ^[A-Za-z0-9._+-]+$ ]] \
+    || fail "The active OpenAlice release name is invalid"
+fi
+
+if [[ "$legacy_detected" == true ]]; then
+  legacy_launcher_backup="$staging_dir/legacy-launchers"
+  mkdir "$legacy_launcher_backup"
+  for launcher_name in openalice alice alice-workspace alice-uta traderhub pi pi.cmd openalice.cmd; do
+    launcher_path="$bin_dir/$launcher_name"
+    if [[ -e "$launcher_path" || -L "$launcher_path" ]]; then
+      [[ -f "$launcher_path" || -L "$launcher_path" ]] \
+        || fail "Legacy launcher path is not a regular file or symlink and cannot be replaced safely: $launcher_path"
     fi
-  fi
-  printf '\nStart it when you are ready:\n  cd %q\n  %s\n\n' "$checkout" "$BIN_DIR/openalice"
-elif [[ -z "$RUNTIME_CONTENT_IDENTITY" && "$INSTALL_CONTEXT" != "remote" ]]; then
-  printf '\n%bNext: open the OpenAlice Supervisor%b\n' "$BOLD" "$RESET"
-  printf '  %s\n\n' "$BIN_DIR/openalice"
-  printf 'Press %bEnter%b inside the Supervisor to prepare, start, and open OpenAlice.\n' "$BOLD" "$RESET"
-  printf 'Use %bc%b only if you want to select an existing checkout instead.\n\n' "$BOLD" "$RESET"
+  done
+  for launcher_name in openalice alice alice-workspace alice-uta traderhub pi pi.cmd openalice.cmd; do
+    launcher_path="$bin_dir/$launcher_name"
+    if [[ -e "$launcher_path" || -L "$launcher_path" ]]; then
+      cp -pP "$launcher_path" "$legacy_launcher_backup/$launcher_name"
+    fi
+  done
+  legacy_launchers_backed_up=true
 fi
+
+if [[ "$previous_release_name" != "$release_name" ]]; then
+  activated_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  activation_next="$activation_path.next.$$"
+  cat >"$activation_next" <<EOF
+{
+  "schemaVersion": 1,
+  "activeRelease": "$release_name",
+  "previousRelease": $([[ -n "$previous_release_name" ]] && printf '"%s"' "$previous_release_name" || printf 'null'),
+  "productVersion": "$artifact_version",
+  "state": "pending",
+  "activatedAt": "$activated_at"
+}
+EOF
+  chmod 600 "$activation_next"
+  mv -f "$activation_next" "$activation_path"
+  activation_receipt_written=true
+
+  next_link="$cli_root/current.next.$$"
+  rm -f "$next_link"
+  ln -s "releases/$release_name" "$next_link"
+  if [[ "$platform" == darwin ]]; then
+    mv -fh "$next_link" "$cli_root/current"
+  else
+    mv -Tf "$next_link" "$cli_root/current"
+  fi
+  activation_switched=true
+fi
+
+write_launcher() {
+  launcher_name="$1"
+  workspace_cli="${2:-}"
+  temporary_launcher="$bin_dir/.${launcher_name}.next.$$"
+  cat >"$temporary_launcher" <<EOF
+#!/bin/sh
+set -eu
+bin_dir=\$(CDPATH= cd -- "\$(dirname -- "\$0")" && pwd -P)
+install_root=\$(dirname "\$bin_dir")
+release_dir=\$(CDPATH= cd -- "\$install_root/cli/current" && pwd -P)
+release_name=\$(basename "\$release_dir")
+content_identity=\${release_name##*-}
+export OPENALICE_INSTALL_ROOT="\$install_root"
+export OPENALICE_RELEASE_DIR="\$release_dir"
+export OPENALICE_INSTALL_SOURCE="\$install_root/cli/provenance/\$release_name.json"
+export OPENALICE_CONTENT_IDENTITY="\$content_identity"
+export OPENALICE_INSTALL_METHOD="direct"
+EOF
+  if [[ -n "$workspace_cli" ]]; then
+    printf 'exec "$release_dir/bin/openalice" --workspace-cli %s "$@"\n' "$workspace_cli" >>"$temporary_launcher"
+  else
+    printf 'exec "$release_dir/bin/openalice" "$@"\n' >>"$temporary_launcher"
+  fi
+  chmod 755 "$temporary_launcher"
+  mv -f "$temporary_launcher" "$bin_dir/$launcher_name"
+}
+
+write_launcher openalice
+for helper in alice alice-workspace alice-uta traderhub; do write_launcher "$helper" "$helper"; done
+"$bin_dir/openalice" --version >/dev/null
+
+if [[ "$legacy_detected" == true ]]; then
+  rm -f "$bin_dir/pi" "$bin_dir/pi.cmd" "$bin_dir/openalice.cmd"
+  rm -rf "$legacy_cli_root"
+  printf 'Removed the validated legacy CLI release and managed-Pi launchers.\n'
+fi
+install_complete=true
+
+active_release="$(CDPATH= cd -- "$cli_root/current" && pwd -P)"
+release_paths=("$releases_dir"/*)
+if [[ -e "${release_paths[0]}" ]]; then
+  release_count=0
+  while IFS= read -r retained_release; do
+    [[ -n "$retained_release" ]] || continue
+    release_count=$((release_count + 1))
+    if (( release_count > KEEP_RELEASES )) \
+      && [[ "$retained_release" != "$active_release" ]] \
+      && [[ -z "$previous_release_name" || "$retained_release" != "$releases_dir/$previous_release_name" ]]; then
+      retained_name="$(basename "$retained_release")"
+      rm -rf "$retained_release"
+      rm -f "$provenance_dir/$retained_name.json"
+    fi
+  done < <(ls -1dt "${release_paths[@]}")
+fi
+
+BEGIN_MARKER="# >>> OpenAlice CLI >>>"
+END_MARKER="# <<< OpenAlice CLI <<<"
+shell_single_quote() {
+  local quoted
+  quoted="$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+  printf "'%s'" "$quoted"
+}
+quoted_bin_dir="$(shell_single_quote "$bin_dir")"
+path_command="export PATH=${quoted_bin_dir}:\$PATH"
+profile=""
+case "$(basename "${SHELL:-}")" in
+  zsh) [[ "$platform" == darwin ]] && profile="$HOME/.zprofile" || profile="$HOME/.zshrc" ;;
+  bash) [[ "$platform" == darwin ]] && profile="$HOME/.bash_profile" || profile="$HOME/.bashrc" ;;
+  fish) profile="$HOME/.config/fish/config.fish"; path_command="fish_add_path -- ${quoted_bin_dir}" ;;
+esac
+if [[ "$modify_path" == true && -n "$profile" ]]; then
+  mkdir -p "$(dirname "$profile")"
+  touch "$profile"
+  if ! grep -Fq "$BEGIN_MARKER" "$profile"; then
+    printf '\n%s\n%s\n%s\n' "$BEGIN_MARKER" "$path_command" "$END_MARKER" >>"$profile" \
+      || printf 'Warning: could not update %s; use the activation command below.\n' "$profile" >&2
+  fi
+fi
+
+printf '\nOpenAlice %s is ready.\n' "$artifact_version"
+printf 'Active release: %s\n' "$final_release"
+if [[ ":${PATH:-}:" != *":$bin_dir:"* ]]; then
+  printf 'Activate OpenAlice in this terminal now (no restart required):\n  %s\n' "$path_command"
+fi
+printf 'Run: openalice\n'
+printf 'Agent Runtimes remain user-owned and are discovered from PATH.\n'

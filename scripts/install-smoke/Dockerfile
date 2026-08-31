@@ -1,23 +1,16 @@
-FROM node:22-bookworm-slim
+FROM debian:bookworm-slim
 
 RUN DEBIAN_FRONTEND=noninteractive apt-get update \
-  && apt-get install -y --no-install-recommends bash ca-certificates curl \
+  && apt-get install -y --no-install-recommends bash ca-certificates coreutils curl tar \
   && rm -rf /var/lib/apt/lists/* \
-  && rm -f /usr/local/bin/pnpm /usr/local/bin/pnpx \
   && useradd --home-dir /home/smoke --no-create-home --shell /bin/bash --uid 10001 smoke \
   && mkdir -p /home/smoke \
   && chown smoke:smoke /home/smoke
 
 WORKDIR /fixture
 COPY --chown=smoke:smoke install /fixture/install
-COPY --chown=smoke:smoke packages/cli /fixture/packages/cli
-COPY --chown=smoke:smoke scripts/install-smoke/interactive.sh /fixture/interactive.sh
 COPY --chown=smoke:smoke scripts/install-smoke/run.sh /fixture/run.sh
-COPY --chown=smoke:smoke scripts/install-smoke/fake-package-manager.sh /fixture/fake-package-manager.sh
-COPY --chown=smoke:smoke scripts/install-smoke/fake-npm.sh /fixture/fake-npm.sh
-COPY --chown=smoke:smoke scripts/install-smoke/fake-pi-tui.mjs /fixture/fake-pi-tui.mjs
-COPY --chown=smoke:smoke scripts/install-smoke/pi-assets /fixture/pi-assets
-COPY --chown=smoke:smoke scripts/install-smoke/static-server.mjs /fixture/static-server.mjs
+COPY --chown=smoke:smoke scripts/install-smoke/interactive.sh /fixture/interactive.sh
 
 USER smoke
 ENV HOME=/home/smoke

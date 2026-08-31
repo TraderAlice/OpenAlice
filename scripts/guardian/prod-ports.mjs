@@ -86,7 +86,9 @@ export async function planProdPorts(
   config,
   options = {},
 ) {
-  const probe = options.probe ?? probeFreePort
+  const probe = options.probe ?? ((start, max) => probeFreePort(start, max, {
+    createServerImpl: options.createServerImpl,
+  }))
   const claim = async (name, choice, probeStart) => {
     if (choice.source === 'default') return probe(probeStart)
     try {
@@ -120,22 +122,33 @@ export async function planProdPorts(
   return { web, mcp, uta, connector }
 }
 
-async function probeFreePort(start, max = 65_535) {
+async function probeFreePort(start, max = 65_535, options = {}) {
   for (let port = start; port <= max; port += 1) {
-    if (await canListen(port)) return port
+    if (await canListen(port, options)) return port
   }
   throw new Error(
     `[guardian/prod] no free loopback port available from ${start} to ${max}`,
   )
 }
 
-function canListen(port) {
+function canListen(port, options = {}) {
   return new Promise((resolveResult) => {
-    const server = createServer()
+    const createServerImpl = options.createServerImpl ?? createServer
+    const server = createServerImpl((socket) => {
+      // A readiness client can race this temporary listener. Reject it so
+      // server.close() never waits on a non-HTTP probe connection.
+      socket.destroy()
+    })
+    let settled = false
+    const finish = (available) => {
+      if (settled) return
+      settled = true
+      resolveResult(available)
+    }
     server.unref()
-    server.once('error', () => resolveResult(false))
+    server.once('error', () => finish(false))
     server.listen(port, '127.0.0.1', () => {
-      server.close(() => resolveResult(true))
+      server.close(() => finish(true))
     })
   })
 }

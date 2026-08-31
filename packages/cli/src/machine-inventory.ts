@@ -9,6 +9,7 @@ import { access, readFile } from 'node:fs/promises'
 import { hostname } from 'node:os'
 
 import { readAliceProjectProduct, type AliceProjectProduct } from './alice-project-product.ts'
+import { CLI_VERSION } from './install-source.mjs'
 import { resolveSupervisorRootPath, type ResolveSupervisorRootOptions } from './launch-context.ts'
 import { inspectRuntime } from './lifecycle.mjs'
 import type { RegisteredMachine } from './machine-registry.ts'
@@ -468,9 +469,7 @@ function emptyRuntimeSummary(): ProjectRuntimeSummary {
 }
 
 async function readCliVersion(): Promise<string> {
-  const text = await readFile(new URL('../package.json', import.meta.url), 'utf8')
-  const value = JSON.parse(text) as unknown
-  return isRecord(value) && typeof value['version'] === 'string' ? value['version'] : 'unknown'
+  return CLI_VERSION
 }
 
 async function mapWithConcurrency<T, R>(

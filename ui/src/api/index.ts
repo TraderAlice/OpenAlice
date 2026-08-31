@@ -96,6 +96,8 @@ export type {
 } from './types'
 export type {
   ConnectorDefinition,
+  ConnectorAdapterMutation,
+  ConnectorAdapterMutationResult,
   PublicConnectorConfig,
   ConnectorHealth,
   ConnectorSettingsSnapshot,

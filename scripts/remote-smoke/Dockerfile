@@ -1,51 +1,39 @@
-FROM node:22-bookworm-slim
+FROM oven/bun:1.4.0 AS bun-runtime
+
+FROM node:22-bookworm AS builder
+COPY --from=bun-runtime /usr/local/bin/bun /usr/local/bin/bun
+WORKDIR /repo
+COPY . .
+RUN corepack enable \
+  && corepack prepare pnpm@11.7.0 --activate \
+  && pnpm install --frozen-lockfile \
+  && pnpm exec tsx scripts/build-migration-index.ts \
+  && pnpm exec turbo run build --filter=!./packages/uta-broker-* \
+  && pnpm exec tsup src/main.ts --format esm --dts \
+  && pnpm build:bun:release
+
+FROM debian:bookworm-slim
 
 RUN DEBIAN_FRONTEND=noninteractive apt-get update \
-  && apt-get install -y --no-install-recommends bash ca-certificates curl git g++ make openssh-server python3 \
+  && apt-get install -y --no-install-recommends bash ca-certificates curl openssh-server python3 \
   && rm -rf /var/lib/apt/lists/* \
   && useradd --create-home --shell /bin/bash --uid 10001 smoke \
   && passwd --delete smoke \
-  && mkdir -p /run/sshd /fixture/OpenAlice/scripts/guardian \
+  && mkdir -p /run/sshd /fixture/www/cli/dev \
   && ssh-keygen -A
 
-COPY install /fixture/install
-COPY packages/cli /fixture/packages/cli
-COPY scripts/install-smoke/static-server.mjs /fixture/static-server.mjs
-COPY scripts/install-smoke/fake-npm.sh /fixture/fake-npm.sh
-COPY scripts/install-smoke/fake-pi-tui.mjs /fixture/fake-pi-tui.mjs
-COPY scripts/install-smoke/pi-assets /fixture/pi-assets
-COPY packages/guardian-runtime/src/control-server.ts /fixture/packages/guardian-runtime/src/control-server.ts
-COPY scripts/guardian/control-server.mjs /fixture/OpenAlice/scripts/guardian/control-server.mjs
-COPY scripts/remote-smoke/fixture-guardian.mjs /fixture/OpenAlice/scripts/guardian/prod.mjs
-COPY scripts/remote-smoke/fixture-package.json /fixture/OpenAlice/package.json
-COPY scripts/remote-smoke/build-runtime-fixture.mjs /fixture/scripts/remote-smoke/build-runtime-fixture.mjs
+COPY install /fixture/www/install
+COPY --from=builder /repo/dist/bun-release/openalice-cli-*.tar.gz /fixture/artifacts/
+COPY --from=builder /repo/dist/bun-release/openalice-cli-*.tar.gz.sha256 /fixture/artifacts/
 COPY scripts/remote-smoke/entrypoint.sh /fixture/entrypoint.sh
 
-RUN mkdir -p \
-    /fixture/OpenAlice/dist \
-    /fixture/OpenAlice/ui/dist \
-    /fixture/OpenAlice/services/uta/dist \
-    /fixture/OpenAlice/services/connector/dist \
-    /fixture/OpenAlice/packages/guardian-runtime/dist \
-    /fixture/OpenAlice/node_modules \
-  && cp /fixture/pi-assets/package.json /fixture/pi-assets/pi-coding-agent-install-package.json \
-  && cp /fixture/pi-assets/package-lock.json /fixture/pi-assets/pi-coding-agent-install-package-lock.json \
-  && touch \
-    /fixture/OpenAlice/dist/main.js \
-    /fixture/OpenAlice/ui/dist/index.html \
-    /fixture/OpenAlice/services/uta/dist/uta.js \
-    /fixture/OpenAlice/services/connector/dist/connector.cjs \
-    /fixture/OpenAlice/packages/guardian-runtime/dist/index.js \
-    /fixture/OpenAlice/node_modules/.keep \
-  && git -C /fixture/OpenAlice init --initial-branch=main \
-  && git -C /fixture/OpenAlice config user.email smoke@openalice.local \
-  && git -C /fixture/OpenAlice config user.name 'OpenAlice Smoke' \
-  && git -C /fixture/OpenAlice add --force . \
-  && git -C /fixture/OpenAlice commit -m 'remote smoke fixture' \
-  && git -C /fixture/OpenAlice tag remote-smoke \
-  && node /fixture/scripts/remote-smoke/build-runtime-fixture.mjs \
-  && chmod +x /fixture/entrypoint.sh /fixture/fake-npm.sh \
-  && chown -R smoke:smoke /fixture/OpenAlice /home/smoke
+RUN archive="$(find /fixture/artifacts -name 'openalice-cli-*-linux-*.tar.gz' -type f -print -quit)" \
+  && test -n "$archive" \
+  && target_arch="$(uname -m | sed 's/x86_64/x64/; s/aarch64/arm64/')" \
+  && cp "$archive" "/fixture/www/cli/dev/openalice-cli-dev-linux-${target_arch}.tar.gz" \
+  && cp "$archive.sha256" "/fixture/www/cli/dev/openalice-cli-dev-linux-${target_arch}.tar.gz.sha256" \
+  && chmod +x /fixture/entrypoint.sh \
+  && chown -R smoke:smoke /fixture /home/smoke
 
 EXPOSE 22
 ENTRYPOINT ["/fixture/entrypoint.sh"]

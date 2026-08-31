@@ -1,11 +1,16 @@
 # Bun-native CLI Distribution
 
-Status: Active — design accepted, feasibility work not started
+Status: Active — macOS/Linux native CLI is public in v0.90.2 and the separately
+dispatched v0.91.0-beta.1 is externally verified; stable remains v0.90.2 while
+stable/beta discovery authority is converged on the OpenAlice CDN;
+native PowerShell and external package-manager activation remain deferred
 
-Delivery mode: Serial / interactive. This changes a released install and
-long-running Runtime entry path. Each accepted increment starts from current
-`dev`, lands through one focused PR to `dev`, and updates this plan with the
-verification actually completed.
+Delivery mode: Serial / interactive from current `dev`. The accepted native CLI
+increments have already reached `dev`; the old `codex/usability-improvements`
+tip contains superseded release-flow experiments and must not be promoted as a
+whole. New implementation increments use focused branches back to `dev`.
+Human-directed source promotion and the focused version-only branch continue to
+follow [[docs/development-workflow.md]].
 
 Parent product plan: [[plans/shell-first-cli-supervisor.md]]. This plan
 supersedes only that plan's CLI distribution mechanics: managed Pi, the host
@@ -51,13 +56,13 @@ shrinking the ownership boundary to OpenAlice itself.
 
 ## Objective
 
-Publish a native OpenAlice command for macOS, Linux, and Windows that:
+Publish a native OpenAlice command for macOS and Linux that:
 
-- runs without a system Node.js or Bun installation;
+- runs without a system Node.js, Bun, or Git installation;
 - starts the existing Guardian-owned multi-process Runtime from any directory;
 - embeds or ships only OpenAlice-owned code and resources;
 - launches user-owned Agent Runtime executables as independent PTY processes;
-- supports direct Bash/PowerShell installation plus npm, Bun, Homebrew, and
+- supports direct Bash installation plus npm, Bun, Homebrew, and
   Arch/AUR installation from the same accepted release artifacts;
 - keeps installation bytes separate from `OPENALICE_HOME` product data so a
   clean reinstall or bounded cutover never rewrites that data; and
@@ -179,12 +184,21 @@ preserve the old layout.
 
 ```text
 <install-root>/
-  releases/
-    <version>-<platform>-<content-id>/
-      bin/openalice[.exe]
-      adapters/
-      release.json
-  current -> releases/<active-release>
+  cli/
+    releases/
+      <version>-<platform>-<arch>-<content-id>/
+        bin/openalice[.exe]
+        share/openalice/
+          runtime/git/
+          ui/dist/
+          default/
+          src/workspaces/templates/
+          src/workspaces/cli/bin/
+        adapters/
+        release.json
+    current -> releases/<active-release>
+    provenance/<release-name>.json
+    staging/
   bin/
     openalice
     alice
@@ -207,13 +221,15 @@ installations are never removal targets.
 
 ### Initial build matrix
 
-Cutover requires the platforms already served by the CLI plus native Windows:
+The current cutover gate covers macOS and Linux. Native Windows is explicitly
+deferred; its PowerShell, PTY, path, junction, signing, and locked-executable
+work remains a later platform initiative rather than blocking this plan.
 
 | Platform | Architectures | Initial gate |
 |---|---|---|
 | macOS | arm64, x64 | Required |
 | Linux glibc | arm64, x64 | Required |
-| Windows | x64 | Required |
+| Windows | x64 | Deferred |
 
 Linux musl and Windows arm64 are follow-up targets only after there is a
 supported-user or deployment requirement. Do not multiply release variants
@@ -242,7 +258,7 @@ The intended stable user surfaces are:
 curl -fsSL https://openalice.ai/install | bash
 # native Windows uses the matching PowerShell entry
 npm install -g openalice
-bun add -g openalice
+bun add -g --trust openalice
 brew install traderalice/tap/openalice
 paru -S openalice-bin
 ```
@@ -266,11 +282,10 @@ npm and Bun consume one registry topology rather than separate packages:
 ```text
 openalice                       # small meta package, exposes `openalice`
   optionalDependencies:
-    @traderalice/openalice-darwin-arm64
-    @traderalice/openalice-darwin-x64
-    @traderalice/openalice-linux-arm64
-    @traderalice/openalice-linux-x64
-    @traderalice/openalice-windows-x64
+    openalice-darwin-arm64
+    openalice-darwin-x64
+    openalice-linux-arm64
+    openalice-linux-x64
 ```
 
 Each platform package contains the already accepted native release payload.
@@ -344,27 +359,28 @@ Checkboxes reflect repository truth, not intent.
 
 ### 1. Feasibility gate
 
-- [ ] Pin the Bun build tool version used by CI and local release builds.
-- [ ] Compile the TypeScript CLI and Supervisor TUI for the current host with
+- [x] Pin the Bun build tool version used by CI and local release builds.
+- [x] Compile the TypeScript CLI and Supervisor TUI for the current host with
   no system Node requirement in the output.
-- [ ] Compile and boot Alice from an isolated `OPENALICE_HOME` with the real Web
+- [x] Compile and boot Alice from an isolated `OPENALICE_HOME` with the real Web
   UI and auth-status route.
-- [ ] Re-execute the compiled binary as Guardian, Alice, UTA, and Connector;
+- [x] Re-execute the compiled binary as Guardian, Alice, UTA, and Connector;
   prove separate PIDs, signal propagation, component failure isolation, and
   clean lock release.
-- [ ] Launch at least two independent fake or real Agent CLI PTYs; stopping one
+- [x] Launch at least two independent fake or real Agent CLI PTYs; stopping one
   must not stop the other, Alice, or Guardian.
-- [ ] Prove the current `node-pty` path under Bun on macOS and Windows. If it
-  fails, compare an embedded N-API load with a Bun-native PTY implementation
-  behind the existing PTY ownership boundary. Do not add a Node sidecar as the
-  default answer.
-- [ ] Prove an installed broker pack can still be dynamically loaded from
+- [x] Finish the Bun-native PTY gate. Bun 1.4 `Terminal` is accepted on macOS
+  arm64, Linux arm64, and Linux x64 behind the existing PTY ownership boundary;
+  high-output backpressure stops the whole PTY process group at the producer
+  boundary and resumes below the existing low watermark. Do not add a Node
+  sidecar as the default answer.
+- [x] Prove an installed broker pack can still be dynamically loaded from
   `OPENALICE_HOME` without bundling its SDK into UTA Core.
-- [ ] Prove embedded UI/default/template reads and one materialized external
+- [x] Prove embedded UI/default/template reads and one materialized external
   adapter file.
-- [ ] Record measured executable size, cold start, idle memory per role, and
+- [x] Record measured executable size, cold start, idle memory per role, and
   clean-build time against the released headless Runtime.
-- [ ] Decide go/no-go from real macOS and Windows evidence. A compile-only
+- [x] Decide go/no-go from real macOS and Linux evidence. A compile-only
   success is insufficient.
 
 No public installer or durable compatibility layer changes in this increment.
@@ -373,99 +389,114 @@ build harness when it improves the next investigation.
 
 ### 2. Bun runtime entry and build ownership
 
-- [ ] Add one strict TypeScript build entry that dispatches user commands and
+- [x] Add one strict TypeScript build entry that dispatches user commands and
   internal roles before role startup.
-- [ ] Convert Guardian, Alice, UTA, and Connector top-level startup into
+- [x] Convert Guardian, Alice, UTA, and Connector top-level startup into
   explicit boot functions without changing their process boundaries.
-- [ ] Replace Guardian's child JavaScript paths with self-executable role
+- [x] Replace Guardian's child JavaScript paths with self-executable role
   spawns while preserving environment, readiness, restart, and shutdown
   behavior.
-- [ ] Bundle OpenAlice package dependencies and required platform-native
+- [x] Bundle OpenAlice package dependencies and required platform-native
   assets; keep broker packs external.
-- [ ] Generate platform archives, `release.json`, SHA-256 metadata, version,
+- [x] Generate platform archives, `release.json`, SHA-256 metadata, version,
   control compatibility, and content identity from accepted build outputs.
-- [ ] Keep source development on `pnpm dev`; it need not imitate the installed
+- [x] Keep source development on `pnpm dev`; it need not imitate the installed
   executable layout.
 
 ### 3. Resources and Workspace helper boundary
 
-- [ ] Embed Web UI, defaults, templates, migrations, and immutable adapter
+- [x] Ship Web UI, defaults, templates, migrations, and immutable adapter
   resources through one resource-root abstraction shared with source and
   Electron modes.
-- [ ] Serve the real UI and create every standard Workspace template from a
+- [x] Serve the real UI and create every standard Workspace template from a
   compiled executable outside the repository.
-- [ ] Replace Node-backed Workspace CLI shims with aliases or small wrappers
+- [x] Replace Node-backed Workspace CLI shims with aliases or small wrappers
   that dispatch into `openalice`.
-- [ ] Materialize only files that an external Agent process must open by path;
+- [x] Materialize only files that an external Agent process must open by path;
   verify lifecycle, permissions, content identity, and update replacement.
-- [ ] Remove CLI-only `OPENALICE_MANAGED_PI_*` selection and injection without
+- [x] Remove CLI-only `OPENALICE_MANAGED_PI_*` selection and injection without
   changing Electron's bundled-Agent behavior.
-- [ ] Verify existing user-installed Agent CLIs retain their native config,
+- [x] Verify existing user-installed Agent CLIs retain their native config,
   version, executable path, and credentials.
+- [x] Ship a release-owned Git sidecar and prepend only its `bin` directory to
+  Runtime children; prove init, commit, local clone, and GitHub HTTPS with no
+  system Git on PATH.
 
 ### 4. Native CLI installers
 
-- [ ] Define one platform-neutral install plan and transaction model shared by
-  the Bash and PowerShell presentations.
-- [ ] Make both installers manage only OpenAlice release artifacts, helper
+- [x] Define one platform-neutral install plan and transaction model; realize
+  it in Bash for the accepted macOS/Linux lane while PowerShell stays deferred.
+- [x] Make the Bash installer manage only OpenAlice release artifacts, helper
   shims, PATH, provenance, lock, activation, retention, and uninstall.
-- [ ] Remove Node/npm/Pi/build-tool preflight and managed-Pi consent from the
+- [x] Remove Node/npm/Pi/build-tool preflight and managed-Pi consent from the
   CLI install plan.
-- [ ] Add the native PowerShell bootstrap for Windows x64 with the same
+- [ ] Deferred Windows lane: add the native PowerShell bootstrap with the same
   checksum, staging, lock, immutable-release, pointer, PATH, and data-preserving
   behavior as Bash.
-- [ ] Preserve explicit install consent and separate start consent; neither
+- [x] Preserve explicit install consent and separate start consent; neither
   installer silently starts or registers a long-running service.
-- [ ] Install from current `dev` artifacts and the matching dev selector before
+- [x] Install from current `dev` artifacts and the matching dev selector before
   promotion.
 
 ### 5. Package-manager publication
 
 - [ ] Reserve the npm meta and platform package names; keep the resulting
   command named `openalice`.
-- [ ] Generate npm platform packages from accepted release archives and one
+- [x] Generate npm platform packages from accepted release archives and one
   meta package with platform `optionalDependencies`.
-- [ ] Install the meta package through both npm and Bun on every required
+- [x] Install the meta package through both npm and Bun on every required
   platform; verify that the final command is the native executable and does
   not require the package manager at runtime.
-- [ ] Generate the TraderAlice Homebrew formula from accepted archive URLs and
-  checksums; test macOS arm64/x64 and supported Linux targets.
-- [ ] Generate and publish the `openalice-bin` AUR `PKGBUILD` and `.SRCINFO`
-  from the accepted Linux archives; test installation through `paru` in a clean
-  Arch fixture.
-- [ ] Record channel provenance without rebuilding or modifying the native
+- [x] Generate the TraderAlice Homebrew formula from accepted archive URLs and
+  checksums. The release gate covers native macOS arm64/x64 and Linuxbrew
+  arm64/x64 installation.
+- [x] Generate the `openalice-bin` AUR `PKGBUILD` and `.SRCINFO` from the
+  accepted Linux archives and configure pinned clean Arch x64 and Arch Linux
+  ARM build/install gates.
+- [ ] Publish the generated formula to the TraderAlice tap and `openalice-bin`
+  to AUR, then test the public `brew` and `paru` commands.
+- [x] Record channel provenance without rebuilding or modifying the native
   executable bytes.
-- [ ] Detect manager-owned installs in update/Doctor output and route update
+- [x] Detect manager-owned installs in update/Doctor output and route update
   and uninstall guidance back to the owning manager.
-- [ ] Exercise each manager's upgrade and removal while a Runtime is stopped,
+- [x] Exercise each manager's upgrade and removal while a Runtime is stopped,
   then exercise its documented behavior while Guardian is active.
-- [ ] Publish platform npm packages first, the npm meta package second, and
-  Brew/AUR metadata only after the referenced release assets are public and
-  verified.
+- [x] Record and enforce platform-first/meta-last npm publication after the
+  GitHub Release succeeds. Stable publication remains explicitly disabled
+  until registry authority and package names are established.
+- [x] Preflight every opted-in public channel before expensive release builds:
+  prove npm package maintainership, Homebrew Tap push access, and pinned-host
+  AUR Git access without logging or weakening the external credentials.
+- [x] Expose the authority preflight as a bounded manual, read-only rehearsal
+  that cannot publish packages, push metadata, or create a release.
+- [ ] Publish Brew/AUR metadata only after the referenced release assets are
+  public and verified. The opt-in automation and public-byte receipt are ready;
+  external repository creation, credentials, activation, and first public
+  command walks still require maintainer authority.
 
 ### 6. Cutover and updates
 
-- [ ] Define the Bun-to-Bun update transaction first; do not let the released
+- [x] Define the Bun-to-Bun update transaction first; do not let the released
   Node layout shape the new Runtime or installed layout.
-- [ ] Keep installation bytes separate from `OPENALICE_HOME` product data so
+- [x] Keep installation bytes separate from `OPENALICE_HOME` product data so
   removing the old CLI and performing a clean Bun install is always a valid
   cutover.
-- [ ] Provide one bounded v0.90.1 cutover path when it is straightforward:
+- [x] Provide one bounded v0.90.1 cutover path when it is straightforward:
   validate the Bun command, replace only installer-owned launchers/releases,
   and preserve product data. A clean reinstall with explicit guidance is an
   acceptable fallback; seamless cross-generation activation is not a design
   requirement.
-- [ ] For Bun-to-Bun updates, preserve a running old Guardian until explicit
+- [x] For Bun-to-Bun updates, preserve a running old Guardian until explicit
   restart and report pending activation; do not replace a running executable
   in place.
-- [ ] Roll back the active pointer when new-runtime readiness fails.
-- [ ] Remove obsolete managed `pi` launchers only after the new OpenAlice
+- [x] Roll back the active pointer when new-runtime readiness fails.
+- [x] Remove obsolete managed `pi` launchers only after the new OpenAlice
   command is validated; never remove a user-owned `pi` elsewhere on PATH.
-- [ ] Keep bounded prior OpenAlice releases for rollback and collect only
+- [x] Keep bounded prior OpenAlice releases for rollback and collect only
   inactive installer-owned releases.
-- [ ] Make `openalice update` hand off to the correct Bash or PowerShell
-  installer for its installation provenance.
-- [ ] Keep package-manager-owned installations manager-owned.
+- [x] Make `openalice update` hand off to the exact-version Bash installer for
+  direct macOS/Linux provenance; PowerShell remains in the deferred lane.
+- [x] Keep package-manager-owned installations manager-owned.
 
 Do not add a permanent dual runtime, compatibility resolver, or old-layout
 repair path. Once the Bun release activates, normal startup knows only the Bun
@@ -474,47 +505,89 @@ artifacts.
 
 ### 7. Remote and server composition
 
-- [ ] Make managed SSH install select a Bun artifact for the remote platform
+- [x] Make managed SSH install select a Bun artifact for the remote platform
   and architecture without cloning source or installing Agent Runtimes.
-- [ ] Preserve loopback binding, Guardian ownership, tunnel behavior, and
+- [x] Preserve loopback binding, Guardian ownership, tunnel behavior, and
   remote content/provenance comparison.
-- [ ] Define an explicit unsupported-host result for targets outside the
+- [x] Define an explicit unsupported-host result for targets outside the
   accepted Bun build matrix.
-- [ ] Keep Docker on its current server image until a separately justified
+- [x] Keep Docker on its current server image until a separately justified
   change proves that consuming the Bun artifact improves that distribution.
 
 ### 8. Retire the expanded CLI Runtime
 
-- [ ] Delete the CLI release path that builds and publishes
+- [x] Delete the CLI release path that builds and publishes
   `openalice-runtime-*.tar.gz` dependency-closure archives.
-- [ ] Delete CLI installation and repair of managed Pi, including the public
+- [x] Delete CLI installation and repair of managed Pi, including the public
   `pi` launcher owned by OpenAlice.
-- [ ] Delete installed-CLI checks that require host Node, npm, native build
+- [x] Delete installed-CLI checks that require host Node, npm, native build
   tools, expanded `node_modules`, or repository-relative service entrypoints.
-- [ ] Remove `OPENALICE_MANAGED_RUNTIME_PATH` from the Bun install path while
+- [x] Remove `OPENALICE_MANAGED_RUNTIME_PATH` from the Bun install path while
   retaining explicit source-development and Electron resource providers.
-- [ ] Update owner guides in the same increment; do not preserve stale current
+- [x] Update owner guides in the same increment; do not preserve stale current
   behavior as a compatibility path.
-- [ ] Keep release history and old tagged installers available for diagnosis;
+- [x] Keep release history and old tagged installers available for diagnosis;
   do not rewrite published v0.90.1 assets.
 
 ### 9. Release acceptance
 
-- [ ] Build every required target from the accepted tagged tree.
-- [ ] Verify archive checksum and internal release metadata before upload.
-- [ ] Run clean non-admin Bash installs on macOS and Linux.
-- [ ] Run a clean standard-user PowerShell install on Windows.
-- [ ] Install and run the accepted release through npm, Bun, Homebrew, and
+- [x] Build every required target from the accepted tagged tree.
+- [x] Verify archive checksum and internal release metadata before upload.
+- [x] Run clean non-admin Bash installs on macOS and Linux.
+- [ ] Deferred Windows lane: run a clean standard-user PowerShell install.
+- [x] Install and run the accepted release through npm, Bun, Homebrew, and
   `paru`, then verify manager-owned update and uninstall guidance.
-- [ ] Exercise the documented old-to-new cutover once on a currently supported
+- [x] Exercise the documented old-to-new cutover once on a currently supported
   v0.90.1 CLI host; this is evidence for the guidance, not a cross-platform
-  compatibility matrix or a release blocker for the Bun architecture.
-- [ ] Prove `up`, detach, `status`, `open`, multiple independent Agent PTYs,
+  compatibility matrix. Keep the real published v0.90.1 replacement as a
+  required Linux x64 `dev` and stable-release acceptance gate.
+- [x] Prove `up`, detach, `status`, `open`, multiple independent Agent PTYs,
   component restart, `down`, update activation, rollback, and uninstall.
-- [ ] Run the root TypeScript/tests, UI typecheck, Guardian recovery, CLI PTY,
+- [x] Run the root TypeScript/tests, UI typecheck, Guardian recovery, CLI PTY,
   installer, managed remote, and relevant Electron regression lanes.
-- [ ] Publish `dev` preview artifacts and exercise their network path before a
+- [x] Publish `dev` preview artifacts and exercise their network path before a
   human-directed `dev` to `master` promotion.
+
+### 10. Publish the 0.91 beta checkpoint
+
+- [x] Capture the current stable manifest, updater feeds, aliases, and shared
+  installer before beta publication.
+- [x] Promote the exact accepted `dev` tip, including the GitHub-safe AUR
+  metadata asset contract, to `master` through the full promotion gate.
+- [x] Use a focused `master` branch and PR to set both product manifests to
+  `0.91.0-beta.1`; do not merge that version-only commit back to `dev`.
+- [x] Dispatch one `beta` release for `v0.91.0-beta.1`. Do not produce or queue
+  a stable release from the same run.
+- [x] Externally verify the beta GitHub Release, updater feeds, CLI manifest,
+  installer, native Runtime, and Broker Packs while proving every stable-owned
+  mutable surface stayed byte-for-byte unchanged.
+- [x] Leave later fixes on `dev`. A `beta.2` checkpoint is optional; stable is
+  a separate later decision after beta testing and maintainer acceptance.
+
+### 11. Converge channel discovery authority
+
+The release workflow already publishes same-schema stable and beta manifests
+to the OpenAlice CDN. Those manifests are the mutable channel pointers;
+versioned GitHub Releases remain the immutable artifact and release-notes host.
+Runtime discovery must not depend on GitHub's anonymous API quota.
+
+- [x] Select the stable and beta CDN manifests as the single discovery
+  authority shared by fresh installation, CLI updates, and Settings checks.
+- [x] Make the Bash installer resolve stable from `manifest.json` and beta from
+  `beta/manifest.json`, with strict channel/version validation and no GitHub
+  Releases API lookup.
+- [x] Make `GET /api/version` and its explicit refresh select and validate the
+  manifest matching the installed product channel while retaining per-channel
+  success and failure caches.
+- [x] Keep the v0.90.1 installer bridge only for an explicit 0.90.1 selector or
+  a stable manifest that explicitly advertises 0.90.1; default stable discovery
+  no longer uses that bridge now that stable has a native CLI release.
+- [x] Remove the unused desktop GitHub API checker, require explicit channel
+  identity in the CLI updater, and make the release gate reject a shared
+  installer that falls back to legacy stable behavior.
+- [x] Update the legacy-cutover fixture and owner guides, then verify fixture
+  tests, the public stable install plan, clean Linux installer acceptance, and
+  the real Settings route without GitHub API access.
 
 ## Verification Matrix
 
@@ -535,8 +608,20 @@ pnpm test:install:docker
 pnpm test:install:dev-channel
 pnpm test:remote:docker
 pnpm electron:smoke:pty
-pnpm electron:smoke:packaged --temp-data
+pnpm electron:smoke:workspace
 ```
+
+Use the local OrbStack Docker engine as the default clean Linux harness for
+installer, remote, package-manager, repeat-install, upgrade, rollback, and
+uninstall checks. Containers must use isolated temporary homes and no host
+credentials or broker state. OrbStack validates Linux behavior efficiently,
+including native Bun release and multiprocess Runtime acceptance on Linux
+arm64 and x64, but it does not replace native macOS acceptance. Prefer this
+local native-macOS plus OrbStack matrix during serial development instead of
+waiting on hosted runners; hosted jobs remain publication and release gates.
+Windows PowerShell,
+filesystem-locking, PATH, and executable-signing checks belong to the deferred
+Windows lane.
 
 The Bun-specific acceptance harness must additionally prove:
 
@@ -547,8 +632,6 @@ The Bun-specific acceptance harness must additionally prove:
 - terminating one Agent Session does not affect another Session;
 - UI, templates, Workspace helper commands, PTY resize/input, and broker-pack
   loading work outside a checkout;
-- Windows paths, spaces, junction activation, PowerShell execution policy, and
-  locked-running-executable updates are exercised on Windows; and
 - npm, Bun, Homebrew, and AUR installations resolve to the same accepted native
   release content for their platform, report correct provenance, and do not
   self-update across package-manager ownership; and
@@ -563,18 +646,13 @@ live-paper trading is not part of packaging verification.
 
 These may change implementation details but not the fixed product boundaries:
 
-1. Does the current `node-pty` N-API package bundle and run reliably in Bun
-   standalone executables on every required target, or should CLI builds use a
-   Bun-native PTY backend behind the same Session process abstraction?
-2. Can the current `@hono/node-server` paths run unchanged under Bun, or should
+1. Can the current `@hono/node-server` paths run unchanged under Bun, or should
    the CLI build use a small runtime-neutral server adapter while Electron and
    source development retain Node?
-3. Can installed broker-pack ESM and native SDKs load dynamically from disk in
-   the compiled UTA role without broadening the base artifact?
-4. Which current filesystem callers work directly against Bun embedded assets,
+2. Which current filesystem callers work directly against Bun embedded assets,
    and which externally consumed adapter files require materialization?
-5. What signing, notarization, and malware-scanning gates are required for the
-   standalone macOS and Windows CLI binaries independently of Electron?
+3. What signing, notarization, and malware-scanning gates are required for the
+   standalone macOS CLI binary independently of Electron?
 
 ## Explicit Non-goals
 
@@ -592,8 +670,8 @@ These may change implementation details but not the fixed product boundaries:
 
 This plan is complete only when:
 
-1. a clean macOS, Linux, or Windows CLI installation needs no preinstalled
-   Node, Bun, npm, source checkout, or Agent Runtime to run OpenAlice itself;
+1. a clean macOS or Linux CLI installation needs no preinstalled
+   Node, Bun, npm, Git, source checkout, or Agent Runtime to run OpenAlice itself;
 2. one primary platform executable starts the existing multi-process Guardian,
    Alice, UTA, and Connector tree and every Agent Session remains an independent
    external process;
@@ -601,8 +679,8 @@ This plan is complete only when:
    the user's machine;
 4. the real UI, Workspace creation, helper commands, PTY Sessions, optional
    components, and fixture broker pack work outside a checkout;
-5. Bash and native PowerShell installers perform verified, atomic,
-   data-preserving install, update, rollback, and uninstall transactions;
+5. the Bash installer performs verified, atomic, data-preserving install,
+   update, rollback, and uninstall transactions;
 6. npm, Bun, Homebrew, and AUR/paru install the same accepted native release,
    and updates/uninstalls remain owned by the selected manager;
 7. the old CLI has a documented, data-preserving cutover; a clean reinstall is
@@ -625,3 +703,294 @@ This plan is complete only when:
   npm, Bun, Homebrew, and AUR/paru. All channels consume the same accepted
   platform artifacts; the installing channel retains update/uninstall
   ownership, and package-manager variants do not rebuild OpenAlice.
+- 2026-08-29: Established `codex/usability-improvements` as the dedicated
+  serial integration lane. Focused implementation PRs target that branch one
+  at a time, then the accepted initiative is promoted coherently to `dev`.
+  OrbStack Docker is the default clean Linux installation harness, with native
+  macOS and Windows acceptance retained for platform-specific behavior.
+- 2026-08-29: Feasibility increment 1 pinned Bun 1.3.14, added a reusable
+  current-host compile/probe harness, and moved CLI version resolution behind a
+  build-time constant with the existing package-manifest fallback for source
+  execution. The compiled CLI and Supervisor import graph runs `--version` and
+  `--help` with an empty `PATH`: macOS arm64 produced 63,891,938 bytes in 70 ms;
+  OrbStack Linux arm64 produced 94,087,312 bytes in 232 ms; emulated Linux x64
+  produced 94,079,104 bytes in 480 ms. This proves the command shell only;
+  Alice/component boot, PTY, resources, and external broker packs remain open.
+- 2026-08-29: Feasibility increment 2 made `node-pty` lazy at the Session/probe
+  boundary and established `native/node-pty` beside the compiled executable as
+  the candidate native sidecar. Alice now boots from a Bun executable with an
+  empty `PATH`, isolated `OPENALICE_HOME`, and checkout-backed resources; the
+  real UI and `/api/auth/status` both return 200. macOS arm64 measured
+  67,937,378 bytes and 1,433 ms to readiness; OrbStack Linux arm64 measured
+  98,150,544 bytes and 735 ms; emulated Linux x64 measured 98,093,184 bytes and
+  4,047 ms. This does not yet prove PTY loading from the sidecar or embedded
+  resources outside a checkout.
+- 2026-08-29: Feasibility increment 3 adopted OpenCode's build-condition
+  boundary without inheriting its third-party native addon: Node/Electron keeps
+  lazy `node-pty`, while Bun 1.4 selects Bun's native `Terminal` API behind one
+  OpenAlice-owned PTY contract. Before the pivot, pinned `bun-pty` passed on
+  macOS arm64 and Linux x64 but produced no output on Linux arm64, including in
+  a direct source-mode probe. The Bun-native compiled probe then passed on
+  macOS arm64, Linux x64, and Linux arm64: it started two PTYs with distinct
+  PIDs, exercised input/output and resize, stopped one, and proved the other
+  remained usable. Alice also booted with an empty `PATH` and no native
+  sidecar. Bun's current Terminal API has no output pause/resume equivalent,
+  and its 1.4 type contract still describes PTY support as POSIX-only, so
+  high-output backpressure and native Windows x64 remain explicit gates.
+- 2026-08-29: A real isolated `Bun Grok Live` AliceProject exposed that the
+  standalone executable could boot and serve the UI but could not initialize
+  its first Chat Workspace: `process.execPath` re-launched Alice instead of
+  interpreting `bootstrap.mjs`, then an external dynamic import could not
+  resolve `dugite`. The Bun build now re-enters the same executable through an
+  internal bootstrap role and supplies the bundled git executor to the plain
+  ESM template helper. The compiled build gate materializes a real Chat
+  Workspace with an empty `PATH`. After rebuilding, the browser created the
+  Workspace, launched installed Grok Build 1.0.13 as an independent Bun-native
+  PTY process, received `BUN_PTY_GROK_OK` plus the correct Workspace cwd,
+  stopped it without stopping Alice, restarted Alice under the same named
+  project identity, resumed the native Grok session, and received
+  `REATTACH_OK`.
+- 2026-08-29: Feasibility increment 4 added one strict Bun entry that dispatches
+  the CLI and private Guardian/Alice/UTA/Connector roles before importing their
+  explicit boot functions. Guardian now re-enters the same 72,116,978-byte
+  macOS arm64 executable for each service while preserving four distinct PIDs.
+  With an empty PATH and isolated home, the real CLI `run` path reached Alice,
+  UTA, and Connector readiness; forced Connector failure recovered under a new
+  PID, forced UTA failure left Alice ready, the control flag restored UTA under
+  a new PID, and SIGTERM released the Guardian lock. The smoke also fixed an
+  existing UTA restart deadlock by clearing a signalled child reference.
+- 2026-08-29: Release-artifact increment added a target-native archive builder
+  with per-file hashes, content identity, SHA-256 sidecar, licenses, immutable
+  resources, Bun-native Workspace helper dispatch, and a release-owned Git
+  sidecar. On macOS arm64 the expanded release measured 114,485,201 bytes and
+  the gzip archive 56,462,626 bytes; Git 2.53.0 occupied 19,168,630 bytes after
+  replacing duplicate built-in executables with 150 relative symlinks and
+  excluding GCM/LFS. Outside the checkout and with no system Node/Bun/Git on
+  PATH, acceptance passed Git init/commit/local clone, live GitHub HTTPS,
+  Chat/AutoQuant/Auto Prediction bootstrap, real `alice-workspace` manifest
+  plus invocation, default and Pi adapter materialization, content provenance,
+  and the real Web UI.
+- 2026-08-29: PTY backpressure increment completed the Bun-native PTY gate
+  without a Node sidecar or an application-level output spool. Because Bun
+  1.4's callback-only `Terminal` has no read-side pause API, the Bun backend
+  maps the existing high/low-watermark contract to `SIGSTOP`/`SIGCONT` on the
+  PTY's POSIX process group. A compiled high-output probe used a child writer
+  behind its parent shell, held output byte-for-byte stable while paused,
+  resumed past another 512 KiB, and exited normally when killed from the paused
+  state on native macOS arm64, OrbStack Linux arm64, and emulated Linux x64.
+  This keeps pressure at the producer/kernel PTY boundary and covers Agent
+  Runtime helper processes without an unbounded Bun heap queue. Native Windows
+  remains part of the deferred Windows distribution lane.
+- 2026-08-29: External Broker Pack acceptance materialized a production-shaped
+  active CCXT fixture under an isolated `OPENALICE_HOME`. Its ESM entry imports
+  a private SDK from the Pack's own `node_modules`, and that SDK must load and
+  expose a real platform N-API `.node` binary before it returns its marker. The
+  separately re-executed compiled UTA role created a healthy keyless account
+  carrying that marker, then loaded the Pack again after forced UTA failure and
+  restart. Native macOS arm64, OrbStack Linux arm64, and emulated Linux x64 all
+  passed with an empty `PATH`; UTA Core and the Bun release artifact remain free
+  of the fixture SDK and live broker dependencies.
+- 2026-08-29: External Agent Runtime ownership increment removed Electron-only
+  `OPENALICE_MANAGED_PI_PATH` and `OPENALICE_MANAGED_PI_NODE_PATH` before any
+  Bun CLI home-derived environment is calculated, while preserving native Pi
+  state, `HOME`, `PATH`, and the source/Electron managed-Pi paths. The release
+  gate now discovers a package-external OpenCode executable and starts it via
+  the real adapter as an independent Workspace PTY on macOS arm64, OrbStack
+  Linux arm64, and emulated Linux x64. An additional native macOS run launched
+  installed OpenCode 1.17.13 from `/opt/homebrew/bin/opencode`, received its
+  real TUI output, and left its synthetic user-owned native config
+  byte-for-byte unchanged. The Linux run also exposed and fixed missing Dugite
+  core symlinks and standard `git-upload-pack`, `git-receive-pack`, and
+  `git-shell` bin entries in the portable Git layout.
+- 2026-08-29: Native Bash installer increment replaced the expanded Node/Pi
+  transaction with verified target-native archives under `cli/releases`, a
+  dynamic `cli/current` launcher, schema 3 artifact provenance, exact-version
+  update handoff, three-release retention, local atomic rollback, and
+  data-preserving uninstall. The validated v0.90.1 cutover removes only the old
+  installer-owned `cli-versions` tree and Pi/CMD launchers after the new native
+  command runs. A real macOS arm64 build installed and reported its provenance,
+  updated over a distinct retained build, and rolled back by pointer. OrbStack
+  Debian arm64 passed install/update with Node, npm, pnpm, Bun, and Agent
+  Runtimes absent. Native Windows PowerShell remains deferred; package-manager
+  channels and published dev/release assets remain open.
+- 2026-08-29: Managed SSH now installs and runs the matching native Bun release
+  without probing or installing Node, build tools, source, or Agent Runtimes in
+  its default path. Explicit `--app-dir` remains a separately validated source
+  development override, and unsupported targets fail instead of silently
+  changing distribution models. The OrbStack Linux arm64 SSH fixture passed
+  native install, distinct Guardian/Alice/UTA processes, real auth readiness,
+  tunnel disconnect/reconnect, aggregate AliceProject inventory, structured
+  stop, interrupted transfer retry, credential resealing, and startup of a
+  transferred second Home on the same immutable release.
+- 2026-08-30: Replaced the formal expanded-headless release matrix with four
+  target-native Bun CLI candidates and made their archives plus SHA-256
+  sidecars part of the gated GitHub Release. Every `dev` push now builds the
+  same matrix, verifies sidecars and internal target/version/Bun metadata,
+  publishes commit-addressed immutable copies, activates fixed preview aliases
+  checksum-last, and runs the raw `dev/install` network journey on a non-root
+  Debian host with Node, npm, pnpm, Bun, and Agent Runtimes absent. Native
+  Doctor now reports its embedded Bun engine instead of Bun's compatibility
+  `process.version` as a host Node dependency. The live network gate remains
+  pending until this increment reaches `dev` and publishes its first aliases.
+- 2026-08-30: Added OpenCode-style platform npm packages plus a small
+  `openalice` meta package, generated Homebrew and `openalice-bin` AUR metadata,
+  schema 3 package-manager provenance, and manager-owned update/uninstall
+  routing. Bun installation deliberately uses `bun add -g --trust openalice`
+  because Bun blocks dependency lifecycle scripts by default; the postinstall
+  has no download fallback and runs under Bun without host Node. Real macOS
+  arm64 npm and pinned Bun 1.4.0 installs passed native `version`, detached
+  `up`, Doctor ownership, `down`, uninstall guidance, and manager removal with
+  Node/Bun absent from the Runtime `PATH`. PR/release workflows now repeat
+  npm/Bun on the native matrix, install the formula on both macOS arches, build
+  and install the x64 AUR package in a pinned Arch image, derive publication
+  inputs only from all four accepted archives, and publish npm platform
+  packages before the stable meta package. OrbStack confirmed the official
+  Arch base-devel image currently lacks arm64, so native Arch Linux ARM remains
+  an explicit acceptance gap. Public registry name reservation and external
+  tap/AUR publication remain activation work rather than hidden fallbacks.
+- 2026-08-30: Direct installs now record an atomic pending activation receipt
+  with the exact previous immutable release. Matching first readiness confirms
+  it; early exit, timeout, or executable failure restores the validated pointer
+  without starting the prior Runtime or touching user data. Installer failure
+  after pointer activation performs the same exact rollback, and retention
+  cannot collect the pending target. Package-manager upgrades remain
+  manager-owned: CLI/TUI status compares content identities and reports restart
+  activation without modifying npm, Bun, Homebrew, or AUR files.
+- 2026-08-30: Recorded a go decision from same-host v0.90.1 expanded Runtime
+  and Bun-native measurements. On macOS arm64, archive size fell from 112.5 to
+  53.8 MiB, expanded size from 528.5 to 113.8 MiB, four-role readiness improved
+  from 1,548 to 1,326 ms, and median idle RSS fell from 539.0 to 440.4 MiB. On
+  native OrbStack Linux arm64, archive size fell from 76.9 to 64.4 MiB,
+  expanded size from 419.2 to 128.4 MiB, readiness was effectively flat at 935
+  versus 959 ms, and idle RSS fell from 525.5 to 391.8 MiB. Rebuilding the
+  v0.90.1 headless artifact from its tag with prebuilt server inputs took 66.52
+  seconds on that Linux host; the Bun artifact assembly plus archive took 4.83
+  seconds, with a 0.93-second standalone compile. Both paths used isolated
+  homes, all four real process roles, three RSS samples at 500 ms intervals,
+  and no configured accounts. Release and feasibility reports now preserve
+  compile, artifact, total, cold-start, and per-role memory evidence. Source
+  development remains the unchanged `pnpm dev` path.
+- 2026-08-30: Expanded the npm/Bun native package smoke from one install/remove
+  pass into two real manager-owned candidates. Each manager now upgrades and
+  removes with the Runtime stopped, then replaces a running prior candidate and
+  proves the new native command sees the old Guardian content as pending,
+  idempotent `up` preserves that result, CLI update/uninstall remain guidance
+  only, and `down` plus a fresh `up` activates the new content. Native macOS
+  arm64 passed through npm and pinned Bun 1.4.0; the PR matrix repeats the same
+  journey on Linux. Homebrew and AUR lifecycle expansion remains separate from
+  this npm/Bun increment.
+- 2026-08-30: Repaired cross-platform acceptance exposed by the package-manager
+  increment. The Bash installer now canonicalizes its release root before
+  retention comparisons, so macOS `/var` to `/private/var` resolution cannot
+  collect the active rollback release. npm package assembly selects `npm.cmd`
+  on Windows, path assertions use native separators, and the direct symlink
+  replacement rollback case is explicitly skipped on Windows while native
+  Windows activation remains a deferred distribution lane. Type checking, 335
+  CLI tests, 5,062 root tests, and the non-root Orb Linux installer smoke pass.
+- 2026-08-30: Completed local system-package-manager lifecycle acceptance.
+  Homebrew now consumes the archive's actual extracted release root and copies
+  `release.json` instead of trying to move one source twice. A shared fixture
+  derives a hash-refreshed N-1 archive set from accepted candidates, after
+  which a local Git-backed tap and an x64 Arch container perform real stopped
+  and active upgrades, restart activation, and removal. Native macOS arm64
+  Homebrew and Orb-emulated Linux x64 `makepkg`/`pacman` both passed with an
+  empty Runtime `PATH`; the formal release matrix repeats Homebrew on Intel and
+  arm64 runners and AUR on native x64. Windows distribution remains deferred.
+- 2026-08-30: Rebuilt the current macOS arm64 native candidate and repeated the
+  complete npm and Bun stopped/active lifecycle after the shared-fixture
+  refactor; both passed. `npx tsc --noEmit`, all 335 CLI tests, all 5,064 root
+  tests, and the non-root Orb Linux installer smoke also pass.
+- 2026-08-30: Promoted the native CLI increments through `dev` and completed
+  preview acceptance. Dev run 33270375503 built darwin-arm64, darwin-x64,
+  linux-arm64, and linux-x64 candidates, verified each candidate through the
+  full npm and pinned Bun manager lifecycle before upload, validated checksums
+  and embedded target/version metadata, activated the four dev aliases, and
+  passed the clean raw `dev/install --branch dev` network journey. A separate
+  isolated macOS arm64 install from the public dev alias passed `version`,
+  `up`, `status`, `down`, and uninstall with Node, Bun, and Agent Runtimes
+  absent from the Runtime `PATH`. Stable registry/tap/AUR publication and the
+  tagged-release matrix remain release activation work; Windows remains
+  deferred.
+- 2026-08-30: Closed the Linuxbrew acceptance gap with pinned official
+  Homebrew 6.0.15 images for native Linux arm64 and x64 runners. The shared
+  system-package lifecycle now accepts Homebrew on macOS or Linux, while a
+  release-gating Linuxbrew matrix repeats stopped and active upgrades,
+  ownership guidance, restart activation, and removal against the exact
+  accepted Linux archives.
+- 2026-08-30: Closed native Arch Linux ARM package acceptance. The x64 lane
+  remains on the pinned official Arch base-devel image; the arm64 lane uses a
+  pinned Arch Linux ARM base-devel image whose audited build consumes
+  signature-checked upstream repositories. Both native runner lanes build the
+  generated `openalice-bin`, install it through `pacman`, and repeat stopped
+  and active upgrade, ownership, restart activation, and removal checks before
+  dev aliases or a stable release can publish.
+- 2026-08-30: Replayed the published v0.90.1 installer into an isolated macOS
+  home, replaced its expanded Node Runtime and managed Pi with the accepted Bun
+  candidate, and proved native `version`, detached `up`, `status`, `down`, and
+  uninstall with a minimal Runtime `PATH`. The cutover removed only
+  installer-owned `cli-versions` and Pi launchers while preserving product data
+  and an external user-owned Pi byte-for-byte. Dev and stable publication now
+  repeat the same bounded journey on native Linux x64. The historical Pi
+  manifests are fetched from the v0.90.1 OpenAlice tag and verified against the
+  hashes embedded by that published installer, avoiding dependence on the
+  upstream Pi asset URL that has since disappeared.
+- 2026-08-30: Consolidated the full Runtime lifecycle evidence into native
+  candidate gates. The compiled macOS arm64 artifact captured the exact URL
+  passed through `open`, created two external OpenCode-adapter Sessions with
+  distinct PIDs, delivered independent binary input after WebSocket resize,
+  stopped one Session, and kept the other interactive. The four-process
+  feasibility receipt forced Connector and UTA failures, recovered both with
+  new PIDs while Alice stayed ready, and released the Guardian lock after
+  shutdown. Existing direct and package-manager receipts cover update pending
+  state, restart activation, local rollback, uninstall, and data preservation;
+  every native dev and stable candidate now repeats the relevant artifact and
+  component gates.
+- 2026-08-30: Added the external-channel activation chain without silently
+  claiming registry ownership. Every stable release now re-downloads all four
+  public archives and sidecars, verifies their accepted hashes, compares the
+  public formula/AUR/npm metadata byte-for-byte with the preserved inputs, and
+  retains a receipt before any registry writer can run. npm/Bun, the
+  TraderAlice Tap, and AUR have separate opt-in variables and least-scope
+  credentials; Tap/AUR commits are idempotent. Package-name reservation, Tap
+  creation, AUR key enrollment, enabling the switches, and the first public
+  install journeys remain explicit maintainer actions.
+- 2026-08-31: Published `v0.90.2-beta.1` and later `v0.90.2` as independent
+  release intents. The stable run built and accepted all native CLI targets,
+  Bash installers, npm/Bun/Homebrew/Linuxbrew/AUR mechanics, desktop packages,
+  and Broker Packs; external package-manager activation remained intentionally
+  disabled. Public GitHub/R2 bytes and a clean native Runtime journey passed
+  independent verification. GitHub normalized the hidden `.SRCINFO` asset name,
+  leaving the original run red only at its final metadata-name comparison; PR
+  #1268 now stages the exact accepted bytes as `openalice-bin.SRCINFO` while AUR
+  keeps its repository-local `.SRCINFO` contract.
+- 2026-08-31: Maintainer selected `v0.91.0-beta.1` as the next public checkpoint
+  and explicitly deferred stable until later testing. Beta and stable are
+  separate serial intents: fixes may accumulate on `dev` between them, another
+  beta is optional, and unchanged-source stable promotion is the exception
+  rather than an automatic second output.
+- 2026-08-31: Published only
+  [`v0.91.0-beta.1`](https://github.com/TraderAlice/OpenAlice/releases/tag/v0.91.0-beta.1)
+  from `009d3f466288bd69cf831e6bddccee501ca99c04` in
+  [release run 33329951354](https://github.com/TraderAlice/OpenAlice/actions/runs/33329951354).
+  The prerelease contains 49 uploaded assets: four native CLI archives and
+  sidecars, 20 Broker Pack archives plus catalogs, signed and notarized macOS
+  desktop packages, the intentionally unsigned Windows package, updater
+  metadata, and installers. Independent public verification downloaded and
+  hashed all CLI and Broker bytes with zero mismatches, then completed a clean
+  non-root Debian beta install, Runtime start/status/stop, uninstall, and data
+  preservation journey with no host Node, Bun, or Agent Runtime. The captured
+  stable manifest, feeds, aliases, and default installer route remained
+  unchanged at `v0.90.2`; npm, Homebrew Tap, and AUR publication stayed
+  disabled. No stable release was produced or queued.
+- 2026-08-31: Converged stable and beta discovery on the existing OpenAlice CDN
+  manifests. The Bash bootstrap, native CLI updater, Web Settings route, and
+  release acceptance now require explicit matching channel/version metadata;
+  GitHub remains the immutable archive and release-notes host rather than the
+  anonymous discovery API. The explicit v0.90.1 bridge remains bounded, while
+  an unused desktop GitHub checker and the beta-release legacy-default
+  tolerance were removed. Local acceptance passed root and UI/Desktop type
+  checks, 359 CLI tests, 5,189 root tests, the non-root OrbStack Linux installer
+  smoke, a public stable plan resolving v0.90.2 despite a deliberately dead old
+  GitHub API seam, and the real Settings card plus forced refresh. A direct
+  public beta manifest read resolved v0.91.0-beta.1. No release or channel
+  promotion was performed.

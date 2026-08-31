@@ -8,6 +8,7 @@ import {
   buildUpgradeSeedExpression,
   buildUpgradeVerifyExpression,
   candidateDesktopAssetName,
+  desktopUpgradeWorkspaceTags,
   previousDesktopAssetName,
   selectPreviousDesktopTag,
   windowsInstallerArgs,
@@ -40,6 +41,16 @@ describe('desktop upgrade smoke planning', () => {
       '0.88.0-beta',
     )).toBe('v0.87.0-beta')
     expect(selectPreviousDesktopTag(['v0.88.0-beta'], '0.88.0-beta')).toBeNull()
+  })
+
+  it('keeps seeded Workspace tags valid for numbered beta releases', () => {
+    const tags = desktopUpgradeWorkspaceTags('0.90.2-beta.123456789')
+    expect(tags).toEqual({
+      tag: 'upgrade-0-90-2-beta-12345678',
+      postUpgradeTag: 'upgrade-0-90-2-beta-12345678-post',
+    })
+    expect(tags.tag).toMatch(/^[a-z0-9][a-z0-9_-]{0,32}$/)
+    expect(tags.postUpgradeTag).toMatch(/^[a-z0-9][a-z0-9_-]{0,32}$/)
   })
 
   it('maps native release artifacts by host architecture', () => {

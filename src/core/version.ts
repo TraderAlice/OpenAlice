@@ -1,18 +1,11 @@
 /**
- * App version awareness — current version + latest GitHub release.
+ * App version awareness — current version + latest channel release.
  *
- * The current version comes from package.json#version (read once at
- * module load). The latest version comes from the GitHub Releases API
- * (cached in-memory with a TTL — GitHub unauthenticated rate limit is
- * 60 req/h per IP, so we don't want to hit it on every UI load).
- *
- * The repo owner+name is derived from package.json#repository.url so
- * fork users don't poll the upstream repo.
- *
- * Self-hosted source distribution: when the user sees "update
- * available" they manually run `git pull && pnpm build` and restart.
- * Auto-execute is out of scope (Electron will handle that path
- * differently when packaging lands).
+ * The current version comes from package.json#version (read once at module
+ * load). The latest stable or beta version comes from the matching OpenAlice
+ * CDN manifest and is cached in memory with separate success/error TTLs.
+ * GitHub Release assets remain the immutable payload source, but update
+ * discovery does not depend on GitHub's anonymous API.
  */
 
 import { readFileSync } from 'node:fs'
@@ -23,7 +16,6 @@ import { fileURLToPath } from 'node:url'
 
 interface PackageJson {
   version?: string
-  repository?: { url?: string } | string
 }
 
 let _packageJson: PackageJson | null = null
@@ -56,15 +48,6 @@ export function getCurrentVersion(): string {
   return readPackageJson().version ?? '0.0.0'
 }
 
-/** Parse owner+repo from `git+https://github.com/<owner>/<repo>.git` style URLs. */
-export function getRepoSlug(): { owner: string; repo: string } | null {
-  const repository = readPackageJson().repository
-  const url = typeof repository === 'string' ? repository : repository?.url ?? ''
-  const match = url.match(/github\.com[/:]([^/]+)\/([^/.]+)/i)
-  if (!match) return null
-  return { owner: match[1], repo: match[2] }
-}
-
 // ==================== Semver comparison (minimal) ====================
 
 interface ParsedVersion {
@@ -94,20 +77,39 @@ export function compareVersions(a: string, b: string): number {
   for (let i = 0; i < 3; i++) {
     if (A.core[i] !== B.core[i]) return A.core[i] - B.core[i]
   }
-  // Cores equal — release > prerelease
-  if (A.pre === null && B.pre === null) return 0
-  if (A.pre === null) return 1
-  if (B.pre === null) return -1
-  // Both prereleases — lexicographic comparison
-  return A.pre < B.pre ? -1 : A.pre > B.pre ? 1 : 0
+  return comparePrerelease(A.pre, B.pre)
 }
 
-// ==================== Latest release (cached GitHub fetch) ====================
+function comparePrerelease(left: string | null, right: string | null): number {
+  if (left === null && right === null) return 0
+  if (left === null) return 1
+  if (right === null) return -1
+
+  const leftParts = left.split('.')
+  const rightParts = right.split('.')
+  const length = Math.max(leftParts.length, rightParts.length)
+  for (let index = 0; index < length; index += 1) {
+    const leftPart = leftParts[index]
+    const rightPart = rightParts[index]
+    if (leftPart === undefined) return -1
+    if (rightPart === undefined) return 1
+    if (leftPart === rightPart) continue
+
+    const leftNumeric = /^\d+$/.test(leftPart)
+    const rightNumeric = /^\d+$/.test(rightPart)
+    if (leftNumeric && rightNumeric) return Number(leftPart) > Number(rightPart) ? 1 : -1
+    if (leftNumeric !== rightNumeric) return leftNumeric ? -1 : 1
+    return leftPart > rightPart ? 1 : -1
+  }
+  return 0
+}
+
+// ==================== Latest release (cached manifest fetch) ====================
 
 export interface LatestRelease {
   version: string
   url: string
-  body: string
+  body: string | null
   publishedAt: string
 }
 
@@ -117,77 +119,125 @@ interface CacheEntry {
   error: string | null
 }
 
+export type ReleaseChannel = 'stable' | 'beta'
+
+const MANIFEST_URLS: Record<ReleaseChannel, string> = {
+  stable: 'https://download.openalice.ai/manifest.json',
+  beta: 'https://download.openalice.ai/beta/manifest.json',
+}
+
+interface FetchLatestReleaseOptions {
+  /** Force re-fetch even if this channel's cache is fresh. */
+  force?: boolean
+  /** Override the channel inferred from the installed product version. */
+  channel?: ReleaseChannel
+}
+
 const SUCCESS_TTL_MS = 60 * 60 * 1000 // 1h
 const ERROR_TTL_MS = 5 * 60 * 1000 // 5min
 
-let cache: CacheEntry | null = null
+const cache = new Map<ReleaseChannel, CacheEntry>()
 
-/**
- * Fetch the latest GitHub release. Returns null + error string when the
- * API is unreachable / rate-limited / repo has no releases. Result
- * (success or failure) is cached so a flapping UI doesn't burn the
- * rate limit.
- */
-export async function fetchLatestRelease(opts?: {
-  /** Force re-fetch even if cache is fresh. */
-  force?: boolean
-}): Promise<{ result: LatestRelease | null; error: string | null }> {
-  const now = Date.now()
-  if (!opts?.force && cache) {
-    const ttl = cache.error ? ERROR_TTL_MS : SUCCESS_TTL_MS
-    if (now - cache.fetchedAt < ttl) {
-      return { result: cache.result, error: cache.error }
-    }
+function releaseChannelForVersion(version: string): ReleaseChannel {
+  return parseVersion(version).pre?.split('.')[0]?.toLowerCase() === 'beta'
+    ? 'beta'
+    : 'stable'
+}
+
+function releaseChannelMatchesVersion(channel: ReleaseChannel, version: string): boolean {
+  if (channel === 'stable') return /^\d+\.\d+\.\d+$/.test(version)
+  return /^\d+\.\d+\.\d+-beta(?:\.[1-9][0-9]*)?$/.test(version)
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value)
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+function parseReleaseManifest(value: unknown, channel: ReleaseChannel): LatestRelease {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${channel} release manifest is not an object`)
   }
 
-  const slug = getRepoSlug()
-  if (!slug) {
-    cache = { fetchedAt: now, result: null, error: 'Could not derive repo slug from package.json' }
-    return { result: null, error: cache.error }
+  const manifest = value as Record<string, unknown>
+  if (manifest['channel'] !== channel) {
+    throw new Error(`${channel} release manifest declares channel ${String(manifest['channel'])}`)
+  }
+
+  const version = manifest['version']
+  if (typeof version !== 'string' || !releaseChannelMatchesVersion(channel, version)) {
+    throw new Error(`${channel} release manifest advertises out-of-channel version ${String(version)}`)
+  }
+
+  const releaseNotesUrl = manifest['releaseNotesUrl']
+  if (typeof releaseNotesUrl !== 'string' || !isHttpUrl(releaseNotesUrl)) {
+    throw new Error(`${channel} release manifest has an invalid releaseNotesUrl`)
+  }
+
+  const publishedAt = manifest['publishedAt']
+  if (
+    typeof publishedAt !== 'string'
+    || publishedAt.trim() === ''
+    || !Number.isFinite(Date.parse(publishedAt))
+  ) {
+    throw new Error(`${channel} release manifest has an invalid publishedAt`)
+  }
+
+  return {
+    version,
+    url: releaseNotesUrl,
+    body: null,
+    publishedAt,
+  }
+}
+
+/**
+ * Fetch the latest release from the requested OpenAlice CDN channel manifest.
+ * Returns null + an error string when the manifest is unreachable or invalid.
+ * Successes and failures are cached independently per channel so repeated UI
+ * loads do not flap the discovery endpoint.
+ */
+export async function fetchLatestRelease(
+  opts?: FetchLatestReleaseOptions,
+): Promise<{ result: LatestRelease | null; error: string | null }> {
+  const now = Date.now()
+  const channel = opts?.channel ?? releaseChannelForVersion(getCurrentVersion())
+  const cached = cache.get(channel)
+  if (!opts?.force && cached) {
+    const ttl = cached.error ? ERROR_TTL_MS : SUCCESS_TTL_MS
+    if (now - cached.fetchedAt < ttl) {
+      return { result: cached.result, error: cached.error }
+    }
   }
 
   try {
-    // Use /releases (not /releases/latest) — the latter excludes
-    // prerelease tags by default. We accept prereleases as valid
-    // updates because most active projects (including this one)
-    // ship -beta/-rc versions before stable. Drafts are still
-    // skipped explicitly.
-    const url = `https://api.github.com/repos/${slug.owner}/${slug.repo}/releases?per_page=10`
+    const url = MANIFEST_URLS[channel]
     const res = await fetch(url, {
-      headers: { 'Accept': 'application/vnd.github+json' },
+      headers: { 'Accept': 'application/json' },
       signal: AbortSignal.timeout(10_000),
     })
     if (!res.ok) {
-      const error = `GitHub API ${res.status} ${res.statusText}`
-      cache = { fetchedAt: now, result: null, error }
+      const error = `OpenAlice ${channel} manifest ${res.status} ${res.statusText}`
+      cache.set(channel, { fetchedAt: now, result: null, error })
       return { result: null, error }
     }
-    type ReleaseRow = { tag_name?: string; html_url?: string; body?: string; published_at?: string; draft?: boolean; prerelease?: boolean }
-    const list = await res.json() as ReleaseRow[]
-    // GitHub returns newest-first by default. Take the first non-draft.
-    const data = Array.isArray(list) ? list.find((r) => !r.draft && r.tag_name) : null
-    if (!data || !data.tag_name) {
-      cache = { fetchedAt: now, result: null, error: 'No published releases found' }
-      return { result: null, error: cache.error }
-    }
-    const result: LatestRelease = {
-      version: data.tag_name.replace(/^v/, ''),
-      url: data.html_url ?? `https://github.com/${slug.owner}/${slug.repo}/releases`,
-      body: data.body ?? '',
-      publishedAt: data.published_at ?? '',
-    }
-    cache = { fetchedAt: now, result, error: null }
+    const result = parseReleaseManifest(await res.json(), channel)
+    cache.set(channel, { fetchedAt: now, result, error: null })
     return { result, error: null }
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err)
-    cache = { fetchedAt: now, result: null, error }
+    cache.set(channel, { fetchedAt: now, result: null, error })
     return { result: null, error }
   }
 }
 
 /** Reset the in-memory cache. Test-only. */
 export function _resetCacheForTest(): void {
-  cache = null
+  cache.clear()
 }
 
 // ==================== Combined view ====================
@@ -202,7 +252,7 @@ export interface VersionInfo {
   error: string | null
 }
 
-export async function getVersionInfo(opts?: { force?: boolean }): Promise<VersionInfo> {
+export async function getVersionInfo(opts?: FetchLatestReleaseOptions): Promise<VersionInfo> {
   const current = getCurrentVersion()
   const { result, error } = await fetchLatestRelease(opts)
   if (!result) {

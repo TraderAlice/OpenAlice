@@ -1,5 +1,17 @@
 # Third-Party Notices
 
+## Git and Dugite
+
+Native OpenAlice CLI release archives for macOS and Linux redistribute a
+minimal Git command-line runtime sourced from the `dugite` package. The exact
+Dugite and Git versions, platform, architecture, content identity, file hashes,
+and release-owned Git root are recorded in each archive's `release.json`.
+
+Git is licensed under GNU General Public License version 2. Its source and
+license are available from the [official Git project](https://git-scm.com/)
+and [git/git repository](https://github.com/git/git). Dugite's license is
+included in the release archive under `licenses/dugite-LICENSE`.
+
 ## stablyai/orca terminal patches and keyboard policy
 
 `patches/@xterm__addon-webgl@0.20.0-beta.286.patch` is adapted from

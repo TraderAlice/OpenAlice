@@ -1,5 +1,4 @@
 import { spawn } from 'node:child_process'
-import { readFileSync } from 'node:fs'
 import {
   dirname,
   join,
@@ -45,7 +44,7 @@ import {
   type TuiLaunchFlags,
 } from './launch-context.ts'
 import { resolveInstalledLayout } from './install-layout.mjs'
-import { readInstallSource } from './install-source.mjs'
+import { CLI_VERSION, readInstallSource } from './install-source.mjs'
 import { findOpenAliceRoot } from './local-start.mjs'
 import { readRuntimeLogs } from './logs.mjs'
 import {
@@ -99,6 +98,7 @@ import {
   checkForUpdate,
   downloadAndRunInstaller,
   maybeNotifyUpdate,
+  normalizeUpdateChannel,
 } from './update.mjs'
 
 const SILENT_OUTPUT = Object.freeze({ write: () => true })
@@ -155,14 +155,25 @@ interface UpdateResult {
   status?: string
   currentVersion?: string
   latestVersion?: string
+  latestCommit?: string
+  latestContentIdentity?: string
+  latestArtifactSha256?: string
   message?: string
   releaseNotesUrl?: string
+  channel?: SupervisorUpdateChannel
+  sourceChannel?: string
+  packageManager?: {
+    label?: string
+    update?: string
+  }
   installer?: {
     url?: string
     versionedUrl?: string
     sha256?: string
   }
 }
+
+export type SupervisorUpdateChannel = 'stable' | 'beta' | 'dev'
 
 export type SupervisorPanel = 'fleet' | 'overview' | 'logs' | 'doctor' | 'help'
 export type SupervisorMode = 'normal' | 'config-recovery'
@@ -212,7 +223,7 @@ export interface SupervisorTuiDependencies {
   open?: (options: Record<string, unknown>) => Promise<unknown>
   readLogs?: (options: Record<string, unknown>) => Promise<RuntimeLogs>
   diagnose?: (options: Record<string, unknown>) => Promise<DoctorReport>
-  checkUpdate?: () => Promise<UpdateResult>
+  checkUpdate?: (channel: SupervisorUpdateChannel) => Promise<UpdateResult>
   discoverUpdate?: () => Promise<UpdateResult | null>
   applyUpdate?: (result: UpdateResult) => Promise<number>
   resolveContext?: (
@@ -375,8 +386,9 @@ export async function runSupervisorTui(
     }
   }
   const piTui = await (dependencies.loadTui ?? loadPiTui)(dependencies.env)
-  const channel = dependencies.channel
+  const resolvedChannel = dependencies.channel
     ?? await (dependencies.resolveChannel ?? resolveSupervisorChannel)()
+  const channel = normalizeSupervisorUpdateChannel(resolvedChannel) ?? 'stable'
   const terminal = new piTui.ProcessTerminal()
   const ui = new piTui.TUI(
     terminal,
@@ -389,6 +401,7 @@ export async function runSupervisorTui(
   let settingsActive = false
   let projectsActive = false
   let transferActive = false
+  let updateChannelActive = false
   let fleetRefreshing = false
   const tunnelControllers = new Map<string, AbortController>()
   let managedStartAction: 'start' | 'start-open' = 'start'
@@ -396,6 +409,7 @@ export async function runSupervisorTui(
   let closeSettings: (() => void) | null = null
   let closeProjects: (() => void) | null = null
   let closeTransfer: (() => void) | null = null
+  let closeUpdateChannel: (() => void) | null = null
   const screen = new SupervisorScreen({
     version: dependencies.version ?? readCliVersion(),
     channel,
@@ -408,7 +422,8 @@ export async function runSupervisorTui(
     fleet,
   }, {
     onAction: (action) => {
-      void requestAction(action)
+      if (action === 'update') openUpdateChannelPicker()
+      else void requestAction(action)
     },
     onConfigureSource: () => {
       openSourcePrompt()
@@ -746,6 +761,94 @@ export async function runSupervisorTui(
     screen.update({ fleet: { ...current, tunnels } })
   }
 
+  function openUpdateChannelPicker(): void {
+    if (
+      updateChannelActive
+      || sourcePromptActive
+      || settingsActive
+      || projectsActive
+      || transferActive
+      || actionRunning
+    ) return
+    updateChannelActive = true
+    const items: SelectItem[] = [
+      {
+        value: 'stable',
+        label: 'Stable',
+        description: 'Production releases only.',
+      },
+      {
+        value: 'beta',
+        label: 'Beta',
+        description: 'The latest accepted beta release.',
+      },
+      {
+        value: 'dev',
+        label: 'Dev',
+        description: 'The latest native CLI built from the dev branch.',
+      },
+    ]
+    const theme: SelectListTheme = {
+      selectedPrefix: (text) => text,
+      selectedText: (text) => text,
+      description: (text) => text,
+      scrollInfo: (text) => text,
+      noMatch: (text) => text,
+    }
+    const list = new piTui.SelectList(items, items.length, theme)
+    list.setSelectedIndex(Math.max(
+      0,
+      items.findIndex((item) => item.value === screen.snapshot.channel),
+    ))
+    const close = (notice?: string) => {
+      if (!updateChannelActive) return
+      updateChannelActive = false
+      closeUpdateChannel = null
+      overlay.hide()
+      if (notice) screen.update({ notice })
+    }
+    list.onCancel = () => close('Update channel unchanged.')
+    list.onSelect = (item) => {
+      const selected = normalizeSupervisorUpdateChannel(item.value)
+      if (!selected) return
+      close()
+      screen.update({
+        channel: selected,
+        update: null,
+        confirmation: undefined,
+      })
+      void performAction('update')
+    }
+    const panel = new (class implements Component {
+      render(width: number): string[] {
+        return [
+          'OpenAlice update channel',
+          '─'.repeat(Math.max(1, width)),
+          '',
+          ...list.render(width),
+          '',
+          'Enter  Check selected channel · Esc  Cancel',
+        ]
+      }
+
+      handleInput(data: string): void {
+        list.handleInput(data)
+      }
+
+      invalidate(): void {
+        list.invalidate()
+      }
+    })()
+    const overlay = ui.showOverlay(panel, {
+      width: '72%',
+      maxHeight: '70%',
+      anchor: 'center',
+      margin: 1,
+    })
+    closeUpdateChannel = () => close()
+    overlay.focus()
+  }
+
   async function requestAction(action: SupervisorAction): Promise<void> {
     if (configRecovery && action !== 'update' && action !== 'apply-update') {
       screen.update({ notice: configRecoveryBlockedNotice() })
@@ -783,11 +886,15 @@ export async function runSupervisorTui(
     })
     try {
       if (action === 'update') {
-        const update = await services.checkUpdate()
+        const update = await services.checkUpdate(
+          normalizeSupervisorUpdateChannel(screen.snapshot.channel) ?? 'stable',
+        )
         screen.update({
           update,
           notice: formatUpdateNotice(update),
-          confirmation: update.status === 'available' ? 'update' : undefined,
+          confirmation: update.status === 'available' && !update.packageManager
+            ? 'update'
+            : undefined,
         })
       } else if (action === 'apply-update') {
         const update = screen.snapshot.update
@@ -973,6 +1080,7 @@ export async function runSupervisorTui(
       sourcePromptActive
       || settingsActive
       || projectsActive
+      || updateChannelActive
       || actionRunning
     ) return
     const source = sourceContext.provenance.appDir.source
@@ -1071,6 +1179,7 @@ export async function runSupervisorTui(
       settingsActive
       || sourcePromptActive
       || projectsActive
+      || updateChannelActive
       || actionRunning
     ) return
     actionRunning = true
@@ -1453,6 +1562,7 @@ export async function runSupervisorTui(
       projectsActive
       || sourcePromptActive
       || settingsActive
+      || updateChannelActive
       || actionRunning
     ) return
     actionRunning = true
@@ -1728,7 +1838,7 @@ export async function runSupervisorTui(
   }
 
   async function openTransferWizard(source: MachineProjectInventory): Promise<void> {
-    if (transferActive || sourcePromptActive || settingsActive || projectsActive || actionRunning) return
+    if (transferActive || sourcePromptActive || settingsActive || projectsActive || updateChannelActive || actionRunning) return
     const fleetState = screen.snapshot.fleet
     if (!fleetState) return
     actionRunning = true
@@ -2012,6 +2122,7 @@ export async function runSupervisorTui(
       const update = await services.discoverUpdate()
       if (!update) return
       if (!active) return
+      if (update.channel && update.channel !== screen.snapshot.channel) return
       screen.update({
         update,
         ...(update.status === 'available'
@@ -2042,6 +2153,7 @@ export async function runSupervisorTui(
       closeSettings?.()
       closeProjects?.()
       closeTransfer?.()
+      closeUpdateChannel?.()
       removeInputListener()
       process.off('SIGTERM', onTerminate)
       process.off('SIGINT', onTerminate)
@@ -2050,7 +2162,7 @@ export async function runSupervisorTui(
     }
     const onTerminate = () => finish()
     const removeInputListener = ui.addInputListener((data) => {
-      if (sourcePromptActive || settingsActive || projectsActive || transferActive) {
+      if (sourcePromptActive || settingsActive || projectsActive || transferActive || updateChannelActive) {
         if (piTui.matchesKey(data, 'ctrl+c')) {
           finish()
           return { consume: true }
@@ -2090,20 +2202,26 @@ export async function resolveSupervisorChannel(
     moduleUrl?: string
     resolveLayout?: (moduleUrl?: string) => unknown
     readSource?: () => Promise<{
+      updateChannel?: string
       selector?: { kind?: string; value?: string }
     }>
   } = {},
-): Promise<string> {
+): Promise<SupervisorUpdateChannel> {
   const moduleUrl = options.moduleUrl ?? import.meta.url
   const layout = (
     options.resolveLayout ?? resolveInstalledLayout
   )(moduleUrl)
-  if (!layout) return 'development'
+  if (!layout) return 'dev'
   const source = await (options.readSource ?? readInstallSource)()
-  if (source.selector?.kind === 'version') return 'stable'
-  return source.selector?.value
-    ? `branch ${source.selector.value}`
-    : 'installed'
+  const explicit = normalizeSupervisorUpdateChannel(source.updateChannel)
+  if (explicit) return explicit
+  if (source.selector?.kind === 'branch' && source.selector.value === 'dev') return 'dev'
+  if (source.selector?.kind === 'version' && source.selector.value?.includes('-beta')) return 'beta'
+  return 'stable'
+}
+
+function normalizeSupervisorUpdateChannel(value: unknown): SupervisorUpdateChannel | null {
+  return normalizeUpdateChannel(value) as SupervisorUpdateChannel | null
 }
 
 export class SupervisorScreen implements Component {
@@ -2383,10 +2501,10 @@ export class SupervisorScreen implements Component {
     const narrow = width < 60
     const state = runtime?.class ?? 'unavailable'
     const updateBadge = this.snapshot.update?.status === 'available'
-      ? ` · update ${this.snapshot.update.latestVersion ?? 'available'}`
+      ? ` · update ${formatUpdateCandidate(this.snapshot.update)}`
       : ''
     const lines = [
-      `OpenAlice  ${this.snapshot.version}  ${this.snapshot.channel}${updateBadge}`,
+      `OpenAlice  ${this.snapshot.version}  channel ${this.snapshot.channel}${updateBadge}`,
       '─'.repeat(Math.max(1, Math.min(width, 80))),
       renderTabs(this.snapshot.panel ?? 'overview', narrow, isConfigRecovery(this.snapshot)),
       '',
@@ -2552,7 +2670,8 @@ function createServices(
     diagnose: options.configRecovery
       ? refuseProjectAction
       : dependencies.diagnose ?? ((doctorOptions) => diagnoseRuntime(doctorOptions, shared)),
-    checkUpdate: dependencies.checkUpdate ?? (() => checkForUpdate({}, shared)),
+    checkUpdate: dependencies.checkUpdate
+      ?? ((channel) => checkForUpdate({ channel }, shared)),
     discoverUpdate: dependencies.discoverUpdate ?? (() => maybeNotifyUpdate(
       { enabled: true },
       { ...shared, interactive: true, stderr: SILENT_OUTPUT },
@@ -2687,7 +2806,7 @@ function renderHelp(recovery = false): string[] {
       'AliceProject configuration cannot be read by this OpenAlice.',
       'This shell will not inspect, start, stop, open, or configure a project.',
       '',
-      'u  Check for and install a product update',
+      'u  Choose stable, beta, or dev; then check and install',
       '?  Toggle this help',
       'q / Esc  Detach only',
       '',
@@ -2701,7 +2820,7 @@ function renderHelp(recovery = false): string[] {
     's  Start in background            o  Open verified Web UI',
     'x  Stop (confirmation required)   r  Restart (confirmation required)',
     'l  Bounded redacted logs          d  Read-only Doctor',
-    'u  Check for and install a product update',
+    'u  Choose stable, beta, or dev; then check and install',
     '?  Toggle this help',
     'i  Select or create an AliceProject',
     'p  Review setup for this AliceProject',
@@ -2720,7 +2839,7 @@ function renderConfigRecovery(snapshot: SupervisorSnapshot): string[] {
       ? 'This file requires a newer OpenAlice than the running CLI.'
       : 'It may be corrupt, or it may require a newer OpenAlice.',
     'This Supervisor will not inspect, start, open, stop, restart, or configure a project.',
-    'Press u to check for and install an OpenAlice update, or ? for help.',
+    'Press u to choose a channel and check for an OpenAlice update, or ? for help.',
   ]
 }
 
@@ -2731,8 +2850,13 @@ function renderConfirmation(
   update?: UpdateResult | null,
 ): string[] {
   if (action === 'update') {
+    const target = formatUpdateCandidate(update)
+    const sourceChannel = update?.sourceChannel ?? 'current'
+    const targetChannel = update?.channel ?? 'selected'
     return [
-      `Install OpenAlice ${update?.latestVersion ?? 'the available update'} now?`,
+      sourceChannel === targetChannel
+        ? `Install OpenAlice ${target} from ${targetChannel} now?`
+        : `Switch ${sourceChannel} → ${targetChannel} and install OpenAlice ${target}?`,
       `Current CLI: ${update?.currentVersion ?? 'this running process'}.`,
       'This downloads the release installer, verifies its SHA-256, and atomically replaces the installed command.',
       'This running Supervisor will not reload. After success, exit and run openalice again.',
@@ -2829,21 +2953,33 @@ function formatUpdateNotice(
   update: UpdateResult,
   kind: 'check' | 'discover' = 'check',
 ): string {
+  if (update.packageManager && update.status === 'available') {
+    return update.channel === 'stable'
+      ? `${update.packageManager.label ?? 'The package manager'} owns this installation. Update with: ${update.packageManager.update ?? 'the package manager'}`
+      : `${update.packageManager.label ?? 'The package manager'} owns this installation and only follows stable. Use the direct installer explicitly to switch to ${update.channel}.`
+  }
   if (update.status === 'available') {
-    const version = update.latestVersion ?? 'update'
+    const version = formatUpdateCandidate(update)
     return kind === 'discover'
-      ? `OpenAlice ${version} is available; press u to review and install it.`
-      : `OpenAlice ${version} is available. Confirm below to install it now.`
+      ? `OpenAlice ${version} is available on ${update.channel}; press u to review and install it.`
+      : `OpenAlice ${version} is available on ${update.channel}. Confirm below to install it now.`
   }
   if (update.status === 'current') {
-    return `OpenAlice ${update.currentVersion ?? ''} is current.`.trim()
+    return `OpenAlice is current on ${update.channel ?? 'this channel'}.`
   }
   return update.message ?? 'Automatic update is unavailable for this install channel.'
 }
 
 function formatUpdateInstalledNotice(update: UpdateResult): string {
-  const version = update.latestVersion ?? 'the new OpenAlice'
+  const version = formatUpdateCandidate(update)
   return `Installed ${version}. This running Supervisor is still the previous CLI and did not reload. Press q to detach, then run openalice again.`
+}
+
+function formatUpdateCandidate(update?: UpdateResult | null): string {
+  if (update?.channel === 'dev' && update.latestCommit) {
+    return `dev@${update.latestCommit.slice(0, 12)}`
+  }
+  return update?.latestVersion ?? 'the available update'
 }
 
 function isConfigRecovery(snapshot: SupervisorSnapshot): boolean {
@@ -2886,11 +3022,18 @@ async function applyVerifiedSupervisorUpdate(
       'This OpenAlice CLI is running from source, not an installed release. Re-run the public installer to update the installed command.',
     )
   }
+  const updateChannel = normalizeSupervisorUpdateChannel(result.channel)
   if (
     result.status !== 'available'
+    || result.packageManager !== undefined
+    || !updateChannel
     || typeof result.latestVersion !== 'string'
     || typeof result.installer?.versionedUrl !== 'string'
     || typeof result.installer.sha256 !== 'string'
+    || (updateChannel === 'dev' && (
+      !/^[a-f0-9]{64}$/.test(result.latestArtifactSha256 ?? '')
+      || !/^[a-f0-9]{16}$/.test(result.latestContentIdentity ?? '')
+    ))
   ) {
     throw new Error('Update metadata is incomplete. Press u to check again.')
   }
@@ -3178,7 +3321,5 @@ function truncate(value: string, width: number): string {
 }
 
 function readCliVersion(): string {
-  const packageUrl = new URL('../package.json', import.meta.url)
-  const manifest = JSON.parse(readFileSync(packageUrl, 'utf8')) as { version?: unknown }
-  return typeof manifest.version === 'string' ? manifest.version : 'unknown'
+  return CLI_VERSION
 }

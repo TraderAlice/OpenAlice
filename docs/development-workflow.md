@@ -11,13 +11,16 @@ Canonical startup rules: [[AGENTS.md]]. Guide index: [[docs/README.md]].
 
 - `dev` is the integration lane for routine development and an independently
   testable preview environment. Merged installer changes are exercised through
-  the mutable `raw/.../dev/install` endpoint with a matching `--branch dev`
+  the mutable `raw/.../dev/install` endpoint with a matching `--channel dev`
   payload selector.
-- `master` is the stable/user-facing lane and the default GitHub branch. A
-  `dev` to `master` merge is a versioned release event, not another integration
-  step.
-- Release automation runs from `master` and derives public artifacts from the
-  accepted release tag. It is the only path that updates stable CDN aliases.
+- `master` is the release-source/user-facing lane and the default GitHub branch.
+  A `dev` to `master` merge establishes a releasable source but does not choose a
+  version or publish a release.
+- Release automation is dispatched manually from `master` with an explicit
+  `beta` or `stable` channel and tag. The tag version and both product package
+  manifests must agree before candidate work begins. Each accepted tag may
+  update only its own mutable product aliases; a newly accepted release may
+  also refresh the shared channel-neutral `install` bootstrap.
 - `archive/dev-pre-beta6` is a historical snapshot; do not modify or delete it.
 - `local` is a legacy shared-worktree branch. It is not the default workflow;
   audit its unmerged commits before deciding whether to retain or retire it.
@@ -52,6 +55,36 @@ Then establish ownership of the checkout:
 
 Delivery mode controls merge authority, not implementation quality.
 
+### Feature-branch iteration hold
+
+Feature-branch iteration is an explicit natural-language instruction, not a
+third delivery mode or a configuration schema. A maintainer may say, for
+example, “keep this on a feature branch and iterate until I am satisfied.” The
+hold applies independently to serial or parallel work and overrides their
+normal PR timing without changing their implementation or review standards.
+
+While the hold is active:
+
+1. keep the coherent initiative on one named branch based on `dev`;
+2. keep one integrator responsible for that branch; parallel workers use
+   temporary branches or worktrees and hand off commits;
+3. commit and push verified increments to the feature branch, but do not open
+   or merge a PR to `dev` yet;
+4. keep substantial multi-session scope and acceptance progress current in its
+   canonical `plans/<topic>.md` file using ordinary prose;
+5. continue to inspect known CI or integration failures before adding scope,
+   and periodically incorporate current `dev` without rewriting shared branch
+   history; and
+6. remain in the hold until the maintainer explicitly says the result is ready
+   for a PR, or explicitly abandons the branch.
+
+When the maintainer accepts the branch, first reconcile it with current `dev`,
+run the complete proportional verification for the accumulated diff, and then
+open the normal PR to `dev`. “Keep working,” an interactive follow-up, or a
+successful local increment does not implicitly end the hold. A held branch is
+also not a preview or release lane: `dev` and `master` retain their existing
+integration and promotion ownership.
+
 ### Serial / interactive
 
 This is the default when the user is actively requesting, reviewing, and
@@ -64,7 +97,8 @@ steering concrete work.
    and its post-merge `dev` run. Repair a completed failure before stacking more
    work; record a still-pending run without waiting on it.
 5. Open a PR to `dev`, confirm the intended base and head, and merge immediately
-   unless the user requests a review pause or earlier CI has a known failure.
+   unless the user requests a review pause, declares a feature-branch iteration
+   hold, or earlier CI has a known failure.
 6. Delete the merged feature branch and return to updated `dev`.
 
 The PR durably integrates the completed increment into `dev` and records its
@@ -84,7 +118,8 @@ into a coherent topic that a reviewer can understand as one product outcome:
 1. define the topic in one sentence and record its acceptance boundary and
    non-goals;
 2. start from latest `dev` on one topic branch and open a Draft PR after the
-   first verified increment;
+   first verified increment, unless a feature-branch iteration hold delays the
+   PR until maintainer acceptance;
 3. keep one integrator responsible for that branch; parallel workers use
    temporary branches or worktrees and hand off commits rather than racing to
    push the topic branch;
@@ -217,7 +252,7 @@ delivery lane:
 - Installer or distributed-CLI PRs run deterministic clean-container install
   and managed-SSH acceptance against the checked-out tree. After merge, the
   `dev` push separately downloads `raw/.../dev/install` into a clean container,
-  installs `--branch dev`, and verifies the live preview channel's provenance,
+  installs `--channel dev`, and verifies the live preview channel's provenance,
   commands, server control surface, and idempotent reuse.
 - A push to `master` always runs the complete matrix.
 - Once this workflow version reaches the default `master` branch, the scheduled
@@ -303,10 +338,9 @@ ownership.
 
 ## Promotion: `dev` to `master`
 
-Promotion is a human-directed, versioned release decision. Do not merge
-unreleased follow-up work to `master` merely to make a public alias catch up;
-finish and test it in the active `dev` environment, then include it in the next
-release.
+Promotion is a human-directed release-source decision, not a release trigger.
+Do not merge unfinished follow-up work to `master` merely to make a public
+alias catch up; finish and test it in the active `dev` environment first.
 
 ```bash
 git fetch origin
@@ -322,18 +356,45 @@ Before merging a promotion:
 - follow [[docs/cli-installer.md]]; require the checkout installer/remote jobs
   and the post-merge live dev-channel job to be green, and walk the interactive
   installer locally when its human-facing flow changed;
-- confirm the new release version, notes, and tag intent; the release workflow
-  must see a version whose tag does not already exist, and the root and
-  `packages/cli` manifests must carry that same product version;
 - confirm CI and release workflow triggers still match the branch policy.
 
+After promotion, a maintainer may prepare a focused version-only branch from
+`master` and target its PR back to `master` when the source is ready to release.
+This maintainer-directed release-prep PR is the narrow exception to the normal
+`dev` base. Keep this publication-only version commit on `master`: the `dev`
+preview keeps its integration version, and a later merge preserves the
+master-only change unless the manifests themselves conflict. Run the `Release`
+workflow manually from `master`, choose the `release` operation, and supply both
+the channel and tag:
+`beta` accepts `vX.Y.Z-beta` or `vX.Y.Z-beta.N`; `stable` accepts only
+`vX.Y.Z`. The workflow rejects an existing tag, a channel/tag mismatch, or a
+version that disagrees with either the root or `packages/cli` package. It binds
+the accepted candidates and eventual tag to the dispatch commit SHA.
+
+Beta and stable are serial public checkpoints, not paired outputs from one
+release run. After a beta, fixes may continue on `dev`, pass the ordinary
+promotion gate, and then ship either as another optional numbered beta or
+directly as stable. Only when the beta source needs no change may a later stable
+intent use that exact source. Even then, stable remains a separate human version
+decision and workflow dispatch; never create beta and stable together merely
+because one candidate build passed.
+
 The release workflow repeats the deterministic installer and managed-remote
-acceptance against the exact master candidate before it can create the tag and
-GitHub Release. It then creates the versioned installer from that tag, mirrors
-the same bytes to `download.openalice.ai/install`, writes the manifest checksum,
-and verifies both CDN objects. A manual `mirror_tag` run is recovery-only: it
-checks out that existing tag and may reproduce its bytes, but must never source
-an installer from current `master`.
+acceptance against that exact master candidate before it can create the tag and
+GitHub Release. The previous release and notes baseline come from the same
+channel, so a stable release after a beta still proves the previous stable to
+new stable journey. Both channels publish immutable versioned bytes, including
+an installer snapshot frozen before the tag/Release exists. A new beta release
+may replace only `beta*.yml`, `beta/manifest.json`, and the shared
+channel-neutral `install`; stable alone may replace `latest*.yml`,
+`manifest.json`, public desktop aliases, and opted-in package-manager metadata.
+A manual `mirror` operation is recovery-only: it runs current `master` tooling,
+requires an existing tag that is already active on the selected channel,
+consumes the release-owned installer snapshot, and never rewrites the shared
+installer or clobbers immutable installer bytes. Mirror repair therefore
+applies only to releases created by this channel-aware workflow, whose GitHub
+Release owns both the installer snapshot and checksum sidecar; older releases
+remain outside this repair contract.
 
 Desktop promotion evidence includes a real N-1 state journey on Apple Silicon,
 Intel macOS, and Windows. PR package jobs seed state with the previous published

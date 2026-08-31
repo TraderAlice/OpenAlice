@@ -1,0 +1,58 @@
+name: Public CLI Channel Authority
+
+on:
+  workflow_dispatch:
+    inputs:
+      npm:
+        description: Verify npm and Bun package-name authority.
+        required: true
+        default: true
+        type: boolean
+      homebrew:
+        description: Verify TraderAlice Homebrew Tap write authority.
+        required: true
+        default: true
+        type: boolean
+      aur:
+        description: Verify AUR openalice-bin Git authority.
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    name: Verify selected public CLI channels
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+
+      - name: Require at least one selected channel
+        env:
+          CHECK_NPM: ${{ inputs.npm }}
+          CHECK_HOMEBREW: ${{ inputs.homebrew }}
+          CHECK_AUR: ${{ inputs.aur }}
+        run: |
+          if [ "$CHECK_NPM" != "true" ] && [ "$CHECK_HOMEBREW" != "true" ] && [ "$CHECK_AUR" != "true" ]; then
+            echo "::error::Select at least one public CLI channel to verify."
+            exit 1
+          fi
+
+      - name: Verify selected channel authority without publishing
+        run: node scripts/preflight-public-cli-authority.mjs
+        env:
+          OPENALICE_PUBLISH_NPM: ${{ inputs.npm }}
+          OPENALICE_PUBLISH_HOMEBREW: ${{ inputs.homebrew }}
+          OPENALICE_PUBLISH_AUR: ${{ inputs.aur }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          AUR_KNOWN_HOSTS: ${{ secrets.AUR_KNOWN_HOSTS }}

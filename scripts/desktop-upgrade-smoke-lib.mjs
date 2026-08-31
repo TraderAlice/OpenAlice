@@ -10,6 +10,15 @@ export function selectPreviousDesktopTag(tags, candidateVersion) {
   return tags.find((tag) => versionFromTag(tag) !== candidateVersion) ?? null
 }
 
+export function desktopUpgradeWorkspaceTags(previousVersion) {
+  const slug = previousVersion
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase() || 'release'
+  const tag = `upgrade-${slug}`.slice(0, 28)
+  return { tag, postUpgradeTag: `${tag}-post` }
+}
+
 export function previousDesktopAssetName(version, platform, arch) {
   if (platform === 'darwin') {
     return arch === 'arm64'

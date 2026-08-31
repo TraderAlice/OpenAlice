@@ -33,7 +33,10 @@ the durable truth after it changes. Git history is the archive.
   Runtime with a Bun-compiled, multi-process CLI distribution. Direct,
   npm/Bun, Homebrew, and AUR channels consume one accepted artifact set. The
   CLI package owns OpenAlice only: Agent Runtime installation and Electron
-  packaging stay outside this plan.
+  packaging stay outside this plan. The native CLI is public through the
+  separately dispatched `v0.91.0-beta.1`; stable/beta discovery now uses the
+  OpenAlice CDN manifests, while native PowerShell and external
+  package-manager activation remain on focused branches from current `dev`.
 - [[plans/remote-project-fleet.md]] — Adds a machine-aware Supervisor fleet,
   remote AliceProject inventory/connection, and safe local-to-SSH project
   transfer for portable configuration and Workspaces while deliberately

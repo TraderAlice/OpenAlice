@@ -8,6 +8,10 @@ Related evidence:
 - [master CI run 31495757321](https://github.com/TraderAlice/OpenAlice/actions/runs/31495757321)
 - [promotion PR #1060](https://github.com/TraderAlice/OpenAlice/pull/1060)
 - [Batch 1 serial PR #1061](https://github.com/TraderAlice/OpenAlice/pull/1061) — merged to `dev` on 2026-08-11
+- [0.91 test-isolation PR #1272](https://github.com/TraderAlice/OpenAlice/pull/1272)
+- [0.91 source-promotion PR #1273](https://github.com/TraderAlice/OpenAlice/pull/1273)
+- [0.91 version-only PR #1271](https://github.com/TraderAlice/OpenAlice/pull/1271)
+- [0.91.0-beta.1 release run 33329951354](https://github.com/TraderAlice/OpenAlice/actions/runs/33329951354)
 
 Owner guides:
 
@@ -43,6 +47,11 @@ the versioned release lane.
   `dev`/`master` pull-request coverage remain available.
 - Defer DAG fan-in removal and accepted-tree provenance to a second batch. Both
   need explicit artifact/provenance contracts rather than YAML-only shortcuts.
+- Keep beta and stable as separate serial release intents. A changed source tree
+  invalidates prior candidate evidence and must be accepted again; unchanged
+  beta source may be selected only through a later explicit stable decision.
+  Even then, stable has independent version preparation and full release
+  acceptance.
 
 ## Acceptance Criteria
 
@@ -116,6 +125,21 @@ Silicon packaged Workspace journey. Its twelve receipt checks passed through
 Electron IPC, staged PTY login-shell readiness, all injected CLIs, scheduled
 managed Pi, and cleanup. Intel macOS, Windows, signing, and notarization remain
 native CI/release evidence.
+
+The 0.91 beta checkpoint supplied concrete Batch 2 evidence. The promotion and
+version-only PRs each tested a synthetic merge tree identical to their final
+merge tree, yet the resulting `master` pushes still started duplicate CI and
+Docker workflows. Those duplicate runs were cancelled only after tree identity
+was established. The tagged release then separately ran its candidate, signing,
+N-1 upgrade, installer, and publication gates. Two intermittent failures were
+test-environment defects rather than product regressions: a hard-coded port
+collided with a hosted runner, and Windows cleanup exceeded an implicit
+five-second test budget. PR #1272 replaced the port assumption with a reserved
+fixture window and gave the bounded Git cleanup path an explicit budget. The
+later promotion, version-only, and release gates all passed. This supports a
+future accepted-tree receipt that skips only identical post-merge CI; it does
+not justify reusing evidence after additional commits, weakening release gates,
+or combining beta and stable publication.
 
 ## Completion
 

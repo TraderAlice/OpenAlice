@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { PublicConnectorConfig } from '@traderalice/connector-protocol'
+import type {
+  ConnectorAdapterMutation,
+  PublicConnectorAdapterMutationResult,
+  PublicConnectorConfig,
+} from '@traderalice/connector-protocol'
 
 import type { WorkspaceService } from '../../workspaces/service.js'
 import type { ConnectorDesk } from '../../workspaces/issues/connector-desk.js'
@@ -24,7 +28,7 @@ function desk(every = '4h'): ConnectorDesk {
     connectorId: 'telegram',
     issue: {
       id: 'telegram-phone-desk',
-      title: 'Telegram phone desk',
+      title: 'Chat on Telegram',
       status: 'todo',
       priority: 'none',
       assignee: '@new-then-resume',
@@ -39,6 +43,8 @@ function build(options: {
   linked?: boolean
   fetchImpl?: typeof fetch
   restartConnectorService?: () => Promise<void>
+  mutateAdapter?: (id: string, mutation: ConnectorAdapterMutation) => Promise<PublicConnectorAdapterMutationResult>
+  mutateService?: (enabled: boolean) => Promise<{ serviceEnabled: boolean; serviceChanged: boolean }>
 } = {}) {
   const createConnectorDesk = vi.fn(async () => desk())
   const updateConnectorDesk = vi.fn(async (_id: string, patch: Parameters<WorkspaceService['updateConnectorDesk']>[1]) => {
@@ -55,11 +61,67 @@ function build(options: {
     readConnectorConfig: async () => connectorConfig(options.linked ?? true),
     fetchImpl: options.fetchImpl,
     restartConnectorService: options.restartConnectorService,
+    mutateAdapter: options.mutateAdapter,
+    mutateService: options.mutateService,
   })
   return { app, createConnectorDesk, updateConnectorDesk }
 }
 
 describe('Telegram phone-desk connector routes', () => {
+  it('reconciles only the mutated adapter when service is already running', async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 })) as typeof fetch
+    const restartConnectorService = vi.fn(async () => undefined)
+    const mutateAdapter = vi.fn(async (): Promise<PublicConnectorAdapterMutationResult> => ({
+      serviceEnabled: true,
+      serviceChanged: false,
+      adapterChanged: true,
+      adapter: { enabled: false, settings: {}, configuredSecrets: ['botToken'] },
+    }))
+    const { app } = build({ fetchImpl, restartConnectorService, mutateAdapter })
+
+    const response = await app.request('/telegram', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ enabled: false }),
+    })
+
+    expect(response.status).toBe(200)
+    expect(mutateAdapter).toHaveBeenCalledWith('telegram', {
+      enabled: false,
+      set: {},
+      unset: [],
+      setSecrets: {},
+      removeSecrets: [],
+    })
+    expect(fetchImpl).toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: '/v1/connectors/telegram/reconcile' }),
+      expect.objectContaining({ method: 'POST' }),
+    )
+    expect(restartConnectorService).not.toHaveBeenCalled()
+  })
+
+  it('asks Guardian to start Connector Service when the first adapter is enabled', async () => {
+    const fetchImpl = vi.fn() as typeof fetch
+    const restartConnectorService = vi.fn(async () => undefined)
+    const mutateAdapter = vi.fn(async (): Promise<PublicConnectorAdapterMutationResult> => ({
+      serviceEnabled: true,
+      serviceChanged: true,
+      adapterChanged: true,
+      adapter: { enabled: true, settings: {}, configuredSecrets: ['botToken'] },
+    }))
+    const { app } = build({ fetchImpl, restartConnectorService, mutateAdapter })
+
+    const response = await app.request('/telegram', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ enabled: true }),
+    })
+
+    expect(response.status).toBe(202)
+    expect(restartConnectorService).toHaveBeenCalledOnce()
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
+
   it('recognizes only a bot token plus a durable private-owner link', () => {
     expect(isTelegramPrivateChatLinked(connectorConfig(true))).toBe(true)
     expect(isTelegramPrivateChatLinked(connectorConfig(false))).toBe(false)
@@ -82,7 +144,10 @@ describe('Telegram phone-desk connector routes', () => {
     })
 
     expect(response.status).toBe(409)
-    expect(await response.json()).toMatchObject({ error: 'not_linked' })
+    expect(await response.json()).toEqual({
+      error: 'not_linked',
+      message: 'Link this connector to its private owner chat before turning on chat',
+    })
     expect(createConnectorDesk).not.toHaveBeenCalled()
   })
 
@@ -107,6 +172,10 @@ describe('Telegram phone-desk connector routes', () => {
     })
 
     expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({
+      error: 'invalid',
+      message: 'when must use a supported heartbeat',
+    })
     expect(updateConnectorDesk).not.toHaveBeenCalled()
   })
 

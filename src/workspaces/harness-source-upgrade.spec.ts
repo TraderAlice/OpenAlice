@@ -12,12 +12,18 @@ import { WorkspaceOperationGuard } from './workspace-operation-guard.js'
 import { WorkspaceRegistry } from './workspace-registry.js'
 
 const roots: string[] = []
+const GIT_FIXTURE_TIMEOUT_MS = 30_000
 const logger = {
   debug() {}, info() {}, warn() {}, error() {}, event() {}, child() { return this },
 } as unknown as Logger
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
+  await Promise.all(roots.splice(0).map((root) => rm(root, {
+    recursive: true,
+    force: true,
+    maxRetries: 5,
+    retryDelay: 100,
+  })))
 })
 
 describe('HarnessSourceUpgradeManager', () => {
@@ -51,7 +57,7 @@ describe('HarnessSourceUpgradeManager', () => {
       version: 'v1.1.0',
       commit: fixture.v2,
     })
-  })
+  }, GIT_FIXTURE_TIMEOUT_MS)
 
   it('keeps unverified stable releases behind the opt-in policy', async () => {
     const fixture = await createFixture({ catalogV2: false })
@@ -70,7 +76,7 @@ describe('HarnessSourceUpgradeManager', () => {
       toVersion: 'v1.1.0',
       verified: false,
     })
-  })
+  }, GIT_FIXTURE_TIMEOUT_MS)
 
   it('blocks a dirty Workspace before any merge is applied', async () => {
     const fixture = await createFixture()
@@ -87,7 +93,7 @@ describe('HarnessSourceUpgradeManager', () => {
       planDigest: plan.planDigest,
       targetVersion: plan.toVersion,
     })).rejects.toMatchObject({ code: 'working_tree_changes' })
-  })
+  }, GIT_FIXTURE_TIMEOUT_MS)
 })
 
 function normalizeLineEndings(value: string): string {

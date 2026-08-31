@@ -1,10 +1,20 @@
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
-import { basename, dirname } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const CLI_VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version
+import {
+  isBunStandalone,
+  resolveBunContentIdentity,
+  resolveBunResourceRoot,
+} from './bun-standalone.mjs'
+
+const compiledCliVersion = globalThis.__OPENALICE_BUILD_VERSION__
+
+export const CLI_VERSION = typeof compiledCliVersion === 'string' && compiledCliVersion.length > 0
+  ? compiledCliVersion
+  : JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version
 
 export const DEFAULT_INSTALL_SOURCE = Object.freeze({
   schemaVersion: 2,
@@ -16,18 +26,48 @@ export const DEFAULT_INSTALL_SOURCE = Object.freeze({
 })
 
 export async function readInstallSource(options = {}) {
-  const metadataUrl = options.metadataUrl ?? new URL('../install-source.json', import.meta.url)
-  try {
-    return requireInstallSource(JSON.parse(await readFile(metadataUrl, 'utf8')))
-  } catch (error) {
-    if (error?.code === 'ENOENT') return cloneInstallSource(DEFAULT_INSTALL_SOURCE)
-    throw error
+  const env = options.env ?? process.env
+  const metadataLocations = options.metadataUrl
+    ? [options.metadataUrl]
+    : env['OPENALICE_INSTALL_SOURCE']
+      ? [env['OPENALICE_INSTALL_SOURCE']]
+      : nativeInstallSourceLocations(options, env)
+  for (const metadataUrl of metadataLocations) {
+    try {
+      return requireInstallSource(JSON.parse(await readFile(metadataUrl, 'utf8')))
+    } catch (error) {
+      if (error?.code === 'ENOENT') continue
+      throw error
+    }
   }
+  return cloneInstallSource(DEFAULT_INSTALL_SOURCE)
 }
 
-export function installedContentIdentity(moduleUrl = import.meta.url) {
+export function installedContentIdentity(moduleUrl = import.meta.url, options = {}) {
+  const env = options.env ?? process.env
+  const explicit = env['OPENALICE_CONTENT_IDENTITY']?.trim()
+  if (/^[a-f0-9]{16}$/.test(explicit ?? '')) return explicit
+  const bunStandalone = options.bunStandalone ?? isBunStandalone()
+  if (bunStandalone) {
+    return resolveBunContentIdentity(
+      resolveBunResourceRoot(env, options.executable ?? process.execPath),
+      env,
+      options.readFileSync ?? readFileSync,
+    )
+  }
   const releaseDirectory = basename(dirname(dirname(fileURLToPath(moduleUrl))))
   return /-([a-f0-9]{16})$/.exec(releaseDirectory)?.[1] ?? null
+}
+
+function nativeInstallSourceLocations(options, env) {
+  const bunStandalone = options.bunStandalone ?? isBunStandalone()
+  if (!bunStandalone) return [new URL('../install-source.json', import.meta.url)]
+  const executable = resolve(options.executable ?? process.execPath)
+  const resourceRoot = resolveBunResourceRoot(env, executable)
+  return [
+    join(dirname(dirname(executable)), 'install-source.json'),
+    join(resourceRoot, 'install-source.json'),
+  ]
 }
 
 export function normalizeInstallSource(value, fallback = DEFAULT_INSTALL_SOURCE) {
@@ -43,11 +83,25 @@ export function parseInstallSource(value) {
   const ref = selector?.value
   const installerUrl = typeof value.installerUrl === 'string' ? value.installerUrl : ''
   const schemaVersion = value.schemaVersion
-  const updateChannel = schemaVersion === 2
+  const updateChannel = schemaVersion === 2 || schemaVersion === 3
     ? value.updateChannel
     : inferLegacyUpdateChannel({ selector, installerUrl })
+  const method = value.method
+  const artifact = value.artifact
+  const installedAt = value.installedAt
+  const validV3 = schemaVersion !== 3 || (
+    ['direct', 'npm', 'bun', 'brew', 'aur'].includes(method)
+    && artifact
+    && typeof artifact === 'object'
+    && ['darwin', 'linux'].includes(artifact.platform)
+    && ['arm64', 'x64'].includes(artifact.arch)
+    && typeof artifact.sha256 === 'string'
+    && /^[a-f0-9]{64}$/.test(artifact.sha256)
+    && typeof installedAt === 'string'
+    && Number.isFinite(Date.parse(installedAt))
+  )
   if (
-    ![1, 2].includes(schemaVersion)
+    ![1, 2, 3].includes(schemaVersion)
     || repository !== 'TraderAlice/OpenAlice'
     || cliVersion.length < 1
     || !['branch', 'version'].includes(kind)
@@ -57,7 +111,8 @@ export function parseInstallSource(value) {
     || ref.includes('..')
     || !/^[A-Za-z0-9._/-]+$/.test(ref)
     || !isHttpUrl(installerUrl)
-    || !['stable', 'pinned', 'development', 'custom'].includes(updateChannel)
+    || !['stable', 'beta', 'pinned', 'development', 'custom'].includes(updateChannel)
+    || !validV3
   ) {
     return null
   }
@@ -67,7 +122,16 @@ export function parseInstallSource(value) {
     cliVersion,
     selector: { kind, value: ref },
     installerUrl,
-    ...(schemaVersion === 2 ? { updateChannel } : {}),
+    ...(schemaVersion >= 2 ? { updateChannel } : {}),
+    ...(schemaVersion === 3 ? {
+      method,
+      artifact: {
+        platform: artifact.platform,
+        arch: artifact.arch,
+        sha256: artifact.sha256,
+      },
+      installedAt,
+    } : {}),
   }
 }
 
@@ -91,7 +155,7 @@ export function installSourcesMatch(left, right) {
 
 export function installSourceUpdateChannel(source) {
   const normalized = requireInstallSource(source)
-  return normalized.schemaVersion === 2
+  return normalized.schemaVersion >= 2
     ? normalized.updateChannel
     : inferLegacyUpdateChannel(normalized)
 }
@@ -121,7 +185,10 @@ function cloneInstallSource(source) {
     cliVersion: source.cliVersion,
     selector: { ...source.selector },
     installerUrl: source.installerUrl,
-    ...(source.schemaVersion === 2 ? { updateChannel: source.updateChannel } : {}),
+    ...(source.schemaVersion >= 2 ? { updateChannel: source.updateChannel } : {}),
+    ...(source.schemaVersion === 3 && source.method ? { method: source.method } : {}),
+    ...(source.schemaVersion === 3 && source.artifact ? { artifact: { ...source.artifact } } : {}),
+    ...(source.schemaVersion === 3 && source.installedAt ? { installedAt: source.installedAt } : {}),
   }
 }
 

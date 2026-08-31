@@ -36,7 +36,7 @@ export function isTelegramConnectorCadence(value: string): value is ConnectorDes
 
 export function connectorDeskDefaultWhat(label: string): string {
   return [
-    `You are the ${label} phone desk for this Workspace.`,
+    `You are the chat connected to the owner through ${label}.`,
     '',
     'On each scheduled wake, read this Issue\'s recent comments (the chat with the human).',
     'If the human needs a message, write that message as your reply.',
@@ -130,14 +130,14 @@ export async function createConnectorDesk(
     if (!revived.ok) {
       return revived.reason === 'invalid'
         ? revived
-        : { ok: false, reason: 'invalid', error: `${label} phone desk could not be re-enabled` }
+        : { ok: false, reason: 'invalid', error: `Chat on ${label} could not be turned back on` }
     }
     return { ok: true, issue: revived.issue }
   }
 
   const created = await createIssue(workspace.dir, {
     id: reservedId,
-    title: `${label} phone desk`,
+    title: `Chat on ${label}`,
     assignee: '@new-then-resume',
     when: CONNECTOR_DESK_DEFAULT_WHEN,
     what: connectorDeskDefaultWhat(label),
@@ -170,7 +170,7 @@ export async function updateConnectorDesk(
     return {
       ok: false,
       reason: 'invalid',
-      error: `Unsupported phone-desk cadence: ${patch.when.every}`,
+      error: `Unsupported heartbeat: ${patch.when.every}`,
     }
   }
   return updateIssueFields(wsDir, id, patch)

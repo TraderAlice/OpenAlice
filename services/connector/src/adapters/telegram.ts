@@ -397,6 +397,7 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
           text,
           userId: String(ctx.from.id),
           chatId: String(ctx.chat.id),
+          eventId: String(ctx.message.message_id),
         })
       } catch (error) {
         this.tracker.degraded(error)
@@ -518,7 +519,7 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
     const sent = await this.presentForm(ctx, form, 'reply')
     if (!sent || !ctx.chat) return
     try {
-      const requestId = context.enqueueUtaRequest({ action: 'review' })
+      const requestId = await context.enqueueUtaRequest({ action: 'review' })
       session.requestId = requestId
       this.utaSessions.set(sessionKey(ctx.chat.id, sent), session)
       this.utaPending.set(requestId, { chatId: ctx.chat.id, messageId: sent, session })
@@ -596,7 +597,7 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
     }
     if (resolution.kind === 'request-artifact') {
       try {
-        context.enqueueArtifactRequest({
+        await context.enqueueArtifactRequest({
           entryId: resolution.entryId,
           docIndex: resolution.docIndex,
         })
@@ -637,7 +638,7 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
     }
     if (resolution.kind === 'enqueue') {
       try {
-        const requestId = context.enqueueUtaRequest({
+        const requestId = await context.enqueueUtaRequest({
           action: resolution.action,
           ...(resolution.utaId ? { utaId: resolution.utaId } : {}),
           ...(resolution.pendingHash ? { pendingHash: resolution.pendingHash } : {}),

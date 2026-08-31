@@ -3,6 +3,12 @@
   "version": "0.90.1",
   "description": "File-based trading agent engine",
   "type": "module",
+  "imports": {
+    "#openalice/pty-backend": {
+      "bun": "./src/workspaces/pty-bun.ts",
+      "default": "./src/workspaces/pty-node.ts"
+    }
+  },
   "main": "dist/electron/main.js",
   "scripts": {
     "cli": "node packages/cli/bin/openalice.ts",
@@ -18,7 +24,13 @@
     "build": "turbo run build && tsup src/main.ts --format esm --dts",
     "prebuild:server": "tsx scripts/build-migration-index.ts",
     "build:server": "turbo run build --filter=!@traderalice/desktop --filter=!./packages/uta-broker-* && tsup src/main.ts --format esm --dts",
-    "build:headless-runtime": "tsx scripts/build-headless-runtime.ts",
+    "build:bun-cli:feasibility": "bun scripts/build-bun-cli-feasibility.ts",
+    "build:bun-alice:feasibility": "bun scripts/build-bun-alice-feasibility.ts",
+    "build:bun-runtime:feasibility": "bun scripts/build-bun-runtime-feasibility.ts",
+    "build:bun:release": "bun scripts/build-bun-release.ts",
+    "build:cli-package-channels": "node scripts/build-cli-package-channels.mjs",
+    "pack:cli-npm": "node scripts/pack-cli-npm-packages.mjs",
+    "test:cli-package-manager": "node scripts/cli-package-manager-smoke.mjs",
     "build:migration-index": "tsx scripts/build-migration-index.ts",
     "broker-packs:build": "turbo run build --filter=./packages/uta-broker-* && tsx scripts/build-broker-packs.ts && pnpm broker-packs:verify",
     "broker-packs:upgrade-smoke": "tsx scripts/broker-pack-upgrade-smoke.ts",

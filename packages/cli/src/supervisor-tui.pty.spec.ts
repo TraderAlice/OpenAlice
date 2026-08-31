@@ -176,7 +176,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       })
     })
 
-    expect(transcript).toContain(`OpenAlice  ${cliVersion}  development`)
+    expect(transcript).toContain(`OpenAlice  ${cliVersion}  channel dev`)
     expect(transcript).toContain('Runtime state: absent')
     expect(transcript).toContain('Supervisor controls')
     expect(transcript).toContain('\u001b[?25h')
@@ -424,7 +424,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       })
     })
 
-    expect(transcript).toContain(`OpenAlice  ${cliVersion}  branch dev`)
+    expect(transcript).toContain(`OpenAlice  ${cliVersion}  channel dev`)
     expect(transcript).toContain('installer-managed OpenAlice source branch dev')
     expect(transcript).not.toContain('Configure Runtime source')
     expect(transcript).toContain('\u001b[?25h')

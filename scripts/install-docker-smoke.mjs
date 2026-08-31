@@ -13,9 +13,8 @@ let imageBuilt = false
 if (args.includes('--help') || args.includes('-h')) {
   console.log(`Usage: pnpm test:install:docker [--interactive] [--keep-image]
 
-Build a clean local container and execute the OpenAlice curl installer through
-its real HTTP download path. The smoke is a manual pre-release gate and is not
-wired into PR CI.
+Build a clean local Linux container with no Node, npm, Bun, or Agent Runtime,
+then exercise the native archive installer and atomic update path.
 
 Options:
   --interactive Keep a TTY open to experience and inspect the installer manually

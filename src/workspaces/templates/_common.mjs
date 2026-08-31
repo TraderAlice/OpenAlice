@@ -2,11 +2,10 @@
  * Shared helpers for the Node workspace bootstrap scripts — the cross-platform
  * port of `_common.sh`.
  *
- * Plain ESM, run directly by the Electron-bundled Node (the launcher spawns it
- * via `process.execPath` + `ELECTRON_RUN_AS_NODE`). So: NO TypeScript syntax,
- * only `node:*` builtins + `dugite`. Resolved via node walk-up from the
- * template dir to the app's `node_modules` (works in dev and in the packaged
- * `asar:false` app).
+ * Plain ESM, run by the Electron-bundled Node or by the Bun standalone's
+ * internal bootstrap role. So: NO TypeScript syntax, only `node:*` builtins
+ * plus the launcher-owned dugite executor. Node resolves dugite through the
+ * packaged dependency tree; the compiled Bun role injects its bundled copy.
  *
  * This is the SOLE importer of `dugite` among the templates: all git goes
  * through `git()` so workspace creation uses OpenAlice's bundled git — no
@@ -17,7 +16,10 @@
 
 import { existsSync, mkdirSync, copyFileSync, appendFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { exec } from 'dugite'
+const injectedGitExec = globalThis.__OPENALICE_BOOTSTRAP_GIT_EXEC__
+const exec = typeof injectedGitExec === 'function'
+  ? injectedGitExec
+  : (await import('dugite')).exec
 
 /**
  * Run a git command via the bundled git, rooted at `cwd`. Throws on a non-zero
