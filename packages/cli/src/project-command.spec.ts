@@ -1,11 +1,15 @@
-import { mkdtemp, mkdir, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, realpath, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { Readable, Writable } from 'node:stream'
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { AI_PROVIDER_FILE_REL } from './ai-credential-copy.ts'
+import { writeAliceProjectProductStamp } from './alice-project-product.ts'
 import { formatProjectHelp, runProjectCommand } from './project-command.ts'
+import { planProjectTransfer } from './project-transfer.ts'
+import { writeProjectTransferStream } from './project-transfer-stream.ts'
 import {
   createSupervisorAliceProject,
   persistMachineLaunchConfig,
@@ -214,6 +218,73 @@ describe('openalice project', () => {
     expect(JSON.parse(stdout.join(''))).toMatchObject({ transferId: 'transfer-receive' })
   })
 
+  it('receives a real stream into the Supervisor registry without changing the default', async () => {
+    const env = await setupProjects()
+    await persistSelectedSupervisorAliceProject(env.context, 'office')
+    const transferRoot = await realpath(env.root)
+    const source = join(transferRoot, 'transfer-source')
+    const destination = join(transferRoot, 'received-home')
+    await mkdir(source)
+    await writeAliceProjectProductStamp(source, 'nano')
+    await writeFile(join(source, 'portable.txt'), 'portable project\n')
+    const sourceSummary = {
+      id: 'alice-project-transfer-source',
+      key: 'source',
+      displayName: 'Source',
+      home: source,
+      port: 47331,
+      portAutomatic: true,
+      isDefault: false,
+    }
+    const plan = await planProjectTransfer({
+      source: sourceSummary,
+      destinationMachineKey: 'cloud',
+      destinationProjectKey: 'remote-copy',
+      destinationDisplayName: 'Remote Copy',
+      destinationHome: destination,
+      scheduledIssues: 'keep-blocked',
+      credentials: 'omit',
+    })
+    const stream = await serializeTransfer(plan)
+    const receiveIo = {
+      supervisorRoot: env.context.supervisorRoot,
+      transferSource: Readable.from(stream),
+      stdout: { write: () => undefined },
+    }
+
+    await expect(runProjectCommand(['transfer-receive'], receiveIo)).resolves.toBe(0)
+    const registered = JSON.parse(await env.readConfig()) as {
+      defaultProject?: string
+      projects?: Record<string, { displayName?: string; home?: string; product?: string }>
+    }
+    expect(registered.defaultProject).toBe('office')
+    expect(registered.projects?.['remote-copy']).toMatchObject({
+      displayName: 'Remote Copy',
+      home: destination,
+      product: 'nano',
+    })
+    expect(await readFile(join(destination, 'portable.txt'), 'utf8')).toBe('portable project\n')
+
+    await expect(runProjectCommand(['transfer-receive'], {
+      ...receiveIo,
+      transferSource: Readable.from(stream),
+    })).resolves.toBe(0)
+
+    const conflictingPlan = await planProjectTransfer({
+      source: sourceSummary,
+      destinationMachineKey: 'cloud',
+      destinationProjectKey: 'remote-copy',
+      destinationDisplayName: 'Conflicting Copy',
+      destinationHome: join(transferRoot, 'conflicting-home'),
+      scheduledIssues: 'keep-blocked',
+      credentials: 'omit',
+    })
+    await expect(runProjectCommand(['transfer-receive'], {
+      ...receiveIo,
+      transferSource: Readable.from(await serializeTransfer(conflictingPlan)),
+    })).rejects.toThrow('already registered to another Home')
+  })
+
   it('documents the command surface', () => {
     expect(formatProjectHelp()).toContain('copy-ai-creds')
     expect(formatProjectHelp()).toContain('project use')
@@ -240,6 +311,7 @@ async function setupProjects() {
   await persistSelectedSupervisorAliceProject(withHome, 'default', options)
   const ready = await resolveStoredLaunchContext({}, options)
   return {
+    root,
     context: ready,
     defaultHome,
     officeHome,
@@ -252,6 +324,18 @@ async function setupProjects() {
       return readFile(join(officeHome, AI_PROVIDER_FILE_REL), 'utf8')
     },
   }
+}
+
+async function serializeTransfer(plan: Awaited<ReturnType<typeof planProjectTransfer>>): Promise<Buffer> {
+  const chunks: Buffer[] = []
+  const output = new Writable({
+    write(chunk, _encoding, callback) {
+      chunks.push(Buffer.from(chunk))
+      callback()
+    },
+  })
+  await writeProjectTransferStream({ plan, output })
+  return Buffer.concat(chunks)
 }
 
 function transferIo(

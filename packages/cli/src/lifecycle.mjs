@@ -98,7 +98,12 @@ export async function startRuntime(options, dependencies = {}) {
   const appDir = standalone
     ? resolveBunResourceRoot(env, dependencies.runtimeExecutable ?? process.execPath)
     : await resolveRoot(requestedAppDir)
-  const runtimeProvider = resolveRuntimeProvider(options.runtimeProvider, appDir, env)
+  const runtimeProvider = resolveRuntimeProvider(
+    options.runtimeProvider,
+    appDir,
+    env,
+    activation.contentIdentity,
+  )
   const prepareSource = dependencies.prepareSource ?? prepareSourceCheckout
   emit({ type: 'preparing', appDir, homeRoot })
   if (!standalone) {
@@ -166,7 +171,8 @@ export async function startRuntime(options, dependencies = {}) {
 
   let ready = false
   const readinessAbort = new AbortController()
-  const startupSignals = createStartupSignalGuard(runtime, 'OpenAlice Runtime start')
+  const signalSource = dependencies.signalSource ?? process
+  const startupSignals = createStartupSignalGuard(runtime, 'OpenAlice Runtime start', { signalSource })
   const earlyFailure = new Promise((_, reject) => {
     runtime.once('error', reject)
     const rejectExit = (code, signal) => {
@@ -209,11 +215,17 @@ export async function startRuntime(options, dependencies = {}) {
       logPath: detached ? logPath : null,
       status,
     }
-    startupSignals.release()
+    if (detached) {
+      startupSignals.release()
+      emit({ type: 'ready', result: launch })
+      return launch
+    }
+    const runtimeExit = holdRuntime(runtime, {
+      signalSource,
+      releaseStartupSignals: startupSignals.release,
+    })
     emit({ type: 'ready', result: launch })
-
-    if (detached) return launch
-    const exitCode = await holdRuntime(runtime)
+    const exitCode = await runtimeExit
     return {
       ...launch,
       outcome: 'exited',
@@ -250,13 +262,17 @@ export async function startRuntime(options, dependencies = {}) {
   }
 }
 
-function resolveRuntimeProvider(explicit, appDir, env) {
+function resolveRuntimeProvider(explicit, appDir, env, installedIdentity = null) {
   if (explicit?.kind === 'bun' || isBunStandalone()) {
+    const explicitIdentity = typeof explicit?.contentIdentity === 'string'
+      ? explicit.contentIdentity.trim()
+      : explicit?.contentIdentity
     return {
       kind: 'bun',
-      contentIdentity: explicit?.contentIdentity
-        ?? env['OPENALICE_RUNTIME_CONTENT_IDENTITY']?.trim()
-        ?? null,
+      contentIdentity: explicitIdentity
+        || env['OPENALICE_RUNTIME_CONTENT_IDENTITY']?.trim()
+        || installedIdentity
+        || null,
     }
   }
   if (explicit?.kind === 'bundle') {
@@ -420,25 +436,45 @@ function isLoopbackWebUrl(value) {
   }
 }
 
-function holdRuntime(runtime) {
+function holdRuntime(runtime, options = {}) {
+  const signalSource = options.signalSource ?? process
+  const releaseStartupSignals = options.releaseStartupSignals ?? (() => undefined)
+  const exitCodeFor = (code, signal, requestedStop) => (
+    requestedStop ? 0 : code ?? (signal ? 1 : 0)
+  )
   if (runtime.exitCode !== undefined && (
     runtime.exitCode !== null
     || (runtime.signalCode !== undefined && runtime.signalCode !== null)
   )) {
-    return Promise.resolve(runtime.exitCode ?? 0)
+    releaseStartupSignals()
+    return Promise.resolve(exitCodeFor(runtime.exitCode, runtime.signalCode, false))
   }
   return new Promise((resolvePromise) => {
     let requestedStop = false
+    let settled = false
+    const cleanup = () => {
+      signalSource.off('SIGINT', stop)
+      signalSource.off('SIGTERM', stop)
+      runtime.off('exit', onExit)
+    }
+    const onExit = (code, signal) => {
+      if (settled) return
+      settled = true
+      cleanup()
+      resolvePromise(exitCodeFor(code, signal, requestedStop))
+    }
     const stop = () => {
+      if (requestedStop) return
       requestedStop = true
       runtime.kill('SIGTERM')
     }
-    process.once('SIGINT', stop)
-    process.once('SIGTERM', stop)
-    runtime.once('exit', (code) => {
-      process.off('SIGINT', stop)
-      process.off('SIGTERM', stop)
-      resolvePromise(requestedStop ? 0 : code ?? 0)
-    })
+    runtime.once('exit', onExit)
+    signalSource.once('SIGINT', stop)
+    signalSource.once('SIGTERM', stop)
+    releaseStartupSignals()
+    if (runtime.exitCode !== undefined && (
+      runtime.exitCode !== null
+      || (runtime.signalCode !== undefined && runtime.signalCode !== null)
+    )) onExit(runtime.exitCode, runtime.signalCode)
   })
 }

@@ -32,6 +32,24 @@ fail() {
   exit 1
 }
 
+process_identity() {
+  local identity_pid="$1" boot_id stat_line stat_tail start_ticks started_at
+  if [[ "${platform:-}" == linux && -r "/proc/$identity_pid/stat" ]]; then
+    boot_id="$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || true)"
+    stat_line="$(cat "/proc/$identity_pid/stat" 2>/dev/null || true)"
+    stat_tail="${stat_line##*) }"
+    start_ticks="$(printf '%s\n' "$stat_tail" | awk 'NF >= 20 { print $20 }')"
+    if [[ -n "$boot_id" && "$start_ticks" =~ ^[0-9]+$ ]]; then
+      printf 'linux:%s:%s\n' "$boot_id" "$start_ticks"
+      return 0
+    fi
+  fi
+  started_at="$(LC_ALL=C ps -p "$identity_pid" -o lstart= 2>/dev/null \
+    | awk '{$1=$1; print}' || true)"
+  [[ -n "$started_at" ]] || return 1
+  printf 'ps:%s\n' "$started_at"
+}
+
 usage() {
   cat <<'EOF'
 OpenAlice CLI Installer
@@ -323,6 +341,16 @@ if [[ "$plan_only" == true ]]; then
   exit 0
 fi
 
+if [[ "$platform" == darwin ]]; then
+  command -v lockf >/dev/null 2>&1 \
+    || fail 'macOS lockf is required for safe concurrent installation'
+else
+  command -v flock >/dev/null 2>&1 \
+    || fail 'Linux flock is required for safe concurrent installation'
+fi
+command -v diff >/dev/null 2>&1 \
+  || fail "diff is required to verify the existing OpenAlice release"
+
 if [[ "$assume_yes" != true ]]; then
   if ! { exec 3<>/dev/tty; } 2>/dev/null; then
     printf 'No interactive terminal is available. Review --plan, then re-run with --yes.\n' >&2
@@ -340,6 +368,8 @@ provenance_dir="$cli_root/provenance"
 activation_path="$cli_root/activation.json"
 bin_dir="$INSTALL_DIR/bin"
 lock_dir="$INSTALL_DIR/.cli-install.lock"
+lock_guard_path="$INSTALL_DIR/.cli-install.lock.guard"
+lock_guard_owned=false
 staging_dir=""
 lock_owned=false
 previous_release_name=""
@@ -348,6 +378,56 @@ activation_switched=false
 install_complete=false
 legacy_launcher_backup=""
 legacy_launchers_backed_up=false
+
+acquire_install_lock() {
+  local lock_pid stored_identity actual_identity
+  if [[ -e "$lock_guard_path" || -L "$lock_guard_path" ]]; then
+    [[ -f "$lock_guard_path" && ! -L "$lock_guard_path" ]] \
+      || fail "CLI installer advisory lock is not a safe file: $lock_guard_path"
+  fi
+  exec 9>>"$lock_guard_path" \
+    || fail "Cannot open CLI installer advisory lock at $lock_guard_path"
+  if [[ "$platform" == darwin ]]; then
+    command -v lockf >/dev/null 2>&1 \
+      || fail 'macOS lockf is required for safe concurrent installation'
+    lockf -t 0 9 2>/dev/null \
+      || fail 'Another OpenAlice CLI installer is running'
+  else
+    command -v flock >/dev/null 2>&1 \
+      || fail 'Linux flock is required for safe concurrent installation'
+    flock -n 9 2>/dev/null \
+      || fail 'Another OpenAlice CLI installer is running'
+  fi
+  lock_guard_owned=true
+
+  if [[ -e "$lock_dir" || -L "$lock_dir" ]]; then
+    [[ -d "$lock_dir" && ! -L "$lock_dir" ]] \
+      || fail "CLI installer transaction lock is not a safe legacy directory: $lock_dir"
+    lock_pid="$(cat "$lock_dir/pid" 2>/dev/null || true)"
+    stored_identity="$(cat "$lock_dir/process-identity" 2>/dev/null || true)"
+    if [[ "$lock_pid" =~ ^[1-9][0-9]*$ ]] && kill -0 "$lock_pid" 2>/dev/null; then
+      if [[ -z "$stored_identity" ]]; then
+        fail "Another OpenAlice CLI installer may be running (pid $lock_pid); the legacy lock cannot be verified"
+      fi
+      actual_identity="$(process_identity "$lock_pid" || true)"
+      [[ -n "$actual_identity" ]] \
+        || fail "Cannot verify OpenAlice CLI installer lock owner $lock_pid"
+      if [[ "$actual_identity" == "$stored_identity" ]]; then
+        fail "Another OpenAlice CLI installer is running (pid $lock_pid)"
+      fi
+    fi
+    printf 'Removing a stale CLI installer lock.\n'
+    rm -rf "$lock_dir"
+  fi
+
+  mkdir "$lock_dir"
+  lock_owned=true
+  printf '%s\n' "$$" >"$lock_dir/pid"
+  actual_identity="$(process_identity "$$" || true)"
+  [[ -n "$actual_identity" ]] \
+    || fail "Cannot record the CLI installer process identity"
+  printf '%s\n' "$actual_identity" >"$lock_dir/process-identity"
+}
 
 cleanup() {
   cleanup_status=$?
@@ -410,6 +490,7 @@ EOF
   fi
   [[ -z "$staging_dir" ]] || rm -rf "$staging_dir"
   if [[ "$lock_owned" == true ]]; then rm -rf "$lock_dir"; fi
+  if [[ "$lock_guard_owned" == true ]]; then exec 9>&-; fi
   exit "$cleanup_status"
 }
 trap cleanup EXIT
@@ -418,17 +499,7 @@ trap 'exit 143' TERM
 trap 'exit 129' HUP
 
 mkdir -p "$INSTALL_DIR"
-if [[ -d "$lock_dir" ]]; then
-  lock_pid="$(cat "$lock_dir/pid" 2>/dev/null || true)"
-  if [[ "$lock_pid" =~ ^[1-9][0-9]*$ ]] && kill -0 "$lock_pid" 2>/dev/null; then
-    fail "Another OpenAlice CLI installer is running (pid $lock_pid)"
-  fi
-  printf 'Removing a stale CLI installer lock.\n'
-  rm -rf "$lock_dir"
-fi
-mkdir "$lock_dir"
-printf '%s\n' "$$" >"$lock_dir/pid"
-lock_owned=true
+acquire_install_lock
 mkdir -p "$releases_dir" "$provenance_dir" "$bin_dir" "$cli_root/staging"
 releases_dir="$(CDPATH= cd -- "$releases_dir" && pwd -P)"
 staging_dir="$(mktemp -d "$cli_root/staging/install.XXXXXX")"

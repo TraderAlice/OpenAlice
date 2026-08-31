@@ -336,6 +336,111 @@ describe('OpenAlice Runtime lifecycle core', () => {
     }
   })
 
+  it('injects and confirms the installed Bun identity on a direct server start', async () => {
+    const fixture = await makeActivationLayout()
+    await recordPendingActivation(fixture.layout, {
+      activeRelease: fixture.currentName,
+      previousRelease: fixture.previousName,
+      productVersion: '0.92.0',
+    })
+    vi.stubGlobal('__OPENALICE_BUN_STANDALONE__', true)
+    try {
+      const child = new FakeChild()
+      const spawnProcess = vi.fn(() => child)
+      const readStatus = vi.fn()
+        .mockResolvedValueOnce(absentStatus())
+        .mockResolvedValue(runningStatus('bbbbbbbbbbbbbbbb'))
+
+      const result = await startRuntime({
+        ...startOptions(),
+        appDir: null,
+      }, {
+        activationLayout: fixture.layout,
+        installedContentIdentityImpl: () => 'bbbbbbbbbbbbbbbb',
+        cliVersion: '0.92.0',
+        detached: true,
+        env: {
+          OPENALICE_APP_HOME: '/opt/openalice/releases/v1/share/openalice',
+          OPENALICE_RUNTIME_CONTENT_IDENTITY: '   ',
+        },
+        runtimeExecutable: '/opt/openalice/releases/v1/bin/openalice',
+        spawnProcess,
+        openFile: async () => ({ fd: 9, close: async () => undefined }),
+        mkdirImpl: async () => undefined,
+        readStatus,
+        sleep: async () => undefined,
+      })
+
+      expect(spawnProcess.mock.calls[0][2].env).toEqual(expect.objectContaining({
+        OPENALICE_RUNTIME_PROVIDER: 'bun',
+        OPENALICE_RUNTIME_CONTENT_IDENTITY: 'bbbbbbbbbbbbbbbb',
+      }))
+      expect(result.status.pendingActivation).toBeNull()
+      expect((await readActivationReceipt(fixture.layout)).state).toBe('confirmed')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('returns a failure when the foreground Guardian exits from an unexpected signal', async () => {
+    const child = new FakeChild()
+    const signalSource = new EventEmitter()
+    const readStatus = vi.fn()
+      .mockResolvedValueOnce(absentStatus())
+      .mockResolvedValue(runningStatus())
+
+    const result = await startRuntime(startOptions(), {
+      detached: false,
+      env: {},
+      signalSource,
+      nodeBinary: '/test/node',
+      resolveRoot: async (path) => path,
+      prepareSource: async () => ({ prepared: false }),
+      spawnProcess: () => child,
+      mkdirImpl: async () => undefined,
+      readStatus,
+      sleep: async () => undefined,
+      emit(event) {
+        if (event.type === 'ready') child.emit('exit', null, 'SIGKILL')
+      },
+    })
+
+    expect(result).toMatchObject({ outcome: 'exited', exitCode: 1 })
+  })
+
+  it('installs the steady signal relay before reporting foreground readiness', async () => {
+    const child = new FakeChild()
+    const signalSource = new EventEmitter()
+    const readStatus = vi.fn()
+      .mockResolvedValueOnce(absentStatus())
+      .mockResolvedValue(runningStatus())
+    child.kill.mockImplementation(() => {
+      child.signalCode = 'SIGTERM'
+      queueMicrotask(() => child.emit('exit', null, 'SIGTERM'))
+      return true
+    })
+
+    const result = await startRuntime(startOptions(), {
+      detached: false,
+      env: {},
+      signalSource,
+      nodeBinary: '/test/node',
+      resolveRoot: async (path) => path,
+      prepareSource: async () => ({ prepared: false }),
+      spawnProcess: () => child,
+      mkdirImpl: async () => undefined,
+      readStatus,
+      sleep: async () => undefined,
+      emit(event) {
+        if (event.type === 'ready') signalSource.emit('SIGTERM')
+      },
+    })
+
+    expect(child.kill).toHaveBeenCalledOnce()
+    expect(child.kill).toHaveBeenCalledWith('SIGTERM')
+    expect(result).toMatchObject({ outcome: 'exited', exitCode: 0 })
+  })
+
   it('allows its spawned Guardian ownership transition but rejects a racing owner', async () => {
     const child = new FakeChild()
     child.pid = 321

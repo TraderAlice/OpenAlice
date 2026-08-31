@@ -220,6 +220,107 @@ describe('OpenAlice Guardian control protocol', () => {
     })
     expect(stale.class).toBe('absent')
     expect(stale.detail).toContain('stale')
+
+    const legacyPidProbe = vi.fn(() => false)
+    const legacyForeignHost = await readRuntimeStatus({ homeRoot: home }, {
+      hostname: 'another-fixture-host',
+      isProcessAlive: legacyPidProbe,
+    })
+    expect(legacyForeignHost.class).toBe('owned_elsewhere')
+    expect(legacyPidProbe).not.toHaveBeenCalled()
+  })
+
+  it('reclaims a dead same-machine owner after its hostname changes', async () => {
+    const home = await makeTempDir()
+    const lock = join(home, 'state', 'guardian.lock')
+    await mkdir(lock, { recursive: true })
+    await writeFile(join(lock, 'owner.json'), JSON.stringify({
+      pid: 4242,
+      hostname: 'old-container-host',
+      machineId: 'env:railway-service-service-test',
+      launcher: 'guardian-cli-server',
+      acquiredAt: '2026-07-15T00:00:00.000Z',
+      processStartedAt: '2026-07-15T00:00:00.000Z',
+    }))
+    const isProcessAlive = vi.fn(() => false)
+    const readProcessStartedAt = vi.fn(async () => Date.parse('2026-07-15T00:00:00.000Z'))
+
+    const status = await readRuntimeStatus({ homeRoot: home }, {
+      env: { OPENALICE_MACHINE_ID: 'railway-service-service-test' },
+      hostname: 'new-container-host',
+      isProcessAlive,
+      readProcessStartedAt,
+    })
+
+    expect(status.class).toBe('absent')
+    expect(status.detail).toContain('stale')
+    expect(isProcessAlive).toHaveBeenCalledWith(4242)
+    expect(readProcessStartedAt).not.toHaveBeenCalled()
+  })
+
+  it('keeps the same process active but treats a reused PID as stale', async () => {
+    const home = await makeTempDir()
+    const lock = join(home, 'state', 'guardian.lock')
+    await mkdir(lock, { recursive: true })
+    await writeFile(join(lock, 'owner.json'), JSON.stringify({
+      pid: 4242,
+      hostname: 'fixture-host',
+      machineId: 'env:fixture-machine',
+      launcher: 'guardian-cli-server',
+      acquiredAt: '2026-07-15T00:00:00.000Z',
+      processStartedAt: '2026-07-15T00:00:00.000Z',
+    }))
+    const readProcessStartedAt = vi.fn()
+      .mockResolvedValueOnce(Date.parse('2026-07-15T00:00:01.000Z'))
+      .mockResolvedValueOnce(Date.parse('2026-07-15T00:00:10.000Z'))
+
+    const dependencies = {
+      hostname: 'fixture-host',
+      isProcessAlive: () => true,
+      readMachineId: async () => 'env:fixture-machine',
+      readProcessStartedAt,
+    }
+
+    const sameProcess = await readRuntimeStatus({ homeRoot: home }, dependencies)
+    expect(sameProcess.class).toBe('owned_elsewhere')
+
+    const reusedPid = await readRuntimeStatus({ homeRoot: home }, dependencies)
+
+    expect(reusedPid.class).toBe('absent')
+    expect(reusedPid.detail).toContain('stale')
+    expect(readProcessStartedAt).toHaveBeenCalledTimes(2)
+    expect(readProcessStartedAt).toHaveBeenNthCalledWith(1, 4242)
+    expect(readProcessStartedAt).toHaveBeenNthCalledWith(2, 4242)
+  })
+
+  it('keeps a foreign-machine owner active without probing its PID', async () => {
+    const home = await makeTempDir()
+    const lock = join(home, 'state', 'guardian.lock')
+    await mkdir(lock, { recursive: true })
+    await writeFile(join(lock, 'owner.json'), JSON.stringify({
+      pid: 4242,
+      hostname: 'same-hostname-is-not-authoritative',
+      machineId: 'env:foreign-machine',
+      launcher: 'guardian-cli-server',
+      acquiredAt: '2026-07-15T00:00:00.000Z',
+      processStartedAt: '2026-07-15T00:00:00.000Z',
+    }))
+    const isProcessAlive = vi.fn(() => false)
+    const readProcessStartedAt = vi.fn(async () => null)
+
+    const status = await readRuntimeStatus({ homeRoot: home }, {
+      hostname: 'same-hostname-is-not-authoritative',
+      isProcessAlive,
+      readMachineId: async () => 'env:local-machine',
+      readProcessStartedAt,
+    })
+
+    expect(status).toEqual(expect.objectContaining({
+      class: 'owned_elsewhere',
+      owner: expect.objectContaining({ surface: 'cli-server', pid: 4242 }),
+    }))
+    expect(isProcessAlive).not.toHaveBeenCalled()
+    expect(readProcessStartedAt).not.toHaveBeenCalled()
   })
 
   it('keeps shutdown non-absent while an Alice runtime lock is still active', async () => {

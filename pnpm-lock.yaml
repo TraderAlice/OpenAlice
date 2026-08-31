@@ -192,6 +192,9 @@ importers:
       '@earendil-works/pi-tui':
         specifier: 0.83.0
         version: 0.83.0
+      yaml:
+        specifier: ^2.9.0
+        version: 2.9.0
 
   packages/connector-protocol:
     dependencies:
