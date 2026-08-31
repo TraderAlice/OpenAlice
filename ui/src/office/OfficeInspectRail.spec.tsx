@@ -61,6 +61,7 @@ describe('OfficeInspectRail', () => {
     )
 
     expect(screen.getByText('Polishing the Office floor.')).toBeTruthy()
+    expect(screen.queryByText('Result')).toBeNull()
     expect(screen.getByText('Codex Mechanic')).toBeTruthy()
     expect(screen.getByText('codex · Desk mate')).toBeTruthy()
     expect(container.textContent).not.toContain('demo-resume-chat')
@@ -124,6 +125,32 @@ describe('OfficeInspectRail', () => {
     expect(onOpenDrawer).toHaveBeenCalledWith(employee.drawers[0])
     await userEvent.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('identifies a fresh completed reply as the Agent result', () => {
+    const { container } = render(
+      <OfficeInspectRail
+        employee={{
+          ...employee,
+          awake: false,
+          mood: 'review',
+          bubble: { kind: 'text', text: 'NORTH DESK CLEAR\nFLOOR SIGNAL CLEAR' },
+          latestResult: {
+            text: 'NORTH DESK CLEAR\nFLOOR SIGNAL CLEAR',
+            at: Date.now(),
+          },
+        }}
+        roomName="Chat"
+        onOpen={vi.fn()}
+        onOpenDrawer={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Result')).toBeTruthy()
+    expect(screen.getByText('NORTH DESK CLEAR FLOOR SIGNAL CLEAR')).toBeTruthy()
+    expect(container.querySelector('blockquote')?.dataset.result).toBe('true')
+    expect(screen.queryByText('Latest result')).toBeNull()
   })
 
   it('gives a quiet coworker in-world dialogue instead of repeating machine facts', () => {

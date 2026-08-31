@@ -5663,6 +5663,25 @@ Pending-landmark count follow-up (2026-08-31):
   tests; root and UI TypeScript passed; the full suite passed all 620 test files and 5,213 tests (one file and nine tests
   skipped); the production UI build passed with only the existing ports fallback and large-chunk advisory.
 
+Fresh-result identity follow-up (2026-08-31):
+
+- Ran real concurrent Grok tasks `run-4WbkdfPo` and `run-AtAQ_UqQ` in the 38-person Chat office. The floor stayed
+  readable at two working/two awake: both active coworkers, their typing bubbles, two exceptional sleeping coworkers,
+  the `+34` roster landmark, room power, header totals, and Operations count remained distinct.
+- Opened Grok Navigator during the lifecycle and watched it settle. The Agent File had an explicit `ASSIGNMENT`, but
+  its fresh two-line completed answer temporarily occupied the ordinary speech bubble without any product identity;
+  only after the 30-second review hold would the same content become the labelled Latest result block.
+- Compared relying on the cream bubble, labelling every transient status utterance, and identifying only successful
+  review text. Chose the last option: working/tool/rejected/error dialogue keeps its lightweight character voice, while
+  a just-completed assistant reply gains the same `RESULT` vocabulary already used by Activity Log.
+- The existing review bubble remains the sole immediate-output surface and gains a restrained moss edge plus compact
+  kicker; no duplicate result panel, new modal, action, or persistence state was added. Real-browser acceptance kept
+  Grok Engineer `run-YJQn58zZ` open from working through completion: `Running a task…` remained unlabelled, then the
+  exact fresh answer gained `RESULT` while asleep status, `Review activity`, and `Open session` stayed visible. Focused
+  Agent-file runtime/style suites passed all 17 tests; root and UI TypeScript passed; the full suite passed all 620 test
+  files and 5,215 tests (one file and nine tests skipped); the production UI build passed with only the existing ports
+  fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

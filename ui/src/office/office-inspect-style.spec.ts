@@ -17,6 +17,15 @@ const drawerLabelRules = [...css.matchAll(/\.oa-office-drawer__label\s*\{([^}]*)
 const drawerLabelCss = drawerLabelRules.at(-1)?.[1] ?? ''
 
 describe('Office Agent-file style contract', () => {
+  it('labels a fresh completion inside the dialogue without adding another panel', () => {
+    expect(css).toMatch(
+      /\.oa-office-inspect__dialogue blockquote\[data-result="true"\]\s*\{[^}]*border-left-width:\s*4px;[^}]*border-left-color:\s*var\(--gba-moss\);[^}]*background:\s*color-mix/s,
+    )
+    expect(css).toMatch(
+      /\.oa-office-inspect__dialogue blockquote small\s*\{[^}]*display:\s*block;[^}]*font-family:\s*ui-monospace,[^}]*font-size:\s*7px;[^}]*text-transform:\s*uppercase;/s,
+    )
+  })
+
   it('opens game windows as opaque stepped panels instead of blending with the floor', () => {
     expect(gameWindowStart).toBeGreaterThan(-1)
     expect(gameWindowEnd).toBeGreaterThan(gameWindowStart)

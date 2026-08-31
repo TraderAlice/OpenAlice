@@ -113,6 +113,9 @@ export function OfficeInspectRail({
           ? 'office.moodDialogue.resting'
           : `office.moodDialogue.${employee.mood}`)
         : '')
+  const dialogueIsResult = !replayFocus
+    && employee?.mood === 'review'
+    && employee.bubble?.kind === 'text'
   const employeeByline = employee
     ? [employee.agent, employee.name].filter(Boolean).join(' · ')
     : ''
@@ -262,7 +265,10 @@ export function OfficeInspectRail({
                 )}
                 </div>
               )}
-              <blockquote>{employeeDialogue}</blockquote>
+              <blockquote data-result={dialogueIsResult || undefined}>
+                {dialogueIsResult && <small>{t('office.eventResult')}</small>}
+                <span>{employeeDialogue}</span>
+              </blockquote>
               {!replayFocus && !employee.bubble && employee.latestResult && latestResultText && (
                 <div className="oa-office-inspect__latest-result">
                   <small>{t('office.latestResult')}</small>

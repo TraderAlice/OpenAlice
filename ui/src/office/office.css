@@ -3310,6 +3310,24 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
   line-height: 1.35;
 }
 
+.oa-office-inspect__dialogue blockquote[data-result="true"] {
+  border-left-width: 4px;
+  border-left-color: var(--gba-moss);
+  background: color-mix(in srgb, var(--gba-moss) 10%, var(--gba-cream));
+}
+
+.oa-office-inspect__dialogue blockquote small {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--gba-moss-dark);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
 .oa-office-inspect__dialogue blockquote::before {
   position: absolute;
   top: 8px;
