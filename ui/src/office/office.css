@@ -4461,7 +4461,7 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
   position: absolute;
   width: 12px;
   height: 12px;
-  opacity: 0.42;
+  opacity: 0.68;
   transform: translate(-50%, calc(-50% + 22px)) rotate(var(--office-route-rotation));
 }
 
@@ -4469,10 +4469,11 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
   display: block;
   width: 100%;
   height: 100%;
+  filter: drop-shadow(1px 1px 0 color-mix(in srgb, var(--gba-ink) 62%, transparent));
 }
 
 .oa-office-route-trail__step[data-destination="true"] {
-  opacity: 0.58;
+  opacity: 0.86;
 }
 
 .oa-office-route-target-pointer {

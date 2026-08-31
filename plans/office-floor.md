@@ -5522,6 +5522,22 @@ Landmark acknowledgement-receipt follow-up (2026-08-31):
   passed; the full suite passed all 620 test files and 5,209 tests (one file and nine tests skipped); the production UI
   build passed with only the existing ports fallback and large-chunk advisory.
 
+Auto-route footprint-contrast follow-up (2026-08-31):
+
+- Replayed both short and long auto-routes on the real 1280x720 floor. The path owned 20 correctly aligned footprint
+  nodes on the first long route, but their 0.42 opacity made the whole trail disappear into the tiled floor; only the
+  detached Auto move HUD and destination pointer remained legible.
+- Compared raising brightness, painting a tactical tile ribbon, and strengthening the existing sparse footsteps with
+  ink contrast. Bright markers would repeat the earlier glare problem and a tile ribbon would make the relaxed office
+  read like a combat grid. Chose static ink-backed footsteps: retain the generated 12px asset, thinning, feet anchor,
+  and zero animation while adding one dark pixel of separation from either day or night floor.
+- Runtime opacity is now 0.68 for route steps and 0.86 for the destination, with a 1px ink drop shadow rather than a
+  glow. In the real long route to Grok Architect, all 14 visible breadcrumbs formed a readable line without competing
+  with coworkers, room signs, or the Auto move HUD. Arrival removed every step and route target. Focused route/style
+  suites passed all 35 tests; root and UI TypeScript passed; the full suite passed all 620 test files and 5,209 tests
+  (one file and nine tests skipped); the production UI build passed with only the existing ports fallback and
+  large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
