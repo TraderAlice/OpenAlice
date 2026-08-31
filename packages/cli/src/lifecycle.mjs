@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { fstatSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { mkdir, open } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 
@@ -53,17 +54,24 @@ export async function startRuntime(options, dependencies = {}) {
   })
   const readStatus = dependencies.readStatus ?? readRuntimeStatus
   const activation = await resolveActivationContext(env, dependencies)
+  const railwayFenceFd = (dependencies.resolveRailwayFenceFd ?? resolveRailwayFenceFd)(env, homeRoot)
+  const railwayFenceClaimed = Boolean(
+    env['OPENALICE_RAILWAY_ENTRYPOINT_OWNER']
+    || env['OPENALICE_RAILWAY_FENCE_FD']
+    || env['OPENALICE_SERVICE_MANAGER']?.trim() === 'railway',
+  )
+  if (railwayFenceClaimed && railwayFenceFd === null) {
+    throw lifecycleError(
+      'ERAILWAYFENCE',
+      'Railway may start the Runtime only through its image entrypoint with the locked Volume capability',
+    )
+  }
   let status = await readStatus({ homeRoot, timeoutMs: 1_000 }, dependencies)
-  if (
-    isRailwayForegroundRuntime(env)
-    && status.class !== 'absent'
-    && !options.takeover
-  ) {
-    status = await waitForRuntimeRelease(homeRoot, options.waitMs, {
-      ...dependencies,
-      readStatus,
-      initialStatus: status,
-    })
+  if (railwayFenceFd !== null && status.class !== 'absent') {
+    throw lifecycleError(
+      'ERAILWAYCUTOVER',
+      `The Railway Volume fence is held, but retained Runtime ownership at ${homeRoot} is not eligible for automatic handoff. Verify the previous deployment is stopped, then quarantine only state/guardian.lock, state/runtime.lock, workspaces/state/runtime.lock, and data/state/config-bootstrap.lock from this exact Project Home; do not clear the Project or Volume.`,
+    )
   }
 
   if (status.owner?.surface === 'cli-server' && status.class === 'running') {
@@ -133,6 +141,8 @@ export async function startRuntime(options, dependencies = {}) {
     takeover: options.takeover,
   })
   delete runtimeEnv.OPENALICE_RAILWAY_ENTRYPOINT_OWNER
+  delete runtimeEnv.OPENALICE_RAILWAY_FENCE_FD
+  if (railwayFenceFd !== null) runtimeEnv.OPENALICE_RAILWAY_FENCE_FD = '3'
   runtimeEnv.OPENALICE_LAUNCHER = 'cli-server'
   runtimeEnv.OPENALICE_SERVER_MODE = detached ? 'detached' : 'foreground'
   runtimeEnv.OPENALICE_RUNTIME_PROVIDER = runtimeProvider.kind
@@ -165,7 +175,9 @@ export async function startRuntime(options, dependencies = {}) {
         cwd: appDir,
         env: runtimeEnv,
         detached: true,
-        stdio: ['ignore', logHandle.fd, logHandle.fd],
+        stdio: railwayFenceFd === null
+          ? ['ignore', logHandle.fd, logHandle.fd]
+          : ['ignore', logHandle.fd, logHandle.fd, railwayFenceFd],
         windowsHide: true,
       })
       runtime.unref()
@@ -176,7 +188,9 @@ export async function startRuntime(options, dependencies = {}) {
     runtime = spawnProcess(guardianSpec.cmd, guardianSpec.args, {
       cwd: appDir,
       env: runtimeEnv,
-      stdio: 'inherit',
+      stdio: railwayFenceFd === null
+        ? 'inherit'
+        : ['inherit', 'inherit', 'inherit', railwayFenceFd],
       windowsHide: true,
     })
   }
@@ -409,37 +423,90 @@ async function waitForRuntimeReady(homeRoot, timeoutMs, dependencies) {
   )
 }
 
-async function waitForRuntimeRelease(homeRoot, timeoutMs, dependencies) {
-  const readStatus = dependencies.readStatus ?? readRuntimeStatus
-  const sleep = dependencies.sleep ?? ((ms) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms)))
-  const deadline = Date.now() + timeoutMs
-  let lastStatus = dependencies.initialStatus ?? null
-  while (true) {
-    if (lastStatus?.class === 'absent') return lastStatus
-    let remainingMs = deadline - Date.now()
-    if (remainingMs <= 0) break
-    await sleep(Math.min(500, remainingMs))
-    remainingMs = deadline - Date.now()
-    if (remainingMs <= 0) break
-    lastStatus = await readStatus({
-      homeRoot,
-      timeoutMs: Math.max(1, Math.min(1_000, remainingMs)),
-    }, dependencies)
-    if (lastStatus.class === 'absent') return lastStatus
+function resolveRailwayFenceFd(env, homeRoot) {
+  const serviceId = env['RAILWAY_SERVICE_ID']?.trim()
+  const rawFd = env['OPENALICE_RAILWAY_FENCE_FD']?.trim()
+  const fd = Number(rawFd)
+  if (
+    env['OPENALICE_RAILWAY_ENTRYPOINT_OWNER'] !== '1'
+    || env['OPENALICE_SERVICE_MANAGER']?.trim() !== 'railway'
+    || !env['RAILWAY_ENVIRONMENT_ID']?.trim()
+    || !/^[A-Za-z0-9-]{1,128}$/.test(serviceId ?? '')
+    || env['OPENALICE_MACHINE_ID']?.trim() !== `railway-service-${serviceId}`
+    || !/^[0-9]{1,4}$/.test(rawFd ?? '')
+    || !Number.isInteger(fd)
+    || fd < 3
+  ) return null
+  const fencePath = railwayRuntimeFencePath(env, homeRoot)
+  if (!fencePath) return null
+  try {
+    const inherited = fstatSync(fd)
+    const expected = statSync(fencePath)
+    return inherited.isDirectory()
+      && expected.isDirectory()
+      && inherited.dev === expected.dev
+      && inherited.ino === expected.ino
+      && inheritedFdHoldsExclusiveFlock(fd)
+      ? fd
+      : null
+  } catch {
+    return null
   }
-  throw lifecycleError(
-    'ETIMEDOUT',
-    `Railway did not release the previous Runtime volume owner within ${Math.ceil(timeoutMs / 1_000)}s (${lastStatus?.class ?? 'no status'}). Keep one replica, Restart Policy Always, and at least 30 seconds of deployment draining.`,
-  )
 }
 
-function isRailwayForegroundRuntime(env) {
+function railwayRuntimeFencePath(env, homeRoot) {
   const serviceId = env['RAILWAY_SERVICE_ID']?.trim()
-  return env['OPENALICE_RAILWAY_ENTRYPOINT_OWNER'] === '1'
-    && env['OPENALICE_SERVICE_MANAGER']?.trim() === 'railway'
-    && Boolean(env['RAILWAY_ENVIRONMENT_ID']?.trim())
-    && /^[A-Za-z0-9-]{1,128}$/.test(serviceId ?? '')
-    && env['OPENALICE_MACHINE_ID']?.trim() === `railway-service-${serviceId}`
+  if (!/^[A-Za-z0-9-]{1,128}$/.test(serviceId ?? '')) return null
+  const configuredRoots = [
+    env['RAILWAY_VOLUME_MOUNT_PATH']?.trim(),
+    env['OPENALICE_RAILWAY_VOLUME_ROOT']?.trim(),
+  ].filter(Boolean).map((value) => resolve(value))
+  if (configuredRoots.length === 0 || new Set(configuredRoots).size !== 1) return null
+  const volumeRoot = configuredRoots[0]
+  const installDir = env['OPENALICE_INSTALL_DIR']?.trim()
+  if (!volumeRoot || volumeRoot === '/' || !homeRoot || !installDir) return null
+  if (!pathIsWithin(volumeRoot, homeRoot) || !pathIsWithin(volumeRoot, installDir)) return null
+  return isLinuxMountPoint(volumeRoot) ? volumeRoot : null
+}
+
+function pathIsWithin(root, candidate) {
+  try {
+    const canonicalRoot = realpathSync(root)
+    const canonicalCandidate = realpathSync(candidate)
+    return canonicalCandidate !== canonicalRoot
+      && canonicalCandidate.startsWith(`${canonicalRoot}/`)
+  } catch {
+    return false
+  }
+}
+
+function isLinuxMountPoint(path) {
+  if (process.platform !== 'linux') return false
+  try {
+    const canonical = realpathSync(path)
+    return readFileSync('/proc/self/mountinfo', 'utf8')
+      .split('\n')
+      .some((line) => decodeMountInfoPath(line.split(' ')[4] ?? '') === canonical)
+  } catch {
+    return false
+  }
+}
+
+function decodeMountInfoPath(value) {
+  return value.replace(/\\([0-7]{3})/g, (_match, octal) => (
+    String.fromCharCode(Number.parseInt(octal, 8))
+  ))
+}
+
+function inheritedFdHoldsExclusiveFlock(fd) {
+  if (process.platform !== 'linux') return false
+  try {
+    return /^lock:\s+\d+:\s+FLOCK\s+ADVISORY\s+WRITE\b/m.test(
+      readFileSync(`/proc/self/fdinfo/${fd}`, 'utf8'),
+    )
+  } catch {
+    return false
+  }
 }
 
 async function sleepOrAbort(ms, sleep, signal) {

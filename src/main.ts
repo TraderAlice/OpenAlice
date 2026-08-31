@@ -1,5 +1,6 @@
 import {
   acquireOpenAliceRuntimeLocks,
+  adoptRailwayRuntimeFence,
   takeoverRequested,
   type OpenAliceRuntimeLock,
 } from '@traderalice/guardian-runtime'
@@ -77,6 +78,12 @@ import { NewsCollectorStore, NewsCollector } from './domain/news/index.js'
 import { createNewsArchiveTools } from './tool/news.js'
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+const RAILWAY_RUNTIME_REQUIRED = Boolean(
+  process.env['OPENALICE_RAILWAY_FENCE_FD']
+  || process.env['OPENALICE_RAILWAY_ENTRYPOINT_OWNER']
+  || process.env['OPENALICE_SERVICE_MANAGER']?.trim() === 'railway',
+)
+const RUNTIME_LOCK_OWNER_AUTHORITY = adoptRailwayRuntimeFence(process.env)
 let runtimeLock: OpenAliceRuntimeLock | null = null
 
 async function releaseRuntimeLock(): Promise<void> {
@@ -91,7 +98,7 @@ async function main() {
   // `pnpm start`; guardian children get OPENALICE_HOME so this stays quiet).
   printLegacyDataNotice('[alice]')
 
-  const config = await loadConfig()
+  const config = await loadConfig({ ownerAuthority: RUNTIME_LOCK_OWNER_AUTHORITY })
 
   const toolCallLog = await createToolCallLog()
 
@@ -448,6 +455,9 @@ async function main() {
 }
 
 export async function startAliceRuntime(): Promise<void> {
+  if (RAILWAY_RUNTIME_REQUIRED && RUNTIME_LOCK_OWNER_AUTHORITY !== 'railway-fenced-handoff') {
+    throw new Error('invalid or missing inherited Railway lifecycle fence; refusing to start Alice')
+  }
   const guardianPid = positiveInteger(process.env['OPENALICE_GUARDIAN_PID'])
   const guardianStartedAt = positiveInteger(process.env['OPENALICE_GUARDIAN_STARTED_AT'])
   runtimeLock = await acquireOpenAliceRuntimeLocks({
@@ -455,6 +465,7 @@ export async function startAliceRuntime(): Promise<void> {
     launcherRoot: resolveLauncherRoot(),
     launcher: process.env['OPENALICE_LAUNCHER'] ?? 'standalone',
     takeover: takeoverRequested(),
+    ownerAuthority: RUNTIME_LOCK_OWNER_AUTHORITY,
     ...(guardianPid ? { guardianPid } : {}),
     ...(guardianStartedAt ? { guardianStartedAt } : {}),
     onOwnershipLost: (err) => {

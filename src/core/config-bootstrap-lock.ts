@@ -1,6 +1,7 @@
 import {
   RuntimeAlreadyRunningError,
   acquireRuntimeLock,
+  type RuntimeLockOwnerAuthority,
   type RuntimeProcessLock,
 } from '@traderalice/guardian-runtime'
 
@@ -15,6 +16,7 @@ export interface ConfigBootstrapLockOptions {
   readonly lockDir?: string
   readonly waitMs?: number
   readonly pollMs?: number
+  readonly ownerAuthority?: RuntimeLockOwnerAuthority
 }
 
 function positiveEnvNumber(name: string): number | undefined {
@@ -56,6 +58,7 @@ export async function withConfigBootstrapLock<T>(
         launcher: `${process.env['OPENALICE_LAUNCHER'] ?? 'standalone'}-config-bootstrap`,
         guardianPid: positiveEnvNumber('OPENALICE_GUARDIAN_PID'),
         guardianStartedAt: positiveEnvNumber('OPENALICE_GUARDIAN_STARTED_AT'),
+        ownerAuthority: opts.ownerAuthority,
       })
     } catch (err) {
       if (!(err instanceof RuntimeAlreadyRunningError)) throw err

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { fstatSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { hostname } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -28,6 +29,7 @@ export interface RuntimeLockOwner {
   readonly launcher: string
   readonly acquiredAt: string
   readonly heartbeatAt: string
+  readonly fencingProtocol?: 'railway-flock-v1'
   readonly processStartedAt?: string
   readonly guardianPid?: number
   readonly guardianStartedAt?: string
@@ -64,7 +66,18 @@ export interface RuntimeLockOptions {
   readonly onOwnershipLost?: (error: Error) => void
 }
 
-export type RuntimeLockOwnerAuthority = 'process' | 'railway-volume'
+export type RuntimeLockOwnerAuthority =
+  | 'process'
+  | 'railway-observer'
+  | 'railway-fenced-owner'
+  | 'railway-fenced-handoff'
+
+export interface RailwayRuntimeFence {
+  readonly fd: number
+  readonly path: string
+}
+
+let adoptedRailwayFence: RailwayRuntimeFence | null = null
 
 export interface OpenAliceRuntimeOptions extends RuntimeLockOptions {
   readonly userDataHome: string
@@ -126,16 +139,120 @@ export function takeoverRequested(env: NodeJS.ProcessEnv = process.env, argv: re
 export function resolveRuntimeLockOwnerAuthority(
   env: NodeJS.ProcessEnv = process.env,
 ): RuntimeLockOwnerAuthority {
+  if (env === process.env && adoptedRailwayFence && railwayFenceMatches(adoptedRailwayFence)) {
+    return 'railway-fenced-owner'
+  }
   const serviceManager = env['OPENALICE_SERVICE_MANAGER']?.trim()
   const machineId = env['OPENALICE_MACHINE_ID']?.trim()
   const serviceId = env['RAILWAY_SERVICE_ID']?.trim()
   const environmentId = env['RAILWAY_ENVIRONMENT_ID']?.trim()
-  return serviceManager === 'railway'
-    && Boolean(environmentId)
-    && /^[A-Za-z0-9-]{1,128}$/.test(serviceId ?? '')
-    && machineId === `railway-service-${serviceId}`
-    ? 'railway-volume'
-    : 'process'
+  if (
+    serviceManager !== 'railway'
+    || !environmentId
+    || !/^[A-Za-z0-9-]{1,128}$/.test(serviceId ?? '')
+    || machineId !== `railway-service-${serviceId}`
+  ) return 'process'
+  return resolveRailwayRuntimeFence(env) ? 'railway-fenced-handoff' : 'railway-observer'
+}
+
+export function resolveRailwayRuntimeFence(
+  env: NodeJS.ProcessEnv = process.env,
+): RailwayRuntimeFence | null {
+  const rawFd = env['OPENALICE_RAILWAY_FENCE_FD']?.trim()
+  const fd = Number(rawFd)
+  const path = railwayRuntimeFencePath(env)
+  if (!path || !/^[0-9]{1,4}$/.test(rawFd ?? '') || !Number.isInteger(fd) || fd < 3) return null
+  try {
+    const fence = { fd, path }
+    return railwayFenceMatches(fence) ? fence : null
+  } catch {
+    return null
+  }
+}
+
+export function railwayRuntimeFencePath(
+  env: NodeJS.ProcessEnv = process.env,
+): string | null {
+  const serviceId = env['RAILWAY_SERVICE_ID']?.trim()
+  if (!/^[A-Za-z0-9-]{1,128}$/.test(serviceId ?? '')) return null
+  const configuredRoots = [
+    env['RAILWAY_VOLUME_MOUNT_PATH']?.trim(),
+    env['OPENALICE_RAILWAY_VOLUME_ROOT']?.trim(),
+  ].filter((value): value is string => Boolean(value)).map((value) => resolve(value))
+  if (configuredRoots.length === 0 || new Set(configuredRoots).size !== 1) return null
+  const volumeRoot = configuredRoots[0]
+  const home = env['OPENALICE_HOME']?.trim()
+  const installDir = env['OPENALICE_INSTALL_DIR']?.trim()
+  if (!volumeRoot || volumeRoot === '/' || !home || !installDir) return null
+  if (!pathIsWithin(volumeRoot, home) || !pathIsWithin(volumeRoot, installDir)) return null
+  return isLinuxMountPoint(volumeRoot) ? volumeRoot : null
+}
+
+function pathIsWithin(root: string, candidate: string): boolean {
+  try {
+    const canonicalRoot = realpathSync(root)
+    const canonicalCandidate = realpathSync(candidate)
+    return canonicalCandidate !== canonicalRoot
+      && canonicalCandidate.startsWith(`${canonicalRoot}/`)
+  } catch {
+    return false
+  }
+}
+
+function isLinuxMountPoint(path: string): boolean {
+  if (process.platform !== 'linux') return false
+  try {
+    const canonical = realpathSync(path)
+    return readFileSync('/proc/self/mountinfo', 'utf8')
+      .split('\n')
+      .some((line) => decodeMountInfoPath(line.split(' ')[4] ?? '') === canonical)
+  } catch {
+    return false
+  }
+}
+
+function decodeMountInfoPath(value: string): string {
+  return value.replace(/\\([0-7]{3})/g, (_match, octal: string) => (
+    String.fromCharCode(Number.parseInt(octal, 8))
+  ))
+}
+
+/**
+ * Adopt the inherited Railway lifecycle capability inside a trusted writer.
+ *
+ * The returned authority may be passed explicitly to the child's initial lock
+ * acquisitions. The writer keeps its duplicate for its complete lifetime so a
+ * Guardian crash cannot release the Volume fence while Alice, UTA, or Connector
+ * is still alive. Node child-process and node-pty launch boundaries do not map
+ * this extra descriptor; the environment marker and descriptor number are also
+ * removed before any untrusted descendant can start.
+ */
+export function adoptRailwayRuntimeFence(
+  env: NodeJS.ProcessEnv = process.env,
+): RuntimeLockOwnerAuthority {
+  const ownerAuthority = resolveRuntimeLockOwnerAuthority(env)
+  const fence = resolveRailwayRuntimeFence(env)
+
+  delete env['OPENALICE_RAILWAY_FENCE_FD']
+  delete env['OPENALICE_RAILWAY_ENTRYPOINT_OWNER']
+  if (fence && env === process.env && ownerAuthority === 'railway-fenced-handoff') {
+    adoptedRailwayFence = fence
+  }
+  return ownerAuthority
+}
+
+function railwayFenceMatches(fence: RailwayRuntimeFence): boolean {
+  try {
+    const openFile = fstatSync(fence.fd)
+    const fenceFile = statSync(fence.path)
+    return openFile.isDirectory()
+      && fenceFile.isDirectory()
+      && openFile.dev === fenceFile.dev
+      && openFile.ino === fenceFile.ino
+      && inheritedFdHoldsExclusiveFlock(fence.fd)
+  } catch {
+    return false
+  }
 }
 
 export async function inspectRuntimeLock(
@@ -173,18 +290,18 @@ export async function inspectRuntimeLock(
   const currentMachineId = await controller.machineId()
   const ownerAuthority = opts.ownerAuthority ?? resolveRuntimeLockOwnerAuthority()
   const railwayScope = railwayOwnerScope(owner, currentMachineId, ownerAuthority)
-  if (railwayScope === 'cross-container') {
-    if (hasExplicitHeartbeat && heartbeatAgeMs !== null && heartbeatStale) {
-      return inspection(
-        lockDir,
-        'stale',
-        owner,
-        heartbeatAgeMs,
-        true,
-        directoryIdentity,
-        'Railway volume owner heartbeat is stale and eligible for orchestrator handoff',
-      )
-    }
+  if (railwayScope === 'cross-container-fenced') {
+    return inspection(
+      lockDir,
+      'stale',
+      owner,
+      heartbeatAgeMs,
+      heartbeatStale,
+      directoryIdentity,
+      'Railway lifecycle fence is held and the prior container owner is eligible for handoff',
+    )
+  }
+  if (railwayScope === 'cross-container-observer') {
     return inspection(
       lockDir,
       'active',
@@ -193,8 +310,8 @@ export async function inspectRuntimeLock(
       heartbeatStale,
       directoryIdentity,
       !hasExplicitHeartbeat || heartbeatAgeMs === null
-        ? 'Railway volume owner heartbeat is missing or invalid; refusing automatic recovery'
-        : 'Railway volume owner heartbeat is active in another container namespace',
+        ? 'Railway owner heartbeat is missing or invalid; observer refuses automatic recovery'
+        : 'Railway owner belongs to another container namespace; observer refuses automatic recovery',
     )
   }
   if (railwayScope === 'foreign') {
@@ -242,16 +359,21 @@ function railwayOwnerScope(
   owner: RuntimeLockOwner,
   currentMachineId: string,
   ownerAuthority: RuntimeLockOwnerAuthority | undefined,
-): 'same-container' | 'cross-container' | 'foreign' | null {
-  if (ownerAuthority !== 'railway-volume') return null
+): 'same-container' | 'cross-container-observer' | 'cross-container-fenced' | 'foreign' | null {
+  if (
+    ownerAuthority !== 'railway-observer'
+    && ownerAuthority !== 'railway-fenced-owner'
+    && ownerAuthority !== 'railway-fenced-handoff'
+  ) return null
   if (!/^env:railway-service-[A-Za-z0-9-]+$/.test(currentMachineId)) return 'foreign'
   if (owner.hostname.length === 0) return 'foreign'
   const sameContainer = owner.hostname === hostname()
-  const belongsToService = owner.machineId === currentMachineId
-    || owner.machineId === `hostname:${owner.hostname}`
-  if (sameContainer && belongsToService) return 'same-container'
-  if (belongsToService) return 'cross-container'
-  return 'foreign'
+  if (owner.machineId !== currentMachineId) return 'foreign'
+  if (sameContainer) return 'same-container'
+  if (owner.fencingProtocol !== 'railway-flock-v1') return 'foreign'
+  return ownerAuthority === 'railway-fenced-handoff'
+    ? 'cross-container-fenced'
+    : 'cross-container-observer'
 }
 
 export async function acquireRuntimeLock(
@@ -272,6 +394,9 @@ export async function acquireRuntimeLock(
     launcher: opts.launcher ?? process.env['OPENALICE_LAUNCHER'] ?? 'standalone',
     acquiredAt: now,
     heartbeatAt: now,
+    ...(ownerAuthority === 'railway-fenced-handoff' || ownerAuthority === 'railway-fenced-owner'
+      ? { fencingProtocol: 'railway-flock-v1' as const }
+      : {}),
     processStartedAt: new Date(processStartedAt).toISOString(),
     ...(opts.guardianPid ? { guardianPid: opts.guardianPid } : {}),
     ...(opts.guardianStartedAt ? { guardianStartedAt: new Date(opts.guardianStartedAt).toISOString() } : {}),
@@ -384,7 +509,7 @@ export async function recoverRuntimeOwner(
   const currentMachineId = await controller.machineId()
   const ownerAuthority = opts.ownerAuthority ?? resolveRuntimeLockOwnerAuthority()
   const railwayScope = railwayOwnerScope(owner, currentMachineId, ownerAuthority)
-  if (railwayScope === 'cross-container') {
+  if (railwayScope === 'cross-container-observer' || railwayScope === 'cross-container-fenced') {
     throw new Error(`OpenAlice owner ${owner.pid} belongs to another Railway container; refusing to signal it`)
   }
   if (railwayScope === 'foreign') {
@@ -480,7 +605,7 @@ async function claimAndRemove(current: RuntimeLockInspection): Promise<boolean> 
     const identity = `${currentStat.dev}:${currentStat.ino}:${currentStat.birthtimeMs}`
     if (identity !== current.directoryIdentity) return false
     const latest = await readOwner(current.lockDir).catch(() => null)
-    if (current.owner && latest?.token !== current.owner.token) return false
+    if (current.owner && !sameReclaimEvidence(current.owner, latest)) return false
     if (!current.owner && latest) return false
     await rename(current.lockDir, quarantineDir)
     quarantined = true
@@ -550,6 +675,9 @@ async function readOwnerRecord(lockDir: string): Promise<ParsedRuntimeLockOwner>
       launcher: typeof parsed['launcher'] === 'string' ? parsed['launcher'] : 'legacy',
       acquiredAt,
       heartbeatAt: hasExplicitHeartbeat ? parsed['heartbeatAt'] as string : acquiredAt,
+      ...(parsed['fencingProtocol'] === 'railway-flock-v1'
+        ? { fencingProtocol: 'railway-flock-v1' as const }
+        : {}),
       ...(typeof parsed['processStartedAt'] === 'string' ? { processStartedAt: parsed['processStartedAt'] } : {}),
       ...(typeof parsed['guardianPid'] === 'number' ? { guardianPid: parsed['guardianPid'] } : {}),
       ...(typeof parsed['guardianStartedAt'] === 'string' ? { guardianStartedAt: parsed['guardianStartedAt'] } : {}),
@@ -559,6 +687,35 @@ async function readOwnerRecord(lockDir: string): Promise<ParsedRuntimeLockOwner>
 
 async function readOwner(lockDir: string): Promise<RuntimeLockOwner> {
   return (await readOwnerRecord(lockDir)).owner
+}
+
+function sameReclaimEvidence(
+  inspected: RuntimeLockOwner,
+  latest: RuntimeLockOwner | null,
+): boolean {
+  return latest !== null
+    && latest.schemaVersion === inspected.schemaVersion
+    && latest.token === inspected.token
+    && latest.pid === inspected.pid
+    && latest.hostname === inspected.hostname
+    && latest.machineId === inspected.machineId
+    && latest.launcher === inspected.launcher
+    && latest.acquiredAt === inspected.acquiredAt
+    && latest.heartbeatAt === inspected.heartbeatAt
+    && latest.fencingProtocol === inspected.fencingProtocol
+    && latest.processStartedAt === inspected.processStartedAt
+    && latest.guardianPid === inspected.guardianPid
+    && latest.guardianStartedAt === inspected.guardianStartedAt
+}
+
+function inheritedFdHoldsExclusiveFlock(fd: number): boolean {
+  if (process.platform !== 'linux') return false
+  try {
+    const fdInfo = readFileSync(`/proc/self/fdinfo/${fd}`, 'utf8')
+    return /^lock:\s+\d+:\s+FLOCK\s+ADVISORY\s+WRITE\b/m.test(fdInfo)
+  } catch {
+    return false
+  }
 }
 
 function inspection(

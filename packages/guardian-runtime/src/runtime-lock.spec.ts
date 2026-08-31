@@ -1,3 +1,5 @@
+import { closeSync, existsSync, openSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { hostname, tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -23,6 +25,7 @@ class FakeProcesses implements ProcessController {
   readonly cascade = new Map<number, number[]>()
   ignoreTerm = new Set<number>()
   currentMachineId = 'machine-a'
+  machineIdHook: (() => Promise<void>) | undefined
 
   add(pid: number, startedAt = 1_000): void {
     this.alive.set(pid, true)
@@ -38,6 +41,7 @@ class FakeProcesses implements ProcessController {
   }
 
   async machineId(): Promise<string> {
+    await this.machineIdHook?.()
     return this.currentMachineId
   }
 
@@ -64,20 +68,63 @@ afterEach(async () => {
   await rm(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
 })
 
+function railwayOwner(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    schemaVersion: 1,
+    pid: 101,
+    hostname: 'prior-container',
+    machineId: 'env:railway-service-service-test',
+    token: 'prior-owner',
+    launcher: 'guardian-cli-server',
+    acquiredAt: new Date().toISOString(),
+    heartbeatAt: new Date().toISOString(),
+    fencingProtocol: 'railway-flock-v1',
+    processStartedAt: new Date(10_000).toISOString(),
+    ...overrides,
+  }
+}
+
 describe('runtime lock ownership', () => {
-  it('enables Railway volume authority only for the exact platform service identity', () => {
+  it('treats an exact Railway service identity without a locked fence as observer-only', () => {
     expect(resolveRuntimeLockOwnerAuthority({
       OPENALICE_SERVICE_MANAGER: 'railway',
       OPENALICE_MACHINE_ID: 'railway-service-service-test',
       RAILWAY_ENVIRONMENT_ID: 'environment-test',
       RAILWAY_SERVICE_ID: 'service-test',
-    })).toBe('railway-volume')
+    })).toBe('railway-observer')
     expect(resolveRuntimeLockOwnerAuthority({
       OPENALICE_SERVICE_MANAGER: 'railway',
       OPENALICE_MACHINE_ID: 'railway-service-other',
       RAILWAY_ENVIRONMENT_ID: 'environment-test',
       RAILWAY_SERVICE_ID: 'service-test',
     })).toBe('process')
+  })
+
+  it.runIf(process.platform === 'linux' && existsSync('/dev/shm'))('recognizes only an inherited FD that actually holds the Railway lifecycle flock', async () => {
+    const volumeRoot = '/dev/shm'
+    const railwayHome = join(volumeRoot, `openalice-fence-${process.pid}-${Math.random().toString(16).slice(2)}`)
+    const installDir = join(railwayHome, 'install')
+    await mkdir(installDir, { recursive: true })
+    const fd = openSync(volumeRoot, 'r')
+    try {
+      const locked = spawnSync('/usr/bin/flock', ['--exclusive', '3'], {
+        stdio: ['ignore', 'ignore', 'ignore', fd],
+      })
+      expect(locked.status).toBe(0)
+      expect(resolveRuntimeLockOwnerAuthority({
+        OPENALICE_HOME: railwayHome,
+        OPENALICE_INSTALL_DIR: installDir,
+        OPENALICE_RAILWAY_VOLUME_ROOT: volumeRoot,
+        OPENALICE_SERVICE_MANAGER: 'railway',
+        OPENALICE_MACHINE_ID: 'railway-service-service-test',
+        OPENALICE_RAILWAY_FENCE_FD: String(fd),
+        RAILWAY_ENVIRONMENT_ID: 'environment-test',
+        RAILWAY_SERVICE_ID: 'service-test',
+      })).toBe('railway-fenced-handoff')
+    } finally {
+      closeSync(fd)
+      await rm(railwayHome, { recursive: true, force: true })
+    }
   })
 
   it('publishes inspectable owner metadata and releases cleanly', async () => {
@@ -200,78 +247,83 @@ describe('runtime lock ownership', () => {
     expect(controller.signals).toEqual([])
   })
 
-  it('uses heartbeat authority for fresh and stale owners in another Railway container', async () => {
-    controller.currentMachineId = 'env:railway-service-service-test'
-    controller.add(202, 20_000)
-
-    for (const [index, machineId] of [
-      'hostname:legacy-container',
-      'env:railway-service-service-test',
-    ].entries()) {
-      const lockDir = join(home, `railway-runtime-${index}.lock`)
-      const owner = {
-        schemaVersion: 1,
-        pid: 101,
-        hostname: 'legacy-container',
-        machineId,
-        token: `owner-${index}`,
-        launcher: 'guardian-cli-server',
-        acquiredAt: new Date().toISOString(),
-        heartbeatAt: new Date().toISOString(),
-        processStartedAt: new Date(10_000).toISOString(),
-      }
-      await mkdir(lockDir)
-      await writeFile(join(lockDir, 'owner.json'), JSON.stringify(owner))
-
-      await expect(inspectRuntimeLock(lockDir, {
-        ownerAuthority: 'railway-volume',
-        processController: controller,
-      })).resolves.toMatchObject({
-        state: 'active',
-        reason: expect.stringContaining('another container namespace'),
-      })
-
-      await writeFile(join(lockDir, 'owner.json'), JSON.stringify({
-        ...owner,
-        heartbeatAt: new Date(0).toISOString(),
-      }))
-      const fresh = await acquireRuntimeLock(lockDir, {
-        pid: 202,
-        processStartedAt: 20_000,
-        ownerAuthority: 'railway-volume',
-        heartbeatMs: 0,
-        processController: controller,
-      })
-      expect(fresh.owner.pid).toBe(202)
-      await fresh.release()
-    }
-  })
-
-  it('never signals a fresh owner in another Railway container during takeover', async () => {
+  it('keeps another Railway container active for an observer regardless of heartbeat age', async () => {
     controller.currentMachineId = 'env:railway-service-service-test'
     controller.add(202, 20_000)
     const lockDir = join(home, 'railway-runtime.lock')
+    const owner = railwayOwner({ heartbeatAt: new Date().toISOString() })
     await mkdir(lockDir)
-    await writeFile(join(lockDir, 'owner.json'), JSON.stringify({
-      schemaVersion: 1,
-      pid: 202,
-      hostname: 'prior-container',
-      machineId: 'env:railway-service-service-test',
-      token: 'prior-owner',
-      launcher: 'guardian-cli-server',
-      acquiredAt: new Date().toISOString(),
-      heartbeatAt: new Date().toISOString(),
-      processStartedAt: new Date(20_000).toISOString(),
-    }))
+    await writeFile(join(lockDir, 'owner.json'), JSON.stringify(owner))
+
+    for (const heartbeatAt of [new Date().toISOString(), new Date(0).toISOString()]) {
+      await writeFile(join(lockDir, 'owner.json'), JSON.stringify({ ...owner, heartbeatAt }))
+      await expect(inspectRuntimeLock(lockDir, {
+        ownerAuthority: 'railway-observer',
+        processController: controller,
+        staleHeartbeatMs: 1,
+      })).resolves.toMatchObject({
+        state: 'active',
+        reason: expect.stringContaining('observer refuses automatic recovery'),
+      })
+    }
 
     await expect(acquireRuntimeLock(lockDir, {
-      pid: 303,
-      processStartedAt: 30_000,
-      ownerAuthority: 'railway-volume',
+      pid: 202,
+      processStartedAt: 20_000,
+      ownerAuthority: 'railway-observer',
       takeover: true,
       heartbeatMs: 0,
       processController: controller,
     })).rejects.toThrow(/another Railway container/)
+    expect(controller.signals).toEqual([])
+  })
+
+  it('lets the fenced Railway handoff replace only a cooperative protocol owner', async () => {
+    controller.currentMachineId = 'env:railway-service-service-test'
+    controller.add(303, 30_000)
+    const lockDir = join(home, 'railway-runtime.lock')
+    await mkdir(lockDir)
+    await writeFile(join(lockDir, 'owner.json'), JSON.stringify(railwayOwner()))
+
+    const fresh = await acquireRuntimeLock(lockDir, {
+      pid: 303,
+      processStartedAt: 30_000,
+      ownerAuthority: 'railway-fenced-handoff',
+      heartbeatMs: 0,
+      processController: controller,
+    })
+    expect(fresh.owner).toMatchObject({
+      pid: 303,
+      fencingProtocol: 'railway-flock-v1',
+    })
+    expect(controller.signals).toEqual([])
+    await fresh.release()
+  })
+
+  it('fails closed on a legacy Railway owner even while holding the lifecycle fence', async () => {
+    controller.currentMachineId = 'env:railway-service-service-test'
+    controller.add(303, 30_000)
+    const lockDir = join(home, 'railway-legacy.lock')
+    await mkdir(lockDir)
+    const legacyOwner = railwayOwner()
+    delete legacyOwner['fencingProtocol']
+    await writeFile(join(lockDir, 'owner.json'), JSON.stringify(legacyOwner))
+
+    await expect(inspectRuntimeLock(lockDir, {
+      ownerAuthority: 'railway-fenced-handoff',
+      processController: controller,
+    })).resolves.toMatchObject({
+      state: 'active',
+      reason: expect.stringContaining('does not belong to this Railway service'),
+    })
+
+    await expect(acquireRuntimeLock(lockDir, {
+      pid: 303,
+      processStartedAt: 30_000,
+      ownerAuthority: 'railway-fenced-handoff',
+      heartbeatMs: 0,
+      processController: controller,
+    })).rejects.toBeInstanceOf(RuntimeAlreadyRunningError)
     expect(controller.signals).toEqual([])
   })
 
@@ -293,7 +345,7 @@ describe('runtime lock ownership', () => {
     }))
 
     await expect(inspectRuntimeLock(lockDir, {
-      ownerAuthority: 'railway-volume',
+      ownerAuthority: 'railway-observer',
       processController: controller,
       staleHeartbeatMs: -1,
     })).resolves.toMatchObject({
@@ -319,7 +371,7 @@ describe('runtime lock ownership', () => {
       }))
 
       await expect(inspectRuntimeLock(lockDir, {
-        ownerAuthority: 'railway-volume',
+        ownerAuthority: 'railway-observer',
         processController: controller,
         staleHeartbeatMs: -1,
       })).resolves.toMatchObject({
@@ -329,7 +381,7 @@ describe('runtime lock ownership', () => {
     }
   })
 
-  it('keeps missing or invalid Railway heartbeats fail closed', async () => {
+  it('keeps missing or invalid Railway heartbeats observer-only', async () => {
     controller.currentMachineId = 'env:railway-service-service-test'
     for (const [index, heartbeatAt] of [undefined, 'not-a-date', 0].entries()) {
       const lockDir = join(home, `railway-heartbeat-${index}.lock`)
@@ -342,11 +394,12 @@ describe('runtime lock ownership', () => {
         token: `owner-${index}`,
         launcher: 'guardian-cli-server',
         acquiredAt: new Date(0).toISOString(),
+        fencingProtocol: 'railway-flock-v1',
         ...(heartbeatAt === undefined ? {} : { heartbeatAt }),
       }))
 
       await expect(inspectRuntimeLock(lockDir, {
-        ownerAuthority: 'railway-volume',
+        ownerAuthority: 'railway-observer',
         processController: controller,
         staleHeartbeatMs: -1,
       })).resolves.toMatchObject({
@@ -354,6 +407,34 @@ describe('runtime lock ownership', () => {
         reason: expect.stringContaining('missing or invalid'),
       })
     }
+  })
+
+  it('aborts reclamation when owner evidence changes after inspection', async () => {
+    controller.currentMachineId = 'env:railway-service-service-test'
+    controller.add(202, 20_000)
+    const lockDir = join(home, 'railway-racing-owner.lock')
+    const ownerPath = join(lockDir, 'owner.json')
+    await mkdir(lockDir)
+    await writeFile(ownerPath, JSON.stringify(railwayOwner({ heartbeatAt: new Date(0).toISOString() })))
+    let machineIdReads = 0
+    controller.machineIdHook = async () => {
+      machineIdReads += 1
+      if (machineIdReads < 2) return
+      const latest = JSON.parse(await readFile(ownerPath, 'utf8')) as Record<string, unknown>
+      await writeFile(ownerPath, JSON.stringify({
+        ...latest,
+        heartbeatAt: new Date(machineIdReads * 1_000).toISOString(),
+      }))
+    }
+
+    await expect(acquireRuntimeLock(lockDir, {
+      pid: 202,
+      processStartedAt: 20_000,
+      ownerAuthority: 'railway-fenced-handoff',
+      heartbeatMs: 0,
+      processController: controller,
+    })).rejects.toBeInstanceOf(RuntimeAlreadyRunningError)
+    expect(JSON.parse(await readFile(ownerPath, 'utf8'))).toMatchObject({ token: 'prior-owner' })
   })
 
   it('performs a controlled takeover before acquiring the lock', async () => {
