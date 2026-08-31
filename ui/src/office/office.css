@@ -4116,6 +4116,21 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
   border-left: 0;
 }
 
+.oa-office-interact-prompt[data-kind="operations"][data-side="above"]::before {
+  position: absolute;
+  bottom: -35px;
+  left: calc(50% + var(--office-prompt-tail-shift, 0px) - 2px);
+  width: 4px;
+  height: 26px;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--office-gba-cream-seed) 0 4px,
+    transparent 4px 9px
+  );
+  content: "";
+  filter: drop-shadow(1px 1px 0 var(--gba-ink));
+}
+
 .oa-office-interact-prompt[data-side="below"] {
   transform: translate(-50%, 0);
 }

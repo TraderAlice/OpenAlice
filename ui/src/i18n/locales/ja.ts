@@ -1932,7 +1932,7 @@ export const ja: Resources = {
     interactInbox: 'Inboxを開く',
     interactNews: 'ニュースを開く',
     floorTerminal: 'フロア端末',
-    floorTerminalHint: 'フロア表示メニューを開きます。',
+    floorTerminalHint: 'Office の完全なアクティビティログを開きます。',
     operationsBoard: 'オペレーションボード',
     operationsBoardHint: 'ライブの製品アクティビティログと再生を確認します。',
     agentMilestoneBorn: '新しい Session がフロアに参加しました',

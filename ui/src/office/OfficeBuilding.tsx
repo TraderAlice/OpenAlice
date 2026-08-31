@@ -115,6 +115,12 @@ const OFFICE_PROMPT_CABINET_TOP = 36
 const OFFICE_PROMPT_CABINET_BOTTOM = 32
 const OFFICE_PROMPT_ROSTER_HALF_WIDTH = 34
 const OFFICE_PROMPT_ROSTER_HALF_HEIGHT = 30
+const OFFICE_PROMPT_OPERATIONS_HALF_WIDTH = 88
+const OFFICE_PROMPT_OPERATIONS_HALF_HEIGHT = 66
+const OFFICE_PROMPT_OPERATIONS_SIGN_CLEARANCE = 28
+const OFFICE_PROMPT_TERMINAL_HALF_WIDTH = 26
+const OFFICE_PROMPT_TERMINAL_TOP = 52
+const OFFICE_PROMPT_TERMINAL_BOTTOM = 26
 export type OfficeLogOrigin =
   | 'menu'
   | 'operations'
@@ -455,12 +461,15 @@ export function OfficeBuilding({
   const promptAvoidBounds = useMemo<OfficePromptAvoidBounds[]>(() => {
     const bounds: OfficePromptAvoidBounds[] = []
     if (!nearbyTarget) return bounds
-    if (nearbyTarget?.kind !== 'roster' && !nearbyDialogue) return bounds
-    if (!('workspaceId' in nearbyTarget)) return bounds
+    const avoidWholeFloor = nearbyTarget.kind === 'operations'
+    const nearbyWorkspaceId = 'workspaceId' in nearbyTarget
+      ? nearbyTarget.workspaceId
+      : null
+    if (!avoidWholeFloor && nearbyTarget.kind !== 'roster' && !nearbyDialogue) return bounds
     bounds.push(...availableInteractionTargets.flatMap((target) => {
-      if (!('workspaceId' in target) || target.workspaceId !== nearbyTarget.workspaceId) return []
       if (target.id === nearbyTarget.id) return []
       if (target.kind === 'sign') {
+        if (!avoidWholeFloor && target.workspaceId !== nearbyWorkspaceId) return []
         return [{
           left: target.x - OFFICE_PROMPT_SIGN_HALF_WIDTH,
           top: target.y - OFFICE_PROMPT_SIGN_HALF_HEIGHT,
@@ -468,6 +477,8 @@ export function OfficeBuilding({
           bottom: target.y + OFFICE_PROMPT_SIGN_HALF_HEIGHT,
         }]
       }
+      if (!('workspaceId' in target)) return []
+      if (!avoidWholeFloor && target.workspaceId !== nearbyWorkspaceId) return []
       if (target.kind === 'employee') {
         return [{
           left: target.x - OFFICE_PROMPT_DESK_HALF_WIDTH,
@@ -497,7 +508,25 @@ export function OfficeBuilding({
     return bounds
   }, [availableInteractionTargets, nearbyDialogue, nearbyTarget])
   const promptTargetBounds = useMemo<OfficePromptAvoidBounds | undefined>(() => {
-    if (nearbyTarget?.kind !== 'inbox-service' && nearbyTarget?.kind !== 'news-service') return undefined
+    if (nearbyTarget?.kind === 'operations') {
+      return {
+        left: operationsBoard.x - OFFICE_PROMPT_OPERATIONS_HALF_WIDTH,
+        top: operationsBoard.y - OFFICE_PROMPT_OPERATIONS_HALF_HEIGHT,
+        right: operationsBoard.x + OFFICE_PROMPT_OPERATIONS_HALF_WIDTH,
+        bottom: operationsBoard.y + OFFICE_PROMPT_OPERATIONS_HALF_HEIGHT,
+      }
+    }
+    if (nearbyTarget?.kind === 'floor-terminal') {
+      return {
+        left: floorTerminal.x - OFFICE_PROMPT_TERMINAL_HALF_WIDTH,
+        top: floorTerminal.y - OFFICE_PROMPT_TERMINAL_TOP,
+        right: floorTerminal.x + OFFICE_PROMPT_TERMINAL_HALF_WIDTH,
+        bottom: floorTerminal.y + OFFICE_PROMPT_TERMINAL_BOTTOM,
+      }
+    }
+    if (nearbyTarget?.kind !== 'inbox-service' && nearbyTarget?.kind !== 'news-service') {
+      return undefined
+    }
     const landmark = serviceLandmarks.find((item) => item.id === nearbyTarget.id)
     if (!landmark) return undefined
     return {
@@ -506,39 +535,58 @@ export function OfficeBuilding({
       right: landmark.x + landmark.width,
       bottom: landmark.y + landmark.height,
     }
-  }, [nearbyTarget, serviceLandmarks])
-  const promptPlacement = useMemo(
-    () => nearbyTarget
-      ? officeInteractionPromptPlacement(
-          alice,
-          nearbyTarget,
-          {
-            width: viewportSize.width || mapLayout.width,
-            height: viewportSize.height || mapLayout.height,
-          },
-          camera,
-          nearbyDialogue
-            ? viewportSize.width > 0 && viewportSize.width <= 520
-              ? OFFICE_PROMPT_NARROW_DIALOGUE_MAX_WIDTH
-              : OFFICE_PROMPT_DIALOGUE_MAX_WIDTH
-            : nearbyService
-              ? viewportSize.width > 0 && viewportSize.width <= 520
-                ? OFFICE_PROMPT_NARROW_SERVICE_MAX_WIDTH
-                : OFFICE_PROMPT_SERVICE_MAX_WIDTH
-            : nearbyTarget.kind === 'sign'
-            ? OFFICE_PROMPT_DESTINATION_MAX_WIDTH
-            : nearbyTarget.kind === 'employee' && nearbyTarget.employee.bubble
-              ? viewportSize.width > 0 && viewportSize.width <= 520
-                ? OFFICE_PROMPT_NARROW_DETAIL_MAX_WIDTH
-                : OFFICE_PROMPT_DETAIL_MAX_WIDTH
-              : undefined,
-          nearbyRichPrompt ? OFFICE_PROMPT_SERVICE_MAX_HEIGHT : undefined,
-          promptAvoidBounds,
-          promptTargetBounds,
-        )
-      : null,
-    [alice, camera, mapLayout.height, mapLayout.width, nearbyRichPrompt, nearbyTarget, promptAvoidBounds, promptTargetBounds, viewportSize],
-  )
+  }, [floorTerminal, nearbyTarget, operationsBoard, serviceLandmarks])
+  const promptPlacement = useMemo(() => {
+    if (!nearbyTarget) return null
+    const narrowPrompt = viewportSize.width > 0 && viewportSize.width <= 520
+    const maxWidth = nearbyDialogue
+      ? narrowPrompt
+        ? OFFICE_PROMPT_NARROW_DIALOGUE_MAX_WIDTH
+        : OFFICE_PROMPT_DIALOGUE_MAX_WIDTH
+      : nearbyService
+        ? narrowPrompt
+          ? OFFICE_PROMPT_NARROW_SERVICE_MAX_WIDTH
+          : OFFICE_PROMPT_SERVICE_MAX_WIDTH
+        : nearbyTarget.kind === 'sign'
+          ? OFFICE_PROMPT_DESTINATION_MAX_WIDTH
+          : nearbyTarget.kind === 'employee' && nearbyTarget.employee.bubble
+            ? narrowPrompt
+              ? OFFICE_PROMPT_NARROW_DETAIL_MAX_WIDTH
+              : OFFICE_PROMPT_DETAIL_MAX_WIDTH
+            : undefined
+    const placement = officeInteractionPromptPlacement(
+      alice,
+      nearbyTarget,
+      {
+        width: viewportSize.width || mapLayout.width,
+        height: viewportSize.height || mapLayout.height,
+      },
+      camera,
+      maxWidth,
+      nearbyRichPrompt ? OFFICE_PROMPT_SERVICE_MAX_HEIGHT : undefined,
+      promptAvoidBounds,
+      promptTargetBounds,
+    )
+    if (nearbyTarget.kind === 'operations' && placement.side === 'above') {
+      return {
+        ...placement,
+        y: placement.y - OFFICE_PROMPT_OPERATIONS_SIGN_CLEARANCE,
+      }
+    }
+    return placement
+  }, [
+    alice,
+    camera,
+    mapLayout.height,
+    mapLayout.width,
+    nearbyDialogue,
+    nearbyRichPrompt,
+    nearbyService,
+    nearbyTarget,
+    promptAvoidBounds,
+    promptTargetBounds,
+    viewportSize,
+  ])
   const promptPresentation: {
     icon: string
     action: string

@@ -1939,7 +1939,7 @@ export const zhHant: Resources = {
     interactInbox: '開啟 Inbox',
     interactNews: '開啟新聞',
     floorTerminal: '樓層終端',
-    floorTerminalHint: '開啟樓層檢視選單。',
+    floorTerminalHint: '開啟完整的 Office 活動日誌。',
     operationsBoard: '行動看板',
     operationsBoardHint: '查看即時產品活動日誌和重放。',
     agentMilestoneBorn: '新 Session 進入樓層',

@@ -1931,7 +1931,7 @@ export const zh: Resources = {
     interactInbox: '打开 Inbox',
     interactNews: '打开新闻',
     floorTerminal: '楼层终端',
-    floorTerminalHint: '打开楼层视图菜单。',
+    floorTerminalHint: '打开完整的 Office 活动日志。',
     operationsBoard: '行动看板',
     operationsBoardHint: '查看实时产品活动日志和重放。',
     agentMilestoneBorn: '新 Session 进入楼层',

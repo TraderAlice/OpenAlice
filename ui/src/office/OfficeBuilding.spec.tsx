@@ -1321,6 +1321,7 @@ describe('OfficeBuilding', () => {
     const floorTerminal = screen.getByRole('button', { name: 'Floor terminal' })
     expect(floorTerminal.querySelector('img')?.getAttribute('src'))
       .toBe('/office/furniture/terminal-kiosk-v2.png')
+    expect(floorTerminal.getAttribute('title')).toBe('Open the complete Office activity log.')
     Object.defineProperties(map, {
       setPointerCapture: { value: vi.fn() },
       releasePointerCapture: { value: vi.fn() },
@@ -1452,8 +1453,11 @@ describe('OfficeBuilding', () => {
     expect(alice.style.top).toBe('336px')
     await userEvent.keyboard('wwww')
     expect(alice.style.top).toBe('264px')
-    expect(screen.getByRole('status', { name: 'Check live operations' }).querySelector('img')?.getAttribute('src'))
+    const operationsPrompt = screen.getByRole('status', { name: 'Check live operations' })
+    expect(operationsPrompt.querySelector('img')?.getAttribute('src'))
       .toBe('/office/hud/occupancy-log-v2.png')
+    expect(operationsPrompt.dataset.side).toBe('above')
+    expect(operationsPrompt.style.top).toBe('102px')
     expect(operations.dataset.nearby).toBe('true')
     await userEvent.keyboard('{Enter}')
     expect(onOpenLog).toHaveBeenCalledWith('operations')

@@ -5483,6 +5483,28 @@ Activity-log position-and-paging follow-up (2026-08-31):
   suite passed all 620 test files and 5,207 tests (one file and nine tests skipped); the production UI build passed with
   only the existing ports fallback and large-chunk advisory.
 
+Operations-prompt landmark-clearance follow-up (2026-08-31):
+
+- Patrolled the real Floor terminal and Operations board routes from the Live map. Their route, arrival, focus-return,
+  and Activity Log selection were coherent, but the rich Operations prompt painted across the control table's main
+  screen and both Prediction/AutoQuant room signs. The Floor terminal tooltip also still promised a removed floor-view
+  menu even though the terminal correctly opens the complete Activity Log.
+- Compared shrinking away the latest-result copy, moving the prompt to a fixed HUD strip, and extending the existing
+  spatial solver with the authored landmark geometry. Chose geometry-aware clearance: it preserves the useful activity
+  summary and the prompt's world ownership without turning the map back into a dashboard overlay.
+- The Operations prompt now protects the full 176x132 control-table footprint and scores every visible sign, occupied
+  desk, cabinet, and roster marker. When the best candidate is the wall strip above the table, a 28px sign-clearance
+  offset keeps both room signs fully readable and a dotted 16-bit tether passes through their center gap back to the
+  table. Floor terminal prompts likewise protect the complete kiosk silhouette, and all four locales now truthfully
+  describe that terminal as the complete Office activity log.
+- Real-browser acceptance routed to Operations, opened its focused Grok Engineer record, and returned to a 280px
+  `Review` prompt at world x480/y102. The prompt, both room signs, all four adjacent desks, and the complete control
+  screen remained visible; the tether retained its spatial connection. A second route to Floor terminal returned to a
+  compact Log prompt with clear equipment bounds and the corrected tooltip. Focused Building, placement, and responsive
+  suites passed all 66 tests; root and UI TypeScript passed; the full suite passed all 620 test files and 5,207 tests
+  (one file and nine tests skipped); the production UI build passed with only the existing ports fallback and
+  large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

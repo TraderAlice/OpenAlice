@@ -1964,7 +1964,7 @@ export const en = {
     interactInbox: 'Open Inbox',
     interactNews: 'Open News',
     floorTerminal: 'Floor terminal',
-    floorTerminalHint: 'Open the floor view menu.',
+    floorTerminalHint: 'Open the complete Office activity log.',
     operationsBoard: 'Operations board',
     operationsBoardHint: 'Review the live product activity log and replay.',
     agentMilestoneBorn: 'New Session joined the floor',

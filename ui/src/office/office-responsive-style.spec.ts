@@ -65,7 +65,10 @@ describe('Office responsive style contract', () => {
     expect(narrowLiveCss).toContain('[data-kind="inbox-service"]')
     expect(narrowLiveCss).toContain('max-width: 240px')
     expect(css).toContain('-webkit-line-clamp: 2')
-    expect(css.match(/var\(--office-prompt-tail-shift, 0px\)/g)).toHaveLength(4)
+    expect(css.match(/var\(--office-prompt-tail-shift, 0px\)/g)).toHaveLength(5)
+    expect(css).toMatch(
+      /\.oa-office-interact-prompt\[data-kind="operations"\]\[data-side="above"\]::before\s*\{[\s\S]*?bottom: -35px;[\s\S]*?repeating-linear-gradient/,
+    )
   })
 
   it('gives narrow auto-route status a second line for cancellation guidance', () => {
