@@ -2404,6 +2404,54 @@ describe('OfficeBuilding', () => {
     expect(onOpenLog).not.toHaveBeenCalled()
   })
 
+  it('keeps carried decisions as a passive Operations count during an active patrol duty', async () => {
+    const [inboxDuty] = inboxUnreadDutyRegistration(
+      [{
+        title: 'Read the cross-asset packet',
+        entry: {
+          id: 'inbox-patrol-primary',
+          ts: 1_100,
+          workspaceId: 'chat-1',
+          workspaceLabel: 'Macro desk',
+          docs: [{ path: 'reports/cross-asset.md', revision: 'rev-cross-asset' }],
+        },
+      }],
+      'ready',
+    ).candidates
+    const onOpenRoutineFollowUps = vi.fn()
+    const onOpenLog = vi.fn()
+
+    const { container } = render(
+      <OfficeBuilding
+        building={emptyBuilding()}
+        dutyCandidates={[inboxDuty!]}
+        dutyShift={activeShift({ total: 3, position: 2, remainingMinutes: 7 })}
+        routineFollowUpCount={2}
+        initialPlayerState={{ position: { x: 480, y: 264 }, direction: 'up' }}
+        onSelectEmployee={vi.fn()}
+        onOpenEmployee={vi.fn()}
+        onOpenWorkspace={vi.fn()}
+        onOpenFiles={vi.fn()}
+        onOpenRoster={vi.fn()}
+        onOpenLog={onOpenLog}
+        onOpenDuty={vi.fn()}
+        onOpenRoutineFollowUps={onOpenRoutineFollowUps}
+      />,
+    )
+
+    expect(screen.getByRole('button', {
+      name: 'Shift duty 2/3: Inbox · Read the cross-asset packet · Macro desk, about 7 minutes remaining',
+    })).toBeTruthy()
+    expect(container.querySelector('[data-kind="decision-desk"]')).toBeNull()
+
+    const operations = screen.getByRole('button', { name: 'Operations board · 2 pending' })
+    expect(operations.dataset.routineFollowUps).toBe('2')
+    expect(operations.querySelector('.oa-office-operations-board__signal')?.textContent).toBe('2')
+    await userEvent.click(operations)
+    await waitFor(() => expect(onOpenLog).toHaveBeenCalledWith('operations'))
+    expect(onOpenRoutineFollowUps).not.toHaveBeenCalled()
+  })
+
   it('keeps the current cadence duty ahead of an older reviewed follow-up at Operations', async () => {
     const currentCadence = cadenceDuty('current-blocker', 'Review today’s blocked cadence')
     const olderFollowUp = cadenceDuty('older-blocker', 'Recheck last week’s unresolved cadence')
@@ -2572,6 +2620,136 @@ describe('OfficeBuilding', () => {
     await userEvent.click(operations)
     await waitFor(() => expect(onOpenCadenceFollowUp).toHaveBeenCalledWith(followUp))
     expect(onOpenLog).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['loading', 'Checking duties…'],
+    ['error', 'Duty signal unavailable'],
+  ] as const)(
+    'keeps carried decisions passive while the patrol source is %s',
+    async (dutyStatus, sourceMessage) => {
+      const onOpenRoutineFollowUps = vi.fn()
+      const onOpenLog = vi.fn()
+
+      render(
+        <OfficeBuilding
+          building={emptyBuilding()}
+          dutyCandidates={[]}
+          dutyStatus={dutyStatus}
+          routineFollowUpCount={2}
+          initialPlayerState={{ position: { x: 480, y: 264 }, direction: 'up' }}
+          onSelectEmployee={vi.fn()}
+          onOpenEmployee={vi.fn()}
+          onOpenWorkspace={vi.fn()}
+          onOpenFiles={vi.fn()}
+          onOpenRoster={vi.fn()}
+          onOpenLog={onOpenLog}
+          onOpenRoutineFollowUps={onOpenRoutineFollowUps}
+        />,
+      )
+
+      expect(screen.getByText(sourceMessage)).toBeTruthy()
+      expect(screen.queryByRole('button', { name: 'Decision desk · 2 pending' })).toBeNull()
+      const operations = screen.getByRole('button', { name: 'Operations board · 2 pending' })
+      expect(operations.dataset.routineFollowUps).toBe('2')
+      expect(operations.title).toBe('Review the live product activity log and replay.')
+
+      await userEvent.click(operations)
+      await waitFor(() => expect(onOpenLog).toHaveBeenCalledWith('operations'))
+      expect(onOpenRoutineFollowUps).not.toHaveBeenCalled()
+    },
+  )
+
+  it('makes the Decision Desk primary before another shift or cadence follow-up', async () => {
+    const cadenceFollowUp = cadenceDuty('cadence-lower-priority', 'Repair an older cadence')
+    const onOpenRoutineFollowUps = vi.fn()
+    const onOpenCadenceFollowUp = vi.fn()
+    const onStartNextShift = vi.fn()
+
+    const { container } = render(
+      <OfficeBuilding
+        building={emptyBuilding()}
+        dutyCandidates={[]}
+        routineFollowUpCount={2}
+        reviewedCadenceFollowUps={[cadenceFollowUp]}
+        dutyShift={{
+          state: 'complete',
+          total: 4,
+          completed: 4,
+          position: null,
+          remainingMinutes: 0,
+          backlogCount: 3,
+          canStartNext: true,
+        }}
+        initialPlayerState={{ position: { x: 480, y: 264 }, direction: 'up' }}
+        onSelectEmployee={vi.fn()}
+        onOpenEmployee={vi.fn()}
+        onOpenWorkspace={vi.fn()}
+        onOpenFiles={vi.fn()}
+        onOpenRoster={vi.fn()}
+        onOpenLog={vi.fn()}
+        onOpenRoutineFollowUps={onOpenRoutineFollowUps}
+        onOpenCadenceFollowUp={onOpenCadenceFollowUp}
+        onStartNextShift={onStartNextShift}
+      />,
+    )
+
+    const decisionDuty = screen.getByRole('button', { name: 'Decision desk · 2 pending' })
+    expect(decisionDuty.dataset.kind).toBe('decision-desk')
+    expect(decisionDuty).toBeTruthy()
+    expect(decisionDuty.textContent).toContain('2')
+    expect(screen.queryByRole('button', {
+      name: 'This shift is complete with 3 more waiting. Start the next shift',
+    })).toBeNull()
+    expect(within(screen.getByTestId('office-wall')).queryByText(cadenceFollowUp.cadence.title))
+      .toBeNull()
+
+    const operations = container.querySelector<HTMLButtonElement>('#office-operations-board')!
+    expect(operations.dataset.routineFollowUps).toBe('2')
+    expect(operations.getAttribute('aria-label')).toBe('Pending at decision desk: 2')
+    expect(operations.title).toBe('Review decision desk')
+    await userEvent.click(decisionDuty)
+    await waitFor(() => expect(onOpenRoutineFollowUps).toHaveBeenCalledTimes(1))
+    expect(onStartNextShift).not.toHaveBeenCalled()
+    expect(onOpenCadenceFollowUp).not.toHaveBeenCalled()
+  })
+
+  it('cancels a Decision Desk route when the carried set clears en route', () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })))
+    try {
+      const onOpenRoutineFollowUps = vi.fn()
+      const onOpenLog = vi.fn()
+      const props = {
+        building: emptyBuilding(),
+        dutyCandidates: [],
+        initialPlayerState: { position: { x: 340, y: 600 }, direction: 'up' as const },
+        onSelectEmployee: vi.fn(),
+        onOpenEmployee: vi.fn(),
+        onOpenWorkspace: vi.fn(),
+        onOpenFiles: vi.fn(),
+        onOpenRoster: vi.fn(),
+        onOpenLog,
+        onOpenRoutineFollowUps,
+      }
+      const view = render(<OfficeBuilding {...props} routineFollowUpCount={1} />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Decision desk · 1 pending' }))
+      expect(screen.getByTestId('office-route-status')).toBeTruthy()
+
+      view.rerender(<OfficeBuilding {...props} routineFollowUpCount={0} />)
+      expect(screen.queryByTestId('office-route-status')).toBeNull()
+      act(() => vi.advanceTimersByTime(5_000))
+
+      expect(onOpenRoutineFollowUps).not.toHaveBeenCalled()
+      expect(onOpenLog).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('opens ambient Inbox instead of a later duty while cadence leads the shift', async () => {

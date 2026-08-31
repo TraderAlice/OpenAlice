@@ -115,6 +115,7 @@ describe('useOfficeDuties', () => {
       { id: duty.id, receipt: duty.receipt },
     ])
     expect(second.result.current.status).toBe('ready')
+    expect(second.result.current.issueStatus).toBe('ready')
     expect(second.result.current.unresolvedCount).toBe(1)
   })
 
@@ -228,6 +229,7 @@ describe('useOfficeDuties', () => {
     )
     expect(hook.result.current.candidates[0]?.kind).toBe('cadence')
     expect(hook.result.current.cadenceStatus).toBe('ready')
+    expect(hook.result.current.issueStatus).toBe('error')
     expect(hook.result.current.status).toBe('error')
     await act(async () => {
       await hook.result.current.acknowledge(hook.result.current.candidates[0]!)
@@ -453,5 +455,21 @@ describe('useOfficeDuties', () => {
       await acknowledgement
     })
     expect(settled).toBe(true)
+  })
+
+  it('exposes exact presentation evidence after a report leaves the unread patrol', () => {
+    const readReport = inboxDelivery('read-report')
+    inboxDutiesMock.mockReturnValue({
+      status: 'ready',
+      deliveries: [],
+      evidenceByEntryId: new Map([['read-report', readReport]]),
+      markReadConfirmed: markReadConfirmedMock,
+    })
+
+    const hook = renderHook(() => useOfficeDuties(activity(), issues(null)))
+
+    expect(hook.result.current.candidates).toEqual([])
+    expect(hook.result.current.inboxByEntryId.has('read-report')).toBe(false)
+    expect(hook.result.current.inboxEvidenceByEntryId.get('read-report')).toBe(readReport)
   })
 })

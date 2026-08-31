@@ -23,6 +23,10 @@ import { officePixelImg } from '../office/furniture'
 import { OfficeConnectionBanner, OfficeConnectionScreen } from '../office/OfficeConnectionState'
 import { OfficeInspectRail } from '../office/OfficeInspectRail'
 import { OfficeInboxDutyDossier } from '../office/OfficeInboxDutyDossier'
+import {
+  OfficeRoutineDecisionDesk,
+  type OfficeRoutineDecisionItem,
+} from '../office/OfficeRoutineDecisionDesk'
 import { OfficeWindowControlGlyph } from '../office/OfficeWindowControlGlyph'
 import { OFFICE_HUD_ASSETS } from '../office/hud-assets'
 import {
@@ -39,12 +43,15 @@ import { OfficeReplayBar } from '../office/OfficeReplayBar'
 import type { OfficeReplayFocus } from '../office/replay-focus'
 import { OfficeRosterWindow } from '../office/OfficeRosterWindow'
 import { useOfficeDuties } from '../office/useOfficeDuties'
+import { useOfficeRoutineFollowUps } from '../office/useOfficeRoutineFollowUps'
 import { useOfficeShift } from '../office/useOfficeShift'
 import {
   useOfficeProductActivity,
 } from '../office/useOfficeProductActivity'
 import type {
   OfficeCadenceDutyCandidate,
+  OfficeDutyAcknowledgementResult,
+  OfficeDutySourceStatus,
   OfficeDutyCandidate,
   OfficeInboxDutyCandidate,
   OfficeDutyTargetId,
@@ -77,6 +84,14 @@ function officeActivityDutyReview(
     throughSeq,
     count,
   }
+}
+
+function combineOfficeSourceStatus(
+  ...statuses: readonly OfficeDutySourceStatus[]
+): OfficeDutySourceStatus {
+  if (statuses.includes('error')) return 'error'
+  if (statuses.includes('loading')) return 'loading'
+  return 'ready'
 }
 
 /**
@@ -119,14 +134,23 @@ export function OfficePage() {
   const productActivity = useOfficeProductActivity()
   const issues = useIssues()
   const officeDuties = useOfficeDuties(productActivity, issues)
+  const routineFollowUps = useOfficeRoutineFollowUps()
+  const dutyGuidanceStatus = combineOfficeSourceStatus(
+    officeDuties.status,
+    routineFollowUps.status,
+  )
+  const totalUnresolvedCount = officeDuties.unresolvedCount
+    + routineFollowUps.followUps.length
   const officeShift = useOfficeShift({
     candidates: officeDuties.candidates,
     status: officeDuties.status,
-    unresolvedCount: officeDuties.unresolvedCount,
+    settlementStatus: dutyGuidanceStatus,
+    unresolvedCount: totalUnresolvedCount,
   })
   const [cadenceDuty, setCadenceDuty] = useState<OfficeCadenceDutyCandidate | null>(null)
   const [cadenceInitialStep, setCadenceInitialStep] = useState<'exception' | 'evidence'>('exception')
   const [inboxDuty, setInboxDuty] = useState<OfficeInboxDutyCandidate | null>(null)
+  const [decisionDeskOpen, setDecisionDeskOpen] = useState(false)
   const [dutyAcknowledgement, setDutyAcknowledgement] = useState<{
     token: number
     targetId: OfficeDutyTargetId
@@ -228,6 +252,7 @@ export function OfficePage() {
     || Boolean(cabinetOffice)
     || Boolean(cadenceDuty)
     || Boolean(inboxDuty)
+    || decisionDeskOpen
   const closeLogWithDestination = (destination: 'origin' | 'floor') => {
     const origin = logView?.origin ?? 'menu'
     setLogView(null)
@@ -431,6 +456,25 @@ export function OfficePage() {
     })
   }
 
+  const finishCarriedInboxDuty = (duty: OfficeInboxDutyCandidate) => {
+    clearOfficeInboxDutyExcursion()
+    inboxExcursionRef.current = null
+    setInboxDuty(null)
+    setDutyAcknowledgement((current) => ({
+      token: (current?.token ?? 0) + 1,
+      targetId: 'operations',
+      label: t('office.routineCarriedShort'),
+      reviewed: duty.delivery.title,
+      dutyKey: `${duty.id}:${duty.receipt.fingerprint}`,
+      announcement: t('office.routineCarriedAnnouncement', {
+        name: duty.delivery.title,
+      }),
+    }))
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>('[data-testid="office-floor"]')?.focus()
+    })
+  }
+
   const continueResolvedInboxDuty = () => {
     clearOfficeInboxDutyExcursion()
     inboxExcursionRef.current = null
@@ -441,7 +485,7 @@ export function OfficePage() {
   }
 
   const openInboxDuty = (duty: OfficeInboxDutyCandidate) => {
-    const excursion: OfficeInboxDutyExcursion = { duty, phase: 'away' }
+    const excursion: OfficeInboxDutyExcursion = { duty, purpose: 'review', phase: 'away' }
     rememberOfficeInboxDutyExcursion(excursion)
     inboxExcursionRef.current = excursion
     setInboxDuty(null)
@@ -528,6 +572,41 @@ export function OfficePage() {
     })
   }
 
+  const carryInboxDuty = async (
+    duty: OfficeInboxDutyCandidate,
+  ): Promise<OfficeDutyAcknowledgementResult> => {
+    await routineFollowUps.carry(duty.destination.inboxEntryId)
+    return officeDuties.acknowledge(duty)
+  }
+
+  const closeDecisionDesk = () => {
+    setDecisionDeskOpen(false)
+    requestAnimationFrame(() => {
+      document.getElementById('office-operations-board')?.focus()
+    })
+  }
+
+  const openRoutineDecisionIssue = (item: OfficeRoutineDecisionItem) => {
+    if (!item.issueAvailable) return
+    setDecisionDeskOpen(false)
+    markExcursion()
+    openOrFocus({
+      kind: 'issue-detail',
+      params: {
+        wsId: item.followUp.issueWorkspaceId,
+        id: item.followUp.issueId,
+      },
+    })
+  }
+
+  const openRoutineDecisionReport = (item: OfficeRoutineDecisionItem) => {
+    if (!item.reportAvailable) return
+    setDecisionDeskOpen(false)
+    useInboxSelection.getState().select(item.followUp.inboxEntryId)
+    markExcursion()
+    openOrFocus({ kind: 'inbox', params: {} })
+  }
+
   const latestCadenceDuty = cadenceDuty?.receipt.kind === 'evidence'
     ? officeDuties.evidenceBySubject.get(cadenceDuty.receipt.subjectKey)
     : null
@@ -540,9 +619,51 @@ export function OfficePage() {
   const latestMatchingInboxDuty = latestInboxDuty?.kind === 'inbox'
     ? latestInboxDuty
     : null
+  const inboxDutyCarrySaved = Boolean(inboxDuty && routineFollowUps.followUps.some(
+    (followUp) => followUp.inboxEntryId === inboxDuty.destination.inboxEntryId,
+  ))
   const currentInboxBacklogCount = officeDuties.inboxStatus === 'ready'
     ? officeDuties.inboxCount
     : null
+  const routineDecisionItems = useMemo<readonly OfficeRoutineDecisionItem[]>(() => (
+    routineFollowUps.followUps.map((followUp) => {
+      const report = officeDuties.inboxEvidenceByEntryId.get(followUp.inboxEntryId)
+      const reportWorkspace = report
+        ? workspaces.find((candidate) => candidate.id === report.entry.workspaceId)
+        : undefined
+      const issueWorkspace = issues.data?.workspaces.find(
+        (workspace) => workspace.wsId === followUp.issueWorkspaceId,
+      )
+      const issue = issueWorkspace?.status === 'ok'
+        ? issueWorkspace.issues.find((candidate) => candidate.id === followUp.issueId)
+        : undefined
+      const workspace = workspaces.find((candidate) => candidate.id === followUp.issueWorkspaceId)
+      return {
+        followUp,
+        reportTitle: report?.title ?? followUp.inboxEntryId,
+        ...(report?.excerpt ? { reportExcerpt: report.excerpt } : {}),
+        reportWorkspaceLabel: report?.entry.workspaceLabel?.trim()
+          || (reportWorkspace ? workspaceDisplayName(reportWorkspace) : report?.entry.workspaceId)
+          || followUp.inboxEntryId,
+        reportAvailable: officeDuties.inboxStatus === 'ready' && Boolean(report),
+        issueTitle: issue?.title ?? followUp.issueId,
+        workspaceLabel: workspace
+          ? workspaceDisplayName(workspace)
+          : issueWorkspace?.tag ?? followUp.issueWorkspaceId,
+        priority: issue?.priority ?? null,
+        issueAvailable: officeDuties.issueStatus === 'ready'
+          && issueWorkspace?.status === 'ok'
+          && Boolean(issue?.when),
+      }
+    })
+  ), [
+    issues.data,
+    officeDuties.inboxEvidenceByEntryId,
+    officeDuties.inboxStatus,
+    officeDuties.issueStatus,
+    routineFollowUps.followUps,
+    workspaces,
+  ])
   const nextDutyCandidate = officeShift.candidates[0]
   const nextDutyKey = nextDutyCandidate
     ? nextDutyCandidate.receipt.kind === 'evidence'
@@ -576,7 +697,7 @@ export function OfficePage() {
           name: nextDutyAnnouncementName,
         })
       : officeDuties.status === 'ready'
-        ? officeDuties.unresolvedCount === 0
+        ? totalUnresolvedCount === 0
           ? t('office.cadenceReviewedClear', { reviewed: dutyAcknowledgement.reviewed })
           : t(reviewedFollowUpAfterAcknowledgement
               ? 'office.cadenceReviewedCompleteFollowUp'
@@ -584,7 +705,7 @@ export function OfficePage() {
               reviewed: dutyAcknowledgement.reviewed,
               count: reviewedFollowUpAfterAcknowledgement
                 ? officeDuties.reviewedCadenceFollowUps.length
-                : officeDuties.unresolvedCount,
+                : totalUnresolvedCount,
             })
         : t('office.cadenceReviewedUnknown', { reviewed: dutyAcknowledgement.reviewed })
     setDutyAcknowledgement((current) => current?.token === dutyAcknowledgement.token
@@ -595,10 +716,10 @@ export function OfficePage() {
     nextDutyAnnouncementName,
     nextDutyKey,
     officeDuties.status,
-    officeDuties.unresolvedCount,
     officeDuties.reviewedCadenceFollowUps,
     reviewedFollowUpAfterAcknowledgement,
     t,
+    totalUnresolvedCount,
   ])
   useEffect(() => {
     const excursion = cadenceExcursionRef.current
@@ -790,11 +911,19 @@ export function OfficePage() {
                 }}
                 productActivity={productActivity}
                 dutyCandidates={officeShift.candidates}
-                dutyStatus={officeDuties.status}
+                dutyStatus={dutyGuidanceStatus}
                 dutyShift={officeShift}
                 inboxBacklogCount={officeDuties.inboxCount}
+                routineFollowUpCount={routineFollowUps.followUps.length}
                 dutyAcknowledgement={dutyAcknowledgement}
                 onOpenDuty={openRegisteredDuty}
+                onOpenRoutineFollowUps={() => {
+                  setDecisionDeskOpen(true)
+                  setSelected(null)
+                  setRosterWorkspaceId(null)
+                  setCabinetWorkspaceId(null)
+                  setLogView(null)
+                }}
                 reviewedCadenceFollowUps={officeDuties.reviewedCadenceFollowUps}
                 onOpenCadenceFollowUp={openReviewedCadenceFollowUp}
                 onStartNextShift={officeShift.startNext}
@@ -952,6 +1081,16 @@ export function OfficePage() {
                 onClose={closeCadenceDuty}
               />
             )}
+            {decisionDeskOpen && (
+              <OfficeRoutineDecisionDesk
+                items={routineDecisionItems}
+                sourceStatus={routineFollowUps.status}
+                onOpenReport={openRoutineDecisionReport}
+                onOpenIssue={openRoutineDecisionIssue}
+                onResolve={(item) => routineFollowUps.resolve(item.followUp.inboxEntryId)}
+                onClose={closeDecisionDesk}
+              />
+            )}
             {inboxDuty && (
               <OfficeInboxDutyDossier
                 key={`${inboxDuty.id}:${inboxDuty.receipt.fingerprint}`}
@@ -959,7 +1098,12 @@ export function OfficePage() {
                 latestDuty={latestMatchingInboxDuty}
                 currentBacklogCount={currentInboxBacklogCount}
                 sourceStatus={officeDuties.inboxStatus}
+                followUpSourceStatus={routineFollowUps.status}
+                issueSourceStatus={officeDuties.issueStatus}
+                carrySaved={inboxDutyCarrySaved}
                 onOpenInbox={openInboxDuty}
+                onCarry={() => carryInboxDuty(inboxDuty)}
+                onCarried={() => finishCarriedInboxDuty(inboxDuty)}
                 onConfirm={() => officeDuties.acknowledge(inboxDuty)}
                 onConfirmed={() => finishInboxDuty(inboxDuty)}
                 onContinue={continueResolvedInboxDuty}

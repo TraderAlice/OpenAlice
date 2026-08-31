@@ -60,20 +60,35 @@ export function projectOfficeInboxDeliveries(
   entries: readonly InboxEntry[],
   copy: InboxPresentationCopy,
 ): OfficeInboxDutyEvidence[] {
-  return entries.flatMap((entry) => {
-    if (entry.readAt) return []
+  return [...projectOfficeInboxEvidence(entries, copy).values()].filter(
+    (evidence) => !evidence.entry.readAt,
+  )
+}
+
+/**
+ * Presentation evidence for every row in the authoritative Inbox history.
+ * Read state decides whether a row is a patrol duty, never whether an exact
+ * report carried to the Decision Desk remains addressable.
+ */
+export function projectOfficeInboxEvidence(
+  entries: readonly InboxEntry[],
+  copy: InboxPresentationCopy,
+): ReadonlyMap<string, OfficeInboxDutyEvidence> {
+  return new Map(entries.map((entry) => {
     const presentation = inboxScan(entry, copy)
-    return [{
+    return [entry.id, {
       title: presentation.subject,
       ...(presentation.excerpt ? { excerpt: presentation.excerpt } : {}),
       entry,
-    }]
-  })
+    }] as const
+  }))
 }
 
 interface OfficeInboxDutySource {
   readonly status: OfficeDutySourceStatus
   readonly deliveries: readonly OfficeInboxDutyEvidence[]
+  /** Exact report presentation, including already-read history rows. */
+  readonly evidenceByEntryId: ReadonlyMap<string, OfficeInboxDutyEvidence>
   markReadConfirmed(inboxEntryId: string): Promise<OfficeDutyAcknowledgementResult>
 }
 
@@ -132,11 +147,15 @@ export function useOfficeInboxDuties(activitySeq?: number): OfficeInboxDutySourc
     void refresh()
   }, [activitySeq, refresh])
 
-  const deliveries = useMemo(() => projectOfficeInboxDeliveries(entries, {
+  const evidenceByEntryId = useMemo(() => projectOfficeInboxEvidence(entries, {
     untitled: t('inbox.untitledUpdate'),
     unreadLabel: t('inbox.unread'),
     moreAttachments: (count) => t('inbox.moreAttachments', { count }),
   }), [entries, t])
+  const deliveries = useMemo(
+    () => [...evidenceByEntryId.values()].filter((evidence) => !evidence.entry.readAt),
+    [evidenceByEntryId],
+  )
 
   const markReadConfirmed = useCallback(async (
     inboxEntryId: string,
@@ -200,7 +219,9 @@ export function useOfficeInboxDuties(activitySeq?: number): OfficeInboxDutySourc
         generationRef.current += 1
         if (mountedRef.current) {
           setStatus('loading')
-          setEntries((current) => current.filter((entry) => entry.id !== inboxEntryId))
+          setEntries(authoritativeEntries.map((entry) => entry.id === inboxEntryId
+            ? { ...entry, readAt: result.readAt }
+            : entry))
         }
         setInboxReadAtOptimistically(inboxEntryId, result.readAt)
         refreshInbox()
@@ -212,5 +233,5 @@ export function useOfficeInboxDuties(activitySeq?: number): OfficeInboxDutySourc
     }
   }, [refresh])
 
-  return { status, deliveries, markReadConfirmed }
+  return { status, deliveries, evidenceByEntryId, markReadConfirmed }
 }

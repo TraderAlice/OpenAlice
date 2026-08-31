@@ -54,6 +54,17 @@ not operator config, and travels with the complete home. Missing or
 malformed files equal the default document (Dev Panel hidden). Settings
 cannot be hidden. Deep links to a hidden surface still adopt.
 
+`<OPENALICE_HOME>/data/inbox/routine-follow-ups.json` is the Office decision
+queue. It contains only active scheduled-report references the human explicitly
+carried out of a review shift: the Inbox entry identity, immutable report
+timestamp, exact Issue coordinates, and first-carried timestamp. It never owns
+Issue status or scheduling, and writing it never dispatches an Agent. Missing
+means an empty queue; malformed state is a queue load error rather than something
+the product silently discards or overwrites. Alice keeps serving its other
+surfaces, while the Office decision-queue API fails closed until the sidecar is
+repaired. The file moves with the complete AliceProject so browser and Electron
+views share one durable diligence workflow.
+
 Each product Session created in that Workspace owns a secret-free dossier
 at `.alice/sessions/<resumeId>.json`. The `ai` object records the Agent
 runtime plus the credential reference, model, and effort frozen for that

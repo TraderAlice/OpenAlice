@@ -194,6 +194,67 @@ describe('InboxPage deletion', () => {
     await waitFor(() => expect(deleteEntry).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(screen.queryByText('Delete Inbox entry?')).toBeNull())
   })
+
+  it.each([
+    { activeTarget: true, expectedReadCalls: 0 },
+    { activeTarget: false, expectedReadCalls: 1 },
+  ])(
+    'advances after delete without bypassing Office review settlement (active target: $activeTarget)',
+    async ({ activeTarget, expectedReadCalls }) => {
+      const current: InboxEntry = {
+        id: 'inbox-delete-current',
+        ts: Date.now(),
+        workspaceId: 'ws-1',
+        workspaceLabel: 'research',
+        comments: 'Delete this current update.',
+      }
+      const successor: InboxEntry = {
+        id: 'inbox-delete-successor',
+        ts: current.ts - 1,
+        workspaceId: 'ws-1',
+        workspaceLabel: 'research',
+        comments: 'Select this successor.',
+      }
+      let serverEntries = [current, successor]
+      vi.spyOn(api.inbox, 'history').mockImplementation(async () => ({
+        entries: serverEntries,
+        hasMore: false,
+      }))
+      vi.spyOn(api.inbox, 'delete').mockImplementation(async () => {
+        serverEntries = [successor]
+        return true
+      })
+      const markRead = vi.spyOn(api.inbox, 'markRead').mockResolvedValue({
+        ok: true,
+        id: successor.id,
+        readAt: Date.now(),
+      })
+      if (activeTarget) {
+        rememberOfficeInboxDutyExcursion({
+          duty: officeInboxDuty(successor),
+          purpose: 'review',
+          phase: 'presented',
+        })
+      } else {
+        rememberOfficeInboxDutyExcursion({
+          duty: officeInboxDuty({ ...successor, id: 'different-entry' }),
+          purpose: 'review',
+          phase: 'presented',
+        })
+      }
+      useInboxSelection.getState().select(current.id)
+
+      render(<InboxPage visible />)
+      fireEvent.click(await screen.findByRole('button', { name: 'Delete this inbox entry' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+
+      await waitFor(() => {
+        expect(useInboxSelection.getState().selectedEntryId).toBe(successor.id)
+      })
+      await waitFor(() => expect(markRead).toHaveBeenCalledTimes(expectedReadCalls))
+      if (expectedReadCalls > 0) expect(markRead).toHaveBeenCalledWith(successor.id)
+    },
+  )
 })
 
 describe('InboxPage Office presentation handshake', () => {
@@ -209,6 +270,7 @@ describe('InboxPage Office presentation handshake', () => {
     vi.spyOn(api.inbox, 'history').mockResolvedValue({ entries: [entry], hasMore: false })
     rememberOfficeInboxDutyExcursion({
       duty: officeInboxDuty(entry),
+      purpose: 'review',
       phase: 'away',
     })
     useInboxSelection.getState().select(entry.id)
@@ -239,6 +301,7 @@ describe('InboxPage Office presentation handshake', () => {
         comments: 'Captured delivery A.',
         docs: [{ path: 'research/a.md' }],
       }),
+      purpose: 'review',
       phase: 'away',
     })
     useInboxSelection.getState().select(entry.id)
@@ -265,7 +328,11 @@ describe('InboxPage Office presentation handshake', () => {
       comments: 'A newer live-feed row.',
     }
     vi.spyOn(api.inbox, 'history').mockResolvedValue({ entries: [newest], hasMore: false })
-    rememberOfficeInboxDutyExcursion({ duty: officeInboxDuty(captured), phase: 'away' })
+    rememberOfficeInboxDutyExcursion({
+      duty: officeInboxDuty(captured),
+      purpose: 'review',
+      phase: 'away',
+    })
     useInboxSelection.getState().select(captured.id)
 
     render(<InboxPage visible />)

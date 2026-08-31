@@ -33,6 +33,7 @@ import { readWorkspaceFile, type ReadFileResult } from '../components/workspace/
 import { workspaceDisplayName, workspaceDisplayTitle } from '../components/workspace/display'
 import { presentInboxEntry } from '../lib/inbox-presentation'
 import {
+  isActiveOfficeInboxDutyReviewTarget,
   markOfficeInboxDutyPresented,
   readOfficeInboxDutyExcursion,
 } from '../office/inbox-duty-excursion'
@@ -55,8 +56,9 @@ interface InboxPageProps {
  * background or open the same Session interactively.
  *
  * Selection (an entryId) is owned by `useInboxSelection`; the sidebar
- * drives it and marks the entry read on select. Confirmed Delete (header
- * trash + page-level Delete/Backspace) advances selection to the next entry.
+ * drives it and ordinarily marks the entry read on select. An active Office
+ * review target remains unread for dossier disposition. Confirmed Delete
+ * (header trash + page-level Delete/Backspace) advances to the next entry.
  */
 export function InboxPage({ visible }: InboxPageProps) {
   const { t } = useTranslation()
@@ -93,7 +95,7 @@ export function InboxPage({ visible }: InboxPageProps) {
 
     // entries is newest-first; the "next" one is the next older entry.
     // Fall back to the previous (newer) if we deleted the tail.
-    const nextId = entries[idx + 1]?.id ?? entries[idx - 1]?.id ?? null
+    const nextEntry = entries[idx + 1] ?? entries[idx - 1] ?? null
 
     try {
       await api.inbox.delete(id)
@@ -104,9 +106,14 @@ export function InboxPage({ visible }: InboxPageProps) {
     }
 
     removeInboxAfterDelete(id)
-    if (nextId) {
-      select(nextId)
-      markRead(nextId)
+    if (nextEntry) {
+      select(nextEntry.id)
+      if (!isActiveOfficeInboxDutyReviewTarget({
+        workspaceId: nextEntry.workspaceId,
+        inboxEntryId: nextEntry.id,
+      })) {
+        markRead(nextEntry.id)
+      }
     } else {
       select(null)
     }

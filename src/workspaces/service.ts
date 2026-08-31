@@ -147,6 +147,7 @@ import {
 import { sessionSignature } from './session-signature.js';
 import { issueRunFailure } from './issues/run-failure.js';
 import type { IInboxStore } from '@/core/inbox-store.js';
+import { RoutineFollowUpStore } from '@/core/routine-follow-up-store.js';
 import { toSafeInboxOrigin } from '@/core/workspace-tool-center.js';
 import {
   AgentConversationLog,
@@ -619,6 +620,10 @@ export interface WorkspaceService {
   resumeRegistry: ResumeRegistry;
   /** Durable product Session -> business artifact attribution index. */
   provenanceStore: ArtifactProvenanceStore;
+  /** Global Inbox delivery source used to prove Office routine-report identity. */
+  inboxStore?: IInboxStore;
+  /** Durable human-carried queue for scheduled reports that need a decision. */
+  routineFollowUpStore: RoutineFollowUpStore;
   /** Append-only analysis/audit projection of cross-Agent messages. */
   agentConversationLog: AgentConversationLog;
   /** Standard append-only product activity journal. Never a dispatch authority. */
@@ -682,6 +687,12 @@ export function resumeFromRecord(
 export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions): Promise<WorkspaceService> {
   const config = loadConfig({ webPort: opts.webPort });
   const inboxStore = opts.inboxStore;
+  const routineFollowUpStore = await RoutineFollowUpStore.loadOrUnavailable();
+  if (!routineFollowUpStore.available) {
+    launcherLogger.error('routine_follow_up_store.load_failed', {
+      error: routineFollowUpStore.loadError,
+    });
+  }
   const registry = await WorkspaceRegistry.load(
     `${config.launcherRoot}/workspaces.json`,
     launcherLogger.child({ scope: 'registry' }),
@@ -3195,6 +3206,8 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     headlessTasks,
     resumeRegistry,
     provenanceStore,
+    inboxStore,
+    routineFollowUpStore,
     agentConversationLog,
     activityJournal: agentRuntimeLog,
     agentRuntimeLog,

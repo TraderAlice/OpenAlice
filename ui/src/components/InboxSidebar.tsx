@@ -9,6 +9,7 @@ import { useInboxSelection } from '../live/inbox-selection'
 import { useInboxViewMode } from '../live/inbox-view-mode'
 import { presentInboxEntry } from '../lib/inbox-presentation'
 import { groupThreads } from '../live/inbox-threads'
+import { isActiveOfficeInboxDutyReviewTarget } from '../office/inbox-duty-excursion'
 import { workspaceDisplayName } from './workspace/display'
 import { Skeleton } from './StateViews'
 import type { InboxEntry } from '../api/inbox'
@@ -23,8 +24,9 @@ import type { InboxEntry } from '../api/inbox'
  *
  * Selection + detail stay per-push in BOTH modes — a workspace's pushes
  * are usually unrelated topics (no Issue layer to make them one thread),
- * so clustering is a sidebar affordance, not a merge. Selecting a row
- * marks just that push read; j/k walks the currently-displayed order.
+ * so clustering is a sidebar affordance, not a merge. Ordinary selection
+ * marks just that push read; an active Office review target remains pending
+ * for its dossier disposition. j/k walks the currently-displayed order.
  */
 export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const { t } = useTranslation()
@@ -68,10 +70,17 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
     [mode, threads, filteredEntries],
   )
 
-  /** select + mark read in one. Used by every selection mutation site. */
+  /** Select one row and apply ordinary Inbox read semantics. Office review
+   *  targets stay unread until their dossier records a disposition. */
   const selectAndRead = (id: string) => {
     select(id)
-    markRead(id)
+    const entry = entries.find((candidate) => candidate.id === id)
+    if (!entry || !isActiveOfficeInboxDutyReviewTarget({
+      workspaceId: entry.workspaceId,
+      inboxEntryId: entry.id,
+    })) {
+      markRead(id)
+    }
     onNavigate?.()
   }
 

@@ -1,11 +1,21 @@
 import { http, HttpResponse } from 'msw'
 
+import type { OfficeRoutineFollowUp } from '../../api/office'
+import { demoInboxEntries } from '../fixtures/inbox'
+import { demoIssueDetail } from '../fixtures/issues'
+import { demoInboxReadAt } from './inbox'
 import {
   DEMO_AUTO_PREDICTION_WORKSPACE_ID,
   DEMO_AUTO_QUANT_WORKSPACE_ID,
   DEMO_CHAT_WORKSPACE_ID,
   demoChatWorkspace,
 } from '../fixtures/workspaces'
+
+const demoRoutineFollowUps = new Map<string, OfficeRoutineFollowUp>()
+
+function isExactIdentity(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && value.trim() === value
+}
 
 export const officeHandlers = [
   http.get('/api/office/floor', ({ request }) => {
@@ -67,5 +77,79 @@ export const officeHandlers = [
         },
       ],
     })
+  }),
+  http.get('/api/office/routine-follow-ups', () => HttpResponse.json({
+    followUps: [...demoRoutineFollowUps.values()].sort((left, right) =>
+      left.createdAt - right.createdAt
+      || left.inboxEntryId.localeCompare(right.inboxEntryId)),
+  })),
+  http.put('/api/office/routine-follow-ups/:inboxEntryId', ({ params }) => {
+    const inboxEntryId = String(params.inboxEntryId)
+    const report = demoInboxEntries.find((entry) => entry.id === inboxEntryId)
+    if (!report) {
+      return HttpResponse.json({
+        error: 'inbox_entry_not_found',
+        message: 'The Inbox report no longer exists.',
+      }, { status: 404 })
+    }
+    if (report.origin?.kind !== 'headless'
+      || !isExactIdentity(report.origin.issueWorkspaceId)
+      || !isExactIdentity(report.origin.issueId)
+      || !Number.isFinite(report.ts)
+      || !Number.isInteger(report.ts)
+      || report.ts < 0) {
+      return HttpResponse.json({
+        error: 'not_a_routine_report',
+        message: 'Only a server-attributed scheduled Issue report can be carried for follow-up.',
+      }, { status: 422 })
+    }
+
+    const existing = demoRoutineFollowUps.get(inboxEntryId)
+    if (existing) {
+      const sameAuthority = existing.reportTs === report.ts
+        && existing.issueWorkspaceId === report.origin.issueWorkspaceId
+        && existing.issueId === report.origin.issueId
+      return sameAuthority
+        ? HttpResponse.json({ followUp: existing, created: false })
+        : HttpResponse.json({
+            error: 'routine_follow_up_conflict',
+            message: `Routine follow-up authority changed for Inbox entry ${inboxEntryId}.`,
+          }, { status: 409 })
+    }
+
+    if (demoInboxReadAt(inboxEntryId) !== undefined) {
+      return HttpResponse.json({
+        error: 'routine_report_already_reviewed',
+        message: 'This Inbox report was already reviewed and cannot be carried again.',
+      }, { status: 409 })
+    }
+
+    const issue = demoIssueDetail(report.origin.issueWorkspaceId, report.origin.issueId)
+    if (!issue) {
+      return HttpResponse.json({
+        error: 'routine_issue_not_found',
+        message: 'The Issue that produced this report no longer exists.',
+      }, { status: 404 })
+    }
+    if (!issue.issue.when) {
+      return HttpResponse.json({
+        error: 'routine_issue_not_scheduled',
+        message: 'The Issue that produced this report is not scheduled.',
+      }, { status: 422 })
+    }
+
+    const followUp: OfficeRoutineFollowUp = {
+      inboxEntryId,
+      reportTs: report.ts,
+      issueWorkspaceId: report.origin.issueWorkspaceId,
+      issueId: report.origin.issueId,
+      createdAt: Date.now(),
+    }
+    demoRoutineFollowUps.set(inboxEntryId, followUp)
+    return HttpResponse.json({ followUp, created: true })
+  }),
+  http.delete('/api/office/routine-follow-ups/:inboxEntryId', ({ params }) => {
+    const removed = demoRoutineFollowUps.delete(String(params.inboxEntryId))
+    return HttpResponse.json({ ok: true, removed })
   }),
 ]

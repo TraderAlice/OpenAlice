@@ -28,6 +28,9 @@ const {
   openOrFocusMock,
   productActivityMock,
   refreshMock,
+  routineCarryMock,
+  routineFollowUpsMock,
+  routineResolveMock,
 } = vi.hoisted(() => ({
   acknowledgeMock: vi.fn(),
   navigateMock: vi.fn(),
@@ -39,6 +42,9 @@ const {
   openOrFocusMock: vi.fn(),
   productActivityMock: vi.fn(),
   refreshMock: vi.fn(async () => undefined),
+  routineCarryMock: vi.fn(async () => undefined),
+  routineFollowUpsMock: vi.fn(),
+  routineResolveMock: vi.fn(async () => undefined),
 }))
 
 vi.mock('react-router-dom', async (importOriginal) => ({
@@ -139,6 +145,10 @@ vi.mock('../office/useOfficeInboxDuties', () => ({
   useOfficeInboxDuties: inboxDutiesMock,
 }))
 
+vi.mock('../office/useOfficeRoutineFollowUps', () => ({
+  useOfficeRoutineFollowUps: routineFollowUpsMock,
+}))
+
 const defaultOfficeFloor = () => ({
   building: {
     config: {
@@ -237,17 +247,20 @@ function routineInboxEvidence(input: {
   title: string
   issueId: string
   ts: number
+  issueWorkspaceId?: string
+  deliveryWorkspaceId?: string
 }): OfficeInboxDutyEvidence {
   const evidence = inboxEvidence(input.id, input.title, input.ts)
   return {
     ...evidence,
     entry: {
       ...evidence.entry,
+      workspaceId: input.deliveryWorkspaceId ?? evidence.entry.workspaceId,
       origin: {
         kind: 'headless',
         runId: `run-${input.id}`,
         issueId: input.issueId,
-        issueWorkspaceId: 'chat-1',
+        issueWorkspaceId: input.issueWorkspaceId ?? 'chat-1',
       },
     },
   }
@@ -295,12 +308,25 @@ beforeEach(async () => {
   acknowledgeMock.mockClear()
   markInboxReadMock.mockReset()
   markInboxReadMock.mockResolvedValue('acknowledged')
+  routineCarryMock.mockReset()
+  routineCarryMock.mockResolvedValue(undefined)
+  routineResolveMock.mockReset()
+  routineResolveMock.mockResolvedValue(undefined)
+  routineFollowUpsMock.mockReset()
+  routineFollowUpsMock.mockReturnValue({
+    status: 'ready',
+    followUps: [],
+    carry: routineCarryMock,
+    resolve: routineResolveMock,
+    refresh: vi.fn(async () => undefined),
+  })
   refreshMock.mockClear()
   useInboxSelection.getState().select(null)
   issuesMock.mockReturnValue({ data: { workspaces: [] }, error: null, loading: false })
   inboxDutiesMock.mockReturnValue({
     status: 'ready',
     deliveries: [],
+    evidenceByEntryId: new Map(),
     markReadConfirmed: markInboxReadMock,
   })
   issueDetailMock.mockReturnValue({
@@ -714,6 +740,7 @@ describe('OfficePage localization', () => {
     })
     expect(readOfficeInboxDutyExcursion()).toMatchObject({
       duty: { id: 'inbox-unread:inbox-a' },
+      purpose: 'review',
       phase: 'away',
     })
     expect(useInboxSelection.getState().selectedEntryId).toBe('inbox-a')
@@ -733,6 +760,7 @@ describe('OfficePage localization', () => {
       deliveries: [deliveryA, deliveryB],
       markReadConfirmed: markInboxReadMock,
     })
+    issuesMock.mockReturnValue({ data: null, error: null, loading: true })
     const returning = render(<OfficePage />)
     expect(await screen.findByRole('dialog', { name: 'NVDA weekly evidence brief' })).toBeTruthy()
     expect(screen.getByText('Inbox 共有 2 条待阅')).toBeTruthy()
@@ -751,6 +779,8 @@ describe('OfficePage localization', () => {
     await waitFor(() => expect(markInboxReadMock).toHaveBeenCalledWith('inbox-a'))
     expect(acknowledgeMock).not.toHaveBeenCalledWith('inbox', expect.anything())
     expect(readOfficeInboxDutyExcursion()).toBeNull()
+    issuesMock.mockReturnValue({ data: { workspaces: [] }, error: null, loading: false })
+    returning.rerender(<OfficePage />)
     expect(await screen.findByRole('button', {
       name: /本班第 2\/2 项：.*Risk desk follow-up/,
     })).toBeTruthy()
@@ -790,7 +820,7 @@ describe('OfficePage localization', () => {
         ts: 5_500,
       }),
     ]
-    issuesMock.mockReturnValue({
+    const routineIssues = {
       data: {
         workspaces: [{
           wsId: 'chat-1',
@@ -806,7 +836,8 @@ describe('OfficePage localization', () => {
       },
       error: null,
       loading: false,
-    })
+    }
+    issuesMock.mockReturnValue(routineIssues)
     inboxDutiesMock.mockReturnValue({
       status: 'ready',
       deliveries,
@@ -837,14 +868,260 @@ describe('OfficePage localization', () => {
           },
         },
       },
+      purpose: 'review',
       phase: 'away',
     })
     expect(markInboxReadMock).not.toHaveBeenCalled()
   })
 
+  it('persists an exact cross-Workspace decision carry before filing the report receipt', async () => {
+    const delivery = routineInboxEvidence({
+      id: 'cross-workspace-report',
+      title: '跨台例行报告',
+      issueId: 'weekly-cross-asset',
+      issueWorkspaceId: 'issue-home',
+      deliveryWorkspaceId: 'execution-desk',
+      ts: 5_600,
+    })
+    const crossWorkspaceIssues = {
+      data: {
+        workspaces: [{
+          wsId: 'issue-home',
+          tag: 'macro',
+          status: 'ok',
+          issues: [healthyRoutineIssue('weekly-cross-asset', '每周跨资产复核')],
+        }],
+      },
+      error: null,
+      loading: false,
+    }
+    issuesMock.mockReturnValue(crossWorkspaceIssues)
+    let carried = false
+    routineFollowUpsMock.mockImplementation(() => ({
+      status: 'ready',
+      followUps: carried ? [{
+        inboxEntryId: 'cross-workspace-report',
+        reportTs: 5_600,
+        issueWorkspaceId: 'issue-home',
+        issueId: 'weekly-cross-asset',
+        createdAt: 5_700,
+      }] : [],
+      carry: routineCarryMock,
+      resolve: routineResolveMock,
+      refresh: vi.fn(async () => undefined),
+    }))
+    routineCarryMock.mockImplementationOnce(async () => {
+      carried = true
+    })
+    inboxDutiesMock.mockReturnValue({
+      status: 'ready',
+      deliveries: [delivery],
+      evidenceByEntryId: new Map([['cross-workspace-report', delivery]]),
+      markReadConfirmed: markInboxReadMock,
+    })
+    markInboxReadMock.mockImplementationOnce(async () => {
+      inboxDutiesMock.mockReturnValue({
+        status: 'ready',
+        deliveries: [],
+        evidenceByEntryId: new Map([['cross-workspace-report', {
+          ...delivery,
+          entry: { ...delivery.entry, readAt: 5_800 },
+        }]]),
+        markReadConfirmed: markInboxReadMock,
+      })
+      return 'acknowledged'
+    })
+
+    const first = render(<OfficePage />)
+    await userEvent.click(screen.getByRole('button', {
+      name: /本班第 1\/1 项：.*每周跨资产复核/,
+    }))
+    await waitFor(() => expect(openOrFocusMock).toHaveBeenLastCalledWith({
+      kind: 'inbox',
+      params: {},
+    }), { timeout: 10_000 })
+    expect(readOfficeInboxDutyExcursion()).toMatchObject({
+      purpose: 'review',
+      phase: 'away',
+      duty: { id: 'inbox-unread:cross-workspace-report' },
+    })
+    first.unmount()
+
+    expect(markOfficeInboxDutyPresented({
+      workspaceId: 'execution-desk',
+      inboxEntryId: 'cross-workspace-report',
+    })).toBe(true)
+    issuesMock.mockReturnValue({ data: null, error: null, loading: true })
+    const returnedFromReport = render(<OfficePage />)
+    expect(await screen.findByRole('dialog', { name: '跨台例行报告' })).toBeTruthy()
+    expect(screen.getByText(
+      '正在核对定时任务。带入决策台需要等待；“没有变化”仍可确认。',
+    )).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: '决定下一步' }))
+    expect(screen.getByRole('button', { name: '带到决策台' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: '没有变化 · 标记已复核' }).hasAttribute('disabled')).toBe(false)
+    await userEvent.click(screen.getByRole('button', { name: '返回' }))
+
+    issuesMock.mockReturnValue(crossWorkspaceIssues)
+    returnedFromReport.rerender(<OfficePage />)
+    expect(await screen.findByRole('dialog', { name: '跨台例行报告' })).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: '决定下一步' }))
+    await userEvent.click(screen.getByRole('button', { name: '带到决策台' }))
+
+    await waitFor(() => expect(routineCarryMock).toHaveBeenCalledWith('cross-workspace-report'))
+    await waitFor(() => expect(markInboxReadMock).toHaveBeenCalledWith('cross-workspace-report'))
+    expect(routineCarryMock.mock.invocationCallOrder[0])
+      .toBeLessThan(markInboxReadMock.mock.invocationCallOrder[0]!)
+    expect(openOrFocusMock).not.toHaveBeenCalledWith(expect.objectContaining({
+      kind: 'issue-detail',
+    }))
+    expect(readOfficeInboxDutyExcursion()).toBeNull()
+    expect(screen.queryByRole('dialog', { name: '跨台例行报告' })).toBeNull()
+    expect(routineResolveMock).not.toHaveBeenCalled()
+
+    const decisionDuty = await screen.findByRole('button', {
+      name: '决策台 · 1 项待处理',
+    })
+    await userEvent.click(decisionDuty)
+    expect(await screen.findByRole('dialog', {}, { timeout: 10_000 })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '处理已带入的跟进' })).toBeTruthy()
+    expect(screen.getByText('跨台例行报告')).toBeTruthy()
+    expect(screen.getByText('研究台')).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: '打开准确报告' }))
+    expect(useInboxSelection.getState().selectedEntryId).toBe('cross-workspace-report')
+    expect(openOrFocusMock).toHaveBeenLastCalledWith({ kind: 'inbox', params: {} })
+    expect(routineResolveMock).not.toHaveBeenCalled()
+
+    await userEvent.click(screen.getByRole('button', {
+      name: '决策台 · 1 项待处理',
+    }))
+    expect(await screen.findByRole('dialog', {}, { timeout: 10_000 })).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: '打开准确 Issue' }))
+    expect(openOrFocusMock).toHaveBeenLastCalledWith({
+      kind: 'issue-detail',
+      params: { wsId: 'issue-home', id: 'weekly-cross-asset' },
+    })
+    expect(routineResolveMock).not.toHaveBeenCalled()
+
+    await userEvent.click(screen.getByRole('button', {
+      name: '决策台 · 1 项待处理',
+    }))
+    expect(await screen.findByRole('dialog', {}, { timeout: 10_000 })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '处理已带入的跟进' })).toBeTruthy()
+    routineResolveMock.mockImplementationOnce(async () => {
+      carried = false
+    })
+    await userEvent.click(screen.getByRole('button', { name: '判断已完成 · 移出决策台' }))
+    await waitFor(() => expect(routineResolveMock).toHaveBeenCalledWith('cross-workspace-report'))
+    returnedFromReport.rerender(<OfficePage />)
+    expect(await screen.findByText('决策台已清空')).toBeTruthy()
+    returnedFromReport.unmount()
+  }, 15_000)
+
+  it('recovers a saved carry without allowing a contradictory no-change receipt', async () => {
+    const delivery = routineInboxEvidence({
+      id: 'recover-carry-report',
+      title: '需要恢复交接的报告',
+      issueId: 'recover-carry-issue',
+      ts: 6_000,
+    })
+    const captured = inboxCandidate(delivery)
+    const dutyWithRoutine: OfficeInboxDutyCandidate = {
+      ...captured,
+      delivery: {
+        ...captured.delivery,
+        declaredIssue: {
+          workspaceId: 'chat-1',
+          issueId: 'recover-carry-issue',
+          title: '恢复交接例行任务',
+          priority: 'high',
+          nextDueAtMs: 7_000,
+          unreadSiblingCount: 0,
+          olderUnreadCount: 0,
+        },
+      },
+    }
+    rememberOfficeInboxDutyExcursion({
+      duty: dutyWithRoutine,
+      purpose: 'review',
+      phase: 'presented',
+    })
+    issuesMock.mockReturnValue({
+      data: {
+        workspaces: [{
+          wsId: 'chat-1',
+          tag: 'chat',
+          status: 'ok',
+          issues: [healthyRoutineIssue('recover-carry-issue', '恢复交接例行任务')],
+        }],
+      },
+      error: null,
+      loading: false,
+    })
+    inboxDutiesMock.mockReturnValue({
+      status: 'ready',
+      deliveries: [delivery],
+      markReadConfirmed: markInboxReadMock,
+    })
+
+    let carried = false
+    routineFollowUpsMock.mockImplementation(() => ({
+      status: 'ready',
+      followUps: carried ? [{
+        inboxEntryId: 'recover-carry-report',
+        reportTs: 6_000,
+        issueWorkspaceId: 'chat-1',
+        issueId: 'recover-carry-issue',
+        createdAt: 6_100,
+      }] : [],
+      carry: routineCarryMock,
+      resolve: routineResolveMock,
+      refresh: vi.fn(async () => undefined),
+    }))
+    routineCarryMock.mockImplementation(async () => {
+      carried = true
+    })
+    markInboxReadMock
+      .mockRejectedValueOnce(new Error('receipt temporarily unavailable'))
+      .mockImplementationOnce(async () => {
+        inboxDutiesMock.mockReturnValue({
+          status: 'ready',
+          deliveries: [],
+          markReadConfirmed: markInboxReadMock,
+        })
+        return 'acknowledged'
+      })
+
+    const view = render(<OfficePage />)
+    expect(await screen.findByRole('dialog', { name: '需要恢复交接的报告' })).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: '决定下一步' }))
+    await userEvent.click(screen.getByRole('button', { name: '带到决策台' }))
+    expect((await screen.findByRole('alert')).textContent).toContain('尚未完成')
+
+    view.unmount()
+    issuesMock.mockReturnValue({ data: null, error: null, loading: true })
+    render(<OfficePage />)
+    expect(await screen.findByRole('dialog', { name: '需要恢复交接的报告' })).toBeTruthy()
+    expect(screen.getByRole('status').textContent).toContain('决策台已保留这份报告')
+    expect(screen.queryByRole('button', { name: '没有变化 · 标记已复核' })).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: '完成交接 · 标记已复核' }))
+    const finishRecovery = screen.getByRole('button', { name: '完成交接 · 标记已复核' })
+    expect(finishRecovery.hasAttribute('disabled')).toBe(false)
+    await userEvent.click(finishRecovery)
+
+    await waitFor(() => expect(routineCarryMock).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(markInboxReadMock).toHaveBeenCalledTimes(2))
+    expect(screen.queryByRole('dialog', { name: '需要恢复交接的报告' })).toBeNull()
+    expect(readOfficeInboxDutyExcursion()).toBeNull()
+  })
+
   it('advances an externally resolved Inbox duty without forging a reviewed receipt', async () => {
     const delivery = inboxEvidence('inbox-a', 'NVDA weekly evidence brief', 5_100)
-    rememberOfficeInboxDutyExcursion({ duty: inboxCandidate(delivery), phase: 'presented' })
+    rememberOfficeInboxDutyExcursion({
+      duty: inboxCandidate(delivery),
+      purpose: 'review',
+      phase: 'presented',
+    })
     inboxDutiesMock.mockReturnValue({
       status: 'ready',
       deliveries: [delivery],
@@ -875,7 +1152,11 @@ describe('OfficePage localization', () => {
 
   it('dismisses a returned durable Inbox duty on Escape without changing its order or read state', async () => {
     const delivery = inboxEvidence('inbox-a', 'NVDA weekly evidence brief', 5_100)
-    rememberOfficeInboxDutyExcursion({ duty: inboxCandidate(delivery), phase: 'presented' })
+    rememberOfficeInboxDutyExcursion({
+      duty: inboxCandidate(delivery),
+      purpose: 'review',
+      phase: 'presented',
+    })
     inboxDutiesMock.mockReturnValue({
       status: 'ready',
       deliveries: [delivery],
@@ -902,7 +1183,11 @@ describe('OfficePage localization', () => {
   it('rotates a returned Inbox duty to the end on Later without marking it read', async () => {
     const deliveryA = inboxEvidence('inbox-a', 'NVDA weekly evidence brief', 5_100)
     const deliveryB = inboxEvidence('inbox-b', 'Risk desk follow-up', 5_200)
-    rememberOfficeInboxDutyExcursion({ duty: inboxCandidate(deliveryA), phase: 'presented' })
+    rememberOfficeInboxDutyExcursion({
+      duty: inboxCandidate(deliveryA),
+      purpose: 'review',
+      phase: 'presented',
+    })
     inboxDutiesMock.mockReturnValue({
       status: 'ready',
       deliveries: [deliveryA, deliveryB],

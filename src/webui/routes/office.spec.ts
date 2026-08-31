@@ -1,7 +1,26 @@
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
 import { Hono } from 'hono'
 import { describe, expect, it, vi } from 'vitest'
 
+import {
+  RoutineFollowUpConflictError,
+  RoutineFollowUpCreateDisallowedError,
+  RoutineFollowUpStore,
+} from '../../core/routine-follow-up-store.js'
 import { createOfficeRoutes } from './office.js'
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
+}
 
 function directory(
   id: string,
@@ -231,5 +250,490 @@ describe('GET /api/office/floor', () => {
     })
     expect(replay.offices[0]?.employees[0]?.latestResult).toBeUndefined()
     expect(read).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('Office routine follow-ups', () => {
+  const record = {
+    inboxEntryId: 'report-1',
+    reportTs: 1_700_000_000_000,
+    issueWorkspaceId: 'issue-home',
+    issueId: 'weekly-review',
+    createdAt: 1_700_000_001_000,
+  }
+
+  function build(overrides: Record<string, unknown> = {}) {
+    const get = vi.fn(async () => ({
+      id: record.inboxEntryId,
+      ts: record.reportTs,
+      workspaceId: 'execution-desk',
+      comments: 'Weekly evidence is ready.',
+      origin: {
+        kind: 'headless' as const,
+        runId: 'run-1',
+        issueWorkspaceId: record.issueWorkspaceId,
+        issueId: record.issueId,
+      },
+    }))
+    const issueDetail = vi.fn(async () => ({
+      issue: {
+        id: record.issueId,
+        when: { kind: 'every' as const, every: '1w' },
+      },
+    }))
+    const list = vi.fn(() => [record])
+    const observeFollowUp = vi.fn(() => ({ followUp: null, revision: 0 }))
+    const put = vi.fn(async () => ({ followUp: record, created: true }))
+    const remove = vi.fn(async () => true)
+    const svc = {
+      inboxStore: { get },
+      issueDetail,
+      routineFollowUpStore: { list, observe: observeFollowUp, put, remove },
+      ...overrides,
+    }
+    return {
+      app: new Hono().route('/', createOfficeRoutes(svc as never)),
+      get,
+      issueDetail,
+      list,
+      observeFollowUp,
+      put,
+      remove,
+    }
+  }
+
+  it('lists the durable queue in one stable envelope', async () => {
+    const { app, list } = build()
+
+    const response = await app.request('/routine-follow-ups')
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ followUps: [record] })
+    expect(list).toHaveBeenCalledOnce()
+  })
+
+  it('derives the exact scheduled Issue authority from Inbox and ignores spoofed request data', async () => {
+    const { app, get, issueDetail, put } = build()
+
+    const response = await app.request('/routine-follow-ups/report-1', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        reportTs: 1,
+        issueWorkspaceId: 'spoofed-workspace',
+        issueId: 'spoofed-issue',
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ followUp: record, created: true })
+    expect(get).toHaveBeenCalledWith('report-1')
+    expect(issueDetail).toHaveBeenCalledWith('issue-home', 'weekly-review')
+    expect(put).toHaveBeenCalledWith(
+      {
+        inboxEntryId: 'report-1',
+        reportTs: record.reportTs,
+        issueWorkspaceId: 'issue-home',
+        issueId: 'weekly-review',
+      },
+      { allowCreate: true, observedRevision: 0 },
+    )
+  })
+
+  it('preserves the idempotent put result', async () => {
+    const put = vi.fn(async () => ({ followUp: record, created: false }))
+    const issueDetail = vi.fn(async () => null)
+    const { app } = build({
+      inboxStore: {
+        get: vi.fn(async () => ({
+          id: record.inboxEntryId,
+          ts: record.reportTs,
+          workspaceId: 'execution-desk',
+          comments: 'Weekly evidence is ready.',
+          readAt: record.reportTs + 1,
+          origin: {
+            kind: 'headless' as const,
+            runId: 'run-1',
+            issueWorkspaceId: record.issueWorkspaceId,
+            issueId: record.issueId,
+          },
+        })),
+      },
+      issueDetail,
+      routineFollowUpStore: {
+        list: vi.fn(() => [record]),
+        observe: vi.fn(() => ({ followUp: record, revision: 7 })),
+        put,
+        remove: vi.fn(),
+      },
+    })
+
+    const response = await app.request('/routine-follow-ups/report-1', { method: 'PUT' })
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ followUp: record, created: false })
+    expect(issueDetail).not.toHaveBeenCalled()
+    expect(put).toHaveBeenCalledWith(
+      {
+        inboxEntryId: record.inboxEntryId,
+        reportTs: record.reportTs,
+        issueWorkspaceId: record.issueWorkspaceId,
+        issueId: record.issueId,
+      },
+      { allowCreate: false, observedRevision: 7 },
+    )
+  })
+
+  it('rejects a fresh carry after the exact Inbox report was already reviewed', async () => {
+    const issueDetail = vi.fn()
+    const put = vi.fn(async () => {
+      throw new RoutineFollowUpCreateDisallowedError(record.inboxEntryId)
+    })
+    const { app } = build({
+      inboxStore: {
+        get: vi.fn(async () => ({
+          id: record.inboxEntryId,
+          ts: record.reportTs,
+          workspaceId: 'execution-desk',
+          comments: 'Weekly evidence is ready.',
+          readAt: record.reportTs + 1,
+          origin: {
+            kind: 'headless' as const,
+            runId: 'run-1',
+            issueWorkspaceId: record.issueWorkspaceId,
+            issueId: record.issueId,
+          },
+        })),
+      },
+      issueDetail,
+      routineFollowUpStore: {
+        list: vi.fn(() => []),
+        observe: vi.fn(() => ({ followUp: null, revision: 0 })),
+        put,
+        remove: vi.fn(),
+      },
+    })
+
+    const response = await app.request('/routine-follow-ups/report-1', { method: 'PUT' })
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({ error: 'routine_report_already_reviewed' })
+    expect(issueDetail).not.toHaveBeenCalled()
+    expect(put).toHaveBeenCalledWith(
+      {
+        inboxEntryId: record.inboxEntryId,
+        reportTs: record.reportTs,
+        issueWorkspaceId: record.issueWorkspaceId,
+        issueId: record.issueId,
+      },
+      { allowCreate: false, observedRevision: 0 },
+    )
+  })
+
+  it('replays an existing carry even after its Issue disappears or stops scheduling', async () => {
+    const issueDetail = vi.fn(async () => ({ issue: { id: record.issueId } }))
+    const put = vi.fn(async () => ({ followUp: record, created: false }))
+    const { app } = build({
+      issueDetail,
+      routineFollowUpStore: {
+        list: vi.fn(() => [record]),
+        observe: vi.fn(() => ({ followUp: record, revision: 7 })),
+        put,
+        remove: vi.fn(),
+      },
+    })
+
+    const response = await app.request('/routine-follow-ups/report-1', { method: 'PUT' })
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ followUp: record, created: false })
+    expect(issueDetail).not.toHaveBeenCalled()
+    expect(put).toHaveBeenCalledWith(
+      {
+        inboxEntryId: record.inboxEntryId,
+        reportTs: record.reportTs,
+        issueWorkspaceId: record.issueWorkspaceId,
+        issueId: record.issueId,
+      },
+      { allowCreate: false, observedRevision: 7 },
+    )
+  })
+
+  it.each([
+    ['reviewed', record.reportTs + 1, 'routine_follow_up_no_longer_active'],
+    ['still-unread', undefined, 'routine_follow_up_no_longer_active'],
+  ] as const)(
+    'does not let a stale existing snapshot recreate a %s follow-up after concurrent resolve',
+    async (_receiptState, readAt, expectedError) => {
+      const dir = await mkdtemp(join(tmpdir(), 'openalice-office-follow-up-aba-'))
+      const store = await RoutineFollowUpStore.load(join(dir, 'routine-follow-ups.json'))
+      await store.put({
+        inboxEntryId: record.inboxEntryId,
+        reportTs: record.reportTs,
+        issueWorkspaceId: record.issueWorkspaceId,
+        issueId: record.issueId,
+      }, {
+        allowCreate: true,
+        observedRevision: 0,
+        createdAt: record.createdAt,
+      })
+      const inboxLookup = deferred<{
+        id: string
+        ts: number
+        workspaceId: string
+        comments: string
+        readAt?: number
+        origin: {
+          kind: 'headless'
+          runId: string
+          issueWorkspaceId: string
+          issueId: string
+        }
+      }>()
+      const observeFollowUp = vi.spyOn(store, 'observe')
+      const issueDetail = vi.fn()
+      const app = new Hono().route('/', createOfficeRoutes({
+        inboxStore: { get: vi.fn(() => inboxLookup.promise) },
+        issueDetail,
+        routineFollowUpStore: store,
+      } as never))
+
+      const stalePut = app.request('/routine-follow-ups/report-1', { method: 'PUT' })
+      await vi.waitFor(() => expect(observeFollowUp).toHaveBeenCalledWith(record.inboxEntryId))
+      await expect(store.remove(record.inboxEntryId)).resolves.toBe(true)
+      inboxLookup.resolve({
+        id: record.inboxEntryId,
+        ts: record.reportTs,
+        workspaceId: 'execution-desk',
+        comments: 'Weekly evidence is ready.',
+        ...(readAt === undefined ? {} : { readAt }),
+        origin: {
+          kind: 'headless',
+          runId: 'run-1',
+          issueWorkspaceId: record.issueWorkspaceId,
+          issueId: record.issueId,
+        },
+      })
+
+      const response = await stalePut
+      expect(response.status).toBe(409)
+      expect(await response.json()).toMatchObject({ error: expectedError })
+      expect(issueDetail).not.toHaveBeenCalled()
+      expect(store.list()).toEqual([])
+      expect((await RoutineFollowUpStore.load(join(dir, 'routine-follow-ups.json'))).list())
+        .toEqual([])
+
+      observeFollowUp.mockRestore()
+      await rm(dir, { recursive: true, force: true })
+    },
+  )
+
+  it('does not let a stale absent snapshot recreate after a concurrent carry and resolve', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'openalice-office-follow-up-fresh-aba-'))
+    const store = await RoutineFollowUpStore.load(join(dir, 'routine-follow-ups.json'))
+    const issueLookup = deferred<{
+      issue: {
+        id: string
+        when: { kind: 'every'; every: string }
+      }
+    }>()
+    let authoritativeReadAt: number | undefined
+    const inboxStore = {
+      get: vi.fn(async () => ({
+        id: record.inboxEntryId,
+        ts: record.reportTs,
+        workspaceId: 'execution-desk',
+        comments: 'Weekly evidence is ready.',
+        ...(authoritativeReadAt === undefined ? {} : { readAt: authoritativeReadAt }),
+        origin: {
+          kind: 'headless' as const,
+          runId: 'run-1',
+          issueWorkspaceId: record.issueWorkspaceId,
+          issueId: record.issueId,
+        },
+      })),
+    }
+    const issueDetail = vi.fn(() => issueLookup.promise)
+    const app = new Hono().route('/', createOfficeRoutes({
+      inboxStore,
+      issueDetail,
+      routineFollowUpStore: store,
+    } as never))
+
+    try {
+      const stalePut = app.request('/routine-follow-ups/report-1', { method: 'PUT' })
+      await vi.waitFor(() => expect(issueDetail).toHaveBeenCalledWith(
+        record.issueWorkspaceId,
+        record.issueId,
+      ))
+
+      const concurrentObservation = store.observe(record.inboxEntryId)
+      expect(concurrentObservation).toEqual({ followUp: null, revision: 0 })
+      await store.put({
+        inboxEntryId: record.inboxEntryId,
+        reportTs: record.reportTs,
+        issueWorkspaceId: record.issueWorkspaceId,
+        issueId: record.issueId,
+      }, {
+        allowCreate: true,
+        observedRevision: concurrentObservation.revision,
+        createdAt: record.createdAt,
+      })
+      authoritativeReadAt = record.reportTs + 1
+      await expect(store.remove(record.inboxEntryId)).resolves.toBe(true)
+
+      issueLookup.resolve({
+        issue: {
+          id: record.issueId,
+          when: { kind: 'every', every: '1w' },
+        },
+      })
+      const response = await stalePut
+
+      expect(response.status).toBe(409)
+      expect(await response.json()).toMatchObject({
+        error: 'routine_follow_up_no_longer_active',
+      })
+      expect(store.list()).toEqual([])
+      expect((await RoutineFollowUpStore.load(join(dir, 'routine-follow-ups.json'))).list())
+        .toEqual([])
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('returns a clear error when Inbox authority is unavailable', async () => {
+    const { app } = build({ inboxStore: undefined })
+
+    const response = await app.request('/routine-follow-ups/report-1', { method: 'PUT' })
+
+    expect(response.status).toBe(503)
+    expect(await response.json()).toMatchObject({ error: 'inbox_unavailable' })
+  })
+
+  it('rejects a missing Inbox report before consulting Issues', async () => {
+    const issueDetail = vi.fn()
+    const { app } = build({
+      inboxStore: { get: vi.fn(async () => null) },
+      issueDetail,
+    })
+
+    const response = await app.request('/routine-follow-ups/missing', { method: 'PUT' })
+
+    expect(response.status).toBe(404)
+    expect(await response.json()).toMatchObject({ error: 'inbox_entry_not_found' })
+    expect(issueDetail).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['missing provenance', {
+      id: 'report-1',
+      ts: record.reportTs,
+      workspaceId: 'execution-desk',
+      comments: 'Manual note.',
+    }],
+    ['interactive provenance', {
+      id: 'report-1',
+      ts: record.reportTs,
+      workspaceId: 'execution-desk',
+      comments: 'Interactive note.',
+      origin: {
+        kind: 'interactive',
+        issueWorkspaceId: record.issueWorkspaceId,
+        issueId: record.issueId,
+      },
+    }],
+    ['invalid timestamp', {
+      id: 'report-1',
+      ts: Number.NaN,
+      workspaceId: 'execution-desk',
+      comments: 'Broken report.',
+      origin: {
+        kind: 'headless',
+        issueWorkspaceId: record.issueWorkspaceId,
+        issueId: record.issueId,
+      },
+    }],
+  ])('rejects %s as a routine report', async (_label, entry) => {
+    const issueDetail = vi.fn()
+    const { app } = build({ inboxStore: { get: vi.fn(async () => entry) }, issueDetail })
+
+    const response = await app.request('/routine-follow-ups/report-1', { method: 'PUT' })
+
+    expect(response.status).toBe(422)
+    expect(await response.json()).toMatchObject({ error: 'not_a_routine_report' })
+    expect(issueDetail).not.toHaveBeenCalled()
+  })
+
+  it('rejects a report whose exact Issue disappeared', async () => {
+    const { app } = build({ issueDetail: vi.fn(async () => null) })
+
+    const response = await app.request('/routine-follow-ups/report-1', { method: 'PUT' })
+
+    expect(response.status).toBe(404)
+    expect(await response.json()).toMatchObject({ error: 'routine_issue_not_found' })
+  })
+
+  it('rejects a report whose Issue is not scheduled', async () => {
+    const { app } = build({ issueDetail: vi.fn(async () => ({ issue: { id: 'weekly-review' } })) })
+
+    const response = await app.request('/routine-follow-ups/report-1', { method: 'PUT' })
+
+    expect(response.status).toBe(422)
+    expect(await response.json()).toMatchObject({ error: 'routine_issue_not_scheduled' })
+  })
+
+  it('surfaces a durable identity conflict as 409', async () => {
+    const put = vi.fn(async () => {
+      throw new RoutineFollowUpConflictError('report-1')
+    })
+    const issueDetail = vi.fn()
+    const { app } = build({
+      issueDetail,
+      routineFollowUpStore: {
+        list: vi.fn(),
+        observe: vi.fn(() => ({ followUp: record, revision: 7 })),
+        put,
+        remove: vi.fn(),
+      },
+    })
+
+    const response = await app.request('/routine-follow-ups/report-1', { method: 'PUT' })
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({ error: 'routine_follow_up_conflict' })
+    expect(issueDetail).not.toHaveBeenCalled()
+  })
+
+  it('fails every decision-queue API closed when the durable sidecar is malformed', async () => {
+    const unavailable = RoutineFollowUpStore.unavailable(new Error('malformed sidecar'))
+    const { app, get } = build({ routineFollowUpStore: unavailable })
+
+    const listed = await app.request('/routine-follow-ups')
+    expect(listed.status).toBe(503)
+    expect(await listed.json()).toMatchObject({ error: 'routine_follow_up_unavailable' })
+
+    const carried = await app.request('/routine-follow-ups/report-1', { method: 'PUT' })
+    expect(carried.status).toBe(503)
+    expect(await carried.json()).toMatchObject({ error: 'routine_follow_up_unavailable' })
+    expect(get).not.toHaveBeenCalled()
+
+    const resolved = await app.request('/routine-follow-ups/report-1', { method: 'DELETE' })
+    expect(resolved.status).toBe(503)
+    expect(await resolved.json()).toMatchObject({ error: 'routine_follow_up_unavailable' })
+  })
+
+  it('resolves a follow-up idempotently and reports whether anything changed', async () => {
+    const { app, remove } = build()
+
+    const removed = await app.request('/routine-follow-ups/report-1', { method: 'DELETE' })
+    expect(removed.status).toBe(200)
+    expect(await removed.json()).toEqual({ ok: true, removed: true })
+    expect(remove).toHaveBeenCalledWith('report-1')
+
+    remove.mockResolvedValueOnce(false)
+    const repeated = await app.request('/routine-follow-ups/report-1', { method: 'DELETE' })
+    expect(repeated.status).toBe(200)
+    expect(await repeated.json()).toEqual({ ok: true, removed: false })
   })
 })

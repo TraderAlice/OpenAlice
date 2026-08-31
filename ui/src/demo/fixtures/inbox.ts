@@ -55,8 +55,13 @@ export const demoHeadlessSessionReport: InboxEntry = {
 /** Build the headless InboxOrigin the server would stamp for a scheduled-issue
  *  run. Agent-invisible: the agent never supplies any of this (it's injected at
  *  spawn, carried out-of-band, resolved server-side). */
-function headlessOrigin(runId: string, issueId: string, agent: string): InboxOrigin {
-  return { kind: 'headless', runId, issueId, agent }
+function headlessOrigin(
+  runId: string,
+  issueWorkspaceId: string,
+  issueId: string,
+  agent: string,
+): InboxOrigin {
+  return { kind: 'headless', runId, issueWorkspaceId, issueId, agent }
 }
 
 // auto-quant › morning-scan, latest run (demo-run-morning-1, codex). Has a doc.
@@ -71,7 +76,7 @@ export const demoMoversReport: InboxEntry = {
     '',
     'Top of the list is **VST** (+7.4%, 3.1x RVOL) on the datacenter-power read; it touches the book. Full table in the report.',
   ].join('\n'),
-  origin: headlessOrigin('demo-run-morning-1', 'morning-scan', 'codex'),
+  origin: headlessOrigin('demo-run-morning-1', 'demo-ws-auto-quant', 'morning-scan', 'codex'),
 }
 
 // macro-research › weekly-digest, latest run (demo-run-digest-1, codex). Has a doc.
@@ -83,7 +88,7 @@ export const demoDigestReport: InboxEntry = {
   docs: [{ path: 'digests/macro-2026-06-25.md' }],
   comments:
     'Weekly macro digest is up — rates steepened, dollar soft, core PCE inline. Next week\'s calendar at the bottom.',
-  origin: headlessOrigin('demo-run-digest-1', 'weekly-digest', 'codex'),
+  origin: headlessOrigin('demo-run-digest-1', 'demo-ws-macro', 'weekly-digest', 'codex'),
 }
 
 // auto-quant › morning-scan, an OLDER run (demo-run-morning-3, codex). Same issue
@@ -99,7 +104,7 @@ export const demoMoversReportOlder: InboxEntry = {
     '',
     'Logged for the record; no doc attached.',
   ].join('\n'),
-  origin: headlessOrigin('demo-run-morning-3', 'morning-scan', 'codex'),
+  origin: headlessOrigin('demo-run-morning-3', 'demo-ws-auto-quant', 'morning-scan', 'codex'),
 }
 
 /** GET /api/inbox/history order — newest-first. `demoInboxEntry` (the AAPL

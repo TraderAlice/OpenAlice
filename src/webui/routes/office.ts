@@ -3,6 +3,12 @@
  */
 import { Hono } from 'hono'
 
+import {
+  RoutineFollowUpConflictError,
+  RoutineFollowUpCreateDisallowedError,
+  RoutineFollowUpStaleObservationError,
+  RoutineFollowUpUnavailableError,
+} from '../../core/routine-follow-up-store.js'
 import { sessionPreferredTitle } from '../../workspaces/session-registry.js'
 import {
   OFFICE_CONFIG,
@@ -94,6 +100,178 @@ async function projectRoom(
 export function createOfficeRoutes(svc: WorkspaceService): Hono {
   const app = new Hono()
   const activityJournal = svc.activityJournal ?? svc.agentRuntimeLog
+
+  app.get('/routine-follow-ups', (c) => {
+    try {
+      return c.json({ followUps: svc.routineFollowUpStore.list() })
+    } catch (error) {
+      if (error instanceof RoutineFollowUpUnavailableError) {
+        return c.json({ error: error.code, message: error.message }, 503)
+      }
+      return c.json({
+        error: 'routine_follow_up_read_failed',
+        message: error instanceof Error ? error.message : String(error),
+      }, 500)
+    }
+  })
+
+  app.put('/routine-follow-ups/:inboxEntryId', async (c) => {
+    const inboxEntryId = c.req.param('inboxEntryId')
+    if (!inboxEntryId) {
+      return c.json({
+        error: 'inbox_entry_id_required',
+        message: 'An Inbox entry id is required.',
+      }, 400)
+    }
+
+    let observation
+    try {
+      observation = svc.routineFollowUpStore.observe(inboxEntryId)
+    } catch (error) {
+      if (error instanceof RoutineFollowUpUnavailableError) {
+        return c.json({ error: error.code, message: error.message }, 503)
+      }
+      return c.json({
+        error: 'routine_follow_up_read_failed',
+        message: error instanceof Error ? error.message : String(error),
+      }, 500)
+    }
+    const existing = observation.followUp
+    if (!svc.inboxStore) {
+      return c.json({
+        error: 'inbox_unavailable',
+        message: 'Inbox authority is unavailable.',
+      }, 503)
+    }
+
+    // This exact read snapshots fresh-Carry attention authority. Once the live
+    // Issue check below passes, overlapping read/delete cannot revoke that intent;
+    // the Decision Desk already degrades honestly if the report later disappears.
+    let entry
+    try {
+      entry = await svc.inboxStore.get(inboxEntryId)
+    } catch (error) {
+      return c.json({
+        error: 'inbox_read_failed',
+        message: error instanceof Error ? error.message : String(error),
+      }, 500)
+    }
+    if (!entry) {
+      return c.json({
+        error: 'inbox_entry_not_found',
+        message: 'The Inbox report no longer exists.',
+      }, 404)
+    }
+
+    const issueWorkspaceId = entry.origin?.issueWorkspaceId
+    const issueId = entry.origin?.issueId
+    if (
+      entry.origin?.kind !== 'headless'
+      || typeof issueWorkspaceId !== 'string'
+      || issueWorkspaceId.length === 0
+      || issueWorkspaceId.trim() !== issueWorkspaceId
+      || typeof issueId !== 'string'
+      || issueId.length === 0
+      || issueId.trim() !== issueId
+      || !Number.isFinite(entry.ts)
+      || !Number.isInteger(entry.ts)
+      || entry.ts < 0
+    ) {
+      return c.json({
+        error: 'not_a_routine_report',
+        message: 'Only a server-attributed scheduled Issue report can be carried for follow-up.',
+      }, 422)
+    }
+
+    const inboxAllowsCreate = !(
+      typeof entry.readAt === 'number'
+      && Number.isFinite(entry.readAt)
+      && entry.readAt > 0
+    )
+    let allowCreate = false
+    if (!existing && inboxAllowsCreate) {
+      let detail
+      try {
+        detail = await svc.issueDetail(issueWorkspaceId, issueId)
+      } catch (error) {
+        return c.json({
+          error: 'routine_issue_read_failed',
+          message: error instanceof Error ? error.message : String(error),
+        }, 500)
+      }
+      if (!detail) {
+        return c.json({
+          error: 'routine_issue_not_found',
+          message: 'The Issue that produced this report no longer exists.',
+        }, 404)
+      }
+      if (!detail.issue.when) {
+        return c.json({
+          error: 'routine_issue_not_scheduled',
+          message: 'The Issue that produced this report is not scheduled.',
+        }, 422)
+      }
+      allowCreate = true
+    }
+
+    try {
+      const result = await svc.routineFollowUpStore.put({
+        inboxEntryId: entry.id,
+        reportTs: entry.ts,
+        issueWorkspaceId,
+        issueId,
+      }, {
+        allowCreate,
+        observedRevision: observation.revision,
+      })
+      return c.json(result)
+    } catch (error) {
+      if (error instanceof RoutineFollowUpStaleObservationError) {
+        return c.json({
+          error: 'routine_follow_up_no_longer_active',
+          message: 'This decision changed while the request was in flight. Refresh before retrying.',
+        }, 409)
+      }
+      if (error instanceof RoutineFollowUpCreateDisallowedError) {
+        return c.json({
+          error: 'routine_report_already_reviewed',
+          message: 'This Inbox report was already reviewed and cannot be carried again.',
+        }, 409)
+      }
+      if (error instanceof RoutineFollowUpConflictError) {
+        return c.json({ error: error.code, message: error.message }, 409)
+      }
+      if (error instanceof RoutineFollowUpUnavailableError) {
+        return c.json({ error: error.code, message: error.message }, 503)
+      }
+      return c.json({
+        error: 'routine_follow_up_write_failed',
+        message: error instanceof Error ? error.message : String(error),
+      }, 500)
+    }
+  })
+
+  app.delete('/routine-follow-ups/:inboxEntryId', async (c) => {
+    const inboxEntryId = c.req.param('inboxEntryId')
+    if (!inboxEntryId) {
+      return c.json({
+        error: 'inbox_entry_id_required',
+        message: 'An Inbox entry id is required.',
+      }, 400)
+    }
+    try {
+      const removed = await svc.routineFollowUpStore.remove(inboxEntryId)
+      return c.json({ ok: true, removed })
+    } catch (error) {
+      if (error instanceof RoutineFollowUpUnavailableError) {
+        return c.json({ error: error.code, message: error.message }, 503)
+      }
+      return c.json({
+        error: 'routine_follow_up_write_failed',
+        message: error instanceof Error ? error.message : String(error),
+      }, 500)
+    }
+  })
 
   app.get('/floor', async (c) => {
     const lastSeq = activityJournal.lastSeq()

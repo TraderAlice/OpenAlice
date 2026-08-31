@@ -29,10 +29,18 @@ export interface OfficeShift {
 
 export function useOfficeShift(input: {
   readonly candidates: readonly OfficeDutyCandidate[]
+  /** Readiness of candidate-producing patrol sources. */
   readonly status: OfficeDutySourceStatus
+  /** Optional broader readiness required before the whole Office may settle clear. */
+  readonly settlementStatus?: OfficeDutySourceStatus
   readonly unresolvedCount: number
 }): OfficeShift {
-  const { candidates: sourceCandidates, status, unresolvedCount } = input
+  const {
+    candidates: sourceCandidates,
+    status,
+    settlementStatus = status,
+    unresolvedCount,
+  } = input
   const [snapshot, setSnapshot] = useState<OfficeShiftSnapshot | null>(readOfficeShiftSnapshot)
 
   useEffect(() => {
@@ -46,7 +54,7 @@ export function useOfficeShift(input: {
       if (next && next !== current) writeOfficeShiftSnapshot(next)
       return next
     })
-  }, [sourceCandidates, status, unresolvedCount])
+  }, [settlementStatus, sourceCandidates, status, unresolvedCount])
 
   const candidateById = useMemo(
     () => new Map(sourceCandidates.map((candidate) => [candidate.id, candidate] as const)),
@@ -73,6 +81,11 @@ export function useOfficeShift(input: {
   if (shiftCandidates.length > 0) state = 'active'
   else if (status === 'error') state = 'degraded'
   else if (status === 'loading') state = 'planning'
+  // Known backlog remains reviewable even if a downstream disposition source
+  // is unavailable; only the final Office-clear claim waits for every source.
+  else if (canStartNext) state = 'complete'
+  else if (settlementStatus === 'error') state = 'degraded'
+  else if (settlementStatus === 'loading') state = 'planning'
   else if (!snapshot || snapshot.slots.length === 0) state = 'quiet'
   else if (snapshot.cleared) state = 'clear'
   else state = 'complete'
@@ -96,7 +109,7 @@ export function useOfficeShift(input: {
   return {
     candidates: shiftCandidates,
     state,
-    sourceStatus: status,
+    sourceStatus: settlementStatus,
     total,
     completed,
     position: shiftCandidates.length > 0 ? completed + 1 : null,

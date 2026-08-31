@@ -837,6 +837,22 @@
   grid-template-columns: minmax(0, 0.62fr) minmax(0, 1.45fr);
 }
 
+.oa-office-cadence__actions--decision {
+  animation: oa-office-decision-in 120ms steps(2, end) both;
+}
+
+@keyframes oa-office-decision-in {
+  from {
+    opacity: 0.72;
+    transform: translateY(2px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .oa-office-inbox-duty__queue {
   display: inline-flex;
   align-items: center;
@@ -857,6 +873,189 @@
   border: 1px solid var(--gba-ink);
   background: var(--gba-water);
   box-shadow: 1px 1px 0 var(--gba-ink);
+}
+
+.oa-office-decision-desk__evidence-label {
+  display: block;
+  margin-top: 9px;
+  color: var(--gba-moss-dark);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-xs);
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.oa-office-decision-desk__issue {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(220px, 0.8fr);
+  border: 3px solid var(--gba-ink);
+  background: var(--gba-paper);
+  box-shadow: 3px 3px 0 color-mix(in srgb, var(--gba-ink) 22%, transparent);
+}
+
+.oa-office-decision-desk__issue > header {
+  display: grid;
+  min-width: 0;
+  align-content: center;
+  gap: 4px;
+  padding: 9px 10px;
+  border-right: 2px solid color-mix(in srgb, var(--gba-ink) 28%, transparent);
+}
+
+.oa-office-decision-desk__issue > header span,
+.oa-office-decision-desk__issue dt {
+  color: var(--gba-moss-dark);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-xs);
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.oa-office-decision-desk__issue > header strong,
+.oa-office-decision-desk__issue dd {
+  color: var(--gba-ink);
+  font-size: var(--text-sm);
+  font-weight: 900;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.oa-office-decision-desk__issue dl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-width: 0;
+  margin: 0;
+}
+
+.oa-office-decision-desk__issue dl > div {
+  min-width: 0;
+  padding: 8px;
+}
+
+.oa-office-decision-desk__issue dl > div + div {
+  border-left: 2px solid color-mix(in srgb, var(--gba-ink) 24%, transparent);
+}
+
+.oa-office-decision-desk__issue dd {
+  margin: 3px 0 0;
+}
+
+.oa-office-decision-desk__pager {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border: 3px solid var(--gba-ink);
+  background: color-mix(in srgb, var(--gba-water) 10%, var(--gba-paper));
+}
+
+.oa-office-decision-desk__pager button,
+.oa-office-decision-desk__empty button {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 5px 8px;
+  border: 2px solid var(--gba-ink);
+  border-radius: 2px;
+  color: var(--gba-ink);
+  background: var(--gba-paper);
+  box-shadow: inset -2px -2px color-mix(in srgb, var(--gba-ink) 14%, transparent);
+  font-size: var(--text-sm);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.oa-office-decision-desk__pager button:first-child {
+  justify-content: flex-start;
+}
+
+.oa-office-decision-desk__pager button:last-child {
+  justify-content: flex-end;
+}
+
+.oa-office-decision-desk__pager button:is(:hover, :focus-visible),
+.oa-office-decision-desk__empty button:is(:hover, :focus-visible) {
+  outline: 2px solid var(--gba-water);
+  outline-offset: 2px;
+  background: color-mix(in srgb, var(--gba-water) 40%, var(--gba-paper));
+}
+
+.oa-office-decision-desk__pager button:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.7);
+  opacity: 0.46;
+}
+
+.oa-office-decision-desk__pager img {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  object-fit: contain;
+}
+
+.oa-office-decision-desk__next-icon {
+  transform: rotate(180deg);
+}
+
+.oa-office-decision-desk__pager > span {
+  min-width: 48px;
+  color: var(--gba-moss-dark);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-xs);
+  font-weight: 950;
+  text-align: center;
+}
+
+.oa-office-cadence__actions--decision-desk {
+  grid-template-columns:
+    minmax(0, 0.62fr)
+    minmax(0, 1.18fr)
+    minmax(0, 1.08fr)
+    minmax(0, 0.92fr);
+}
+
+.oa-office-decision-desk__empty {
+  display: grid;
+  min-height: 220px;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  padding: 24px;
+  border: 3px solid var(--gba-ink);
+  color: var(--gba-ink);
+  background: var(--gba-paper);
+  box-shadow: 3px 3px 0 color-mix(in srgb, var(--gba-ink) 22%, transparent);
+  text-align: center;
+}
+
+.oa-office-decision-desk__empty-copy {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+}
+
+.oa-office-decision-desk__empty-copy img {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+}
+
+.oa-office-decision-desk__empty-copy strong {
+  font-size: var(--text-base);
+  font-weight: 950;
+}
+
+.oa-office-decision-desk__empty-copy p {
+  max-width: 440px;
+  margin: 0;
+  color: var(--gba-ink-soft);
+  font-size: var(--text-sm);
+  font-weight: 750;
+  line-height: 1.4;
 }
 
 .oa-office-inbox-duty__routine {
@@ -7254,6 +7453,24 @@ button.oa-office-hud__duty:active {
     grid-template-columns: 1fr;
   }
 
+  .oa-office-decision-desk__issue {
+    grid-template-columns: 1fr;
+  }
+
+  .oa-office-decision-desk__issue > header {
+    border-right: 0;
+    border-bottom: 2px solid color-mix(in srgb, var(--gba-ink) 28%, transparent);
+  }
+
+  .oa-office-decision-desk__issue dl {
+    grid-template-columns: 1fr;
+  }
+
+  .oa-office-decision-desk__issue dl > div + div {
+    border-top: 2px solid color-mix(in srgb, var(--gba-ink) 24%, transparent);
+    border-left: 0;
+  }
+
   .oa-office-inbox-duty__routine > header {
     border-right: 0;
     border-bottom: 2px solid color-mix(in srgb, var(--gba-ink) 28%, transparent);
@@ -7385,6 +7602,10 @@ button.oa-office-hud__duty:active {
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
+  .oa-office-decision-desk .oa-office-cadence__facts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .oa-office-cadence__facts > div + div {
     border-top: 0;
     border-left: 2px solid color-mix(in srgb, var(--gba-ink) 24%, transparent);
@@ -7392,6 +7613,10 @@ button.oa-office-hud__duty:active {
 
   .oa-office-cadence__actions {
     grid-template-columns: minmax(0, 0.62fr) minmax(0, 1fr) minmax(0, 1.45fr);
+  }
+
+  .oa-office-cadence__actions--decision-desk {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .oa-office-inspect__profile {
@@ -7470,8 +7695,27 @@ button.oa-office-hud__duty:active {
   }
 }
 
+/* The short-landscape optimization appears after the narrow layout and would
+ * otherwise put long decision commands back into three cramped columns. */
+@container (max-width: 520px) and (max-height: 420px) {
+  .oa-office-cadence__facts,
+  .oa-office-cadence__actions {
+    grid-template-columns: 1fr;
+  }
+
+  .oa-office-decision-desk .oa-office-cadence__facts {
+    grid-template-columns: 1fr;
+  }
+
+  .oa-office-cadence__facts > div + div {
+    border-top: 2px solid color-mix(in srgb, var(--gba-ink) 24%, transparent);
+    border-left: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .oa-office-window,
+  .oa-office-cadence__actions--decision,
   .oa-office-touch-action,
   .oa-office-pod .oa-office-desk,
   .oa-office-pod .oa-office-desk[data-selected="true"]::after,

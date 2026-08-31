@@ -21,7 +21,12 @@ export function OfficeInboxDutyDossier({
   latestDuty,
   currentBacklogCount,
   sourceStatus,
+  followUpSourceStatus = 'loading',
+  issueSourceStatus = 'loading',
+  carrySaved = false,
   onOpenInbox,
+  onCarry,
+  onCarried,
   onConfirm,
   onConfirmed,
   onContinue,
@@ -32,7 +37,15 @@ export function OfficeInboxDutyDossier({
   latestDuty: OfficeInboxDutyCandidate | null
   currentBacklogCount: number | null
   sourceStatus: OfficeDutySourceStatus
+  /** Readiness of the durable Decision Desk sidecar. */
+  followUpSourceStatus?: OfficeDutySourceStatus
+  /** Readiness of the live Scheduled-Issue projection used to authorize a fresh carry. */
+  issueSourceStatus?: OfficeDutySourceStatus
+  /** The durable decision carry already exists, but this exact Inbox receipt may still be pending. */
+  carrySaved?: boolean
   onOpenInbox: (duty: OfficeInboxDutyCandidate) => void
+  onCarry: () => Promise<OfficeDutyAcknowledgementResult>
+  onCarried: () => void
   onConfirm: () => Promise<OfficeDutyAcknowledgementResult>
   onConfirmed: () => void
   onContinue: () => void
@@ -41,8 +54,10 @@ export function OfficeInboxDutyDossier({
 }) {
   const { t } = useTranslation()
   const headingRef = useRef<HTMLHeadingElement>(null)
-  const [submitting, setSubmitting] = useState(false)
+  const carryRef = useRef<HTMLButtonElement>(null)
+  const [submittingAction, setSubmittingAction] = useState<'carry' | 'confirm' | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const submitting = submittingAction !== null
   const changed = Boolean(latestDuty
     && latestDuty.receipt.fingerprint !== duty.receipt.fingerprint)
   const resolved = !latestDuty && sourceStatus === 'ready'
@@ -50,7 +65,22 @@ export function OfficeInboxDutyDossier({
   const backlogCount = currentBacklogCount ?? duty.count
   const documents = duty.delivery.entry.docs ?? []
   const visibleDocuments = documents.slice(0, 4)
-  const routine = duty.delivery.declaredIssue
+  // The durable Inbox row is the captured review subject, while Scheduled
+  // Issue metadata is live control-plane data. Reuse the latest safe join for
+  // the same row so a deleted or re-homed Issue cannot leave a stale route in
+  // the decision menu.
+  const capturedRoutine = duty.delivery.declaredIssue
+  const matchingLatestDuty = latestDuty?.receipt.fingerprint === duty.receipt.fingerprint
+    ? latestDuty
+    : null
+  const routine = matchingLatestDuty
+    ? matchingLatestDuty.delivery.declaredIssue
+      ?? (carrySaved || issueSourceStatus !== 'ready' ? capturedRoutine : undefined)
+    : capturedRoutine
+  const followUpSourceReady = followUpSourceStatus === 'ready'
+  const issueSourceReady = issueSourceStatus === 'ready'
+  const [decisionOpen, setDecisionOpen] = useState(false)
+  const showDecision = Boolean((routine || carrySaved) && decisionOpen && !changed && !resolved)
   const routineNextRun = routine
     ? routine.nextDueAtMs == null
       ? t('office.routineNextRunNone')
@@ -58,19 +88,49 @@ export function OfficeInboxDutyDossier({
     : null
 
   useEffect(() => {
+    if (showDecision && carryRef.current && !carryRef.current.disabled) {
+      carryRef.current.focus({ preventScroll: true })
+      return
+    }
     headingRef.current?.focus({ preventScroll: true })
-  }, [])
+  }, [showDecision])
+
+  const carry = async () => {
+    if (submitting
+      || (!routine && !carrySaved)
+      || !sourceReady
+      || !followUpSourceReady
+      || (!carrySaved && !issueSourceReady)
+      || changed
+      || resolved) return
+    setSubmittingAction('carry')
+    setSubmitError(null)
+    try {
+      // The caller persists the carry before writing the exact Inbox receipt.
+      // Even if another tab won that receipt race, the Decision Desk item now
+      // exists and must be announced instead of being treated as a plain skip.
+      await onCarry()
+      onCarried()
+    } catch {
+      setSubmittingAction(null)
+      setSubmitError(t('office.routineCarryFailed'))
+    }
+  }
 
   const confirm = async () => {
-    if (submitting || !sourceReady || changed || resolved) return
-    setSubmitting(true)
+    if (submitting
+      || !sourceReady
+      || carrySaved
+      || changed
+      || resolved) return
+    setSubmittingAction('confirm')
     setSubmitError(null)
     try {
       const result = await onConfirm()
       if (result === 'already-resolved') onContinue()
       else onConfirmed()
     } catch {
-      setSubmitting(false)
+      setSubmittingAction(null)
       setSubmitError(t('office.inboxBacklogSaveFailed'))
     }
   }
@@ -87,7 +147,10 @@ export function OfficeInboxDutyDossier({
       onKeyDown={(event) => {
         if (event.key === 'Escape') {
           event.preventDefault()
-          if (!submitting) onClose()
+          if (!submitting) {
+            if (showDecision) setDecisionOpen(false)
+            else onClose()
+          }
           return
         }
         if (event.key === 'Tab') trapOfficeDialogTab(event)
@@ -102,7 +165,12 @@ export function OfficeInboxDutyDossier({
             <span className="oa-office-window__title-kind">02</span>
           </span>
         </div>
-        <button type="button" aria-label={t('common.close')} disabled={submitting} onClick={onClose}>
+        <button
+          type="button"
+          aria-label={t('common.close')}
+          disabled={submitting}
+          onClick={() => onClose()}
+        >
           <OfficeWindowControlGlyph kind="close" />
         </button>
       </header>
@@ -112,10 +180,14 @@ export function OfficeInboxDutyDossier({
           ref={headingRef}
           className="oa-office-cadence__step"
           tabIndex={-1}
-          aria-label={t('office.inboxBacklogConfirmStep')}
+          aria-label={t(showDecision
+            ? 'office.routineDecisionStep'
+            : 'office.inboxBacklogConfirmStep')}
         >
-          <span>02</span>
-          <strong>{t('office.inboxBacklogConfirm')}</strong>
+          <span>{showDecision ? '03' : '02'}</span>
+          <strong>{t(showDecision
+            ? 'office.routineDecision'
+            : 'office.inboxBacklogConfirm')}</strong>
         </h2>
 
         <div className="oa-office-cadence__subject">
@@ -199,6 +271,20 @@ export function OfficeInboxDutyDossier({
               : 'office.inboxBacklogSignalLost')}
           </p>
         )}
+        {routine && !carrySaved && !resolved && issueSourceStatus !== 'ready' && (
+          <p className="oa-office-cadence__notice" data-tone="warning" role="status">
+            {t(issueSourceStatus === 'loading'
+              ? 'office.routineIssueSyncing'
+              : 'office.routineIssueSignalLost')}
+          </p>
+        )}
+        {(routine || carrySaved) && !resolved && followUpSourceStatus !== 'ready' && (
+          <p className="oa-office-cadence__notice" data-tone="warning" role="status">
+            {t(followUpSourceStatus === 'loading'
+              ? 'office.routineFollowUpSyncing'
+              : 'office.routineFollowUpSignalLost')}
+          </p>
+        )}
         {changed && (
           <p className="oa-office-cadence__notice" data-tone="warning" role="alert">
             {t('office.inboxBacklogChanged')}
@@ -209,6 +295,11 @@ export function OfficeInboxDutyDossier({
             {t('office.inboxBacklogAlreadyRead')}
           </p>
         )}
+        {carrySaved && !resolved && !changed && (
+          <p className="oa-office-cadence__notice" data-tone="success" role="status">
+            {t('office.routineCarrySaved')}
+          </p>
+        )}
         {submitError && (
           <p className="oa-office-cadence__notice" data-tone="warning" role="alert">
             {submitError}
@@ -217,44 +308,111 @@ export function OfficeInboxDutyDossier({
 
         {!resolved && !changed && (
           <p className="oa-office-cadence__receipt-note">
-            {t('office.inboxBacklogReceiptNote')}
+            {t(routine
+              ? showDecision
+                ? carrySaved
+                  ? 'office.routineCarryRecoveryPrompt'
+                  : 'office.routineDecisionPrompt'
+                : 'office.routineDecisionSummaryHint'
+              : 'office.inboxBacklogReceiptNote')}
           </p>
         )}
 
-        <div className="oa-office-cadence__actions">
-          <button type="button" className="oa-office-cadence__back" disabled={submitting} onClick={onLater}>
-            {t('office.inboxBacklogLater')}
-          </button>
-          <button
-            type="button"
-            className="oa-office-cadence__open"
-            disabled={submitting}
-            onClick={() => onOpenInbox(changed && latestDuty ? latestDuty : duty)}
-          >
-            <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" aria-hidden style={officePixelImg} />
-            {t(changed ? 'office.inboxBacklogOpenLatest' : 'office.inboxBacklogOpenAgain')}
-          </button>
-          {resolved ? (
-            <button type="button" className="oa-office-cadence__stamp" onClick={onContinue}>
-              {t('office.cadenceContinue')}
-            </button>
-          ) : changed ? (
-            <button
-              type="button"
-              className="oa-office-cadence__stamp"
-              onClick={() => latestDuty && onOpenInbox(latestDuty)}
-            >
-              {t('office.inboxBacklogOpenLatest')}
-            </button>
+        <div className={`oa-office-cadence__actions${showDecision
+          ? ' oa-office-cadence__actions--decision'
+          : ''}`}>
+          {showDecision ? (
+            <>
+              <button
+                type="button"
+                className="oa-office-cadence__back"
+                disabled={submitting}
+                onClick={() => setDecisionOpen(false)}
+              >
+                {t('office.routineDecisionBack')}
+              </button>
+              <button
+                ref={carryRef}
+                type="button"
+                className="oa-office-cadence__open"
+                disabled={!sourceReady
+                  || !followUpSourceReady
+                  || (!carrySaved && !issueSourceReady)
+                  || submitting}
+                onClick={() => void carry()}
+              >
+                <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" aria-hidden style={officePixelImg} />
+                {submittingAction === 'carry'
+                  ? t('office.routineCarrySaving')
+                  : t(carrySaved
+                    ? 'office.routineCarryFinish'
+                    : 'office.routineCarryToDecisionDesk')}
+              </button>
+              {!carrySaved && (
+                <button
+                  type="button"
+                  className="oa-office-cadence__stamp"
+                  disabled={!sourceReady || submitting}
+                  onClick={() => void confirm()}
+                >
+                  {submittingAction === 'confirm'
+                    ? t('office.inboxBacklogSaving')
+                    : t('office.routineNoChange')}
+                </button>
+              )}
+            </>
           ) : (
-            <button
-              type="button"
-              className="oa-office-cadence__stamp"
-              disabled={!sourceReady || submitting}
-              onClick={() => void confirm()}
-            >
-              {submitting ? t('office.inboxBacklogSaving') : t('office.inboxBacklogStamp')}
-            </button>
+            <>
+              <button type="button" className="oa-office-cadence__back" disabled={submitting} onClick={onLater}>
+                {t('office.inboxBacklogLater')}
+              </button>
+              <button
+                type="button"
+                className="oa-office-cadence__open"
+                disabled={submitting}
+                onClick={() => onOpenInbox(changed && latestDuty ? latestDuty : duty)}
+              >
+                <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" aria-hidden style={officePixelImg} />
+                {t(changed
+                  ? 'office.inboxBacklogOpenLatest'
+                  : routine
+                    ? 'office.routineOpenReport'
+                    : 'office.inboxBacklogOpenAgain')}
+              </button>
+              {resolved ? (
+                <button type="button" className="oa-office-cadence__stamp" onClick={onContinue}>
+                  {t('office.cadenceContinue')}
+                </button>
+              ) : changed ? (
+                <button
+                  type="button"
+                  className="oa-office-cadence__stamp"
+                  onClick={() => latestDuty && onOpenInbox(latestDuty)}
+                >
+                  {t('office.inboxBacklogOpenLatest')}
+                </button>
+              ) : routine ? (
+                <button
+                  type="button"
+                  className="oa-office-cadence__stamp"
+                  disabled={submitting}
+                  onClick={() => setDecisionOpen(true)}
+                >
+                  {t(carrySaved
+                    ? 'office.routineCarryFinish'
+                    : 'office.routineDecideNextStep')}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="oa-office-cadence__stamp"
+                  disabled={!sourceReady || submitting}
+                  onClick={() => void confirm()}
+                >
+                  {submitting ? t('office.inboxBacklogSaving') : t('office.inboxBacklogStamp')}
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>

@@ -8,12 +8,14 @@ import {
   type OfficeDutyAcknowledgementResult,
   type OfficeDutyCandidate,
   type OfficeDutySourceStatus,
+  type OfficeInboxDutyEvidence,
 } from './duty-registry'
 import type { OfficeProductActivity } from './useOfficeProductActivity'
 import { useOfficeInboxDuties } from './useOfficeInboxDuties'
 
 const EVIDENCE_RECEIPTS_KEY = 'openalice:office-duty:evidence-receipts:v2'
 const MAX_SESSION_RECEIPTS = 256
+const EMPTY_INBOX_EVIDENCE = new Map<string, OfficeInboxDutyEvidence>()
 
 function readEvidenceReceipts(): Map<string, string> {
   if (typeof window === 'undefined') return new Map()
@@ -61,10 +63,15 @@ export interface OfficeDutyQueue {
   readonly status: OfficeDutySourceStatus
   readonly inboxStatus: OfficeDutySourceStatus
   readonly cadenceStatus: OfficeDutySourceStatus
+  /** Readiness of the Scheduled-Issue registry used for exact routine joins. */
+  readonly issueStatus: OfficeDutySourceStatus
   /** Domain facts that still block an honest clear, including reviewed cadence exceptions. */
   readonly unresolvedCount: number
   readonly inboxCount: number
   readonly evidenceBySubject: ReadonlyMap<string, OfficeDutyCandidate>
+  /** Exact Inbox presentation for every row in the current full history. */
+  readonly inboxEvidenceByEntryId: ReadonlyMap<string, OfficeInboxDutyEvidence>
+  /** Actionable unread Inbox candidates only. */
   readonly inboxByEntryId: ReadonlyMap<string, OfficeDutyCandidate>
   acknowledge(duty: OfficeDutyCandidate): Promise<OfficeDutyAcknowledgementResult>
 }
@@ -78,6 +85,7 @@ export function useOfficeDuties(
   const inboxDuties = useOfficeInboxDuties(activity.inbox?.seq)
   const inboxStatus = inboxDuties.status
   const inboxDeliveries = inboxDuties.deliveries
+  const inboxEvidenceByEntryId = inboxDuties.evidenceByEntryId ?? EMPTY_INBOX_EVIDENCE
   const markInboxReadConfirmed = inboxDuties.markReadConfirmed
   const cadenceStatus = issues.error
     ? 'error' as const
@@ -180,9 +188,11 @@ export function useOfficeDuties(
     status: projection.status,
     inboxStatus,
     cadenceStatus,
+    issueStatus,
     unresolvedCount: unresolvedProjection.candidates.length,
     inboxCount: inboxDeliveries.length,
     evidenceBySubject,
+    inboxEvidenceByEntryId,
     inboxByEntryId,
     acknowledge,
   }

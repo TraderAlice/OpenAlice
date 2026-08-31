@@ -97,6 +97,44 @@ Office 原生复核，明确确认后才切换下一项；来源均 ready、冻�
 - 冻结顺序和 Later 轮转只保存到当前 tab 的 `sessionStorage`；它不是跨设备日计划，也不
   改写 Inbox、Issue 或活动日志的领域所有权。
 
+### 证据巡检与决策台合同（2026-09-01）
+
+Office 的游戏循环不是“多点几个页面”，而是把容易被熟悉 K 线挤掉的证据复核变成有限、
+可继续的日课。比较了三种处理例行报告的方式：
+
+| 方案 | 用户影响 | 结论 |
+|---|---|---|
+| 看完报告立即跳进 Scheduled Issue | 深挖路径短，但每份报告都会打断广度巡检，用户仍容易回到单一熟悉标的 | 否 |
+| 看完即统一盖章，之后靠 Inbox / Issue 自己找 | 值班很快清空，但把“看过”和“作出判断”混在一起，重要报告会重新隐身 | 否 |
+| 先逐份巡检，再把需要判断的报告带入持久决策台 | 先建立证据覆盖，再集中处理判断；两种完成真相彼此独立 | **是** |
+
+每份精确 Scheduled-Issue 报告返回 Office 后进入三选一分流：`Later` 只轮转；
+`No change · Mark reviewed` 只写该 Inbox 条目的准确 `readAt`；`Carry to decision desk`
+先幂等持久化报告与 Issue 的准确坐标，再写同一条 Inbox 回执。只要持久交接已成功，即使
+随后回执失败，恢复界面也只能补完回执，不能改选“没有变化”。独立来源故障只冻结依赖它
+的动作：Decision sidecar 不可用不能阻止安全的 No-change Inbox 回执，Issue 投影不可用也
+不能阻止已保存交接补完准确 Inbox 回执。
+
+决策台在当班巡检期间只作为 Operations 地标上的被动计数，不抢当前 HUD；本班 settled 后
+才成为下一主行动。每项必须同时显示准确报告标题/摘要和对应 Scheduled Issue，分别提供
+“打开准确报告”和“打开准确 Issue”。任一路由都不算完成、不删除跟进、不启动 Agent；
+只有用户明确选择“判断已完成 · 移出决策台”才移除该条持久跟进。报告或 Issue 已被删除时
+必须诚实显示不可用，仍允许保留或显式移除这条 Office 跟进，绝不改写历史 Inbox 回执或
+Issue 状态。
+
+由此，Office 的进度只来自可证明的领域动作：精确 Inbox 回执、cadence evidence receipt，
+以及决策台显式完成。点击、寻路、打开页面、停留时长、下单、交易频率和盈亏都不能兑换
+值班进度。产品目标是提高每天覆盖的独立证据面与完成判断的连续性，而不是制造更多操作。
+
+当前落地：
+
+- [x] active-only 决策台 sidecar、严格损坏隔离、幂等 carry / resolve API
+- [x] 例行报告三选一分流，以及 carry 成功、Inbox 回执失败后的恢复合同
+- [x] 巡检结束后才提升决策台；寻路途中来源失稳或队列清空会取消过期目标
+- [x] 决策台展示准确报告与 Issue，并把两个打开动作与显式完成分离
+- [x] Demo 契约、窄屏/短横屏、焦点和 reduced-motion 回归
+- [ ] 真实 AliceProject `/office`：桌面、390×844、844×390 完整游玩验收
+
 ## Current diagnosis
 
 数据投影、休眠判断、Harness 分类和最小显示数量可以保留；当前视觉场景不可作为终稿继续
@@ -6195,6 +6233,61 @@ Routine-report harvest (2026-09-01, in progress):
 - The HUD and return dossier will present a safely joined delivery as a Routine report, name the exact Scheduled Issue,
   show its declared priority and next scheduled run, and disclose how many earlier unread versions remain. Unlinked or
   ambiguous Inbox rows keep the ordinary Inbox-duty language and ordering contract.
+
+Routine-report disposition (2026-09-01, in progress):
+
+- The routine dossier currently ends at `Stamp reviewed`, which proves only an exact durable Inbox receipt. That is a
+  useful storage boundary but a weak diligence loop: it does not ask whether the evidence changed the player's next
+  action, and therefore still rewards queue clearing more than decision-making.
+- Rejected the first two-stage implementation after the maintainer clarified the product mission. It kept the exact
+  Inbox row unread while opening its Issue, so the first report worth deeper work froze `n/N` and pulled the player into
+  one topic before the other declared routines were covered. That is safe against lost reminders, but contradicts the
+  intended order: broad evidence patrol first, concentrated decisions second. It also repeated a distinction cadence
+  already handles correctly: `reviewed` is not the same state as `resolved`.
+- Compared keeping that immediate Issue detour, stamping before offering an optional but transient route, and splitting
+  review from a durable decision carry. Chose the split model. The first option blocks breadth; the second can silently
+  lose meaningful follow-up. The chosen model records two independent truths: the exact report was reviewed, and this
+  report was or was not carried into a later decision phase.
+- Only an Inbox delivery with the exact server-declared Workspace + Scheduled Issue join receives this triage. Its
+  review menu is `Back / No change / Carry to decision desk`; ordinary Inbox keeps its single exact receipt because
+  Office cannot invent a decision subject for an unlinked delivery. `No change` writes only the exact server `readAt`.
+  `Carry` must first persist an idempotent, non-dispatching decision fact keyed by the report identity and exact Issue,
+  then write that same `readAt`; retrying cannot duplicate the carry or start Agent work.
+- Carrying advances the finite evidence shift after the receipt succeeds and never opens the Issue immediately. The
+  active shift continues to cover one current delivery per declared routine. The central Operations/Decision desk may
+  show a restrained passive count during patrol, but exact Issue, market-context, and completion actions become primary
+  only after the evidence shift has no current duty. Completing or dismissing a carried decision is a separate explicit
+  mutation and never rewrites the historical Inbox receipt.
+- Comment, Issue-update, and inquiry APIs remain excluded because they can dispatch real Agent work or mutate a workflow
+  whose semantics are not this user's diligence record. No route, dwell-time, scrolling, trade, or financial result is
+  treated as proof. Keyboard and responsive ownership stays in the existing dossier and physical desk windows: 44px
+  actions, trapped focus, Escape backing out before dismissal, one-column narrow layout, and reduced-motion fallbacks.
+
+Routine-report decision desk acceptance (2026-09-01):
+
+- Added an active-only durable decision queue at `data/inbox/routine-follow-ups.json`. Carry authority is reconstructed
+  from the exact Inbox origin and live Scheduled Issue; the record stores only report/Issue coordinates and never
+  dispatches Agent work. Malformed state disables this queue alone and all APIs fail closed instead of replacing it.
+- Carry is ordered `persist decision intent → write exact Inbox readAt`. Existing carries recover idempotently after the
+  Issue disappears or the Inbox receipt lands. Per-Inbox revision/CAS prevents an older in-flight PUT from resurrecting
+  a follow-up after an explicit resolve, including create/delete ABA across tabs. A fresh Carry linearizes at its exact
+  unread Inbox snapshot plus live-Issue check; later ordinary Inbox reads cannot revoke the already expressed intent.
+- Office-driven report presentation no longer inherits Inbox's ordinary select-to-read behavior. The exact captured row
+  stays unread through `away / presented / returned`; unrelated Inbox rows retain normal semantics, and only the dossier's
+  explicit `No change` or successful Carry receipt advances patrol. Issue loading returns the dossier immediately, keeps
+  No change available, and gates only a fresh Carry.
+- The Decision Desk retains the exact report and Issue as independent evidence, routes to each without resolving, and
+  removes an item only through `Decision made · Remove from desk`. Missing reports or Issues degrade honestly while Keep
+  and explicit Remove remain available. During an active evidence shift the desk is a passive Operations count; it becomes
+  the primary HUD action only after the finite patrol settles.
+- Demo browser acceptance completed a four-item broad patrol at desktop size, carried Morning movers scan, marked Weekly
+  macro digest as no-change, opened the carried report and exact Issue without resolving, then removed it explicitly.
+  The Office-selected report remained unread until its disposition. 390×844 and 844×390 kept the long title, fixed close
+  control, internal scroll, and 44px actions reachable. Real Default AliceProject acceptance remains pending because the
+  migration task still owns the shared Guardian process; this plan deliberately does not substitute Demo data for that
+  final check.
+- Focused backend/UI suites pass 169 tests; the complete suite passes 656 files / 5,749 tests (two files and thirteen tests
+  skipped). Root and UI TypeScript pass, and the production UI build remains part of the final branch gate.
 
 ## Completion
 

@@ -184,8 +184,10 @@ export function OfficeBuilding({
   dutyStatus = 'ready',
   dutyShift,
   inboxBacklogCount = 0,
+  routineFollowUpCount = 0,
   dutyAcknowledgement,
   onOpenDuty,
+  onOpenRoutineFollowUps,
   reviewedCadenceFollowUps = [],
   onOpenCadenceFollowUp,
   onStartNextShift,
@@ -214,12 +216,14 @@ export function OfficeBuilding({
   dutyShift?: Pick<OfficeShift,
     'state' | 'total' | 'completed' | 'position' | 'remainingMinutes' | 'backlogCount' | 'canStartNext'>
   inboxBacklogCount?: number
+  routineFollowUpCount?: number
   dutyAcknowledgement?: {
     readonly token: number
     readonly targetId: OfficeDutyTargetId
     readonly label?: string
   } | null
   onOpenDuty?: (duty: OfficeResolvedDuty) => void
+  onOpenRoutineFollowUps?: () => void
   reviewedCadenceFollowUps?: readonly OfficeCadenceDutyCandidate[]
   onOpenCadenceFollowUp?: (duty: OfficeCadenceDutyCandidate) => void
   onStartNextShift?: () => void
@@ -300,6 +304,7 @@ export function OfficeBuilding({
   const routeTimerRef = useRef<number | null>(null)
   const routeContinuationRef = useRef<(() => void) | null>(null)
   const routeContinuationDelayRef = useRef(0)
+  const routeObjectiveRef = useRef<'decision-desk' | null>(null)
   const floorInteractionSuspendedRef = useRef(floorInteractionSuspended)
   const departureTimerRef = useRef<number | null>(null)
 
@@ -488,6 +493,20 @@ export function OfficeBuilding({
       : currentDutyStatus === 'ready' ? 'quiet'
         : currentDutyStatus === 'loading' ? 'planning' : 'degraded')
   const currentDutyCandidate = currentDutyCandidates[0] ?? null
+  const activeRoutineFollowUpCount = replaySeq == null
+    && Number.isSafeInteger(routineFollowUpCount)
+    && routineFollowUpCount > 0
+    ? routineFollowUpCount
+    : 0
+  const routineDecisionPending = activeRoutineFollowUpCount > 0
+  const routineDecisionSourceSettled = currentDutyStatus === 'ready'
+    && (currentShiftState === 'quiet'
+      || currentShiftState === 'complete'
+      || currentShiftState === 'clear')
+  const routineDecisionPrimary = routineDecisionSourceSettled
+    && currentDutyCandidate == null
+    && routineDecisionPending
+    && Boolean(onOpenRoutineFollowUps)
   const nextDuty = replaySeq == null && currentDutyCandidate
     ? resolveOfficeDutyTarget(
         currentDutyCandidate,
@@ -553,17 +572,26 @@ export function OfficeBuilding({
     : null
   const operationsInteractionMode = currentOperationsCadenceDuty
     ? 'current-cadence'
-    : operationsFollowUp
-      ? 'reviewed-follow-up'
-      : 'ambient'
+    : routineDecisionPrimary
+      ? 'decision-desk'
+      : operationsFollowUp
+        ? 'reviewed-follow-up'
+        : 'ambient'
   const operationsNeedsAttention = productActivity.attention.agent
     || Boolean(queuedOperationsCadenceDuty)
+    || routineDecisionPending
     || reviewedCadenceFollowUpCount > 0
+  const passiveRoutineFollowUpCount = operationsInteractionMode === 'decision-desk'
+    ? 0
+    : activeRoutineFollowUpCount
   const operationsPending = operationsInteractionMode === 'current-cadence'
-    ? currentCadenceDutyCandidate?.count ?? 0
+    ? (currentCadenceDutyCandidate?.count ?? 0) + passiveRoutineFollowUpCount
+    : operationsInteractionMode === 'decision-desk'
+      ? activeRoutineFollowUpCount
     : operationsInteractionMode === 'reviewed-follow-up'
-      ? reviewedCadenceFollowUpCount
-      : queuedOperationsCadenceDuty?.count ?? productActivity.pending.agent
+      ? reviewedCadenceFollowUpCount + passiveRoutineFollowUpCount
+      : (queuedOperationsCadenceDuty?.count ?? productActivity.pending.agent)
+        + passiveRoutineFollowUpCount
   const routeStatusEdge = officeRouteStatusEdge(alice, camera, viewportSize, mapLayout.height)
   const operationsBoard = useMemo(
     () => officeOperationsBoardPosition(mapLayout.width),
@@ -922,6 +950,14 @@ export function OfficeBuilding({
         source: currentCadenceDutyCandidate?.cadence.workspaceTag,
       }
     }
+    if (routineDecisionPrimary) {
+      return {
+        icon: OFFICE_HUD_ASSETS.drawerRecord,
+        action: t('office.decisionDeskAction'),
+        label: t('office.decisionDeskPending', { count: activeRoutineFollowUpCount }),
+        detail: null,
+      }
+    }
     if (reviewedCadenceFollowUp && !nextDuty) {
       return {
         icon: OFFICE_HUD_ASSETS.occupancyLog,
@@ -1076,7 +1112,9 @@ export function OfficeBuilding({
     } else if (target.kind === 'news-service') {
       onOpenService?.('news', productActivity.news?.seq)
     } else {
-      if (operationsInteractionMode === 'reviewed-follow-up' && operationsFollowUp) {
+      if (operationsInteractionMode === 'decision-desk' && onOpenRoutineFollowUps) {
+        onOpenRoutineFollowUps()
+      } else if (operationsInteractionMode === 'reviewed-follow-up' && operationsFollowUp) {
         onOpenCadenceFollowUp?.(operationsFollowUp)
       } else {
         onOpenLog('operations')
@@ -1127,6 +1165,7 @@ export function OfficeBuilding({
     routeTimerRef.current = null
     routeContinuationRef.current = null
     routeContinuationDelayRef.current = 0
+    routeObjectiveRef.current = null
     setAliceWalking(false)
     setAliceSprinting(false)
     setRouteTargetId(null)
@@ -1166,6 +1205,7 @@ export function OfficeBuilding({
       allowReplay?: boolean
       fallbackTargetId?: string
       fallbackActivate?: () => void
+      objective?: 'decision-desk'
     } = {},
   ) => {
     if (selected || departingWorkspace || floorInteractionSuspended) return
@@ -1174,6 +1214,7 @@ export function OfficeBuilding({
     if (replaySeq != null && target.kind !== 'operations' && !options.allowReplay) return
     setInteractionAnchorTargetId(null)
     cancelAutoWalk()
+    routeObjectiveRef.current = options.objective ?? null
     const generation = routeGenerationRef.current
     const path = officeInteractionPath(aliceRef.current, target, mapLayout, collisionRects)
     if (!path) {
@@ -1190,6 +1231,7 @@ export function OfficeBuilding({
       setRouteTargetId(null)
       scheduleAutoWalk(() => {
         if (routeGenerationRef.current !== generation) return
+        routeObjectiveRef.current = null
         setRouteTrail([])
         const currentTarget = interactionTargetByIdRef.current.get(targetId)
         if (!currentTarget) {
@@ -1247,6 +1289,17 @@ export function OfficeBuilding({
   // The route canceler intentionally follows the finite duty identity, not each render.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nextDuty?.id])
+  useLayoutEffect(() => {
+    if (routineDecisionPrimary || routeObjectiveRef.current !== 'decision-desk') return
+
+    // A Decision Desk route is an intent to act on the currently carried set,
+    // not a generic trip to Operations. If that set disappears (or the duty
+    // source becomes unsettled), do not arrive and activate stale work.
+    cancelAutoWalk()
+    setInteractionAnchorTargetId(null)
+  // The objective ref distinguishes this route from an ambient Operations trip.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routineDecisionPrimary])
   useEffect(() => {
     if (floorInteractionSuspended) pauseAutoWalk()
     else resumeAutoWalk()
@@ -1691,6 +1744,25 @@ export function OfficeBuilding({
               </span>
               <strong title={nextDutyName}>{nextDutyName}</strong>
               <em>{dutyShift?.position ?? 1}/{dutyShift?.total ?? currentDutyCandidates.length}</em>
+            </button>
+          ) : routineDecisionPrimary && onOpenRoutineFollowUps ? (
+            <button
+              type="button"
+              className="oa-office-hud__duty oa-office-hud__duty--follow-up"
+              data-kind="decision-desk"
+              aria-label={t('office.decisionDeskDuty', { count: activeRoutineFollowUpCount })}
+              onClick={() => requestTargetInteraction('operations', {
+                activate: onOpenRoutineFollowUps,
+                objective: 'decision-desk',
+              })}
+            >
+              <span className="oa-office-hud__duty-meta">
+                <span>{t('office.shiftReviewed')}</span>
+                <i className="oa-office-hud__duty-separator" aria-hidden>·</i>
+                <span>{t('office.decisionDeskAction')}</span>
+              </span>
+              <strong>{t('office.decisionDeskTitle')}</strong>
+              <em>{activeRoutineFollowUpCount}</em>
             </button>
           ) : currentShiftState === 'complete' && dutyShift?.canStartNext && onStartNextShift ? (
             <button
@@ -2236,14 +2308,19 @@ export function OfficeBuilding({
               data-live={(replaySeq == null ? stats.working : stats.active) > 0}
               data-has-activity={Boolean(productActivity.agent)
                 || Boolean(queuedOperationsCadenceDuty)
+                || routineDecisionPending
                 || reviewedCadenceFollowUpCount > 0
                 || undefined}
+              data-routine-follow-ups={activeRoutineFollowUpCount || undefined}
               data-attention={operationsNeedsAttention || undefined}
               data-fresh={productActivity.freshKind === 'agent' || undefined}
               data-nearby={nearbyTarget?.kind === 'operations'}
               data-route={routeTargetId === 'operations'}
               data-acknowledged={acknowledgedTargetId === 'operations' || undefined}
-              aria-label={operationsInteractionMode === 'reviewed-follow-up'
+              aria-label={operationsInteractionMode === 'decision-desk'
+                ? t('office.decisionDeskPending', { count: activeRoutineFollowUpCount })
+                : operationsInteractionMode === 'reviewed-follow-up'
+                  && passiveRoutineFollowUpCount === 0
                 ? t('office.operationsFollowUpPending', {
                     count: reviewedCadenceFollowUpCount,
                   })
@@ -2257,12 +2334,19 @@ export function OfficeBuilding({
                       })
                     : t('office.serviceNeedsAttention', { name: t('office.operationsBoard') })
                   : t('office.operationsBoard')}
-              title={operationsInteractionMode === 'reviewed-follow-up' && operationsFollowUp
+              title={operationsInteractionMode === 'decision-desk'
+                ? t('office.decisionDeskAction')
+                : operationsInteractionMode === 'reviewed-follow-up' && operationsFollowUp
                 ? t('office.cadenceFollowUpIssue', {
                     name: operationsFollowUp.cadence.title,
                   })
                 : t('office.operationsBoardHint')}
-              onClick={() => requestTargetInteraction('operations')}
+              onClick={() => requestTargetInteraction(
+                'operations',
+                operationsInteractionMode === 'decision-desk'
+                  ? { objective: 'decision-desk' }
+                  : undefined,
+              )}
               style={{
                 left: operationsBoard.x,
                 top: operationsBoard.y,

@@ -139,6 +139,16 @@ describe('InboxStore (in-memory)', () => {
     expect(await store.get('missing')).toBeNull()
   })
 
+  it('includes the durable read receipt in a direct lookup', async () => {
+    const entry = await store.append({ workspaceId: 'ws-1', comments: 'find my receipt' })
+    await store.markRead(entry.id, 1234)
+
+    expect(await store.get(entry.id)).toMatchObject({ id: entry.id, readAt: 1234 })
+
+    await store.markUnread(entry.id)
+    expect(await store.get(entry.id)).not.toHaveProperty('readAt')
+  })
+
   it('delete removes an entry and returns true; missing id returns false', async () => {
     const a = await store.append({ workspaceId: 'ws-1', comments: 'a' })
     await store.append({ workspaceId: 'ws-1', comments: 'b' })
@@ -286,6 +296,7 @@ describe('InboxStore (JSONL persistence)', () => {
     const fresh = createInboxStore({ filePath: path, readStatePath })
     const { entries } = await fresh.read()
     expect(entries[0].readAt).toBe(4567)
+    expect(await fresh.get(a.id)).toMatchObject({ id: a.id, readAt: 4567 })
     expect(JSON.parse(await fs.readFile(readStatePath, 'utf-8'))).toEqual({
       version: 1,
       read: { [a.id]: 4567 },

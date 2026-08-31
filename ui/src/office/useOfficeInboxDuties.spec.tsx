@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { InboxEntry, InboxHistoryResponse } from '../api/inbox'
 import {
   projectOfficeInboxDeliveries,
+  projectOfficeInboxEvidence,
   readOfficeInboxHistory,
   useOfficeInboxDuties,
 } from './useOfficeInboxDuties'
@@ -134,9 +135,39 @@ describe('projectOfficeInboxDeliveries', () => {
       excerpt: 'Evidence is ready.',
     })
   })
+
+  it('keeps presentation evidence for already-read history rows', () => {
+    const read = entry('read-report', 300, { readAt: 400 })
+
+    const projected = projectOfficeInboxEvidence([read], {
+      untitled: 'Untitled',
+      unreadLabel: 'Unread',
+      moreAttachments: (count) => `+${count}`,
+    })
+
+    expect(projected.get('read-report')).toMatchObject({
+      title: 'Delivery read-report',
+      excerpt: 'Evidence is ready.',
+      entry: { id: 'read-report', readAt: 400 },
+    })
+  })
 })
 
 describe('useOfficeInboxDuties', () => {
+  it('retains an addressable presentation map for read history', async () => {
+    const read = entry('read-report', 300, { readAt: 400 })
+    historyMock.mockResolvedValueOnce(page([read]))
+
+    const hook = renderHook(() => useOfficeInboxDuties())
+
+    await waitFor(() => expect(hook.result.current.status).toBe('ready'))
+    expect(hook.result.current.deliveries).toEqual([])
+    expect(hook.result.current.evidenceByEntryId.get('read-report')).toMatchObject({
+      title: 'Delivery read-report',
+      entry: { id: 'read-report', readAt: 400 },
+    })
+  })
+
   it('hard-fences Shift clear while the first authoritative read is loading or failed', async () => {
     const first = deferred<InboxHistoryResponse>()
     historyMock.mockReturnValueOnce(first.promise)
@@ -179,6 +210,9 @@ describe('useOfficeInboxDuties', () => {
 
     expect(hook.result.current.status).toBe('loading')
     expect(hook.result.current.deliveries.map((item) => item.entry.id)).toEqual(['b'])
+    expect(hook.result.current.evidenceByEntryId.get('a')).toMatchObject({
+      entry: { id: 'a', readAt: 500 },
+    })
     expect(setReadAtMock).toHaveBeenCalledWith('a', 500)
     expect(refreshInboxMock).toHaveBeenCalledOnce()
 

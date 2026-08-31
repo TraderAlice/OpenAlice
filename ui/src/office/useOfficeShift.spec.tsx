@@ -39,6 +39,7 @@ function inboxDuty(id: string): OfficeDutyCandidate {
 interface HookProps {
   readonly candidates: readonly OfficeDutyCandidate[]
   readonly status: OfficeDutySourceStatus
+  readonly settlementStatus?: OfficeDutySourceStatus
   readonly unresolvedCount: number
 }
 
@@ -183,5 +184,80 @@ describe('useOfficeShift', () => {
       backlogCount: 0,
       canStartNext: false,
     })
+  })
+
+  it('keeps a completed patrol unsettled until the broader decision source is authoritative', async () => {
+    const current = inboxDuty('a')
+    const hook = renderShift({
+      candidates: [current],
+      status: 'ready',
+      settlementStatus: 'ready',
+      unresolvedCount: 1,
+    })
+    await waitFor(() => expect(hook.result.current.state).toBe('active'))
+
+    hook.rerender({
+      candidates: [],
+      status: 'ready',
+      settlementStatus: 'loading',
+      unresolvedCount: 0,
+    })
+    await waitFor(() => expect(hook.result.current.state).toBe('planning'))
+    expect(hook.result.current.sourceStatus).toBe('loading')
+
+    hook.rerender({
+      candidates: [],
+      status: 'ready',
+      settlementStatus: 'error',
+      unresolvedCount: 0,
+    })
+    await waitFor(() => expect(hook.result.current.state).toBe('degraded'))
+    expect(hook.result.current.completed).toBe(1)
+
+    hook.rerender({
+      candidates: [],
+      status: 'ready',
+      settlementStatus: 'ready',
+      unresolvedCount: 0,
+    })
+    await waitFor(() => expect(hook.result.current.state).toBe('clear'))
+  })
+
+  it('preserves automatic intake after a cleared shift while the broader source is unsettled', async () => {
+    const first = inboxDuty('a')
+    const next = inboxDuty('b')
+    const hook = renderShift({
+      candidates: [first],
+      status: 'ready',
+      settlementStatus: 'ready',
+      unresolvedCount: 1,
+    })
+    await waitFor(() => expect(hook.result.current.state).toBe('active'))
+
+    hook.rerender({
+      candidates: [],
+      status: 'ready',
+      settlementStatus: 'ready',
+      unresolvedCount: 0,
+    })
+    await waitFor(() => expect(hook.result.current.state).toBe('clear'))
+
+    hook.rerender({
+      candidates: [],
+      status: 'ready',
+      settlementStatus: 'loading',
+      unresolvedCount: 0,
+    })
+    await waitFor(() => expect(hook.result.current.state).toBe('planning'))
+
+    hook.rerender({
+      candidates: [next],
+      status: 'ready',
+      settlementStatus: 'loading',
+      unresolvedCount: 1,
+    })
+    await waitFor(() => expect(hook.result.current.state).toBe('active'))
+    expect(hook.result.current.candidates.map((duty) => duty.id)).toEqual([next.id])
+    expect(hook.result.current).toMatchObject({ total: 1, completed: 0, position: 1 })
   })
 })

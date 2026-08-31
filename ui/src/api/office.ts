@@ -68,6 +68,33 @@ export interface OfficeBuildingSnapshot {
   asOfSeq?: number
 }
 
+/**
+ * One exact routine report deliberately carried from the evidence patrol into
+ * Office's later decision phase. This is a diligence fact, not an Issue
+ * mutation: persisting it must never dispatch Agent work.
+ */
+export interface OfficeRoutineFollowUp {
+  inboxEntryId: string
+  reportTs: number
+  issueWorkspaceId: string
+  issueId: string
+  createdAt: number
+}
+
+export interface OfficeRoutineFollowUpsResponse {
+  followUps: OfficeRoutineFollowUp[]
+}
+
+export interface OfficeRoutineFollowUpPutResponse {
+  followUp: OfficeRoutineFollowUp
+  created: boolean
+}
+
+export interface OfficeRoutineFollowUpDeleteResponse {
+  ok: true
+  removed: boolean
+}
+
 export const officeApi = {
   async floor(opts?: { workspaceId?: string; asOfSeq?: number }): Promise<OfficeBuildingSnapshot> {
     const params = new URLSearchParams()
@@ -75,5 +102,25 @@ export const officeApi = {
     if (opts?.asOfSeq != null) params.set('asOfSeq', String(opts.asOfSeq))
     const query = params.toString()
     return fetchJson<OfficeBuildingSnapshot>(`/api/office/floor${query ? `?${query}` : ''}`)
+  },
+
+  async listRoutineFollowUps(): Promise<OfficeRoutineFollowUpsResponse> {
+    return fetchJson('/api/office/routine-follow-ups')
+  },
+
+  async carryRoutineFollowUp(
+    inboxEntryId: string,
+  ): Promise<OfficeRoutineFollowUpPutResponse> {
+    return fetchJson(`/api/office/routine-follow-ups/${encodeURIComponent(inboxEntryId)}`, {
+      method: 'PUT',
+    })
+  },
+
+  async resolveRoutineFollowUp(
+    inboxEntryId: string,
+  ): Promise<OfficeRoutineFollowUpDeleteResponse> {
+    return fetchJson(`/api/office/routine-follow-ups/${encodeURIComponent(inboxEntryId)}`, {
+      method: 'DELETE',
+    })
   },
 }
