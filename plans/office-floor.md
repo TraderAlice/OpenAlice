@@ -5218,6 +5218,28 @@ Activity-log assignment-reading follow-up (2026-08-31):
   620 test files and 5,199 tests (one file and nine tests skipped); the production UI build passed with only the
   existing ports fallback and large-chunk advisory.
 
+Dormant-cast legibility follow-up (2026-08-31):
+
+- Played the current zero-awake Live floor, opened the pause menu and 27-member Chat roster, inspected failed g25, then
+  used the Chat sign to enter its real Workspace and returned through Office. The excursion correctly restored Alice
+  beside the sign. The remaining visual break was on the Live floor: sleeping pods already dimmed their rug, sign,
+  Harness prop, and monitor, while each coworker was separately lowered 6px and reduced to 68% saturation / 82%
+  brightness. The generated cast consequently read as near-identical dark silhouettes in the most common idle scene.
+- Compared retaining the full character power-down, restoring unmodified full-color sprites, and preserving a small
+  seated offset with only a restrained color reduction. Full power-down wastes the authored cast and duplicates the
+  workstation signal; completely unchanged actors weaken the sleep beat. Chose the restrained map-only treatment:
+  powered-down furniture, contextual sleep emotes, roster/Agent-file labels, and accessible names continue to own the
+  state, while floor coworkers keep their recognizable hair, clothing, and runtime silhouettes.
+- Map coworkers now sit only 3px lower at 92% saturation / 94% brightness with a normal grounded shadow; their runtime
+  accent remains subdued but legible. Roster and Agent-file portraits intentionally keep their stronger asleep
+  treatment because those surfaces present explicit status rather than composing the overworld scene.
+- Real-browser acceptance compared the same 0-awake floor before and after hot reload: the ten rendered sleepers now
+  retain distinct red, pale, dark, and warm cast palettes while their monitors remain visibly off and each pod stays
+  subdued. Clicking real g27 still showed the asleep identity during auto-route and opened an Agent file with the
+  explicit asleep fact, so legibility did not erase product state. Focused desk/style suites passed all 44 tests; root
+  and UI TypeScript passed; the full suite passed all 620 test files and 5,200 tests (one file and nine tests skipped);
+  the production UI build passed with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

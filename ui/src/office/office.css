@@ -414,16 +414,16 @@
 }
 
 .oa-office-desk[data-awake="false"]:not([data-replay-focus="true"]) .oa-office-coworker {
-  transform: translateY(6px);
+  transform: translateY(3px);
 }
 
 .oa-office-desk[data-awake="false"]:not([data-replay-focus="true"]) .oa-office-coworker img {
-  filter: saturate(0.68) brightness(0.82)
-    drop-shadow(1px 1px 0 color-mix(in srgb, var(--gba-ink) 20%, transparent));
+  filter: saturate(0.92) brightness(0.94)
+    drop-shadow(1px 2px 0 color-mix(in srgb, var(--gba-ink) 24%, transparent));
 }
 
 .oa-office-desk[data-awake="false"]:not([data-replay-focus="true"]) .oa-office-coworker::after {
-  opacity: 0.42;
+  opacity: 0.58;
 }
 
 .oa-office-coworker img {

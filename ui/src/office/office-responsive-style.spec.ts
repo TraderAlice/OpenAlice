@@ -111,7 +111,7 @@ describe('Office responsive style contract', () => {
       /\.oa-office-mood-emote\[data-kind="sleeping"\]\s*\{[^}]*width:\s*40px;[^}]*height:\s*40px;[^}]*steps\(3, end\) 3;/s,
     )
     expect(css).toMatch(
-      /\.oa-office-desk\[data-awake="false"\]:not\(\[data-replay-focus="true"\]\) \.oa-office-coworker\s*\{[^}]*translateY\(6px\)/s,
+      /\.oa-office-desk\[data-awake="false"\]:not\(\[data-replay-focus="true"\]\) \.oa-office-coworker\s*\{[^}]*translateY\(3px\)/s,
     )
   })
 
@@ -317,6 +317,15 @@ describe('Office responsive style contract', () => {
     )
     expect(css).toMatch(
       /\.oa-office-runtime__assignment > p\[data-expanded="true"\]\s*\{[\s\S]*?max-height: 7\.8em;[\s\S]*?overflow-y: auto;[\s\S]*?scrollbar-width: thin;/,
+    )
+  })
+
+  it('keeps dormant map coworkers legible while the workstation carries power state', () => {
+    expect(css).toMatch(
+      /\.oa-office-desk\[data-awake="false"\]:not\(\[data-replay-focus="true"\]\) \.oa-office-coworker img\s*\{[\s\S]*?saturate\(0\.92\) brightness\(0\.94\)/,
+    )
+    expect(css).toMatch(
+      /\.oa-office-desk\[data-awake="false"\]:not\(\[data-replay-focus="true"\]\) \.oa-office-coworker::after\s*\{[\s\S]*?opacity: 0\.58;/,
     )
   })
 

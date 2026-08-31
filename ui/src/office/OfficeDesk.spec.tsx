@@ -85,7 +85,7 @@ describe('OfficeDesk', () => {
     expect(screen.queryByText('Researching…')).toBeNull()
   })
 
-  it('powers down and lowers a sleeping Session without filling the room with cues', () => {
+  it('powers down a sleeping Session without removing its coworker from the cast', () => {
     const sleepingEmployee = { ...employee, awake: false, mood: 'idle' as const, bubble: null }
     const { container } = render(
       <OfficeDesk
