@@ -5313,6 +5313,29 @@ Persistent latest-result evidence follow-up (2026-08-31):
   (one file and nine tests skipped); the production UI build passed with only the existing ports fallback and
   large-chunk advisory.
 
+Update-banner notification safe-area follow-up (2026-08-31):
+
+- Used the existing real product-activity test producer to inject Inbox #5546 and News #5547 together while staying on
+  the Live floor. Both physical service stations correctly retained distinct paper/water attention markers and the
+  nearby Inbox prompt selected `Dev Panel · Product activity journal Inbox test`. The two matching Sonner notices,
+  however, began around y77 while the currently visible version-update banner had pushed the Office HUD down to
+  y50–102, covering working/awake counts and Menu.
+- This was a new layout condition on top of the existing live-floor Sonner safe area. The original 82px offset had
+  been measured without the 34px application update banner. Compared globally moving every toast, permanently
+  enlarging the Office offset, hiding/merging simultaneous notices, and branching only when that banner is actually
+  mounted. Global movement leaves Office ownership; permanent space wastes map composition; hiding notices defeats
+  the product-activity contract. Chose the conditional safe-area extension.
+- Normal unobstructed Office retains its existing 82px desktop and 96px phone offsets. While the update banner's
+  existing dismiss control is present, Office CSS raises only top-positioned Sonner to 116px desktop / 130px phone.
+  Office windows and the pause menu continue to opt out so their established foreground hierarchy is unchanged; no
+  global Sonner or update-banner code was modified.
+- Real-browser acceptance used the existing `/dev/frontend` Test News control solely as the intended producer, then
+  returned through the app's Office navigation before capturing the live toast. With the update banner still visible,
+  the toast began around y116 below the HUD's y102 edge, leaving a clear gap and preserving statistics plus Menu while
+  retaining the complete notice and `View News` action. The focused responsive-style suite passed all 30 tests; root
+  and UI TypeScript passed; the full suite passed all 620 test files and 5,203 tests (one file and nine tests skipped);
+  the production UI build passed with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

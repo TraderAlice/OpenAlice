@@ -215,6 +215,12 @@ describe('Office responsive style contract', () => {
     expect(css).toMatch(
       /@media \(max-width: 700px\) \{[\s\S]*?\[data-sonner-toaster\]\[data-y-position="top"\]\s*\{\s*--offset-top: 96px !important;/,
     )
+    expect(css).toMatch(
+      /body:has\(\.oa-office-main\):has\(button\[title="Dismiss until next reload"\]\)[\s\S]*?--offset-top: 116px !important;\s*--mobile-offset-top: 116px !important;/,
+    )
+    expect(css).toMatch(
+      /@media \(max-width: 700px\) \{[\s\S]*?body:has\(\.oa-office-main\):has\(button\[title="Dismiss until next reload"\]\)[\s\S]*?--offset-top: 130px !important;\s*--mobile-offset-top: 130px !important;/,
+    )
   })
 
   it('keeps the roster command legend fixed while only the teammate grid scrolls', () => {

@@ -2292,11 +2292,23 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
   --mobile-offset-top: 82px !important;
 }
 
+body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:has(.oa-office-window)):not(:has(.oa-office-pause-menu))
+  [data-sonner-toaster][data-y-position="top"] {
+  --offset-top: 116px !important;
+  --mobile-offset-top: 116px !important;
+}
+
 @media (max-width: 700px) {
   body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause-menu))
     [data-sonner-toaster][data-y-position="top"] {
     --offset-top: 96px !important;
     --mobile-offset-top: 96px !important;
+  }
+
+  body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:has(.oa-office-window)):not(:has(.oa-office-pause-menu))
+    [data-sonner-toaster][data-y-position="top"] {
+    --offset-top: 130px !important;
+    --mobile-offset-top: 130px !important;
   }
 }
 
