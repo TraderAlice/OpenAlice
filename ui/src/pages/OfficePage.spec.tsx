@@ -500,6 +500,86 @@ describe('OfficePage localization', () => {
     expect(acknowledgeMock).toHaveBeenCalledWith('agent', 45)
   })
 
+  it('carries an exact visible Agent duty through the coworker file and returns its stamp to the floor', async () => {
+    officeFloorMock.mockReturnValue({
+      ...defaultOfficeFloor(),
+      building: {
+        ...defaultOfficeFloor().building,
+        lastSeq: 45,
+        offices: [{
+          ...defaultOfficeFloor().building.offices[0],
+          employees: [{
+            resumeId: 'resume-grok-duty',
+            agent: 'grok',
+            name: 'g18',
+            title: 'Deliver the Office duty result',
+            mood: 'idle' as const,
+            awake: false,
+            bubble: null,
+            lastSeq: 45,
+            lastInteractionAt: 4_500,
+            drawers: [],
+          }],
+        }],
+      },
+    })
+    productActivityMock.mockReturnValue({
+      agent: {
+        seq: 45,
+        occurredAt: 4_500,
+        eventType: 'runtime.stopped',
+        status: 'done',
+        subject: {
+          kind: 'session',
+          workspaceId: 'chat-1',
+          resumeId: 'resume-grok-duty',
+        },
+      },
+      inbox: null,
+      news: null,
+      attention: { agent: true, inbox: false, news: false },
+      pending: { agent: 3, inbox: 0, news: 0 },
+      freshKind: null,
+      acknowledgeThrough: acknowledgeMock,
+    })
+    const { container } = render(<OfficePage />)
+
+    const duty = screen.getByRole('button', { name: /下一值班项：.*待处理 3 条/ })
+    expect(duty.textContent).not.toContain('行动看板')
+    await userEvent.click(duty)
+    const file = await screen.findByRole('dialog', { name: /Grok/ }, { timeout: 10_000 })
+    const actions = file.querySelector<HTMLElement>('.oa-office-inspect__actions')
+    expect(actions?.dataset.dutyPending).toBe('true')
+    const reviewDuty = screen.getByRole('button', { name: '复核这次结果' })
+    expect(document.activeElement).toBe(reviewDuty)
+
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog', { name: /Grok/ })).toBeNull()
+    expect(acknowledgeMock).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: /下一值班项：.*待处理 3 条/ })).toBeTruthy()
+
+    await userEvent.click(duty)
+    await userEvent.click(await screen.findByRole('button', { name: '复核这次结果' }))
+    let runtime = await screen.findByTestId('office-runtime-section')
+    expect(runtime.dataset.channel).toBe('agent')
+    expect(runtime.dataset.selectedSeq).toBe('45')
+    expect(runtime.dataset.dutyKind).toBe('agent')
+    expect(runtime.dataset.dutyThroughSeq).toBe('45')
+    expect(runtime.dataset.dutyCount).toBe('3')
+
+    await userEvent.keyboard('{Escape}')
+    expect(screen.getByRole('dialog', { name: /Grok/ })).toBeTruthy()
+    expect(acknowledgeMock).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: '复核这次结果' }))
+    runtime = await screen.findByTestId('office-runtime-section')
+    await userEvent.click(screen.getByRole('button', { name: 'Mock confirm duty' }))
+    expect(acknowledgeMock).toHaveBeenCalledWith('agent', 45)
+    await vi.waitFor(() => expect(screen.queryByTestId('office-runtime-section')).toBeNull())
+    expect(screen.queryByRole('dialog', { name: /Grok/ })).toBeNull()
+    expect(container.querySelector<HTMLElement>('.oa-office-scene')?.hasAttribute('inert')).toBe(false)
+    await vi.waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('office-floor')))
+  })
+
   it('keeps Inbox and News station visits inside the Office journal', async () => {
     productActivityMock.mockReturnValue({
       agent: null,

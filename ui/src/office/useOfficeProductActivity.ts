@@ -12,6 +12,12 @@ const ACK_STORAGE_PREFIX = 'openalice:office-product-activity:ack:'
 const OFFICE_ACTIVITY_KINDS = ['agent', 'inbox', 'news'] as const
 export type OfficeActivityKind = typeof OFFICE_ACTIVITY_KINDS[number]
 
+export interface OfficeActivitySessionSubject {
+  readonly kind: 'session'
+  readonly workspaceId: string
+  readonly resumeId: string
+}
+
 const OFFICE_AGENT_REVIEW_TYPES = [
   'runtime.spawn_failed',
   'runtime.stopped',
@@ -30,6 +36,7 @@ export interface OfficeActivityLandmark {
   readonly inboxEntryId?: string
   readonly eventType?: AgentRuntimeEvent['type']
   readonly status?: AgentRuntimeEvent['payload']['status']
+  readonly subject?: OfficeActivitySessionSubject
 }
 
 export interface OfficeProductActivityState {
@@ -69,6 +76,15 @@ export function projectOfficeProductActivity(
             ?? agent.payload.workspaceId,
           eventType: agent.type,
           status: agent.payload.status,
+          ...(agent.payload.workspaceId && agent.payload.resumeId
+            ? {
+                subject: {
+                  kind: 'session' as const,
+                  workspaceId: agent.payload.workspaceId,
+                  resumeId: agent.payload.resumeId,
+                },
+              }
+            : {}),
         }
       : null,
     inbox: inbox

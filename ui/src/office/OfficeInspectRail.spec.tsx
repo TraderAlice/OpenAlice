@@ -306,6 +306,40 @@ describe('OfficeInspectRail', () => {
     expect(document.activeElement).toBe(reviewActivity)
   })
 
+  it('promotes the existing review command while the coworker owns a captured duty', () => {
+    const { container, rerender } = render(
+      <OfficeInspectRail
+        employee={{ ...employee, awake: false, mood: 'idle', bubble: null }}
+        roomName="Chat"
+        dutyPending
+        onOpen={vi.fn()}
+        onReviewActivity={vi.fn()}
+        onOpenDrawer={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+
+    const actions = container.querySelector<HTMLElement>('.oa-office-inspect__actions')
+    expect(actions?.dataset.dutyPending).toBe('true')
+    expect(screen.getByRole('button', { name: 'Review this result' })).toBe(document.activeElement)
+    expect(screen.getByRole('button', { name: 'Open session' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Review activity' })).toBeNull()
+
+    rerender(
+      <OfficeInspectRail
+        employee={{ ...employee, awake: false, mood: 'idle', bubble: null }}
+        roomName="Chat"
+        dutyPending
+        dutyReviewIntent="run"
+        onOpen={vi.fn()}
+        onReviewActivity={vi.fn()}
+        onOpenDrawer={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+    expect(screen.getByRole('button', { name: 'Review this run' })).toBe(document.activeElement)
+  })
+
   it('keeps a long Assignment readable across live snapshot refreshes', async () => {
     const longTitle = 'Research question: Is NVDA in a buyable technical setup right now, and does the broader semiconductor sector support it?'
     const onClose = vi.fn()

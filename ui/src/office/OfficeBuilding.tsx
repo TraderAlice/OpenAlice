@@ -128,8 +128,22 @@ export type OfficeLogOrigin =
   | 'floor-terminal'
   | 'inbox-service'
   | 'news-service'
-type OfficeAcknowledgementTarget = 'operations' | 'floor-terminal' | 'inbox-service' | 'news-service'
-type OfficeDutyTargetId = Extract<OfficeAcknowledgementTarget, 'operations' | 'inbox-service' | 'news-service'>
+type OfficeEmployeeTargetId = `employee:${string}:${string}`
+type OfficeAcknowledgementTarget =
+  | 'operations'
+  | 'floor-terminal'
+  | 'inbox-service'
+  | 'news-service'
+  | OfficeEmployeeTargetId
+type OfficeDutyTargetId =
+  | 'operations'
+  | 'inbox-service'
+  | 'news-service'
+  | OfficeEmployeeTargetId
+
+function isOfficeEmployeeTargetId(targetId: string): targetId is OfficeEmployeeTargetId {
+  return targetId.startsWith('employee:')
+}
 
 export interface OfficeNextDuty {
   kind: OfficeActivityKind
@@ -143,9 +157,20 @@ const OFFICE_DUTY_PRIORITY: readonly Readonly<Pick<OfficeNextDuty, 'kind' | 'tar
   { kind: 'news', targetId: 'news-service' },
 ]
 
-export function nextOfficeDuty(activity: OfficeProductActivityState): OfficeNextDuty | null {
+export function nextOfficeDuty(
+  activity: OfficeProductActivityState,
+  targetAvailable: (targetId: string) => boolean = () => false,
+): OfficeNextDuty | null {
   const next = OFFICE_DUTY_PRIORITY.find(({ kind }) => activity.attention[kind])
-  return next ? { ...next, count: activity.pending[next.kind] } : null
+  if (!next) return null
+  if (next.kind === 'agent' && activity.agent?.subject) {
+    const { workspaceId, resumeId } = activity.agent.subject
+    const employeeTargetId = `employee:${workspaceId}:${resumeId}` as const
+    if (targetAvailable(employeeTargetId)) {
+      return { kind: 'agent', targetId: employeeTargetId, count: activity.pending.agent }
+    }
+  }
+  return { ...next, count: activity.pending[next.kind] }
 }
 
 export interface OfficePlayerState {
@@ -406,6 +431,10 @@ export function OfficeBuilding({
     () => new Map(interactionTargets.map((target) => [target.id, target])),
     [interactionTargets],
   )
+  const interactionTargetByIdRef = useRef(interactionTargetById)
+  useLayoutEffect(() => {
+    interactionTargetByIdRef.current = interactionTargetById
+  }, [interactionTargetById])
   const replayFocusTarget = useMemo(() => {
     if (replaySeq == null || replayFocus?.seq !== replaySeq) return null
     for (const targetId of replayFocus.targetIds) {
@@ -440,12 +469,20 @@ export function OfficeBuilding({
                   ? `${t('office.roster')} · ${routeTarget.roomName}`
                   : routeTarget.roomName
     : null
-  const nextDuty = replaySeq == null ? nextOfficeDuty(productActivity) : null
+  const nextDuty = replaySeq == null
+    ? nextOfficeDuty(productActivity, (targetId) => interactionTargetById.has(targetId))
+    : null
+  const nextDutyTarget = nextDuty ? interactionTargetById.get(nextDuty.targetId) : null
   const nextDutyName = nextDuty
     ? nextDuty.kind === 'inbox'
       ? t('office.inboxStation')
       : nextDuty.kind === 'agent'
-        ? t('office.operationsBoard')
+        ? nextDutyTarget?.kind === 'employee'
+          ? officeCoworkerCallsign(
+              nextDutyTarget.employee,
+              coworkerAssets.get(nextDutyTarget.employee.resumeId),
+            )
+          : t('office.operationsBoard')
         : t('office.newsStation')
     : null
   const routeStatusEdge = officeRouteStatusEdge(alice, camera, viewportSize, mapLayout.height)
@@ -465,7 +502,9 @@ export function OfficeBuilding({
     const previous = previousAttentionRef.current
     const current = productActivity.attention
     const targetForKind = {
-      agent: interactionAnchorTargetId === 'operations' || interactionAnchorTargetId === 'floor-terminal'
+      agent: interactionAnchorTargetId === 'operations'
+        || interactionAnchorTargetId === 'floor-terminal'
+        || (interactionAnchorTargetId != null && isOfficeEmployeeTargetId(interactionAnchorTargetId))
         ? interactionAnchorTargetId
         : null,
       inbox: interactionAnchorTargetId === 'inbox-service' ? interactionAnchorTargetId : null,
@@ -493,7 +532,13 @@ export function OfficeBuilding({
   }, [interactionSuspended, productActivity.attention])
   const nearbyTarget = useMemo(
     () => {
-      if (floorInteractionSuspended || departingWorkspace || selected) return null
+      if (
+        floorInteractionSuspended
+        || departingWorkspace
+        || selected
+        || routeTargetId
+        || acknowledgedTargetId
+      ) return null
       const anchoredTarget = interactionAnchorTargetId
         ? availableInteractionTargets.find((target) => target.id === interactionAnchorTargetId)
         : null
@@ -506,10 +551,12 @@ export function OfficeBuilding({
     [
       alice,
       aliceDirection,
+      acknowledgedTargetId,
       availableInteractionTargets,
       departingWorkspace,
       floorInteractionSuspended,
       interactionAnchorTargetId,
+      routeTargetId,
       selected,
     ],
   )
@@ -673,8 +720,18 @@ export function OfficeBuilding({
         nearbyTarget.employee,
         coworkerAssets.get(nearbyTarget.employee.resumeId),
       )
+      const isAgentDutyTarget = nextDuty?.kind === 'agent'
+        && nextDuty.targetId === nearbyTarget.id
       const failed = nearbyTarget.employee.mood === 'failed'
+        || (isAgentDutyTarget && (
+          productActivity.agent?.eventType === 'runtime.spawn_failed'
+          || productActivity.agent?.eventType === 'runtime.rejected'
+          || productActivity.agent?.eventType === 'runtime.turn.error'
+        ))
       const hasFreshResult = nearbyTarget.employee.mood === 'review'
+        || (isAgentDutyTarget
+          && productActivity.agent?.eventType === 'runtime.stopped'
+          && productActivity.agent.status === 'done')
       const canTalk = nearbyTarget.employee.awake
       const interaction = failed
         ? {
@@ -688,6 +745,12 @@ export function OfficeBuilding({
               action: t('office.interactActionReview'),
               label: t('office.interactResult', { name: target }),
             }
+          : isAgentDutyTarget
+            ? {
+                icon: OFFICE_HUD_ASSETS.occupancyLog,
+                action: t('office.interactActionReview'),
+                label: t('office.interactDutyRun', { name: target }),
+              }
           : canTalk
             ? {
                 icon: OFFICE_HUD_ASSETS.talkBubble,
@@ -978,7 +1041,7 @@ export function OfficeBuilding({
   }
   const requestTargetInteraction = (
     targetId: string,
-    options: { activate?: () => void; allowReplay?: boolean } = {},
+    options: { activate?: () => void; allowReplay?: boolean; fallbackTargetId?: string } = {},
   ) => {
     if (selected || departingWorkspace || floorInteractionSuspended) return
     const target = interactionTargetById.get(targetId)
@@ -1003,7 +1066,15 @@ export function OfficeBuilding({
       scheduleAutoWalk(() => {
         if (routeGenerationRef.current !== generation) return
         setRouteTrail([])
-        const action = options.activate ?? (() => activateTarget(target))
+        const currentTarget = interactionTargetByIdRef.current.get(targetId)
+        if (!currentTarget) {
+          const fallbackTarget = options.fallbackTargetId
+            ? interactionTargetByIdRef.current.get(options.fallbackTargetId)
+            : null
+          if (fallbackTarget) activateTarget(fallbackTarget)
+          return
+        }
+        const action = options.activate ?? (() => activateTarget(currentTarget))
         action()
       }, reducedMotion ? 0 : 80)
     }
@@ -1422,7 +1493,12 @@ export function OfficeBuilding({
                 name: nextDutyName,
                 countLabel: nextDuty.count >= 9 ? '9+' : nextDuty.count,
               })}
-              onClick={() => requestTargetInteraction(nextDuty.targetId)}
+              onClick={() => requestTargetInteraction(
+                nextDuty.targetId,
+                nextDuty.kind === 'agent' && nextDuty.targetId !== 'operations'
+                  ? { fallbackTargetId: 'operations' }
+                  : undefined,
+              )}
             >
               <span>{t('office.nextDuty')}</span>
               <strong>{nextDutyName}</strong>
@@ -2069,6 +2145,7 @@ export function OfficeBuilding({
                 onOpenRoster={(workspaceId) => requestTargetInteraction(`roster:${workspaceId}`)}
                 nearbyTargetId={nearbyTarget?.id}
                 routeTargetId={routeTargetId}
+                acknowledgedTargetId={acknowledgedTargetId}
                 replayFocusResumeId={replayFocus?.seq === replaySeq
                   && replayFocus.workspaceId === group.workspace.id
                   ? replayFocus.resumeId

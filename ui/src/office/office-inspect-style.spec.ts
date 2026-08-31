@@ -46,6 +46,12 @@ describe('Office Agent-file style contract', () => {
     expect(css).toMatch(
       /\.oa-office-inspect__actions\[data-has-activity="true"\]\s*\{[^}]*grid-template-columns: minmax\(0, 0\.9fr\) minmax\(0, 1\.1fr\)/s,
     )
+    expect(css).toMatch(
+      /\.oa-office-inspect__actions\[data-duty-pending="true"\]\s*\{[^}]*grid-template-columns: minmax\(0, 1\.1fr\) minmax\(0, 0\.9fr\)/s,
+    )
+    expect(css).toMatch(
+      /\.oa-office-inspect__actions\[data-duty-pending="true"\] \.oa-office-inspect__activity\s*\{[^}]*background: var\(--gba-moss-dark\)/s,
+    )
   })
 
   it('keeps callsigns short, clamps optional Assignments, and uses a simple DOM-owned close mark', () => {

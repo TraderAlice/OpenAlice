@@ -23,6 +23,8 @@ export function OfficeInspectRail({
   coworkerAsset,
   roomName,
   replayFocus = null,
+  dutyPending = false,
+  dutyReviewIntent = 'result',
   onOpen,
   onReviewActivity,
   onOpenDrawer,
@@ -34,6 +36,8 @@ export function OfficeInspectRail({
   coworkerAsset?: OfficeCoworkerSpriteAsset
   roomName?: string
   replayFocus?: OfficeReplayFocus | null
+  dutyPending?: boolean
+  dutyReviewIntent?: 'result' | 'run'
   onOpen: () => void
   onReviewActivity?: () => void
   onOpenDrawer: (item: OfficeDrawerItem) => void
@@ -456,6 +460,7 @@ export function OfficeInspectRail({
         <div
           className="oa-office-inspect__actions"
           data-has-activity={Boolean(onReviewActivity) || undefined}
+          data-duty-pending={dutyPending || undefined}
         >
           {onReviewActivity && (
             <button
@@ -480,7 +485,11 @@ export function OfficeInspectRail({
                 else openButtonRef.current?.focus()
               }}
             >
-              {t('office.reviewActivity')}
+              {t(dutyPending
+                ? dutyReviewIntent === 'result'
+                  ? 'office.reviewDutyResult'
+                  : 'office.reviewDutyRun'
+                : 'office.reviewActivity')}
               <img src={OFFICE_HUD_ASSETS.occupancyLog} alt="" aria-hidden style={officePixelImg} />
             </button>
           )}

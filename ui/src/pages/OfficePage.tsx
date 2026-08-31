@@ -55,7 +55,12 @@ export function OfficePage() {
   const [replayFocus, setReplayFocus] = useState<OfficeReplayFocus | null>(null)
   const [replayPanelOpen, setReplayPanelOpen] = useState(false)
   const [retryingFloor, setRetryingFloor] = useState(false)
-  const [selected, setSelected] = useState<{ workspaceId: string; resumeId: string } | null>(null)
+  const [selected, setSelected] = useState<{
+    workspaceId: string
+    resumeId: string
+    dutyReview?: OfficeDutyReview
+    dutyReviewIntent?: 'result' | 'run'
+  } | null>(null)
   const [logView, setLogView] = useState<{
     origin: OfficeLogOrigin
     channel: OfficeLogChannel
@@ -162,6 +167,14 @@ export function OfficePage() {
   const closeLogWithDestination = (destination: 'origin' | 'floor') => {
     const origin = logView?.origin ?? 'menu'
     setLogView(null)
+    if (destination === 'floor') {
+      setSelected(null)
+      employeeOriginRef.current = { kind: 'map' }
+      requestAnimationFrame(() => {
+        document.querySelector<HTMLElement>('[data-testid="office-floor"]')?.focus()
+      })
+      return
+    }
     if (origin === 'menu' && destination === 'origin') {
       setMenuResumeToken((current) => current + 1)
       return
@@ -278,6 +291,7 @@ export function OfficePage() {
     }
   }
 
+  const selectedDutyReview = asOfSeq == null ? selected?.dutyReview : undefined
   const reviewSelectedActivity = selectedSeat && selectedReplayFocus
     ? () => {
       setLogView({
@@ -287,7 +301,17 @@ export function OfficePage() {
       })
       setReplayPanelOpen(true)
     }
-    : selectedSeat && selectedSeat.employee.lastSeq > 0 && (
+    : selectedSeat && selectedDutyReview
+      ? () => {
+        setLogView({
+          origin: 'employee',
+          channel: 'agent',
+          focusSeq: selectedDutyReview.throughSeq,
+          dutyReview: selectedDutyReview,
+        })
+        setReplayPanelOpen(false)
+      }
+      : selectedSeat && selectedSeat.employee.lastSeq > 0 && (
       selectedSeat.employee.mood === 'failed'
       || selectedSeat.employee.mood === 'waiting'
       || selectedSeat.employee.mood === 'review'
@@ -340,7 +364,28 @@ export function OfficePage() {
                 onPlayerStateChange={rememberOfficePlayerState}
                 onSelectEmployee={(workspaceId, employee) => {
                   employeeOriginRef.current = { kind: 'map' }
-                  setSelected({ workspaceId, resumeId: employee.resumeId })
+                  const agentLandmark = productActivity.agent
+                  const dutyReview = asOfSeq == null
+                    && productActivity.attention.agent
+                    && agentLandmark?.subject?.workspaceId === workspaceId
+                    && agentLandmark.subject.resumeId === employee.resumeId
+                    ? {
+                        kind: 'agent' as const,
+                        throughSeq: agentLandmark.seq,
+                        count: productActivity.pending.agent,
+                      }
+                    : undefined
+                  const dutyReviewIntent = dutyReview && agentLandmark
+                    ? agentLandmark.eventType === 'runtime.stopped' && agentLandmark.status === 'done'
+                      ? 'result' as const
+                      : 'run' as const
+                    : undefined
+                  setSelected({
+                    workspaceId,
+                    resumeId: employee.resumeId,
+                    ...(dutyReview ? { dutyReview } : {}),
+                    ...(dutyReviewIntent ? { dutyReviewIntent } : {}),
+                  })
                   setRosterFocusResumeId(null)
                   setLogView(null)
                   setCabinetWorkspaceId(null)
@@ -509,6 +554,8 @@ export function OfficePage() {
                 coworkerAsset={selectedCoworkerAsset}
                 roomName={selectedSeat.roomName}
                 replayFocus={selectedReplayFocus}
+                dutyPending={Boolean(selectedDutyReview)}
+                dutyReviewIntent={selected?.dutyReviewIntent}
                 onOpen={() => openEmployee(selectedSeat.office.workspace.id, selectedSeat.employee)}
                 onReviewActivity={reviewSelectedActivity}
                 onOpenDrawer={(item) => openDrawer(selectedSeat.office.workspace.id, selectedSeat.employee, item)}

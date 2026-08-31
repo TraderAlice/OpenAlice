@@ -101,6 +101,8 @@ describe('projectOfficeProductActivity', () => {
       event(14, 'runtime.turn.text', { agent: 'grok', text: 'still working' }),
       event(15, 'runtime.turn.error', {
         agent: 'grok',
+        workspaceId: 'office-lab',
+        resumeId: 'resume-grok-15',
         error: `  Failed\n  after   ${'a'.repeat(190)}  `,
       }),
     ]
@@ -111,6 +113,11 @@ describe('projectOfficeProductActivity', () => {
       occurredAt: 15_000,
       source: 'grok',
       eventType: 'runtime.turn.error',
+      subject: {
+        kind: 'session',
+        workspaceId: 'office-lab',
+        resumeId: 'resume-grok-15',
+      },
     })
     expect(projection.agent?.detail).toHaveLength(180)
     expect(projection.agent?.detail).toBe(`Failed after ${'a'.repeat(166)}…`)

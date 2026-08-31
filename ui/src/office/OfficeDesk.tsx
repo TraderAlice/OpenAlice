@@ -13,6 +13,7 @@ export function OfficeDesk({
   selected,
   nearby,
   targeted,
+  acknowledged = false,
   replayFocused = false,
   depth,
   reducedMotion,
@@ -27,6 +28,7 @@ export function OfficeDesk({
   selected: boolean
   nearby?: boolean
   targeted?: boolean
+  acknowledged?: boolean
   replayFocused?: boolean
   depth: number
   reducedMotion: boolean
@@ -88,6 +90,7 @@ export function OfficeDesk({
         data-selected={selected}
         data-nearby={nearby}
         data-route={targeted}
+        data-acknowledged={acknowledged || undefined}
         data-replay-focus={replayFocused || undefined}
         data-occupied={Boolean(employee)}
         data-awake={employee?.awake}
@@ -147,6 +150,9 @@ export function OfficeDesk({
               pose="desk"
             />
           </span>
+        )}
+        {acknowledged && (
+          <span className="oa-office-landmark-ack" aria-hidden>OK</span>
         )}
       </button>
     </li>

@@ -51,6 +51,264 @@ describe('OfficeBuilding', () => {
     })).toBeNull()
   })
 
+  it('routes Agent review to an exact visible session and otherwise falls back to Operations', () => {
+    const activity = {
+      agent: {
+        seq: 45,
+        occurredAt: 4_500,
+        subject: {
+          kind: 'session' as const,
+          workspaceId: 'chat-1',
+          resumeId: 'resume-grok',
+        },
+      },
+      inbox: null,
+      news: null,
+      attention: { agent: true, inbox: false, news: false },
+      pending: { agent: 3, inbox: 0, news: 0 },
+      freshKind: null,
+    }
+    const exactTarget = 'employee:chat-1:resume-grok'
+
+    expect(nextOfficeDuty(activity, (targetId) => targetId === exactTarget)).toEqual({
+      kind: 'agent',
+      targetId: exactTarget,
+      count: 3,
+    })
+    expect(nextOfficeDuty(activity, (targetId) => targetId === 'employee:other:resume-grok'))
+      .toEqual({ kind: 'agent', targetId: 'operations', count: 3 })
+    expect(nextOfficeDuty({
+      ...activity,
+      agent: { seq: 45, occurredAt: 4_500 },
+    }, () => true)).toEqual({ kind: 'agent', targetId: 'operations', count: 3 })
+  })
+
+  it('walks the Agent duty to its visible coworker and returns the receipt to that desk', async () => {
+    const employee = {
+      resumeId: 'resume-duty-grok',
+      agent: 'grok',
+      name: 'g17',
+      title: 'Review the latest Office result',
+      awake: false,
+      mood: 'review' as const,
+      bubble: null,
+      latestResult: { text: 'Duty result', at: 4_500 },
+      lastSeq: 45,
+      lastInteractionAt: 4_500,
+      drawers: [],
+    }
+    const building = {
+      config: {
+        workspaceSleepAfterMs: 1,
+        harnessMinimumVisibleGroups: { chat: 1, 'auto-quant': 0, prediction: 0, other: 0 },
+      },
+      lastSeq: 45,
+      firstSeq: 1,
+      offices: [{
+        workspace: { id: 'chat-duty', tag: 'chat', harness: 'chat' as const },
+        lastInteractionAt: 4_500,
+        sleeping: false,
+        employees: [employee],
+      }],
+    }
+    const activity = {
+      agent: {
+        seq: 45,
+        occurredAt: 4_500,
+        eventType: 'runtime.stopped' as const,
+        status: 'done' as const,
+        subject: {
+          kind: 'session' as const,
+          workspaceId: 'chat-duty',
+          resumeId: 'resume-duty-grok',
+        },
+      },
+      inbox: null,
+      news: null,
+      attention: { agent: true, inbox: false, news: false },
+      pending: { agent: 3, inbox: 0, news: 0 },
+      freshKind: null,
+    }
+    const onSelectEmployee = vi.fn()
+    const props = {
+      building,
+      productActivity: activity,
+      onSelectEmployee,
+      onOpenEmployee: vi.fn(),
+      onOpenWorkspace: vi.fn(),
+      onOpenFiles: vi.fn(),
+      onOpenRoster: vi.fn(),
+      onOpenLog: vi.fn(),
+    }
+    const view = render(<OfficeBuilding {...props} />)
+
+    const duty = screen.getByRole('button', { name: /Next duty: .*3 pending/ })
+    expect(duty.textContent).not.toContain('Operations board')
+    await userEvent.click(duty)
+    await waitFor(() => expect(onSelectEmployee).toHaveBeenCalledWith(
+      'chat-duty',
+      expect.objectContaining({ resumeId: 'resume-duty-grok' }),
+    ), { timeout: 5_000 })
+
+    view.rerender(<OfficeBuilding {...props} interactionSuspended />)
+    view.rerender(
+      <OfficeBuilding
+        {...props}
+        productActivity={{
+          ...activity,
+          attention: { ...activity.attention, agent: false },
+        }}
+      />,
+    )
+    const desk = screen.getByTestId('office-desk-resume-duty-grok')
+    await waitFor(() => expect(desk.dataset.acknowledged).toBe('true'))
+    expect(desk.querySelector('.oa-office-landmark-ack')?.textContent).toBe('OK')
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  it('keeps a hidden fifth Agent duty on Operations without reassigning visible desks', () => {
+    const employees = Array.from({ length: 5 }, (_, index) => ({
+      resumeId: `resume-${index}`,
+      agent: 'grok',
+      name: `g${index + 1}`,
+      title: `Session ${index + 1}`,
+      awake: false,
+      mood: 'idle' as const,
+      bubble: null,
+      lastSeq: 45,
+      lastInteractionAt: 4_500 - index,
+      drawers: [],
+    }))
+    render(
+      <OfficeBuilding
+        building={{
+          config: {
+            workspaceSleepAfterMs: 1,
+            harnessMinimumVisibleGroups: { chat: 1, 'auto-quant': 0, prediction: 0, other: 0 },
+          },
+          lastSeq: 45,
+          firstSeq: 1,
+          offices: [{
+            workspace: { id: 'chat-full', tag: 'chat', harness: 'chat' },
+            lastInteractionAt: 4_500,
+            sleeping: false,
+            employees,
+          }],
+        }}
+        productActivity={{
+          agent: {
+            seq: 45,
+            occurredAt: 4_500,
+            subject: {
+              kind: 'session',
+              workspaceId: 'chat-full',
+              resumeId: 'resume-4',
+            },
+          },
+          inbox: null,
+          news: null,
+          attention: { agent: true, inbox: false, news: false },
+          pending: { agent: 1, inbox: 0, news: 0 },
+          freshKind: null,
+        }}
+        onSelectEmployee={vi.fn()}
+        onOpenEmployee={vi.fn()}
+        onOpenWorkspace={vi.fn()}
+        onOpenFiles={vi.fn()}
+        onOpenRoster={vi.fn()}
+        onOpenLog={vi.fn()}
+      />,
+    )
+
+    expect(screen.getAllByTestId(/^office-desk-/)).toHaveLength(4)
+    expect(screen.queryByTestId('office-desk-resume-4')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Next duty: Operations board, 1 pending' }))
+      .toBeTruthy()
+  })
+
+  it('falls back to Operations when an Agent duty coworker leaves during auto-walk', () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })))
+    try {
+      const employee = {
+        resumeId: 'resume-departing-duty',
+        agent: 'grok',
+        name: 'g19',
+        title: 'Depart during route',
+        awake: false,
+        mood: 'review' as const,
+        bubble: null,
+        lastSeq: 45,
+        lastInteractionAt: 4_500,
+        drawers: [],
+      }
+      const office = {
+        workspace: { id: 'chat-duty', tag: 'chat', harness: 'chat' as const },
+        lastInteractionAt: 4_500,
+        sleeping: false,
+        employees: [employee],
+      }
+      const building = {
+        config: {
+          workspaceSleepAfterMs: 1,
+          harnessMinimumVisibleGroups: { chat: 1, 'auto-quant': 0, prediction: 0, other: 0 },
+        },
+        lastSeq: 45,
+        firstSeq: 1,
+        offices: [office],
+      }
+      const productActivity = {
+        agent: {
+          seq: 45,
+          occurredAt: 4_500,
+          subject: {
+            kind: 'session' as const,
+            workspaceId: 'chat-duty',
+            resumeId: 'resume-departing-duty',
+          },
+        },
+        inbox: null,
+        news: null,
+        attention: { agent: true, inbox: false, news: false },
+        pending: { agent: 1, inbox: 0, news: 0 },
+        freshKind: null,
+      }
+      const onSelectEmployee = vi.fn()
+      const onOpenLog = vi.fn()
+      const props = {
+        building,
+        productActivity,
+        initialPlayerState: { position: { x: 480, y: 600 }, direction: 'up' as const },
+        onSelectEmployee,
+        onOpenEmployee: vi.fn(),
+        onOpenWorkspace: vi.fn(),
+        onOpenFiles: vi.fn(),
+        onOpenRoster: vi.fn(),
+        onOpenLog,
+      }
+      const view = render(<OfficeBuilding {...props} />)
+
+      fireEvent.click(screen.getByRole('button', { name: /Next duty:/ }))
+      expect(screen.getByTestId('office-route-status')).toBeTruthy()
+      view.rerender(
+        <OfficeBuilding
+          {...props}
+          building={{ ...building, offices: [{ ...office, employees: [] }] }}
+        />,
+      )
+      act(() => vi.advanceTimersByTime(5_000))
+
+      expect(onSelectEmployee).not.toHaveBeenCalled()
+      expect(onOpenLog).toHaveBeenCalledWith('operations')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('claims the initial keyboard focus so the first direction key enters the game', async () => {
     const onOpenLog = vi.fn()
     render(

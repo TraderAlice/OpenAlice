@@ -5903,6 +5903,62 @@ Explicit diligence receipt follow-up (2026-08-31):
   115 tests; root and UI TypeScript passed; the full suite passed 641 test files and 5,414 tests (one file and nine tests
   skipped); the production UI build passed with only the existing ports fallback and large-chunk advisory.
 
+Agent-duty character routing design (2026-08-31):
+
+- Audited the Agent duty chain from product-event identity through visible desk targets, Agent File, Activity Log, the
+  explicit receipt, and the world acknowledgement. The current Operations-only route is safe but throws away the
+  Office's strongest advantage: a player cannot see which coworker produced the result that now deserves review.
+- Compared keeping every Agent duty on Operations, routing to a coworker and opening their Agent File before review,
+  and treating the coworker as a waypoint that opens Activity Log directly. Chose the Agent File route: arrival first
+  answers “who needs me?”, the existing Review activity command answers “what happened?”, and only the existing
+  read-then-stamp receipt completes the duty. Direct log opening would make the character decorative again.
+- The route requires an exact `workspaceId` plus `resumeId` match against a currently rendered employee interaction
+  target. Missing identity, a sleeping room that is not rendered, an employee outside the four visible desk slots, a
+  departed employee, or a target that disappears during auto-walk falls back to Operations. The first increment does
+  not infer identity from names and does not force a hidden coworker into a seat: either behavior would make the map
+  lie, and forced seating would visibly teleport coworkers when attention clears.
+- A duty captures its sequence and count when the matching Agent File opens. Escape remains postponement; ordinary
+  employee inspection remains uncommitted; and the duty action is visually promoted over Open Session only while that
+  exact captured review is pending. Confirming closes both Activity Log and Agent File back to the floor, advances the
+  queue, and raises the existing one-shot `OK` receipt on that coworker's desk.
+
+Agent-duty character routing implementation (2026-08-31):
+
+- Product activity now preserves an optional session subject as raw `workspaceId` plus `resumeId`; the hook remains
+  independent from rooms, desk slots, callsigns, and DOM target IDs. The live Building resolves that subject only
+  against its current interaction-target map. Exact visible employees become the duty destination; missing identity,
+  a hidden fifth seat, a hidden room, or a departed target remains an Operations duty without changing desk order.
+- Clicking the duty uses the normal collision-aware route and opens the matching Agent File. The captured sequence and
+  count then travel through that file's review command into the existing Activity Log receipt. Completed runs say
+  `Review this result`; paused, interrupted, rejected, failed-start, and error evidence say `Review this run`, so the
+  command never claims that a stopped terminal necessarily produced a result. While pending, Review owns the green
+  primary command and Open Session becomes secondary; no third CTA or duty banner was added.
+- Auto-walk now re-resolves its target at arrival. If the coworker leaves during the route, it opens Operations with
+  the same pending Agent evidence instead of activating a stale employee or silently doing nothing. Nearby prompts are
+  suppressed during auto-walk, so `Walking to …` is the only movement instruction. After a receipt, the log and Agent
+  File close together, the exact desk owns the one-shot `OK`, and nearby `CHECK/ENTER` waits until that receipt ends.
+- Live acceptance created two real Grok Sessions in the Default AliceProject, stopped them normally, and followed
+  `Grok Cartographer #16883` on desktop plus `Grok Curator #16905` at 500×420. In both cases the HUD named the exact
+  visible NPC, Alice walked through the authored map, Agent File selected the exact paused record, Escape preserved the
+  duty, and the explicit stamp returned to the same desk before advancing to the newer News batch. The narrow HUD held
+  two rows and the complete Agent File kept identity, Assignment, three facts, and both commands visible.
+- Focused Office suites passed 76 tests; root and UI TypeScript passed. The full suite passed 641 files and 5,420 tests
+  (one file and nine tests skipped); the production UI build passed with only the existing ports fallback and large-
+  chunk advisory.
+
+First cadence-duty contract (design queued, 2026-08-31):
+
+- Audited Product Activity, Inbox, News, Issue snapshots, Workspace files, and Office drawers for a first diligence
+  duty beyond event arrival. The safest zero-backend increment is a Scheduled Issue health exception: a row with
+  `when` plus `automationHealth` in `blocked`, `failed`, or `interrupted`. It catches missed weekly-report, thesis, and
+  risk-review routines without parsing Issue titles, guessing from file mtimes, or treating ordinary `due` dispatch
+  latency as failure.
+- The next projector should be a registered descriptor fed by the existing Issue domain hook, not a fetch inside the
+  Building. It will sit after Inbox and before generic Agent/News, navigate with exact `workspaceId + issueId`, and use
+  a session receipt fingerprint over workspace, Issue, health state, latest task, last fired time, and next due time.
+  Reviewing it must not mutate Issue health, schedule state, or Inbox read state; changed evidence must produce a new
+  duty, and `Shift clear` must wait until every registered source has completed its first load.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

@@ -24,6 +24,7 @@ export function OfficeMapPod({
   onOpenRoster,
   nearbyTargetId,
   routeTargetId,
+  acknowledgedTargetId,
   replayFocusResumeId,
   coworkerAssets,
   slots,
@@ -43,6 +44,7 @@ export function OfficeMapPod({
   onOpenRoster: (workspaceId: string) => void
   nearbyTargetId?: string | null
   routeTargetId?: string | null
+  acknowledgedTargetId?: string | null
   replayFocusResumeId?: string | null
   coworkerAssets?: ReadonlyMap<string, OfficeCoworkerSpriteAsset>
   slots: readonly (OfficeFloorEmployee | null)[]
@@ -147,6 +149,10 @@ export function OfficeMapPod({
               targeted={Boolean(
                 employee
                 && routeTargetId === `employee:${group.workspace.id}:${employee.resumeId}`
+              )}
+              acknowledged={Boolean(
+                employee
+                && acknowledgedTargetId === `employee:${group.workspace.id}:${employee.resumeId}`
               )}
               replayFocused={Boolean(employee && employee.resumeId === replayFocusResumeId)}
               depth={officeDepthAt(layout.y + OFFICE_DESK_CENTERS[index].y)}

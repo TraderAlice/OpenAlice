@@ -3668,6 +3668,32 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
   object-fit: contain;
 }
 
+.oa-office-inspect__actions[data-duty-pending="true"] {
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+}
+
+.oa-office-inspect__actions[data-duty-pending="true"] .oa-office-inspect__activity {
+  color: var(--gba-cream);
+  background: var(--gba-moss-dark);
+  box-shadow: inset -3px -3px color-mix(in srgb, var(--gba-ink) 24%, transparent);
+  text-shadow: 1px 1px 0 var(--gba-ink);
+}
+
+.oa-office-inspect__actions[data-duty-pending="true"] .oa-office-inspect__activity:is(:hover, :focus-visible) {
+  background: var(--gba-moss);
+}
+
+.oa-office-inspect__actions[data-duty-pending="true"] .oa-office-inspect__open {
+  color: var(--gba-ink);
+  background: color-mix(in srgb, var(--gba-water) 26%, var(--gba-paper));
+  box-shadow: inset -3px -3px color-mix(in srgb, var(--gba-ink) 14%, transparent);
+  text-shadow: none;
+}
+
+.oa-office-inspect__actions[data-duty-pending="true"] .oa-office-inspect__open:hover {
+  background: color-mix(in srgb, var(--gba-water) 48%, var(--gba-paper));
+}
+
 .oa-office-inspect__open:hover {
   background: var(--gba-moss);
 }
@@ -6264,6 +6290,12 @@ button.oa-office-hud__duty:active {
 .oa-office-operations-board .oa-office-landmark-ack {
   top: 8px;
   right: 17px;
+}
+
+.oa-office-pod .oa-office-desk .oa-office-landmark-ack {
+  top: -5px;
+  right: -3px;
+  z-index: 12;
 }
 
 @keyframes oa-office-landmark-ack {
