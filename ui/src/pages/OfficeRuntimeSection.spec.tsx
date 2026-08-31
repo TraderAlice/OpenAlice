@@ -17,8 +17,21 @@ import {
 const query = vi.fn()
 const openOrFocus = vi.fn()
 
-function mockJournal(entries: Array<{ type: string } & Record<string, unknown>>) {
-  query.mockImplementation(async (opts: { family?: string; page?: number; pageSize?: number } = {}) => {
+function mockJournal(entries: Array<{ seq: number; type: string } & Record<string, unknown>>) {
+  query.mockImplementation(async (opts: {
+    family?: string
+    page?: number
+    pageSize?: number
+    afterSeq?: number
+    limit?: number
+  } = {}) => {
+    if (opts.afterSeq !== undefined) {
+      const matching = entries
+        .filter((entry) => entry.seq > opts.afterSeq!)
+        .sort((a, b) => a.seq - b.seq)
+        .slice(0, opts.limit)
+      return { entries: matching, lastSeq: entries[0]?.seq ?? 0 }
+    }
     const filtered = opts.family === 'inbox'
       ? entries.filter((entry) => entry.type === 'inbox.received')
       : opts.family === 'news'
@@ -142,6 +155,26 @@ describe('OfficeRuntimeSection', () => {
     rowBounds.mockReturnValueOnce({ top: 70, bottom: 110 } as DOMRect)
     revealOfficeJournalRow(journal, row)
     expect(journal.scrollTop).toBe(50)
+
+    const borderedJournal = document.createElement('ol')
+    const borderedRow = document.createElement('button')
+    borderedJournal.append(borderedRow)
+    borderedJournal.scrollTop = 20
+    Object.defineProperties(borderedJournal, {
+      clientTop: { configurable: true, value: 3 },
+      clientHeight: { configurable: true, value: 200 },
+    })
+    vi.spyOn(borderedJournal, 'getBoundingClientRect').mockReturnValue({
+      top: 100,
+      bottom: 306,
+    } as DOMRect)
+    vi.spyOn(borderedRow, 'getBoundingClientRect').mockReturnValue({
+      top: 246,
+      bottom: 304,
+    } as DOMRect)
+
+    revealOfficeJournalRow(borderedJournal, borderedRow)
+    expect(borderedJournal.scrollTop).toBe(21)
   })
 
   it('shows the empty occupancy copy', async () => {
@@ -740,6 +773,45 @@ describe('OfficeRuntimeSection', () => {
     expect(query).toHaveBeenCalledWith({ page: 2, pageSize: 100, family: 'agent' })
     expect(screen.getByRole('button', { name: /Task complete.*#0002/i })).toBeTruthy()
     expect(screen.getByRole('button', { name: /Task started.*#0001/i })).toBeTruthy()
+  })
+
+  it('loads and selects an older Agent-file record outside the recent story window', async () => {
+    const now = Date.now()
+    const recent = Array.from({ length: 100 }, (_, index) => ({
+      seq: 210 - index,
+      ts: now - index,
+      type: index % 2 === 0 ? 'runtime.started' : 'runtime.stopped',
+      payload: {
+        resumeId: `resume-recent-${index}`,
+        taskId: `task-recent-${index}`,
+        status: index % 2 === 0 ? undefined : 'done',
+      },
+    }))
+    mockJournal([
+      ...recent,
+      {
+        seq: 10,
+        ts: now - 10_000,
+        type: 'runtime.stopped',
+        payload: {
+          resumeId: 'resume-file-target',
+          taskId: 'task-file-target',
+          status: 'done',
+          assistantText: 'Requested coworker result.',
+        },
+      },
+    ])
+
+    render(<OfficeRuntimeSection initialChannel="agent" initialSelectedSeq={10} />)
+
+    const target = await screen.findByRole('button', { name: /Task complete.*#0010/i })
+    expect(target.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByText('Requested coworker result.')).toBeTruthy()
+    expect(query).toHaveBeenCalledWith({ afterSeq: 9, limit: 100 })
+
+    window.dispatchEvent(new Event(GLOBAL_ACTIVITY_REFRESH_EVENT))
+    await waitFor(() => expect(query.mock.calls.filter(([opts]) => opts.afterSeq === 9)).toHaveLength(1))
+    expect(target.getAttribute('aria-pressed')).toBe('true')
   })
 
   it('folds adjacent reports from one task into a selectable activity beat', async () => {

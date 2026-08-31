@@ -46,6 +46,7 @@ const OFFICE_LOG_CHANNELS: readonly OfficeLogChannel[] = ['overview', 'agent', '
 const OFFICE_AGENT_BEAT_TARGET = 12
 const OFFICE_AGENT_PAGE_SIZE = 100
 const OFFICE_AGENT_MAX_PAGES = 5
+const OFFICE_AGENT_FOCUS_WINDOW_SIZE = 100
 const OFFICE_SERVICE_PAGE_SIZE = 50
 const OFFICE_LOG_CHANNEL_LABEL_KEYS = {
   overview: 'office.logChannelOverview',
@@ -86,10 +87,14 @@ export function revealOfficeJournalRow(
 ): void {
   const journalBounds = journal.getBoundingClientRect()
   const rowBounds = row.getBoundingClientRect()
-  if (rowBounds.top < journalBounds.top) {
-    journal.scrollTop = Math.max(0, journal.scrollTop - (journalBounds.top - rowBounds.top))
-  } else if (rowBounds.bottom > journalBounds.bottom) {
-    journal.scrollTop += rowBounds.bottom - journalBounds.bottom
+  const viewportTop = journalBounds.top + journal.clientTop
+  const viewportBottom = journal.clientHeight > 0
+    ? viewportTop + journal.clientHeight
+    : journalBounds.bottom
+  if (rowBounds.top < viewportTop) {
+    journal.scrollTop = Math.max(0, journal.scrollTop - (viewportTop - rowBounds.top))
+  } else if (rowBounds.bottom > viewportBottom) {
+    journal.scrollTop += rowBounds.bottom - viewportBottom
   }
 }
 
@@ -287,6 +292,7 @@ type ActivityQuery = typeof api.agentRuntime.query
 interface OfficeLogWindow {
   entries: AgentRuntimeEvent[]
   hasMore: boolean
+  focusEntries: AgentRuntimeEvent[]
 }
 
 function officeLogPageHasMore(
@@ -299,8 +305,13 @@ function officeLogPageHasMore(
   return page.entries.length === fallbackPageSize
 }
 
-async function loadOfficeAgentWindow(query: ActivityQuery): Promise<OfficeLogWindow> {
+async function loadOfficeAgentWindow(
+  query: ActivityQuery,
+  focusSeq: number | null,
+  retainedFocusEntries: readonly AgentRuntimeEvent[],
+): Promise<OfficeLogWindow> {
   let entries: AgentRuntimeEvent[] = []
+  let focusEntries = [...retainedFocusEntries]
   let hasMore = false
 
   for (let page = 1; page <= OFFICE_AGENT_MAX_PAGES; page += 1) {
@@ -317,7 +328,17 @@ async function loadOfficeAgentWindow(query: ActivityQuery): Promise<OfficeLogWin
     if (hasEnoughStoryBeats || !hasNextPage || result.entries.length === 0) break
   }
 
-  return { entries, hasMore }
+  entries = mergeOfficeLogFamilies([entries, focusEntries])
+  if (focusSeq != null && !entries.some((event) => event.seq === focusSeq)) {
+    const focusWindow = await query({
+      afterSeq: Math.max(0, focusSeq - 1),
+      limit: OFFICE_AGENT_FOCUS_WINDOW_SIZE,
+    })
+    focusEntries = focusWindow.entries.filter((event) => officeLogFamilyForEvent(event) === 'agent')
+    entries = mergeOfficeLogFamilies([entries, focusEntries])
+  }
+
+  return { entries, hasMore, focusEntries }
 }
 
 export function OfficeRuntimeSection({
@@ -369,17 +390,30 @@ export function OfficeRuntimeSection({
   const journalLiveFollowFocusPendingRef = useRef(false)
   const previousHeadSeqByChannelRef = useRef<Partial<Record<OfficeLogChannel, number>>>({})
   const appliedReplaySeqRef = useRef<number | null>(null)
+  const agentFocusWindowRef = useRef<{ seq: number; entries: AgentRuntimeEvent[] } | null>(null)
 
   const load = useCallback(async () => {
     try {
       const activityApi = api.productActivity ?? api.agentRuntime
+      const agentFocusSeq = initialChannel === 'agent' ? initialSelectedSeq : null
+      const retainedFocusEntries = agentFocusSeq != null
+        && agentFocusWindowRef.current?.seq === agentFocusSeq
+        ? agentFocusWindowRef.current.entries
+        : []
       const [agentWindow, inboxPage, newsPage] = await Promise.all([
-        loadOfficeAgentWindow(activityApi.query),
+        loadOfficeAgentWindow(
+          activityApi.query,
+          agentFocusSeq,
+          retainedFocusEntries,
+        ),
         activityApi.query({ page: 1, pageSize: OFFICE_SERVICE_PAGE_SIZE, family: 'inbox' }),
         activityApi.query({ page: 1, pageSize: OFFICE_SERVICE_PAGE_SIZE, family: 'news' }),
       ])
       const inbox = inboxPage.entries
       const news = newsPage.entries
+      agentFocusWindowRef.current = agentFocusSeq != null && agentWindow.focusEntries.length > 0
+        ? { seq: agentFocusSeq, entries: agentWindow.focusEntries }
+        : null
       setEntriesByChannel({
         overview: mergeOfficeLogFamilies([agentWindow.entries, inbox, news]),
         agent: agentWindow.entries,
@@ -400,7 +434,7 @@ export function OfficeRuntimeSection({
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [initialChannel, initialSelectedSeq])
 
   useEffect(() => {
     void load()
@@ -444,13 +478,19 @@ export function OfficeRuntimeSection({
 
   useEffect(() => {
     const visibleSeqs = visibleBeats.map((beat) => beat.event.seq)
+    const initialVisibleSeq = initialSelectedSeq == null
+      ? null
+      : visibleBeats.find((beat) => (
+        initialSelectedSeq >= Math.min(beat.oldestSeq, beat.event.seq)
+        && initialSelectedSeq <= Math.max(beat.oldestSeq, beat.event.seq)
+      ))?.event.seq ?? initialSelectedSeq
     const nextHeadSeq = visibleSeqs[0] ?? null
     const previousHeadSeq = previousHeadSeqByChannelRef.current[channel] ?? null
     if (nextHeadSeq == null) delete previousHeadSeqByChannelRef.current[channel]
     else previousHeadSeqByChannelRef.current[channel] = nextHeadSeq
     const nextSelectedSeq = officeJournalSelectionAfterRefresh({
       currentSeq: selectedSeq,
-      initialSelectedSeq,
+      initialSelectedSeq: initialVisibleSeq,
       previousHeadSeq: replaySeq == null ? previousHeadSeq : null,
       visibleSeqs,
     })
@@ -553,6 +593,30 @@ export function OfficeRuntimeSection({
     if (journalChannelFocusPendingRef.current && selectedRow) {
       journalChannelFocusPendingRef.current = false
       selectedRow.focus({ preventScroll: true })
+    }
+  }, [channel, mobileView, selectedSeq])
+
+  useEffect(() => {
+    if (selectedSeq == null) return
+    let cancelled = false
+    let fontFrame: number | null = null
+    const reveal = () => {
+      if (cancelled) return
+      const journal = journalIndexRef.current
+      const row = journal?.querySelector<HTMLButtonElement>(`button[data-seq="${selectedSeq}"]`)
+      if (journal && row) revealOfficeJournalRow(journal, row)
+    }
+    const frame = window.requestAnimationFrame(reveal)
+    const animatedWindow = journalIndexRef.current?.closest('.oa-office-window--log')
+    animatedWindow?.addEventListener('animationend', reveal, { once: true })
+    void document.fonts?.ready.then(() => {
+      if (!cancelled) fontFrame = window.requestAnimationFrame(reveal)
+    })
+    return () => {
+      cancelled = true
+      window.cancelAnimationFrame(frame)
+      if (fontFrame != null) window.cancelAnimationFrame(fontFrame)
+      animatedWindow?.removeEventListener('animationend', reveal)
     }
   }, [channel, mobileView, selectedSeq])
 

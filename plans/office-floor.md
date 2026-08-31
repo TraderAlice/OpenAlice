@@ -5777,6 +5777,32 @@ Expanded Grok cast follow-up (2026-08-31):
   contract; root and UI TypeScript passed; the full suite passed 620 test files and 5,217 tests (one file and nine tests
   skipped); the production UI build passed with only the existing ports fallback and large-chunk advisory.
 
+Agent-file activity-focus follow-up (2026-08-31):
+
+- Opened real Grok Prototyper g32 from the 40-person Chat Team and activated `Review activity`. Its Agent File showed
+  the exact completed result, but Activity Log silently selected unrelated Grok Synthesist `#6360` because g32's
+  `#5675` record sat beyond the recent twelve-beat loading window.
+- Compared retaining the generic newest Agent log, replacing Activity Log with a character-only history, and opening
+  the complete Agent channel at the coworker's exact record. Chose exact focus inside the shared channel: the player
+  keeps the surrounding Office story and normal channel navigation, while the character command finally answers
+  “what did this coworker do?” without inventing a second history surface.
+- Normal log opens still stop after a playable recent story window. An Agent-file deep link whose sequence is absent
+  performs one bounded `afterSeq` read, merges only Agent-family events into the journal, and maps a raw sequence into
+  its containing grouped beat before selection. Older target context remains visibly marked with the existing `+`
+  inventory suffix rather than pretending the gap is a complete history.
+- The first live fix exposed a second failure: the correct detail opened while its selected index row remained below
+  the viewport. The 120ms GBA window entrance temporarily transforms `getBoundingClientRect`, so the initial scroll
+  calculation used animated coordinates. The journal now performs its local reveal again after the owning window's
+  `animationend` and measures the scrollable client box inside its three-pixel border; it never scrolls the permanent
+  Activity Log chrome.
+- Real-browser acceptance repeated Team -> Grok Prototyper -> Review activity. Activity Log selected visible
+  `Task complete · Grok Prototyper · #5675`, rendered `OFFICE HARNESS LIVE QA COMPLETE.`, kept the outer window at
+  `scrollTop=0`, placed the complete 58px row inside the 315.5–680.5px journal viewport, and retained that selection
+  through the next four-second live refresh without repeating the bounded historical query. The focused runtime suite
+  passed all 24 tests; root and UI TypeScript passed; the full suite passed 620 test files and 5,218 tests (one file
+  and nine tests skipped); the production UI build passed with only the existing ports fallback and large-chunk
+  advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
