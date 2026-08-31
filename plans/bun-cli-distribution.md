@@ -1199,3 +1199,23 @@ This plan is complete only when:
   blocked contention, and fenced Guardian/Alice owner metadata. Linux installer,
   remote-SSH, and full Docker Runtime smokes pass. PR/dev archive publication,
   live Railway reacceptance, Project apply, and the Agent turn remain pending.
+- 2026-09-01: PR #1280 merged the kernel-fence repair to `dev` at
+  `a0f17e40`; run 33431851058 published all four native aliases and passed the
+  public raw/dev install. The retained Railway Volume then failed before
+  release mutation on eight legacy lock directories as designed. After proving
+  the old deployment had stopped and no installed writer remained, those exact
+  directories and owner records moved reversibly to
+  `/data/quarantine/legacy-cutover-a0f17e40-1/`; the new Linux x64 archive
+  started with Guardian and Alice holding the Volume inode fence. Its first
+  restart exposed a separate immutability defect: the Workspace logger used
+  `process.cwd()` and appended to the release-owned
+  `share/openalice/logs/workspace-sessions.log`, so reinstall verification
+  rejected the changed tree and safely fell back. The current fix routes that
+  sink to `<OPENALICE_HOME>/logs/workspace-sessions.log` and opens it lazily so
+  a rejected pre-fence Alice process cannot create Project state. A direct
+  no-fence Alice regression now requires the whole Project Home to stay absent;
+  the real Bun Workspace smoke requires the Project-owned log and rejects any
+  before/after release-tree mutation. Root TypeScript, the 5,295-test suite,
+  full build, and the local native Bun release smoke pass. A fresh dev archive
+  and Railway restart/redeploy acceptance remain required before Project
+  transfer.
