@@ -2173,8 +2173,9 @@ describe('OfficeBuilding', () => {
       .toBe('up')
   })
 
-  it('shows a one-shot landmark receipt after returning from acknowledged activity', async () => {
+  it('returns a one-shot landmark receipt after a guided HUD duty is acknowledged', async () => {
     const onOpenService = vi.fn()
+    const onOpenDuty = vi.fn()
     const building = {
       config: {
         workspaceSleepAfterMs: 1,
@@ -2213,13 +2214,17 @@ describe('OfficeBuilding', () => {
       onOpenRoster: vi.fn(),
       onOpenLog: vi.fn(),
       onOpenService,
+      onOpenDuty,
     }
     const view = render(<OfficeBuilding {...props} productActivity={activity} />)
 
     const inbox = screen.getByRole('button', { name: 'Inbox station · 1 pending' })
-    inbox.focus()
-    fireEvent.keyDown(inbox, { key: 'Enter' })
-    await waitFor(() => expect(onOpenService).toHaveBeenCalledWith('inbox', 11))
+    await userEvent.click(screen.getByRole('button', { name: 'Next duty: Inbox station, 1 pending' }))
+    await waitFor(() => expect(onOpenDuty).toHaveBeenCalledWith(expect.objectContaining({
+      kind: 'inbox',
+      targetId: 'inbox-service',
+    })))
+    expect(onOpenService).not.toHaveBeenCalled()
 
     const acknowledgedActivity = {
       ...activity,

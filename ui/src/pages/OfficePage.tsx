@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
@@ -9,7 +9,13 @@ import { useOfficeFloor } from '../hooks/useOfficeFloor'
 import { useInboxSelection } from '../live/inbox-selection'
 import { useWorkspaceSidePanels } from '../live/workspace-side-panels'
 import { OfficeBuilding, type OfficeLogOrigin } from '../office/OfficeBuilding'
+import { OfficeCadenceDutyDossier } from '../office/OfficeCadenceDutyDossier'
 import { OfficeCabinetWindow } from '../office/OfficeCabinetWindow'
+import {
+  clearOfficeCadenceExcursion,
+  readOfficeCadenceExcursion,
+  rememberOfficeCadenceExcursion,
+} from '../office/cadence-excursion'
 import { officeActivityActors } from '../office/activity-actors'
 import { officeCoworkerCast, type OfficeCoworkerSpriteAsset } from '../office/coworker-sprites'
 import { readOfficeCoworkerCasts, writeOfficeCoworkerCasts } from '../office/coworker-cast-storage'
@@ -25,7 +31,13 @@ import {
 import { OfficeReplayBar } from '../office/OfficeReplayBar'
 import type { OfficeReplayFocus } from '../office/replay-focus'
 import { OfficeRosterWindow } from '../office/OfficeRosterWindow'
+import { useOfficeDuties } from '../office/useOfficeDuties'
 import { useOfficeProductActivity, type OfficeActivityKind } from '../office/useOfficeProductActivity'
+import type {
+  OfficeCadenceDutyCandidate,
+  OfficeResolvedDuty,
+} from '../office/duty-registry'
+import { useIssues } from '../hooks/useIssues'
 import '../office/office.css'
 import { useWorkspace } from '../tabs/store'
 import type { WorkspaceSource } from '../tabs/types'
@@ -51,6 +63,7 @@ export function OfficePage() {
   const { workspaces } = useWorkspaces()
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
   const initialPlayerStateRef = useRef(readOfficePlayerState())
+  const cadenceExcursionRef = useRef(readOfficeCadenceExcursion())
   const [asOfSeq, setAsOfSeq] = useState<number | null>(null)
   const [replayFocus, setReplayFocus] = useState<OfficeReplayFocus | null>(null)
   const [replayPanelOpen, setReplayPanelOpen] = useState(false)
@@ -77,6 +90,18 @@ export function OfficePage() {
   const [cabinetWorkspaceId, setCabinetWorkspaceId] = useState<string | null>(null)
   const { building, error, refresh } = useOfficeFloor(asOfSeq)
   const productActivity = useOfficeProductActivity()
+  const issues = useIssues()
+  const officeDuties = useOfficeDuties(productActivity, issues)
+  const [cadenceDuty, setCadenceDuty] = useState<OfficeCadenceDutyCandidate | null>(null)
+  const [cadenceInitialStep, setCadenceInitialStep] = useState<'exception' | 'evidence'>('exception')
+  const [dutyAcknowledgement, setDutyAcknowledgement] = useState<{
+    token: number
+    targetId: 'operations'
+    label: string
+    reviewed: string
+    dutyKey: string
+    announcement: string | null
+  } | null>(null)
   const retryFloor = async () => {
     setRetryingFloor(true)
     try {
@@ -164,6 +189,7 @@ export function OfficePage() {
     || Boolean(selectedSeat)
     || Boolean(rosterOffice)
     || Boolean(cabinetOffice)
+    || Boolean(cadenceDuty)
   const closeLogWithDestination = (destination: 'origin' | 'floor') => {
     const origin = logView?.origin ?? 'menu'
     setLogView(null)
@@ -291,6 +317,123 @@ export function OfficePage() {
     }
   }
 
+  const closeCadenceDuty = () => {
+    clearOfficeCadenceExcursion()
+    cadenceExcursionRef.current = null
+    setCadenceDuty(null)
+    setCadenceInitialStep('exception')
+    requestAnimationFrame(() => {
+      document.getElementById('office-operations-board')?.focus()
+    })
+  }
+
+  const openRegisteredDuty = (duty: OfficeResolvedDuty) => {
+    if (duty.kind === 'cadence') {
+      clearOfficeCadenceExcursion()
+      cadenceExcursionRef.current = null
+      setCadenceInitialStep('exception')
+      setCadenceDuty(duty)
+      setSelected(null)
+      setRosterWorkspaceId(null)
+      setCabinetWorkspaceId(null)
+      setLogView(null)
+      return
+    }
+    const dutyReview: OfficeDutyReview = {
+      kind: duty.receipt.family,
+      throughSeq: duty.receipt.throughSeq,
+      count: duty.count,
+    }
+    if (duty.kind === 'agent' && duty.targetId.startsWith('employee:')) {
+      const subject = duty.destination.subject
+      const office = subject
+        ? building?.offices.find((item) => item.workspace.id === subject.workspaceId)
+        : null
+      const employee = subject
+        ? office?.employees.find((item) => item.resumeId === subject.resumeId)
+        : null
+      if (subject && employee) {
+        const dutyReviewIntent = duty.landmark.eventType === 'runtime.stopped'
+          && duty.landmark.status === 'done'
+          ? 'result' as const
+          : 'run' as const
+        employeeOriginRef.current = { kind: 'map' }
+        setSelected({
+          workspaceId: subject.workspaceId,
+          resumeId: subject.resumeId,
+          dutyReview,
+          dutyReviewIntent,
+        })
+        setRosterFocusResumeId(null)
+        setLogView(null)
+        setCabinetWorkspaceId(null)
+        return
+      }
+    }
+    setLogView({
+      origin: duty.kind === 'agent' ? 'operations' : `${duty.kind}-service`,
+      channel: duty.kind,
+      focusSeq: duty.receipt.throughSeq,
+      dutyReview,
+    })
+    setReplayPanelOpen(false)
+    setSelected(null)
+    setRosterWorkspaceId(null)
+    setCabinetWorkspaceId(null)
+  }
+
+  const latestCadenceDuty = cadenceDuty?.receipt.kind === 'evidence'
+    ? officeDuties.evidenceBySubject.get(cadenceDuty.receipt.subjectKey)
+    : null
+  const latestMatchingCadenceDuty = latestCadenceDuty?.kind === 'cadence'
+    ? latestCadenceDuty
+    : null
+  const nextDutyCandidate = officeDuties.candidates[0]
+  const nextDutyKey = nextDutyCandidate
+    ? nextDutyCandidate.receipt.kind === 'evidence'
+      ? `${nextDutyCandidate.id}:${nextDutyCandidate.receipt.fingerprint}`
+      : `${nextDutyCandidate.id}:${nextDutyCandidate.receipt.throughSeq}`
+    : null
+  const nextDutyAnnouncementName = (() => {
+    const next = nextDutyCandidate
+    if (!next) return null
+    if (next.kind === 'cadence') return next.cadence.title
+    if (next.kind === 'inbox') return t('office.inboxStation')
+    if (next.kind === 'news') return t('office.newsStation')
+    return t('office.logChannelAgent')
+  })()
+  useEffect(() => {
+    if (!dutyAcknowledgement
+      || dutyAcknowledgement.announcement
+      || dutyAcknowledgement.dutyKey === nextDutyKey) return
+    const announcement = nextDutyAnnouncementName
+      ? t('office.cadenceReviewedNext', {
+          reviewed: dutyAcknowledgement.reviewed,
+          name: nextDutyAnnouncementName,
+        })
+      : officeDuties.status === 'ready'
+        ? t('office.cadenceReviewedClear', { reviewed: dutyAcknowledgement.reviewed })
+        : t('office.cadenceReviewedUnknown', { reviewed: dutyAcknowledgement.reviewed })
+    setDutyAcknowledgement((current) => current?.token === dutyAcknowledgement.token
+      ? { ...current, announcement }
+      : current)
+  }, [
+    dutyAcknowledgement,
+    nextDutyAnnouncementName,
+    nextDutyKey,
+    officeDuties.status,
+    t,
+  ])
+  useEffect(() => {
+    const excursion = cadenceExcursionRef.current
+    if (!excursion || cadenceDuty) return
+    if (officeDuties.cadenceStatus === 'loading') return
+    cadenceExcursionRef.current = null
+    clearOfficeCadenceExcursion()
+    setCadenceInitialStep('evidence')
+    setCadenceDuty(excursion.duty)
+  }, [cadenceDuty, officeDuties.cadenceStatus])
+
   const selectedDutyReview = asOfSeq == null ? selected?.dutyReview : undefined
   const reviewSelectedActivity = selectedSeat && selectedReplayFocus
     ? () => {
@@ -333,6 +476,11 @@ export function OfficePage() {
         <h2>{t('nav.item.office')}</h2>
         <p>{t('office.description')}</p>
       </div>
+      {dutyAcknowledgement?.announcement && (
+        <p className="sr-only" role="status" aria-live="polite">
+          {dutyAcknowledgement.announcement}
+        </p>
+      )}
       {!building && (
         <OfficeConnectionScreen
           error={error}
@@ -406,6 +554,11 @@ export function OfficePage() {
                   setLogView(null)
                 }}
                 onOpenLog={(origin) => {
+                  const registeredDuty = officeDuties.candidates[0]
+                  if (asOfSeq == null && origin === 'operations' && registeredDuty?.kind === 'cadence') {
+                    openRegisteredDuty({ ...registeredDuty, targetId: 'operations' })
+                    return
+                  }
                   const replayLogView = replayFocus && replayFocus.seq === asOfSeq
                     ? { channel: replayFocus.channel, focusSeq: replayFocus.seq }
                     : null
@@ -430,6 +583,10 @@ export function OfficePage() {
                   setCabinetWorkspaceId(null)
                 }}
                 productActivity={productActivity}
+                dutyCandidates={officeDuties.candidates}
+                dutyStatus={officeDuties.status}
+                dutyAcknowledgement={dutyAcknowledgement}
+                onOpenDuty={openRegisteredDuty}
                 onOpenService={(kind, seq) => {
                   const throughSeq = seq ?? productActivity[kind]?.seq
                   const dutyReview = asOfSeq == null
@@ -547,6 +704,51 @@ export function OfficePage() {
                   />
                 </div>
               </section>
+            )}
+            {cadenceDuty && (
+              <OfficeCadenceDutyDossier
+                key={cadenceDuty.receipt.fingerprint}
+                duty={cadenceDuty}
+                latestDuty={latestMatchingCadenceDuty}
+                sourceStatus={officeDuties.cadenceStatus}
+                initialStep={cadenceInitialStep}
+                onOpenIssue={() => {
+                  const excursion = { duty: cadenceDuty }
+                  rememberOfficeCadenceExcursion(excursion)
+                  cadenceExcursionRef.current = excursion
+                  markExcursion()
+                  openOrFocus({
+                    kind: 'issue-detail',
+                    params: {
+                      wsId: cadenceDuty.destination.workspaceId,
+                      id: cadenceDuty.destination.issueId,
+                    },
+                  })
+                }}
+                onConfirm={() => {
+                  clearOfficeCadenceExcursion()
+                  cadenceExcursionRef.current = null
+                  officeDuties.acknowledge(cadenceDuty)
+                  setCadenceDuty(null)
+                  setCadenceInitialStep('exception')
+                  setDutyAcknowledgement((current) => ({
+                    token: (current?.token ?? 0) + 1,
+                    targetId: 'operations',
+                    label: t('office.cadenceReviewedShort'),
+                    reviewed: cadenceDuty.cadence.title,
+                    dutyKey: `${cadenceDuty.id}:${cadenceDuty.receipt.fingerprint}`,
+                    announcement: null,
+                  }))
+                  requestAnimationFrame(() => {
+                    document.querySelector<HTMLElement>('[data-testid="office-floor"]')?.focus()
+                  })
+                }}
+                onReviewLatest={(next) => {
+                  setCadenceInitialStep('evidence')
+                  setCadenceDuty(next)
+                }}
+                onClose={closeCadenceDuty}
+              />
             )}
             {!logView && !cabinetOffice && selectedSeat && (
               <OfficeInspectRail

@@ -12,6 +12,8 @@ import { OfficePage } from './OfficePage'
 const {
   acknowledgeMock,
   navigateMock,
+  issuesMock,
+  issueDetailMock,
   officeFloorMock,
   openOrFocusMock,
   productActivityMock,
@@ -19,6 +21,8 @@ const {
 } = vi.hoisted(() => ({
   acknowledgeMock: vi.fn(),
   navigateMock: vi.fn(),
+  issuesMock: vi.fn(),
+  issueDetailMock: vi.fn(),
   officeFloorMock: vi.fn(),
   openOrFocusMock: vi.fn(),
   productActivityMock: vi.fn(),
@@ -95,6 +99,14 @@ vi.mock('../hooks/useOfficeFloor', () => ({
   useOfficeFloor: officeFloorMock,
 }))
 
+vi.mock('../hooks/useIssues', () => ({
+  useIssues: issuesMock,
+}))
+
+vi.mock('../hooks/useIssueDetail', () => ({
+  useIssueDetail: issueDetailMock,
+}))
+
 vi.mock('../office/useOfficeProductActivity', () => ({
   useOfficeProductActivity: productActivityMock,
 }))
@@ -119,6 +131,66 @@ const defaultOfficeFloor = () => ({
   refresh: refreshMock,
 })
 
+const blockedCadenceHealth = {
+  state: 'blocked',
+  message: 'Assigned Session does not exist. Choose an active Session or @new-each-run.',
+} as const
+
+function cadenceIssue(automationHealth: {
+  readonly state: 'blocked' | 'failed' | 'healthy'
+  readonly message: string
+  readonly latestTaskId?: string
+}) {
+  return {
+    id: 'weekly-review',
+    title: '检查周报排期',
+    what: '检查本周周报。',
+    status: 'todo' as const,
+    priority: 'high' as const,
+    assignee: '@new-each-run',
+    when: { kind: 'every' as const, every: '1w' },
+    lastFiredAtMs: Date.UTC(2026, 7, 31, 11),
+    nextDueAtMs: Date.UTC(2026, 8, 7, 11),
+    automationHealth,
+  }
+}
+
+function cadenceIssues(
+  automationHealth: Parameters<typeof cadenceIssue>[0],
+  error: string | null = null,
+) {
+  return {
+    data: {
+      workspaces: [{
+        wsId: 'chat-1',
+        tag: 'chat',
+        status: 'ok' as const,
+        issues: [cadenceIssue(automationHealth)],
+      }],
+    },
+    error,
+    loading: false,
+  }
+}
+
+function cadenceIssueDetail(automationHealth: Parameters<typeof cadenceIssue>[0]) {
+  return {
+    data: { issue: cadenceIssue(automationHealth), runs: [] },
+    error: null,
+    loading: false,
+    mutate: vi.fn(),
+  }
+}
+
+async function leaveCadenceDossierForFullIssue() {
+  const view = render(<OfficePage />)
+  await userEvent.click(screen.getByRole('button', { name: '下一值班项：检查周报排期，待处理 1 条' }))
+  await screen.findByRole('dialog', { name: '检查周报排期' })
+  await userEvent.click(screen.getByRole('button', { name: '复核证据' }))
+  await userEvent.click(screen.getByRole('button', { name: '打开完整 Issue' }))
+  view.unmount()
+}
+
 vi.mock('../tabs/store', () => ({
   useWorkspace: (select: (state: { openOrFocus: () => void }) => unknown) =>
     select({ openOrFocus: openOrFocusMock }),
@@ -131,6 +203,30 @@ beforeEach(async () => {
   openOrFocusMock.mockClear()
   acknowledgeMock.mockClear()
   refreshMock.mockClear()
+  issuesMock.mockReturnValue({ data: { workspaces: [] }, error: null, loading: false })
+  issueDetailMock.mockReturnValue({
+    data: {
+      issue: {
+        id: 'weekly-review',
+        title: '检查周报排期',
+        what: '检查本周周报。',
+        status: 'todo',
+        priority: 'high',
+        assignee: '@new-each-run',
+        when: { kind: 'every', every: '1w' },
+        lastFiredAtMs: Date.UTC(2026, 7, 31, 11),
+        nextDueAtMs: Date.UTC(2026, 8, 7, 11),
+        automationHealth: {
+          state: 'blocked',
+          message: 'Assigned Session does not exist. Choose an active Session or @new-each-run.',
+        },
+      },
+      runs: [],
+    },
+    error: null,
+    loading: false,
+    mutate: vi.fn(),
+  })
   productActivityMock.mockReturnValue({
     agent: null,
     inbox: null,
@@ -142,6 +238,7 @@ beforeEach(async () => {
   })
   clearOfficePlayerState()
   window.localStorage.clear()
+  window.sessionStorage.clear()
   vi.stubGlobal('matchMedia', vi.fn(() => ({
     matches: true,
     addEventListener: vi.fn(),
@@ -406,7 +503,7 @@ describe('OfficePage localization', () => {
     const { container } = render(<OfficePage />)
 
     expect(screen.getByRole('heading', { name: '办公室' })).toBeTruthy()
-    expect(screen.getByText('把 Agent、Inbox 和 News 动态变成下一项勤勉值班任务的引导式行动楼层。')).toBeTruthy()
+    expect(screen.getByText('把分散的工作信号排成下一项正确行动，让该做的检查变成日常习惯。')).toBeTruthy()
     expect(screen.queryByText('Office occupancy')).toBeNull()
     const menuTrigger = screen.getByRole('button', { name: '菜单' })
     menuTrigger.focus()
@@ -498,6 +595,126 @@ describe('OfficePage localization', () => {
     await userEvent.click(operations)
     await userEvent.click(await screen.findByRole('button', { name: 'Mock confirm duty' }))
     expect(acknowledgeMock).toHaveBeenCalledWith('agent', 45)
+  })
+
+  it('guides a scheduled Issue exception through evidence and an explicit Office receipt', async () => {
+    issuesMock.mockReturnValue({
+      data: {
+        workspaces: [{
+          wsId: 'chat-1',
+          tag: 'chat',
+          status: 'ok',
+          issues: [{
+            id: 'weekly-review',
+            title: '检查周报排期',
+            status: 'todo',
+            priority: 'high',
+            assignee: '@new-each-run',
+            when: { kind: 'every', every: '1w' },
+            lastFiredAtMs: Date.UTC(2026, 7, 31, 11),
+            nextDueAtMs: Date.UTC(2026, 8, 7, 11),
+            automationHealth: {
+              state: 'blocked',
+              message: 'Assigned Session does not exist. Choose an active Session or @new-each-run.',
+            },
+          }],
+        }],
+      },
+      error: null,
+      loading: false,
+    })
+
+    const view = render(<OfficePage />)
+
+    const operations = screen.getByRole('button', { name: '行动看板 · 待处理 1 条' })
+    await userEvent.click(operations)
+    expect(await screen.findByRole('dialog', { name: '检查周报排期' }, { timeout: 10_000 })).toBeTruthy()
+    expect(view.container.querySelector<HTMLElement>('.oa-office-scene')?.hasAttribute('inert')).toBe(true)
+    expect(acknowledgeMock).not.toHaveBeenCalled()
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog', { name: '检查周报排期' })).toBeNull()
+
+    await userEvent.click(screen.getByRole('button', { name: '下一值班项：检查周报排期，待处理 1 条' }))
+    await screen.findByRole('dialog', { name: '检查周报排期' })
+
+    await userEvent.click(screen.getByRole('button', { name: '复核证据' }))
+    expect(screen.getByText('检查本周周报。')).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: '打开完整 Issue' }))
+    expect(navigateMock).toHaveBeenCalledWith('/office/return', {
+      state: { officeExcursion: true },
+    })
+    expect(openOrFocusMock).toHaveBeenCalledWith({
+      kind: 'issue-detail',
+      params: { wsId: 'chat-1', id: 'weekly-review' },
+    })
+    expect(acknowledgeMock).not.toHaveBeenCalled()
+    view.unmount()
+    render(<OfficePage />)
+    expect(await screen.findByRole('dialog', { name: '检查周报排期' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '第 2 步 · 证据' })).toBeTruthy()
+
+    await userEvent.click(screen.getByRole('button', { name: '盖章：本次值班已复核' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '检查周报排期' })).toBeNull())
+    expect(screen.getByText('值班已清')).toBeTruthy()
+    expect(screen.getByText('已复核')).toBeTruthy()
+    expect(screen.getByText('已复核“检查周报排期”。值班已清。')).toBeTruthy()
+    expect(acknowledgeMock).not.toHaveBeenCalled()
+    expect(window.sessionStorage.getItem('openalice:office-duty:evidence-receipts:v2'))
+      .toContain('weekly-review')
+  })
+
+  it('returns from a full Issue to the captured evidence when the live exception changed', async () => {
+    issuesMock.mockReturnValue(cadenceIssues(blockedCadenceHealth))
+    issueDetailMock.mockReturnValue(cadenceIssueDetail(blockedCadenceHealth))
+    await leaveCadenceDossierForFullIssue()
+
+    const changedHealth = {
+      state: 'failed',
+      message: 'Latest scheduled run failed.',
+      latestTaskId: 'run-b',
+    } as const
+    issuesMock.mockReturnValue(cadenceIssues(changedHealth))
+    issueDetailMock.mockReturnValue(cadenceIssueDetail(changedHealth))
+    render(<OfficePage />)
+
+    expect(await screen.findByRole('heading', { name: '第 2 步 · 证据' })).toBeTruthy()
+    expect(screen.getByRole('alert').textContent).toContain('证据已变化')
+    expect(screen.queryByRole('button', { name: '盖章：本次值班已复核' })).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: '复核最新证据' }))
+    expect(screen.queryByText(/证据已变化/)).toBeNull()
+    expect(screen.getByRole('button', { name: '盖章：本次值班已复核' })).toBeTruthy()
+  })
+
+  it('returns from a full Issue with an explicit resolved state instead of dropping the dossier', async () => {
+    issuesMock.mockReturnValue(cadenceIssues(blockedCadenceHealth))
+    issueDetailMock.mockReturnValue(cadenceIssueDetail(blockedCadenceHealth))
+    await leaveCadenceDossierForFullIssue()
+
+    const healthy = { state: 'healthy', message: 'Schedule healthy.' } as const
+    issuesMock.mockReturnValue(cadenceIssues(healthy))
+    issueDetailMock.mockReturnValue(cadenceIssueDetail(healthy))
+    render(<OfficePage />)
+
+    expect(await screen.findByRole('heading', { name: '第 2 步 · 证据' })).toBeTruthy()
+    expect(screen.getByText('这个 Issue 已不再是定时异常。')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '盖章：本次值班已复核' })).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: '返回下一值班项' }))
+    expect(screen.queryByRole('dialog', { name: '检查周报排期' })).toBeNull()
+    expect(screen.getByText('值班已清')).toBeTruthy()
+  })
+
+  it('restores captured evidence but refuses a receipt while the cadence source is stale', async () => {
+    issuesMock.mockReturnValue(cadenceIssues(blockedCadenceHealth))
+    issueDetailMock.mockReturnValue(cadenceIssueDetail(blockedCadenceHealth))
+    await leaveCadenceDossierForFullIssue()
+
+    issuesMock.mockReturnValue(cadenceIssues(blockedCadenceHealth, 'scanner unavailable'))
+    render(<OfficePage />)
+
+    expect(await screen.findByRole('heading', { name: '第 2 步 · 证据' })).toBeTruthy()
+    expect(screen.getByText('Issue 信号不可用，这份证据可能已过时；当前无法确认值班已清。')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '盖章：本次值班已复核' }).hasAttribute('disabled'))
+      .toBe(true)
   })
 
   it('carries an exact visible Agent duty through the coworker file and returns its stamp to the floor', async () => {

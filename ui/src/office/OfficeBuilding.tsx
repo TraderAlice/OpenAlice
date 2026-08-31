@@ -58,6 +58,16 @@ import {
 import { officeCoworkerCallsign } from './label'
 import { stableDeskSlotsForOffice } from './desk-slots'
 import {
+  coreOfficeDutyRegistrations,
+  projectOfficeDutyQueue,
+  resolveOfficeDutyTarget,
+  type OfficeDutyCandidate,
+  type OfficeDutySourceStatus,
+  type OfficeDutyTargetId,
+  type OfficeEmployeeDutyTargetId,
+  type OfficeResolvedDuty,
+} from './duty-registry'
+import {
   isOfficePositionWalkable,
   moveAliceOnOfficeMap,
   officeCollisionRects,
@@ -128,20 +138,14 @@ export type OfficeLogOrigin =
   | 'floor-terminal'
   | 'inbox-service'
   | 'news-service'
-type OfficeEmployeeTargetId = `employee:${string}:${string}`
 type OfficeAcknowledgementTarget =
   | 'operations'
   | 'floor-terminal'
   | 'inbox-service'
   | 'news-service'
-  | OfficeEmployeeTargetId
-type OfficeDutyTargetId =
-  | 'operations'
-  | 'inbox-service'
-  | 'news-service'
-  | OfficeEmployeeTargetId
+  | OfficeEmployeeDutyTargetId
 
-function isOfficeEmployeeTargetId(targetId: string): targetId is OfficeEmployeeTargetId {
+function isOfficeEmployeeTargetId(targetId: string): targetId is OfficeEmployeeDutyTargetId {
   return targetId.startsWith('employee:')
 }
 
@@ -151,26 +155,27 @@ export interface OfficeNextDuty {
   count: number
 }
 
-const OFFICE_DUTY_PRIORITY: readonly Readonly<Pick<OfficeNextDuty, 'kind' | 'targetId'>>[] = [
-  { kind: 'inbox', targetId: 'inbox-service' },
-  { kind: 'agent', targetId: 'operations' },
-  { kind: 'news', targetId: 'news-service' },
-]
-
 export function nextOfficeDuty(
   activity: OfficeProductActivityState,
   targetAvailable: (targetId: string) => boolean = () => false,
 ): OfficeNextDuty | null {
-  const next = OFFICE_DUTY_PRIORITY.find(({ kind }) => activity.attention[kind])
-  if (!next) return null
-  if (next.kind === 'agent' && activity.agent?.subject) {
-    const { workspaceId, resumeId } = activity.agent.subject
-    const employeeTargetId = `employee:${workspaceId}:${resumeId}` as const
-    if (targetAvailable(employeeTargetId)) {
-      return { kind: 'agent', targetId: employeeTargetId, count: activity.pending.agent }
-    }
+  if (activity.attention.inbox) {
+    return { kind: 'inbox', targetId: 'inbox-service', count: activity.pending.inbox }
   }
-  return { ...next, count: activity.pending[next.kind] }
+  if (activity.attention.agent) {
+    const subject = activity.agent?.subject
+    if (subject) {
+      const employeeTargetId = `employee:${subject.workspaceId}:${subject.resumeId}` as const
+      if (targetAvailable(employeeTargetId)) {
+        return { kind: 'agent', targetId: employeeTargetId, count: activity.pending.agent }
+      }
+    }
+    return { kind: 'agent', targetId: 'operations', count: activity.pending.agent }
+  }
+  if (activity.attention.news) {
+    return { kind: 'news', targetId: 'news-service', count: activity.pending.news }
+  }
+  return null
 }
 
 export interface OfficePlayerState {
@@ -202,6 +207,10 @@ export function OfficeBuilding({
     pending: { agent: 0, inbox: 0, news: 0 },
     freshKind: null,
   },
+  dutyCandidates,
+  dutyStatus = 'ready',
+  dutyAcknowledgement,
+  onOpenDuty,
   onOpenService,
   onReturnLive,
   coworkerAssets: retainedCoworkerAssets,
@@ -222,6 +231,14 @@ export function OfficeBuilding({
   onOpenRoster: (workspaceId: string) => void
   onOpenLog: (origin: OfficeLogOrigin) => void
   productActivity?: OfficeProductActivityState
+  dutyCandidates?: readonly OfficeDutyCandidate[]
+  dutyStatus?: OfficeDutySourceStatus
+  dutyAcknowledgement?: {
+    readonly token: number
+    readonly targetId: OfficeDutyTargetId
+    readonly label?: string
+  } | null
+  onOpenDuty?: (duty: OfficeResolvedDuty) => void
   onOpenService?: (kind: 'inbox' | 'news', seq?: number) => void
   onReturnLive?: () => void
   coworkerAssets?: ReadonlyMap<string, OfficeCoworkerSpriteAsset>
@@ -255,9 +272,11 @@ export function OfficeBuilding({
   const [controlsLearned, setControlsLearned] = useState(false)
   const [interactionAnchorTargetId, setInteractionAnchorTargetId] = useState<string | null>(null)
   const [acknowledgedTargetId, setAcknowledgedTargetId] = useState<OfficeAcknowledgementTarget | null>(null)
+  const [acknowledgementLabel, setAcknowledgementLabel] = useState('OK')
   const previousAttentionRef = useRef(productActivity.attention)
   const pendingAcknowledgementRef = useRef<OfficeAcknowledgementTarget | null>(null)
   const acknowledgementTimerRef = useRef<number | null>(null)
+  const lastDutyAcknowledgementTokenRef = useRef(dutyAcknowledgement?.token ?? 0)
   const [routeTargetId, setRouteTargetId] = useState<string | null>(null)
   const [routeTrail, setRouteTrail] = useState<readonly OfficeInteractionPathStep[]>([])
   const [departingWorkspace, setDepartingWorkspace] = useState<{
@@ -469,12 +488,26 @@ export function OfficeBuilding({
                   ? `${t('office.roster')} · ${routeTarget.roomName}`
                   : routeTarget.roomName
     : null
-  const nextDuty = replaySeq == null
-    ? nextOfficeDuty(productActivity, (targetId) => interactionTargetById.has(targetId))
+  const legacyDutyCandidates = useMemo(() => projectOfficeDutyQueue(coreOfficeDutyRegistrations({
+    now: Date.now(),
+    activity: productActivity,
+    activityStatus: 'ready',
+    issues: null,
+    issueStatus: 'ready',
+  })).candidates, [productActivity])
+  const currentDutyCandidates = dutyCandidates ?? legacyDutyCandidates
+  const currentDutyStatus = dutyCandidates ? dutyStatus : 'ready'
+  const nextDuty = replaySeq == null && currentDutyCandidates[0]
+    ? resolveOfficeDutyTarget(
+        currentDutyCandidates[0],
+        (targetId) => interactionTargetById.has(targetId),
+      )
     : null
   const nextDutyTarget = nextDuty ? interactionTargetById.get(nextDuty.targetId) : null
   const nextDutyName = nextDuty
-    ? nextDuty.kind === 'inbox'
+    ? nextDuty.kind === 'cadence'
+      ? nextDuty.cadence.title
+      : nextDuty.kind === 'inbox'
       ? t('office.inboxStation')
       : nextDuty.kind === 'agent'
         ? nextDutyTarget?.kind === 'employee'
@@ -485,6 +518,11 @@ export function OfficeBuilding({
           : t('office.operationsBoard')
         : t('office.newsStation')
     : null
+  const operationsCadenceDuty = nextDuty?.kind === 'cadence' && nextDuty.targetId === 'operations'
+    ? nextDuty
+    : null
+  const operationsNeedsAttention = productActivity.attention.agent || Boolean(operationsCadenceDuty)
+  const operationsPending = operationsCadenceDuty?.count ?? productActivity.pending.agent
   const routeStatusEdge = officeRouteStatusEdge(alice, camera, viewportSize, mapLayout.height)
   const operationsBoard = useMemo(
     () => officeOperationsBoardPosition(mapLayout.width),
@@ -525,11 +563,27 @@ export function OfficeBuilding({
       window.clearTimeout(acknowledgementTimerRef.current)
     }
     setAcknowledgedTargetId(targetId)
+    setAcknowledgementLabel('OK')
     acknowledgementTimerRef.current = window.setTimeout(() => {
       acknowledgementTimerRef.current = null
       setAcknowledgedTargetId(null)
     }, 900)
   }, [interactionSuspended, productActivity.attention])
+  useEffect(() => {
+    if (!dutyAcknowledgement
+      || dutyAcknowledgement.token === lastDutyAcknowledgementTokenRef.current
+      || interactionSuspended) return
+    lastDutyAcknowledgementTokenRef.current = dutyAcknowledgement.token
+    if (acknowledgementTimerRef.current != null) {
+      window.clearTimeout(acknowledgementTimerRef.current)
+    }
+    setAcknowledgedTargetId(dutyAcknowledgement.targetId)
+    setAcknowledgementLabel(dutyAcknowledgement.label ?? 'OK')
+    acknowledgementTimerRef.current = window.setTimeout(() => {
+      acknowledgementTimerRef.current = null
+      setAcknowledgedTargetId(null)
+    }, 900)
+  }, [dutyAcknowledgement, interactionSuspended])
   const nearbyTarget = useMemo(
     () => {
       if (
@@ -819,6 +873,15 @@ export function OfficeBuilding({
         source: productActivity.news?.source,
       }
     }
+    if (operationsCadenceDuty) {
+      return {
+        icon: OFFICE_HUD_ASSETS.occupancyLog,
+        action: t('office.interactActionOperations'),
+        label: t('office.cadenceReview'),
+        detail: operationsCadenceDuty.cadence.title,
+        source: operationsCadenceDuty.cadence.workspaceTag,
+      }
+    }
     const agentDetail = (() => {
       if (productActivity.agent?.detail) return productActivity.agent.detail
       switch (productActivity.agent?.eventType) {
@@ -1041,7 +1104,13 @@ export function OfficeBuilding({
   }
   const requestTargetInteraction = (
     targetId: string,
-    options: { activate?: () => void; allowReplay?: boolean; fallbackTargetId?: string } = {},
+    options: {
+      activate?: () => void
+      anchorTarget?: boolean
+      allowReplay?: boolean
+      fallbackTargetId?: string
+      fallbackActivate?: () => void
+    } = {},
   ) => {
     if (selected || departingWorkspace || floorInteractionSuspended) return
     const target = interactionTargetById.get(targetId)
@@ -1071,11 +1140,18 @@ export function OfficeBuilding({
           const fallbackTarget = options.fallbackTargetId
             ? interactionTargetByIdRef.current.get(options.fallbackTargetId)
             : null
-          if (fallbackTarget) activateTarget(fallbackTarget)
+          if (fallbackTarget) {
+            if (options.fallbackActivate) {
+              if (options.anchorTarget) setInteractionAnchorTargetId(fallbackTarget.id)
+              options.fallbackActivate()
+            } else activateTarget(fallbackTarget)
+          }
           return
         }
-        const action = options.activate ?? (() => activateTarget(currentTarget))
-        action()
+        if (options.activate) {
+          if (options.anchorTarget) setInteractionAnchorTargetId(currentTarget.id)
+          options.activate()
+        } else activateTarget(currentTarget)
       }, reducedMotion ? 0 : 80)
     }
     const advance = () => {
@@ -1495,19 +1571,50 @@ export function OfficeBuilding({
               })}
               onClick={() => requestTargetInteraction(
                 nextDuty.targetId,
-                nextDuty.kind === 'agent' && nextDuty.targetId !== 'operations'
-                  ? { fallbackTargetId: 'operations' }
-                  : undefined,
+                {
+                  ...(onOpenDuty
+                    ? {
+                        activate: () => onOpenDuty(nextDuty),
+                        anchorTarget: nextDuty.receipt.kind === 'event-watermark',
+                      }
+                    : {}),
+                  ...(nextDuty.fallbackTargetId
+                    ? {
+                        fallbackTargetId: nextDuty.fallbackTargetId,
+                        ...(onOpenDuty
+                          ? {
+                              fallbackActivate: () => {
+                                onOpenDuty({
+                                  ...nextDuty,
+                                  targetId: nextDuty.fallbackTargetId!,
+                                })
+                              },
+                            }
+                          : {}),
+                      }
+                    : {}),
+                },
               )}
             >
               <span>{t('office.nextDuty')}</span>
               <strong>{nextDutyName}</strong>
               {nextDuty.count > 0 && <em>{nextDuty.count >= 9 ? '9+' : nextDuty.count}</em>}
             </button>
-          ) : (
+          ) : currentDutyStatus === 'ready' ? (
             <div className="oa-office-hud__duty oa-office-hud__duty--clear">
               <span>{t('office.nextDuty')}</span>
               <strong>{t('office.shiftClear')}</strong>
+            </div>
+          ) : (
+            <div
+              className="oa-office-hud__duty oa-office-hud__duty--clear"
+              data-status={currentDutyStatus}
+              role="status"
+            >
+              <span>{t('office.nextDuty')}</span>
+              <strong>{t(currentDutyStatus === 'loading'
+                ? 'office.dutySyncing'
+                : 'office.dutySignalInterrupted')}</strong>
             </div>
           )
         )}
@@ -1870,7 +1977,7 @@ export function OfficeBuilding({
                 style={officePixelImg}
               />
               {acknowledgedTargetId === 'floor-terminal' && (
-                <span className="oa-office-landmark-ack" aria-hidden>OK</span>
+                <span className="oa-office-landmark-ack" aria-hidden>{acknowledgementLabel}</span>
               )}
             </button>
             <div
@@ -1969,7 +2076,7 @@ export function OfficeBuilding({
                   <span className="oa-office-map-service__signal" aria-hidden>{pendingLabel}</span>
                 )}
                 {acknowledgedTargetId === landmark.id && (
-                  <span className="oa-office-landmark-ack" aria-hidden>OK</span>
+                  <span className="oa-office-landmark-ack" aria-hidden>{acknowledgementLabel}</span>
                 )}
               </button>
               )
@@ -1980,19 +2087,19 @@ export function OfficeBuilding({
               tabIndex={-1}
               className="oa-office-operations-board"
               data-live={(replaySeq == null ? stats.working : stats.active) > 0}
-              data-has-activity={Boolean(productActivity.agent) || undefined}
-              data-attention={productActivity.attention.agent || undefined}
+              data-has-activity={Boolean(productActivity.agent) || Boolean(operationsCadenceDuty) || undefined}
+              data-attention={operationsNeedsAttention || undefined}
               data-fresh={productActivity.freshKind === 'agent' || undefined}
               data-nearby={nearbyTarget?.kind === 'operations'}
               data-route={routeTargetId === 'operations'}
               data-acknowledged={acknowledgedTargetId === 'operations' || undefined}
-              aria-label={productActivity.attention.agent
-                ? productActivity.pending.agent > 0
-                  ? t(productActivity.pending.agent >= 9
+              aria-label={operationsNeedsAttention
+                ? operationsPending > 0
+                  ? t(operationsPending >= 9
                       ? 'office.servicePendingActivityMore'
                       : 'office.servicePendingActivity', {
                       name: t('office.operationsBoard'),
-                      count: Math.min(9, productActivity.pending.agent),
+                      count: Math.min(9, operationsPending),
                     })
                   : t('office.serviceNeedsAttention', { name: t('office.operationsBoard') })
                 : t('office.operationsBoard')}
@@ -2010,13 +2117,13 @@ export function OfficeBuilding({
                 aria-hidden
                 style={officePixelImg}
               />
-              {productActivity.attention.agent && (
+              {operationsNeedsAttention && (
                 <span className="oa-office-operations-board__signal" aria-hidden>
-                  {productActivity.pending.agent >= 9 ? '9+' : productActivity.pending.agent || '!'}
+                  {operationsPending >= 9 ? '9+' : operationsPending || '!'}
                 </span>
               )}
               {acknowledgedTargetId === 'operations' && (
-                <span className="oa-office-landmark-ack" aria-hidden>OK</span>
+                <span className="oa-office-landmark-ack" aria-hidden>{acknowledgementLabel}</span>
               )}
             </button>
             <img

@@ -1,7 +1,7 @@
 # Plan: Office overworld
 
 **Status:** active — scene rebuild in progress
-**Owner guides:** [[docs/ui-interaction-and-motion.md]], [[docs/conversation-provenance.md]], [[docs/workspace-lifecycle.md]]
+**Owner guides:** [[docs/ui-interaction-and-motion.md]], [[docs/conversation-provenance.md]], [[docs/workspace-lifecycle.md]], [[docs/workspace-issues-and-scheduling.md]]
 **Depends on:** [[plans/agent-runtime-log.md]]
 **Delivery:** serial PR to `dev` (`area:workspace`, `theme:reliability`)
 
@@ -24,10 +24,12 @@ Office 奖励的是流程勤勉，而不是交易频率或盈亏：到岗后先�
 - **product Session 员工**：围绕小组工位活动，身份仍由 `resumeId` 决定
 - **Alice**：地图角色和镜头锚点
 
-第一阶段的引导闭环复用现有可消费活动日志：`Agent / Inbox / News` 仍由可插拔生产者
-注册，Office 只负责按产品优先级投影为一个“下一值班项”。用户点击后 Alice 必须走到
-现有地标并完成原交互，确认后才切换下一项；无待处理事项时低调显示值班已清。产品度量
-关注报告/消息/新闻的复核与确认，不以 Office 停留时长、点击量或下单次数代替勤勉。
+第一阶段的引导闭环复用现有可消费活动日志，并允许其他产品域主动注册规范化值班源：
+`Agent / Inbox / News` 与 Scheduled Issue 健康信号都只提供候选、来源状态和确认语义，
+Office 按产品优先级投影成一个“下一值班项”。用户点击后 Alice 必须走到对应地标并完成
+原交互或 Office 原生复核，明确确认后才切换下一项；无待处理事项且所有更高优先级来源
+已知时，才低调显示值班已清。产品度量关注报告、消息、节奏检查与新闻的复核和确认，
+不以 Office 停留时长、点击量、下单次数或盈亏代替勤勉。
 
 ### 值班引导方案
 
@@ -37,8 +39,10 @@ Office 奖励的是流程勤勉，而不是交易频率或盈亏：到岗后先�
 | 只保留地标角标 | 环境感强，但用户仍需自己猜测先后顺序 | 否 |
 | 一次只显示一个下一值班项，并指向现有地标 | 给出明确动线，同时保留走动、发现和空间记忆 | **是** |
 
-第一版优先级为 Inbox（已送达的产物）→ Agent（运行结果与异常）→ News（新信息）；后续
-把周报、风险检查、thesis 复核等节奏型事项也注册进同一投影，而不是在 HUD 里堆更多卡片。
+第一版优先级为 Inbox（已送达的产物）→ cadence（Scheduled Issue 节奏异常）→ Agent
+（运行结果与异常）→ News（新信息）。优先级是“下一步”的引导契约，不是地图访问控制：
+用户仍可自由探索地标和历史记录，但只有当前队首事项的明确确认会推进 HUD。后续把周报、
+风险检查、thesis 复核等正向节奏事项注册进同一投影，而不是在 HUD 里堆更多卡片。
 
 ## Current diagnosis
 
@@ -5946,18 +5950,51 @@ Agent-duty character routing implementation (2026-08-31):
   (one file and nine tests skipped); the production UI build passed with only the existing ports fallback and large-
   chunk advisory.
 
-First cadence-duty contract (design queued, 2026-08-31):
+Scheduled cadence-duty first increment (2026-09-01):
 
 - Audited Product Activity, Inbox, News, Issue snapshots, Workspace files, and Office drawers for a first diligence
   duty beyond event arrival. The safest zero-backend increment is a Scheduled Issue health exception: a row with
   `when` plus `automationHealth` in `blocked`, `failed`, or `interrupted`. It catches missed weekly-report, thesis, and
   risk-review routines without parsing Issue titles, guessing from file mtimes, or treating ordinary `due` dispatch
   latency as failure.
-- The next projector should be a registered descriptor fed by the existing Issue domain hook, not a fetch inside the
-  Building. It will sit after Inbox and before generic Agent/News, navigate with exact `workspaceId + issueId`, and use
-  a session receipt fingerprint over workspace, Issue, health state, latest task, last fired time, and next due time.
-  Reviewing it must not mutate Issue health, schedule state, or Inbox read state; changed evidence must produce a new
-  duty, and `Shift clear` must wait until every registered source has completed its first load.
+- Compared three interaction models: redirect directly to Issue detail, reuse Activity Log as a generic cadence drawer,
+  and open an Operations dossier before an optional exact-Issue excursion. Direct navigation confuses arrival with
+  review; Activity Log has event-watermark semantics and cannot truthfully receipt mutable schedule evidence. Chose an
+  Office-native two-step dossier: `Exception` explains why attention is due, `Evidence` shows the exact current Issue
+  and affected run, and only an explicit session receipt advances the world. Opening the full Issue remains optional
+  and never confirms work by itself.
+- Added a normalized duty-registration boundary (`id / order / status / candidates`). Inbox, cadence, Agent, and News
+  use it today; a future NanoAlice or non-Trading provider can register without teaching the Building its domain API.
+  An empty loading/error source is a hard ordering fence, so lower work and `Shift clear` never pretend an unknown
+  higher-priority source is clear. A known candidate from a degraded source remains visible but cannot be stamped.
+- Scheduled evidence identity includes exact Workspace + Issue, health state, task identity, assignee/blocker,
+  schedule, last fire, and due state. A future fire becoming due intentionally creates one new review; already-overdue
+  snapshots normalize to `due`, avoiding a resurrected reminder on every poll. Presentation-only title/priority edits
+  do not forge new work, while an unknown blocker-message change does.
+- The dossier keeps captured evidence pinned. If live evidence changes it offers `Review latest`; if the exception
+  resolves it says no stamp is needed; if the source fails it keeps the evidence readable but disables confirmation.
+  A full-Issue excursion stores the captured candidate, then restores Step 2 against the live candidate on return, so
+  A→B, A→healthy, and stale-source transitions cannot silently skip the receipt boundary.
+- Operations board, nearby prompt, and the HUD queue head all open the same cadence dossier in Live mode. Map landmarks
+  remain freely explorable out of order; this priority system guides attention rather than locking the rest of Office.
+  Replay continues to own its historical log and never opens a live cadence duty.
+- The game window has a persistent simple close control, stable accessible dialog name/description, heading-first focus,
+  trapped Tab order, two-stage Escape behavior, 44px actions, a collapsible long Issue brief, single-column phone facts,
+  and a short-landscape layout whose inner panel owns scrolling. Receipt copy states clearly that Office acknowledgement
+  does not repair or mutate the underlying Issue.
+- Focused registry/hook/dossier/Building/Page/storage/style tests cover ordering, readiness fences, evidence identity,
+  same-session recurrence, exact-detail freshness, mixed valid/invalid Workspaces, return transitions, explicit receipt,
+  Operations/HUD coherence, focus containment, and responsive rules. Real-browser acceptance covered the current Default
+  AliceProject at 500×420: Step 1 keeps its heading and close control visible, Step 2 folds the long BOJ task brief, full
+  Issue return resumes at Evidence, and both HUD and Operations open the same candidate.
+- Final verification passed root `npx tsc --noEmit`, UI `npx tsc -b`, all 122 focused tests, the complete 645-file / 5,458-
+  test suite (one file and nine tests skipped), and the production UI build. The build retained only the existing missing
+  local ports fallback and large-chunk advisory. A 390×844 real-browser pass additionally confirmed that the collapsed
+  task brief, exact facts, receipt note, and all three actions remain scrollable and reachable; stamping advanced the
+  live HUD from the BOJ exception to News and produced the Operations `REVIEWED` acknowledgement.
+- Known residual outside this Office-only increment: the shared `useIssues` hook does not yet generation-guard an older
+  overlapping refresh from replacing a newer snapshot. The Office projector fails closed while loading/error state is
+  visible, but the shared hook should eventually adopt the same out-of-order protection used by Product Activity.
 
 ## Completion
 

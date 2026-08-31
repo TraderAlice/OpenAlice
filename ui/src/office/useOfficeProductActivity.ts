@@ -4,6 +4,7 @@ import { api } from '../api'
 import type { AgentRuntimeEvent } from '../api/agentRuntimeLog'
 import { GLOBAL_ACTIVITY_REFRESH_EVENT } from '../hooks/useGlobalAgentActivity'
 import { officeActivityExcerpt } from './activity-text'
+import type { OfficeDutySourceStatus } from './duty-registry'
 
 const POLL_MS = 4_000
 const FRESH_MS = 12_000
@@ -46,6 +47,8 @@ export interface OfficeProductActivityState {
   readonly attention: Readonly<Record<OfficeActivityKind, boolean>>
   readonly pending: Readonly<Record<OfficeActivityKind, number>>
   readonly freshKind: OfficeActivityKind | null
+  /** Optional for fixture compatibility; the live hook always reports it. */
+  readonly sourceStatus?: OfficeDutySourceStatus
 }
 
 export interface OfficeProductActivity extends OfficeProductActivityState {
@@ -135,6 +138,7 @@ function writeAcknowledgedSeq(kind: OfficeActivityKind, seq: number) {
 /** Office-specific projection: persistent landmark copy, attention, and fresh-event motion. */
 export function useOfficeProductActivity(): OfficeProductActivity {
   const [events, setEvents] = useState<AgentRuntimeEvent[]>([])
+  const [sourceStatus, setSourceStatus] = useState<OfficeDutySourceStatus>('loading')
   const [freshKind, setFreshKind] = useState<OfficeActivityKind | null>(null)
   const [attention, setAttention] = useState<Record<OfficeActivityKind, boolean>>({
     agent: false,
@@ -166,7 +170,11 @@ export function useOfficeProductActivity(): OfficeProductActivity {
       activityApi.query({ page: 1, pageSize: PENDING_COUNT_CAP, family: 'inbox' }),
       activityApi.query({ page: 1, pageSize: PENDING_COUNT_CAP, family: 'news' }),
     ]).catch(() => null)
-    if (!pages || generation !== refreshGenerationRef.current) return
+    if (!pages) {
+      if (generation === refreshGenerationRef.current) setSourceStatus('error')
+      return
+    }
+    if (generation !== refreshGenerationRef.current) return
     const nextEvents = pages.flatMap((page) => page.entries).sort((a, b) => a.seq - b.seq)
     const journalLastSeq = Math.max(0, ...pages.map((page) => page.lastSeq))
     const previousLatest = { ...latestSeqRef.current }
@@ -233,6 +241,7 @@ export function useOfficeProductActivity(): OfficeProductActivity {
 
     setEvents(nextEvents)
     initializedRef.current = true
+    setSourceStatus('ready')
   }, [])
 
   const acknowledgeThrough = useCallback((kind: OfficeActivityKind, requestedSeq: number) => {
@@ -271,5 +280,5 @@ export function useOfficeProductActivity(): OfficeProductActivity {
   }, [refresh])
 
   const projected = useMemo(() => projectOfficeProductActivity(events), [events])
-  return { ...projected, attention, pending, freshKind, acknowledgeThrough }
+  return { ...projected, attention, pending, freshKind, sourceStatus, acknowledgeThrough }
 }

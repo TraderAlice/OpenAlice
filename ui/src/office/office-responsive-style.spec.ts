@@ -98,6 +98,24 @@ describe('Office responsive style contract', () => {
     expect(css).toMatch(
       /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.oa-office-landmark-ack \{ animation: none; \}/,
     )
+    expect(css).toMatch(
+      /\.oa-office-landmark-ack\s*\{[^}]*width:\s*max-content;[^}]*min-width:\s*30px;[^}]*white-space:\s*nowrap;/s,
+    )
+  })
+
+  it('keeps the cadence review readable and actionable on phone and short landscape stages', () => {
+    expect(css).toMatch(
+      /\.oa-office-cadence__review,[\s\S]*?\.oa-office-cadence__actions button\s*\{[^}]*min-height:\s*44px;/,
+    )
+    expect(narrowLiveCss).toMatch(
+      /\.oa-office-cadence__facts,[\s\S]*?\.oa-office-cadence__evidence dl\s*\{\s*grid-template-columns:\s*1fr;/,
+    )
+    expect(narrowLiveCss).toMatch(
+      /\.oa-office-cadence__actions\s*\{\s*grid-template-columns:\s*1fr;/,
+    )
+    expect(css).toMatch(
+      /@container \(max-width: 760px\) and \(max-height: 420px\) \{[\s\S]*?\.oa-office-cadence\s*\{[^}]*top:\s*60px;[^}]*bottom:\s*8px;[^}]*max-height:\s*none;/,
+    )
   })
 
   it('keeps pending landmark counts compact and game-readable', () => {
