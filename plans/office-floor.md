@@ -7,9 +7,14 @@
 
 ## Goal
 
-把 `/office` 做成一张真正可读、可操作的 4:3 俯视 Office 地图，让用户先看懂
-「哪些 Harness 在场、哪些 Workspace 正在活动、每名 Session 在做什么」，再进入日志、
-Session、Files 或 provenance。
+把 `/office` 做成 OpenAlice 的**交易值班与行为引导层**。它不只是把后台运行状态画成
+一张可读、可操作的 4:3 俯视地图，还要把用户此刻应该完成的研究、阅读、复核和记录
+变成世界里的可见事项，让用户不必先知道该去哪个传统金融页面。
+
+Office 奖励的是流程勤勉，而不是交易频率或盈亏：到岗后先处理报告与 Inbox、复核 Agent
+结果、阅读需要关注的 News，再进入判断和决策。地图本身就是任务清单；完成一项后，世界
+状态收敛并把下一项交给用户。未来 Trading、NanoAlice 或其他领域通过主动注册各自的值班
+事项接入同一投影，不在 `src/` 里生长第二套工作流引擎。
 
 产品层级固定为：
 
@@ -18,6 +23,22 @@ Session、Files 或 provenance。
 - **Workspace 小组**：地图上的家具簇和铭牌
 - **product Session 员工**：围绕小组工位活动，身份仍由 `resumeId` 决定
 - **Alice**：地图角色和镜头锚点
+
+第一阶段的引导闭环复用现有可消费活动日志：`Agent → Inbox → News` 仍由可插拔生产者
+注册，Office 只负责按产品优先级投影为一个“下一值班项”。用户点击后 Alice 必须走到
+现有地标并完成原交互，确认后才切换下一项；无待处理事项时低调显示值班已清。产品度量
+关注报告/消息/新闻的复核与确认，不以 Office 停留时长、点击量或下单次数代替勤勉。
+
+### 值班引导方案
+
+| 方案 | 用户影响 | 结论 |
+|---|---|---|
+| 常驻 checklist / 任务面板 | 信息完整，但把 Office 重新做成 Dashboard，用户仍在读列表 | 否 |
+| 只保留地标角标 | 环境感强，但用户仍需自己猜测先后顺序 | 否 |
+| 一次只显示一个下一值班项，并指向现有地标 | 给出明确动线，同时保留走动、发现和空间记忆 | **是** |
+
+第一版优先级为 Inbox（已送达的产物）→ Agent（运行结果与异常）→ News（新信息）；后续
+把周报、风险检查、thesis 复核等节奏型事项也注册进同一投影，而不是在 HUD 里堆更多卡片。
 
 ## Current diagnosis
 
@@ -5836,6 +5857,21 @@ Replay-roster target coherence follow-up (2026-08-31):
   replay power and pinned highlight. Focused roster/style suites passed all 36 tests; root and UI TypeScript passed;
   the full suite passed 620 test files and 5,218 tests (one file and nine tests skipped); the production UI build passed
   with only the existing ports fallback and large-chunk advisory.
+
+Guided-duty first loop (2026-08-31):
+
+- Reframed Office from a map-shaped entry surface into OpenAlice's diligence-guidance layer: the world should tell the
+  user what deserves review before they fall back to familiar charts, while never rewarding trade count or P&L.
+- Compared a permanent checklist, ambient landmark badges alone, and one ordered next duty. Chose one duty routed to
+  the existing world object, so the map supplies the sequence without becoming another Dashboard or bypassing play.
+- The first projection reuses the pluggable Agent / Inbox / News activity contract and prioritizes delivered Inbox
+  artifacts, then Agent milestones, then News. Clicking the HUD duty runs Alice through the real collision-aware path;
+  the existing station acknowledgement advances the projection, and an empty queue becomes a restrained Shift clear.
+- Real-browser acceptance on the Default AliceProject showed `Operations board · 5`, walked Alice to the board, opened
+  Activity Log, and then converged the HUD to `Shift clear`. The cue fit the live 1064×660 Office scene without hiding
+  map content. Focused Office tests passed 69 tests; root and UI TypeScript passed; the full suite passed 641 test files
+  and 5,408 tests (one file and nine tests skipped); the production UI build passed with only the existing ports
+  fallback and large-chunk advisory.
 
 ## Completion
 

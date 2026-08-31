@@ -10,7 +10,7 @@ const FRESH_MS = 12_000
 const PENDING_COUNT_CAP = 9
 const ACK_STORAGE_PREFIX = 'openalice:office-product-activity:ack:'
 const OFFICE_ACTIVITY_KINDS = ['agent', 'inbox', 'news'] as const
-type OfficeActivityKind = typeof OFFICE_ACTIVITY_KINDS[number]
+export type OfficeActivityKind = typeof OFFICE_ACTIVITY_KINDS[number]
 
 const OFFICE_AGENT_MILESTONE_TYPES = [
   'session.born',

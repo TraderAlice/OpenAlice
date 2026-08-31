@@ -70,7 +70,7 @@ import {
 import { layoutOfficeMap } from './map-layout'
 import { officeDepthAt } from './scene-depth'
 import { useReducedMotion } from './use-reduced-motion'
-import type { OfficeProductActivityState } from './useOfficeProductActivity'
+import type { OfficeActivityKind, OfficeProductActivityState } from './useOfficeProductActivity'
 
 const OFFICE_MOVEMENTS = {
   left: { x: -24, y: 0, direction: 'left' as const },
@@ -129,6 +129,25 @@ export type OfficeLogOrigin =
   | 'inbox-service'
   | 'news-service'
 type OfficeAcknowledgementTarget = 'operations' | 'floor-terminal' | 'inbox-service' | 'news-service'
+type OfficeDutyTargetId = Extract<OfficeAcknowledgementTarget, 'operations' | 'inbox-service' | 'news-service'>
+
+export interface OfficeNextDuty {
+  kind: OfficeActivityKind
+  targetId: OfficeDutyTargetId
+  count: number
+}
+
+const OFFICE_DUTY_PRIORITY: readonly Readonly<Pick<OfficeNextDuty, 'kind' | 'targetId'>>[] = [
+  { kind: 'inbox', targetId: 'inbox-service' },
+  { kind: 'agent', targetId: 'operations' },
+  { kind: 'news', targetId: 'news-service' },
+]
+
+export function nextOfficeDuty(activity: OfficeProductActivityState): OfficeNextDuty | null {
+  const next = OFFICE_DUTY_PRIORITY.find(({ kind }) => activity.attention[kind])
+  return next ? { ...next, count: activity.pending[next.kind] } : null
+}
+
 export interface OfficePlayerState {
   position: { x: number; y: number }
   direction: OfficeAliceDirection
@@ -420,6 +439,14 @@ export function OfficeBuilding({
                 : routeTarget.kind === 'roster'
                   ? `${t('office.roster')} · ${routeTarget.roomName}`
                   : routeTarget.roomName
+    : null
+  const nextDuty = replaySeq == null ? nextOfficeDuty(productActivity) : null
+  const nextDutyName = nextDuty
+    ? nextDuty.kind === 'inbox'
+      ? t('office.inboxStation')
+      : nextDuty.kind === 'agent'
+        ? t('office.operationsBoard')
+        : t('office.newsStation')
     : null
   const routeStatusEdge = officeRouteStatusEdge(alice, camera, viewportSize, mapLayout.height)
   const operationsBoard = useMemo(
@@ -1384,6 +1411,30 @@ export function OfficeBuilding({
             </p>
           </div>
         </div>
+
+        {replaySeq == null && (
+          nextDuty && nextDutyName ? (
+            <button
+              type="button"
+              className="oa-office-hud__duty"
+              data-kind={nextDuty.kind}
+              aria-label={t('office.nextDutyPending', {
+                name: nextDutyName,
+                count: nextDuty.count,
+              })}
+              onClick={() => requestTargetInteraction(nextDuty.targetId)}
+            >
+              <span>{t('office.nextDuty')}</span>
+              <strong>{nextDutyName}</strong>
+              {nextDuty.count > 0 && <em>{nextDuty.count >= 9 ? '9+' : nextDuty.count}</em>}
+            </button>
+          ) : (
+            <div className="oa-office-hud__duty oa-office-hud__duty--clear">
+              <span>{t('office.nextDuty')}</span>
+              <strong>{t('office.shiftClear')}</strong>
+            </div>
+          )
+        )}
 
         <div
           className="oa-office-hud__status"

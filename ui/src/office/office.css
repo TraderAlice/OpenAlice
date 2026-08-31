@@ -5364,10 +5364,67 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
 }
 
 .oa-office-hud {
-  grid-template-columns: minmax(10rem, 1fr) auto auto;
+  grid-template-columns: minmax(10rem, 1fr) minmax(11rem, auto) auto auto;
   min-height: 52px;
   padding: 5px 8px;
   box-shadow: none;
+}
+
+.oa-office-hud__duty {
+  display: grid;
+  min-width: 0;
+  min-height: 38px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-content: center;
+  column-gap: 7px;
+  padding: 3px 8px;
+  border: 2px solid var(--office-gba-ink-seed);
+  border-radius: 2px;
+  color: var(--office-gba-ink-seed);
+  background: var(--office-gba-live);
+  box-shadow: 2px 2px 0 color-mix(in srgb, var(--office-gba-ink-seed) 24%, transparent);
+  text-align: left;
+}
+
+.oa-office-hud__duty span {
+  grid-column: 1 / -1;
+  color: color-mix(in srgb, var(--office-gba-ink-seed) 64%, transparent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.oa-office-hud__duty strong {
+  overflow: hidden;
+  font-weight: 900;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oa-office-hud__duty em {
+  min-width: 20px;
+  padding: 1px 4px;
+  border: 1px solid currentColor;
+  background: var(--office-gba-cream-seed);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-style: normal;
+  font-weight: 900;
+  text-align: center;
+}
+
+.oa-office-hud__duty:is(:hover, :focus-visible) {
+  outline: 3px solid var(--office-gba-live);
+  outline-offset: 2px;
+  transform: translate(-1px, -1px);
+}
+
+.oa-office-hud__duty--clear {
+  border-color: color-mix(in srgb, var(--office-gba-ink-seed) 42%, transparent);
+  background: color-mix(in srgb, var(--office-gba-cream-seed) 86%, var(--office-gba-water-seed));
+  box-shadow: none;
+  opacity: 0.72;
 }
 
 .oa-office-hud__status {
@@ -6351,6 +6408,14 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
   }
 
   .oa-office-hud__status span:not(:first-child) {
+    display: none;
+  }
+
+  .oa-office-hud {
+    grid-template-columns: minmax(8rem, 1fr) minmax(9rem, auto) auto;
+  }
+
+  .oa-office-hud__status {
     display: none;
   }
 }

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { OfficeBuildingSnapshot } from '../api/office'
 import { i18n } from '../i18n'
-import { OfficeBuilding, officeRouteStatusEdge } from './OfficeBuilding'
+import { nextOfficeDuty, OfficeBuilding, officeRouteStatusEdge } from './OfficeBuilding'
 import { officeCoworkerSpriteForAgent } from './coworker-sprites'
 import { officeCoworkerCallsign } from './label'
 
@@ -22,6 +22,35 @@ beforeEach(async () => {
 })
 
 describe('OfficeBuilding', () => {
+  it('turns pending product activity into one ordered next duty', () => {
+    const activity = {
+      agent: null,
+      inbox: null,
+      news: null,
+      attention: { agent: true, inbox: true, news: true },
+      pending: { agent: 2, inbox: 1, news: 9 },
+      freshKind: null,
+    }
+
+    expect(nextOfficeDuty(activity)).toEqual({
+      kind: 'inbox',
+      targetId: 'inbox-service',
+      count: 1,
+    })
+    expect(nextOfficeDuty({
+      ...activity,
+      attention: { ...activity.attention, inbox: false },
+    })).toEqual({
+      kind: 'agent',
+      targetId: 'operations',
+      count: 2,
+    })
+    expect(nextOfficeDuty({
+      ...activity,
+      attention: { agent: false, inbox: false, news: false },
+    })).toBeNull()
+  })
+
   it('claims the initial keyboard focus so the first direction key enters the game', async () => {
     const onOpenLog = vi.fn()
     render(
@@ -1842,6 +1871,10 @@ describe('OfficeBuilding', () => {
 
     const inbox = screen.getByRole('button', { name: 'Inbox station · 2 pending' })
     const news = screen.getByRole('button', { name: 'News terminal · 9+ pending' })
+    const nextDuty = screen.getByRole('button', { name: 'Next duty: Inbox station, 2 pending' })
+    expect(nextDuty.dataset.kind).toBe('inbox')
+    expect(nextDuty.textContent).toContain('Next duty')
+    expect(nextDuty.textContent).toContain('Inbox station')
     const serviceZone = screen.getByTestId('office-service-zone')
     expect(serviceZone.querySelector('img')?.getAttribute('src'))
       .toBe('/office/furniture/workspace-rug-v2.png')

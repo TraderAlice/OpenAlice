@@ -396,7 +396,7 @@ describe('OfficePage localization', () => {
     const { container } = render(<OfficePage />)
 
     expect(screen.getByRole('heading', { name: '办公室' })).toBeTruthy()
-    expect(screen.getByText('多个 Harness 办公室共处一个平层。Workspace 是小组，每个 Session 都有自己的工位。')).toBeTruthy()
+    expect(screen.getByText('把 Agent、Inbox 和 News 动态变成下一项勤勉值班任务的引导式行动楼层。')).toBeTruthy()
     expect(screen.queryByText('Office occupancy')).toBeNull()
     const menuTrigger = screen.getByRole('button', { name: '菜单' })
     menuTrigger.focus()
