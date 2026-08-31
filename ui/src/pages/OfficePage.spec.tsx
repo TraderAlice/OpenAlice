@@ -35,11 +35,15 @@ vi.mock('./OfficeRuntimeSection', () => ({
     initialChannel,
     initialSelectedSeq,
     replaySeq,
+    dutyReview,
+    onConfirmDuty,
     onReplay,
   }: {
     initialChannel?: string
     initialSelectedSeq?: number | null
     replaySeq?: number | null
+    dutyReview?: { kind: string; throughSeq: number; count: number }
+    onConfirmDuty?: () => void
     onReplay?: (focus: {
       seq: number
       targetIds: readonly string[]
@@ -53,8 +57,14 @@ vi.mock('./OfficeRuntimeSection', () => ({
       data-channel={initialChannel}
       data-selected-seq={initialSelectedSeq ?? undefined}
       data-replay-seq={replaySeq ?? undefined}
+      data-duty-kind={dutyReview?.kind}
+      data-duty-through-seq={dutyReview?.throughSeq}
+      data-duty-count={dutyReview?.count}
     >
       Office occupancy
+      {dutyReview && onConfirmDuty && (
+        <button type="button" onClick={onConfirmDuty}>Mock confirm duty</button>
+      )}
       <button
         type="button"
         onClick={() => onReplay?.({
@@ -128,7 +138,7 @@ beforeEach(async () => {
     attention: { agent: false, inbox: false, news: false },
     pending: { agent: 0, inbox: 0, news: 0 },
     freshKind: null,
-    acknowledge: acknowledgeMock,
+    acknowledgeThrough: acknowledgeMock,
   })
   clearOfficePlayerState()
   window.localStorage.clear()
@@ -339,7 +349,7 @@ describe('OfficePage localization', () => {
     const runtime = screen.getByTestId('office-runtime-section')
     expect(runtime.dataset.channel).toBe('agent')
     expect(runtime.dataset.selectedSeq).toBe('37')
-    expect(acknowledgeMock).toHaveBeenCalledWith('agent')
+    expect(acknowledgeMock).not.toHaveBeenCalled()
 
     await userEvent.keyboard('{Escape}')
     expect(screen.getByRole('dialog', { name: /Grok/ })).toBeTruthy()
@@ -389,7 +399,7 @@ describe('OfficePage localization', () => {
     const runtime = screen.getByTestId('office-runtime-section')
     expect(runtime.dataset.channel).toBe('agent')
     expect(runtime.dataset.selectedSeq).toBe('45')
-    expect(acknowledgeMock).toHaveBeenCalledWith('agent')
+    expect(acknowledgeMock).not.toHaveBeenCalled()
   })
 
   it('localizes the Office HUD and opens logs on request', async () => {
@@ -451,6 +461,45 @@ describe('OfficePage localization', () => {
     })
   })
 
+  it('offers an Agent receipt only from the pending Operations duty', async () => {
+    productActivityMock.mockReturnValue({
+      agent: { seq: 45, occurredAt: 4_500, eventType: 'runtime.stopped' },
+      inbox: null,
+      news: null,
+      attention: { agent: true, inbox: false, news: false },
+      pending: { agent: 3, inbox: 0, news: 0 },
+      freshKind: null,
+      acknowledgeThrough: acknowledgeMock,
+    })
+    render(<OfficePage />)
+
+    const operations = screen.getByRole('button', { name: '行动看板 · 待处理 3 条' })
+    await userEvent.click(operations)
+    let runtime = await screen.findByTestId('office-runtime-section', {}, { timeout: 10_000 })
+    expect(runtime.dataset.channel).toBe('agent')
+    expect(runtime.dataset.selectedSeq).toBe('45')
+    expect(runtime.dataset.dutyKind).toBe('agent')
+    expect(runtime.dataset.dutyThroughSeq).toBe('45')
+    expect(runtime.dataset.dutyCount).toBe('3')
+    expect(acknowledgeMock).not.toHaveBeenCalled()
+
+    await userEvent.keyboard('{Escape}')
+    await vi.waitFor(() => expect(document.activeElement).toBe(operations))
+    expect(acknowledgeMock).not.toHaveBeenCalled()
+
+    const floorTerminal = screen.getByRole('button', { name: '楼层终端' })
+    await userEvent.click(floorTerminal)
+    runtime = await screen.findByTestId('office-runtime-section', {}, { timeout: 10_000 })
+    expect(runtime.dataset.channel).toBe('overview')
+    expect(runtime.dataset.dutyKind).toBeUndefined()
+    expect(screen.queryByRole('button', { name: 'Mock confirm duty' })).toBeNull()
+    await userEvent.keyboard('{Escape}')
+
+    await userEvent.click(operations)
+    await userEvent.click(await screen.findByRole('button', { name: 'Mock confirm duty' }))
+    expect(acknowledgeMock).toHaveBeenCalledWith('agent', 45)
+  })
+
   it('keeps Inbox and News station visits inside the Office journal', async () => {
     productActivityMock.mockReturnValue({
       agent: null,
@@ -459,7 +508,7 @@ describe('OfficePage localization', () => {
       attention: { agent: false, inbox: true, news: true },
       pending: { agent: 0, inbox: 1, news: 2 },
       freshKind: null,
-      acknowledge: acknowledgeMock,
+      acknowledgeThrough: acknowledgeMock,
     })
     const { container } = render(<OfficePage />)
 
@@ -468,7 +517,10 @@ describe('OfficePage localization', () => {
     const runtime = await screen.findByTestId('office-runtime-section', {}, { timeout: 10_000 })
     expect(runtime.dataset.channel).toBe('inbox')
     expect(runtime.dataset.selectedSeq).toBe('11')
-    expect(acknowledgeMock).toHaveBeenCalledWith('inbox')
+    expect(runtime.dataset.dutyKind).toBe('inbox')
+    expect(runtime.dataset.dutyThroughSeq).toBe('11')
+    expect(runtime.dataset.dutyCount).toBe('1')
+    expect(acknowledgeMock).not.toHaveBeenCalled()
     expect(openOrFocusMock).not.toHaveBeenCalled()
     expect(navigateMock).not.toHaveBeenCalled()
     expect(container.querySelector<HTMLElement>('.oa-office-scene')?.hasAttribute('inert')).toBe(true)
@@ -476,12 +528,20 @@ describe('OfficePage localization', () => {
     await userEvent.keyboard('{Escape}')
     await vi.waitFor(() => expect(document.activeElement).toBe(inbox))
 
+    await userEvent.click(inbox)
+    await userEvent.click(await screen.findByRole('button', { name: 'Mock confirm duty' }))
+    expect(acknowledgeMock).toHaveBeenCalledWith('inbox', 11)
+    await vi.waitFor(() => expect(screen.queryByTestId('office-runtime-section')).toBeNull())
+    acknowledgeMock.mockClear()
+
     const news = screen.getByRole('button', { name: '新闻终端 · 待处理 2 条' })
     await userEvent.click(news)
     const newsRuntime = await screen.findByTestId('office-runtime-section', {}, { timeout: 10_000 })
     expect(newsRuntime.dataset.channel).toBe('news')
     expect(newsRuntime.dataset.selectedSeq).toBe('12')
-    expect(acknowledgeMock).toHaveBeenCalledWith('news')
+    expect(newsRuntime.dataset.dutyKind).toBe('news')
+    expect(newsRuntime.dataset.dutyThroughSeq).toBe('12')
+    expect(acknowledgeMock).not.toHaveBeenCalled()
     expect(openOrFocusMock).not.toHaveBeenCalled()
     expect(navigateMock).not.toHaveBeenCalled()
 

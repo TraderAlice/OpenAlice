@@ -76,6 +76,62 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('OfficeRuntimeSection', () => {
+  it('requires an explicit review receipt before completing a captured duty batch', async () => {
+    const onConfirmDuty = vi.fn()
+    mockJournal([{
+      seq: 12,
+      ts: Date.now(),
+      type: 'news.ingested',
+      payload: { newsItemId: 12, source: 'Wire', title: 'Review this headline' },
+    }])
+
+    render(
+      <OfficeRuntimeSection
+        initialChannel="news"
+        initialSelectedSeq={12}
+        dutyReview={{ kind: 'news', throughSeq: 12, count: 2 }}
+        onConfirmDuty={onConfirmDuty}
+      />,
+    )
+
+    const receipt = await screen.findByRole('button', {
+      name: 'Stamp reviewed · News ×2',
+    })
+    expect(receipt.closest('.oa-office-runtime__content')).toBeTruthy()
+    expect(onConfirmDuty).not.toHaveBeenCalled()
+
+    await userEvent.click(screen.getByRole('tab', { name: /^Agent/ }))
+    expect(screen.queryByRole('button', { name: /Stamp reviewed/ })).toBeNull()
+    await userEvent.click(screen.getByRole('tab', { name: /^News/ }))
+
+    await userEvent.click(screen.getByRole('button', {
+      name: 'Stamp reviewed · News ×2',
+    }))
+    expect(onConfirmDuty).toHaveBeenCalledTimes(1)
+  })
+
+  it('labels a capped review batch as nine-plus rather than an exact count', async () => {
+    mockJournal([{
+      seq: 22,
+      ts: Date.now(),
+      type: 'news.ingested',
+      payload: { newsItemId: 22, source: 'Wire', title: 'Newest of a large batch' },
+    }])
+
+    render(
+      <OfficeRuntimeSection
+        initialChannel="news"
+        initialSelectedSeq={22}
+        dutyReview={{ kind: 'news', throughSeq: 22, count: 9 }}
+        onConfirmDuty={() => undefined}
+      />,
+    )
+
+    expect(await screen.findByRole('button', {
+      name: 'Stamp reviewed · News ×9+',
+    })).toBeTruthy()
+  })
+
   it('follows a newly arrived head only while the previous head remains selected', () => {
     expect(officeJournalSelectionAfterRefresh({
       currentSeq: 12,
@@ -135,6 +191,46 @@ describe('OfficeRuntimeSection', () => {
 
     await screen.findByRole('button', { name: /Third headline.*#0003/i })
     await waitFor(() => expect(first.getAttribute('aria-pressed')).toBe('true'))
+  })
+
+  it('pins a captured duty record and hides its receipt on a newer selection', async () => {
+    const now = Date.now()
+    const entries = [{
+      seq: 1,
+      ts: now - 1_000,
+      type: 'news.ingested',
+      payload: { newsItemId: 1, source: 'Wire', title: 'Captured headline' },
+    }]
+    mockJournal(entries)
+    render(
+      <OfficeRuntimeSection
+        initialChannel="news"
+        initialSelectedSeq={1}
+        dutyReview={{ kind: 'news', throughSeq: 1, count: 1 }}
+        onConfirmDuty={() => undefined}
+      />,
+    )
+
+    const captured = await screen.findByRole('button', { name: /Captured headline.*#0001/i })
+    expect(captured.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Stamp reviewed · News ×1' })).toBeTruthy()
+
+    entries.unshift({
+      seq: 2,
+      ts: now,
+      type: 'news.ingested',
+      payload: { newsItemId: 2, source: 'Wire', title: 'Arrived during review' },
+    })
+    window.dispatchEvent(new Event(GLOBAL_ACTIVITY_REFRESH_EVENT))
+
+    const newer = await screen.findByRole('button', { name: /Arrived during review.*#0002/i })
+    await waitFor(() => expect(captured.getAttribute('aria-pressed')).toBe('true'))
+    expect(newer.getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByRole('button', { name: 'Stamp reviewed · News ×1' })).toBeTruthy()
+
+    await userEvent.click(newer)
+    await waitFor(() => expect(newer.getAttribute('aria-pressed')).toBe('true'))
+    expect(screen.queryByRole('button', { name: /Stamp reviewed/ })).toBeNull()
   })
 
   it('reveals a selected record by scrolling only the journal index', () => {

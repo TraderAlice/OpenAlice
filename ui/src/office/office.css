@@ -1568,6 +1568,32 @@
   background: var(--gba-water);
 }
 
+.oa-office-runtime__open--receipt {
+  width: 100%;
+  justify-content: center;
+  margin-top: 8px;
+  color: var(--gba-ink);
+  background: var(--office-gba-live);
+  box-shadow:
+    inset 0 0 0 2px color-mix(in srgb, var(--gba-paper) 54%, transparent),
+    2px 2px 0 color-mix(in srgb, var(--gba-ink) 32%, transparent);
+}
+
+.oa-office-runtime__receipt-stamp {
+  display: grid;
+  width: 30px;
+  height: 24px;
+  flex: none;
+  place-items: center;
+  border: 3px double var(--gba-ink);
+  color: var(--gba-ink);
+  background: var(--gba-paper);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 1000;
+  line-height: 1;
+  transform: rotate(-3deg);
+}
+
 .oa-office-runtime__open > img {
   display: block;
   width: 30px;
@@ -2267,11 +2293,13 @@
 
   .oa-office-runtime__actions {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .oa-office-runtime__open {
+  .oa-office-runtime__actions > .oa-office-runtime__open {
+    grid-column: auto;
     width: 100%;
+    align-self: stretch;
     justify-content: center;
   }
 
@@ -5373,11 +5401,11 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
 .oa-office-hud__duty {
   display: grid;
   min-width: 0;
-  min-height: 38px;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-content: center;
-  column-gap: 7px;
-  padding: 3px 8px;
+  min-height: 34px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 6px;
+  padding: 2px 6px;
   border: 2px solid var(--office-gba-ink-seed);
   border-radius: 2px;
   color: var(--office-gba-ink-seed);
@@ -5387,9 +5415,9 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
 }
 
 .oa-office-hud__duty span {
-  grid-column: 1 / -1;
   color: color-mix(in srgb, var(--office-gba-ink-seed) 64%, transparent);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-xs) !important;
   font-weight: 900;
   line-height: 1;
   text-transform: uppercase;
@@ -5414,10 +5442,15 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
   text-align: center;
 }
 
-.oa-office-hud__duty:is(:hover, :focus-visible) {
+button.oa-office-hud__duty:is(:hover, :focus-visible) {
   outline: 3px solid var(--office-gba-live);
   outline-offset: 2px;
   transform: translate(-1px, -1px);
+}
+
+button.oa-office-hud__duty:active {
+  box-shadow: 1px 1px 0 color-mix(in srgb, var(--office-gba-ink-seed) 24%, transparent);
+  transform: translate(1px, 1px);
 }
 
 .oa-office-hud__duty--clear {
@@ -6563,7 +6596,7 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
   .oa-office-hud {
     grid-template-areas:
       "identity actions"
-      "status status";
+      "duty duty";
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 3px 8px;
     min-height: 68px;
@@ -6573,14 +6606,14 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
     grid-area: identity;
   }
 
+  .oa-office-hud__duty {
+    width: 100%;
+    grid-area: duty;
+  }
+
   .oa-office-hud__status,
   .oa-office-building[data-replay="true"] .oa-office-hud__status {
-    display: flex;
-    width: 100%;
-    min-width: 0;
-    grid-area: status;
-    padding-top: 3px;
-    border-top: 1px solid color-mix(in srgb, var(--office-gba-ink-seed) 22%, transparent);
+    display: none;
   }
 
   .oa-office-hud__status span:not(:first-child) {

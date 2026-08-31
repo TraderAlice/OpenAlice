@@ -25,11 +25,15 @@ import {
 import { OfficeReplayBar } from '../office/OfficeReplayBar'
 import type { OfficeReplayFocus } from '../office/replay-focus'
 import { OfficeRosterWindow } from '../office/OfficeRosterWindow'
-import { useOfficeProductActivity } from '../office/useOfficeProductActivity'
+import { useOfficeProductActivity, type OfficeActivityKind } from '../office/useOfficeProductActivity'
 import '../office/office.css'
 import { useWorkspace } from '../tabs/store'
 import type { WorkspaceSource } from '../tabs/types'
-import { OfficeRuntimeSection, type OfficeLogChannel } from './OfficeRuntimeSection'
+import {
+  OfficeRuntimeSection,
+  type OfficeDutyReview,
+  type OfficeLogChannel,
+} from './OfficeRuntimeSection'
 
 function sourceForTag(tag: string): WorkspaceSource | undefined {
   if (tag === 'chat') return 'chat'
@@ -56,6 +60,7 @@ export function OfficePage() {
     origin: OfficeLogOrigin
     channel: OfficeLogChannel
     focusSeq: number | null
+    dutyReview?: OfficeDutyReview
   } | null>(null)
   const [menuResumeToken, setMenuResumeToken] = useState(0)
   const [rosterWorkspaceId, setRosterWorkspaceId] = useState<string | null>(null)
@@ -275,7 +280,6 @@ export function OfficePage() {
 
   const reviewSelectedActivity = selectedSeat && selectedReplayFocus
     ? () => {
-      productActivity.acknowledge('agent')
       setLogView({
         origin: 'employee',
         channel: selectedReplayFocus.channel,
@@ -290,7 +294,6 @@ export function OfficePage() {
       || selectedSeat.employee.latestResult != null
     )
       ? () => {
-        productActivity.acknowledge('agent')
         setLogView({
           origin: 'employee',
           channel: 'agent',
@@ -358,23 +361,47 @@ export function OfficePage() {
                   setLogView(null)
                 }}
                 onOpenLog={(origin) => {
-                  productActivity.acknowledge('agent')
                   const replayLogView = replayFocus && replayFocus.seq === asOfSeq
                     ? { channel: replayFocus.channel, focusSeq: replayFocus.seq }
                     : null
+                  const dutyReview = asOfSeq == null
+                    && origin === 'operations'
+                    && productActivity.attention.agent
+                    && productActivity.agent
+                    ? {
+                        kind: 'agent' as const,
+                        throughSeq: productActivity.agent.seq,
+                        count: productActivity.pending.agent,
+                      }
+                    : undefined
                   setLogView({
                     origin,
-                    channel: replayLogView?.channel ?? 'overview',
+                    channel: replayLogView?.channel ?? (dutyReview ? 'agent' : 'overview'),
                     focusSeq: replayLogView?.focusSeq
                       ?? (origin === 'operations' ? productActivity.agent?.seq ?? null : null),
+                    ...(dutyReview ? { dutyReview } : {}),
                   })
                   setReplayPanelOpen(asOfSeq != null)
                   setCabinetWorkspaceId(null)
                 }}
                 productActivity={productActivity}
                 onOpenService={(kind, seq) => {
-                  productActivity.acknowledge(kind)
-                  setLogView({ origin: `${kind}-service`, channel: kind, focusSeq: seq ?? null })
+                  const throughSeq = seq ?? productActivity[kind]?.seq
+                  const dutyReview = asOfSeq == null
+                    && productActivity.attention[kind]
+                    && throughSeq != null
+                    ? {
+                        kind: kind as OfficeActivityKind,
+                        throughSeq,
+                        count: productActivity.pending[kind],
+                      }
+                    : undefined
+                  setLogView({
+                    origin: `${kind}-service`,
+                    channel: kind,
+                    focusSeq: seq ?? null,
+                    ...(dutyReview ? { dutyReview } : {}),
+                  })
                   setReplayPanelOpen(asOfSeq != null)
                   setSelected(null)
                   setRosterWorkspaceId(null)
@@ -457,6 +484,16 @@ export function OfficePage() {
                     initialChannel={logView.channel}
                     initialSelectedSeq={logView.focusSeq}
                     replaySeq={asOfSeq}
+                    dutyReview={logView.dutyReview}
+                    onConfirmDuty={logView.dutyReview
+                      ? () => {
+                          productActivity.acknowledgeThrough(
+                            logView.dutyReview!.kind,
+                            logView.dutyReview!.throughSeq,
+                          )
+                          closeLogToFloor()
+                        }
+                      : undefined}
                     onReplay={(focus) => {
                       setReplayFocus(focus)
                       setAsOfSeq(focus.seq)

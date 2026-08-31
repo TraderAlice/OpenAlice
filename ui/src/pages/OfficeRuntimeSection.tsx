@@ -37,9 +37,15 @@ import {
   type OfficeReplayFocus,
 } from '../office/replay-focus'
 import { officeRunModeLabel } from '../office/runtime-presentation'
+import type { OfficeActivityKind } from '../office/useOfficeProductActivity'
 import { useWorkspace } from '../tabs/store'
 
 export type OfficeLogChannel = OfficeReplayChannel
+export interface OfficeDutyReview {
+  kind: OfficeActivityKind
+  throughSeq: number
+  count: number
+}
 type OfficeLogMobileView = 'index' | 'detail'
 
 const OFFICE_LOG_CHANNELS: readonly OfficeLogChannel[] = ['overview', 'agent', 'inbox', 'news']
@@ -346,12 +352,16 @@ export function OfficeRuntimeSection({
   initialChannel = 'overview',
   initialSelectedSeq = null,
   replaySeq = null,
+  dutyReview = null,
+  onConfirmDuty,
   onReplay,
 }: {
   actors?: ReadonlyMap<string, OfficeActivityActor>
   initialChannel?: OfficeLogChannel
   initialSelectedSeq?: number | null
   replaySeq?: number | null
+  dutyReview?: OfficeDutyReview | null
+  onConfirmDuty?: () => void
   onReplay?: (focus: OfficeReplayFocus) => void
 } = {}) {
   const { t } = useTranslation()
@@ -491,7 +501,10 @@ export function OfficeRuntimeSection({
     const nextSelectedSeq = officeJournalSelectionAfterRefresh({
       currentSeq: selectedSeq,
       initialSelectedSeq: initialVisibleSeq,
-      previousHeadSeq: replaySeq == null ? previousHeadSeq : null,
+      previousHeadSeq: replaySeq == null
+        && !(dutyReview && channel === dutyReview.kind)
+        ? previousHeadSeq
+        : null,
       visibleSeqs,
     })
     if (
@@ -505,7 +518,7 @@ export function OfficeRuntimeSection({
       journalLiveFollowFocusPendingRef.current = document.activeElement === currentRow
     }
     if (nextSelectedSeq !== selectedSeq) setSelectedSeq(nextSelectedSeq)
-  }, [channel, initialSelectedSeq, replaySeq, selectedSeq, visibleBeats])
+  }, [channel, dutyReview, initialSelectedSeq, replaySeq, selectedSeq, visibleBeats])
 
   useEffect(() => {
     if (replaySeq == null) {
@@ -1113,6 +1126,25 @@ export function OfficeRuntimeSection({
                 </li>
               ))}
             </ul>
+            {dutyReview
+              && onConfirmDuty
+              && replaySeq == null
+              && channel === dutyReview.kind
+              && selectedBeat.event.seq <= dutyReview.throughSeq
+              && (
+              <button
+                type="button"
+                className="oa-office-runtime__open oa-office-runtime__open--receipt"
+                onClick={onConfirmDuty}
+                onKeyDown={(event) => confirmRuntimeAction(event, onConfirmDuty)}
+              >
+                <span className="oa-office-runtime__receipt-stamp" aria-hidden>OK</span>
+                {t('office.dutyReceipt', {
+                  name: t(OFFICE_LOG_CHANNEL_LABEL_KEYS[dutyReview.kind]),
+                  countLabel: dutyReview.count >= 9 ? '9+' : dutyReview.count,
+                })}
+              </button>
+              )}
           </div>
           <div className="oa-office-runtime__actions">
             {onReplay && (

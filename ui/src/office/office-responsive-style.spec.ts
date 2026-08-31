@@ -412,6 +412,12 @@ describe('Office responsive style contract', () => {
       /\.oa-office-runtime__actions::after\s*\{[\s\S]*?top: 100%;[\s\S]*?height: 11px;[\s\S]*?background: var\(--gba-paper\);/,
     )
     expect(css).toMatch(
+      /@container \(max-width: 480px\) \{[\s\S]*?\.oa-office-runtime__actions\s*\{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);[\s\S]*?\.oa-office-runtime__actions > \.oa-office-runtime__open\s*\{[\s\S]*?grid-column: auto;[\s\S]*?align-self: stretch;/,
+    )
+    expect(css).toMatch(
+      /\.oa-office-runtime__open--receipt\s*\{[\s\S]*?width: 100%;[\s\S]*?margin-top: 8px;/,
+    )
+    expect(css).toMatch(
       /@container \(max-width: 760px\) \{[\s\S]*?\.oa-office-runtime__event\s*\{[\s\S]*?height: 100%;/,
     )
     expect(css).toMatch(
@@ -487,25 +493,28 @@ describe('Office responsive style contract', () => {
     expect(css).toContain(".oa-office-building[data-controls-suspended='true'] :is(")
   })
 
-  it('keeps the floor identity and commands on the first phone HUD row', () => {
+  it('keeps the floor identity, commands, and compact duty ticket on the phone HUD', () => {
     expect(narrowLiveStart).toBeGreaterThan(-1)
     expect(narrowLiveEnd).toBeGreaterThan(narrowLiveStart)
     expect(narrowLiveCss).toMatch(/\n\s*\.oa-office-hud \{/)
     expect(narrowLiveCss).not.toContain(':not([data-replay="true"])')
     expect(narrowLiveCss).toContain('"identity actions"')
+    expect(narrowLiveCss).toContain('"duty duty"')
     expect(narrowLiveCss).toContain('grid-template-columns: minmax(0, 1fr) auto')
     expect(narrowLiveCss).toContain('grid-area: identity')
     expect(narrowLiveCss).toContain('grid-area: actions')
+    expect(narrowLiveCss).toContain('grid-area: duty')
+    expect(css).toMatch(
+      /\.oa-office-hud__duty\s*\{[^}]*min-height:\s*34px;[^}]*grid-template-columns:\s*auto minmax\(0, 1fr\) auto;/s,
+    )
   })
 
-  it('preserves live and replay agent status as a separate full-width phone HUD row', () => {
-    expect(narrowLiveCss).toContain('"status status"')
-    expect(narrowLiveCss).toContain('grid-area: status')
+  it('keeps clear duty copy passive and yields phone HUD space to guidance', () => {
+    expect(css).toContain('button.oa-office-hud__duty:is(:hover, :focus-visible)')
+    expect(css).not.toMatch(/\n\.oa-office-hud__duty:is\(/)
     expect(narrowLiveCss).toContain('.oa-office-building[data-replay="true"] .oa-office-hud__status')
-    expect(narrowLiveCss).toContain('display: flex')
-    expect(narrowLiveCss).toContain('width: 100%')
-    expect(narrowLiveCss).toContain('border-top: 1px solid')
-    expect(narrowLiveCss).toContain('.oa-office-hud__status span:not(:first-child)')
-    expect(narrowLiveCss).toContain('display: inline-flex')
+    expect(narrowLiveCss).toMatch(
+      /\.oa-office-hud__status,\s*\.oa-office-building\[data-replay="true"\] \.oa-office-hud__status\s*\{\s*display: none;/,
+    )
   })
 })

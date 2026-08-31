@@ -53,6 +53,14 @@ function queueRefresh(entries: AgentRuntimeEvent[], lastSeq: number) {
     })
 }
 
+function deferredPage() {
+  let resolve!: (value: { entries: AgentRuntimeEvent[]; lastSeq: number }) => void
+  const promise = new Promise<{ entries: AgentRuntimeEvent[]; lastSeq: number }>((done) => {
+    resolve = done
+  })
+  return { promise, resolve }
+}
+
 beforeEach(() => {
   queryRuntime.mockReset()
   window.sessionStorage.clear()
@@ -142,7 +150,7 @@ describe('useOfficeProductActivity', () => {
     await waitFor(() => expect(firstVisit.result.current.news?.seq).toBe(11))
     expect(queryRuntime).toHaveBeenCalledWith(expect.objectContaining({
       pageSize: 9,
-      types: expect.arrayContaining(['runtime.started', 'runtime.stopped']),
+      types: expect.arrayContaining(['runtime.stopped', 'runtime.turn.error']),
     }))
     expect(queryRuntime).toHaveBeenCalledWith({ page: 1, pageSize: 9, family: 'inbox' })
     expect(queryRuntime).toHaveBeenCalledWith({ page: 1, pageSize: 9, family: 'news' })
@@ -160,7 +168,7 @@ describe('useOfficeProductActivity', () => {
     expect(returnVisit.result.current.pending).toEqual({ agent: 0, inbox: 0, news: 1 })
     expect(returnVisit.result.current.freshKind).toBeNull()
 
-    act(() => returnVisit.result.current.acknowledge('news'))
+    act(() => returnVisit.result.current.acknowledgeThrough('news', 12))
     expect(returnVisit.result.current.attention.news).toBe(false)
     expect(returnVisit.result.current.pending.news).toBe(0)
     returnVisit.unmount()
@@ -187,10 +195,10 @@ describe('useOfficeProductActivity', () => {
     expect(hook.result.current.pending.inbox).toBe(1)
     expect(hook.result.current.freshKind).toBe('inbox')
 
-    act(() => hook.result.current.acknowledge('news'))
+    act(() => hook.result.current.acknowledgeThrough('news', 11))
     expect(hook.result.current.freshKind).toBe('inbox')
 
-    act(() => hook.result.current.acknowledge('inbox'))
+    act(() => hook.result.current.acknowledgeThrough('inbox', 12))
     expect(hook.result.current.attention.inbox).toBe(false)
     expect(hook.result.current.pending.inbox).toBe(0)
     expect(hook.result.current.freshKind).toBeNull()
@@ -213,10 +221,14 @@ describe('useOfficeProductActivity', () => {
     await waitFor(() => expect(hook.result.current.news?.seq).toBe(22))
     expect(hook.result.current.attention.news).toBe(true)
     expect(hook.result.current.pending.news).toBe(9)
+
+    act(() => hook.result.current.acknowledgeThrough('news', 22))
+    expect(hook.result.current.attention.news).toBe(false)
+    expect(hook.result.current.pending.news).toBe(0)
     hook.unmount()
   })
 
-  it('raises and acknowledges Operations Board attention for an Agent milestone', async () => {
+  it('keeps routine Agent starts ambient and raises review duty for a result', async () => {
     queueRefresh([inboxNine, newsEleven], 11)
     const hook = renderHook(() => useOfficeProductActivity())
     await waitFor(() => expect(hook.result.current.news?.seq).toBe(11))
@@ -226,13 +238,80 @@ describe('useOfficeProductActivity', () => {
     })
     queueRefresh([started, inboxNine, newsEleven], 12)
     act(() => window.dispatchEvent(new Event(GLOBAL_ACTIVITY_REFRESH_EVENT)))
-    await waitFor(() => expect(hook.result.current.agent?.seq).toBe(12))
+    await waitFor(() => expect(hook.result.current.news?.seq).toBe(11))
+    expect(hook.result.current.agent).toBeNull()
+    expect(hook.result.current.attention.agent).toBe(false)
+
+    const completed = event(13, 'runtime.stopped', {
+      agent: 'grok', workspaceLabel: 'Office Lab', status: 'done', assistantText: 'Report ready.',
+    })
+    queueRefresh([completed, started, inboxNine, newsEleven], 13)
+    act(() => window.dispatchEvent(new Event(GLOBAL_ACTIVITY_REFRESH_EVENT)))
+    await waitFor(() => expect(hook.result.current.agent?.seq).toBe(13))
     expect(hook.result.current.attention.agent).toBe(true)
     expect(hook.result.current.freshKind).toBe('agent')
 
-    act(() => hook.result.current.acknowledge('agent'))
+    act(() => hook.result.current.acknowledgeThrough('agent', 13))
     expect(hook.result.current.attention.agent).toBe(false)
     expect(hook.result.current.freshKind).toBeNull()
+    hook.unmount()
+  })
+
+  it('acknowledges only the captured batch and preserves activity that arrived while reviewing', async () => {
+    queueRefresh([newsEleven], 11)
+    const hook = renderHook(() => useOfficeProductActivity())
+    await waitFor(() => expect(hook.result.current.news?.seq).toBe(11))
+
+    const newsTwelve = event(12, 'news.ingested', { title: 'First duty', source: 'Wire' })
+    queueRefresh([newsEleven, newsTwelve], 12)
+    act(() => window.dispatchEvent(new Event(GLOBAL_ACTIVITY_REFRESH_EVENT)))
+    await waitFor(() => expect(hook.result.current.pending.news).toBe(1))
+
+    const newsThirteen = event(13, 'news.ingested', { title: 'Arrived during review', source: 'Wire' })
+    queueRefresh([newsEleven, newsTwelve, newsThirteen], 13)
+    act(() => window.dispatchEvent(new Event(GLOBAL_ACTIVITY_REFRESH_EVENT)))
+    await waitFor(() => expect(hook.result.current.pending.news).toBe(2))
+
+    act(() => hook.result.current.acknowledgeThrough('news', 12))
+    expect(hook.result.current.attention.news).toBe(true)
+    expect(hook.result.current.pending.news).toBe(1)
+    expect(hook.result.current.news?.seq).toBe(13)
+    hook.unmount()
+  })
+
+  it('ignores an older refresh that resolves after a newer activity snapshot', async () => {
+    queueRefresh([newsEleven], 11)
+    const hook = renderHook(() => useOfficeProductActivity())
+    await waitFor(() => expect(hook.result.current.news?.seq).toBe(11))
+
+    const newsTwelve = event(12, 'news.ingested', { title: 'Older snapshot', source: 'Wire' })
+    const newsThirteen = event(13, 'news.ingested', { title: 'Newer snapshot', source: 'Wire' })
+    const older = [deferredPage(), deferredPage(), deferredPage()]
+    const newer = [deferredPage(), deferredPage(), deferredPage()]
+    const pendingPages = [...older, ...newer]
+    let call = 0
+    queryRuntime.mockImplementation(() => pendingPages[call++].promise)
+
+    act(() => window.dispatchEvent(new Event(GLOBAL_ACTIVITY_REFRESH_EVENT)))
+    act(() => window.dispatchEvent(new Event(GLOBAL_ACTIVITY_REFRESH_EVENT)))
+
+    await act(async () => {
+      newer[0].resolve({ entries: [], lastSeq: 13 })
+      newer[1].resolve({ entries: [], lastSeq: 13 })
+      newer[2].resolve({ entries: [newsThirteen, newsTwelve, newsEleven], lastSeq: 13 })
+      await Promise.resolve()
+    })
+    await waitFor(() => expect(hook.result.current.news?.seq).toBe(13))
+    expect(hook.result.current.pending.news).toBe(2)
+
+    await act(async () => {
+      older[0].resolve({ entries: [], lastSeq: 12 })
+      older[1].resolve({ entries: [], lastSeq: 12 })
+      older[2].resolve({ entries: [newsTwelve, newsEleven], lastSeq: 12 })
+      await Promise.resolve()
+    })
+    expect(hook.result.current.news?.seq).toBe(13)
+    expect(hook.result.current.pending.news).toBe(2)
     hook.unmount()
   })
 })

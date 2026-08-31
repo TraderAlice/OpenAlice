@@ -1971,11 +1971,12 @@ describe('OfficeBuilding', () => {
       <OfficeBuilding
         {...props}
         interactionSuspended
-        productActivity={acknowledgedActivity}
+        productActivity={activity}
       />,
     )
     expect(inbox.querySelector('.oa-office-landmark-ack')).toBeNull()
 
+    // The real receipt closes the modal in the same React batch that clears attention.
     view.rerender(<OfficeBuilding {...props} productActivity={acknowledgedActivity} />)
     await waitFor(() => expect(inbox.dataset.acknowledged).toBe('true'))
     expect(inbox.querySelector('.oa-office-landmark-ack')?.textContent).toBe('OK')

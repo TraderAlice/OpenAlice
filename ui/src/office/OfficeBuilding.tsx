@@ -472,7 +472,7 @@ export function OfficeBuilding({
       news: interactionAnchorTargetId === 'news-service' ? interactionAnchorTargetId : null,
     } as const
     for (const kind of ['agent', 'inbox', 'news'] as const) {
-      if (interactionSuspended && previous[kind] && !current[kind] && targetForKind[kind]) {
+      if (previous[kind] && !current[kind] && targetForKind[kind]) {
         pendingAcknowledgementRef.current = targetForKind[kind]
       }
     }
@@ -490,7 +490,7 @@ export function OfficeBuilding({
       acknowledgementTimerRef.current = null
       setAcknowledgedTargetId(null)
     }, 900)
-  }, [interactionSuspended])
+  }, [interactionSuspended, productActivity.attention])
   const nearbyTarget = useMemo(
     () => {
       if (floorInteractionSuspended || departingWorkspace || selected) return null
@@ -1420,7 +1420,7 @@ export function OfficeBuilding({
               data-kind={nextDuty.kind}
               aria-label={t('office.nextDutyPending', {
                 name: nextDutyName,
-                count: nextDuty.count,
+                countLabel: nextDuty.count >= 9 ? '9+' : nextDuty.count,
               })}
               onClick={() => requestTargetInteraction(nextDuty.targetId)}
             >

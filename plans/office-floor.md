@@ -24,7 +24,7 @@ Office 奖励的是流程勤勉，而不是交易频率或盈亏：到岗后先�
 - **product Session 员工**：围绕小组工位活动，身份仍由 `resumeId` 决定
 - **Alice**：地图角色和镜头锚点
 
-第一阶段的引导闭环复用现有可消费活动日志：`Agent → Inbox → News` 仍由可插拔生产者
+第一阶段的引导闭环复用现有可消费活动日志：`Agent / Inbox / News` 仍由可插拔生产者
 注册，Office 只负责按产品优先级投影为一个“下一值班项”。用户点击后 Alice 必须走到
 现有地标并完成原交互，确认后才切换下一项；无待处理事项时低调显示值班已清。产品度量
 关注报告/消息/新闻的复核与确认，不以 Office 停留时长、点击量或下单次数代替勤勉。
@@ -5872,6 +5872,36 @@ Guided-duty first loop (2026-08-31):
   map content. Focused Office tests passed 69 tests; root and UI TypeScript passed; the full suite passed 641 test files
   and 5,408 tests (one file and nine tests skipped); the production UI build passed with only the existing ports
   fallback and large-chunk advisory.
+
+Explicit diligence receipt follow-up (2026-08-31):
+
+- Refined the Office mission from merely exposing background motion into a habit-guidance layer: like a game chore loop,
+  it should make the next valuable review obvious and satisfying to finish, while never rewarding trade frequency,
+  Office dwell time, or P&L.
+- Compared acknowledging on terminal entry, acknowledging on window close, and an explicit batch receipt inside the
+  existing Activity Log. Chose the receipt: opening is exploration, Escape is postponement, and only the deliberate
+  review stamp advances the duty. This keeps the world honest without adding a second checklist or workflow engine.
+- A duty captures its entry sequence. Confirming acknowledges only through that sequence, so a new Inbox or News item
+  that arrives while the log is open remains the next duty instead of being silently swallowed. Routine Agent starts
+  stay ambient; only stops, failures, rejects, and turn errors become human review duties.
+- A captured duty pins its reviewed record instead of live-following a newer head. Selecting an event beyond the captured
+  sequence hides the old receipt, and closing plus acknowledging in one React commit still raises the world landmark's
+  short `OK` response.
+- Overlapping poll and push refreshes are generation-guarded, so a slower old response cannot rewind the projected head
+  or clamp a captured receipt below the sequence the player actually reviewed.
+- The receipt appears only in the duty's own channel, and capped batches say `9+` rather than presenting the query cap
+  as an exact total. Browsing another journal channel never permits an unrelated duty to be stamped; an Operations
+  duty enters the Agent channel directly, while the generic floor terminal remains an uncommitted overview.
+- Recast the HUD duty as a compact one-line game ticket rather than a web CTA. Its cleared state has no hover affordance,
+  and the narrow layout dedicates its second row to the duty instead of growing a third status row. The phone journal
+  places its two follow-up commands side by side and puts the full-width receipt after the review content, preserving
+  room to read and making the intended read-then-stamp order visible.
+- Real-browser acceptance on the Default AliceProject covered desktop and a 500×420 viewport. Closing Inbox without a
+  stamp preserved the duty; two events arriving during an older review remained after that batch was stamped. News
+  `#16830` stayed pinned when `#16831` arrived, selecting the newer record hid the old receipt, and the refreshed batch
+  returned to the floor with a visible terminal `OK` before converging to `Shift clear`. Focused Office suites passed
+  115 tests; root and UI TypeScript passed; the full suite passed 641 test files and 5,414 tests (one file and nine tests
+  skipped); the production UI build passed with only the existing ports fallback and large-chunk advisory.
 
 ## Completion
 
