@@ -1925,7 +1925,7 @@ export const en = {
     cabinetRecords_other: '{{count}} filed records',
     cabinetPosition: 'Record {{index}} of {{count}}',
     cabinetInspectHint: 'Desk records stay in Office until you choose where to go.',
-    cabinetKeyboardHint: 'Arrows choose · Enter / Space open',
+    cabinetKeyboardHint: 'Arrows choose · PgUp/PgDn page · Home/End jump · Enter / Space open',
     cabinetEmptyKeyboardHint: 'Enter / Space opens Workspace files',
     cabinetRecordOwner: 'Filed by {{name}}',
     drawerOpenRecord: 'Open {{record}}, {{kind}}, {{time}}, in Workspace',

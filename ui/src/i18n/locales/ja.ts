@@ -1893,7 +1893,7 @@ export const ja: Resources = {
     cabinetRecords_other: '保管記録 {{count}} 件',
     cabinetPosition: '{{count}} 件中 {{index}} 件目',
     cabinetInspectHint: '移動先を選ぶまで、デスク記録は Office 内に表示されます。',
-    cabinetKeyboardHint: '方向キーで選択 · Enter / Space で開く',
+    cabinetKeyboardHint: '方向キーで選択 · PgUp/PgDn でページ移動 · Home/End で端へ · Enter / Space で開く',
     cabinetEmptyKeyboardHint: 'Enter / Space で Workspace ファイルを開く',
     cabinetRecordOwner: '{{name}} が保管',
     drawerOpenRecord: 'Workspace で {{record}}（{{kind}}、{{time}}）を開く',

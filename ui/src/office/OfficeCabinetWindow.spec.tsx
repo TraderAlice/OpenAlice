@@ -78,7 +78,8 @@ describe('OfficeCabinetWindow', () => {
     expect(dialog.hasAttribute('data-empty')).toBe(false)
     expect(dialog.hasAttribute('data-dense')).toBe(false)
     expect(screen.getByText('2 filed records')).toBeTruthy()
-    expect(screen.getByText('Arrows choose · Enter / Space open').getAttribute('data-input')).toBe('keyboard')
+    expect(screen.getByText('Arrows choose · PgUp/PgDn page · Home/End jump · Enter / Space open')
+      .getAttribute('data-input')).toBe('keyboard')
     expect(screen.getByText('Desk records stay in Office until you choose where to go.').getAttribute('data-input'))
       .toBe('touch')
     const recordText = screen.getAllByRole('listitem').map((item) => item.textContent ?? '')
@@ -96,6 +97,8 @@ describe('OfficeCabinetWindow', () => {
       .toBe('Record 1 of 2')
 
     const recordButtons = screen.getAllByRole('button', { name: /Open .*, (Issue|Report), .* in Workspace/ })
+    expect(screen.getByRole('list', { name: 'Filing cabinet' }).getAttribute('aria-keyshortcuts'))
+      .toBe('ArrowLeft ArrowRight ArrowUp ArrowDown PageUp PageDown Home End Enter Space')
     expect(document.activeElement).toBe(recordButtons[0])
     vi.spyOn(recordButtons[0]!, 'getBoundingClientRect').mockReturnValue({
       left: 0, right: 100, top: 0, bottom: 60,
@@ -154,7 +157,7 @@ describe('OfficeCabinetWindow', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  it('marks a cabinet with five or more records as dense', () => {
+  it('pages through a dense cabinet by its visible list height', async () => {
     const denseGroup: OfficeRoomSnapshot = {
       ...group,
       employees: [{
@@ -182,6 +185,22 @@ describe('OfficeCabinetWindow', () => {
     const dialog = screen.getByRole('dialog', { name: 'Filing cabinet · Semis' })
     expect(dialog.getAttribute('data-record-count')).toBe('5')
     expect(dialog.getAttribute('data-dense')).toBe('true')
+    const list = screen.getByRole('list', { name: 'Filing cabinet' })
+    Object.defineProperty(list, 'clientHeight', { configurable: true, value: 120 })
+    const buttons = list.querySelectorAll<HTMLButtonElement>('button[data-record-key]')
+    buttons.forEach((button, index) => {
+      vi.spyOn(button, 'getBoundingClientRect').mockReturnValue({
+        left: 0,
+        right: 220,
+        top: index * 64,
+        bottom: index * 64 + 56,
+      } as DOMRect)
+    })
+    expect(document.activeElement).toBe(buttons[0])
+    await userEvent.keyboard('{PageDown}')
+    expect(document.activeElement).toBe(buttons[2])
+    await userEvent.keyboard('{PageUp}')
+    expect(document.activeElement).toBe(buttons[0])
   })
 
   it('keeps the distinguishing suffix of long record titles visible', () => {
@@ -273,7 +292,7 @@ describe('OfficeCabinetWindow', () => {
       .toBe('0 filed records')
     expect(screen.getByText('No desk records have been filed here yet.')).toBeTruthy()
     expect(screen.getByText('Enter / Space opens Workspace files').getAttribute('data-input')).toBe('keyboard')
-    expect(screen.queryByText('Arrows choose · Enter / Space open')).toBeNull()
+    expect(screen.queryByText('Arrows choose · PgUp/PgDn page · Home/End jump · Enter / Space open')).toBeNull()
     expect(container.querySelector<HTMLImageElement>('.oa-office-cabinet-window__empty img')?.src)
       .toContain('/office/furniture/empty-cabinet-v1.png')
     const workspaceFiles = screen.getByRole('button', { name: 'Enter Workspace files' })

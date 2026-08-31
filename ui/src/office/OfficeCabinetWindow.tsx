@@ -6,7 +6,7 @@ import { formatRelativeTime } from '../lib/intl'
 import { employeesForOffice } from './desk-slots'
 import { officeDrawerKindLabel, officeDrawerTitle } from './drawer-presentation'
 import { OFFICE_FURNITURE, officePixelImg } from './furniture'
-import { nextOfficeGridIndex } from './grid-navigation'
+import { nextOfficeGridIndex, nextOfficeGridPageIndex } from './grid-navigation'
 import { OFFICE_HUD_ASSETS } from './hud-assets'
 import { isOfficeConfirmKey } from './input'
 import { OfficeWindowControlGlyph } from './OfficeWindowControlGlyph'
@@ -119,6 +119,7 @@ export function OfficeCabinetWindow({
             ref={recordListRef}
             className="oa-office-cabinet-window__records"
             aria-label={t('office.cabinet')}
+            aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown PageUp PageDown Home End Enter Space"
             onKeyDown={(event) => {
               if (event.key === 'Tab') {
                 event.preventDefault()
@@ -143,6 +144,13 @@ export function OfficeCabinetWindow({
                   buttons.map((button) => button.getBoundingClientRect()),
                   currentIndex,
                   direction,
+                )
+              } else if (event.key === 'PageUp' || event.key === 'PageDown') {
+                nextIndex = nextOfficeGridPageIndex(
+                  buttons.map((button) => button.getBoundingClientRect()),
+                  currentIndex,
+                  event.key === 'PageUp' ? 'up' : 'down',
+                  event.currentTarget.clientHeight,
                 )
               } else if (event.key === 'Home') {
                 nextIndex = 0

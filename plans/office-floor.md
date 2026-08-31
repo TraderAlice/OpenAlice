@@ -5450,6 +5450,22 @@ Stepped Office time-shift follow-up (2026-08-31):
   suite passed all 620 test files and 5,207 tests (one file and nine tests skipped); the production UI build passed
   with only the existing ports fallback and large-chunk advisory.
 
+Filing-cabinet page-navigation follow-up (2026-08-31):
+
+- Played the real Chat filing cabinet with 12 records through selection, detail opening, return, and long-list travel.
+  Arrow navigation and Home/End already worked, but the visible hint hid the jump keys and PgUp/PgDn did nothing even
+  though the adjacent team roster supported paging. That made two Office collection windows teach different controls.
+- Compared documenting only the existing keys, adding paging without advertising the full set, and adopting one shared
+  collection grammar. Chose the full grammar: arrows move one record, PgUp/PgDn move one visible page, Home/End jump to
+  the ends, and Enter/Space open. This adds no buttons or layout weight to the compact game window.
+- Paging reuses the shared spatial-grid helper and the cabinet list's actual visible height, preserving the current
+  column where possible while keeping roving focus, selection, record counter, and nearest-item scrolling in sync. The
+  list now exposes the complete key set through `aria-keyshortcuts`; all four Office locales teach the same controls.
+- Real-browser acceptance moved PgDn from the first record to the first record on the next visible page, then PgUp back
+  to the exact first record. Focused cabinet/navigation suites passed all 8 tests; root and UI TypeScript passed; the
+  full suite passed all 620 test files and 5,207 tests (one file and nine tests skipped); the production UI build passed
+  with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

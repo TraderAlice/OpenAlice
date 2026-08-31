@@ -1892,7 +1892,7 @@ export const zh: Resources = {
     cabinetRecords_other: '{{count}} 份归档记录',
     cabinetPosition: '第 {{index}} 份，共 {{count}} 份',
     cabinetInspectHint: '工位记录会留在 Office，直到你选择继续前往。',
-    cabinetKeyboardHint: '方向键选择 · Enter / Space 打开',
+    cabinetKeyboardHint: '方向键选择 · PgUp/PgDn 翻页 · Home/End 跳转 · Enter / Space 打开',
     cabinetEmptyKeyboardHint: 'Enter / Space 打开 Workspace 文件',
     cabinetRecordOwner: '{{name}} 归档',
     drawerOpenRecord: '在工作区中打开 {{record}}，{{kind}}，{{time}}',
