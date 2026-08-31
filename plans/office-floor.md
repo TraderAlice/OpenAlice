@@ -5396,6 +5396,27 @@ Diegetic service wayfinding follow-up (2026-08-31):
   root and UI TypeScript passed; the full suite passed all 620 test files and 5,205 tests (one file and nine tests
   skipped); the production UI build passed with only the existing ports fallback and large-chunk advisory.
 
+Harness-landmark power-cycle follow-up (2026-08-31):
+
+- Played the real three-Harness floor after the service-wayfinding pass. Chat's coffee station, AutoQuant's server rack,
+  and Prediction's evidence console already gave each Workspace family a distinct silhouette, but only the AutoQuant
+  prop had a live treatment. Chat and Prediction could therefore have an awake agent while their zone landmark still
+  looked disconnected from the work happening at its desks.
+- Compared flashing the whole rug, relying only on desk animation, and powering only the authored Harness landmark.
+  A room-wide pulse creates dashboard noise; desk-only state is easy to miss across a large map. Chose the landmark
+  power cycle: Chat uses a warm amber lamp, AutoQuant a cool water light, and Prediction a restrained violet console;
+  each breathes on a two-frame 1.2-second cadence without changing layout or adding another interaction target.
+- The first real Grok QA run exposed an important state-boundary error before acceptance: the old `activeCount` also
+  included failed and review moods, so a finished floor with `0 awake` would stay lit. The final scene contract uses an
+  explicit `data-powered` state owned only by `awakeCount`; finished, failed, and review coworkers keep their existing
+  desk/emote evidence while the shared zone power turns off. Reduced-motion mode retains the static powered glow.
+- Real `office-lab-chat` Grok run `run-UxSaQsZ-` created awake working coworker g33. The Chat prop switched from no
+  animation to `oa-office-harness-live`, resolved its warm color to `#986700`, and stayed synchronized with g33's
+  working emote. After the run completed, g33 became asleep, `data-powered` returned false, and the prop animation
+  returned to `none`. The focused Building and responsive-style suites passed all 56 tests; root and UI TypeScript
+  passed; the full suite passed all 620 test files and 5,206 tests (one file and nine tests skipped); the production UI
+  build passed with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

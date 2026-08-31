@@ -4507,12 +4507,21 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
 
 /* Shared top-down scene graph. Workspace pods are map objects, not rooms. */
 .oa-office-pod {
+  --office-harness-live-color: var(--office-cyan);
   position: absolute;
   z-index: auto;
   display: grid;
   grid-template-rows: 64px minmax(0, 1fr);
   box-sizing: border-box;
   padding: 0 12px 12px;
+}
+
+.oa-office-pod[data-harness="chat"] {
+  --office-harness-live-color: var(--office-amber);
+}
+
+.oa-office-pod[data-harness="prediction"] {
+  --office-harness-live-color: var(--terminal-magenta);
 }
 
 .oa-office-pod__sign {
@@ -4658,10 +4667,24 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
   height: 72px;
 }
 
-.oa-office-pod[data-harness="auto-quant"][data-active="true"] .oa-office-pod__harness-prop {
+.oa-office-pod[data-powered="true"] .oa-office-pod__harness-prop {
   filter:
     drop-shadow(2px 3px 0 color-mix(in srgb, var(--gba-ink) 22%, transparent))
-    drop-shadow(0 0 4px color-mix(in srgb, var(--gba-water) 65%, transparent));
+    drop-shadow(0 0 5px color-mix(in srgb, var(--office-harness-live-color) 70%, transparent));
+  animation: oa-office-harness-live 1.2s steps(2, end) infinite;
+}
+
+.oa-office-pod[data-powered="true"][data-reduced-motion="true"] .oa-office-pod__harness-prop {
+  animation: none;
+}
+
+@keyframes oa-office-harness-live {
+  50% {
+    filter:
+      brightness(1.12)
+      drop-shadow(2px 3px 0 color-mix(in srgb, var(--gba-ink) 22%, transparent))
+      drop-shadow(0 0 7px color-mix(in srgb, var(--office-harness-live-color) 82%, transparent));
+  }
 }
 
 .oa-office-pod[data-sleeping="true"] .oa-office-pod__harness-prop {
@@ -5432,7 +5455,7 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
 
 .oa-office-building[data-office-time="night"] .oa-office-map-landmark--terminal img,
 .oa-office-building[data-office-time="night"] .oa-office-operations-board[data-live="true"] img,
-.oa-office-building[data-office-time="night"] .oa-office-pod[data-active="true"] .oa-office-topdown-station__asset {
+.oa-office-building[data-office-time="night"] .oa-office-pod[data-powered="true"] .oa-office-topdown-station__asset {
   filter:
     drop-shadow(0 0 5px color-mix(in srgb, var(--gba-water) 60%, transparent))
     drop-shadow(2px 3px 0 color-mix(in srgb, var(--gba-ink) 24%, transparent));

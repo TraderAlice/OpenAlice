@@ -1480,7 +1480,9 @@ describe('OfficeBuilding', () => {
       expect.objectContaining({ resumeId: 'resume-alice' }),
     )
     expect(screen.getByTestId('office-pod-chat-1')).toBeTruthy()
+    expect(screen.getByTestId('office-pod-chat-1').dataset.powered).toBe('true')
     expect(screen.getByTestId('office-pod-quant-1')).toBeTruthy()
+    expect(screen.getByTestId('office-pod-quant-1').dataset.powered).toBe('false')
     expect(screen.queryByTestId('office-pod-quant-old')).toBeNull()
     expect(screen.getByTestId('office-pod-chat-1').querySelector<HTMLImageElement>('.oa-office-pod__harness-prop')?.src)
       .toContain('/office/furniture/coffee-station-v2.png')
@@ -1636,6 +1638,7 @@ describe('OfficeBuilding', () => {
       )
 
       const reviewPrompt = screen.getByRole('status', { name: 'Review Grok Strategist’s failed run' })
+      expect(screen.getByTestId('office-pod-quant-dormant').dataset.powered).toBe('false')
       expect(reviewPrompt.querySelector('img')?.getAttribute('src'))
         .toBe('/office/log/alert-v1.png')
       expect(reviewPrompt.textContent).toContain('Review')
@@ -1655,6 +1658,7 @@ describe('OfficeBuilding', () => {
       )
 
       const resultPrompt = screen.getByRole('status', { name: 'Review Grok Strategist’s latest result' })
+      expect(screen.getByTestId('office-pod-quant-dormant').dataset.powered).toBe('false')
       expect(resultPrompt.querySelector('img')?.getAttribute('src'))
         .toBe('/office/coworkers/review-emote-v1.png')
       expect(resultPrompt.textContent).toContain('Review')

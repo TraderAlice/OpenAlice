@@ -75,8 +75,9 @@ export function OfficeMapPod({
         height: layout.height,
       }}
       data-harness={group.workspace.harness}
-      data-active={activeCount > 0}
+      data-powered={awakeCount > 0}
       data-sleeping={group.sleeping}
+      data-reduced-motion={reducedMotion || undefined}
       data-replay-locked={interactionDisabled || undefined}
     >
       <button

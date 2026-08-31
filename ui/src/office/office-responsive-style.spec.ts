@@ -126,6 +126,21 @@ describe('Office responsive style contract', () => {
     )
   })
 
+  it('lights each active Harness landmark without adding motion in reduced-motion mode', () => {
+    expect(css).toMatch(
+      /\.oa-office-pod\[data-harness="chat"\]\s*\{[^}]*--office-harness-live-color:\s*var\(--office-amber\);/s,
+    )
+    expect(css).toMatch(
+      /\.oa-office-pod\[data-harness="prediction"\]\s*\{[^}]*--office-harness-live-color:\s*var\(--terminal-magenta\);/s,
+    )
+    expect(css).toMatch(
+      /\.oa-office-pod\[data-powered="true"\] \.oa-office-pod__harness-prop\s*\{[^}]*oa-office-harness-live 1\.2s steps\(2, end\) infinite;/s,
+    )
+    expect(css).toMatch(
+      /\.oa-office-pod\[data-powered="true"\]\[data-reduced-motion="true"\] \.oa-office-pod__harness-prop\s*\{[^}]*animation:\s*none;/s,
+    )
+  })
+
   it('keeps employee replay beacons beside current coworker state', () => {
     expect(css).toMatch(
       /\.oa-office-replay-beacon\[data-kind="employee"\]\s*\{[^}]*--office-replay-beacon-shift-x:\s*calc\(-100% - 14px\);/s,
