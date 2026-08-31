@@ -258,53 +258,77 @@ describe('OpenAlice Guardian control protocol', () => {
     expect(readProcessStartedAt).not.toHaveBeenCalled()
   })
 
-  it('uses heartbeat authority across Railway container namespaces', async () => {
+  it('keeps cross-container Railway owners observer-only and lets a valid fence reclaim the cooperative protocol', async () => {
     const env = {
       OPENALICE_SERVICE_MANAGER: 'railway',
       OPENALICE_MACHINE_ID: 'railway-service-service-test',
       RAILWAY_ENVIRONMENT_ID: 'environment-test',
       RAILWAY_SERVICE_ID: 'service-test',
     }
-    for (const [index, machineId] of [
-      'hostname:prior-container',
-      'env:railway-service-service-test',
-    ].entries()) {
-      const home = await makeTempDir()
-      const lock = join(home, 'state', 'guardian.lock')
-      await mkdir(lock, { recursive: true })
-      const ownerPath = join(lock, 'owner.json')
-      const owner = {
-        pid: 4242,
-        hostname: 'prior-container',
-        machineId,
-        launcher: 'guardian-cli-server',
-        acquiredAt: new Date().toISOString(),
-        heartbeatAt: new Date().toISOString(),
-      }
-      await writeFile(ownerPath, JSON.stringify(owner))
-      const isProcessAlive = vi.fn(() => false)
-
-      const active = await readRuntimeStatus({ homeRoot: home }, {
-        env,
-        hostname: `current-container-${index}`,
-        isProcessAlive,
-      })
-      expect(active.class).toBe('owned_elsewhere')
-      expect(isProcessAlive).not.toHaveBeenCalled()
-
-      await writeFile(ownerPath, JSON.stringify({
-        ...owner,
-        heartbeatAt: new Date(0).toISOString(),
-      }))
-      const stale = await readRuntimeStatus({ homeRoot: home }, {
-        env,
-        hostname: `current-container-${index}`,
-        isProcessAlive,
-      })
-      expect(stale.class).toBe('absent')
-      expect(stale.detail).toContain('stale')
-      expect(isProcessAlive).not.toHaveBeenCalled()
+    const home = await makeTempDir()
+    const lock = join(home, 'state', 'guardian.lock')
+    await mkdir(lock, { recursive: true })
+    const ownerPath = join(lock, 'owner.json')
+    const owner = {
+      pid: 4242,
+      hostname: 'prior-container',
+      machineId: 'env:railway-service-service-test',
+      launcher: 'guardian-cli-server',
+      acquiredAt: new Date().toISOString(),
+      heartbeatAt: new Date().toISOString(),
+      fencingProtocol: 'railway-flock-v1',
     }
+    await writeFile(ownerPath, JSON.stringify(owner))
+    const isProcessAlive = vi.fn(() => false)
+
+    for (const heartbeatAt of [new Date().toISOString(), new Date(0).toISOString()]) {
+      await writeFile(ownerPath, JSON.stringify({ ...owner, heartbeatAt }))
+      const observer = await readRuntimeStatus({ homeRoot: home }, {
+        env,
+        hostname: 'current-container',
+        isProcessAlive,
+      })
+      expect(observer.class).toBe('owned_elsewhere')
+
+      const fenced = await readRuntimeStatus({ homeRoot: home }, {
+        env,
+        hostname: 'current-container',
+        isProcessAlive,
+        railwayFenceValid: true,
+      })
+      expect(fenced.class).toBe('absent')
+      expect(fenced.detail).toContain('stale')
+    }
+    expect(isProcessAlive).not.toHaveBeenCalled()
+  })
+
+  it('keeps a legacy cross-container Railway owner blocked even for a fenced entrypoint', async () => {
+    const home = await makeTempDir()
+    const lock = join(home, 'state', 'guardian.lock')
+    await mkdir(lock, { recursive: true })
+    await writeFile(join(lock, 'owner.json'), JSON.stringify({
+      pid: 4242,
+      hostname: 'prior-container',
+      machineId: 'env:railway-service-service-test',
+      launcher: 'guardian-cli-server',
+      acquiredAt: new Date(0).toISOString(),
+      heartbeatAt: new Date(0).toISOString(),
+    }))
+    const isProcessAlive = vi.fn(() => false)
+    const status = await readRuntimeStatus({ homeRoot: home }, {
+      env: {
+        OPENALICE_SERVICE_MANAGER: 'railway',
+        OPENALICE_MACHINE_ID: 'railway-service-service-test',
+        RAILWAY_ENVIRONMENT_ID: 'environment-test',
+        RAILWAY_SERVICE_ID: 'service-test',
+      },
+      hostname: 'current-container',
+      isProcessAlive,
+      railwayFenceValid: true,
+    })
+
+    expect(status.class).toBe('owned_elsewhere')
+    expect(isProcessAlive).not.toHaveBeenCalled()
   })
 
   it('keeps same-container PID identity authoritative under Railway', async () => {
@@ -388,6 +412,7 @@ describe('OpenAlice Guardian control protocol', () => {
         machineId: 'env:railway-service-service-test',
         launcher: 'guardian-cli-server',
         acquiredAt: new Date(0).toISOString(),
+        fencingProtocol: 'railway-flock-v1',
         ...(heartbeatAt === undefined ? {} : { heartbeatAt }),
       }))
       const isProcessAlive = vi.fn(() => false)

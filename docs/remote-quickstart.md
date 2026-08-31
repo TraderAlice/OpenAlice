@@ -129,6 +129,28 @@ Set the service lifecycle explicitly in the Railway Dashboard:
 - set `RAILWAY_DEPLOYMENT_DRAINING_SECONDS=30` or higher so Railway gives
   Guardian at least 30 seconds between `SIGTERM` and forced termination.
 
+The image entrypoint holds an exclusive lifecycle `flock` on the mounted
+Railway Volume directory inode for the whole foreground Runtime. A replacement
+waits for that kernel lock before installing, selecting a Project, or starting;
+heartbeat age is not takeover authority. Before any install-pointer or Project
+mutation, the entrypoint also rejects retained legacy, malformed, or foreign
+owner records across every discovered Project Home on the Volume. Alice, UTA,
+and Connector validate and retain their own lifetime duplicates while removing
+the capability from descendant environments; ordinary child processes, adapters,
+Agents, and PTYs do not inherit them. Thus Guardian and every Project writer must
+be gone before a replacement can acquire the fence. Ordinary Railway SSH shells are observer-only and
+cannot start or reclaim a Runtime owner.
+
+For the first fenced deployment against a retained pre-fence Project, first
+verify the old deployment is stopped. Inspect and move only these directories
+when present: `state/guardian.lock`, `state/runtime.lock`,
+`workspaces/state/runtime.lock`, and `data/state/config-bootstrap.lock`, all
+relative to that exact Project Home. Preserve those relative paths beneath a
+timestamped `/data/quarantine/<project>-<timestamp>/` directory so the cutover
+is reversible. That quarantine tree is never a valid `OPENALICE_HOME`. Never
+clear the Project or Volume; if an owner still matches a
+running deployment, stop instead of quarantining it.
+
 The default service variables install the latest stable native release. Use
 only the selectors needed for the intended host:
 

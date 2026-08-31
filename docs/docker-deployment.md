@@ -109,7 +109,8 @@ the persistent `PATH` only after it has verified the native CLI.
 
 `OPENALICE_HOME` is the only layout selector and must resolve beneath `/data`;
 `AQ_LAUNCHER_ROOT` is always canonicalized from that selected Project as
-`<OPENALICE_HOME>/workspaces`. The entrypoint rejects a different Volume mount,
+`<OPENALICE_HOME>/workspaces`. The reserved `/data/quarantine` tree can never be
+selected as a Project Home. The entrypoint rejects a different Volume mount,
 ephemeral `HOME`, alternate install/npm/Bun root, or normalized/symlink escape;
 it does not honor an independent Workspace-root override. The image filesystem
 is replaceable; no install release, credential, Workspace, Agent login, or
@@ -137,15 +138,46 @@ its provenance environment, and rejects update/rollback/uninstall mutations;
 this keeps older published CLIs from bypassing Railway's release authority via
 the persistent command path.
 
+Before installer, current-pointer, or Project selection mutation, the
+entrypoint opens the mounted Railway Volume root itself read-only, takes an
+exclusive `flock` on that directory inode, and keeps the open file description
+for the complete foreground Runtime lifetime. Locking the mount inode avoids a
+replaceable Project-owned lock file and serializes every Runtime using that
+Volume. While holding that fence and before touching the install pointer,
+shims, or Project layout, the image discovers every Project Home on the Volume
+and inspects its four known Runtime lock directories, including nested legacy
+homes. It skips only the documented quarantine. Missing locks and
+same-service `railway-flock-v1` records may proceed; an initializing, malformed,
+foreign, or pre-fence owner anywhere on the Volume stops the deployment at this
+read-only boundary. The CLI independently checks that the actual canonical Project Home
+and install root are children of that real mount, that the inherited descriptor
+names its directory inode, and that Linux `/proc/self/fdinfo` reports an
+exclusive kernel lock; an environment flag or arbitrary locked directory is
+not authority.
+
+The CLI maps the locked descriptor explicitly to Guardian. Guardian retains
+its lifetime copy and maps a startup duplicate only to trusted Alice, UTA, and
+Connector processes. Each trusted writer validates and retains its duplicate for
+its own lifetime, but consumes the marker and descriptor number before connector
+adapters, broker helpers, Workspace Agents, or PTYs can start. Ordinary Node
+child-process and node-pty launch boundaries omit extra descriptors, which is
+verified with a positive-control Linux inheritance test. Consequently a Guardian
+crash cannot release the Volume fence while any old Project writer is still alive.
+This also makes a direct Railway `--internal-role connector` invocation without
+Guardian authority fail before it can open Project-backed queues. Agent and PTY environments also strip
+the descriptor number and entrypoint marker as defense in depth. Every Railway
+Runtime entry fails closed if the capability is missing or invalid; it never
+silently starts an unfenced writer.
+
 The entrypoint finally `exec`s `openalice server run`; it does not launch a
 detached Server and sleep. Railway therefore observes and restarts the actual
 Guardian service process. Railway places its platform init at PID 1, so the
 image runs `tini -s -g` as a child subreaper: it forwards signals to the
 complete process group and adopts/reaps orphaned descendants even though it is
-not PID 1. The shared installer serializes mutations
-with the platform kernel (`lockf` on macOS, `flock` on Linux); its persistent
-guard inode contains no Project or credential data, and hard process death
-releases ownership automatically.
+not PID 1. The shared installer has its own shorter transaction lock; both
+locks use the platform kernel and contain no Project or credential data. Hard
+process death releases ownership only after the complete trusted writer set has
+exited; one surviving Alice, UTA, or Connector keeps the replacement fenced.
 Alice stays on loopback port `47331` (or the explicit
 `OPENALICE_RAILWAY_PORT`), and this profile does not consume Railway's public
 `PORT` contract.
@@ -154,15 +186,35 @@ Every Railway shell and service process derives one exact machine identity
 from `RAILWAY_SERVICE_ID`; a conflicting configured identity fails startup.
 Within one container, Runtime ownership still uses PID and process-start-time
 identity. Across replacement-container PID namespaces on the same service
-Volume, it never probes or signals the recorded PID: a fresh, explicit
-heartbeat remains authoritative, while a stale explicit heartbeat may be
-reclaimed atomically. Missing, invalid, or foreign identity/heartbeat evidence
-fails closed. The image-owned entrypoint alone waits for this handoff before
-preparing or spawning Guardian; ordinary SSH commands do not inherit that
-privilege. Keep `OPENALICE_RAILWAY_WAIT_SECONDS` at 130 or higher (180 by
-default). The same value separately bounds owner release and Runtime readiness;
-for custom draining use at least `draining seconds + 100`, so the stale-heartbeat
-window retains a bounded margin.
+Volume, it never probes or signals the recorded PID. A Railway shell without
+the inherited locked descriptor is an observer: even a very old heartbeat is
+not reclaim authority. A fenced replacement may reclaim only an owner written
+under `fencingProtocol: railway-flock-v1`; the owner directory identity and
+complete owner evidence are checked again immediately before quarantine.
+Heartbeats remain diagnostic only. Missing or foreign identity, a forged or
+unlocked descriptor, and pre-fence legacy owners all fail closed. A retained
+legacy owner therefore requires a one-time operator cutover: first prove the
+old deployment has stopped, inspect the owner records, then move only these
+exact directories when present:
+
+```text
+<OPENALICE_HOME>/state/guardian.lock
+<OPENALICE_HOME>/state/runtime.lock
+<OPENALICE_HOME>/workspaces/state/runtime.lock
+<OPENALICE_HOME>/data/state/config-bootstrap.lock
+```
+
+Move them into a timestamped quarantine outside the Project, such as
+`/data/quarantine/<project>-<timestamp>/`, while preserving each relative
+path. If any owner still matches a running deployment, stop and do not move it.
+Never clear the Volume or relabel the Project to bypass the gate. Recovery is
+the reverse move while the service is stopped.
+
+The image-owned entrypoint alone waits to acquire the lifecycle fence before it
+installs or starts Guardian; ordinary SSH commands do not inherit that
+privilege. `OPENALICE_RAILWAY_WAIT_SECONDS` is 180 by default and separately
+bounds fence acquisition and Runtime readiness. Keep it comfortably above the
+configured deployment draining interval.
 
 Agent Runtime installation remains a user action performed through Railway
 SSH. Persistent locations `/data/home/.local/bin` and `/data/home/.bun/bin` are
@@ -204,11 +256,17 @@ self-contained repository connectivity, fail-closed linked/nested/submodule or
 external-object state, known Alice backup/session/install exclusions,
 credential omission and resealing, receipt validation, and safe handling of
 absolute or escaping symlinks.
-Runtime ownership tests must also cover same-container PID identity,
-legacy-to-stable Railway service identity handoff, fresh-versus-stale explicit
-heartbeats across container namespaces, missing/invalid evidence that remains
-blocked, entrypoint-only bounded waiting, and a proof that no cross-container
-PID receives a signal.
+Runtime ownership tests must also cover same-container PID identity, an
+observer that refuses both fresh and stale cross-container owners, a locked-FD
+entrypoint that reclaims only `railway-flock-v1` owners, legacy and forged-FD
+failure, owner-evidence races, bounded fence waiting, actual-home/mount
+containment, and a proof that no cross-container PID receives a signal. A
+Linux PTY regression must inspect `/proc/self/fd`, prove each trusted Project
+writer retains its own lifetime descriptor, and prove ordinary child processes
+and PTYs do not inherit one; an explicit mapped-descriptor positive control
+must still block a contender. Linux acceptance must suspend the old holder beyond the former heartbeat window and
+show that a replacement still cannot acquire the fence; only process/container
+death may release it, and simultaneous replacements must produce one winner.
 
 A real Railway acceptance is still required before treating the profile as a
 usable hosted product. Keep the clean-bootstrap and retained-data journeys

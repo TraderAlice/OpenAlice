@@ -662,18 +662,26 @@ source-built Docker image.
 - [x] Diagnose the first retained-Volume Railway deployment failure. Its old
   beta lock used the legacy hostname-derived machine identity, while the new
   container correctly used the stable Railway service identity; ordinary
-  foreign-machine protection therefore left the stale owner blocked. Add the
-  Railway-volume authority needed for same-service container handoff: exact
-  service identity, explicit-heartbeat freshness, fail-closed missing/invalid
-  evidence, same-container PID authority, no cross-container signals, bounded
-  entrypoint-only waiting, and `tini` subreaper operation beneath Railway's
-  platform init. Live reacceptance remains pending a dev artifact containing
-  this repair.
-- [x] Pass the handoff-repair local gates: 83 focused ownership/CLI/entrypoint
-  tests, 5,281 full-suite tests, root/Guardian/CLI TypeScript, Guardian recovery,
-  Linux installer and SSH-remote Docker smokes, Bash syntax, and a rebuilt
-  Railway image whose `tini -s -g` entrypoint still contains no Node, Bun, or
-  Agent Runtime executable.
+  foreign-machine protection therefore left the stale owner blocked.
+- [x] Reject the first heartbeat-based handoff repair during review. It allowed
+  ordinary Railway SSH to gain cross-container reclaim authority and had a
+  stale-inspection/rename race. Cancel its dev artifact before publication;
+  keep the last accepted dev manifest unchanged.
+- [x] Replace heartbeat authority with a Volume-mount-inode kernel `flock`
+  taken before installer or Project mutation. Validate the real mount, its
+  canonical relationship to the actual Home/install roots, and the inherited
+  locked FD. Pass a startup duplicate only through CLI -> Guardian ->
+  Alice/UTA/Connector; those trusted writers validate and retain lifetime copies
+  while ordinary child processes, adapters, Agents, and PTYs receive none. Write `railway-flock-v1` owner
+  records, keep ordinary SSH observer-only, fail closed at every Runtime hop,
+  discover every Volume Project and reject legacy owners before release or
+  Project mutation, and recheck complete owner evidence before quarantine.
+- [x] Pass the fenced-handoff local gates: focused ownership/CLI/entrypoint and
+  capability-isolation specs, root/Guardian/CLI TypeScript, full suite,
+  Guardian recovery, Linux installer and SSH-remote Docker smokes, plus a
+  Linux shared-Volume drill for suspended holder, hard kill, and simultaneous
+  replacements. Rebuild the Railway image and reconfirm that it contains no
+  Node, Bun, or Agent Runtime executable.
 - [x] Pass the remaining local repository gates: root and CLI TypeScript,
   `git diff --check`, the 222-test focused run, the 5,266-test full suite,
   Linux installer and SSH-remote Docker smokes, Guardian recovery smoke, and a
@@ -690,8 +698,10 @@ source-built Docker image.
   `openalice remote` browser/tunnel journey. A beta candidate has now booted
   successfully against an isolated diagnostic Home on the retained Volume and
   exposed no public domain. Its first attempt against the existing Project Home
-  reproduced the legacy-machine-identity handoff failure above; redeployment
-  of the repaired dev artifact against that original Home is still required.
+  reproduced the legacy-machine-identity handoff failure above. Prove the new
+  lifecycle fence on the diagnostic Home first; then, after showing the old
+  deployment is stopped, quarantine only the exact retained legacy lock
+  directories before selecting that original Home.
 - [ ] Repeat `openalice project transfer --plan` through the deployed Railway
   candidate so SSH compatibility, destination absence, and free-space
   preflight are proven before apply.
@@ -705,7 +715,8 @@ source-built Docker image.
 - [ ] Restart and redeploy against the same Volume, verify install/Home/Agent
   persistence and foreground Guardian recovery, then exercise valid-release
   refresh fallback and the separately accepted hard-kill recovery path,
-  including legacy hostname identity and stable service identity across
+  including a holder suspended beyond the old heartbeat threshold, hard-kill
+  release of the kernel fence, and one-winner concurrent replacement across
   isolated container PID namespaces. The empty-Volume fail-closed case remains
   isolated to the disposable service.
 
@@ -1167,3 +1178,24 @@ This plan is complete only when:
   real Railway fixed-layout candidate deployment, Agent, restart/redeploy, and
   failure journeys remain pending. The inspected Railway service with
   `HOME=/root` is the old deployment, not candidate evidence.
+- 2026-09-01: Review of the first same-service handoff repair found two release
+  blockers: general Railway SSH inherited reclaim authority, and a heartbeat
+  could refresh between stale inspection and lock-directory rename. Dev build
+  run 33417079146 was cancelled before publication; the public dev manifest
+  stayed on `7a5fad58`. The replacement now locks the real Railway Volume mount
+  directory before creating mutable paths or installing. It validates canonical
+  actual Home/install containment plus the locked directory FD through Linux
+  fdinfo. A read-only Volume-wide retained-lock preflight now rejects legacy
+  ownership before release-pointer, shim, or Project mutation. Guardian keeps
+  the lifetime copy; Alice, UTA, and Connector retain lifetime duplicates that
+  ordinary children, adapters, Agents, and PTYs do not inherit. CLI, Guardian,
+  Alice, UTA, and Connector all fail
+  closed when the profile declares a missing or invalid fence. Cooperative owners declare `railway-flock-v1`;
+  legacy owners and changed owner evidence fail closed. The current macOS
+  focused review sets pass with the expected Linux-only skips; root, CLI,
+  and Guardian TypeScript, shell/Node syntax, Guardian recovery, and the full
+  5,292-test suite pass. A compiled Linux arm64 Bun chain independently proved
+  identical Volume/CLI/Guardian lock identity, trusted-writer descriptor adoption,
+  blocked contention, and fenced Guardian/Alice owner metadata. Linux installer,
+  remote-SSH, and full Docker Runtime smokes pass. PR/dev archive publication,
+  live Railway reacceptance, Project apply, and the Agent turn remain pending.
