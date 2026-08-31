@@ -31,6 +31,7 @@ export const OFFICE_FURNITURE = {
     collisionImpact: '/office/furniture/collision-impact-v1.png',
     inboxTerminal: '/office/furniture/inbox-terminal-v1.png',
     newsTerminal: '/office/furniture/news-terminal-v1.png',
+    servicePlacard: '/office/furniture/service-placard-v1.png',
   },
 } as const
 

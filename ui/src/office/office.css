@@ -5737,6 +5737,34 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
   filter: drop-shadow(3px 4px 0 color-mix(in srgb, var(--gba-ink) 20%, transparent));
 }
 
+.oa-office-map-service__placard {
+  position: absolute;
+  bottom: -28px;
+  left: 28px;
+  display: grid;
+  width: 80px;
+  height: 40px;
+  place-items: center;
+  pointer-events: none;
+  background: var(--office-service-placard) center / contain no-repeat;
+}
+
+.oa-office-map-service__placard > span {
+  max-width: 54px;
+  margin-top: -2px;
+  overflow: hidden;
+  color: var(--office-gba-cream-seed);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs) !important;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  text-overflow: ellipsis;
+  text-shadow: 1px 1px 0 var(--gba-ink);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .oa-office-map-service:is(:hover, :focus-visible),
 .oa-office-map-service[data-nearby="true"],
 .oa-office-map-service[data-route="true"] {

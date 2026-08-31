@@ -66,6 +66,8 @@ machine light instead of dimming the whole Office scene.
 - `collision-impact-v1.png` — generated four-frame blocked-movement sparkle at native 24px cells
 - `mail-service-v1.png` — water cooler and mail-sorting landmark for the open service edge
 - `archive-service-v1.png` — copier and archive-trolley landmark for the open service edge
+- `service-placard-v1.png` — blank generated floor nameplate shared by the Inbox and News service machines;
+  localized runtime text identifies each service without baking language into the art
 
 The v2 environment pack converts the original generated masters into their actual runtime canvases with
 nearest-neighbor sampling, hard alpha, and compact 48- or 64-color palettes. Fifteen formerly 1K-scale sources
@@ -101,6 +103,10 @@ lifetime instead of animating the sheet; the effect is decorative and does not c
 from a chroma-key sheet, baseline-aligned, nearest-neighbor reduced to 120x104, and quantized against one 64-color
 palette. One-row maps place them along the open lower service edge. Multi-row maps place the pair inside the first
 unused cell of a partial final row, turning a structural grid gap into a service bay without crowding complete floors.
+
+`service-placard-v1.png` is a single low-profile walnut, brass, and dark-teal floor nameplate generated from the
+locked style master, then nearest-neighbor reduced to a transparent 80x40 runtime canvas. The inset stays blank so
+localized HTML can label Inbox and News while both landmarks retain one shared environmental asset.
 
 `empty-cabinet-v1.png` was generated from the locked style master and the shipped cabinet identity as a single
 cream two-drawer cabinet with its upper drawer pulled open and visibly empty. The transparent master was trimmed,

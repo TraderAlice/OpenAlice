@@ -38,6 +38,7 @@ describe('OFFICE_FURNITURE', () => {
       collisionImpact: [96, 24],
       inboxTerminal: [136, 116],
       newsTerminal: [136, 116],
+      servicePlacard: [80, 40],
     } satisfies Record<keyof typeof OFFICE_FURNITURE.generated, [number, number]>
 
     for (const [key, url] of Object.entries(OFFICE_FURNITURE.generated)) {

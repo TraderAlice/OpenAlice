@@ -5377,6 +5377,25 @@ Pause-menu first-cursor follow-up (2026-08-31):
   root and UI TypeScript passed; the full suite passed all 620 test files and 5,205 tests (one file and nine tests
   skipped); the production UI build passed with only the existing ports fallback and large-chunk advisory.
 
+Diegetic service wayfinding follow-up (2026-08-31):
+
+- Played the real floor through a dormant coworker's nearby prompt, Agent File, long-assignment disclosure, exact
+  Activity Log review, and return to the same file. Those loops were already coherent; the remaining scene-level
+  ambiguity was the right-side Inbox and News equipment. Their distinct machine silhouettes read as props, but their
+  product roles were discoverable only after approaching or hovering.
+- Compared permanent floating text, relying only on the nearby prompt, and adding low-profile in-world floor
+  nameplates. Floating text makes the map more dashboard-like; prompt-only preserves avoidable trial and error.
+  Chose the nameplates because classic 16-bit overworlds use physical signs and landmarks to establish place before
+  interaction, while leaving action prompts responsible for the actual command.
+- Generated one blank walnut, brass, and dark-teal nameplate against the locked Office style master, then
+  nearest-neighbor packaged it as a transparent 80x40 runtime prop. Both stations share the same art; localized HTML
+  supplies `Inbox` and `News`, so there is no baked language, duplicate asset, new collision, or new window surface.
+- Real-browser acceptance found both 80x40 props on the floor with 12px runtime labels. Clicking Inbox let Alice
+  complete the existing route, opened the matching Activity Log, and closing it restored focus to `Inbox station`;
+  the placards add no new interaction target or focus stop. Focused Building and furniture suites passed all 26 tests;
+  root and UI TypeScript passed; the full suite passed all 620 test files and 5,205 tests (one file and nine tests
+  skipped); the production UI build passed with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

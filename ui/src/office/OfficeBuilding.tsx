@@ -1711,6 +1711,17 @@ export function OfficeBuilding({
                   aria-hidden
                   style={officePixelImg}
                 />
+                <span
+                  className="oa-office-map-service__placard"
+                  aria-hidden
+                  style={{
+                    '--office-service-placard': `url(${OFFICE_FURNITURE.generated.servicePlacard})`,
+                  } as CSSProperties}
+                >
+                  <span>{t(landmark.kind === 'inbox'
+                    ? 'office.logChannelInbox'
+                    : 'office.logChannelNews')}</span>
+                </span>
                 {needsAttention && (
                   <span className="oa-office-map-service__signal" aria-hidden>!</span>
                 )}
