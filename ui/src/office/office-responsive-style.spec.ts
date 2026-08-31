@@ -81,6 +81,13 @@ describe('Office responsive style contract', () => {
     expect(narrowLiveCss).toContain('grid-column: 2')
   })
 
+  it('keeps the replay exit inside the pixel control language', () => {
+    expect(css).toMatch(
+      /\.oa-office-replay-exit__icon\s*\{[^}]*display:\s*block;[^}]*width:\s*18px;[^}]*height:\s*18px;[^}]*object-fit:\s*contain;/s,
+    )
+    expect(css).not.toContain('.oa-office-replay-exit__arrow')
+  })
+
   it('confirms acknowledged landmarks once without leaving ambient map noise', () => {
     expect(css).toMatch(
       /\.oa-office-landmark-ack\s*\{[\s\S]*?animation: oa-office-landmark-ack 900ms steps\(4, end\) forwards;/,

@@ -5718,6 +5718,22 @@ Large-roster identity follow-up (2026-08-31):
   files and 5,215 tests (one file and nine tests skipped); the production UI build passed with only the existing ports
   fallback and large-chunk advisory.
 
+Replay-exit pixel-control follow-up (2026-08-31):
+
+- Continued real play from Activity Log into `Find on floor` for Grok Cartographer replay `#6360`. A suspected
+  prompt/actor collision was rejected after measuring the dialogue bottom at 541.5px, the target workstation top at
+  542px, and Alice wholly outside the prompt. The placement already preserved the intended half-pixel boundary.
+- The same replay exposed a genuine art-language break in a primary command: the otherwise generated-pixel HUD used an
+  antialiased Unicode `↩` for Return Live. Compared retaining the glyph, generating another near-duplicate control,
+  and reusing the established 48px pixel Back asset. Chose reuse: leaving historical context is the same back-stack
+  action already taught by Office game windows, without growing the asset vocabulary.
+- Return Live now renders `window-back-v2.png` at an integer 18px box while preserving its complete accessible label,
+  Live text, target size, focus treatment, and atomic replay-exit behavior. Real-browser acceptance measured an
+  18x18px `pixelated` image inside the unchanged 32px-high command, then activated it back to Live. Focused Building
+  and style suites passed all 61 tests; root and UI TypeScript passed. The full suite passed all 620 test files and
+  5,216 tests (one file and nine tests skipped); the production UI build passed with only the existing ports fallback
+  and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

@@ -1409,7 +1409,13 @@ export function OfficeBuilding({
               aria-label={t('office.replayReturnLive')}
               onClick={returnToLiveFloor}
             >
-              <span className="oa-office-replay-exit__arrow" aria-hidden>↩</span>
+              <img
+                className="oa-office-replay-exit__icon"
+                src={OFFICE_HUD_ASSETS.windowBack}
+                alt=""
+                aria-hidden
+                style={officePixelImg}
+              />
               {t('office.replayLive')}
             </button>
           )}

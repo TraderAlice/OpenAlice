@@ -5358,9 +5358,11 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
   filter: brightness(1.1);
 }
 
-.oa-office-replay-exit__arrow {
-  font-size: 14px;
-  line-height: 1;
+.oa-office-replay-exit__icon {
+  display: block;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
 }
 
 .oa-office-pause-trigger {

@@ -205,8 +205,9 @@ describe('OfficeBuilding', () => {
     await waitFor(() => expect(document.activeElement).toBe(map))
 
     const returnLive = screen.getByRole('button', { name: 'Return live' })
-    expect(returnLive.textContent).toContain('↩')
     expect(returnLive.textContent).toContain('Live')
+    expect(returnLive.querySelector('img')?.getAttribute('src'))
+      .toBe('/office/hud/window-back-v2.png')
     await userEvent.click(returnLive)
     expect(onReturnLive).toHaveBeenCalledTimes(2)
     await waitFor(() => expect(document.activeElement).toBe(map))
