@@ -5700,6 +5700,24 @@ Fresh-result status follow-up (2026-08-31):
   TypeScript passed; the full suite passed all 620 test files and 5,215 tests (one file and nine tests skipped); the
   production UI build passed with only the existing ports fallback and large-chunk advisory.
 
+Large-roster identity follow-up (2026-08-31):
+
+- Opened the real 40-person Chat Team roster. Its two-column game menu, six visible members, contained scrolling, and
+  Home/End navigation remained coherent, but repeated archetypes exposed an identity-priority bug: the 144px title
+  slot treated `Grok Cartographer · g40` as one 169px ellipsis target and removed the unique `g40` suffix first.
+- Compared taller three-line rows, moving status into the assignment line, and pinning the short Session name inside
+  the existing identity line. Chose the pinned suffix: row density, two-line assignment, status badge, and six-member
+  viewport stay intact, while only the reusable callsign is allowed to shorten.
+- Roster identity now owns a flex callsign plus a non-shrinking Session suffix. The accessible button name remains the
+  complete `callsign · session · status · assignment` string; this is a visual information-priority change, not an
+  alternate identity or compatibility path.
+- Real-browser acceptance measured Grok Cartographer g40 after the change: the 144px title no longer overflows, the
+  36px `· g40` suffix remains intact, and only its 130px callsign compresses into 108px. Both g40 and g38 were visibly
+  distinguishable beside ASLEEP badges; End still scrolled to the final member and advanced the header to `40/40`.
+  Focused roster/style suites passed all 35 tests; root and UI TypeScript passed. The full suite passed all 620 test
+  files and 5,215 tests (one file and nine tests skipped); the production UI build passed with only the existing ports
+  fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

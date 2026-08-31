@@ -82,6 +82,8 @@ describe('OfficeRosterWindow', () => {
     expect(container.querySelector('.oa-office-window__title-count')?.textContent).toBe('06/06')
     expect(container.querySelector('.oa-office-window__title-count')?.getAttribute('aria-label'))
       .toBe('Member 6 of 6')
+    expect(container.querySelector('.oa-office-roster__callsign')?.textContent).toMatch(/^Codex /)
+    expect(container.querySelector('.oa-office-roster__session')?.textContent).toBe(' · x1')
     expect(container.querySelector('.oa-office-roster__cursor')?.getAttribute('src'))
       .toBe('/office/hud/journal-cursor-v1.png')
     expect(Number.parseFloat(

@@ -119,6 +119,13 @@ describe('Office responsive style contract', () => {
       /\.oa-office-roster__identity\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) auto;/s,
     )
     expect(css).toMatch(
+      /\.oa-office-roster__title\s*\{[^}]*display:\s*flex;[^}]*min-width:\s*0;[^}]*white-space:\s*nowrap;/s,
+    )
+    expect(css).toMatch(
+      /\.oa-office-roster__callsign\s*\{[^}]*min-width:\s*0;[^}]*overflow:\s*hidden;[^}]*text-overflow:\s*ellipsis;/s,
+    )
+    expect(css).toMatch(/\.oa-office-roster__session\s*\{[^}]*flex:\s*none;/s)
+    expect(css).toMatch(
       /\.oa-office-roster__meta\s*\{[^}]*overflow-wrap:\s*anywhere;[^}]*-webkit-line-clamp:\s*2;/s,
     )
     expect(css).toMatch(/\.oa-office-roster__cursor\s*\{[^}]*opacity:\s*0;/s)

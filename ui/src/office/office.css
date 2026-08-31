@@ -2781,11 +2781,21 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
 }
 
 .oa-office-roster__title {
+  display: flex;
+  min-width: 0;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.oa-office-roster__callsign {
   min-width: 0;
   overflow: hidden;
-  line-height: 1.15;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.oa-office-roster__session {
+  flex: none;
 }
 
 .oa-office-roster__identity {

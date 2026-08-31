@@ -174,7 +174,8 @@ export function OfficeRosterWindow({
                 </span>
                 <span className="oa-office-roster__identity">
                   <strong className="oa-office-roster__title">
-                    {callsign}<span> · {employee.name}</span>
+                    <span className="oa-office-roster__callsign">{callsign}</span>
+                    <span className="oa-office-roster__session"> · {employee.name}</span>
                   </strong>
                   <span
                     className="oa-office-roster__status"
