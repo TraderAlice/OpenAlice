@@ -5928,12 +5928,54 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
   filter: saturate(0.55) brightness(0.82);
 }
 
+.oa-office-landmark-ack {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  width: 30px;
+  height: 22px;
+  place-items: center;
+  border: 3px solid var(--gba-ink);
+  border-radius: 2px;
+  color: var(--gba-ink);
+  background: var(--gba-water);
+  box-shadow: 2px 3px 0 color-mix(in srgb, var(--gba-ink) 34%, transparent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 1000;
+  line-height: 1;
+  pointer-events: none;
+  animation: oa-office-landmark-ack 900ms steps(4, end) forwards;
+}
+
+.oa-office-map-landmark--terminal .oa-office-landmark-ack {
+  top: 4px;
+  right: -5px;
+}
+
+.oa-office-map-service .oa-office-landmark-ack {
+  top: 2px;
+  right: 4px;
+}
+
+.oa-office-operations-board .oa-office-landmark-ack {
+  top: 8px;
+  right: 17px;
+}
+
+@keyframes oa-office-landmark-ack {
+  0% { opacity: 0; transform: translateY(5px) scale(0.75); }
+  22%, 72% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-8px) scale(1); }
+}
+
 @keyframes oa-office-service-signal {
   50% { transform: translateY(-3px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .oa-office-map-service__signal { animation: none; }
+  .oa-office-map-service__signal,
+  .oa-office-landmark-ack { animation: none; }
 }
 
 .oa-office-operations-board {

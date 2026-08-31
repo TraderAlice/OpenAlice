@@ -1868,4 +1868,70 @@ describe('OfficeBuilding', () => {
     expect(screen.getByRole('img', { name: 'Alice on the office map' }).dataset.direction)
       .toBe('up')
   })
+
+  it('shows a one-shot landmark receipt after returning from acknowledged activity', async () => {
+    const onOpenService = vi.fn()
+    const building = {
+      config: {
+        workspaceSleepAfterMs: 1,
+        harnessMinimumVisibleGroups: { chat: 0, 'auto-quant': 0, prediction: 0, other: 0 },
+      },
+      lastSeq: 11,
+      firstSeq: 1,
+      offices: [{
+        workspace: { id: 'chat-1', tag: 'chat', harness: 'chat' as const },
+        lastInteractionAt: 1,
+        sleeping: false,
+        employees: [],
+      }],
+    }
+    const activity = {
+      agent: null,
+      inbox: {
+        seq: 11,
+        occurredAt: 1_100,
+        detail: 'Agent report delivered',
+        source: 'codex',
+        inboxEntryId: 'inbox-11',
+      },
+      news: null,
+      attention: { agent: false, inbox: true, news: false },
+      freshKind: null,
+    }
+    const props = {
+      building,
+      initialPlayerState: { position: { x: 340, y: 600 }, direction: 'up' as const },
+      onSelectEmployee: vi.fn(),
+      onOpenEmployee: vi.fn(),
+      onOpenWorkspace: vi.fn(),
+      onOpenFiles: vi.fn(),
+      onOpenRoster: vi.fn(),
+      onOpenLog: vi.fn(),
+      onOpenService,
+    }
+    const view = render(<OfficeBuilding {...props} productActivity={activity} />)
+
+    const inbox = screen.getByRole('button', { name: 'Inbox station · New activity' })
+    inbox.focus()
+    fireEvent.keyDown(inbox, { key: 'Enter' })
+    await waitFor(() => expect(onOpenService).toHaveBeenCalledWith('inbox', 11))
+
+    const acknowledgedActivity = {
+      ...activity,
+      attention: { ...activity.attention, inbox: false },
+    }
+    view.rerender(
+      <OfficeBuilding
+        {...props}
+        interactionSuspended
+        productActivity={acknowledgedActivity}
+      />,
+    )
+    expect(inbox.querySelector('.oa-office-landmark-ack')).toBeNull()
+
+    view.rerender(<OfficeBuilding {...props} productActivity={acknowledgedActivity} />)
+    await waitFor(() => expect(inbox.dataset.acknowledged).toBe('true'))
+    expect(inbox.querySelector('.oa-office-landmark-ack')?.textContent).toBe('OK')
+    await waitFor(() => expect(inbox.dataset.acknowledged).toBeUndefined(), { timeout: 1_500 })
+  })
 })

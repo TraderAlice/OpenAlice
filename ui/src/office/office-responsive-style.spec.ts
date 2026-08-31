@@ -81,6 +81,18 @@ describe('Office responsive style contract', () => {
     expect(narrowLiveCss).toContain('grid-column: 2')
   })
 
+  it('confirms acknowledged landmarks once without leaving ambient map noise', () => {
+    expect(css).toMatch(
+      /\.oa-office-landmark-ack\s*\{[\s\S]*?animation: oa-office-landmark-ack 900ms steps\(4, end\) forwards;/,
+    )
+    expect(css).toMatch(
+      /@keyframes oa-office-landmark-ack\s*\{[\s\S]*?100% \{ opacity: 0; transform: translateY\(-8px\) scale\(1\); \}/,
+    )
+    expect(css).toMatch(
+      /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.oa-office-landmark-ack \{ animation: none; \}/,
+    )
+  })
+
   it('keeps roster state beside identity and gives assignments two stable lines', () => {
     const dormantCardStart = css.indexOf('.oa-office-roster li button[data-awake="false"]')
     const focusedCardStart = css.indexOf('.oa-office-roster li button:focus-visible {')

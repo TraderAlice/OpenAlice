@@ -5505,6 +5505,23 @@ Operations-prompt landmark-clearance follow-up (2026-08-31):
   (one file and nine tests skipped); the production UI build passed with only the existing ports fallback and
   large-chunk advisory.
 
+Landmark acknowledgement-receipt follow-up (2026-08-31):
+
+- Played the real News discovery, route, read, and return loop. The terminal's new-activity signal correctly opened
+  the matching journal channel and cleared while the modal covered the map, but returning to the floor gave no visible
+  confirmation that the player had handled it.
+- Compared retaining the silent removal, leaving a persistent check mark, and showing a one-shot game receipt. Chose a
+  900ms pixel `OK` receipt after returning from the corresponding landmark's Activity Log; it confirms completion at
+  the place the player acted without adding permanent map noise.
+- The receipt is queued only when attention changes from true to false while interaction is suspended and the active
+  route anchor matches that exact landmark. Operations, Floor terminal, Inbox, and News share the contract; reduced
+  motion keeps the receipt static for its short lifetime, and ordinary ambient refreshes cannot trigger it.
+- Real-browser acceptance injected News event `#5727`, observed the News attention state, opened the exact selected
+  journal record, and closed the log. Attention cleared, `data-acknowledged` became true, and the terminal displayed
+  `OK` before removing it. Focused Building and responsive-style suites passed all 59 tests; root and UI TypeScript
+  passed; the full suite passed all 620 test files and 5,209 tests (one file and nine tests skipped); the production UI
+  build passed with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

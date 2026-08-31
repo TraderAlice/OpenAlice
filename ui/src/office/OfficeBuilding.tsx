@@ -128,6 +128,7 @@ export type OfficeLogOrigin =
   | 'floor-terminal'
   | 'inbox-service'
   | 'news-service'
+type OfficeAcknowledgementTarget = 'operations' | 'floor-terminal' | 'inbox-service' | 'news-service'
 export interface OfficePlayerState {
   position: { x: number; y: number }
   direction: OfficeAliceDirection
@@ -208,6 +209,10 @@ export function OfficeBuilding({
   const [panning, setPanning] = useState(false)
   const [controlsLearned, setControlsLearned] = useState(false)
   const [interactionAnchorTargetId, setInteractionAnchorTargetId] = useState<string | null>(null)
+  const [acknowledgedTargetId, setAcknowledgedTargetId] = useState<OfficeAcknowledgementTarget | null>(null)
+  const previousAttentionRef = useRef(productActivity.attention)
+  const pendingAcknowledgementRef = useRef<OfficeAcknowledgementTarget | null>(null)
+  const acknowledgementTimerRef = useRef<number | null>(null)
   const [routeTargetId, setRouteTargetId] = useState<string | null>(null)
   const [routeTrail, setRouteTrail] = useState<readonly OfficeInteractionPathStep[]>([])
   const [departingWorkspace, setDepartingWorkspace] = useState<{
@@ -428,6 +433,36 @@ export function OfficeBuilding({
     () => officeServiceLandmarks(mapLayout),
     [mapLayout],
   )
+  useEffect(() => {
+    const previous = previousAttentionRef.current
+    const current = productActivity.attention
+    const targetForKind = {
+      agent: interactionAnchorTargetId === 'operations' || interactionAnchorTargetId === 'floor-terminal'
+        ? interactionAnchorTargetId
+        : null,
+      inbox: interactionAnchorTargetId === 'inbox-service' ? interactionAnchorTargetId : null,
+      news: interactionAnchorTargetId === 'news-service' ? interactionAnchorTargetId : null,
+    } as const
+    for (const kind of ['agent', 'inbox', 'news'] as const) {
+      if (interactionSuspended && previous[kind] && !current[kind] && targetForKind[kind]) {
+        pendingAcknowledgementRef.current = targetForKind[kind]
+      }
+    }
+    previousAttentionRef.current = current
+  }, [interactionAnchorTargetId, interactionSuspended, productActivity.attention])
+  useEffect(() => {
+    if (interactionSuspended || !pendingAcknowledgementRef.current) return
+    const targetId = pendingAcknowledgementRef.current
+    pendingAcknowledgementRef.current = null
+    if (acknowledgementTimerRef.current != null) {
+      window.clearTimeout(acknowledgementTimerRef.current)
+    }
+    setAcknowledgedTargetId(targetId)
+    acknowledgementTimerRef.current = window.setTimeout(() => {
+      acknowledgementTimerRef.current = null
+      setAcknowledgedTargetId(null)
+    }, 900)
+  }, [interactionSuspended])
   const nearbyTarget = useMemo(
     () => {
       if (floorInteractionSuspended || departingWorkspace || selected) return null
@@ -1173,6 +1208,7 @@ export function OfficeBuilding({
     if (bumpFrameRef.current != null) window.cancelAnimationFrame(bumpFrameRef.current)
     if (bumpTimerRef.current != null) window.clearTimeout(bumpTimerRef.current)
     if (impactTimerRef.current != null) window.clearTimeout(impactTimerRef.current)
+    if (acknowledgementTimerRef.current != null) window.clearTimeout(acknowledgementTimerRef.current)
     if (walkTimerRef.current != null) window.clearTimeout(walkTimerRef.current)
     routeGenerationRef.current += 1
     if (routeTimerRef.current != null) window.clearTimeout(routeTimerRef.current)
@@ -1686,6 +1722,7 @@ export function OfficeBuilding({
               data-replay-locked={replaySeq != null || undefined}
               data-nearby={nearbyTarget?.kind === 'floor-terminal'}
               data-route={routeTargetId === 'floor-terminal'}
+              data-acknowledged={acknowledgedTargetId === 'floor-terminal' || undefined}
               onClick={() => requestTargetInteraction('floor-terminal')}
               style={{ zIndex: officeDepthAt(floorTerminal.y + 19) }}
             >
@@ -1695,6 +1732,9 @@ export function OfficeBuilding({
                 aria-hidden
                 style={officePixelImg}
               />
+              {acknowledgedTargetId === 'floor-terminal' && (
+                <span className="oa-office-landmark-ack" aria-hidden>OK</span>
+              )}
             </button>
             <div
               className="oa-office-service-zone"
@@ -1740,6 +1780,7 @@ export function OfficeBuilding({
                 data-has-activity={Boolean(activity) || undefined}
                 data-nearby={nearbyTarget?.kind === interactionKind || undefined}
                 data-route={routeTargetId === landmark.id || undefined}
+                data-acknowledged={acknowledgedTargetId === landmark.id || undefined}
                 data-replay-locked={replaySeq != null || undefined}
                 aria-label={needsAttention
                   ? t('office.serviceNeedsAttention', { name: serviceName })
@@ -1781,6 +1822,9 @@ export function OfficeBuilding({
                 {needsAttention && (
                   <span className="oa-office-map-service__signal" aria-hidden>!</span>
                 )}
+                {acknowledgedTargetId === landmark.id && (
+                  <span className="oa-office-landmark-ack" aria-hidden>OK</span>
+                )}
               </button>
               )
             })}
@@ -1795,6 +1839,7 @@ export function OfficeBuilding({
               data-fresh={productActivity.freshKind === 'agent' || undefined}
               data-nearby={nearbyTarget?.kind === 'operations'}
               data-route={routeTargetId === 'operations'}
+              data-acknowledged={acknowledgedTargetId === 'operations' || undefined}
               aria-label={productActivity.attention.agent
                 ? t('office.serviceNeedsAttention', { name: t('office.operationsBoard') })
                 : t('office.operationsBoard')}
@@ -1814,6 +1859,9 @@ export function OfficeBuilding({
               />
               {productActivity.attention.agent && (
                 <span className="oa-office-operations-board__signal" aria-hidden>!</span>
+              )}
+              {acknowledgedTargetId === 'operations' && (
+                <span className="oa-office-landmark-ack" aria-hidden>OK</span>
               )}
             </button>
             <img
