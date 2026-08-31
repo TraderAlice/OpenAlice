@@ -248,6 +248,7 @@ export function OfficeBuilding({
   const restoreFloorFocusRef = useRef(true)
   const handledMenuResumeTokenRef = useRef(menuResumeToken)
   const activityLogMenuItemRef = useRef<HTMLDivElement | null>(null)
+  const pauseMenuRef = useRef<HTMLDivElement | null>(null)
   const resumeActivityLogFocusRef = useRef(false)
   floorInteractionSuspendedRef.current = floorInteractionSuspended
 
@@ -1338,6 +1339,17 @@ export function OfficeBuilding({
                 if (resumeActivityLogFocusRef.current) {
                   resumeActivityLogFocusRef.current = false
                   activityLogMenuItemRef.current?.focus({ preventScroll: true })
+                } else {
+                  window.requestAnimationFrame(() => {
+                    const firstAction = Array.from(
+                      pauseMenuRef.current?.querySelectorAll<HTMLElement>(
+                        '[role="menuitem"], [role="menuitemradio"]',
+                      ) ?? [],
+                    ).find((item) => (
+                      item.getAttribute('aria-disabled') !== 'true' && !item.hasAttribute('data-disabled')
+                    ))
+                    firstAction?.focus({ preventScroll: true })
+                  })
                 }
                 return
               }
@@ -1366,6 +1378,7 @@ export function OfficeBuilding({
               {t('office.pauseMenu')}
             </DropdownMenuTrigger>
             <DropdownMenuContent
+              ref={pauseMenuRef}
               aria-label={t('office.floorView')}
               align="end"
               sideOffset={8}

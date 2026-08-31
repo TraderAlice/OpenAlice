@@ -21,6 +21,7 @@ beforeEach(async () => {
 
 describe('OfficeBuilding', () => {
   it('claims the initial keyboard focus so the first direction key enters the game', async () => {
+    const onOpenLog = vi.fn()
     render(
       <OfficeBuilding
         building={{
@@ -37,7 +38,7 @@ describe('OfficeBuilding', () => {
         onOpenWorkspace={vi.fn()}
         onOpenFiles={vi.fn()}
         onOpenRoster={vi.fn()}
-        onOpenLog={vi.fn()}
+        onOpenLog={onOpenLog}
       />,
     )
 
@@ -48,12 +49,11 @@ describe('OfficeBuilding', () => {
     await userEvent.keyboard('{ArrowDown}')
     expect(alice.style.top).not.toBe(topBeforeMove)
     await userEvent.keyboard('{Escape}')
-    const pauseMenu = screen.getByRole('menu', { name: 'Menu' })
-    expect(document.activeElement).toBe(pauseMenu)
-    await userEvent.keyboard('{ArrowDown}')
-    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Activity log' }))
-    await userEvent.keyboard('{Escape}')
-    await waitFor(() => expect(document.activeElement).toBe(floor))
+    const activityLog = screen.getByRole('menuitem', { name: 'Activity log' })
+    await waitFor(() => expect(document.activeElement).toBe(activityLog))
+    await userEvent.keyboard('{Enter}')
+    expect(screen.queryByRole('menu', { name: 'Menu' })).toBeNull()
+    expect(onOpenLog).toHaveBeenCalledWith('menu')
   })
 
   it('keeps historical floors visibly in replay mode with a direct return to Live', async () => {

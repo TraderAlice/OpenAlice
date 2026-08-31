@@ -5359,6 +5359,24 @@ Non-disruptive live-journal follow-up (2026-08-31):
   passed all 620 test files and 5,205 tests (one file and nine tests skipped); the production UI build passed with only
   the existing ports fallback and large-chunk advisory.
 
+Pause-menu first-cursor follow-up (2026-08-31):
+
+- Played the real Live floor through Escape -> pause menu. The menu opened with its Base UI container focused, so the
+  visible `Activity log` row had no selection band and pressing Enter did nothing. A player had to guess that one
+  directional key was required before the first confirm, breaking the otherwise game-like Escape/Enter loop.
+- Compared selecting the non-actionable current `Live map` label, always selecting Activity Log, and selecting the
+  first enabled menu command in rendered order. A current-view label cannot own confirm; hard-coding Activity Log is
+  wrong when Replay's `Live map` exit or hidden-group radio commands precede it. Chose the rendered first-enabled
+  command, which matches a classic RPG menu cursor while respecting each menu composition.
+- Once Base UI completes opening and establishes its focus trap, Office moves focus from the menu container to the
+  first enabled menu item/radio item. Existing arrow-key opening already lands on that same first command. Returning
+  from Activity Log still uses its explicit resume token and restores Activity Log instead of resetting the cursor.
+- Real-browser acceptance pressed Escape on the Live floor and immediately showed the complete focus band on
+  `Activity log`; Enter opened the log without an intermediate arrow key. Closing the log reopened the pause menu with
+  Activity Log still selected, and Escape returned focus to the map. The focused Building suite passed all 25 tests;
+  root and UI TypeScript passed; the full suite passed all 620 test files and 5,205 tests (one file and nine tests
+  skipped); the production UI build passed with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
