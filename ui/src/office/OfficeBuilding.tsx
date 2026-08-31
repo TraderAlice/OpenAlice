@@ -189,6 +189,11 @@ export function OfficeBuilding({
   const [aliceDirection, setAliceDirection] = useState<OfficeAliceDirection>(
     initialPlayerState?.direction ?? 'down',
   )
+  const liveExcursionRef = useRef({
+    player: initialPlayerState ?? { position: { x: 480, y: 336 }, direction: 'down' as const },
+    camera,
+  })
+  const previousReplaySeqRef = useRef(replaySeq)
   const [aliceWalking, setAliceWalking] = useState(false)
   const [aliceSprinting, setAliceSprinting] = useState(false)
   const [alicePushing, setAlicePushing] = useState(false)
@@ -1188,6 +1193,40 @@ export function OfficeBuilding({
   }, [mapLayoutGeometryKey])
 
   useLayoutEffect(() => {
+    const wasReplay = previousReplaySeqRef.current != null
+    const isReplay = replaySeq != null
+    previousReplaySeqRef.current = replaySeq
+    if (!wasReplay || isReplay) return
+
+    cancelAutoWalk()
+    stopTouchMove()
+    stopManualMove()
+    setPanning(false)
+    setCollisionImpact(null)
+    setInteractionAnchorTargetId(null)
+    const checkpoint = liveExcursionRef.current
+    const canRestore = isOfficePositionWalkable(checkpoint.player.position, mapLayout, collisionRects)
+    const nextPosition = canRestore ? checkpoint.player.position : mapLayout.alice
+    const nextDirection = canRestore ? checkpoint.player.direction : 'down'
+    aliceRef.current = nextPosition
+    setAlice(nextPosition)
+    setAliceDirection(nextDirection)
+    setAliceWalking(false)
+    setAliceSprinting(false)
+    setAlicePushing(false)
+    pushDirectionRef.current = null
+    const viewport = viewportRef.current?.getBoundingClientRect()
+    const nextCamera = canRestore
+      ? checkpoint.camera
+      : viewport && viewport.width > 0 && viewport.height > 0
+        ? officeCameraCenteredOn(nextPosition, viewport, mapLayout)
+        : { x: 0, y: 0 }
+    setCamera(nextCamera)
+  // Replay is a temporary excursion; returning Live restores the last Live checkpoint.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [replaySeq])
+
+  useLayoutEffect(() => {
     if (replaySeq == null || !replayFocus || !replayFocusTarget) {
       replayFocusKeyRef.current = null
       return
@@ -1219,9 +1258,15 @@ export function OfficeBuilding({
   }, [building.asOfSeq, mapLayout, replayFocus, replayFocusTarget, replaySeq])
 
   useEffect(() => {
-    if (!initialLayoutKeyRef.current) return
-    onPlayerStateChange?.({ position: alice, direction: aliceDirection })
-  }, [alice, aliceDirection, onPlayerStateChange])
+    if (replaySeq == null) liveExcursionRef.current.camera = camera
+  }, [camera, replaySeq])
+
+  useEffect(() => {
+    if (!initialLayoutKeyRef.current || replaySeq != null) return
+    const player = { position: alice, direction: aliceDirection }
+    liveExcursionRef.current.player = player
+    onPlayerStateChange?.(player)
+  }, [alice, aliceDirection, onPlayerStateChange, replaySeq])
 
   return (
     <div

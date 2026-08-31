@@ -5169,6 +5169,30 @@ Agent-file assignment-reading follow-up (2026-08-31):
   root and UI TypeScript passed; the full suite passed all 620 test files and 5,196 tests (one file and nine tests
   skipped); the production UI build passed with only the existing ports fallback and large-chunk advisory.
 
+Replay excursion continuity follow-up (2026-08-31):
+
+- Played the real Operations board -> `Find on floor` -> Seq 5501 route. Alice entered Replay from the live Operations
+  console, walked to historical g27, then returned through `Live map` at x312/y576 beside the Chat pod instead of the
+  console she had left. Replay movement also flowed through the shared `onPlayerStateChange` callback, so a historical
+  excursion could overwrite the remembered Live-floor position.
+- Compared retaining one shared player coordinate, resetting to the compass spawn, and checkpointing the Live
+  excursion. Shared coordinates make a memory scene teleport the present; a spawn reset is predictable but destroys
+  the player's immediate Operations-board context. Chose the classic RPG memory-scene contract: Live and Replay share
+  the same movement rules, but entering Replay checkpoints Alice's position, facing, and camera; returning restores
+  that checkpoint exactly.
+- Replay movement must remain fully playable without writing the persisted Office excursion. Changing from one Replay
+  sequence to another keeps the original Live checkpoint. A direct Replay mount falls back to the supplied initial
+  player state, and the normal walkability guard still owns any future map-geometry invalidation.
+- Implemented a Live-only excursion checkpoint in `OfficeBuilding`: Alice/camera updates refresh it only on Live,
+  Replay movement no longer calls the persistence callback, and the Replay-to-Live transition cancels transient route,
+  touch, sprint, collision, and interaction state before restoring the saved player and camera. Focused coverage walks
+  in Live, moves through two Replay sequences, proves neither historical move persists, and then verifies exact return.
+- Real-browser acceptance recorded Live at x480/y264 facing up with camera `translate3d(49px, -37px, 0)`, routed Seq
+  5501 to x312/y576 facing left with camera y=-73px, and returned through the visible Live command. Alice restored to
+  x480/y264 facing up and the map transform matched the original camera string exactly. The Building suite passed all
+  25 tests; root and UI TypeScript passed; the full suite passed all 620 test files and 5,197 tests (one file and nine
+  tests skipped); the production UI build passed with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

@@ -215,6 +215,62 @@ describe('OfficeBuilding', () => {
     expect(replayAlice.style.left).not.toBe(leftBeforeMove)
   })
 
+  it('restores the Live excursion after moving through Replay without persisting the memory walk', async () => {
+    const onPlayerStateChange = vi.fn()
+    const building: OfficeBuildingSnapshot = {
+      config: {
+        workspaceSleepAfterMs: 1,
+        harnessMinimumVisibleGroups: { chat: 0, 'auto-quant': 0, prediction: 0, other: 0 },
+      },
+      lastSeq: 2,
+      firstSeq: 1,
+      offices: [],
+    }
+    const commonProps = {
+      onPlayerStateChange,
+      onSelectEmployee: vi.fn(),
+      onOpenEmployee: vi.fn(),
+      onOpenWorkspace: vi.fn(),
+      onOpenFiles: vi.fn(),
+      onOpenRoster: vi.fn(),
+      onOpenLog: vi.fn(),
+    }
+    const { rerender } = render(<OfficeBuilding building={building} {...commonProps} />)
+    const floor = screen.getByTestId('office-floor')
+    const alice = screen.getByRole('img', { name: 'Alice on the office map' })
+
+    await userEvent.keyboard('{ArrowRight}')
+    const livePosition = { left: alice.style.left, top: alice.style.top }
+    expect(livePosition.left).toBe('504px')
+    await waitFor(() => expect(onPlayerStateChange).toHaveBeenLastCalledWith({
+      position: { x: 504, y: 336 },
+      direction: 'right',
+    }))
+    onPlayerStateChange.mockClear()
+
+    rerender(<OfficeBuilding building={{ ...building, asOfSeq: 2 }} replaySeq={2} {...commonProps} />)
+    floor.focus()
+    await userEvent.keyboard('{ArrowDown}')
+    expect(alice.style.top).toBe('360px')
+    expect(onPlayerStateChange).not.toHaveBeenCalled()
+
+    rerender(<OfficeBuilding building={{ ...building, asOfSeq: 3 }} replaySeq={3} {...commonProps} />)
+    floor.focus()
+    await userEvent.keyboard('{ArrowLeft}')
+    expect(alice.style.left).toBe('480px')
+    expect(onPlayerStateChange).not.toHaveBeenCalled()
+
+    rerender(<OfficeBuilding building={building} {...commonProps} />)
+    await waitFor(() => {
+      expect(alice.style.left).toBe(livePosition.left)
+      expect(alice.style.top).toBe(livePosition.top)
+    })
+    expect(onPlayerStateChange).toHaveBeenLastCalledWith({
+      position: { x: 504, y: 336 },
+      direction: 'right',
+    })
+  })
+
   it('leaves the active Replay menu as the only Live exit while the floor is suspended', () => {
     render(
       <OfficeBuilding
