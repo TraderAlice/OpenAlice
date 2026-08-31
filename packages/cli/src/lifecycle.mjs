@@ -54,6 +54,17 @@ export async function startRuntime(options, dependencies = {}) {
   const readStatus = dependencies.readStatus ?? readRuntimeStatus
   const activation = await resolveActivationContext(env, dependencies)
   let status = await readStatus({ homeRoot, timeoutMs: 1_000 }, dependencies)
+  if (
+    isRailwayForegroundRuntime(env)
+    && status.class !== 'absent'
+    && !options.takeover
+  ) {
+    status = await waitForRuntimeRelease(homeRoot, options.waitMs, {
+      ...dependencies,
+      readStatus,
+      initialStatus: status,
+    })
+  }
 
   if (status.owner?.surface === 'cli-server' && status.class === 'running') {
     status = await reconcileActivation(status, activation, dependencies)
@@ -121,6 +132,7 @@ export async function startRuntime(options, dependencies = {}) {
     port: options.port,
     takeover: options.takeover,
   })
+  delete runtimeEnv.OPENALICE_RAILWAY_ENTRYPOINT_OWNER
   runtimeEnv.OPENALICE_LAUNCHER = 'cli-server'
   runtimeEnv.OPENALICE_SERVER_MODE = detached ? 'detached' : 'foreground'
   runtimeEnv.OPENALICE_RUNTIME_PROVIDER = runtimeProvider.kind
@@ -395,6 +407,39 @@ async function waitForRuntimeReady(homeRoot, timeoutMs, dependencies) {
     'ETIMEDOUT',
     `OpenAlice Runtime did not become ready within ${Math.ceil(timeoutMs / 1_000)}s (${lastStatus?.class ?? 'no status'})`,
   )
+}
+
+async function waitForRuntimeRelease(homeRoot, timeoutMs, dependencies) {
+  const readStatus = dependencies.readStatus ?? readRuntimeStatus
+  const sleep = dependencies.sleep ?? ((ms) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms)))
+  const deadline = Date.now() + timeoutMs
+  let lastStatus = dependencies.initialStatus ?? null
+  while (true) {
+    if (lastStatus?.class === 'absent') return lastStatus
+    let remainingMs = deadline - Date.now()
+    if (remainingMs <= 0) break
+    await sleep(Math.min(500, remainingMs))
+    remainingMs = deadline - Date.now()
+    if (remainingMs <= 0) break
+    lastStatus = await readStatus({
+      homeRoot,
+      timeoutMs: Math.max(1, Math.min(1_000, remainingMs)),
+    }, dependencies)
+    if (lastStatus.class === 'absent') return lastStatus
+  }
+  throw lifecycleError(
+    'ETIMEDOUT',
+    `Railway did not release the previous Runtime volume owner within ${Math.ceil(timeoutMs / 1_000)}s (${lastStatus?.class ?? 'no status'}). Keep one replica, Restart Policy Always, and at least 30 seconds of deployment draining.`,
+  )
+}
+
+function isRailwayForegroundRuntime(env) {
+  const serviceId = env['RAILWAY_SERVICE_ID']?.trim()
+  return env['OPENALICE_RAILWAY_ENTRYPOINT_OWNER'] === '1'
+    && env['OPENALICE_SERVICE_MANAGER']?.trim() === 'railway'
+    && Boolean(env['RAILWAY_ENVIRONMENT_ID']?.trim())
+    && /^[A-Za-z0-9-]{1,128}$/.test(serviceId ?? '')
+    && env['OPENALICE_MACHINE_ID']?.trim() === `railway-service-${serviceId}`
 }
 
 async function sleepOrAbort(ms, sleep, signal) {

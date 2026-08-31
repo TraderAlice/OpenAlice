@@ -34,7 +34,12 @@ fi
 if [[ -n "${RAILWAY_ENVIRONMENT_ID:-}" ]]; then
   [[ -n "${RAILWAY_SERVICE_ID:-}" ]] \
     || fail 'Railway did not provide a stable service identity'
-  export OPENALICE_MACHINE_ID="${OPENALICE_MACHINE_ID:-railway-service-${RAILWAY_SERVICE_ID}}"
+  expected_machine_id="railway-service-${RAILWAY_SERVICE_ID}"
+  if [[ -n "${OPENALICE_MACHINE_ID:-}" && "$OPENALICE_MACHINE_ID" != "$expected_machine_id" ]]; then
+    fail 'OPENALICE_MACHINE_ID must match the Railway service identity'
+  fi
+  export OPENALICE_MACHINE_ID="$expected_machine_id"
+  export OPENALICE_RAILWAY_ENTRYPOINT_OWNER=1
 fi
 
 fixed_home="$(canonical_path "$volume_root/home")"
@@ -93,6 +98,9 @@ launcher="$OPENALICE_INSTALL_DIR/bin/openalice"
   || fail 'OPENALICE_RAILWAY_PORT must be between 1 and 65535'
 [[ "$wait_seconds" =~ ^[0-9]+$ && "$wait_seconds" -ge 1 && "$wait_seconds" -le 600 ]] \
   || fail 'OPENALICE_RAILWAY_WAIT_SECONDS must be between 1 and 600'
+if [[ -n "${RAILWAY_ENVIRONMENT_ID:-}" && "$wait_seconds" -lt 130 ]]; then
+  fail 'OPENALICE_RAILWAY_WAIT_SECONDS must be at least 130 on Railway so draining plus stale-heartbeat recovery retains a bounded margin'
+fi
 if [[ "$channel" == dev && -n "$version" ]]; then
   fail 'the rolling dev channel cannot be combined with OPENALICE_RAILWAY_VERSION'
 fi

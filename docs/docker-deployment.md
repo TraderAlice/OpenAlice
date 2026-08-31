@@ -80,14 +80,15 @@ fallback, persistent `PATH`, and foreground Guardian startup in the image
 entrypoint.
 
 ```text
-tini (PID 1)
-└── scripts/railway/entrypoint.sh
-    └── /data/home/.openalice/bin/openalice server run
-        └── Guardian foreground tree
-            ├── Alice
-            ├── optional UTA
-            ├── optional Connector Service
-            └── user-launched external Agent Runtime processes
+Railway platform init (PID 1)
+└── tini -s -g
+    └── scripts/railway/entrypoint.sh
+        └── /data/home/.openalice/bin/openalice server run
+            └── Guardian foreground tree
+                ├── Alice
+                ├── optional UTA
+                ├── optional Connector Service
+                └── user-launched external Agent Runtime processes
 
 /opt/openalice/install       shared installer snapshot from the image source
 /data/home                   persistent user HOME
@@ -138,14 +139,30 @@ the persistent command path.
 
 The entrypoint finally `exec`s `openalice server run`; it does not launch a
 detached Server and sleep. Railway therefore observes and restarts the actual
-Guardian service process, while `tini -g` forwards signals to the complete
-process group and reaps children. The shared installer serializes mutations
+Guardian service process. Railway places its platform init at PID 1, so the
+image runs `tini -s -g` as a child subreaper: it forwards signals to the
+complete process group and adopts/reaps orphaned descendants even though it is
+not PID 1. The shared installer serializes mutations
 with the platform kernel (`lockf` on macOS, `flock` on Linux); its persistent
 guard inode contains no Project or credential data, and hard process death
 releases ownership automatically.
 Alice stays on loopback port `47331` (or the explicit
 `OPENALICE_RAILWAY_PORT`), and this profile does not consume Railway's public
 `PORT` contract.
+
+Every Railway shell and service process derives one exact machine identity
+from `RAILWAY_SERVICE_ID`; a conflicting configured identity fails startup.
+Within one container, Runtime ownership still uses PID and process-start-time
+identity. Across replacement-container PID namespaces on the same service
+Volume, it never probes or signals the recorded PID: a fresh, explicit
+heartbeat remains authoritative, while a stale explicit heartbeat may be
+reclaimed atomically. Missing, invalid, or foreign identity/heartbeat evidence
+fails closed. The image-owned entrypoint alone waits for this handoff before
+preparing or spawning Guardian; ordinary SSH commands do not inherit that
+privilege. Keep `OPENALICE_RAILWAY_WAIT_SECONDS` at 130 or higher (180 by
+default). The same value separately bounds owner release and Runtime readiness;
+for custom draining use at least `draining seconds + 100`, so the stale-heartbeat
+window retains a bounded margin.
 
 Agent Runtime installation remains a user action performed through Railway
 SSH. Persistent locations `/data/home/.local/bin` and `/data/home/.bun/bin` are
@@ -161,6 +178,9 @@ Local contract checks for this profile are:
 bash -n scripts/railway/*.sh
 pnpm exec vitest run \
   scripts/railway-entrypoint.spec.ts \
+  packages/guardian-runtime/src/runtime-lock.spec.ts \
+  packages/cli/src/lifecycle.spec.mjs \
+  packages/cli/src/server-control.spec.mjs \
   packages/cli/src/remote.spec.mjs \
   packages/cli/src/project-transfer.spec.ts \
   packages/cli/src/project-transfer-ssh.spec.ts \
@@ -184,6 +204,11 @@ self-contained repository connectivity, fail-closed linked/nested/submodule or
 external-object state, known Alice backup/session/install exclusions,
 credential omission and resealing, receipt validation, and safe handling of
 absolute or escaping symlinks.
+Runtime ownership tests must also cover same-container PID identity,
+legacy-to-stable Railway service identity handoff, fresh-versus-stale explicit
+heartbeats across container namespaces, missing/invalid evidence that remains
+blocked, entrypoint-only bounded waiting, and a proof that no cross-container
+PID receives a signal.
 
 A real Railway acceptance is still required before treating the profile as a
 usable hosted product. Keep the clean-bootstrap and retained-data journeys

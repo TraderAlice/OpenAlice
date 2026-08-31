@@ -654,10 +654,26 @@ source-built Docker image.
   remain excluded. Live source ownership/quiescence and remote capability,
   destination, and free-space preflight are not part of this offline evidence.
 - [x] Rerun the hard-kill container replacement after the stale-owner PID reuse
-  and CLI preflight repairs. The current dev Bun Runtime reclaimed the stale
-  lock on the same Volume, retained the Project marker, matched release content
-  without pending activation, restored the fixed SSH Home/PATH, and did not
-  acquire an Agent Runtime.
+  and CLI preflight repairs in the local Docker harness. The current dev Bun
+  Runtime reclaimed the stale lock on the same Volume, retained the Project
+  marker, matched release content without pending activation, restored the
+  fixed SSH Home/PATH, and did not acquire an Agent Runtime. This evidence did
+  not exercise Railway replacement containers with isolated PID namespaces.
+- [x] Diagnose the first retained-Volume Railway deployment failure. Its old
+  beta lock used the legacy hostname-derived machine identity, while the new
+  container correctly used the stable Railway service identity; ordinary
+  foreign-machine protection therefore left the stale owner blocked. Add the
+  Railway-volume authority needed for same-service container handoff: exact
+  service identity, explicit-heartbeat freshness, fail-closed missing/invalid
+  evidence, same-container PID authority, no cross-container signals, bounded
+  entrypoint-only waiting, and `tini` subreaper operation beneath Railway's
+  platform init. Live reacceptance remains pending a dev artifact containing
+  this repair.
+- [x] Pass the handoff-repair local gates: 83 focused ownership/CLI/entrypoint
+  tests, 5,281 full-suite tests, root/Guardian/CLI TypeScript, Guardian recovery,
+  Linux installer and SSH-remote Docker smokes, Bash syntax, and a rebuilt
+  Railway image whose `tini -s -g` entrypoint still contains no Node, Bun, or
+  Agent Runtime executable.
 - [x] Pass the remaining local repository gates: root and CLI TypeScript,
   `git diff --check`, the 222-test focused run, the 5,266-test full suite,
   Linux installer and SSH-remote Docker smokes, Guardian recovery smoke, and a
@@ -671,8 +687,11 @@ source-built Docker image.
   Serverless disabled, Restart Policy set to Always, one replica, at least 30
   seconds of draining, fixed SSH `HOME=/data/home` plus persistent user `PATH`,
   an OpenSSH alias from `railway ssh config`, and a successful inspection-only
-  `openalice remote` browser/tunnel journey. The inspected `HOME=/root` service
-  is an old deployment; the candidate has not been deployed.
+  `openalice remote` browser/tunnel journey. A beta candidate has now booted
+  successfully against an isolated diagnostic Home on the retained Volume and
+  exposed no public domain. Its first attempt against the existing Project Home
+  reproduced the legacy-machine-identity handoff failure above; redeployment
+  of the repaired dev artifact against that original Home is still required.
 - [ ] Repeat `openalice project transfer --plan` through the deployed Railway
   candidate so SSH compatibility, destination absence, and free-space
   preflight are proven before apply.
@@ -685,8 +704,10 @@ source-built Docker image.
   release artifact.
 - [ ] Restart and redeploy against the same Volume, verify install/Home/Agent
   persistence and foreground Guardian recovery, then exercise valid-release
-  refresh fallback and the separately accepted hard-kill recovery path. The
-  empty-Volume fail-closed case remains isolated to the disposable service.
+  refresh fallback and the separately accepted hard-kill recovery path,
+  including legacy hostname identity and stable service identity across
+  isolated container PID namespaces. The empty-Volume fail-closed case remains
+  isolated to the disposable service.
 
 ## Verification Matrix
 
