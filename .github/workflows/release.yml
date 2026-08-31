@@ -1448,15 +1448,7 @@ jobs:
             curl -fsSL "${BASE_URL}/${INSTALL_PATH}" -o /tmp/openalice-channel-install
             cmp /tmp/openalice-versioned-install /tmp/openalice-channel-install
             bash /tmp/openalice-channel-install --plan | tee /tmp/openalice-default-install-plan
-            if [ "$RELEASE_CHANNEL" = "stable" ]; then
-              grep -Fq "Channel         stable (latest)" /tmp/openalice-default-install-plan
-            else
-              # Until v0.90.2 stable exists, the channel-neutral installer keeps
-              # its stable default by delegating the verified v0.90.1 installer.
-              # Accept either plan vocabulary while keeping beta opt-in explicit.
-              grep -Eq '^(Channel[[:space:]]+stable \(latest\)|[[:space:]]*Updates[[:space:]]+stable)$' \
-                /tmp/openalice-default-install-plan
-            fi
+            grep -Fq "Channel         stable (latest)" /tmp/openalice-default-install-plan
           fi
 
           if [ "$RELEASE_CHANNEL" = "stable" ]; then

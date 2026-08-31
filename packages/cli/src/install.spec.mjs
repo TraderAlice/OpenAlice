@@ -331,9 +331,9 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
     const fixture = await makeReleaseArchive(version, channel === 'stable' ? 'e'.repeat(16) : 'f'.repeat(16))
     const installRoot = join(fixture.root, 'installed')
     const server = createServer(async (request, response) => {
-      if (request.url === '/releases/latest') {
+      if (request.url === '/manifest.json') {
         response.setHeader('content-type', 'application/json')
-        response.end(JSON.stringify({ tag_name: `v${version}` }))
+        response.end(JSON.stringify({ channel: 'stable', version }))
         return
       }
       if (request.url === '/beta/manifest.json') {
@@ -364,7 +364,7 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
           ...process.env,
           HOME: fixture.root,
           OPENALICE_DOWNLOAD_BASE_URL: baseUrl,
-          OPENALICE_RELEASES_API_URL: `${baseUrl}/releases/latest`,
+          OPENALICE_STABLE_MANIFEST_URL: `${baseUrl}/manifest.json`,
           OPENALICE_RELEASE_ASSET_BASE_URL: baseUrl,
         },
       })
@@ -380,7 +380,50 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
     }
   })
 
-  it('bridges fresh latest and exact v0.90.1 installs with explicit update ownership', async () => {
+  it.each([
+    ['stable', 'beta', '0.92.0', 'Stable manifest did not identify the stable channel'],
+    ['beta', 'stable', '0.92.0-beta.1', 'Beta manifest did not identify the beta channel'],
+  ])('rejects a %s manifest that identifies the %s release channel', async (
+    selectedChannel,
+    manifestChannel,
+    version,
+    expectedError,
+  ) => {
+    const root = await mkdtemp(join(tmpdir(), `openalice-${selectedChannel}-manifest-channel-`))
+    temporaryPaths.push(root)
+    const server = createServer((_request, response) => {
+      response.setHeader('content-type', 'application/json')
+      response.end(JSON.stringify({ channel: manifestChannel, version }))
+    })
+    await new Promise((resolvePromise, rejectPromise) => {
+      server.once('error', rejectPromise)
+      server.listen(0, '127.0.0.1', resolvePromise)
+    })
+    try {
+      const address = server.address()
+      const manifestUrl = `http://127.0.0.1:${address.port}/${selectedChannel === 'stable' ? '' : 'beta/'}manifest.json`
+      const manifestVariable = selectedChannel === 'stable'
+        ? 'OPENALICE_STABLE_MANIFEST_URL'
+        : 'OPENALICE_BETA_MANIFEST_URL'
+      await expect(execFileAsync('bash', [installer,
+        '--channel', selectedChannel,
+        '--install-dir', join(root, 'installed'),
+        '--plan',
+      ], {
+        env: {
+          ...process.env,
+          HOME: root,
+          [manifestVariable]: manifestUrl,
+        },
+      })).rejects.toMatchObject({
+        stderr: expect.stringContaining(expectedError),
+      })
+    } finally {
+      await new Promise((resolvePromise) => server.close(resolvePromise))
+    }
+  })
+
+  it('bridges stable-manifest and exact v0.90.1 installs with explicit update ownership', async () => {
     const root = await mkdtemp(join(tmpdir(), 'openalice-legacy-stable-'))
     temporaryPaths.push(root)
     const receipt = join(root, 'receipt.txt')
@@ -397,9 +440,9 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
 `)
     const legacySha256 = createHash('sha256').update(legacyInstaller).digest('hex')
     const server = createServer((request, response) => {
-      if (request.url === '/releases/latest') {
+      if (request.url === '/manifest.json') {
         response.setHeader('content-type', 'application/json')
-        response.end(JSON.stringify({ tag_name: 'v0.90.1' }))
+        response.end(JSON.stringify({ channel: 'stable', version: '0.90.1' }))
       } else if (request.url === '/legacy-install') {
         response.end(legacyInstaller)
       } else {
@@ -422,7 +465,7 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
         env: {
           ...process.env,
           HOME: root,
-          OPENALICE_RELEASES_API_URL: `${baseUrl}/releases/latest`,
+          OPENALICE_STABLE_MANIFEST_URL: `${baseUrl}/manifest.json`,
           OPENALICE_LEGACY_STABLE_INSTALLER_URL: `${baseUrl}/legacy-install`,
           OPENALICE_LEGACY_STABLE_INSTALLER_SHA256: legacySha256,
           OPENALICE_LEGACY_TEST_RECEIPT: receipt,
@@ -498,9 +541,9 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
     await mkdir(join(installRoot, 'cli', 'releases'), { recursive: true })
     let legacyInstallerRequests = 0
     const server = createServer((request, response) => {
-      if (request.url === '/releases/latest') {
+      if (request.url === '/manifest.json') {
         response.setHeader('content-type', 'application/json')
-        response.end(JSON.stringify({ tag_name: 'v0.90.1' }))
+        response.end(JSON.stringify({ channel: 'stable', version: '0.90.1' }))
       } else if (request.url === '/legacy-install') {
         legacyInstallerRequests += 1
         response.end('#!/usr/bin/env bash\nexit 0\n')
@@ -524,7 +567,7 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
         env: {
           ...process.env,
           HOME: root,
-          OPENALICE_RELEASES_API_URL: `${baseUrl}/releases/latest`,
+          OPENALICE_STABLE_MANIFEST_URL: `${baseUrl}/manifest.json`,
           OPENALICE_LEGACY_STABLE_INSTALLER_URL: `${baseUrl}/legacy-install`,
         },
       })).rejects.toMatchObject({
@@ -583,9 +626,9 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
     const fixture = await makeReleaseArchive('0.92.0', '1'.repeat(16))
     const installRoot = join(fixture.root, 'legacy-updater')
     const server = createServer(async (request, response) => {
-      if (request.url === '/releases/latest') {
+      if (request.url === '/manifest.json') {
         response.setHeader('content-type', 'application/json')
-        response.end(JSON.stringify({ tag_name: 'v0.92.0' }))
+        response.end(JSON.stringify({ channel: 'stable', version: '0.92.0' }))
       } else if (request.url?.endsWith('.sha256')) {
         response.end(`${fixture.sha256}  archive.tar.gz\n`)
       } else {
@@ -608,7 +651,7 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
           ...process.env,
           HOME: fixture.root,
           OPENALICE_EXPECTED_CLI_VERSION: '0.92.0',
-          OPENALICE_RELEASES_API_URL: `${baseUrl}/releases/latest`,
+          OPENALICE_STABLE_MANIFEST_URL: `${baseUrl}/manifest.json`,
           OPENALICE_RELEASE_ASSET_BASE_URL: baseUrl,
         },
       })

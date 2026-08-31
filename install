@@ -5,8 +5,8 @@ PRODUCT="OpenAlice CLI"
 REPOSITORY="TraderAlice/OpenAlice"
 PUBLIC_INSTALLER_URL="https://openalice.ai/install"
 DOWNLOAD_BASE_URL="${OPENALICE_DOWNLOAD_BASE_URL:-https://download.openalice.ai}"
-RELEASES_API_URL="${OPENALICE_RELEASES_API_URL:-https://api.github.com/repos/${REPOSITORY}/releases/latest}"
 RELEASE_ASSET_BASE_URL="${OPENALICE_RELEASE_ASSET_BASE_URL:-https://github.com/${REPOSITORY}/releases/download}"
+STABLE_MANIFEST_URL="${OPENALICE_STABLE_MANIFEST_URL:-${DOWNLOAD_BASE_URL}/manifest.json}"
 BETA_MANIFEST_URL="${OPENALICE_BETA_MANIFEST_URL:-${DOWNLOAD_BASE_URL}/beta/manifest.json}"
 LEGACY_STABLE_VERSION="0.90.1"
 LEGACY_STABLE_INSTALLER_URL="${OPENALICE_LEGACY_STABLE_INSTALLER_URL:-${RELEASE_ASSET_BASE_URL}/v${LEGACY_STABLE_VERSION}/OpenAlice-${LEGACY_STABLE_VERSION}-install}"
@@ -239,11 +239,14 @@ if [[ -n "$archive_path" ]]; then
 else
   command -v curl >/dev/null 2>&1 || fail "curl is required for a network install"
   if [[ "$selector_kind" == stable ]]; then
-    latest_json="$(curl -fsSL --max-time 15 "$RELEASES_API_URL")" \
-      || fail "Could not resolve the latest OpenAlice release"
-    release_version="$(printf '%s' "$latest_json" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v\{0,1\}\([^"]*\)".*/\1/p' | head -n 1)"
+    stable_json="$(curl -fsSL --max-time 15 "$STABLE_MANIFEST_URL")" \
+      || fail "Could not resolve the latest OpenAlice stable release"
+    stable_channel="$(printf '%s' "$stable_json" | sed -n 's/.*"channel"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)"
+    release_version="$(printf '%s' "$stable_json" | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)"
+    [[ "$stable_channel" == stable ]] \
+      || fail "Stable manifest did not identify the stable channel"
     [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
-      || fail "Latest release metadata did not contain a valid version"
+      || fail "Stable manifest did not contain a valid stable version"
     if [[ "$release_version" == "$LEGACY_STABLE_VERSION" ]]; then
       delegate_legacy_stable_install stable
     fi
@@ -251,7 +254,10 @@ else
   elif [[ "$selector_kind" == beta ]]; then
     beta_json="$(curl -fsSL --max-time 15 "$BETA_MANIFEST_URL")" \
       || fail "Could not resolve the latest OpenAlice beta"
+    beta_channel="$(printf '%s' "$beta_json" | sed -n 's/.*"channel"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)"
     release_version="$(printf '%s' "$beta_json" | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)"
+    [[ "$beta_channel" == beta ]] \
+      || fail "Beta manifest did not identify the beta channel"
     [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-beta(\.[1-9][0-9]*)?$ ]] \
       || fail "Beta manifest did not contain a valid beta version"
     artifact_url="${RELEASE_ASSET_BASE_URL}/v${release_version}/openalice-cli-${release_version}-${platform}-${architecture}.tar.gz"

@@ -373,6 +373,6 @@ describe('Release workflow critical path', () => {
     expect(verify).toContain('--channel "$RELEASE_CHANNEL"')
     expect(verify).toContain('INSTALL_URL="${BASE_URL}/install"')
     expect(verify).toContain('grep -Fq "Channel         stable (latest)"')
-    expect(verify).toContain('Updates[[:space:]]+stable')
+    expect(verify).not.toContain('Updates[[:space:]]+stable')
   })
 })

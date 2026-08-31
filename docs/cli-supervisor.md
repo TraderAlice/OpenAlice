@@ -153,10 +153,10 @@ explicit commands. Its ordinary path is intentionally parameter-free:
   makes the chosen channel the next launch's default. Package-manager-owned
   installs are never overwritten by the TUI: a stable candidate shows the
   matching manager command, while beta/dev explain that those channels require
-  an explicit switch to the direct installer. During the beta-first transition,
-  a native beta/dev installation also refuses to switch back to the legacy
-  v0.90.1 stable layout; the picker leaves the installation unchanged until a
-  native stable release exists.
+  an explicit switch to the direct installer. If an explicit selector or
+  channel manifest ever targets the legacy v0.90.1 layout, a native
+  installation refuses that downgrade and stays unchanged. Current native
+  stable releases switch through the ordinary direct-installer transaction.
   After a successful in-TUI install, the running Supervisor is still the
   previous CLI and does not reload; the user must exit and run `openalice`
   again;

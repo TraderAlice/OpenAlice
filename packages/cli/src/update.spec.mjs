@@ -218,14 +218,14 @@ describe('OpenAlice CLI updates', () => {
     })).resolves.toMatchObject({ status: 'available', channel: 'stable' })
   })
 
-  it('accepts the shipped pre-channel stable manifest during the 0.90.1 cutover', async () => {
+  it('rejects a release manifest without an explicit channel', async () => {
     await expect(checkForUpdate({
       currentVersion: '0.90.1',
       installSource: stableSource,
     }, {
       fetchImpl: manifestFetch(newerStableVersion, { omitChannel: true }),
       env: {},
-    })).resolves.toMatchObject({ status: 'available', channel: 'stable' })
+    })).rejects.toThrow('release manifest does not contain a valid CLI installer')
   })
 
   it('uses the ordinary installer only after an explicit update command', async () => {

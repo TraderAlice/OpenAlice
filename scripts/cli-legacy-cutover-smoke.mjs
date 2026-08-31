@@ -56,11 +56,6 @@ const server = createServer((request, response) => {
     }))
     return
   }
-  if (pathname === '/releases/latest') {
-    response.setHeader('content-type', 'application/json')
-    response.end(JSON.stringify({ tag_name: 'v' + config.version }))
-    return
-  }
   if (pathname === config.installerPath || pathname === '/install') {
     response.setHeader('content-type', 'text/plain')
     response.end(readFileSync(config.installer))
@@ -153,7 +148,7 @@ export function runLegacyCutoverSmoke(options) {
           PATH: `${dirname(externalPi)}:${inheritedPath}`,
           OPENALICE_INSTALL_URL: 'https://openalice.ai/install',
           OPENALICE_UPDATE_MANIFEST_URL: `${fixture.baseUrl}/manifest.json`,
-          OPENALICE_RELEASES_API_URL: `${fixture.baseUrl}/releases/latest`,
+          OPENALICE_STABLE_MANIFEST_URL: `${fixture.baseUrl}/manifest.json`,
           OPENALICE_RELEASE_ASSET_BASE_URL: fixture.baseUrl,
         }, 10 * 60_000)
       } finally {
@@ -306,7 +301,6 @@ function startStableUpdateFixture(options, root) {
   const requiredRequests = [
     '/manifest.json',
     installerPath,
-    '/releases/latest',
     archivePath,
     `${archivePath}.sha256`,
   ]
