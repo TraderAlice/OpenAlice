@@ -68,6 +68,18 @@ describe('Office Agent-file style contract', () => {
     )
   })
 
+  it('keeps exceptional Agent states as pixel status badges inside the file', () => {
+    expect(css).toMatch(
+      /\.oa-office-inspect__facts dd > span\s*\{[^}]*width:\s*7px;[^}]*border-radius:\s*0;[^}]*box-shadow:\s*1px 1px 0 var\(--gba-ink\);/s,
+    )
+    expect(css).toMatch(
+      /\.oa-office-inspect__facts dd:is\(\[data-mood="waiting"\], \[data-mood="failed"\]\)\s*\{[^}]*width:\s*fit-content;[^}]*border:\s*1px solid currentColor;[^}]*font-weight:\s*900;[^}]*text-transform:\s*uppercase;/s,
+    )
+    expect(css).toMatch(
+      /\.oa-office-inspect__facts dd\[data-mood="failed"\]\s*\{[^}]*color:\s*color-mix\(in srgb, var\(--gba-alert\) 72%, var\(--gba-ink\)\);[^}]*background:\s*color-mix\(in srgb, var\(--gba-alert\) 12%, var\(--gba-paper\)\);/s,
+    )
+  })
+
   it('keeps the three-column character card in landscape windows', () => {
     expect(mediumStart).toBeGreaterThan(gameWindowStart)
     expect(compactStart).toBeGreaterThan(mediumStart)

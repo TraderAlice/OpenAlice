@@ -5603,6 +5603,25 @@ Activity-log disclosure-focus follow-up (2026-08-31):
   root and UI TypeScript passed; the full suite passed all 620 test files and 5,210 tests (one file and nine tests
   skipped); the production UI build passed with only the existing ports fallback and large-chunk advisory.
 
+Agent-file exceptional-status hierarchy follow-up (2026-08-31):
+
+- Played the 35-member Chat roster from its `+31` floor landmark, jumped Home/End across the complete team, opened the
+  final sleeping Agent, returned to the preserved roster cursor, then inspected failed Grok Researcher g25. Roster
+  failure was a clear red `FAILED` badge; the Agent File reduced the same decision-critical state to a five-pixel dot
+  and ordinary lowercase metadata beside Office and Run mode.
+- Compared relying on the existing dialogue sentence, tinting the whole Agent File, and carrying the compact condition
+  badge into the character facts. Dialogue alone makes status easy to miss and a full red panel would overpower the
+  actual diagnosis/actions. Chose the compact badge: exceptional waiting/failed states retain roster-level semantic
+  weight while the stable character sheet and command rail remain unchanged.
+- Agent File status marks now use the roster's square seven-pixel state glyph. Waiting and failed become fit-content,
+  uppercase pixel badges with restrained amber/alert paper fills; asleep, idle, working, and replay keep their existing
+  low-noise hierarchy.
+- Real-browser acceptance reopened failed g25 from the 35-member roster and measured a 75px alert badge with a seven-pixel
+  square glyph, uppercase 900-weight label, and restrained paper fill. `Review activity` plus `Open session` stayed
+  visible and unchanged. Focused Inspect/style suites passed all 15 tests; root and UI TypeScript passed; the full suite
+  passed all 620 test files and 5,211 tests (one file and nine tests skipped); the production UI build passed with only
+  the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

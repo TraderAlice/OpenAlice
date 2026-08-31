@@ -3404,6 +3404,54 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
   white-space: normal;
 }
 
+.oa-office-inspect__facts dd > span {
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--gba-ink);
+  border-radius: 0;
+  background: var(--gba-moss);
+  box-shadow: 1px 1px 0 var(--gba-ink);
+}
+
+.oa-office-inspect__facts dd[data-mood="idle"] > span {
+  background: var(--gba-ink-soft);
+}
+
+.oa-office-inspect__facts dd[data-power="asleep"] > span {
+  background: transparent;
+  box-shadow:
+    inset 0 0 0 1px var(--gba-paper),
+    1px 1px 0 var(--gba-ink);
+}
+
+.oa-office-inspect__facts dd:is([data-mood="waiting"], [data-mood="failed"]) {
+  width: fit-content;
+  max-width: 100%;
+  padding: 2px 5px 1px;
+  border: 1px solid currentColor;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.oa-office-inspect__facts dd[data-mood="waiting"] {
+  color: color-mix(in srgb, var(--office-amber) 68%, var(--gba-ink));
+  background: color-mix(in srgb, var(--office-amber) 14%, var(--gba-paper));
+}
+
+.oa-office-inspect__facts dd[data-mood="failed"] {
+  color: color-mix(in srgb, var(--gba-alert) 72%, var(--gba-ink));
+  background: color-mix(in srgb, var(--gba-alert) 12%, var(--gba-paper));
+}
+
+.oa-office-inspect__facts dd:is([data-mood="waiting"], [data-mood="failed"]) > span {
+  border-color: currentColor;
+  background: currentColor;
+  box-shadow: 1px 1px 0 var(--gba-ink);
+}
+
 .oa-office-inspect__open {
   min-height: 38px;
   border: 3px solid var(--gba-ink);
