@@ -857,12 +857,74 @@ describe('OfficePage localization', () => {
 
     await userEvent.click(screen.getByRole('button', { name: '盖章：本次值班已复核' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '检查周报排期' })).toBeNull())
-    expect(screen.getByText('本班已复核 · 1 项仍待处理')).toBeTruthy()
+    expect(screen.getByRole('button', {
+      name: '本班已复核，仍有 1 项定时 Issue 未解决。跟进 chat 的“检查周报排期”。',
+    })).toBeTruthy()
     expect(screen.getByText('已复核')).toBeTruthy()
-    expect(screen.getByText('已复核“检查周报排期”。本班完成，仍有 1 项待处理。')).toBeTruthy()
+    expect(screen.getByText(
+      '已复核“检查周报排期”。本班完成；仍有 1 项定时 Issue 待跟进。',
+    )).toBeTruthy()
     expect(acknowledgeMock).not.toHaveBeenCalled()
     expect(window.sessionStorage.getItem('openalice:office-duty:evidence-receipts:v2'))
       .toContain('weekly-review')
+  })
+
+  it('keeps a reviewed cadence exception as an exact follow-up without stealing the active Inbox duty', async () => {
+    const delivery = inboxEvidence('inbox-a', 'NVDA weekly evidence brief', 5_100)
+    issuesMock.mockReturnValue(cadenceIssues(blockedCadenceHealth))
+    issueDetailMock.mockReturnValue(cadenceIssueDetail(blockedCadenceHealth))
+    inboxDutiesMock.mockReturnValue({
+      status: 'ready',
+      deliveries: [delivery],
+      markReadConfirmed: markInboxReadMock,
+    })
+    const view = render(<OfficePage />)
+
+    await userEvent.click(screen.getByRole('button', {
+      name: /本班第 1\/2 项：.*检查周报排期/,
+    }))
+    await screen.findByRole('dialog', { name: '检查周报排期' })
+    await userEvent.click(screen.getByRole('button', { name: '复核证据' }))
+    await userEvent.click(screen.getByRole('button', { name: '盖章：本次值班已复核' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '检查周报排期' })).toBeNull())
+    expect(screen.getByRole('button', {
+      name: /本班第 2\/2 项：.*NVDA weekly evidence brief/,
+    })).toBeTruthy()
+    expect(markInboxReadMock).not.toHaveBeenCalled()
+    const receiptAfterReview = window.sessionStorage.getItem(
+      'openalice:office-duty:evidence-receipts:v2',
+    )
+    expect(receiptAfterReview).toContain('weekly-review')
+
+    openOrFocusMock.mockClear()
+    await userEvent.click(screen.getByRole('button', { name: /行动看板/ }))
+    await waitFor(() => expect(openOrFocusMock).toHaveBeenCalledWith({
+      kind: 'issue-detail',
+      params: { wsId: 'chat-1', id: 'weekly-review' },
+    }))
+    expect(screen.queryByRole('dialog', { name: '活动日志' })).toBeNull()
+    expect(screen.queryByRole('dialog', { name: '检查周报排期' })).toBeNull()
+    expect(window.sessionStorage.getItem('openalice:office-duty:evidence-receipts:v2'))
+      .toBe(receiptAfterReview)
+    expect(markInboxReadMock).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', {
+      name: /本班第 2\/2 项：.*NVDA weekly evidence brief/,
+    })).toBeTruthy()
+
+    const healthy = { state: 'healthy', message: 'Schedule healthy.' } as const
+    issuesMock.mockReturnValue(cadenceIssues(healthy))
+    issueDetailMock.mockReturnValue(cadenceIssueDetail(healthy))
+    openOrFocusMock.mockClear()
+    view.rerender(<OfficePage />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '行动看板' })).toBeTruthy()
+    })
+    await userEvent.click(screen.getByRole('button', { name: '行动看板' }))
+    expect(await screen.findByRole('dialog', { name: '活动日志' })).toBeTruthy()
+    expect(openOrFocusMock).not.toHaveBeenCalled()
+    expect(markInboxReadMock).not.toHaveBeenCalled()
   })
 
   it('hands a deferred cadence duty to Inbox without letting Operations bypass the shift lead', async () => {

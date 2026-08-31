@@ -62,6 +62,7 @@ import {
   coreOfficeDutyRegistrations,
   projectOfficeDutyQueue,
   resolveOfficeDutyTarget,
+  type OfficeCadenceDutyCandidate,
   type OfficeDutyCandidate,
   type OfficeDutySourceStatus,
   type OfficeDutyTargetId,
@@ -185,6 +186,8 @@ export function OfficeBuilding({
   inboxBacklogCount = 0,
   dutyAcknowledgement,
   onOpenDuty,
+  reviewedCadenceFollowUps = [],
+  onOpenCadenceFollowUp,
   onStartNextShift,
   onOpenService,
   onReturnLive,
@@ -217,6 +220,8 @@ export function OfficeBuilding({
     readonly label?: string
   } | null
   onOpenDuty?: (duty: OfficeResolvedDuty) => void
+  reviewedCadenceFollowUps?: readonly OfficeCadenceDutyCandidate[]
+  onOpenCadenceFollowUp?: (duty: OfficeCadenceDutyCandidate) => void
   onStartNextShift?: () => void
   onOpenService?: (kind: 'inbox' | 'news', seq?: number) => void
   onReturnLive?: () => void
@@ -532,8 +537,30 @@ export function OfficeBuilding({
   const queuedOperationsCadenceDuty = queuedCadenceDutyCandidate?.kind === 'cadence'
     ? resolveOfficeDutyTarget(queuedCadenceDutyCandidate)
     : null
-  const operationsNeedsAttention = productActivity.attention.agent || Boolean(queuedOperationsCadenceDuty)
-  const operationsPending = queuedOperationsCadenceDuty?.count ?? productActivity.pending.agent
+  const reviewedCadenceFollowUp = replaySeq == null
+    ? reviewedCadenceFollowUps[0] ?? null
+    : null
+  const reviewedCadenceFollowUpCount = replaySeq == null
+    ? reviewedCadenceFollowUps.length
+    : 0
+  const operationsFollowUp = !currentOperationsCadenceDuty
+    && reviewedCadenceFollowUp
+    && onOpenCadenceFollowUp
+    ? reviewedCadenceFollowUp
+    : null
+  const operationsInteractionMode = currentOperationsCadenceDuty
+    ? 'current-cadence'
+    : operationsFollowUp
+      ? 'reviewed-follow-up'
+      : 'ambient'
+  const operationsNeedsAttention = productActivity.attention.agent
+    || Boolean(queuedOperationsCadenceDuty)
+    || reviewedCadenceFollowUpCount > 0
+  const operationsPending = operationsInteractionMode === 'current-cadence'
+    ? currentCadenceDutyCandidate?.count ?? 0
+    : operationsInteractionMode === 'reviewed-follow-up'
+      ? reviewedCadenceFollowUpCount
+      : queuedOperationsCadenceDuty?.count ?? productActivity.pending.agent
   const routeStatusEdge = officeRouteStatusEdge(alice, camera, viewportSize, mapLayout.height)
   const operationsBoard = useMemo(
     () => officeOperationsBoardPosition(mapLayout.width),
@@ -892,6 +919,17 @@ export function OfficeBuilding({
         source: currentCadenceDutyCandidate?.cadence.workspaceTag,
       }
     }
+    if (reviewedCadenceFollowUp && !nextDuty) {
+      return {
+        icon: OFFICE_HUD_ASSETS.occupancyLog,
+        action: t('office.cadenceFollowUpAction'),
+        label: t('office.cadenceFollowUpIssue', {
+          name: reviewedCadenceFollowUp.cadence.title,
+        }),
+        detail: reviewedCadenceFollowUp.cadence.title,
+        source: reviewedCadenceFollowUp.cadence.workspaceTag,
+      }
+    }
     const agentDetail = (() => {
       if (productActivity.agent?.detail) return productActivity.agent.detail
       switch (productActivity.agent?.eventType) {
@@ -1035,7 +1073,11 @@ export function OfficeBuilding({
     } else if (target.kind === 'news-service') {
       onOpenService?.('news', productActivity.news?.seq)
     } else {
-      onOpenLog('operations')
+      if (operationsInteractionMode === 'reviewed-follow-up' && operationsFollowUp) {
+        onOpenCadenceFollowUp?.(operationsFollowUp)
+      } else {
+        onOpenLog('operations')
+      }
     }
   }
   const closeFloorMenu = (restoreFocus = true) => {
@@ -1658,6 +1700,36 @@ export function OfficeBuilding({
               <strong>{t('office.shiftComplete')}</strong>
               <em>+{dutyShift.backlogCount ?? 0}</em>
             </button>
+          ) : reviewedCadenceFollowUp && onOpenCadenceFollowUp ? (
+            <button
+              type="button"
+              className="oa-office-hud__duty oa-office-hud__duty--follow-up"
+              data-kind="cadence-follow-up"
+              aria-label={t('office.cadenceFollowUpDuty', {
+                name: reviewedCadenceFollowUp.cadence.title,
+                workspace: reviewedCadenceFollowUp.cadence.workspaceTag,
+                count: reviewedCadenceFollowUpCount,
+              })}
+              onClick={() => requestTargetInteraction('operations', {
+                activate: () => onOpenCadenceFollowUp(reviewedCadenceFollowUp),
+              })}
+            >
+              <span className="oa-office-hud__duty-meta">
+                <span>{t('office.shiftReviewed')}</span>
+                <i className="oa-office-hud__duty-separator" aria-hidden>·</i>
+                <span>{t('office.cadenceFollowUpAction')}</span>
+                <i className="oa-office-hud__duty-separator" aria-hidden>·</i>
+                <span className="oa-office-hud__duty-context">
+                  {reviewedCadenceFollowUp.cadence.workspaceTag}
+                </span>
+              </span>
+              <strong title={reviewedCadenceFollowUp.cadence.title}>
+                {reviewedCadenceFollowUp.cadence.title}
+              </strong>
+              <em>{reviewedCadenceFollowUpCount > 1
+                ? `+${reviewedCadenceFollowUpCount - 1}`
+                : '!'}</em>
+            </button>
           ) : currentShiftState === 'complete' ? (
             <div className="oa-office-hud__duty oa-office-hud__duty--complete" role="status">
               <span className="oa-office-hud__duty-meta">{t('office.shiftLabel')}</span>
@@ -2159,23 +2231,34 @@ export function OfficeBuilding({
               tabIndex={-1}
               className="oa-office-operations-board"
               data-live={(replaySeq == null ? stats.working : stats.active) > 0}
-              data-has-activity={Boolean(productActivity.agent) || Boolean(queuedOperationsCadenceDuty) || undefined}
+              data-has-activity={Boolean(productActivity.agent)
+                || Boolean(queuedOperationsCadenceDuty)
+                || reviewedCadenceFollowUpCount > 0
+                || undefined}
               data-attention={operationsNeedsAttention || undefined}
               data-fresh={productActivity.freshKind === 'agent' || undefined}
               data-nearby={nearbyTarget?.kind === 'operations'}
               data-route={routeTargetId === 'operations'}
               data-acknowledged={acknowledgedTargetId === 'operations' || undefined}
-              aria-label={operationsNeedsAttention
-                ? operationsPending > 0
-                  ? t(operationsPending >= 9
-                      ? 'office.servicePendingActivityMore'
-                      : 'office.servicePendingActivity', {
-                      name: t('office.operationsBoard'),
-                      count: Math.min(9, operationsPending),
-                    })
-                  : t('office.serviceNeedsAttention', { name: t('office.operationsBoard') })
-                : t('office.operationsBoard')}
-              title={t('office.operationsBoardHint')}
+              aria-label={operationsInteractionMode === 'reviewed-follow-up'
+                ? t('office.operationsFollowUpPending', {
+                    count: reviewedCadenceFollowUpCount,
+                  })
+                : operationsNeedsAttention
+                  ? operationsPending > 0
+                    ? t(operationsPending >= 9
+                        ? 'office.servicePendingActivityMore'
+                        : 'office.servicePendingActivity', {
+                        name: t('office.operationsBoard'),
+                        count: Math.min(9, operationsPending),
+                      })
+                    : t('office.serviceNeedsAttention', { name: t('office.operationsBoard') })
+                  : t('office.operationsBoard')}
+              title={operationsInteractionMode === 'reviewed-follow-up' && operationsFollowUp
+                ? t('office.cadenceFollowUpIssue', {
+                    name: operationsFollowUp.cadence.title,
+                  })
+                : t('office.operationsBoardHint')}
               onClick={() => requestTargetInteraction('operations')}
               style={{
                 left: operationsBoard.x,

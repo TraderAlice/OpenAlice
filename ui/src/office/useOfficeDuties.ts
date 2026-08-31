@@ -4,6 +4,7 @@ import type { UseIssues } from '../hooks/useIssues'
 import {
   coreOfficeDutyRegistrations,
   projectOfficeDutyQueue,
+  type OfficeCadenceDutyCandidate,
   type OfficeDutyAcknowledgementResult,
   type OfficeDutyCandidate,
   type OfficeDutySourceStatus,
@@ -39,9 +40,24 @@ function writeEvidenceReceipts(receipts: ReadonlyMap<string, string>) {
   }
 }
 
+function scheduledIssueWorkspaceId(subjectKey: string): string | null {
+  try {
+    const parsed: unknown = JSON.parse(subjectKey)
+    return Array.isArray(parsed)
+      && parsed[0] === 'scheduled-issue'
+      && typeof parsed[1] === 'string'
+      ? parsed[1]
+      : null
+  } catch {
+    return null
+  }
+}
+
 export interface OfficeDutyQueue {
   /** Every currently actionable duty, before the Office freezes a finite shift. */
   readonly candidates: readonly OfficeDutyCandidate[]
+  /** Reviewed cadence exceptions whose exact evidence is still unresolved. */
+  readonly reviewedCadenceFollowUps: readonly OfficeCadenceDutyCandidate[]
   readonly status: OfficeDutySourceStatus
   readonly inboxStatus: OfficeDutySourceStatus
   readonly cadenceStatus: OfficeDutySourceStatus
@@ -86,6 +102,10 @@ export function useOfficeDuties(
     duty.receipt.kind !== 'evidence'
       || evidenceReceipts.get(duty.receipt.subjectKey) !== duty.receipt.fingerprint
   )), [evidenceReceipts, registrations])
+  const reviewedCadenceFollowUps = useMemo(() => unresolvedProjection.candidates.filter(
+    (duty): duty is OfficeCadenceDutyCandidate => duty.kind === 'cadence'
+      && evidenceReceipts.get(duty.receipt.subjectKey) === duty.receipt.fingerprint,
+  ), [evidenceReceipts, unresolvedProjection.candidates])
   const candidates = useMemo(() => {
     const pending = projection.candidates
     const evidenceCounts = new Map<string, number>()
@@ -104,6 +124,12 @@ export function useOfficeDuties(
       duty.receipt.kind === 'evidence' ? [duty.receipt.subjectKey] : []
     )))
   }, [registrations])
+  const reconcilableIssueWorkspaces = useMemo(() => {
+    if (issues.loading || issues.error || !issues.data) return null
+    return new Set(issues.data.workspaces.flatMap((workspace) => (
+      workspace.status === 'ok' ? [workspace.wsId] : []
+    )))
+  }, [issues.data, issues.error, issues.loading])
   const evidenceBySubject = useMemo(() => new Map(registrations.flatMap((registration) => (
     registration.candidates.flatMap((duty) => duty.receipt.kind === 'evidence'
       ? [[duty.receipt.subjectKey, duty] as const]
@@ -115,16 +141,18 @@ export function useOfficeDuties(
       : [])
   ))), [registrations])
   useEffect(() => {
-    if (issueStatus !== 'ready') return
+    if (!reconcilableIssueWorkspaces) return
     setEvidenceReceipts((current) => {
       const next = new Map([...current].filter(([subjectKey]) => (
-        !subjectKey.startsWith('["scheduled-issue",') || currentExceptionReceipts.has(subjectKey)
+        !subjectKey.startsWith('["scheduled-issue",')
+        || !reconcilableIssueWorkspaces.has(scheduledIssueWorkspaceId(subjectKey) ?? '')
+        || currentExceptionReceipts.has(subjectKey)
       )))
       if (next.size === current.size) return current
       writeEvidenceReceipts(next)
       return next
     })
-  }, [currentExceptionReceipts, issueStatus])
+  }, [currentExceptionReceipts, reconcilableIssueWorkspaces])
 
   const acknowledge = useCallback(async (duty: OfficeDutyCandidate) => {
     const receipt = duty.receipt
@@ -148,6 +176,7 @@ export function useOfficeDuties(
 
   return {
     candidates,
+    reviewedCadenceFollowUps,
     status: projection.status,
     inboxStatus,
     cadenceStatus,

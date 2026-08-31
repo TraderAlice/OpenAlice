@@ -133,7 +133,7 @@ describe('useOfficeShift', () => {
     expect(restored.result.current).toMatchObject({ total: 3, completed: 0, position: 1 })
   })
 
-  it('keeps complete with backlog distinct from clear and starts the next backlog shift explicitly', async () => {
+  it('counts only actionable duties in the next batch when a reviewed issue remains unresolved', async () => {
     const firstShift = ['a', 'b', 'c', 'd'].map(inboxDuty)
     const carryover = [inboxDuty('e'), inboxDuty('f')]
     const hook = renderShift({
@@ -143,7 +143,8 @@ describe('useOfficeShift', () => {
     })
     await waitFor(() => expect(hook.result.current.total).toBe(4))
 
-    hook.rerender({ candidates: carryover, status: 'ready', unresolvedCount: 2 })
+    // The third unresolved fact is a reviewed cadence follow-up, not another shift duty.
+    hook.rerender({ candidates: carryover, status: 'ready', unresolvedCount: 3 })
     await waitFor(() => expect(hook.result.current.state).toBe('complete'))
     expect(hook.result.current).toMatchObject({
       total: 4,

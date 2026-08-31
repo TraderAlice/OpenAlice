@@ -105,11 +105,15 @@ describe('useOfficeDuties', () => {
       await first.result.current.acknowledge(duty)
     })
     expect(first.result.current.candidates).toEqual([])
+    expect(first.result.current.reviewedCadenceFollowUps).toEqual([duty])
     expect(first.result.current.unresolvedCount).toBe(1)
     first.unmount()
 
     const second = renderHook(() => useOfficeDuties(productActivity, issues(exception())))
     expect(second.result.current.candidates).toEqual([])
+    expect(second.result.current.reviewedCadenceFollowUps).toMatchObject([
+      { id: duty.id, receipt: duty.receipt },
+    ])
     expect(second.result.current.status).toBe('ready')
     expect(second.result.current.unresolvedCount).toBe(1)
   })
@@ -130,6 +134,28 @@ describe('useOfficeDuties', () => {
     })
     expect(result.current.candidates).toHaveLength(1)
     expect(result.current.candidates[0]?.receipt).not.toEqual(captured.receipt)
+    expect(result.current.reviewedCadenceFollowUps).toEqual([])
+  })
+
+  it('returns changed evidence to the actionable queue instead of treating it as reviewed', async () => {
+    const productActivity = activity()
+    const { result, rerender } = renderHook(
+      ({ issue }) => useOfficeDuties(productActivity, issues(issue)),
+      { initialProps: { issue: exception('run-a') } },
+    )
+    const reviewed = result.current.candidates[0]!
+    await act(async () => {
+      await result.current.acknowledge(reviewed)
+    })
+    expect(result.current.reviewedCadenceFollowUps).toEqual([reviewed])
+
+    rerender({ issue: exception('run-b') })
+
+    expect(result.current.reviewedCadenceFollowUps).toEqual([])
+    expect(result.current.candidates).toMatchObject([
+      { id: reviewed.id, kind: 'cadence' },
+    ])
+    expect(result.current.candidates[0]?.receipt).not.toEqual(reviewed.receipt)
   })
 
   it('clears a recovered subject receipt so the same exception can recur later', async () => {
@@ -143,11 +169,18 @@ describe('useOfficeDuties', () => {
       await result.current.acknowledge(first)
     })
     expect(result.current.candidates).toEqual([])
+    expect(result.current.reviewedCadenceFollowUps).toEqual([first])
 
     rerender({ issue: { ...exception(), automationHealth: { state: 'healthy', message: 'Recovered.' } } })
-    await waitFor(() => expect(result.current.candidates).toEqual([]))
+    await waitFor(() => {
+      expect(result.current.candidates).toEqual([])
+      expect(result.current.reviewedCadenceFollowUps).toEqual([])
+    })
     rerender({ issue: exception() })
-    await waitFor(() => expect(result.current.candidates[0]?.kind).toBe('cadence'))
+    await waitFor(() => {
+      expect(result.current.candidates[0]?.kind).toBe('cadence')
+      expect(result.current.reviewedCadenceFollowUps).toEqual([])
+    })
   })
 
   it('keeps a stale exception actionable but refuses to call the shift clear after stamping', async () => {
@@ -162,6 +195,7 @@ describe('useOfficeDuties', () => {
       await hook.result.current.acknowledge(duty)
     })
     expect(hook.result.current.candidates).toEqual([])
+    expect(hook.result.current.reviewedCadenceFollowUps).toEqual([duty])
     expect(hook.result.current.status).toBe('error')
     expect(hook.result.current.unresolvedCount).toBe(1)
   })
@@ -177,18 +211,21 @@ describe('useOfficeDuties', () => {
     expect(hook.result.current.status).toBe('error')
   })
 
-  it('keeps an exact healthy-workspace exception reviewable when another workspace is invalid', async () => {
-    const mixed: UseIssues = {
+  it('reconciles a healthy workspace receipt while preserving another invalid workspace boundary', async () => {
+    const mixed = (issue: IssueListItem): UseIssues => ({
       data: {
         workspaces: [
-          { wsId: 'ws-a', tag: 'weekly', status: 'ok', issues: [exception()] },
+          { wsId: 'ws-a', tag: 'weekly', status: 'ok', issues: [issue] },
           { wsId: 'ws-b', tag: 'broken', status: 'invalid', error: 'bad data', issues: [] },
         ],
       },
       error: null,
       loading: false,
-    }
-    const hook = renderHook(() => useOfficeDuties(activity(), mixed))
+    })
+    const hook = renderHook(
+      ({ issue }) => useOfficeDuties(activity(), mixed(issue)),
+      { initialProps: { issue: exception() } },
+    )
     expect(hook.result.current.candidates[0]?.kind).toBe('cadence')
     expect(hook.result.current.cadenceStatus).toBe('ready')
     expect(hook.result.current.status).toBe('error')
@@ -196,7 +233,16 @@ describe('useOfficeDuties', () => {
       await hook.result.current.acknowledge(hook.result.current.candidates[0]!)
     })
     expect(hook.result.current.candidates).toEqual([])
+    expect(hook.result.current.reviewedCadenceFollowUps).toHaveLength(1)
     expect(hook.result.current.status).toBe('error')
+
+    hook.rerender({
+      issue: { ...exception(), automationHealth: { state: 'healthy', message: 'Recovered.' } },
+    })
+    await waitFor(() => expect(hook.result.current.reviewedCadenceFollowUps).toEqual([]))
+
+    hook.rerender({ issue: exception() })
+    await waitFor(() => expect(hook.result.current.candidates[0]?.kind).toBe('cadence'))
   })
 
   it('does not call a cached empty snapshot shift-clear while Issue refresh is loading', () => {

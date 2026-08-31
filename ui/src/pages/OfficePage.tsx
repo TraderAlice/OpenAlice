@@ -513,6 +513,21 @@ export function OfficePage() {
     setCabinetWorkspaceId(null)
   }
 
+  const openReviewedCadenceFollowUp = (duty: OfficeCadenceDutyCandidate) => {
+    clearOfficeCadenceExcursion()
+    cadenceExcursionRef.current = null
+    setCadenceDuty(null)
+    setCadenceInitialStep('exception')
+    markExcursion()
+    openOrFocus({
+      kind: 'issue-detail',
+      params: {
+        wsId: duty.destination.workspaceId,
+        id: duty.destination.issueId,
+      },
+    })
+  }
+
   const latestCadenceDuty = cadenceDuty?.receipt.kind === 'evidence'
     ? officeDuties.evidenceBySubject.get(cadenceDuty.receipt.subjectKey)
     : null
@@ -543,22 +558,33 @@ export function OfficePage() {
     if (next.kind === 'inbox') return next.delivery.title
     return t('office.logChannelAgent')
   })()
+  const reviewedFollowUpAfterAcknowledgement = dutyAcknowledgement
+    ? officeDuties.reviewedCadenceFollowUps.find((duty) => (
+        `${duty.id}:${duty.receipt.fingerprint}` === dutyAcknowledgement.dutyKey
+      )) ?? null
+    : null
   useEffect(() => {
     if (!dutyAcknowledgement
       || dutyAcknowledgement.announcement
       || dutyAcknowledgement.dutyKey === nextDutyKey) return
     if (!nextDutyAnnouncementName && officeDuties.status === 'loading') return
     const announcement = nextDutyAnnouncementName
-      ? t('office.cadenceReviewedNext', {
+      ? t(reviewedFollowUpAfterAcknowledgement
+          ? 'office.cadenceReviewedNextFollowUp'
+          : 'office.cadenceReviewedNext', {
           reviewed: dutyAcknowledgement.reviewed,
           name: nextDutyAnnouncementName,
         })
       : officeDuties.status === 'ready'
         ? officeDuties.unresolvedCount === 0
           ? t('office.cadenceReviewedClear', { reviewed: dutyAcknowledgement.reviewed })
-          : t('office.cadenceReviewedComplete', {
+          : t(reviewedFollowUpAfterAcknowledgement
+              ? 'office.cadenceReviewedCompleteFollowUp'
+              : 'office.cadenceReviewedComplete', {
               reviewed: dutyAcknowledgement.reviewed,
-              count: officeDuties.unresolvedCount,
+              count: reviewedFollowUpAfterAcknowledgement
+                ? officeDuties.reviewedCadenceFollowUps.length
+                : officeDuties.unresolvedCount,
             })
         : t('office.cadenceReviewedUnknown', { reviewed: dutyAcknowledgement.reviewed })
     setDutyAcknowledgement((current) => current?.token === dutyAcknowledgement.token
@@ -570,6 +596,8 @@ export function OfficePage() {
     nextDutyKey,
     officeDuties.status,
     officeDuties.unresolvedCount,
+    officeDuties.reviewedCadenceFollowUps,
+    reviewedFollowUpAfterAcknowledgement,
     t,
   ])
   useEffect(() => {
@@ -767,6 +795,8 @@ export function OfficePage() {
                 inboxBacklogCount={officeDuties.inboxCount}
                 dutyAcknowledgement={dutyAcknowledgement}
                 onOpenDuty={openRegisteredDuty}
+                reviewedCadenceFollowUps={officeDuties.reviewedCadenceFollowUps}
+                onOpenCadenceFollowUp={openReviewedCadenceFollowUp}
                 onStartNextShift={officeShift.startNext}
                 onOpenService={(kind, seq) => {
                   setLogView({

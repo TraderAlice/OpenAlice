@@ -20,6 +20,7 @@ export interface OfficeShift {
   readonly completed: number
   readonly position: number | null
   readonly remainingMinutes: number
+  /** Actionable duties waiting outside this frozen shift; excludes reviewed follow-ups. */
   readonly backlogCount: number | null
   readonly canStartNext: boolean
   defer(duty: OfficeDutyCandidate): void
@@ -62,7 +63,7 @@ export function useOfficeShift(input: {
     0,
   )
   const backlogCount = status === 'ready'
-    ? Math.max(0, unresolvedCount - (snapshot?.order.length ?? 0))
+    ? Math.max(0, sourceCandidates.length - (snapshot?.order.length ?? 0))
     : null
   const canStartNext = status === 'ready'
     && (snapshot?.order.length ?? 0) === 0

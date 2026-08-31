@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -10,6 +10,7 @@ import { OfficeBuilding, officeRouteStatusEdge } from './OfficeBuilding'
 import { officeCoworkerSpriteForAgent } from './coworker-sprites'
 import {
   inboxUnreadDutyRegistration,
+  type OfficeCadenceDutyCandidate,
   type OfficeDutyCandidate,
 } from './duty-registry'
 import { officeCoworkerCallsign } from './label'
@@ -47,7 +48,10 @@ function agentDuty(input: {
   }
 }
 
-function cadenceDuty(id = 'weekly-review'): OfficeDutyCandidate {
+function cadenceDuty(
+  id = 'weekly-review',
+  title = 'Review the weekly cadence',
+): OfficeCadenceDutyCandidate {
   return {
     id: `scheduled-issue-health:chat-1:${id}`,
     registrationId: 'scheduled-issue-health',
@@ -69,12 +73,24 @@ function cadenceDuty(id = 'weekly-review'): OfficeDutyCandidate {
       workspaceId: 'chat-1',
       workspaceTag: 'chat',
       issueId: id,
-      title: 'Review the weekly cadence',
+      title,
       priority: 'high',
       assignee: '@new-each-run',
       when: { kind: 'every', every: '1w' },
       health: { state: 'blocked', message: 'Owner is unavailable.' },
     },
+  }
+}
+
+function emptyBuilding(): OfficeBuildingSnapshot {
+  return {
+    config: {
+      workspaceSleepAfterMs: 1,
+      harnessMinimumVisibleGroups: { chat: 0, 'auto-quant': 0, prediction: 0, other: 0 },
+    },
+    lastSeq: 0,
+    firstSeq: 0,
+    offices: [],
   }
 }
 
@@ -2239,6 +2255,240 @@ describe('OfficeBuilding', () => {
     )
     expect(screen.getByText('Shift clear')).toBeTruthy()
     expect(screen.queryByTestId('office-duty-target-beacon')).toBeNull()
+  })
+
+  it('keeps an active Inbox duty on the HUD and beacon while Operations exposes an exact cadence follow-up', async () => {
+    const [inboxDuty] = inboxUnreadDutyRegistration(
+      [{
+        title: 'Read the overnight risk packet',
+        entry: {
+          id: 'inbox-active-head',
+          ts: 1_100,
+          workspaceId: 'chat-1',
+          workspaceLabel: 'Macro desk',
+          docs: [{ path: 'reports/overnight.md', revision: 'rev-overnight' }],
+        },
+      }],
+      'ready',
+    ).candidates
+    const followUp = cadenceDuty('carry-risk', 'Recheck unresolved carry risk')
+    const laterCadence = cadenceDuty('later-review', 'Review the later weekly cadence')
+    const onOpenDuty = vi.fn()
+    const onOpenLog = vi.fn()
+    const onOpenCadenceFollowUp = vi.fn()
+
+    render(
+      <OfficeBuilding
+        building={emptyBuilding()}
+        dutyCandidates={[inboxDuty!, laterCadence]}
+        reviewedCadenceFollowUps={[followUp]}
+        dutyShift={activeShift({
+          total: 4,
+          completed: 1,
+          position: 2,
+          remainingMinutes: 8,
+          backlogCount: 2,
+        })}
+        inboxBacklogCount={2}
+        initialPlayerState={{ position: { x: 480, y: 264 }, direction: 'up' }}
+        onSelectEmployee={vi.fn()}
+        onOpenEmployee={vi.fn()}
+        onOpenWorkspace={vi.fn()}
+        onOpenFiles={vi.fn()}
+        onOpenRoster={vi.fn()}
+        onOpenLog={onOpenLog}
+        onOpenDuty={onOpenDuty}
+        onOpenCadenceFollowUp={onOpenCadenceFollowUp}
+      />,
+    )
+
+    expect(screen.getByRole('button', {
+      name: 'Shift duty 2/4: Inbox · Read the overnight risk packet · Macro desk, about 8 minutes remaining',
+    })).toBeTruthy()
+    expect(screen.getByTestId('office-duty-target-beacon').dataset.kind).toBe('inbox-service')
+    expect(screen.queryByRole('status', {
+      name: /Follow up scheduled Issue.*Recheck unresolved carry risk/,
+    })).toBeNull()
+
+    const operations = screen.getByRole('button', {
+      name: /Operations board · scheduled Issue follow-up: 1/,
+    })
+    expect(operations.dataset.attention).toBe('true')
+    expect(operations.title).toBe('Follow up scheduled Issue “Recheck unresolved carry risk”')
+    await userEvent.click(operations)
+    await waitFor(() => expect(onOpenCadenceFollowUp).toHaveBeenCalledWith(followUp))
+    expect(onOpenDuty).not.toHaveBeenCalled()
+    expect(onOpenLog).not.toHaveBeenCalled()
+  })
+
+  it('keeps the current cadence duty ahead of an older reviewed follow-up at Operations', async () => {
+    const currentCadence = cadenceDuty('current-blocker', 'Review today’s blocked cadence')
+    const olderFollowUp = cadenceDuty('older-blocker', 'Recheck last week’s unresolved cadence')
+    const onOpenDuty = vi.fn()
+    const onOpenLog = vi.fn()
+    const onOpenCadenceFollowUp = vi.fn()
+
+    render(
+      <OfficeBuilding
+        building={emptyBuilding()}
+        dutyCandidates={[currentCadence]}
+        reviewedCadenceFollowUps={[olderFollowUp]}
+        dutyShift={activeShift({ total: 2, remainingMinutes: 5 })}
+        onSelectEmployee={vi.fn()}
+        onOpenEmployee={vi.fn()}
+        onOpenWorkspace={vi.fn()}
+        onOpenFiles={vi.fn()}
+        onOpenRoster={vi.fn()}
+        onOpenLog={onOpenLog}
+        onOpenDuty={onOpenDuty}
+        onOpenCadenceFollowUp={onOpenCadenceFollowUp}
+      />,
+    )
+
+    expect(screen.getByTestId('office-duty-target-beacon').dataset.kind).toBe('operations')
+    expect(screen.getByRole('button', {
+      name: /Shift duty 1\/2: .*Review today’s blocked cadence.*about 5 minutes remaining/,
+    })).toBeTruthy()
+    expect(within(screen.getByTestId('office-wall')).queryByText(olderFollowUp.cadence.title))
+      .toBeNull()
+    expect(screen.queryByRole('button', {
+      name: /Operations board · scheduled Issue follow-up: 1/,
+    })).toBeNull()
+
+    const operations = screen.getByRole('button', { name: 'Operations board · 1 pending' })
+    expect(operations.title).toBe('Review the live product activity log and replay.')
+    await userEvent.click(operations)
+    await waitFor(() => expect(onOpenLog).toHaveBeenCalledWith('operations'))
+    expect(onOpenCadenceFollowUp).not.toHaveBeenCalled()
+
+    await userEvent.click(screen.getByRole('button', {
+      name: /Shift duty 1\/2: .*Review today’s blocked cadence.*about 5 minutes remaining/,
+    }))
+    await waitFor(() => expect(onOpenDuty).toHaveBeenCalledWith(expect.objectContaining({
+      id: currentCadence.id,
+      kind: 'cadence',
+    })))
+    expect(onOpenCadenceFollowUp).not.toHaveBeenCalled()
+  })
+
+  it('keeps reviewed cadence follow-ups out of Replay interactions', async () => {
+    const followUp = cadenceDuty('live-only-follow-up', 'Repair the live cadence')
+    const onOpenCadenceFollowUp = vi.fn()
+    const onOpenLog = vi.fn()
+
+    render(
+      <OfficeBuilding
+        building={emptyBuilding()}
+        replaySeq={2}
+        reviewedCadenceFollowUps={[followUp]}
+        onSelectEmployee={vi.fn()}
+        onOpenEmployee={vi.fn()}
+        onOpenWorkspace={vi.fn()}
+        onOpenFiles={vi.fn()}
+        onOpenRoster={vi.fn()}
+        onOpenLog={onOpenLog}
+        onOpenCadenceFollowUp={onOpenCadenceFollowUp}
+      />,
+    )
+
+    expect(screen.queryByText(followUp.cadence.title)).toBeNull()
+    const operations = screen.getByRole('button', { name: 'Operations board' })
+    expect(operations.title).toBe('Review the live product activity log and replay.')
+    await userEvent.click(operations)
+    await waitFor(() => expect(onOpenLog).toHaveBeenCalledWith('operations'))
+    expect(onOpenCadenceFollowUp).not.toHaveBeenCalled()
+  })
+
+  it('turns a completed shift without a next batch into an exact cadence follow-up ticket', async () => {
+    const firstFollowUp = cadenceDuty('first-unresolved', 'Repair the BOJ review schedule')
+    const secondFollowUp = cadenceDuty('second-unresolved', 'Restore the weekly risk review')
+    const onOpenCadenceFollowUp = vi.fn()
+    const onStartNextShift = vi.fn()
+
+    render(
+      <OfficeBuilding
+        building={emptyBuilding()}
+        dutyCandidates={[]}
+        reviewedCadenceFollowUps={[firstFollowUp, secondFollowUp]}
+        dutyShift={{
+          state: 'complete',
+          total: 4,
+          completed: 4,
+          position: null,
+          remainingMinutes: 0,
+          backlogCount: 2,
+          canStartNext: false,
+        }}
+        onSelectEmployee={vi.fn()}
+        onOpenEmployee={vi.fn()}
+        onOpenWorkspace={vi.fn()}
+        onOpenFiles={vi.fn()}
+        onOpenRoster={vi.fn()}
+        onOpenLog={vi.fn()}
+        onStartNextShift={onStartNextShift}
+        onOpenCadenceFollowUp={onOpenCadenceFollowUp}
+      />,
+    )
+
+    const followUpTicket = within(screen.getByTestId('office-wall')).getByRole('button', {
+      name: /Shift reviewed.*Follow up.*Repair the BOJ review schedule/,
+    })
+    expect(followUpTicket.textContent).toContain('Follow up')
+    expect(followUpTicket.textContent).toContain(firstFollowUp.cadence.title)
+    expect(followUpTicket.textContent).toContain('+1')
+    expect(followUpTicket.textContent).not.toContain(secondFollowUp.cadence.title)
+
+    await userEvent.click(followUpTicket)
+    await waitFor(() => expect(onOpenCadenceFollowUp).toHaveBeenCalledWith(firstFollowUp))
+    expect(onStartNextShift).not.toHaveBeenCalled()
+  })
+
+  it('keeps the next-shift CTA primary while Operations retains reviewed cadence follow-up', async () => {
+    const followUp = cadenceDuty('still-blocked', 'Repair the still-blocked cadence')
+    const onOpenCadenceFollowUp = vi.fn()
+    const onOpenLog = vi.fn()
+    const onStartNextShift = vi.fn()
+
+    render(
+      <OfficeBuilding
+        building={emptyBuilding()}
+        dutyCandidates={[]}
+        reviewedCadenceFollowUps={[followUp]}
+        dutyShift={{
+          state: 'complete',
+          total: 4,
+          completed: 4,
+          position: null,
+          remainingMinutes: 0,
+          backlogCount: 3,
+          canStartNext: true,
+        }}
+        onSelectEmployee={vi.fn()}
+        onOpenEmployee={vi.fn()}
+        onOpenWorkspace={vi.fn()}
+        onOpenFiles={vi.fn()}
+        onOpenRoster={vi.fn()}
+        onOpenLog={onOpenLog}
+        onStartNextShift={onStartNextShift}
+        onOpenCadenceFollowUp={onOpenCadenceFollowUp}
+      />,
+    )
+
+    const hud = within(screen.getByTestId('office-wall'))
+    const nextShift = hud.getByRole('button', {
+      name: 'This shift is complete with 3 more waiting. Start the next shift',
+    })
+    expect(hud.queryByText(followUp.cadence.title)).toBeNull()
+    await userEvent.click(nextShift)
+    expect(onStartNextShift).toHaveBeenCalledTimes(1)
+    expect(onOpenCadenceFollowUp).not.toHaveBeenCalled()
+
+    const operations = screen.getByRole('button', {
+      name: /Operations board · scheduled Issue follow-up: 1/,
+    })
+    await userEvent.click(operations)
+    await waitFor(() => expect(onOpenCadenceFollowUp).toHaveBeenCalledWith(followUp))
+    expect(onOpenLog).not.toHaveBeenCalled()
   })
 
   it('opens ambient Inbox instead of a later duty while cadence leads the shift', async () => {

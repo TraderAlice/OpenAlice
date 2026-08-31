@@ -6026,6 +6026,14 @@ button.oa-office-hud__duty:active {
   background: color-mix(in srgb, var(--gba-alert) 18%, var(--office-gba-cream-seed));
 }
 
+.oa-office-hud__duty--follow-up {
+  border-color: var(--office-gba-ink-seed);
+  background: color-mix(in srgb, var(--gba-alert) 24%, var(--office-gba-cream-seed));
+  box-shadow:
+    inset 3px 0 0 var(--gba-alert),
+    2px 2px 0 color-mix(in srgb, var(--office-gba-ink-seed) 24%, transparent);
+}
+
 .oa-office-hud__status {
   display: flex;
   align-items: center;

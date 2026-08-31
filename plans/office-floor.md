@@ -6145,6 +6145,35 @@ Shift-handoff world coherence follow-up (2026-09-01):
   652 files / 5,618 tests (one file and nine tests skipped); the production UI build passed with only the existing
   local-ports fallback and large-chunk advisory.
 
+Reviewed cadence follow-up tail (2026-09-01):
+
+- Compared putting a reviewed exception back into the finite shift, leaving only passive carryover copy, and projecting
+  a separate exact follow-up. Chose the independent projection: review still advances `n/N` once, while the unresolved
+  domain fact keeps an accurate Issue action without turning a four-item shift into an endless loop.
+- `useOfficeDuties` now exposes only cadence evidence whose stored session receipt exactly matches the still-current
+  exception fingerprint. New run/health/owner/schedule evidence returns to the actionable shift; healthy, deleted, or
+  otherwise recovered Issues disappear immediately. Receipt cleanup is scoped to valid Issue workspaces, so one invalid
+  workspace no longer prevents a known healthy workspace from recurring later, while globally stale data remains intact.
+- Active duty and follow-up are deliberately separate. Inbox can remain `2/4` with the only duty beacon while Operations
+  carries a static follow-up count and opens the exact Issue without another dossier or receipt. A current Operations
+  duty wins over older follow-ups; a completed shift with no actionable next batch turns its passive carryover into an
+  exact first-Issue ticket with `+N`, while an available next batch retains the primary `Start next shift` command. One
+  Operations interaction mode now owns its title, accessible name, signal count, and activation together, so a queued
+  later cadence cannot make the board describe one target while opening another; Replay always keeps the follow-up out.
+- The next-batch count now derives from actionable candidates rather than all unresolved domain facts. Reviewed follow-ups
+  still prevent the false `Shift clear`, but they no longer inflate `+N` with work that cannot enter the next shift.
+- Four locales distinguish `reviewed` from `resolved`. The world follow-up prompt remains hidden while another shift duty
+  is active: the first real-browser pass caught it visually overpowering the new Inbox head while Alice still stood by
+  Operations, so the final hierarchy keeps only the small board signal until the finite shift has no current work.
+- Real Default AliceProject acceptance stamped only the session-scoped BOJ review, advanced to the exact Asian close
+  Inbox delivery at `2/4`, kept all seven durable Inbox rows unread, and used Operations to open
+  `/issues/fdb98edb-35f3-4348-90f4-7be19ea1e228/japan-boj-watch`. Returning to Office preserved `2/4`, the Inbox beacon,
+  the seven-row signal, and the one-item Operations follow-up. At 390x844, document and page scroll widths both measured
+  390px; the long Inbox title truncated without moving `2/4`, and the follow-up did not create a competing prompt.
+- Focused follow-up verification passed 5 files / 124 tests. Root and UI TypeScript passed; the complete suite passed
+  652 files / 5,625 tests (one file and nine tests skipped); the production UI build passed with only the existing local-
+  ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
