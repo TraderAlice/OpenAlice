@@ -3633,6 +3633,50 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
     color-mix(in srgb, var(--office-gba-ink-seed) 10%, transparent);
 }
 
+.oa-office-time-shift {
+  --office-time-shift-color: var(--office-gba-cream-seed);
+  position: absolute;
+  z-index: 35;
+  pointer-events: none;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      color-mix(in srgb, var(--office-time-shift-color) 28%, transparent) 0 4px,
+      transparent 4px 8px
+    ),
+    color-mix(in srgb, var(--office-time-shift-color) 78%, transparent);
+  opacity: 0;
+  animation-duration: 360ms;
+  animation-fill-mode: forwards;
+  animation-timing-function: steps(6, end);
+}
+
+.oa-office-time-shift[data-office-time="day"] {
+  animation-name: oa-office-time-shift-day;
+}
+
+.oa-office-time-shift[data-office-time="night"] {
+  --office-time-shift-color: var(--office-gba-ink-seed);
+  animation-name: oa-office-time-shift-night;
+}
+
+.oa-office-time-shift[data-reduced-motion="true"] {
+  animation: none;
+}
+
+@keyframes oa-office-time-shift-day {
+  0% { opacity: 0.78; }
+  50% { opacity: 0.42; }
+  100% { opacity: 0; }
+}
+
+@keyframes oa-office-time-shift-night {
+  0% { opacity: 0.82; }
+  50% { opacity: 0.46; }
+  100% { opacity: 0; }
+}
+
 .oa-office-departure {
   position: absolute;
   z-index: 40;

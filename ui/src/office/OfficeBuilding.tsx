@@ -1563,6 +1563,14 @@ export function OfficeBuilding({
           setPanning(false)
         }}
       >
+        <span
+          key={officeTime}
+          className="oa-office-time-shift"
+          data-testid="office-time-shift"
+          data-office-time={officeTime}
+          data-reduced-motion={reducedMotion || undefined}
+          aria-hidden
+        />
         <div className="oa-office-map-stage">
           <div
             ref={mapRef}

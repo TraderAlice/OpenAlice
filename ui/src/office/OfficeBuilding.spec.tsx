@@ -1265,6 +1265,8 @@ describe('OfficeBuilding', () => {
       />,
     )
     expect(screen.getByTestId('office-building').dataset.officeTime).toBe('night')
+    expect(screen.getByTestId('office-time-shift').dataset.officeTime).toBe('night')
+    expect(screen.getByTestId('office-time-shift').getAttribute('aria-hidden')).toBe('true')
     expect(screen.getByTestId('office-wall')).toBeTruthy()
     expect(screen.getByTestId('office-wall').querySelector('.oa-office-hud__status')?.getAttribute('title'))
       .toBe('2 on floor · 1 recent · 3 total')

@@ -111,6 +111,21 @@ describe('Office responsive style contract', () => {
     expect(css).not.toContain('@keyframes oa-office-replay-visitor')
   })
 
+  it('reveals Office time changes through a map-only stepped palette curtain', () => {
+    expect(css).toMatch(
+      /\.oa-office-time-shift\s*\{[^}]*z-index:\s*35;[^}]*pointer-events:\s*none;[^}]*animation-duration:\s*360ms;[^}]*steps\(6, end\);/s,
+    )
+    expect(css).toMatch(
+      /\.oa-office-time-shift\[data-office-time="day"\]\s*\{[^}]*oa-office-time-shift-day;/s,
+    )
+    expect(css).toMatch(
+      /\.oa-office-time-shift\[data-office-time="night"\]\s*\{[^}]*oa-office-time-shift-night;/s,
+    )
+    expect(css).toMatch(
+      /\.oa-office-time-shift\[data-reduced-motion="true"\]\s*\{[^}]*animation:\s*none;/s,
+    )
+  })
+
   it('anchors normalized coworker emotes beside the character instead of over room signs', () => {
     expect(css).toMatch(
       /\.oa-office-mood-emote\s*\{[^}]*top:\s*-4px;[^}]*left:\s*64%;/s,

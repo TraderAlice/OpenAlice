@@ -5433,6 +5433,23 @@ Agent-file assignment-language follow-up (2026-08-31):
   (one file and nine tests skipped); the production UI build passed with only the existing ports fallback and
   large-chunk advisory.
 
+Stepped Office time-shift follow-up (2026-08-31):
+
+- Played the real global Auto/Day/Night cycle while staying on the Office floor. Day and night wall windows, utility
+  bank, floor tint, and powered props all changed correctly, but every asset swapped in the same unmasked frame. The
+  result read as a web-theme toggle rather than a place changing palette in a 16-bit game.
+- Compared smooth CSS interpolation, a full-app blackout, and a map-owned stepped palette curtain. Smooth interpolation
+  weakens the pixel language; a full-app cover disrupts stable HUD and navigation context. Chose a 360ms, six-step
+  map-only curtain: cream scanlines reveal day and ink-blue scanlines reveal night while the Office HUD stays fixed.
+- The decorative curtain is pointer-transparent, sits below departure and pause layers, remounts only when effective
+  Office time changes, and finishes at exact zero opacity. Initial Office entry receives the same short scene reveal;
+  reduced-motion mode skips the animation and displays the final palette immediately.
+- Real-browser acceptance cycled Auto -> Day -> Night. The day and night animation names changed independently, the
+  wall and utility assets swapped beneath the curtain, opacity reached zero after 360ms, and the theme control retained
+  focus. Focused Building and responsive-style suites passed all 57 tests; root and UI TypeScript passed; the full
+  suite passed all 620 test files and 5,207 tests (one file and nine tests skipped); the production UI build passed
+  with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
