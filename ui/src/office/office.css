@@ -3095,7 +3095,16 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
 
 .oa-office-inspect__assignment p[data-expanded="true"] {
   display: block;
-  overflow: visible;
+  max-height: 7.8em;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 6px;
+  border-left: 2px solid var(--gba-moss);
+  outline-offset: 2px;
+  background: color-mix(in srgb, var(--gba-moss) 9%, var(--gba-cream));
+  scrollbar-color: var(--gba-moss-dark) var(--gba-paper);
+  scrollbar-width: thin;
 }
 
 .oa-office-inspect__assignment {

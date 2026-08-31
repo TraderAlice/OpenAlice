@@ -50,6 +50,7 @@ describe('GET /api/office/floor', () => {
         ? directory('chat-1', 'chat', [{ resumeId: 'resume-alice', agent: 'codex', lifecycle: 'active' }])
         : directory('quant-1', 'auto-quant', [])),
       sessionRegistry: { findByResumeId: vi.fn(() => ({ id: 'codex-1', name: 'c1', resumeId: 'resume-alice', title: 'Desk mate' })) },
+      headlessTasks: { get: vi.fn(() => null) },
       agentRuntimeLog: {
         lastSeq: () => 0,
         firstSeq: () => 0,
@@ -152,6 +153,14 @@ describe('GET /api/office/floor', () => {
           ? { id: 'codex-1', name: 'c1', resumeId, title: 'Desk mate' }
           : undefined),
       },
+      headlessTasks: {
+        get: vi.fn((taskId: string) => taskId === 'run-1'
+          ? {
+              taskId,
+              prompt: 'Read every relevant file, compare the Office interaction states, and return the complete live-floor QA report without shortening this assignment.',
+            }
+          : null),
+      },
       agentRuntimeLog: {
         lastSeq: () => 3,
         firstSeq: () => 1,
@@ -186,6 +195,7 @@ describe('GET /api/office/floor', () => {
       offices: {
         employees: {
           resumeId: string
+          title?: string
           mood: string
           latestResult?: { text: string; at: number }
           drawers: { label: string }[]
@@ -198,6 +208,7 @@ describe('GET /api/office/floor', () => {
     expect(live.offices[0]?.employees).toHaveLength(1)
     expect(live.offices[0]?.employees[0]).toMatchObject({
       resumeId: 'resume-alice',
+      title: 'Read every relevant file, compare the Office interaction states, and return the complete live-floor QA report without shortening this assignment.',
       latestResult: { text: 'Filed the finished report.', at: now },
       drawers: [expect.objectContaining({ label: 'note.md' })],
     })

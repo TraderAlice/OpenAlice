@@ -230,15 +230,17 @@ describe('OfficeInspectRail', () => {
     expect(document.activeElement).toBe(reviewActivity)
   })
 
-  it('collapses a long Session title without moving the primary commands', async () => {
+  it('keeps a long Assignment readable across live snapshot refreshes', async () => {
     const longTitle = 'Research question: Is NVDA in a buyable technical setup right now, and does the broader semiconductor sector support it?'
     const onClose = vi.fn()
-    const { container } = render(
+    const onOpen = vi.fn()
+    const onOpenDrawer = vi.fn()
+    const { container, rerender } = render(
       <OfficeInspectRail
         employee={{ ...employee, title: longTitle, bubble: null }}
         roomName="Auto Quant"
-        onOpen={vi.fn()}
-        onOpenDrawer={vi.fn()}
+        onOpen={onOpen}
+        onOpenDrawer={onOpenDrawer}
         onClose={onClose}
       />,
     )
@@ -257,16 +259,37 @@ describe('OfficeInspectRail', () => {
     expect(document.activeElement).toBe(toggle)
     await userEvent.keyboard('{Enter}')
     expect(title.dataset.expanded).toBe('true')
+    expect(title.getAttribute('tabindex')).toBe('0')
+    expect(screen.getByRole('region', { name: 'Assignment' })).toBe(title)
+    expect(document.activeElement).toBe(title)
+    rerender(
+      <OfficeInspectRail
+        employee={{ ...employee, title: longTitle, bubble: null, drawers: [...employee.drawers] }}
+        roomName="Auto Quant"
+        onOpen={onOpen}
+        onOpenDrawer={onOpenDrawer}
+        onClose={onClose}
+      />,
+    )
+    expect(title.dataset.expanded).toBe('true')
+    expect(document.activeElement).toBe(title)
     await userEvent.keyboard('{Escape}')
     expect(screen.getByRole('button', { name: 'Show full title' })).toBeTruthy()
-    expect(document.activeElement).toBe(toggle)
+    expect(title.getAttribute('tabindex')).toBeNull()
+    expect(title.getAttribute('role')).toBeNull()
+    await vi.waitFor(() => expect(document.activeElement).toBe(toggle))
     expect(onClose).not.toHaveBeenCalled()
     await userEvent.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalledOnce()
     await userEvent.keyboard(' ')
     expect(title.dataset.expanded).toBe('true')
+    expect(document.activeElement).toBe(title)
+    await userEvent.keyboard('{Escape}')
+    await vi.waitFor(() => expect(document.activeElement).toBe(toggle))
     await userEvent.keyboard(' ')
-    expect(title.dataset.expanded).toBeUndefined()
+    expect(title.dataset.expanded).toBe('true')
+    await userEvent.keyboard('{Escape}')
+    await vi.waitFor(() => expect(document.activeElement).toBe(toggle))
     await userEvent.keyboard('{Tab}')
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Open session' }))
     const profile = container.querySelector<HTMLElement>('.oa-office-inspect__profile')
@@ -275,6 +298,7 @@ describe('OfficeInspectRail', () => {
     await userEvent.click(toggle)
     expect(title.dataset.expanded).toBe('true')
     expect(profile?.scrollTop).toBe(0)
+    expect(document.activeElement).toBe(title)
     expect(screen.getByRole('button', { name: 'Collapse title' })).toBeTruthy()
   })
 

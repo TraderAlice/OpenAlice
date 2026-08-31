@@ -5143,6 +5143,32 @@ Filing-cabinet selection-position follow-up (2026-08-31):
   620 test files and 5,196 tests (one file and nine tests skipped); the production UI build passed with only the
   existing ports fallback and large-chunk advisory.
 
+Agent-file assignment-reading follow-up (2026-08-31):
+
+- Followed a real Grok headless Session (`run-YMYMMjUX`) from working/awake through completion while staying on the
+  Live floor. The working emote, HUD occupancy, auto-route, and fixed close command were already truthful. During the
+  run, expanding its long Assignment changed the command to `Collapse title`, but the profile viewport clipped the
+  remaining copy after `do not cre...`; the only continuation affordance was the whole character card's subtle scroll.
+- Compared increasing the whole Agent-file height, scrolling the whole window, and giving only expanded Assignment
+  copy a bounded reading area. The first two recreate the earlier failure where long copy competes with primary
+  commands and the close affordance. Chose the local reading area: collapsed copy keeps the existing two-line rhythm;
+  expanded copy grows to a bounded multi-line panel with its own visible overflow while the portrait, facts, dialogue,
+  close control, and command row remain fixed.
+- The expanded paragraph must expose keyboard scrolling without inserting a surprise tab stop while collapsed. Escape
+  still collapses before closing the Agent file, and toggling Latest result still collapses Assignment so only one long
+  reading surface is active at a time.
+- Live replay exposed two data-lifecycle constraints behind the visual symptom. Same-employee polling replaced the
+  drawers array and reset both expansion states on every refresh, while the Agent file read the registry's bounded
+  Session title even when the latest headless execution still owned the complete prompt. Expansion now resets only
+  when the selected coworker changes; drawer inventory changes preserve a valid cursor; the Office projection prefers
+  the latest execution's full prompt as that coworker's current Assignment and falls back to the Session title.
+- Implemented the bounded moss-edged Assignment reading region and made it focusable only while expanded. Real-browser
+  acceptance reopened failed g25, expanded the complete 331-character headless prompt, held it open across multiple
+  Live-floor polls, and used Escape to collapse back to the focused `Show full title` command. The fixed roster-return,
+  `Review activity`, and `Open session` controls never moved or scrolled away. Focused Office suites passed 14 tests;
+  root and UI TypeScript passed; the full suite passed all 620 test files and 5,196 tests (one file and nine tests
+  skipped); the production UI build passed with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

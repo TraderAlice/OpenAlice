@@ -47,6 +47,7 @@ export function OfficeInspectRail({
   const [focusedDrawerId, setFocusedDrawerId] = useState(employee?.drawers[0]?.id ?? null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const profileRef = useRef<HTMLDivElement>(null)
+  const assignmentRef = useRef<HTMLParagraphElement>(null)
   const titleToggleRef = useRef<HTMLButtonElement>(null)
   const resultToggleRef = useRef<HTMLButtonElement>(null)
   const reviewActivityRef = useRef<HTMLButtonElement>(null)
@@ -55,6 +56,7 @@ export function OfficeInspectRail({
   const drawerButtons = () => Array.from(
     drawerListRef.current?.querySelectorAll<HTMLButtonElement>('button[data-drawer-id]') ?? [],
   )
+  const drawerIdentity = employee?.drawers.map((drawer) => drawer.id).join('\u001f') ?? ''
   const focusedDrawerButton = () => {
     const buttons = drawerButtons()
     return buttons.find((button) => button.dataset.drawerId === focusedDrawerId) ?? buttons[0]
@@ -64,11 +66,22 @@ export function OfficeInspectRail({
     setFocusedDrawerId(employee?.drawers[0]?.id ?? null)
     setTitleExpanded(false)
     setResultExpanded(false)
-  }, [employee?.resumeId, employee?.drawers])
+  }, [employee?.resumeId])
+
+  useEffect(() => {
+    setFocusedDrawerId((current) => current && employee?.drawers.some((drawer) => drawer.id === current)
+      ? current
+      : employee?.drawers[0]?.id ?? null)
+    // Drawer objects refresh with live snapshots; ids change only when the playable inventory changes.
+  }, [drawerIdentity])
 
   useLayoutEffect(() => {
     if (!titleExpanded || !profileRef.current) return
     profileRef.current.scrollTop = 0
+    if (assignmentRef.current) {
+      assignmentRef.current.scrollTop = 0
+      assignmentRef.current.focus({ preventScroll: true })
+    }
   }, [titleExpanded])
 
   const employeeLabel = employee ? officeCoworkerCallsign(employee, coworkerAsset) : ''
@@ -165,7 +178,15 @@ export function OfficeInspectRail({
               {employeeAssignment && (
                 <div className="oa-office-inspect__assignment">
                   <small>{t('office.assignment')}</small>
-                  <p id={titleId} data-expanded={titleExpanded || undefined} title={employeeAssignment}>
+                  <p
+                    ref={assignmentRef}
+                    id={titleId}
+                    role={titleExpanded ? 'region' : undefined}
+                    aria-label={titleExpanded ? t('office.assignment') : undefined}
+                    data-expanded={titleExpanded || undefined}
+                    tabIndex={titleExpanded ? 0 : undefined}
+                    title={employeeAssignment}
+                  >
                     {employeeAssignment}
                   </p>
                 {titleCanExpand && (

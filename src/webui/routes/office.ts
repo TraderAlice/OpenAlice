@@ -46,12 +46,16 @@ async function projectRoom(
   if (!directory) return null
   const roster: OfficeRosterPerson[] = directory.sessions.map((entry) => {
     const record = svc.sessionRegistry.findByResumeId(workspaceId, entry.resumeId)
+    const latestPrompt = entry.latestExecution
+      ? svc.headlessTasks.get(entry.latestExecution.taskId)?.prompt.trim()
+      : undefined
+    const assignment = latestPrompt || (record ? sessionPreferredTitle(record) : undefined)
     return {
       resumeId: entry.resumeId,
       agent: entry.agent,
       name: record?.name ?? entry.resumeId,
       ...(entry.displayName ? { displayName: entry.displayName } : {}),
-      ...(record && sessionPreferredTitle(record) ? { title: sessionPreferredTitle(record) } : {}),
+      ...(assignment ? { title: assignment } : {}),
       ...(record ? { sessionRecordId: record.id } : {}),
       ...(entry.presence ? { presence: entry.presence } : {}),
       lifecycle: entry.lifecycle === 'retired' ? 'retired' : 'active',
