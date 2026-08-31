@@ -136,12 +136,11 @@ unverified fallback.
 
 The Railway profile currently requires `railway-runtime-lock-v2`. Public
 stable `v0.90.2` and beta `v0.91.0-beta.1` predate that capability, so they are
-not eligible Railway fallbacks. The dev manifest current before this change is
-also v1-only. Do not deploy this profile until the change has merged and the
-matching completed dev manifest explicitly advertises v2; that later dev
-artifact may then be selected for candidate acceptance. A stable or beta host
-still requires a later explicit release. This repository change does not
-publish or promote one.
+not eligible Railway fallbacks. A completed dev artifact that explicitly
+advertises both Railway capabilities has passed retained-Volume acceptance; a
+stable or beta host still requires a later explicit release that carries the
+same capabilities. Do not infer eligibility from package version or branch
+name, and do not treat this guide as authority to publish or promote a channel.
 
 After selection, the image atomically replaces the persistent `openalice`,
 `alice`, `alice-workspace`, `alice-uta`, and `traderhub` shims with its Railway
@@ -149,6 +148,15 @@ wrapper. The wrapper resolves the active immutable release directly, rebuilds
 its provenance environment, and rejects update/rollback/uninstall mutations;
 this keeps older published CLIs from bypassing Railway's release authority via
 the persistent command path.
+
+Railway and the source-built Docker image are service-managed update surfaces.
+Their Web version route reports the normalized installed channel and
+`updateAuthority: service`, but does not fetch a stable/beta manifest or offer
+`git pull`, `openalice update`, rollback, or uninstall guidance. The deployment
+configuration selects and replaces the runtime; for dev that decision is bound
+to the completed artifact checksum and content identity rather than the reused
+package version. Missing or invalid installed provenance fails closed instead
+of handing update authority to the browser.
 
 Before installer, current-pointer, or Project selection mutation, the
 entrypoint opens the mounted Railway Volume root itself read-only, takes an
@@ -307,10 +315,11 @@ must still block a contender. Linux acceptance must suspend the old holder beyon
 show that a replacement still cannot acquire the fence; only process/container
 death may release it, and simultaneous replacements must produce one winner.
 
-A real Railway acceptance is still required before treating the profile as a
-usable hosted product. Keep the clean-bootstrap and retained-data journeys
-separate; never relabel or clear an existing user Volume merely to obtain an
-empty-host result:
+The retained-data Railway journey has passed through migration, a real Agent
+turn, normal restart, and hard-kill replacement. The disposable clean-bootstrap
+and forced installer-failure journeys remain separate required acceptance;
+never relabel or clear an existing user Volume merely to obtain an empty-host
+result:
 
 1. on a disposable service and empty `/data` Volume, bootstrap the image and
    prove that a failed initial install stops without an unverified fallback;

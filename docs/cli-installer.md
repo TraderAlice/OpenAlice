@@ -292,6 +292,34 @@ Direct installs write schema 3 metadata:
 identity. Invalid installed metadata is an error; the CLI does not silently
 change channels or trust boundaries.
 
+### Update authority in the Web surface
+
+Installed provenance and the runtime profile determine which surface may
+offer an update; package semver alone is not authority:
+
+- source checkouts use Git and may show source-update guidance;
+- packaged Electron uses the native desktop updater;
+- installed stable and beta releases use `openalice update` as the update entry
+  point; that command defers to npm, Bun, Homebrew, or AUR when provenance says
+  a package manager owns the files;
+- a direct dev CLI resolves updates in the native CLI by complete artifact
+  checksum and content identity, never by a Web semver comparison;
+- Railway and Docker are updated by their service/deployment owner, not by the
+  browser UI or a command run inside the service; and
+- pinned, custom, or invalid provenance is non-updating until the user repairs
+  it or explicitly selects another channel.
+
+`GET /api/version` and `POST /api/version/check` expose only the normalized
+channel and update authority. They never expose the provenance file path.
+Service-managed, dev, pinned, and custom contexts do not fetch a release
+manifest through these routes, so the Web UI cannot invent a second update
+path beside the native CLI or deployment workflow.
+
+The standalone launcher propagates the already-discovered `install-source.json`
+path into Guardian and Alice. This covers metadata beside the install prefix
+(npm/Bun and Homebrew) and under `share/openalice` (Homebrew and AUR) without
+teaching the Web layer a second package-layout discovery algorithm.
+
 ## Update and rollback
 
 `openalice update --check` reads the manifest owned by the installed stable,
