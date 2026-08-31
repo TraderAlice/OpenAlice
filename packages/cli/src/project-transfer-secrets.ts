@@ -29,10 +29,14 @@ const KEY_BYTES = 32
 const IV_BYTES = 12
 
 export interface ProjectTransferCredentialBundle {
-  ai: AiProviderVault
+  ai: ProjectTransferAiVault
   brokerAccounts: unknown[]
   connectors: Record<string, unknown>
   providerKeys: Record<string, string>
+}
+
+export interface ProjectTransferAiVault extends AiProviderVault {
+  apiKeys: Record<string, string>
 }
 
 export interface ProjectTransferCredentialSummary {
@@ -53,7 +57,7 @@ interface SealedEnvelope {
 export async function readProjectTransferCredentialBundle(
   home: string,
 ): Promise<ProjectTransferCredentialBundle> {
-  const [ai, brokerValue, connectorValue, globalProviderKeys, marketData] = await Promise.all([
+  const [aiVault, brokerValue, connectorValue, globalProviderKeys, marketData] = await Promise.all([
     readAiProviderVault(home),
     readOptionalSecretJson(home, join('data', 'config', 'accounts.json')),
     readOptionalSecretJson(home, join('data', 'config', 'connectors.json')),
@@ -61,7 +65,7 @@ export async function readProjectTransferCredentialBundle(
     readOptionalJson(join(home, 'data', 'config', 'market-data.json')),
   ])
   return {
-    ai,
+    ai: normalizeProjectTransferAiVault(aiVault),
     brokerAccounts: Array.isArray(brokerValue) ? brokerValue : [],
     connectors: recordValue(connectorValue),
     providerKeys: stringMap({
@@ -78,6 +82,7 @@ export function summarizeProjectTransferCredentials(
   for (const value of Object.values(bundle.ai.credentials)) {
     if (typeof value.vendor === 'string' && value.vendor.trim()) aiVendors.add(value.vendor)
   }
+  for (const vendor of Object.keys(bundle.ai.apiKeys)) aiVendors.add(vendor)
   const brokerPresets = new Set<string>()
   for (const value of bundle.brokerAccounts) {
     const record = recordValue(value)
@@ -87,7 +92,7 @@ export function summarizeProjectTransferCredentials(
   const connectorRoot = recordValue(bundle.connectors['adapters'])
   return {
     ai: {
-      count: Object.keys(bundle.ai.credentials).length,
+      count: Object.keys(bundle.ai.credentials).length + Object.keys(bundle.ai.apiKeys).length,
       vendors: [...aiVendors].sort(),
     },
     broker: {
@@ -102,6 +107,19 @@ export function summarizeProjectTransferCredentials(
       count: Object.keys(bundle.providerKeys).length,
       vendors: Object.keys(bundle.providerKeys).sort(),
     },
+  }
+}
+
+/**
+ * Legacy flat API keys are still a supported read shape. Normalize them into
+ * an explicit string-only map before they enter the private transfer bundle so
+ * they are counted, transported only on SSH stdin, and never left behind in
+ * the portable AI configuration file.
+ */
+export function normalizeProjectTransferAiVault(vault: AiProviderVault): ProjectTransferAiVault {
+  return {
+    ...vault,
+    apiKeys: stringMap(recordValue(vault['apiKeys'])),
   }
 }
 

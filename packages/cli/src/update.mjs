@@ -26,6 +26,7 @@ const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1_000
 const CHECK_TIMEOUT_MS = 1_500
 const EXPLICIT_CHECK_TIMEOUT_MS = 10_000
 const INSTALLER_DOWNLOAD_TIMEOUT_MS = 30_000
+const DEV_MANIFEST_TARGET_COUNT = 4
 
 export function parseUpdateArgs(argv) {
   const options = { checkOnly: false, yes: false, json: false }
@@ -142,9 +143,15 @@ export async function checkForUpdate(options = {}, dependencies = {}) {
 export async function runUpdateCommand(argv, dependencies = {}) {
   const options = parseUpdateArgs(argv)
   const stdout = dependencies.stdout ?? process.stdout
+  const env = dependencies.env ?? process.env
+  if (env['OPENALICE_SERVICE_MANAGER']?.trim() === 'railway' && !options.checkOnly) {
+    stdout.write('Railway service variables own this OpenAlice installation. Set OPENALICE_RAILWAY_CHANNEL and optional OPENALICE_RAILWAY_VERSION, then restart or redeploy the service.\n')
+    stdout.write('OpenAlice did not modify the persistent release pointer.\n')
+    return 0
+  }
   const installSource = await (
     dependencies.readInstallSourceImpl ?? readInstallSource
-  )({ env: dependencies.env ?? process.env })
+  )({ env })
   const manager = packageManagerForSource(installSource)
   if (manager && !options.checkOnly) {
     if (options.channel && options.channel !== 'stable') {
@@ -193,7 +200,7 @@ export async function runUpdateCommand(argv, dependencies = {}) {
   }
   const layout = Object.hasOwn(dependencies, 'layout')
     ? dependencies.layout
-    : resolveInstalledLayout(import.meta.url, { env: dependencies.env ?? process.env })
+    : resolveInstalledLayout(import.meta.url, { env })
   if (!layout) {
     throw new Error('This OpenAlice CLI is running from source, not an installed release. Re-run the public installer to update the installed command.')
   }
@@ -201,7 +208,7 @@ export async function runUpdateCommand(argv, dependencies = {}) {
   return await applyUpdate(result, {
     layout,
     yes: options.yes,
-    env: dependencies.env ?? process.env,
+    env,
     fetchImpl: dependencies.fetchImpl,
     spawnImpl: dependencies.spawnImpl,
   })
@@ -367,6 +374,14 @@ function requireReleaseManifest(value) {
 }
 
 async function fetchDevManifest(options, dependencies) {
+  const manifest = await fetchDevManifestDocument(options, dependencies)
+  return {
+    ...manifest,
+    target: selectDevManifestTarget(manifest, options),
+  }
+}
+
+export async function fetchDevManifestDocument(options, dependencies = {}) {
   const fetchImpl = dependencies.fetchImpl ?? fetch
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs)
@@ -377,13 +392,13 @@ async function fetchDevManifest(options, dependencies) {
       headers: { accept: 'application/json' },
     })
     if (!response.ok) throw new Error(`dev manifest returned HTTP ${response.status}`)
-    return requireDevManifest(await response.json(), options)
+    return requireDevManifestDocument(await response.json())
   } finally {
     clearTimeout(timeout)
   }
 }
 
-function requireDevManifest(value, options) {
+function requireDevManifestDocument(value) {
   if (
     value?.schemaVersion !== 1
     || value.channel !== 'dev'
@@ -393,36 +408,59 @@ function requireDevManifest(value, options) {
     || typeof value.commit !== 'string'
     || !/^[a-f0-9]{7,64}$/.test(value.commit)
     || !Array.isArray(value.targets)
+    || value.targets.length !== DEV_MANIFEST_TARGET_COUNT
   ) {
     throw new Error('dev manifest is invalid')
   }
-  const matchingTargets = value.targets.filter((target) => (
-    target?.platform === options.platform && target?.arch === options.arch
-  ))
-  if (matchingTargets.length !== 1) {
-    throw new Error(`dev manifest does not contain exactly one ${options.platform}-${options.arch} target`)
-  }
-  const target = matchingTargets[0]
-  const expectedArchive = `openalice-cli-dev-${options.platform}-${options.arch}.tar.gz`
-  if (
-    typeof target.archive !== 'string'
-    || target.archive !== expectedArchive
-    || typeof target.sha256 !== 'string'
-    || !/^[a-f0-9]{64}$/.test(target.sha256)
-    || typeof target.contentIdentity !== 'string'
-    || !/^[a-f0-9]{16}$/.test(target.contentIdentity)
-  ) {
-    throw new Error(`dev manifest contains an invalid ${options.platform}-${options.arch} target`)
+  const targets = []
+  const seen = new Set()
+  for (const target of value.targets) {
+    const key = `${String(target?.platform)}-${String(target?.arch)}`
+    const expectedArchive = `openalice-cli-dev-${key}.tar.gz`
+    if (
+      !['darwin', 'linux'].includes(target?.platform)
+      || !['arm64', 'x64'].includes(target?.arch)
+      || seen.has(key)
+      || typeof target.archive !== 'string'
+      || target.archive !== expectedArchive
+      || typeof target.sha256 !== 'string'
+      || !/^[a-f0-9]{64}$/.test(target.sha256)
+      || typeof target.contentIdentity !== 'string'
+      || !/^[a-f0-9]{16}$/.test(target.contentIdentity)
+    ) {
+      throw new Error(`dev manifest contains an invalid ${key} target`)
+    }
+    seen.add(key)
+    targets.push({
+      platform: target.platform,
+      arch: target.arch,
+      archive: target.archive,
+      sha256: target.sha256,
+      contentIdentity: target.contentIdentity,
+    })
   }
   return {
     version: value.version,
     commit: value.commit,
     installer: requireInstaller(value.installer, 'dev'),
-    target: {
-      archive: target.archive,
-      sha256: target.sha256,
-      contentIdentity: target.contentIdentity,
-    },
+    targets,
+  }
+}
+
+export function selectDevManifestTarget(manifest, options) {
+  const matchingTargets = manifest.targets.filter((target) => (
+    target.platform === options.platform && target.arch === options.arch
+  ))
+  if (matchingTargets.length !== 1) {
+    throw new Error(`dev manifest does not contain exactly one ${options.platform}-${options.arch} target`)
+  }
+  const target = matchingTargets[0]
+  return {
+    platform: target.platform,
+    arch: target.arch,
+    archive: target.archive,
+    sha256: target.sha256,
+    contentIdentity: target.contentIdentity,
   }
 }
 

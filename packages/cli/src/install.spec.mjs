@@ -11,10 +11,12 @@ import {
   realpath,
   readdir,
   rm,
+  symlink,
+  utimes,
   writeFile,
 } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { delimiter, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 
@@ -241,6 +243,28 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
     await expect(access(join(installRoot, 'cli', 'current'))).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
+  it('checks locking and release-comparison prerequisites before requesting consent', async () => {
+    const fixture = await makeReleaseArchive('0.91.0', '5'.repeat(16))
+    const lockCommand = platform === 'darwin' ? 'lockf' : 'flock'
+    const cases = [
+      {
+        missing: lockCommand,
+        message: platform === 'darwin'
+          ? 'macOS lockf is required for safe concurrent installation'
+          : 'Linux flock is required for safe concurrent installation',
+      },
+      { missing: 'diff', message: 'diff is required to verify the existing OpenAlice release' },
+    ]
+
+    for (const testCase of cases) {
+      const installRoot = join(fixture.root, `missing-${testCase.missing}`)
+      const path = await makeInstallerPathWithout(testCase.missing)
+      await expect(runInstaller(fixture, installRoot, [], { PATH: path }))
+        .rejects.toMatchObject({ stderr: expect.stringContaining(testCase.message) })
+      await expect(access(installRoot)).rejects.toMatchObject({ code: 'ENOENT' })
+    }
+  })
+
   it('recovers a stale lock and refuses to race a live installer', async () => {
     const fixture = await makeReleaseArchive('0.91.0', '6'.repeat(16))
     const installRoot = join(fixture.root, 'installed')
@@ -253,7 +277,62 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
     await mkdir(lockDir)
     await writeFile(join(lockDir, 'pid'), `${process.pid}\n`)
     await expect(runInstaller(fixture, installRoot, ['--yes']))
-      .rejects.toMatchObject({ stderr: expect.stringContaining('installer is running') })
+      .rejects.toMatchObject({ stderr: expect.stringContaining('legacy lock cannot be verified') })
+  })
+
+  it('recovers an interrupted installer lock after its pid is reused by another process', async () => {
+    const fixture = await makeReleaseArchive('0.91.0', '6'.repeat(16))
+    const installRoot = join(fixture.root, 'installed')
+    const lockDir = join(installRoot, '.cli-install.lock')
+    await mkdir(lockDir, { recursive: true })
+    await writeFile(join(lockDir, 'pid'), `${process.pid}\n`)
+    await writeFile(join(lockDir, 'process-identity'), 'linux:stale-boot:1\n')
+
+    const recovered = await runInstaller(fixture, installRoot, ['--yes'])
+
+    expect(recovered.stdout).toContain('Removing a stale CLI installer lock')
+  })
+
+  it('recovers an installer lock interrupted before its owner pid was published', async () => {
+    const fixture = await makeReleaseArchive('0.91.0', '6'.repeat(16))
+    const installRoot = join(fixture.root, 'installed')
+    const lockDir = join(installRoot, '.cli-install.lock')
+    await mkdir(lockDir, { recursive: true })
+    await writeFile(join(lockDir, 'process-identity'), 'linux:interrupted:1\n')
+    const old = new Date(Date.now() - 5_000)
+    await utimes(lockDir, old, old)
+
+    const recovered = await runInstaller(fixture, installRoot, ['--yes'])
+
+    expect(recovered.stdout).toContain('Removing a stale CLI installer lock')
+  })
+
+  it('recovers a legacy stale lock even when an interrupted reclaimer left its marker', async () => {
+    const fixture = await makeReleaseArchive('0.91.0', '6'.repeat(16))
+    const installRoot = join(fixture.root, 'installed')
+    const lockDir = join(installRoot, '.cli-install.lock')
+    await mkdir(join(lockDir, 'reclaiming'), { recursive: true })
+    await writeFile(join(lockDir, 'pid'), '99999999\n')
+    await writeFile(join(lockDir, 'process-identity'), 'linux:interrupted:1\n')
+
+    const recovered = await runInstaller(fixture, installRoot, ['--yes'])
+
+    expect(recovered.stdout).toContain('Removing a stale CLI installer lock')
+  })
+
+  it('serializes two installers with a kernel lock while recovering transaction markers', async () => {
+    const fixture = await makeReleaseArchive('0.91.0', '6'.repeat(16), { versionDelaySeconds: 2 })
+    const installRoot = join(fixture.root, 'installed')
+    const lockDir = join(installRoot, '.cli-install.lock')
+    const guard = join(installRoot, '.cli-install.lock.guard')
+    const first = runInstaller(fixture, installRoot, ['--yes'])
+    await waitForPath(lockDir)
+
+    await expect(runInstaller(fixture, installRoot, ['--yes']))
+      .rejects.toMatchObject({ stderr: expect.stringContaining('Another OpenAlice CLI installer is running') })
+    await expect(first).resolves.toMatchObject({ stdout: expect.stringContaining('OpenAlice 0.91.0 is ready') })
+    await expect(access(lockDir)).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(access(guard)).resolves.toBeUndefined()
   })
 
   it('uses the fixed dev-channel archive and records dev provenance', async () => {
@@ -697,9 +776,12 @@ async function makeReleaseArchive(version, contentIdentity, options = {}) {
   const installedLauncherFailure = options.failInstalledLauncher
     ? 'if [ "${OPENALICE_INSTALL_METHOD:-}" = "direct" ]; then exit 42; fi\n'
     : ''
+  const versionDelay = Number(options.versionDelaySeconds) > 0
+    ? `sleep ${Number(options.versionDelaySeconds)}\n`
+    : ''
   await writeFile(executable, `#!/bin/sh
 set -eu
-${installedLauncherFailure}if [ "\${1:-}" = "--version" ]; then printf '%s\\n' '${version}'; exit 0; fi
+${installedLauncherFailure}if [ "\${1:-}" = "--version" ]; then ${versionDelay}printf '%s\\n' '${version}'; exit 0; fi
 if [ "\${1:-}" = "debug-env" ]; then
   printf '%s|%s|%s|%s|%s\\n' "\$OPENALICE_INSTALL_ROOT" "\$OPENALICE_RELEASE_DIR" "\$OPENALICE_INSTALL_SOURCE" "\$OPENALICE_CONTENT_IDENTITY" "\$OPENALICE_INSTALL_METHOD"
   exit 0
@@ -723,4 +805,51 @@ printf 'fixture %s\\n' '${version}'
     archive,
     sha256: createHash('sha256').update(bytes).digest('hex'),
   }
+}
+
+async function waitForPath(path, timeoutMs = 5_000) {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    try {
+      await access(path)
+      return
+    } catch {}
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 20))
+  }
+  throw new Error(`Timed out waiting for ${path}`)
+}
+
+async function makeInstallerPathWithout(missingCommand) {
+  const bin = await mkdtemp(join(tmpdir(), 'openalice-installer-path-'))
+  temporaryPaths.push(bin)
+  const commands = [
+    'bash',
+    'cat',
+    'diff',
+    'flock',
+    'lockf',
+    'sha256sum',
+    'shasum',
+    'sysctl',
+    'tar',
+    'uname',
+  ]
+  for (const command of commands) {
+    if (command === missingCommand) continue
+    const executable = await resolveExecutable(command)
+    if (executable) await symlink(executable, join(bin, command))
+  }
+  return bin
+}
+
+async function resolveExecutable(command) {
+  for (const directory of (process.env.PATH ?? '').split(delimiter)) {
+    if (!directory) continue
+    const candidate = join(directory, command)
+    try {
+      await access(candidate)
+      return candidate
+    } catch {}
+  }
+  return null
 }

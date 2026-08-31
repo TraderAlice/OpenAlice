@@ -190,6 +190,23 @@ describe('OpenAlice CLI updates', () => {
     })).rejects.toThrow('invalid linux-x64 target')
   })
 
+  it('rejects a dev manifest that is not the complete four-target receipt', async () => {
+    await expect(checkForUpdate({
+      installSource: devSource,
+      platform: 'linux',
+      arch: 'x64',
+    }, {
+      fetchImpl: devManifestFetch({
+        version: currentCliVersion,
+        commit: '0123456789abcdef0123456789abcdef01234567',
+        sha256: 'e'.repeat(64),
+        contentIdentity: '1'.repeat(16),
+        missingTarget: 'darwin-x64',
+      }),
+      env: {},
+    })).rejects.toThrow('dev manifest is invalid')
+  })
+
   it('treats an explicit cross-channel selection as an installable switch', async () => {
     await expect(checkForUpdate({
       currentVersion: newerStableVersion,
@@ -246,6 +263,24 @@ describe('OpenAlice CLI updates', () => {
         yes: true,
       }),
     )
+  })
+
+  it('leaves Railway release selection to service variables', async () => {
+    const applyUpdate = vi.fn(async () => 0)
+    const readInstallSourceImpl = vi.fn(async () => stableSource)
+    const stdout = { write: vi.fn() }
+
+    await expect(runUpdateCommand(['--channel', 'stable', '--yes'], {
+      applyUpdate,
+      readInstallSourceImpl,
+      stdout,
+      env: { OPENALICE_SERVICE_MANAGER: 'railway' },
+    })).resolves.toBe(0)
+
+    expect(readInstallSourceImpl).not.toHaveBeenCalled()
+    expect(applyUpdate).not.toHaveBeenCalled()
+    expect(stdout.write.mock.calls.flat().join('')).toContain('OPENALICE_RAILWAY_CHANNEL')
+    expect(stdout.write.mock.calls.flat().join('')).toContain('did not modify')
   })
 
   it('routes package-managed updates back to the owner without invoking the installer', async () => {
@@ -499,8 +534,39 @@ function devManifestFetch({
   sha256,
   contentIdentity,
   archive = 'openalice-cli-dev-linux-x64.tar.gz',
+  missingTarget = '',
 }) {
   const installer = '#!/usr/bin/env bash\n'
+  const targets = [
+    {
+      platform: 'darwin',
+      arch: 'arm64',
+      archive: 'openalice-cli-dev-darwin-arm64.tar.gz',
+      sha256: 'a'.repeat(64),
+      contentIdentity: 'aaaaaaaaaaaaaaaa',
+    },
+    {
+      platform: 'darwin',
+      arch: 'x64',
+      archive: 'openalice-cli-dev-darwin-x64.tar.gz',
+      sha256: 'b'.repeat(64),
+      contentIdentity: 'bbbbbbbbbbbbbbbb',
+    },
+    {
+      platform: 'linux',
+      arch: 'arm64',
+      archive: 'openalice-cli-dev-linux-arm64.tar.gz',
+      sha256: 'c'.repeat(64),
+      contentIdentity: 'cccccccccccccccc',
+    },
+    {
+      platform: 'linux',
+      arch: 'x64',
+      archive,
+      sha256,
+      contentIdentity,
+    },
+  ].filter((target) => `${target.platform}-${target.arch}` !== missingTarget)
   return vi.fn(async () => ({
     ok: true,
     status: 200,
@@ -515,13 +581,7 @@ function devManifestFetch({
         versionedUrl: `https://download.openalice.ai/cli/dev/releases/${commit}/install`,
         sha256: createHash('sha256').update(installer).digest('hex'),
       },
-      targets: [{
-        platform: 'linux',
-        arch: 'x64',
-        archive,
-        sha256,
-        contentIdentity,
-      }],
+      targets,
     }),
   }))
 }

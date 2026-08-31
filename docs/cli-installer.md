@@ -9,6 +9,13 @@ The current CLI payload is one target-native Bun executable plus immutable
 OpenAlice resources. The installer does not install Node.js, Bun, npm, source
 dependencies, build tools, or an Agent Runtime.
 
+The direct installer expects Bash, `tar` with gzip support, `diff`, and either `sha256sum` or
+`shasum`; a network install also needs `curl`. Safe transaction ownership uses
+the platform kernel: macOS must provide `lockf`, while Linux must provide
+`flock` (normally from `util-linux`). These are host prerequisites, not packages
+that the installer silently adds. Minimal images and remote hosts should install
+them before running the shared installer.
+
 npm, Bun, Homebrew, and Arch/AUR installation consume the same accepted native
 archives but remain owned by their package manager. Their topology, commands,
 and update behavior live in [[docs/cli-package-managers.md]].
@@ -162,7 +169,8 @@ The default install root is `~/.openalice`, independent from any
 │   ├── releases/<version>-<platform>-<arch>-<content-id>/
 │   ├── provenance/<release-name>.json
 │   └── staging/
-├── .cli-install.lock/       # only while an installer owns the transaction
+├── .cli-install.lock/       # owner record while an installer owns the transaction
+├── .cli-install.lock.guard  # persistent kernel-lock inode; contains no user data
 ├── .cli-update-check.json   # optional bounded update cache
 ├── data/                    # preserved product state
 ├── workspaces/              # preserved user work
@@ -175,6 +183,48 @@ Launchers resolve `cli/current` on every invocation and export the canonical
 install root, release root, provenance path, content identity, and install
 method to the native executable. They never hard-code one release path, so an
 atomic pointer change is enough for update or rollback.
+
+### Volume-backed service hosts
+
+A persistent service host must keep the native install root separate from the
+AliceProject Home even when both live on one mounted volume. The Railway SSH
+profile uses:
+
+```text
+/data/home                  fixed persistent Railway SSH HOME
+/data/home/.openalice       OPENALICE_INSTALL_DIR
+/data/projects/default      OPENALICE_HOME
+```
+
+The image fixes and exports `/data/home`, `/data/home/.openalice`,
+`/data/home/.local`, `/data/home/.bun`, and their persistent executable `PATH`.
+That image environment is intentional: a Railway SSH process must see the same
+user and installed commands as Guardian. The entrypoint starts installer
+bootstrap with system-only `PATH`, validates those fixed roots, and restores
+the persistent `PATH` only after the native CLI passes provenance and Runtime
+checks. These user/install paths are not deployment options.
+
+Only `OPENALICE_HOME` may select another AliceProject beneath `/data`.
+`AQ_LAUNCHER_ROOT` is always derived as `<OPENALICE_HOME>/workspaces`; an
+independent Workspace-root override is not honored, while an alternate
+Volume/user/install/npm/Bun root or normalized path escape is rejected.
+
+The install root owns immutable native releases, activation, provenance, and
+the five OpenAlice launchers. The AliceProject root owns user configuration,
+credentials, Workspaces, and Runtime state. Machine-level convenience links
+under `/usr/local/bin` may be rebuilt on every container boot; they are not the
+durable install or data authority. AliceProject transfer likewise excludes
+top-level `bin/`, `cli/`, and machine-local or escaping symlinks rather than
+copying installation bytes to another machine.
+
+Service bootstrap may call the shared installer with `--yes`,
+`--no-modify-path`, the fixed install root, and a stable, beta, or dev selector.
+This is service configuration authority, not a relaxation of the interactive
+user consent contract. Installation still does not start a background service
+by itself; the Railway entrypoint separately validates the active launcher and
+`exec`s foreground `openalice server run`. Agent Runtime executables and their
+user-level install roots remain outside both the OpenAlice install root and
+AliceProject transfer.
 
 ## Consent and transaction
 
@@ -195,7 +245,8 @@ consent never starts OpenAlice.
 
 After consent, the transaction:
 
-1. rejects a live installer lock or removes a stale one;
+1. acquires the persistent kernel-lock inode, then rejects a verified live
+   transaction owner or removes only its stale owner record;
 2. stages on the same filesystem as the release store;
 3. downloads or copies the archive and verifies SHA-256;
 4. validates and smoke-runs the staged release;
@@ -267,6 +318,24 @@ human bootstrap entry only; an updater never combines that URL with the
 versioned checksum.
 `openalice status` and an idempotent `openalice up` report the pending product
 version while an older Guardian is still active.
+
+Managed SSH bootstrap compares stable, beta, and pinned installations by their
+logical release identity: repository, channel/selector, and product version.
+It must not require a macOS archive and Linux archive for that release to have
+the same SHA-256 or content identity. The remote host must instead report valid
+schema 3 provenance for its own platform and architecture, and its active
+native Runtime must match that remote artifact's product and content identity.
+When local and remote targets are the same, their checksum and content identity
+must still match exactly.
+
+Dev is stricter because the package version alone does not name one build. The
+latest CDN dev manifest is the completed-set authority. Before a managed remote
+install, the invoking CLI must match its own manifest target by version,
+archive SHA-256, and content identity; the remote platform target is then
+selected from that same manifest and passed to the installer as expected
+checksum and content identity. A stale local dev CLI, missing target, malformed
+manifest, or unavailable manifest blocks remote mutation rather than falling
+back to a branch label or version-only comparison.
 
 The first successful Guardian plus Alice HTTP readiness from the newly active
 content confirms `cli/activation.json`. If that first start exits early, times
@@ -395,6 +464,25 @@ pnpm test:install:docker
 npx tsc --noEmit
 pnpm test
 ```
+
+For a volume-backed Railway bootstrap or managed cross-target change, also run:
+
+```bash
+bash -n scripts/railway/*.sh
+pnpm exec vitest run \
+  scripts/railway-entrypoint.spec.ts \
+  packages/cli/src/remote.spec.mjs \
+  packages/cli/src/project-transfer.spec.ts \
+  packages/cli/src/project-transfer-ssh.spec.ts \
+  packages/cli/src/project-transfer-stream.spec.ts
+```
+
+These local checks replace neither hosted acceptance journey: a disposable
+empty-Volume bootstrap/fail-closed drill, nor a non-destructive deployment,
+AliceProject transfer, restart/redeploy, and SSH tunnel journey against the
+retained real Volume. The authoritative checklist is owned by
+[[docs/docker-deployment.md]]; run-specific progress and measurements live only
+in [[plans/bun-cli-distribution.md]].
 
 The Docker smoke uses a clean non-root Debian host with Node, npm, pnpm, Bun,
 and Agent Runtimes absent. It verifies plan, consent, native installation,

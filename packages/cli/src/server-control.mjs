@@ -1,10 +1,14 @@
+import { execFile } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { homedir, hostname, tmpdir } from 'node:os'
 import { createConnection } from 'node:net'
 import { resolve } from 'node:path'
+import { promisify } from 'node:util'
 
 import { resolveAliceProjectIdentity } from './alice-project.ts'
+
+const execFileAsync = promisify(execFile)
 
 export const GUARDIAN_CONTROL_PROTOCOL = 1
 export const GUARDIAN_CONTROL_API_VERSION = 1
@@ -123,8 +127,12 @@ export async function readRuntimeStatus(options = {}, dependencies = {}) {
 
   const inspectOwner = dependencies.inspectOwner ?? inspectGuardianOwner
   const owner = await inspectOwner(homeRoot, {
+    env: dependencies.env,
     hostname: dependencies.hostname,
     isProcessAlive: dependencies.isProcessAlive,
+    platform: dependencies.platform,
+    readMachineId: dependencies.readMachineId,
+    readProcessStartedAt: dependencies.readProcessStartedAt,
   })
   if (owner?.active) {
     return {
@@ -306,6 +314,18 @@ async function inspectGuardianOwner(homeRoot, options = {}) {
   ]
   const localHostname = options.hostname ?? hostname()
   const isAlive = options.isProcessAlive ?? isProcessAlive
+  const machineId = options.readMachineId ?? (() => readMachineId({
+    env: options.env,
+    hostname: localHostname,
+    platform: options.platform,
+  }))
+  let machineIdPromise
+  const currentMachineId = () => {
+    machineIdPromise ??= Promise.resolve().then(() => machineId())
+    return machineIdPromise
+  }
+  const processStartedAt = options.readProcessStartedAt
+    ?? ((pid) => readProcessStartedAt(pid, { platform: options.platform }))
   let staleOwner = null
   for (const ownerPath of ownerPaths) {
     let owner
@@ -326,9 +346,13 @@ async function inspectGuardianOwner(homeRoot, options = {}) {
         detail: `Runtime owner metadata is invalid at ${ownerPath}`,
       }
     }
-    const sameHost = typeof owner.hostname !== 'string'
-      || owner.hostname === localHostname
-    const active = !sameHost || isAlive(owner.pid)
+    const sameMachine = typeof owner.machineId === 'string' && owner.machineId
+      ? owner.machineId === await currentMachineId()
+      : typeof owner.hostname !== 'string' || owner.hostname === localHostname
+    const active = !sameMachine || await isSameProcess(owner, {
+      isAlive,
+      processStartedAt,
+    })
     const publicOwner = {
       surface: owner.launcher.startsWith('guardian-')
         ? owner.launcher.slice('guardian-'.length)
@@ -348,6 +372,70 @@ async function inspectGuardianOwner(homeRoot, options = {}) {
         detail: 'A stale Runtime owner record is present; the next start may recover it',
       }
     : null
+}
+
+async function isSameProcess(owner, dependencies) {
+  if (!dependencies.isAlive(owner.pid)) return false
+  if (typeof owner.processStartedAt !== 'string') return true
+  const expected = Date.parse(owner.processStartedAt)
+  if (!Number.isFinite(expected)) return true
+  const actual = await dependencies.processStartedAt(owner.pid)
+  if (actual === null) return true
+  return Math.abs(actual - expected) <= 2_000
+}
+
+async function readProcessStartedAt(pid, options = {}) {
+  try {
+    if ((options.platform ?? process.platform) === 'win32') {
+      const script = `(Get-Process -Id ${pid} -ErrorAction Stop).StartTime.ToUniversalTime().ToString('o')`
+      const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
+        windowsHide: true,
+        timeout: 2_000,
+      })
+      const parsed = Date.parse(stdout.trim())
+      return Number.isFinite(parsed) ? parsed : null
+    }
+
+    const { stdout } = await execFileAsync('ps', ['-p', String(pid), '-o', 'lstart='], { timeout: 2_000 })
+    const parsed = Date.parse(stdout.trim())
+    return Number.isFinite(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+// Installed CLI payloads do not include @traderalice/guardian-runtime. Keep
+// these machine/process identity readers aligned with its process-control.ts.
+async function readMachineId(options = {}) {
+  const env = options.env ?? process.env
+  const platform = options.platform ?? process.platform
+  const localHostname = options.hostname ?? hostname()
+  const override = env['OPENALICE_MACHINE_ID']?.trim()
+  if (override) return `env:${override}`
+  try {
+    if (platform === 'linux') {
+      const value = (await readFile('/etc/machine-id', 'utf8')).trim()
+      if (value) return `linux:${value}`
+    }
+    if (platform === 'darwin') {
+      const { stdout } = await execFileAsync('ioreg', ['-rd1', '-c', 'IOPlatformExpertDevice'], { timeout: 2_000 })
+      const value = /"IOPlatformUUID"\s*=\s*"([^"]+)"/.exec(stdout)?.[1]
+      if (value) return `darwin:${value}`
+    }
+    if (platform === 'win32') {
+      const { stdout } = await execFileAsync('reg.exe', [
+        'query',
+        'HKLM\\SOFTWARE\\Microsoft\\Cryptography',
+        '/v',
+        'MachineGuid',
+      ], { windowsHide: true, timeout: 2_000 })
+      const value = /MachineGuid\s+REG_\w+\s+([^\r\n]+)/i.exec(stdout)?.[1]?.trim()
+      if (value) return `win32:${value}`
+    }
+  } catch {
+    // Match Guardian's weaker fallback when a platform identity is unavailable.
+  }
+  return `hostname:${localHostname}`
 }
 
 function sanitizeControlOwner(owner) {

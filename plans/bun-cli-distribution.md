@@ -3,7 +3,10 @@
 Status: Active — macOS/Linux native CLI is public in v0.90.2 and the separately
 dispatched v0.91.0-beta.1 is externally verified; stable remains v0.90.2 while
 stable/beta discovery authority is converged on the OpenAlice CDN;
-native PowerShell and external package-manager activation remain deferred
+the Railway native CLI SSH host passes local empty-Volume, normal replacement,
+hard-kill recovery, and real Project offline planning while hosted deploy/apply
+acceptance remains pending; native PowerShell and external
+package-manager activation remain deferred
 
 Delivery mode: Serial / interactive from current `dev`. The accepted native CLI
 increments have already reached `dev`; the old `codex/usability-improvements`
@@ -27,6 +30,8 @@ Owner guides:
 - [[docs/managed-workspace-runtime.md]]
 - [[docs/broker-packs.md]]
 - [[docs/development-workflow.md]]
+- [[docs/remote-access.md]]
+- [[docs/docker-deployment.md]]
 
 Research references:
 
@@ -511,8 +516,9 @@ artifacts.
   remote content/provenance comparison.
 - [x] Define an explicit unsupported-host result for targets outside the
   accepted Bun build matrix.
-- [x] Keep Docker on its current server image until a separately justified
-  change proves that consuming the Bun artifact improves that distribution.
+- [x] Keep the existing source-built Docker server image on its current
+  bundled-Agent/public-Web contract; add the separately justified Railway
+  native CLI SSH-host profile instead of reshaping that image.
 
 ### 8. Retire the expanded CLI Runtime
 
@@ -589,6 +595,99 @@ Runtime discovery must not depend on GitHub's anonymous API quota.
   tests, the public stable install plan, clean Linux installer acceptance, and
   the real Settings route without GitHub API access.
 
+### 12. Railway native CLI SSH host
+
+This is a small deployment profile of the Stage 2 SSH product. It is not a
+hosted Studio, public Web server, new installer, or replacement for the
+source-built Docker image.
+
+- [x] Add a repo-owned `Dockerfile.railway` and entrypoint that keep the native
+  OpenAlice release out of the image, validate or install it on the mounted
+  volume, and `exec` foreground `openalice server run` under `tini`.
+- [x] Fix the Volume at `/data`, Railway SSH `HOME` at `/data/home`, and native
+  install/npm/Bun user roots beneath it. Export those paths and persistent
+  `PATH` from the image for Railway SSH, use system-only `PATH` during
+  bootstrap, and keep machine launch links rebuildable outside the durable
+  authority.
+- [x] Allow only `OPENALICE_HOME` to select a Project beneath `/data`; always
+  derive `AQ_LAUNCHER_ROOT` from it and reject alternate Volume/user/install/
+  package roots or normalized escapes.
+- [x] Reuse the shared stable/beta/dev installer. Stable and beta may select an
+  in-channel pinned version; dev follows its completed latest manifest and
+  rejects a version override. A failed refresh may reuse only a still-valid
+  prior release; an empty failed bootstrap stops.
+- [x] On ordinary SSH-managed hosts, compare stable, beta, and pinned targets by
+  logical release while validating each target's schema 3 platform,
+  architecture, checksum, content identity, and embedded Runtime locally. For
+  dev, require the invoking CLI to match the latest manifest and bind installer
+  handoff to the remote target from that same completed set.
+- [x] Keep Railway inspection-only from the laptop: the service entrypoint and
+  variables own release selection and lifecycle, while `openalice remote`
+  verifies target-local provenance/Runtime consistency, distinguishes a
+  configured selector from a verified fallback, and opens only the tunnel.
+  Replace persistent command shims with the image-owned wrapper after every
+  selection and route SSH `update`, `rollback`, and `uninstall` back to Railway
+  configuration so neither a current release nor a published fallback can
+  split the persistent pointer from the foreground Runtime.
+- [x] Keep Agent Runtime installation, authentication, version, plugins, and
+  updates user-owned through Railway SSH and persistent user `PATH` locations.
+- [x] Make AliceProject transfer Git-aware: retain tracked and nonignored
+  untracked Workspace content, exclude ignored untracked dependencies, native
+  install/runtime/session/known-backup state, and reject or classify unsafe
+  symlinks. Prove ordinary repositories remain connected after transfer and
+  fail closed on linked worktrees, alternate/promisor object state, nested Git
+  repositories, and initialized submodules. Transfer only Alice-owned
+  credential families through the private stream; Web auth/sessions and native
+  Agent login/config remain destination setup.
+- [x] Pass Bash syntax plus the focused entrypoint, managed-remote, and
+  Project-transfer specs (222 tests).
+- [x] Build `Dockerfile.railway`, bootstrap the native CLI and foreground
+  Runtime from an empty local Docker Volume, then perform a normal
+  stop/recreate replacement against that Volume and retain CLI and Project
+  markers. Verify the image has no Agent Runtime.
+- [x] Run the content planner locally against the real Default AliceProject,
+  using the intended Railway destination metadata but no SSH or mutation:
+  10,693 portable files, 5,612 directories, 222,215,071 portable bytes,
+  289,328,517 required destination bytes, 21 credential entries, six
+  exact-Session scheduled Issues, and no content-policy blockers. Git-ignored
+  dependencies plus runtime, backup, session, install, and machine-local state
+  remain excluded. Live source ownership/quiescence and remote capability,
+  destination, and free-space preflight are not part of this offline evidence.
+- [x] Rerun the hard-kill container replacement after the stale-owner PID reuse
+  and CLI preflight repairs. The current dev Bun Runtime reclaimed the stale
+  lock on the same Volume, retained the Project marker, matched release content
+  without pending activation, restored the fixed SSH Home/PATH, and did not
+  acquire an Agent Runtime.
+- [x] Pass the remaining local repository gates: root and CLI TypeScript,
+  `git diff --check`, the 222-test focused run, the 5,266-test full suite,
+  Linux installer and SSH-remote Docker smokes, Guardian recovery smoke, and a
+  rebuilt Railway image with the required tools but no Node, Bun, or Agent
+  Runtime.
+- [ ] On a disposable Railway service and empty `/data` Volume, pass clean
+  bootstrap and empty-host install-failure/fail-closed acceptance without using
+  or clearing the retained real Volume.
+- [ ] Deploy the profile non-destructively against the retained real Railway
+  `/data` Volume with no public domain, no Dashboard Start Command override,
+  Serverless disabled, Restart Policy set to Always, one replica, at least 30
+  seconds of draining, fixed SSH `HOME=/data/home` plus persistent user `PATH`,
+  an OpenSSH alias from `railway ssh config`, and a successful inspection-only
+  `openalice remote` browser/tunnel journey. The inspected `HOME=/root` service
+  is an old deployment; the candidate has not been deployed.
+- [ ] Repeat `openalice project transfer --plan` through the deployed Railway
+  candidate so SSH compatibility, destination absence, and free-space
+  preflight are proven before apply.
+- [ ] Apply the reviewed real AliceProject transfer into a new
+  `/data/projects/<name>` Home, select that Home for the service, and verify its
+  portable Workspace/configuration state after redeploy without copied install
+  bytes or machine-local symlinks.
+- [ ] Install and authenticate one Agent Runtime through Railway SSH, then prove
+  a real Workspace turn without treating those Agent bytes as an OpenAlice
+  release artifact.
+- [ ] Restart and redeploy against the same Volume, verify install/Home/Agent
+  persistence and foreground Guardian recovery, then exercise valid-release
+  refresh fallback and the separately accepted hard-kill recovery path. The
+  empty-Volume fail-closed case remains isolated to the disposable service.
+
 ## Verification Matrix
 
 Every code increment runs:
@@ -609,6 +708,19 @@ pnpm test:install:dev-channel
 pnpm test:remote:docker
 pnpm electron:smoke:pty
 pnpm electron:smoke:workspace
+bash -n scripts/railway/*.sh
+pnpm exec vitest run scripts/railway-entrypoint.spec.ts \
+  packages/cli/src/install.spec.mjs \
+  packages/cli/src/lifecycle.spec.mjs \
+  packages/cli/src/project-command.spec.ts \
+  packages/cli/src/remote.spec.mjs \
+  packages/cli/src/server-control.spec.mjs \
+  packages/cli/src/update.spec.mjs \
+  packages/cli/src/rollback.spec.mjs \
+  packages/cli/src/uninstall.spec.mjs \
+  packages/cli/src/project-transfer.spec.ts \
+  packages/cli/src/project-transfer-ssh.spec.ts \
+  packages/cli/src/project-transfer-stream.spec.ts
 ```
 
 Use the local OrbStack Docker engine as the default clean Linux harness for
@@ -689,7 +801,12 @@ This plan is complete only when:
    pass; and
 9. the old expanded headless Runtime and managed-Pi CLI distribution paths are
    deleted from current source and the durable owner guides describe the Bun
-   architecture.
+   architecture; and
+10. the Railway SSH-host profile completes both a disposable empty-Volume
+    bootstrap/fail-closed journey and a non-destructive retained-Volume journey
+    with fixed persistent SSH Home, AliceProject migration, a user-owned Agent
+    turn, same-Volume normal and hard-kill restart/redeploy, and exact-release
+    fallback without a public Web route.
 
 ## Progress Log
 
@@ -994,3 +1111,38 @@ This plan is complete only when:
   GitHub API seam, and the real Settings card plus forced refresh. A direct
   public beta manifest read resolved v0.91.0-beta.1. No release or channel
   promotion was performed.
+- 2026-08-31: Added the focused Railway native CLI SSH-host increment in the
+  working tree. The repo-owned image fixes `/data`, persistent Railway SSH
+  `HOME=/data/home`, OpenAlice install/npm/Bun user paths, and persistent `PATH`;
+  bootstrap first uses system-only `PATH`. Only `OPENALICE_HOME` selects a
+  Project and its Workspace root is always derived. Ordinary SSH-managed remote
+  treats stable/beta/pinned as logical releases with target-local artifact
+  integrity, while dev is bound to both local and remote targets from the latest
+  completed manifest. Railway remains platform-owned and inspection-only from
+  the laptop. Project transfer is Git-aware and excludes native install,
+  runtime, Session, known-backup, and machine-local state. Focused Bash,
+  entrypoint, managed-remote, and Project-transfer checks passed 222 tests; the
+  full suite passed 5,266 tests. Root and CLI TypeScript, diff checks, Linux
+  installer and SSH-remote Docker smokes, Guardian recovery smoke, and the
+  Railway image prerequisite/no-runtime check also passed. A local empty-Volume
+  build and normal stop/recreate retained CLI and Project markers while
+  confirming the image has no Agent Runtime. A later hard-kill exposed
+  stale-owner PID reuse and CLI preflight defects; after the owner check adopted
+  stable machine and process-start identity, the current dev Bun Runtime passed
+  the same-Volume hard-kill/recreate journey with its Project marker and
+  persistent login-shell environment intact. The real Default AliceProject
+  offline content-planner pass, using destination metadata but no SSH, reduced
+  the portable boundary to 10,693 files, 5,612 directories, and 222,215,071
+  bytes; it requires 289,328,517 destination bytes and found 21 credential
+  entries plus six exact-Session scheduled Issues, with no content-policy
+  blockers. Git-ignored dependencies, runtime state, backups, sessions, native
+  install trees, and machine-local state stay outside the stream. Live source
+  ownership and remote destination preflight remain separate apply gates. A
+  real public `v0.91.0-beta.1` run in the final Railway image proved the legacy
+  provider-without-content-identity compatibility fallback, and the
+  image-owned persistent wrappers blocked direct update, rollback, and
+  uninstall without changing the active pointer, release store, or install
+  manifest. The disposable hosted empty-Volume drill, Project apply, the
+  real Railway fixed-layout candidate deployment, Agent, restart/redeploy, and
+  failure journeys remain pending. The inspected Railway service with
+  `HOME=/root` is the old deployment, not candidate evidence.
