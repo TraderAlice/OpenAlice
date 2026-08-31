@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { chmod, mkdir, mkdtemp, readFile, readlink, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -10,6 +11,7 @@ const execFileAsync = promisify(execFile)
 const temporaryPaths: string[] = []
 const entrypoint = resolve('scripts/railway/entrypoint.sh')
 const commandWrapper = resolve('scripts/railway/command-wrapper.sh')
+const retainedLockPreflight = resolve('scripts/railway/preflight-retained-locks.py')
 const shellEnvironment = resolve('scripts/railway/shell-env.sh')
 
 afterEach(async () => {
@@ -87,6 +89,36 @@ describe('Railway native CLI host entrypoint', () => {
     await expect(readFile(fixture.installCalled, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
+  it('rejects a Project Home inside the reserved reversible-quarantine tree', async () => {
+    const fixture = await makeFixture({ installer: 'success' })
+
+    await expect(execFileAsync('bash', [entrypoint], {
+      env: {
+        ...fixture.env,
+        OPENALICE_HOME: join(fixture.volume, 'quarantine', 'old-project'),
+      },
+    })).rejects.toMatchObject({
+      stderr: expect.stringContaining('cannot select the reserved Railway quarantine tree'),
+    })
+    await expect(readFile(fixture.installCalled, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('rejects a Project Home reached through a symlinked quarantine alias', async () => {
+    const fixture = await makeFixture({ installer: 'success' })
+    await mkdir(join(fixture.volume, 'quarantine-target'))
+    await symlink('quarantine-target', join(fixture.volume, 'quarantine'))
+
+    await expect(execFileAsync('bash', [entrypoint], {
+      env: {
+        ...fixture.env,
+        OPENALICE_HOME: join(fixture.volume, 'quarantine', 'old-project'),
+      },
+    })).rejects.toMatchObject({
+      stderr: expect.stringContaining('cannot select the reserved Railway quarantine tree'),
+    })
+    await expect(readFile(fixture.installCalled, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
   it('rejects the legacy Node-managed 0.90.1 release before invoking the installer', async () => {
     const fixture = await makeFixture({ installer: 'success' })
 
@@ -100,23 +132,149 @@ describe('Railway native CLI host entrypoint', () => {
     await expect(readFile(fixture.installCalled, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
-  it('uses the Railway mount and service identity as container-replacement authority', async () => {
+  it.runIf(process.platform === 'linux')('rejects a Railway fence rooted at an ordinary directory instead of a mounted Volume', async () => {
     const fixture = await makeFixture({ installer: 'success' })
 
-    await execFileAsync('bash', [entrypoint], {
+    await expect(execFileAsync('bash', [entrypoint], {
       env: {
         ...fixture.env,
         RAILWAY_ENVIRONMENT_ID: 'environment-test',
         RAILWAY_SERVICE_ID: 'service-test',
       },
-    })
+    })).rejects.toMatchObject({ stderr: expect.stringContaining('must be an actual mount point') })
+    await expect(readFile(fixture.installCalled, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
+  })
 
-    expect(await readFile(fixture.runtimeCalled, 'utf8')).toContain(
-      'OPENALICE_MACHINE_ID=railway-service-service-test',
-    )
-    expect(await readFile(fixture.runtimeCalled, 'utf8')).toContain(
-      'OPENALICE_RAILWAY_ENTRYPOINT_OWNER=1',
-    )
+  it.runIf(process.platform === 'linux' && existsSync('/dev/shm'))('blocks legacy retained ownership before installer or Project mutation', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-railway-legacy-preflight-'))
+    const fixtureRoot = join('/dev/shm', `openalice-legacy-preflight-${process.pid}-${Date.now()}`)
+    const legacyProject = join(fixtureRoot, 'projects', 'legacy-a')
+    const selectedProject = join(fixtureRoot, 'projects', 'empty-b')
+    temporaryPaths.push(root, fixtureRoot)
+    const lockDir = join(legacyProject, 'state', 'guardian.lock')
+    const installCalled = join(root, 'installer-called')
+    const installer = join(root, 'install')
+    await mkdir(lockDir, { recursive: true })
+    await writeFile(join(lockDir, 'owner.json'), JSON.stringify({
+      schemaVersion: 1,
+      pid: 101,
+      hostname: 'legacy-container',
+      machineId: 'env:railway-service-service-test',
+      token: 'legacy-owner',
+      launcher: 'guardian-cli-server',
+      acquiredAt: new Date().toISOString(),
+      heartbeatAt: new Date().toISOString(),
+    }))
+    await writeFile(installer, `#!/usr/bin/env bash\nprintf called >${JSON.stringify(installCalled)}\n`, { mode: 0o755 })
+
+    await expect(execFileAsync('bash', [entrypoint], {
+      env: {
+        PATH: process.env.PATH,
+        HOME: '/dev/shm/home',
+        OPENALICE_HOME: selectedProject,
+        OPENALICE_INSTALL_DIR: '/dev/shm/home/.openalice',
+        NPM_CONFIG_PREFIX: '/dev/shm/home/.local',
+        BUN_INSTALL: '/dev/shm/home/.bun',
+        RAILWAY_VOLUME_MOUNT_PATH: '/dev/shm',
+        OPENALICE_RAILWAY_VOLUME_ROOT: '/dev/shm',
+        OPENALICE_RAILWAY_INSTALLER_PATH: installer,
+        OPENALICE_RAILWAY_PREFLIGHT_PATH: retainedLockPreflight,
+        OPENALICE_RAILWAY_COMMAND_WRAPPER_PATH: commandWrapper,
+        OPENALICE_RAILWAY_LINK_DIR: join(root, 'links'),
+        OPENALICE_RAILWAY_CHANNEL: 'dev',
+        OPENALICE_RAILWAY_WAIT_SECONDS: '10',
+        RAILWAY_ENVIRONMENT_ID: 'environment-test',
+        RAILWAY_SERVICE_ID: 'service-test',
+      },
+    })).rejects.toMatchObject({
+      stderr: expect.stringContaining(
+        `${fixtureRoot.slice('/dev/shm/'.length)}/projects/legacy-a/state/guardian.lock`,
+      ),
+    })
+    await expect(readFile(installCalled, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
+    expect(existsSync(selectedProject)).toBe(false)
+  })
+
+  it('accepts only retained lock owners written by the same fenced Railway service', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-railway-retained-locks-'))
+    temporaryPaths.push(root)
+    const project = join(root, 'project')
+    const launcher = join(project, 'workspaces')
+    const owner = {
+      schemaVersion: 1,
+      pid: 101,
+      hostname: 'previous-container',
+      machineId: 'env:railway-service-service-test',
+      token: 'fenced-owner',
+      launcher: 'guardian-cli-server',
+      acquiredAt: new Date().toISOString(),
+      heartbeatAt: new Date().toISOString(),
+      fencingProtocol: 'railway-flock-v1',
+    }
+    for (const lockDir of [
+      join(project, 'state', 'guardian.lock'),
+      join(project, 'state', 'runtime.lock'),
+      join(launcher, 'state', 'runtime.lock'),
+      join(project, 'data', 'state', 'config-bootstrap.lock'),
+    ]) {
+      await mkdir(lockDir, { recursive: true })
+      await writeFile(join(lockDir, 'owner.json'), JSON.stringify(owner))
+    }
+
+    await expect(execFileAsync('python3', [
+      retainedLockPreflight,
+      root,
+      project,
+      launcher,
+      'env:railway-service-service-test',
+    ])).resolves.toMatchObject({ stderr: '' })
+
+    await writeFile(join(project, 'state', 'guardian.lock', 'owner.json'), JSON.stringify({
+      ...owner,
+      machineId: 'env:railway-service-other',
+    }))
+    await expect(execFileAsync('python3', [
+      retainedLockPreflight,
+      root,
+      project,
+      launcher,
+      'env:railway-service-service-test',
+    ])).rejects.toMatchObject({
+      stderr: expect.stringContaining('state/guardian.lock'),
+    })
+  })
+
+  it('discovers a nested legacy owner beyond another Project marker before an A-to-B cutover', async () => {
+    const volume = await mkdtemp(join(tmpdir(), 'openalice-railway-volume-scan-'))
+    temporaryPaths.push(volume)
+    const outerProject = join(volume, 'projects', 'outer')
+    const legacyProject = join(outerProject, 'nested', 'legacy-a')
+    const selectedProject = join(volume, 'projects', 'empty-b')
+    const lockDir = join(legacyProject, 'state', 'guardian.lock')
+    await mkdir(lockDir, { recursive: true })
+    await mkdir(join(outerProject, 'data', 'config'), { recursive: true })
+    await writeFile(join(outerProject, 'data', 'config', 'alice-project.json'), '{}')
+    await writeFile(join(lockDir, 'owner.json'), JSON.stringify({
+      schemaVersion: 1,
+      pid: 101,
+      hostname: 'legacy-container',
+      machineId: 'env:railway-service-service-test',
+      token: 'legacy-owner',
+      launcher: 'guardian-cli-server',
+      acquiredAt: new Date().toISOString(),
+      heartbeatAt: new Date().toISOString(),
+    }))
+
+    await expect(execFileAsync('python3', [
+      retainedLockPreflight,
+      volume,
+      selectedProject,
+      join(selectedProject, 'workspaces'),
+      'env:railway-service-service-test',
+    ])).rejects.toMatchObject({
+      stderr: expect.stringContaining('projects/outer/nested/legacy-a/state/guardian.lock'),
+    })
+    expect(existsSync(selectedProject)).toBe(false)
   })
 
   it('rejects a configured machine identity that does not match the Railway service', async () => {
@@ -135,18 +293,34 @@ describe('Railway native CLI host entrypoint', () => {
     await expect(readFile(fixture.installCalled, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
-  it('requires enough Railway startup time for hard-kill heartbeat recovery', async () => {
+  it('rejects a Dashboard override that disables Railway lifecycle authority', async () => {
     const fixture = await makeFixture({ installer: 'success' })
 
     await expect(execFileAsync('bash', [entrypoint], {
       env: {
         ...fixture.env,
-        OPENALICE_RAILWAY_WAIT_SECONDS: '90',
+        OPENALICE_SERVICE_MANAGER: 'docker',
         RAILWAY_ENVIRONMENT_ID: 'environment-test',
         RAILWAY_SERVICE_ID: 'service-test',
       },
     })).rejects.toMatchObject({
-      stderr: expect.stringContaining('must be at least 130 on Railway'),
+      stderr: expect.stringContaining('OPENALICE_SERVICE_MANAGER must be railway'),
+    })
+    await expect(readFile(fixture.installCalled, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('rejects an invalid Railway lifecycle-fence wait bound', async () => {
+    const fixture = await makeFixture({ installer: 'success' })
+
+    await expect(execFileAsync('bash', [entrypoint], {
+      env: {
+        ...fixture.env,
+        OPENALICE_RAILWAY_WAIT_SECONDS: '0',
+        RAILWAY_ENVIRONMENT_ID: 'environment-test',
+        RAILWAY_SERVICE_ID: 'service-test',
+      },
+    })).rejects.toMatchObject({
+      stderr: expect.stringContaining('must be between 1 and 600'),
     })
     await expect(readFile(fixture.installCalled, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
   })
@@ -177,7 +351,9 @@ describe('Railway native CLI host entrypoint', () => {
       'PATH=/usr/local/sbin:/usr/local/bin:/data/home/.openalice/bin:/data/home/.local/bin:/data/home/.bun/bin:',
     )
     expect(dockerfile).toContain('scripts/railway/command-wrapper.sh')
+    expect(dockerfile).toContain('scripts/railway/preflight-retained-locks.py')
     expect(dockerfile).toContain('scripts/railway/shell-env.sh')
+    expect(await readFile(entrypoint, 'utf8')).toContain('/usr/bin/flock --exclusive --timeout "$wait_seconds" 9')
     expect(dockerfile).toContain('ENTRYPOINT ["/usr/bin/tini", "-s", "-g", "--"')
   })
 
@@ -349,12 +525,25 @@ exit 1
       .rejects.toMatchObject({ stderr: expect.stringContaining('no previously verified OpenAlice release') })
   })
 
+  it('rejects a native release that cannot retain the Railway lifecycle fence', async () => {
+    const fixture = await makeFixture({
+      installer: 'failure',
+      existing: true,
+      existingFenceCapability: false,
+    })
+
+    await expect(execFileAsync('bash', [entrypoint], { env: fixture.env }))
+      .rejects.toMatchObject({ stderr: expect.stringContaining('no previously verified OpenAlice release') })
+    await expect(readFile(fixture.runtimeCalled, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
 })
 
 async function makeFixture(options: {
   installer: 'success' | 'failure' | 'noop'
   existing?: boolean
   existingChannel?: 'beta' | 'dev'
+  existingFenceCapability?: boolean
 }) {
   const root = await mkdtemp(join(tmpdir(), 'openalice-railway-entrypoint-'))
   temporaryPaths.push(root)
@@ -368,9 +557,12 @@ async function makeFixture(options: {
   const installRoot = join(volume, 'home', '.openalice')
   await writeInstaller(installer, options.installer, installCalled, runtimeCalled)
   if (options.existing) {
-    await writeLauncher(join(installRoot, 'bin', 'openalice'), runtimeCalled, options.existingChannel === 'dev'
-      ? { version: '0.91.0-dev.1', channel: 'dev' }
-      : undefined)
+    await writeLauncher(join(installRoot, 'bin', 'openalice'), runtimeCalled, {
+      ...(options.existingChannel === 'dev'
+        ? { version: '0.91.0-dev.1', channel: 'dev' as const }
+        : {}),
+      ...(options.existingFenceCapability === false ? { runtimeCapabilities: [] } : {}),
+    })
   }
   return {
     volume,
@@ -465,12 +657,15 @@ cat >"$OPENALICE_INSTALL_DIR/cli/current/bin/openalice" <<'LAUNCHER'
 #!/usr/bin/env bash
 if [[ "\${1:-}" == --version ]]; then printf '0.91.0-beta.1\\n'; exit 0; fi
 if [[ "\${1:-}" == version && "\${2:-}" == --json ]]; then
-  printf '{"version":"0.91.0-beta.1","installSource":{"schemaVersion":3,"repository":"TraderAlice/OpenAlice","cliVersion":"0.91.0-beta.1","selector":{"kind":"version","value":"v0.91.0-beta.1"},"installerUrl":"https://openalice.ai/install","updateChannel":"beta","method":"direct","artifact":{"platform":"linux","arch":"x64","sha256":"%s"},"installedAt":"2026-08-31T00:00:00.000Z"},"contentIdentity":"aaaaaaaaaaaaaaaa","managedRuntime":{"productVersion":"0.91.0-beta.1","platform":"linux","arch":"x64","path":"%s","contentIdentity":"aaaaaaaaaaaaaaaa"}}\\n' \\
+  printf '{"version":"0.91.0-beta.1","installSource":{"schemaVersion":3,"repository":"TraderAlice/OpenAlice","cliVersion":"0.91.0-beta.1","selector":{"kind":"version","value":"v0.91.0-beta.1"},"installerUrl":"https://openalice.ai/install","updateChannel":"beta","method":"direct","artifact":{"platform":"linux","arch":"x64","sha256":"%s"},"installedAt":"2026-08-31T00:00:00.000Z"},"contentIdentity":"aaaaaaaaaaaaaaaa","managedRuntime":{"productVersion":"0.91.0-beta.1","platform":"linux","arch":"x64","path":"%s","contentIdentity":"aaaaaaaaaaaaaaaa"},"runtimeCapabilities":["railway-flock-v1"]}\\n' \\
     "$(printf '0%.0s' {1..64})" "$OPENALICE_INSTALL_DIR/cli/releases/0.91.0-beta.1-linux-x64-aaaaaaaaaaaaaaaa"
   exit 0
 fi
-printf 'HOME=%s\\nOPENALICE_HOME=%s\\nAQ_LAUNCHER_ROOT=%s\\nOPENALICE_INSTALL_DIR=%s\\nNPM_CONFIG_PREFIX=%s\\nBUN_INSTALL=%s\\nOPENALICE_MACHINE_ID=%s\\nOPENALICE_RAILWAY_ENTRYPOINT_OWNER=%s\\n' \\
-  "$HOME" "$OPENALICE_HOME" "$AQ_LAUNCHER_ROOT" "$OPENALICE_INSTALL_DIR" "$NPM_CONFIG_PREFIX" "$BUN_INSTALL" "\${OPENALICE_MACHINE_ID:-}" "\${OPENALICE_RAILWAY_ENTRYPOINT_OWNER:-}" >'${runtimeCalled}'
+if [[ -n "\${OPENALICE_RAILWAY_FENCE_FD:-}" ]]; then
+  grep -Eq '^lock:[[:space:]]+[0-9]+:[[:space:]]+FLOCK[[:space:]]+ADVISORY[[:space:]]+WRITE' "/proc/self/fdinfo/\${OPENALICE_RAILWAY_FENCE_FD}" || exit 97
+fi
+printf 'HOME=%s\\nOPENALICE_HOME=%s\\nAQ_LAUNCHER_ROOT=%s\\nOPENALICE_INSTALL_DIR=%s\\nNPM_CONFIG_PREFIX=%s\\nBUN_INSTALL=%s\\nOPENALICE_MACHINE_ID=%s\\nOPENALICE_RAILWAY_ENTRYPOINT_OWNER=%s\\nOPENALICE_RAILWAY_FENCE_FD=%s\\n' \\
+  "$HOME" "$OPENALICE_HOME" "$AQ_LAUNCHER_ROOT" "$OPENALICE_INSTALL_DIR" "$NPM_CONFIG_PREFIX" "$BUN_INSTALL" "\${OPENALICE_MACHINE_ID:-}" "\${OPENALICE_RAILWAY_ENTRYPOINT_OWNER:-}" "\${OPENALICE_RAILWAY_FENCE_FD:-}" >'${runtimeCalled}'
 printf '%s\\n' "$*" >>'${runtimeCalled}'
 LAUNCHER
 chmod 0755 "$OPENALICE_INSTALL_DIR/cli/current/bin/openalice"
@@ -482,7 +677,7 @@ ln -s ../cli/current/bin/openalice "$OPENALICE_INSTALL_DIR/bin/openalice"
 async function writeLauncher(
   path: string,
   runtimeCalled: string,
-  profile: { version?: string; channel?: 'beta' | 'dev'; identity?: string } = {},
+  profile: { version?: string; channel?: 'beta' | 'dev'; identity?: string; runtimeCapabilities?: string[] } = {},
 ) {
   const installRoot = resolve(path, '..', '..')
   const version = profile.version ?? '0.91.0-beta.1'
@@ -495,9 +690,12 @@ async function writeLauncher(
   await symlink(join('releases', releaseName), join(installRoot, 'cli', 'current'))
   await writeFile(join(runtimeRoot, 'bin', 'openalice'), `#!/usr/bin/env bash
 if [[ "\${1:-}" == --version ]]; then printf '${version}\\n'; exit 0; fi
-if [[ "\${1:-}" == version && "\${2:-}" == --json ]]; then printf '%s\\n' '${JSON.stringify(versionPayload(runtimeRoot, { version, channel, identity }))}'; exit 0; fi
-printf 'HOME=%s\\nOPENALICE_HOME=%s\\nAQ_LAUNCHER_ROOT=%s\\nOPENALICE_INSTALL_DIR=%s\\nNPM_CONFIG_PREFIX=%s\\nBUN_INSTALL=%s\\nOPENALICE_MACHINE_ID=%s\\nOPENALICE_RAILWAY_ENTRYPOINT_OWNER=%s\\n' \\
-  "$HOME" "$OPENALICE_HOME" "$AQ_LAUNCHER_ROOT" "$OPENALICE_INSTALL_DIR" "$NPM_CONFIG_PREFIX" "$BUN_INSTALL" "\${OPENALICE_MACHINE_ID:-}" "\${OPENALICE_RAILWAY_ENTRYPOINT_OWNER:-}" >'${runtimeCalled}'
+if [[ "\${1:-}" == version && "\${2:-}" == --json ]]; then printf '%s\\n' '${JSON.stringify(versionPayload(runtimeRoot, { version, channel, identity, runtimeCapabilities: profile.runtimeCapabilities }))}'; exit 0; fi
+if [[ -n "\${OPENALICE_RAILWAY_FENCE_FD:-}" ]]; then
+  grep -Eq '^lock:[[:space:]]+[0-9]+:[[:space:]]+FLOCK[[:space:]]+ADVISORY[[:space:]]+WRITE' "/proc/self/fdinfo/\${OPENALICE_RAILWAY_FENCE_FD}" || exit 97
+fi
+printf 'HOME=%s\\nOPENALICE_HOME=%s\\nAQ_LAUNCHER_ROOT=%s\\nOPENALICE_INSTALL_DIR=%s\\nNPM_CONFIG_PREFIX=%s\\nBUN_INSTALL=%s\\nOPENALICE_MACHINE_ID=%s\\nOPENALICE_RAILWAY_ENTRYPOINT_OWNER=%s\\nOPENALICE_RAILWAY_FENCE_FD=%s\\n' \\
+  "$HOME" "$OPENALICE_HOME" "$AQ_LAUNCHER_ROOT" "$OPENALICE_INSTALL_DIR" "$NPM_CONFIG_PREFIX" "$BUN_INSTALL" "\${OPENALICE_MACHINE_ID:-}" "\${OPENALICE_RAILWAY_ENTRYPOINT_OWNER:-}" "\${OPENALICE_RAILWAY_FENCE_FD:-}" >'${runtimeCalled}'
 printf '%s\\n' "$*" >>'${runtimeCalled}'
 `, { mode: 0o755 })
   await writeDynamicLauncher(path)
@@ -523,7 +721,7 @@ async function writeReleaseLauncher(
   runtimeRoot: string,
   runtimeCalled: string,
   releaseName: string,
-  profile: { version: string; channel: 'beta' | 'dev'; identity: string; installedAt?: string },
+  profile: { version: string; channel: 'beta' | 'dev'; identity: string; installedAt?: string; runtimeCapabilities?: string[] },
 ) {
   await mkdir(join(runtimeRoot, 'bin'), { recursive: true })
   const versionFile = join(runtimeRoot, 'version.json')
@@ -537,7 +735,7 @@ printf 'release=${releaseName}\\n%s\\n' "$*" >'${runtimeCalled}'
 
 function versionPayload(
   runtimeRoot: string,
-  profile: { version?: string; channel?: 'beta' | 'dev'; identity?: string; installedAt?: string } = {},
+  profile: { version?: string; channel?: 'beta' | 'dev'; identity?: string; installedAt?: string; runtimeCapabilities?: string[] } = {},
 ) {
   const version = profile.version ?? '0.91.0-beta.1'
   const channel = profile.channel ?? 'beta'
@@ -558,6 +756,7 @@ function versionPayload(
       installedAt: profile.installedAt ?? '2026-08-31T00:00:00.000Z',
     },
     contentIdentity: identity,
+    runtimeCapabilities: profile.runtimeCapabilities ?? ['railway-flock-v1'],
     managedRuntime: {
       productVersion: version,
       platform: 'linux',

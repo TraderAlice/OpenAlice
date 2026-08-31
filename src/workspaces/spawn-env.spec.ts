@@ -86,6 +86,22 @@ describe('buildSpawnEnv', () => {
     expect(out['COLORFGBG']).toBeUndefined()
   })
 
+  it('never exposes Railway handoff capabilities to a Workspace agent PTY', () => {
+    const out = buildSpawnEnv(
+      {
+        OPENALICE_RAILWAY_FENCE_FD: '3',
+        OPENALICE_RAILWAY_ENTRYPOINT_OWNER: '1',
+      },
+      {
+        OPENALICE_RAILWAY_FENCE_FD: '9',
+        OPENALICE_RAILWAY_ENTRYPOINT_OWNER: '1',
+      },
+    )
+
+    expect(out).not.toHaveProperty('OPENALICE_RAILWAY_FENCE_FD')
+    expect(out).not.toHaveProperty('OPENALICE_RAILWAY_ENTRYPOINT_OWNER')
+  })
+
   it('defaults terminal locale to UTF-8 without overriding explicit locale', () => {
     expect(buildSpawnEnv({})['LANG']).toBe('en_US.UTF-8')
     expect(buildSpawnEnv({})['LC_CTYPE']).toBe('en_US.UTF-8')

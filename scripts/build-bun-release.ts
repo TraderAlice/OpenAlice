@@ -126,7 +126,9 @@ const releaseMetadata = {
   ...unsignedReleaseMetadata,
   contentIdentity,
 }
-await writeFile(join(releaseRoot, 'release.json'), `${JSON.stringify(releaseMetadata, null, 2)}\n`)
+const releaseMetadataPath = join(releaseRoot, 'release.json')
+await writeFile(releaseMetadataPath, `${JSON.stringify(releaseMetadata, null, 2)}\n`)
+const releaseMetadataHash = await sha256File(releaseMetadataPath)
 const assemblyDurationMs = Math.round(performance.now() - releaseStartedAt)
 
 const smokeStartedAt = performance.now()
@@ -138,6 +140,20 @@ const smoke = await smokeRelease({
   contentIdentity,
 })
 const smokeDurationMs = Math.round(performance.now() - smokeStartedAt)
+const filesAfterSmoke = await releaseFiles(releaseRoot, new Set(['release.json']))
+const beforeByPath = new Map(files.map((entry) => [entry.path, JSON.stringify(entry)]))
+const afterByPath = new Map(filesAfterSmoke.map((entry) => [entry.path, JSON.stringify(entry)]))
+const mutatedReleasePaths = [...new Set([...beforeByPath.keys(), ...afterByPath.keys()])]
+  .filter((path) => beforeByPath.get(path) !== afterByPath.get(path))
+  .sort()
+if (await sha256File(releaseMetadataPath) !== releaseMetadataHash) {
+  mutatedReleasePaths.push('release.json')
+}
+if (mutatedReleasePaths.length > 0) {
+  throw new Error(
+    `Bun release smoke mutated the immutable release tree: ${mutatedReleasePaths.join(', ')}`,
+  )
+}
 
 const archiveStartedAt = performance.now()
 const archive = Bun.spawnSync([
@@ -670,6 +686,13 @@ printf '%s\\n' "${'$'}1" > "${'$'}OPENALICE_SMOKE_OPEN_RECEIPT"
   if (runtimeError || exitCode !== 0) {
     throw new Error(`installed release Runtime failed: ${String(runtimeError)}\n${stdout}\n${stderr}`)
   }
+  const workspaceSessionLog = await readFile(
+    join(runtimeHome, 'logs', 'workspace-sessions.log'),
+    'utf8',
+  ).catch(() => '')
+  if (!workspaceSessionLog.includes('"msg":"workspace.session_spawned"')) {
+    throw new Error('installed release did not persist Workspace session logs under the selected Project Home')
+  }
   return {
     nodeOrBunOnPath: false,
     gitInitCommitClone: true,
@@ -682,6 +705,7 @@ printf '%s\\n' "${'$'}1" > "${'$'}OPENALICE_SMOKE_OPEN_RECEIPT"
     externalAgentRuntimeManagedPi: false,
     browserOpenUrl,
     agentPtys: agentPtyReport,
+    workspaceSessionLog: 'logs/workspace-sessions.log',
     realExternalAgentRuntime: realOpenCodeReport,
     defaultResources: true,
     materializedPiAdapter: true,

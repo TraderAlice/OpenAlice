@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
+import { fstatSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { homedir, hostname, tmpdir } from 'node:os'
 import { createConnection } from 'node:net'
@@ -14,7 +15,6 @@ export const GUARDIAN_CONTROL_PROTOCOL = 1
 export const GUARDIAN_CONTROL_API_VERSION = 1
 const MAX_RESPONSE_BYTES = 1024 * 1024
 const MAX_UPTIME_SECONDS = 10 * 365 * 24 * 60 * 60
-const RUNTIME_OWNER_STALE_HEARTBEAT_MS = 90_000
 
 export function resolveOpenAliceHome(homeRoot, options = {}) {
   const env = options.env ?? process.env
@@ -134,6 +134,7 @@ export async function readRuntimeStatus(options = {}, dependencies = {}) {
     platform: dependencies.platform,
     readMachineId: dependencies.readMachineId,
     readProcessStartedAt: dependencies.readProcessStartedAt,
+    railwayFenceValid: dependencies.railwayFenceValid,
   })
   if (owner?.active) {
     return {
@@ -349,14 +350,12 @@ async function inspectGuardianOwner(homeRoot, options = {}) {
       }
     }
     const resolvedMachineId = await currentMachineId()
-    const railwayScope = railwayOwnerScope(owner, resolvedMachineId, localHostname, env)
+    const railwayScope = railwayOwnerScope(owner, resolvedMachineId, localHostname, env, homeRoot, options)
     let active
-    if (railwayScope === 'cross-container') {
-      const heartbeatAt = typeof owner.heartbeatAt === 'string'
-        ? Date.parse(owner.heartbeatAt)
-        : Number.NaN
-      active = !Number.isFinite(heartbeatAt)
-        || Math.max(0, Date.now() - heartbeatAt) <= RUNTIME_OWNER_STALE_HEARTBEAT_MS
+    if (railwayScope === 'cross-container-fenced') {
+      active = false
+    } else if (railwayScope === 'cross-container-observer') {
+      active = true
     } else if (railwayScope === 'foreign') {
       active = true
     } else {
@@ -390,7 +389,7 @@ async function inspectGuardianOwner(homeRoot, options = {}) {
     : null
 }
 
-function railwayOwnerScope(owner, currentMachineId, localHostname, env) {
+function railwayOwnerScope(owner, currentMachineId, localHostname, env, homeRoot, options) {
   const serviceId = env['RAILWAY_SERVICE_ID']?.trim()
   const environmentId = env['RAILWAY_ENVIRONMENT_ID']?.trim()
   const configuredMachineId = env['OPENALICE_MACHINE_ID']?.trim()
@@ -405,10 +404,91 @@ function railwayOwnerScope(owner, currentMachineId, localHostname, env) {
     return null
   }
   if (typeof owner.hostname !== 'string' || owner.hostname.length === 0) return 'foreign'
-  const belongsToService = owner.machineId === currentMachineId
-    || owner.machineId === `hostname:${owner.hostname}`
-  if (!belongsToService) return 'foreign'
-  return owner.hostname === localHostname ? 'same-container' : 'cross-container'
+  if (owner.machineId !== currentMachineId) return 'foreign'
+  if (owner.hostname === localHostname) return 'same-container'
+  if (owner.fencingProtocol !== 'railway-flock-v1') return 'foreign'
+  const fenceValid = options.railwayFenceValid
+    ?? hasValidRailwayFence(env, homeRoot)
+  return fenceValid ? 'cross-container-fenced' : 'cross-container-observer'
+}
+
+function hasValidRailwayFence(env, homeRoot) {
+  const rawFd = env['OPENALICE_RAILWAY_FENCE_FD']?.trim()
+  const fd = Number(rawFd)
+  if (
+    env['OPENALICE_RAILWAY_ENTRYPOINT_OWNER'] !== '1'
+    || !/^[0-9]{1,4}$/.test(rawFd ?? '')
+    || !Number.isInteger(fd)
+    || fd < 3
+  ) return false
+  const fencePath = railwayRuntimeFencePath(env, homeRoot)
+  if (!fencePath) return false
+  try {
+    const inherited = fstatSync(fd)
+    const expected = statSync(fencePath)
+    return inherited.isDirectory()
+      && expected.isDirectory()
+      && inherited.dev === expected.dev
+      && inherited.ino === expected.ino
+      && inheritedFdHoldsExclusiveFlock(fd)
+  } catch {
+    return false
+  }
+}
+
+function railwayRuntimeFencePath(env, homeRoot) {
+  const serviceId = env['RAILWAY_SERVICE_ID']?.trim()
+  if (!/^[A-Za-z0-9-]{1,128}$/.test(serviceId ?? '')) return null
+  const configuredRoots = [
+    env['RAILWAY_VOLUME_MOUNT_PATH']?.trim(),
+    env['OPENALICE_RAILWAY_VOLUME_ROOT']?.trim(),
+  ].filter(Boolean).map((value) => resolve(value))
+  if (configuredRoots.length === 0 || new Set(configuredRoots).size !== 1) return null
+  const volumeRoot = configuredRoots[0]
+  const installDir = env['OPENALICE_INSTALL_DIR']?.trim()
+  if (!volumeRoot || volumeRoot === '/' || !homeRoot || !installDir) return null
+  if (!pathIsWithin(volumeRoot, homeRoot) || !pathIsWithin(volumeRoot, installDir)) return null
+  return isLinuxMountPoint(volumeRoot) ? volumeRoot : null
+}
+
+function pathIsWithin(root, candidate) {
+  try {
+    const canonicalRoot = realpathSync(root)
+    const canonicalCandidate = realpathSync(candidate)
+    return canonicalCandidate !== canonicalRoot
+      && canonicalCandidate.startsWith(`${canonicalRoot}/`)
+  } catch {
+    return false
+  }
+}
+
+function isLinuxMountPoint(path) {
+  if (process.platform !== 'linux') return false
+  try {
+    const canonical = realpathSync(path)
+    return readFileSync('/proc/self/mountinfo', 'utf8')
+      .split('\n')
+      .some((line) => decodeMountInfoPath(line.split(' ')[4] ?? '') === canonical)
+  } catch {
+    return false
+  }
+}
+
+function decodeMountInfoPath(value) {
+  return value.replace(/\\([0-7]{3})/g, (_match, octal) => (
+    String.fromCharCode(Number.parseInt(octal, 8))
+  ))
+}
+
+function inheritedFdHoldsExclusiveFlock(fd) {
+  if (process.platform !== 'linux') return false
+  try {
+    return /^lock:\s+\d+:\s+FLOCK\s+ADVISORY\s+WRITE\b/m.test(
+      readFileSync(`/proc/self/fdinfo/${fd}`, 'utf8'),
+    )
+  } catch {
+    return false
+  }
 }
 
 async function isSameProcess(owner, dependencies) {

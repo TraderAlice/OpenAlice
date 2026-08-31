@@ -138,9 +138,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - uses: pnpm/action-setup@v6
+
       - uses: actions/setup-node@v7
         with:
           node-version: 22.19.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile --filter @traderalice/openalice-cli
 
       - name: Exercise clean SSH host fixture
         run: node scripts/remote-ssh-smoke.mjs --skip-tui

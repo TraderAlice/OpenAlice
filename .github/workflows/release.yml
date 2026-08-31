@@ -400,9 +400,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - uses: pnpm/action-setup@v6
+
       - uses: actions/setup-node@v7
         with:
           node-version: 22.19.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile --filter @traderalice/openalice-cli
 
       - name: Exercise candidate installer in a clean HTTP fixture
         run: node scripts/install-docker-smoke.mjs
