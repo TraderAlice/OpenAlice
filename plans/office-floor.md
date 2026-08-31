@@ -5572,6 +5572,20 @@ Agent-file result-reader follow-up (2026-08-31):
   TypeScript passed; the full suite passed all 620 test files and 5,210 tests (one file and nine tests skipped); the
   production UI build passed with only the existing ports fallback and large-chunk advisory.
 
+Agent-file reader-focus follow-up (2026-08-31):
+
+- Replayed both expandable Agent File reading states with Grok Strategist g35's real assignment and result. Their
+  focus, contained scrolling, and Escape return behavior were correct, but both focused regions exposed the browser's
+  default `rgb(0, 95, 204) auto 1px` outline inside an otherwise authored 16-bit window.
+- Compared hiding the outline, retaining the browser ring, and owning one shared Office-palette focus frame. Hiding it
+  would regress keyboard visibility; keeping it leaves the most interactive reading state visually unfinished. Chose
+  a shared two-pixel water frame with a paper inner edge and two-pixel ink offset, without animation or glow.
+- Real-browser acceptance confirmed Assignment and Latest result both resolve to `rgb(110, 180, 189) solid 2px`, retain
+  focus and their independent thin scrollbars, and use the same paper/ink pixel shadow. The result reader remained
+  168px tall over 372px of real content. Focused Inspect/style suites passed all 14 tests; root and UI TypeScript
+  passed; the full suite passed all 620 test files and 5,210 tests (one file and nine tests skipped); the production UI
+  build passed with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

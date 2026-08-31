@@ -3344,6 +3344,15 @@ body:has(.oa-office-main):has(button[title="Dismiss until next reload"]):not(:ha
   -webkit-line-clamp: unset;
 }
 
+.oa-office-inspect__assignment p[data-expanded="true"]:focus-visible,
+.oa-office-inspect__latest-result p[data-expanded="true"]:focus-visible {
+  outline: 2px solid var(--gba-water);
+  outline-offset: 1px;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--gba-paper) 72%, transparent),
+    2px 2px 0 color-mix(in srgb, var(--gba-ink) 38%, transparent);
+}
+
 .oa-office-inspect__result-toggle {
   display: block;
   grid-column: 1 / -1;

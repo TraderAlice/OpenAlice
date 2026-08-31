@@ -51,6 +51,9 @@ describe('Office Agent-file style contract', () => {
     expect(css).toMatch(
       /\.oa-office-inspect__latest-result p\[data-expanded="true"\]\s*\{[^}]*max-height:\s*12em;[^}]*overflow-y:\s*auto;[^}]*overscroll-behavior:\s*contain;[^}]*scrollbar-width:\s*thin;/s,
     )
+    expect(css).toMatch(
+      /\.oa-office-inspect__assignment p\[data-expanded="true"\]:focus-visible,[\s\S]*?\.oa-office-inspect__latest-result p\[data-expanded="true"\]:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--gba-water\);[^}]*outline-offset:\s*1px;[^}]*2px 2px 0 color-mix\(in srgb, var\(--gba-ink\) 38%, transparent\);/s,
+    )
   })
 
   it('marks replay Agent files as one explicit historical character state', () => {
