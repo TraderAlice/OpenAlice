@@ -370,6 +370,9 @@ describe('Office responsive style contract', () => {
     expect(css).toMatch(
       /@container \(max-width: 760px\) \{[\s\S]*?\.oa-office-runtime__event\s*\{[\s\S]*?height: 100%;/,
     )
+    expect(css).toMatch(
+      /\.oa-office-runtime__detail-toggle:focus-visible\s*\{[\s\S]*?outline: 2px solid var\(--gba-water\);[\s\S]*?background: color-mix\(in srgb, var\(--gba-paper\) 72%, transparent\);[\s\S]*?box-shadow: 2px 2px 0 color-mix\(in srgb, var\(--gba-ink\) 38%, transparent\);/,
+    )
   })
 
   it('gives long journal assignments a bounded keyboard-readable disclosure', () => {

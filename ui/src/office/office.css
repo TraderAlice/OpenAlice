@@ -1420,6 +1420,13 @@
   color: var(--gba-ink);
 }
 
+.oa-office-runtime__detail-toggle:focus-visible {
+  outline: 2px solid var(--gba-water);
+  outline-offset: 2px;
+  background: color-mix(in srgb, var(--gba-paper) 72%, transparent);
+  box-shadow: 2px 2px 0 color-mix(in srgb, var(--gba-ink) 38%, transparent);
+}
+
 .oa-office-runtime__beat {
   margin-top: 5px;
 }

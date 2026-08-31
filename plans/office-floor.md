@@ -5586,6 +5586,23 @@ Agent-file reader-focus follow-up (2026-08-31):
   passed; the full suite passed all 620 test files and 5,210 tests (one file and nine tests skipped); the production UI
   build passed with only the existing ports fallback and large-chunk advisory.
 
+Activity-log disclosure-focus follow-up (2026-08-31):
+
+- Replayed the real Operations -> Replay -> Live loop through task completion `#6191`, stepped to News event `#6192`,
+  reopened the exact event from its floor prompt, and returned to the unchanged Live camera. The replay model was
+  coherent; expanding the completion's long report exposed the browser's default blue focus ring on `Collapse report`.
+- Compared removing the outline, turning the disclosure into a large game button, and retaining its compact text-command
+  silhouette with the shared Office focus frame. Removing the ring would hide keyboard position, while a large button
+  would compete with the fixed `Find on floor` and `Open Runs` command rail. Chose the compact command with an authored
+  two-pixel water outline, paper backing, and two-pixel ink offset.
+- The shared detail toggle now gives Assignment, grouped beats, and full-report disclosure the same keyboard-visible
+  palette without changing their existing expansion, Escape, internal scrolling, or action-rail behavior.
+- Real-browser acceptance measured `Collapse report` and its returned `Show full report` state at
+  `rgb(110, 180, 189) solid 2px` with the paper/ink pixel shadow; the report remained expanded and independently
+  scrollable while `Find on floor` plus `Open Runs` stayed fixed. Focused runtime/style suites passed all 56 tests;
+  root and UI TypeScript passed; the full suite passed all 620 test files and 5,210 tests (one file and nine tests
+  skipped); the production UI build passed with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
