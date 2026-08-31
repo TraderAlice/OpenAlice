@@ -124,6 +124,7 @@ describe('OfficeRuntimeSection', () => {
     expect(screen.getByText('Issue · office-playtest')).toBeTruthy()
     expect(screen.getByText('Assignment')).toBeTruthy()
     expect(screen.getByText('Watch the semiconductor desk for a clean entry.')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Show full title' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Open Runs' })).toBeTruthy()
     expect(screen.getByRole('button', { name: /Task started.*Market Scout.*#0001/i }).getAttribute('aria-pressed'))
       .toBe('true')
@@ -269,6 +270,64 @@ describe('OfficeRuntimeSection', () => {
     await userEvent.click(screen.getByRole('button', { name: /Task complete.*#0003/i }))
     expect(screen.queryByText('Office Visual-State QA Sleep Command')).toBeNull()
     expect(screen.queryByText('Assignment')).toBeNull()
+  })
+
+  it('keeps a long Assignment as the single focused reading disclosure', async () => {
+    const longAssignment = [
+      'Read-only Office live-floor animation QA.',
+      'Inspect this Workspace with at least eight separate file listing, search, or read operations;',
+      'read README and relevant guidance; do not edit files, and finish with a concise verified result.',
+    ].join(' ')
+    query.mockResolvedValue({
+      lastSeq: 1,
+      total: 1,
+      page: 1,
+      pageSize: 50,
+      totalPages: 1,
+      entries: [{
+        seq: 1,
+        ts: Date.now(),
+        type: 'runtime.turn.text',
+        payload: {
+          resumeId: 'resume-long-assignment',
+          taskId: 'task-long-assignment',
+          text: Array.from({ length: 12 }, (_, index) => `Verified report line ${index + 1}.`).join('\n'),
+        },
+      }],
+    })
+    const actors = new Map([['resume-long-assignment', {
+      resumeId: 'resume-long-assignment',
+      agent: 'grok',
+      lastSeq: 1,
+      label: 'Grok Engineer',
+      assignment: longAssignment,
+      secondary: 'grok · g27 · Chat',
+      asset: OFFICE_COWORKER_SPRITES['grok-engineer'],
+    }]])
+    const { container } = render(<OfficeRuntimeSection actors={actors} initialChannel="agent" />)
+
+    await screen.findByRole('button', { name: /Agent report.*#0001/i })
+    const assignment = screen.getByText(longAssignment)
+    const assignmentBox = container.querySelector('.oa-office-runtime__assignment')
+    expect(assignmentBox?.getAttribute('data-expandable')).toBe('true')
+    expect(assignment.getAttribute('data-expanded')).toBeNull()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Show full title' }))
+    expect(screen.getByRole('region', { name: 'Assignment' })).toBe(assignment)
+    expect(document.activeElement).toBe(assignment)
+    expect(assignment.getAttribute('data-expanded')).toBe('true')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Show full report' }))
+    expect(assignment.getAttribute('data-expanded')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Collapse report' })).toBeTruthy()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Show full title' }))
+    expect(screen.queryByRole('button', { name: 'Collapse report' })).toBeNull()
+    expect(document.activeElement).toBe(assignment)
+    await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(document.activeElement)
+      .toBe(screen.getByRole('button', { name: 'Show full title' })))
+    expect(assignment.getAttribute('data-expanded')).toBeNull()
   })
 
   it('presents long agent Markdown as expandable game dialogue', async () => {

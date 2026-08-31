@@ -3161,13 +3161,31 @@ body:has(.oa-office-main):not(:has(.oa-office-window)):not(:has(.oa-office-pause
 }
 
 .oa-office-runtime__assignment > p {
-  display: -webkit-box;
+  display: block;
   margin: 1px 0 0;
-  overflow: hidden;
+  overflow: visible;
   line-height: 1.3;
   overflow-wrap: anywhere;
+}
+
+.oa-office-runtime__assignment[data-expandable="true"] > p:not([data-expanded="true"]) {
+  display: -webkit-box;
+  overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
+}
+
+.oa-office-runtime__assignment > p[data-expanded="true"] {
+  max-height: 7.8em;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 5px;
+  outline-offset: 2px;
+  background: color-mix(in srgb, var(--gba-paper) 72%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gba-moss-dark) 52%, transparent);
+  scrollbar-color: var(--gba-moss-dark) var(--gba-paper);
+  scrollbar-width: thin;
 }
 
 .oa-office-inspect__dialogue blockquote {

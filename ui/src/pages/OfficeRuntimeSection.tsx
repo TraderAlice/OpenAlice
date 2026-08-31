@@ -324,12 +324,16 @@ export function OfficeRuntimeSection({
   const [mobileView, setMobileView] = useState<OfficeLogMobileView>(
     initialSelectedSeq == null ? 'index' : 'detail',
   )
+  const [assignmentExpanded, setAssignmentExpanded] = useState(false)
   const [detailExpanded, setDetailExpanded] = useState(false)
   const [beatExpanded, setBeatExpanded] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const journalIndexRef = useRef<HTMLOListElement>(null)
   const journalBackRef = useRef<HTMLButtonElement>(null)
+  const assignmentTextRef = useRef<HTMLParagraphElement>(null)
+  const assignmentToggleRef = useRef<HTMLButtonElement>(null)
+  const assignmentToggleFocusPendingRef = useRef(false)
   const reportToggleRef = useRef<HTMLButtonElement>(null)
   const reportToggleFocusPendingRef = useRef(false)
   const journalInitialFocusPendingRef = useRef(true)
@@ -448,9 +452,21 @@ export function OfficeRuntimeSection({
   }, [beatsByChannel, channel, entriesByChannel.overview, replaySeq])
 
   useEffect(() => {
+    setAssignmentExpanded(false)
     setDetailExpanded(false)
     setBeatExpanded(false)
   }, [selectedSeq])
+
+  useLayoutEffect(() => {
+    if (assignmentExpanded && assignmentTextRef.current) {
+      assignmentTextRef.current.scrollTop = 0
+      assignmentTextRef.current.focus({ preventScroll: true })
+      return
+    }
+    if (!assignmentToggleFocusPendingRef.current) return
+    assignmentToggleFocusPendingRef.current = false
+    assignmentToggleRef.current?.focus({ preventScroll: true })
+  }, [assignmentExpanded])
 
   useLayoutEffect(() => {
     if (!reportToggleFocusPendingRef.current) return
@@ -586,6 +602,8 @@ export function OfficeRuntimeSection({
   )
     ? selectedActor.assignment
     : undefined
+  const selectedAssignmentId = `office-runtime-assignment-${selectedEvent.seq}`
+  const assignmentCanExpand = (selectedAssignment?.length ?? 0) > 120
   const selectedIdentity = eventIdentity(selectedEvent, actors)
   const selectJournalEvent = (seq: number) => {
     setSelectedSeq(seq)
@@ -620,7 +638,19 @@ export function OfficeRuntimeSection({
   }
   const toggleReport = () => {
     reportToggleFocusPendingRef.current = true
+    setAssignmentExpanded(false)
+    setBeatExpanded(false)
     setDetailExpanded((expanded) => !expanded)
+  }
+  const toggleAssignment = () => {
+    setDetailExpanded(false)
+    setBeatExpanded(false)
+    setAssignmentExpanded((expanded) => !expanded)
+  }
+  const toggleBeat = () => {
+    setAssignmentExpanded(false)
+    setDetailExpanded(false)
+    setBeatExpanded((expanded) => !expanded)
   }
   const reportToggle = detailCanExpand ? (
     <button
@@ -689,6 +719,13 @@ export function OfficeRuntimeSection({
       keyboardEvent.stopPropagation()
       reportToggleFocusPendingRef.current = true
       setDetailExpanded(false)
+      return
+    }
+    if (assignmentExpanded) {
+      keyboardEvent.preventDefault()
+      keyboardEvent.stopPropagation()
+      assignmentToggleFocusPendingRef.current = true
+      setAssignmentExpanded(false)
       return
     }
     const detailBackVisible = journalBackRef.current?.offsetParent != null
@@ -841,9 +878,35 @@ export function OfficeRuntimeSection({
               <span>{selectedIdentity.secondary}</span>
             </div>
             {selectedAssignment && (
-              <div className="oa-office-runtime__assignment">
+              <div
+                className="oa-office-runtime__assignment"
+                data-expandable={assignmentCanExpand || undefined}
+              >
                 <small>{t('office.assignment')}</small>
-                <p title={selectedAssignment}>{selectedAssignment}</p>
+                <p
+                  ref={assignmentTextRef}
+                  id={selectedAssignmentId}
+                  role={assignmentExpanded ? 'region' : undefined}
+                  aria-label={assignmentExpanded ? t('office.assignment') : undefined}
+                  data-expanded={assignmentExpanded || undefined}
+                  tabIndex={assignmentExpanded ? 0 : undefined}
+                  title={selectedAssignment}
+                >
+                  {selectedAssignment}
+                </p>
+                {assignmentCanExpand && (
+                  <button
+                    type="button"
+                    ref={assignmentToggleRef}
+                    className="oa-office-runtime__detail-toggle"
+                    aria-controls={selectedAssignmentId}
+                    aria-expanded={assignmentExpanded}
+                    onClick={toggleAssignment}
+                    onKeyDown={(event) => confirmRuntimeAction(event, toggleAssignment)}
+                  >
+                    {assignmentExpanded ? t('office.collapseTitle') : t('office.showFullTitle')}
+                  </button>
+                )}
               </div>
             )}
             {selectedDetail && (
@@ -867,10 +930,10 @@ export function OfficeRuntimeSection({
                   className="oa-office-runtime__detail-toggle"
                   aria-controls={`office-runtime-beat-${selectedEvent.seq}`}
                   aria-expanded={beatExpanded}
-                  onClick={() => setBeatExpanded((expanded) => !expanded)}
+                  onClick={toggleBeat}
                   onKeyDown={(event) => confirmRuntimeAction(
                     event,
-                    () => setBeatExpanded((expanded) => !expanded),
+                    toggleBeat,
                   )}
                 >
                   {beatExpanded

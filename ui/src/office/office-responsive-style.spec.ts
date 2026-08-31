@@ -308,6 +308,18 @@ describe('Office responsive style contract', () => {
     )
   })
 
+  it('gives long journal assignments a bounded keyboard-readable disclosure', () => {
+    expect(css).toMatch(
+      /\.oa-office-runtime__assignment > p\s*\{[\s\S]*?display: block;[\s\S]*?overflow: visible;/,
+    )
+    expect(css).toMatch(
+      /\.oa-office-runtime__assignment\[data-expandable="true"\] > p:not\(\[data-expanded="true"\]\)\s*\{[\s\S]*?-webkit-line-clamp: 3;/,
+    )
+    expect(css).toMatch(
+      /\.oa-office-runtime__assignment > p\[data-expanded="true"\]\s*\{[\s\S]*?max-height: 7\.8em;[\s\S]*?overflow-y: auto;[\s\S]*?scrollbar-width: thin;/,
+    )
+  })
+
   it('pins activity-log chrome while the record and detail panes own overflow', () => {
     expect(css).toMatch(
       /\.oa-office-window--log \.oa-office-window__body\s*\{[\s\S]*?display: flex;[\s\S]*?overflow: clip;/,

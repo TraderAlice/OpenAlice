@@ -5193,6 +5193,31 @@ Replay excursion continuity follow-up (2026-08-31):
   25 tests; root and UI TypeScript passed; the full suite passed all 620 test files and 5,197 tests (one file and nine
   tests skipped); the production UI build passed with only the existing ports fallback and large-chunk advisory.
 
+Activity-log assignment-reading follow-up (2026-08-31):
+
+- Replayed the real Floor terminal, Inbox station, News terminal, and Operations board loops after the Replay excursion
+  fix. Their spatial routing, attention acknowledgement, exact channel selection, record identity, and specific exits
+  were already coherent. The selected g27 completion exposed the discontinuity: its 331-character Assignment was
+  clamped after three lines in Activity Log with no way to read the remainder, despite Agent file now owning a complete
+  Assignment reading interaction.
+- Compared growing every event card, removing Assignment from journal evidence, and sharing the bounded disclosure
+  grammar. Unbounded event growth competes with detail metadata and the fixed command rail; removal discards the task
+  context that makes a lifecycle beat understandable. Chose the shared disclosure: short assignments render fully,
+  long assignments keep a compact preview and an explicit `Show full title` command.
+- Expanded Assignment becomes a labelled, focusable, internally scrollable reading region. Escape collapses it and
+  restores the toggle before leaving the journal; expanding Assignment collapses a full report or grouped beat, and
+  expanding a report collapses Assignment, so one selected event never opens competing long-text surfaces.
+- Implemented the disclosure without changing the product-log producer: short Assignments remain natural-height,
+  while only copy over 120 characters receives the three-line preview and existing localized title command. The
+  expanded paper panel owns a bounded thin-scrollbar reading area; selection changes reset it, and report or grouped
+  beat expansion closes it before opening the other evidence surface.
+- Real-browser acceptance reopened actual g27 completion Seq 5501, expanded its complete 331-character Assignment,
+  held it open across a five-second journal poll, and kept `Find on floor` plus `Open Runs` visible. `Show full report`
+  closed Assignment; reopening Assignment closed the report; Escape collapsed back to the focused `Show full title`
+  command. Focused component/style suites passed all 50 tests; root and UI TypeScript passed; the full suite passed all
+  620 test files and 5,199 tests (one file and nine tests skipped); the production UI build passed with only the
+  existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log
