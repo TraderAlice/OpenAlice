@@ -52,6 +52,7 @@ describe('OfficeRosterWindow', () => {
         }}
         roomName="Semis and supply chain"
         focusResumeId="resume-5"
+        replayFocusResumeId="resume-5"
         onSelect={onSelect}
         onClose={onClose}
       />,
@@ -97,9 +98,13 @@ describe('OfficeRosterWindow', () => {
     expect(screen.getByText('failed')).toBeTruthy()
     expect(screen.getByText('waiting')).toBeTruthy()
     expect(screen.getByText('review')).toBeTruthy()
-    expect(screen.getByText('asleep')).toBeTruthy()
+    expect(screen.queryByText('asleep')).toBeNull()
+    expect(screen.getByText('Replay').getAttribute('aria-label')).toBe('active in replay')
     expect(container.querySelectorAll('.oa-office-roster__status[data-power="awake"]')).toHaveLength(2)
-    expect(container.querySelectorAll('.oa-office-roster__status[data-power="asleep"]')).toHaveLength(4)
+    expect(container.querySelectorAll('.oa-office-roster__status[data-power="asleep"]')).toHaveLength(3)
+    expect(container.querySelectorAll('.oa-office-roster__status[data-power="replay"]')).toHaveLength(1)
+    expect((container.querySelector('button[data-replay-focus="true"]') as HTMLElement | null)?.dataset.resumeId)
+      .toBe('resume-5')
     expect(container.querySelectorAll('.oa-office-roster__identity > .oa-office-roster__status')).toHaveLength(6)
     expect(container.querySelector('.oa-office-roster__meta')?.textContent).toBe('Research session 1')
     expect(container.querySelectorAll('.oa-office-roster li button[data-awake="false"]')).toHaveLength(4)

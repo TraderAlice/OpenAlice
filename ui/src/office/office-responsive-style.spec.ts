@@ -145,6 +145,12 @@ describe('Office responsive style contract', () => {
       /\.oa-office-roster li button:focus-visible\s*\{[^}]*background:\s*color-mix\(in srgb, var\(--gba-water\) 26%, var\(--gba-paper\)\);[^}]*inset 0 0 0 2px var\(--gba-water\),/s,
     )
     expect(css).toMatch(
+      /\.oa-office-roster li button\[data-replay-focus="true"\]\s*\{[^}]*border-color:\s*var\(--gba-water\);[^}]*inset 0 0 0 2px color-mix\(in srgb, var\(--gba-water\) 54%, transparent\),/s,
+    )
+    expect(css).toMatch(
+      /\.oa-office-roster__status\[data-power="replay"\]\s*\{[^}]*border-color:\s*var\(--gba-water\);[^}]*background:\s*color-mix\(in srgb, var\(--gba-water\) 30%, var\(--gba-paper\)\);/s,
+    )
+    expect(css).toMatch(
       /\.oa-office-roster li button:focus-visible \.oa-office-roster__cursor\s*\{[^}]*drop-shadow\(1px 1px 0 var\(--gba-paper\)\);/s,
     )
   })

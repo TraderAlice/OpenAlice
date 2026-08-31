@@ -5819,6 +5819,24 @@ Replay-status fact containment follow-up (2026-08-31):
   root and UI TypeScript passed; the full suite passed 620 test files and 5,218 tests (one file and nine tests skipped);
   the production UI build passed with only the existing ports fallback and large-chunk advisory.
 
+Replay-roster target coherence follow-up (2026-08-31):
+
+- Continued from Grok Prototyper `#6370` Agent File back into the real 40-person Chat roster. The Agent File called the
+  target `ACTIVE IN REPLAY`, but the same g32 row reverted to an `IDLE` badge; the ordinary keyboard cursor was the only
+  remaining visual hint, so moving focus made the replay subject look indistinguishable from every other coworker.
+- Compared only replacing the status text, adding a second replay badge beside the live mood, and treating replay focus
+  as the row's temporary power state. Chose the temporary power state: a dense roster does not need two competing
+  statuses, while a pinned water-color row and compact `REPLAY` badge match the sequence marker already shown on the
+  floor. The full `active in replay` wording remains the accessible label.
+- Replay focus is now passed independently from keyboard focus. The target row keeps its water border, inset highlight,
+  and Replay badge while arrow navigation moves to another coworker; its Session suffix remains non-shrinking and the
+  row still owns a single status slot.
+- Real-browser acceptance measured the g32 row at 330.5px with equal 325px client/scroll widths, the 74.6px badge fully
+  inside its 224.5px identity region, and no overflow. After ArrowRight moved keyboard focus to g31, g32 retained its
+  replay power and pinned highlight. Focused roster/style suites passed all 36 tests; root and UI TypeScript passed;
+  the full suite passed 620 test files and 5,218 tests (one file and nine tests skipped); the production UI build passed
+  with only the existing ports fallback and large-chunk advisory.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

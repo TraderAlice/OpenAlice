@@ -17,6 +17,7 @@ export function OfficeRosterWindow({
   group,
   roomName,
   focusResumeId,
+  replayFocusResumeId,
   onSelect,
   onClose,
   coworkerAssets,
@@ -24,6 +25,7 @@ export function OfficeRosterWindow({
   group: OfficeRoomSnapshot
   roomName: string
   focusResumeId?: string | null
+  replayFocusResumeId?: string | null
   onSelect: (employee: OfficeFloorEmployee) => void
   onClose: () => void
   coworkerAssets?: ReadonlyMap<string, OfficeCoworkerSpriteAsset>
@@ -145,6 +147,7 @@ export function OfficeRosterWindow({
             const asset = coworkerAssets?.get(employee.resumeId) ?? coworkerCast.get(employee.resumeId)
             const callsign = officeCoworkerCallsign(employee, asset)
             const assignment = officeCoworkerAssignment(employee)
+            const replayFocused = employee.resumeId === replayFocusResumeId
             return (
             <li key={employee.resumeId}>
               <button
@@ -152,6 +155,7 @@ export function OfficeRosterWindow({
                 autoFocus={employee.resumeId === initialFocusResumeId}
                 data-resume-id={employee.resumeId}
                 data-awake={employee.awake}
+                data-replay-focus={replayFocused || undefined}
                 tabIndex={employee.resumeId === focusedResumeId ? 0 : -1}
                 onFocus={() => setFocusedResumeId(employee.resumeId)}
                 onClick={() => onSelect(employee)}
@@ -180,10 +184,11 @@ export function OfficeRosterWindow({
                   <span
                     className="oa-office-roster__status"
                     data-mood={employee.mood}
-                    data-power={employee.awake ? 'awake' : 'asleep'}
+                    data-power={replayFocused ? 'replay' : employee.awake ? 'awake' : 'asleep'}
+                    aria-label={replayFocused ? t('office.power.replayActive') : undefined}
                   >
                     <i aria-hidden />
-                    {t(officeCoworkerStatusKey(employee))}
+                    {t(replayFocused ? 'office.replay' : officeCoworkerStatusKey(employee))}
                   </span>
                 </span>
                 <small className="oa-office-roster__meta">

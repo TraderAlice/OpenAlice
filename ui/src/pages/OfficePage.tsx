@@ -484,6 +484,10 @@ export function OfficePage() {
                 group={rosterOffice.office}
                 roomName={rosterOffice.roomName}
                 focusResumeId={rosterFocusResumeId}
+                replayFocusResumeId={replayFocus?.seq === asOfSeq
+                  && replayFocus.workspaceId === rosterOffice.office.workspace.id
+                  ? replayFocus.resumeId
+                  : null}
                 coworkerAssets={coworkerCastSnapshot.assets}
                 onSelect={(employee) => {
                   employeeOriginRef.current = {
