@@ -27,7 +27,7 @@ if [[ -n "${RAILWAY_ENVIRONMENT_ID:-}" ]]; then
     printf 'openalice railway: Railway did not provide a stable service identity\n' >&2
     exit 1
   }
-  export OPENALICE_MACHINE_ID="${OPENALICE_MACHINE_ID:-railway-service-${RAILWAY_SERVICE_ID}}"
+  export OPENALICE_MACHINE_ID="railway-service-${RAILWAY_SERVICE_ID}"
 fi
 
 if [[ "${OPENALICE_SERVICE_MANAGER:-}" == railway && ( "$command_name" == openalice || "$command_name" == alice ) ]]; then

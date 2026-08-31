@@ -114,6 +114,41 @@ describe('Railway native CLI host entrypoint', () => {
     expect(await readFile(fixture.runtimeCalled, 'utf8')).toContain(
       'OPENALICE_MACHINE_ID=railway-service-service-test',
     )
+    expect(await readFile(fixture.runtimeCalled, 'utf8')).toContain(
+      'OPENALICE_RAILWAY_ENTRYPOINT_OWNER=1',
+    )
+  })
+
+  it('rejects a configured machine identity that does not match the Railway service', async () => {
+    const fixture = await makeFixture({ installer: 'success' })
+
+    await expect(execFileAsync('bash', [entrypoint], {
+      env: {
+        ...fixture.env,
+        OPENALICE_MACHINE_ID: 'railway-service-other',
+        RAILWAY_ENVIRONMENT_ID: 'environment-test',
+        RAILWAY_SERVICE_ID: 'service-test',
+      },
+    })).rejects.toMatchObject({
+      stderr: expect.stringContaining('must match the Railway service identity'),
+    })
+    await expect(readFile(fixture.installCalled, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('requires enough Railway startup time for hard-kill heartbeat recovery', async () => {
+    const fixture = await makeFixture({ installer: 'success' })
+
+    await expect(execFileAsync('bash', [entrypoint], {
+      env: {
+        ...fixture.env,
+        OPENALICE_RAILWAY_WAIT_SECONDS: '90',
+        RAILWAY_ENVIRONMENT_ID: 'environment-test',
+        RAILWAY_SERVICE_ID: 'service-test',
+      },
+    })).rejects.toMatchObject({
+      stderr: expect.stringContaining('must be at least 130 on Railway'),
+    })
+    await expect(readFile(fixture.installCalled, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
   it('rejects an ephemeral Railway shell home that would split SSH from the Runtime', async () => {
@@ -143,7 +178,7 @@ describe('Railway native CLI host entrypoint', () => {
     )
     expect(dockerfile).toContain('scripts/railway/command-wrapper.sh')
     expect(dockerfile).toContain('scripts/railway/shell-env.sh')
-    expect(dockerfile).toContain('ENTRYPOINT ["/usr/bin/tini", "-g", "--"')
+    expect(dockerfile).toContain('ENTRYPOINT ["/usr/bin/tini", "-s", "-g", "--"')
   })
 
   it('restores the persistent user environment in a Railway login shell', async () => {
@@ -157,6 +192,7 @@ describe('Railway native CLI host entrypoint', () => {
         PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
         HOME: '/root',
         OPENALICE_HOME: '/data/projects/main-cloud',
+        OPENALICE_MACHINE_ID: 'railway-service-wrong',
         RAILWAY_ENVIRONMENT_ID: 'environment-test',
         RAILWAY_SERVICE_ID: 'service-test',
       },
@@ -433,8 +469,8 @@ if [[ "\${1:-}" == version && "\${2:-}" == --json ]]; then
     "$(printf '0%.0s' {1..64})" "$OPENALICE_INSTALL_DIR/cli/releases/0.91.0-beta.1-linux-x64-aaaaaaaaaaaaaaaa"
   exit 0
 fi
-printf 'HOME=%s\\nOPENALICE_HOME=%s\\nAQ_LAUNCHER_ROOT=%s\\nOPENALICE_INSTALL_DIR=%s\\nNPM_CONFIG_PREFIX=%s\\nBUN_INSTALL=%s\\nOPENALICE_MACHINE_ID=%s\\n' \\
-  "$HOME" "$OPENALICE_HOME" "$AQ_LAUNCHER_ROOT" "$OPENALICE_INSTALL_DIR" "$NPM_CONFIG_PREFIX" "$BUN_INSTALL" "\${OPENALICE_MACHINE_ID:-}" >'${runtimeCalled}'
+printf 'HOME=%s\\nOPENALICE_HOME=%s\\nAQ_LAUNCHER_ROOT=%s\\nOPENALICE_INSTALL_DIR=%s\\nNPM_CONFIG_PREFIX=%s\\nBUN_INSTALL=%s\\nOPENALICE_MACHINE_ID=%s\\nOPENALICE_RAILWAY_ENTRYPOINT_OWNER=%s\\n' \\
+  "$HOME" "$OPENALICE_HOME" "$AQ_LAUNCHER_ROOT" "$OPENALICE_INSTALL_DIR" "$NPM_CONFIG_PREFIX" "$BUN_INSTALL" "\${OPENALICE_MACHINE_ID:-}" "\${OPENALICE_RAILWAY_ENTRYPOINT_OWNER:-}" >'${runtimeCalled}'
 printf '%s\\n' "$*" >>'${runtimeCalled}'
 LAUNCHER
 chmod 0755 "$OPENALICE_INSTALL_DIR/cli/current/bin/openalice"
@@ -460,8 +496,8 @@ async function writeLauncher(
   await writeFile(join(runtimeRoot, 'bin', 'openalice'), `#!/usr/bin/env bash
 if [[ "\${1:-}" == --version ]]; then printf '${version}\\n'; exit 0; fi
 if [[ "\${1:-}" == version && "\${2:-}" == --json ]]; then printf '%s\\n' '${JSON.stringify(versionPayload(runtimeRoot, { version, channel, identity }))}'; exit 0; fi
-printf 'HOME=%s\\nOPENALICE_HOME=%s\\nAQ_LAUNCHER_ROOT=%s\\nOPENALICE_INSTALL_DIR=%s\\nNPM_CONFIG_PREFIX=%s\\nBUN_INSTALL=%s\\nOPENALICE_MACHINE_ID=%s\\n' \\
-  "$HOME" "$OPENALICE_HOME" "$AQ_LAUNCHER_ROOT" "$OPENALICE_INSTALL_DIR" "$NPM_CONFIG_PREFIX" "$BUN_INSTALL" "\${OPENALICE_MACHINE_ID:-}" >'${runtimeCalled}'
+printf 'HOME=%s\\nOPENALICE_HOME=%s\\nAQ_LAUNCHER_ROOT=%s\\nOPENALICE_INSTALL_DIR=%s\\nNPM_CONFIG_PREFIX=%s\\nBUN_INSTALL=%s\\nOPENALICE_MACHINE_ID=%s\\nOPENALICE_RAILWAY_ENTRYPOINT_OWNER=%s\\n' \\
+  "$HOME" "$OPENALICE_HOME" "$AQ_LAUNCHER_ROOT" "$OPENALICE_INSTALL_DIR" "$NPM_CONFIG_PREFIX" "$BUN_INSTALL" "\${OPENALICE_MACHINE_ID:-}" "\${OPENALICE_RAILWAY_ENTRYPOINT_OWNER:-}" >'${runtimeCalled}'
 printf '%s\\n' "$*" >>'${runtimeCalled}'
 `, { mode: 0o755 })
   await writeDynamicLauncher(path)

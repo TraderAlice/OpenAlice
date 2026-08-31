@@ -14,6 +14,7 @@ export const GUARDIAN_CONTROL_PROTOCOL = 1
 export const GUARDIAN_CONTROL_API_VERSION = 1
 const MAX_RESPONSE_BYTES = 1024 * 1024
 const MAX_UPTIME_SECONDS = 10 * 365 * 24 * 60 * 60
+const RUNTIME_OWNER_STALE_HEARTBEAT_MS = 90_000
 
 export function resolveOpenAliceHome(homeRoot, options = {}) {
   const env = options.env ?? process.env
@@ -312,10 +313,11 @@ async function inspectGuardianOwner(homeRoot, options = {}) {
     resolve(homeRoot, 'state', 'runtime.lock', 'owner.json'),
     resolve(homeRoot, 'workspaces', 'state', 'runtime.lock', 'owner.json'),
   ]
+  const env = options.env ?? process.env
   const localHostname = options.hostname ?? hostname()
   const isAlive = options.isProcessAlive ?? isProcessAlive
   const machineId = options.readMachineId ?? (() => readMachineId({
-    env: options.env,
+    env,
     hostname: localHostname,
     platform: options.platform,
   }))
@@ -346,13 +348,27 @@ async function inspectGuardianOwner(homeRoot, options = {}) {
         detail: `Runtime owner metadata is invalid at ${ownerPath}`,
       }
     }
-    const sameMachine = typeof owner.machineId === 'string' && owner.machineId
-      ? owner.machineId === await currentMachineId()
-      : typeof owner.hostname !== 'string' || owner.hostname === localHostname
-    const active = !sameMachine || await isSameProcess(owner, {
-      isAlive,
-      processStartedAt,
-    })
+    const resolvedMachineId = await currentMachineId()
+    const railwayScope = railwayOwnerScope(owner, resolvedMachineId, localHostname, env)
+    let active
+    if (railwayScope === 'cross-container') {
+      const heartbeatAt = typeof owner.heartbeatAt === 'string'
+        ? Date.parse(owner.heartbeatAt)
+        : Number.NaN
+      active = !Number.isFinite(heartbeatAt)
+        || Math.max(0, Date.now() - heartbeatAt) <= RUNTIME_OWNER_STALE_HEARTBEAT_MS
+    } else if (railwayScope === 'foreign') {
+      active = true
+    } else {
+      const sameMachine = railwayScope === 'same-container'
+        || (typeof owner.machineId === 'string' && owner.machineId
+          ? owner.machineId === resolvedMachineId
+          : typeof owner.hostname !== 'string' || owner.hostname === localHostname)
+      active = !sameMachine || await isSameProcess(owner, {
+        isAlive,
+        processStartedAt,
+      })
+    }
     const publicOwner = {
       surface: owner.launcher.startsWith('guardian-')
         ? owner.launcher.slice('guardian-'.length)
@@ -372,6 +388,27 @@ async function inspectGuardianOwner(homeRoot, options = {}) {
         detail: 'A stale Runtime owner record is present; the next start may recover it',
       }
     : null
+}
+
+function railwayOwnerScope(owner, currentMachineId, localHostname, env) {
+  const serviceId = env['RAILWAY_SERVICE_ID']?.trim()
+  const environmentId = env['RAILWAY_ENVIRONMENT_ID']?.trim()
+  const configuredMachineId = env['OPENALICE_MACHINE_ID']?.trim()
+  const expectedMachineId = `railway-service-${serviceId}`
+  if (
+    env['OPENALICE_SERVICE_MANAGER']?.trim() !== 'railway'
+    || !environmentId
+    || !/^[A-Za-z0-9-]{1,128}$/.test(serviceId ?? '')
+    || configuredMachineId !== expectedMachineId
+    || currentMachineId !== `env:${expectedMachineId}`
+  ) {
+    return null
+  }
+  if (typeof owner.hostname !== 'string' || owner.hostname.length === 0) return 'foreign'
+  const belongsToService = owner.machineId === currentMachineId
+    || owner.machineId === `hostname:${owner.hostname}`
+  if (!belongsToService) return 'foreign'
+  return owner.hostname === localHostname ? 'same-container' : 'cross-container'
 }
 
 async function isSameProcess(owner, dependencies) {
