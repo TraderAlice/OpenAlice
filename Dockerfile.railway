@@ -41,4 +41,4 @@ RUN chmod 0755 \
      done \
   && printf '\n. /etc/profile.d/openalice-railway.sh\n' >>/etc/bash.bashrc
 
-ENTRYPOINT ["/usr/bin/tini", "-g", "--", "/usr/local/bin/openalice-railway-entrypoint"]
+ENTRYPOINT ["/usr/bin/tini", "-s", "-g", "--", "/usr/local/bin/openalice-railway-entrypoint"]

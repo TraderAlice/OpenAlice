@@ -59,9 +59,12 @@ export interface RuntimeLockOptions {
   readonly heartbeatMs?: number
   readonly staleHeartbeatMs?: number
   readonly initializationGraceMs?: number
+  readonly ownerAuthority?: RuntimeLockOwnerAuthority
   readonly processController?: ProcessController
   readonly onOwnershipLost?: (error: Error) => void
 }
+
+export type RuntimeLockOwnerAuthority = 'process' | 'railway-volume'
 
 export interface OpenAliceRuntimeOptions extends RuntimeLockOptions {
   readonly userDataHome: string
@@ -80,6 +83,7 @@ export interface PrepareOpenAliceRuntimeOptions {
   readonly userDataHome: string
   readonly launcherRoot: string
   readonly takeover?: boolean
+  readonly ownerAuthority?: RuntimeLockOwnerAuthority
   readonly processController?: ProcessController
   readonly staleHeartbeatMs?: number
   readonly initializationGraceMs?: number
@@ -119,9 +123,24 @@ export function takeoverRequested(env: NodeJS.ProcessEnv = process.env, argv: re
   return /^(1|true|yes|on)$/i.test(env['OPENALICE_TAKEOVER']?.trim() ?? '')
 }
 
+export function resolveRuntimeLockOwnerAuthority(
+  env: NodeJS.ProcessEnv = process.env,
+): RuntimeLockOwnerAuthority {
+  const serviceManager = env['OPENALICE_SERVICE_MANAGER']?.trim()
+  const machineId = env['OPENALICE_MACHINE_ID']?.trim()
+  const serviceId = env['RAILWAY_SERVICE_ID']?.trim()
+  const environmentId = env['RAILWAY_ENVIRONMENT_ID']?.trim()
+  return serviceManager === 'railway'
+    && Boolean(environmentId)
+    && /^[A-Za-z0-9-]{1,128}$/.test(serviceId ?? '')
+    && machineId === `railway-service-${serviceId}`
+    ? 'railway-volume'
+    : 'process'
+}
+
 export async function inspectRuntimeLock(
   lockDir: string,
-  opts: Pick<RuntimeLockOptions, 'processController' | 'staleHeartbeatMs' | 'initializationGraceMs'> = {},
+  opts: Pick<RuntimeLockOptions, 'processController' | 'staleHeartbeatMs' | 'initializationGraceMs' | 'ownerAuthority'> = {},
 ): Promise<RuntimeLockInspection> {
   const controller = opts.processController ?? defaultProcessController
   const staleMs = opts.staleHeartbeatMs ?? DEFAULT_STALE_HEARTBEAT_MS
@@ -136,8 +155,11 @@ export async function inspectRuntimeLock(
   const directoryIdentity = `${lockStat.dev}:${lockStat.ino}:${lockStat.birthtimeMs}`
   const ageMs = Math.max(0, Date.now() - lockStat.mtimeMs)
   let owner: RuntimeLockOwner
+  let hasExplicitHeartbeat: boolean
   try {
-    owner = await readOwner(lockDir)
+    const parsedOwner = await readOwnerRecord(lockDir)
+    owner = parsedOwner.owner
+    hasExplicitHeartbeat = parsedOwner.hasExplicitHeartbeat
   } catch {
     if (ageMs < initGraceMs) {
       return inspection(lockDir, 'initializing', null, null, false, directoryIdentity, 'owner metadata is still being published')
@@ -148,7 +170,45 @@ export async function inspectRuntimeLock(
   const heartbeatAt = Date.parse(owner.heartbeatAt)
   const heartbeatAgeMs = Number.isFinite(heartbeatAt) ? Math.max(0, Date.now() - heartbeatAt) : null
   const heartbeatStale = heartbeatAgeMs === null || heartbeatAgeMs > staleMs
-  if (owner.machineId && owner.machineId !== await controller.machineId()) {
+  const currentMachineId = await controller.machineId()
+  const ownerAuthority = opts.ownerAuthority ?? resolveRuntimeLockOwnerAuthority()
+  const railwayScope = railwayOwnerScope(owner, currentMachineId, ownerAuthority)
+  if (railwayScope === 'cross-container') {
+    if (hasExplicitHeartbeat && heartbeatAgeMs !== null && heartbeatStale) {
+      return inspection(
+        lockDir,
+        'stale',
+        owner,
+        heartbeatAgeMs,
+        true,
+        directoryIdentity,
+        'Railway volume owner heartbeat is stale and eligible for orchestrator handoff',
+      )
+    }
+    return inspection(
+      lockDir,
+      'active',
+      owner,
+      heartbeatAgeMs,
+      heartbeatStale,
+      directoryIdentity,
+      !hasExplicitHeartbeat || heartbeatAgeMs === null
+        ? 'Railway volume owner heartbeat is missing or invalid; refusing automatic recovery'
+        : 'Railway volume owner heartbeat is active in another container namespace',
+    )
+  }
+  if (railwayScope === 'foreign') {
+    return inspection(
+      lockDir,
+      'active',
+      owner,
+      heartbeatAgeMs,
+      heartbeatStale,
+      directoryIdentity,
+      'owner does not belong to this Railway service; refusing automatic recovery',
+    )
+  }
+  if (owner.machineId && owner.machineId !== currentMachineId && railwayScope !== 'same-container') {
     return inspection(
       lockDir,
       'active',
@@ -178,11 +238,28 @@ export async function inspectRuntimeLock(
   )
 }
 
+function railwayOwnerScope(
+  owner: RuntimeLockOwner,
+  currentMachineId: string,
+  ownerAuthority: RuntimeLockOwnerAuthority | undefined,
+): 'same-container' | 'cross-container' | 'foreign' | null {
+  if (ownerAuthority !== 'railway-volume') return null
+  if (!/^env:railway-service-[A-Za-z0-9-]+$/.test(currentMachineId)) return 'foreign'
+  if (owner.hostname.length === 0) return 'foreign'
+  const sameContainer = owner.hostname === hostname()
+  const belongsToService = owner.machineId === currentMachineId
+    || owner.machineId === `hostname:${owner.hostname}`
+  if (sameContainer && belongsToService) return 'same-container'
+  if (belongsToService) return 'cross-container'
+  return 'foreign'
+}
+
 export async function acquireRuntimeLock(
   lockDir: string,
   opts: RuntimeLockOptions = {},
 ): Promise<RuntimeProcessLock> {
   const controller = opts.processController ?? defaultProcessController
+  const ownerAuthority = opts.ownerAuthority ?? resolveRuntimeLockOwnerAuthority()
   const processStartedAt = opts.processStartedAt ?? currentProcessStartedAt()
   const machineId = await controller.machineId()
   const now = new Date().toISOString()
@@ -205,19 +282,22 @@ export async function acquireRuntimeLock(
     try {
       await mkdir(lockDir)
       await writeOwnerAtomic(lockDir, owner, controller)
-      return makeLock(lockDir, owner, opts)
+      return makeLock(lockDir, owner, { ...opts, ownerAuthority })
     } catch (err) {
       if (!isErrno(err, 'EEXIST')) throw err
     }
 
-    const current = await inspectRuntimeLock(lockDir, opts)
+    const current = await inspectRuntimeLock(lockDir, { ...opts, ownerAuthority })
     if (current.state === 'missing' || current.state === 'initializing') {
       await controller.sleep(25)
       continue
     }
     if (current.state === 'active') {
       if (!opts.takeover || !current.owner) throw new RuntimeAlreadyRunningError(current)
-      await recoverRuntimeOwner(current.owner, { processController: controller })
+      await recoverRuntimeOwner(current.owner, {
+        processController: controller,
+        ownerAuthority,
+      })
       await controller.sleep(25)
       continue
     }
@@ -226,7 +306,7 @@ export async function acquireRuntimeLock(
     await controller.sleep(25)
   }
 
-  throw new RuntimeAlreadyRunningError(await inspectRuntimeLock(lockDir, opts))
+  throw new RuntimeAlreadyRunningError(await inspectRuntimeLock(lockDir, { ...opts, ownerAuthority }))
 }
 
 export async function acquireOpenAliceRuntimeLocks(opts: OpenAliceRuntimeOptions): Promise<OpenAliceRuntimeLock> {
@@ -285,17 +365,32 @@ export async function prepareOpenAliceRuntime(opts: PrepareOpenAliceRuntimeOptio
   const active = dedupeOwners(inspections.filter((row) => row.state === 'active' && row.owner !== null))
   if (active.length > 0 && !opts.takeover) throw new RuntimeAlreadyRunningError(active[0]!)
   for (const row of active) {
-    await recoverRuntimeOwner(row.owner!, { processController: opts.processController })
+    await recoverRuntimeOwner(row.owner!, {
+      processController: opts.processController,
+      ownerAuthority: opts.ownerAuthority,
+    })
   }
   return inspections
 }
 
 export async function recoverRuntimeOwner(
   owner: RuntimeLockOwner,
-  opts: { readonly processController?: ProcessController } = {},
+  opts: {
+    readonly processController?: ProcessController
+    readonly ownerAuthority?: RuntimeLockOwnerAuthority
+  } = {},
 ): Promise<void> {
   const controller = opts.processController ?? defaultProcessController
-  if (owner.machineId && owner.machineId !== await controller.machineId()) {
+  const currentMachineId = await controller.machineId()
+  const ownerAuthority = opts.ownerAuthority ?? resolveRuntimeLockOwnerAuthority()
+  const railwayScope = railwayOwnerScope(owner, currentMachineId, ownerAuthority)
+  if (railwayScope === 'cross-container') {
+    throw new Error(`OpenAlice owner ${owner.pid} belongs to another Railway container; refusing to signal it`)
+  }
+  if (railwayScope === 'foreign') {
+    throw new Error(`OpenAlice owner ${owner.pid} does not belong to this Railway service; refusing to signal it`)
+  }
+  if (owner.machineId && owner.machineId !== currentMachineId && railwayScope !== 'same-container') {
     throw new Error(`OpenAlice owner ${owner.pid} belongs to another machine; refusing to signal it`)
   }
   if (!controller.isAlive(owner.pid)) return
@@ -428,7 +523,12 @@ function isTransientWindowsRenameError(error: unknown): boolean {
   return isErrno(error, 'EPERM') || isErrno(error, 'EACCES') || isErrno(error, 'EBUSY')
 }
 
-async function readOwner(lockDir: string): Promise<RuntimeLockOwner> {
+interface ParsedRuntimeLockOwner {
+  readonly owner: RuntimeLockOwner
+  readonly hasExplicitHeartbeat: boolean
+}
+
+async function readOwnerRecord(lockDir: string): Promise<ParsedRuntimeLockOwner> {
   const parsed = JSON.parse(await readFile(join(lockDir, OWNER_FILE), 'utf8')) as Record<string, unknown>
   if (
     typeof parsed['pid'] !== 'number' ||
@@ -438,19 +538,27 @@ async function readOwner(lockDir: string): Promise<RuntimeLockOwner> {
   ) throw new Error('invalid runtime lock owner')
 
   const acquiredAt = parsed['acquiredAt']
+  const hasExplicitHeartbeat = typeof parsed['heartbeatAt'] === 'string'
   return {
-    schemaVersion: 1,
-    pid: parsed['pid'],
-    hostname: parsed['hostname'],
-    ...(typeof parsed['machineId'] === 'string' ? { machineId: parsed['machineId'] } : {}),
-    token: parsed['token'],
-    launcher: typeof parsed['launcher'] === 'string' ? parsed['launcher'] : 'legacy',
-    acquiredAt,
-    heartbeatAt: typeof parsed['heartbeatAt'] === 'string' ? parsed['heartbeatAt'] : acquiredAt,
-    ...(typeof parsed['processStartedAt'] === 'string' ? { processStartedAt: parsed['processStartedAt'] } : {}),
-    ...(typeof parsed['guardianPid'] === 'number' ? { guardianPid: parsed['guardianPid'] } : {}),
-    ...(typeof parsed['guardianStartedAt'] === 'string' ? { guardianStartedAt: parsed['guardianStartedAt'] } : {}),
+    hasExplicitHeartbeat,
+    owner: {
+      schemaVersion: 1,
+      pid: parsed['pid'],
+      hostname: parsed['hostname'],
+      ...(typeof parsed['machineId'] === 'string' ? { machineId: parsed['machineId'] } : {}),
+      token: parsed['token'],
+      launcher: typeof parsed['launcher'] === 'string' ? parsed['launcher'] : 'legacy',
+      acquiredAt,
+      heartbeatAt: hasExplicitHeartbeat ? parsed['heartbeatAt'] as string : acquiredAt,
+      ...(typeof parsed['processStartedAt'] === 'string' ? { processStartedAt: parsed['processStartedAt'] } : {}),
+      ...(typeof parsed['guardianPid'] === 'number' ? { guardianPid: parsed['guardianPid'] } : {}),
+      ...(typeof parsed['guardianStartedAt'] === 'string' ? { guardianStartedAt: parsed['guardianStartedAt'] } : {}),
+    },
   }
+}
+
+async function readOwner(lockDir: string): Promise<RuntimeLockOwner> {
+  return (await readOwnerRecord(lockDir)).owner
 }
 
 function inspection(
