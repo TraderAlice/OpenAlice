@@ -222,7 +222,7 @@ describe('OfficeBuilding', () => {
 
     expect(screen.getAllByTestId(/^office-desk-/)).toHaveLength(4)
     expect(screen.queryByTestId('office-desk-resume-4')).toBeNull()
-    expect(screen.getByRole('button', { name: 'Next duty: Operations board, 1 pending' }))
+    expect(screen.getByRole('button', { name: 'Next duty: Agent · Operations board, 1 pending' }))
       .toBeTruthy()
   })
 
@@ -2104,7 +2104,12 @@ describe('OfficeBuilding', () => {
             occurredAt: 1_100,
             detail: 'Agent report delivered',
             source: 'codex',
-            inboxEntryId: 'inbox-11',
+            subject: {
+              kind: 'inbox-entry',
+              workspaceId: 'chat-1',
+              inboxEntryId: 'inbox-11',
+              documentCount: 1,
+            },
           },
           news: {
             seq: 12,
@@ -2129,10 +2134,13 @@ describe('OfficeBuilding', () => {
 
     const inbox = screen.getByRole('button', { name: 'Inbox station · 2 pending' })
     const news = screen.getByRole('button', { name: 'News terminal · 9+ pending' })
-    const nextDuty = screen.getByRole('button', { name: 'Next duty: Inbox station, 2 pending' })
+    const nextDuty = screen.getByRole('button', {
+      name: 'Next duty: Inbox · Agent report delivered · codex, 2 pending',
+    })
     expect(nextDuty.dataset.kind).toBe('inbox')
     expect(nextDuty.textContent).toContain('Next duty')
-    expect(nextDuty.textContent).toContain('Inbox station')
+    expect(nextDuty.textContent).toContain('Inbox')
+    expect(nextDuty.textContent).toContain('Agent report delivered')
     const serviceZone = screen.getByTestId('office-service-zone')
     expect(serviceZone.querySelector('img')?.getAttribute('src'))
       .toBe('/office/furniture/workspace-rug-v2.png')
@@ -2197,7 +2205,12 @@ describe('OfficeBuilding', () => {
         occurredAt: 1_100,
         detail: 'Agent report delivered',
         source: 'codex',
-        inboxEntryId: 'inbox-11',
+        subject: {
+          kind: 'inbox-entry' as const,
+          workspaceId: 'chat-1',
+          inboxEntryId: 'inbox-11',
+          documentCount: 1,
+        },
       },
       news: null,
       attention: { agent: false, inbox: true, news: false },
@@ -2219,7 +2232,9 @@ describe('OfficeBuilding', () => {
     const view = render(<OfficeBuilding {...props} productActivity={activity} />)
 
     const inbox = screen.getByRole('button', { name: 'Inbox station · 1 pending' })
-    await userEvent.click(screen.getByRole('button', { name: 'Next duty: Inbox station, 1 pending' }))
+    await userEvent.click(screen.getByRole('button', {
+      name: 'Next duty: Inbox · Agent report delivered · codex, 1 pending',
+    }))
     await waitFor(() => expect(onOpenDuty).toHaveBeenCalledWith(expect.objectContaining({
       kind: 'inbox',
       targetId: 'inbox-service',

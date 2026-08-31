@@ -523,8 +523,10 @@ describe('Office responsive style contract', () => {
     expect(narrowLiveCss).toContain('grid-area: actions')
     expect(narrowLiveCss).toContain('grid-area: duty')
     expect(css).toMatch(
-      /\.oa-office-hud__duty\s*\{[^}]*min-height:\s*34px;[^}]*grid-template-columns:\s*auto minmax\(0, 1fr\) auto;/s,
+      /\.oa-office-hud__duty\s*\{[^}]*min-height:\s*34px;[^}]*grid-template-columns:\s*minmax\(0, 1fr\) auto;/s,
     )
+    expect(css).toMatch(/\.oa-office-hud__duty-meta\s*\{\s*display:\s*none;/)
+    expect(css).toMatch(/\.oa-office-hud__duty strong\s*\{[^}]*grid-column:\s*1;/s)
   })
 
   it('keeps clear duty copy passive and yields phone HUD space to guidance', () => {

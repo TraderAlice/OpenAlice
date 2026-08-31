@@ -28,13 +28,24 @@ import {
   readOfficePlayerState,
   rememberOfficePlayerState,
 } from '../office/office-excursion'
+import {
+  clearOfficeInboxDutyExcursion,
+  readOfficeInboxDutyExcursion,
+  rememberOfficeInboxDutyExcursion,
+  type OfficeInboxDutyExcursion,
+} from '../office/inbox-duty-excursion'
 import { OfficeReplayBar } from '../office/OfficeReplayBar'
 import type { OfficeReplayFocus } from '../office/replay-focus'
 import { OfficeRosterWindow } from '../office/OfficeRosterWindow'
 import { useOfficeDuties } from '../office/useOfficeDuties'
-import { useOfficeProductActivity, type OfficeActivityKind } from '../office/useOfficeProductActivity'
+import {
+  useOfficeProductActivity,
+  type OfficeActivityKind,
+  type OfficeActivityLandmark,
+} from '../office/useOfficeProductActivity'
 import type {
   OfficeCadenceDutyCandidate,
+  OfficeDutyTargetId,
   OfficeResolvedDuty,
 } from '../office/duty-registry'
 import { useIssues } from '../hooks/useIssues'
@@ -54,6 +65,52 @@ function sourceForTag(tag: string): WorkspaceSource | undefined {
   return undefined
 }
 
+function inboxDutyReviewFromExcursion(
+  excursion: OfficeInboxDutyExcursion,
+): OfficeDutyReview {
+  return {
+    kind: 'inbox',
+    throughSeq: excursion.throughSeq,
+    count: excursion.count,
+    inboxDelivery: {
+      workspaceId: excursion.workspaceId,
+      inboxEntryId: excursion.inboxEntryId,
+      documentCount: excursion.documentCount,
+      phase: 'returned',
+    },
+  }
+}
+
+function officeActivityDutyReview(
+  kind: OfficeActivityKind,
+  throughSeq: number,
+  count: number,
+  landmark: OfficeActivityLandmark | null,
+): OfficeDutyReview {
+  const inboxSubject = kind === 'inbox' && landmark?.subject?.kind === 'inbox-entry'
+    ? landmark.subject
+    : null
+  return {
+    kind,
+    throughSeq,
+    count,
+    ...(kind === 'inbox'
+      && count === 1
+      && inboxSubject
+      && inboxSubject.documentCount != null
+      && inboxSubject.documentCount > 0
+      ? {
+          inboxDelivery: {
+            workspaceId: inboxSubject.workspaceId,
+            inboxEntryId: inboxSubject.inboxEntryId,
+            documentCount: inboxSubject.documentCount,
+            phase: 'required' as const,
+          },
+        }
+      : {}),
+  }
+}
+
 /**
  * One spatial floor. Each Workspace is a bay of desks. Activity Bar is the only navigator.
  */
@@ -64,6 +121,8 @@ export function OfficePage() {
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
   const initialPlayerStateRef = useRef(readOfficePlayerState())
   const cadenceExcursionRef = useRef(readOfficeCadenceExcursion())
+  const inboxExcursionRef = useRef(readOfficeInboxDutyExcursion())
+  const inboxExcursionRestoredRef = useRef(false)
   const [asOfSeq, setAsOfSeq] = useState<number | null>(null)
   const [replayFocus, setReplayFocus] = useState<OfficeReplayFocus | null>(null)
   const [replayPanelOpen, setReplayPanelOpen] = useState(false)
@@ -94,9 +153,12 @@ export function OfficePage() {
   const officeDuties = useOfficeDuties(productActivity, issues)
   const [cadenceDuty, setCadenceDuty] = useState<OfficeCadenceDutyCandidate | null>(null)
   const [cadenceInitialStep, setCadenceInitialStep] = useState<'exception' | 'evidence'>('exception')
+  const [inboxExcursion, setInboxExcursion] = useState<OfficeInboxDutyExcursion | null>(
+    inboxExcursionRef.current,
+  )
   const [dutyAcknowledgement, setDutyAcknowledgement] = useState<{
     token: number
-    targetId: 'operations'
+    targetId: OfficeDutyTargetId
     label: string
     reviewed: string
     dutyKey: string
@@ -192,6 +254,11 @@ export function OfficePage() {
     || Boolean(cadenceDuty)
   const closeLogWithDestination = (destination: 'origin' | 'floor') => {
     const origin = logView?.origin ?? 'menu'
+    if (logView?.dutyReview?.inboxDelivery?.phase === 'returned') {
+      clearOfficeInboxDutyExcursion()
+      inboxExcursionRef.current = null
+      setInboxExcursion(null)
+    }
     setLogView(null)
     if (destination === 'floor') {
       setSelected(null)
@@ -339,11 +406,28 @@ export function OfficePage() {
       setLogView(null)
       return
     }
-    const dutyReview: OfficeDutyReview = {
-      kind: duty.receipt.family,
-      throughSeq: duty.receipt.throughSeq,
-      count: duty.count,
+    if (duty.kind === 'inbox'
+      && inboxExcursion
+      && inboxExcursion.phase === 'returned'
+      && duty.receipt.throughSeq >= inboxExcursion.throughSeq) {
+      setLogView({
+        origin: 'inbox-service',
+        channel: 'inbox',
+        focusSeq: inboxExcursion.throughSeq,
+        dutyReview: inboxDutyReviewFromExcursion(inboxExcursion),
+      })
+      setReplayPanelOpen(false)
+      setSelected(null)
+      setRosterWorkspaceId(null)
+      setCabinetWorkspaceId(null)
+      return
     }
+    const dutyReview = officeActivityDutyReview(
+      duty.receipt.family,
+      duty.receipt.throughSeq,
+      duty.count,
+      duty.landmark,
+    )
     if (duty.kind === 'agent' && duty.targetId.startsWith('employee:')) {
       const subject = duty.destination.subject
       const office = subject
@@ -398,8 +482,8 @@ export function OfficePage() {
     const next = nextDutyCandidate
     if (!next) return null
     if (next.kind === 'cadence') return next.cadence.title
-    if (next.kind === 'inbox') return t('office.inboxStation')
-    if (next.kind === 'news') return t('office.newsStation')
+    if (next.kind === 'inbox') return next.landmark.detail ?? t('office.inboxStation')
+    if (next.kind === 'news') return next.landmark.detail ?? t('office.newsStation')
     return t('office.logChannelAgent')
   })()
   useEffect(() => {
@@ -433,6 +517,33 @@ export function OfficePage() {
     setCadenceInitialStep('evidence')
     setCadenceDuty(excursion.duty)
   }, [cadenceDuty, officeDuties.cadenceStatus])
+  useEffect(() => {
+    const excursion = inboxExcursionRef.current
+    if (!excursion || inboxExcursionRestoredRef.current || !building) return
+    if (productActivity.sourceStatus !== 'ready') return
+    inboxExcursionRestoredRef.current = true
+    if (!productActivity.attention.inbox) {
+      clearOfficeInboxDutyExcursion()
+      inboxExcursionRef.current = null
+      setInboxExcursion(null)
+      return
+    }
+    if (excursion.phase === 'away') return
+    const returned = { ...excursion, phase: 'returned' as const }
+    rememberOfficeInboxDutyExcursion(returned)
+    inboxExcursionRef.current = returned
+    setInboxExcursion(returned)
+    setLogView({
+      origin: 'inbox-service',
+      channel: 'inbox',
+      focusSeq: returned.throughSeq,
+      dutyReview: inboxDutyReviewFromExcursion(returned),
+    })
+    setReplayPanelOpen(false)
+    setSelected(null)
+    setRosterWorkspaceId(null)
+    setCabinetWorkspaceId(null)
+  }, [building, productActivity.attention.inbox, productActivity.sourceStatus])
 
   const selectedDutyReview = asOfSeq == null ? selected?.dutyReview : undefined
   const reviewSelectedActivity = selectedSeat && selectedReplayFocus
@@ -515,7 +626,8 @@ export function OfficePage() {
                   const agentLandmark = productActivity.agent
                   const dutyReview = asOfSeq == null
                     && productActivity.attention.agent
-                    && agentLandmark?.subject?.workspaceId === workspaceId
+                    && agentLandmark?.subject?.kind === 'session'
+                    && agentLandmark.subject.workspaceId === workspaceId
                     && agentLandmark.subject.resumeId === employee.resumeId
                     ? {
                         kind: 'agent' as const,
@@ -592,11 +704,12 @@ export function OfficePage() {
                   const dutyReview = asOfSeq == null
                     && productActivity.attention[kind]
                     && throughSeq != null
-                    ? {
-                        kind: kind as OfficeActivityKind,
+                    ? officeActivityDutyReview(
+                        kind,
                         throughSeq,
-                        count: productActivity.pending[kind],
-                      }
+                        productActivity.pending[kind],
+                        productActivity[kind],
+                      )
                     : undefined
                   setLogView({
                     origin: `${kind}-service`,
@@ -689,11 +802,45 @@ export function OfficePage() {
                     dutyReview={logView.dutyReview}
                     onConfirmDuty={logView.dutyReview
                       ? () => {
+                          const review = logView.dutyReview!
                           productActivity.acknowledgeThrough(
-                            logView.dutyReview!.kind,
-                            logView.dutyReview!.throughSeq,
+                            review.kind,
+                            review.throughSeq,
                           )
+                          if (review.inboxDelivery?.phase === 'returned') {
+                            clearOfficeInboxDutyExcursion()
+                            inboxExcursionRef.current = null
+                            setInboxExcursion(null)
+                            setDutyAcknowledgement((current) => ({
+                              token: (current?.token ?? 0) + 1,
+                              targetId: 'inbox-service',
+                              label: t('office.cadenceReviewedShort'),
+                              reviewed: t('office.inboxDutyReviewed'),
+                              dutyKey: `inbox-arrival:${review.throughSeq}:${review.throughSeq}`,
+                              announcement: null,
+                            }))
+                          }
                           closeLogToFloor()
+                        }
+                      : undefined}
+                    onOpenInboxDuty={logView.dutyReview?.inboxDelivery?.phase === 'required'
+                      ? () => {
+                          const review = logView.dutyReview!
+                          const delivery = review.inboxDelivery!
+                          const excursion: OfficeInboxDutyExcursion = {
+                            throughSeq: review.throughSeq,
+                            count: 1,
+                            workspaceId: delivery.workspaceId,
+                            inboxEntryId: delivery.inboxEntryId,
+                            documentCount: delivery.documentCount,
+                            phase: 'away',
+                          }
+                          rememberOfficeInboxDutyExcursion(excursion)
+                          inboxExcursionRef.current = excursion
+                          setInboxExcursion(excursion)
+                          useInboxSelection.getState().select(delivery.inboxEntryId)
+                          markExcursion()
+                          openOrFocus({ kind: 'inbox', params: {} })
                         }
                       : undefined}
                     onReplay={(focus) => {

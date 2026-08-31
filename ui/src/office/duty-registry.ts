@@ -7,6 +7,7 @@ import type {
 import type { ScheduleWhen } from '../api/schedule'
 import type {
   OfficeActivityKind,
+  OfficeActivityInboxSubject,
   OfficeActivityLandmark,
   OfficeActivitySessionSubject,
   OfficeProductActivityState,
@@ -54,7 +55,9 @@ type OfficeEventDutyCandidate = {
       readonly targetId: K extends 'inbox'
         ? 'inbox-service'
         : K extends 'news' ? 'news-service' : 'operations'
-      readonly subject?: K extends 'agent' ? OfficeActivitySessionSubject : never
+      readonly subject?: K extends 'agent'
+        ? OfficeActivitySessionSubject
+        : K extends 'inbox' ? OfficeActivityInboxSubject : never
     }
     readonly receipt: {
       readonly kind: 'event-watermark'
@@ -196,7 +199,14 @@ function eventDutyDescriptor(
       kind: 'inbox',
       landmark: activity.inbox,
       count: activity.pending.inbox,
-      destination: { kind: 'journal', channel: 'inbox', targetId: 'inbox-service' },
+      destination: {
+        kind: 'journal',
+        channel: 'inbox',
+        targetId: 'inbox-service',
+        ...(activity.inbox.subject?.kind === 'inbox-entry'
+          ? { subject: activity.inbox.subject }
+          : {}),
+      },
       receipt: { kind: 'event-watermark', family: 'inbox', throughSeq: activity.inbox.seq },
     }
   } else if (family === 'agent' && activity.attention.agent && activity.agent) {
@@ -210,7 +220,9 @@ function eventDutyDescriptor(
         kind: 'journal',
         channel: 'agent',
         targetId: 'operations',
-        ...(activity.agent.subject ? { subject: activity.agent.subject } : {}),
+        ...(activity.agent.subject?.kind === 'session'
+          ? { subject: activity.agent.subject }
+          : {}),
       },
       receipt: { kind: 'event-watermark', family: 'agent', throughSeq: activity.agent.seq },
     }
@@ -352,7 +364,7 @@ export function resolveOfficeDutyTarget(
 ): OfficeResolvedDuty {
   if (duty.destination.kind === 'journal'
     && duty.destination.channel === 'agent'
-    && duty.destination.subject) {
+    && duty.destination.subject?.kind === 'session') {
     const { workspaceId, resumeId } = duty.destination.subject
     const employeeTargetId = `employee:${workspaceId}:${resumeId}` as const
     if (targetAvailable(employeeTargetId)) {

@@ -110,6 +110,86 @@ describe('OfficeRuntimeSection', () => {
     expect(onConfirmDuty).toHaveBeenCalledTimes(1)
   })
 
+  it('gates one documented Inbox delivery behind an exact report round trip', async () => {
+    const onConfirmDuty = vi.fn()
+    const onOpenInboxDuty = vi.fn()
+    mockJournal([
+      {
+        seq: 12,
+        ts: Date.now(),
+        type: 'inbox.received',
+        payload: {
+          workspaceId: 'chat-1',
+          inboxEntryId: 'inbox-a',
+          summary: 'NVDA weekly evidence brief',
+          documentCount: 1,
+        },
+      },
+      {
+        seq: 11,
+        ts: Date.now() - 1_000,
+        type: 'inbox.received',
+        payload: {
+          workspaceId: 'chat-1',
+          inboxEntryId: 'inbox-old',
+          summary: 'Older handoff',
+          documentCount: 1,
+        },
+      },
+    ])
+    const review = {
+      kind: 'inbox' as const,
+      throughSeq: 12,
+      count: 1,
+      inboxDelivery: {
+        workspaceId: 'chat-1',
+        inboxEntryId: 'inbox-a',
+        documentCount: 1,
+        phase: 'required' as const,
+      },
+    }
+    const view = render(
+      <OfficeRuntimeSection
+        initialChannel="inbox"
+        initialSelectedSeq={12}
+        dutyReview={review}
+        onConfirmDuty={onConfirmDuty}
+        onOpenInboxDuty={onOpenInboxDuty}
+      />,
+    )
+
+    expect(await screen.findByText('Review the delivered work')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Stamp/ })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Review exact delivery' })).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: /Older handoff.*#0011/i }))
+    expect(screen.queryByText('Review the delivered work')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Review exact delivery' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Stamp/ })).toBeNull()
+
+    await userEvent.click(screen.getByRole('button', { name: /NVDA weekly evidence brief.*#0012/i }))
+    screen.getByRole('button', { name: 'Review exact delivery' }).focus()
+    await userEvent.keyboard('{Enter}')
+    expect(onOpenInboxDuty).toHaveBeenCalledTimes(1)
+    expect(openOrFocus).not.toHaveBeenCalled()
+    expect(onConfirmDuty).not.toHaveBeenCalled()
+
+    view.rerender(
+      <OfficeRuntimeSection
+        initialChannel="inbox"
+        initialSelectedSeq={12}
+        dutyReview={{
+          ...review,
+          inboxDelivery: { ...review.inboxDelivery, phase: 'returned' },
+        }}
+        onConfirmDuty={onConfirmDuty}
+      />,
+    )
+    expect(screen.getByText('Delivery opened')).toBeTruthy()
+    screen.getByRole('button', { name: 'Stamp this delivery reviewed' }).focus()
+    await userEvent.keyboard(' ')
+    expect(onConfirmDuty).toHaveBeenCalledTimes(1)
+  })
+
   it('labels a capped review batch as nine-plus rather than an exact count', async () => {
     mockJournal([{
       seq: 22,
@@ -908,6 +988,61 @@ describe('OfficeRuntimeSection', () => {
     window.dispatchEvent(new Event(GLOBAL_ACTIVITY_REFRESH_EVENT))
     await waitFor(() => expect(query.mock.calls.filter(([opts]) => opts.afterSeq === 9)).toHaveLength(1))
     expect(target.getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('loads an exact Inbox delivery outside the recent service window before offering its receipt', async () => {
+    const now = Date.now()
+    const recent = Array.from({ length: 60 }, (_, index) => ({
+      seq: 100 - index,
+      ts: now - index,
+      type: 'inbox.received',
+      payload: {
+        workspaceId: 'chat-recent',
+        inboxEntryId: `inbox-recent-${index}`,
+        summary: `Recent delivery ${index}`,
+        documentCount: 1,
+      },
+    }))
+    mockJournal([
+      ...recent,
+      {
+        seq: 10,
+        ts: now - 10_000,
+        type: 'inbox.received',
+        payload: {
+          workspaceId: 'chat-captured',
+          inboxEntryId: 'inbox-captured',
+          summary: 'Captured report outside the latest fifty',
+          documentCount: 1,
+        },
+      },
+    ])
+
+    render(
+      <OfficeRuntimeSection
+        initialChannel="inbox"
+        initialSelectedSeq={10}
+        dutyReview={{
+          kind: 'inbox',
+          throughSeq: 10,
+          count: 1,
+          inboxDelivery: {
+            workspaceId: 'chat-captured',
+            inboxEntryId: 'inbox-captured',
+            documentCount: 1,
+            phase: 'returned',
+          },
+        }}
+        onConfirmDuty={() => undefined}
+      />,
+    )
+
+    const target = await screen.findByRole('button', {
+      name: /Captured report outside the latest fifty.*#0010/i,
+    })
+    expect(target.getAttribute('aria-pressed')).toBe('true')
+    expect(query).toHaveBeenCalledWith({ afterSeq: 9, limit: 100 })
+    expect(screen.getByRole('button', { name: 'Stamp this delivery reviewed' })).toBeTruthy()
   })
 
   it('folds adjacent reports from one task into a selectable activity beat', async () => {

@@ -3,7 +3,7 @@
 **Status:** active — scene rebuild in progress
 **Owner guides:** [[docs/ui-interaction-and-motion.md]], [[docs/conversation-provenance.md]], [[docs/workspace-lifecycle.md]], [[docs/workspace-issues-and-scheduling.md]]
 **Depends on:** [[plans/agent-runtime-log.md]]
-**Delivery:** serial PR to `dev` (`area:workspace`, `theme:reliability`)
+**Delivery:** continue on `codex/office-workstation-crew`; submit to `dev` after maintainer acceptance
 
 ## Goal
 
@@ -23,6 +23,27 @@ Office 奖励的是流程勤勉，而不是交易频率或盈亏：到岗后先�
 - **Workspace 小组**：地图上的家具簇和铭牌
 - **product Session 员工**：围绕小组工位活动，身份仍由 `resumeId` 决定
 - **Alice**：地图角色和镜头锚点
+
+### Inbox 交付复核闭环（2026-09-01）
+
+把刚刚对齐的“正确的勤快”落到第一个正向班次：单条、带文档的 Inbox 交付不能仅靠
+打开 Activity Log 或 Inbox 就被算作完成。Office 必须冻结准确的交付事件，引导用户
+打开对应 Inbox 条目，等用户真实返回 Office 后，才允许对该次交付显式盖章。
+
+| 方案 | 用户影响 | 结论 |
+|---|---|---|
+| 进入 Inbox 终端即确认 | 路径短，但把发现误当成复核，后台仍然“看起来做完了” | 否 |
+| 在 Office 内复制完整报告 | 不必离开地图，但制造第二个 Inbox/文档阅读器 | 否 |
+| 精确交付往返：Log → Inbox 条目 → 返回 → 盖章 | 用户亲自阅读真实产物，Office 只负责节奏、身份和回执 | **是** |
+
+第一切片只特化 `pending === 1`、拥有准确 `workspaceId + inboxEntryId`、且事件时
+`documentCount > 0` 的 Inbox duty。激活时冻结 `throughSeq` 和交付 subject；出门期间到达
+的新事件不会替换当前交付，返回后的盖章也只确认冻结水位。批量、无文档或字段不完整的
+Inbox 仍走现有中性 journal receipt，不猜测“报告”语义。Activity Log 的盖章必须绑定
+冻结事件本身，浏览更旧记录不能确认它；被最新 50 条服务日志挤出的冻结事件由 Office
+自己的 bounded focus window 补回。Inbox 阅读面只负责在“精确条目已于可见 reading surface
+呈现”后写入一次 presentation handshake；它不持有值班、回执或优先级语义，也不修改 API、
+后端或 Inbox 数据契约。导航 intent、后台标签、条目缺失和 Activity 源错误都不能开放盖章。
 
 第一阶段的引导闭环复用现有可消费活动日志，并允许其他产品域主动注册规范化值班源：
 `Agent / Inbox / News` 与 Scheduled Issue 健康信号都只提供候选、来源状态和确认语义，
@@ -5996,6 +6017,29 @@ Scheduled cadence-duty first increment (2026-09-01):
 - Known residual outside this Office-only increment: the shared `useIssues` hook does not yet generation-guard an older
   overlapping refresh from replacing a newer snapshot. The Office projector fails closed while loading/error state is
   visible, but the shared hook should eventually adopt the same out-of-order protection used by Product Activity.
+
+Exact Inbox delivery round trip (2026-09-01):
+
+- Replaced “enter the Inbox station and stamp” for one documented delivery with an exact two-step shift: select the
+  captured journal event, open that exact Inbox entry, return to Office, then explicitly stamp it reviewed. The HUD and
+  the map station share one review constructor, so neither entrance can bypass the excursion.
+- The activity projection and duty registry now retain `workspaceId + inboxEntryId + documentCount` as a typed subject.
+  Only one pending entry with a positive document count gets the specialized route; batch, zero-document, unknown-count,
+  and incomplete legacy events keep the generic journal receipt instead of pretending to be reports.
+- Navigation intent is not proof of arrival. Inbox writes a presentation handshake only after the matching entry has
+  rendered in its visible reading surface. A background tab, default-selected B, missing A, reload, or activity-source
+  error leaves the excursion unconfirmed and cannot expose the stamp.
+- The return keeps A's sequence frozen and loads it through a bounded service focus window even after it falls outside
+  the latest fifty entries. Stamping acknowledges only through A; an Inbox B arriving during the excursion remains one
+  pending duty across the Office remount. Escape clears the unfinished return without acknowledging anything.
+- The HUD now names the concrete duty plus category/context, clamps long copy, and collapses short-landscape layout to
+  only the exact title plus count. Meaningful meta text uses opaque game ink (5.76:1 on the duty green); 390×844 and
+  500×420 real-browser passes showed no title/button clipping, while the existing desktop cadence duty still walked
+  Alice into its real two-step dossier. The live project did not contain an eligible new single-document Inbox event,
+  so the exact cross-tab path is verified by component integration rather than a fabricated production-log mutation.
+- Root and UI TypeScript passed; 168 focused Office/Inbox tests passed; the complete suite passed 647 files and 5,567
+  tests (one file and nine tests skipped); and the production UI build passed with only the existing local-ports fallback
+  and large-chunk advisory.
 
 ## Completion
 

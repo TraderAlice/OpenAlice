@@ -41,10 +41,17 @@ import type { OfficeActivityKind } from '../office/useOfficeProductActivity'
 import { useWorkspace } from '../tabs/store'
 
 export type OfficeLogChannel = OfficeReplayChannel
+export interface OfficeInboxDeliveryReview {
+  readonly workspaceId: string
+  readonly inboxEntryId: string
+  readonly documentCount: number
+  readonly phase: 'required' | 'returned'
+}
 export interface OfficeDutyReview {
   kind: OfficeActivityKind
   throughSeq: number
   count: number
+  inboxDelivery?: OfficeInboxDeliveryReview
 }
 type OfficeLogMobileView = 'index' | 'detail'
 
@@ -347,6 +354,30 @@ async function loadOfficeAgentWindow(
   return { entries, hasMore, focusEntries }
 }
 
+async function loadOfficeServiceWindow(
+  query: ActivityQuery,
+  family: Extract<OfficeActivityKind, 'inbox' | 'news'>,
+  focusSeq: number | null,
+  retainedFocusEntries: readonly AgentRuntimeEvent[],
+): Promise<OfficeLogWindow> {
+  const recent = await query({ page: 1, pageSize: OFFICE_SERVICE_PAGE_SIZE, family })
+  let focusEntries = [...retainedFocusEntries]
+  let entries = mergeOfficeLogFamilies([recent.entries, focusEntries])
+  if (focusSeq != null && !entries.some((event) => event.seq === focusSeq)) {
+    const focusWindow = await query({
+      afterSeq: Math.max(0, focusSeq - 1),
+      limit: OFFICE_AGENT_FOCUS_WINDOW_SIZE,
+    })
+    focusEntries = focusWindow.entries.filter((event) => officeLogFamilyForEvent(event) === family)
+    entries = mergeOfficeLogFamilies([entries, focusEntries])
+  }
+  return {
+    entries,
+    hasMore: officeLogPageHasMore(recent, OFFICE_SERVICE_PAGE_SIZE),
+    focusEntries,
+  }
+}
+
 export function OfficeRuntimeSection({
   actors = new Map(),
   initialChannel = 'overview',
@@ -354,6 +385,7 @@ export function OfficeRuntimeSection({
   replaySeq = null,
   dutyReview = null,
   onConfirmDuty,
+  onOpenInboxDuty,
   onReplay,
 }: {
   actors?: ReadonlyMap<string, OfficeActivityActor>
@@ -362,6 +394,7 @@ export function OfficeRuntimeSection({
   replaySeq?: number | null
   dutyReview?: OfficeDutyReview | null
   onConfirmDuty?: () => void
+  onOpenInboxDuty?: () => void
   onReplay?: (focus: OfficeReplayFocus) => void
 } = {}) {
   const { t } = useTranslation()
@@ -401,6 +434,10 @@ export function OfficeRuntimeSection({
   const previousHeadSeqByChannelRef = useRef<Partial<Record<OfficeLogChannel, number>>>({})
   const appliedReplaySeqRef = useRef<number | null>(null)
   const agentFocusWindowRef = useRef<{ seq: number; entries: AgentRuntimeEvent[] } | null>(null)
+  const serviceFocusWindowRef = useRef<Partial<Record<
+    Extract<OfficeActivityKind, 'inbox' | 'news'>,
+    { seq: number; entries: AgentRuntimeEvent[] }
+  >>>({})
 
   const load = useCallback(async () => {
     try {
@@ -410,33 +447,59 @@ export function OfficeRuntimeSection({
         && agentFocusWindowRef.current?.seq === agentFocusSeq
         ? agentFocusWindowRef.current.entries
         : []
-      const [agentWindow, inboxPage, newsPage] = await Promise.all([
+      const inboxFocusSeq = initialChannel === 'inbox' ? initialSelectedSeq : null
+      const newsFocusSeq = initialChannel === 'news' ? initialSelectedSeq : null
+      const retainedInboxFocus = inboxFocusSeq != null
+        && serviceFocusWindowRef.current.inbox?.seq === inboxFocusSeq
+        ? serviceFocusWindowRef.current.inbox.entries
+        : []
+      const retainedNewsFocus = newsFocusSeq != null
+        && serviceFocusWindowRef.current.news?.seq === newsFocusSeq
+        ? serviceFocusWindowRef.current.news.entries
+        : []
+      const [agentWindow, inboxWindow, newsWindow] = await Promise.all([
         loadOfficeAgentWindow(
           activityApi.query,
           agentFocusSeq,
           retainedFocusEntries,
         ),
-        activityApi.query({ page: 1, pageSize: OFFICE_SERVICE_PAGE_SIZE, family: 'inbox' }),
-        activityApi.query({ page: 1, pageSize: OFFICE_SERVICE_PAGE_SIZE, family: 'news' }),
+        loadOfficeServiceWindow(
+          activityApi.query,
+          'inbox',
+          inboxFocusSeq,
+          retainedInboxFocus,
+        ),
+        loadOfficeServiceWindow(
+          activityApi.query,
+          'news',
+          newsFocusSeq,
+          retainedNewsFocus,
+        ),
       ])
-      const inbox = inboxPage.entries
-      const news = newsPage.entries
+      const inbox = inboxWindow.entries
+      const news = newsWindow.entries
       agentFocusWindowRef.current = agentFocusSeq != null && agentWindow.focusEntries.length > 0
         ? { seq: agentFocusSeq, entries: agentWindow.focusEntries }
         : null
+      serviceFocusWindowRef.current = {
+        inbox: inboxFocusSeq != null && inboxWindow.focusEntries.length > 0
+          ? { seq: inboxFocusSeq, entries: inboxWindow.focusEntries }
+          : undefined,
+        news: newsFocusSeq != null && newsWindow.focusEntries.length > 0
+          ? { seq: newsFocusSeq, entries: newsWindow.focusEntries }
+          : undefined,
+      }
       setEntriesByChannel({
         overview: mergeOfficeLogFamilies([agentWindow.entries, inbox, news]),
         agent: agentWindow.entries,
         inbox,
         news,
       })
-      const inboxHasMore = officeLogPageHasMore(inboxPage, OFFICE_SERVICE_PAGE_SIZE)
-      const newsHasMore = officeLogPageHasMore(newsPage, OFFICE_SERVICE_PAGE_SIZE)
       setHasMoreByChannel({
-        overview: agentWindow.hasMore || inboxHasMore || newsHasMore,
+        overview: agentWindow.hasMore || inboxWindow.hasMore || newsWindow.hasMore,
         agent: agentWindow.hasMore,
-        inbox: inboxHasMore,
-        news: newsHasMore,
+        inbox: inboxWindow.hasMore,
+        news: newsWindow.hasMore,
       })
       setError(null)
     } catch (err) {
@@ -687,6 +750,16 @@ export function OfficeRuntimeSection({
   const selectedPositionLabel = `${String(selectedBeatIndex + 1).padStart(positionWidth, '0')}/${channelCountLabels[channel]}`
   const selectedBeatEvents = [...selectedBeat.events].reverse()
   const selectedPayload = selectedEvent.payload
+  const selectedDutyIsExact = Boolean(dutyReview
+    && channel === dutyReview.kind
+    && dutyReview.throughSeq >= Math.min(selectedBeat.oldestSeq, selectedBeat.event.seq)
+    && dutyReview.throughSeq <= Math.max(selectedBeat.oldestSeq, selectedBeat.event.seq))
+  const selectedInboxDelivery = dutyReview?.inboxDelivery
+  const selectedInboxDeliveryIsExact = Boolean(selectedDutyIsExact
+    && selectedInboxDelivery
+    && selectedEvent.type === 'inbox.received'
+    && selectedPayload.workspaceId === selectedInboxDelivery.workspaceId
+    && selectedPayload.inboxEntryId === selectedInboxDelivery.inboxEntryId)
   const selectedDetail = eventDetail(selectedEvent, t)
   const selectedDetailIsResult = selectedDetail != null && (
     selectedEvent.type === 'runtime.turn.text'
@@ -715,7 +788,7 @@ export function OfficeRuntimeSection({
   }
   addMeta(t('office.eventReason'), selectedPayload.reason)
   addMeta(t('office.eventErrorCode'), selectedPayload.launchErrorCode)
-  if (selectedEvent.type === 'inbox.received' && selectedPayload.documentCount) {
+  if (selectedEvent.type === 'inbox.received' && selectedPayload.documentCount != null) {
     addMeta(t('office.eventDocuments'), String(selectedPayload.documentCount))
   }
   if (selectedEvent.type === 'news.ingested') {
@@ -1126,11 +1199,30 @@ export function OfficeRuntimeSection({
                 </li>
               ))}
             </ul>
+            {selectedInboxDeliveryIsExact && selectedInboxDelivery && (
+              <div
+                className="oa-office-runtime__duty-gate"
+                data-phase={selectedInboxDelivery.phase}
+                role="status"
+              >
+                <span aria-hidden>{selectedInboxDelivery.phase === 'required' ? '01/02' : '02/02'}</span>
+                <div>
+                  <strong>{t(selectedInboxDelivery.phase === 'required'
+                    ? 'office.inboxDutyOpenTitle'
+                    : 'office.inboxDutyReturnTitle')}</strong>
+                  <p>{t(selectedInboxDelivery.phase === 'required'
+                    ? 'office.inboxDutyOpenHint'
+                    : 'office.inboxDutyReturnHint', {
+                    count: selectedInboxDelivery.documentCount,
+                  })}</p>
+                </div>
+              </div>
+            )}
             {dutyReview
               && onConfirmDuty
               && replaySeq == null
-              && channel === dutyReview.kind
-              && selectedBeat.event.seq <= dutyReview.throughSeq
+              && selectedDutyIsExact
+              && !dutyReview.inboxDelivery
               && (
               <button
                 type="button"
@@ -1143,6 +1235,21 @@ export function OfficeRuntimeSection({
                   name: t(OFFICE_LOG_CHANNEL_LABEL_KEYS[dutyReview.kind]),
                   countLabel: dutyReview.count >= 9 ? '9+' : dutyReview.count,
                 })}
+              </button>
+              )}
+            {selectedInboxDeliveryIsExact
+              && selectedInboxDelivery?.phase === 'returned'
+              && onConfirmDuty
+              && replaySeq == null
+              && (
+              <button
+                type="button"
+                className="oa-office-runtime__open oa-office-runtime__open--receipt"
+                onClick={onConfirmDuty}
+                onKeyDown={(event) => confirmRuntimeAction(event, onConfirmDuty)}
+              >
+                <span className="oa-office-runtime__receipt-stamp" aria-hidden>OK</span>
+                {t('office.inboxDutyReceipt')}
               </button>
               )}
           </div>
@@ -1189,14 +1296,30 @@ export function OfficeRuntimeSection({
             {selectedEvent.type === 'inbox.received' && (
               <button
                 type="button"
-                className="oa-office-runtime__open"
+                className={`oa-office-runtime__open${
+                  selectedInboxDeliveryIsExact && selectedInboxDelivery?.phase === 'required'
+                    ? ' oa-office-runtime__open--duty'
+                    : ''
+                }`}
                 onClick={() => {
+                  if (selectedInboxDeliveryIsExact
+                    && selectedInboxDelivery?.phase === 'required'
+                    && onOpenInboxDuty) {
+                    onOpenInboxDuty()
+                    return
+                  }
                   if (selectedPayload.inboxEntryId) {
                     useInboxSelection.getState().select(selectedPayload.inboxEntryId)
                   }
                   openOrFocus({ kind: 'inbox', params: {} })
                 }}
                 onKeyDown={(event) => confirmRuntimeAction(event, () => {
+                  if (selectedInboxDeliveryIsExact
+                    && selectedInboxDelivery?.phase === 'required'
+                    && onOpenInboxDuty) {
+                    onOpenInboxDuty()
+                    return
+                  }
                   if (selectedPayload.inboxEntryId) {
                     useInboxSelection.getState().select(selectedPayload.inboxEntryId)
                   }
@@ -1204,7 +1327,9 @@ export function OfficeRuntimeSection({
                 })}
               >
                 <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" aria-hidden style={officePixelImg} />
-                {t('office.interactInbox')}
+                {t(selectedInboxDeliveryIsExact && selectedInboxDelivery?.phase === 'required'
+                  ? 'office.inboxDutyOpenAction'
+                  : 'office.interactInbox')}
               </button>
             )}
             {selectedEvent.type === 'news.ingested' && (

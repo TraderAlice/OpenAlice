@@ -19,6 +19,16 @@ export interface OfficeActivitySessionSubject {
   readonly resumeId: string
 }
 
+export interface OfficeActivityInboxSubject {
+  readonly kind: 'inbox-entry'
+  readonly workspaceId: string
+  readonly inboxEntryId: string
+  /** Event-time attachment count. `null` means the producer did not supply a valid count. */
+  readonly documentCount: number | null
+}
+
+export type OfficeActivitySubject = OfficeActivitySessionSubject | OfficeActivityInboxSubject
+
 const OFFICE_AGENT_REVIEW_TYPES = [
   'runtime.spawn_failed',
   'runtime.stopped',
@@ -34,10 +44,9 @@ export interface OfficeActivityLandmark {
   readonly occurredAt: number
   readonly detail?: string
   readonly source?: string
-  readonly inboxEntryId?: string
   readonly eventType?: AgentRuntimeEvent['type']
   readonly status?: AgentRuntimeEvent['payload']['status']
-  readonly subject?: OfficeActivitySessionSubject
+  readonly subject?: OfficeActivitySubject
 }
 
 export interface OfficeProductActivityState {
@@ -96,7 +105,19 @@ export function projectOfficeProductActivity(
           occurredAt: inbox.ts,
           detail: officeActivityExcerpt(inbox.payload.summary),
           source: inbox.payload.agent ?? inbox.payload.workspaceLabel,
-          inboxEntryId: inbox.payload.inboxEntryId,
+          ...(inbox.payload.workspaceId && inbox.payload.inboxEntryId
+            ? {
+                subject: {
+                  kind: 'inbox-entry' as const,
+                  workspaceId: inbox.payload.workspaceId,
+                  inboxEntryId: inbox.payload.inboxEntryId,
+                  documentCount: Number.isSafeInteger(inbox.payload.documentCount)
+                    && inbox.payload.documentCount! >= 0
+                    ? inbox.payload.documentCount!
+                    : null,
+                },
+              }
+            : {}),
         }
       : null,
     news: news

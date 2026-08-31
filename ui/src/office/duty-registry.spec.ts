@@ -222,6 +222,49 @@ describe('Office duty registry', () => {
     })
   })
 
+  it('preserves one exact documented Inbox subject through the duty destination', () => {
+    const inboxActivity = activity({
+      inbox: {
+        seq: 8,
+        occurredAt: NOW,
+        detail: 'NVDA weekly evidence brief',
+        subject: {
+          kind: 'inbox-entry',
+          workspaceId: 'chat-1',
+          inboxEntryId: 'inbox-8',
+          documentCount: 1,
+        },
+      },
+      attention: { agent: false, inbox: true, news: false },
+      pending: { agent: 0, inbox: 1, news: 0 },
+    })
+
+    const candidate = coreOfficeDutyRegistrations({
+      now: NOW,
+      activity: inboxActivity,
+      activityStatus: 'ready',
+      issues: snapshot(),
+      issueStatus: 'ready',
+    }).find((registration) => registration.id === 'inbox-arrival')!.candidates[0]!
+
+    expect(candidate).toMatchObject({
+      kind: 'inbox',
+      count: 1,
+      destination: {
+        kind: 'journal',
+        channel: 'inbox',
+        targetId: 'inbox-service',
+        subject: {
+          kind: 'inbox-entry',
+          workspaceId: 'chat-1',
+          inboxEntryId: 'inbox-8',
+          documentCount: 1,
+        },
+      },
+      receipt: { kind: 'event-watermark', family: 'inbox', throughSeq: 8 },
+    })
+  })
+
   it('deduplicates logical candidates first-win and resolves exact Agent subjects spatially', () => {
     const agentActivity = activity({
       agent: {

@@ -6,6 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { i18n } from '../i18n'
 import { api } from '../api'
 import { useInboxSelection } from '../live/inbox-selection'
+import {
+  readOfficeInboxDutyExcursion,
+  rememberOfficeInboxDutyExcursion,
+} from '../office/inbox-duty-excursion'
 import { readWorkspaceFile } from '../components/workspace/api'
 import { InboxAttachment, InboxPage } from './InboxPage'
 
@@ -41,6 +45,7 @@ vi.mock('../components/workspace/api', async (importOriginal) => {
 
 beforeEach(async () => {
   await i18n.changeLanguage('en')
+  window.sessionStorage.clear()
   vi.mocked(readWorkspaceFile).mockResolvedValue({
     kind: 'ok',
     content: '<!doctype html><html><body><h1>Close report</h1></body></html>',
@@ -50,6 +55,7 @@ beforeEach(async () => {
 afterEach(() => {
   cleanup()
   useInboxSelection.getState().select(null)
+  window.sessionStorage.clear()
   vi.clearAllMocks()
 })
 
@@ -178,6 +184,60 @@ describe('InboxPage deletion', () => {
 
     await waitFor(() => expect(deleteEntry).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(screen.queryByText('Delete Inbox entry?')).toBeNull())
+  })
+})
+
+describe('InboxPage Office presentation handshake', () => {
+  it('marks the exact selected delivery only after its reading surface is visible', async () => {
+    const entry = {
+      id: 'inbox-office-a',
+      ts: Date.now(),
+      workspaceId: 'ws-1',
+      workspaceLabel: 'research',
+      comments: 'Exact Office delivery.',
+      docs: [{ path: 'research/close-report.md' }],
+    }
+    vi.spyOn(api.inbox, 'history').mockResolvedValue({ entries: [entry], hasMore: false })
+    rememberOfficeInboxDutyExcursion({
+      throughSeq: 42,
+      count: 1,
+      workspaceId: 'ws-1',
+      inboxEntryId: entry.id,
+      documentCount: 1,
+      phase: 'away',
+    })
+    useInboxSelection.getState().select(entry.id)
+
+    const view = render(<InboxPage visible={false} />)
+    expect(await screen.findByText('Exact Office delivery.')).toBeTruthy()
+    expect(readOfficeInboxDutyExcursion()?.phase).toBe('away')
+
+    view.rerender(<InboxPage visible />)
+    await waitFor(() => expect(readOfficeInboxDutyExcursion()?.phase).toBe('presented'))
+  })
+
+  it('does not present captured delivery A when Inbox renders delivery B', async () => {
+    const entry = {
+      id: 'inbox-office-b',
+      ts: Date.now(),
+      workspaceId: 'ws-1',
+      workspaceLabel: 'research',
+      comments: 'A newer default-selected delivery.',
+    }
+    vi.spyOn(api.inbox, 'history').mockResolvedValue({ entries: [entry], hasMore: false })
+    rememberOfficeInboxDutyExcursion({
+      throughSeq: 42,
+      count: 1,
+      workspaceId: 'ws-1',
+      inboxEntryId: 'inbox-office-a',
+      documentCount: 1,
+      phase: 'away',
+    })
+    useInboxSelection.getState().select(entry.id)
+
+    render(<InboxPage visible />)
+    expect(await screen.findByText('A newer default-selected delivery.')).toBeTruthy()
+    expect(readOfficeInboxDutyExcursion()?.phase).toBe('away')
   })
 })
 

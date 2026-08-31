@@ -27,7 +27,11 @@ function event(
 }
 
 const inboxNine = event(9, 'inbox.received', {
-  inboxEntryId: 'inbox-9', summary: 'Research report', agent: 'codex',
+  workspaceId: 'chat-1',
+  inboxEntryId: 'inbox-9',
+  summary: 'Research report',
+  agent: 'codex',
+  documentCount: 1,
 })
 const newsEleven = event(11, 'news.ingested', {
   newsItemId: 4, title: 'Latest headline', source: 'Market feed',
@@ -83,7 +87,12 @@ describe('projectOfficeProductActivity', () => {
         occurredAt: 9_000,
         detail: 'Research report',
         source: 'codex',
-        inboxEntryId: 'inbox-9',
+        subject: {
+          kind: 'inbox-entry',
+          workspaceId: 'chat-1',
+          inboxEntryId: 'inbox-9',
+          documentCount: 1,
+        },
       },
       news: {
         seq: 11,
@@ -92,6 +101,23 @@ describe('projectOfficeProductActivity', () => {
         source: 'Market feed',
       },
     })
+  })
+
+  it('distinguishes an Inbox delivery with no documents from an unknown count', () => {
+    const zeroDocuments = projectOfficeProductActivity([event(20, 'inbox.received', {
+      workspaceId: 'chat-1',
+      inboxEntryId: 'inbox-zero',
+      summary: 'No attachment handoff',
+      documentCount: 0,
+    })])
+    const unknownDocuments = projectOfficeProductActivity([event(21, 'inbox.received', {
+      workspaceId: 'chat-1',
+      inboxEntryId: 'inbox-unknown',
+      summary: 'Legacy handoff',
+    })])
+
+    expect(zeroDocuments.inbox?.subject).toMatchObject({ documentCount: 0 })
+    expect(unknownDocuments.inbox?.subject).toMatchObject({ documentCount: null })
   })
 
   it('projects only low-noise Agent milestones and compacts their detail', () => {
@@ -284,6 +310,45 @@ describe('useOfficeProductActivity', () => {
     expect(hook.result.current.pending.news).toBe(1)
     expect(hook.result.current.news?.seq).toBe(13)
     hook.unmount()
+  })
+
+  it('keeps Inbox delivery B pending across remount after acknowledging captured delivery A', async () => {
+    queueRefresh([inboxNine, newsEleven], 11)
+    const hook = renderHook(() => useOfficeProductActivity())
+    await waitFor(() => expect(hook.result.current.inbox?.seq).toBe(9))
+
+    const inboxA = event(12, 'inbox.received', {
+      workspaceId: 'chat-1',
+      inboxEntryId: 'inbox-a',
+      summary: 'Captured delivery A',
+      documentCount: 1,
+    })
+    queueRefresh([inboxNine, inboxA, newsEleven], 12)
+    act(() => window.dispatchEvent(new Event(GLOBAL_ACTIVITY_REFRESH_EVENT)))
+    await waitFor(() => expect(hook.result.current.pending.inbox).toBe(1))
+
+    const inboxB = event(13, 'inbox.received', {
+      workspaceId: 'chat-1',
+      inboxEntryId: 'inbox-b',
+      summary: 'Arrived during review B',
+      documentCount: 1,
+    })
+    queueRefresh([inboxNine, inboxA, inboxB, newsEleven], 13)
+    act(() => window.dispatchEvent(new Event(GLOBAL_ACTIVITY_REFRESH_EVENT)))
+    await waitFor(() => expect(hook.result.current.pending.inbox).toBe(2))
+
+    act(() => hook.result.current.acknowledgeThrough('inbox', 12))
+    expect(hook.result.current.attention.inbox).toBe(true)
+    expect(hook.result.current.pending.inbox).toBe(1)
+    expect(hook.result.current.inbox?.seq).toBe(13)
+    hook.unmount()
+
+    queueRefresh([inboxNine, inboxA, inboxB, newsEleven], 13)
+    const remounted = renderHook(() => useOfficeProductActivity())
+    await waitFor(() => expect(remounted.result.current.inbox?.seq).toBe(13))
+    expect(remounted.result.current.attention.inbox).toBe(true)
+    expect(remounted.result.current.pending.inbox).toBe(1)
+    remounted.unmount()
   })
 
   it('ignores an older refresh that resolves after a newer activity snapshot', async () => {

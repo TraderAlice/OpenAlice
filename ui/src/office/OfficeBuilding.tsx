@@ -164,7 +164,7 @@ export function nextOfficeDuty(
   }
   if (activity.attention.agent) {
     const subject = activity.agent?.subject
-    if (subject) {
+    if (subject?.kind === 'session') {
       const employeeTargetId = `employee:${subject.workspaceId}:${subject.resumeId}` as const
       if (targetAvailable(employeeTargetId)) {
         return { kind: 'agent', targetId: employeeTargetId, count: activity.pending.agent }
@@ -508,7 +508,7 @@ export function OfficeBuilding({
     ? nextDuty.kind === 'cadence'
       ? nextDuty.cadence.title
       : nextDuty.kind === 'inbox'
-      ? t('office.inboxStation')
+      ? nextDuty.landmark.detail ?? t('office.inboxStation')
       : nextDuty.kind === 'agent'
         ? nextDutyTarget?.kind === 'employee'
           ? officeCoworkerCallsign(
@@ -516,7 +516,21 @@ export function OfficeBuilding({
               coworkerAssets.get(nextDutyTarget.employee.resumeId),
             )
           : t('office.operationsBoard')
-        : t('office.newsStation')
+        : nextDuty.landmark.detail ?? t('office.newsStation')
+    : null
+  const nextDutyCategory = nextDuty
+    ? nextDuty.kind === 'cadence'
+      ? t('office.cadenceReview')
+      : t(nextDuty.kind === 'inbox'
+        ? 'office.logChannelInbox'
+        : nextDuty.kind === 'agent'
+          ? 'office.logChannelAgent'
+          : 'office.logChannelNews')
+    : null
+  const nextDutyContext = nextDuty
+    ? nextDuty.kind === 'cadence'
+      ? nextDuty.cadence.workspaceTag
+      : nextDuty.landmark.source
     : null
   const operationsCadenceDuty = nextDuty?.kind === 'cadence' && nextDuty.targetId === 'operations'
     ? nextDuty
@@ -1566,7 +1580,9 @@ export function OfficeBuilding({
               className="oa-office-hud__duty"
               data-kind={nextDuty.kind}
               aria-label={t('office.nextDutyPending', {
-                name: nextDutyName,
+                name: [nextDutyCategory, nextDutyName, nextDutyContext]
+                  .filter(Boolean)
+                  .join(' · '),
                 countLabel: nextDuty.count >= 9 ? '9+' : nextDuty.count,
               })}
               onClick={() => requestTargetInteraction(
@@ -1596,13 +1612,23 @@ export function OfficeBuilding({
                 },
               )}
             >
-              <span>{t('office.nextDuty')}</span>
-              <strong>{nextDutyName}</strong>
+              <span className="oa-office-hud__duty-meta">
+                <span className="oa-office-hud__duty-kicker">{t('office.nextDuty')}</span>
+                <i className="oa-office-hud__duty-separator" aria-hidden>·</i>
+                <span className="oa-office-hud__duty-category">{nextDutyCategory}</span>
+                {nextDutyContext && (
+                  <>
+                    <i className="oa-office-hud__duty-separator" aria-hidden>·</i>
+                    <span className="oa-office-hud__duty-context">{nextDutyContext}</span>
+                  </>
+                )}
+              </span>
+              <strong title={nextDutyName}>{nextDutyName}</strong>
               {nextDuty.count > 0 && <em>{nextDuty.count >= 9 ? '9+' : nextDuty.count}</em>}
             </button>
           ) : currentDutyStatus === 'ready' ? (
             <div className="oa-office-hud__duty oa-office-hud__duty--clear">
-              <span>{t('office.nextDuty')}</span>
+              <span className="oa-office-hud__duty-meta">{t('office.nextDuty')}</span>
               <strong>{t('office.shiftClear')}</strong>
             </div>
           ) : (
@@ -1611,7 +1637,7 @@ export function OfficeBuilding({
               data-status={currentDutyStatus}
               role="status"
             >
-              <span>{t('office.nextDuty')}</span>
+              <span className="oa-office-hud__duty-meta">{t('office.nextDuty')}</span>
               <strong>{t(currentDutyStatus === 'loading'
                 ? 'office.dutySyncing'
                 : 'office.dutySignalInterrupted')}</strong>

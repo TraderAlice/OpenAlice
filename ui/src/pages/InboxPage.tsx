@@ -32,6 +32,7 @@ import { useWorkspaces } from '../contexts/workspaces-context'
 import { readWorkspaceFile, type ReadFileResult } from '../components/workspace/api'
 import { workspaceDisplayName, workspaceDisplayTitle } from '../components/workspace/display'
 import { presentInboxEntry } from '../lib/inbox-presentation'
+import { markOfficeInboxDutyPresented } from '../office/inbox-duty-excursion'
 import type { InboxEntry, InboxDoc } from '../api/inbox'
 
 interface InboxPageProps {
@@ -66,6 +67,14 @@ export function InboxPage({ visible }: InboxPageProps) {
 
   const selected = entries.find((e) => e.id === selectedId) ?? null
   const pendingDelete = entries.find((e) => e.id === pendingDeleteId) ?? null
+
+  useEffect(() => {
+    if (!visible || !selected) return
+    markOfficeInboxDutyPresented({
+      workspaceId: selected.workspaceId,
+      inboxEntryId: selected.id,
+    })
+  }, [selected, visible])
 
   /** Hard-delete an entry. The durable DELETE must succeed before the UI
    *  removes anything: a failed destructive action should keep both the
