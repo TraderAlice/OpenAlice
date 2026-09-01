@@ -118,7 +118,7 @@ export function FinancialStatementsPanel({ symbol }: Props) {
       contentClassName="overflow-x-auto overscroll-x-contain p-0"
       right={
         <div
-          className="grid grid-cols-3 overflow-hidden rounded border border-border sm:flex"
+          className="grid grid-cols-3 overflow-hidden rounded-lg border border-border sm:flex"
           role="tablist"
           aria-label="Financial statement type"
         >
@@ -129,7 +129,7 @@ export function FinancialStatementsPanel({ symbol }: Props) {
               role="tab"
               aria-selected={tab === t.key}
               onClick={() => setTab(t.key)}
-              className={`min-h-10 px-2.5 py-1 text-[12px] transition-colors cursor-pointer sm:min-h-0 ${
+              className={`min-h-10 cursor-pointer px-2.5 py-1 text-[12px] sm:min-h-0 ${
                 i > 0 ? 'border-l border-border' : ''
               } ${tab === t.key ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
             >

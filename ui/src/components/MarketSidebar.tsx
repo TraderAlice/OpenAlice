@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { X } from 'lucide-react'
 import { type AssetClass, type BarSourceCandidate } from '../api/market'
 import { useAssetSearch } from './market/useAssetSearch'
 import { useWorkspace } from '../tabs/store'
@@ -8,6 +9,8 @@ import { getFocusedTab, type ViewSpec } from '../tabs/types'
 import { SidebarRow } from './SidebarRow'
 import { SidebarSectionHeader } from './SidebarSectionHeader'
 import { Spinner } from './StateViews'
+import { Button } from './ui/button'
+import { inputClass } from './form'
 
 const ASSET_CLASS_COLORS: Record<string, string> = {
   equity: 'bg-primary/15 text-primary',
@@ -97,7 +100,7 @@ export function MarketSidebar() {
           onKeyDown={handleSearchKeyDown}
           placeholder={t('market.searchPlaceholder')}
           aria-label={t('market.searchPlaceholder')}
-          className="w-full px-2.5 py-1.5 bg-background text-foreground border border-border/70 rounded-md text-[13px] outline-none focus:border-primary"
+          className={`${inputClass} px-2.5 text-[13px]`}
         />
       </div>
 
@@ -166,7 +169,7 @@ export function MarketSidebar() {
               {t('market.searchResults')}{loading ? ` (${t('common.searching')})` : results.length ? ` (${results.length})` : ''}
             </SidebarSectionHeader>
             {loading && (
-              <div className="flex items-center gap-2 px-3 py-2 text-[12px] text-muted-foreground">
+              <div className="flex items-center gap-2 px-3 py-2 text-[12px] leading-[18px] text-muted-foreground">
                 <Spinner size="sm" />
                 <span>{t('common.searching')}</span>
               </div>
@@ -218,19 +221,19 @@ export function MarketSidebar() {
               trail={
                 <>
                   <AssetClassChip cls={entry.assetClass} />
-                  <button
+                  <Button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation()
                       removeFromWatchlist(entry.assetClass, entry.symbol)
                     }}
-                    className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/70 hover:bg-muted hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:text-destructive"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-muted-foreground/70 hover:text-destructive focus-visible:text-destructive"
                     aria-label={t('market.removeFromWatchlist', { symbol: entry.symbol })}
                   >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                      <path d="M18 6L6 18M6 6l12 12" />
-                    </svg>
-                  </button>
+                    <X className="size-3" aria-hidden />
+                  </Button>
                 </>
               }
             />
@@ -243,7 +246,7 @@ export function MarketSidebar() {
 
 function AssetClassChip({ cls }: { cls: string }) {
   return (
-    <span className={`shrink-0 text-[9px] uppercase tracking-wide px-1 rounded ${ASSET_CLASS_COLORS[cls] ?? ASSET_CLASS_COLORS.unknown}`}>
+    <span className={`shrink-0 rounded-sm px-1 font-mono text-[10px] leading-[14px] ${ASSET_CLASS_COLORS[cls] ?? ASSET_CLASS_COLORS.unknown}`}>
       {cls}
     </span>
   )
@@ -255,7 +258,7 @@ function SourceTrail({ c }: { c: BarSourceCandidate }) {
   // Provider is the disambiguator; keep it compact so the ticker is never
   // crushed. (Asset class is shown in the wider main search box, not here.)
   return (
-    <span className="flex items-center gap-1 shrink-0" title={`${c.barId}${c.barCapability ? ` · ${c.barCapability}` : ''}`}>
+    <span className="flex shrink-0 items-center gap-1" title={`${c.barId}${c.barCapability ? `, ${c.barCapability}` : ''}`}>
       <span className="text-[10px] text-foreground/75 font-medium truncate max-w-[96px]">{c.sourceId}</span>
       {c.barCapability && (
         <span className={`text-[9px] ${CAPABILITY_COLOR[c.barCapability] ?? 'text-muted-foreground'}`}>{c.barCapability}</span>
