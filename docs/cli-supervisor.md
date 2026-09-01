@@ -111,16 +111,25 @@ separate daemons.
 
 The TypeScript TUI reports and polls the selected Runtime, detaches with `q`,
 `Esc`, or `Ctrl+C`, and exposes the same presentation-neutral operations as the
-explicit commands. Its ordinary path is intentionally parameter-free:
+explicit commands. It owns an alternate-screen application canvas and restores
+the screen, cursor, and mouse modes on detach or signal exit. `NO_COLOR` and
+`TERM=dumb` remove decorative color without removing state text;
+`OPENALICE_TUI_MOUSE=0` keeps the full keyboard surface while disabling terminal
+mouse reporting. Its ordinary path is intentionally parameter-free:
 
-- the default Fleet page renders `Machine → AliceProject`: ordinary terminals
-  use two panes and narrow terminals drill down from Machines to Projects;
+- the default Overview page is an AliceProject operational home: its status
+  card presents the selected project, current Runtime state, human guidance,
+  and the primary Enter action; its Runtime card keeps Home, Web endpoint,
+  owner, provider identity, services, and uptime available without returning
+  to the historical flat field dump;
+- the Fleet page renders `Machine → AliceProject`: ordinary terminals use two
+  panes and narrow terminals drill down from Machines to Projects;
   selection and list windows survive resize, use Unicode display width, and
   keep the action/detach footer visible at the supported 80×24 baseline;
-- `↑`/`↓` move within the active Fleet pane, Tab/left/right switch panes, and
-  `[`/`]` switch Fleet/Overview/Logs/Doctor/Help pages. With only the local
-  Machine, focus starts on its current AliceProject so the historical one-key
-  Enter start/open path remains intact;
+- the Overview/Fleet/Logs/Doctor/Help navigation accepts Tab, left/right, and
+  `[`/`]`; the visible tabs accept pointer hover and click. `↑`/`↓` move within
+  the active Fleet pane and the mouse wheel moves the focused Fleet selection.
+  With only the local Machine, Fleet focus starts on its current AliceProject;
 - registered Machines refresh in the background with one bounded,
   non-interactive (`BatchMode=yes`) SSH inventory request each. Registered,
   checking, online, unauthorized, offline, and incompatible remain distinct

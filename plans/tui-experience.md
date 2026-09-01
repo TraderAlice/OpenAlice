@@ -1,0 +1,136 @@
+# OpenAlice Supervisor TUI Experience
+
+Status: Active
+
+Related issues: None
+
+Owner guides: [[docs/cli-supervisor.md]], [[docs/cli-installer.md]]
+
+## Goal
+
+Turn the Shell Supervisor from a keyboard-shortcut status report into a polished,
+mouse-capable OpenAlice control surface. Oh My Pi is the interaction and finish
+benchmark: use its proven terminal patterns and MIT-licensed implementation ideas
+where they fit, while preserving OpenAlice's Runtime, Machine, and AliceProject
+product boundary.
+
+This initiative stays on `codex/tui-usability` until the maintainer reviews the
+complete experience. It does not open or merge a `dev` PR before that acceptance.
+
+## Scope
+
+- `packages/cli/src/supervisor-tui*.ts`, `supervisor-fleet.ts`, and focused TUI
+  tests own the product changes.
+- Package metadata, distribution manifests, and third-party notices may change
+  only when required to ship the TUI implementation safely.
+- Runtime lifecycle operations remain presentation-neutral. Alice, UTA, Web UI,
+  Workspace agent loops, persisted state, and trading behavior are out of scope.
+
+## Design Alternatives
+
+### 1. Reskin the existing string renderer
+
+Add ANSI colors, borders, and glyphs without changing navigation or input. This
+is the fastest route to a prettier screenshot, but leaves the shortcut wall,
+weak focus model, and discontinuous action feedback intact. Rejected as the end
+state; useful only as an incremental implementation technique.
+
+### 2. Replace `@earendil-works/pi-tui` with current `@oh-my-pi/pi-tui`
+
+This gives OpenAlice the closest upstream implementation, including current
+mouse, overlay, tab, scroll, and differential-rendering work. The current OMP
+package requires Bun and its utility layer pulls platform-native packages, while
+the OpenAlice CLI remains a Node-compatible distributed entrypoint. Rejected for
+this initiative because it expands runtime and packaging ownership beyond TUI.
+
+### 3. Port OMP interaction primitives into a Node-compatible OpenAlice layer
+
+Keep the existing renderer/runtime dependency, add focused semantic styling,
+mouse parsing/routing, alternate-screen lifecycle, hit testing, scroll models,
+and reusable Supervisor components based on OMP's proven patterns. Preserve MIT
+attribution for adapted substantial code. Selected because it moves toward the
+requested experience without changing the CLI runtime contract.
+
+The selected route is an autonomous design choice made for this topic; it does
+not imply maintainer approval of the finished interaction.
+
+## Interaction Model
+
+- Keyboard and mouse are equal inputs over one focus and action model.
+- Pointer hover communicates the target; click selects or activates according
+  to the same rule as keyboard focus plus Enter; wheel scrolls the pane under
+  the pointer.
+- Tabs, lists, primary actions, dialogs, and scrollable diagnostics expose clear
+  hit areas. Shortcuts remain accelerators rather than the only discovery path.
+- Every asynchronous action visibly progresses through started, working,
+  succeeded, or recoverable-failure states without stealing selection.
+- The Supervisor uses an alternate-screen application canvas and restores the
+  terminal, cursor, and mouse modes on every normal and signal-driven exit.
+
+## Responsive and Accessibility Contract
+
+- `80x24` remains the minimum full experience. Wide terminals show the
+  Machine/AliceProject split view; narrow terminals drill into one pane without
+  losing selection or the primary action.
+- Render width uses Unicode display width and ANSI-aware truncation. Resize must
+  not move focus or reset scroll windows.
+- `NO_COLOR` and `TERM=dumb` disable decorative color without hiding meaning.
+  State always has text or glyph semantics in addition to color.
+- `OPENALICE_TUI_MOUSE=0` disables terminal mouse reporting. Every pointer action
+  has a keyboard equivalent, and exit always restores native terminal selection.
+- Motion is limited to purposeful progress/status frames and can be disabled;
+  no information depends on animation.
+
+## Shared Primitive Ownership
+
+Reusable terminal styling, layout, hit-region, pointer, badge, panel, toast,
+progress, and command-bar behavior belongs in focused
+`packages/cli/src/supervisor-tui-*.ts` modules. Feature panels consume those
+primitives instead of embedding more raw ANSI or mouse-coordinate logic in the
+already large `supervisor-tui.ts` application controller.
+
+## Ordered Work
+
+- [x] Audit the current Supervisor, current OMP TUI package, license, runtime,
+  distribution dependencies, and select the implementation route.
+- [ ] Add the semantic theme, application frame, panels, status badges, command
+  bar, notice treatment, and ANSI-safe width utilities.
+- [ ] Add alternate-screen lifecycle, SGR pointer parsing, hover/click/wheel
+  routing, and terminal restoration tests.
+- [ ] Rebuild Fleet with pointer-aware responsive panes, clear primary actions,
+  and stable selection/scroll behavior.
+- [ ] Rebuild Overview as the selected AliceProject's operational home rather
+  than a flat field dump.
+- [ ] Upgrade Logs and Doctor with scroll/follow/filter or actionable diagnostic
+  presentation inside the existing read-only contracts.
+- [ ] Upgrade Help, Setup, Project selection, Update, source, and transfer flows
+  to consistent overlays and dialogs.
+- [ ] Dogfood the real `pnpm cli` surface across wide, 80x24, and narrow sizes;
+  inspect mouse, resize, copy/selection, signal exit, and failure recovery.
+- [ ] Run the owning package typecheck and tests, affected tests, full hermetic
+  tests at dependency/shared-renderer boundaries, and installer/package smoke
+  when the distributed payload changes.
+
+## Progress
+
+- The first implementation increment adds the Node-compatible semantic theme,
+  alternate-screen and SGR mouse lifecycle, pointer parser, hoverable/clickable
+  top navigation, Fleet wheel routing, and exit restoration coverage.
+- The ordinary launch now enters Overview and renders a selected-AliceProject
+  status card plus a compact Runtime card. Fleet remains available as a
+  management page instead of defining the first-run information architecture.
+- Focused screen/pointer specs and the complete real-PTY Supervisor suite pass.
+  Fleet rows, command bars, logs, diagnostics, and overlays still retain old
+  presentation and remain active work rather than accepted completion.
+
+## Completion Criteria
+
+- A first-time user can identify the selected AliceProject, Runtime health, and
+  primary action without opening Help.
+- Tabs, Fleet rows, scrollable content, and visible actions work with mouse and
+  keyboard; keyboard-only use remains complete.
+- The TUI has a coherent OpenAlice visual identity with stable rendering and no
+  raw-mode, cursor, alternate-screen, or mouse-mode leakage after exit or error.
+- All existing lifecycle/refusal safety contracts remain intact.
+- Real terminal acceptance and applicable automated gates pass, and the
+  maintainer has reviewed the retained feature branch before any `dev` PR.

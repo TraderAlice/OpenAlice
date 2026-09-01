@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { resolveLaunchContext } from './launch-context.ts'
 import type { MachineFleetEnvelope, MachineInventory } from './machine-inventory.ts'
 import { createSupervisorFleetState } from './supervisor-fleet.ts'
+import { createSupervisorTuiTheme } from './supervisor-tui-theme.ts'
 import {
   resolveSupervisorChannel,
   runSupervisorTui,
@@ -52,8 +53,10 @@ describe('Supervisor TUI screen', () => {
 
     const lines = screen.render(80)
 
-    expect(lines).toContain('OpenAlice  0.87.0-beta  channel dev')
-    expect(lines).toContain('Runtime state: absent')
+    expect(lines[0]).toContain('OpenAlice Supervisor')
+    expect(lines[0]).toContain('v0.87.0-beta · DEV')
+    expect(lines.join('\n')).toContain('○ STOPPED')
+    expect(lines.join('\n')).toContain('[ Enter ]  Start OpenAlice & open Workspace')
     expect(lines.join('\n')).toContain('Enter Start & open · s Background · p Setup')
     expect(lines.join('\n')).toContain('i AliceProjects')
     expect(lines).toContain('d Doctor · l Logs · u Update · ? Help')
@@ -98,6 +101,35 @@ describe('Supervisor TUI screen', () => {
     expect(screen.snapshot.fleet?.focus).toBe('machines')
   })
 
+  it('styles the application frame and routes pointer tabs and Fleet wheel input', () => {
+    const actions: SupervisorAction[] = []
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'running', endpoints: { web: 'http://127.0.0.1:2024' } },
+      fleet: createSupervisorFleetState(
+        '2026-08-23T00:00:00Z',
+        fleetMachines(),
+        'default',
+      ),
+    }, {
+      onAction: (action) => actions.push(action),
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+    })
+
+    expect(screen.render(100).join('\n')).toContain('\u001b[38;2;')
+    expect(screen.snapshot.fleet?.selectedMachine).toBe(0)
+    expect(screen.handlePointer({
+      button: 65, col: 2, row: 7, release: false, wheel: 1, motion: false, leftClick: false,
+    })).toBe(true)
+    expect(screen.snapshot.fleet?.selectedMachine).toBe(1)
+    expect(screen.handlePointer({
+      button: 0, col: 24, row: 3, release: false, wheel: null, motion: false, leftClick: true,
+    })).toBe(true)
+    expect(screen.snapshot.panel).toBe('logs')
+    expect(actions).toContain('logs')
+  })
+
   it('offers Start for a stopped compatible remote AliceProject', () => {
     const machines = fleetMachines()
     machines[1]!.projects[0]!.runtime = {
@@ -136,7 +168,7 @@ describe('Supervisor TUI screen', () => {
 
     const lines = screen.render(40)
 
-    expect(lines).toContain('Runtime: unavailable')
+    expect(lines.join('\n')).toContain('◇ UNAVAILABLE')
     expect(lines.join('\n')).not.toContain('\u001b')
     expect(lines.every((line) => line.length <= 40)).toBe(true)
   })
@@ -164,9 +196,9 @@ describe('Supervisor TUI screen', () => {
     })
 
     const output = screen.render(100).join('\n')
-    expect(output).toContain('Provider: bundle (installed)')
+    expect(output).toContain('Provider')
     expect(output).toContain(
-      'Runtime: OpenAlice 0.87.0-beta · bundle 1234567890abcdef',
+      'OpenAlice 0.87.0-beta · bundle 1234567890abcdef',
     )
     expect(output).not.toContain('/opt/openalice/releases/runtime')
   })
@@ -210,9 +242,7 @@ describe('Supervisor TUI screen', () => {
 
     expect(screen.handleKey('enter', matchesKey)).toBe(true)
     expect(actions).toEqual(['start-open'])
-    expect(screen.render(100).join('\n')).toContain(
-      'Enter prepares anything missing and opens the browser',
-    )
+    expect(screen.render(100).join('\n')).toContain('[ Enter ]  Start OpenAlice & open Workspace')
 
     screen.update({
       runtime: {
@@ -223,9 +253,7 @@ describe('Supervisor TUI screen', () => {
     })
     expect(screen.handleKey('enter', matchesKey)).toBe(true)
     expect(actions).toEqual(['start-open', 'open'])
-    expect(screen.render(100).join('\n')).toContain(
-      'Press Enter or o to open the Web UI',
-    )
+    expect(screen.render(100).join('\n')).toContain('[ Enter ]  Open Workspace')
   })
 
   it('starts the Runtime and opens the browser from one Enter key', async () => {
@@ -306,6 +334,7 @@ describe('Supervisor TUI screen', () => {
       setShowHardwareCursor(): void {}
       start(): void {
         queueMicrotask(() => {
+          inputListener?.('tab')
           inputListener?.('down')
           inputListener?.('tab')
           inputListener?.('o')
@@ -376,6 +405,7 @@ describe('Supervisor TUI screen', () => {
       setShowHardwareCursor(): void {}
       start(): void {
         queueMicrotask(() => {
+          inputListener?.('tab')
           inputListener?.('down')
           inputListener?.('tab')
           inputListener?.('s')
@@ -443,7 +473,9 @@ describe('Supervisor TUI screen', () => {
         }
       }
       start(): void {
-        queueMicrotask(() => inputListener?.('m'))
+        queueMicrotask(() => {
+          inputListener?.('m')
+        })
         setTimeout(() => inputListener?.('\u0003'), 100)
       }
       stop(): void {}
@@ -454,6 +486,7 @@ describe('Supervisor TUI screen', () => {
       stdout: { isTTY: true } as NodeJS.WriteStream,
       resolveContext: () => resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' }),
       inspect: async () => ({ class: 'absent', owner: null, endpoints: {} }),
+      initialPanel: 'fleet',
       inspectTransferSource: async () => ({ class: 'absent', owner: null, endpoints: {} }),
       seedFleet: async () => fleet,
       inspectFleet: async () => fleet,
@@ -528,7 +561,9 @@ describe('Supervisor TUI screen', () => {
         }
       }
       start(): void {
-        queueMicrotask(() => inputListener?.('m'))
+        queueMicrotask(() => {
+          inputListener?.('m')
+        })
         setTimeout(() => inputListener?.('\u0003'), 1_000)
       }
       stop(): void {}
@@ -540,6 +575,7 @@ describe('Supervisor TUI screen', () => {
       stdout: { isTTY: true } as NodeJS.WriteStream,
       resolveContext: () => resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' }),
       inspect: async () => ({ class: 'absent', owner: null, endpoints: {} }),
+      initialPanel: 'fleet',
       inspectTransferSource: async () => ({ class: 'absent', owner: null, endpoints: {} }),
       seedFleet: async () => fleet,
       inspectFleet: async () => fleet,
@@ -612,7 +648,9 @@ describe('Supervisor TUI screen', () => {
         }
       }
       start(): void {
-        queueMicrotask(() => inputListener?.('m'))
+        queueMicrotask(() => {
+          inputListener?.('m')
+        })
         setTimeout(() => inputListener?.('\u0003'), 1_000)
       }
       stop(): void {}
@@ -624,6 +662,7 @@ describe('Supervisor TUI screen', () => {
       stdout: { isTTY: true } as NodeJS.WriteStream,
       resolveContext: () => resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' }),
       inspect: async () => ({ class: 'absent', owner: null, endpoints: {} }),
+      initialPanel: 'fleet',
       inspectTransferSource: async () => ({ class: 'absent', owner: null, endpoints: {} }),
       seedFleet: async () => fleet,
       inspectFleet: async () => fleet,
@@ -868,6 +907,10 @@ describe('Supervisor TUI screen', () => {
     }, {
       onAction: (action) => actions.push(action),
     })
+
+    expect(screen.handleKey('tab', matchesKey)).toBe(true)
+    expect(screen.snapshot.panel).toBe('fleet')
+    expect(actions).toEqual([])
 
     expect(screen.handleKey('tab', matchesKey)).toBe(true)
     expect(screen.snapshot.panel).toBe('logs')

@@ -54,6 +54,20 @@ import {
   type ManagedSourceResult,
 } from './managed-source.ts'
 import { loadPiTui } from './pi-tui-loader.ts'
+import {
+  createSupervisorTerminalCanvas,
+  parseSupervisorPointer,
+  type SupervisorPointerEvent,
+} from './supervisor-tui-pointer.ts'
+import {
+  createSupervisorTuiTheme,
+  decorateSupervisorFrame,
+  type SupervisorTuiTheme,
+} from './supervisor-tui-theme.ts'
+import {
+  renderSupervisorHeader,
+  renderSupervisorHome,
+} from './supervisor-tui-view.ts'
 import { connectSsh } from './ssh-connect.mjs'
 import { buildRemoteSshArgs } from './remote.mjs'
 import { planProjectTransfer, type ProjectTransferPlan } from './project-transfer.ts'
@@ -217,6 +231,7 @@ export interface SupervisorTuiDependencies {
   env?: NodeJS.ProcessEnv
   stdin?: NodeJS.ReadStream
   stdout?: NodeJS.WriteStream
+  initialPanel?: SupervisorPanel
   inspect?: (options?: { homeRoot?: string; waitMs?: number }) => Promise<RuntimeSummary>
   start?: (options: Record<string, unknown>) => Promise<unknown>
   stop?: (options: Record<string, unknown>) => Promise<unknown>
@@ -395,6 +410,7 @@ export async function runSupervisorTui(
     undefined,
     join(supervisorRoot, 'logs'),
   )
+  const canvas = createSupervisorTerminalCanvas(stdout, dependencies.env ?? process.env)
   let active = true
   let actionRunning = false
   let sourcePromptActive = false
@@ -413,6 +429,7 @@ export async function runSupervisorTui(
   const screen = new SupervisorScreen({
     version: dependencies.version ?? readCliVersion(),
     channel,
+    panel: dependencies.initialPanel ?? 'overview',
     runtime,
     context,
     mode: configRecovery ? 'config-recovery' : 'normal',
@@ -453,6 +470,7 @@ export async function runSupervisorTui(
       void prepareManagedSourceAndStart()
     },
     requestRender: () => ui.requestRender(),
+    theme: createSupervisorTuiTheme(dependencies.env ?? process.env),
   })
   ui.addChild(screen)
 
@@ -2158,10 +2176,18 @@ export async function runSupervisorTui(
       process.off('SIGTERM', onTerminate)
       process.off('SIGINT', onTerminate)
       ui.stop()
+      canvas.stop()
       resolve(code)
     }
     const onTerminate = () => finish()
     const removeInputListener = ui.addInputListener((data) => {
+      const pointer = parseSupervisorPointer(data)
+      if (pointer) {
+        if (!sourcePromptActive && !settingsActive && !projectsActive && !transferActive && !updateChannelActive) {
+          screen.handlePointer(pointer)
+        }
+        return { consume: true }
+      }
       if (sourcePromptActive || settingsActive || projectsActive || transferActive || updateChannelActive) {
         if (piTui.matchesKey(data, 'ctrl+c')) {
           finish()
@@ -2191,7 +2217,18 @@ export async function runSupervisorTui(
 
     process.once('SIGTERM', onTerminate)
     process.once('SIGINT', onTerminate)
-    ui.start()
+    canvas.start()
+    try {
+      ui.start()
+    } catch (error: unknown) {
+      active = false
+      clearInterval(poll)
+      removeInputListener()
+      process.off('SIGTERM', onTerminate)
+      process.off('SIGINT', onTerminate)
+      canvas.stop()
+      throw error
+    }
     void refreshFleet({ quiet: true })
     void discoverUpdateInBackground()
   })
@@ -2243,6 +2280,9 @@ export class SupervisorScreen implements Component {
   private readonly onRequestManagedSource?: () => void
   private readonly onPrepareManagedSource?: () => void
   private readonly requestRender?: () => void
+  private readonly theme: SupervisorTuiTheme
+  private hoveredPanel?: SupervisorPanel
+  private renderWidth = 80
 
   constructor(
     snapshot: SupervisorSnapshot,
@@ -2264,6 +2304,7 @@ export class SupervisorScreen implements Component {
       onRequestManagedSource?: () => void
       onPrepareManagedSource?: () => void
       requestRender?: () => void
+      theme?: SupervisorTuiTheme
     } = {},
   ) {
     this.snapshot = {
@@ -2281,6 +2322,7 @@ export class SupervisorScreen implements Component {
     this.onRequestManagedSource = callbacks.onRequestManagedSource
     this.onPrepareManagedSource = callbacks.onPrepareManagedSource
     this.requestRender = callbacks.requestRender
+    this.theme = callbacks.theme ?? createSupervisorTuiTheme({ NO_COLOR: '1' })
   }
 
   update(patch: Partial<SupervisorSnapshot>): void {
@@ -2496,7 +2538,38 @@ export class SupervisorScreen implements Component {
     return false
   }
 
+  handlePointer(event: SupervisorPointerEvent): boolean {
+    const hovered = event.row === 3
+      ? panelAtColumn(
+          event.col,
+          this.snapshot.panel ?? 'overview',
+          this.renderWidth < 60,
+          isConfigRecovery(this.snapshot),
+        )
+      : undefined
+    if (event.motion) {
+      if (hovered !== this.hoveredPanel) {
+        this.hoveredPanel = hovered
+        this.requestRender?.()
+      }
+      return true
+    }
+    if (event.leftClick && hovered) {
+      this.hoveredPanel = hovered
+      this.selectPanel(hovered)
+      return true
+    }
+    if (event.wheel !== null && this.snapshot.panel === 'fleet' && this.snapshot.fleet) {
+      this.update({
+        fleet: moveFleetSelection(this.snapshot.fleet, event.wheel),
+      })
+      return true
+    }
+    return event.release
+  }
+
   render(width: number): string[] {
+    this.renderWidth = width
     const runtime = this.snapshot.runtime
     const narrow = width < 60
     const state = runtime?.class ?? 'unavailable'
@@ -2504,7 +2577,7 @@ export class SupervisorScreen implements Component {
       ? ` · update ${formatUpdateCandidate(this.snapshot.update)}`
       : ''
     const lines = [
-      `OpenAlice  ${this.snapshot.version}  channel ${this.snapshot.channel}${updateBadge}`,
+      `${renderSupervisorHeader(this.snapshot.version, this.snapshot.channel, width)}${updateBadge}`,
       '─'.repeat(Math.max(1, Math.min(width, 80))),
       renderTabs(this.snapshot.panel ?? 'overview', narrow, isConfigRecovery(this.snapshot)),
       '',
@@ -2535,39 +2608,28 @@ export class SupervisorScreen implements Component {
     } else if (isConfigRecovery(this.snapshot)) {
       lines.push(...renderConfigRecovery(this.snapshot))
     } else {
-      lines.push(
-        narrow ? `Runtime: ${state}` : `Runtime state: ${state}`,
-        `AliceProject: ${this.snapshot.context?.aliceProject.displayName ?? 'Default AliceProject'}`,
-        `Home: ${this.snapshot.context?.home ?? runtime?.home ?? 'default'}`,
-      )
-      if (!narrow) {
-        lines.push(
-          `Owner: ${formatOwner(runtime)}`,
-          `Web: ${runtime?.endpoints?.web ?? 'not available'}`,
-          `Components: ${formatComponents(runtime)}`,
-        )
-        const reportedProvider = runtime?.provider?.kind
-        const provider = reportedProvider && reportedProvider !== 'unknown'
-          ? reportedProvider
-          : this.snapshot.context?.runtimeProvider.kind
-        if (provider) {
-          lines.push(`Provider: ${provider}${runtime?.class === 'absent' && provider === 'bundle' ? ' (installed)' : ''}`)
-        }
-        if (Number.isInteger(runtime?.uptimeSeconds)) {
-          lines.push(`Uptime: ${formatDuration(runtime?.uptimeSeconds ?? 0)}`)
-        }
-        if (this.snapshot.context) {
-          lines.push(`Resolved: home ${formatProvenance(this.snapshot.context.provenance.home)} · port ${formatPortResolution(this.snapshot.context)}`)
-          if (this.snapshot.context.runtimeProvider.kind === 'bundle') {
-            lines.push(
-              `Runtime: OpenAlice ${this.snapshot.version} · bundle ${this.snapshot.context.runtimeProvider.contentIdentity ?? 'verified'}`,
-            )
-          } else {
-            lines.push(`Source: ${this.snapshot.context.appDir ?? runtime?.provider?.root ?? 'current directory discovery'} ${formatProvenance(this.snapshot.context.provenance.appDir)}`)
-          }
-        }
-      }
-      lines.push('', ...renderGuidance(runtime, this.snapshot.context))
+      const reportedProvider = runtime?.provider?.kind
+      const provider = reportedProvider && reportedProvider !== 'unknown'
+        ? reportedProvider
+        : this.snapshot.context?.runtimeProvider.kind ?? 'not resolved'
+      const providerLabel = this.snapshot.context?.runtimeProvider.kind === 'bundle'
+        ? `OpenAlice ${this.snapshot.version} · bundle ${this.snapshot.context.runtimeProvider.contentIdentity ?? 'verified'}`
+        : provider
+      const uptime = Number.isInteger(runtime?.uptimeSeconds)
+        ? formatDuration(runtime?.uptimeSeconds ?? 0)
+        : undefined
+      lines.push(...renderSupervisorHome({
+        projectName: this.snapshot.context?.aliceProject.displayName ?? 'Default AliceProject',
+        state,
+        home: this.snapshot.context?.home ?? runtime?.home ?? 'default',
+        web: runtime?.endpoints?.web ?? 'Not available until the Runtime starts',
+        owner: formatOwner(runtime),
+        provider: providerLabel,
+        components: formatComponents(runtime),
+        ...(uptime ? { uptime } : {}),
+        guidance: renderGuidance(runtime, this.snapshot.context)[0] ?? 'Runtime status is unavailable.',
+        primaryAction: primaryActionLabel(runtime),
+      }, width))
     }
 
     if (this.snapshot.confirmation) {
@@ -2595,7 +2657,15 @@ export class SupervisorScreen implements Component {
         : actionBar(runtime, this.snapshot.context, width, isConfigRecovery(this.snapshot))),
       'q / Esc / Ctrl+C  Detach without stopping',
     )
-    return lines.map((line) => truncate(line, width))
+    return decorateSupervisorFrame(
+      lines.map((line) => truncate(line, width)),
+      this.theme,
+      {
+        panel: this.snapshot.panel ?? 'overview',
+        hoveredPanel: this.hoveredPanel,
+        runtimeClass: runtime?.class,
+      },
+    )
   }
 
   invalidate(): void {}
@@ -2621,10 +2691,14 @@ export class SupervisorScreen implements Component {
   private selectAdjacentPanel(direction: 1 | -1): void {
     const panels: SupervisorPanel[] = isConfigRecovery(this.snapshot)
       ? ['overview', 'help']
-      : ['fleet', 'overview', 'logs', 'doctor', 'help']
+      : ['overview', 'fleet', 'logs', 'doctor', 'help']
     const current = panels.indexOf(this.snapshot.panel ?? 'overview')
     const panel = panels[(current + direction + panels.length) % panels.length]
       ?? 'overview'
+    this.selectPanel(panel)
+  }
+
+  private selectPanel(panel: SupervisorPanel): void {
     this.update({ panel })
     if (panel === 'logs') this.onAction?.('logs')
     if (panel === 'doctor') this.onAction?.('doctor')
@@ -2686,21 +2760,43 @@ function renderTabs(
   narrow: boolean,
   recovery = false,
 ): string {
-  const labels: Array<[SupervisorPanel, string]> = recovery
+  return tabLabels(narrow, recovery)
+    .map(([panel, label]) => panel === selected ? `[${label}]` : label)
+    .join('  ')
+}
+
+function tabLabels(
+  narrow: boolean,
+  recovery = false,
+): Array<[SupervisorPanel, string]> {
+  return recovery
     ? [
         ['overview', narrow ? 'Home' : 'Overview'],
         ['help', 'Help'],
       ]
     : [
-        ['fleet', narrow ? 'Fleet' : 'Machines'],
         ['overview', narrow ? 'Home' : 'Overview'],
+        ['fleet', narrow ? 'Fleet' : 'Machines'],
         ['logs', 'Logs'],
         ['doctor', 'Doctor'],
         ['help', 'Help'],
       ]
-  return labels
-    .map(([panel, label]) => panel === selected ? `[${label}]` : label)
-    .join('  ')
+}
+
+function panelAtColumn(
+  column: number,
+  selected: SupervisorPanel,
+  narrow: boolean,
+  recovery = false,
+): SupervisorPanel | undefined {
+  let offset = 1
+  for (const [panel, label] of tabLabels(narrow, recovery)) {
+    const rendered = panel === selected ? `[${label}]` : label
+    const end = offset + rendered.length - 1
+    if (column >= offset && column <= end) return panel
+    offset = end + 3
+  }
+  return undefined
 }
 
 function fleetActionBar(
@@ -2947,6 +3043,13 @@ function primaryAction(
   if (runtime?.class === 'absent') return 'start-open'
   if (runtime?.endpoints?.web) return 'open'
   return undefined
+}
+
+function primaryActionLabel(runtime: RuntimeSummary | null): string {
+  if (runtime?.class === 'absent') return 'Start OpenAlice & open Workspace'
+  if (runtime?.endpoints?.web) return 'Open Workspace'
+  if (runtime?.class === 'incompatible') return 'Review Doctor diagnostics'
+  return 'Review Runtime status'
 }
 
 function formatUpdateNotice(
