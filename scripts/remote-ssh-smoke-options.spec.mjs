@@ -31,6 +31,11 @@ describe('parseRemoteSshSmokeOptions', () => {
       .toThrow('--skip-build requires --image <name>')
   })
 
+  it('rejects a missing image value before consuming the next option', () => {
+    expect(() => parseRemoteSshSmokeOptions(['--image', '--skip-tui']))
+      .toThrow('--image requires a Docker image name')
+  })
+
   it('rejects unknown options', () => {
     expect(() => parseRemoteSshSmokeOptions(['--wat']))
       .toThrow('unknown option: --wat')
