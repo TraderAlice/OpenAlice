@@ -49,8 +49,11 @@ versioned release lane.
   source tree is already exercised on the promotion PR, while the release
   workflow builds and accepts the signed candidate bytes. Manual dispatch and
   `dev`/`master` pull-request coverage remain available.
-- Defer DAG fan-in removal and accepted-tree provenance to a second batch. Both
-  need explicit artifact/provenance contracts rather than YAML-only shortcuts.
+- Do not add an accepted-tree receipt or a second release-provenance trust path
+  in this iteration. The strict version-only classifier removes the expensive
+  preparation duplicate, while the tagged release still rebuilds and accepts
+  its own bytes. Revisit provenance reuse only if measured master duplication
+  remains material after the simpler lane split.
 - Keep the existing desktop build and N-1 matrices. Beta stops after signed or
   packaged candidate construction, current Workspace smoke, update-byte
   verification, and artifact upload. The downstream N-1 matrix runs only for
@@ -65,6 +68,20 @@ versioned release lane.
 - Keep beta and stable as separate serial release intents. A changed source tree
   invalidates prior candidate evidence and must be accepted again; unchanged
   beta source may be selected only through a later explicit stable decision.
+- Keep rolling `dev` publication CLI-only. The four native candidates already
+  exercise packaged Guardian/Alice, Web, Workspace, PTY, and Git behavior; do
+  not add Electron or Docker to the commit path, and do not repeat the separate
+  source-mode post-merge smoke. Sample the heavier multiprocess/Broker Pack
+  recovery once on Linux x64 rather than four times. Preserve all four targets
+  and activate their checksummed manifest atomically rather than publishing
+  partial platform state.
+- Run platform-neutral build and unit coverage once on Ubuntu for routine
+  integration PRs. macOS and Windows run the focused native CLI, Guardian,
+  filesystem, shell, and process contracts plus their real runtime/package
+  smokes. The full cross-platform build/test matrix belongs to `master`, stable
+  promotion, scheduled validation, and explicit manual rehearsal. Classify a
+  hosted-runner failure from captured evidence and a proportional local/native
+  rerun; do not make blind whole-matrix retries part of the contract.
   Even then, stable has independent version preparation and full release
   acceptance.
 
@@ -91,7 +108,7 @@ versioned release lane.
   packaged Workspace smoke pass locally. Native Intel/Windows, signing, and
   notarization remain CI/release evidence and are not claimed locally.
 
-### Batch 2: beta fast lane and provenance redesign
+### Batch 2: beta fast lane and CI lane redesign
 
 - [x] Beta publication requires every current desktop, CLI, Broker Pack, and
   installer candidate plus integrity/channel-isolation checks, but does not
@@ -99,18 +116,18 @@ versioned release lane.
 - [x] Stable publication still requires desktop N-1, managed SSH, legacy CLI
   cutover, Broker Pack N-1, public-channel authority, and every supported
   package-manager acceptance gate.
-- [ ] A trusted promotion receipt binds the accepted commit tree to the exact
-  required PR checks. A `master` release may reuse it only for the identical
-  tree; direct hotfixes or missing/stale receipts run the full master CI gates.
-- [ ] Release status presents one coherent view of publication and CI evidence,
-  so a green release beside an unrelated red duplicate workflow is no longer
-  the normal successful path.
 - [x] An exact two-manifest release-preparation PR takes the bounded semantic
   fast lane, while near misses demonstrably fall back to the ordinary full PR
   matrix.
 - [ ] Successful beta timing is measured before and after the channel split;
   signing, notarization, current-candidate startup, artifact integrity, and
   stable-alias isolation are never removed from beta.
+- [x] Each `dev` commit publishes only the four accepted native CLI candidates
+  plus the live installer check; Electron, Docker, generic CI, package-manager,
+  legacy, and cross-version lanes are absent.
+- [x] Routine integration PRs run the full suite once on Ubuntu and a focused
+  native contract suite on macOS/Windows; `master`, stable, scheduled, and
+  manual validation retain the complete cross-platform matrix.
 
 ## Work
 
@@ -131,10 +148,16 @@ versioned release lane.
   downloadable desktop candidates for three days.
 - [x] Add the exact release-preparation semantic classifier and use it to skip
   only redundant host/package PR jobs, never the final Release gates.
-- [ ] Define the signed accepted-tree receipt, trust boundary, invalidation
-  rules, and hotfix fallback.
-- [ ] Implement the release DAG and master-CI provenance changes with timing
-  telemetry and native release rehearsal evidence.
+- [x] Remove the redundant generic CI `dev` push smoke after proving that the
+  native CLI candidate smoke covers the real packaged runtime on every target.
+- [x] Keep one Linux x64 multiprocess/Broker Pack recovery acceptance per dev
+  commit instead of repeating that identical semantic gate on four candidates.
+- [x] Replace routine macOS/Windows copies of the complete Vitest suite with
+  the focused platform contract command, while retaining full host coverage in
+  stable and scheduled lanes.
+- [ ] Record the first authorized beta run's actual wall and runner timing; this
+  is observational follow-up, not a publication blocker or a reason to add a
+  second provenance system.
 
 ## Verification
 
@@ -160,10 +183,10 @@ test-environment defects rather than product regressions: a hard-coded port
 collided with a hosted runner, and Windows cleanup exceeded an implicit
 five-second test budget. PR #1272 replaced the port assumption with a reserved
 fixture window and gave the bounded Git cleanup path an explicit budget. The
-later promotion, version-only, and release gates all passed. This supports a
-future accepted-tree receipt that skips only identical post-merge CI; it does
-not justify reusing evidence after additional commits, weakening release gates,
-or combining beta and stable publication.
+later promotion, version-only, and release gates all passed. The strict
+version-only fast lane captures the useful part of that evidence without
+making ordinary development depend on a new signed receipt or another release
+trust boundary.
 
 The successful `v0.91.0-beta.1` Release run took 35:03 without a failed job or
 rerun. Its beta publication spent about 37 runner-minutes on compatibility
@@ -188,11 +211,35 @@ those runner-minutes; its expected PR wall time is about four minutes. The
 classifier executes from the trusted base commit and accepts only a byte-exact,
 synchronized, forward beta version change. Stable bumps, near misses, and
 classifier failures run the complete suite. `master` push reuse remains out of
-scope until the accepted-tree receipt can prove the associated PR, tree, and
-successful checks without adding an ad hoc trust tower.
+scope because its modest savings do not currently justify another release
+trust path.
+
+Recent successful `dev` pushes confirmed that rolling publication already had
+no Electron, Docker, release, or full-test job. Four native CLI candidates,
+atomic R2 activation, and the live network installer took a median of about
+8.25 minutes wall time and 14.9 runner-minutes; Intel macOS was consistently the
+critical native leg. The removed source-mode smoke cost about one runner-minute
+in parallel and duplicated packaged runtime evidence. Sampling the heavier
+multiprocess/Broker Pack recovery only on Linux x64 saves roughly another
+minute of aggregate runner time and tens of seconds on the Intel critical path.
+All four final candidate smokes, checksums/content identities, manifest-last
+activation, cancellation of superseded builds, and the public dev install stay
+intact.
+
+The CI lane redesign passed root TypeScript, the complete local suite (5,359
+passing, 13 skipped), 44 focused workflow/desktop contracts, current
+`actionlint`, the 67-file platform contract command (774 passing, 6 skipped),
+and the real `build:server -> build:bun-runtime:feasibility ->
+build:bun:release` sequence on Apple Silicon. A local unpacked Electron journey
+also launched the latest published beta profile, launched the current dev
+candidate, and immediately restarted that candidate with all eleven persistence
+checks passing. Because the dev manifest still declares `0.90.1`, that journey
+is evidence for the macOS profile-release/restart repair, not a forward beta.2
+upgrade claim.
 
 ## Completion
 
 Batch 1 is complete: criteria, local verification, and serial PR #1061 are
-merged to `dev`. The overall plan remains active until the second-batch DAG
-and provenance criteria are implemented and measured.
+merged to `dev`. Batch 2 implementation is complete. The plan remains active
+only to record the first authorized beta fast-lane timing; publication itself
+still requires a separate maintainer decision.

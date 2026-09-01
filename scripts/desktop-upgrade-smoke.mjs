@@ -28,6 +28,7 @@ import {
   previousDesktopAssetName,
   selectPreviousDesktopTag,
   versionFromTag,
+  waitForChromiumProfileRelease,
   windowsInstallerArgs,
 } from './desktop-upgrade-smoke-lib.mjs'
 import { packagedElectronExecutable } from './smoke-packaged-toolchain.mjs'
@@ -369,6 +370,13 @@ async function runRendererJourney({ executable, env, electronUserData, expressio
     client = null
     const exitCode = await waitForExit(child)
     if (exitCode !== 0) throw new Error(`${label} exited ${exitCode}`)
+    if (process.platform === 'darwin') {
+      await waitForChromiumProfileRelease(electronUserData, {
+        label,
+        childExitCode: child.exitCode,
+        childPid: child.pid,
+      })
+    }
     return result
   } catch (error) {
     client?.close()

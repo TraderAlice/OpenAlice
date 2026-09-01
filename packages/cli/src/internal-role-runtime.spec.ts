@@ -6,7 +6,11 @@ import { tmpdir } from 'node:os'
 
 import { describe, expect, it } from 'vitest'
 
-describe('private Runtime role fencing', () => {
+// Each case starts a real TypeScript child process with its own 10-second
+// process ceiling. Windows hosted runners can need more than Vitest's default
+// five seconds merely to load tsx under full-suite contention, so the enclosing
+// assertion budget must remain larger than the subprocess budget.
+describe('private Runtime role fencing', { timeout: 15_000 }, () => {
   it('refuses a direct Railway Connector writer without the Guardian fence', () => {
     const home = join(tmpdir(), `openalice-connector-no-fence-${process.pid}-${randomUUID()}`)
     const result = spawnSync(process.execPath, [
