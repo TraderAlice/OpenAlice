@@ -165,7 +165,7 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
         {normalizedQuery && (
           <div
             aria-live="polite"
-            className="px-1 pt-1 text-[10px] tabular-nums text-muted-foreground/55"
+            className="px-1 pt-1 text-[10px] leading-[14px] tabular-nums text-muted-foreground/55"
           >
             {t('inbox.searchResults', { count: filteredEntries.length, total: entries.length })}
           </div>
@@ -305,7 +305,7 @@ function WorkspaceView({
                 {workspaceLabel}
               </span>
               {unread > 0 && (
-                <span className="shrink-0 min-w-[15px] h-[15px] px-1 rounded-full bg-primary text-primary-foreground text-[9px] font-semibold tabular-nums flex items-center justify-center">
+                <span className="shrink-0 min-w-[15px] h-[15px] px-1 rounded-full bg-primary text-primary-foreground text-[10px] leading-[14px] font-semibold tabular-nums flex items-center justify-center">
                   {unread}
                 </span>
               )}

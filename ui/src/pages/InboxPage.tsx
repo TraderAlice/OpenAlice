@@ -335,7 +335,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
             <h1 className="text-pretty break-words text-[1.35rem] font-semibold leading-snug tracking-[-0.02em] text-foreground md:text-[1.5rem]">
               {documentTitle}
             </h1>
-            <div className="mt-2.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground">
+            <div className="mt-2.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[12px] leading-[18px] text-muted-foreground">
               <span
                 className={wsAlive ? 'min-w-0 break-words' : 'min-w-0 break-words text-muted-foreground/70 line-through'}
                 title={wsAlive ? displayTitle : t('inbox.workspaceNotExists')}
@@ -350,7 +350,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
                         ref={senderTriggerRef}
                         type="button"
                         aria-label={t('inbox.showSenderDetails', { sender: senderDisplay })}
-                        className="inline-flex min-h-10 min-w-0 items-center gap-1.5 rounded-sm text-[12px] text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 sm:min-h-8"
+                        className="inline-flex min-h-10 min-w-0 items-center gap-1.5 rounded-sm text-[12px] leading-[18px] text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 sm:min-h-8"
                       />}
                     >
                         {origin?.kind === 'interactive'
@@ -416,7 +416,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
                 </span>
               )}
             </div>
-            <div className="mt-1.5 flex flex-wrap gap-x-2 text-[11px] tabular-nums text-muted-foreground/55">
+            <div className="mt-1.5 flex flex-wrap gap-x-2 text-[11px] leading-[15px] tabular-nums text-muted-foreground/55">
               <span>{formatAbsolute(entry.ts)}</span>
               <span>{relativeTime}</span>
             </div>
@@ -483,7 +483,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
         >
           <h2
             id={`inbox-attachments-${entry.id}`}
-            className="mb-3 flex items-center gap-2 text-[12px] font-medium text-muted-foreground/70"
+            className="mb-3 flex items-center gap-2 text-[12px] leading-[18px] font-medium text-muted-foreground/70"
           >
             <Paperclip size={12} aria-hidden />
             {t('inbox.documentsSection')}
@@ -604,11 +604,11 @@ export function InboxAttachment({
           </span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[12px] font-medium text-foreground/90">{name}</span>
-            <span className="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground/50">
+            <span className="mt-0.5 block truncate font-mono text-[10px] leading-[14px] text-muted-foreground/50">
               {directory || t('inbox.workspaceRoot')}
             </span>
           </span>
-          <span className="hidden shrink-0 items-center gap-1.5 text-[10px] text-muted-foreground/50 sm:flex">
+          <span className="hidden shrink-0 items-center gap-1.5 text-[10px] leading-[14px] text-muted-foreground/50 sm:flex">
             <span>{fileKind}</span>
             {size && <span>{size}</span>}
           </span>

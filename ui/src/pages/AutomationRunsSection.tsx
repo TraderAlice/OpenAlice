@@ -170,7 +170,7 @@ function RunOutput({ task }: { task: HeadlessTaskRecord }) {
         </div>
       )}
       <section className="border-l-2 border-primary/30 pl-3">
-        <div className="mb-2 flex items-center gap-2 text-[12px] font-medium text-muted-foreground">
+        <div className="mb-2 flex items-center gap-2 text-[12px] leading-[18px] font-medium text-muted-foreground">
           <MessageSquareText size={14} />
           Reply
         </div>
@@ -185,7 +185,7 @@ function RunOutput({ task }: { task: HeadlessTaskRecord }) {
 
       {(tools.length > 0 || errors.length > 0) && (
         <section>
-          <div className="mb-2 flex items-center gap-2 text-[12px] font-medium text-muted-foreground">
+          <div className="mb-2 flex items-center gap-2 text-[12px] leading-[18px] font-medium text-muted-foreground">
             <Wrench size={13} />
             <span>Activity</span>
             <span className="font-normal text-muted-foreground/70">{tools.length} tool{tools.length === 1 ? '' : 's'}</span>
@@ -312,7 +312,7 @@ function AutomationRunTitle({
   return (
     <>
       <span className="flex min-w-0 items-center gap-2">
-        <span className="shrink-0 rounded-sm border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+        <span className="shrink-0 rounded-sm border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-[10px] leading-[14px] font-medium text-primary">
           {source.label}
         </span>
         <span
@@ -563,7 +563,7 @@ export function AutomationRunsSection() {
                     aria-expanded={isExpanded}
                     aria-label={runLabel}
                   >
-                    <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${STATUS_STYLE[task.status]}`}>
+                    <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] leading-[14px] font-medium ${STATUS_STYLE[task.status]}`}>
                       {task.status}
                     </span>
                     <Bot size={14} className="mt-1 shrink-0 text-muted-foreground/70" />

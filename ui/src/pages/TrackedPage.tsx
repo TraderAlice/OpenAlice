@@ -331,7 +331,7 @@ function StaleCollectionNotice({
   return (
     <div
       role="status"
-      className="mx-4 mt-4 flex items-center gap-2 rounded-md border border-warning/25 bg-warning/[0.06] px-3 py-2 text-[12px] text-muted-foreground md:mx-8"
+      className="mx-4 mt-4 flex items-center gap-2 rounded-md border border-warning/25 bg-warning/[0.06] px-3 py-2 text-[12px] leading-[18px] text-muted-foreground md:mx-8"
     >
       <CircleAlert size={14} className="shrink-0 text-warning" aria-hidden />
       <span className="min-w-0 flex-1">{t('tracked.listStale')}</span>
@@ -408,7 +408,7 @@ function Detail({ detail }: { detail: EntityDetail }) {
         <h2 className="min-w-0 break-words font-mono text-[18px] font-semibold leading-snug text-foreground sm:text-[20px]">
           {entity.name}
         </h2>
-        <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+        <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] leading-[15px] font-medium text-muted-foreground">
           {entity.type}
         </span>
       </div>
@@ -455,7 +455,7 @@ function IssueAnchorDetail({
           <div className="flex items-start gap-3">
             <ListChecks size={17} strokeWidth={1.8} className="mt-1 shrink-0 text-muted-foreground" aria-hidden />
             <div className="min-w-0 flex-1">
-              <div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium text-muted-foreground">
+              <div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-[15px] font-medium text-muted-foreground">
                 <span>{t('tracked.issue')}</span>
                 <span>{workspaceTag}</span>
                 <span className="font-mono">{issue.id}</span>
@@ -494,7 +494,7 @@ function IssueAnchorDetail({
 
 function IssueMetaPill({ children }: { children: React.ReactNode }) {
   return (
-    <span className="rounded-full border border-border/80 bg-background/70 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+    <span className="rounded-full border border-border/80 bg-background/70 px-2.5 py-1 text-[11px] leading-[15px] font-medium text-muted-foreground">
       {children}
     </span>
   )

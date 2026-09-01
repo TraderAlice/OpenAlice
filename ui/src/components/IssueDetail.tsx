@@ -118,7 +118,7 @@ function InspectorField({
 }) {
   return (
     <div className={`min-w-0 space-y-1.5 ${className}`}>
-      <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+      <span className="flex items-center gap-1.5 text-[11px] leading-[15px] font-medium text-muted-foreground">
         {icon}
         {label}
       </span>
@@ -138,7 +138,7 @@ function InspectorSection({
 }) {
   return (
     <section className="border-t border-border/60 px-4 py-4 first:border-t-0">
-      <h3 className="text-[12px] font-semibold text-muted-foreground">{title}</h3>
+      <h3 className="text-[12px] leading-[18px] font-semibold text-muted-foreground">{title}</h3>
       {description && <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p>}
       <div className="mt-3">{children}</div>
     </section>
@@ -1127,7 +1127,7 @@ function PropertiesRail({
                   message: t('issues.detail.healthMessage.not_started'),
                 }}
               />
-              <span className="text-[11px] tabular-nums text-muted-foreground">
+              <span className="text-[11px] leading-[15px] tabular-nums text-muted-foreground">
                 {t('issues.detail.lastRun')}: {issue.lastFiredAtMs
                   ? formatRelativeTime(issue.lastFiredAtMs)
                   : t('issues.detail.never')}
@@ -1496,7 +1496,7 @@ function RunRow({ run, onOpen }: { run: IssueRunRecord; onOpen: (run: IssueRunRe
     <li className="min-w-0 overflow-hidden rounded-lg border border-border bg-secondary px-3 py-2.5">
       <div className="flex flex-wrap items-center gap-2">
         <span
-          className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${RUN_STATUS_STYLE[displayStatus]}`}
+          className={`inline-block rounded-full px-2 py-0.5 text-[11px] leading-[15px] font-medium ${RUN_STATUS_STYLE[displayStatus]}`}
         >
           {t(`issues.detail.runStatus.${displayStatus}`)}
         </span>
@@ -1703,7 +1703,7 @@ export function IssuePendingReply({
   const { t } = useTranslation()
   return (
     <div className="mt-3 border-t border-border/60 pt-2">
-      <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+      <p className="flex items-center gap-1.5 text-[11px] leading-[15px] text-muted-foreground">
         <LoaderCircle size={11} className="shrink-0 animate-spin text-primary" aria-hidden />
         <span>
           {t('issues.detail.waitingForPrefix')}{' '}
@@ -1772,7 +1772,7 @@ export function IssueActivity({
                     <MessageSquare size={10} aria-hidden />
                   </span>
                   <article className={`rounded-lg border bg-secondary px-4 py-3 ${comment.replyTo ? 'ml-3 border-primary/25' : 'border-border'}`}>
-                    <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                    <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-[15px] text-muted-foreground">
                       <span className="font-medium text-foreground/85">{comment.author}</span>
                       {comment.replyTo && (
                         <span className="rounded bg-muted px-1.5 py-0.5">{t('issues.detail.reply')}</span>
@@ -1907,7 +1907,7 @@ function RunsSection({
     <section id="issue-runs" className="mt-8 scroll-mt-20 rounded-lg border border-border bg-secondary/45 px-3 py-3 sm:px-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-foreground">{t('issues.detail.runs')}</h2>
-        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{runs.length}</span>
+        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] leading-[15px] text-muted-foreground">{runs.length}</span>
       </div>
       <ul className="space-y-2">
         {visible.map((run) => <RunRow key={run.taskId} run={run} onOpen={onOpen} />)}
@@ -1990,10 +1990,10 @@ function WikilinkPicker({
                 className="group h-auto w-full justify-start gap-2.5 whitespace-normal bg-muted/30 px-3 py-2 text-left"
               >
                 <EntityIcon size={14} className="shrink-0 text-muted-foreground/70 transition-colors group-hover:text-primary" aria-hidden />
-                <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-foreground">
+                <span className="min-w-0 flex-1 truncate font-mono text-[12px] leading-[18px] text-foreground">
                   {resolution.entity.name}
                 </span>
-                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] leading-[15px] text-muted-foreground">
                   {resolution.entity.type}
                 </span>
               </Button>
@@ -2011,7 +2011,7 @@ function WikilinkPicker({
                 <ListChecks size={14} className="shrink-0 text-muted-foreground/70 transition-colors group-hover:text-primary" aria-hidden />
                 <span className="min-w-0 flex-1 truncate text-[12px] text-foreground">{iss.title}</span>
                 <span
-                  className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
+                  className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] leading-[15px] text-muted-foreground"
                   title={t('issues.workspaceTitle', {
                     workspace: iss.wsTag,
                     id: iss.wsId.slice(0, 8),
