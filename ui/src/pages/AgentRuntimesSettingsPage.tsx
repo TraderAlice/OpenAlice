@@ -4,7 +4,7 @@ import { ArrowDown, ArrowUp, RefreshCw } from 'lucide-react'
 
 import { ConfigSection, SettingsScrollArea, inputClass } from '../components/form'
 import { PageHeader } from '../components/PageHeader'
-import { PageLoading } from '../components/StateViews'
+import { EmptyState, PageLoading } from '../components/StateViews'
 import { Button } from '../components/ui/button'
 import { Toggle } from '../components/Toggle'
 import { installHintFor } from '../components/workspace/agentInstall'
@@ -125,10 +125,7 @@ export function AgentRuntimesSettingsPage() {
   if (loading && catalog.length === 0 && !error) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
-        <PageHeader
-          title={t('settings.agentRuntimes.title')}
-          description={t('settings.agentRuntimes.description')}
-        />
+        <PageHeader title={t('settings.agentRuntimes.title')} />
         <PageLoading />
       </div>
     )
@@ -138,7 +135,6 @@ export function AgentRuntimesSettingsPage() {
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
         title={t('settings.agentRuntimes.title')}
-        description={t('settings.agentRuntimes.description')}
         right={(
           <Button
             variant="outline"
@@ -151,7 +147,7 @@ export function AgentRuntimesSettingsPage() {
           </Button>
         )}
       />
-      <SettingsScrollArea className="px-4 py-6 md:px-8">
+      <SettingsScrollArea className="px-4 py-5 md:px-8">
         <div className="mx-auto max-w-[880px]">
           {error && (
             <p role="alert" className="mb-4 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-[12px] text-destructive">
@@ -161,20 +157,21 @@ export function AgentRuntimesSettingsPage() {
 
           <ConfigSection
             title={t('settings.agentRuntimes.quickAccess')}
-            description={t('settings.agentRuntimes.quickAccessDescription')}
           >
             {pinned.length === 0 ? (
-              <p className="text-[13px] text-muted-foreground">{t('settings.agentRuntimes.quickAccessEmpty')}</p>
+              <div className="[&>div]:py-8">
+                <EmptyState title={t('settings.agentRuntimes.quickAccessEmpty')} />
+              </div>
             ) : (
-              <ol className="flex flex-col gap-2">
+              <ol className="overflow-hidden rounded-lg border border-border/70 bg-background">
                 {pinned.map((agent, index) => {
                   return (
                     <li
                       key={agent.id}
-                      className="flex min-w-0 items-center gap-2 rounded-lg border border-border/70 bg-background px-3 py-2"
+                      className="flex min-h-12 min-w-0 items-center gap-2 border-b border-border/60 px-3 py-2 last:border-b-0"
                     >
                       <span className="w-5 shrink-0 text-[11px] tabular-nums text-muted-foreground">{index + 1}</span>
-                      <AgentRuntimeIcon agentId={agent.id} className="h-4 w-4 shrink-0" />
+                      <AgentRuntimeIcon agentId={agent.id} className="size-4 shrink-0" />
                       <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{agent.displayName}</span>
                       <div className="flex shrink-0 items-center gap-1">
                         <Button
@@ -212,7 +209,6 @@ export function AgentRuntimesSettingsPage() {
 
           <ConfigSection
             title={t('settings.agentRuntimes.catalog')}
-            description={t('settings.agentRuntimes.catalogDescription')}
           >
             <input
               value={query}
@@ -222,13 +218,14 @@ export function AgentRuntimesSettingsPage() {
               className={`${inputClass} mb-3`}
             />
             {visible.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-[12px] text-muted-foreground">
-                {catalog.length === 0
+              <div className="rounded-lg border border-dashed border-border">
+                <EmptyState title={catalog.length === 0
                   ? t('settings.agentRuntimes.emptyCatalog')
                   : t('settings.agentRuntimes.noMatches', { query })}
-              </p>
+                />
+              </div>
             ) : (
-              <div className="flex flex-col gap-3">
+              <div className="overflow-hidden rounded-lg border border-border/70 bg-background">
                 {visible.map((agent) => (
                   <RuntimeSettingsCard
                     key={agent.id}
@@ -276,19 +273,18 @@ function RuntimeSettingsCard({
   const binPath = row?.binPath ?? agent.binPath ?? null
 
   return (
-    <article className="min-w-0 rounded-lg border border-border/70 bg-background px-4 py-3">
+    <article className="min-w-0 border-b border-border/60 px-3 py-3 last:border-b-0 sm:px-4">
       <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start">
         <div className="flex min-w-0 flex-1 items-start gap-3">
-          <AgentRuntimeIcon agentId={agent.id} className="mt-0.5 h-5 w-5 shrink-0" />
+          <AgentRuntimeIcon agentId={agent.id} className="mt-0.5 size-5 shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
               <h3 className="min-w-0 truncate text-[13px] font-semibold text-foreground">{agent.displayName}</h3>
               <span className="font-mono text-[11px] text-muted-foreground">{agent.id}</span>
             </div>
-            <p className="mt-0.5 text-[12px] text-muted-foreground">
-              {installed ? t('settings.agentRuntimes.installed') : t('settings.agentRuntimes.notInstalled')}
-              <span className="px-1.5 text-muted-foreground/50">·</span>
-              {t(agentRuntimeSettingsStatusKey(row))}
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[12px] text-muted-foreground">
+              <span>{installed ? t('settings.agentRuntimes.installed') : t('settings.agentRuntimes.notInstalled')}</span>
+              <span>{t(agentRuntimeSettingsStatusKey(row))}</span>
             </p>
             <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground" title={binPath ?? undefined}>
               {binPath ?? t('settings.agentRuntimes.unknownPath')}
@@ -300,13 +296,13 @@ function RuntimeSettingsCard({
               <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">{t(REPAIR_KEYS[row.repairTarget])}</p>
             )}
             {agent.id in RUNTIME_COPY && (
-              <dl className="mt-2 space-y-1 text-[11px] leading-snug text-muted-foreground">
-                <div className="flex gap-2">
-                  <dt className="w-14 shrink-0 text-muted-foreground/70">{t('settings.agentRuntimes.models')}</dt>
+              <dl className="mt-2 grid gap-x-4 gap-y-1 text-[11px] leading-snug text-muted-foreground md:grid-cols-2">
+                <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] gap-2">
+                  <dt className="text-muted-foreground/70">{t('settings.agentRuntimes.models')}</dt>
                   <dd>{t(RUNTIME_COPY[agent.id as keyof typeof RUNTIME_COPY].models)}</dd>
                 </div>
-                <div className="flex gap-2">
-                  <dt className="w-14 shrink-0 text-muted-foreground/70">{t('settings.agentRuntimes.auth')}</dt>
+                <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] gap-2">
+                  <dt className="text-muted-foreground/70">{t('settings.agentRuntimes.auth')}</dt>
                   <dd>{t(RUNTIME_COPY[agent.id as keyof typeof RUNTIME_COPY].auth)}</dd>
                 </div>
               </dl>

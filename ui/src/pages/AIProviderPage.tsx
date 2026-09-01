@@ -17,6 +17,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Check, ChevronDown, Plus } from 'lucide-react'
 import { api, type Preset, type WireShape } from '../api'
 import type {
   CredentialSummary,
@@ -24,7 +25,7 @@ import type {
   WorkspaceCredentialDefaultsResponse,
 } from '../api/config'
 import { PageHeader } from '../components/PageHeader'
-import { PageLoading, Skeleton } from '../components/StateViews'
+import { EmptyState, PageLoading, RecoverySurface, Skeleton } from '../components/StateViews'
 import { SettingsScrollArea, inputClass } from '../components/form'
 import { CredentialModal } from '../components/credentials/CredentialModal'
 import { ConfirmDialog } from '../components/ConfirmDialog'
@@ -44,7 +45,10 @@ import {
 import { notifyWorkspaceDefaultsChanged } from '../lib/workspaceAiEvents'
 import type { AgentInfo } from '../components/workspace/api'
 import { useAgentRuntimes } from '../hooks/useAgentRuntimes'
+import { AgentRuntimeIcon } from '../lib/agentRuntimeIcon'
+import { AIProviderIcon } from '../lib/aiProviderIcon'
 import { useWorkspace } from '../tabs/store'
+import { Button } from '../components/ui/button'
 
 function credentialLabel(cred: Pick<CredentialSummary, 'slug' | 'vendor' | 'label'>): string {
   return cred.label?.trim() || cred.slug
@@ -99,19 +103,14 @@ export function AIProviderPage() {
   if (!credentials) {
     return (
       <div className="flex flex-col flex-1 min-h-0">
-        <PageHeader title={t('aiProvider.title')} description={t('aiProvider.description')} />
+        <PageHeader title={t('aiProvider.title')} />
         {credentialsLoadError ? (
-          <div className="flex flex-1 items-center justify-center px-6 py-12">
-            <div role="alert" className="max-w-md text-center">
-              <h2 className="text-sm font-semibold text-foreground">{t('aiProvider.loadErrorTitle')}</h2>
-              <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
-                {t('aiProvider.loadErrorDescription')}
-              </p>
-              <button type="button" className="btn-secondary-sm mt-4" onClick={() => void reload()}>
-                {t('common.retry')}
-              </button>
-            </div>
-          </div>
+          <RecoverySurface
+            title={t('aiProvider.loadErrorTitle')}
+            description={t('aiProvider.loadErrorDescription')}
+            actionLabel={t('common.retry')}
+            onAction={() => void reload()}
+          />
         ) : (
           <PageLoading />
         )}
@@ -121,20 +120,14 @@ export function AIProviderPage() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <PageHeader title={t('aiProvider.title')} description={t('aiProvider.description')} />
-      <SettingsScrollArea className="px-4 py-6 md:px-8">
+      <PageHeader title={t('aiProvider.title')} />
+      <SettingsScrollArea className="px-4 py-5 md:px-8">
         <div className="mx-auto grid min-w-0 max-w-[1100px] gap-6 2xl:grid-cols-2">
           {/* ============== Credentials ============== */}
           <section className="min-w-0">
-            <div className="rounded-lg border border-border/50 bg-secondary/50 px-4 py-3 mb-4">
-              <p className="text-[13px] text-muted-foreground leading-relaxed">
-                {t('aiProvider.vaultIntro')}
-              </p>
-            </div>
-
             <div className="flex items-center justify-between mb-3">
               <div className="flex min-w-0 items-baseline gap-1.5">
-                <h2 className="text-[13px] font-semibold text-foreground uppercase tracking-wide">{t('aiProvider.credentials')}</h2>
+                <h2 className="text-[14px] font-semibold text-foreground">{t('aiProvider.credentials')}</h2>
                 {credentials.length > 0 && (
                   <span className="text-[11px] text-muted-foreground">
                     {vaultQuery.trim()
@@ -146,12 +139,15 @@ export function AIProviderPage() {
                   </span>
                 )}
               </div>
-              <button
+              <Button
+                type="button"
                 onClick={() => setModal({ mode: 'add' })}
-                className="text-[11px] px-2 py-1 rounded-md border border-border text-muted-foreground hover:text-primary hover:border-primary transition-colors"
+                variant="outline"
+                size="sm"
               >
-                + {t('common.add')}
-              </button>
+                <Plus aria-hidden className="size-3.5" />
+                {t('common.add')}
+              </Button>
             </div>
 
             {credentials.length > 0 && (
@@ -167,73 +163,94 @@ export function AIProviderPage() {
             <div className="space-y-2.5">
               {visibleCredentials.map((cred) => {
                 const compatibleAgents = compatibleAgentIds(cred.wires, agents)
+                const displayLabel = credentialLabel(cred)
+                const displayVendor = vendorLabel(cred.vendor)
+                const showVendor = displayVendor.toLocaleLowerCase() !== displayLabel.toLocaleLowerCase()
                 return (
-                  <div key={cred.slug} className="flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-background px-4 py-3 sm:flex-row sm:items-center">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[13px] font-medium text-foreground">{credentialLabel(cred)}</span>
-                        <span className="text-[11px] text-muted-foreground">{vendorLabel(cred.vendor)}</span>
-                        {cred.label && (
-                          <span className="text-[11px] text-muted-foreground font-mono">{cred.slug}</span>
-                        )}
-                        {compatibleAgents.map((agentId) => (
-                          <span key={agentId} className="text-[10px] text-muted-foreground border border-border rounded px-1">{AGENT_LABELS[agentId] ?? agentId}</span>
-                        ))}
-                        {cred.hasApiKey && (
-                          <span className="text-[10px] text-success border border-success/40 rounded px-1">{t('aiProvider.keySet')}</span>
-                        )}
-                      </div>
-                      <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                        {t('aiProvider.defaultModel')}: <span className="font-mono">{cred.lastModel || t('aiProvider.notSet')}</span>
-                        <span className="px-1.5 text-muted-foreground/50">·</span>
-                        <span className="font-mono">{Object.values(cred.wires)[0] || t('aiProvider.officialEndpoint')}</span>
+                  <div key={cred.slug} className="flex min-h-12 min-w-0 flex-col gap-3 rounded-lg border border-border bg-background px-4 py-3 sm:flex-row sm:items-center">
+                    <div className="flex min-w-0 flex-1 items-start gap-3">
+                      <AIProviderIcon vendor={cred.vendor} className="mt-0.5 size-5 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                          <span className="text-[13px] font-medium text-foreground">{displayLabel}</span>
+                          {showVendor && (
+                            <span className="text-[11px] text-muted-foreground">{displayVendor}</span>
+                          )}
+                          {cred.label && (
+                            <span className="font-mono text-[11px] text-muted-foreground">{cred.slug}</span>
+                          )}
+                          {cred.hasApiKey && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-success">
+                              <Check aria-hidden className="size-3" />
+                              {t('aiProvider.keySet')}
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-0.5 flex min-w-0 flex-col gap-0.5 text-[11px] text-muted-foreground">
+                          <span className="truncate">
+                            {t('aiProvider.defaultModel')}: <span className="font-mono">{cred.lastModel || t('aiProvider.notSet')}</span>
+                          </span>
+                          <span className="flex min-w-0 flex-wrap gap-x-2 gap-y-0.5">
+                            <span className="truncate font-mono">{Object.values(cred.wires)[0] || t('aiProvider.officialEndpoint')}</span>
+                            {compatibleAgents.length > 0 && (
+                              <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+                                {compatibleAgents.map((agentId) => (
+                                  <span key={agentId} className="inline-flex items-center gap-1.5">
+                                    <AgentRuntimeIcon agentId={agentId} className="size-4 shrink-0" />
+                                    <span>{AGENT_LABELS[agentId] ?? agentId}</span>
+                                  </span>
+                                ))}
+                              </span>
+                            )}
+                          </span>
+                        </div>
                       </div>
                     </div>
                     <div className="flex shrink-0 gap-2 self-end sm:self-auto">
-                      <button
+                      <Button
                         type="button"
                         onClick={() => setModal({ mode: 'edit', cred })}
-                        title={t('aiProvider.editCredentialAria', {
-                          credential: credentialLabel(cred),
-                        })}
                         aria-label={t('aiProvider.editCredentialAria', {
                           credential: credentialLabel(cred),
                         })}
-                        className="text-[11px] px-2 py-1 rounded-md border border-border text-muted-foreground hover:text-foreground transition-colors"
+                        variant="outline"
+                        size="sm"
                       >
                         {t('common.edit')}
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
                         onClick={() => setPendingDelete(cred)}
-                        title={t('aiProvider.deleteCredentialAria', {
-                          credential: credentialLabel(cred),
-                        })}
                         aria-label={t('aiProvider.deleteCredentialAria', {
                           credential: credentialLabel(cred),
                         })}
-                        className="text-[11px] px-2 py-1 rounded-md border border-border text-muted-foreground hover:text-destructive transition-colors"
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-destructive"
                       >
                         {t('common.delete')}
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )
               })}
 
               {credentials.length > 0 && visibleCredentials.length === 0 && (
-                <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-[12px] text-muted-foreground">
-                  {t('aiProvider.noCredentialMatches', { query: vaultQuery })}
-                </p>
+                <div className="rounded-lg border border-dashed border-border">
+                  <EmptyState title={t('aiProvider.noCredentialMatches', { query: vaultQuery })} />
+                </div>
               )}
 
               {credentials.length === 0 && (
-                <button
+                <Button
+                  type="button"
                   onClick={() => setModal({ mode: 'add' })}
-                  className="w-full p-4 rounded-xl border-2 border-dashed border-border text-muted-foreground hover:border-primary/50 hover:text-primary transition-all text-[13px] font-medium"
+                  variant="outline"
+                  className="h-auto min-h-12 w-full border-dashed text-muted-foreground hover:text-primary"
                 >
-                  + {t('aiProvider.addFirst')}
-                </button>
+                  <Plus aria-hidden className="size-3.5" />
+                  {t('aiProvider.addFirst')}
+                </Button>
               )}
             </div>
           </section>
@@ -242,17 +259,17 @@ export function AIProviderPage() {
           <WorkspaceDefaultsSection credentials={credentials} presets={presets} agents={agents} />
         </div>
 
-        <div className="mx-auto mt-6 max-w-[1100px] rounded-lg border border-border/70 bg-background px-4 py-3">
-          <p className="text-[13px] leading-relaxed text-muted-foreground">
-            {t('aiProvider.openAgentRuntimesDescription')}
-          </p>
-          <button
+        <div className="mx-auto mt-6 flex min-h-12 max-w-[1100px] items-center justify-between gap-4 border-t border-border/60 py-3">
+          <p className="min-w-0 text-[12px] leading-5 text-muted-foreground">{t('aiProvider.openAgentRuntimesDescription')}</p>
+          <Button
             type="button"
             onClick={() => openOrFocus({ kind: 'settings', params: { category: 'agent-runtimes' } })}
-            className="oa-pressable mt-2 text-[12px] font-medium text-primary hover:underline"
+            variant="outline"
+            size="sm"
+            className="shrink-0"
           >
             {t('aiProvider.openAgentRuntimes')}
-          </button>
+          </Button>
         </div>
       </SettingsScrollArea>
 
@@ -330,7 +347,7 @@ function WorkspaceDefaultsSection({
 
   const credLabel = (slug: string) => {
     const c = credentials.find((x) => x.slug === slug)
-    return c ? `${credentialLabel(c)} · ${slug}` : slug
+    return c ? `${credentialLabel(c)} — ${slug}` : slug
   }
 
   const persist = async (
@@ -422,16 +439,19 @@ function WorkspaceDefaultsSection({
     const selectedSemantics = presetModel(selectedPreset, selectedModelId)?.semantics ?? null
     const semanticsSummary = describeModelSemantics(selectedSemantics)
     return (
-      <div key={agent.id} className="flex flex-col gap-3 rounded-lg border border-border bg-background px-4 py-3 sm:flex-row sm:items-center">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-2">
-            <span className="text-[13px] font-medium text-foreground">{agent.name}</span>
-            <span className="text-[11px] text-muted-foreground font-mono">{agent.id}</span>
+      <div key={agent.id} className="flex min-h-12 flex-col gap-3 rounded-lg border border-border bg-background px-4 py-3 sm:flex-row sm:items-center">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <AgentRuntimeIcon agentId={agent.id} className="mt-0.5 size-5 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline gap-2">
+              <span className="text-[13px] font-medium text-foreground">{agent.name}</span>
+              <span className="font-mono text-[11px] text-muted-foreground">{agent.id}</span>
+            </div>
+            {note && <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{note}</p>}
+            {options.length === 0 && (
+              <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground/70">{t('aiProvider.noCompatible')}</p>
+            )}
           </div>
-          {note && <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{note}</p>}
-          {options.length === 0 && (
-            <p className="text-[11px] text-muted-foreground/70 mt-0.5 leading-snug">{t('aiProvider.noCompatible')}</p>
-          )}
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[260px]">
           <select
@@ -470,10 +490,10 @@ function WorkspaceDefaultsSection({
           )}
           {(agent.id === 'pi' || agent.id === 'opencode') && current && !selectedSemantics?.reasoning && (
             <details className="px-1 text-[10.5px] text-muted-foreground">
-              <summary className="cursor-pointer">{t('aiProvider.advancedReasoning')}</summary>
+              <summary className="inline-flex min-h-8 cursor-pointer items-center">{t('aiProvider.advancedReasoning')}</summary>
               <select
                 aria-label={t('aiProvider.reasoningOverrideLabel', { agent: agent.name })}
-                className={inputClass + ' mt-1.5'}
+                className={`${inputClass} mt-1.5`}
                 value={typeof data?.defaults[agent.id]?.reasoning !== 'boolean' ||
                   data.defaults[agent.id]?.reasoningModel !== selectedModelId
                   ? 'auto'
@@ -498,14 +518,8 @@ function WorkspaceDefaultsSection({
 
   return (
     <section className="min-w-0">
-      <div className="rounded-lg border border-border/50 bg-secondary/50 px-4 py-3 mb-4">
-        <p className="text-[13px] text-muted-foreground leading-relaxed">
-          {t('aiProvider.defaultsIntro')}
-        </p>
-      </div>
-
       <div className="mb-3 flex min-h-5 items-center justify-between gap-3">
-        <h2 className="text-[13px] font-semibold text-foreground uppercase tracking-wide">{t('aiProvider.defaultsTitle')}</h2>
+        <h2 className="text-[14px] font-semibold text-foreground">{t('aiProvider.defaultsTitle')}</h2>
         <span aria-live="polite" className={`text-[11px] ${saveStatus === 'saved' ? 'text-success' : 'text-muted-foreground'}`}>
           {saveStatus === 'saving' ? t('common.saving') : saveStatus === 'saved' ? t('common.saved') : ''}
         </span>
@@ -515,6 +529,7 @@ function WorkspaceDefaultsSection({
         <div className="space-y-2.5" aria-hidden="true">
           {PRIMARY_DEFAULT_AGENTS.map((a) => (
             <div key={a.id} className="flex items-center gap-3 rounded-lg border border-border bg-background px-4 py-3">
+              <Skeleton className="size-5 shrink-0 rounded" />
               <div className="flex-1 min-w-0 space-y-1.5">
                 <Skeleton className="h-3.5 w-28 rounded" />
                 <Skeleton className="h-2.5 w-44 rounded" />
@@ -527,18 +542,23 @@ function WorkspaceDefaultsSection({
         <div className="space-y-2.5">
           {PRIMARY_DEFAULT_AGENTS.map((a) => renderAgent(a))}
 
-          <button
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => setShowAdvanced((v) => !v)}
-            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors pt-1"
+            aria-expanded={showAdvanced}
+            className="text-muted-foreground"
           >
-            {showAdvanced ? '▾' : '▸'} {t('aiProvider.advancedAgents')}
-          </button>
+            <ChevronDown
+              aria-hidden
+              className={`size-3.5 transition-transform duration-[var(--motion-fast)] ${showAdvanced ? 'rotate-180' : ''}`}
+            />
+            {t('aiProvider.advancedAgents')}
+          </Button>
 
           {showAdvanced && (
             <>
-              <p className="text-[11px] text-muted-foreground/80 leading-snug px-1">
-                {t('aiProvider.advancedAgentsDescription')}
-              </p>
               {ADVANCED_DEFAULT_AGENTS.map((a) => renderAgent(a))}
             </>
           )}

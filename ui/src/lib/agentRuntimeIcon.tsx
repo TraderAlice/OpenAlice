@@ -5,7 +5,7 @@ import cursorIcon from '@lobehub/icons-static-svg/icons/cursor.svg'
 import grokIcon from '@lobehub/icons-static-svg/icons/grok.svg'
 import opencodeIcon from '@lobehub/icons-static-svg/icons/opencode.svg'
 import piIcon from '@lobehub/icons-static-svg/icons/pi.svg'
-import { Bot } from 'lucide-react'
+import { Bot, SquareTerminal } from 'lucide-react'
 
 import ompIcon from '../assets/agent-runtimes/omp.svg'
 
@@ -32,6 +32,9 @@ const AGENT_RUNTIME_BRANDS: Record<string, BrandAsset> = {
 
 /** Official runtime identity where available; unknown extensions keep a safe generic fallback. */
 export function AgentRuntimeIcon({ agentId, className }: AgentRuntimeIconProps) {
+  if (agentId === 'shell') {
+    return <SquareTerminal aria-hidden data-agent-runtime-icon="shell" className={className} />
+  }
   const brand = agentId ? AGENT_RUNTIME_BRANDS[agentId] : undefined
   if (!brand) return <Bot aria-hidden data-agent-runtime-icon={agentId ?? 'generic'} className={className} />
 
