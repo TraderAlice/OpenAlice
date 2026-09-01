@@ -413,11 +413,17 @@ export const zh: Resources = {
       channel: {
         stable: '稳定通道',
         beta: 'Beta 通道',
+        dev: '开发通道',
+        pinned: '固定版本',
+        custom: '自定义来源',
       },
       status: {
         loading: '正在读取版本信息…',
         checking: '正在检查更新…',
         current: '当前已是最新版本。',
+        serviceManaged: '更新由当前部署服务管理。',
+        cliManaged: '请使用 OpenAlice CLI 检查此开发版本的更新。',
+        noUpdater: '当前安装不跟随自动更新通道。',
         available: 'OpenAlice v{{version}} 已可更新。',
         availableUnknown: '已有新的 OpenAlice 版本可更新。',
         downloading: '正在下载更新…',

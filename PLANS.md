@@ -35,12 +35,17 @@ the durable truth after it changes. Git history is the archive.
   CLI package owns OpenAlice only: Agent Runtime installation and Electron
   packaging stay outside this plan. The native CLI is public through the
   separately dispatched `v0.91.0-beta.1`; stable/beta discovery now uses the
-  OpenAlice CDN manifests, while native PowerShell and external
-  package-manager activation remain on focused branches from current `dev`.
+  OpenAlice CDN manifests. The retained no-domain Railway profile has passed
+  real migration, OpenCode resume, normal restart, and hard-kill recovery;
+  disposable empty-Volume/failure fallback, native PowerShell, and external
+  package-manager activation remain open on focused branches from current
+  `dev`.
 - [[plans/remote-project-fleet.md]] — Adds a machine-aware Supervisor fleet,
   remote AliceProject inventory/connection, and safe local-to-SSH project
   transfer for portable configuration and Workspaces while deliberately
-  excluding native/OpenAlice Session continuation state.
+  excluding native/OpenAlice Session continuation state. The next increment
+  unifies controller/remote release negotiation and adds a consented Railway
+  redeploy adapter without background polling or SSH-owned installation.
 - [[plans/auto-prediction-harness.md]] — Auto Prediction Beta conversation
   Harness is in `dev`; managed AP/AQ Studio supervision, opaque routing, and
   embedded product surfaces are implemented. Shared verified/unverified source

@@ -50,6 +50,33 @@ function terminate(child) {
   child.kill('SIGTERM')
 }
 
+function waitForExit(child, label, exitTimeoutMs = 10_000) {
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return Promise.resolve({ code: child.exitCode, signal: child.signalCode })
+  }
+  return new Promise((resolvePromise, rejectPromise) => {
+    const cleanup = () => {
+      clearTimeout(timer)
+      child.off('exit', onExit)
+      child.off('error', onError)
+    }
+    const onExit = (code, signal) => {
+      cleanup()
+      resolvePromise({ code, signal })
+    }
+    const onError = (error) => {
+      cleanup()
+      rejectPromise(error)
+    }
+    const timer = setTimeout(() => {
+      cleanup()
+      rejectPromise(new Error(`${label} did not exit within ${exitTimeoutMs}ms`))
+    }, exitTimeoutMs)
+    child.once('exit', onExit)
+    child.once('error', onError)
+  })
+}
+
 if (!skipBuild) {
   run('build Guardian runtime', 'pnpm', ['-F', '@traderalice/guardian-runtime', 'build'])
   run('build Electron main', 'pnpm', ['-F', '@traderalice/desktop', 'build'])
@@ -178,6 +205,17 @@ async function proveSurface(surface) {
     throw new Error(`${surface} owner pid ${fixturePid} is gone`)
   }
   terminate(fixture)
+  const fixtureExit = await waitForExit(fixture, `${surface} owner fixture`)
+  if (process.platform !== 'win32' && fixtureExit.code !== 0) {
+    throw new Error(
+      `${surface} owner fixture did not release cleanly ` +
+      `(code=${fixtureExit.code ?? 'null'}, signal=${fixtureExit.signal ?? 'none'}):\n${fixtureOutput}`,
+    )
+  }
+  // The fixture owns guardian.lock. POSIX SIGTERM lets it release cleanly;
+  // Windows taskkill force-stops the tree. In both cases the owner must exit
+  // before deleting the disposable AliceProject, otherwise cleanup races the
+  // release mutation and can turn a successful handoff into ENOTEMPTY.
   await rm(smokeRoot, { recursive: true, force: true })
   if (!passed || !ownerSurvived) {
     throw new Error(`${surface} handoff smoke failed:\n${output.split('\n').slice(-40).join('\n')}`)

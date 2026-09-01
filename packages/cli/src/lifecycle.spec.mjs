@@ -492,13 +492,7 @@ describe('OpenAlice Runtime lifecycle core', () => {
 
     await expect(startRuntime({ ...startOptions(), takeover: true }, {
       detached: true,
-      env: {
-        OPENALICE_RAILWAY_ENTRYPOINT_OWNER: '1',
-        OPENALICE_SERVICE_MANAGER: 'railway',
-        OPENALICE_MACHINE_ID: 'railway-service-service-test',
-        RAILWAY_ENVIRONMENT_ID: 'environment-test',
-        RAILWAY_SERVICE_ID: 'service-test',
-      },
+      env: {},
       nodeBinary: '/test/node',
       resolveRoot: async (path) => path,
       prepareSource: async () => ({ prepared: false }),
@@ -510,7 +504,10 @@ describe('OpenAlice Runtime lifecycle core', () => {
     })).resolves.toEqual(expect.objectContaining({ outcome: 'started' }))
 
     expect(spawnProcess).toHaveBeenCalledWith('/test/node', ['scripts/guardian/prod.mjs'], expect.objectContaining({
-      env: expect.objectContaining({ OPENALICE_TAKEOVER: '1' }),
+      env: expect.objectContaining({
+        OPENALICE_TAKEOVER: '1',
+      }),
+      stdio: ['ignore', 9, 9],
     }))
     expect(child.kill).not.toHaveBeenCalled()
   })
@@ -529,16 +526,9 @@ describe('OpenAlice Runtime lifecycle core', () => {
     })
   })
 
-  it('waits for Railway entrypoint ownership handoff before spawning the foreground Runtime', async () => {
+  it('starts the foreground Runtime after the Volume fence and owner cleanup agree', async () => {
     const child = new FakeChild()
-    const previousOwner = {
-      ...runningStatus(),
-      class: 'owned_elsewhere',
-      endpoints: {},
-      capabilities: [],
-    }
     const readStatus = vi.fn()
-      .mockResolvedValueOnce(previousOwner)
       .mockResolvedValueOnce(absentStatus())
       .mockResolvedValue(runningStatus())
     const spawnProcess = vi.fn(() => child)
@@ -547,6 +537,8 @@ describe('OpenAlice Runtime lifecycle core', () => {
       detached: false,
       env: {
         OPENALICE_RAILWAY_ENTRYPOINT_OWNER: '1',
+        OPENALICE_RAILWAY_FENCE_FD: '9',
+        OPENALICE_RAILWAY_INSTANCE_ID: '22222222-2222-4222-8222-222222222222',
         OPENALICE_SERVICE_MANAGER: 'railway',
         OPENALICE_MACHINE_ID: 'railway-service-service-test',
         RAILWAY_ENVIRONMENT_ID: 'environment-test',
@@ -558,37 +550,52 @@ describe('OpenAlice Runtime lifecycle core', () => {
       spawnProcess,
       readStatus,
       sleep: async () => undefined,
+      resolveRailwayFenceFd: () => 9,
       emit(event) {
         if (event.type === 'ready') child.emit('exit', 0, null)
       },
     })).resolves.toEqual(expect.objectContaining({ outcome: 'exited', exitCode: 0 }))
 
-    expect(readStatus).toHaveBeenCalledTimes(3)
+    expect(readStatus).toHaveBeenCalledTimes(2)
     const spawnedEnvironment = spawnProcess.mock.calls[0][2].env
     expect(spawnedEnvironment).not.toHaveProperty('OPENALICE_RAILWAY_ENTRYPOINT_OWNER')
+    expect(spawnedEnvironment).toHaveProperty('OPENALICE_RAILWAY_FENCE_FD', '3')
+    expect(spawnedEnvironment).toHaveProperty(
+      'OPENALICE_RAILWAY_INSTANCE_ID',
+      '22222222-2222-4222-8222-222222222222',
+    )
+    expect(spawnProcess.mock.calls[0][2].stdio).toEqual(['inherit', 'inherit', 'inherit', 9])
   })
 
-  it('does not grant Railway entrypoint handoff behavior to ordinary SSH commands', async () => {
+  it('fails closed before inspection when Railway has no valid locked Volume FD', async () => {
     const sleep = vi.fn(async () => undefined)
+    const readStatus = vi.fn(async () => ({
+      ...runningStatus(),
+      class: 'owned_elsewhere',
+      owner: { ...runningStatus().owner, surface: 'cli-server' },
+    }))
     await expect(startRuntime(startOptions(), {
       detached: true,
       env: {
+        OPENALICE_RAILWAY_ENTRYPOINT_OWNER: '1',
+        OPENALICE_RAILWAY_FENCE_FD: '9',
         OPENALICE_SERVICE_MANAGER: 'railway',
         OPENALICE_MACHINE_ID: 'railway-service-service-test',
         RAILWAY_ENVIRONMENT_ID: 'environment-test',
         RAILWAY_SERVICE_ID: 'service-test',
       },
-      readStatus: async () => ({
-        ...runningStatus(),
-        class: 'owned_elsewhere',
-        owner: { ...runningStatus().owner, surface: 'cli-server' },
-      }),
+      readStatus,
       sleep,
-    })).rejects.toMatchObject({ code: 'EOWNED' })
+      resolveRailwayFenceFd: () => null,
+    })).rejects.toMatchObject({
+      code: 'ERAILWAYFENCE',
+      message: expect.stringContaining('image entrypoint'),
+    })
+    expect(readStatus).not.toHaveBeenCalled()
     expect(sleep).not.toHaveBeenCalled()
   })
 
-  it('times out Railway entrypoint handoff before preparation or spawn', async () => {
+  it('fails retained pre-fence ownership immediately with reversible cutover guidance', async () => {
     const previousOwner = {
       ...runningStatus(),
       class: 'owned_elsewhere',
@@ -600,24 +607,28 @@ describe('OpenAlice Runtime lifecycle core', () => {
     const spawnProcess = vi.fn(() => new FakeChild())
     const emit = vi.fn()
 
+    const readStatus = vi.fn(async () => previousOwner)
     await expect(startRuntime({ ...startOptions(), waitMs: 10 }, {
       detached: false,
       env: {
         OPENALICE_RAILWAY_ENTRYPOINT_OWNER: '1',
+        OPENALICE_RAILWAY_FENCE_FD: '9',
         OPENALICE_SERVICE_MANAGER: 'railway',
         OPENALICE_MACHINE_ID: 'railway-service-service-test',
         RAILWAY_ENVIRONMENT_ID: 'environment-test',
         RAILWAY_SERVICE_ID: 'service-test',
       },
-      readStatus: async () => previousOwner,
+      readStatus,
       resolveRoot,
       prepareSource,
       spawnProcess,
       emit,
+      resolveRailwayFenceFd: () => 9,
     })).rejects.toMatchObject({
-      code: 'ETIMEDOUT',
-      message: expect.stringContaining('(owned_elsewhere)'),
+      code: 'ERAILWAYCUTOVER',
+      message: expect.stringContaining('state/guardian.lock'),
     })
+    expect(readStatus).toHaveBeenCalledOnce()
     expect(resolveRoot).not.toHaveBeenCalled()
     expect(prepareSource).not.toHaveBeenCalled()
     expect(spawnProcess).not.toHaveBeenCalled()

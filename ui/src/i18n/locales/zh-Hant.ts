@@ -421,11 +421,17 @@ export const zhHant: Resources = {
       channel: {
         stable: '穩定通道',
         beta: 'Beta 通道',
+        dev: '開發通道',
+        pinned: '固定版本',
+        custom: '自訂來源',
       },
       status: {
         loading: '正在讀取版本資訊…',
         checking: '正在檢查更新…',
         current: '目前已是最新版本。',
+        serviceManaged: '更新由此部署服務管理。',
+        cliManaged: '請使用 OpenAlice CLI 檢查此開發版本的更新。',
+        noUpdater: '此安裝不跟隨自動更新通道。',
         available: 'OpenAlice v{{version}} 已可更新。',
         availableUnknown: '已有新的 OpenAlice 版本可更新。',
         downloading: '正在下載更新…',

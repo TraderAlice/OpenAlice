@@ -168,7 +168,7 @@ jobs:
   preflight-public-cli-authority:
     name: Preflight public CLI channel authority
     needs: release
-    if: needs.release.outputs.created == 'true'
+    if: needs.release.outputs.created == 'true' && needs.release.outputs.channel == 'stable'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -182,7 +182,6 @@ jobs:
           node-version: 22.19.0
 
       - name: Verify every opted-in public channel before release publication
-        if: needs.release.outputs.channel == 'stable'
         run: node scripts/preflight-public-cli-authority.mjs
         env:
           OPENALICE_PUBLISH_NPM: ${{ vars.OPENALICE_PUBLISH_NPM }}
@@ -193,14 +192,11 @@ jobs:
           AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
           AUR_KNOWN_HOSTS: ${{ secrets.AUR_KNOWN_HOSTS }}
 
-  # Per-platform desktop installers are built before any tag or GitHub Release
-  # exists. Each runner builds only its own platform/arch, preserves the candidate
-  # immediately after fast package acceptance, and leaves the slower N-1 upgrade
-  # journey to a downstream job that can be retried without rebuilding it. macOS
-  # builds are signed and notarized through Developer ID secrets; Windows remains
-  # unsigned until a Windows code-signing certificate exists.
+  # Every beta still ships real signed/notarized desktop candidates and proves
+  # their current Workspace runtime. The slower N-1 journey is a stable-only
+  # confidence gate below rather than a tax on each beta iteration.
   build-desktop:
-    needs: [release, preflight-public-cli-authority]
+    needs: release
     if: needs.release.outputs.created == 'true'
     timeout-minutes: 45
     strategy:
@@ -328,15 +324,15 @@ jobs:
             dist/electron-app/*.exe
           if-no-files-found: error
           compression-level: 0
-          retention-days: 1
+          retention-days: 3
 
-  # The final-artifact upgrade journey is intentionally downstream from the
-  # build. A failed platform can be retried from its preserved installer without
-  # repeating Electron packaging, macOS signing, or notarization.
+  # Stable publication additionally proves each final candidate can upgrade
+  # the previous stable state. A failed platform remains retriable from the
+  # preserved candidate without rebuilding or re-signing it.
   accept-desktop-upgrade:
     name: Accept desktop upgrade (${{ matrix.os }}, ${{ matrix.arch }})
     needs: [release, build-desktop]
-    if: needs.release.outputs.created == 'true' && needs.build-desktop.result == 'success'
+    if: needs.release.outputs.created == 'true' && needs.release.outputs.channel == 'stable' && needs.build-desktop.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -390,7 +386,7 @@ jobs:
 
   cli-installer-acceptance:
     name: Accept CLI installer candidate
-    needs: [release, preflight-public-cli-authority]
+    needs: release
     if: needs.release.outputs.created == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -400,14 +396,20 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - uses: pnpm/action-setup@v6
+
       - uses: actions/setup-node@v7
         with:
           node-version: 22.19.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile --filter @traderalice/openalice-cli
 
       - name: Exercise candidate installer in a clean HTTP fixture
         run: node scripts/install-docker-smoke.mjs
 
       - name: Exercise candidate installer through managed SSH remote
+        if: needs.release.outputs.channel == 'stable'
         run: node scripts/remote-ssh-smoke.mjs --skip-tui
 
   build-cli-installer:
@@ -445,7 +447,7 @@ jobs:
 
   build-cli-release:
     name: Build native CLI (${{ matrix.platform }}-${{ matrix.arch }})
-    needs: [release, preflight-public-cli-authority]
+    needs: release
     if: needs.release.outputs.created == 'true'
     strategy:
       fail-fast: false
@@ -516,6 +518,7 @@ jobs:
             --json
 
       - name: Accept npm and Bun installs from the native candidate
+        if: needs.release.outputs.channel == 'stable'
         shell: bash
         run: |
           VERSION=$(node -p "require('./package.json').version")
@@ -806,7 +809,7 @@ jobs:
   accept-cli-legacy-cutover:
     name: Accept published v0.90.1 CLI cutover
     needs: [release, build-cli-release]
-    if: needs.release.outputs.created == 'true' && needs.build-cli-release.result == 'success'
+    if: needs.release.outputs.created == 'true' && needs.release.outputs.channel == 'stable' && needs.build-cli-release.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     permissions:
@@ -844,7 +847,7 @@ jobs:
   # native CLI candidates instead of serializing them in desktop jobs.
   build-broker-packs:
     name: Build Broker Packs (${{ matrix.os }}, ${{ matrix.arch }})
-    needs: [release, preflight-public-cli-authority]
+    needs: release
     if: needs.release.outputs.created == 'true'
     timeout-minutes: 30
     strategy:
@@ -880,6 +883,7 @@ jobs:
         run: pnpm broker-packs:build
 
       - name: Prove previous-release Broker Pack upgrade
+        if: needs.release.outputs.channel == 'stable'
         run: pnpm broker-packs:upgrade-smoke -- --from "${{ needs.release.outputs.previous_tag }}"
 
       - name: Preserve Broker Packs
@@ -899,22 +903,22 @@ jobs:
     if: >-
       always() &&
       needs.release.outputs.created == 'true' &&
-      needs.preflight-public-cli-authority.result == 'success' &&
       needs.build-desktop.result == 'success' &&
-      needs.accept-desktop-upgrade.result == 'success' &&
       needs.build-cli-installer.result == 'success' &&
       needs.build-cli-release.result == 'success' &&
-      needs.accept-cli-legacy-cutover.result == 'success' &&
       needs.build-broker-packs.result == 'success' &&
       needs.cli-installer-acceptance.result == 'success' &&
       (
         needs.release.outputs.channel == 'beta' ||
         (
           needs.release.outputs.channel == 'stable' &&
+          needs.preflight-public-cli-authority.result == 'success' &&
+          needs.accept-desktop-upgrade.result == 'success' &&
           needs.build-cli-package-channels.result == 'success' &&
           needs.accept-cli-homebrew.result == 'success' &&
           needs.accept-cli-linuxbrew.result == 'success' &&
-          needs.accept-cli-aur.result == 'success'
+          needs.accept-cli-aur.result == 'success' &&
+          needs.accept-cli-legacy-cutover.result == 'success'
         )
       )
     runs-on: ubuntu-latest

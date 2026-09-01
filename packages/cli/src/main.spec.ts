@@ -3,6 +3,23 @@ import { describe, expect, it, vi } from 'vitest'
 import { main } from './main.ts'
 
 describe('OpenAlice TypeScript application entry', () => {
+  it('advertises Railway lifecycle-fence support in machine-readable version output', async () => {
+    let output = ''
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      output += String(chunk)
+      return true
+    })
+    try {
+      await expect(main(['version', '--json'])).resolves.toBe(0)
+    } finally {
+      write.mockRestore()
+    }
+
+    expect(JSON.parse(output)).toMatchObject({
+      runtimeCapabilities: expect.arrayContaining(['railway-flock-v1', 'railway-runtime-lock-v2']),
+    })
+  })
+
   it('opens the Supervisor TUI for the bare command', async () => {
     const runTui = vi.fn(async () => 0)
 

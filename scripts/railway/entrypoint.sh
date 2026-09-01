@@ -34,12 +34,16 @@ fi
 if [[ -n "${RAILWAY_ENVIRONMENT_ID:-}" ]]; then
   [[ -n "${RAILWAY_SERVICE_ID:-}" ]] \
     || fail 'Railway did not provide a stable service identity'
+  [[ -z "${OPENALICE_SERVICE_MANAGER:-}" || "$OPENALICE_SERVICE_MANAGER" == railway ]] \
+    || fail 'OPENALICE_SERVICE_MANAGER must be railway on a Railway host'
+  export OPENALICE_SERVICE_MANAGER=railway
+  [[ "$RAILWAY_SERVICE_ID" =~ ^[A-Za-z0-9-]{1,128}$ ]] \
+    || fail 'Railway service identity is invalid'
   expected_machine_id="railway-service-${RAILWAY_SERVICE_ID}"
   if [[ -n "${OPENALICE_MACHINE_ID:-}" && "$OPENALICE_MACHINE_ID" != "$expected_machine_id" ]]; then
     fail 'OPENALICE_MACHINE_ID must match the Railway service identity'
   fi
   export OPENALICE_MACHINE_ID="$expected_machine_id"
-  export OPENALICE_RAILWAY_ENTRYPOINT_OWNER=1
 fi
 
 fixed_home="$(canonical_path "$volume_root/home")"
@@ -79,7 +83,16 @@ for persistent_path in "$HOME" "$OPENALICE_HOME" "$AQ_LAUNCHER_ROOT" "$OPENALICE
     *) fail "$persistent_path must stay beneath the persistent volume root $volume_root" ;;
   esac
 done
-mkdir -p "$HOME" "$OPENALICE_HOME" "$AQ_LAUNCHER_ROOT" "$NPM_CONFIG_PREFIX/bin" "$BUN_INSTALL/bin"
+quarantine_root="$volume_root/quarantine"
+if [[ -e "$quarantine_root" || -L "$quarantine_root" ]]; then
+  [[ -d "$quarantine_root" && ! -L "$quarantine_root" ]] \
+    || fail 'the reserved Railway quarantine path must be an actual directory, not a symlink or file'
+fi
+case "$OPENALICE_HOME" in
+  "$quarantine_root"|"$quarantine_root/"*)
+    fail 'OPENALICE_HOME cannot select the reserved Railway quarantine tree'
+    ;;
+esac
 
 channel="${OPENALICE_RAILWAY_CHANNEL:-stable}"
 version="${OPENALICE_RAILWAY_VERSION:-}"
@@ -88,6 +101,7 @@ port="${OPENALICE_RAILWAY_PORT:-47331}"
 wait_seconds="${OPENALICE_RAILWAY_WAIT_SECONDS:-180}"
 installer="${OPENALICE_RAILWAY_INSTALLER_PATH:-/opt/openalice/install}"
 command_wrapper="${OPENALICE_RAILWAY_COMMAND_WRAPPER_PATH:-/usr/local/libexec/openalice-railway-command}"
+retained_lock_preflight="${OPENALICE_RAILWAY_PREFLIGHT_PATH:-/usr/local/libexec/openalice-railway-preflight}"
 launcher="$OPENALICE_INSTALL_DIR/bin/openalice"
 
 [[ "$channel" == stable || "$channel" == beta || "$channel" == dev ]] \
@@ -98,9 +112,6 @@ launcher="$OPENALICE_INSTALL_DIR/bin/openalice"
   || fail 'OPENALICE_RAILWAY_PORT must be between 1 and 65535'
 [[ "$wait_seconds" =~ ^[0-9]+$ && "$wait_seconds" -ge 1 && "$wait_seconds" -le 600 ]] \
   || fail 'OPENALICE_RAILWAY_WAIT_SECONDS must be between 1 and 600'
-if [[ -n "${RAILWAY_ENVIRONMENT_ID:-}" && "$wait_seconds" -lt 130 ]]; then
-  fail 'OPENALICE_RAILWAY_WAIT_SECONDS must be at least 130 on Railway so draining plus stale-heartbeat recovery retains a bounded margin'
-fi
 if [[ "$channel" == dev && -n "$version" ]]; then
   fail 'the rolling dev channel cannot be combined with OPENALICE_RAILWAY_VERSION'
 fi
@@ -115,6 +126,41 @@ if [[ -n "$version" ]]; then
   [[ "$version" != 0.90.1 ]] \
     || fail 'OpenAlice 0.90.1 uses the legacy Node-managed layout and cannot run as a Railway native CLI host'
 fi
+
+if [[ -n "${RAILWAY_ENVIRONMENT_ID:-}" ]]; then
+  [[ -x /usr/bin/flock ]] \
+    || fail 'the Railway image is missing /usr/bin/flock'
+  [[ -x /usr/bin/mountpoint ]] \
+    || fail 'the Railway image is missing /usr/bin/mountpoint'
+  /usr/bin/mountpoint --quiet "$volume_root" \
+    || fail 'the Railway Volume root must be an actual mount point'
+  railway_fence_path="$volume_root"
+  exec 9<"$railway_fence_path"
+  printf 'openalice railway: waiting for the Volume lifecycle fence at %s\n' "$railway_fence_path"
+  /usr/bin/flock --exclusive --timeout "$wait_seconds" 9 \
+    || fail "could not acquire the Volume lifecycle fence within ${wait_seconds}s"
+  [[ -d "$railway_fence_path" && -e /proc/self/fd/9 ]] \
+    || fail 'the Railway lifecycle fence did not preserve fd 9'
+  [[ "$(stat -Lc '%d:%i' /proc/self/fd/9)" == "$(stat -Lc '%d:%i' "$railway_fence_path")" ]] \
+    || fail 'the inherited Railway lifecycle fence names the wrong inode'
+  grep -Eq '^lock:[[:space:]]+[0-9]+:[[:space:]]+FLOCK[[:space:]]+ADVISORY[[:space:]]+WRITE' /proc/self/fdinfo/9 \
+    || fail 'the inherited Railway lifecycle fence is not exclusively locked'
+  OPENALICE_RAILWAY_INSTANCE_ID="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+  [[ "$OPENALICE_RAILWAY_INSTANCE_ID" =~ ^[A-Za-z0-9-]{16,128}$ ]] \
+    || fail 'could not create the Railway fencing instance identity'
+  export OPENALICE_RAILWAY_INSTANCE_ID
+  export OPENALICE_RAILWAY_FENCE_FD=9
+  export OPENALICE_RAILWAY_ENTRYPOINT_OWNER=1
+  [[ -f "$retained_lock_preflight" && ! -L "$retained_lock_preflight" ]] \
+    || fail 'the Railway image is missing its retained-lock preflight'
+  python3 "$retained_lock_preflight" \
+    "$volume_root" \
+    "$OPENALICE_HOME" \
+    "$AQ_LAUNCHER_ROOT" \
+    "env:${OPENALICE_MACHINE_ID}"
+fi
+
+mkdir -p "$HOME" "$OPENALICE_HOME" "$AQ_LAUNCHER_ROOT" "$NPM_CONFIG_PREFIX/bin" "$BUN_INSTALL/bin"
 
 validated_install_identity() {
   local expected_channel="${1:-}" expected_version="${2:-}"
@@ -136,6 +182,7 @@ except Exception:
 
 source = payload.get("installSource")
 runtime = payload.get("managedRuntime")
+capabilities = payload.get("runtimeCapabilities")
 artifact = source.get("artifact") if isinstance(source, dict) else None
 version = payload.get("version")
 identity = payload.get("contentIdentity")
@@ -156,6 +203,9 @@ if not (
     and isinstance(artifact.get("sha256"), str)
     and re.fullmatch(r"[a-f0-9]{64}", artifact["sha256"])
     and isinstance(runtime, dict)
+    and isinstance(capabilities, list)
+    and "railway-flock-v1" in capabilities
+    and "railway-runtime-lock-v2" in capabilities
     and runtime.get("productVersion") == version
     and runtime.get("contentIdentity") == identity
     and runtime.get("platform") == artifact.get("platform")
@@ -188,6 +238,7 @@ if expected_channel:
 print(json.dumps({
     "version": version,
     "contentIdentity": identity,
+    "runtimeCapabilities": capabilities,
     "releaseRoot": runtime_root,
     "installSource": {
         "schemaVersion": source["schemaVersion"],

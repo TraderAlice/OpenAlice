@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { delimiter, dirname, join, resolve } from 'node:path'
 
 export function isBunStandalone() {
@@ -10,6 +10,30 @@ export function resolveBunResourceRoot(env = process.env, executable = process.e
     env.OPENALICE_APP_HOME?.trim()
       || resolve(dirname(executable), '..', 'share', 'openalice'),
   )
+}
+
+export function bunInstallSourceLocations(
+  env = process.env,
+  executable = process.execPath,
+  resourceRoot = resolveBunResourceRoot(env, executable),
+) {
+  const explicit = env.OPENALICE_INSTALL_SOURCE?.trim()
+  if (explicit) return [explicit]
+  return [
+    resolve(dirname(dirname(executable)), 'install-source.json'),
+    resolve(resourceRoot, 'install-source.json'),
+  ]
+}
+
+export function resolveBunInstallSourcePath(
+  env = process.env,
+  executable = process.execPath,
+  resourceRoot = resolveBunResourceRoot(env, executable),
+  exists = existsSync,
+) {
+  const locations = bunInstallSourceLocations(env, executable, resourceRoot)
+  if (env.OPENALICE_INSTALL_SOURCE?.trim()) return locations[0]
+  return locations.find((path) => exists(path)) ?? null
 }
 
 export function bunGuardianProcessSpec(executable = process.execPath) {
@@ -30,12 +54,20 @@ export function buildBunRuntimeEnvironment(
   env,
   resourceRoot,
   executable = process.execPath,
+  options = {},
 ) {
   const gitRoot = join(resourceRoot, 'runtime', 'git')
   const gitBin = join(gitRoot, 'bin')
   const runtimeEnv = buildExternalAgentRuntimeEnvironment(env)
+  const installSource = resolveBunInstallSourcePath(
+    runtimeEnv,
+    executable,
+    resourceRoot,
+    options.exists ?? existsSync,
+  )
   return {
     ...runtimeEnv,
+    ...(installSource ? { OPENALICE_INSTALL_SOURCE: installSource } : {}),
     OPENALICE_RUNTIME_EXECUTABLE: executable,
     LOCAL_GIT_DIRECTORY: gitRoot,
     GIT_EXEC_PATH: join(gitRoot, 'libexec', 'git-core'),

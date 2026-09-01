@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import {
+  bunInstallSourceLocations,
   isBunStandalone,
   resolveBunContentIdentity,
   resolveBunResourceRoot,
@@ -62,12 +63,12 @@ export function installedContentIdentity(moduleUrl = import.meta.url, options = 
 function nativeInstallSourceLocations(options, env) {
   const bunStandalone = options.bunStandalone ?? isBunStandalone()
   if (!bunStandalone) return [new URL('../install-source.json', import.meta.url)]
-  const executable = resolve(options.executable ?? process.execPath)
-  const resourceRoot = resolveBunResourceRoot(env, executable)
-  return [
-    join(dirname(dirname(executable)), 'install-source.json'),
-    join(resourceRoot, 'install-source.json'),
-  ]
+  const executable = options.executable ?? process.execPath
+  return bunInstallSourceLocations(
+    env,
+    executable,
+    resolveBunResourceRoot(env, executable),
+  )
 }
 
 export function normalizeInstallSource(value, fallback = DEFAULT_INSTALL_SOURCE) {

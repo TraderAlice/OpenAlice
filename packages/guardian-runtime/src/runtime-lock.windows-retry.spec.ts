@@ -77,7 +77,7 @@ describe('Windows owner replacement retry', () => {
     await waitFor(() => renameFault.calls >= callsAfterAcquire + 3)
 
     expect(ownershipError).toBeNull()
-    expect(retryDelays).toEqual([10, 25])
+    expect(retryDelays).toEqual([0, 10, 25])
     await expect(readFile(join(lockDir, 'owner.json'), 'utf8')).resolves.toContain(lock.owner.token)
     await lock.release()
   })
