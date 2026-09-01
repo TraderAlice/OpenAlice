@@ -80,7 +80,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           child.write('u')
         } else if (!laneHovered && output.includes('Release Observatory · 3 LANES')) {
           laneHovered = true
-          child.write('\u001b[<35;20;13M')
+          setTimeout(() => child.write('\u001b[<35;20;13M'), 100)
         } else if (!laneSelected && output.includes('│ › Dev')) {
           laneSelected = true
           child.write('\u001b[<0;20;13M')
@@ -904,7 +904,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-source-prompt-'))
     temporaryPaths.push(isolatedHome)
     const child = pty.spawn(process.execPath, [cliEntry], {
-      cols: 100,
+      cols: 110,
       rows: 28,
       cwd: isolatedHome,
       env: {
@@ -931,9 +931,13 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         if (!requestedStart && output.includes('Start OpenAlice & open Workspace')) {
           requestedStart = true
           child.write('s')
-        } else if (!submittedInvalidPath && output.includes('Runtime Source · AliceProject setting')) {
+        } else if (!submittedInvalidPath && output.includes('Source route · SELECT CHECKOUT')) {
           submittedInvalidPath = true
-          child.write('\u0005\u0015/definitely/not/openalice\r')
+          child.write('\u0005\u0015/definitely/not/openalice')
+          setTimeout(() => {
+            child.write('\u001b[<35;63;14M')
+            setTimeout(() => child.write('\u001b[<0;63;14M'), 100)
+          }, 100)
         } else if (!cancelledPrompt && output.includes('Could not use that checkout')) {
           cancelledPrompt = true
           child.write('\u001b')
@@ -949,8 +953,67 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       })
     })
 
+    expect(transcript).toContain('Source route · SELECT CHECKOUT')
     expect(transcript).toContain('Runtime Source · AliceProject setting')
+    expect(transcript).toContain('› [ Enter ] Save & start')
+    expect(transcript).toContain('Source route · REJECTED')
     expect(transcript).toContain('Could not use that checkout')
+    expect(transcript).toContain('Source configuration cancelled.')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  })
+
+  it('keeps the complete Source Launch Bay route at the 80-column baseline', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-source-narrow-'))
+    temporaryPaths.push(isolatedHome)
+    const childEnv = { ...process.env }
+    delete childEnv.OPENALICE_HOME
+    delete childEnv.OPENALICE_INSTANCE
+    const child = pty.spawn(process.execPath, [cliEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...childEnv,
+        HOME: isolatedHome,
+        OPENALICE_SUPERVISOR_HOME: join(isolatedHome, 'supervisor'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let closed = false
+      let detached = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor narrow Source Launch Bay timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!opened && output.includes('Start OpenAlice & open Workspace')) {
+          opened = true
+          child.write('c')
+        } else if (!closed && output.includes('Source Launch Bay · SELECT CHECKOUT')) {
+          closed = true
+          child.write('\u001b')
+        } else if (!detached && output.includes('Source configuration cancelled.')) {
+          detached = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor narrow Source Launch Bay exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('Source Launch Bay · SELECT CHECKOUT')
+    expect(transcript).toContain('◆ Select  → Validate  → Save  → Launch')
+    expect(transcript).toContain('Runtime Source · AliceProject setting')
+    expect(transcript).toContain('◆ CONTRACT')
     expect(transcript).toContain('Source configuration cancelled.')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')

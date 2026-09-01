@@ -104,6 +104,12 @@ import {
   type SupervisorProjectFoundryView,
 } from './supervisor-project-foundry-view.ts'
 import {
+  decorateSupervisorSourceLaunchBay,
+  renderSupervisorSourceLaunchBay,
+  supervisorSourceFieldWidth,
+  type SupervisorSourcePhase,
+} from './supervisor-source-view.ts'
+import {
   decorateSupervisorReleaseObservatory,
   renderSupervisorReleaseObservatory,
 } from './supervisor-release-view.ts'
@@ -1405,9 +1411,11 @@ export async function runSupervisorTui(
 
     sourcePromptActive = true
     let saving = false
+    let phase: SupervisorSourcePhase = 'select'
+    let sourceHoveredCommand: string | undefined
     const overlayOptions = {
-      width: '80%',
-      maxHeight: 10,
+      width: '92%',
+      maxHeight: 20,
       anchor: 'center',
       margin: 1,
     } as const
@@ -1416,25 +1424,44 @@ export async function runSupervisorTui(
         ? `Start needs an OpenAlice source checkout. ${reason}`
         : 'Choose the OpenAlice source checkout for this AliceProject.'
 
-      setDetail(detail: string): void {
+      setDetail(detail: string, nextPhase: SupervisorSourcePhase = phase): void {
         this.detail = detail
+        phase = nextPhase
         this.invalidate()
         ui.requestRender()
       }
 
       override render(width: number): string[] {
-        const lines = renderSupervisorPanel('Runtime Source', 'AliceProject setting', [
-          sanitize(this.detail),
-          '',
-          ...super.render(Math.max(1, width - 4)),
-          '',
-          ...renderSupervisorCommandBar([
-            { key: 'Enter', label: 'Save & start', primary: true },
-            { key: 'Esc', label: 'Cancel' },
-          ], Math.max(1, width - 4)),
-        ], width)
-        captureOverlayPointer(lines, width, overlayOptions, (data) => this.handleInput(data))
-        return lines
+        const launchBay = renderSupervisorSourceLaunchBay({
+          phase,
+          projectName: sourceContext.aliceProject.displayName,
+          provenance: sourceContext.provenance.appDir.source,
+          fieldLines: super.render(supervisorSourceFieldWidth(width)),
+          detail: sanitize(this.detail),
+          contract: 'Validate the checkout before saving; launch only follows a saved source.',
+        }, width)
+        captureOverlayPointer(
+          launchBay.lines,
+          width,
+          overlayOptions,
+          (data) => this.handleInput(data),
+          undefined,
+          (label) => {
+            if (sourceHoveredCommand === label) return
+            sourceHoveredCommand = label
+            ui.requestRender()
+          },
+        )
+        return decorateSupervisorSourceLaunchBay(
+          launchBay.lines,
+          tuiTheme,
+          sourceHoveredCommand,
+        )
+      }
+
+      override handleInput(data: string): void {
+        sourceHoveredCommand = undefined
+        super.handleInput(data)
       }
     })()
     input.setValue(sourceContext.appDir ?? process.cwd())
@@ -1447,6 +1474,8 @@ export async function runSupervisorTui(
       sourcePromptActive = false
       closeSourcePrompt = null
       overlayPointer.clear()
+      sourceHoveredCommand = undefined
+      overlay.unfocus?.({ target: screen })
       overlay.hide()
       ui.setShowHardwareCursor(false)
       if (notice) screen.update({ notice })
@@ -1457,11 +1486,11 @@ export async function runSupervisorTui(
       if (saving) return
       const requested = value.trim()
       if (!requested) {
-        input.setDetail('Enter a source checkout path.')
+        input.setDetail('Enter a source checkout path.', 'error')
         return
       }
       saving = true
-      input.setDetail('Validating and saving the source checkout…')
+      input.setDetail('Validating the checkout before saving or launching…', 'validating')
       void (async () => {
         try {
           const appDir = await findSource(requested)
@@ -1476,7 +1505,7 @@ export async function runSupervisorTui(
           close()
           await performAction('start')
         } catch (error: unknown) {
-          input.setDetail(`Could not use that checkout: ${safeError(error)}`)
+          input.setDetail(`Could not use that checkout: ${safeError(error)}`, 'error')
         } finally {
           saving = false
         }

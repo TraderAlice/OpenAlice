@@ -340,6 +340,21 @@ not imply maintainer approval of the finished interaction.
   The Switchboard remains the entry/back surface, and the existing
   `createProject` call is still the only mutation boundary.
 
+### Runtime Source Launch Bay decision
+
+- Restyling the existing source-path input would keep the overlay small, but it
+  would continue to hide that one Enter action performs four ordered steps:
+  checkout selection, validation, persistence, and Runtime launch.
+- Moving source editing into Setup would consolidate configuration, but startup
+  without a usable checkout needs an immediate recovery surface and `c` is an
+  intentional advanced shortcut for this exact boundary.
+- The selected model is a Source Launch Bay. A Route panel keeps Select,
+  Validate, Save, and Launch visible while a Field Inspector owns the existing
+  focused input, failure guidance, and explicit action. Wide terminals pair the
+  regions; the 80-column baseline stacks the complete route. The existing
+  `findSource` -> `configureProject` -> `performAction('start')` chain remains
+  the only validation, persistence, and launch path.
+
 ### Persistent context-ribbon decision
 
 - Expanding the animated brand header would make version/update presentation
@@ -474,6 +489,8 @@ already large `supervisor-tui.ts` application controller.
   Flight Deck while preserving its planner, sender, and recovery state machine.
 - [x] Replace the legacy AliceProject Creator card with a responsive Foundry
   while preserving its ordered key/Home validation and creation boundary.
+- [x] Replace the legacy Runtime Source input card with a responsive Launch Bay
+  while preserving its validate-save-start execution boundary.
 
 ## Progress
 
@@ -881,6 +898,19 @@ already large `supervisor-tui.ts` application controller.
   pass; the 698-file suite passes (697 passed, 1 skipped; 6130 tests passed, 10
   skipped). Docker installer smoke passes, and package dry-run includes
   `src/supervisor-project-foundry-view.ts`.
+- Runtime Source now opens as a responsive Launch Bay rather than a raw input
+  card. Select, Validate, Save, and Launch remain visible beside the focused
+  checkout Inspector on wide terminals; validation failures mark the route
+  `REJECTED`, block the downstream stages, and retain the editable field. The
+  80-column layout stacks the same complete route and launch contract.
+- Source-Launch-Bay acceptance passes with 80 focused view, pointer, screen,
+  and real-PTY tests. A 110×28 no-checkout run typed an invalid path, hovered
+  and clicked the full `Save & start` segment, rendered the rejected route,
+  then cancelled without mutation; a separate 80×24 run retained the complete
+  route and restored terminal modes. Root TypeScript and CLI build/typecheck
+  pass; the 699-file suite passes (698 passed, 1 skipped; 6134 tests passed, 10
+  skipped). Docker installer smoke passes, and package dry-run includes
+  `src/supervisor-source-view.ts`.
 
 ## Completion Criteria
 

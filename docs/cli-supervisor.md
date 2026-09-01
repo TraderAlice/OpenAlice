@@ -214,6 +214,10 @@ path is intentionally parameter-free:
   place to understand controls, while `/` remains the faster Command Palette.
   Update, Setup, AliceProject selection, Runtime Source, and Remote Transfer
   use the same bordered overlay shell and semantic selected/description states.
+  Runtime Source is a responsive Launch Bay: its Select, Validate, Save, and
+  Launch route stays visible beside the checkout Field Inspector on wide
+  terminals and stacks intact at the 80-column baseline. Rejected checkouts
+  visibly block Save and Launch without leaving the focused input.
   Overlay lists share the application pointer contract: motion moves the
   visible selection, the wheel moves its list window, and a click invokes the
   same Enter path. Rendered keycaps remain clickable inside list, input,
@@ -291,7 +295,8 @@ path is intentionally parameter-free:
   complete regions;
 - `m` on Overview is an advanced control that confirms, prepares, remembers, and starts an installer-managed source
   aligned to the installed CLI branch/version;
-- `c` is an advanced control that chooses and remembers the selected AliceProject's source checkout;
+- `c` opens the Source Launch Bay to choose, validate, remember, and then start
+  the selected AliceProject's source checkout;
 - `?` toggles Help; `[` and `]` expose the other top-level panels.
 
 The TUI refuses to stop or restart Electron, development, incompatible, or
