@@ -1,4 +1,4 @@
-import { createReadStream } from 'node:fs';
+import { createReadStream, readFileSync } from 'node:fs';
 import { readFile, realpath } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -91,6 +91,34 @@ const HEADLESS_ALLOWED_TOOLS = [
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+// A workspace may widen its OWN headless Bash surface by committing extra
+// command-prefix rules to `.claude/settings.json` `permissions.allow`. Claude
+// Code `-p` decides non-safe Bash from the `--allowedTools` FLAG only — it does
+// not consult project settings files for that gate (verified 2.1.258) — so a
+// workspace's committed intent has to be projected onto the flag here. The
+// locked shim list above still applies to every workspace that ships no such
+// file. Only `Bash(...)` / `mcp__*` entries are forwarded; a missing or
+// malformed file leaves the default untouched.
+function workspaceHeadlessAllowExtras(cwd: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(
+      readFileSync(join(cwd, '.claude/settings.json'), 'utf8'),
+    );
+    if (!isRecord(parsed)) return [];
+    const perms = parsed['permissions'];
+    if (!isRecord(perms)) return [];
+    const allow = perms['allow'];
+    if (!Array.isArray(allow)) return [];
+    return allow.filter(
+      (entry): entry is string =>
+        typeof entry === 'string' &&
+        (entry.startsWith('Bash(') || entry.startsWith('mcp__')),
+    );
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -273,10 +301,14 @@ export const claudeAdapter: CliAdapter = {
     if (ctx.resume === 'last') {
       throw new Error('claude headless: resume requires a concrete resumeId mapping')
     }
+    const allowedTools = [
+      HEADLESS_ALLOWED_TOOLS,
+      ...workspaceHeadlessAllowExtras(ctx.cwd),
+    ].join(',');
     return [
       ...base,
       '--settings', AUTOTRUST_SETTINGS,
-      '--allowedTools', HEADLESS_ALLOWED_TOOLS,
+      '--allowedTools', allowedTools,
       ...(ctx.sessionRuntime?.headlessArgs ?? []),
       ...(ctx.resume ? ['--resume', ctx.resume.sessionId] : []),
       '-p', '--output-format', 'stream-json', '--verbose',

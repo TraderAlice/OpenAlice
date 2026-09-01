@@ -778,6 +778,46 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
     ]);
   });
 
+  it('claude: a workspace .claude/settings.json permissions.allow widens --allowedTools', async () => {
+    // Claude Code `-p` gates non-safe Bash on the --allowedTools FLAG only, not
+    // on project settings files — so a workspace opts extra command prefixes
+    // into its own headless runs by committing them, and the adapter projects
+    // them onto the flag. Non-Bash/non-mcp entries are dropped.
+    await mkdir(join(dir, '.claude'), { recursive: true });
+    await writeFile(
+      join(dir, '.claude/settings.json'),
+      JSON.stringify({
+        permissions: {
+          allow: [
+            'Bash(bash orb-bot/run_live.sh:*)',
+            'Bash(git push:*)',
+            'mcp__foo__bar',
+            'Read(./secrets)',
+          ],
+        },
+        sandbox: false,
+      }),
+    );
+    const argv = claudeAdapter.composeHeadlessCommand!(['claude'], { cwd: dir, env: {} }, 'do x');
+    const allowed = argv[argv.indexOf('--allowedTools') + 1];
+    expect(allowed).toBe(
+      'Bash(alice:*),Bash(alice-workspace:*),Bash(alice-uta:*),Bash(traderhub:*),'
+      + 'Bash(bash orb-bot/run_live.sh:*),Bash(git push:*),mcp__foo__bar',
+    );
+  });
+
+  it('claude: missing or malformed .claude/settings.json leaves the locked shim list untouched', async () => {
+    const locked = 'Bash(alice:*),Bash(alice-workspace:*),Bash(alice-uta:*),Bash(traderhub:*)';
+    // missing file
+    let argv = claudeAdapter.composeHeadlessCommand!(['claude'], { cwd: dir, env: {} }, 'do x');
+    expect(argv[argv.indexOf('--allowedTools') + 1]).toBe(locked);
+    // malformed file
+    await mkdir(join(dir, '.claude'), { recursive: true });
+    await writeFile(join(dir, '.claude/settings.json'), '{ not json');
+    argv = claudeAdapter.composeHeadlessCommand!(['claude'], { cwd: dir, env: {} }, 'do x');
+    expect(argv[argv.indexOf('--allowedTools') + 1]).toBe(locked);
+  });
+
   it('codex: CLI-mode headless (no MCP) — approval/sandbox/network -c + exec --json -- <prompt>', () => {
     expect(codexAdapter.composeHeadlessCommand!(['codex'], ctx(), 'do x')).toEqual([
       'codex',
