@@ -54,6 +54,47 @@ export interface AgentRuntimeReadinessSnapshot {
   readonly checkedAt: string | null;
 }
 
+export interface AgentRuntimeReadinessProbeInFlight {
+  readonly identity: string
+  readonly promise: Promise<AgentRuntimeReadinessRow>
+}
+
+function runtimeReadinessProbeIdentity(
+  agent: string,
+  availability: AgentAvailability | undefined,
+): string {
+  return JSON.stringify([
+    agent,
+    availability?.installed ?? true,
+    availability?.path ?? null,
+    availability?.fingerprint ?? null,
+  ])
+}
+
+/** Share only probes that target the same executable identity. A package
+ * manager may replace a binary in place while the old probe is still running;
+ * that fresh path/fingerprint must start its own probe instead of inheriting
+ * the result Promise for the retired executable. */
+export function shareRuntimeReadinessProbe(
+  inFlight: Map<string, AgentRuntimeReadinessProbeInFlight>,
+  agent: string,
+  availability: AgentAvailability | undefined,
+  start: () => Promise<AgentRuntimeReadinessRow>,
+): Promise<AgentRuntimeReadinessRow> {
+  const identity = runtimeReadinessProbeIdentity(agent, availability)
+  const existing = inFlight.get(agent)
+  if (existing?.identity === identity) return existing.promise
+
+  const promise = start()
+  const entry = { identity, promise }
+  inFlight.set(agent, entry)
+  const clear = () => {
+    if (inFlight.get(agent) === entry) inFlight.delete(agent)
+  }
+  void promise.then(clear, clear)
+  return promise
+}
+
 export function initialRuntimeReadinessRow(
   adapter: CliAdapter,
   availability: AgentAvailability | undefined,

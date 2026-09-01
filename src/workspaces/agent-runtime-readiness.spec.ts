@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   classifyRuntimeReadinessFailure,
   failedRuntimeReadinessRow,
+  initialRuntimeReadinessRow,
   runtimeProbeSucceeded,
+  shareRuntimeReadinessProbe,
   snapshotRuntimeReadiness,
+  type AgentRuntimeReadinessProbeInFlight,
   type AgentRuntimeReadinessRow,
 } from './agent-runtime-readiness.js';
 import { emptyAgentSessionRuntime, type CliAdapter } from './cli-adapter.js';
@@ -55,6 +58,41 @@ function result(overrides: Partial<HeadlessTaskResult>): HeadlessTaskResult {
 }
 
 describe('agent runtime readiness helpers', () => {
+  it('shares an in-flight probe only while executable path and fingerprint match', async () => {
+    const inFlight = new Map<string, AgentRuntimeReadinessProbeInFlight>();
+    const probes = [
+      deferred<AgentRuntimeReadinessRow>(),
+      deferred<AgentRuntimeReadinessRow>(),
+      deferred<AgentRuntimeReadinessRow>(),
+    ];
+    let probeIndex = 0;
+    const start = vi.fn(() => probes[probeIndex++]!.promise);
+    const v1 = { installed: true, path: '/usr/bin/pi', fingerprint: 'pi-v1' };
+    const v2 = { installed: true, path: '/usr/bin/pi', fingerprint: 'pi-v2' };
+    const rerouted = { installed: true, path: '/opt/bin/pi', fingerprint: 'pi-v2' };
+
+    const first = shareRuntimeReadinessProbe(inFlight, 'pi', v1, start);
+    expect(shareRuntimeReadinessProbe(inFlight, 'pi', v1, start)).toBe(first);
+    expect(start).toHaveBeenCalledTimes(1);
+
+    const replacement = shareRuntimeReadinessProbe(inFlight, 'pi', v2, start);
+    expect(replacement).not.toBe(first);
+    expect(start).toHaveBeenCalledTimes(2);
+
+    probes[0]!.resolve(initialRuntimeReadinessRow(piAdapter, v1));
+    await first;
+    await Promise.resolve();
+    expect(shareRuntimeReadinessProbe(inFlight, 'pi', v2, start)).toBe(replacement);
+
+    const reroutedProbe = shareRuntimeReadinessProbe(inFlight, 'pi', rerouted, start);
+    expect(reroutedProbe).not.toBe(replacement);
+    expect(start).toHaveBeenCalledTimes(3);
+
+    probes[1]!.resolve(initialRuntimeReadinessRow(piAdapter, v2));
+    probes[2]!.resolve(initialRuntimeReadinessRow(piAdapter, rerouted));
+    await Promise.all([replacement, reroutedProbe]);
+  });
+
   it('classifies timeout, auth, provider, and generic failures', () => {
     expect(classifyRuntimeReadinessFailure(result({ killed: true }))).toBe('timeout');
     expect(
@@ -202,3 +240,14 @@ describe('agent runtime readiness helpers', () => {
     });
   });
 });
+
+function deferred<T>(): {
+  promise: Promise<T>
+  resolve(value: T): void
+} {
+  let resolvePromise!: (value: T) => void
+  const promise = new Promise<T>((resolve) => {
+    resolvePromise = resolve
+  })
+  return { promise, resolve: resolvePromise }
+}

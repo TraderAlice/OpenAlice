@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   backendRecoveryGeneration: 0,
   sockets: [] as Array<{
     url: string
+    emitOpen: () => void
     emitClose: (code: number) => void
   }>,
 }))
@@ -104,6 +105,7 @@ class FakeWebSocket {
     this.url = String(url)
     mocks.sockets.push({
       url: this.url,
+      emitOpen: () => this.emitOpen(),
       emitClose: (code) => this.emit('close', { code }),
     })
   }
@@ -115,6 +117,13 @@ class FakeWebSocket {
     const listeners = this.listeners.get(type) ?? []
     listeners.push(listener)
     this.listeners.set(type, listeners)
+  }
+
+  private emitOpen() {
+    this.readyState = this.OPEN
+    for (const listener of this.listeners.get('open') ?? []) {
+      ;(listener as () => void)()
+    }
   }
 
   private emit(type: string, event: { code: number } | { data: unknown }) {
@@ -139,14 +148,20 @@ async function startTerminal() {
   expect(mocks.sockets).toHaveLength(1)
 }
 
-async function exhaustReconnectBudget() {
+async function exhaustReconnectBudget(options: { openBeforeClose?: boolean } = {}) {
   for (const delay of reconnectDelays) {
-    act(() => mocks.sockets.at(-1)!.emitClose(1006))
+    act(() => {
+      if (options.openBeforeClose) mocks.sockets.at(-1)!.emitOpen()
+      mocks.sockets.at(-1)!.emitClose(1006)
+    })
     await act(async () => {
       await vi.advanceTimersByTimeAsync(delay)
     })
   }
-  act(() => mocks.sockets.at(-1)!.emitClose(1006))
+  act(() => {
+    if (options.openBeforeClose) mocks.sockets.at(-1)!.emitOpen()
+    mocks.sockets.at(-1)!.emitClose(1006)
+  })
   expect(screen.getByRole('button', { name: 'retry this terminal connection' })).toBeTruthy()
 }
 
@@ -167,6 +182,15 @@ afterEach(() => {
 })
 
 describe('TerminalView backend recovery', () => {
+  it('exhausts the retry budget when sockets open but close before attached', async () => {
+    render(<TerminalView wsId="research" sessionId="session-1" wsUrl="ws://127.0.0.1:40123/pty" />)
+    await startTerminal()
+
+    await exhaustReconnectBudget({ openBeforeClose: true })
+
+    expect(mocks.sockets).toHaveLength(13)
+  })
+
   it('re-attaches the same Session when backend health recovers after the retry budget expires', async () => {
     const view = render(<TerminalView wsId="research" sessionId="session-1" wsUrl="ws://127.0.0.1:40123/pty" />)
     await startTerminal()

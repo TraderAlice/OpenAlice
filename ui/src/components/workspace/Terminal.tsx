@@ -520,7 +520,6 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
       setStatus(hasConnectedOnce ? 'reconnecting' : 'connecting');
 
       ws.addEventListener('open', () => {
-        attempts = 0;
         recoverableTransportFailure = false;
         setClosedRecoverable(false);
         takeoverNextAttachRef.current = false;
@@ -547,6 +546,11 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
           if (!msg) return;
           switch (msg.type) {
             case 'attached':
+              // A transport-level open is not proof that the backend accepted
+              // this Session. Only the authoritative attached frame retires
+              // the reconnect history; open-then-close loops must still
+              // exhaust the bounded retry budget.
+              attempts = 0;
               setPid(msg.pid);
               setScrollbackTruncated(msg.scrollbackTruncated);
               kittyKeyboardMode.scan(`\x1b[=${msg.kittyKeyboardFlags};1u`);

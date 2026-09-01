@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { create } from 'zustand'
 
 import { preferencesApi } from '../api/preferences'
+import { useAuth } from '../auth/AuthContext'
 import {
   getAgentRuntimeReadiness,
   listAgents,
@@ -267,6 +268,8 @@ export function resetAgentRuntimesStore(): void {
  * runtime outside primary does not write pins.
  */
 export function useAgentRuntimes(): AgentRuntimesState {
+  const { backendRecoveryGeneration } = useAuth()
+  const observedBackendRecoveryGenerationRef = useRef(backendRecoveryGeneration)
   const agents = useAgentRuntimesStore((state) => state.agents)
   const readiness = useAgentRuntimesStore((state) => state.readiness)
   const quickAccessIds = useAgentRuntimesStore((state) => state.quickAccessIds)
@@ -283,6 +286,13 @@ export function useAgentRuntimes(): AgentRuntimesState {
   useEffect(() => {
     void ensureLoaded()
   }, [ensureLoaded])
+
+  useEffect(() => {
+    const observed = observedBackendRecoveryGenerationRef.current
+    observedBackendRecoveryGenerationRef.current = backendRecoveryGeneration
+    if (backendRecoveryGeneration <= observed) return
+    void rediscoverStore()
+  }, [backendRecoveryGeneration, rediscoverStore])
 
   useEffect(() => {
     const rediscover = () => void rediscoverStore()

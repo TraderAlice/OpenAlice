@@ -12,6 +12,14 @@ import {
 } from '../components/workspace/api'
 import { resetAgentRuntimesStore, useAgentRuntimes } from './useAgentRuntimes'
 
+const authMocks = vi.hoisted(() => ({
+  backendRecoveryGeneration: 0,
+}))
+
+vi.mock('../auth/AuthContext', () => ({
+  useAuth: () => ({ backendRecoveryGeneration: authMocks.backendRecoveryGeneration }),
+}))
+
 vi.mock('../api/preferences', () => ({
   preferencesApi: {
     getAgentRuntimes: vi.fn(),
@@ -70,6 +78,7 @@ const readiness = {
 describe('useAgentRuntimes', () => {
   beforeEach(() => {
     resetAgentRuntimesStore()
+    authMocks.backendRecoveryGeneration = 0
     vi.mocked(listAgents).mockReset()
     vi.mocked(getAgentRuntimeReadiness).mockReset()
     vi.mocked(probeAgentRuntimeReadiness).mockReset()
@@ -197,6 +206,56 @@ describe('useAgentRuntimes', () => {
     expect(getAgentRuntimeReadiness).toHaveBeenCalledTimes(3)
     expect(probeAgentRuntimeReadiness).not.toHaveBeenCalled()
     visibility.mockRestore()
+  })
+
+  it('cheaply rediscovers runtimes when backend recovery generation advances', async () => {
+    const runtimes = renderHook(() => useAgentRuntimes())
+    await waitFor(() => expect(runtimes.result.current.loading).toBe(false))
+
+    const updatedAgents = agents.map((entry) => entry.id === 'codex'
+      ? { ...entry, installed: true, binPath: '/usr/local/bin/codex', fingerprint: 'codex-recovered' }
+      : entry)
+    const updatedReadiness = {
+      ...readiness,
+      overallReady: false,
+      checkedAt: null,
+      agents: {
+        ...readiness.agents,
+        codex: {
+          agent: 'codex',
+          displayName: 'Codex',
+          installed: true,
+          binPath: '/usr/local/bin/codex',
+          fingerprint: 'codex-recovered',
+          status: 'unknown' as const,
+          ready: false,
+          source: 'unknown' as const,
+          checkedAt: null,
+          durationMs: null,
+        },
+      },
+    }
+    vi.mocked(listAgents).mockResolvedValue(updatedAgents)
+    vi.mocked(getAgentRuntimeReadiness).mockResolvedValue(updatedReadiness)
+
+    authMocks.backendRecoveryGeneration = 1
+    runtimes.rerender()
+
+    await waitFor(() => expect(listAgents).toHaveBeenCalledTimes(2))
+    expect(getAgentRuntimeReadiness).toHaveBeenCalledTimes(2)
+    expect(probeAgentRuntimeReadiness).not.toHaveBeenCalled()
+    expect(runtimes.result.current.catalog.find((entry) => entry.id === 'codex')?.installed).toBe(true)
+    expect(runtimes.result.current.readiness?.agents.codex?.status).toBe('unknown')
+
+    runtimes.rerender()
+    await act(async () => undefined)
+    expect(listAgents).toHaveBeenCalledTimes(2)
+
+    authMocks.backendRecoveryGeneration = 2
+    runtimes.rerender()
+    await waitFor(() => expect(listAgents).toHaveBeenCalledTimes(3))
+    expect(getAgentRuntimeReadiness).toHaveBeenCalledTimes(3)
+    expect(probeAgentRuntimeReadiness).not.toHaveBeenCalled()
   })
 
   it('restores the last confirmed pins and exposes an error when an optimistic save fails', async () => {

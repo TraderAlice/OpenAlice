@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../api'
+import { useAuth } from '../auth/AuthContext'
 import type {
   BrokerAccountPackReadiness,
   BrokerEngine,
@@ -10,6 +11,7 @@ import type {
 } from '../api/types'
 
 const REFRESH_TTL_MS = 15_000
+const BACKEND_UNAVAILABLE_REASON = 'OpenAlice Runtime is unavailable.'
 
 export type AccountPackReadinessState = BrokerAccountPackReadiness['state'] | 'checking' | 'status-unavailable'
 
@@ -34,9 +36,6 @@ export function selectAccountPackReadiness(
   account: Pick<UTAConfig, 'id' | 'label' | 'presetId' | 'enabled'>,
   state: ReadinessSelectionState,
 ): AccountPackReadiness {
-  const exact = state.data?.accounts.find((candidate) => candidate.accountId === account.id)
-  if (exact) return exact
-
   const base = {
     accountId: account.id,
     label: account.label ?? account.id,
@@ -44,11 +43,21 @@ export function selectAccountPackReadiness(
     configuredEnabled: account.enabled !== false,
     operational: false,
   }
-  if (state.loading && !state.data) return { ...base, state: 'checking' }
+  // Readiness is a live capability, not a historical snapshot. A refresh or
+  // transport error must invalidate even an exact row from the previous
+  // response so trading surfaces always fail closed.
+  if (state.loading) return { ...base, state: 'checking' }
+  if (state.error) {
+    return { ...base, state: 'status-unavailable', reason: state.error }
+  }
+
+  const exact = state.data?.accounts.find((candidate) => candidate.accountId === account.id)
+  if (exact) return exact
+
   return {
     ...base,
     state: 'status-unavailable',
-    reason: state.error ?? 'Broker support status is unavailable on this Runtime.',
+    reason: 'Broker support status is unavailable on this Runtime.',
   }
 }
 
@@ -100,6 +109,7 @@ export function deriveAccountInteractionPolicy({
 }
 
 export function useBrokerPackReadiness() {
+  const { backendUnavailable, backendRecoveryGeneration } = useAuth()
   const [data, setData] = useState<BrokerPackReadinessResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -107,29 +117,60 @@ export function useBrokerPackReadiness() {
   const dataRef = useRef<BrokerPackReadinessResponse | null>(null)
   const lastLoadedAt = useRef(0)
   const inFlight = useRef<Promise<void> | null>(null)
+  const requestGeneration = useRef(0)
 
-  const refresh = useCallback(async () => {
-    if (inFlight.current) return inFlight.current
-    const request = (async () => {
-      if (!dataRef.current) setLoading(true)
+  const failClosed = useCallback((nextError: string | null, nextLoading: boolean) => {
+    requestGeneration.current += 1
+    dataRef.current = null
+    lastLoadedAt.current = 0
+    setData(null)
+    setError(nextError)
+    setLoading(nextLoading)
+  }, [])
+
+  const performRefresh = useCallback(async (supersedePending: boolean) => {
+    if (!supersedePending && inFlight.current) return inFlight.current
+    const generation = ++requestGeneration.current
+    dataRef.current = null
+    lastLoadedAt.current = 0
+    setData(null)
+    setError(null)
+    setLoading(true)
+
+    let request!: Promise<void>
+    request = (async () => {
       try {
         const next = await api.trading.getBrokerPacks()
+        if (generation !== requestGeneration.current) return
         dataRef.current = next
         setData(next)
         setError(null)
         lastLoadedAt.current = Date.now()
       } catch (err) {
+        if (generation !== requestGeneration.current) return
+        dataRef.current = null
+        setData(null)
         setError(err instanceof Error ? err.message : String(err))
       } finally {
-        setLoading(false)
-        inFlight.current = null
+        if (generation === requestGeneration.current) setLoading(false)
+        if (inFlight.current === request) inFlight.current = null
       }
     })()
     inFlight.current = request
     return request
   }, [])
 
-  useEffect(() => { void refresh() }, [refresh])
+  const refresh = useCallback(() => performRefresh(false), [performRefresh])
+
+  useEffect(() => {
+    if (backendUnavailable) {
+      failClosed(BACKEND_UNAVAILABLE_REASON, false)
+      return
+    }
+    // Recovery must not wait for a request left hanging by the outage. Start a
+    // new generation immediately and ignore any late response from the old one.
+    void performRefresh(true)
+  }, [backendRecoveryGeneration, backendUnavailable, failClosed, performRefresh])
 
   useEffect(() => {
     const refreshIfStale = () => {
@@ -158,9 +199,24 @@ export function useBrokerPackReadiness() {
     }
   }, [refresh])
 
+  const visibleData = backendUnavailable ? null : data
+  const visibleLoading = backendUnavailable ? false : loading
+  const visibleError = backendUnavailable ? BACKEND_UNAVAILABLE_REASON : error
   const forAccount = useCallback((account: Pick<UTAConfig, 'id' | 'label' | 'presetId' | 'enabled'>) => (
-    selectAccountPackReadiness(account, { data, loading, error })
-  ), [data, loading, error])
+    selectAccountPackReadiness(account, {
+      data: visibleData,
+      loading: visibleLoading,
+      error: visibleError,
+    })
+  ), [visibleData, visibleError, visibleLoading])
 
-  return { data, loading, error, installingEngine, refresh, install, forAccount }
+  return {
+    data: visibleData,
+    loading: visibleLoading,
+    error: visibleError,
+    installingEngine,
+    refresh,
+    install,
+    forAccount,
+  }
 }

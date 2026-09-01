@@ -8,9 +8,16 @@ const apiMocks = vi.hoisted(() => ({
   getBrokerPacks: vi.fn(),
   installBrokerPack: vi.fn(),
 }))
+const authMocks = vi.hoisted(() => ({
+  backendUnavailable: false,
+  backendRecoveryGeneration: 0,
+}))
 
 vi.mock('../api', () => ({
   api: { trading: apiMocks },
+}))
+vi.mock('../auth/AuthContext', () => ({
+  useAuth: () => authMocks,
 }))
 
 import {
@@ -37,6 +44,8 @@ const response: BrokerPackReadinessResponse = {
 }
 
 beforeEach(() => {
+  authMocks.backendUnavailable = false
+  authMocks.backendRecoveryGeneration = 0
   apiMocks.getBrokerPacks.mockResolvedValue(response)
   apiMocks.installBrokerPack.mockResolvedValue(response.packs[0])
   vi.clearAllMocks()
@@ -51,6 +60,12 @@ describe('account Broker Pack readiness policy', () => {
 
     expect(selectAccountPackReadiness(account, { data: null, loading: false, error: 'Runtime offline' })).toMatchObject({
       state: 'status-unavailable', operational: false, reason: 'Runtime offline',
+    })
+    expect(selectAccountPackReadiness(account, { data: response, loading: false, error: 'Runtime offline' })).toMatchObject({
+      state: 'status-unavailable', operational: false, reason: 'Runtime offline',
+    })
+    expect(selectAccountPackReadiness(account, { data: response, loading: true, error: null })).toMatchObject({
+      state: 'checking', operational: false,
     })
   })
 
@@ -79,5 +94,33 @@ describe('useBrokerPackReadiness', () => {
     await act(async () => { await result.current.install('ccxt') })
     expect(apiMocks.installBrokerPack).toHaveBeenCalledWith('ccxt')
     expect(apiMocks.getBrokerPacks).toHaveBeenCalledTimes(2)
+  })
+
+  it('fails closed after a refresh error and reloads on backend recovery', async () => {
+    const { result, rerender } = renderHook(() => useBrokerPackReadiness())
+
+    await waitFor(() => expect(result.current.forAccount(account).operational).toBe(true))
+
+    apiMocks.getBrokerPacks.mockRejectedValueOnce(new Error('Runtime offline'))
+    await act(async () => { await result.current.refresh() })
+
+    expect(result.current.data).toBeNull()
+    expect(result.current.forAccount(account)).toMatchObject({
+      state: 'status-unavailable', operational: false, reason: 'Runtime offline',
+    })
+
+    authMocks.backendUnavailable = true
+    rerender()
+    expect(result.current.forAccount(account)).toMatchObject({
+      state: 'status-unavailable', operational: false,
+    })
+
+    apiMocks.getBrokerPacks.mockResolvedValueOnce(response)
+    authMocks.backendUnavailable = false
+    authMocks.backendRecoveryGeneration += 1
+    rerender()
+
+    await waitFor(() => expect(result.current.forAccount(account).operational).toBe(true))
+    expect(apiMocks.getBrokerPacks).toHaveBeenCalledTimes(3)
   })
 })

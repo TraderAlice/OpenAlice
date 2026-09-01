@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   issueAutomationHealth,
+  issueAutomationOwnerState,
   issueAutomationRuntime,
   type IssueAutomationHealthInput,
 } from './automation-health.js'
@@ -82,6 +83,17 @@ describe('issueAutomationHealth', () => {
     expect(issueAutomationHealth({ ...base, ownerState: 'missing' }).state).toBe('blocked')
     expect(issueAutomationHealth({ ...base, ownerState: 'retired' }).message).toMatch(/retired/)
     expect(issueAutomationHealth({ ...base, ownerState: 'unbound' }).message).toMatch(/resumable/)
+    expect(issueAutomationHealth({ ...base, ownerState: 'workspace_missing' })).toMatchObject({
+      state: 'blocked',
+      message: expect.stringMatching(/Workspace is unavailable/),
+    })
+  })
+
+  it('uses the authoritative assignee projection for exact Session health', () => {
+    expect(issueAutomationOwnerState('@new-each-run')).toBe('workspace')
+    expect(issueAutomationOwnerState('@resume-1', { state: 'workspace_missing' }))
+      .toBe('workspace_missing')
+    expect(issueAutomationOwnerState('@resume-missing')).toBe('missing')
   })
 
   it('lets an in-flight run finish before surfacing a newly blocked owner', () => {

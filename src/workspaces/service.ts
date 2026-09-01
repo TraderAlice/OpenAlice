@@ -62,9 +62,11 @@ import {
   notInstalledRuntimeReadinessRow,
   readyRuntimeReadinessRow,
   runtimeProbeSucceeded,
+  shareRuntimeReadinessProbe,
   snapshotRuntimeReadiness,
   RUNTIME_READINESS_PROMPT,
   RUNTIME_READINESS_TIMEOUT_MS,
+  type AgentRuntimeReadinessProbeInFlight,
   type AgentRuntimeReadinessRow,
   type AgentRuntimeReadinessSnapshot,
   type AgentRuntimeReadinessSource,
@@ -124,8 +126,8 @@ import {
 import { updateIssueFields } from './issues/mutate.js';
 import {
   issueAutomationHealth,
+  issueAutomationOwnerState,
   issueAutomationRuntime,
-  type IssueAutomationOwnerState,
 } from './issues/automation-health.js';
 import {
   issueAssigneeClaimsFirstSession,
@@ -190,18 +192,6 @@ import {
   type ChatWorkspaceResolution,
   type TemplateWorkspaceResolution,
 } from './chat-workspace-resolver.js';
-
-/** Resolve only the operational facts automation health needs. Product APIs do
- * not expose the runtime-native session id itself. */
-function automationOwnerState(assignee: string, resumes: ResumeRegistry): IssueAutomationOwnerState {
-  const resumeId = issueAssigneeResumeId(assignee);
-  if (!resumeId) return 'workspace';
-  const identity = resumes.get(resumeId);
-  if (!identity) return 'missing';
-  if (identity.lifecycle === 'retired') return 'retired';
-  if (identity.presence === 'deleted') return 'deleted';
-  return identity.agentSessionId ? 'ready' : 'unbound';
-}
 
 function automationLatestRun(task: HeadlessTaskRecord) {
   const failure = issueRunFailure(task);
@@ -1423,7 +1413,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     },
   });
 
-  const runtimeReadinessProbeInFlight = new Map<string, Promise<AgentRuntimeReadinessRow>>();
+  const runtimeReadinessProbeInFlight = new Map<string, AgentRuntimeReadinessProbeInFlight>();
 
   const executeSingleAgentRuntimeReadinessProbe = async (
     adapter: CliAdapter,
@@ -1489,18 +1479,13 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   const probeSingleAgentRuntimeReadiness = (
     adapter: CliAdapter,
     availability?: AgentAvailability,
-  ): Promise<AgentRuntimeReadinessRow> => {
-    const existing = runtimeReadinessProbeInFlight.get(adapter.id);
-    if (existing) return existing;
-    const probe = executeSingleAgentRuntimeReadinessProbe(adapter, availability);
-    runtimeReadinessProbeInFlight.set(adapter.id, probe);
-    void probe.finally(() => {
-      if (runtimeReadinessProbeInFlight.get(adapter.id) === probe) {
-        runtimeReadinessProbeInFlight.delete(adapter.id);
-      }
-    });
-    return probe;
-  };
+  ): Promise<AgentRuntimeReadinessRow> =>
+    shareRuntimeReadinessProbe(
+      runtimeReadinessProbeInFlight,
+      adapter.id,
+      availability,
+      () => executeSingleAgentRuntimeReadinessProbe(adapter, availability),
+    );
 
   const readinessTargets = (agentId?: string): CliAdapter[] => {
     const runtimeAdapters = getRuntimeAdapters();
@@ -2384,6 +2369,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
             scheduleMarkers.getHeld(ws.id, issue.id) ?? null,
           );
           const latestRun = headlessTasks.list({ issue: { workspaceId: ws.id, issueId: issue.id } })[0];
+          const assigneeSession = projectIssueAssigneeSession(issue.assignee);
           return snapshotBoardIssue(
             issue,
             {
@@ -2393,7 +2379,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
                 status: issue.status,
                 nowMs,
                 nextDueAtMs: fired.nextDueAtMs,
-                ownerState: automationOwnerState(issue.assignee, resumeRegistry),
+                ownerState: issueAutomationOwnerState(issue.assignee, assigneeSession),
                 runtime: issueRuntimeAvailability(issue, defaultIssueAgent, availability),
                 ...(latestRun ? { latestRun: automationLatestRun(latestRun) } : {}),
               }),
@@ -2459,7 +2445,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         status: issue.status,
         nowMs: Date.now(),
         nextDueAtMs: scheduledSnapshot.nextDueAtMs,
-        ownerState: automationOwnerState(issue.assignee, resumeRegistry),
+        ownerState: issueAutomationOwnerState(issue.assignee, assigneeSession),
         runtime: runtimeAvailability,
         ...(runs[0] ? {
           latestRun: {

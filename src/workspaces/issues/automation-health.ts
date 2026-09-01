@@ -1,5 +1,5 @@
 import type { HeadlessTaskStatus } from '../headless-task-registry.js'
-import type { IssueStatus } from './declaration.js'
+import { issueAssigneeResumeId, type IssueStatus } from './declaration.js'
 import type { IssueRunFailure } from './run-failure.js'
 
 /** Operational state of a scheduled Issue. This is a live projection, never a
@@ -30,7 +30,28 @@ export interface IssueAutomationHealth {
   latestTaskId?: string
 }
 
-export type IssueAutomationOwnerState = 'workspace' | 'ready' | 'missing' | 'retired' | 'deleted' | 'unbound'
+export type IssueAutomationOwnerState =
+  | 'workspace'
+  | 'ready'
+  | 'missing'
+  | 'retired'
+  | 'deleted'
+  | 'unbound'
+  | 'workspace_missing'
+
+type ExactIssueAutomationOwnerState = Exclude<IssueAutomationOwnerState, 'workspace'>
+
+/** Map the authoritative exact-Session projection onto scheduler health. The
+ * projection already owns Workspace presence, lifecycle, deletion, and native
+ * resume availability, so health must not re-derive a weaker answer from only
+ * the resume registry. */
+export function issueAutomationOwnerState(
+  assignee: string,
+  assigneeSession?: { state: ExactIssueAutomationOwnerState },
+): IssueAutomationOwnerState {
+  if (!issueAssigneeResumeId(assignee)) return 'workspace'
+  return assigneeSession?.state ?? 'missing'
+}
 
 export interface IssueAutomationHealthInput {
   status: IssueStatus
@@ -87,6 +108,9 @@ export function issueAutomationHealth(input: IssueAutomationHealthInput): IssueA
   }
   if (input.ownerState === 'unbound') {
     return withLatest({ state: 'blocked', message: 'Assigned Session has no resumable runtime conversation yet.' })
+  }
+  if (input.ownerState === 'workspace_missing') {
+    return withLatest({ state: 'blocked', message: 'Assigned Session Workspace is unavailable. Restore it or reassign the Issue before its next run.' })
   }
   if (input.runtime && !input.runtime.installed) {
     return withLatest({

@@ -348,8 +348,7 @@ export function TradingPage() {
 
   useEffect(() => {
     if (!hasReadableAccount) {
-      setEquity(null)
-      setLastUpdated(null)
+      setServiceStatus(null)
       return
     }
     let cancelled = false
@@ -373,13 +372,18 @@ export function TradingPage() {
     void refresh()
     const id = setInterval(refresh, 15_000)
     return () => { cancelled = true; clearInterval(id) }
-  }, [])
+  }, [hasReadableAccount])
 
   // Per-card liveness signal — `equity()` lets each card show "this
   // connection actually returned an account balance" rather than just
   // "ping went through". 60s cadence is enough; trend/sparkline/aggregate
   // moved to Portfolio.
   useEffect(() => {
+    if (!hasReadableAccount) {
+      setEquity(null)
+      setLastUpdated(null)
+      return
+    }
     let cancelled = false
     const refresh = async () => {
       const eq = await api.trading.equity().catch(() => null)
@@ -389,7 +393,7 @@ export function TradingPage() {
         setLastUpdated(new Date())
       }
     }
-    refresh()
+    void refresh()
     const id = setInterval(refresh, 60_000)
     return () => { cancelled = true; clearInterval(id) }
   }, [hasReadableAccount])
