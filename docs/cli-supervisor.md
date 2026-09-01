@@ -571,6 +571,17 @@ root envelope as lifecycle commands. A completed Doctor run exits `1` when it
 contains failures, `0` for healthy or warning-only results, and `2` for invalid
 syntax.
 
+The TUI presents that unchanged report as a selectable checklist plus an
+Inspector for the selected check. Initial focus goes to the first failure, then
+the first warning, then the first check. Up/Down wraps selection; Page Up/Page
+Down and the mouse wheel move within the list bounds; Home/End select the first
+or last check. Pointer hover highlights a complete row and click selects it.
+At 100 columns and wider the checklist and Inspector render side by side;
+narrower terminals stack the same complete regions. The Inspector separates the
+check summary, existing Doctor evidence, and conservative status guidance. It
+does not run a repair, invent a command, or issue another diagnostic request;
+`d` remains the explicit read-only rerun action.
+
 ## Shell Completion
 
 Completion is generated from the root command registry:

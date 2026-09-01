@@ -469,16 +469,32 @@ describe('Supervisor TUI screen', () => {
     expect(screen.render(80).join('\n')).toContain('✓ Runtime reachable')
     expect(screen.render(80).join('\n')).toContain('! Update available')
     expect(screen.render(80).join('\n')).toContain('× Port collision')
+    expect(screen.render(80).join('\n')).toContain('Inspection · 3/3 · FAIL')
     expect(screen.render(80).join('\n')).toContain('[ d ] Rerun')
+    expect(screen.handleKey('up', matchesKey)).toBe(true)
+    expect(screen.render(80).join('\n')).toContain('Inspection · 2/3 · WARNING')
+    expect(screen.render(80).join('\n')).toContain('Install when convenient.')
+    expect(screen.handleKey('home', matchesKey)).toBe(true)
+    expect(screen.render(80).join('\n')).toContain('Inspection · 1/3 · PASS')
+    expect(screen.handleKey('end', matchesKey)).toBe(true)
+    expect(screen.render(80).join('\n')).toContain('Inspection · 3/3 · FAIL')
     screen.update({ panel: 'overview' })
     const navigation = screen.render(80)[2]!
     const doctorBadgeColumn = navigation.indexOf('×1') + 2
     expect(screen.handlePointer(pointerClick(doctorBadgeColumn, 3))).toBe(true)
     expect(screen.snapshot.panel).toBe('doctor')
+    const doctorLines = screen.render(80)
+    const reachableRow = doctorLines.findIndex((line) => line.includes('Runtime reachable')) + 1
     expect(screen.handlePointer({
-      button: 65, col: 10, row: 8, release: false, wheel: 1, motion: false, leftClick: false,
+      button: 32, col: 4, row: reachableRow, release: false, wheel: null, motion: true, leftClick: false,
     })).toBe(true)
-    expect(screen.render(80).join('\n')).not.toContain('✓ Runtime reachable')
+    expect(screen.render(80)[reachableRow - 1]).toContain('» ✓ Runtime reachable')
+    expect(screen.handlePointer(pointerClick(4, reachableRow))).toBe(true)
+    expect(screen.render(80).join('\n')).toContain('Inspection · 1/3 · PASS')
+    expect(screen.handlePointer({
+      button: 65, col: 10, row: reachableRow, release: false, wheel: 1, motion: false, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(80).join('\n')).toContain('Inspection · 2/3 · WARNING')
     expect(requestRender).toHaveBeenCalled()
   })
 

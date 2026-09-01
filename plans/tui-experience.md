@@ -132,6 +132,19 @@ not imply maintainer approval of the finished interaction.
   Machine and loaded-log counts plus Doctor pass/warn/fail state. Badges extend
   the original pointer target and do not introduce separate controls.
 
+### Doctor inspector decision
+
+- Keeping Doctor as a flat list of summary/detail text preserves the old output
+  order but makes evidence compete with check identity and turns navigation into
+  anonymous line scrolling.
+- Toggling detail under each check would reduce initial density but make row
+  heights unstable and mouse hit testing dependent on every expanded neighbor.
+- The selected model follows OMP's list-detail inspector: checks are stable
+  selectable rows, the first failure (then warning) receives initial focus, and
+  the selected check owns a separate evidence pane. Wide terminals use parallel
+  checklist/Inspector cards; 80-column and narrow terminals stack the same two
+  regions. All evidence remains the existing read-only Doctor snapshot.
+
 ## Responsive and Accessibility Contract
 
 - `80x24` remains the minimum full experience. Wide terminals show the
@@ -191,6 +204,8 @@ already large `supervisor-tui.ts` application controller.
   reader or changing the snapshot contract.
 - [x] Replace the static Command Deck with a contextual, selectable, whole-row
   mouse-capable Command Palette.
+- [x] Replace Doctor's flat line scroller with a responsive, selectable
+  checklist and detail Inspector.
 
 ## Progress
 
@@ -335,6 +350,21 @@ already large `supervisor-tui.ts` application controller.
   skipped). The Docker installer smoke passes, and
   `pnpm pack --dry-run --json` confirms the new Palette module is included in
   the published CLI file set.
+- Doctor is now a list-detail inspector rather than a flat text report. It
+  selects the first failure, otherwise the first warning; Up/Down wraps, page
+  keys and wheel clamp, Home/End jump to boundaries, pointer motion highlights
+  the full check row, and click selects it. The Inspector separates summary,
+  existing evidence, and conservative status guidance without adding commands
+  or reads. Real 80-column acceptance navigated a seven-check report through
+  keyboard, End, hover, click, and wheel; real 120x30 acceptance rendered all
+  seven checks beside the selected evidence and switched to the actual stopped-
+  Runtime start guidance by raw SGR click. Both sessions restored terminal modes.
+- Doctor-inspector acceptance passes with 68 focused screen, Fleet, Doctor,
+  Palette, log-module, and real-PTY tests, CLI build/typecheck, root TypeScript
+  check, and the 688-file repository suite (687 passed, 1 skipped; 6074 tests
+  passed, 10 skipped). The Docker installer smoke passes, and
+  `pnpm pack --dry-run --json` confirms the new Doctor view module is included
+  in the published CLI file set.
 
 ## Completion Criteria
 

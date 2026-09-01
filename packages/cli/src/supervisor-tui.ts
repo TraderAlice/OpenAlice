@@ -87,6 +87,16 @@ import {
   type SupervisorRuntimeLogs as RuntimeLogs,
 } from './supervisor-tui-logs.ts'
 import {
+  createSupervisorDoctorState,
+  moveSupervisorDoctorSelection,
+  normalizeSupervisorDoctorState,
+  renderSupervisorDoctor,
+  selectSupervisorDoctorBoundary,
+  type SupervisorDoctorReport as DoctorReport,
+  type SupervisorDoctorState,
+  type SupervisorDoctorTarget,
+} from './supervisor-doctor-view.ts'
+import {
   renderSupervisorCommandBar,
   renderSupervisorDock,
   renderSupervisorHeader,
@@ -175,20 +185,6 @@ interface RuntimeSummary {
     uta?: string
     connector?: string
   }
-}
-
-interface DoctorReport {
-  overall?: string
-  summary?: {
-    passed?: number
-    warnings?: number
-    failures?: number
-  }
-  checks?: Array<{
-    status?: string
-    summary?: string
-    detail?: string
-  }>
 }
 
 interface UpdateResult {
@@ -2344,7 +2340,8 @@ export class SupervisorScreen implements Component {
   private runtimePulse = false
   private logsFromEnd = 0
   private logFilter: SupervisorLogFilter = 'all'
-  private doctorOffset = 0
+  private doctorState: SupervisorDoctorState = createSupervisorDoctorState()
+  private doctorTargets: SupervisorDoctorTarget[] = []
   private renderWidth = 80
 
   constructor(
@@ -2377,6 +2374,7 @@ export class SupervisorScreen implements Component {
       panel: snapshot.fleet ? 'fleet' : 'overview',
       ...snapshot,
     }
+    this.doctorState = createSupervisorDoctorState(this.snapshot.doctor)
     this.onAction = callbacks.onAction
     this.onConfigureSource = callbacks.onConfigureSource
     this.onSettings = callbacks.onSettings
@@ -2402,7 +2400,9 @@ export class SupervisorScreen implements Component {
   update(patch: Partial<SupervisorSnapshot>): void {
     const wasBusy = Boolean(this.snapshot.busy)
     if (patch.logs !== undefined && patch.logs !== this.snapshot.logs) this.logsFromEnd = 0
-    if (patch.doctor !== undefined && patch.doctor !== this.snapshot.doctor) this.doctorOffset = 0
+    if (patch.doctor !== undefined && patch.doctor !== this.snapshot.doctor) {
+      this.doctorState = createSupervisorDoctorState(patch.doctor)
+    }
     if (patch.busy !== undefined && patch.busy !== this.snapshot.busy) this.motionFrame = 0
     if (patch.runtime !== undefined) {
       const nextFleet = patch.fleet ?? this.snapshot.fleet
@@ -2594,11 +2594,29 @@ export class SupervisorScreen implements Component {
         : matchesKey(data, 'down') || matchesKey(data, 'pageDown') ? 1 : 0
       if (direction !== 0) {
         const amount = matchesKey(data, 'pageUp') || matchesKey(data, 'pageDown') ? 8 : 1
-        this.scrollOperationalPanel(direction * amount)
+        if (this.snapshot.panel === 'doctor') {
+          this.doctorState = moveSupervisorDoctorSelection(
+            this.doctorState,
+            direction * amount,
+            this.snapshot.doctor,
+            amount === 1,
+          )
+          this.requestRender?.()
+        } else {
+          this.scrollOperationalPanel(direction * amount)
+        }
         return true
       }
       if (matchesKey(data, 'home') || matchesKey(data, 'end')) {
-        this.jumpOperationalPanel(matchesKey(data, 'end'))
+        if (this.snapshot.panel === 'doctor') {
+          this.doctorState = selectSupervisorDoctorBoundary(
+            this.snapshot.doctor,
+            matchesKey(data, 'end'),
+          )
+          this.requestRender?.()
+        } else {
+          this.jumpOperationalPanel(matchesKey(data, 'end'))
+        }
         return true
       }
     }
@@ -2726,6 +2744,13 @@ export class SupervisorScreen implements Component {
     const fleetTarget = fleet
       ? supervisorFleetTargetAt(fleet, this.renderWidth, event.col, event.row - 4)
       : undefined
+    const doctorTarget = !this.commandDeckOpen && this.snapshot.panel === 'doctor'
+      ? this.doctorTargets.find((target) => (
+          target.row === event.row
+          && event.col >= target.startColumn
+          && event.col <= target.endColumn
+        ))
+      : undefined
     const commandTarget = commandAtPosition(this.commandTargets, event.col, event.row)
     if (event.motion) {
       const fleetHoverChanged = fleetTarget?.focus !== this.hoveredFleetTarget?.focus
@@ -2734,11 +2759,20 @@ export class SupervisorScreen implements Component {
         || commandTarget?.label !== this.hoveredCommandTarget?.label
       const deckHover = commandDeckTarget?.index ?? null
       const deckHoverChanged = deckHover !== this.commandDeckState.hovered
-      if (hovered !== this.hoveredPanel || fleetHoverChanged || commandHoverChanged || deckHoverChanged) {
+      const doctorHover = doctorTarget?.index ?? null
+      const doctorHoverChanged = doctorHover !== this.doctorState.hovered
+      if (
+        hovered !== this.hoveredPanel
+        || fleetHoverChanged
+        || commandHoverChanged
+        || deckHoverChanged
+        || doctorHoverChanged
+      ) {
         this.hoveredPanel = hovered
         this.hoveredFleetTarget = fleetTarget
         this.hoveredCommandTarget = commandTarget
         this.commandDeckState = { ...this.commandDeckState, hovered: deckHover }
+        this.doctorState = { ...this.doctorState, hovered: doctorHover }
         this.requestRender?.()
       }
       return true
@@ -2758,6 +2792,11 @@ export class SupervisorScreen implements Component {
         hovered: commandDeckTarget.index,
       }
       return this.activateCommandDeckItem(items[commandDeckTarget.index])
+    }
+    if (event.leftClick && doctorTarget) {
+      this.doctorState = { selected: doctorTarget.index, hovered: doctorTarget.index }
+      this.requestRender?.()
+      return true
     }
     if (event.leftClick && fleet && fleetTarget) {
       const selected = fleetTarget.focus === 'machines'
@@ -2817,6 +2856,7 @@ export class SupervisorScreen implements Component {
     ]
 
     this.commandDeckTargets = []
+    this.doctorTargets = []
     if (this.commandDeckOpen) {
       const items = this.commandDeckItems()
       this.commandDeckState = normalizeSupervisorCommandDeckState(
@@ -2850,7 +2890,17 @@ export class SupervisorScreen implements Component {
         this.logFilter,
       ))
     } else if (this.snapshot.panel === 'doctor') {
-      lines.push(...renderDoctor(this.snapshot.doctor, width, this.doctorOffset))
+      this.doctorState = normalizeSupervisorDoctorState(
+        this.doctorState,
+        this.snapshot.doctor,
+      )
+      const doctor = renderSupervisorDoctor(this.snapshot.doctor, this.doctorState, width)
+      const rowOffset = lines.length
+      this.doctorTargets = doctor.targets.map((target) => ({
+        ...target,
+        row: target.row + rowOffset,
+      }))
+      lines.push(...doctor.lines)
     } else if (this.snapshot.panel === 'help') {
       lines.push(...renderHelp(isConfigRecovery(this.snapshot), width))
     } else if (isConfigRecovery(this.snapshot)) {
@@ -2920,10 +2970,10 @@ export class SupervisorScreen implements Component {
             ], width)
           : this.snapshot.panel === 'doctor'
             ? renderSupervisorCommandBar([
-                { key: '↑↓', label: 'Scroll' },
+                { key: '↑↓', label: 'Inspect' },
                 { key: 'd', label: 'Rerun' },
-                { key: 'Home', label: 'Top' },
-                { key: '?', label: 'More' },
+                { key: 'Home', label: 'First' },
+                { key: 'End', label: 'Last' },
               ], width)
             : this.snapshot.panel === 'help'
               ? renderSupervisorCommandBar([
@@ -2993,8 +3043,12 @@ export class SupervisorScreen implements Component {
       const length = supervisorFilteredLogCount(this.snapshot.logs, this.logFilter)
       this.logsFromEnd = clamp(this.logsFromEnd - direction, 0, Math.max(0, length - 1))
     } else if (this.snapshot.panel === 'doctor') {
-      const length = doctorLines(this.snapshot.doctor).length
-      this.doctorOffset = clamp(this.doctorOffset + direction, 0, Math.max(0, length - 1))
+      this.doctorState = moveSupervisorDoctorSelection(
+        this.doctorState,
+        direction,
+        this.snapshot.doctor,
+        false,
+      )
     }
     this.requestRender?.()
   }
@@ -3004,8 +3058,6 @@ export class SupervisorScreen implements Component {
       this.logsFromEnd = end
         ? 0
         : Math.max(0, supervisorFilteredLogCount(this.snapshot.logs, this.logFilter) - 1)
-    } else if (this.snapshot.panel === 'doctor') {
-      this.doctorOffset = end ? Math.max(0, doctorLines(this.snapshot.doctor).length - 1) : 0
     }
     this.requestRender?.()
   }
@@ -3276,39 +3328,6 @@ function renderGuidance(
     return ['OpenAlice is ready. Press Enter or o to open the Web UI.']
   }
   return [`Runtime is ${runtime.class ?? runtime.state ?? 'unknown'}; status will refresh automatically.`]
-}
-
-function renderDoctor(
-  doctor: DoctorReport | null | undefined,
-  width: number,
-  offset: number,
-): string[] {
-  if (!doctor) return ['Press d to run read-only Runtime diagnostics.']
-  const summary = doctor.summary
-  const rows = doctorLines(doctor)
-  const visible = 12
-  const start = clamp(offset, 0, Math.max(0, rows.length - 1))
-  const end = Math.min(rows.length, start + visible)
-  const meta = [
-    (doctor.overall ?? 'unknown').toUpperCase(),
-    `${summary?.passed ?? 0} pass`,
-    `${summary?.warnings ?? 0} warn`,
-    `${summary?.failures ?? 0} fail`,
-    rows.length > visible ? `${start + 1}–${end}/${rows.length}` : '',
-  ].filter(Boolean).join(' · ')
-  return renderSupervisorPanel('Doctor', meta, rows.slice(start, end), width)
-}
-
-function doctorLines(doctor: DoctorReport | null | undefined): string[] {
-  return (doctor?.checks ?? []).flatMap((check) => {
-    const status = (check.status ?? 'unknown').toLowerCase()
-    const glyph = status === 'pass' || status === 'passed'
-      ? '✓'
-      : status === 'warn' || status === 'warning' ? '!' : status === 'fail' || status === 'failed' ? '×' : '·'
-    const lines = [`${glyph} ${sanitize(check.summary ?? 'Unnamed check')}`]
-    if (check.detail) lines.push(`  ${sanitize(check.detail)}`)
-    return lines
-  })
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {
