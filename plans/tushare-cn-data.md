@@ -36,7 +36,8 @@ package.
 - [x] Settings UI, masked credential flow, connectivity/capability test
 - [x] Unit/integration tests and owner-guide updates
 - [x] Typecheck, focused suites, full build, and demo UI verification
-- [ ] Commit, PR, and CI acceptance
+- [x] Commit and open PR #1311 against `dev`
+- [ ] CI acceptance
 
 ## Completion
 
