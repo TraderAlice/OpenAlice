@@ -17,7 +17,7 @@ const authMocks = vi.hoisted(() => ({
 }))
 
 vi.mock('../auth/AuthContext', () => ({
-  useAuth: () => ({ backendRecoveryGeneration: authMocks.backendRecoveryGeneration }),
+  useBackendRecoverySignal: () => ({ backendRecoveryGeneration: authMocks.backendRecoveryGeneration }),
 }))
 
 vi.mock('../api/preferences', () => ({

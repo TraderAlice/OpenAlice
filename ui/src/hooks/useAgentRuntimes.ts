@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { create } from 'zustand'
 
 import { preferencesApi } from '../api/preferences'
-import { useAuth } from '../auth/AuthContext'
+import { useBackendRecoverySignal } from '../auth/AuthContext'
 import {
   getAgentRuntimeReadiness,
   listAgents,
@@ -268,7 +268,7 @@ export function resetAgentRuntimesStore(): void {
  * runtime outside primary does not write pins.
  */
 export function useAgentRuntimes(): AgentRuntimesState {
-  const { backendRecoveryGeneration } = useAuth()
+  const { backendRecoveryGeneration } = useBackendRecoverySignal()
   const observedBackendRecoveryGenerationRef = useRef(backendRecoveryGeneration)
   const agents = useAgentRuntimesStore((state) => state.agents)
   const readiness = useAgentRuntimesStore((state) => state.readiness)

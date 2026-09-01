@@ -17,7 +17,7 @@ vi.mock('../api', () => ({
   api: { trading: apiMocks },
 }))
 vi.mock('../auth/AuthContext', () => ({
-  useAuth: () => authMocks,
+  useBackendRecoverySignal: () => authMocks,
 }))
 
 import {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../api'
-import { useAuth } from '../auth/AuthContext'
+import { useBackendRecoverySignal } from '../auth/AuthContext'
 import type {
   BrokerAccountPackReadiness,
   BrokerEngine,
@@ -109,7 +109,7 @@ export function deriveAccountInteractionPolicy({
 }
 
 export function useBrokerPackReadiness() {
-  const { backendUnavailable, backendRecoveryGeneration } = useAuth()
+  const { backendUnavailable, backendRecoveryGeneration } = useBackendRecoverySignal()
   const [data, setData] = useState<BrokerPackReadinessResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

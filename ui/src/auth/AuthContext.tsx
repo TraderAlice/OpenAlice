@@ -57,11 +57,27 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
+const DEFAULT_BACKEND_RECOVERY_SIGNAL = Object.freeze({
+  backendUnavailable: false,
+  backendRecoveryGeneration: 0,
+})
 
 export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext)
   if (!ctx) throw new Error('useAuth must be used within AuthProvider')
   return ctx
+}
+
+/** Optional connectivity signal for reusable domain hooks. Those hooks are
+ * also rendered in isolated tests and embedded surfaces that do not own auth;
+ * absence of the provider means no observed outage, while auth decisions
+ * themselves continue to require the strict useAuth() contract above. */
+export function useBackendRecoverySignal(): Pick<
+  AuthContextValue,
+  'backendUnavailable' | 'backendRecoveryGeneration'
+> {
+  const ctx = useContext(AuthContext)
+  return ctx ?? DEFAULT_BACKEND_RECOVERY_SIGNAL
 }
 
 function deriveState(status: AuthStatus | null): AuthState {

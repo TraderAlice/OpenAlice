@@ -13,7 +13,12 @@ vi.mock('./api', () => ({
   getStatus: mocks.getStatus,
 }))
 
-import { AuthProvider, BACKEND_HEALTH_POLL_MS, useAuth } from './AuthContext'
+import {
+  AuthProvider,
+  BACKEND_HEALTH_POLL_MS,
+  useAuth,
+  useBackendRecoverySignal,
+} from './AuthContext'
 import { AuthGate, BackendUnavailableScreen } from './AuthGate'
 import { BACKEND_PROBE_REQUESTED_EVENT } from './backendConnectivity'
 
@@ -26,6 +31,11 @@ function WorkspaceHarness() {
       <button type="button" onClick={() => void refresh()}>Refresh auth</button>
     </>
   )
+}
+
+function OptionalBackendSignalHarness() {
+  const { backendUnavailable, backendRecoveryGeneration } = useBackendRecoverySignal()
+  return <span>{`${backendUnavailable}:${backendRecoveryGeneration}`}</span>
 }
 
 async function flushEffects() {
@@ -42,6 +52,11 @@ afterEach(() => {
 })
 
 describe('AuthProvider backend recovery', () => {
+  it('lets reusable domain hooks default to no observed outage outside AuthProvider', () => {
+    render(<OptionalBackendSignalHarness />)
+    expect(screen.getByText('false:0')).toBeTruthy()
+  })
+
   it('shows the exact SSH route when a remote Runtime is unavailable', () => {
     render(
       <BackendUnavailableScreen
