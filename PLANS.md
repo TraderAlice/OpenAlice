@@ -40,7 +40,7 @@ the durable truth after it changes. Git history is the archive.
   non-destructive dev-to-pinned-beta2 replacement; disposable empty-Volume and
   failure-fallback journeys, native PowerShell, and external package-manager
   activation remain open on focused branches from current `dev`. Routine dev
-  and exact-beta source feedback is being reduced to local-first, lightweight
+  and exact-beta source feedback is reduced to local-first, lightweight
   hosted lanes while `master` promotion, stable, and final artifact acceptance
   retain the complete gates.
 - [[plans/remote-project-fleet.md]] — Adds a machine-aware Supervisor fleet,

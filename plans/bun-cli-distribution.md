@@ -761,7 +761,7 @@ source-built Docker image.
   artifacts once; the post-merge full `master` run is an asynchronous backstop.
 - [x] Keep `master` promotion, stable preparation/release, `master` push,
   nightly, and manual full validation on the complete cross-platform lanes.
-- [ ] Verify the lightweight lane on its own `dev` PR and record the measured
+- [x] Verify the lightweight lane on its own `dev` PR and record the measured
   before/after wall and runner time. Local workflow contracts, root typecheck,
   full tests, and full build must already be green before opening that PR.
 
@@ -1351,5 +1351,11 @@ This plan is complete only when:
   root suite passed 5,431 tests with 13 expected skips, root typecheck passed,
   and the complete workspace build passed. The prior remote baseline was a
   15:31 desktop critical path for the preceding product PR and a 5:15
-  redundant Ubuntu root-test lane for the version-only beta3 PR; measured
-  post-change timing remains pending on the workflow's own `dev` PR.
+  redundant Ubuntu root-test lane for the version-only beta3 PR. On the
+  workflow's own [PR #1298](https://github.com/TraderAlice/OpenAlice/pull/1298),
+  central feedback completed in 2:50 wall and 2:37 runner time; the relevant
+  clean checkout installer completed in 0:31 wall and 0:25 runner time in
+  parallel. All full-test, macOS/Windows, dev-smoke, Bun-feasibility, and
+  managed-SSH jobs were explicitly skipped. The combined critical path fell
+  81.7% from 15:31 to 2:50 and aggregate hosted allocation fell from roughly 70
+  minutes to 3:02 (about 95.7%).
