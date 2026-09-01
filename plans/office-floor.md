@@ -6297,7 +6297,7 @@ Routine-report decision desk acceptance (2026-09-01):
 - Focused backend/UI suites pass 169 tests; the complete suite passes 656 files / 5,749 tests (two files and thirteen tests
   skipped). Root and UI TypeScript pass, and the production UI build remains part of the final branch gate.
 
-Office-Day persistence and harvest meter (2026-09-01, implementation complete; real-project QA pending):
+Office-Day persistence and harvest meter (2026-09-01, implementation complete; narrow real-project QA pending):
 
 - The corrected product mission is a repeatable diligence ritual, not an activity aquarium. A shift that survives only
   for one browser tab cannot truthfully model a daily chore: a new tab resurrects an unchanged cadence exception
@@ -6337,9 +6337,11 @@ Office-Day persistence and harvest meter (2026-09-01, implementation complete; r
   stamp, survived a full reload at `2/4`, and projected the same duty in a second tab. `Later` rotated the duty in both
   tabs without changing `2/4`; console warnings/errors remained empty. Demo fixture identity is now stable for one
   local calendar day, so reload cannot manufacture a resolved shift or a new backlog from the same recording.
-- Focused Office verification passes 19 files / 337 tests. Root and UI TypeScript, the complete monorepo suite and the
-  production build pass; real Default AliceProject desktop/narrow/short-landscape play remains pending only because
-  another migration task still owns the shared Guardian process.
+- Focused Office verification passes 19 files / 337 tests. Root and UI TypeScript, the complete monorepo suite
+  (662 files / 5,875 tests, with two files and thirteen tests skipped) and the production build pass. Real Default
+  AliceProject desktop acceptance opened the exact `Japan / BOJ carry-trade watch` duty from a persisted `1/4` shift;
+  closing the dossier left progress unchanged and the browser reported no warnings or errors. The 390×844 and 844×390
+  real-Project passes remain pending because the current browser-control surface cannot resize this tab.
 
 ## Completion
 
