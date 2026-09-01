@@ -9,6 +9,12 @@ const timestampSchema = z.number().finite().int().nonnegative()
 const identitySchema = z.string().min(1).refine((value) => value.trim() === value, {
   message: 'identity must not have leading or trailing whitespace',
 })
+const decisionNoteSchema = z.string().min(1).max(280).refine((value) => value.trim() === value, {
+  message: 'decision note must not have leading or trailing whitespace',
+})
+const decisionNoteInputSchema = z.string()
+  .transform((value) => value.trim())
+  .pipe(z.string().min(1).max(280))
 
 export const routineFollowUpRecordSchema = z.object({
   inboxEntryId: identitySchema,
@@ -21,26 +27,85 @@ export const routineFollowUpRecordSchema = z.object({
 export type RoutineFollowUpRecord = z.infer<typeof routineFollowUpRecordSchema>
 export type RoutineFollowUpInput = Omit<RoutineFollowUpRecord, 'createdAt'>
 
+export const routineDecisionInputSchema = z.discriminatedUnion('outcome', [
+  z.object({ outcome: z.literal('maintain-plan') }).strict(),
+  z.object({ outcome: z.literal('revise-plan'), note: decisionNoteInputSchema }).strict(),
+  z.object({ outcome: z.literal('evidence-unavailable') }).strict(),
+])
+
+export type RoutineDecisionInput = z.infer<typeof routineDecisionInputSchema>
+
+const decisionRecordShape = {
+  ...routineFollowUpRecordSchema.shape,
+  decidedAt: timestampSchema,
+}
+
+export const routineDecisionRecordSchema = z.discriminatedUnion('outcome', [
+  z.object({
+    ...decisionRecordShape,
+    outcome: z.literal('maintain-plan'),
+  }).strict(),
+  z.object({
+    ...decisionRecordShape,
+    outcome: z.literal('revise-plan'),
+    note: decisionNoteSchema,
+  }).strict(),
+  z.object({
+    ...decisionRecordShape,
+    outcome: z.literal('evidence-unavailable'),
+  }).strict(),
+])
+
+export type RoutineDecisionRecord = z.infer<typeof routineDecisionRecordSchema>
+
 const routineFollowUpFileSchema = z.object({
-  version: z.literal(1),
+  version: z.literal(2),
   active: z.array(routineFollowUpRecordSchema),
+  decisions: z.array(routineDecisionRecordSchema),
 }).strict().superRefine((file, ctx) => {
-  const seen = new Set<string>()
+  const activeIds = new Set<string>()
   for (const [index, record] of file.active.entries()) {
-    if (seen.has(record.inboxEntryId)) {
+    if (activeIds.has(record.inboxEntryId)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['active', index, 'inboxEntryId'],
         message: `duplicate inboxEntryId: ${record.inboxEntryId}`,
       })
     }
-    seen.add(record.inboxEntryId)
+    activeIds.add(record.inboxEntryId)
+  }
+  const decisionIds = new Set<string>()
+  for (const [index, decision] of file.decisions.entries()) {
+    if (decisionIds.has(decision.inboxEntryId)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['decisions', index, 'inboxEntryId'],
+        message: `duplicate decision inboxEntryId: ${decision.inboxEntryId}`,
+      })
+    }
+    if (activeIds.has(decision.inboxEntryId)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['decisions', index, 'inboxEntryId'],
+        message: `decision remains active: ${decision.inboxEntryId}`,
+      })
+    }
+    const previous = file.decisions[index - 1]
+    if (previous && compareDecisions(previous, decision) > 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['decisions', index, 'decidedAt'],
+        message: 'decisions must be ordered by decidedAt and inboxEntryId',
+      })
+    }
+    decisionIds.add(decision.inboxEntryId)
   }
 })
 
 interface RoutineFollowUpFile {
-  version: 1
+  version: 2
   active: RoutineFollowUpRecord[]
+  decisions: RoutineDecisionRecord[]
 }
 
 export class RoutineFollowUpConflictError extends Error {
@@ -55,8 +120,13 @@ export class RoutineFollowUpConflictError extends Error {
 export class RoutineFollowUpCreateDisallowedError extends Error {
   readonly code = 'routine_follow_up_create_disallowed'
 
-  constructor(readonly inboxEntryId: string) {
-    super(`Routine follow-up ${inboxEntryId} no longer permits a new durable record.`)
+  constructor(
+    readonly inboxEntryId: string,
+    readonly reason: 'already-reviewed' | 'already-decided' = 'already-reviewed',
+  ) {
+    super(reason === 'already-decided'
+      ? `Routine follow-up ${inboxEntryId} already has a decision receipt.`
+      : `Routine follow-up ${inboxEntryId} was already reviewed.`)
     this.name = 'RoutineFollowUpCreateDisallowedError'
   }
 }
@@ -67,6 +137,24 @@ export class RoutineFollowUpStaleObservationError extends Error {
   constructor(readonly inboxEntryId: string) {
     super(`Routine follow-up ${inboxEntryId} changed while the request was in flight.`)
     this.name = 'RoutineFollowUpStaleObservationError'
+  }
+}
+
+export class RoutineFollowUpDecisionConflictError extends Error {
+  readonly code = 'routine_follow_up_decision_conflict'
+
+  constructor(readonly inboxEntryId: string) {
+    super(`Routine follow-up ${inboxEntryId} already has a different decision receipt.`)
+    this.name = 'RoutineFollowUpDecisionConflictError'
+  }
+}
+
+export class RoutineFollowUpDecisionMissingError extends Error {
+  readonly code = 'routine_follow_up_decision_missing'
+
+  constructor(readonly inboxEntryId: string) {
+    super(`Routine follow-up ${inboxEntryId} has neither an active carry nor a decision receipt.`)
+    this.name = 'RoutineFollowUpDecisionMissingError'
   }
 }
 
@@ -97,10 +185,21 @@ export interface RoutineFollowUpObservation {
   revision: number
 }
 
+export interface RoutineFollowUpDecisionResult {
+  decision: RoutineDecisionRecord
+  created: boolean
+}
+
+export interface RoutineFollowUpDecisionOptions {
+  /** Per-entry revision returned by `observe()` before external evidence checks. */
+  observedRevision: number
+  decidedAt?: number
+}
+
 /**
- * Product-owned queue of scheduled reports the human explicitly carried out
- * of an Office review shift. It records intent only: it never edits or
- * dispatches the referenced Issue.
+ * Product-owned queue and receipt ledger for scheduled reports the human
+ * explicitly carried out of an Office review shift. Decisions record only the
+ * human's declared disposition; they never edit or dispatch the referenced Issue.
  */
 export class RoutineFollowUpStore {
   private mutationQueue: Promise<void> = Promise.resolve()
@@ -113,6 +212,7 @@ export class RoutineFollowUpStore {
   private constructor(
     private readonly path: string,
     private active: RoutineFollowUpRecord[],
+    private decisions: RoutineDecisionRecord[],
     readonly loadError: Error | null = null,
   ) {}
 
@@ -124,13 +224,13 @@ export class RoutineFollowUpStore {
       raw = await readFile(path, 'utf8')
     } catch (error: unknown) {
       if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
-        return new RoutineFollowUpStore(path, [])
+        return new RoutineFollowUpStore(path, [], [])
       }
       throw error
     }
 
     const parsed = routineFollowUpFileSchema.parse(JSON.parse(raw))
-    return new RoutineFollowUpStore(path, parsed.active)
+    return new RoutineFollowUpStore(path, parsed.active, parsed.decisions)
   }
 
   /**
@@ -153,7 +253,7 @@ export class RoutineFollowUpStore {
     path = dataPath('inbox', 'routine-follow-ups.json'),
   ): RoutineFollowUpStore {
     const loadError = error instanceof Error ? error : new Error(String(error))
-    return new RoutineFollowUpStore(path, [], loadError)
+    return new RoutineFollowUpStore(path, [], [], loadError)
   }
 
   get available(): boolean {
@@ -163,6 +263,11 @@ export class RoutineFollowUpStore {
   list(): RoutineFollowUpRecord[] {
     this.assertAvailable()
     return this.active.map((record) => ({ ...record }))
+  }
+
+  listDecisions(): RoutineDecisionRecord[] {
+    this.assertAvailable()
+    return this.decisions.map((record) => ({ ...record }))
   }
 
   get(inboxEntryId: string): RoutineFollowUpRecord | null {
@@ -200,33 +305,65 @@ export class RoutineFollowUpStore {
       if (this.revision(candidate.inboxEntryId) !== observedRevision) {
         throw new RoutineFollowUpStaleObservationError(candidate.inboxEntryId)
       }
+      if (this.decisions.some((decision) => decision.inboxEntryId === candidate.inboxEntryId)) {
+        throw new RoutineFollowUpCreateDisallowedError(candidate.inboxEntryId, 'already-decided')
+      }
       if (!allowCreate) {
         throw new RoutineFollowUpCreateDisallowedError(candidate.inboxEntryId)
       }
 
       const next = [...this.active, candidate]
-      await this.write({ version: 1, active: next })
+      await this.write({ version: 2, active: next, decisions: this.decisions })
       this.active = next
       this.bumpRevision(candidate.inboxEntryId)
       return { followUp: { ...candidate }, created: true }
     })
   }
 
-  async remove(inboxEntryId: string): Promise<boolean> {
+  async decide(
+    inboxEntryId: string,
+    input: RoutineDecisionInput,
+    options: RoutineFollowUpDecisionOptions,
+  ): Promise<RoutineFollowUpDecisionResult> {
     this.assertAvailable()
+    const exactInboxEntryId = identitySchema.parse(inboxEntryId)
+    const exactInput = routineDecisionInputSchema.parse(input)
+    const { observedRevision } = options
+    if (!Number.isSafeInteger(observedRevision) || observedRevision < 0) {
+      throw new TypeError('observedRevision must be a non-negative safe integer')
+    }
+    const decidedAt = timestampSchema.parse(options.decidedAt ?? Date.now())
     return this.withMutation(async () => {
-      // inboxEntryId is the active-only identity: after Carry marks the report
-      // read, resolve has no valid later incarnation to distinguish or preserve.
-      const next = this.active.filter((record) => record.inboxEntryId !== inboxEntryId)
-      const removed = next.length !== this.active.length
-      if (removed) {
-        await this.write({ version: 1, active: next })
-        this.active = next
+      const existing = this.decisions.find(
+        (decision) => decision.inboxEntryId === exactInboxEntryId,
+      )
+      if (existing) {
+        if (!sameDecision(existing, exactInput)) {
+          throw new RoutineFollowUpDecisionConflictError(exactInboxEntryId)
+        }
+        // A repeated exact decision remains an authoritative newer intent and
+        // invalidates any stale carry request still holding an older revision.
+        this.bumpRevision(exactInboxEntryId)
+        return { decision: { ...existing }, created: false }
       }
-      // Even an idempotent resolve is an authoritative newer intent for this
-      // key and must invalidate a fresh carry that observed the earlier state.
-      this.bumpRevision(inboxEntryId)
-      return removed
+      if (this.revision(exactInboxEntryId) !== observedRevision) {
+        throw new RoutineFollowUpStaleObservationError(exactInboxEntryId)
+      }
+      const followUp = this.active.find((record) => record.inboxEntryId === exactInboxEntryId)
+      if (!followUp) throw new RoutineFollowUpDecisionMissingError(exactInboxEntryId)
+
+      const decision = routineDecisionRecordSchema.parse({
+        ...followUp,
+        ...exactInput,
+        decidedAt,
+      })
+      const active = this.active.filter((record) => record.inboxEntryId !== exactInboxEntryId)
+      const decisions = orderDecisions([...this.decisions, decision])
+      await this.write({ version: 2, active, decisions })
+      this.active = active
+      this.decisions = decisions
+      this.bumpRevision(exactInboxEntryId)
+      return { decision: { ...decision }, created: true }
     })
   }
 
@@ -265,4 +402,17 @@ function sameAuthority(a: RoutineFollowUpRecord, b: RoutineFollowUpRecord): bool
     && a.reportTs === b.reportTs
     && a.issueWorkspaceId === b.issueWorkspaceId
     && a.issueId === b.issueId
+}
+
+function sameDecision(a: RoutineDecisionRecord, b: RoutineDecisionInput): boolean {
+  return a.outcome === b.outcome
+    && (a.outcome !== 'revise-plan' || (b.outcome === 'revise-plan' && a.note === b.note))
+}
+
+function compareDecisions(a: RoutineDecisionRecord, b: RoutineDecisionRecord): number {
+  return a.decidedAt - b.decidedAt || a.inboxEntryId.localeCompare(b.inboxEntryId)
+}
+
+function orderDecisions(decisions: readonly RoutineDecisionRecord[]): RoutineDecisionRecord[] {
+  return [...decisions].sort(compareDecisions)
 }

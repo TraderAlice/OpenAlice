@@ -24,6 +24,7 @@ import { OfficeConnectionBanner, OfficeConnectionScreen } from '../office/Office
 import { OfficeInspectRail } from '../office/OfficeInspectRail'
 import { OfficeInboxDutyDossier } from '../office/OfficeInboxDutyDossier'
 import {
+  classifyOfficeRoutineEvidence,
   OfficeRoutineDecisionDesk,
   type OfficeRoutineDecisionItem,
 } from '../office/OfficeRoutineDecisionDesk'
@@ -645,7 +646,7 @@ export function OfficePage() {
   }
 
   const openRoutineDecisionIssue = (item: OfficeRoutineDecisionItem) => {
-    if (!item.issueAvailable) return
+    if (item.issueState !== 'available') return
     setDecisionDeskOpen(false)
     markExcursion()
     openOrFocus({
@@ -658,7 +659,7 @@ export function OfficePage() {
   }
 
   const openRoutineDecisionReport = (item: OfficeRoutineDecisionItem) => {
-    if (!item.reportAvailable) return
+    if (item.reportState !== 'available') return
     setDecisionDeskOpen(false)
     useInboxSelection.getState().select(item.followUp.inboxEntryId)
     markExcursion()
@@ -685,7 +686,15 @@ export function OfficePage() {
     : null
   const routineDecisionItems = useMemo<readonly OfficeRoutineDecisionItem[]>(() => (
     routineFollowUps.followUps.map((followUp) => {
-      const report = officeDuties.inboxEvidenceByEntryId.get(followUp.inboxEntryId)
+      const reportCandidate = officeDuties.inboxEvidenceByEntryId.get(followUp.inboxEntryId)
+      const report = reportCandidate
+        && reportCandidate.entry.id === followUp.inboxEntryId
+        && reportCandidate.entry.ts === followUp.reportTs
+        && reportCandidate.entry.origin?.kind === 'headless'
+        && reportCandidate.entry.origin.issueWorkspaceId === followUp.issueWorkspaceId
+        && reportCandidate.entry.origin.issueId === followUp.issueId
+        ? reportCandidate
+        : undefined
       const reportWorkspace = report
         ? workspaces.find((candidate) => candidate.id === report.entry.workspaceId)
         : undefined
@@ -703,15 +712,19 @@ export function OfficePage() {
         reportWorkspaceLabel: report?.entry.workspaceLabel?.trim()
           || (reportWorkspace ? workspaceDisplayName(reportWorkspace) : report?.entry.workspaceId)
           || followUp.inboxEntryId,
-        reportAvailable: officeDuties.inboxStatus === 'ready' && Boolean(report),
+        reportState: classifyOfficeRoutineEvidence(
+          officeDuties.inboxStatus,
+          Boolean(report),
+        ),
         issueTitle: issue?.title ?? followUp.issueId,
         workspaceLabel: workspace
           ? workspaceDisplayName(workspace)
           : issueWorkspace?.tag ?? followUp.issueWorkspaceId,
         priority: issue?.priority ?? null,
-        issueAvailable: officeDuties.issueStatus === 'ready'
-          && issueWorkspace?.status === 'ok'
-          && Boolean(issue?.when),
+        issueState: classifyOfficeRoutineEvidence(
+          officeDuties.issueStatus,
+          issueWorkspace?.status === 'ok' && Boolean(issue?.when),
+        ),
       }
     })
   ), [
@@ -1154,7 +1167,10 @@ export function OfficePage() {
                 sourceStatus={routineFollowUps.status}
                 onOpenReport={openRoutineDecisionReport}
                 onOpenIssue={openRoutineDecisionIssue}
-                onResolve={(item) => routineFollowUps.resolve(item.followUp.inboxEntryId)}
+                onDecide={(item, input) => routineFollowUps.decide(
+                  item.followUp.inboxEntryId,
+                  input,
+                )}
                 onClose={closeDecisionDesk}
               />
             )}

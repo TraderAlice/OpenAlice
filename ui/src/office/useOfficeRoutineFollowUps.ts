@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { api } from '../api'
-import type { OfficeRoutineFollowUp } from '../api/office'
+import type {
+  OfficeRoutineDecision,
+  OfficeRoutineDecisionInput,
+  OfficeRoutineFollowUp,
+} from '../api/office'
 
 export type OfficeRoutineFollowUpStatus = 'loading' | 'ready' | 'error'
 
@@ -11,16 +15,19 @@ const OFFICE_ROUTINE_FOLLOW_UP_CHANNEL = 'openalice:office-routine-follow-ups'
 export interface OfficeRoutineFollowUpsState {
   readonly status: OfficeRoutineFollowUpStatus
   readonly followUps: readonly OfficeRoutineFollowUp[]
+  readonly decisions: readonly OfficeRoutineDecision[]
   /** Latest authoritative list request started by this hook. */
   readonly requestEpoch: number
   /** Request-start epoch of the latest validated list accepted by this hook. */
   readonly successEpoch: number
   carry(inboxEntryId: string): Promise<void>
-  resolve(inboxEntryId: string): Promise<void>
+  decide(inboxEntryId: string, input: OfficeRoutineDecisionInput): Promise<void>
   refresh(): Promise<void>
 }
 
-type RoutineFollowUpMutation = 'carry' | 'resolve'
+type RoutineFollowUpMutation =
+  | { readonly kind: 'carry' }
+  | { readonly kind: 'decide'; readonly input: OfficeRoutineDecisionInput }
 
 interface InflightMutation {
   readonly generation: number
@@ -40,12 +47,29 @@ function isTimestamp(value: unknown): value is number {
 
 function isRoutineFollowUp(value: unknown): value is OfficeRoutineFollowUp {
   if (!value || typeof value !== 'object') return false
-  const candidate = value as Record<string, unknown>
+  const candidate = value as unknown as Record<string, unknown>
   return isExactIdentity(candidate.inboxEntryId)
     && isTimestamp(candidate.reportTs)
     && isExactIdentity(candidate.issueWorkspaceId)
     && isExactIdentity(candidate.issueId)
     && isTimestamp(candidate.createdAt)
+}
+
+function isRoutineDecision(value: unknown): value is OfficeRoutineDecision {
+  if (!isRoutineFollowUp(value) || !value || typeof value !== 'object') return false
+  const candidate = value as unknown as Record<string, unknown>
+  const outcome = candidate.outcome
+  const noteValid = candidate.note === undefined
+    || (typeof candidate.note === 'string'
+      && candidate.note.length >= 1
+      && candidate.note.length <= 280
+      && candidate.note.trim() === candidate.note)
+  return (outcome === 'maintain-plan'
+      || outcome === 'revise-plan'
+      || outcome === 'evidence-unavailable')
+    && noteValid
+    && (outcome === 'revise-plan' ? typeof candidate.note === 'string' : candidate.note === undefined)
+    && isTimestamp(candidate.decidedAt)
 }
 
 function validatedFollowUps(value: unknown): OfficeRoutineFollowUp[] {
@@ -55,6 +79,17 @@ function validatedFollowUps(value: unknown): OfficeRoutineFollowUp[] {
   const ids = new Set(value.map((followUp) => followUp.inboxEntryId))
   if (ids.size !== value.length) {
     throw new Error('Invalid Office routine follow-up response')
+  }
+  return value
+}
+
+function validatedDecisions(value: unknown): OfficeRoutineDecision[] {
+  if (!Array.isArray(value) || !value.every(isRoutineDecision)) {
+    throw new Error('Invalid Office routine decision response')
+  }
+  const ids = new Set(value.map((decision) => decision.inboxEntryId))
+  if (ids.size !== value.length) {
+    throw new Error('Invalid Office routine decision response')
   }
   return value
 }
@@ -78,6 +113,25 @@ function upsertFollowUp(
   ])
 }
 
+function orderDecisions(
+  decisions: readonly OfficeRoutineDecision[],
+): OfficeRoutineDecision[] {
+  return [...decisions].sort((left, right) =>
+    right.decidedAt - left.decidedAt
+    || right.reportTs - left.reportTs
+    || left.inboxEntryId.localeCompare(right.inboxEntryId))
+}
+
+function upsertDecision(
+  decisions: readonly OfficeRoutineDecision[],
+  next: OfficeRoutineDecision,
+): OfficeRoutineDecision[] {
+  return orderDecisions([
+    ...decisions.filter((decision) => decision.inboxEntryId !== next.inboxEntryId),
+    next,
+  ])
+}
+
 /**
  * Durable, server-authoritative decision-desk facts for Office.
  *
@@ -89,6 +143,7 @@ function upsertFollowUp(
 export function useOfficeRoutineFollowUps(): OfficeRoutineFollowUpsState {
   const [status, setStatus] = useState<OfficeRoutineFollowUpStatus>('loading')
   const [followUps, setFollowUps] = useState<OfficeRoutineFollowUp[]>([])
+  const [decisions, setDecisions] = useState<OfficeRoutineDecision[]>([])
   const [requestEpoch, setRequestEpoch] = useState(0)
   const [successEpoch, setSuccessEpoch] = useState(0)
   const mountedRef = useRef(true)
@@ -136,6 +191,7 @@ export function useOfficeRoutineFollowUps(): OfficeRoutineFollowUpsState {
       if (!mountedRef.current
         || refreshGenerationRef.current !== generation) return
       const serverFollowUps = validatedFollowUps(response.followUps)
+      const serverDecisions = validatedDecisions(response.decisions)
       setFollowUps((current) => {
         const currentById = new Map(current.map((followUp) => [followUp.inboxEntryId, followUp]))
         const merged = serverFollowUps.filter((followUp) =>
@@ -145,10 +201,22 @@ export function useOfficeRoutineFollowUps(): OfficeRoutineFollowUpsState {
           if (committedAt <= startedAtMutationVersion) continue
           const locallyConfirmed = currentById.get(inboxEntryId)
           if (locallyConfirmed) merged.push(locallyConfirmed)
-          // No local row means a resolve committed after this GET began; omit
+          // No local row means a decision committed after this GET began; omit
           // the stale server copy while still accepting unrelated server rows.
         }
         return orderFollowUps(merged)
+      })
+      setDecisions((current) => {
+        const currentById = new Map(current.map((decision) => [decision.inboxEntryId, decision]))
+        const merged = serverDecisions.filter((decision) =>
+          (entryCommitVersionRef.current.get(decision.inboxEntryId) ?? 0)
+            <= startedAtMutationVersion)
+        for (const [inboxEntryId, committedAt] of entryCommitVersionRef.current) {
+          if (committedAt <= startedAtMutationVersion) continue
+          const locallyConfirmed = currentById.get(inboxEntryId)
+          if (locallyConfirmed) merged.push(locallyConfirmed)
+        }
+        return orderDecisions(merged)
       })
       // This full read recovers only failures that predate it. A mutation may
       // fail after the GET took its snapshot; that newer uncertainty must keep
@@ -173,7 +241,9 @@ export function useOfficeRoutineFollowUps(): OfficeRoutineFollowUpsState {
     mutation: RoutineFollowUpMutation,
     inboxEntryId: string,
   ): Promise<void> => {
-    const key = `${mutation}:${inboxEntryId}`
+    const key = mutation.kind === 'carry'
+      ? `carry:${inboxEntryId}`
+      : `decide:${inboxEntryId}:${JSON.stringify(mutation.input)}`
     const existing = inflightMutationsRef.current.get(key)
     const currentEntryGeneration = entryIntentGenerationRef.current.get(inboxEntryId)
     if (existing && existing.generation === currentEntryGeneration) {
@@ -191,7 +261,7 @@ export function useOfficeRoutineFollowUps(): OfficeRoutineFollowUpsState {
         // no-op. If it already reached the server, the newer exact-entry intent
         // waits on this promise and therefore reaches the server afterwards.
         if (entryIntentGenerationRef.current.get(inboxEntryId) !== generation) return
-        if (mutation === 'carry') {
+        if (mutation.kind === 'carry') {
           const response = await api.office.carryRoutineFollowUp(inboxEntryId)
           if (!isRoutineFollowUp(response.followUp)
             || response.followUp.inboxEntryId !== inboxEntryId
@@ -207,9 +277,15 @@ export function useOfficeRoutineFollowUps(): OfficeRoutineFollowUpsState {
           )
           setFollowUps((current) => upsertFollowUp(current, response.followUp))
         } else {
-          const response = await api.office.resolveRoutineFollowUp(inboxEntryId)
-          if (response.ok !== true || typeof response.removed !== 'boolean') {
-            throw new Error('Invalid Office routine follow-up response')
+          const response = await api.office.decideRoutineFollowUp(inboxEntryId, mutation.input)
+          if (!isRoutineDecision(response.decision)
+            || response.decision.inboxEntryId !== inboxEntryId
+            || response.decision.outcome !== mutation.input.outcome
+            || (response.decision.note ?? undefined) !== (
+              mutation.input.outcome === 'revise-plan' ? mutation.input.note : undefined
+            )
+            || typeof response.created !== 'boolean') {
+            throw new Error('Invalid Office routine decision response')
           }
           if (!mountedRef.current
             || entryIntentGenerationRef.current.get(inboxEntryId) !== generation) return
@@ -218,14 +294,15 @@ export function useOfficeRoutineFollowUps(): OfficeRoutineFollowUpsState {
             inboxEntryId,
             mutationCommitVersionRef.current,
           )
-          // `removed: false` is still authoritative: the server confirms this
-          // exact key is absent, so a stale local copy must disappear too.
+          // A decision receipt is authoritative: the exact carry is no longer
+          // active, so a stale local copy must disappear too.
           setFollowUps((current) => current.filter(
             (followUp) => followUp.inboxEntryId !== inboxEntryId,
           ))
+          setDecisions((current) => upsertDecision(current, response.decision))
         }
         errorTokensRef.current.delete(`entry:${inboxEntryId}`)
-        channelRef.current?.postMessage({ mutation, inboxEntryId })
+        channelRef.current?.postMessage({ mutation: mutation.kind, inboxEntryId })
       } catch (cause) {
         if (mountedRef.current
           && entryIntentGenerationRef.current.get(inboxEntryId) === generation) {
@@ -254,11 +331,13 @@ export function useOfficeRoutineFollowUps(): OfficeRoutineFollowUpsState {
   }, [beginRequest, finishRequest])
 
   const carry = useCallback(
-    (inboxEntryId: string) => mutate('carry', inboxEntryId),
+    (inboxEntryId: string) => mutate({ kind: 'carry' }, inboxEntryId),
     [mutate],
   )
-  const resolve = useCallback(
-    (inboxEntryId: string) => mutate('resolve', inboxEntryId),
+  const decide = useCallback(
+    (inboxEntryId: string, input: OfficeRoutineDecisionInput) => (
+      mutate({ kind: 'decide', input }, inboxEntryId)
+    ),
     [mutate],
   )
 
@@ -299,10 +378,11 @@ export function useOfficeRoutineFollowUps(): OfficeRoutineFollowUpsState {
   return {
     status,
     followUps,
+    decisions,
     requestEpoch,
     successEpoch,
     carry,
-    resolve,
+    decide,
     refresh,
   }
 }

@@ -126,9 +126,9 @@ Office 的游戏循环不是“多点几个页面”，而是把容易被熟悉 
 决策台在当班巡检期间只作为 Operations 地标上的被动计数，不抢当前 HUD；本班 settled 后
 才成为下一主行动。每项必须同时显示准确报告标题/摘要和对应 Scheduled Issue，分别提供
 “打开准确报告”和“打开准确 Issue”。任一路由都不算完成、不删除跟进、不启动 Agent；
-只有用户明确选择“判断已完成 · 移出决策台”才移除该条持久跟进。报告或 Issue 已被删除时
-必须诚实显示不可用，仍允许保留或显式移除这条 Office 跟进，绝不改写历史 Inbox 回执或
-Issue 状态。
+只有用户明确保存“维持当前计划”或带 1–280 字说明的“调整观察 / 计划”，才会把该条持久
+跟进原子地转为判断回执。报告或 Issue 已被删除时必须诚实显示不可用，只能保留，或另记
+“证据不可用”后移出；后者不计作判断，也绝不改写历史 Inbox 回执或 Issue 状态。
 
 由此，Office 的进度只来自可证明的领域动作：精确 Inbox 回执、cadence evidence receipt，
 以及决策台显式完成。点击、寻路、打开页面、停留时长、下单、交易频率和盈亏都不能兑换
@@ -136,12 +136,51 @@ Issue 状态。
 
 当前落地：
 
-- [x] active-only 决策台 sidecar、严格损坏隔离、幂等 carry / resolve API
+- [x] active + decision receipt 决策台 sidecar、严格损坏隔离、幂等 carry / decide API
 - [x] 例行报告三选一分流，以及 carry 成功、Inbox 回执失败后的恢复合同
 - [x] 巡检结束后才提升决策台；寻路途中来源失稳或队列清空会取消过期目标
-- [x] 决策台展示准确报告与 Issue，并把两个打开动作与显式完成分离
+- [x] 决策台展示准确报告与 Issue，并把打开动作、明确判断与证据不可用分开记账
 - [x] Demo 契约、窄屏/短横屏、焦点和 reduced-motion 回归
-- [ ] 真实 AliceProject `/office`：桌面、390×844、844×390 完整游玩验收
+- [x] 真实 AliceProject `/office`：桌面、390×844、844×390 布局与稳定运行验收
+
+### 判断回执合同（2026-09-01）
+
+实机走完“精确报告 → 返回 Office → 带入决策台”后，发现现有终点仍可用一个无语义的
+`判断已完成 · 移出决策台` 删除事项。它能证明队列变短，却不能证明用户到底做了什么判断，
+会把“清空列表”误当成“完成交易功课”。比较了三个下一增量：
+
+| 方案 | 用户影响 | 结论 |
+|---|---|---|
+| 先做班前简报与收工仪式 | 日课更像游戏，但无法修复决策终点的假完成 | 后做 |
+| 立刻把 raw News 注册成日课 | 能增加内容量，但当前 News 没有用户声明的关注边界和精确回执 | 否 |
+| 把决策台删除动作升级为持久判断回执 | 让每次移出台面都有明确的人类处置，同时不评价收益或正确性 | **是** |
+
+判断回执只记录过程事实：精确 Inbox 报告、精确 Scheduled Issue、`维持计划` 或
+`调整观察/计划`、必要说明和服务端时间。`调整观察/计划` 必须留下简短理由；证据缺失时
+只能显式记为 `证据不可用` 后移出，它不计作完成判断。`需要更多证据` 继续等价于留在决策台，
+不能靠打开报告、停留时长、交易提交、P&L 或删除按钮自动完成。保存必须原子地把 active carry
+转成 resolved receipt；失败保留原项，相同重试幂等，不同处置冲突。历史回执可供未来收班簿
+消费，但本增量不把它扩张成 Dashboard、绩效分数或交易归因系统。
+
+证据状态严格分为 `available / missing / unknown`：只有完整、成功的权威快照明确缺少准确报告
+或定时 Issue，才能写 `evidence-unavailable`；加载中、数据源错误和读取异常一律只能等待重试。
+新判断还必须携带证据检查前观察到的 per-entry revision，在持久化线性化点重新比较，不能消费
+检查后才出现的 carry。同 Inbox id 也必须同时匹配报告时间、headless origin 和准确 Issue 坐标。
+
+当前落地：
+
+- [x] 严格持久化 active → decision receipt，并暴露可读取的决定历史
+- [x] 决策台显式选择判断结果；调整类要求 1–280 字理由
+- [x] 证据不可用的移除与真实判断分开记账
+- [x] 三态证据、准确报告 identity 与 carry/decision 并发 CAS 全部 fail closed
+- [x] Demo、并发/失败、窄屏、键盘和真实 AliceProject 回归
+
+验收记录：隔离 Demo 真实走完四项广度巡检、带入 Morning movers report、结束巡检后进入
+Decision Desk，并保存一条带理由的 `revise-plan` 回执；保存后 active 队列清空。390×844
+单列动作和 844×390 双列动作均可滚动到达，按钮高 44px，页面无横向溢出；稳定热更新后的
+Default AliceProject 在同三种视口也无横向溢出或浏览器告警。定向 6 文件 162 tests、完整
+664 files / 5,947 tests（另 2 files / 13 tests skipped）、根/UI TypeScript、生产 build 与
+`git diff --check` 全部通过。真实 Inbox 只读复验当前 2/4 精确报告路线，没有为测试写入回执。
 
 ## Current diagnosis
 
@@ -6242,9 +6281,9 @@ Routine-report harvest (2026-09-01, in progress):
   show its declared priority and next scheduled run, and disclose how many earlier unread versions remain. Unlinked or
   ambiguous Inbox rows keep the ordinary Inbox-duty language and ordering contract.
 
-Routine-report disposition (2026-09-01, in progress):
+Routine-report disposition (2026-09-01, implementation complete):
 
-- The routine dossier currently ends at `Stamp reviewed`, which proves only an exact durable Inbox receipt. That is a
+- Before this increment, the routine dossier ended at `Stamp reviewed`, which proved only an exact durable Inbox receipt. That is a
   useful storage boundary but a weak diligence loop: it does not ask whether the evidence changed the player's next
   action, and therefore still rewards queue clearing more than decision-making.
 - Rejected the first two-stage implementation after the maintainer clarified the product mission. It kept the exact
@@ -6264,8 +6303,8 @@ Routine-report disposition (2026-09-01, in progress):
 - Carrying advances the finite evidence shift after the receipt succeeds and never opens the Issue immediately. The
   active shift continues to cover one current delivery per declared routine. The central Operations/Decision desk may
   show a restrained passive count during patrol, but exact Issue, market-context, and completion actions become primary
-  only after the evidence shift has no current duty. Completing or dismissing a carried decision is a separate explicit
-  mutation and never rewrites the historical Inbox receipt.
+  only after the evidence shift has no current duty. Saving `maintain-plan`, a reasoned `revise-plan`, or the separately
+  classified `evidence-unavailable` receipt is a distinct mutation and never rewrites the historical Inbox receipt.
 - Comment, Issue-update, and inquiry APIs remain excluded because they can dispatch real Agent work or mutate a workflow
   whose semantics are not this user's diligence record. No route, dwell-time, scrolling, trade, or financial result is
   treated as proof. Keyboard and responsive ownership stays in the existing dossier and physical desk windows: 44px
@@ -6273,31 +6312,36 @@ Routine-report disposition (2026-09-01, in progress):
 
 Routine-report decision desk acceptance (2026-09-01):
 
-- Added an active-only durable decision queue at `data/inbox/routine-follow-ups.json`. Carry authority is reconstructed
-  from the exact Inbox origin and live Scheduled Issue; the record stores only report/Issue coordinates and never
-  dispatches Agent work. Malformed state disables this queue alone and all APIs fail closed instead of replacing it.
+- Added one strict v2 ledger at `data/inbox/routine-follow-ups.json` with active carries and durable immutable decision
+  receipts. Receipts are never silently pruned because every historical identity remains the idempotency and
+  anti-resurrection authority for that exact report. Carry authority is reconstructed from the exact Inbox origin and
+  live Scheduled Issue; records store only report/Issue coordinates and declared human disposition, and never dispatch
+  Agent work. Malformed state disables this queue alone and all APIs fail closed instead of replacing it.
 - Carry is ordered `persist decision intent → write exact Inbox readAt`. Existing carries recover idempotently after the
   Issue disappears or the Inbox receipt lands. Per-Inbox revision/CAS prevents an older in-flight PUT from resurrecting
-  a follow-up after an explicit resolve, including create/delete ABA across tabs. A fresh Carry linearizes at its exact
+  a follow-up after an explicit decision, including active/receipt ABA across tabs. A fresh Carry linearizes at its exact
   unread Inbox snapshot plus live-Issue check; later ordinary Inbox reads cannot revoke the already expressed intent.
 - Office-driven report presentation no longer inherits Inbox's ordinary select-to-read behavior. The exact captured row
   stays unread through `away / presented / returned`; unrelated Inbox rows retain normal semantics, and only the dossier's
   explicit `No change` or successful Carry receipt advances patrol. Issue loading returns the dossier immediately, keeps
   No change available, and gates only a fresh Carry.
-- The Decision Desk retains the exact report and Issue as independent evidence, routes to each without resolving, and
-  removes an item only through `Decision made · Remove from desk`. Missing reports or Issues degrade honestly while Keep
-  and explicit Remove remain available. During an active evidence shift the desk is a passive Operations count; it becomes
-  the primary HUD action only after the finite patrol settles.
-- Demo browser acceptance completed a four-item broad patrol at desktop size, carried Morning movers scan, marked Weekly
-  macro digest as no-change, opened the carried report and exact Issue without resolving, then removed it explicitly.
-  The Office-selected report remained unread until its disposition. 390×844 and 844×390 kept the long title, fixed close
-  control, internal scroll, and 44px actions reachable. Real Default AliceProject acceptance remains pending because the
-  migration task still owns the shared Guardian process; this plan deliberately does not substitute Demo data for that
-  final check.
-- Focused backend/UI suites pass 169 tests; the complete suite passes 656 files / 5,749 tests (two files and thirteen tests
-  skipped). Root and UI TypeScript pass, and the production UI build remains part of the final branch gate.
+- The Decision Desk retains the exact report and Issue as independent evidence and routes to each without resolving.
+  With both available it requires either `Maintain current plan` or `Adjust watch / plan`; the latter requires a trimmed
+  1–280 character note. Missing evidence exposes only `evidence-unavailable`, explicitly not a judgment. During an active
+  evidence shift the desk is a passive Operations count; it becomes the primary HUD action only after patrol settles.
+- Evidence is explicitly `available / missing / unknown`. Loading and source failures keep every disposition disabled;
+  only successful authoritative reads can prove absence. The report join matches id, timestamp, headless provenance,
+  and exact Issue coordinates. A decision commits only against the per-entry revision observed before those checks, so
+  it cannot consume a carry that appeared while the request was in flight.
+- Demo browser acceptance completed a four-item broad patrol, carried Morning movers scan, marked Weekly macro digest
+  no-change, and saved a reasoned revised-plan receipt only after the finite shift. The selected report remained unread
+  until its disposition. 390×844 and 844×390 retain internal scroll, zero horizontal overflow, and 44px decision actions.
+  A fresh real Default AliceProject tab renders its persisted 2/4 shift at desktop and both responsive viewports without
+  warnings; no real Inbox receipt was written for the test.
+- Focused decision suites pass 6 files / 162 tests; the complete suite passes 664 files / 5,947 tests (two files and
+  thirteen tests skipped). Root and UI TypeScript, the production build, and `git diff --check` pass.
 
-Office-Day persistence and harvest meter (2026-09-01, implementation complete; narrow real-project QA pending):
+Office-Day persistence and harvest meter (2026-09-01, implementation complete):
 
 - The corrected product mission is a repeatable diligence ritual, not an activity aquarium. A shift that survives only
   for one browser tab cannot truthfully model a daily chore: a new tab resurrects an unchanged cadence exception
@@ -6340,8 +6384,8 @@ Office-Day persistence and harvest meter (2026-09-01, implementation complete; n
 - Focused Office verification passes 19 files / 337 tests. Root and UI TypeScript, the complete monorepo suite
   (662 files / 5,875 tests, with two files and thirteen tests skipped) and the production build pass. Real Default
   AliceProject desktop acceptance opened the exact `Japan / BOJ carry-trade watch` duty from a persisted `1/4` shift;
-  closing the dossier left progress unchanged and the browser reported no warnings or errors. The 390×844 and 844×390
-  real-Project passes remain pending because the current browser-control surface cannot resize this tab.
+  closing the dossier left progress unchanged and the browser reported no warnings or errors. A later CDP viewport pass
+  covered 390×844 and 844×390 on the persisted real Project with exact viewport widths and no browser warning/error.
 
 External evidence escort (2026-09-01, implementation complete):
 

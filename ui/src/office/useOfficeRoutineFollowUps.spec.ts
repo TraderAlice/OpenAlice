@@ -4,7 +4,7 @@ import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { api } from '../api'
-import type { OfficeRoutineFollowUp } from '../api/office'
+import type { OfficeRoutineDecision, OfficeRoutineFollowUp } from '../api/office'
 import { useOfficeRoutineFollowUps } from './useOfficeRoutineFollowUps'
 
 vi.mock('../api', () => ({
@@ -12,7 +12,7 @@ vi.mock('../api', () => ({
     office: {
       listRoutineFollowUps: vi.fn(),
       carryRoutineFollowUp: vi.fn(),
-      resolveRoutineFollowUp: vi.fn(),
+      decideRoutineFollowUp: vi.fn(),
     },
   },
 }))
@@ -28,6 +28,24 @@ function followUp(
     issueId: `issue-${inboxEntryId}`,
     createdAt,
   }
+}
+
+function decision(
+  inboxEntryId: string,
+  outcome: OfficeRoutineDecision['outcome'] = 'maintain-plan',
+  decidedAt = 2_000,
+): OfficeRoutineDecision {
+  return {
+    ...followUp(inboxEntryId),
+    outcome,
+    ...(outcome === 'revise-plan' ? { note: 'Tighten the confirmation gate.' } : {}),
+    decidedAt,
+  }
+}
+
+interface RoutineListResponse {
+  followUps: OfficeRoutineFollowUp[]
+  decisions: OfficeRoutineDecision[]
 }
 
 function deferred<T>() {
@@ -65,7 +83,7 @@ class TestBroadcastChannel {
 beforeEach(() => {
   vi.mocked(api.office.listRoutineFollowUps).mockReset()
   vi.mocked(api.office.carryRoutineFollowUp).mockReset()
-  vi.mocked(api.office.resolveRoutineFollowUp).mockReset()
+  vi.mocked(api.office.decideRoutineFollowUp).mockReset()
 })
 
 afterEach(() => {
@@ -77,7 +95,7 @@ afterEach(() => {
 
 describe('useOfficeRoutineFollowUps', () => {
   it('fails closed until the initial server list is ready', async () => {
-    const request = deferred<{ followUps: OfficeRoutineFollowUp[] }>()
+    const request = deferred<RoutineListResponse>()
     vi.mocked(api.office.listRoutineFollowUps).mockReturnValue(request.promise)
 
     const { result } = renderHook(() => useOfficeRoutineFollowUps())
@@ -86,7 +104,10 @@ describe('useOfficeRoutineFollowUps', () => {
     expect(result.current).toMatchObject({ requestEpoch: 1, successEpoch: 0 })
 
     await act(async () => {
-      request.resolve({ followUps: [followUp('later', 2_000), followUp('first', 1_000)] })
+      request.resolve({
+        followUps: [followUp('later', 2_000), followUp('first', 1_000)],
+        decisions: [],
+      })
       await request.promise
     })
     expect(result.current.status).toBe('ready')
@@ -103,9 +124,25 @@ describe('useOfficeRoutineFollowUps', () => {
     expect(result.current).toMatchObject({ requestEpoch: 1, successEpoch: 0 })
   })
 
+  it('hydrates durable decision receipts separately from the active desk', async () => {
+    const older = decision('older', 'maintain-plan', 2_000)
+    const newer = decision('newer', 'revise-plan', 3_000)
+    vi.mocked(api.office.listRoutineFollowUps).mockResolvedValue({
+      followUps: [followUp('active')],
+      decisions: [older, newer],
+    })
+
+    const { result } = renderHook(() => useOfficeRoutineFollowUps())
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    expect(result.current.followUps.map((item) => item.inboxEntryId)).toEqual(['active'])
+    expect(result.current.decisions).toEqual([newer, older])
+  })
+
   it('fails closed for a malformed successful list response', async () => {
     vi.mocked(api.office.listRoutineFollowUps).mockResolvedValue({
       followUps: [{ ...followUp('bad'), createdAt: -1 }],
+      decisions: [],
     })
 
     const { result } = renderHook(() => useOfficeRoutineFollowUps())
@@ -117,7 +154,7 @@ describe('useOfficeRoutineFollowUps', () => {
   it('preserves the last confirmed list when refresh transiently fails', async () => {
     const known = followUp('known')
     vi.mocked(api.office.listRoutineFollowUps)
-      .mockResolvedValueOnce({ followUps: [known] })
+      .mockResolvedValueOnce({ followUps: [known], decisions: [] })
       .mockRejectedValueOnce(new Error('offline'))
 
     const { result } = renderHook(() => useOfficeRoutineFollowUps())
@@ -132,11 +169,11 @@ describe('useOfficeRoutineFollowUps', () => {
   })
 
   it('starts a causal refresh after an older read and advances success only for the accepted read', async () => {
-    const older = deferred<{ followUps: OfficeRoutineFollowUp[] }>()
-    const causal = deferred<{ followUps: OfficeRoutineFollowUp[] }>()
+    const older = deferred<RoutineListResponse>()
+    const causal = deferred<RoutineListResponse>()
     const current = followUp('current')
     vi.mocked(api.office.listRoutineFollowUps)
-      .mockResolvedValueOnce({ followUps: [] })
+      .mockResolvedValueOnce({ followUps: [], decisions: [] })
       .mockReturnValueOnce(older.promise)
       .mockReturnValueOnce(causal.promise)
 
@@ -156,13 +193,13 @@ describe('useOfficeRoutineFollowUps', () => {
     expect(result.current).toMatchObject({ requestEpoch: 3, successEpoch: 1 })
 
     await act(async () => {
-      older.resolve({ followUps: [] })
+      older.resolve({ followUps: [], decisions: [] })
       await olderPromise
     })
     expect(result.current.successEpoch).toBe(1)
 
     await act(async () => {
-      causal.resolve({ followUps: [current] })
+      causal.resolve({ followUps: [current], decisions: [] })
       await causalPromise
     })
     expect(result.current).toMatchObject({
@@ -179,14 +216,22 @@ describe('useOfficeRoutineFollowUps', () => {
     let serverFollowUps: OfficeRoutineFollowUp[] = []
     vi.mocked(api.office.listRoutineFollowUps).mockImplementation(async () => ({
       followUps: [...serverFollowUps],
+      decisions: [],
     }))
     vi.mocked(api.office.carryRoutineFollowUp).mockImplementation(async () => {
       serverFollowUps = [carried]
       return { followUp: carried, created: true }
     })
-    vi.mocked(api.office.resolveRoutineFollowUp).mockImplementation(async () => {
+    vi.mocked(api.office.decideRoutineFollowUp).mockImplementation(async (inboxEntryId, input) => {
       serverFollowUps = []
-      return { ok: true, removed: true }
+      return {
+        decision: {
+          ...carried,
+          ...input,
+          decidedAt: 3_000,
+        },
+        created: true,
+      }
     })
 
     const tabA = renderHook(() => useOfficeRoutineFollowUps())
@@ -211,7 +256,7 @@ describe('useOfficeRoutineFollowUps', () => {
 
     const afterCarryEpoch = tabB.result.current.successEpoch
     await act(async () => {
-      await tabA.result.current.resolve('report-a')
+      await tabA.result.current.decide('report-a', { outcome: 'maintain-plan' })
     })
     await waitFor(() => expect(tabB.result.current.followUps).toEqual([]))
     expect(tabB.result.current.successEpoch).toBeGreaterThan(afterCarryEpoch)
@@ -221,7 +266,7 @@ describe('useOfficeRoutineFollowUps', () => {
 
   it('refreshes authoritative follow-ups on focus, visible return, and polling', async () => {
     vi.useFakeTimers()
-    vi.mocked(api.office.listRoutineFollowUps).mockResolvedValue({ followUps: [] })
+    vi.mocked(api.office.listRoutineFollowUps).mockResolvedValue({ followUps: [], decisions: [] })
     const visibility = Object.getOwnPropertyDescriptor(document, 'visibilityState')
     Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
     const hook = renderHook(() => useOfficeRoutineFollowUps())
@@ -250,7 +295,7 @@ describe('useOfficeRoutineFollowUps', () => {
   it('publishes a confirmed carry once and coalesces an identical inflight retry', async () => {
     const carried = followUp('report-a')
     const request = deferred<{ followUp: OfficeRoutineFollowUp; created: boolean }>()
-    vi.mocked(api.office.listRoutineFollowUps).mockResolvedValue({ followUps: [] })
+    vi.mocked(api.office.listRoutineFollowUps).mockResolvedValue({ followUps: [], decisions: [] })
     vi.mocked(api.office.carryRoutineFollowUp).mockReturnValue(request.promise)
 
     const { result } = renderHook(() => useOfficeRoutineFollowUps())
@@ -275,26 +320,37 @@ describe('useOfficeRoutineFollowUps', () => {
     expect(result.current.followUps).toEqual([carried])
   })
 
-  it('publishes confirmed absence even when resolve reports an idempotent replay', async () => {
+  it('publishes an idempotent decision receipt and removes the active carry', async () => {
     const known = followUp('report-a')
-    vi.mocked(api.office.listRoutineFollowUps).mockResolvedValue({ followUps: [known] })
-    vi.mocked(api.office.resolveRoutineFollowUp).mockResolvedValue({ ok: true, removed: false })
+    const receipt = decision('report-a')
+    vi.mocked(api.office.listRoutineFollowUps).mockResolvedValue({
+      followUps: [known],
+      decisions: [],
+    })
+    vi.mocked(api.office.decideRoutineFollowUp).mockResolvedValue({
+      decision: receipt,
+      created: false,
+    })
 
     const { result } = renderHook(() => useOfficeRoutineFollowUps())
     await waitFor(() => expect(result.current.status).toBe('ready'))
 
     await act(async () => {
-      await result.current.resolve('report-a')
+      await result.current.decide('report-a', { outcome: 'maintain-plan' })
     })
     expect(result.current.status).toBe('ready')
     expect(result.current.followUps).toEqual([])
+    expect(result.current.decisions).toEqual([receipt])
   })
 
-  it('keeps known facts unchanged when carry or resolve fails', async () => {
+  it('keeps known facts unchanged when carry or decision save fails', async () => {
     const known = followUp('known')
-    vi.mocked(api.office.listRoutineFollowUps).mockResolvedValue({ followUps: [known] })
+    vi.mocked(api.office.listRoutineFollowUps).mockResolvedValue({
+      followUps: [known],
+      decisions: [],
+    })
     vi.mocked(api.office.carryRoutineFollowUp).mockRejectedValue(new Error('carry failed'))
-    vi.mocked(api.office.resolveRoutineFollowUp).mockRejectedValue(new Error('resolve failed'))
+    vi.mocked(api.office.decideRoutineFollowUp).mockRejectedValue(new Error('decision failed'))
 
     const { result } = renderHook(() => useOfficeRoutineFollowUps())
     await waitFor(() => expect(result.current.status).toBe('ready'))
@@ -306,7 +362,8 @@ describe('useOfficeRoutineFollowUps', () => {
     expect(result.current.followUps).toEqual([known])
 
     await act(async () => {
-      await expect(result.current.resolve('known')).rejects.toThrow('resolve failed')
+      await expect(result.current.decide('known', { outcome: 'maintain-plan' }))
+        .rejects.toThrow('decision failed')
     })
     expect(result.current.status).toBe('error')
     expect(result.current.followUps).toEqual([known])
@@ -314,14 +371,18 @@ describe('useOfficeRoutineFollowUps', () => {
 
   it('rejects a mismatched successful mutation response without changing known facts', async () => {
     const known = followUp('known')
-    vi.mocked(api.office.listRoutineFollowUps).mockResolvedValue({ followUps: [known] })
+    vi.mocked(api.office.listRoutineFollowUps).mockResolvedValue({
+      followUps: [known],
+      decisions: [],
+    })
     vi.mocked(api.office.carryRoutineFollowUp).mockResolvedValue({
       followUp: followUp('different-report'),
       created: true,
     })
-    vi.mocked(api.office.resolveRoutineFollowUp).mockResolvedValue(
-      { ok: false, removed: true } as unknown as { ok: true; removed: boolean },
-    )
+    vi.mocked(api.office.decideRoutineFollowUp).mockResolvedValue({
+      decision: decision('different-report'),
+      created: true,
+    })
 
     const { result } = renderHook(() => useOfficeRoutineFollowUps())
     await waitFor(() => expect(result.current.status).toBe('ready'))
@@ -333,19 +394,19 @@ describe('useOfficeRoutineFollowUps', () => {
     expect(result.current.followUps).toEqual([known])
 
     await act(async () => {
-      await expect(result.current.resolve('known'))
-        .rejects.toThrow('Invalid Office routine follow-up response')
+      await expect(result.current.decide('known', { outcome: 'maintain-plan' }))
+        .rejects.toThrow('Invalid Office routine decision response')
     })
     expect(result.current.status).toBe('error')
     expect(result.current.followUps).toEqual([known])
   })
 
   it('does not let a stale refresh erase a later confirmed carry', async () => {
-    const staleRefresh = deferred<{ followUps: OfficeRoutineFollowUp[] }>()
+    const staleRefresh = deferred<RoutineListResponse>()
     const carried = followUp('carried')
     const external = followUp('external', 2_000)
     vi.mocked(api.office.listRoutineFollowUps)
-      .mockResolvedValueOnce({ followUps: [] })
+      .mockResolvedValueOnce({ followUps: [], decisions: [] })
       .mockReturnValueOnce(staleRefresh.promise)
     vi.mocked(api.office.carryRoutineFollowUp).mockResolvedValue({
       followUp: carried,
@@ -365,7 +426,7 @@ describe('useOfficeRoutineFollowUps', () => {
     expect(result.current.followUps).toEqual([carried])
 
     await act(async () => {
-      staleRefresh.resolve({ followUps: [external] })
+      staleRefresh.resolve({ followUps: [external], decisions: [] })
       await refreshPromise
     })
     expect(result.current.status).toBe('ready')
@@ -374,10 +435,10 @@ describe('useOfficeRoutineFollowUps', () => {
 
   it('finishes a newer refresh gate without replacing a write that lands during it', async () => {
     const carryRequest = deferred<{ followUp: OfficeRoutineFollowUp; created: boolean }>()
-    const refreshRequest = deferred<{ followUps: OfficeRoutineFollowUp[] }>()
+    const refreshRequest = deferred<RoutineListResponse>()
     const carried = followUp('carried')
     vi.mocked(api.office.listRoutineFollowUps)
-      .mockResolvedValueOnce({ followUps: [] })
+      .mockResolvedValueOnce({ followUps: [], decisions: [] })
       .mockReturnValueOnce(refreshRequest.promise)
     vi.mocked(api.office.carryRoutineFollowUp).mockReturnValue(carryRequest.promise)
 
@@ -398,7 +459,7 @@ describe('useOfficeRoutineFollowUps', () => {
     expect(result.current.followUps).toEqual([carried])
 
     await act(async () => {
-      refreshRequest.resolve({ followUps: [] })
+      refreshRequest.resolve({ followUps: [], decisions: [] })
       await refreshPromise
     })
     expect(result.current.status).toBe('ready')
@@ -406,12 +467,12 @@ describe('useOfficeRoutineFollowUps', () => {
   })
 
   it('does not let a stale successful refresh clear a mutation error that happened after it began', async () => {
-    const staleRefresh = deferred<{ followUps: OfficeRoutineFollowUp[] }>()
+    const staleRefresh = deferred<RoutineListResponse>()
     const carried = followUp('carried')
     vi.mocked(api.office.listRoutineFollowUps)
-      .mockResolvedValueOnce({ followUps: [] })
+      .mockResolvedValueOnce({ followUps: [], decisions: [] })
       .mockReturnValueOnce(staleRefresh.promise)
-      .mockResolvedValueOnce({ followUps: [carried] })
+      .mockResolvedValueOnce({ followUps: [carried], decisions: [] })
     vi.mocked(api.office.carryRoutineFollowUp).mockRejectedValue(new Error('response lost'))
 
     const { result } = renderHook(() => useOfficeRoutineFollowUps())
@@ -427,7 +488,7 @@ describe('useOfficeRoutineFollowUps', () => {
     expect(result.current.status).toBe('loading')
 
     await act(async () => {
-      staleRefresh.resolve({ followUps: [] })
+      staleRefresh.resolve({ followUps: [], decisions: [] })
       await refreshPromise
     })
     expect(result.current.status).toBe('error')
@@ -440,14 +501,17 @@ describe('useOfficeRoutineFollowUps', () => {
     expect(result.current.followUps).toEqual([carried])
   })
 
-  it('does not let a superseded carry resurrect an entry after resolve', async () => {
+  it('does not let a superseded carry resurrect an entry after a decision', async () => {
     const staleCarry = deferred<{ followUp: OfficeRoutineFollowUp; created: boolean }>()
     const carried = followUp('report-a')
     vi.mocked(api.office.listRoutineFollowUps)
-      .mockResolvedValueOnce({ followUps: [carried] })
-      .mockResolvedValueOnce({ followUps: [] })
+      .mockResolvedValueOnce({ followUps: [carried], decisions: [] })
+      .mockResolvedValueOnce({ followUps: [], decisions: [decision('report-a')] })
     vi.mocked(api.office.carryRoutineFollowUp).mockReturnValue(staleCarry.promise)
-    vi.mocked(api.office.resolveRoutineFollowUp).mockResolvedValue({ ok: true, removed: true })
+    vi.mocked(api.office.decideRoutineFollowUp).mockResolvedValue({
+      decision: decision('report-a'),
+      created: true,
+    })
 
     const { result } = renderHook(() => useOfficeRoutineFollowUps())
     await waitFor(() => expect(result.current.status).toBe('ready'))
@@ -457,18 +521,18 @@ describe('useOfficeRoutineFollowUps', () => {
       carryPromise = result.current.carry('report-a')
     })
     await waitFor(() => expect(api.office.carryRoutineFollowUp).toHaveBeenCalledTimes(1))
-    let resolvePromise!: Promise<void>
+    let decidePromise!: Promise<void>
     act(() => {
-      resolvePromise = result.current.resolve('report-a')
+      decidePromise = result.current.decide('report-a', { outcome: 'maintain-plan' })
     })
-    expect(api.office.resolveRoutineFollowUp).not.toHaveBeenCalled()
+    expect(api.office.decideRoutineFollowUp).not.toHaveBeenCalled()
 
     await act(async () => {
       staleCarry.resolve({ followUp: carried, created: false })
       await carryPromise
-      await resolvePromise
+      await decidePromise
     })
-    expect(api.office.resolveRoutineFollowUp).toHaveBeenCalledTimes(1)
+    expect(api.office.decideRoutineFollowUp).toHaveBeenCalledTimes(1)
     expect(result.current.status).toBe('ready')
     expect(result.current.followUps).toEqual([])
 
@@ -484,7 +548,7 @@ describe('useOfficeRoutineFollowUps', () => {
     const secondRequest = deferred<{ followUp: OfficeRoutineFollowUp; created: boolean }>()
     const first = followUp('first', 1_000)
     const second = followUp('second', 2_000)
-    vi.mocked(api.office.listRoutineFollowUps).mockResolvedValue({ followUps: [] })
+    vi.mocked(api.office.listRoutineFollowUps).mockResolvedValue({ followUps: [], decisions: [] })
     vi.mocked(api.office.carryRoutineFollowUp).mockImplementation((inboxEntryId) =>
       inboxEntryId === 'first' ? firstRequest.promise : secondRequest.promise)
 

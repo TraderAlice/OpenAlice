@@ -6,8 +6,11 @@ import { OfficeDayUnavailableError } from '../../core/office-day-store.js'
 import {
   RoutineFollowUpConflictError,
   RoutineFollowUpCreateDisallowedError,
+  RoutineFollowUpDecisionConflictError,
+  RoutineFollowUpDecisionMissingError,
   RoutineFollowUpStaleObservationError,
   RoutineFollowUpUnavailableError,
+  routineDecisionInputSchema,
 } from '../../core/routine-follow-up-store.js'
 import { sessionPreferredTitle } from '../../workspaces/session-registry.js'
 import {
@@ -159,7 +162,10 @@ export function createOfficeRoutes(svc: WorkspaceService): Hono {
 
   app.get('/routine-follow-ups', (c) => {
     try {
-      return c.json({ followUps: svc.routineFollowUpStore.list() })
+      return c.json({
+        followUps: svc.routineFollowUpStore.list(),
+        decisions: svc.routineFollowUpStore.listDecisions(),
+      })
     } catch (error) {
       if (error instanceof RoutineFollowUpUnavailableError) {
         return c.json({ error: error.code, message: error.message }, 503)
@@ -181,8 +187,13 @@ export function createOfficeRoutes(svc: WorkspaceService): Hono {
     }
 
     let observation
+    let existingDecision = false
     try {
       observation = svc.routineFollowUpStore.observe(inboxEntryId)
+      existingDecision = !observation.followUp
+        && svc.routineFollowUpStore.listDecisions().some(
+          (decision) => decision.inboxEntryId === inboxEntryId,
+        )
     } catch (error) {
       if (error instanceof RoutineFollowUpUnavailableError) {
         return c.json({ error: error.code, message: error.message }, 503)
@@ -191,6 +202,12 @@ export function createOfficeRoutes(svc: WorkspaceService): Hono {
         error: 'routine_follow_up_read_failed',
         message: error instanceof Error ? error.message : String(error),
       }, 500)
+    }
+    if (existingDecision) {
+      return c.json({
+        error: 'routine_follow_up_no_longer_active',
+        message: 'This report already has an authoritative decision receipt.',
+      }, 409)
     }
     const existing = observation.followUp
     if (!svc.inboxStore) {
@@ -289,6 +306,12 @@ export function createOfficeRoutes(svc: WorkspaceService): Hono {
         }, 409)
       }
       if (error instanceof RoutineFollowUpCreateDisallowedError) {
+        if (error.reason === 'already-decided') {
+          return c.json({
+            error: 'routine_follow_up_no_longer_active',
+            message: 'This report already has an authoritative decision receipt.',
+          }, 409)
+        }
         return c.json({
           error: 'routine_report_already_reviewed',
           message: 'This Inbox report was already reviewed and cannot be carried again.',
@@ -307,7 +330,7 @@ export function createOfficeRoutes(svc: WorkspaceService): Hono {
     }
   })
 
-  app.delete('/routine-follow-ups/:inboxEntryId', async (c) => {
+  app.post('/routine-follow-ups/:inboxEntryId/decision', async (c) => {
     const inboxEntryId = c.req.param('inboxEntryId')
     if (!inboxEntryId) {
       return c.json({
@@ -315,15 +338,129 @@ export function createOfficeRoutes(svc: WorkspaceService): Hono {
         message: 'An Inbox entry id is required.',
       }, 400)
     }
+
+    let input
     try {
-      const removed = await svc.routineFollowUpStore.remove(inboxEntryId)
-      return c.json({ ok: true, removed })
+      input = routineDecisionInputSchema.parse(await c.req.json())
+    } catch (error) {
+      if (error instanceof ZodError || error instanceof SyntaxError) {
+        return c.json({
+          error: 'invalid_routine_follow_up_decision',
+          message: 'A strict routine decision outcome is required.',
+        }, 400)
+      }
+      return c.json({
+        error: 'routine_follow_up_decision_read_failed',
+        message: error instanceof Error ? error.message : String(error),
+      }, 500)
+    }
+
+    let observation
+    let existingDecision = false
+    try {
+      existingDecision = svc.routineFollowUpStore.listDecisions().some(
+        (decision) => decision.inboxEntryId === inboxEntryId,
+      )
+      observation = svc.routineFollowUpStore.observe(inboxEntryId)
     } catch (error) {
       if (error instanceof RoutineFollowUpUnavailableError) {
         return c.json({ error: error.code, message: error.message }, 503)
       }
       return c.json({
-        error: 'routine_follow_up_write_failed',
+        error: 'routine_follow_up_read_failed',
+        message: error instanceof Error ? error.message : String(error),
+      }, 500)
+    }
+    const activeFollowUp = existingDecision ? null : observation.followUp
+    if (!existingDecision && !activeFollowUp) {
+      return c.json({
+        error: 'routine_follow_up_decision_missing',
+        message: `Routine follow-up ${inboxEntryId} has neither an active carry nor a decision receipt.`,
+      }, 409)
+    }
+
+    // Idempotent/conflicting retries use their durable receipt as authority.
+    // A new decision must match the same exact report + scheduled Issue that
+    // the UI presents; a stale or direct caller cannot manufacture a judgment.
+    if (activeFollowUp) {
+      if (!svc.inboxStore) {
+        return c.json({
+          error: 'routine_follow_up_evidence_check_unavailable',
+          message: 'Inbox authority is unavailable, so this evidence cannot be classified.',
+        }, 503)
+      }
+
+      let entry
+      try {
+        entry = await svc.inboxStore.get(inboxEntryId)
+      } catch {
+        return c.json({
+          error: 'routine_follow_up_evidence_check_unavailable',
+          message: 'The exact Inbox report could not be checked, so no decision was recorded.',
+        }, 503)
+      }
+      const reportAvailable = Boolean(
+        entry
+        && entry.id === activeFollowUp.inboxEntryId
+        && entry.ts === activeFollowUp.reportTs
+        && entry.origin?.kind === 'headless'
+        && entry.origin.issueWorkspaceId === activeFollowUp.issueWorkspaceId
+        && entry.origin.issueId === activeFollowUp.issueId,
+      )
+
+      let detail
+      try {
+        detail = await svc.issueDetail(
+          activeFollowUp.issueWorkspaceId,
+          activeFollowUp.issueId,
+        )
+      } catch {
+        return c.json({
+          error: 'routine_follow_up_evidence_check_unavailable',
+          message: 'The exact Scheduled Issue could not be checked, so no decision was recorded.',
+        }, 503)
+      }
+      const issueAvailable = Boolean(
+        detail
+        && detail.issue.id === activeFollowUp.issueId
+        && detail.issue.when,
+      )
+
+      const evidenceAvailable = reportAvailable && issueAvailable
+      if (input.outcome === 'evidence-unavailable' && evidenceAvailable) {
+        return c.json({
+          error: 'routine_follow_up_evidence_available',
+          message: 'The exact report and Scheduled Issue are available for a judgment.',
+        }, 409)
+      }
+      if (input.outcome !== 'evidence-unavailable' && !evidenceAvailable) {
+        return c.json({
+          error: 'routine_follow_up_evidence_unavailable',
+          message: 'The exact report and Scheduled Issue must both be available for a judgment.',
+        }, 409)
+      }
+    }
+
+    try {
+      return c.json(await svc.routineFollowUpStore.decide(inboxEntryId, input, {
+        observedRevision: observation.revision,
+      }))
+    } catch (error) {
+      if (error instanceof RoutineFollowUpStaleObservationError) {
+        return c.json({
+          error: error.code,
+          message: 'This follow-up changed while the judgment was in flight. Refresh before retrying.',
+        }, 409)
+      }
+      if (error instanceof RoutineFollowUpDecisionConflictError
+        || error instanceof RoutineFollowUpDecisionMissingError) {
+        return c.json({ error: error.code, message: error.message }, 409)
+      }
+      if (error instanceof RoutineFollowUpUnavailableError) {
+        return c.json({ error: error.code, message: error.message }, 503)
+      }
+      return c.json({
+        error: 'routine_follow_up_decision_failed',
         message: error instanceof Error ? error.message : String(error),
       }, 500)
     }

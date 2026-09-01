@@ -81,8 +81,25 @@ export interface OfficeRoutineFollowUp {
   createdAt: number
 }
 
+export type OfficeRoutineDecisionOutcome =
+  | 'maintain-plan'
+  | 'revise-plan'
+  | 'evidence-unavailable'
+
+/**
+ * Durable human disposition for one exact carried report. It proves only that
+ * the person chose a next-step judgment; it does not imply a trade, Issue
+ * mutation, or a correct investment outcome.
+ */
+export interface OfficeRoutineDecision extends OfficeRoutineFollowUp {
+  outcome: OfficeRoutineDecisionOutcome
+  note?: string
+  decidedAt: number
+}
+
 export interface OfficeRoutineFollowUpsResponse {
   followUps: OfficeRoutineFollowUp[]
+  decisions: OfficeRoutineDecision[]
 }
 
 export interface OfficeRoutineFollowUpPutResponse {
@@ -90,9 +107,14 @@ export interface OfficeRoutineFollowUpPutResponse {
   created: boolean
 }
 
-export interface OfficeRoutineFollowUpDeleteResponse {
-  ok: true
-  removed: boolean
+export type OfficeRoutineDecisionInput =
+  | { outcome: 'maintain-plan' }
+  | { outcome: 'revise-plan'; note: string }
+  | { outcome: 'evidence-unavailable' }
+
+export interface OfficeRoutineDecisionPutResponse {
+  decision: OfficeRoutineDecision
+  created: boolean
 }
 
 export interface OfficeDayEvidenceReceipt {
@@ -200,11 +222,14 @@ export const officeApi = {
     })
   },
 
-  async resolveRoutineFollowUp(
+  async decideRoutineFollowUp(
     inboxEntryId: string,
-  ): Promise<OfficeRoutineFollowUpDeleteResponse> {
-    return fetchJson(`/api/office/routine-follow-ups/${encodeURIComponent(inboxEntryId)}`, {
-      method: 'DELETE',
+    input: OfficeRoutineDecisionInput,
+  ): Promise<OfficeRoutineDecisionPutResponse> {
+    return fetchJson(`/api/office/routine-follow-ups/${encodeURIComponent(inboxEntryId)}/decision`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(input),
     })
   },
 

@@ -503,11 +503,10 @@ describe('demo Office handlers', () => {
     expect(demoWorkspaceFiles[drawerPath ?? '']).toBeTruthy()
   })
 
-  it('persists one exact routine follow-up idempotently and resolves it idempotently', async () => {
+  it('persists one exact routine follow-up and atomically records an idempotent decision', async () => {
     const inboxEntryId = 'demo-inbox-morning-1'
     const endpoint = `${baseUrl}/api/office/routine-follow-ups/${inboxEntryId}`
     const readEndpoint = `${baseUrl}/api/inbox/${inboxEntryId}/read`
-    await fetch(endpoint, { method: 'DELETE' })
     await fetch(readEndpoint, { method: 'DELETE' })
 
     try {
@@ -535,26 +534,109 @@ describe('demo Office handlers', () => {
 
       const listedBody = await officeApi.listRoutineFollowUps()
       expect(listedBody.followUps).toContainEqual(firstBody.followUp)
+      expect(listedBody.decisions).toEqual([])
 
-      expect(await officeApi.resolveRoutineFollowUp(inboxEntryId))
-        .toEqual({ ok: true, removed: true })
-      expect(await officeApi.resolveRoutineFollowUp(inboxEntryId))
-        .toEqual({ ok: true, removed: false })
+      const falseUnavailable = await fetch(`${endpoint}/decision`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ outcome: 'evidence-unavailable' }),
+      })
+      expect(falseUnavailable.status).toBe(409)
+      expect(await falseUnavailable.json()).toMatchObject({
+        error: 'routine_follow_up_evidence_available',
+      })
+
+      const decided = await officeApi.decideRoutineFollowUp(inboxEntryId, {
+        outcome: 'revise-plan',
+        note: 'Wait for breadth confirmation.',
+      })
+      expect(decided).toMatchObject({
+        created: true,
+        decision: {
+          ...firstBody.followUp,
+          outcome: 'revise-plan',
+          note: 'Wait for breadth confirmation.',
+        },
+      })
+      expect(await officeApi.decideRoutineFollowUp(inboxEntryId, {
+        outcome: 'revise-plan',
+        note: '  Wait for breadth confirmation.  ',
+      })).toEqual({ decision: decided.decision, created: false })
+      expect(await officeApi.listRoutineFollowUps()).toMatchObject({
+        followUps: [],
+        decisions: [decided.decision],
+      })
+
+      const conflictingDecision = await fetch(`${endpoint}/decision`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ outcome: 'maintain-plan' }),
+      })
+      expect(conflictingDecision.status).toBe(409)
+      expect(await conflictingDecision.json()).toMatchObject({
+        error: 'routine_follow_up_decision_conflict',
+      })
+
+      const originalOrigin = demoMoversReport.origin
+      try {
+        demoMoversReport.origin = { kind: 'manual' }
+        const receiptReplay = await fetch(endpoint, { method: 'PUT' })
+        expect(receiptReplay.status).toBe(409)
+        expect(await receiptReplay.json()).toMatchObject({
+          error: 'routine_follow_up_no_longer_active',
+        })
+      } finally {
+        demoMoversReport.origin = originalOrigin
+      }
 
       const markedRead = await fetch(readEndpoint, { method: 'PUT' })
       expect(markedRead.status).toBe(200)
       const staleReplay = await fetch(endpoint, { method: 'PUT' })
       expect(staleReplay.status).toBe(409)
       expect(await staleReplay.json()).toMatchObject({
-        error: 'routine_report_already_reviewed',
+        error: 'routine_follow_up_no_longer_active',
       })
     } finally {
-      await fetch(endpoint, { method: 'DELETE' })
       await fetch(readEndpoint, { method: 'DELETE' })
     }
   })
 
-  it('replays an existing demo carry after its Issue stops scheduling', async () => {
+  it.each([
+    ['malformed JSON', '{'],
+    ['invalid decision', JSON.stringify({ outcome: 'maintain-plan', note: 'not accepted' })],
+  ])('rejects a %s with the production decision error contract', async (_label, body) => {
+    const response = await fetch(
+      `${baseUrl}/api/office/routine-follow-ups/demo-inbox-morning-1/decision`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body,
+      },
+    )
+
+    expect(response.status).toBe(400)
+    expect(await response.json()).toMatchObject({
+      error: 'invalid_routine_follow_up_decision',
+    })
+  })
+
+  it('uses the production missing-decision error when no carry or receipt exists', async () => {
+    const response = await fetch(
+      `${baseUrl}/api/office/routine-follow-ups/demo-inbox-morning-1/decision`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ outcome: 'maintain-plan' }),
+      },
+    )
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({
+      error: 'routine_follow_up_decision_missing',
+    })
+  })
+
+  it('replays an existing carry after its Issue stops scheduling and permits only unavailable evidence', async () => {
     const inboxEntryId = demoMoversReport.id
     const endpoint = `${baseUrl}/api/office/routine-follow-ups/${inboxEntryId}`
     const readEndpoint = `${baseUrl}/api/inbox/${inboxEntryId}/read`
@@ -563,7 +645,6 @@ describe('demo Office handlers', () => {
       ?.issues.find((candidate) => candidate.id === 'morning-scan')
     expect(issue?.when).toBeTruthy()
     const originalWhen = issue!.when
-    await fetch(endpoint, { method: 'DELETE' })
     await fetch(readEndpoint, { method: 'DELETE' })
 
     try {
@@ -573,9 +654,26 @@ describe('demo Office handlers', () => {
       const replay = await fetch(endpoint, { method: 'PUT' })
       expect(replay.status).toBe(200)
       expect(await replay.json()).toEqual({ followUp: first.followUp, created: false })
+
+      const falseJudgment = await fetch(`${endpoint}/decision`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ outcome: 'maintain-plan' }),
+      })
+      expect(falseJudgment.status).toBe(409)
+      expect(await falseJudgment.json()).toMatchObject({
+        error: 'routine_follow_up_evidence_unavailable',
+      })
+
+      const unavailable = await officeApi.decideRoutineFollowUp(inboxEntryId, {
+        outcome: 'evidence-unavailable',
+      })
+      expect(unavailable).toMatchObject({
+        created: true,
+        decision: { outcome: 'evidence-unavailable' },
+      })
     } finally {
       issue!.when = originalWhen
-      await fetch(endpoint, { method: 'DELETE' })
       await fetch(readEndpoint, { method: 'DELETE' })
     }
   })
@@ -590,7 +688,6 @@ describe('demo Office handlers', () => {
 
   it('requires the exact originating Issue to remain scheduled', async () => {
     const endpoint = `${baseUrl}/api/office/routine-follow-ups/${demoMoversReport.id}`
-    await fetch(endpoint, { method: 'DELETE' })
     const originalIssueId = demoMoversReport.origin?.issueId
     try {
       demoMoversReport.origin!.issueId = 'rebalance-sizing-review'

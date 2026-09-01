@@ -9,6 +9,8 @@ import { OfficeDayStore } from '../../core/office-day-store.js'
 import {
   RoutineFollowUpConflictError,
   RoutineFollowUpCreateDisallowedError,
+  RoutineFollowUpDecisionConflictError,
+  RoutineFollowUpStaleObservationError,
   RoutineFollowUpStore,
 } from '../../core/routine-follow-up-store.js'
 import { createOfficeRoutes } from './office.js'
@@ -439,6 +441,12 @@ describe('Office routine follow-ups', () => {
     issueId: 'weekly-review',
     createdAt: 1_700_000_001_000,
   }
+  const decision = {
+    ...record,
+    outcome: 'revise-plan' as const,
+    note: 'Reduce concentration before the next review.',
+    decidedAt: 1_700_000_002_000,
+  }
 
   function build(overrides: Record<string, unknown> = {}) {
     const get = vi.fn(async () => ({
@@ -460,13 +468,14 @@ describe('Office routine follow-ups', () => {
       },
     }))
     const list = vi.fn(() => [record])
+    const listDecisions = vi.fn((): Array<typeof decision> => [])
     const observeFollowUp = vi.fn(() => ({ followUp: null, revision: 0 }))
     const put = vi.fn(async () => ({ followUp: record, created: true }))
-    const remove = vi.fn(async () => true)
+    const decide = vi.fn(async () => ({ decision, created: true }))
     const svc = {
       inboxStore: { get },
       issueDetail,
-      routineFollowUpStore: { list, observe: observeFollowUp, put, remove },
+      routineFollowUpStore: { list, listDecisions, observe: observeFollowUp, put, decide },
       ...overrides,
     }
     return {
@@ -474,20 +483,23 @@ describe('Office routine follow-ups', () => {
       get,
       issueDetail,
       list,
+      listDecisions,
       observeFollowUp,
       put,
-      remove,
+      decide,
     }
   }
 
-  it('lists the durable queue in one stable envelope', async () => {
-    const { app, list } = build()
+  it('lists the durable queue and decision receipts in one stable envelope', async () => {
+    const { app, list, listDecisions } = build()
+    listDecisions.mockReturnValue([decision])
 
     const response = await app.request('/routine-follow-ups')
 
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ followUps: [record] })
+    expect(await response.json()).toEqual({ followUps: [record], decisions: [decision] })
     expect(list).toHaveBeenCalledOnce()
+    expect(listDecisions).toHaveBeenCalledOnce()
   })
 
   it('derives the exact scheduled Issue authority from Inbox and ignores spoofed request data', async () => {
@@ -540,9 +552,10 @@ describe('Office routine follow-ups', () => {
       issueDetail,
       routineFollowUpStore: {
         list: vi.fn(() => [record]),
+        listDecisions: vi.fn(() => []),
         observe: vi.fn(() => ({ followUp: record, revision: 7 })),
         put,
-        remove: vi.fn(),
+        decide: vi.fn(),
       },
     })
 
@@ -586,9 +599,10 @@ describe('Office routine follow-ups', () => {
       issueDetail,
       routineFollowUpStore: {
         list: vi.fn(() => []),
+        listDecisions: vi.fn(() => []),
         observe: vi.fn(() => ({ followUp: null, revision: 0 })),
         put,
-        remove: vi.fn(),
+        decide: vi.fn(),
       },
     })
 
@@ -608,6 +622,31 @@ describe('Office routine follow-ups', () => {
     )
   })
 
+  it('distinguishes a durable decision receipt from an ordinary reviewed report', async () => {
+    const put = vi.fn()
+    const issueDetail = vi.fn(async () => { throw new Error('Issue registry offline') })
+    const { app, get } = build({
+      issueDetail,
+      routineFollowUpStore: {
+        list: vi.fn(() => []),
+        listDecisions: vi.fn(() => [decision]),
+        observe: vi.fn(() => ({ followUp: null, revision: 2 })),
+        put,
+        decide: vi.fn(),
+      },
+    })
+
+    const response = await app.request('/routine-follow-ups/report-1', { method: 'PUT' })
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({
+      error: 'routine_follow_up_no_longer_active',
+    })
+    expect(get).not.toHaveBeenCalled()
+    expect(issueDetail).not.toHaveBeenCalled()
+    expect(put).not.toHaveBeenCalled()
+  })
+
   it('replays an existing carry even after its Issue disappears or stops scheduling', async () => {
     const issueDetail = vi.fn(async () => ({ issue: { id: record.issueId } }))
     const put = vi.fn(async () => ({ followUp: record, created: false }))
@@ -615,9 +654,10 @@ describe('Office routine follow-ups', () => {
       issueDetail,
       routineFollowUpStore: {
         list: vi.fn(() => [record]),
+        listDecisions: vi.fn(() => []),
         observe: vi.fn(() => ({ followUp: record, revision: 7 })),
         put,
-        remove: vi.fn(),
+        decide: vi.fn(),
       },
     })
 
@@ -641,7 +681,7 @@ describe('Office routine follow-ups', () => {
     ['reviewed', record.reportTs + 1, 'routine_follow_up_no_longer_active'],
     ['still-unread', undefined, 'routine_follow_up_no_longer_active'],
   ] as const)(
-    'does not let a stale existing snapshot recreate a %s follow-up after concurrent resolve',
+    'does not let a stale existing snapshot recreate a %s follow-up after a decision receipt',
     async (_receiptState, readAt, expectedError) => {
       const dir = await mkdtemp(join(tmpdir(), 'openalice-office-follow-up-aba-'))
       const store = await RoutineFollowUpStore.load(join(dir, 'routine-follow-ups.json'))
@@ -678,7 +718,14 @@ describe('Office routine follow-ups', () => {
 
       const stalePut = app.request('/routine-follow-ups/report-1', { method: 'PUT' })
       await vi.waitFor(() => expect(observeFollowUp).toHaveBeenCalledWith(record.inboxEntryId))
-      await expect(store.remove(record.inboxEntryId)).resolves.toBe(true)
+      await expect(store.decide(
+        record.inboxEntryId,
+        { outcome: 'maintain-plan' },
+        {
+          observedRevision: store.observe(record.inboxEntryId).revision,
+          decidedAt: decision.decidedAt,
+        },
+      )).resolves.toMatchObject({ created: true })
       inboxLookup.resolve({
         id: record.inboxEntryId,
         ts: record.reportTs,
@@ -698,15 +745,16 @@ describe('Office routine follow-ups', () => {
       expect(await response.json()).toMatchObject({ error: expectedError })
       expect(issueDetail).not.toHaveBeenCalled()
       expect(store.list()).toEqual([])
-      expect((await RoutineFollowUpStore.load(join(dir, 'routine-follow-ups.json'))).list())
-        .toEqual([])
+      const reloaded = await RoutineFollowUpStore.load(join(dir, 'routine-follow-ups.json'))
+      expect(reloaded.list()).toEqual([])
+      expect(reloaded.listDecisions()).toHaveLength(1)
 
       observeFollowUp.mockRestore()
       await rm(dir, { recursive: true, force: true })
     },
   )
 
-  it('does not let a stale absent snapshot recreate after a concurrent carry and resolve', async () => {
+  it('does not let a stale absent snapshot recreate after a concurrent carry and decision', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'openalice-office-follow-up-fresh-aba-'))
     const store = await RoutineFollowUpStore.load(join(dir, 'routine-follow-ups.json'))
     const issueLookup = deferred<{
@@ -758,7 +806,14 @@ describe('Office routine follow-ups', () => {
         createdAt: record.createdAt,
       })
       authoritativeReadAt = record.reportTs + 1
-      await expect(store.remove(record.inboxEntryId)).resolves.toBe(true)
+      await expect(store.decide(
+        record.inboxEntryId,
+        { outcome: 'maintain-plan' },
+        {
+          observedRevision: store.observe(record.inboxEntryId).revision,
+          decidedAt: decision.decidedAt,
+        },
+      )).resolves.toMatchObject({ created: true })
 
       issueLookup.resolve({
         issue: {
@@ -773,8 +828,9 @@ describe('Office routine follow-ups', () => {
         error: 'routine_follow_up_no_longer_active',
       })
       expect(store.list()).toEqual([])
-      expect((await RoutineFollowUpStore.load(join(dir, 'routine-follow-ups.json'))).list())
-        .toEqual([])
+      const reloaded = await RoutineFollowUpStore.load(join(dir, 'routine-follow-ups.json'))
+      expect(reloaded.list()).toEqual([])
+      expect(reloaded.listDecisions()).toHaveLength(1)
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
@@ -870,9 +926,10 @@ describe('Office routine follow-ups', () => {
       issueDetail,
       routineFollowUpStore: {
         list: vi.fn(),
+        listDecisions: vi.fn(),
         observe: vi.fn(() => ({ followUp: record, revision: 7 })),
         put,
-        remove: vi.fn(),
+        decide: vi.fn(),
       },
     })
 
@@ -896,22 +953,299 @@ describe('Office routine follow-ups', () => {
     expect(await carried.json()).toMatchObject({ error: 'routine_follow_up_unavailable' })
     expect(get).not.toHaveBeenCalled()
 
-    const resolved = await app.request('/routine-follow-ups/report-1', { method: 'DELETE' })
-    expect(resolved.status).toBe(503)
-    expect(await resolved.json()).toMatchObject({ error: 'routine_follow_up_unavailable' })
+    const decided = await app.request('/routine-follow-ups/report-1/decision', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ outcome: 'maintain-plan' }),
+    })
+    expect(decided.status).toBe(503)
+    expect(await decided.json()).toMatchObject({ error: 'routine_follow_up_unavailable' })
   })
 
-  it('resolves a follow-up idempotently and reports whether anything changed', async () => {
-    const { app, remove } = build()
+  it('creates a canonical decision receipt through the strict POST contract', async () => {
+    const decide = vi.fn(async () => ({ decision, created: true }))
+    const { app, get, issueDetail } = build({
+      routineFollowUpStore: {
+        listDecisions: vi.fn(() => []),
+        observe: vi.fn(() => ({ followUp: record, revision: 1 })),
+        decide,
+      },
+    })
 
-    const removed = await app.request('/routine-follow-ups/report-1', { method: 'DELETE' })
-    expect(removed.status).toBe(200)
-    expect(await removed.json()).toEqual({ ok: true, removed: true })
-    expect(remove).toHaveBeenCalledWith('report-1')
+    const response = await app.request('/routine-follow-ups/report-1/decision', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        outcome: 'revise-plan',
+        note: '  Reduce concentration before the next review.  ',
+      }),
+    })
 
-    remove.mockResolvedValueOnce(false)
-    const repeated = await app.request('/routine-follow-ups/report-1', { method: 'DELETE' })
-    expect(repeated.status).toBe(200)
-    expect(await repeated.json()).toEqual({ ok: true, removed: false })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ decision, created: true })
+    expect(decide).toHaveBeenCalledWith('report-1', {
+      outcome: 'revise-plan',
+      note: 'Reduce concentration before the next review.',
+    }, { observedRevision: 1 })
+    expect(get).toHaveBeenCalledWith(record.inboxEntryId)
+    expect(issueDetail).toHaveBeenCalledWith(record.issueWorkspaceId, record.issueId)
+  })
+
+  it('rejects a judgment when either exact evidence source is unavailable', async () => {
+    const decide = vi.fn()
+    const { app } = build({
+      inboxStore: { get: vi.fn(async () => null) },
+      routineFollowUpStore: {
+        listDecisions: vi.fn(() => []),
+        observe: vi.fn(() => ({ followUp: record, revision: 1 })),
+        decide,
+      },
+    })
+
+    const response = await app.request('/routine-follow-ups/report-1/decision', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ outcome: 'maintain-plan' }),
+    })
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({
+      error: 'routine_follow_up_evidence_unavailable',
+    })
+    expect(decide).not.toHaveBeenCalled()
+  })
+
+  it('does not classify an Inbox read failure as unavailable evidence', async () => {
+    const decide = vi.fn()
+    const issueDetail = vi.fn()
+    const { app } = build({
+      inboxStore: { get: vi.fn(async () => { throw new Error('Inbox offline') }) },
+      issueDetail,
+      routineFollowUpStore: {
+        listDecisions: vi.fn(() => []),
+        observe: vi.fn(() => ({ followUp: record, revision: 1 })),
+        decide,
+      },
+    })
+
+    const response = await app.request('/routine-follow-ups/report-1/decision', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ outcome: 'evidence-unavailable' }),
+    })
+
+    expect(response.status).toBe(503)
+    expect(await response.json()).toMatchObject({
+      error: 'routine_follow_up_evidence_check_unavailable',
+    })
+    expect(issueDetail).not.toHaveBeenCalled()
+    expect(decide).not.toHaveBeenCalled()
+  })
+
+  it('does not classify a Scheduled Issue read failure as unavailable evidence', async () => {
+    const decide = vi.fn()
+    const { app } = build({
+      issueDetail: vi.fn(async () => { throw new Error('Issue registry offline') }),
+      routineFollowUpStore: {
+        listDecisions: vi.fn(() => []),
+        observe: vi.fn(() => ({ followUp: record, revision: 1 })),
+        decide,
+      },
+    })
+
+    const response = await app.request('/routine-follow-ups/report-1/decision', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ outcome: 'evidence-unavailable' }),
+    })
+
+    expect(response.status).toBe(503)
+    expect(await response.json()).toMatchObject({
+      error: 'routine_follow_up_evidence_check_unavailable',
+    })
+    expect(decide).not.toHaveBeenCalled()
+  })
+
+  it('rejects evidence-unavailable when both exact evidence sources remain available', async () => {
+    const decide = vi.fn()
+    const { app } = build({
+      routineFollowUpStore: {
+        listDecisions: vi.fn(() => []),
+        observe: vi.fn(() => ({ followUp: record, revision: 1 })),
+        decide,
+      },
+    })
+
+    const response = await app.request('/routine-follow-ups/report-1/decision', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ outcome: 'evidence-unavailable' }),
+    })
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({
+      error: 'routine_follow_up_evidence_available',
+    })
+    expect(decide).not.toHaveBeenCalled()
+  })
+
+  it('records evidence-unavailable only when exact evidence cannot support a judgment', async () => {
+    const unavailableDecision = {
+      ...record,
+      outcome: 'evidence-unavailable' as const,
+      decidedAt: decision.decidedAt,
+    }
+    const decide = vi.fn(async () => ({ decision: unavailableDecision, created: true }))
+    const { app } = build({
+      issueDetail: vi.fn(async () => ({ issue: { id: record.issueId } })),
+      routineFollowUpStore: {
+        listDecisions: vi.fn(() => []),
+        observe: vi.fn(() => ({ followUp: record, revision: 1 })),
+        decide,
+      },
+    })
+
+    const response = await app.request('/routine-follow-ups/report-1/decision', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ outcome: 'evidence-unavailable' }),
+    })
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ decision: unavailableDecision, created: true })
+    expect(decide).toHaveBeenCalledWith(
+      'report-1',
+      { outcome: 'evidence-unavailable' },
+      { observedRevision: 1 },
+    )
+  })
+
+  it('preserves an idempotent decision result', async () => {
+    const decide = vi.fn(async () => ({ decision, created: false }))
+    const { app } = build({
+      routineFollowUpStore: {
+        list: vi.fn(() => []),
+        listDecisions: vi.fn(() => [decision]),
+        observe: vi.fn(() => ({ followUp: null, revision: 2 })),
+        put: vi.fn(),
+        decide,
+      },
+    })
+
+    const response = await app.request('/routine-follow-ups/report-1/decision', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ outcome: 'revise-plan', note: decision.note }),
+    })
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ decision, created: false })
+  })
+
+  it.each([
+    ['invalid JSON', '{'],
+    ['missing outcome', JSON.stringify({})],
+    ['unknown outcome', JSON.stringify({ outcome: 'trade-now' })],
+    ['unknown field', JSON.stringify({ outcome: 'maintain-plan', extra: true })],
+    ['maintain-plan note', JSON.stringify({ outcome: 'maintain-plan', note: 'not accepted' })],
+    ['evidence-unavailable note', JSON.stringify({
+      outcome: 'evidence-unavailable',
+      note: 'not accepted',
+    })],
+    ['blank revise-plan note', JSON.stringify({ outcome: 'revise-plan', note: '   ' })],
+    ['oversized revise-plan note', JSON.stringify({
+      outcome: 'revise-plan',
+      note: 'x'.repeat(281),
+    })],
+    ['client decidedAt', JSON.stringify({ outcome: 'maintain-plan', decidedAt: 123 })],
+  ])('rejects a malformed decision body without touching the store: %s', async (_label, body) => {
+    const { app, decide } = build()
+
+    const response = await app.request('/routine-follow-ups/report-1/decision', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body,
+    })
+
+    expect(response.status).toBe(400)
+    expect(await response.json()).toMatchObject({ error: 'invalid_routine_follow_up_decision' })
+    expect(decide).not.toHaveBeenCalled()
+  })
+
+  it('rejects an absent observation before evidence or a future carry can be consumed', async () => {
+    const decide = vi.fn()
+    const get = vi.fn()
+    const issueDetail = vi.fn()
+    const { app } = build({
+      inboxStore: { get },
+      issueDetail,
+      routineFollowUpStore: {
+        list: vi.fn(() => []),
+        listDecisions: vi.fn(() => []),
+        observe: vi.fn(() => ({ followUp: null, revision: 0 })),
+        put: vi.fn(),
+        decide,
+      },
+    })
+
+    const response = await app.request('/routine-follow-ups/report-1/decision', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ outcome: 'maintain-plan' }),
+    })
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({ error: 'routine_follow_up_decision_missing' })
+    expect(get).not.toHaveBeenCalled()
+    expect(issueDetail).not.toHaveBeenCalled()
+    expect(decide).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    [
+      new RoutineFollowUpDecisionConflictError('report-1'),
+      [decision],
+      null,
+      2,
+      'routine_follow_up_decision_conflict',
+    ],
+    [
+      new RoutineFollowUpStaleObservationError('report-1'),
+      [],
+      record,
+      1,
+      'routine_follow_up_stale_observation',
+    ],
+  ] as const)(
+    'surfaces an authoritative decision race as 409: %s',
+    async (error, receipts, followUp, revision, code) => {
+      const { app } = build({
+        routineFollowUpStore: {
+          list: vi.fn(() => []),
+          listDecisions: vi.fn(() => receipts),
+          observe: vi.fn(() => ({ followUp, revision })),
+          put: vi.fn(),
+          decide: vi.fn(async () => { throw error }),
+        },
+      })
+
+      const response = await app.request('/routine-follow-ups/report-1/decision', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ outcome: 'maintain-plan' }),
+      })
+
+      expect(response.status).toBe(409)
+      expect(await response.json()).toMatchObject({ error: code })
+    },
+  )
+
+  it('removes the old DELETE shortcut so it cannot masquerade as a decision', async () => {
+    const { app, decide } = build()
+
+    const response = await app.request('/routine-follow-ups/report-1', { method: 'DELETE' })
+
+    expect(response.status).toBe(404)
+    expect(decide).not.toHaveBeenCalled()
   })
 })

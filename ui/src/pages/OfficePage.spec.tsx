@@ -40,7 +40,7 @@ const {
   refreshMock,
   routineCarryMock,
   routineFollowUpsMock,
-  routineResolveMock,
+  routineDecideMock,
   sourceEpochState,
   useOfficeDayMock,
 } = vi.hoisted(() => ({
@@ -56,7 +56,7 @@ const {
   refreshMock: vi.fn(async () => undefined),
   routineCarryMock: vi.fn(async () => undefined),
   routineFollowUpsMock: vi.fn(),
-  routineResolveMock: vi.fn(async () => undefined),
+  routineDecideMock: vi.fn(async () => undefined),
   sourceEpochState: {
     inboxRequested: 1,
     inboxSuccessful: 1,
@@ -639,14 +639,15 @@ beforeEach(async () => {
   markInboxReadMock.mockResolvedValue('acknowledged')
   routineCarryMock.mockReset()
   routineCarryMock.mockResolvedValue(undefined)
-  routineResolveMock.mockReset()
-  routineResolveMock.mockResolvedValue(undefined)
+  routineDecideMock.mockReset()
+  routineDecideMock.mockResolvedValue(undefined)
   routineFollowUpsMock.mockReset()
   routineFollowUpsMock.mockReturnValue({
     status: 'ready',
     followUps: [],
+    decisions: [],
     carry: routineCarryMock,
-    resolve: routineResolveMock,
+    decide: routineDecideMock,
     refresh: vi.fn(async () => undefined),
   })
   refreshMock.mockClear()
@@ -1238,8 +1239,9 @@ describe('OfficePage localization', () => {
         issueId: 'weekly-cross-asset',
         createdAt: 5_700,
       }] : [],
+      decisions: [],
       carry: routineCarryMock,
-      resolve: routineResolveMock,
+      decide: routineDecideMock,
       refresh: vi.fn(async () => undefined),
     }))
     routineCarryMock.mockImplementationOnce(async () => {
@@ -1310,20 +1312,51 @@ describe('OfficePage localization', () => {
     }))
     expect(readOfficeInboxDutyExcursion()).toBeNull()
     expect(screen.queryByRole('dialog', { name: '跨台例行报告' })).toBeNull()
-    expect(routineResolveMock).not.toHaveBeenCalled()
+    expect(routineDecideMock).not.toHaveBeenCalled()
 
+    const exactDecisionEvidence = {
+      ...delivery,
+      entry: { ...delivery.entry, readAt: 5_800 },
+    }
+    inboxDutiesMock.mockReturnValue({
+      status: 'ready',
+      deliveries: [],
+      evidenceByEntryId: new Map([['cross-workspace-report', {
+        ...exactDecisionEvidence,
+        entry: { ...exactDecisionEvidence.entry, ts: 5_601 },
+      }]]),
+      markReadConfirmed: markInboxReadMock,
+    })
+    returnedFromReport.rerender(<OfficePage />)
+    await userEvent.click(await screen.findByRole('button', {
+      name: '决策台 · 1 项待处理',
+    }))
+    expect(await screen.findByText(/准确 Inbox 报告暂不可用/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: '打开准确报告' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.queryByRole('button', { name: '维持当前计划' })).toBeNull()
+    expect(screen.getByRole('button', { name: '记录证据不可用 · 移出' })).toBeTruthy()
+    expect(routineDecideMock).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: '留待稍后' }))
+
+    inboxDutiesMock.mockReturnValue({
+      status: 'ready',
+      deliveries: [],
+      evidenceByEntryId: new Map([['cross-workspace-report', exactDecisionEvidence]]),
+      markReadConfirmed: markInboxReadMock,
+    })
+    returnedFromReport.rerender(<OfficePage />)
     const decisionDuty = await screen.findByRole('button', {
       name: '决策台 · 1 项待处理',
     })
     await userEvent.click(decisionDuty)
     expect(await screen.findByRole('dialog', {}, { timeout: 10_000 })).toBeTruthy()
-    expect(screen.getByRole('heading', { name: '处理已带入的跟进' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '作出带入判断' })).toBeTruthy()
     expect(screen.getByText('跨台例行报告')).toBeTruthy()
     expect(screen.getByText('研究台')).toBeTruthy()
     await userEvent.click(screen.getByRole('button', { name: '打开准确报告' }))
     expect(useInboxSelection.getState().selectedEntryId).toBe('cross-workspace-report')
     expect(openOrFocusMock).toHaveBeenLastCalledWith({ kind: 'inbox', params: {} })
-    expect(routineResolveMock).not.toHaveBeenCalled()
+    expect(routineDecideMock).not.toHaveBeenCalled()
 
     await userEvent.click(screen.getByRole('button', {
       name: '决策台 · 1 项待处理',
@@ -1334,18 +1367,21 @@ describe('OfficePage localization', () => {
       kind: 'issue-detail',
       params: { wsId: 'issue-home', id: 'weekly-cross-asset' },
     })
-    expect(routineResolveMock).not.toHaveBeenCalled()
+    expect(routineDecideMock).not.toHaveBeenCalled()
 
     await userEvent.click(screen.getByRole('button', {
       name: '决策台 · 1 项待处理',
     }))
     expect(await screen.findByRole('dialog', {}, { timeout: 10_000 })).toBeTruthy()
-    expect(screen.getByRole('heading', { name: '处理已带入的跟进' })).toBeTruthy()
-    routineResolveMock.mockImplementationOnce(async () => {
+    expect(screen.getByRole('heading', { name: '作出带入判断' })).toBeTruthy()
+    routineDecideMock.mockImplementationOnce(async () => {
       carried = false
     })
-    await userEvent.click(screen.getByRole('button', { name: '判断已完成 · 移出决策台' }))
-    await waitFor(() => expect(routineResolveMock).toHaveBeenCalledWith('cross-workspace-report'))
+    await userEvent.click(screen.getByRole('button', { name: '维持当前计划' }))
+    await waitFor(() => expect(routineDecideMock).toHaveBeenCalledWith(
+      'cross-workspace-report',
+      { outcome: 'maintain-plan' },
+    ))
     returnedFromReport.rerender(<OfficePage />)
     expect(await screen.findByText('决策台已清空')).toBeTruthy()
     returnedFromReport.unmount()
@@ -1408,8 +1444,9 @@ describe('OfficePage localization', () => {
         issueId: 'recover-carry-issue',
         createdAt: 6_100,
       }] : [],
+      decisions: [],
       carry: routineCarryMock,
-      resolve: routineResolveMock,
+      decide: routineDecideMock,
       refresh: vi.fn(async () => undefined),
     }))
     routineCarryMock.mockImplementation(async () => {
@@ -1505,8 +1542,9 @@ describe('OfficePage localization', () => {
         issueId: 'causal-clear-issue',
         createdAt: 5_150,
       }] : [],
+      decisions: [],
       carry: routineCarryMock,
-      resolve: routineResolveMock,
+      decide: routineDecideMock,
       refresh: routineRefresh,
     }))
     rememberOfficeInboxDutyExcursion({

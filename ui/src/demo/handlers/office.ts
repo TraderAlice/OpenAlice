@@ -6,10 +6,12 @@ import type {
   OfficeDayMutationReason,
   OfficeDayMutationResponse,
   OfficeDayRecord,
+  OfficeRoutineDecision,
+  OfficeRoutineDecisionInput,
   OfficeRoutineFollowUp,
 } from '../../api/office'
 import { demoInboxEntries } from '../fixtures/inbox'
-import { demoIssueDetail } from '../fixtures/issues'
+import { demoIssueDetail, demoIssuesSnapshot } from '../fixtures/issues'
 import { demoInboxReadAt } from './inbox'
 import {
   DEMO_AUTO_PREDICTION_WORKSPACE_ID,
@@ -19,6 +21,7 @@ import {
 } from '../fixtures/workspaces'
 
 const demoRoutineFollowUps = new Map<string, OfficeRoutineFollowUp>()
+const demoRoutineDecisions = new Map<string, OfficeRoutineDecision>()
 export const DEMO_OFFICE_DAY_STORAGE_KEY = 'openalice:demo:office-day:v1'
 const DEMO_OFFICE_DAY_MUTATION_LOCK = 'openalice:demo:office-day:mutation'
 
@@ -242,6 +245,8 @@ function commitDemoOfficeDay(
 
 export function resetDemoOfficeDay(): void {
   demoOfficeDayStorage.reset()
+  demoRoutineFollowUps.clear()
+  demoRoutineDecisions.clear()
   demoOfficeDayMutationTail = Promise.resolve()
 }
 
@@ -516,9 +521,18 @@ export const officeHandlers = [
     followUps: [...demoRoutineFollowUps.values()].sort((left, right) =>
       left.createdAt - right.createdAt
       || left.inboxEntryId.localeCompare(right.inboxEntryId)),
+    decisions: [...demoRoutineDecisions.values()].sort((left, right) =>
+      left.decidedAt - right.decidedAt
+      || left.inboxEntryId.localeCompare(right.inboxEntryId)),
   })),
   http.put('/api/office/routine-follow-ups/:inboxEntryId', ({ params }) => {
     const inboxEntryId = String(params.inboxEntryId)
+    if (demoRoutineDecisions.has(inboxEntryId)) {
+      return HttpResponse.json({
+        error: 'routine_follow_up_no_longer_active',
+        message: 'This report already has an authoritative decision receipt.',
+      }, { status: 409 })
+    }
     const report = demoInboxEntries.find((entry) => entry.id === inboxEntryId)
     if (!report) {
       return HttpResponse.json({
@@ -582,8 +596,95 @@ export const officeHandlers = [
     demoRoutineFollowUps.set(inboxEntryId, followUp)
     return HttpResponse.json({ followUp, created: true })
   }),
-  http.delete('/api/office/routine-follow-ups/:inboxEntryId', ({ params }) => {
-    const removed = demoRoutineFollowUps.delete(String(params.inboxEntryId))
-    return HttpResponse.json({ ok: true, removed })
+  http.post('/api/office/routine-follow-ups/:inboxEntryId/decision', async ({ params, request }) => {
+    const inboxEntryId = String(params.inboxEntryId)
+    let raw: unknown
+    try {
+      raw = await request.json()
+    } catch {
+      return HttpResponse.json({
+        error: 'invalid_routine_follow_up_decision',
+        message: 'A strict routine decision outcome is required.',
+      }, { status: 400 })
+    }
+    if (!raw || typeof raw !== 'object') {
+      return HttpResponse.json({
+        error: 'invalid_routine_follow_up_decision',
+        message: 'A strict routine decision outcome is required.',
+      }, { status: 400 })
+    }
+    const input = raw as Record<string, unknown>
+    const outcome = input.outcome
+    const note = typeof input.note === 'string' ? input.note.trim() : undefined
+    const validOutcome = outcome === 'maintain-plan'
+      || outcome === 'revise-plan'
+      || outcome === 'evidence-unavailable'
+    const validNote = outcome === 'revise-plan'
+      ? note !== undefined && note.length >= 1 && note.length <= 280
+      : input.note === undefined
+    if (!validOutcome || !validNote || Object.keys(input).some((key) => key !== 'outcome' && key !== 'note')) {
+      return HttpResponse.json({
+        error: 'invalid_routine_follow_up_decision',
+        message: 'A strict routine decision outcome is required.',
+      }, { status: 400 })
+    }
+
+    const decisionInput: OfficeRoutineDecisionInput = outcome === 'revise-plan'
+      ? { outcome, note: note! }
+      : { outcome }
+    const existing = demoRoutineDecisions.get(inboxEntryId)
+    if (existing) {
+      const same = existing.outcome === decisionInput.outcome
+        && (decisionInput.outcome !== 'revise-plan'
+          || existing.note === decisionInput.note)
+      return same
+        ? HttpResponse.json({ decision: existing, created: false })
+        : HttpResponse.json({
+            error: 'routine_follow_up_decision_conflict',
+            message: `Routine follow-up ${inboxEntryId} already has a different decision receipt.`,
+          }, { status: 409 })
+    }
+
+    const followUp = demoRoutineFollowUps.get(inboxEntryId)
+    if (!followUp) {
+      return HttpResponse.json({
+        error: 'routine_follow_up_decision_missing',
+        message: `Routine follow-up ${inboxEntryId} has neither an active carry nor a decision receipt.`,
+      }, { status: 409 })
+    }
+
+    const report = demoInboxEntries.find((entry) => entry.id === inboxEntryId)
+    const issue = demoIssuesSnapshot.workspaces
+      .find((workspace) => workspace.wsId === followUp.issueWorkspaceId)
+      ?.issues.find((candidate) => candidate.id === followUp.issueId)
+    const reportAvailable = Boolean(
+      report
+      && report.ts === followUp.reportTs
+      && report.origin?.kind === 'headless'
+      && report.origin.issueWorkspaceId === followUp.issueWorkspaceId
+      && report.origin.issueId === followUp.issueId,
+    )
+    const evidenceAvailable = reportAvailable && Boolean(issue?.when)
+    if (decisionInput.outcome === 'evidence-unavailable' && evidenceAvailable) {
+      return HttpResponse.json({
+        error: 'routine_follow_up_evidence_available',
+        message: 'The exact report and Scheduled Issue are available for a judgment.',
+      }, { status: 409 })
+    }
+    if (decisionInput.outcome !== 'evidence-unavailable' && !evidenceAvailable) {
+      return HttpResponse.json({
+        error: 'routine_follow_up_evidence_unavailable',
+        message: 'The exact report and Scheduled Issue must both be available for a judgment.',
+      }, { status: 409 })
+    }
+
+    const decision: OfficeRoutineDecision = {
+      ...followUp,
+      ...decisionInput,
+      decidedAt: Date.now(),
+    }
+    demoRoutineFollowUps.delete(inboxEntryId)
+    demoRoutineDecisions.set(inboxEntryId, decision)
+    return HttpResponse.json({ decision, created: true })
   }),
 ]
