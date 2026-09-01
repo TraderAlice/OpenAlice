@@ -3147,13 +3147,70 @@ function renderLogs(
   const safeFromEnd = clamp(fromEnd, 0, Math.max(0, entries.length - 1))
   const end = Math.max(1, entries.length - safeFromEnd)
   const start = Math.max(0, end - visible)
-  const position = `${start + 1}–${end}/${entries.length}${safeFromEnd === 0 ? ' · LIVE TAIL' : ''}`
+  const position = `${start + 1}–${end}/${entries.length}${safeFromEnd === 0 ? ' · LATEST' : ''}`
   const rows = entries.slice(start, end).map((entry, index) => {
     const number = String(start + index + 1).padStart(String(entries.length).length, ' ')
-    return `${number}  ${sanitize(entry.text ?? '')}`
+    const formatted = formatRuntimeLogEntry(entry.text ?? '')
+    return `${formatted.glyph} ${number}  ${formatted.text}`.trimEnd()
   })
-  if (logs.truncated && start === 0) rows.unshift('… earlier lines were omitted by the bounded reader')
+  if (logs.truncated && start === 0) rows.unshift('· … earlier lines were omitted by the bounded reader')
   return renderSupervisorPanel('Runtime Logs', position, rows, width)
+}
+
+function formatRuntimeLogEntry(value: string): { glyph: string; text: string } {
+  const trimmed = value.trim()
+  if (!trimmed) return { glyph: '·', text: '' }
+  try {
+    const parsed: unknown = JSON.parse(trimmed)
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const record = parsed as Record<string, unknown>
+      const level = typeof record['level'] === 'string' ? record['level'].toLowerCase() : 'info'
+      const message = typeof record['msg'] === 'string'
+        ? sanitize(record['msg'])
+        : 'Structured Runtime event'
+      const time = formatRuntimeLogTime(record['ts'])
+      const context = Object.entries(record)
+        .filter(([key]) => key !== 'ts' && key !== 'level' && key !== 'msg')
+        .slice(0, 3)
+        .map(([key, field]) => `${sanitize(key)}=${formatRuntimeLogField(field)}`)
+        .join(' ')
+      return {
+        glyph: logLevelGlyph(level),
+        text: [time, message, context ? `· ${context}` : ''].filter(Boolean).join(' '),
+      }
+    }
+  } catch {
+    // Third-party and legacy logs remain valid plain-text entries.
+  }
+  const safe = sanitize(value)
+  const severity = /\b(error|fatal|failed|failure)\b/iu.test(safe)
+    ? 'error'
+    : /\b(warn|warning)\b/iu.test(safe) ? 'warn' : 'info'
+  return { glyph: logLevelGlyph(severity), text: safe }
+}
+
+function formatRuntimeLogTime(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  const utc = /T(\d{2}:\d{2}:\d{2})(?:\.\d+)?Z$/u.exec(value)
+  if (utc?.[1]) return `${utc[1]}Z`
+  const clock = /T(\d{2}:\d{2}:\d{2})/u.exec(value)
+  return clock?.[1] ?? sanitize(value)
+}
+
+function formatRuntimeLogField(value: unknown): string {
+  if (typeof value === 'string') return sanitize(value)
+  if (typeof value === 'number' || typeof value === 'boolean' || value === null) return String(value)
+  try {
+    return sanitize(JSON.stringify(value))
+  } catch {
+    return '[unavailable]'
+  }
+}
+
+function logLevelGlyph(level: string): string {
+  if (level === 'fatal' || level === 'error') return '×'
+  if (level === 'warn' || level === 'warning') return '!'
+  return '·'
 }
 
 function renderDoctor(

@@ -88,6 +88,17 @@ not imply maintainer approval of the finished interaction.
   routes every keypress and pointer click through the same action, confirmation,
   refusal, and detach state machines.
 
+### Runtime log presentation decision
+
+- Coloring raw JSON would leave the event message behind long metadata and
+  terminal clipping.
+- Requiring every line to parse as OpenAlice JSON would hide valid third-party
+  and legacy plain-text output.
+- The selected model is best-effort semantic projection: recognized JSON puts
+  severity, time, message, and compact context first; all other lines retain a
+  sanitized plain-text fallback. The bounded snapshot edge is named `LATEST`,
+  not the misleading `LIVE TAIL`.
+
 ## Responsive and Accessibility Contract
 
 - `80x24` remains the minimum full experience. Wide terminals show the
@@ -139,6 +150,8 @@ already large `supervisor-tui.ts` application controller.
   changing lifecycle action semantics or sacrificing the 80x24 baseline.
 - [x] Replace the legacy global shortcut hint with a clickable command dock and
   contextual `/` Command Deck.
+- [x] Project structured Runtime logs into semantic event rows while preserving
+  bounded, redacted plain-text fallback behavior.
 
 ## Progress
 
@@ -234,6 +247,16 @@ already large `supervisor-tui.ts` application controller.
   Real 80x24 acceptance opened and closed the deck by keyboard and raw SGR
   clicks, then detached by clicking `[ q ]` with complete terminal restoration.
 - Command Deck acceptance passes with 59 focused screen, Fleet, and real-PTY
+  tests, CLI build/typecheck, root TypeScript check, and the 685-file repository
+  suite (684 passed, 1 skipped; 6065 tests passed, 10 skipped). The Docker
+  installer smoke also passes for the changed distributed TUI payload.
+- Runtime Logs now recognize OpenAlice JSON events and lead with a semantic
+  glyph, line number, UTC clock time, message, and compact context; unrecognized
+  plugin and Guardian output stays sanitized plain text. The snapshot edge is
+  truthfully labeled `LATEST`. A real 100x30 log snapshot confirmed that event
+  messages survive clipping, Up leaves the edge, End returns to it, and detach
+  restores the terminal.
+- Semantic-log acceptance passes with 59 focused screen, Fleet, and real-PTY
   tests, CLI build/typecheck, root TypeScript check, and the 685-file repository
   suite (684 passed, 1 skipped; 6065 tests passed, 10 skipped). The Docker
   installer smoke also passes for the changed distributed TUI payload.

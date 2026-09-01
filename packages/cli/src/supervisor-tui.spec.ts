@@ -416,12 +416,26 @@ describe('Supervisor TUI screen', () => {
       },
     }, { requestRender })
 
-    expect(screen.render(80).join('\n')).toContain('9–20/20 · LIVE TAIL')
+    expect(screen.render(80).join('\n')).toContain('9–20/20 · LATEST')
     expect(screen.render(80).join('\n')).toContain('[ l ] Reload')
     expect(screen.handleKey('up', matchesKey)).toBe(true)
     expect(screen.render(80).join('\n')).toContain('8–19/20')
     expect(screen.handleKey('end', matchesKey)).toBe(true)
-    expect(screen.render(80).join('\n')).toContain('9–20/20 · LIVE TAIL')
+    expect(screen.render(80).join('\n')).toContain('9–20/20 · LATEST')
+
+    screen.update({
+      panel: 'logs',
+      logs: {
+        entries: [
+          { text: '{"ts":"2026-09-02T03:04:05.123Z","level":"warn","msg":"Runtime probe slowed","scope":"guardian","waitMs":120}' },
+          { text: 'plain adapter output' },
+        ],
+      },
+    })
+    const semanticLogs = screen.render(80).join('\n')
+    expect(semanticLogs).toContain('! 1  03:04:05Z Runtime probe slowed · scope=guardian waitMs=120')
+    expect(semanticLogs).toContain('· 2  plain adapter output')
+    expect(semanticLogs).not.toContain('"msg"')
 
     screen.update({ panel: 'doctor' })
     expect(screen.render(80).join('\n')).toContain('✓ Runtime reachable')

@@ -529,10 +529,13 @@ openalice logs --lines 200 --json
 ```
 
 The TUI projects that same bounded snapshot into a numbered Runtime Logs panel.
-Up/Down, Page Up/Page Down, Home/End, and the mouse wheel navigate the snapshot;
-End returns to the live tail and `l` reloads it. This is navigation over a
-redacted snapshot, not an unbounded file follower. Follow, pause, and component
-filtering remain later work and must reuse this bounded reader.
+OpenAlice JSON log lines are rendered best-effort as severity, clock time,
+message, then compact context so the useful event survives terminal clipping;
+unrecognized and third-party lines remain plain text. Up/Down, Page Up/Page
+Down, Home/End, and the mouse wheel navigate the snapshot; End returns to the
+`LATEST` edge and `l` reloads it. This is navigation over a redacted snapshot,
+not an unbounded file follower. Follow, pause, and component filtering remain
+later work and must reuse this bounded reader.
 
 ## Doctor
 
