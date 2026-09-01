@@ -98,6 +98,10 @@ import {
   type SupervisorProjectSwitchboardItem,
 } from './supervisor-projects-view.ts'
 import {
+  decorateSupervisorReleaseObservatory,
+  renderSupervisorReleaseObservatory,
+} from './supervisor-release-view.ts'
+import {
   createSupervisorHelpState,
   moveSupervisorHelpSelection,
   normalizeSupervisorHelpState,
@@ -1023,6 +1027,7 @@ export async function runSupervisorTui(
       || actionRunning
     ) return
     updateChannelActive = true
+    let updateChannelHoveredCommand: string | undefined
     const items: SelectItem[] = [
       {
         value: 'stable',
@@ -1053,8 +1058,8 @@ export async function runSupervisorTui(
       items.findIndex((item) => item.value === screen.snapshot.channel),
     ))
     const overlayOptions = {
-      width: '72%',
-      maxHeight: '70%',
+      width: '90%',
+      maxHeight: '90%',
       anchor: 'center',
       margin: 1,
     } as const
@@ -1063,6 +1068,8 @@ export async function runSupervisorTui(
       updateChannelActive = false
       closeUpdateChannel = null
       overlayPointer.clear()
+      updateChannelHoveredCommand = undefined
+      overlay.unfocus?.({ target: screen })
       overlay.hide()
       if (notice) screen.update({ notice })
     }
@@ -1080,25 +1087,58 @@ export async function runSupervisorTui(
     }
     const panel = new (class implements Component {
       render(width: number): string[] {
-        const lines = renderSupervisorPanel('Update Channel', 'Choose release lane', [
-          ...list.render(Math.max(1, width - 4)),
-          '',
-          ...renderSupervisorCommandBar([
-            { key: 'Enter', label: 'Check channel', primary: true },
-            { key: 'Esc', label: 'Cancel' },
-          ], Math.max(1, width - 4)),
-        ], width)
+        const selectedItem = list.getSelectedItem()
+        const selectedIndex = Math.max(0, items.findIndex((item) => item.value === selectedItem?.value))
+        const observatory = renderSupervisorReleaseObservatory({
+          installedVersion: screen.snapshot.version,
+          currentLane: normalizeSupervisorUpdateChannel(screen.snapshot.channel) ?? 'stable',
+          selected: selectedIndex,
+        }, width)
+        const baseList = selectListPointerTarget(
+          items,
+          list,
+          items.length,
+          observatory.targets[0]?.row ?? 2,
+        )
+        const firstTarget = observatory.targets[0]
+        const listTarget: SupervisorOverlayListTarget = {
+          ...baseList,
+          indexes: observatory.targets.map((target) => target.index),
+          startColumn: firstTarget?.startColumn ?? 2,
+          endColumn: firstTarget?.endColumn ?? Math.max(2, width - 1),
+          select: (index) => {
+            updateChannelHoveredCommand = undefined
+            list.setSelectedIndex(index)
+            list.invalidate()
+            ui.requestRender()
+          },
+          move: (delta) => {
+            updateChannelHoveredCommand = undefined
+            baseList.move(delta)
+          },
+          activate: () => undefined,
+        }
         captureOverlayPointer(
-          lines,
+          observatory.lines,
           width,
           overlayOptions,
           (data) => this.handleInput(data),
-          selectListPointerTarget(items, list, items.length, 2),
+          listTarget,
+          (label) => {
+            if (updateChannelHoveredCommand === label) return
+            updateChannelHoveredCommand = label
+            ui.requestRender()
+          },
         )
-        return lines
+        return decorateSupervisorReleaseObservatory(
+          observatory.lines,
+          tuiTheme,
+          updateChannelHoveredCommand,
+        )
       }
 
       handleInput(data: string): void {
+        updateChannelHoveredCommand = undefined
         list.handleInput(data)
       }
 

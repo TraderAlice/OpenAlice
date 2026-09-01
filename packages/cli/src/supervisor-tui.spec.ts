@@ -1854,7 +1854,10 @@ describe('Supervisor TUI screen', () => {
           focus: () => {
             const lines = component.render(72)
             const overlayRow = 1 + Math.floor((28 - lines.length) / 2)
-            queueMicrotask(() => inputListener?.(`\u001b[<0;20;${overlayRow + 4}M`))
+            queueMicrotask(() => {
+              inputListener?.(`\u001b[<0;20;${overlayRow + 4}M`)
+              setTimeout(() => inputListener?.(`\u001b[<0;20;${overlayRow + 13}M`), 0)
+            })
           },
         }
       }

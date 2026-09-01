@@ -28,6 +28,10 @@ const launchpadFixtureEntry = join(
   dirname(fileURLToPath(import.meta.url)),
   '__fixtures__/supervisor-launchpad-tui-fixture.ts',
 )
+const releaseFixtureEntry = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '__fixtures__/supervisor-release-tui-fixture.ts',
+)
 const eventLensFixtureEntry = join(
   dirname(fileURLToPath(import.meta.url)),
   '__fixtures__/supervisor-event-lens-tui-fixture.ts',
@@ -45,6 +49,66 @@ afterEach(async () => {
 })
 
 describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
+  it('selects a release lane and clicks the Channel Brief action with raw pointer input', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-release-pointer-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [releaseFixtureEntry], {
+      cols: 110,
+      rows: 30,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let laneHovered = false
+      let laneSelected = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Release Observatory pointer timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!opened && output.includes('◆ [Overview]')) {
+          opened = true
+          child.write('u')
+        } else if (!laneHovered && output.includes('Release Observatory · 3 LANES')) {
+          laneHovered = true
+          child.write('\u001b[<35;20;13M')
+        } else if (!laneSelected && output.includes('│ › Dev')) {
+          laneSelected = true
+          child.write('\u001b[<0;20;13M')
+          setTimeout(() => {
+            child.write('\u001b[<35;70;16M')
+            setTimeout(() => {
+              child.write('\u001b[<0;70;16M')
+              setTimeout(() => child.write('q'), 300)
+            }, 100)
+          }, 100)
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor Release Observatory pointer exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('│ › Dev')
+    expect(transcript).toContain('Channel Brief · 3/3 · INSTALLED BETA')
+    expect(transcript).toContain('› [ Enter ] Check')
+    expect(transcript).toContain('OpenAlice is current on dev.')
+    expect(transcript).toContain('FIXTURE_RESULT checked=dev')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
   it('hovers and clicks an Action Shelf label outside its keycap', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-action-shelf-pointer-'))
     temporaryPaths.push(isolatedHome)

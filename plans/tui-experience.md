@@ -291,6 +291,23 @@ not imply maintainer approval of the finished interaction.
   the only mutation path. CLI-selected contexts expose a read-only action shelf,
   and pointer columns keep Inspector clicks out of the adjacent map.
 
+### Release Observatory decision
+
+- Recoloring the three-row update `SelectList` would preserve its small size,
+  but users would still choose Stable, Beta, or Dev without seeing cadence,
+  audience, installed-lane relationship, or the consequence of Enter together.
+- Probing all three channels when the overlay opens could show live versions,
+  but would triple advisory network work, alter the current single-channel
+  contract, and make a presentation surface own update orchestration.
+- The selected model is an OMP-model-picker-inspired Release Observatory. A
+  stable lane map identifies CURRENT, PRODUCTION, PREVIEW, and EDGE semantics;
+  the selected Channel Brief keeps cadence, audience, installed version,
+  tradeoff, and one explicit Check action together. Wide overlays pair the
+  regions and the 80-column baseline stacks them. Arrow keys, wheel, row hover,
+  and click continue to drive the existing `SelectList`; only Enter closes the
+  overlay and invokes the existing one-channel `checkUpdate` path. The selected
+  lane remains session-local until an already-confirmed installer succeeds.
+
 ### Persistent context-ribbon decision
 
 - Expanding the animated brand header would make version/update presentation
@@ -419,6 +436,8 @@ already large `supervisor-tui.ts` application controller.
   map/Inspector while preserving the existing configuration mutation path.
 - [x] Replace the legacy AliceProject picker with a responsive Switchboard
   map/Inspector while preserving its selection and creation state machine.
+- [x] Replace the legacy update-channel picker with a responsive Release
+  Observatory while preserving one-channel, explicit-Enter network behavior.
 
 ## Progress
 
@@ -787,6 +806,20 @@ already large `supervisor-tui.ts` application controller.
   build/typecheck, and the 695-file suite pass (694 passed, 1 skipped; 6119
   tests passed, 10 skipped). Docker installer smoke passes, and package dry-run includes
   `src/supervisor-projects-view.ts`.
+- Update selection is now a responsive Release Observatory inspired by OMP's
+  model picker: a three-lane map and Channel Brief are adjacent on wide
+  terminals and stack completely at the 80-column baseline. Lane hover and
+  click only move selection; keyboard `Enter` or the Brief's whole `Check`
+  surface is the single-channel network boundary. Closing the overlay now
+  explicitly restores screen focus before hiding it.
+- Release-Observatory real-PTY acceptance at 110×30 selected Dev with raw SGR
+  pointer input, clicked `Check` outside `[ Enter ]`, issued exactly one Dev
+  probe, displayed the current-channel result, and restored terminal modes.
+- Release-Observatory acceptance passes with 78 focused view, pointer, screen,
+  and real-PTY tests. Root TypeScript and CLI build/typecheck pass; the 696-file
+  suite passes (695 passed, 1 skipped; 6123 tests passed, 10 skipped). Docker
+  installer smoke passes, and package dry-run includes
+  `src/supervisor-release-view.ts`.
 
 ## Completion Criteria
 

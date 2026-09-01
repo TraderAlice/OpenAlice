@@ -252,9 +252,13 @@ path is intentionally parameter-free:
   confirmation;
 - `l` reads the bounded, redacted log tail;
 - `d` runs read-only Doctor checks;
-- `u` first chooses stable, beta, or dev, then probes that channel and, when a
-  candidate is available, can install it after explicit confirmation through
-  the same verified atomic installer path as `openalice update --yes`. The
+- `u` opens the responsive Release Observatory: a stable/beta/dev lane map and
+  a selected Channel Brief sit side by side on wide terminals and stack at the
+  80-column baseline. Pointer movement or a lane click only changes the
+  selection; `Enter` or the full `Check` action is the sole network boundary.
+  It probes that one channel and, when a candidate is available, can install it
+  after explicit confirmation through the same verified atomic installer path
+  as `openalice update --yes`. The
   choice is session-local until installation succeeds; installer provenance
   makes the chosen channel the next launch's default. Package-manager-owned
   installs are never overwritten by the TUI: a stable candidate shows the
