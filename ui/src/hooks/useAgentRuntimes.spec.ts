@@ -9,8 +9,13 @@ import {
   listAgents,
   probeAgentRuntimeReadiness,
   type AgentInfo,
+  type AgentRuntimeReadinessSnapshot,
 } from '../components/workspace/api'
-import { resetAgentRuntimesStore, useAgentRuntimes } from './useAgentRuntimes'
+import {
+  resetAgentRuntimesStore,
+  useAgentRuntimes,
+  useAgentRuntimesStore,
+} from './useAgentRuntimes'
 
 const authMocks = vi.hoisted(() => ({
   backendRecoveryGeneration: 0,
@@ -73,6 +78,23 @@ const readiness = {
       durationMs: 12,
     },
   },
+}
+
+function discoveredCodex(fingerprint: string): AgentInfo[] {
+  return agents.map((entry) => entry.id === 'codex'
+    ? { ...entry, installed: true, binPath: '/usr/local/bin/codex', fingerprint }
+    : entry)
+}
+
+function readinessSnapshot(label: string): AgentRuntimeReadinessSnapshot {
+  return {
+    ...readiness,
+    checkedAt: label,
+    agents: {
+      ...readiness.agents,
+      pi: { ...readiness.agents.pi, fingerprint: label },
+    },
+  }
 }
 
 describe('useAgentRuntimes', () => {
@@ -258,6 +280,283 @@ describe('useAgentRuntimes', () => {
     expect(probeAgentRuntimeReadiness).not.toHaveBeenCalled()
   })
 
+  it('reconciles a shared cached inventory when the first subscriber mounts after recovery', async () => {
+    useAgentRuntimesStore.setState({
+      agents,
+      readiness,
+      loaded: true,
+      loading: false,
+      observedBackendRecoveryGeneration: 0,
+    })
+    const recoveredAgents = agents.map((entry) => entry.id === 'codex'
+      ? { ...entry, installed: true, binPath: '/usr/local/bin/codex', fingerprint: 'codex-late-mount' }
+      : entry)
+    vi.mocked(listAgents).mockResolvedValueOnce(recoveredAgents)
+    vi.mocked(getAgentRuntimeReadiness).mockResolvedValueOnce(readiness)
+    authMocks.backendRecoveryGeneration = 3
+
+    const runtimes = renderHook(() => useAgentRuntimes())
+
+    await waitFor(() => expect(listAgents).toHaveBeenCalledOnce())
+    await waitFor(() => expect(
+      runtimes.result.current.catalog.find((entry) => entry.id === 'codex')?.fingerprint,
+    ).toBe('codex-late-mount'))
+    expect(useAgentRuntimesStore.getState().observedBackendRecoveryGeneration).toBe(3)
+  })
+
+  it('supersedes a hanging pre-recovery rediscovery and ignores its late snapshot', async () => {
+    const runtimes = renderHook(() => useAgentRuntimes())
+    await waitFor(() => expect(runtimes.result.current.loading).toBe(false))
+
+    const staleAgents = deferred<AgentInfo[]>()
+    const staleReadiness = deferred<typeof readiness>()
+    vi.mocked(listAgents).mockReturnValueOnce(staleAgents.promise)
+    vi.mocked(getAgentRuntimeReadiness).mockReturnValueOnce(staleReadiness.promise)
+    act(() => window.dispatchEvent(new Event('focus')))
+    await waitFor(() => expect(listAgents).toHaveBeenCalledTimes(2))
+
+    const recoveredAgents = agents.map((entry) => entry.id === 'codex'
+      ? { ...entry, installed: true, binPath: '/usr/local/bin/codex', fingerprint: 'codex-recovered' }
+      : entry)
+    const recoveredReadiness = {
+      ...readiness,
+      agents: {
+        ...readiness.agents,
+        codex: {
+          agent: 'codex',
+          displayName: 'Codex',
+          installed: true,
+          binPath: '/usr/local/bin/codex',
+          fingerprint: 'codex-recovered',
+          status: 'unknown' as const,
+          ready: false,
+          source: 'unknown' as const,
+          checkedAt: null,
+          durationMs: null,
+        },
+      },
+    }
+    vi.mocked(listAgents).mockResolvedValueOnce(recoveredAgents)
+    vi.mocked(getAgentRuntimeReadiness).mockResolvedValueOnce(recoveredReadiness)
+
+    authMocks.backendRecoveryGeneration = 1
+    runtimes.rerender()
+
+    await waitFor(() => expect(listAgents).toHaveBeenCalledTimes(3))
+    await waitFor(() => expect(
+      runtimes.result.current.catalog.find((entry) => entry.id === 'codex')?.fingerprint,
+    ).toBe('codex-recovered'))
+
+    await act(async () => {
+      staleAgents.resolve(agents)
+      staleReadiness.resolve(readiness)
+      await staleAgents.promise
+      await staleReadiness.promise
+    })
+    expect(runtimes.result.current.catalog.find((entry) => entry.id === 'codex')?.fingerprint)
+      .toBe('codex-recovered')
+  })
+
+  it('supersedes a hanging initial load when backend recovery arrives before loaded', async () => {
+    const staleAgents = deferred<AgentInfo[]>()
+    const staleReadiness = deferred<typeof readiness>()
+    const stalePreferences = deferred<{ quickAccessIds: string[]; recentAgentIds: string[] }>()
+    vi.mocked(listAgents).mockReturnValueOnce(staleAgents.promise)
+    vi.mocked(getAgentRuntimeReadiness).mockReturnValueOnce(staleReadiness.promise)
+    vi.mocked(preferencesApi.getAgentRuntimes).mockReturnValueOnce(stalePreferences.promise)
+
+    const runtimes = renderHook(() => useAgentRuntimes())
+    await waitFor(() => expect(listAgents).toHaveBeenCalledOnce())
+    expect(runtimes.result.current.loading).toBe(true)
+
+    const recoveredAgents = agents.map((entry) => entry.id === 'codex'
+      ? { ...entry, installed: true, binPath: '/usr/local/bin/codex', fingerprint: 'codex-initial-recovery' }
+      : entry)
+    vi.mocked(listAgents).mockResolvedValueOnce(recoveredAgents)
+    vi.mocked(getAgentRuntimeReadiness).mockResolvedValueOnce(readiness)
+    vi.mocked(preferencesApi.getAgentRuntimes).mockResolvedValueOnce({
+      quickAccessIds: ['cursor'],
+      recentAgentIds: ['claude'],
+    })
+
+    authMocks.backendRecoveryGeneration = 1
+    runtimes.rerender()
+
+    await waitFor(() => expect(listAgents).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(runtimes.result.current.loading).toBe(false))
+    expect(runtimes.result.current.catalog.find((entry) => entry.id === 'codex')?.fingerprint)
+      .toBe('codex-initial-recovery')
+    expect(runtimes.result.current.quickAccessIds).toEqual(['cursor'])
+
+    await act(async () => {
+      staleAgents.resolve(agents)
+      staleReadiness.resolve(readiness)
+      stalePreferences.resolve({ quickAccessIds: ['pi'], recentAgentIds: ['opencode'] })
+      await Promise.all([staleAgents.promise, staleReadiness.promise, stalePreferences.promise])
+    })
+    expect(runtimes.result.current.catalog.find((entry) => entry.id === 'codex')?.fingerprint)
+      .toBe('codex-initial-recovery')
+    expect(runtimes.result.current.quickAccessIds).toEqual(['cursor'])
+  })
+
+  it('releases a failed recovery claim so a later subscriber retries the same generation', async () => {
+    const first = renderHook(() => useAgentRuntimes())
+    await waitFor(() => expect(first.result.current.loading).toBe(false))
+
+    vi.mocked(listAgents).mockRejectedValueOnce(new Error('inventory still restarting'))
+    vi.mocked(getAgentRuntimeReadiness).mockRejectedValueOnce(new Error('readiness still restarting'))
+    authMocks.backendRecoveryGeneration = 1
+    first.rerender()
+
+    await waitFor(() => expect(first.result.current.error).toBe('inventory still restarting'))
+    expect(useAgentRuntimesStore.getState()).toMatchObject({
+      observedBackendRecoveryGeneration: 0,
+      backendRecoveryInflightGeneration: null,
+      backendRecoveryInflight: null,
+    })
+
+    vi.mocked(listAgents).mockResolvedValueOnce(discoveredCodex('same-generation-retry'))
+    vi.mocked(getAgentRuntimeReadiness).mockResolvedValueOnce(readinessSnapshot('same-generation-retry'))
+    const second = renderHook(() => useAgentRuntimes())
+
+    await waitFor(() => expect(
+      second.result.current.catalog.find((entry) => entry.id === 'codex')?.fingerprint,
+    ).toBe('same-generation-retry'))
+    expect(useAgentRuntimesStore.getState()).toMatchObject({
+      observedBackendRecoveryGeneration: 1,
+      backendRecoveryInflightGeneration: null,
+      backendRecoveryInflight: null,
+    })
+  })
+
+  it('lets an explicit diagnostic refresh supersede a pending rediscovery', async () => {
+    const runtimes = renderHook(() => useAgentRuntimes())
+    await waitFor(() => expect(runtimes.result.current.loading).toBe(false))
+
+    const rediscoveredAgents = deferred<AgentInfo[]>()
+    const rediscoveredReadiness = deferred<AgentRuntimeReadinessSnapshot>()
+    vi.mocked(listAgents).mockReturnValueOnce(rediscoveredAgents.promise)
+    vi.mocked(getAgentRuntimeReadiness).mockReturnValueOnce(rediscoveredReadiness.promise)
+    act(() => window.dispatchEvent(new Event('focus')))
+    await waitFor(() => expect(listAgents).toHaveBeenCalledTimes(2))
+
+    const probedAgents = deferred<AgentInfo[]>()
+    const probedReadiness = deferred<AgentRuntimeReadinessSnapshot>()
+    vi.mocked(listAgents).mockReturnValueOnce(probedAgents.promise)
+    vi.mocked(probeAgentRuntimeReadiness).mockReturnValueOnce(probedReadiness.promise)
+    let refreshPromise!: Promise<void>
+    act(() => {
+      refreshPromise = runtimes.result.current.refresh('pi')
+    })
+    expect(runtimes.result.current.refreshing).toBe(true)
+
+    await act(async () => {
+      probedAgents.resolve(discoveredCodex('probe-current'))
+      probedReadiness.resolve(readinessSnapshot('probe-current'))
+      await refreshPromise
+    })
+    expect(runtimes.result.current.catalog.find((entry) => entry.id === 'codex')?.fingerprint)
+      .toBe('probe-current')
+    expect(runtimes.result.current.readiness?.checkedAt).toBe('probe-current')
+    expect(runtimes.result.current.refreshing).toBe(false)
+
+    await act(async () => {
+      rediscoveredAgents.resolve(discoveredCodex('rediscovery-stale'))
+      rediscoveredReadiness.resolve(readinessSnapshot('rediscovery-stale'))
+      await Promise.all([rediscoveredAgents.promise, rediscoveredReadiness.promise])
+    })
+    expect(runtimes.result.current.catalog.find((entry) => entry.id === 'codex')?.fingerprint)
+      .toBe('probe-current')
+    expect(runtimes.result.current.readiness?.checkedAt).toBe('probe-current')
+    expect(runtimes.result.current.refreshing).toBe(false)
+  })
+
+  it('keeps refresh B authoritative when refresh A callbacks and result arrive later', async () => {
+    const runtimes = renderHook(() => useAgentRuntimes())
+    await waitFor(() => expect(runtimes.result.current.loading).toBe(false))
+
+    const agentsA = deferred<AgentInfo[]>()
+    const readinessA = deferred<AgentRuntimeReadinessSnapshot>()
+    const agentsB = deferred<AgentInfo[]>()
+    const readinessB = deferred<AgentRuntimeReadinessSnapshot>()
+    let publishA: ((snapshot: AgentRuntimeReadinessSnapshot) => void) | undefined
+    let publishB: ((snapshot: AgentRuntimeReadinessSnapshot) => void) | undefined
+    vi.mocked(listAgents)
+      .mockReturnValueOnce(agentsA.promise)
+      .mockReturnValueOnce(agentsB.promise)
+    vi.mocked(probeAgentRuntimeReadiness)
+      .mockImplementationOnce((_agent, publish) => {
+        publishA = publish
+        return readinessA.promise
+      })
+      .mockImplementationOnce((_agent, publish) => {
+        publishB = publish
+        return readinessB.promise
+      })
+
+    let refreshA!: Promise<void>
+    let refreshB!: Promise<void>
+    act(() => {
+      refreshA = runtimes.result.current.refresh('pi')
+      refreshB = runtimes.result.current.refresh('pi')
+    })
+    act(() => publishB?.(readinessSnapshot('probe-b-progress')))
+    expect(runtimes.result.current.readiness?.checkedAt).toBe('probe-b-progress')
+    expect(runtimes.result.current.refreshing).toBe(true)
+
+    await act(async () => {
+      agentsB.resolve(discoveredCodex('probe-b-final'))
+      readinessB.resolve(readinessSnapshot('probe-b-final'))
+      await refreshB
+    })
+    expect(runtimes.result.current.catalog.find((entry) => entry.id === 'codex')?.fingerprint)
+      .toBe('probe-b-final')
+    expect(runtimes.result.current.readiness?.checkedAt).toBe('probe-b-final')
+    expect(runtimes.result.current.refreshing).toBe(false)
+
+    await act(async () => {
+      publishA?.(readinessSnapshot('probe-a-late-progress'))
+      agentsA.resolve(discoveredCodex('probe-a-late-final'))
+      readinessA.resolve(readinessSnapshot('probe-a-late-final'))
+      await refreshA
+    })
+    expect(runtimes.result.current.catalog.find((entry) => entry.id === 'codex')?.fingerprint)
+      .toBe('probe-b-final')
+    expect(runtimes.result.current.readiness?.checkedAt).toBe('probe-b-final')
+    expect(runtimes.result.current.refreshing).toBe(false)
+    expect(runtimes.result.current.error).toBeNull()
+  })
+
+  it('retires probe callbacks when the sibling Agent inventory refresh fails first', async () => {
+    const runtimes = renderHook(() => useAgentRuntimes())
+    await waitFor(() => expect(runtimes.result.current.loading).toBe(false))
+
+    const probedReadiness = deferred<AgentRuntimeReadinessSnapshot>()
+    let publish: ((snapshot: AgentRuntimeReadinessSnapshot) => void) | undefined
+    vi.mocked(listAgents).mockRejectedValueOnce(new Error('inventory unavailable'))
+    vi.mocked(probeAgentRuntimeReadiness).mockImplementationOnce((_agent, next) => {
+      publish = next
+      return probedReadiness.promise
+    })
+
+    let refreshPromise!: Promise<void>
+    act(() => {
+      refreshPromise = runtimes.result.current.refresh('pi')
+    })
+    await expect(refreshPromise).rejects.toThrow('inventory unavailable')
+    expect(runtimes.result.current.refreshing).toBe(false)
+    expect(runtimes.result.current.error).toBe('inventory unavailable')
+    const retained = runtimes.result.current.readiness
+
+    await act(async () => {
+      publish?.(readinessSnapshot('late-failed-progress'))
+      probedReadiness.resolve(readinessSnapshot('late-failed-final'))
+      await probedReadiness.promise
+    })
+    expect(runtimes.result.current.readiness).toBe(retained)
+    expect(runtimes.result.current.error).toBe('inventory unavailable')
+  })
+
   it('restores the last confirmed pins and exposes an error when an optimistic save fails', async () => {
     const { result } = renderHook(() => useAgentRuntimes())
     await waitFor(() => expect(result.current.loading).toBe(false))
@@ -347,3 +646,11 @@ describe('useAgentRuntimes', () => {
     expect(preferencesApi.rememberAgentRuntimeUse).toHaveBeenNthCalledWith(2, 'claude')
   })
 })
+
+function deferred<T>(): { promise: Promise<T>; resolve(value: T): void } {
+  let resolvePromise!: (value: T) => void
+  const promise = new Promise<T>((resolve) => {
+    resolvePromise = resolve
+  })
+  return { promise, resolve: resolvePromise }
+}

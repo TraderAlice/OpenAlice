@@ -56,7 +56,13 @@ export interface AgentRuntimeReadinessSnapshot {
 
 export interface AgentRuntimeReadinessProbeInFlight {
   readonly identity: string
+  readonly epoch: symbol
   readonly promise: Promise<AgentRuntimeReadinessRow>
+}
+
+export interface AgentRuntimeReadinessProbeAuthority {
+  readonly identity: string
+  readonly epoch: symbol
 }
 
 function runtimeReadinessProbeIdentity(
@@ -77,16 +83,27 @@ function runtimeReadinessProbeIdentity(
  * the result Promise for the retired executable. */
 export function shareRuntimeReadinessProbe(
   inFlight: Map<string, AgentRuntimeReadinessProbeInFlight>,
+  authority: Map<string, AgentRuntimeReadinessProbeAuthority>,
   agent: string,
   availability: AgentAvailability | undefined,
-  start: () => Promise<AgentRuntimeReadinessRow>,
+  start: (mayPublish: () => boolean) => Promise<AgentRuntimeReadinessRow>,
 ): Promise<AgentRuntimeReadinessRow> {
   const identity = runtimeReadinessProbeIdentity(agent, availability)
   const existing = inFlight.get(agent)
-  if (existing?.identity === identity) return existing.promise
+  if (
+    existing?.identity === identity
+    && authority.get(agent)?.epoch === existing.epoch
+  ) {
+    return existing.promise
+  }
 
-  const promise = start()
-  const entry = { identity, promise }
+  // Identity is repeatable (A -> B -> A), so it cannot itself be publication
+  // authority. Every newly started probe gets a unique epoch that outlives its
+  // in-flight entry; only the latest epoch may publish to the cache.
+  const epoch = Symbol(`${agent}:runtime-readiness-probe`)
+  authority.set(agent, { identity, epoch })
+  const promise = start(() => authority.get(agent)?.epoch === epoch)
+  const entry = { identity, epoch, promise }
   inFlight.set(agent, entry)
   const clear = () => {
     if (inFlight.get(agent) === entry) inFlight.delete(agent)
@@ -132,9 +149,22 @@ export function snapshotRuntimeReadiness(
   adapters: readonly CliAdapter[],
   availability: Record<string, AgentAvailability>,
   cache: Map<string, AgentRuntimeReadinessRow>,
+  authority?: Map<string, AgentRuntimeReadinessProbeAuthority>,
 ): AgentRuntimeReadinessSnapshot {
   const rows = adapters.map((adapter) => {
-    const fresh = initialRuntimeReadinessRow(adapter, availability[adapter.id]);
+    const freshAvailability = availability[adapter.id]
+    const fresh = initialRuntimeReadinessRow(adapter, freshAvailability);
+    const activeAuthority = authority?.get(adapter.id)
+    if (
+      activeAuthority
+      && activeAuthority.identity !== runtimeReadinessProbeIdentity(adapter.id, freshAvailability)
+      && authority?.get(adapter.id) === activeAuthority
+    ) {
+      // Discovery is authoritative even while a probe is running. Retiring
+      // the epoch prevents a late result for a replaced or uninstalled binary
+      // from repopulating the cache after this snapshot invalidates it.
+      authority.delete(adapter.id)
+    }
     const cached = cache.get(adapter.id);
     if (
       cached

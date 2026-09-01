@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import { create } from 'zustand'
 
 import { preferencesApi } from '../api/preferences'
@@ -45,16 +45,25 @@ interface AgentRuntimesStore {
   loaded: boolean
   inflight: Promise<void> | null
   rediscoveryInflight: Promise<void> | null
-  loadGeneration: number
+  refreshInflight: Promise<void> | null
+  publicationEpoch: number
+  observedBackendRecoveryGeneration: number
+  backendRecoveryInflightGeneration: number | null
+  backendRecoveryInflight: Promise<void> | null
   saveGeneration: number
   saveQueue: Promise<unknown>
   recentGeneration: number
   recentQueue: Promise<unknown>
-  ensureLoaded(): Promise<void>
-  rediscover(): Promise<void>
+  ensureLoaded(options?: AgentRuntimeDiscoveryOptions): Promise<void>
+  rediscover(options?: AgentRuntimeDiscoveryOptions): Promise<void>
+  recoverAfterBackend(generation: number): Promise<void>
   refresh(agent?: string): Promise<void>
   saveQuickAccess(ids: readonly string[]): Promise<void>
   recordSuccessfulUse(agentId: string): Promise<void>
+}
+
+interface AgentRuntimeDiscoveryOptions {
+  readonly supersedePending?: boolean
 }
 
 function errorMessage(cause: unknown): string {
@@ -83,29 +92,46 @@ const emptyStoreSlice = {
   loaded: false,
   inflight: null as Promise<void> | null,
   rediscoveryInflight: null as Promise<void> | null,
+  refreshInflight: null as Promise<void> | null,
+  backendRecoveryInflightGeneration: null as number | null,
+  backendRecoveryInflight: null as Promise<void> | null,
 }
 
 export const useAgentRuntimesStore = create<AgentRuntimesStore>((set, get) => ({
   ...emptyStoreSlice,
-  loadGeneration: 0,
+  publicationEpoch: 0,
+  observedBackendRecoveryGeneration: 0,
   saveGeneration: 0,
   saveQueue: Promise.resolve(),
   recentGeneration: 0,
   recentQueue: Promise.resolve(),
 
-  async ensureLoaded() {
-    if (get().loaded) return
+  async ensureLoaded(options) {
+    const supersedePending = options?.supersedePending === true
+    if (get().loaded && !supersedePending) return
+    const refreshInflight = get().refreshInflight
+    if (refreshInflight && !supersedePending) return refreshInflight
     const inflight = get().inflight
-    if (inflight) return inflight
-    const generation = get().loadGeneration
-    const request = (async () => {
-      set({ loading: true })
+    if (inflight && !supersedePending) return inflight
+    const epoch = get().publicationEpoch + 1
+    set({
+      publicationEpoch: epoch,
+      loading: true,
+      ...(supersedePending ? {
+        inflight: null,
+        rediscoveryInflight: null,
+        refreshInflight: null,
+        refreshing: false,
+      } : {}),
+    })
+    let request!: Promise<void>
+    request = (async () => {
       const [listed, snapshot, preferences] = await Promise.all([
         asSettled(() => listAgents()),
         asSettled(() => getAgentRuntimeReadiness()),
         asSettled(() => preferencesApi.getAgentRuntimes()),
       ])
-      if (get().loadGeneration !== generation) return
+      if (get().publicationEpoch !== epoch || get().inflight !== request) return
       const agents = listed.status === 'fulfilled'
         ? listed.value ?? []
         : get().agents
@@ -132,47 +158,91 @@ export const useAgentRuntimesStore = create<AgentRuntimesStore>((set, get) => ({
     try {
       await request
     } finally {
-      if (get().inflight === request) set({ inflight: null })
+      if (get().publicationEpoch === epoch && get().inflight === request) {
+        set({ inflight: null })
+      }
     }
   },
 
   async refresh(agent?: string) {
-    const generation = get().loadGeneration
-    set({ refreshing: true, error: null })
+    const epoch = get().publicationEpoch + 1
+    set({
+      publicationEpoch: epoch,
+      inflight: null,
+      rediscoveryInflight: null,
+      refreshInflight: null,
+      loading: false,
+      refreshing: true,
+      error: null,
+    })
+    let request!: Promise<void>
+    request = (async () => {
+      try {
+        const [listed, snapshot] = await Promise.all([
+          listAgents(),
+          probeAgentRuntimeReadiness(agent, (next) => {
+            if (
+              get().publicationEpoch === epoch
+              && get().refreshInflight === request
+            ) {
+              set({ readiness: next })
+            }
+          }),
+        ])
+        if (get().publicationEpoch !== epoch || get().refreshInflight !== request) return
+        set({
+          agents: listed,
+          readiness: snapshot,
+          refreshing: false,
+          error: null,
+          loaded: true,
+          loading: false,
+          refreshInflight: null,
+        })
+      } catch (cause) {
+        if (get().publicationEpoch !== epoch || get().refreshInflight !== request) return
+        // Retire callback publication before surfacing the failure. The probe
+        // transport may still deliver progress after its sibling inventory
+        // request has already failed.
+        set({ refreshing: false, error: errorMessage(cause), refreshInflight: null })
+        throw cause
+      }
+    })()
+    set({ refreshInflight: request })
     try {
-      const [listed, snapshot] = await Promise.all([
-        listAgents(),
-        probeAgentRuntimeReadiness(agent, (next) => {
-          if (get().loadGeneration === generation) set({ readiness: next })
-        }),
-      ])
-      if (get().loadGeneration !== generation) return
-      set({
-        agents: listed,
-        readiness: snapshot,
-        refreshing: false,
-        error: null,
-        loaded: true,
-        loading: false,
-      })
-    } catch (cause) {
-      if (get().loadGeneration !== generation) return
-      set({ refreshing: false, error: errorMessage(cause) })
-      throw cause
+      await request
+    } finally {
+      if (get().publicationEpoch === epoch && get().refreshInflight === request) {
+        set({ refreshInflight: null })
+      }
     }
   },
 
-  async rediscover() {
-    if (!get().loaded) return get().ensureLoaded()
+  async rediscover(options) {
+    const supersedePending = options?.supersedePending === true
+    if (!get().loaded) return get().ensureLoaded(options)
+    const refreshInflight = get().refreshInflight
+    if (refreshInflight && !supersedePending) return refreshInflight
     const inflight = get().rediscoveryInflight
-    if (inflight) return inflight
-    const generation = get().loadGeneration
-    const request = (async () => {
+    if (inflight && !supersedePending) return inflight
+    const epoch = get().publicationEpoch + 1
+    set({
+      publicationEpoch: epoch,
+      ...(supersedePending ? {
+        inflight: null,
+        rediscoveryInflight: null,
+        refreshInflight: null,
+        loading: false,
+        refreshing: false,
+      } : {}),
+    })
+    let request!: Promise<void>
+    request = (async () => {
       const [listed, snapshot] = await Promise.all([
         asSettled(() => listAgents()),
         asSettled(() => getAgentRuntimeReadiness()),
       ])
-      if (get().loadGeneration !== generation) return
+      if (get().publicationEpoch !== epoch || get().rediscoveryInflight !== request) return
       const failed = [listed, snapshot].find((result) => result.status === 'rejected')
       set({
         agents: listed.status === 'fulfilled' ? listed.value ?? [] : get().agents,
@@ -184,8 +254,44 @@ export const useAgentRuntimesStore = create<AgentRuntimesStore>((set, get) => ({
     try {
       await request
     } finally {
-      if (get().rediscoveryInflight === request) set({ rediscoveryInflight: null })
+      if (get().publicationEpoch === epoch && get().rediscoveryInflight === request) {
+        set({ rediscoveryInflight: null })
+      }
     }
+  },
+
+  async recoverAfterBackend(generation) {
+    const state = get()
+    if (generation <= state.observedBackendRecoveryGeneration) return
+    if (
+      state.backendRecoveryInflightGeneration === generation
+      && state.backendRecoveryInflight
+    ) {
+      return state.backendRecoveryInflight
+    }
+
+    let recovery!: Promise<void>
+    recovery = (async () => {
+      const discovery = get().rediscover({ supersedePending: true })
+      const epoch = get().publicationEpoch
+      await discovery
+      const current = get()
+      if (current.backendRecoveryInflight !== recovery) return
+      const succeeded = current.publicationEpoch === epoch && current.error === null
+      set({
+        ...(succeeded ? { observedBackendRecoveryGeneration: generation } : {}),
+        backendRecoveryInflightGeneration: null,
+        backendRecoveryInflight: null,
+      })
+    })()
+    // The coordinator, not a hopeful request start, owns the claim. Failed or
+    // superseded recovery releases it so a later subscriber at the same Auth
+    // generation can reconcile again.
+    set({
+      backendRecoveryInflightGeneration: generation,
+      backendRecoveryInflight: recovery,
+    })
+    return recovery
   },
 
   async saveQuickAccess(ids: readonly string[]) {
@@ -254,7 +360,10 @@ export const useAgentRuntimesStore = create<AgentRuntimesStore>((set, get) => ({
 export function resetAgentRuntimesStore(): void {
   useAgentRuntimesStore.setState({
     ...emptyStoreSlice,
-    loadGeneration: useAgentRuntimesStore.getState().loadGeneration + 1,
+    publicationEpoch: useAgentRuntimesStore.getState().publicationEpoch + 1,
+    observedBackendRecoveryGeneration: 0,
+    backendRecoveryInflightGeneration: null,
+    backendRecoveryInflight: null,
     saveGeneration: useAgentRuntimesStore.getState().saveGeneration + 1,
     saveQueue: Promise.resolve(),
     recentGeneration: useAgentRuntimesStore.getState().recentGeneration + 1,
@@ -269,7 +378,6 @@ export function resetAgentRuntimesStore(): void {
  */
 export function useAgentRuntimes(): AgentRuntimesState {
   const { backendRecoveryGeneration } = useBackendRecoverySignal()
-  const observedBackendRecoveryGenerationRef = useRef(backendRecoveryGeneration)
   const agents = useAgentRuntimesStore((state) => state.agents)
   const readiness = useAgentRuntimesStore((state) => state.readiness)
   const quickAccessIds = useAgentRuntimesStore((state) => state.quickAccessIds)
@@ -279,6 +387,7 @@ export function useAgentRuntimes(): AgentRuntimesState {
   const error = useAgentRuntimesStore((state) => state.error)
   const ensureLoaded = useAgentRuntimesStore((state) => state.ensureLoaded)
   const rediscoverStore = useAgentRuntimesStore((state) => state.rediscover)
+  const recoverAfterBackendStore = useAgentRuntimesStore((state) => state.recoverAfterBackend)
   const refreshStore = useAgentRuntimesStore((state) => state.refresh)
   const saveStore = useAgentRuntimesStore((state) => state.saveQuickAccess)
   const recordSuccessfulUseStore = useAgentRuntimesStore((state) => state.recordSuccessfulUse)
@@ -288,11 +397,12 @@ export function useAgentRuntimes(): AgentRuntimesState {
   }, [ensureLoaded])
 
   useEffect(() => {
-    const observed = observedBackendRecoveryGenerationRef.current
-    observedBackendRecoveryGenerationRef.current = backendRecoveryGeneration
-    if (backendRecoveryGeneration <= observed) return
-    void rediscoverStore()
-  }, [backendRecoveryGeneration, rediscoverStore])
+    // The store, rather than an individual mounted consumer, claims each
+    // generation. A surface mounted after recovery must still reconcile a
+    // cached inventory left behind by an earlier subscriber.
+    if (backendRecoveryGeneration <= 0) return
+    void recoverAfterBackendStore(backendRecoveryGeneration)
+  }, [backendRecoveryGeneration, recoverAfterBackendStore])
 
   useEffect(() => {
     const rediscover = () => void rediscoverStore()

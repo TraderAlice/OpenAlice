@@ -66,6 +66,7 @@ import {
   snapshotRuntimeReadiness,
   RUNTIME_READINESS_PROMPT,
   RUNTIME_READINESS_TIMEOUT_MS,
+  type AgentRuntimeReadinessProbeAuthority,
   type AgentRuntimeReadinessProbeInFlight,
   type AgentRuntimeReadinessRow,
   type AgentRuntimeReadinessSnapshot,
@@ -989,6 +990,8 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   const resolveRuntimeWorkspace = (workspaceId: string): WorkspaceMeta | undefined =>
     workspaceId === managerWorkspace.id ? managerWorkspace : registry.get(workspaceId);
   const runtimeReadinessCache = new Map<string, AgentRuntimeReadinessRow>();
+  const runtimeReadinessProbeInFlight = new Map<string, AgentRuntimeReadinessProbeInFlight>();
+  const runtimeReadinessProbeAuthority = new Map<string, AgentRuntimeReadinessProbeAuthority>();
 
   const creator = new WorkspaceCreator({
     workspacesRoot: `${config.launcherRoot}/workspaces`,
@@ -1254,7 +1257,12 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   const getRuntimeAdapters = () => adapters.list().filter(isAgentRuntime);
 
   const getAgentRuntimeReadinessMethod = (): AgentRuntimeReadinessSnapshot =>
-    snapshotRuntimeReadiness(getRuntimeAdapters(), detectAgents(), runtimeReadinessCache);
+    snapshotRuntimeReadiness(
+      getRuntimeAdapters(),
+      detectAgents(),
+      runtimeReadinessCache,
+      runtimeReadinessProbeAuthority,
+    );
 
   const runtimeReadinessSourceFor = (
     adapter: CliAdapter,
@@ -1413,16 +1421,18 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     },
   });
 
-  const runtimeReadinessProbeInFlight = new Map<string, AgentRuntimeReadinessProbeInFlight>();
-
   const executeSingleAgentRuntimeReadinessProbe = async (
     adapter: CliAdapter,
-    availability?: AgentAvailability,
+    availability: AgentAvailability | undefined,
+    mayPublish: () => boolean,
   ): Promise<AgentRuntimeReadinessRow> => {
+    const publish = (row: AgentRuntimeReadinessRow): AgentRuntimeReadinessRow => {
+      if (mayPublish()) runtimeReadinessCache.set(adapter.id, row);
+      return row;
+    };
     if (!availability?.installed) {
       const row = notInstalledRuntimeReadinessRow(adapter, availability);
-      runtimeReadinessCache.set(adapter.id, row);
-      return row;
+      return publish(row);
     }
     if (!adapter.capabilities.headless || !adapter.composeHeadlessCommand) {
       const row = failedRuntimeReadinessRow({
@@ -1430,13 +1440,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         availability,
         result: syntheticRuntimeReadinessFailure('Agent does not support headless probes.'),
       });
-      runtimeReadinessCache.set(adapter.id, row);
-      return row;
+      return publish(row);
     }
 
-    const existing =
-      runtimeReadinessCache.get(adapter.id) ?? initialRuntimeReadinessRow(adapter, availability);
-    runtimeReadinessCache.set(adapter.id, checkingRuntimeReadinessRow(existing));
+    publish(checkingRuntimeReadinessRow(initialRuntimeReadinessRow(adapter, availability)));
 
     const globalSource = runtimeReadinessSourceFor(adapter, availability);
     let lastAttempt: Awaited<ReturnType<typeof runRuntimeReadinessProbeAttempt>> | null = null;
@@ -1450,8 +1457,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           source: lastAttempt.source,
           durationMs: lastAttempt.result.durationMs,
         });
-        runtimeReadinessCache.set(adapter.id, row);
-        return row;
+        return publish(row);
       }
 
       const row = failedRuntimeReadinessRow({
@@ -1462,8 +1468,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           syntheticRuntimeReadinessFailure('The native runtime login or Workspace provider config is not ready.'),
         source: lastAttempt?.source ?? globalSource,
       });
-      runtimeReadinessCache.set(adapter.id, row);
-      return row;
+      return publish(row);
     } catch (err) {
       const row = failedRuntimeReadinessRow({
         adapter,
@@ -1471,8 +1476,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         result: syntheticRuntimeReadinessFailure(err instanceof Error ? err.message : String(err)),
         source: lastAttempt?.source ?? globalSource,
       });
-      runtimeReadinessCache.set(adapter.id, row);
-      return row;
+      return publish(row);
     }
   };
 
@@ -1482,9 +1486,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   ): Promise<AgentRuntimeReadinessRow> =>
     shareRuntimeReadinessProbe(
       runtimeReadinessProbeInFlight,
+      runtimeReadinessProbeAuthority,
       adapter.id,
       availability,
-      () => executeSingleAgentRuntimeReadinessProbe(adapter, availability),
+      (mayPublish) => executeSingleAgentRuntimeReadinessProbe(adapter, availability, mayPublish),
     );
 
   const readinessTargets = (agentId?: string): CliAdapter[] => {
@@ -1519,7 +1524,12 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     await Promise.all(
       targets.map((adapter) => probeSingleAgentRuntimeReadiness(adapter, availability[adapter.id])),
     );
-    return snapshotRuntimeReadiness(getRuntimeAdapters(), detectAgents(), runtimeReadinessCache);
+    return snapshotRuntimeReadiness(
+      getRuntimeAdapters(),
+      detectAgents(),
+      runtimeReadinessCache,
+      runtimeReadinessProbeAuthority,
+    );
   };
 
   const computeSpawnPlan = (
