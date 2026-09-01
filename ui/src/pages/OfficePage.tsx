@@ -49,6 +49,10 @@ import { useOfficeDay } from '../office/useOfficeDay'
 import { useOfficeRoutineFollowUps } from '../office/useOfficeRoutineFollowUps'
 import { useOfficeShift } from '../office/useOfficeShift'
 import {
+  officeWorkspaceDestination,
+  officeWorkspaceSource,
+} from '../office/office-destination'
+import {
   useOfficeProductActivity,
 } from '../office/useOfficeProductActivity'
 import {
@@ -64,19 +68,11 @@ import {
 import { useIssues } from '../hooks/useIssues'
 import '../office/office.css'
 import { useWorkspace } from '../tabs/store'
-import type { WorkspaceSource } from '../tabs/types'
 import {
   OfficeRuntimeSection,
   type OfficeDutyReview,
   type OfficeLogChannel,
 } from './OfficeRuntimeSection'
-
-function sourceForTag(tag: string): WorkspaceSource | undefined {
-  if (tag === 'chat') return 'chat'
-  if (tag === 'auto-quant') return 'auto-quant'
-  if (tag === 'prediction') return 'prediction'
-  return undefined
-}
 
 function officeActivityDutyReview(
   kind: OfficeDutyReview['kind'],
@@ -409,45 +405,40 @@ export function OfficePage() {
     })
   }
 
+  const officeWorkspaceFor = (workspaceId: string) => (
+    building?.offices.find((office) => office.workspace.id === workspaceId)?.workspace
+  )
+
   const openEmployee = (workspaceId: string, employee: OfficeFloorEmployee) => {
-    const workspace = workspaces.find((item) => item.id === workspaceId)
-    const source = workspace ? sourceForTag(workspace.tag) : undefined
+    const workspace = officeWorkspaceFor(workspaceId)
+    if (!workspace) return
     markExcursion()
-    openOrFocus({
-      kind: 'workspace',
-      params: {
-        wsId: workspaceId,
-        ...(employee.sessionRecordId ? { sessionId: employee.sessionRecordId } : {}),
-        ...(source ? { source } : {}),
-      },
-    })
+    openOrFocus(officeWorkspaceDestination(
+      workspace,
+      employee.sessionRecordId,
+    ))
   }
 
   const openWorkspaceFiles = (workspaceId: string) => {
-    const workspace = workspaces.find((item) => item.id === workspaceId)
-    const source = workspace ? sourceForTag(workspace.tag) : undefined
+    const workspace = officeWorkspaceFor(workspaceId)
+    if (!workspace) return
     useWorkspaceSidePanels.getState().setFiles(true)
     markExcursion()
-    openOrFocus({
-      kind: 'workspace',
-      params: { wsId: workspaceId, ...(source ? { source } : {}) },
-    })
+    openOrFocus(officeWorkspaceDestination(workspace))
   }
 
   const openWorkspace = (workspaceId: string) => {
-    const workspace = workspaces.find((item) => item.id === workspaceId)
-    const source = workspace ? sourceForTag(workspace.tag) : undefined
+    const workspace = officeWorkspaceFor(workspaceId)
+    if (!workspace) return
     useWorkspaceSidePanels.getState().setFiles(false)
     markExcursion()
-    openOrFocus({
-      kind: 'workspace',
-      params: { wsId: workspaceId, ...(source ? { source } : {}) },
-    })
+    openOrFocus(officeWorkspaceDestination(workspace))
   }
 
   const openDrawer = (workspaceId: string, employee: OfficeFloorEmployee, item: OfficeDrawerItem) => {
-    const workspace = workspaces.find((row) => row.id === workspaceId)
-    const source = workspace ? sourceForTag(workspace.tag) : undefined
+    const workspace = officeWorkspaceFor(workspaceId)
+    if (!workspace) return
+    const source = officeWorkspaceSource(workspace.harness)
     if (item.kind === 'report' && item.path) {
       markExcursion()
       openOrFocus({
