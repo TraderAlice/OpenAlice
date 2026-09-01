@@ -997,22 +997,10 @@ html[lang="ja"] .oa-onboarding-title {
     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background;
 }
 
-/* Scroll affordances stay quiet at rest and surface beside the active gesture. */
+/* Native scrollbars stay subtle and gain contrast under the pointer. */
 * {
-  scrollbar-color: transparent transparent;
+  scrollbar-color: color-mix(in srgb, var(--muted-foreground) 22%, transparent) transparent;
   scrollbar-width: thin;
-}
-
-*[data-scrollbar-active],
-:where(
-  [data-settings-scroll-area],
-  [data-scroll-surface],
-  [class*="overflow-auto"],
-  [class*="overflow-y-auto"],
-  [class*="overflow-x-auto"],
-  [class*="overflow-scroll"]
-):hover {
-  scrollbar-color: color-mix(in srgb, var(--muted-foreground) 34%, transparent) transparent;
 }
 
 ::-webkit-scrollbar {
@@ -1025,67 +1013,15 @@ html[lang="ja"] .oa-onboarding-title {
 ::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
   border-radius: 999px;
-  background: transparent;
+  background: color-mix(in srgb, var(--muted-foreground) 22%, transparent);
   background-clip: padding-box;
 }
-*[data-scrollbar-active]::-webkit-scrollbar-thumb,
-:where(
-  [data-settings-scroll-area],
-  [data-scroll-surface],
-  [class*="overflow-auto"],
-  [class*="overflow-y-auto"],
-  [class*="overflow-x-auto"],
-  [class*="overflow-scroll"]
-):hover::-webkit-scrollbar-thumb {
+::-webkit-scrollbar-thumb:hover {
   background: color-mix(in srgb, var(--muted-foreground) 34%, transparent);
   background-clip: padding-box;
 }
 ::-webkit-scrollbar-button {
   display: none;
-}
-
-.oa-scroll-edges {
-  --oa-scroll-edge-size: 12px;
-  mask-repeat: no-repeat;
-  mask-size: 100% 100%;
-}
-
-.oa-scroll-edges[data-scroll-after]:not([data-scroll-before]) {
-  mask-image: linear-gradient(to bottom, black 0, black calc(100% - var(--oa-scroll-edge-size)), transparent 100%);
-}
-
-.oa-scroll-edges[data-scroll-before][data-scroll-after] {
-  mask-image: linear-gradient(to bottom, transparent 0, black var(--oa-scroll-edge-size), black calc(100% - var(--oa-scroll-edge-size)), transparent 100%);
-}
-
-.oa-scroll-edges[data-scroll-before]:not([data-scroll-after]) {
-  mask-image: linear-gradient(to bottom, transparent 0, black var(--oa-scroll-edge-size), black 100%);
-}
-
-.oa-overflow-marquee-track {
-  will-change: transform;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .oa-overflow-marquee[data-marquee-active="true"] {
-    mask-image: linear-gradient(to right, transparent 0, black 8px, black calc(100% - 8px), transparent 100%);
-  }
-
-  .oa-overflow-marquee[data-marquee-active="true"] .oa-overflow-marquee-label {
-    opacity: 0;
-  }
-
-  .oa-overflow-marquee[data-marquee-active="true"] .oa-overflow-marquee-track {
-    display: flex;
-    gap: 24px;
-    animation: oa-overflow-marquee var(--oa-marquee-duration) linear 480ms infinite;
-  }
-}
-
-@keyframes oa-overflow-marquee {
-  to {
-    transform: translateX(calc(-1 * var(--oa-marquee-distance)));
-  }
 }
 
 /* Hide scrollbar utility — content still scrolls (programmatically or via
@@ -1703,14 +1639,6 @@ html[lang="ja"] .oa-onboarding-title {
 /* Final cascade-level safety net. Several domain animations are declared
    below the first reduced-motion block, so this lives at EOF on purpose. */
 @media (prefers-reduced-motion: reduce) {
-  .oa-overflow-marquee-track {
-    display: none !important;
-  }
-
-  .oa-overflow-marquee-label {
-    opacity: 1 !important;
-  }
-
   *,
   *::before,
   *::after {

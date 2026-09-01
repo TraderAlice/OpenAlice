@@ -889,25 +889,21 @@ function ConnectorAdapterSection({
   const sectionId = connectorSectionId(definition.id)
   const titleId = `${sectionId}-title`
   return (
-    <section
+    <ConfigSection
       id={sectionId}
-      aria-labelledby={titleId}
       className="scroll-mt-4 md:scroll-mt-[9.5rem] xl:scroll-mt-[7rem]"
+      title={(
+        <span className="inline-flex items-center gap-2">
+          <ConnectorBrandMark id={definition.id} className="size-5" />
+          <span>{definition.label}</span>
+        </span>
+      )}
+      titleId={titleId}
+      focusableTitle
+      description={t('connectorSettings.adapterDescription', { name: definition.label })}
     >
-      <ConfigSection
-        title={(
-          <span className="inline-flex items-center gap-2">
-            <ConnectorBrandMark id={definition.id} className="size-5" />
-            <span>{definition.label}</span>
-          </span>
-        )}
-        titleId={titleId}
-        focusableTitle
-        description={t('connectorSettings.adapterDescription', { name: definition.label })}
-      >
-        {children}
-      </ConfigSection>
-    </section>
+      {children}
+    </ConfigSection>
   )
 }
 

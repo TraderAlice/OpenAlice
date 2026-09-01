@@ -19,7 +19,6 @@ import { orderSessionsForSidebar, orderWorkspacesForSidebar } from './sidebar-or
 import { useReorderMotion } from './useReorderMotion';
 import { SidebarActionMenu } from './SidebarActionMenu';
 import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon';
-import { OverflowMarquee } from '../OverflowMarquee';
 import { SelectionIndicator } from '../SelectionIndicator';
 
 /**
@@ -394,7 +393,7 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
             className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusClass}`}
             title={hasRunning ? t('workspace.runningCount', { count: runningCount }) : t('workspace.idle')}
           />
-          <OverflowMarquee text={label} className="flex-1 font-medium" />
+          <span className="flex-1 truncate font-medium">{label}</span>
           <span className="text-[10px] text-muted-foreground/50 tabular-nums shrink-0">{formatRelativeTime(w.createdAt)}</span>
         </button>
         {props.agents.length > 0 && (
@@ -701,6 +700,9 @@ export function SessionRow(props: SessionRowProps): ReactElement {
     }] : []),
   ];
   const selectLabel = headlessOccupying ? t('workspace.sessionRunning', { title: display }) : display;
+  let labelTone = 'text-foreground';
+  if (props.failed) labelTone = 'text-muted-foreground/70';
+  else if (isPaused && !headlessOccupying) labelTone = 'text-muted-foreground';
   return (
     <div
       data-reorder-id={props.reorderId}
@@ -724,11 +726,12 @@ export function SessionRow(props: SessionRowProps): ReactElement {
           <AgentBadgeGlyph agentId={s.agent} />
         </span>
         <span className="min-w-0 flex-1">
-          <OverflowMarquee text={display} className={
-            props.failed ? 'text-muted-foreground/70'
-              : isPaused && !headlessOccupying ? 'text-muted-foreground'
-                : 'text-foreground'
-          } />
+          <span
+            title={display}
+            className={`block truncate ${labelTone}`}
+          >
+            {display}
+          </span>
           {props.subtitle && (
             <span className="mt-0.5 block truncate text-[10px] leading-3 text-muted-foreground/55">
               {props.subtitle}

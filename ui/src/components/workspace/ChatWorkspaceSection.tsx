@@ -79,9 +79,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import type { ChatDisplayMode } from './chat-display-mode'
-import { OverflowMarquee } from '../OverflowMarquee'
 import { SelectionIndicator } from '../SelectionIndicator'
-import { useScrollEdgeFade } from '../../hooks/useScrollEdgeFade'
 
 const CHAT_TEMPLATE = 'chat'
 const AUTO_QUANT_TEMPLATE = 'auto-quant-v2'
@@ -889,8 +887,6 @@ function HarnessSessionRoster(props: HarnessSessionRosterProps): ReactElement {
   const visibleRecent = selectRecentSidebarWorkset(recent, props.isRowActive)
   const runningRef = useReorderMotion<HTMLDivElement>(running.map(props.keyFor))
   const recentRef = useReorderMotion<HTMLDivElement>(visibleRecent.map(props.keyFor))
-  const scrollRef = useRef<HTMLDivElement>(null)
-  useScrollEdgeFade(scrollRef)
   const renderRow = (row: HarnessSession) => (
     <HarnessSessionRow
       key={props.keyFor(row)}
@@ -907,7 +903,7 @@ function HarnessSessionRoster(props: HarnessSessionRosterProps): ReactElement {
   )
 
   return (
-    <div ref={scrollRef} className="oa-scroll-edges min-h-0 flex-1 overflow-y-auto py-0.5">
+    <div className="min-h-0 flex-1 overflow-y-auto py-0.5">
       {running.length > 0 && (
         <section className="border-b border-border/55 pb-1" aria-label={t('chat.runningInBackground')}>
           <button
@@ -1363,7 +1359,7 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
         >
           <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusClass}`} aria-hidden="true" />
           <span className="min-w-0 flex-1">
-            <OverflowMarquee text={props.label} className="font-medium" />
+            <span className="block truncate font-medium" title={props.label}>{props.label}</span>
             {subtitle && (
               <span className="block truncate text-[11px] leading-3 text-muted-foreground/65" title={subtitle}>
                 {subtitle}

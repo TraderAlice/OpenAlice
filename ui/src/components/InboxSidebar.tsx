@@ -16,7 +16,6 @@ import { inputClass } from './form'
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from './ui/tooltip'
 import { SelectionIndicator } from './SelectionIndicator'
@@ -232,8 +231,7 @@ export function InboxViewToggle() {
   const setMode = useInboxViewMode((s) => s.setMode)
 
   return (
-    <TooltipProvider delay={250} timeout={300}>
-      <div className="flex items-center overflow-hidden rounded-md border border-border/70 bg-background p-0.5">
+    <div className="flex items-center overflow-hidden rounded-md border border-border/70 bg-background p-0.5">
       <ToggleBtn
         active={mode === 'time'}
         onClick={() => setMode('time')}
@@ -248,8 +246,7 @@ export function InboxViewToggle() {
       >
         <Layers size={13} strokeWidth={2} />
       </ToggleBtn>
-      </div>
-    </TooltipProvider>
+    </div>
   )
 }
 

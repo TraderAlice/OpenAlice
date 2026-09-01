@@ -12,7 +12,8 @@ import { useSchemaForm } from '../../hooks/useSchemaForm'
 import { Dialog } from './Dialog'
 import { SchemaFormFields } from './SchemaFormFields'
 
-type WizardStep = 'pick' | 'install' | 'config' | 'test'
+const WIZARD_STEPS = ['pick', 'install', 'config', 'test'] as const
+type WizardStep = (typeof WIZARD_STEPS)[number]
 
 interface BrokerConflict {
   existing: { id: string; label: string; presetId: string }
@@ -210,7 +211,9 @@ export function CreateUTADialog({
       <div className="shrink-0 px-6 py-4 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0">
           <h3 className="text-[14px] font-semibold text-foreground truncate">{headerLabel}</h3>
-          <StepProgress current={step} />
+          <span className="text-[11px] tabular-nums text-muted-foreground">
+            Step {WIZARD_STEPS.indexOf(step) + 1} of {WIZARD_STEPS.length}
+          </span>
         </div>
         <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close broker setup">
           <X aria-hidden />
@@ -345,15 +348,6 @@ function PickerSectionHeader({ title }: { title: string }) {
     <p className="text-[12px] font-medium text-muted-foreground">
       {title}
     </p>
-  )
-}
-
-function StepProgress({ current }: { current: WizardStep }) {
-  const order: WizardStep[] = ['pick', 'install', 'config', 'test']
-  return (
-    <span className="text-[11px] tabular-nums text-muted-foreground">
-      Step {order.indexOf(current) + 1} of {order.length}
-    </span>
   )
 }
 

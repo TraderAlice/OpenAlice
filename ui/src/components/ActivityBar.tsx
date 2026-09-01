@@ -17,11 +17,9 @@ import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { SelectionIndicator } from './SelectionIndicator'
-import { useScrollEdgeFade } from '../hooks/useScrollEdgeFade'
 import { Button } from '@/components/ui/button'
 
 /**
@@ -128,11 +126,8 @@ export function ActivityBar({
   const narrowRail = desktopStatic && railMode === 'narrow' && !compactRail
   const denseRail = desktopStatic && shortRailHeight
   const mobileDrawerRef = useRef<HTMLDivElement>(null)
-  const activityScrollRef = useRef<HTMLElement>(null)
-  useScrollEdgeFade(activityScrollRef)
-
   const railContent = (
-    <TooltipProvider delay={250} timeout={300}>
+    <>
         <div className={`${denseRail ? 'h-10 md:h-8' : 'h-10'} flex shrink-0 items-center ${compactRail ? 'justify-center px-0' : narrowRail ? 'gap-2 px-3' : 'gap-2.5 px-3.5'}`}>
           <img
             src="/alice.ico"
@@ -157,8 +152,7 @@ export function ActivityBar({
 
         {/* Navigation */}
         <nav
-          ref={activityScrollRef}
-          className={`oa-scroll-edges flex flex-1 flex-col overflow-x-hidden overflow-y-auto ${denseRail ? 'pb-3 md:pb-1' : 'pb-3 pt-1'} ${compactRail ? 'px-2 md:items-center' : 'px-2'}`}
+          className={`flex flex-1 flex-col overflow-x-hidden overflow-y-auto ${denseRail ? 'pb-3 md:pb-1' : 'pb-3 pt-1'} ${compactRail ? 'px-2 md:items-center' : 'px-2'}`}
         >
           {navSections.map((section, si) => {
             const labeled = section.id !== 'primary'
@@ -311,7 +305,7 @@ export function ActivityBar({
             </Tooltip>
           )}
         </div>
-    </TooltipProvider>
+    </>
   )
 
   const railClassName = `

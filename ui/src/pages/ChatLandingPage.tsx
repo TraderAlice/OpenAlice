@@ -50,7 +50,6 @@ import { Button } from '../components/ui/button'
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from '../components/ui/tooltip'
 import { workspaceDisplayName, workspaceDisplayTitle } from '../components/workspace/display'
@@ -125,24 +124,22 @@ function ComposerNotice({
 
 function StableIntentLabel({ children }: { children: string }) {
   const labelRef = useRef<HTMLSpanElement>(null)
-  const [measuredHeight, setMeasuredHeight] = useState<number>()
 
   useLayoutEffect(() => {
     const label = labelRef.current
     if (!label) return
-    let disposed = false
 
     const measure = () => {
-      if (disposed) return
-      const width = label.clientWidth
-      if (width <= 0) return
+      if (label.clientWidth <= 0) return
       const style = window.getComputedStyle(label)
       const lineHeight = Number.parseFloat(style.lineHeight)
       if (!style.font || !Number.isFinite(lineHeight)) return
       try {
-        setMeasuredHeight(Math.ceil(layout(prepare(children, style.font), width, lineHeight).height))
+        label.style.minHeight = `${Math.ceil(
+          layout(prepare(children, style.font), label.clientWidth, lineHeight).height,
+        )}px`
       } catch {
-        setMeasuredHeight(undefined)
+        label.style.removeProperty('min-height')
       }
     }
 
@@ -150,17 +147,13 @@ function StableIntentLabel({ children }: { children: string }) {
     void document.fonts?.ready.then(measure)
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure)
     observer?.observe(label)
-    return () => {
-      disposed = true
-      observer?.disconnect()
-    }
+    return () => observer?.disconnect()
   }, [children])
 
   return (
     <span
       ref={labelRef}
       className="min-w-0 flex-1 text-[14px] font-medium leading-5 text-muted-foreground transition-colors group-hover:text-foreground group-focus-visible:text-foreground"
-      style={measuredHeight === undefined ? undefined : { minHeight: measuredHeight }}
     >
       {children}
     </span>
@@ -450,91 +443,88 @@ function HarnessLandingPage({
   const showStarterIntents = value.trim().length === 0 && !launching
 
   return (
-    <TooltipProvider delay={250} timeout={300}>
-      <div
-        data-testid="harness-landing-root"
-        className="@container/harness flex h-full min-h-0 w-full flex-col overflow-hidden bg-background"
-      >
+    <div
+      data-testid="harness-landing-root"
+      className="@container/harness flex h-full min-h-0 w-full flex-col overflow-hidden bg-background"
+    >
       <div
         data-testid="harness-landing-scroll"
         className="oa-harness-scroll flex min-h-0 flex-1 justify-start overflow-x-hidden overflow-y-auto overscroll-contain px-5 py-8 @min-[42rem]/harness:px-8 @min-[42rem]/harness:py-10"
       >
         <div
           data-testid="harness-landing-stack"
-          className="my-auto flex w-full flex-col items-center"
+          className="mx-auto my-auto w-full max-w-[42rem]"
         >
-          <div className="w-full max-w-[42rem]">
-            {listError !== null && (
-              <RefreshNotice
-                message={t('workspace.dataStale')}
-                actionLabel={t('common.retry')}
-                onAction={() => void refresh()}
-              />
-            )}
-            <header className="flex flex-col items-center text-center">
-              <img
-                src="/alice.ico"
-                alt=""
-                aria-hidden="true"
-                draggable={false}
-                className="oa-harness-hero-mark h-11 w-11 select-none [image-rendering:pixelated]"
-              />
-              <h1 className="oa-harness-title mt-3 max-w-[38rem] text-balance text-[24px] font-semibold leading-[30px] tracking-[-0.018em] text-foreground @min-[42rem]/harness:text-[28px] @min-[42rem]/harness:leading-[34px]">
-                {t(`${copyKey}.heading`)}
-              </h1>
-            </header>
+          {listError !== null && (
+            <RefreshNotice
+              message={t('workspace.dataStale')}
+              actionLabel={t('common.retry')}
+              onAction={() => void refresh()}
+            />
+          )}
+          <header className="flex flex-col items-center text-center">
+            <img
+              src="/alice.ico"
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+              className="oa-harness-hero-mark h-11 w-11 select-none [image-rendering:pixelated]"
+            />
+            <h1 className="oa-harness-title mt-3 max-w-[38rem] text-balance text-[24px] font-semibold leading-[30px] tracking-[-0.018em] text-foreground @min-[42rem]/harness:text-[28px] @min-[42rem]/harness:leading-[34px]">
+              {t(`${copyKey}.heading`)}
+            </h1>
+          </header>
 
-            <div
-              data-testid="harness-landing-suggestions"
-              data-state={showStarterIntents ? 'visible' : 'hidden'}
-              className={showStarterIntents ? 'oa-harness-starters mt-7' : 'hidden'}
-              inert={!showStarterIntents}
-            >
-              <div className="flex h-7 items-center justify-between px-1">
-                <span className="text-[12px] font-medium text-muted-foreground">
-                  {t(`${copyKey}.examplesLabel`)}
-                </span>
-                {mode === 'chat' && exampleGroups.length > 1 && (
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={(
-                        <Button
-                          type="button"
-                          onClick={() => setExamplePage((page) => (page + 1) % exampleGroups.length)}
-                          disabled={launching}
-                          variant="ghost"
-                          size="icon-sm"
-                          className="text-muted-foreground"
-                          aria-label={t('chatLanding.moreExamples')}
-                        />
-                      )}
-                    >
-                      <RefreshCw aria-hidden className="h-3.5 w-3.5" />
-                    </TooltipTrigger>
-                    <TooltipContent>{t('chatLanding.moreExamples')}</TooltipContent>
-                  </Tooltip>
-                )}
-              </div>
-              <div role="group" aria-label={t(`${copyKey}.examplesLabel`)}>
-                {examples.map((example) => {
-                  const IntentIcon = WORKFLOW_ICONS[example.id] ?? SearchCheck
-                  return (
-                    <button
-                      key={example.id}
-                      type="button"
-                      onClick={() => useExample(example.prompt)}
-                      disabled={launching}
-                      className="group flex min-h-11 w-full items-center gap-3 border-b border-border/70 px-1 text-left outline-none transition-colors duration-[var(--motion-fast)] hover:border-border hover:text-foreground focus-visible:border-ring disabled:opacity-40"
-                    >
-                      <IntentIcon
-                        aria-hidden
-                        className="h-[17px] w-[17px] shrink-0 text-muted-foreground transition-colors duration-[var(--motion-fast)] group-hover:text-foreground group-focus-visible:text-foreground"
+          <div
+            data-testid="harness-landing-suggestions"
+            data-state={showStarterIntents ? 'visible' : 'hidden'}
+            className={showStarterIntents ? 'oa-harness-starters mt-7' : 'hidden'}
+            inert={!showStarterIntents}
+          >
+            <div className="flex h-7 items-center justify-between px-1">
+              <span className="text-[12px] font-medium text-muted-foreground">
+                {t(`${copyKey}.examplesLabel`)}
+              </span>
+              {mode === 'chat' && exampleGroups.length > 1 && (
+                <Tooltip>
+                  <TooltipTrigger
+                    render={(
+                      <Button
+                        type="button"
+                        onClick={() => setExamplePage((page) => (page + 1) % exampleGroups.length)}
+                        disabled={launching}
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-muted-foreground"
+                        aria-label={t('chatLanding.moreExamples')}
                       />
-                      <StableIntentLabel>{example.title}</StableIntentLabel>
-                    </button>
-                  )
-                })}
-              </div>
+                    )}
+                  >
+                    <RefreshCw aria-hidden className="h-3.5 w-3.5" />
+                  </TooltipTrigger>
+                  <TooltipContent>{t('chatLanding.moreExamples')}</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+            <div role="group" aria-label={t(`${copyKey}.examplesLabel`)}>
+              {examples.map((example) => {
+                const IntentIcon = WORKFLOW_ICONS[example.id] ?? SearchCheck
+                return (
+                  <button
+                    key={example.id}
+                    type="button"
+                    onClick={() => useExample(example.prompt)}
+                    disabled={launching}
+                    className="group flex min-h-11 w-full items-center gap-3 border-b border-border/70 px-1 text-left outline-none transition-colors duration-[var(--motion-fast)] hover:border-border hover:text-foreground focus-visible:border-ring disabled:opacity-40"
+                  >
+                    <IntentIcon
+                      aria-hidden
+                      className="h-[17px] w-[17px] shrink-0 text-muted-foreground transition-colors duration-[var(--motion-fast)] group-hover:text-foreground group-focus-visible:text-foreground"
+                    />
+                    <StableIntentLabel>{example.title}</StableIntentLabel>
+                  </button>
+                )
+              })}
             </div>
           </div>
         </div>
@@ -545,31 +535,29 @@ function HarnessLandingPage({
           <div className="oa-harness-composer isolate">
             <div
               data-testid="harness-landing-context"
-              className="oa-harness-context-tray relative z-0 mx-[13px] -mb-3 flex min-h-12 min-w-0 items-start gap-3 overflow-hidden rounded-t-[20px] px-3 pb-4 pt-2 text-[12px] leading-4 text-muted-foreground"
+              className="oa-harness-context-tray relative z-0 mx-[13px] -mb-3 flex min-h-12 min-w-0 items-center gap-0.5 overflow-hidden rounded-t-[20px] px-3 pb-4 pt-2 text-[12px] leading-4 text-muted-foreground"
             >
-              <div className="flex min-w-0 items-center gap-0.5 overflow-hidden">
-                <HarnessWorkspacePicker
-                  mode={mode}
-                  workspace={workspaceTarget}
-                  options={chatWorkspaceOptions}
-                  locked={targetWs !== undefined || mode !== 'chat'}
-                  onSelect={(workspaceId) => {
-                    setSelectedWorkspaceId(workspaceId)
-                    launchConfig.resetCredentialSelection()
-                  }}
-                  onClear={targetWs && mode === 'chat'
-                    ? () => openOrFocus({ kind: landingKind, params: {} })
-                    : undefined}
-                />
-                <AgentLaunchSelectors
-                  ref={launchSelectorsRef}
-                  config={launchConfig}
-                  onConfigureProvider={goConfigureProvider}
-                  showAi={false}
-                  menuPlacement="up"
-                  toolbar
-                />
-              </div>
+              <HarnessWorkspacePicker
+                mode={mode}
+                workspace={workspaceTarget}
+                options={chatWorkspaceOptions}
+                locked={targetWs !== undefined || mode !== 'chat'}
+                onSelect={(workspaceId) => {
+                  setSelectedWorkspaceId(workspaceId)
+                  launchConfig.resetCredentialSelection()
+                }}
+                onClear={targetWs && mode === 'chat'
+                  ? () => openOrFocus({ kind: landingKind, params: {} })
+                  : undefined}
+              />
+              <AgentLaunchSelectors
+                ref={launchSelectorsRef}
+                config={launchConfig}
+                onConfigureProvider={goConfigureProvider}
+                showAi={false}
+                menuPlacement="up"
+                toolbar
+              />
             </div>
             <div
               data-testid="harness-composer-shell"
@@ -673,7 +661,6 @@ function HarnessLandingPage({
         </div>
       </div>
     </div>
-    </TooltipProvider>
   )
 }
 

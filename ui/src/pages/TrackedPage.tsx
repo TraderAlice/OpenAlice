@@ -202,7 +202,10 @@ export function TrackedPage() {
         ) : !hasAnchors && (listError || issueListError) ? (
           <CollectionLoadError refreshing={refreshing} onRetry={refreshEntities} />
         ) : !hasAnchors ? (
-          <TrackedEmptyState />
+          <SharedEmptyState
+            icon={<TrendingUp aria-hidden />}
+            title={t('tracked.nothingTrackedYet')}
+          />
         ) : viewMode === 'graph' ? (
           graphLoading && !graphWithIssues ? (
             <PageLoading />
@@ -391,16 +394,6 @@ function TrackedListSkeleton() {
         </div>
       ))}
     </div>
-  )
-}
-
-function TrackedEmptyState() {
-  const { t } = useTranslation()
-  return (
-    <SharedEmptyState
-      icon={<TrendingUp aria-hidden />}
-      title={t('tracked.nothingTrackedYet')}
-    />
   )
 }
 

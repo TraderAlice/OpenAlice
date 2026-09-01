@@ -54,22 +54,30 @@ export function Section({ id, title, description, children }: SectionProps) {
 // ==================== ConfigSection ====================
 
 interface ConfigSectionProps {
+  id?: string
   title: ReactNode
   description?: string
   children: ReactNode
   titleId?: string
   focusableTitle?: boolean
+  className?: string
 }
 
 export function ConfigSection({
+  id,
   title,
   description,
   children,
   titleId,
   focusableTitle = false,
+  className = '',
 }: ConfigSectionProps) {
   return (
-    <section className="min-w-0 border-b border-border/60 py-5 last:border-b-0">
+    <section
+      id={id}
+      aria-labelledby={titleId}
+      className={`min-w-0 border-b border-border/60 py-5 last:border-b-0 ${className}`}
+    >
       <div className="mb-3 min-w-0">
         <h3
           id={titleId}

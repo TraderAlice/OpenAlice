@@ -133,7 +133,11 @@ export function InboxPage({ visible }: InboxPageProps) {
           {loading && entries.length === 0 ? (
             <InboxLoadingSkeleton />
           ) : entries.length === 0 ? (
-            <InboxEmptyState />
+            <SharedEmptyState
+              icon={<MessageSquare aria-hidden />}
+              title={t('inbox.noMessages')}
+              description={t('inbox.emptyHint')}
+            />
           ) : !selected ? (
             <div className="px-6 py-8 text-muted-foreground text-sm">
               {t('inbox.selectFromSidebar')}
@@ -194,17 +198,6 @@ function InboxLoadingSkeleton() {
         </div>
       ))}
     </div>
-  )
-}
-
-function InboxEmptyState() {
-  const { t } = useTranslation()
-  return (
-    <SharedEmptyState
-      icon={<MessageSquare aria-hidden />}
-      title={t('inbox.noMessages')}
-      description={t('inbox.emptyHint')}
-    />
   )
 }
 

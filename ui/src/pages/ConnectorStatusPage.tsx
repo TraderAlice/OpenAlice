@@ -477,7 +477,7 @@ function AvailableConnectorGroup({
             className="oa-status-surface flex min-w-0 flex-col gap-3 rounded-lg border border-border/70 bg-secondary/10 p-4 sm:flex-row sm:items-center"
           >
             <div className="flex min-w-0 flex-1 items-center gap-3">
-              <ConnectorGlyph id={definition.id} />
+              <ConnectorBrandMark id={definition.id} className="size-10" />
               <div className="min-w-0">
                 <h4 className="text-[14px] font-semibold text-foreground">{definition.label}</h4>
                 <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11.5px] text-muted-foreground">
@@ -549,7 +549,7 @@ function ConnectorOverviewCard({
     <article className="oa-status-surface flex flex-col rounded-lg border border-border/70 bg-secondary/15 p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <ConnectorGlyph id={definition.id} />
+          <ConnectorBrandMark id={definition.id} className="size-10" />
           <h4 className="min-w-0 text-[15px] font-semibold text-foreground">{definition.label}</h4>
         </div>
         <StatusBadge tone={presentation.tone}>{presentation.label}</StatusBadge>
@@ -775,10 +775,6 @@ function SummaryPill({ tone = 'neutral', children }: { tone?: 'neutral' | 'dange
       {children}
     </span>
   )
-}
-
-function ConnectorGlyph({ id }: { id: string }) {
-  return <ConnectorBrandMark id={id} className="size-10" />
 }
 
 function formatDate(value: string): string {
