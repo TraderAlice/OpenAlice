@@ -862,6 +862,50 @@ describe('OfficePage localization', () => {
     expect(await screen.findByRole('dialog', { name: /Codex/ })).toBeTruthy()
   })
 
+  it('opens an exact Session inside the Harness that owns its Office', async () => {
+    officeFloorMock.mockReturnValue({
+      ...defaultOfficeFloor(),
+      building: {
+        ...defaultOfficeFloor().building,
+        offices: [{
+          workspace: { id: 'chat-custom', tag: 'chat-jun15', harness: 'chat' },
+          lastInteractionAt: Date.now(),
+          sleeping: false,
+          employees: [{
+            resumeId: 'resume-grok',
+            sessionRecordId: 'grok-brisk-maple-path',
+            agent: 'grok',
+            name: 'g6',
+            title: 'Inspect the Harness-owned Session route',
+            mood: 'idle' as const,
+            awake: false,
+            bubble: null,
+            lastSeq: 1,
+            lastInteractionAt: 1,
+            drawers: [],
+          }],
+        }],
+      },
+    })
+
+    render(<OfficePage />)
+
+    await userEvent.click(screen.getByTestId('office-desk-resume-grok'))
+    await userEvent.click(await screen.findByRole('button', { name: '打开 Session' }))
+
+    expect(openOrFocusMock).toHaveBeenLastCalledWith({
+      kind: 'workspace',
+      params: {
+        wsId: 'chat-custom',
+        sessionId: 'grok-brisk-maple-path',
+        source: 'chat',
+      },
+    })
+    expect(navigateMock).toHaveBeenLastCalledWith('/office/return', {
+      state: { officeExcursion: true },
+    })
+  })
+
   it('opens a failed coworker activity at its last event and returns to the Agent file', async () => {
     officeFloorMock.mockReturnValue({
       ...defaultOfficeFloor(),
