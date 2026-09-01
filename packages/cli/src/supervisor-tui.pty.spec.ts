@@ -28,6 +28,10 @@ const launchpadFixtureEntry = join(
   dirname(fileURLToPath(import.meta.url)),
   '__fixtures__/supervisor-launchpad-tui-fixture.ts',
 )
+const eventLensFixtureEntry = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '__fixtures__/supervisor-event-lens-tui-fixture.ts',
+)
 const cliPackageRoot = dirname(dirname(cliEntry))
 const cliVersion = JSON.parse(
   await readFile(join(cliPackageRoot, 'package.json'), 'utf8'),
@@ -41,6 +45,59 @@ afterEach(async () => {
 })
 
 describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
+  it('hovers and selects an Event Lens row with raw pointer input', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-event-lens-pointer-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [eventLensFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let hovered = false
+      let clicked = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Event Lens pointer timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!opened && output.includes('[ l ] Logs')) {
+          opened = true
+          child.write('l')
+        } else if (!hovered && output.includes('Event Lens · LINE 10 · INFO · TEXT')) {
+          hovered = true
+          child.write('\u001b[<35;20;11M')
+        } else if (!clicked && output.includes('│ » !  9  03:04:09Z Fixture event 9')) {
+          clicked = true
+          child.write('\u001b[<0;20;11M')
+        } else if (clicked && output.includes('Event Lens · LINE 9 · WARNING · JSON')) {
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor Event Lens pointer exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('│ » !  9  03:04:09Z Fixture event 9')
+    expect(transcript).toContain('Event Lens · LINE 9 · WARNING · JSON')
+    expect(transcript).toContain('FIXTURE_RESULT event-lens')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
   it('hovers and clicks the Launchpad primary surface outside its keycap', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-launchpad-pointer-'))
     temporaryPaths.push(isolatedHome)

@@ -1,3 +1,4 @@
+import { displayWidth, truncateDisplayWidth } from './supervisor-fleet.ts'
 import { renderSupervisorPanel } from './supervisor-tui-view.ts'
 
 export type SupervisorLogFilter = 'all' | 'attention' | 'errors'
@@ -7,9 +8,25 @@ export interface SupervisorRuntimeLogs {
   truncated?: boolean
 }
 
+export interface SupervisorLogTarget {
+  /** 1-based row inside the complete Event Lens rendering. */
+  row: number
+  startColumn: number
+  endColumn: number
+  fromEnd: number
+}
+
+export interface SupervisorLogRender {
+  lines: string[]
+  targets: SupervisorLogTarget[]
+}
+
 interface FormattedLogEntry {
   glyph: '·' | '!' | '×'
+  severity: 'INFO' | 'WARNING' | 'ERROR'
+  format: 'JSON' | 'TEXT'
   text: string
+  raw: string
 }
 
 interface IndexedLogEntry extends FormattedLogEntry {
@@ -44,34 +61,114 @@ export function renderSupervisorLogs(
   width: number,
   fromEnd: number,
   filter: SupervisorLogFilter,
-): string[] {
-  if (!logs) return ['Press l to load the bounded, redacted Runtime log tail.']
+  hoveredFromEnd: number | null = null,
+): SupervisorLogRender {
+  if (!logs) {
+    return {
+      lines: renderSupervisorPanel('Event stream', 'NOT LOADED', [
+        'Press l to load the bounded, redacted Runtime log tail.',
+      ], width),
+      targets: [],
+    }
+  }
   const sourceEntries = logs.entries ?? []
-  if (sourceEntries.length === 0) return ['No Runtime log entries were found.']
+  if (sourceEntries.length === 0) {
+    return {
+      lines: renderSupervisorPanel('Event stream', 'EMPTY', [
+        'No Runtime log entries were found.',
+      ], width),
+      targets: [],
+    }
+  }
   const entries = filterLogEntries(logs, filter)
   if (entries.length === 0) {
-    return renderSupervisorPanel('Runtime Logs', `0/${sourceEntries.length} · ${filter.toUpperCase()}`, [
-      filter === 'errors'
-        ? '✓ No error log entries in this snapshot.'
-        : '✓ No warning or error log entries in this snapshot.',
-      'Press f to return to another severity view.',
-    ], width)
+    return {
+      lines: renderSupervisorPanel('Event stream', `0/${sourceEntries.length} · ${filter.toUpperCase()}`, [
+        filter === 'errors'
+          ? '✓ No error log entries in this snapshot.'
+          : '✓ No warning or error log entries in this snapshot.',
+        'Press f to return to another severity view.',
+      ], width),
+      targets: [],
+    }
   }
 
-  const visible = 12
-  const safeFromEnd = clamp(fromEnd, 0, Math.max(0, entries.length - 1))
-  const end = Math.max(1, entries.length - safeFromEnd)
-  const start = Math.max(0, end - visible)
-  const filterMeta = filter === 'all'
-    ? ''
-    : ` · ${filter.toUpperCase()} · ${entries.length}/${sourceEntries.length}`
-  const position = `${start + 1}–${end}/${entries.length}${filterMeta}${safeFromEnd === 0 ? ' · LATEST' : ''}`
+  const safeFromEnd = clamp(fromEnd, 0, entries.length - 1)
+  const selectedIndex = entries.length - 1 - safeFromEnd
+  const selected = entries[selectedIndex]!
+  const wide = width >= 100
+  const visible = wide ? 10 : width < 60 ? 4 : 7
+  const start = windowStart(selectedIndex, entries.length, visible)
+  const end = Math.min(entries.length, start + visible)
   const numberWidth = String(sourceEntries.length).length
-  const rows = entries.slice(start, end).map((entry) => (
-    `${entry.glyph} ${String(entry.number).padStart(numberWidth, ' ')}  ${entry.text}`.trimEnd()
-  ))
-  if (logs.truncated && start === 0) rows.unshift('· … earlier lines were omitted by the bounded reader')
-  return renderSupervisorPanel('Runtime Logs', position, rows, width)
+  const omitted = Boolean(logs.truncated && start === 0)
+  const listRows = entries.slice(start, end).map((entry, relativeIndex) => {
+    const index = start + relativeIndex
+    const rowFromEnd = entries.length - 1 - index
+    const marker = index === selectedIndex ? '›' : rowFromEnd === hoveredFromEnd ? '»' : ' '
+    return `${marker} ${entry.glyph} ${String(entry.number).padStart(numberWidth, ' ')}  ${entry.text}`.trimEnd()
+  })
+  if (omitted) listRows.unshift('· … earlier lines were omitted by the bounded reader')
+
+  const filterMeta = filter === 'all'
+    ? 'ALL'
+    : `${filter.toUpperCase()} · ${entries.length}/${sourceEntries.length}`
+  const position = `${start + 1}–${end}/${entries.length} · ${filterMeta}${safeFromEnd === 0 ? ' · LATEST' : ''}`
+  const detailRows = eventDetailRows(
+    selected,
+    wide ? Math.max(24, Math.floor(width * 0.46) - 4) : Math.max(20, width - 4),
+  )
+
+  if (wide) {
+    const gap = 3
+    const listWidth = Math.max(48, Math.floor(width * 0.54))
+    const detailWidth = Math.max(24, width - listWidth - gap)
+    const bodyHeight = Math.max(listRows.length, detailRows.length)
+    const left = renderSupervisorPanel(
+      'Event stream',
+      position,
+      padRows(listRows, bodyHeight),
+      listWidth,
+    )
+    const right = renderSupervisorPanel(
+      'Event Lens',
+      `LINE ${selected.number} · ${selected.severity} · ${selected.format}`,
+      padRows(detailRows, bodyHeight),
+      detailWidth,
+    )
+    return {
+      lines: left.map((line, index) => joinColumns(
+        line,
+        right[index] ?? '',
+        listWidth,
+        gap,
+        width,
+      )),
+      targets: entries.slice(start, end).map((_, relativeIndex) => ({
+        row: relativeIndex + 2 + (omitted ? 1 : 0),
+        startColumn: 2,
+        endColumn: listWidth - 1,
+        fromEnd: entries.length - 1 - (start + relativeIndex),
+      })),
+    }
+  }
+
+  const list = renderSupervisorPanel('Event stream', position, listRows, width)
+  const detail = renderSupervisorPanel(
+    'Event Lens',
+    `LINE ${selected.number} · ${selected.severity} · ${selected.format}`,
+    detailRows,
+    width,
+  )
+  return {
+    lines: [...list, '', ...detail],
+    targets: entries.slice(start, end).map((_, relativeIndex) => ({
+      row: relativeIndex + 2 + (omitted ? 1 : 0),
+      startColumn: 2,
+      endColumn: Math.max(2, width - 1),
+      fromEnd: entries.length - 1 - (start + relativeIndex),
+    })),
+  }
 }
 
 function filterLogEntries(
@@ -96,7 +193,7 @@ function filterLogEntries(
 
 function formatRuntimeLogEntry(value: string): FormattedLogEntry {
   const trimmed = value.trim()
-  if (!trimmed) return { glyph: '·', text: '' }
+  if (!trimmed) return { glyph: '·', severity: 'INFO', format: 'TEXT', text: '', raw: '' }
   try {
     const parsed: unknown = JSON.parse(trimmed)
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
@@ -111,9 +208,13 @@ function formatRuntimeLogEntry(value: string): FormattedLogEntry {
         .slice(0, 3)
         .map(([key, field]) => `${sanitize(key)}=${formatRuntimeLogField(field)}`)
         .join(' ')
+      const glyph = logLevelGlyph(level)
       return {
-        glyph: logLevelGlyph(level),
+        glyph,
+        severity: logSeverity(glyph),
+        format: 'JSON',
         text: [time, message, context ? `· ${context}` : ''].filter(Boolean).join(' '),
+        raw: sanitize(trimmed),
       }
     }
   } catch {
@@ -123,7 +224,15 @@ function formatRuntimeLogEntry(value: string): FormattedLogEntry {
   const severity = /\b(error|fatal|failed|failure)\b/iu.test(safe)
     ? 'error'
     : /\b(warn|warning)\b/iu.test(safe) ? 'warn' : 'info'
-  return { glyph: logLevelGlyph(severity), text: safe }
+  const glyph = logLevelGlyph(severity)
+  return { glyph, severity: logSeverity(glyph), format: 'TEXT', text: safe, raw: safe }
+}
+
+function eventDetailRows(entry: IndexedLogEntry, width: number): string[] {
+  const contentWidth = Math.max(1, width)
+  const summary = wrapDisplayText(entry.text || 'Empty log entry.', contentWidth).slice(0, 2)
+  const raw = wrapDisplayText(`Raw · ${entry.raw || '(empty)'}`, contentWidth).slice(0, 2)
+  return [...summary, ...raw]
 }
 
 function formatRuntimeLogTime(value: unknown): string {
@@ -148,6 +257,49 @@ function logLevelGlyph(level: string): FormattedLogEntry['glyph'] {
   if (level === 'fatal' || level === 'error') return '×'
   if (level === 'warn' || level === 'warning') return '!'
   return '·'
+}
+
+function logSeverity(glyph: FormattedLogEntry['glyph']): FormattedLogEntry['severity'] {
+  if (glyph === '×') return 'ERROR'
+  if (glyph === '!') return 'WARNING'
+  return 'INFO'
+}
+
+function windowStart(selected: number, total: number, visible: number): number {
+  const centered = selected - Math.floor(visible / 2)
+  return clamp(centered, 0, Math.max(0, total - visible))
+}
+
+function padRows(rows: string[], height: number): string[] {
+  return [...rows, ...Array.from({ length: Math.max(0, height - rows.length) }, () => '')]
+}
+
+function joinColumns(
+  left: string,
+  right: string,
+  leftWidth: number,
+  gap: number,
+  width: number,
+): string {
+  const safeLeft = truncateDisplayWidth(left, leftWidth)
+  const combined = `${safeLeft}${' '.repeat(Math.max(0, leftWidth - displayWidth(safeLeft) + gap))}${right}`
+  return truncateDisplayWidth(combined, width)
+}
+
+function wrapDisplayText(value: string, width: number): string[] {
+  const lines: string[] = []
+  let line = ''
+  for (const word of value.split(/\s+/u).filter(Boolean)) {
+    const candidate = line ? `${line} ${word}` : word
+    if (displayWidth(candidate) <= width) {
+      line = candidate
+      continue
+    }
+    if (line) lines.push(line)
+    line = truncateDisplayWidth(word, width)
+  }
+  if (line || lines.length === 0) lines.push(line)
+  return lines
 }
 
 function sanitize(value: string): string {

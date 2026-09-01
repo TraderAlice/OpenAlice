@@ -511,12 +511,21 @@ describe('Supervisor TUI screen', () => {
       },
     }, { requestRender })
 
-    expect(screen.render(80).join('\n')).toContain('9–20/20 · LATEST')
+    expect(screen.render(80).join('\n')).toContain('14–20/20 · ALL · LATEST')
+    expect(screen.render(80).join('\n')).toContain('Event Lens · LINE 20 · INFO · TEXT')
     expect(screen.render(80).join('\n')).toContain('[ l ] Reload')
     expect(screen.handleKey('up', matchesKey)).toBe(true)
-    expect(screen.render(80).join('\n')).toContain('8–19/20')
+    expect(screen.render(80).join('\n')).toContain('Event Lens · LINE 19 · INFO · TEXT')
     expect(screen.handleKey('end', matchesKey)).toBe(true)
-    expect(screen.render(80).join('\n')).toContain('9–20/20 · LATEST')
+    expect(screen.render(80).join('\n')).toContain('14–20/20 · ALL · LATEST')
+    const logLines = screen.render(80)
+    const previousEventRow = logLines.findIndex((line) => line.includes('log line 19')) + 1
+    expect(screen.handlePointer({
+      button: 32, col: 8, row: previousEventRow, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(80)[previousEventRow - 1]).toContain('» · 19  log line 19')
+    expect(screen.handlePointer(pointerClick(8, previousEventRow))).toBe(true)
+    expect(screen.render(80).join('\n')).toContain('Event Lens · LINE 19 · INFO · TEXT')
 
     screen.update({
       panel: 'logs',
@@ -536,6 +545,7 @@ describe('Supervisor TUI screen', () => {
     expect(screen.handleKey('f', matchesKey)).toBe(true)
     const attentionLogs = screen.render(80).join('\n')
     expect(attentionLogs).toContain('ATTENTION · 1/2 · LATEST')
+    expect(attentionLogs).toContain('Event Lens · LINE 1 · WARNING · JSON')
     expect(attentionLogs).toContain('! 1  03:04:05Z Runtime probe slowed')
     expect(attentionLogs).not.toContain('plain adapter output')
     expect(attentionLogs).toContain('[ f ] Show errors')
@@ -576,6 +586,26 @@ describe('Supervisor TUI screen', () => {
     })).toBe(true)
     expect(screen.render(80).join('\n')).toContain('Inspection · 2/3 · WARNING')
     expect(requestRender).toHaveBeenCalled()
+  })
+
+  it('treats keycap-like log text as an Event Lens row instead of a command', () => {
+    const detach = vi.fn()
+    const requestRender = vi.fn()
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'logs',
+      runtime: { class: 'running', endpoints: {} },
+      logs: { entries: [{ text: '[ q ] adapter emitted this text' }] },
+    }, { onDetach: detach, requestRender })
+
+    const lines = screen.render(80)
+    const row = lines.findIndex((line) => line.includes('[ q ] adapter emitted')) + 1
+    const col = lines[row - 1]!.indexOf('[ q ]') + 2
+    expect(screen.handlePointer(pointerClick(col, row))).toBe(true)
+    expect(detach).not.toHaveBeenCalled()
+    expect(requestRender).toHaveBeenCalledOnce()
+    expect(screen.render(80).join('\n')).toContain('Event Lens · LINE 1 · INFO · TEXT')
   })
 
   it('offers Start for a stopped compatible remote AliceProject', () => {

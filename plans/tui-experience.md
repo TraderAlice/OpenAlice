@@ -143,6 +143,21 @@ not imply maintainer approval of the finished interaction.
   preserving original source line numbers; the navigation badge continues to
   report the complete loaded snapshot.
 
+### Runtime Event Lens decision
+
+- Keeping the filtered log page as a passive tail would preserve simple paging,
+  but it would still make every event compete in one text plane and leave mouse
+  input useful only for scrolling.
+- Porting OMP's complete debug-log viewer would add selection ranges, clipboard,
+  text search, older-file loading, and process filtering that OpenAlice's
+  bounded/redacted Logs contract does not currently own.
+- The selected model ports only OMP's cursor-as-context pattern. The latest
+  matching event starts focused; keyboard, wheel, hover, and whole-row click
+  move one selection; a responsive Event Lens exposes that event's source line,
+  severity, JSON/text format, semantic projection, and sanitized raw content.
+  Wide terminals use a stream/Inspector split and 80-column terminals stack the
+  same model without another read or lifecycle path.
+
 ### Operational navigation decision
 
 - Static route labels are simple but require opening every page to discover
@@ -307,6 +322,8 @@ already large `supervisor-tui.ts` application controller.
   responsive labels and render-derived hover/click geometry.
 - [x] Add local severity views to Runtime Logs without widening the bounded
   reader or changing the snapshot contract.
+- [x] Replace the passive Runtime Logs tail with a selectable Event Lens and
+  responsive Inspector while preserving the same bounded snapshot.
 - [x] Replace the static Command Deck with a contextual, selectable, whole-row
   mouse-capable Command Palette.
 - [x] Replace Doctor's flat line scroller with a responsive, selectable
@@ -594,6 +611,22 @@ already large `supervisor-tui.ts` application controller.
   and restored cursor, mouse, and bracketed-paste modes. CLI build/typecheck,
   root TypeScript, and the 692-file suite pass (691 passed, 1 skipped; 6099
   tests passed, 10 skipped). Docker installer smoke and package dry-run pass.
+- Runtime Logs is now an OMP-inspired selectable Event Lens instead of a
+  passive tail. The latest matching event owns focus; keyboard movement,
+  pointer wheel, whole-row hover, and click update one selection. Wide layouts
+  pair Event stream and Inspector columns, while 80-column layouts stack them.
+  The Lens identifies original source line, semantic severity, JSON/text
+  format, projected content, and sanitized raw content without widening the
+  bounded/redacted reader.
+- Event-Lens acceptance passes with 121 focused Supervisor screen, Logs,
+  pointer, modal, Palette, Fleet, Doctor, transfer, and real-PTY tests. An
+  isolated real 80x24 color fixture loaded ten mixed events, hovered and clicked
+  warning line 9 with raw SGR reports, changed the Lens from line 10 to
+  `LINE 9 · WARNING · JSON`, and restored cursor, mouse, and bracketed-paste
+  modes. CLI build/typecheck, root TypeScript, and the 692-file suite pass (691
+  passed, 1 skipped; 6102 tests passed, 10 skipped). Docker installer smoke
+  passes, and package dry-run retains `src/supervisor-tui-logs.ts` while
+  excluding the PTY fixture.
 
 ## Completion Criteria
 

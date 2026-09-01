@@ -572,12 +572,17 @@ openalice logs --lines 200
 openalice logs --lines 200 --json
 ```
 
-The TUI projects that same bounded snapshot into a numbered Runtime Logs panel.
+The TUI projects that same bounded snapshot into a selectable Event stream and
+Event Lens.
 OpenAlice JSON log lines are rendered best-effort as severity, clock time,
 message, then compact context so the useful event survives terminal clipping;
-unrecognized and third-party lines remain plain text. Up/Down, Page Up/Page
-Down, Home/End, and the mouse wheel navigate the snapshot; End returns to the
-`LATEST` edge and `l` reloads it. `f`, or its clickable footer keycap, cycles
+unrecognized and third-party lines remain plain text. The latest matching event
+starts focused. Up/Down, Page Up/Page Down, Home/End, the mouse wheel, pointer
+hover, and whole-row click share that focus model; the Lens follows it with the
+source line, semantic severity, JSON/text format, projected message, and
+sanitized raw content. Wide terminals split stream and Lens while 80-column and
+narrow terminals stack the same information. End returns to the `LATEST` edge
+and `l` reloads it. `f`, or its clickable footer keycap, cycles
 All, Attention (warning plus error), and Errors views locally over that loaded
 snapshot. Filtering retains the source line numbers, resets navigation to the
 latest matching entry, and shows an explicit healthy empty state; it performs

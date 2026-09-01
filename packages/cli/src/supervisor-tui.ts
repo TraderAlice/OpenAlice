@@ -111,6 +111,7 @@ import {
   supervisorFilteredLogCount,
   supervisorLogFilterLabel,
   type SupervisorLogFilter,
+  type SupervisorLogTarget,
   type SupervisorRuntimeLogs as RuntimeLogs,
 } from './supervisor-tui-logs.ts'
 import {
@@ -2646,6 +2647,8 @@ export class SupervisorScreen implements Component {
   private runtimePulse = false
   private logsFromEnd = 0
   private logFilter: SupervisorLogFilter = 'all'
+  private hoveredLogFromEnd: number | null = null
+  private logTargets: SupervisorLogTarget[] = []
   private doctorState: SupervisorDoctorState = createSupervisorDoctorState()
   private doctorTargets: SupervisorDoctorTarget[] = []
   private helpState: SupervisorHelpState = createSupervisorHelpState()
@@ -2714,7 +2717,10 @@ export class SupervisorScreen implements Component {
   update(patch: Partial<SupervisorSnapshot>): void {
     const wasBusy = Boolean(this.snapshot.busy)
     const previousConfirmation = this.snapshot.confirmation
-    if (patch.logs !== undefined && patch.logs !== this.snapshot.logs) this.logsFromEnd = 0
+    if (patch.logs !== undefined && patch.logs !== this.snapshot.logs) {
+      this.logsFromEnd = 0
+      this.hoveredLogFromEnd = null
+    }
     if (patch.doctor !== undefined && patch.doctor !== this.snapshot.doctor) {
       this.doctorState = createSupervisorDoctorState(patch.doctor)
     }
@@ -3117,6 +3123,13 @@ export class SupervisorScreen implements Component {
           && event.col <= target.endColumn
         ))
       : undefined
+    const logTarget = !this.commandDeckOpen && this.snapshot.panel === 'logs'
+      ? this.logTargets.find((target) => (
+          target.row === event.row
+          && event.col >= target.startColumn
+          && event.col <= target.endColumn
+        ))
+      : undefined
     const helpTarget = !this.commandDeckOpen && this.snapshot.panel === 'help'
       ? this.helpTargets.find((target) => (
           target.row === event.row
@@ -3139,6 +3152,8 @@ export class SupervisorScreen implements Component {
         || commandTarget?.label !== this.hoveredCommandTarget?.label
       const doctorHover = doctorTarget?.index ?? null
       const doctorHoverChanged = doctorHover !== this.doctorState.hovered
+      const logHover = logTarget?.fromEnd ?? null
+      const logHoverChanged = logHover !== this.hoveredLogFromEnd
       const helpHover = helpTarget?.index ?? null
       const helpHoverChanged = helpHover !== this.helpState.hovered
       const homeHover = Boolean(homePrimaryTarget)
@@ -3148,6 +3163,7 @@ export class SupervisorScreen implements Component {
         || fleetHoverChanged
         || commandHoverChanged
         || doctorHoverChanged
+        || logHoverChanged
         || helpHoverChanged
         || homeHoverChanged
       ) {
@@ -3155,6 +3171,7 @@ export class SupervisorScreen implements Component {
         this.hoveredFleetTarget = fleetTarget
         this.hoveredCommandTarget = commandTarget
         this.doctorState = { ...this.doctorState, hovered: doctorHover }
+        this.hoveredLogFromEnd = logHover
         this.helpState = { ...this.helpState, hovered: helpHover }
         this.homePrimaryHovered = homeHover
         this.requestRender?.()
@@ -3164,6 +3181,12 @@ export class SupervisorScreen implements Component {
     if (event.leftClick && hovered) {
       this.hoveredPanel = hovered
       this.selectPanel(hovered)
+      return true
+    }
+    if (event.leftClick && logTarget) {
+      this.logsFromEnd = logTarget.fromEnd
+      this.hoveredLogFromEnd = logTarget.fromEnd
+      this.requestRender?.()
       return true
     }
     if (event.leftClick && commandTarget) {
@@ -3252,6 +3275,7 @@ export class SupervisorScreen implements Component {
     ]
 
     this.doctorTargets = []
+    this.logTargets = []
     this.helpTargets = []
     this.homePrimaryTarget = undefined
     if (this.snapshot.panel === 'fleet' && this.snapshot.fleet) {
@@ -3262,12 +3286,19 @@ export class SupervisorScreen implements Component {
         this.runtimePulse,
       ))
     } else if (this.snapshot.panel === 'logs') {
-      lines.push(...renderSupervisorLogs(
+      const logs = renderSupervisorLogs(
         this.snapshot.logs,
         width,
         this.logsFromEnd,
         this.logFilter,
-      ))
+        this.hoveredLogFromEnd,
+      )
+      const rowOffset = lines.length
+      this.logTargets = logs.targets.map((target) => ({
+        ...target,
+        row: target.row + rowOffset,
+      }))
+      lines.push(...logs.lines)
     } else if (this.snapshot.panel === 'doctor') {
       this.doctorState = normalizeSupervisorDoctorState(
         this.doctorState,
@@ -3489,6 +3520,7 @@ export class SupervisorScreen implements Component {
   private selectPanel(panel: SupervisorPanel): void {
     this.setCommandPaletteOpen(false)
     this.homePrimaryHovered = false
+    this.hoveredLogFromEnd = null
     this.update({ panel })
     if (panel === 'logs') this.onAction?.('logs')
     if (panel === 'doctor') this.onAction?.('doctor')
