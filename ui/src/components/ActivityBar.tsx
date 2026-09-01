@@ -1,4 +1,4 @@
-import { ChevronDown, Info, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { ChevronDown, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { type Page } from '../App'
 import { useWorkspace } from '../tabs/store'
@@ -14,6 +14,13 @@ import { useBetaFeatures } from '../live/beta-features'
 import { joinNavLayout, NAV_SECTIONS } from './activity-navigation'
 import { useUiLayout } from '../hooks/useUiLayout'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import { SelectionIndicator } from './SelectionIndicator'
+import { Button } from '@/components/ui/button'
 
 /**
  * Map ActivityBar page enum (visual layout grouping) to the ActivitySection
@@ -45,7 +52,7 @@ interface ActivityBarProps {
   desktopStatic?: boolean
   /** Static desktop rail width chosen by App's shell breakpoints. */
   railMode?: 'compact' | 'narrow' | 'full'
-  /** Force the static rail into icon-only mode at narrow desktop widths. */
+  /** Force the static rail into icon-only mode for a compact workbench. */
   compactRailForced?: boolean
   /** Mobile drawer trigger that receives focus again when the drawer closes. */
   returnFocusRef?: RefObject<HTMLElement | null>
@@ -109,30 +116,44 @@ export function ActivityBar({
   const setRailCollapsed = useActivityBarCollapse((s) => s.setRailCollapsed)
   const shortRailHeight = useMediaQuery('(max-height: 700px)')
   const veryShortRailHeight = useMediaQuery('(max-height: 520px)')
+  const workbenchRail = selectedSidebar === 'chat' ||
+    selectedSidebar === 'auto-quant' ||
+    selectedSidebar === 'prediction'
   const forcedCompactRail = desktopStatic && (
-    compactRailForced || railMode === 'compact' || veryShortRailHeight
+    compactRailForced || workbenchRail || railMode === 'compact' || veryShortRailHeight
   )
   const compactRail = desktopStatic && (forcedCompactRail || railCollapsed)
   const narrowRail = desktopStatic && railMode === 'narrow' && !compactRail
   const denseRail = desktopStatic && shortRailHeight
   const mobileDrawerRef = useRef<HTMLDivElement>(null)
-
   const railContent = (
     <>
-        {/* Branding — h-10 to line up with the Sidebar header and preserve
-            the shell's 40px header rhythm. */}
-        <div className={`${denseRail ? 'h-10 mb-2 md:h-7 md:mb-0.5' : 'h-10 mb-2'} flex items-center shrink-0 ${compactRail ? 'justify-center px-0' : narrowRail ? 'pl-[18px] pr-3 gap-2' : 'pl-[22px] pr-4 gap-2.5'}`}>
+        <div className={`${denseRail ? 'h-10 md:h-8' : 'h-10'} flex shrink-0 items-center ${compactRail ? 'justify-center px-0' : narrowRail ? 'gap-2 px-3' : 'gap-2.5 px-3.5'}`}>
           <img
             src="/alice.ico"
             alt="Alice"
-            className={`${denseRail ? 'h-6 w-6 md:h-5 md:w-5' : 'h-6 w-6'} shrink-0 rounded-full ring-1 ring-border shadow-[0_0_14px_var(--primary-muted)]`}
+            className={`${denseRail ? 'h-6 w-6 md:h-5 md:w-5' : 'h-[22px] w-[22px]'} shrink-0 object-contain`}
             draggable={false}
           />
-          <h1 className={`min-w-0 flex-1 truncate text-[15px] font-semibold text-foreground ${compactRail ? 'md:hidden' : ''}`}>OpenAlice</h1>
+          <h1 className={`min-w-0 flex-1 truncate text-[13px] font-semibold leading-[18px] tracking-[-0.01em] text-foreground ${compactRail ? 'md:hidden' : ''}`}>OpenAlice</h1>
+          {!desktopStatic && (
+            <Button
+              type="button"
+              onClick={onClose}
+              aria-label={t('common.closePanel', { title: t('nav.primaryNavigation') })}
+              className="-mr-1 shrink-0 text-muted-foreground"
+              variant="ghost"
+              size="icon"
+            >
+              <X size={15} strokeWidth={1.75} aria-hidden />
+            </Button>
+          )}
         </div>
 
         {/* Navigation */}
-        <nav className={`flex-1 flex flex-col overflow-x-hidden overflow-y-auto ${denseRail ? 'pb-3 md:pb-0.5' : 'pb-3'} ${compactRail ? 'px-2 md:items-center' : narrowRail ? 'px-2.5' : 'px-3'}`}>
+        <nav
+          className={`flex flex-1 flex-col overflow-x-hidden overflow-y-auto ${denseRail ? 'pb-3 md:pb-1' : 'pb-3 pt-1'} ${compactRail ? 'px-2 md:items-center' : 'px-2'}`}
+        >
           {navSections.map((section, si) => {
             const labeled = section.id !== 'primary'
             // User toggle wins over default. The collapse store stores
@@ -149,11 +170,11 @@ export function ActivityBar({
                 key={section.id}
                 className={
                   compactRail && si > 0
-                    ? `${denseRail ? 'mt-3 pt-3 md:mt-0.5 md:pt-0.5 md:w-8' : 'mt-3 pt-3 md:w-11'} border-t border-border/70`
+                    ? `${denseRail ? 'mt-3 pt-3 md:mt-0.5 md:pt-0.5 md:w-8' : 'mt-3 pt-3 md:w-8'} border-t border-sidebar-border/70`
                     : si > 0
-                      ? denseRail ? 'mt-2' : 'mt-4'
+                      ? denseRail ? 'mt-2' : 'mt-3'
                       : compactRail
-                        ? denseRail ? 'md:w-8' : 'md:w-11'
+                        ? 'md:w-8'
                         : ''
                 }
               >
@@ -168,83 +189,84 @@ export function ActivityBar({
                       section.defaultCollapsed,
                     )}
                     controlsId={`activity-section-${section.id}`}
-                    showItems={showItems}
                   />
                 )}
                 {showItems && (
-                  <div className={`oa-disclosure-enter flex flex-col ${denseRail ? 'gap-1 md:gap-px' : 'gap-1'}`} id={`activity-section-${section.id}`}>
+                  <div className={`flex flex-col ${denseRail ? 'gap-1 md:gap-px' : 'gap-px'}`} id={`activity-section-${section.id}`}>
                     {section.items.map((item) => {
                       const sec = activitySectionFor(item.page)
                       const isActive = selectedSidebar === sec
                       const Icon = item.icon
+                      let badge: { count: number; label: string; tone: string } | null = null
+                      if (item.page === 'inbox' && unreadInbox > 0) {
+                        badge = {
+                          count: unreadInbox,
+                          label: t('nav.unread', { count: unreadInbox }),
+                          tone: 'bg-sidebar-foreground text-sidebar',
+                        }
+                      } else if (item.page === 'portfolio' && pendingPush > 0) {
+                        badge = {
+                          count: pendingPush,
+                          label: t('nav.pendingPush', { count: pendingPush }),
+                          tone: 'bg-info text-info-foreground',
+                        }
+                      } else if (item.page === 'connectors' && connectorWarnings > 0) {
+                        badge = {
+                          count: connectorWarnings,
+                          label: t('nav.connectorNeedsAttention', { count: connectorWarnings }),
+                          tone: 'bg-warning text-warning-foreground',
+                        }
+                      }
                       const handleClick = () => {
                         setSidebar(sec)
                         openOrFocus(item.defaultTab)
                         onClose()
                       }
-                      return (
+                      const label = t(item.labelKey)
+                      const control = (
                         <button
                           key={item.page}
                           type="button"
                           onClick={handleClick}
-                          title={t(item.labelKey)}
+                          aria-label={label}
                           aria-current={isActive ? 'page' : undefined}
                           className={`oa-nav-item relative flex items-center rounded-md text-left ${
                             compactRail
                               ? denseRail
                                 ? 'md:h-[26px] md:w-8 md:min-h-[26px] md:justify-center md:gap-0 md:px-0 md:py-0'
-                                : 'md:h-9 md:w-11 md:min-h-9 md:justify-center md:gap-0 md:px-0 md:py-0'
+                                : 'md:h-8 md:w-8 md:min-h-8 md:justify-center md:gap-0 md:px-0 md:py-0'
                               : denseRail
                                 ? `min-h-[28px] ${narrowRail ? 'gap-2 px-2' : 'gap-2.5 px-2.5'} py-1 text-[12px]`
-                                : `min-h-10 md:min-h-[34px] ${narrowRail ? 'gap-2 px-2.5' : 'gap-3 px-3'} py-1.5 text-[13px]`
+                                : 'min-h-10 gap-2.5 px-2.5 py-1 text-[13px] leading-[18px] md:min-h-8'
                           } ${
                             isActive
-                              ? 'bg-primary-muted text-foreground'
-                              : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                              : 'text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'
                           }`}
                         >
-                          {/* Active indicator — left vertical bar */}
-                          <span
-                            className={`absolute left-0 ${denseRail ? 'top-1.5 bottom-1.5 md:top-0.5 md:bottom-0.5' : 'top-1.5 bottom-1.5'} w-[2px] rounded-r-full bg-primary transition-opacity duration-150 ${
-                              isActive ? 'opacity-100' : 'opacity-0'
-                            }`}
-                            aria-hidden
-                          />
-                          <span className={`oa-nav-icon relative flex items-center justify-center w-5 h-5 shrink-0 ${denseRail ? 'md:w-3.5 md:h-3.5' : ''}`}>
-                            <Icon size={denseRail ? 14 : 16} strokeWidth={1.75} />
+                          {isActive && <SelectionIndicator />}
+                          <span className={`oa-nav-icon relative flex h-[18px] w-[18px] shrink-0 items-center justify-center ${denseRail ? 'md:h-3.5 md:w-3.5' : ''}`}>
+                            <Icon size={denseRail ? 14 : 15} strokeWidth={1.75} />
                           </span>
-                          <span className={`flex-1 truncate ${compactRail ? 'md:hidden' : ''}`}>{t(item.labelKey)}</span>
-                          {item.page === 'inbox' && unreadInbox > 0 && (
+                          <span className={`flex-1 truncate ${compactRail ? 'md:hidden' : ''}`}>{label}</span>
+                          {badge !== null && (
                             <span
-                              aria-label={t('nav.unread', { count: unreadInbox })}
-                              className={`shrink-0 min-w-[18px] h-[18px] px-1.5 rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground tabular-nums flex items-center justify-center ${
+                              aria-label={badge.label}
+                              className={`flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tabular-nums ${badge.tone} ${
                                 compactRail ? 'md:absolute md:-right-1 md:-top-1 md:h-4 md:min-w-4 md:px-1 md:text-[9px]' : ''
                               }`}
                             >
-                              {unreadInbox > 99 ? '99+' : unreadInbox}
-                            </span>
-                          )}
-                          {item.page === 'portfolio' && pendingPush > 0 && (
-                            <span
-                              aria-label={t('nav.pendingPush', { count: pendingPush })}
-                              className={`shrink-0 min-w-[18px] h-[18px] px-1.5 rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground tabular-nums flex items-center justify-center ${
-                                compactRail ? 'md:absolute md:-right-1 md:-top-1 md:h-4 md:min-w-4 md:px-1 md:text-[9px]' : ''
-                              }`}
-                            >
-                              {pendingPush > 99 ? '99+' : pendingPush}
-                            </span>
-                          )}
-                          {item.page === 'connectors' && connectorWarnings > 0 && (
-                            <span
-                              aria-label={t('nav.connectorNeedsAttention', { count: connectorWarnings })}
-                              className={`shrink-0 min-w-[18px] h-[18px] px-1.5 rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground tabular-nums flex items-center justify-center ${
-                                compactRail ? 'md:absolute md:-right-1 md:-top-1 md:h-4 md:min-w-4 md:px-1 md:text-[9px]' : ''
-                              }`}
-                            >
-                              {connectorWarnings > 99 ? '99+' : connectorWarnings}
+                              {badge.count > 99 ? '99+' : badge.count}
                             </span>
                           )}
                         </button>
+                      )
+                      if (!compactRail || !desktopStatic) return control
+                      return (
+                        <Tooltip key={item.page}>
+                          <TooltipTrigger render={control} />
+                          <TooltipContent side="right" sideOffset={8}>{label}</TooltipContent>
+                        </Tooltip>
                       )
                     })}
                   </div>
@@ -255,30 +277,40 @@ export function ActivityBar({
         </nav>
 
         {/* Footer — global icon controls pinned to the bottom of the rail. */}
-        <div className={`shrink-0 flex items-center ${compactRail ? `${denseRail ? 'py-2 md:py-0.5 md:gap-px' : 'py-2 md:gap-1'} px-4 md:flex-col md:items-center md:px-2` : `${narrowRail ? 'px-3' : 'px-4'} border-t border-border py-1.5 justify-between gap-2`}`}>
+        <div className={`flex shrink-0 items-center ${compactRail ? `${denseRail ? 'py-2 md:py-0.5 md:gap-px' : 'py-2 md:gap-1'} px-4 md:flex-col md:items-center md:px-2` : 'justify-between gap-2 border-t border-border/55 px-2 py-1'}`}>
           <ThemeToggle compact={denseRail} />
           {!forcedCompactRail && (
-            <button
-              type="button"
-              onClick={() => setRailCollapsed(!railCollapsed)}
-              title={t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
-              aria-label={t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
-              aria-hidden={!desktopStatic ? true : undefined}
-              tabIndex={!desktopStatic ? -1 : undefined}
-              className={`oa-icon-action hidden ${denseRail ? 'h-9 w-9 md:h-[26px] md:w-[26px]' : 'h-9 w-9'} shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground md:flex`}
-            >
-              {railCollapsed
-                ? <PanelLeftOpen size={denseRail ? 14 : 17} strokeWidth={1.75} aria-hidden />
-                : <PanelLeftClose size={denseRail ? 14 : 17} strokeWidth={1.75} aria-hidden />}
-            </button>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    onClick={() => setRailCollapsed(!railCollapsed)}
+                    aria-label={t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
+                    aria-hidden={!desktopStatic ? true : undefined}
+                    tabIndex={!desktopStatic ? -1 : undefined}
+                    className={`hidden ${denseRail ? 'md:h-[26px] md:w-[26px]' : ''} shrink-0 text-muted-foreground md:flex`}
+                    variant="ghost"
+                    size="icon"
+                  />
+                }
+              >
+                {railCollapsed
+                  ? <PanelLeftOpen size={denseRail ? 14 : 17} strokeWidth={1.75} aria-hidden />
+                  : <PanelLeftClose size={denseRail ? 14 : 17} strokeWidth={1.75} aria-hidden />}
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={8}>
+                {t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
+              </TooltipContent>
+            </Tooltip>
           )}
         </div>
     </>
   )
 
   const railClassName = `
-    w-[280px] ${compactRail ? 'md:w-[60px]' : narrowRail ? 'md:w-[152px]' : 'md:w-[188px]'} h-full flex flex-col shrink-0
-    bg-muted border-r border-border/80
+    w-[280px] ${compactRail ? 'md:w-[50px]' : narrowRail ? 'md:w-[152px]' : 'md:w-[188px]'} h-full flex flex-col shrink-0
+    bg-sidebar border-r border-sidebar-border/70
   `
 
   if (desktopStatic) {
@@ -286,7 +318,8 @@ export function ActivityBar({
       <aside
         id="activity-bar"
         data-testid="activity-bar"
-        className={`${railClassName} static z-auto transition-[width] duration-200 motion-reduce:transition-none`}
+        data-rail-layout={compactRail ? 'compact' : narrowRail ? 'narrow' : 'full'}
+        className={`${railClassName} static z-auto transition-[width] duration-[var(--motion-standard)] [transition-timing-function:var(--motion-ease-out)] motion-reduce:transition-none`}
       >
         {railContent}
       </aside>
@@ -304,11 +337,12 @@ export function ActivityBar({
         ref={mobileDrawerRef}
         id="activity-bar"
         data-testid="activity-bar"
+        data-rail-layout="drawer"
         side="left"
         aria-modal="true"
         aria-describedby={undefined}
         showCloseButton={false}
-        className={`${railClassName} max-w-[85vw] gap-0 p-0 shadow-none motion-reduce:animate-none motion-reduce:transition-none data-[side=left]:w-[280px] data-[side=left]:max-w-[85vw] sm:max-w-[85vw]`}
+        className={`${railClassName} max-w-[85vw] gap-0 overflow-hidden rounded-r-[20px] p-0 motion-reduce:animate-none motion-reduce:transition-none data-[side=left]:w-[280px] data-[side=left]:max-w-[85vw] sm:max-w-[85vw]`}
         initialFocus={() => {
           const drawer = mobileDrawerRef.current
           const current = drawer?.querySelector<HTMLElement>('[aria-current="page"]')
@@ -326,77 +360,44 @@ export function ActivityBar({
 
 // ==================== SectionHeader ====================
 
-/**
- * Section header row: collapse-toggle on the left + optional (i)
- * disclosure on the right that expands the section's `description`
- * prose inline below the row, pushing items down.
- *
- * Why inline rather than a floating popover: the nav uses
- * `overflow-y: auto` for scrolling, which clips horizontally-
- * overflowing absolute children. An inline disclosure sidesteps that
- * entirely and lets the prose use full sidebar width.
- *
- * Hint visibility is component-local state — every fresh mount starts
- * collapsed. Intentional: the description is reference info, not a
- * preference worth persisting.
- */
 function SectionHeader({
   label,
   description,
   isCollapsed,
   onToggleCollapse,
   controlsId,
-  showItems,
 }: {
   label: string
   description?: string
   isCollapsed: boolean
   onToggleCollapse: () => void
   controlsId: string
-  showItems: boolean
 }) {
-  const { t } = useTranslation()
-  const [hintOpen, setHintOpen] = useState(false)
+  const control = (
+    <button
+      type="button"
+      onClick={onToggleCollapse}
+      className="mb-0.5 flex min-h-10 w-full items-center gap-1.5 px-2.5 py-1 text-left text-[12px] font-medium leading-4 text-muted-foreground/75 transition-colors hover:text-foreground md:min-h-6"
+      aria-expanded={!isCollapsed}
+      aria-controls={controlsId}
+      aria-label={label}
+    >
+      <ChevronDown
+        size={11}
+        strokeWidth={2.25}
+        className={`shrink-0 transition-transform duration-[var(--motion-fast)] ${
+          isCollapsed ? '-rotate-90' : 'rotate-0'
+        }`}
+        aria-hidden
+      />
+      <span className="truncate">{label}</span>
+    </button>
+  )
+  if (!description) return control
   return (
-    <>
-      <div className="flex items-center px-3 mb-1">
-        <button
-          type="button"
-          onClick={onToggleCollapse}
-          className="flex min-h-10 flex-1 items-center gap-1.5 py-1 text-left text-[12px] font-semibold text-muted-foreground transition-colors hover:text-foreground md:min-h-7"
-          aria-expanded={!isCollapsed}
-          aria-controls={controlsId}
-          title={label}
-        >
-          <ChevronDown
-            size={12}
-            strokeWidth={2.25}
-            className={`shrink-0 transition-transform duration-150 ${
-              isCollapsed ? '-rotate-90' : 'rotate-0'
-            }`}
-            aria-hidden
-          />
-          <span>{label}</span>
-        </button>
-        {description && (
-          <button
-            type="button"
-            onClick={() => setHintOpen((o) => !o)}
-            className={`flex min-h-10 min-w-10 items-center justify-center p-0.5 transition-colors md:min-h-7 md:min-w-7 ${
-              hintOpen ? 'text-muted-foreground' : 'text-muted-foreground/50 hover:text-muted-foreground'
-            }`}
-            aria-label={t('nav.about', { label })}
-            aria-expanded={hintOpen}
-          >
-            <Info size={11} strokeWidth={2.25} aria-hidden />
-          </button>
-        )}
-      </div>
-      {showItems && description && hintOpen && (
-        <p className="oa-disclosure-enter mb-2 px-3 text-[11px] leading-relaxed text-muted-foreground">
-          {description}
-        </p>
-      )}
-    </>
+    <Tooltip>
+      <TooltipTrigger render={control} />
+      <TooltipContent side="right" sideOffset={8}>{description}</TooltipContent>
+    </Tooltip>
   )
 }

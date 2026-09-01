@@ -355,7 +355,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
 
     const picker = await screen.findByRole('button', { name: 'Select agent' })
     expect(picker.textContent).toContain('Codex')
-    expect(screen.getByText('Model, reasoning, and context are managed by Codex')).toBeTruthy()
+    expect(screen.getByText('Codex chooses the model, reasoning, and context limits')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Configure workspace AI' }))
     expect(mocks.openAgentConfig).toHaveBeenCalledWith('workspace-manager', 'codex', 'ai')
     fireEvent.click(picker)
@@ -571,7 +571,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
     render(<WorkspaceManagerPage spec={{ kind: 'workspace-manager', params: {} }} />)
 
     await waitFor(() => expect(mocks.listAgentCredentials).toHaveBeenCalled())
-    expect(screen.getByRole('button', { name: 'AI access' }).textContent).toContain('Managed by Pi')
+    expect(screen.getByRole('button', { name: 'AI access' }).textContent).toContain('Pi account')
     expect(screen.queryByText('Gemini')).toBeNull()
     expect((screen.getByRole('combobox', { name: 'AI model' }) as HTMLInputElement).placeholder)
       .not.toContain('gemini-3.1-flash-lite')
@@ -678,7 +678,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
     expect(terminal.getAttribute('data-session-label')).toBe('Inspect the floor')
     expect(container.firstElementChild?.classList.contains('workspace-manager-terminal-canvas')).toBe(true)
     expect(screen.getAllByRole('button', { name: i18n.t('workspaceManager.back') })).toHaveLength(1)
-    expect(screen.getByText('Codex · TUI')).toBeTruthy()
+    expect(screen.getByText('Codex TUI')).toBeTruthy()
   })
 
   it('reopens a paused Pi Manager Session in its saved WebPi surface', () => {
