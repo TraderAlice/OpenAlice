@@ -103,7 +103,7 @@ export function MarketRotationPage() {
         {error && (
           <div
             role="alert"
-            className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive"
+            className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive"
           >
             <span className="min-w-0 break-words">{error}</span>
             <Button
@@ -185,7 +185,7 @@ function PointTooltip({ active, payload, t }: { active?: boolean; payload?: Arra
   if (!active || !payload?.length) return null
   const p = payload[0].payload
   return (
-    <div className="rounded-xl border border-border bg-popover px-2.5 py-1.5 text-[11px] shadow-md">
+    <div className="rounded-xl border border-border bg-popover px-2.5 py-1.5 text-[11px] leading-[15px] shadow-md">
       <div className="font-mono font-semibold text-foreground">{p.symbol} <span className="text-muted-foreground font-sans font-normal">{p.sector}</span></div>
       <div className="mt-0.5 grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5">
         <span className="text-muted-foreground">{t('market.colScore')}</span><span className={signColor(p.score)}>{p.score ?? '—'}</span>

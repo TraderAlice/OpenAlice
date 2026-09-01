@@ -144,7 +144,7 @@ function ContractRow({ hit }: { hit: ContractSearchHit }) {
       <span className="flex min-w-0 items-center gap-2 sm:contents">
         <span className="truncate font-mono font-semibold text-foreground">{c.symbol ?? '—'}</span>
         {c.secType && (
-          <span className="shrink-0 rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+          <span className="shrink-0 rounded-sm bg-muted px-1.5 py-0.5 text-[10px] leading-[14px] font-medium text-muted-foreground">
             {c.secType}
           </span>
         )}
@@ -160,7 +160,7 @@ function ContractRow({ hit }: { hit: ContractSearchHit }) {
         </span>
         {aliceId && (
           <code
-            className="min-w-0 max-w-full truncate font-mono text-[10px] text-muted-foreground sm:max-w-[260px]"
+            className="min-w-0 max-w-full truncate font-mono text-[10px] leading-[14px] text-muted-foreground sm:max-w-[260px]"
             title={aliceId}
           >
             {aliceId}
@@ -171,7 +171,7 @@ function ContractRow({ hit }: { hit: ContractSearchHit }) {
       {orderHref && (
         <Link
           to={orderHref}
-          className="row-start-1 col-start-2 inline-flex min-h-8 shrink-0 items-center rounded-md px-2 text-[11px] text-primary hover:bg-primary/10 sm:min-h-0 sm:rounded-none sm:px-0 sm:hover:bg-transparent sm:hover:underline"
+          className="row-start-1 col-start-2 inline-flex min-h-8 shrink-0 items-center rounded-md px-2 text-[11px] leading-[15px] text-primary hover:bg-primary/10 sm:min-h-0 sm:rounded-none sm:px-0 sm:hover:bg-transparent sm:hover:underline"
           title={t('market.tradeableOrderTitle')}
         >
           {t('market.tradeableOrder')} →

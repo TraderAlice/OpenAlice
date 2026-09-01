@@ -113,7 +113,7 @@ export function CurrencyDetail({ symbol, source }: Props) {
   if (!pair) {
     return (
       <div className="flex flex-col gap-3 min-h-0 flex-1">
-        <div className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[12px] text-muted-foreground">
+        <div className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[12px] leading-[18px] text-muted-foreground">
           Open a six-letter currency pair such as EURUSD or USDJPY to use the FX workbench.
         </div>
         <div className="h-[420px] shrink-0">
@@ -190,7 +190,7 @@ export function CurrencyDetail({ symbol, source }: Props) {
                   <MacroCompareRow label="Growth CLI" base={baseRow?.cli} quote={quoteRow?.cli} diff={cliDiff} cellSuffix="" diffSuffix="" />
                 </div>
               </div>
-              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 px-3 py-2 text-[10px] text-muted-foreground">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 px-3 py-2 text-[10px] leading-[14px] text-muted-foreground">
                 <span>{baseCountry?.label}{baseCountry?.proxy ? ` (${baseCountry.proxy})` : ''} vs {quoteCountry?.label}{quoteCountry?.proxy ? ` (${quoteCountry.proxy})` : ''}</span>
                 {pair.symbol.includes('USD') && dollar && (
                   <span>Broad USD {dollar.latest.toFixed(1)}, 20 obs {fmtPctSigned(dollar.changePct)}</span>
@@ -256,7 +256,7 @@ export function CurrencyDetail({ symbol, source }: Props) {
               step="100000"
               value={notional}
               onChange={(event) => setNotional(event.target.value)}
-              className="min-h-8 w-full rounded-md border border-border bg-background px-2.5 text-[12px] font-mono text-foreground focus:border-primary focus:outline-none"
+              className="min-h-8 w-full rounded-md border border-border bg-background px-2.5 text-[12px] leading-[18px] font-mono text-foreground focus:border-primary focus:outline-none"
             />
           </label>
           <div>
@@ -270,7 +270,7 @@ export function CurrencyDetail({ symbol, source }: Props) {
                   onClick={() => setMovePips(String(shock))}
                   variant={Number(movePips) === shock ? 'secondary' : 'outline'}
                   size="sm"
-                  className="font-mono text-[11px]"
+                  className="font-mono text-[11px] leading-[15px]"
                 >
                   {shock > 0 ? '+' : ''}{shock}
                 </Button>
@@ -281,7 +281,7 @@ export function CurrencyDetail({ symbol, source }: Props) {
                 step="1"
                 value={movePips}
                 onChange={(event) => setMovePips(event.target.value)}
-                className="min-h-8 w-24 rounded-md border border-border bg-background px-2 text-right text-[11px] font-mono text-foreground focus:border-primary focus:outline-none"
+                className="min-h-8 w-24 rounded-md border border-border bg-background px-2 text-right text-[11px] leading-[15px] font-mono text-foreground focus:border-primary focus:outline-none"
               />
             </div>
           </div>
@@ -331,7 +331,7 @@ function MacroCompareRow({ label, base, quote, diff, cellSuffix, diffSuffix }: {
   diffSuffix: string
 }) {
   return (
-    <div className="grid grid-cols-[minmax(110px,1fr)_minmax(90px,1fr)_minmax(90px,1fr)_80px] items-center border-b border-border/50 px-3 py-2.5 text-[12px] last:border-0">
+    <div className="grid grid-cols-[minmax(110px,1fr)_minmax(90px,1fr)_minmax(90px,1fr)_80px] items-center border-b border-border/50 px-3 py-2.5 text-[12px] leading-[18px] last:border-0">
       <span className="font-medium text-foreground">{label}</span>
       <span className="text-right font-mono text-foreground" title={base?.date ?? 'No data'}>{fmtCell(base, cellSuffix)}</span>
       <span className="text-right font-mono text-foreground" title={quote?.date ?? 'No data'}>{fmtCell(quote, cellSuffix)}</span>

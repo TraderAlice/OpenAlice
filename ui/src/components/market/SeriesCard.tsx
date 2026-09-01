@@ -18,7 +18,7 @@ export function SeriesCard({ card, label, emptyText }: { card: MacroSeriesCard; 
         <div className="flex min-w-0 items-baseline gap-2">
           <span className="shrink-0 text-[20px] font-semibold text-foreground font-mono">{fmtSeriesValue(card, card.latest)}</span>
           {card.change != null && card.change !== 0 && (
-            <span className={`text-[11px] font-mono ${card.change > 0 ? 'text-success' : 'text-destructive'}`}>
+            <span className={`text-[11px] leading-[15px] font-mono ${card.change > 0 ? 'text-success' : 'text-destructive'}`}>
               {card.change > 0 ? '+' : ''}{card.unit === 'count' ? fmtCompactNum(card.change) : card.change.toFixed(2)}
             </span>
           )}

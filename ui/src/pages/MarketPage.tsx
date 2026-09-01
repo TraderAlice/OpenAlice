@@ -34,7 +34,7 @@ export function MarketPage() {
           <div className="flex flex-col gap-3.5">
             <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between lg:gap-8">
               <div>
-                <h2 className="text-[14px] font-semibold text-foreground">{t('market.fxTitle')}</h2>
+                <h2 className="text-[14px] leading-[19px] font-semibold text-foreground">{t('market.fxTitle')}</h2>
                 <p className="mt-0.5 max-w-2xl text-[12px] leading-5 text-muted-foreground">
                   {t('market.fxDescription')}
                 </p>
@@ -47,7 +47,7 @@ export function MarketPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => openOrFocus({ kind: 'market-detail', params: { assetClass: 'currency', symbol: pair } })}
-                    className="font-mono text-[11px]"
+                    className="font-mono text-[11px] leading-[15px]"
                   >
                     {pair.slice(0, 3)}/{pair.slice(3)}
                   </Button>
@@ -108,7 +108,7 @@ export function MarketPage() {
         <section className="border-y border-border/60 py-4">
           <div>
             <div className="flex items-end justify-between gap-6">
-              <h2 className="text-[14px] font-semibold text-foreground">{t('market.overviewTitle')}</h2>
+              <h2 className="text-[14px] leading-[19px] font-semibold text-foreground">{t('market.overviewTitle')}</h2>
             </div>
 
             <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">

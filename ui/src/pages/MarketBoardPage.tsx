@@ -93,7 +93,7 @@ function MoversBoardView() {
 
         {loading && !data && <CenteredLoading label={t('common.loading')} />}
         {error && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive">{error}</div>
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive">{error}</div>
         )}
         {data && rows.length === 0 && !loading && (
           <div className="text-[13px] text-muted-foreground">{t('market.noMatches')}</div>
@@ -217,14 +217,14 @@ function CalendarBoardView() {
               onClick={() => setList(k)}
               aria-pressed={list === k}
               aria-label={`${t(calendarLabelKey(k))} (${data?.[k].length ?? 0})`}
-              className={`oa-pressable flex min-h-11 min-w-0 flex-col items-center justify-center rounded-md px-2 py-1 text-[12px] font-medium sm:flex-row sm:gap-1.5 ${
+              className={`oa-pressable flex min-h-11 min-w-0 flex-col items-center justify-center rounded-md px-2 py-1 text-[12px] leading-[18px] font-medium sm:flex-row sm:gap-1.5 ${
                 list === k
                   ? 'bg-background text-foreground shadow-sm ring-1 ring-border/60'
                   : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
               }`}
             >
               <span className="truncate">{t(calendarLabelKey(k))}</span>
-              <span className="font-mono text-[10px] text-muted-foreground">
+              <span className="font-mono text-[10px] leading-[14px] text-muted-foreground">
                 {data?.[k].length ?? 0}
               </span>
             </button>
@@ -235,7 +235,7 @@ function CalendarBoardView() {
           <CenteredLoading label={slow ? t('market.calendarSlowLoading') : t('common.loading')} />
         )}
         {error && (
-          <div className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive">
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive">
             <span className="min-w-0 break-words">{error}</span>
             <Button
               type="button"
@@ -250,7 +250,7 @@ function CalendarBoardView() {
         )}
         {/* Per-list upstream failure — loud, with the provider's own message. */}
         {data?.errors?.[list] && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive">{data.errors[list]}</div>
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive">{data.errors[list]}</div>
         )}
 
         {data && data[list].length > 0 && !data.errors?.[list] && (
@@ -513,7 +513,7 @@ function CalendarMobileList<T>({
               const content = (
                 <>
                   <div className="min-w-0 flex-1">
-                    <div className="font-mono text-[13px] font-semibold text-foreground">
+                    <div className="font-mono text-[13px] leading-[18px] font-semibold text-foreground">
                       {rowSymbol ?? '—'}
                     </div>
                     {rowName && (
@@ -528,7 +528,7 @@ function CalendarMobileList<T>({
                         <dt className="text-[10px] font-medium text-muted-foreground/70">
                           {metric.label}
                         </dt>
-                        <dd className="mt-0.5 whitespace-nowrap font-mono text-[11px] text-foreground">
+                        <dd className="mt-0.5 whitespace-nowrap font-mono text-[11px] leading-[15px] text-foreground">
                           {metric.value}
                         </dd>
                       </div>
@@ -581,7 +581,7 @@ function MacroBoardView() {
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 min-h-0">
         {loading && !data && <CenteredLoading label={t('common.loading')} />}
         {error && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive">{error}</div>
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive">{error}</div>
         )}
         {data && (
           <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
@@ -638,10 +638,10 @@ function TermStructureBoardView() {
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 flex flex-col gap-6 min-h-0">
         {loading && !data && <CenteredLoading label={t('common.loading')} />}
         {error && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive">{error}</div>
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive">{error}</div>
         )}
         {data?.errors && Object.entries(data.errors).map(([sym, msg]) => (
-          <div key={sym} className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive">{sym}: {msg}</div>
+          <div key={sym} className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive">{sym}: {msg}</div>
         ))}
         {data?.curves.map((curve) => <TermCurveCard key={curve.symbol} curve={curve} />)}
       </div>
@@ -700,7 +700,7 @@ function TermCurveCard({ curve }: { curve: TermCurve }) {
       </MeasuredChartFrame>
       <div className="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap">
         {curve.points.map((p) => (
-          <span key={p.expiration} className="flex items-center justify-between gap-2 whitespace-nowrap rounded-sm bg-muted/60 px-1.5 py-0.5 font-mono text-[11px]" title={`${p.daysToExpiry ?? '—'}d`}>
+          <span key={p.expiration} className="flex items-center justify-between gap-2 whitespace-nowrap rounded-sm bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] leading-[15px]" title={`${p.daysToExpiry ?? '—'}d`}>
             {p.expiration.slice(2)}{' '}
             <span className={p.annualizedBasis == null ? 'text-muted-foreground' : p.annualizedBasis >= 0 ? 'text-success' : 'text-destructive'}>
               {p.annualizedBasis == null ? '—' : `${p.annualizedBasis >= 0 ? '+' : ''}${p.annualizedBasis.toFixed(1)}%`}
@@ -748,7 +748,7 @@ function GlobalMacroBoardView() {
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 min-h-0">
         {loading && !data && <CenteredLoading label={t('common.loading')} />}
         {error && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive">{error}</div>
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive">{error}</div>
         )}
         {data && (
           <>
@@ -758,7 +758,7 @@ function GlobalMacroBoardView() {
             >
               {data.rows.map((r) => (
                 <article key={r.country} className="py-3">
-                  <h3 className="truncate text-[13px] font-semibold text-foreground">{r.label}</h3>
+                  <h3 className="truncate text-[13px] leading-[18px] font-semibold text-foreground">{r.label}</h3>
                   <dl className="mt-2 grid grid-cols-3 gap-x-3">
                     <GlobalMetric
                       label={t('market.colCpiYoy')}
@@ -860,7 +860,7 @@ function GlobalMetric({
     <div className="min-w-0" title={title}>
       <dt className="min-h-8 text-[10px] leading-4 text-muted-foreground">{label}</dt>
       <dd
-        className={`truncate font-mono text-[13px] font-medium tabular-nums ${globalCellColor(cell, colorBy)}`}
+        className={`truncate font-mono text-[13px] leading-[18px] font-medium tabular-nums ${globalCellColor(cell, colorBy)}`}
         aria-label={`${label}: ${value}${title ? `, ${title}` : ''}`}
       >
         {value}
@@ -901,10 +901,10 @@ function ShippingBoardView() {
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 min-h-0">
         {loading && !data && <CenteredLoading label={t('common.loading')} />}
         {error && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive">{error}</div>
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive">{error}</div>
         )}
         {data?.errors && Object.entries(data.errors).map(([key, msg]) => (
-          <div key={key} className="mb-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive">{key}: {msg}</div>
+          <div key={key} className="mb-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive">{key}: {msg}</div>
         ))}
         {data && (
           <div className="grid gap-3 grid-cols-1 lg:grid-cols-2">
@@ -924,9 +924,9 @@ function ChokepointCard({ curve }: { curve: ShippingCurve }) {
   return (
     <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-card px-3 py-3 sm:px-4">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
-        <span className="text-[13px] font-semibold text-foreground sm:shrink-0">{curve.name}</span>
+        <span className="text-[13px] leading-[18px] font-semibold text-foreground sm:shrink-0">{curve.name}</span>
         {curve.latest && (
-          <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground sm:justify-end">
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] leading-[15px] text-muted-foreground sm:justify-end">
             <span className="whitespace-nowrap">{curve.latest.date}</span>
             <span className="whitespace-nowrap">{curve.latest.vessels ?? '—'} {t('market.shippingVessels')}</span>
             <span className="whitespace-nowrap">{curve.latest.tons != null ? (curve.latest.tons / 1e6).toFixed(2) + 'M t' : '—'}</span>
@@ -972,10 +972,10 @@ function FedBoardView() {
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 flex flex-col gap-5 min-h-0">
         {loading && !data && <CenteredLoading label={t('common.loading')} />}
         {error && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive">{error}</div>
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive">{error}</div>
         )}
         {data?.errors && Object.entries(data.errors).map(([k, msg]) => (
-          <div key={k} className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive">{k}: {msg}</div>
+          <div key={k} className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] leading-5 text-destructive">{k}: {msg}</div>
         ))}
         {data && data.cards.length > 0 && (
           <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
@@ -989,17 +989,17 @@ function FedBoardView() {
         )}
         {data && data.documents.length > 0 && (
           <div className="flex flex-col gap-1.5">
-            <h3 className="text-[12px] font-semibold text-muted-foreground">{t('market.fedDocuments')}</h3>
+            <h3 className="text-[12px] leading-[18px] font-semibold text-muted-foreground">{t('market.fedDocuments')}</h3>
             {data.documents.map((d) => (
               <a
                 key={`${d.type}-${d.date}`}
                 href={d.url}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center gap-3 rounded-lg border border-border/60 bg-card px-3 py-1.5 text-[12px] hover:bg-secondary"
+                className="flex items-center gap-3 rounded-lg border border-border/60 bg-card px-3 py-1.5 text-[12px] leading-[18px] hover:bg-secondary"
               >
                 <span className="font-mono text-muted-foreground shrink-0">{d.date}</span>
-                <span className={`shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] font-medium ${
+                <span className={`shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] leading-[14px] font-medium ${
                   d.type === 'statement' ? 'bg-primary/15 text-primary'
                   : d.type === 'minutes' ? 'bg-success/15 text-success'
                   : 'bg-muted text-muted-foreground'

@@ -309,7 +309,7 @@ export function KlinePanel({ selection, source, onSnapshot }: Props) {
           <span className="text-[13px] font-medium text-foreground truncate">{title}</span>
           {meta && (
             <span
-              className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground"
+              className="inline-flex items-center gap-1.5 text-[11px] leading-[15px] font-medium text-muted-foreground"
               title={`Provider: ${meta.barId}${meta.barCapability ? ` (${meta.barCapability})` : ''}`}
             >
               <span>{meta.sourceId}</span>{meta.barCapability && <span>{meta.barCapability}</span>}
@@ -328,7 +328,7 @@ export function KlinePanel({ selection, source, onSnapshot }: Props) {
               <select
                 value={selectedBarId ?? meta?.barId ?? ''}
                 onChange={(e) => setSelectedBarId(e.target.value || null)}
-                className="max-w-[240px] cursor-pointer rounded-md border border-border bg-background px-2 py-1 text-[12px] text-foreground"
+                className="max-w-[240px] cursor-pointer rounded-md border border-border bg-background px-2 py-1 text-[12px] leading-[18px] text-foreground"
                 title="Which provider's K-line to show — sources are never merged; you pick"
               >
                 {sourceOptions.map((c) => (
@@ -371,7 +371,7 @@ export function KlinePanel({ selection, source, onSnapshot }: Props) {
       <div className="relative min-h-0 flex-1 rounded-lg border border-border bg-card">
         <div ref={containerRef} className="absolute inset-0" />
         {!selection && (
-          <div className="absolute inset-0 flex items-center justify-center text-[13px] text-muted-foreground">
+          <div className="absolute inset-0 flex items-center justify-center text-[13px] leading-5 text-muted-foreground">
             Pick an asset to see the K-line.
           </div>
         )}
@@ -384,7 +384,7 @@ export function KlinePanel({ selection, source, onSnapshot }: Props) {
           <div className="absolute top-2 right-2 text-[11px] text-muted-foreground">Loading…</div>
         )}
         {selection && error && !loading && (
-          <div className="absolute inset-0 flex items-center justify-center text-[13px] text-muted-foreground px-8 text-center">
+          <div className="absolute inset-0 flex items-center justify-center text-[13px] leading-5 text-muted-foreground px-8 text-center">
             {error}
           </div>
         )}

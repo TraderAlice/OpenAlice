@@ -189,7 +189,7 @@ function CustomTooltip({ active, payload, isAllView, accounts }: any) {
   const accountMap = new Map((accounts as Array<{ id: string; label: string }>).map(a => [a.id, a.label]))
 
   return (
-    <div className="bg-secondary border border-border rounded-md px-3 py-2 shadow-lg text-[12px]">
+    <div className="bg-secondary border border-border rounded-md px-3 py-2 shadow-lg text-[12px] leading-[18px]">
       <p className="text-muted-foreground mb-1">
         {new Date(data.time).toLocaleString()}
       </p>

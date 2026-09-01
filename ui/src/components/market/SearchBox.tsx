@@ -77,7 +77,7 @@ export function SearchBox() {
   return (
     <div ref={containerRef} className="relative">
       <input
-        className="w-full rounded-md border border-border bg-background px-3 py-2 text-[14px] outline-none placeholder:text-muted-foreground/50 focus:border-primary focus:ring-2 focus:ring-primary/20"
+        className="w-full rounded-md border border-border bg-background px-3 py-2 text-[14px] leading-5 outline-none placeholder:text-muted-foreground/50 focus:border-primary focus:ring-2 focus:ring-primary/20"
         placeholder={t('market.searchInputPlaceholder')}
         value={query}
         onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
@@ -97,7 +97,7 @@ export function SearchBox() {
               key={r.barId}
               onClick={() => handleSelect(r)}
               onMouseEnter={() => setHighlight(i)}
-              className={`flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-[13px] ${
+              className={`flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-[13px] leading-[18px] ${
                 i === highlight ? 'bg-muted' : ''
               }`}
             >
@@ -106,13 +106,13 @@ export function SearchBox() {
                 <span className="text-muted-foreground truncate flex-1 min-w-0">— {r.name}</span>
               )}
               {/* Explicit provider — this is how same-symbol sources are disambiguated. */}
-              <span className="ml-auto flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+              <span className="ml-auto flex shrink-0 items-center gap-1.5 text-[11px] leading-[15px] text-muted-foreground">
                 <span className="font-medium text-foreground/80">{r.sourceId}</span>
                 {r.barCapability && (
                   <span className={CAPABILITY_COLOR[r.barCapability] ?? 'text-muted-foreground'}>{r.barCapability}</span>
                 )}
               </span>
-              <span className={`shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] font-medium ${ASSET_CLASS_COLORS[r.assetClass] ?? ASSET_CLASS_COLORS.unknown}`}>
+              <span className={`shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] leading-[14px] font-medium ${ASSET_CLASS_COLORS[r.assetClass] ?? ASSET_CLASS_COLORS.unknown}`}>
                 {r.assetClass}
               </span>
             </button>

@@ -169,7 +169,7 @@ export function MarketSidebar() {
               {t('market.searchResults')}{loading ? ` (${t('common.searching')})` : results.length ? ` (${results.length})` : ''}
             </SidebarSectionHeader>
             {loading && (
-              <div className="flex items-center gap-2 px-3 py-2 text-[12px] text-muted-foreground">
+              <div className="flex items-center gap-2 px-3 py-2 text-[12px] leading-[18px] text-muted-foreground">
                 <Spinner size="sm" />
                 <span>{t('common.searching')}</span>
               </div>
@@ -246,7 +246,7 @@ export function MarketSidebar() {
 
 function AssetClassChip({ cls }: { cls: string }) {
   return (
-    <span className={`shrink-0 rounded-sm px-1 font-mono text-[9px] ${ASSET_CLASS_COLORS[cls] ?? ASSET_CLASS_COLORS.unknown}`}>
+    <span className={`shrink-0 rounded-sm px-1 font-mono text-[10px] leading-[14px] ${ASSET_CLASS_COLORS[cls] ?? ASSET_CLASS_COLORS.unknown}`}>
       {cls}
     </span>
   )
