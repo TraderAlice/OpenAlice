@@ -9,7 +9,7 @@ afterEach(cleanup)
 
 describe('AgentRuntimeIcon', () => {
   it('provides a distinct brand mark for every registered agent runtime', () => {
-    const ids = ['claude', 'codex', 'cursor', 'agy', 'grok', 'omp', 'opencode', 'pi']
+    const ids = ['claude', 'codex', 'cursor', 'agy', 'grok', 'omp', 'opencode', 'pi', 'shell']
     const { container } = render(
       <div>{ids.map((id) => <AgentRuntimeIcon key={id} agentId={id} />)}</div>,
     )

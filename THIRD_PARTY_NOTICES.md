@@ -1,5 +1,14 @@
 # Third-Party Notices
 
+## Connector brand marks
+
+The Connector interface displays identification marks sourced from
+[Discord's brand guidelines](https://discord.com/branding),
+[Telegram's website assets](https://telegram.org/),
+[Slack's media kit](https://slack.com/media-kit), and
+[Feishu's website assets](https://www.feishu.cn/). Each mark remains property
+of its respective owner and identifies the matching integration.
+
 ## Instrument Sans
 
 The OpenAlice interface bundles Instrument Sans from the
