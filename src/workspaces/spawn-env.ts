@@ -20,6 +20,12 @@ import { delimiter, dirname, join } from 'node:path';
 
 import { runtimeProfileFromEnv } from '@/core/runtime-profile.js';
 
+const PRIVILEGED_RUNTIME_ENV = [
+  'OPENALICE_RAILWAY_FENCE_FD',
+  'OPENALICE_RAILWAY_ENTRYPOINT_OWNER',
+  'OPENALICE_RAILWAY_INSTANCE_ID',
+] as const;
+
 const STRIP_EXACT = new Set<string>([
   'TERM_PROGRAM',
   'TERM_PROGRAM_VERSION',
@@ -30,6 +36,7 @@ const STRIP_EXACT = new Set<string>([
   'OPENALICE_WORKSPACE_CLI_BIN_PATH',
   'OPENCODE_CONFIG_CONTENT',
   'COLORFGBG',
+  ...PRIVILEGED_RUNTIME_ENV,
 ]);
 
 const STRIP_PREFIXES = [
@@ -102,6 +109,11 @@ export function buildSpawnEnv(
   for (const [k, v] of Object.entries(extras)) {
     out[k] = v;
   }
+  // The Railway fence is a launcher/Guardian capability, not session
+  // configuration. Never let a Workspace agent or its PTY inherit the marker
+  // or the descriptor number, even if a caller accidentally supplies either
+  // through per-session extras.
+  for (const name of PRIVILEGED_RUNTIME_ENV) delete out[name];
   const cliPath = buildCliPath(out);
   // Windows environment names are case-insensitive, but JavaScript objects are
   // not. A typical host contributes `Path`; adding a separate `PATH` leaves two

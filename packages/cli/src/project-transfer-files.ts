@@ -1,5 +1,6 @@
 /** Deterministic transforms applied before portable bytes enter the SSH stream. */
-import { join } from 'node:path'
+import { posix } from 'node:path'
+import { parseDocument } from 'yaml'
 
 import type { ProjectTransferTransform } from './project-transfer.ts'
 
@@ -15,7 +16,11 @@ export function transformProjectTransferFile(input: {
     case 'workspace-catalog-paths':
       return transformJson(input.bytes, (value) => rewriteWorkspaceCatalog(value, input.destinationHome))
     case 'strip-ai-credentials':
-      return transformJson(input.bytes, (value) => ({ ...recordValue(value), credentials: {} }))
+      return transformJson(input.bytes, (value) => ({
+        ...recordValue(value),
+        apiKeys: {},
+        credentials: {},
+      }))
     case 'strip-market-provider-keys':
       return transformJson(input.bytes, (value) => ({ ...recordValue(value), providerKeys: {} }))
     case 'rewrite-issue-owner':
@@ -29,7 +34,7 @@ function rewriteWorkspaceRegistry(value: unknown, destinationHome: string): unkn
     ? root['workspaces'].map((entry) => {
         const workspace = recordValue(entry)
         const id = requireSafeId(workspace['id'], 'Workspace')
-        return { ...workspace, dir: join(destinationHome, 'workspaces', 'workspaces', id) }
+        return { ...workspace, dir: posix.join(destinationHome, 'workspaces', 'workspaces', id) }
       })
     : []
   return { ...root, workspaces }
@@ -38,16 +43,23 @@ function rewriteWorkspaceRegistry(value: unknown, destinationHome: string): unkn
 function rewriteWorkspaceCatalog(value: unknown, destinationHome: string): unknown {
   const root = recordValue(value)
   const workspaces = Array.isArray(root['workspaces'])
-    ? root['workspaces'].map((entry) => {
+    ? root['workspaces'].flatMap((entry) => {
         const workspace = recordValue(entry)
+        // Pre-#662 could import Pi's redirected agent home as a departed
+        // pseudo-Workspace. It is native runtime state, not a user Workspace.
+        if (
+          workspace['id'] === '.pi-agent'
+          && workspace['legacyImported'] === true
+          && workspace['lifecycle'] === 'departed'
+        ) return []
         const id = requireSafeId(workspace['id'], 'Workspace Catalog')
-        return {
+        return [{
           ...workspace,
-          activeDir: join(destinationHome, 'workspaces', 'workspaces', id),
+          activeDir: posix.join(destinationHome, 'workspaces', 'workspaces', id),
           ...(typeof workspace['departedDir'] === 'string'
-            ? { departedDir: join(destinationHome, 'workspaces', 'departed-workspaces', id) }
+            ? { departedDir: posix.join(destinationHome, 'workspaces', 'departed-workspaces', id) }
             : {}),
-        }
+        }]
       })
     : []
   return { ...root, workspaces }
@@ -58,13 +70,12 @@ function rewriteIssueOwner(value: string): string {
   if (!match?.[1] || match[2] === undefined || !match[3]) {
     throw transferTransformError('Scheduled Issue frontmatter changed after planning.')
   }
-  const rewritten = match[2].replace(
-    /^(assignee\s*:\s*)["']?@resume-[^\s"']+["']?(\s*)$/mu,
-    '$1"@new-then-resume"$2',
-  )
-  if (rewritten === match[2]) {
+  const document = parseDocument(match[2])
+  if (document.errors.length > 0 || document.get('assignee')?.toString().startsWith('@resume-') !== true) {
     throw transferTransformError('Scheduled Issue exact owner changed after planning.')
   }
+  document.set('assignee', '@new-then-resume')
+  const rewritten = document.toString().replace(/\n$/u, '')
   return `${match[1]}${rewritten}${match[3]}${value.slice(match[0].length)}`
 }
 

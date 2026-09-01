@@ -70,6 +70,7 @@
     "directory": "packages/cli"
   },
   "dependencies": {
-    "@earendil-works/pi-tui": "0.83.0"
+    "@earendil-works/pi-tui": "0.83.0",
+    "yaml": "^2.9.0"
   }
 }

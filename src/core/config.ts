@@ -6,6 +6,7 @@ import { newsCollectorSchema } from '../domain/news/config.js'
 import { runMigrations } from '../migrations/runner.js'
 import { dataPath } from '@/core/paths.js'
 import { withConfigBootstrapLock } from './config-bootstrap-lock.js'
+import type { RuntimeLockOwnerAuthority } from '@traderalice/guardian-runtime'
 import { parseDuration } from './duration.js'
 import { isSealedEnvelope, seal, unseal } from './sealing.js'
 
@@ -537,8 +538,12 @@ async function parseAndSeed<T>(
   return parsed
 }
 
-export async function loadConfig(): Promise<Config> {
-  return withConfigBootstrapLock(loadConfigUnlocked)
+export async function loadConfig(
+  options: { ownerAuthority?: RuntimeLockOwnerAuthority } = {},
+): Promise<Config> {
+  return withConfigBootstrapLock(loadConfigUnlocked, {
+    ownerAuthority: options.ownerAuthority,
+  })
 }
 
 async function loadConfigUnlocked(): Promise<Config> {

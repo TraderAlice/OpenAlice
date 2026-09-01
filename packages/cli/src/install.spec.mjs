@@ -11,10 +11,12 @@ import {
   realpath,
   readdir,
   rm,
+  symlink,
+  utimes,
   writeFile,
 } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { delimiter, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 
@@ -241,6 +243,39 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
     await expect(access(join(installRoot, 'cli', 'current'))).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
+  it('checks locking and release-comparison prerequisites before requesting consent', async () => {
+    const fixture = await makeReleaseArchive('0.91.0', '5'.repeat(16))
+    const lockCommands = platform === 'darwin' ? ['lockf', 'shlock'] : ['flock']
+    const cases = [
+      {
+        missing: lockCommands,
+        message: platform === 'darwin'
+          ? 'macOS lockf or shlock is required for safe concurrent installation'
+          : 'Linux flock is required for safe concurrent installation',
+      },
+      { missing: ['diff'], message: 'diff is required to verify the existing OpenAlice release' },
+    ]
+
+    for (const testCase of cases) {
+      const installRoot = join(fixture.root, `missing-${testCase.missing.join('-')}`)
+      const path = await makeInstallerPathWithout(testCase.missing)
+      await expect(runInstaller(fixture, installRoot, [], { PATH: path }))
+        .rejects.toMatchObject({ stderr: expect.stringContaining(testCase.message) })
+      await expect(access(installRoot)).rejects.toMatchObject({ code: 'ENOENT' })
+    }
+  })
+
+  it.skipIf(platform !== 'darwin')('falls back to shlock on macOS versions without lockf', async () => {
+    const fixture = await makeReleaseArchive('0.91.0', 'e'.repeat(16))
+    const installRoot = join(fixture.root, 'shlock-fallback')
+    const path = await makeInstallerPathWithout(['lockf'])
+
+    await expect(runInstaller(fixture, installRoot, ['--yes'], { PATH: path }))
+      .resolves.toMatchObject({ stdout: expect.stringContaining('OpenAlice 0.91.0 is ready') })
+    await expect(access(join(installRoot, '.cli-install.lock.guard')))
+      .rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
   it('recovers a stale lock and refuses to race a live installer', async () => {
     const fixture = await makeReleaseArchive('0.91.0', '6'.repeat(16))
     const installRoot = join(fixture.root, 'installed')
@@ -253,7 +288,67 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
     await mkdir(lockDir)
     await writeFile(join(lockDir, 'pid'), `${process.pid}\n`)
     await expect(runInstaller(fixture, installRoot, ['--yes']))
-      .rejects.toMatchObject({ stderr: expect.stringContaining('installer is running') })
+      .rejects.toMatchObject({ stderr: expect.stringContaining('legacy lock cannot be verified') })
+  })
+
+  it('recovers an interrupted installer lock after its pid is reused by another process', async () => {
+    const fixture = await makeReleaseArchive('0.91.0', '6'.repeat(16))
+    const installRoot = join(fixture.root, 'installed')
+    const lockDir = join(installRoot, '.cli-install.lock')
+    await mkdir(lockDir, { recursive: true })
+    await writeFile(join(lockDir, 'pid'), `${process.pid}\n`)
+    await writeFile(join(lockDir, 'process-identity'), 'linux:stale-boot:1\n')
+
+    const recovered = await runInstaller(fixture, installRoot, ['--yes'])
+
+    expect(recovered.stdout).toContain('Removing a stale CLI installer lock')
+  })
+
+  it('recovers an installer lock interrupted before its owner pid was published', async () => {
+    const fixture = await makeReleaseArchive('0.91.0', '6'.repeat(16))
+    const installRoot = join(fixture.root, 'installed')
+    const lockDir = join(installRoot, '.cli-install.lock')
+    await mkdir(lockDir, { recursive: true })
+    await writeFile(join(lockDir, 'process-identity'), 'linux:interrupted:1\n')
+    const old = new Date(Date.now() - 5_000)
+    await utimes(lockDir, old, old)
+
+    const recovered = await runInstaller(fixture, installRoot, ['--yes'])
+
+    expect(recovered.stdout).toContain('Removing a stale CLI installer lock')
+  })
+
+  it('recovers a legacy stale lock even when an interrupted reclaimer left its marker', async () => {
+    const fixture = await makeReleaseArchive('0.91.0', '6'.repeat(16))
+    const installRoot = join(fixture.root, 'installed')
+    const lockDir = join(installRoot, '.cli-install.lock')
+    await mkdir(join(lockDir, 'reclaiming'), { recursive: true })
+    await writeFile(join(lockDir, 'pid'), '99999999\n')
+    await writeFile(join(lockDir, 'process-identity'), 'linux:interrupted:1\n')
+
+    const recovered = await runInstaller(fixture, installRoot, ['--yes'])
+
+    expect(recovered.stdout).toContain('Removing a stale CLI installer lock')
+  })
+
+  it('serializes two installers with a kernel lock while recovering transaction markers', async () => {
+    const fixture = await makeReleaseArchive('0.91.0', '6'.repeat(16), { versionDelaySeconds: 2 })
+    const installRoot = join(fixture.root, 'installed')
+    const lockDir = join(installRoot, '.cli-install.lock')
+    const first = runInstaller(fixture, installRoot, ['--yes'])
+    await waitForPath(lockDir)
+
+    await expect(runInstaller(fixture, installRoot, ['--yes']))
+      .rejects.toMatchObject({ stderr: expect.stringContaining('Another OpenAlice CLI installer is running') })
+    await expect(first).resolves.toMatchObject({ stdout: expect.stringContaining('OpenAlice 0.91.0 is ready') })
+    await expect(access(lockDir)).rejects.toMatchObject({ code: 'ENOENT' })
+
+    // lockf/flock keep a harmless inode after releasing their advisory lock;
+    // shlock represents the lock by the file itself and removes it. A third
+    // successful install is the backend-independent proof that no live guard
+    // remains after the first owner exits.
+    await expect(runInstaller(fixture, installRoot, ['--yes']))
+      .resolves.toMatchObject({ stdout: expect.stringContaining('OpenAlice 0.91.0 is ready') })
   })
 
   it('uses the fixed dev-channel archive and records dev provenance', async () => {
@@ -331,9 +426,9 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
     const fixture = await makeReleaseArchive(version, channel === 'stable' ? 'e'.repeat(16) : 'f'.repeat(16))
     const installRoot = join(fixture.root, 'installed')
     const server = createServer(async (request, response) => {
-      if (request.url === '/releases/latest') {
+      if (request.url === '/manifest.json') {
         response.setHeader('content-type', 'application/json')
-        response.end(JSON.stringify({ tag_name: `v${version}` }))
+        response.end(JSON.stringify({ channel: 'stable', version }))
         return
       }
       if (request.url === '/beta/manifest.json') {
@@ -364,7 +459,7 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
           ...process.env,
           HOME: fixture.root,
           OPENALICE_DOWNLOAD_BASE_URL: baseUrl,
-          OPENALICE_RELEASES_API_URL: `${baseUrl}/releases/latest`,
+          OPENALICE_STABLE_MANIFEST_URL: `${baseUrl}/manifest.json`,
           OPENALICE_RELEASE_ASSET_BASE_URL: baseUrl,
         },
       })
@@ -380,7 +475,50 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
     }
   })
 
-  it('bridges fresh latest and exact v0.90.1 installs with explicit update ownership', async () => {
+  it.each([
+    ['stable', 'beta', '0.92.0', 'Stable manifest did not identify the stable channel'],
+    ['beta', 'stable', '0.92.0-beta.1', 'Beta manifest did not identify the beta channel'],
+  ])('rejects a %s manifest that identifies the %s release channel', async (
+    selectedChannel,
+    manifestChannel,
+    version,
+    expectedError,
+  ) => {
+    const root = await mkdtemp(join(tmpdir(), `openalice-${selectedChannel}-manifest-channel-`))
+    temporaryPaths.push(root)
+    const server = createServer((_request, response) => {
+      response.setHeader('content-type', 'application/json')
+      response.end(JSON.stringify({ channel: manifestChannel, version }))
+    })
+    await new Promise((resolvePromise, rejectPromise) => {
+      server.once('error', rejectPromise)
+      server.listen(0, '127.0.0.1', resolvePromise)
+    })
+    try {
+      const address = server.address()
+      const manifestUrl = `http://127.0.0.1:${address.port}/${selectedChannel === 'stable' ? '' : 'beta/'}manifest.json`
+      const manifestVariable = selectedChannel === 'stable'
+        ? 'OPENALICE_STABLE_MANIFEST_URL'
+        : 'OPENALICE_BETA_MANIFEST_URL'
+      await expect(execFileAsync('bash', [installer,
+        '--channel', selectedChannel,
+        '--install-dir', join(root, 'installed'),
+        '--plan',
+      ], {
+        env: {
+          ...process.env,
+          HOME: root,
+          [manifestVariable]: manifestUrl,
+        },
+      })).rejects.toMatchObject({
+        stderr: expect.stringContaining(expectedError),
+      })
+    } finally {
+      await new Promise((resolvePromise) => server.close(resolvePromise))
+    }
+  })
+
+  it('bridges stable-manifest and exact v0.90.1 installs with explicit update ownership', async () => {
     const root = await mkdtemp(join(tmpdir(), 'openalice-legacy-stable-'))
     temporaryPaths.push(root)
     const receipt = join(root, 'receipt.txt')
@@ -397,9 +535,9 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
 `)
     const legacySha256 = createHash('sha256').update(legacyInstaller).digest('hex')
     const server = createServer((request, response) => {
-      if (request.url === '/releases/latest') {
+      if (request.url === '/manifest.json') {
         response.setHeader('content-type', 'application/json')
-        response.end(JSON.stringify({ tag_name: 'v0.90.1' }))
+        response.end(JSON.stringify({ channel: 'stable', version: '0.90.1' }))
       } else if (request.url === '/legacy-install') {
         response.end(legacyInstaller)
       } else {
@@ -422,7 +560,7 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
         env: {
           ...process.env,
           HOME: root,
-          OPENALICE_RELEASES_API_URL: `${baseUrl}/releases/latest`,
+          OPENALICE_STABLE_MANIFEST_URL: `${baseUrl}/manifest.json`,
           OPENALICE_LEGACY_STABLE_INSTALLER_URL: `${baseUrl}/legacy-install`,
           OPENALICE_LEGACY_STABLE_INSTALLER_SHA256: legacySha256,
           OPENALICE_LEGACY_TEST_RECEIPT: receipt,
@@ -498,9 +636,9 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
     await mkdir(join(installRoot, 'cli', 'releases'), { recursive: true })
     let legacyInstallerRequests = 0
     const server = createServer((request, response) => {
-      if (request.url === '/releases/latest') {
+      if (request.url === '/manifest.json') {
         response.setHeader('content-type', 'application/json')
-        response.end(JSON.stringify({ tag_name: 'v0.90.1' }))
+        response.end(JSON.stringify({ channel: 'stable', version: '0.90.1' }))
       } else if (request.url === '/legacy-install') {
         legacyInstallerRequests += 1
         response.end('#!/usr/bin/env bash\nexit 0\n')
@@ -524,7 +662,7 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
         env: {
           ...process.env,
           HOME: root,
-          OPENALICE_RELEASES_API_URL: `${baseUrl}/releases/latest`,
+          OPENALICE_STABLE_MANIFEST_URL: `${baseUrl}/manifest.json`,
           OPENALICE_LEGACY_STABLE_INSTALLER_URL: `${baseUrl}/legacy-install`,
         },
       })).rejects.toMatchObject({
@@ -583,9 +721,9 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
     const fixture = await makeReleaseArchive('0.92.0', '1'.repeat(16))
     const installRoot = join(fixture.root, 'legacy-updater')
     const server = createServer(async (request, response) => {
-      if (request.url === '/releases/latest') {
+      if (request.url === '/manifest.json') {
         response.setHeader('content-type', 'application/json')
-        response.end(JSON.stringify({ tag_name: 'v0.92.0' }))
+        response.end(JSON.stringify({ channel: 'stable', version: '0.92.0' }))
       } else if (request.url?.endsWith('.sha256')) {
         response.end(`${fixture.sha256}  archive.tar.gz\n`)
       } else {
@@ -608,7 +746,7 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
           ...process.env,
           HOME: fixture.root,
           OPENALICE_EXPECTED_CLI_VERSION: '0.92.0',
-          OPENALICE_RELEASES_API_URL: `${baseUrl}/releases/latest`,
+          OPENALICE_STABLE_MANIFEST_URL: `${baseUrl}/manifest.json`,
           OPENALICE_RELEASE_ASSET_BASE_URL: baseUrl,
         },
       })
@@ -654,9 +792,12 @@ async function makeReleaseArchive(version, contentIdentity, options = {}) {
   const installedLauncherFailure = options.failInstalledLauncher
     ? 'if [ "${OPENALICE_INSTALL_METHOD:-}" = "direct" ]; then exit 42; fi\n'
     : ''
+  const versionDelay = Number(options.versionDelaySeconds) > 0
+    ? `sleep ${Number(options.versionDelaySeconds)}\n`
+    : ''
   await writeFile(executable, `#!/bin/sh
 set -eu
-${installedLauncherFailure}if [ "\${1:-}" = "--version" ]; then printf '%s\\n' '${version}'; exit 0; fi
+${installedLauncherFailure}if [ "\${1:-}" = "--version" ]; then ${versionDelay}printf '%s\\n' '${version}'; exit 0; fi
 if [ "\${1:-}" = "debug-env" ]; then
   printf '%s|%s|%s|%s|%s\\n' "\$OPENALICE_INSTALL_ROOT" "\$OPENALICE_RELEASE_DIR" "\$OPENALICE_INSTALL_SOURCE" "\$OPENALICE_CONTENT_IDENTITY" "\$OPENALICE_INSTALL_METHOD"
   exit 0
@@ -680,4 +821,73 @@ printf 'fixture %s\\n' '${version}'
     archive,
     sha256: createHash('sha256').update(bytes).digest('hex'),
   }
+}
+
+async function waitForPath(path, timeoutMs = 5_000) {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    try {
+      await access(path)
+      return
+    } catch {}
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 20))
+  }
+  throw new Error(`Timed out waiting for ${path}`)
+}
+
+async function makeInstallerPathWithout(missingCommands) {
+  const bin = await mkdtemp(join(tmpdir(), 'openalice-installer-path-'))
+  temporaryPaths.push(bin)
+  const missing = new Set(missingCommands)
+  const commands = [
+    'awk',
+    'basename',
+    'bash',
+    'cat',
+    'chmod',
+    'cp',
+    'date',
+    'diff',
+    'dirname',
+    'find',
+    'flock',
+    'head',
+    'ln',
+    'lockf',
+    'mkdir',
+    'mktemp',
+    'mv',
+    'ps',
+    'readlink',
+    'rm',
+    'sed',
+    'shlock',
+    'sha256sum',
+    'shasum',
+    'sort',
+    'stat',
+    'sysctl',
+    'tar',
+    'tr',
+    'uname',
+    'wc',
+  ]
+  for (const command of commands) {
+    if (missing.has(command)) continue
+    const executable = await resolveExecutable(command)
+    if (executable) await symlink(executable, join(bin, command))
+  }
+  return bin
+}
+
+async function resolveExecutable(command) {
+  for (const directory of (process.env.PATH ?? '').split(delimiter)) {
+    if (!directory) continue
+    const candidate = join(directory, command)
+    try {
+      await access(candidate)
+      return candidate
+    } catch {}
+  }
+  return null
 }

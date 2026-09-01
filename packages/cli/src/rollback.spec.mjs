@@ -74,6 +74,23 @@ describe.skipIf(process.platform === 'win32')('OpenAlice CLI rollback transactio
     expect(await readlink(layout.currentPath)).toBe(before)
   })
 
+  it('does not switch the persistent release pointer inside Railway', async () => {
+    const layout = await makeInstalledLayout()
+    const before = await readlink(layout.currentPath)
+    const output = []
+
+    await expect(runRollbackCommand(['--yes'], {
+      layout,
+      env: { OPENALICE_SERVICE_MANAGER: 'railway' },
+      stdout: { write: (value) => output.push(value) },
+      stdin: { isTTY: false },
+    })).resolves.toBe(0)
+
+    expect(await readlink(layout.currentPath)).toBe(before)
+    expect(output.join('')).toContain('OPENALICE_RAILWAY_CHANNEL')
+    expect(output.join('')).toContain('did not modify')
+  })
+
   it('refuses rollback when no previous release is retained', async () => {
     const layout = await makeInstalledLayout({ previous: false })
     await expect(inspectRollback(layout)).rejects.toThrow('No previous')

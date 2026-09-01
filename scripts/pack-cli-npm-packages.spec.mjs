@@ -7,7 +7,13 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { packCliNpmPackages } from './pack-cli-npm-packages.mjs'
 
 const temporaryPaths = []
-const npmPackTimeoutMs = 30_000
+// This is an integration check around three real `npm pack` subprocesses. On
+// the two-core hosted Linux runner those subprocesses can be starved while the
+// rest of the 600+ file Vitest suite is active; the observed slow run still
+// completed successfully in about 69 seconds. Keep a test-local ceiling rather
+// than weakening the suite-wide timeout or misclassifying runner contention as
+// a packaging failure.
+const npmPackTimeoutMs = 90_000
 
 afterEach(async () => {
   await Promise.all(temporaryPaths.splice(0).map((path) => rm(path, { recursive: true, force: true })))

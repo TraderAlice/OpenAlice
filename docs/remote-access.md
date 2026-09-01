@@ -39,6 +39,9 @@ source checkout support retained only as an explicit development override:
   AliceProject into a new complete home on a registered SSH Machine, preserving
   portable configuration and Workspace repositories while deliberately
   starting with zero resumable Sessions;
+- `Dockerfile.railway` provides a volume-backed native CLI SSH host whose
+  foreground `server run` process is supervised by Railway while the browser
+  still connects only through an SSH loopback tunnel;
 - Electron remains a complete local desktop distribution.
 
 The release-owned installer advances one checksum-bound native OpenAlice
@@ -109,12 +112,18 @@ protocol is deferred until the local/server boundary is stable.
    PID or delete a live lock.
 8. `--takeover` remains the only command-line authority to replace another
    recorded Guardian owner.
-9. Remote bootstrap reuses the invoking local CLI's recorded ordinary
-   installer source, selector, and installed content identity. It does not
-   carry a second SSH-only installer, upload Runtime bytes through SSH, install
-   Node/build tools, clone a checkout, or install an Agent Runtime. The ordinary
-   installer downloads the matching platform-native release directly on the
-   remote host. Only an explicit `--app-dir` opts into source preparation.
+9. On an ordinary SSH-managed host, remote bootstrap reuses the invoking local
+   CLI's recorded installer source and logical release identity. Stable, beta,
+   and pinned installs may use different target archives for different
+   operating systems or architectures; each host verifies its own archive
+   checksum and content identity. Dev additionally requires the invoking CLI to
+   match the latest completed dev manifest and selects the remote target from
+   that same manifest. Bootstrap does not carry a second SSH-only installer,
+   upload Runtime bytes through SSH, install Node/build tools, clone a checkout,
+   or install an Agent Runtime. Only an explicit `--app-dir` opts into source
+   preparation. A Railway host is platform-managed instead: its entrypoint and
+   service variables select the release, while the laptop only inspects the
+   resulting target-local CLI and Runtime identity.
 10. Shared Runtime facts use presentation-neutral names and versioned schemas.
     Browser layout, Electron chrome, modal state, and other client UI state do
     not become server truth.
@@ -152,19 +161,39 @@ A matching published receipt makes registration retry idempotent. Cancellation
 terminates the SSH receiver and leaves only that transaction's marked staging
 path eligible for a safe retry.
 
-Portable configuration, active and departed Workspace repositories, Git state,
-Workspace ids, and lifecycle records transfer. Absolute Workspace paths are
-rebased to the remote Home. Guardian state, Runtime payloads, ports, auth,
-headless/native conversation state, resume identities, and untracked Session
-dossiers do not. A deliberately Git-tracked `.alice/sessions` dossier remains
-as inert repository content but does not create a resumable remote Session.
+Portable configuration, active and departed Workspace repositories, Workspace
+ids, and lifecycle records transfer. Absolute Workspace paths are rebased to
+the remote Home. For an ordinary self-contained Git Workspace, the planner
+keeps portable object/ref/index state, tracked files (including deliberately
+tracked ignored files), and nonignored untracked user files; machine-local Git
+configuration plus ignored untracked dependencies and build outputs stay
+behind. Linked worktrees, alternate/promisor object stores, nested Git
+repositories, and initialized submodules block apply instead of being silently
+degraded. A non-Git Workspace remains portable subject to the same Session,
+symlink, and machine-local exclusions.
 
-Home-owned AI/provider credentials can travel only in the private SSH stream.
-Broker and Connector values are decrypted in source-process memory and sealed
-on the receiver with a newly created destination key; the source sealing key is
-never copied. `--without-credentials` retains secret-free configuration and
-requires those integrations to be configured again. Exact-Session scheduled
-Issue owners require an explicit `keep-blocked` or `new-then-resume` policy.
+Guardian state, Runtime payloads, ports, Web auth and sessions,
+headless/native conversation state, resume identities, native Agent login and
+configuration, and untracked Session dossiers do not transfer. A deliberately
+Git-tracked `.alice/sessions` dossier remains inert repository content and does
+not create a resumable remote Session. Top-level `bin/` and `cli/` trees,
+installer locks/caches, and Alice-owned backup families are excluded; an
+arbitrary backup file deliberately stored inside a user repository still
+follows that repository's Git rules. Absolute symlinks, symlinks containing
+control characters, and relative symlinks that resolve outside the source
+AliceProject Home are reported as machine-local exclusions. Portable relative
+symlinks contained by the Home remain part of the transfer.
+
+Only Alice-owned AI, market-data-provider, broker, and Connector credentials
+can travel in the private SSH stream. Broker and Connector values are decrypted
+in source-process memory and sealed on the receiver with a newly created
+destination key; the source sealing key is never copied. With
+`--without-credentials`, portable AI and market-data configuration remains
+after secret fields are stripped, while broker-account and Connector credential
+files are omitted and must be configured again. Web authentication and native
+Agent login remain separate destination setup in either mode. Exact-Session
+scheduled Issue owners require an explicit `keep-blocked` or `new-then-resume`
+policy.
 
 ## Layered Topology
 
@@ -257,6 +286,17 @@ does not advertise that control contract, status reports `owned_elsewhere` and
 stop refuses. The user may then close that surface normally or make a separate
 explicit takeover decision.
 
+On a service-managed host, `server run` stays in the foreground so Guardian is
+the service's observed process rather than a detached child hidden behind an
+idle container. The platform owns container restart and replacement. A
+Railway-identified target is therefore status/connect-only through
+`openalice remote`: `--stop`, `--takeover`, and `--app-dir` are rejected, and
+the operator changes lifecycle or release selection through Railway. Inside
+Railway SSH, the image-owned wrapper replaces every persistent command shim on
+startup and routes `update`, `rollback`, and `uninstall` back to service
+configuration before an installed release can change the persistent pointer
+beneath a running foreground Runtime.
+
 ### Managed remote command
 
 ```bash
@@ -271,8 +311,11 @@ openalice remote <target>
    or the explicit source checkout named by `--app-dir`;
 4. probe `openalice server status --json`, Runtime provider state, and protocol
    compatibility;
-5. compare the remote CLI version, installer source/selector, and immutable
-   installed content identity with the invoking local CLI;
+5. on an ordinary SSH-managed host, compare stable, beta, or pinned installs by
+   logical release, then validate the remote target's own platform,
+   architecture, archive checksum, content identity, and embedded Runtime
+   identity; for dev, first require the invoking CLI to match the latest
+   completed dev manifest and bind the remote target to that same manifest;
 6. if CLI install or update is required, show the exact matching plan and ask
    separately before calling the normal installer on the remote host;
 7. re-probe and re-plan after installation so a newly visible owner can block
@@ -287,20 +330,86 @@ openalice remote <target>
 12. open or print the local URL and stay in the foreground to own only the
     tunnel.
 
+Railway is the explicit exception to release-selection and mutation steps 5–9.
+Its service variables, entrypoint, deploy, and restart policy are the sole
+release/lifecycle authority. The laptop does not fetch a dev manifest or
+compare the service release to its own CLI. `openalice remote` verifies that the
+platform-managed installed CLI, target-local provenance, embedded Runtime,
+running provider, and configured selector are self-consistent; a verified
+previous-release fallback is reported distinctly. It then opens the same
+loopback tunnel without installing, updating, starting, taking over, or stopping
+the service.
+
 When reusing a healthy Server, `remote` takes the loopback web port from the
 versioned status response. An explicitly supplied `--remote-port` must match
 that owner; a mismatch is reported before opening a misleading tunnel.
 
-Closing `openalice remote` closes the tunnel but leaves the detached remote
-Server running. Status and stop remain explicit but do not require users to
-compose raw SSH commands:
+On an ordinary SSH-managed host, closing `openalice remote` closes the tunnel
+but leaves the detached remote Server running. Status and stop remain explicit
+and do not require users to compose raw SSH commands:
 
 ```bash
 openalice remote <target> --status
 openalice remote <target> --stop
 ```
 
-Neither command conflates “disconnect” with “stop my remote work.”
+Neither command conflates “disconnect” with “stop my remote work.” A Railway
+foreground Server also survives tunnel closure, but Railway owns its lifecycle
+and `openalice remote --stop` is rejected.
+
+### Railway native CLI SSH host
+
+Railway is a deployment profile of the same SSH/browser product, not a public
+Web deployment and not a second remote protocol. `Dockerfile.railway` builds a
+small service image with OpenSSH client utilities, the shared Bash installer,
+and `scripts/railway/entrypoint.sh`. The image does not contain an OpenAlice
+native release or an Agent Runtime. At boot the entrypoint installs or reuses a
+verified native release on the attached volume, then replaces itself with:
+
+```bash
+openalice server run --home /data/projects/default --port 47331 --wait 180
+```
+
+The required persistent layout keeps machine installation and AliceProject
+state distinct:
+
+```text
+/data/
+├── home/
+│   ├── .openalice/       # native CLI install root and immutable releases
+│   ├── .local/           # persistent user-owned package/bin prefix
+│   └── .bun/             # optional user-owned Bun installation
+└── projects/
+    └── default/          # OPENALICE_HOME
+        └── workspaces/   # AQ_LAUNCHER_ROOT
+```
+
+The Railway Volume is fixed at `/data`. The image exposes the persistent SSH
+`HOME=/data/home`, OpenAlice install root, npm prefix, Bun root, and their
+executable directories on `PATH`, so a fresh Railway SSH shell sees the same
+user installation as Guardian. Bootstrap temporarily replaces that `PATH` with
+system directories only, validates the fixed user layout, and restores the
+persistent paths only after the native CLI is verified. Operators may select
+only `OPENALICE_HOME`, which must resolve beneath `/data`; `AQ_LAUNCHER_ROOT` is
+always derived as `<OPENALICE_HOME>/workspaces`. `HOME`, install root, npm/Bun
+roots, Volume root, and `AQ_LAUNCHER_ROOT` are not independent profile options.
+A normalized `..` or symlink escape is refused, and a Railway environment
+without the `/data` Volume fails before installation.
+Stable is the default bootstrap channel; beta may be pinned to an accepted beta
+version, stable may be pinned to an accepted stable version, and rolling dev
+does not accept a version override. Stable and beta reuse a verified matching
+release unless refresh is explicitly requested. Rolling dev always asks the
+shared installer to resolve the latest completed dev manifest. If a requested
+refresh fails, the exact previously verified release remains the fallback; an
+empty or damaged install fails closed.
+
+The service must not publish Alice's port or attach a Railway public domain.
+The laptop reaches it through Railway's SSH target and the ordinary
+`openalice remote` loopback tunnel. Agent Runtime executables, credentials, and
+updates remain user-owned: install them through an SSH shell into persistent
+user paths such as `/data/home/.local/bin` or `/data/home/.bun/bin`, both of
+which the entrypoint includes on `PATH`. Missing Agent Runtimes do not make the
+OpenAlice host bootstrap incomplete.
 
 ### Registered Machines and aggregate inventory
 
@@ -649,6 +758,7 @@ Remote documentation must distinguish what survived:
 | Alice child restart under Guardian | Guardian survives | depends on current PTY ownership path | implementation-dependent | native Agent process/session dependent |
 | full Guardian/server restart | stops and restarts | does not automatically survive | only persisted history, if explicitly supported | only through native Agent resume/provenance |
 | machine reboot | stops | stops | only persisted history | only through native Agent resume/provenance |
+| Railway container replacement with the same Volume | foreground Guardian restarts | stops | only persisted history | only through native Agent resume/provenance |
 
 OpenAlice must not market server detach as crash-proof terminal persistence.
 Conversation provenance and native CLI resume remain governed by
@@ -662,13 +772,14 @@ incompatible. It must describe the effect before acting.
 
 ## Managed Remote Bootstrap and Compatibility
 
-Managed bootstrap uses a plan/apply split.
+Ordinary SSH-managed bootstrap uses a plan/apply split. Railway uses the same
+read-only facts but permits no laptop-owned apply phase.
 
 The read-only plan reports:
 
 - SSH target and resolved remote platform/architecture;
-- detected OpenAlice CLI path, version, and whether its install source and
-  content identity match the invoking local CLI;
+- detected OpenAlice CLI path, version, logical release identity, and whether
+  its target-local artifact identity is valid for the remote host;
 - control protocol compatibility;
 - Server state, Runtime provider, native content identity, and release/source
   root;
@@ -676,16 +787,18 @@ The read-only plan reports:
   platform, architecture, selector, and checksum-bound provenance;
 - for an explicit source override, whether its checkout already has complete
   Runtime artifacts;
-- proposed install/update/start actions;
+- proposed install/update/start actions, or an explicit no-mutation result for
+  Railway;
 - destination paths and whether PATH changes are required;
 - whether a running owner would be affected;
 - the final local and remote loopback ports.
 
-Apply rules:
+Apply rules for an ordinary SSH-managed host:
 
 1. no matching compatible CLI or Runtime: ask before invoking the normal
-   installer with the local CLI's recorded branch/version selector and expected
-   product version; the installer obtains the matching platform-native release;
+   installer with the local CLI's recorded logical release selector and
+   expected target-local artifact identity; the installer obtains the matching
+   platform-native release;
 2. native mode never installs source-build dependencies or Agent Runtime
    executables;
 3. explicit source mode validates its own prerequisites and remains separate
@@ -712,12 +825,24 @@ or Server is already present and compatible, otherwise it returns the original
 failure. Source preparation uses compact phase output and suppresses successful
 package/build chatter; a failed phase still includes a bounded diagnostic tail.
 
-The local orchestrator compares protocol ranges, CLI version, install source,
-and immutable content identity; human version strings alone are insufficient. It may tolerate a newer
-compatible Runtime, but its remote control CLI must match the invoking local
-CLI. The managed command exposes no independent branch/version selector. Test
-fixtures may replace the installer URL and payload base through test-only
-environment seams; those are not a release path.
+For an ordinary SSH-managed host, the local orchestrator compares protocol
+ranges and logical release identity; human version strings alone are
+insufficient. Stable, beta, and pinned releases may have different macOS and
+Linux archive/content identities, but the remote CLI provenance and embedded
+Runtime must agree with that remote host's target. For dev, the latest CDN dev
+manifest is the completed-set authority: the local CLI must match its own
+target, the remote target is selected from the same manifest, and installer
+handoff is bound to the remote checksum and content identity. If the manifest
+cannot be verified or the local CLI is stale, remote mutation is blocked.
+
+Railway performs no such laptop-to-service release selection. Its entrypoint
+resolves stable, beta, or rolling dev on the service and may start an exactly
+verified prior fallback. The local orchestrator only checks target-local
+provenance, embedded/running Runtime agreement, and configured selector versus
+running fallback before tunneling. Neither mode exposes an independent
+branch/version selector through `openalice remote`. Test fixtures may replace
+the installer URL and payload base through test-only environment seams; those
+are not a release path.
 
 ## Future Independent Studio Protocol
 
@@ -776,22 +901,11 @@ Runtime model.
 - remaining release observation: validate ordinary Agent TUI interaction under
   representative network shaping before deciding whether Stage 3 is useful.
 
-#### Bun-native Linux SSH observation — 2026-08-29
-
-The disposable OrbStack Docker SSH fixture exercised a Linux arm64 host with no
-Node, npm, Bun, source checkout, or Agent Runtime executable. The normal Bash
-installer downloaded and checksum-verified the native `dev` archive, activated
-it under `cli/releases/`, and reported `provider=bun`. The installed binary
-then re-executed Guardian, Alice, and optional UTA as distinct processes.
-
-The same journey verified default-no planning, detached readiness against the
-real `/api/auth/status` contract, tunnel disconnect persistence, same-origin
-and same-port reconnect, aggregate Machine/AliceProject inventory, structured
-stop, interrupted-transfer retry, secret resealing, a second transferred
-AliceProject home using the same immutable native release, and final clean
-shutdown. No managed source checkout or `bin/pi` launcher was created. This is
-the current native baseline; representative network shaping and authenticated
-third-party Agent turns remain separate observations.
+The Railway profile follows the contracts above, but implementation progress,
+exact transfer measurements, and service-specific acceptance evidence are
+tracked only in [[plans/bun-cli-distribution.md]]. An offline content plan does
+not prove source quiescence, remote capability, destination absence, free
+space, transfer apply, or hosted lifecycle recovery.
 
 ### Stage 3 — terminal transport optimization
 
@@ -840,24 +954,31 @@ third-party Agent turns remain separate observations.
 
 | Scenario | Required result |
 |---|---|
-| matching compatible remote CLI/Server | reuses both without mutation |
-| protocol-compatible CLI from a different branch/tag/commit | plan names a matching CLI update before connection |
-| missing remote CLI, interactive | shows plan; default no leaves host unchanged |
-| missing remote CLI, non-interactive | fails unless explicit approval is present |
-| incompatible running Server | explains process impact before update/restart |
+| ordinary SSH, matching compatible remote CLI/Server | reuses both without mutation |
+| ordinary SSH, matching release across different targets | compares the logical stable/beta/pinned release, then validates the remote archive and Runtime against its own platform/architecture provenance |
+| ordinary SSH, dev client behind latest manifest | blocks install/start mutation and asks the user to update the local dev CLI first |
+| ordinary SSH, protocol-compatible CLI from a different branch/tag/commit | plan names a matching CLI update before connection |
+| ordinary SSH, missing remote CLI, interactive | shows plan; default no leaves host unchanged |
+| ordinary SSH, missing remote CLI, non-interactive | fails unless explicit approval is present |
+| ordinary SSH, incompatible running Server | explains process impact before update/restart |
 | matching installed native Runtime | plan selects it without Node, Bun, checkout, build-tool, or Agent-install mutation |
 | missing remote CLI and Runtime | ordinary installer obtains matching native platform artifact; default no leaves the host unchanged |
 | unsupported native target | reports the unsupported platform/architecture without cloning source |
 | explicit source path | remains a deliberate development override and preserves existing Git state |
 | tunnel disconnect | local command exits; remote Server and work continue |
 | reconnect | same local port is preferred; same Runtime, browser origin, and live terminal are reachable; a busy port falls back visibly |
-| status and stop | user-facing commands require no raw SSH; status uses one bundled control probe and stop verifies structured shutdown |
-| transient SSH loss after apply | retry known transport faults; re-probe completed install/start state before deciding failure |
+| ordinary SSH, status and stop | user-facing commands require no raw SSH; status uses one bundled control probe and stop verifies structured shutdown |
+| ordinary SSH, transient SSH loss after apply | retry known transport faults; re-probe completed install/start state before deciding failure |
 | host-key failure | fails without disabling verification |
 | SSH agent/passphrase path | preserves normal OpenSSH interaction |
 | browser security | same-origin HTTP/WS works; public Origin remains rejected |
 | external Agent TUI matrix | each user-installed Shell/Agent executable retains its own version, config, and process |
 | Docker SSH fixture | no-Node host exercises install, start, tunnel, reconnect, transfer, and stop |
+| AliceProject containing install bytes or host links | transfer excludes top-level `bin/`, `cli/`, and escaping/absolute symlinks as machine-local content |
+| Railway inspection-only connect | local CLI proposes no release or lifecycle mutation; it validates the service selector, target-local provenance, and running Runtime before opening the tunnel |
+| Railway empty Volume | shared installer bootstraps the selected native channel, then Guardian remains the foreground service process |
+| Railway normal refresh or replacement | failed refresh reuses only a still-valid prior release; normal same-Volume replacement preserves install root and AliceProject data while restarting process state |
+| Railway hard-kill replacement | stale owner metadata cannot become active merely because the replacement reused a PID; CLI preflight reaches a valid start or an actionable failure without mutating Project data |
 
 ### Later protocols
 
@@ -885,12 +1006,17 @@ When this surface changes:
 5. exercise pure `ssh` and managed `remote` against a disposable SSH/Docker
    host with `pnpm test:remote:docker`, including default-no, installed payload
    equality, detach persistence, reconnect, and structured stop;
-6. follow [[docs/docker-deployment.md]] and run `pnpm docker:smoke` when
+6. for the Railway profile, run the entrypoint and cross-target/project-transfer
+   specs documented in [[docs/docker-deployment.md]], then exercise two hosted
+   journeys: bootstrap and fail-closed behavior on a disposable service with an
+   empty Volume, and non-destructive Project migration, SSH reconnect, restart,
+   and redeploy acceptance on the retained real Volume;
+7. follow [[docs/docker-deployment.md]] and run `pnpm docker:smoke` when
    `scripts/guardian/prod.mjs` or the server image path changes;
-7. follow [[docs/managed-workspace-runtime.md]] and run the matching Electron
+8. follow [[docs/managed-workspace-runtime.md]] and run the matching Electron
    and package smoke whenever shared Guardian, PTY, startup, or dependency
    behavior changes;
-8. run the repository-wide TypeScript and test gates required by `AGENTS.md`.
+9. run the repository-wide TypeScript and test gates required by `AGENTS.md`.
 
 Record any network-shaping gap explicitly. A localhost smoke does not verify
 remote TUI behavior, and an SSH tunnel smoke does not verify Electron package
@@ -899,6 +1025,7 @@ behavior.
 ## Non-Goals for the First Implementation
 
 - public TCP binding of Alice or the Guardian control endpoint;
+- a Railway public domain or public Web fallback for the SSH-host profile;
 - hosted-domain cookie forwarding;
 - cloud relay, NAT traversal, or device fleet management;
 - live migration of PTYs across Runtime upgrades;

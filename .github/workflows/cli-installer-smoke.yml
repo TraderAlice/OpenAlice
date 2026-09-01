@@ -55,8 +55,38 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  bun-cli-feasibility:
+  release-prep-scope:
     if: github.event_name != 'push'
+    name: release-prep scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      beta_release_prep: ${{ steps.beta-release-prep.outcome == 'success' && steps.beta-release-prep.outputs.beta_release_prep || 'false' }}
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Detect exact beta release preparation
+        id: beta-release-prep
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git show "${BASE_SHA}:scripts/classify-beta-release-prep.mjs" > "$RUNNER_TEMP/classify-beta-release-prep.mjs"
+          node "$RUNNER_TEMP/classify-beta-release-prep.mjs" --github-output "$GITHUB_OUTPUT"
+
+  bun-cli-feasibility:
+    needs: release-prep-scope
+    if: >-
+      !cancelled() &&
+      github.event_name != 'push' &&
+      (
+        needs.release-prep-scope.result != 'success' ||
+        needs.release-prep-scope.outputs.beta_release_prep != 'true'
+      )
     name: Bun feasibility (${{ matrix.os }})
     strategy:
       fail-fast: false
@@ -114,7 +144,14 @@ jobs:
             --expected-content-identity "$CONTENT_IDENTITY"
 
   checkout-install:
-    if: github.event_name != 'push'
+    needs: release-prep-scope
+    if: >-
+      !cancelled() &&
+      github.event_name != 'push' &&
+      (
+        needs.release-prep-scope.result != 'success' ||
+        needs.release-prep-scope.outputs.beta_release_prep != 'true'
+      )
     name: Current checkout install
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -130,7 +167,14 @@ jobs:
         run: node scripts/install-docker-smoke.mjs
 
   checkout-remote:
-    if: github.event_name != 'push'
+    needs: release-prep-scope
+    if: >-
+      !cancelled() &&
+      github.event_name != 'push' &&
+      (
+        needs.release-prep-scope.result != 'success' ||
+        needs.release-prep-scope.outputs.beta_release_prep != 'true'
+      )
     name: Current checkout managed remote
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -138,9 +182,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - uses: pnpm/action-setup@v6
+
       - uses: actions/setup-node@v7
         with:
           node-version: 22.19.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile --filter @traderalice/openalice-cli
 
       - name: Exercise clean SSH host fixture
         run: node scripts/remote-ssh-smoke.mjs --skip-tui
@@ -183,11 +232,15 @@ jobs:
 
       - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
 
-      - name: Build Alice and native CLI
-        run: |
-          pnpm build:server
-          pnpm build:bun-runtime:feasibility
-          pnpm build:bun:release
+      - name: Build Alice server
+        run: pnpm build:server
+
+      - name: Accept multiprocess recovery once per dev commit
+        if: matrix.platform == 'linux' && matrix.arch == 'x64'
+        run: pnpm build:bun-runtime:feasibility
+
+      - name: Build native CLI
+        run: pnpm build:bun:release
 
       - name: Name the native acceptance report
         shell: bash

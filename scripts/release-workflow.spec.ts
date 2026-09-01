@@ -135,20 +135,22 @@ describe('Release workflow critical path', () => {
     )
   })
 
-  it('preserves desktop candidates before running retriable N-1 acceptance', () => {
+  it('keeps current desktop candidates on beta and N-1 acceptance on stable', () => {
     const desktop = workflow.jobs['build-desktop']
     const upgrade = workflow.jobs['accept-desktop-upgrade']
 
     expect(step(desktop, 'Preserve desktop release candidate').uses).toBe('actions/upload-artifact@v4')
+    expect(step(desktop, 'Preserve desktop release candidate').with?.['retention-days']).toBe(3)
     expect(desktop.steps?.map((candidate) => candidate.name)).not.toContain(
       'Prove final desktop artifact upgrades previous release state',
     )
     expect(needs(upgrade)).toEqual(['release', 'build-desktop'])
+    expect(upgrade.if).toContain("needs.release.outputs.channel == 'stable'")
     expect(step(upgrade, 'Restore desktop release candidate').uses).toBe('actions/download-artifact@v4')
     expect(step(upgrade, 'Prove final desktop artifact upgrades previous release state')).toBeDefined()
   })
 
-  it('keeps publication gated on both candidate builds and upgrade receipts', () => {
+  it('publishes beta from current candidates and stable from the complete compatibility gate set', () => {
     expect(needs(workflow.jobs['publish-release'])).toEqual(expect.arrayContaining([
       'preflight-public-cli-authority',
       'build-desktop',
@@ -161,17 +163,33 @@ describe('Release workflow critical path', () => {
       'accept-cli-legacy-cutover',
       'cli-installer-acceptance',
     ]))
-    expect(workflow.jobs['publish-release'].if).toContain(
+    const publication = workflow.jobs['publish-release'].if ?? ''
+    for (const common of [
+      "needs.build-desktop.result == 'success'",
+      "needs.build-cli-installer.result == 'success'",
+      "needs.build-cli-release.result == 'success'",
+      "needs.build-broker-packs.result == 'success'",
+      "needs.cli-installer-acceptance.result == 'success'",
+    ]) expect(publication).toContain(common)
+    for (const stable of [
       "needs.preflight-public-cli-authority.result == 'success'",
+      "needs.accept-desktop-upgrade.result == 'success'",
+      "needs.accept-cli-legacy-cutover.result == 'success'",
+      "needs.accept-cli-homebrew.result == 'success'",
+      "needs.accept-cli-linuxbrew.result == 'success'",
+      "needs.accept-cli-aur.result == 'success'",
+    ]) expect(publication).toContain(stable)
+    expect(publication.indexOf("needs.release.outputs.channel == 'beta'")).toBeLessThan(
+      publication.indexOf("needs.accept-desktop-upgrade.result == 'success'"),
     )
   })
 
-  it('preflights every enabled public CLI channel before creating the release', () => {
+  it('reserves public-channel authority checks for stable without delaying beta builders', () => {
     const preflight = workflow.jobs['preflight-public-cli-authority']
     expect(needs(preflight)).toEqual(['release'])
     expect(preflight['timeout-minutes']).toBe(5)
+    expect(preflight.if).toContain("needs.release.outputs.channel == 'stable'")
     const verify = step(preflight, 'Verify every opted-in public channel before release publication')
-    expect(verify.if).toContain("needs.release.outputs.channel == 'stable'")
     expect(verify.run).toBe('node scripts/preflight-public-cli-authority.mjs')
     for (const job of [
       'build-desktop',
@@ -179,8 +197,43 @@ describe('Release workflow critical path', () => {
       'build-cli-release',
       'build-broker-packs',
     ]) {
-      expect(needs(workflow.jobs[job])).toContain('preflight-public-cli-authority')
+      expect(needs(workflow.jobs[job])).not.toContain('preflight-public-cli-authority')
     }
+  })
+
+  it('installs the remote smoke parser before release installer acceptance', () => {
+    const steps = workflow.jobs['cli-installer-acceptance'].steps ?? []
+    const pnpm = steps.findIndex((candidate) => candidate.uses === 'pnpm/action-setup@v6')
+    const node = steps.findIndex((candidate) => candidate.uses === 'actions/setup-node@v7')
+    const install = steps.findIndex((candidate) => candidate.run === 'pnpm install --frozen-lockfile --filter @traderalice/openalice-cli')
+    const remote = steps.findIndex((candidate) => candidate.name === 'Exercise candidate installer through managed SSH remote')
+
+    expect(pnpm).toBeGreaterThanOrEqual(0)
+    expect(node).toBeGreaterThan(pnpm)
+    expect(steps[node]?.with?.cache).toBe('pnpm')
+    expect(install).toBeGreaterThan(node)
+    expect(remote).toBeGreaterThan(install)
+    expect(steps[remote]?.if).toContain("needs.release.outputs.channel == 'stable'")
+  })
+
+  it('keeps beta behind real candidate build, startup, installer, and integrity checks', () => {
+    const desktop = workflow.jobs['build-desktop']
+    const nativeCli = workflow.jobs['build-cli-release']
+    const installer = workflow.jobs['cli-installer-acceptance']
+
+    expect(desktop.strategy?.matrix?.include).toEqual([
+      { os: 'macos-14', arch: 'arm64' },
+      { os: 'macos-15-intel', arch: 'x64' },
+      { os: 'windows-latest', arch: 'x64' },
+    ])
+    expect(step(desktop, 'Package macOS installer').if).toBe("runner.os == 'macOS'")
+    expect(step(desktop, 'Prove release candidate Workspace CLI acceptance').if).toBeUndefined()
+    expect(step(desktop, 'Verify candidate update metadata and referenced bytes').if).toBeUndefined()
+    const boot = step(nativeCli, 'Install and boot the native candidate outside the checkout').run ?? ''
+    expect(boot).toContain('openalice" up')
+    expect(boot).toContain('openalice" doctor')
+    expect(boot).toContain('openalice" down')
+    expect(step(installer, 'Exercise candidate installer in a clean HTTP fixture').if).toBeUndefined()
   })
 
   it('does not activate stable package-manager channels before CDN verification', () => {
@@ -220,6 +273,8 @@ describe('Release workflow critical path', () => {
     const aur = workflow.jobs['accept-cli-aur']
 
     const npmAndBun = step(nativeCli, 'Accept npm and Bun installs from the native candidate').run ?? ''
+    expect(step(nativeCli, 'Accept npm and Bun installs from the native candidate').if)
+      .toContain("needs.release.outputs.channel == 'stable'")
     expect(npmAndBun).toContain('--manager npm')
     expect(npmAndBun).toContain('--manager bun')
     expect(needs(channels)).toEqual(['release', 'build-cli-release'])
@@ -251,9 +306,19 @@ describe('Release workflow critical path', () => {
       .toContain('cli-aur-container-smoke.mjs')
     const cutover = workflow.jobs['accept-cli-legacy-cutover']
     expect(needs(cutover)).toEqual(['release', 'build-cli-release'])
+    expect(cutover.if).toContain("needs.release.outputs.channel == 'stable'")
     const cutoverRun = step(cutover, 'Replace the published legacy CLI with the accepted native candidate').run ?? ''
     expect(cutoverRun).toContain('cli-legacy-cutover-smoke.mjs')
     expect(cutoverRun).toContain('--channel "${{ needs.release.outputs.channel }}"')
+  })
+
+  it('builds beta Broker Packs but reserves previous-release upgrade proof for stable', () => {
+    const brokerPacks = workflow.jobs['build-broker-packs']
+    expect(needs(brokerPacks)).toEqual(['release'])
+    expect(step(brokerPacks, 'Build optional Broker Packs').if).toBeUndefined()
+    expect(step(brokerPacks, 'Prove previous-release Broker Pack upgrade').if)
+      .toContain("needs.release.outputs.channel == 'stable'")
+    expect(step(brokerPacks, 'Preserve Broker Packs').if).toBeUndefined()
   })
 
   it('publishes npm platform packages before the stable meta package', () => {
@@ -373,6 +438,6 @@ describe('Release workflow critical path', () => {
     expect(verify).toContain('--channel "$RELEASE_CHANNEL"')
     expect(verify).toContain('INSTALL_URL="${BASE_URL}/install"')
     expect(verify).toContain('grep -Fq "Channel         stable (latest)"')
-    expect(verify).toContain('Updates[[:space:]]+stable')
+    expect(verify).not.toContain('Updates[[:space:]]+stable')
   })
 })

@@ -225,15 +225,31 @@ the issue/PR that shaped the work.
 
 ## CI Feedback Lanes
 
-CI provides both change-level confidence and post-merge integration feedback.
-Its execution stays the same, but its blocking authority depends on the
+Pull-request CI and the rolling dev CLI publication provide change-level and
+post-merge integration feedback. Their blocking authority depends on the
 delivery lane:
 
 - Every PR to `dev` or `master` runs independent Ubuntu build and unit-test
   lanes so either failure is visible without waiting for the other. The stable
   `build-and-test` aggregate check requires both lanes to pass.
 - PRs whose complete diff is limited to `ui/`, `docs/`, or root documentation
-  skip the macOS/Windows runtime matrix. Any other path keeps the full matrix.
+  skip the macOS/Windows runtime matrix. Other routine PRs to `dev` run the
+  focused native CLI, Guardian, filesystem, shell, and process contract suite
+  on macOS and Windows instead of repeating every platform-neutral Vitest file
+  already accepted on Ubuntu. PRs to `master`, `master` pushes, scheduled runs,
+  and manual full validation still build and test the complete tree on both
+  hosts.
+- A `master`-targeted PR whose complete diff is exactly the synchronized,
+  forward beta `version` value in `package.json` and
+  `packages/cli/package.json` takes the release-preparation fast lane. It keeps
+  Ubuntu build/test, workflow contracts, and root typecheck, while skipping the
+  Docker, CLI installer, Broker Pack, and desktop/cross-platform PR matrices
+  because no runtime implementation changed. The beta Release workflow then
+  rebuilds and accepts every final version-bearing candidate from the exact
+  `master` SHA.
+  The classifier is read from the trusted base commit and fails closed: stable
+  versions, extra bytes or paths, mismatches, invalid versions, and classifier
+  errors all retain the full PR suite.
 - Superseded runs for the same PR are cancelled. Only the latest-head result is
   actionable evidence.
 - Desktop Package Smoke runs its workflow-contract and root-typecheck preflight
@@ -242,28 +258,44 @@ delivery lane:
 - In serial mode, a `dev` PR may merge after proportional local verification
   while its remote checks are pending. Before the next serial PR is published,
   inspect both that PR's checks and the resulting `dev` push run. A completed
-  failure blocks further stacking until it is understood and repaired; pending
-  status alone does not block progress.
+  product or contract failure blocks further stacking until it is understood
+  and repaired; pending status alone does not block progress. A hosted-runner
+  resource failure is not converted into product risk by repetition: capture
+  the log, reproduce the affected contract locally or in the smallest native
+  lane, then repair or remove the noisy routine check rather than blindly
+  retrying the whole matrix.
 - Autonomous topic PRs remain open for later acceptance. Pending runs do not
   block related commits, but only the latest head is evidence and a completed
   failure blocks further scope until repaired. CI never grants merge authority.
-- A push to `dev` runs the focused Ubuntu Guardian/full-stack smoke instead of
-  repeating the PR's complete build, test, and cross-platform jobs.
+- A push to `dev` is a CLI-only rolling publication lane. It does not run the
+  generic CI workflow, build Electron, or build Docker. Four native macOS/Linux
+  CLI candidates are assembled and each candidate runs its packaged
+  Guardian/Alice, Web, Workspace, PTY, and release-owned Git acceptance before
+  one atomic dev manifest is activated. The heavier UTA/Connector recovery and
+  external Broker Pack fixture run once on Linux x64; PR and release lanes keep
+  their broader native-host coverage. The scheduled CI run remains the daily
+  full cross-platform backstop for current `dev`.
 - Installer or distributed-CLI PRs run deterministic clean-container install
   and managed-SSH acceptance against the checked-out tree. After merge, the
   `dev` push separately downloads `raw/.../dev/install` into a clean container,
   installs `--channel dev`, and verifies the live preview channel's provenance,
   commands, server control surface, and idempotent reuse.
-- A push to `master` always runs the complete matrix.
+- A push to `master` always runs the complete matrix. Reusing PR evidence after
+  merge remains a separate accepted-tree provenance problem; the semantic beta
+  PR fast lane does not silently solve it by trusting a commit message or diff.
 - Once this workflow version reaches the default `master` branch, the scheduled
   validation checks out current `dev` and runs the complete matrix, providing a
   daily cross-platform backstop for lightweight PRs.
 
 Keep the lightweight-path allowlist narrow. Changes to dependencies, runtime,
 Guardian, Electron, packaging, scripts, workflows, or any unclassified path
-must still produce Windows and macOS evidence. In serial `dev` work that
-evidence may arrive after merge, but a known failure stops the next increment;
-it must be green before promotion to `master` or release.
+must still produce Windows and macOS evidence, but routine PR evidence is the
+focused native contract suite plus the relevant real-runtime/package smoke, not
+three copies of all platform-neutral tests. Serial development uses the local
+Mac for the complete `npx tsc --noEmit` and `pnpm test` contract, adding the
+unsigned Electron/package smoke when that surface changes. A product failure
+must be green before promotion to `master` or release; stable keeps the full
+remote matrix even when routine integration used focused host checks.
 
 ### Package signing boundary
 
@@ -370,6 +402,12 @@ the channel and tag:
 `vX.Y.Z`. The workflow rejects an existing tag, a channel/tag mismatch, or a
 version that disagrees with either the root or `packages/cli` package. It binds
 the accepted candidates and eventual tag to the dispatch commit SHA.
+
+An exact forward beta version-only PR uses the bounded CI fast lane described
+above. Stable version preparation deliberately does not: it retains the full
+PR matrix. The subsequent `master` push also remains complete for both
+channels, and the manually dispatched Release always rebuilds and accepts its
+own final candidates; the fast lane never supplies release artifacts.
 
 Beta and stable are serial public checkpoints, not paired outputs from one
 release run. After a beta, fixes may continue on `dev`, pass the ordinary

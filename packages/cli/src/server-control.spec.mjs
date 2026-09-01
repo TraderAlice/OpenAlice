@@ -14,6 +14,8 @@ import {
 } from './server-control.mjs'
 
 const temporaryPaths = []
+const PRIOR_RAILWAY_INSTANCE_ID = '11111111-1111-4111-8111-111111111111'
+const CURRENT_RAILWAY_INSTANCE_ID = '22222222-2222-4222-8222-222222222222'
 
 afterEach(async () => {
   await Promise.all(temporaryPaths.splice(0).map((path) => rm(path, { recursive: true, force: true })))
@@ -220,6 +222,330 @@ describe('OpenAlice Guardian control protocol', () => {
     })
     expect(stale.class).toBe('absent')
     expect(stale.detail).toContain('stale')
+
+    const legacyPidProbe = vi.fn(() => false)
+    const legacyForeignHost = await readRuntimeStatus({ homeRoot: home }, {
+      hostname: 'another-fixture-host',
+      isProcessAlive: legacyPidProbe,
+    })
+    expect(legacyForeignHost.class).toBe('owned_elsewhere')
+    expect(legacyPidProbe).not.toHaveBeenCalled()
+  })
+
+  it('does not report a claim-only Runtime lock as absent', async () => {
+    const home = await makeTempDir()
+    const lock = join(home, 'state', 'guardian.lock')
+    await mkdir(join(lock, 'reclaiming'), { recursive: true })
+
+    const status = await readRuntimeStatus({ homeRoot: home })
+
+    expect(status.class).toBe('owned_elsewhere')
+    expect(status.owner).toBeNull()
+    expect(status.detail).toContain('ownership is active')
+  })
+
+  it('reclaims a dead same-machine owner after its hostname changes', async () => {
+    const home = await makeTempDir()
+    const lock = join(home, 'state', 'guardian.lock')
+    await mkdir(lock, { recursive: true })
+    await writeFile(join(lock, 'owner.json'), JSON.stringify({
+      pid: 4242,
+      hostname: 'old-container-host',
+      machineId: 'env:railway-service-service-test',
+      launcher: 'guardian-cli-server',
+      acquiredAt: '2026-07-15T00:00:00.000Z',
+      processStartedAt: '2026-07-15T00:00:00.000Z',
+    }))
+    const isProcessAlive = vi.fn(() => false)
+    const readProcessStartedAt = vi.fn(async () => Date.parse('2026-07-15T00:00:00.000Z'))
+
+    const status = await readRuntimeStatus({ homeRoot: home }, {
+      env: { OPENALICE_MACHINE_ID: 'railway-service-service-test' },
+      hostname: 'new-container-host',
+      isProcessAlive,
+      readProcessStartedAt,
+    })
+
+    expect(status.class).toBe('absent')
+    expect(status.detail).toContain('stale')
+    expect(isProcessAlive).toHaveBeenCalledWith(4242)
+    expect(readProcessStartedAt).not.toHaveBeenCalled()
+  })
+
+  it('uses the Railway instance identity even when hostname, PID, and start time are reused', async () => {
+    const env = {
+      OPENALICE_RAILWAY_INSTANCE_ID: CURRENT_RAILWAY_INSTANCE_ID,
+      OPENALICE_SERVICE_MANAGER: 'railway',
+      OPENALICE_MACHINE_ID: 'railway-service-service-test',
+      RAILWAY_ENVIRONMENT_ID: 'environment-test',
+      RAILWAY_SERVICE_ID: 'service-test',
+    }
+    const home = await makeTempDir()
+    const lock = join(home, 'state', 'guardian.lock')
+    await mkdir(lock, { recursive: true })
+    const ownerPath = join(lock, 'owner.json')
+    const owner = {
+      pid: 4242,
+      hostname: 'current-container',
+      machineId: 'env:railway-service-service-test',
+      launcher: 'guardian-cli-server',
+      acquiredAt: new Date().toISOString(),
+      heartbeatAt: new Date().toISOString(),
+      fencingProtocol: 'railway-flock-v1',
+      fencingInstanceId: PRIOR_RAILWAY_INSTANCE_ID,
+      processStartedAt: '2026-07-15T00:00:00.000Z',
+    }
+    await writeFile(ownerPath, JSON.stringify(owner))
+    const isProcessAlive = vi.fn(() => true)
+    const readProcessStartedAt = vi.fn(async () => Date.parse('2026-07-15T00:00:00.000Z'))
+
+    for (const heartbeatAt of [new Date().toISOString(), new Date(0).toISOString()]) {
+      await writeFile(ownerPath, JSON.stringify({ ...owner, heartbeatAt }))
+      const observer = await readRuntimeStatus({ homeRoot: home }, {
+        env,
+        hostname: 'current-container',
+        isProcessAlive,
+        readProcessStartedAt,
+      })
+      expect(observer.class).toBe('owned_elsewhere')
+
+      const fenced = await readRuntimeStatus({ homeRoot: home }, {
+        env,
+        hostname: 'current-container',
+        isProcessAlive,
+        readProcessStartedAt,
+        railwayFenceValid: true,
+      })
+      expect(fenced.class).toBe('absent')
+      expect(fenced.detail).toContain('stale')
+    }
+    expect(isProcessAlive).not.toHaveBeenCalled()
+    expect(readProcessStartedAt).not.toHaveBeenCalled()
+  })
+
+  it('keeps a legacy cross-container Railway owner blocked even for a fenced entrypoint', async () => {
+    const home = await makeTempDir()
+    const lock = join(home, 'state', 'guardian.lock')
+    await mkdir(lock, { recursive: true })
+    await writeFile(join(lock, 'owner.json'), JSON.stringify({
+      pid: 4242,
+      hostname: 'prior-container',
+      machineId: 'env:railway-service-service-test',
+      launcher: 'guardian-cli-server',
+      acquiredAt: new Date(0).toISOString(),
+      heartbeatAt: new Date(0).toISOString(),
+    }))
+    const isProcessAlive = vi.fn(() => false)
+    const status = await readRuntimeStatus({ homeRoot: home }, {
+      env: {
+        OPENALICE_RAILWAY_INSTANCE_ID: CURRENT_RAILWAY_INSTANCE_ID,
+        OPENALICE_SERVICE_MANAGER: 'railway',
+        OPENALICE_MACHINE_ID: 'railway-service-service-test',
+        RAILWAY_ENVIRONMENT_ID: 'environment-test',
+        RAILWAY_SERVICE_ID: 'service-test',
+      },
+      hostname: 'current-container',
+      isProcessAlive,
+      railwayFenceValid: true,
+    })
+
+    expect(status.class).toBe('owned_elsewhere')
+    expect(isProcessAlive).not.toHaveBeenCalled()
+  })
+
+  it('keeps a malformed Railway fencing instance blocked', async () => {
+    const home = await makeTempDir()
+    const lock = join(home, 'state', 'guardian.lock')
+    await mkdir(lock, { recursive: true })
+    await writeFile(join(lock, 'owner.json'), JSON.stringify({
+      pid: 4242,
+      hostname: 'current-container',
+      machineId: 'env:railway-service-service-test',
+      launcher: 'guardian-cli-server',
+      acquiredAt: new Date(0).toISOString(),
+      heartbeatAt: new Date(0).toISOString(),
+      fencingProtocol: 'railway-flock-v1',
+      fencingInstanceId: 'not valid',
+    }))
+
+    const status = await readRuntimeStatus({ homeRoot: home }, {
+      env: {
+        OPENALICE_RAILWAY_INSTANCE_ID: CURRENT_RAILWAY_INSTANCE_ID,
+        OPENALICE_SERVICE_MANAGER: 'railway',
+        OPENALICE_MACHINE_ID: 'railway-service-service-test',
+        RAILWAY_ENVIRONMENT_ID: 'environment-test',
+        RAILWAY_SERVICE_ID: 'service-test',
+      },
+      hostname: 'current-container',
+      isProcessAlive: vi.fn(() => false),
+      railwayFenceValid: true,
+    })
+
+    expect(status.class).toBe('owned_elsewhere')
+  })
+
+  it('keeps same-container PID identity authoritative under Railway', async () => {
+    const home = await makeTempDir()
+    const lock = join(home, 'state', 'guardian.lock')
+    await mkdir(lock, { recursive: true })
+    await writeFile(join(lock, 'owner.json'), JSON.stringify({
+      pid: 4242,
+      hostname: 'current-container',
+      machineId: 'env:railway-service-service-test',
+      launcher: 'guardian-cli-server',
+      acquiredAt: new Date(0).toISOString(),
+      heartbeatAt: new Date(0).toISOString(),
+      fencingProtocol: 'railway-flock-v1',
+      fencingInstanceId: CURRENT_RAILWAY_INSTANCE_ID,
+      processStartedAt: '2026-07-15T00:00:00.000Z',
+    }))
+    const isProcessAlive = vi.fn(() => true)
+    const readProcessStartedAt = vi.fn(async () => Date.parse('2026-07-15T00:00:00.000Z'))
+
+    const status = await readRuntimeStatus({ homeRoot: home }, {
+      env: {
+        OPENALICE_RAILWAY_INSTANCE_ID: CURRENT_RAILWAY_INSTANCE_ID,
+        OPENALICE_SERVICE_MANAGER: 'railway',
+        OPENALICE_MACHINE_ID: 'railway-service-service-test',
+        RAILWAY_ENVIRONMENT_ID: 'environment-test',
+        RAILWAY_SERVICE_ID: 'service-test',
+      },
+      hostname: 'current-container',
+      isProcessAlive,
+      readProcessStartedAt,
+    })
+
+    expect(status.class).toBe('owned_elsewhere')
+    expect(isProcessAlive).toHaveBeenCalledWith(4242)
+    expect(readProcessStartedAt).toHaveBeenCalledWith(4242)
+  })
+
+  it('keeps missing or foreign Railway owner identity fail closed', async () => {
+    const env = {
+      OPENALICE_SERVICE_MANAGER: 'railway',
+      OPENALICE_MACHINE_ID: 'railway-service-service-test',
+      RAILWAY_ENVIRONMENT_ID: 'environment-test',
+      RAILWAY_SERVICE_ID: 'service-test',
+    }
+    for (const [index, machineId] of [undefined, 'env:railway-service-other'].entries()) {
+      const home = await makeTempDir()
+      const lock = join(home, 'state', 'guardian.lock')
+      await mkdir(lock, { recursive: true })
+      await writeFile(join(lock, 'owner.json'), JSON.stringify({
+        pid: 4242,
+        hostname: `foreign-container-${index}`,
+        ...(machineId ? { machineId } : {}),
+        launcher: 'guardian-cli-server',
+        acquiredAt: new Date(0).toISOString(),
+        heartbeatAt: new Date(0).toISOString(),
+      }))
+      const isProcessAlive = vi.fn(() => false)
+
+      const status = await readRuntimeStatus({ homeRoot: home }, {
+        env,
+        hostname: 'current-container',
+        isProcessAlive,
+      })
+      expect(status.class).toBe('owned_elsewhere')
+      expect(isProcessAlive).not.toHaveBeenCalled()
+    }
+  })
+
+  it('keeps missing or invalid Railway heartbeats fail closed', async () => {
+    const env = {
+      OPENALICE_SERVICE_MANAGER: 'railway',
+      OPENALICE_MACHINE_ID: 'railway-service-service-test',
+      RAILWAY_ENVIRONMENT_ID: 'environment-test',
+      RAILWAY_SERVICE_ID: 'service-test',
+    }
+    for (const [index, heartbeatAt] of [undefined, 'not-a-date', 0].entries()) {
+      const home = await makeTempDir()
+      const lock = join(home, 'state', 'guardian.lock')
+      await mkdir(lock, { recursive: true })
+      await writeFile(join(lock, 'owner.json'), JSON.stringify({
+        pid: 4242,
+        hostname: `prior-container-${index}`,
+        machineId: 'env:railway-service-service-test',
+        launcher: 'guardian-cli-server',
+        acquiredAt: new Date(0).toISOString(),
+        fencingProtocol: 'railway-flock-v1',
+        ...(heartbeatAt === undefined ? {} : { heartbeatAt }),
+      }))
+      const isProcessAlive = vi.fn(() => false)
+
+      const status = await readRuntimeStatus({ homeRoot: home }, {
+        env,
+        hostname: 'current-container',
+        isProcessAlive,
+      })
+      expect(status.class).toBe('owned_elsewhere')
+      expect(isProcessAlive).not.toHaveBeenCalled()
+    }
+  })
+
+  it('keeps the same process active but treats a reused PID as stale', async () => {
+    const home = await makeTempDir()
+    const lock = join(home, 'state', 'guardian.lock')
+    await mkdir(lock, { recursive: true })
+    await writeFile(join(lock, 'owner.json'), JSON.stringify({
+      pid: 4242,
+      hostname: 'fixture-host',
+      machineId: 'env:fixture-machine',
+      launcher: 'guardian-cli-server',
+      acquiredAt: '2026-07-15T00:00:00.000Z',
+      processStartedAt: '2026-07-15T00:00:00.000Z',
+    }))
+    const readProcessStartedAt = vi.fn()
+      .mockResolvedValueOnce(Date.parse('2026-07-15T00:00:01.000Z'))
+      .mockResolvedValueOnce(Date.parse('2026-07-15T00:00:10.000Z'))
+
+    const dependencies = {
+      hostname: 'fixture-host',
+      isProcessAlive: () => true,
+      readMachineId: async () => 'env:fixture-machine',
+      readProcessStartedAt,
+    }
+
+    const sameProcess = await readRuntimeStatus({ homeRoot: home }, dependencies)
+    expect(sameProcess.class).toBe('owned_elsewhere')
+
+    const reusedPid = await readRuntimeStatus({ homeRoot: home }, dependencies)
+
+    expect(reusedPid.class).toBe('absent')
+    expect(reusedPid.detail).toContain('stale')
+    expect(readProcessStartedAt).toHaveBeenCalledTimes(2)
+    expect(readProcessStartedAt).toHaveBeenNthCalledWith(1, 4242)
+    expect(readProcessStartedAt).toHaveBeenNthCalledWith(2, 4242)
+  })
+
+  it('keeps a foreign-machine owner active without probing its PID', async () => {
+    const home = await makeTempDir()
+    const lock = join(home, 'state', 'guardian.lock')
+    await mkdir(lock, { recursive: true })
+    await writeFile(join(lock, 'owner.json'), JSON.stringify({
+      pid: 4242,
+      hostname: 'same-hostname-is-not-authoritative',
+      machineId: 'env:foreign-machine',
+      launcher: 'guardian-cli-server',
+      acquiredAt: '2026-07-15T00:00:00.000Z',
+      processStartedAt: '2026-07-15T00:00:00.000Z',
+    }))
+    const isProcessAlive = vi.fn(() => false)
+    const readProcessStartedAt = vi.fn(async () => null)
+
+    const status = await readRuntimeStatus({ homeRoot: home }, {
+      hostname: 'same-hostname-is-not-authoritative',
+      isProcessAlive,
+      readMachineId: async () => 'env:local-machine',
+      readProcessStartedAt,
+    })
+
+    expect(status).toEqual(expect.objectContaining({
+      class: 'owned_elsewhere',
+      owner: expect.objectContaining({ surface: 'cli-server', pid: 4242 }),
+    }))
+    expect(isProcessAlive).not.toHaveBeenCalled()
+    expect(readProcessStartedAt).not.toHaveBeenCalled()
   })
 
   it('keeps shutdown non-absent while an Alice runtime lock is still active', async () => {

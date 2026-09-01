@@ -480,20 +480,36 @@ and warns before writing it.
 ### Version and update surface
 
 **Settings → General → About OpenAlice** is the user-facing source for the
-running version and update state on every distribution surface. The passive
-read uses `GET /api/version`, whose GitHub release lookup is cached. An
-explicit **Check for updates** uses the authenticated
-`POST /api/version/check` route to bypass that cache without exposing a public
-rate-limit bypass.
+running version, normalized channel, and update owner on every distribution
+surface. The backend derives that state from installed provenance and the
+runtime profile rather than guessing from package semver. A source checkout
+uses Git, packaged Electron uses its native updater, a directly installed
+stable or beta CLI uses `openalice update` as its entry point (with that command
+handing package-manager installs back to their manager), and Railway or Docker
+remains owned by its service deployment. Pinned and custom installs have no
+implicit updater.
+Invalid installed provenance fails closed as custom/non-updating instead of
+silently falling back to a stable package version.
+
+The passive read uses `GET /api/version`. An explicit **Check for updates**
+uses the authenticated `POST /api/version/check` route to bypass the
+application cache, but neither route crosses the running surface's authority.
+Stable and beta source, desktop, or CLI contexts may read their matching
+OpenAlice CDN manifest. Dev identity is the complete native payload identity,
+not its reused package version, so the Web surface does not duplicate the
+native CLI or deployment selector. Service-managed, dev, pinned, and custom
+contexts therefore make no Web manifest request and never render a Git or CLI
+update instruction that their owner cannot apply. GitHub remains the immutable
+release-asset and release-notes host rather than the runtime discovery API.
 
 Packaged Electron also invokes the existing `electron-updater` check through
 the narrow preload bridge. That check starts the native download path when an
 eligible release exists; download progress and the ready-to-restart action are
 projected into the same Settings card. Electron development and unsigned
 directory packages may not have updater metadata, so the native check reports
-that it is unsupported and the shared version route remains the non-installing
-fallback. The top-level update banner and downloaded-update prompt remain
-secondary notifications over the same backend and updater state.
+that it is unsupported without transferring authority to the Web route. The
+top-level update banner and downloaded-update prompt remain secondary
+notifications over the same backend and updater state.
 
 The update UI must distinguish determinate download progress from the native
 installer handoff. Before closing, the old app reports `preparing`,

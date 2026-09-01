@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events'
 import type { ChildProcess, spawn } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { PassThrough } from 'node:stream'
 
 import { describe, expect, it } from 'vitest'
@@ -47,11 +48,55 @@ describe('AliceProject SSH transfer transport', () => {
     }
   })
 
-  it('bounds and sanitizes remote failure diagnostics', async () => {
+  it('validates every receipt field and returns only the receipt schema', async () => {
+    const receipt = matchingReceipt()
+    const remoteReceipt = {
+      ...receipt,
+      secretCanary: 'top-level-secret',
+      unexpectedNested: {
+        secretCanary: 'nested-secret',
+      },
+    }
+    const spawnProcess = fakeSpawn((child) => {
+      child.stdin.once('finish', () => {
+        child.stdout.end(`${JSON.stringify(remoteReceipt)}\n`)
+        child.emit('exit', 0, null)
+      })
+    })
+    const returned = await transferProjectOverSsh({
+      machine: machine(),
+      plan: transferPlan(),
+      spawnProcess,
+    })
+    expect(returned).toEqual(receipt)
+    expect(JSON.stringify(returned)).not.toContain('secretCanary')
+
+    for (const invalid of [
+      { ...receipt, files: -1 },
+      { ...receipt, bytes: 1.5 },
+      { ...receipt, manifestSha256: 'not-a-sha256' },
+      { ...receipt, credentials: 'unknown' },
+      { ...receipt, publishedAt: 123 },
+    ]) {
+      const invalidSpawn = fakeSpawn((child) => {
+        child.stdin.once('finish', () => {
+          child.stdout.end(`${JSON.stringify(invalid)}\n`)
+          child.emit('exit', 0, null)
+        })
+      })
+      await expect(transferProjectOverSsh({
+        machine: machine(),
+        plan: transferPlan(),
+        spawnProcess: invalidSpawn,
+      })).rejects.toMatchObject({ code: 'ETRANSSSH' })
+    }
+  })
+
+  it('withholds untrusted remote diagnostics from the credential-bearing channel', async () => {
     const diagnostics: string[] = []
     const spawnProcess = fakeSpawn((child) => {
       child.stdin.once('finish', () => {
-        child.stderr.write('receiver\u0000 failed\n')
+        child.stderr.write('receiver\u0000 failed secret-canary\n')
         child.stderr.end()
         child.emit('exit', 23, null)
       })
@@ -61,8 +106,8 @@ describe('AliceProject SSH transfer transport', () => {
       plan: transferPlan(),
       spawnProcess,
       stderr: { write: (value) => diagnostics.push(value) },
-    })).rejects.toThrow('receiver failed')
-    expect(diagnostics).toEqual(['receiver\u0000 failed\n'])
+    })).rejects.toThrow('diagnostics were withheld')
+    expect(diagnostics).toEqual([])
   })
 })
 
@@ -142,7 +187,7 @@ function matchingReceipt() {
     destinationHome: '/home/alice/.openalice-copy',
     files: 0,
     bytes: 0,
-    manifestSha256: '0'.repeat(64),
+    manifestSha256: createHash('sha256').update('[]').digest('hex'),
     credentials: 'omitted' as const,
     sessionsImported: 0 as const,
     publishedAt: '2026-08-23T00:01:00.000Z',

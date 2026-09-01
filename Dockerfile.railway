@@ -1,0 +1,46 @@
+FROM debian:bookworm-slim
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    bash \
+    ca-certificates \
+    curl \
+    diffutils \
+    git \
+    gzip \
+    openssh-client \
+    procps \
+    python3 \
+    tini \
+    util-linux \
+  && rm -rf /var/lib/apt/lists/*
+
+ENV OPENALICE_RAILWAY_VOLUME_ROOT=/data \
+    OPENALICE_SERVICE_MANAGER=railway \
+    OPENALICE_RAILWAY_CHANNEL=stable \
+    HOME=/data/home \
+    OPENALICE_HOME=/data/projects/default \
+    OPENALICE_INSTALL_DIR=/data/home/.openalice \
+    NPM_CONFIG_PREFIX=/data/home/.local \
+    BUN_INSTALL=/data/home/.bun \
+    ENV=/etc/profile.d/openalice-railway.sh \
+    PATH=/usr/local/sbin:/usr/local/bin:/data/home/.openalice/bin:/data/home/.local/bin:/data/home/.bun/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+COPY install /opt/openalice/install
+COPY scripts/railway/entrypoint.sh /usr/local/bin/openalice-railway-entrypoint
+COPY scripts/railway/command-wrapper.sh /usr/local/libexec/openalice-railway-command
+COPY scripts/railway/preflight-retained-locks.py /usr/local/libexec/openalice-railway-preflight
+COPY scripts/railway/shell-env.sh /etc/profile.d/openalice-railway.sh
+
+RUN chmod 0755 \
+      /opt/openalice/install \
+      /usr/local/bin/openalice-railway-entrypoint \
+      /usr/local/libexec/openalice-railway-command \
+      /usr/local/libexec/openalice-railway-preflight \
+      /etc/profile.d/openalice-railway.sh \
+  && for command_name in openalice alice alice-workspace alice-uta traderhub; do \
+       install -m 0755 /usr/local/libexec/openalice-railway-command "/usr/local/bin/$command_name"; \
+     done \
+  && printf '\n. /etc/profile.d/openalice-railway.sh\n' >>/etc/bash.bashrc
+
+ENTRYPOINT ["/usr/bin/tini", "-s", "-g", "--", "/usr/local/bin/openalice-railway-entrypoint"]

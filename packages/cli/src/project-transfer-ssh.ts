@@ -1,5 +1,6 @@
 /** SSH transport for the AliceProject transfer stream. */
 import { spawn } from 'node:child_process'
+import { createHash } from 'node:crypto'
 
 import type { RegisteredMachine } from './machine-registry.ts'
 import { buildRemoteSshArgs } from './remote.mjs'
@@ -35,7 +36,7 @@ export async function transferProjectOverSsh(input: {
   })
   const stdout: Buffer[] = []
   let stdoutBytes = 0
-  let stderrText = ''
+  let receiverReportedError = false
   ssh.stdout.on('data', (chunk: Buffer | string) => {
     const bytes = Buffer.from(chunk)
     stdoutBytes += bytes.byteLength
@@ -46,16 +47,14 @@ export async function transferProjectOverSsh(input: {
     stdout.push(bytes)
   })
   ssh.stderr.on('data', (chunk: Buffer | string) => {
-    const text = String(chunk)
-    stderrText = `${stderrText}${text}`.slice(-16_384)
-    input.stderr?.write(text)
+    if (Buffer.byteLength(chunk) > 0) receiverReportedError = true
   })
   const exited = new Promise<number>((resolvePromise, reject) => {
     ssh.once('error', reject)
     ssh.once('exit', (code, signal) => {
       if (code === 0) resolvePromise(0)
       else reject(transferSshError(
-        `Remote transfer receiver exited ${signal ? `with ${signal}` : `with code ${code ?? 'unknown'}`}${stderrText.trim() ? `: ${safeRemoteError(stderrText)}` : '.'}`,
+        `Remote transfer receiver exited ${signal ? `with ${signal}` : `with code ${code ?? 'unknown'}`}.${receiverReportedError ? ' Remote diagnostics were withheld from the credential-bearing transfer channel.' : ''}`,
       ))
     })
   })
@@ -90,11 +89,19 @@ export async function transferProjectOverSsh(input: {
   }
   if (stdoutBytes > MAX_RECEIPT_BYTES) throw transferSshError('Remote transfer receipt was too large.')
   const receipt = parseReceipt(Buffer.concat(stdout).toString('utf8'))
+  const expectedManifestSha256 = createHash('sha256')
+    .update(JSON.stringify(input.plan.portable.entries))
+    .digest('hex')
+  const expectedCredentials = input.plan.policy.credentials === 'include' ? 'included' : 'omitted'
   if (
     receipt.transferId !== input.plan.transferId
     || receipt.sourceProjectId !== input.plan.source.projectId
     || receipt.destinationProjectId !== input.plan.destination.projectId
     || receipt.destinationHome !== input.plan.destination.home
+    || receipt.files !== input.plan.portable.files
+    || receipt.bytes !== input.plan.portable.bytes
+    || receipt.manifestSha256 !== expectedManifestSha256
+    || receipt.credentials !== expectedCredentials
     || receipt.sessionsImported !== 0
   ) throw transferSshError('Remote transfer receiver returned a receipt for another transaction.')
   return receipt
@@ -111,24 +118,55 @@ function parseReceipt(value: string): ProjectTransferReceipt {
     parsed === null
     || typeof parsed !== 'object'
     || Array.isArray(parsed)
-    || (parsed as Record<string, unknown>)['schemaVersion'] !== 1
-    || typeof (parsed as Record<string, unknown>)['transferId'] !== 'string'
-    || typeof (parsed as Record<string, unknown>)['sourceProjectId'] !== 'string'
-    || typeof (parsed as Record<string, unknown>)['destinationProjectId'] !== 'string'
-    || typeof (parsed as Record<string, unknown>)['destinationHome'] !== 'string'
-    || (parsed as Record<string, unknown>)['sessionsImported'] !== 0
   ) {
     throw transferSshError('Remote transfer receiver returned an invalid receipt.')
   }
-  return parsed as ProjectTransferReceipt
-}
-
-function safeRemoteError(value: string): string {
-  return value
-    .replaceAll(/[\u0000-\u001f\u007f-\u009f]+/gu, ' ')
-    .replaceAll(/\s+/gu, ' ')
-    .trim()
-    .slice(-1_000)
+  const root = parsed as Record<string, unknown>
+  const transferId = root['transferId']
+  const sourceProjectId = root['sourceProjectId']
+  const destinationProjectId = root['destinationProjectId']
+  const destinationHome = root['destinationHome']
+  const files = root['files']
+  const bytes = root['bytes']
+  const manifestSha256 = root['manifestSha256']
+  const credentials = root['credentials']
+  const publishedAt = root['publishedAt']
+  if (
+    root['schemaVersion'] !== 1
+    || typeof transferId !== 'string'
+    || transferId.length < 1
+    || typeof sourceProjectId !== 'string'
+    || sourceProjectId.length < 1
+    || typeof destinationProjectId !== 'string'
+    || destinationProjectId.length < 1
+    || typeof destinationHome !== 'string'
+    || destinationHome.length < 1
+    || !Number.isSafeInteger(files)
+    || Number(files) < 0
+    || !Number.isSafeInteger(bytes)
+    || Number(bytes) < 0
+    || typeof manifestSha256 !== 'string'
+    || !/^[a-f0-9]{64}$/u.test(manifestSha256)
+    || (credentials !== 'included' && credentials !== 'omitted')
+    || root['sessionsImported'] !== 0
+    || typeof publishedAt !== 'string'
+    || !Number.isFinite(Date.parse(publishedAt))
+  ) {
+    throw transferSshError('Remote transfer receiver returned an invalid receipt.')
+  }
+  return {
+    schemaVersion: 1,
+    transferId,
+    sourceProjectId,
+    destinationProjectId,
+    destinationHome,
+    files: Number(files),
+    bytes: Number(bytes),
+    manifestSha256,
+    credentials,
+    sessionsImported: 0,
+    publishedAt,
+  }
 }
 
 function transferSshError(message: string, cause?: unknown): Error & { code: string; exitCode: number } {

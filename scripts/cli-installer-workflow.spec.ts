@@ -5,6 +5,7 @@ import YAML from 'yaml'
 
 interface WorkflowStep {
   name?: string
+  if?: string
   run?: string
   uses?: string
   with?: Record<string, unknown>
@@ -24,7 +25,13 @@ interface WorkflowJob {
 const root = resolve(import.meta.dirname, '..')
 const workflow = YAML.parse(
   readFileSync(resolve(root, '.github/workflows/cli-installer-smoke.yml'), 'utf8'),
-) as { jobs: Record<string, WorkflowJob> }
+) as {
+  on?: {
+    push?: { branches?: string[] }
+    pull_request?: { branches?: string[] }
+  }
+  jobs: Record<string, WorkflowJob>
+}
 
 function step(job: WorkflowJob, name: string): WorkflowStep {
   const found = job.steps?.find((candidate) => candidate.name === name)
@@ -33,6 +40,11 @@ function step(job: WorkflowJob, name: string): WorkflowStep {
 }
 
 describe('CLI installer dev publication workflow', () => {
+  it('owns every dev push as the only rolling publication lane', () => {
+    expect(workflow.on?.push?.branches).toEqual(['dev'])
+    expect(workflow.on?.pull_request?.branches).toEqual(expect.arrayContaining(['dev', 'master']))
+  })
+
   it('builds all four supported native targets with the pinned Bun version', () => {
     const build = workflow.jobs['build-dev-cli']
     expect(build.strategy?.matrix?.include).toEqual([
@@ -42,7 +54,19 @@ describe('CLI installer dev publication workflow', () => {
       { os: 'ubuntu-24.04-arm', platform: 'linux', arch: 'arm64' },
     ])
     expect(build.steps?.some((candidate) => candidate.uses === 'oven-sh/setup-bun@v2')).toBe(true)
-    expect(step(build, 'Build Alice and native CLI').run).toContain('build:bun-runtime:feasibility')
+    expect(step(build, 'Accept multiprocess recovery once per dev commit')).toMatchObject({
+      if: "matrix.platform == 'linux' && matrix.arch == 'x64'",
+      run: 'pnpm build:bun-runtime:feasibility',
+    })
+    expect(step(build, 'Build Alice server').run).toBe('pnpm build:server')
+    expect(step(build, 'Build native CLI').run).toBe('pnpm build:bun:release')
+    const stepNames = build.steps?.map((candidate) => candidate.name)
+    expect(stepNames?.indexOf('Build Alice server')).toBeLessThan(
+      stepNames?.indexOf('Accept multiprocess recovery once per dev commit') ?? -1,
+    )
+    expect(stepNames?.indexOf('Accept multiprocess recovery once per dev commit')).toBeLessThan(
+      stepNames?.indexOf('Build native CLI') ?? -1,
+    )
     expect(step(build, 'Preserve accepted dev candidate').with?.name).toBe(
       'dev-cli-${{ matrix.platform }}-${{ matrix.arch }}',
     )
@@ -80,5 +104,19 @@ describe('CLI installer dev publication workflow', () => {
     const live = workflow.jobs['dev-channel-install']
     expect(live.needs).toBe('publish-dev-cli')
     expect(live.if).toContain("needs.publish-dev-cli.result == 'success'")
+  })
+
+  it('installs the remote smoke parser before running the checkout fixture', () => {
+    const steps = workflow.jobs['checkout-remote'].steps ?? []
+    const pnpm = steps.findIndex((candidate) => candidate.uses === 'pnpm/action-setup@v6')
+    const node = steps.findIndex((candidate) => candidate.uses === 'actions/setup-node@v7')
+    const install = steps.findIndex((candidate) => candidate.run === 'pnpm install --frozen-lockfile --filter @traderalice/openalice-cli')
+    const smoke = steps.findIndex((candidate) => candidate.name === 'Exercise clean SSH host fixture')
+
+    expect(pnpm).toBeGreaterThanOrEqual(0)
+    expect(node).toBeGreaterThan(pnpm)
+    expect(steps[node]?.with?.cache).toBe('pnpm')
+    expect(install).toBeGreaterThan(node)
+    expect(smoke).toBeGreaterThan(install)
   })
 })

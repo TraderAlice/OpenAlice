@@ -27,6 +27,8 @@ import { AboutOpenAliceSection } from './AboutOpenAliceSection'
 
 const currentVersion = {
   current: '0.82.0-beta',
+  channel: 'beta' as const,
+  updateAuthority: 'source' as const,
   latest: '0.82.0-beta',
   hasUpdate: false,
   releaseUrl: 'https://example.test/v0.82.0-beta',
@@ -77,6 +79,40 @@ describe('AboutOpenAliceSection', () => {
     await waitFor(() => expect(mocks.checkVersion).toHaveBeenCalledOnce())
     await waitFor(() => expect(screen.queryByText('Checking for updates…')).toBeNull())
     expect(screen.getByText('You’re up to date.')).toBeTruthy()
+  })
+
+  it('uses the backend channel instead of inferring it from the version', async () => {
+    mocks.getVersion.mockResolvedValue({
+      ...currentVersion,
+      current: '0.90.1',
+      channel: 'dev',
+    })
+
+    render(<AboutOpenAliceSection />)
+
+    expect(await screen.findByText('Development channel')).toBeTruthy()
+  })
+
+  it.each([
+    ['service', 'dev', 'Updates are managed by this deployment service.'],
+    ['cli', 'dev', 'Use the OpenAlice CLI to check this development build for updates.'],
+    ['none', 'pinned', 'This installation does not follow an automatic update channel.'],
+  ] as const)('shows %s update ownership without offering a no-op Web check', async (
+    updateAuthority,
+    channel,
+    expectedStatus,
+  ) => {
+    mocks.getVersion.mockResolvedValue({
+      ...currentVersion,
+      current: '0.90.1',
+      channel,
+      updateAuthority,
+    })
+
+    render(<AboutOpenAliceSection />)
+
+    expect(await screen.findByText(expectedStatus)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Check for updates' })).toBeNull()
   })
 
   it('uses the packaged updater and offers restart after a download completes', async () => {
