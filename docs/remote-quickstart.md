@@ -166,14 +166,15 @@ at that exact Volume-root path, and startup fails closed otherwise. Never
 clear the Project or Volume; if an owner still matches a
 running deployment, stop instead of quarantining it.
 
-The default service variables select the latest stable native release, but the
-currently public stable `v0.90.2` and beta `v0.91.0-beta.1` do not advertise the
-required `railway-runtime-lock-v2` capability and are therefore rejected by
-this profile. The dev manifest current before this change is also v1-only. Do
-not deploy until this change has merged and its matching completed dev manifest
-advertises v2; that later artifact may be used for candidate acceptance. Stable
-or beta still requires a later explicit release, which this guide does not
-authorize or perform. Use only the selectors needed for the intended host:
+The default service variables select the latest stable native release. Public
+stable `v0.90.2` predates `railway-runtime-lock-v2` and is therefore rejected by
+this profile. Accepted beta `v0.91.0-beta.3` advertises both Railway Runtime
+capabilities and has passed retained-Volume replacement plus core Runtime/PTY
+recovery through a long tunnel outage. The Settings identity-refresh fix found
+by that journey lands after beta3. A completed dev manifest is eligible only
+when it advertises those same capabilities. Do not infer eligibility from a
+package version or branch name, and do not treat this guide as release
+authority. Use only the selectors needed for the intended host:
 
 ```text
 OPENALICE_RAILWAY_CHANNEL=stable

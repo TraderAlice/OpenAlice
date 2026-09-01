@@ -1,12 +1,12 @@
 # Bun-native CLI Distribution
 
 Status: Active — macOS/Linux native CLI is public in v0.90.2 and the separately
-dispatched v0.91.0-beta.2 is externally verified; stable remains v0.90.2 while
+dispatched v0.91.0-beta.3 is externally verified; stable remains v0.90.2 while
 stable/beta discovery authority is converged on the OpenAlice CDN;
 the Railway native CLI SSH host passes local empty-Volume, normal replacement,
 hard-kill recovery, real retained-Volume transfer, hosted Agent turns, and live
 v2 normal-restart/hard-kill reacceptance, plus a non-destructive switch from a
-rolling dev Runtime to pinned beta2; the disposable hosted empty-Volume and
+rolling dev Runtime to pinned beta3; the disposable hosted empty-Volume and
 forced installer-failure fallback journeys remain open; native PowerShell and
 external package-manager activation remain deferred
 
@@ -583,6 +583,11 @@ artifacts.
   `v0.91.0-beta.2`, independently verify its public surface and stable-channel
   isolation, then replace the retained Railway dev Runtime through the
   service-owned selector rather than an SSH-owned install.
+- [x] After the remote-readiness increment, publish only `v0.91.0-beta.3`,
+  independently verify all accepted assets and stable-channel isolation, then
+  replace the retained Railway beta2 Runtime through its service-owned selector
+  and pass the retained core Runtime/PTY long-outage journey. Record the
+  resulting Settings identity-refresh fix as the following `dev` increment.
 
 ### 11. Converge channel discovery authority
 
@@ -1338,6 +1343,26 @@ This plan is complete only when:
   remained executable under `/data/home`, and a fresh inspection-only SSH
   tunnel served the beta2 UI on local loopback. No installer or release-pointer
   mutation ran through Railway SSH.
+- 2026-09-01: Published only
+  [`v0.91.0-beta.3`](https://github.com/TraderAlice/OpenAlice/releases/tag/v0.91.0-beta.3)
+  from `3af7b0b3df46b829c40e6fab6698044dc60e07c7` in
+  [release run 33498423338](https://github.com/TraderAlice/OpenAlice/actions/runs/33498423338).
+  Independent acceptance matched all 49 GitHub assets and their CDN mirrors,
+  including four native CLI archives, updater feeds, installers, Broker Packs,
+  and sidecars. The beta manifest resolved beta3 while GitHub latest, the
+  stable manifest, stable feeds, and stable aliases remained v0.90.2. The
+  retained Railway service then moved from pinned beta2 to pinned beta3 through
+  service variables and deployment `745fbb1f-ed13-4df0-ab20-4d03d6e35ec0`.
+  It accepted Linux x64 SHA-256
+  `9d421eb08e58472509c053aa550db464b2f40c28e51e09da94daadf0fcbd499c`,
+  preserved `/data/projects/main-cloud`, the same AliceProject identity and six
+  Workspace directories, Pi 0.84.4, and OpenCode 1.18.25, and returned Alice,
+  UTA, and Connector ready. A shell PTY retained PID 893 and printed both sides
+  of a 120-second command while its local tunnel stayed absent beyond the
+  terminal retry budget; replacing only the tunnel restored the existing page
+  and reattached the same PTY without a manual retry or page reload. The beta3
+  UI still retained its pre-outage version/Project identity after replacement;
+  the following `dev` increment makes those domain reads recovery-aware.
 - 2026-09-01: Reframed development confidence around local acceptance instead
   of constrained hosted runners. Routine `dev` PRs now retain one clean Ubuntu
   workflow-contract, root-typecheck, and complete-build lane; relevant CLI
