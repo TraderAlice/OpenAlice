@@ -1,6 +1,6 @@
 {
   "name": "open-alice",
-  "version": "0.90.1",
+  "version": "0.91.0-beta.3",
   "description": "File-based trading agent engine",
   "type": "module",
   "imports": {
@@ -53,9 +53,10 @@
     "electron:smoke:upgrade": "node scripts/desktop-upgrade-smoke.mjs",
     "vendor:runtime": "node scripts/vendor-managed-runtime.mjs",
     "test": "vitest run",
+    "test:railway:local": "bash -n scripts/railway/*.sh && vitest run --config vitest.railway.config.ts",
     "test:workflow-contracts": "vitest run --project node scripts/classify-beta-release-prep.spec.mjs scripts/ci-workflow.spec.ts scripts/beta-release-prep-workflow.spec.ts scripts/cli-channel-authority-workflow.spec.ts scripts/cli-installer-workflow.spec.ts scripts/desktop-package-workflow.spec.ts scripts/release-workflow.spec.ts",
     "test:cli": "pnpm -F @traderalice/openalice-cli test",
-    "test:platform-contracts": "vitest run --project node packages/cli/src packages/guardian-runtime/src scripts/guardian/shared.spec.ts scripts/pnpm-command.spec.ts scripts/railway-entrypoint.spec.ts services/connector/src/core/io-journal.spec.ts services/uta/src/uta-startup-resilience.spec.ts src/core/windows-workspace-shell.spec.ts src/services/auth/session-store.spec.ts src/services/auth/token-store.spec.ts src/workspaces/adapters/ai-config.spec.ts src/workspaces/adapters/shell.spec.ts src/workspaces/agent-conversation-log.spec.ts src/workspaces/agent-detect.spec.ts src/workspaces/cli/shim.spec.ts src/workspaces/headless-task-win-shim.spec.ts src/workspaces/spawn-env.spec.ts src/workspaces/win-command.spec.ts src/workspaces/workspace-creator.spec.ts",
+    "test:platform-contracts": "vitest run --project node packages/cli/src packages/guardian-runtime/src scripts/guardian/shared.spec.ts scripts/pnpm-command.spec.ts services/connector/src/core/io-journal.spec.ts services/uta/src/uta-startup-resilience.spec.ts src/core/windows-workspace-shell.spec.ts src/services/auth/session-store.spec.ts src/services/auth/token-store.spec.ts src/workspaces/adapters/ai-config.spec.ts src/workspaces/adapters/shell.spec.ts src/workspaces/agent-conversation-log.spec.ts src/workspaces/agent-detect.spec.ts src/workspaces/cli/shim.spec.ts src/workspaces/headless-task-win-shim.spec.ts src/workspaces/spawn-env.spec.ts src/workspaces/win-command.spec.ts src/workspaces/workspace-creator.spec.ts",
     "test:watch": "vitest",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "test:uta:live-paper": "vitest run --config vitest.uta-live.config.ts",

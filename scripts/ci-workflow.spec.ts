@@ -34,8 +34,14 @@ const workflow = YAML.parse(
   readFileSync(resolve(root, '.github/workflows/ci.yml'), 'utf8'),
 ) as Workflow
 const packageJson = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as {
+  version: string
   scripts: Record<string, string>
 }
+const cliPackageJson = JSON.parse(
+  readFileSync(resolve(root, 'packages/cli/package.json'), 'utf8'),
+) as { version: string }
+const defaultVitestConfig = readFileSync(resolve(root, 'vitest.config.ts'), 'utf8')
+const railwayVitestConfig = readFileSync(resolve(root, 'vitest.railway.config.ts'), 'utf8')
 
 function commands(job: WorkflowJob): string[] {
   return job.steps?.flatMap((step) => step.run ? [step.run] : []) ?? []
@@ -66,7 +72,7 @@ describe('CI workflow fast failure lanes', () => {
     )
   })
 
-  it('builds every ordinary candidate but reserves the full root suite for master lanes', () => {
+  it('builds every ordinary candidate but reserves full local suites for master lanes', () => {
     const build = workflow.jobs.build
     const test = workflow.jobs.test
     const buildStep = build.steps?.find((step) => step.name === 'Build complete workspace')
@@ -83,7 +89,25 @@ describe('CI workflow fast failure lanes', () => {
     expect(test.if).toContain("beta_release_prep != 'true'")
     expect(test.if).toContain("github.base_ref == 'master'")
     expect(commands(test)).toContain('pnpm test')
+    expect(commands(test)).toContain('pnpm test:railway:local')
     expect(commands(test)).not.toContain('pnpm build')
+  })
+
+  it('keeps Railway lifecycle system tests explicit, local, and serialized', () => {
+    expect(packageJson.scripts.test).toBe('vitest run')
+    expect(packageJson.scripts['test:railway:local']).toContain('vitest.railway.config.ts')
+    expect(packageJson.scripts['test:platform-contracts']).not.toContain('railway-entrypoint.spec.ts')
+    expect(defaultVitestConfig).toContain("'scripts/railway-entrypoint.spec.ts'")
+    expect(defaultVitestConfig).toContain("'scripts/railway-fence-pty.spec.ts'")
+    expect(railwayVitestConfig).toContain("'scripts/railway-entrypoint.spec.ts'")
+    expect(railwayVitestConfig).toContain("'scripts/railway-fence-pty.spec.ts'")
+    expect(railwayVitestConfig).toContain('fileParallelism: false')
+    expect(railwayVitestConfig).toContain('maxWorkers: 1')
+    expect(railwayVitestConfig).toContain('testTimeout: 35_000')
+  })
+
+  it('keeps the runtime-visible root and CLI version baselines synchronized', () => {
+    expect(packageJson.version).toBe(cliPackageJson.version)
   })
 
   it('keeps build-and-test successful for intentional dev and beta skips only', () => {
@@ -127,6 +151,7 @@ describe('CI workflow fast failure lanes', () => {
     expect(crossPlatform.if).toContain("github.base_ref == 'master'")
     expect(fullBuild?.run).toBe('pnpm build')
     expect(fullTest?.run).toBe('pnpm test')
+    expect(commands(crossPlatform)).not.toContain('pnpm test:railway:local')
     expect(crossPlatform.steps?.some(
       (step) => step.name === 'Run native platform contracts for routine integration PRs',
     )).toBe(false)

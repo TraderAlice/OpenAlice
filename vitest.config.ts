@@ -28,12 +28,14 @@ export default defineConfig({
     alias: workspaceAliases,
   },
   test: {
-    // The Node suite includes installer, PTY, Guardian, and Railway specs that
-    // spawn their own process trees. Leaving Vitest at `available CPUs - 1`
+    // The Node suite includes installer, PTY, and Guardian specs that spawn
+    // their own process trees. Leaving Vitest at `available CPUs - 1`
     // lets those children contend with a worker per core on constrained CI
     // hosts, turning fast installer checks into timeout flakes. Keep enough
     // parallelism for the unit-heavy majority while reserving capacity for the
-    // subprocesses owned by each worker.
+    // subprocesses owned by each worker. The Railway lifecycle system harness
+    // has its own serialized config because it also owns a host-global mount
+    // fence on Linux.
     maxWorkers: '50%',
     projects: [
       {
@@ -45,7 +47,13 @@ export default defineConfig({
           environment: 'node',
           setupFiles: ['./vitest.setup.ts'],
           include: ['src/**/*.spec.*', 'packages/**/*.spec.*', 'services/**/*.spec.*', 'apps/**/*.spec.*', 'scripts/**/*.spec.*'],
-          exclude: ['**/*.e2e.spec.*', '**/*.bbProvider.spec.*', '**/node_modules/**'],
+          exclude: [
+            '**/*.e2e.spec.*',
+            '**/*.bbProvider.spec.*',
+            '**/node_modules/**',
+            'scripts/railway-entrypoint.spec.ts',
+            'scripts/railway-fence-pty.spec.ts',
+          ],
         },
       },
       {
