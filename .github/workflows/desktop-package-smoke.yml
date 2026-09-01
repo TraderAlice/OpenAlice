@@ -55,9 +55,23 @@ jobs:
     name: fast preflight
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      beta_release_prep: ${{ steps.beta-release-prep.outcome == 'success' && steps.beta-release-prep.outputs.beta_release_prep || 'false' }}
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Detect exact beta release preparation
+        id: beta-release-prep
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git show "${BASE_SHA}:scripts/classify-beta-release-prep.mjs" > "$RUNNER_TEMP/classify-beta-release-prep.mjs"
+          node "$RUNNER_TEMP/classify-beta-release-prep.mjs" --github-output "$GITHUB_OUTPUT"
 
       - uses: pnpm/action-setup@v6
 
@@ -83,6 +97,7 @@ jobs:
   broker-packs-windows:
     name: broker-packs windows-latest
     needs: preflight
+    if: needs.preflight.outputs.beta_release_prep != 'true'
     runs-on: windows-latest
     timeout-minutes: 25
 
@@ -112,6 +127,7 @@ jobs:
   package:
     name: package ${{ matrix.os }}
     needs: preflight
+    if: needs.preflight.outputs.beta_release_prep != 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:
