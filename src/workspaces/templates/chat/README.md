@@ -1,5 +1,5 @@
 ---
-version: 1.8.5
+version: 1.8.6
 ---
 
 # Chat
@@ -23,7 +23,9 @@ community `opencli` CLI — it will ask before assuming you have it.
 When an Inbox result or Issue is hard to interpret, the workspace can ask its
 attributable product Session directly. It can also dispatch several peer
 questions concurrently, await them server-side, and synthesize the replies
-without hand-written sleep loops or leaking runtime-native session ids.
+without hand-written sleep loops or leaking runtime-native session ids. The
+bundled delegation skills route governed research to the durable AutoQuant or
+Auto Prediction desk without making Chat impersonate either specialist.
 
 Trading runs through the `alice-uta` CLI against your UTA accounts — orders go
 through the trading-as-git approval flow. Recurring/headless work runs through

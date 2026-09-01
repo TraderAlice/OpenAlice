@@ -39,6 +39,7 @@ One concept has one primary owner:
 |---|---|
 | Inbox, Issue collaboration, provenance, peer questions, Session nametags | `alice-workspace` |
 | Delegating quantitative research from Chat to AutoQuant | `delegate-autoquant` |
+| Delegating prediction-market evidence research from Chat to Auto Prediction | `delegate-prediction` |
 | Issue file shape, ownership, schedules, headless delivery | `self-scheduling` |
 | Low-frequency market/fundamental/macro data | `traderhub` |
 | Quantitative K-line panels and source choice | `alice-analysis` |
