@@ -33,7 +33,7 @@ export function EventLog({ events }: { events: SimulatorEvent[] }) {
             <tbody>
               {visible.map((ev) => (
                 <tr key={ev.id} className="text-foreground">
-                  <td className="py-0.5 pr-3 font-mono text-[11px] text-muted-foreground/80 w-20">{formatTime(ev.ts)}</td>
+                  <td className="py-0.5 pr-3 font-mono text-[11px] leading-[15px] text-muted-foreground/80 w-20">{formatTime(ev.ts)}</td>
                   <td className="py-0.5 pr-3 text-muted-foreground/60 text-[11px] w-20">{formatRelativeTime(ev.ts)}</td>
                   <td className="py-0.5 pr-3">
                     <span className={ev.status === 'err' ? 'text-destructive' : 'text-foreground'}>{ev.label}</span>

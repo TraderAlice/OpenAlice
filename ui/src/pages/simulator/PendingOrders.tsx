@@ -60,7 +60,7 @@ export function PendingOrders({ utaId, state, run, loading }: {
               const closeToFire = distancePct != null && distancePct < 0.01
               return (
                 <tr key={o.orderId} className="text-foreground">
-                  <td className="py-1 pr-3 font-mono text-[11px]">{o.orderId}</td>
+                  <td className="py-1 pr-3 font-mono text-[11px] leading-[15px]">{o.orderId}</td>
                   <td className="py-1 pr-3">{o.symbol}</td>
                   <td className="py-1 pr-3">{o.action}</td>
                   <td className="py-1 pr-3">{o.orderType}</td>

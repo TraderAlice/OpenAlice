@@ -47,7 +47,7 @@ export function PortfolioSidebar() {
             pendingPush > 0 ? (
               <span
                 aria-label={t('nav.pendingPush', { count: pendingPush })}
-                className="min-w-[18px] h-[18px] px-1.5 rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground tabular-nums flex items-center justify-center"
+                className="min-w-[18px] h-[18px] px-1.5 rounded-full bg-destructive text-[10px] leading-[14px] font-semibold text-destructive-foreground tabular-nums flex items-center justify-center"
               >
                 {pendingPush > 99 ? '99+' : pendingPush}
               </span>

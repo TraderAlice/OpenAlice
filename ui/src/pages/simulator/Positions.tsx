@@ -61,9 +61,9 @@ export function Positions({ state }: { state: SimulatorState }) {
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="font-medium text-foreground">{describePosition(p)}</span>
                       {p.secType && (
-                        <span className="rounded-sm bg-muted px-1 py-0.5 text-[9px] text-muted-foreground/80">{p.secType}</span>
+                        <span className="rounded-sm bg-muted px-1 py-0.5 text-[10px] leading-[14px] text-muted-foreground/80">{p.secType}</span>
                       )}
-                      <span className={`rounded-sm px-1 py-0.5 text-[10px] font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
+                      <span className={`rounded-sm px-1 py-0.5 text-[10px] leading-[14px] font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
                         {p.side}
                       </span>
                       {p.multiplier && p.multiplier !== '1' && (

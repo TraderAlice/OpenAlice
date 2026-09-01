@@ -74,7 +74,7 @@ export function SnapshotDetail({ snapshot, onClose }: SnapshotDetailProps) {
                           {p.side}
                         </span>
                       </td>
-                      <td className="px-2.5 py-1.5 text-center text-[10px] text-muted-foreground tabular-nums">{p.currency}</td>
+                      <td className="px-2.5 py-1.5 text-center text-[10px] leading-[14px] text-muted-foreground tabular-nums">{p.currency}</td>
                       <td className="px-2.5 py-1.5 text-right text-foreground tabular-nums">{p.quantity}</td>
                       <td className="px-2.5 py-1.5 text-right text-muted-foreground tabular-nums">{fmtStr(p.avgCost, p.currency)}</td>
                       <td className="px-2.5 py-1.5 text-right text-foreground tabular-nums">{fmtStr(p.marketPrice, p.currency)}</td>
@@ -99,7 +99,7 @@ export function SnapshotDetail({ snapshot, onClose }: SnapshotDetailProps) {
           </p>
           <div className="space-y-1">
             {snapshot.openOrders.map((o, i) => (
-              <div key={i} className="flex items-center gap-2 text-[12px] px-2.5 py-1.5 border border-border rounded bg-background">
+              <div key={i} className="flex items-center gap-2 text-[12px] leading-[18px] px-2.5 py-1.5 border border-border rounded bg-background">
                 <span className={`font-medium ${o.action === 'BUY' ? 'text-success' : 'text-destructive'}`}>{o.action}</span>
                 <span className="text-foreground">{symbolFromAliceId(o.aliceId)}</span>
                 <span className="text-muted-foreground">{o.totalQuantity} @ {o.orderType}</span>

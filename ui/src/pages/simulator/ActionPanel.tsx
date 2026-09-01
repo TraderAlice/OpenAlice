@@ -195,7 +195,7 @@ function DepositTab({ utaId, knownKeys, run, loading }: {
               onClick={submitDeposit}
               size="sm"
             >Deposit</Button>
-            {draftOk && <span className="text-[11px] text-muted-foreground/70 font-mono">→ {draftOk.nativeKey}</span>}
+            {draftOk && <span className="text-[11px] leading-[15px] text-muted-foreground/70 font-mono">→ {draftOk.nativeKey}</span>}
             {draftError && draft.symbol && <span className="text-[11px] text-warning">{draftError}</span>}
           </>
         ) : (
@@ -271,7 +271,7 @@ function TradeTab({ utaId, run, loading }: {
       <input className={`${inputClassMono} w-24`} placeholder="qty" value={qty} onChange={(e) => setQty(e.target.value)} />
       <input className={`${inputClassMono} w-24`} placeholder="price" value={price} onChange={(e) => setPrice(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} />
       <Button disabled={loading || !draftOk || !qty || !price} onClick={submit} size="sm">Submit</Button>
-      {draftOk && <span className="text-[11px] text-muted-foreground/70 font-mono">→ {draftOk.nativeKey}</span>}
+      {draftOk && <span className="text-[11px] leading-[15px] text-muted-foreground/70 font-mono">→ {draftOk.nativeKey}</span>}
       {draftError && draft.symbol && <span className="text-[11px] text-warning">{draftError}</span>}
     </div>
   )

@@ -306,7 +306,7 @@ export function PortfolioPage() {
               />
             ) : <>
             {refreshError && (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-[12px] text-destructive" role="alert">
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-[12px] leading-[18px] text-destructive" role="alert">
                 Live portfolio data is unavailable: {refreshError}
               </div>
             )}
@@ -648,7 +648,7 @@ function AccountStrip({ sources, perAccountCurve }: {
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-foreground font-medium text-[13px] truncate">{s.label}</span>
                 {!isDisabled && !isOffline && !isConnecting && (
-                  <span className="text-muted-foreground tabular-nums text-[13px]">{fmt(Number(s.equity))}</span>
+                  <span className="text-muted-foreground tabular-nums text-[13px] leading-[18px]">{fmt(Number(s.equity))}</span>
                 )}
               </div>
               <div className="flex items-baseline justify-between gap-2 mt-0.5">
@@ -659,7 +659,7 @@ function AccountStrip({ sources, perAccountCurve }: {
                   : isOffline
                     ? <span className="text-destructive text-[11px]">Reconnecting…</span>
                     : (
-                      <span className="text-[11px] tabular-nums">
+                      <span className="text-[11px] leading-[15px] tabular-nums">
                         {todayDelta ? (
                           <span className={`inline-flex items-center gap-1 ${todayDeltaTone}`}>
                             <TodayDeltaIcon aria-hidden className="size-3 shrink-0" />
@@ -755,7 +755,7 @@ export function PositionsTable({ positions, fxRates }: { positions: PositionWith
 
   return (
     <div>
-      <h3 className="mb-3 text-[13px] font-semibold text-foreground">
+      <h3 className="mb-3 text-[13px] leading-[18px] font-semibold text-foreground">
         Positions
       </h3>
       <div
@@ -774,16 +774,16 @@ export function PositionsTable({ positions, fxRates }: { positions: PositionWith
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 items-center gap-1.5">
                       <span className="truncate font-medium text-foreground" title={display.name}>{display.name}</span>
-                      <span className="shrink-0 rounded-sm bg-muted px-1 py-0.5 font-mono text-[9px] tracking-tight text-muted-foreground">
+                      <span className="shrink-0 rounded-sm bg-muted px-1 py-0.5 font-mono text-[10px] leading-[14px] tracking-tight text-muted-foreground">
                         {display.tag}
                       </span>
                       {isShort && (
-                        <span className="shrink-0 rounded-sm bg-destructive/15 px-1 py-0.5 text-[9px] font-medium text-destructive">
+                        <span className="shrink-0 rounded-sm bg-destructive/15 px-1 py-0.5 text-[10px] leading-[14px] font-medium text-destructive">
                           Short
                         </span>
                       )}
                     </div>
-                    <div className="mt-1 flex min-w-0 items-center gap-2 text-[10px] text-muted-foreground">
+                    <div className="mt-1 flex min-w-0 items-center gap-2 text-[10px] leading-[14px] text-muted-foreground">
                       <span className="truncate">{position.accountLabel}</span>
                       <span className="shrink-0 font-mono">{currency}</span>
                     </div>
@@ -792,7 +792,7 @@ export function PositionsTable({ positions, fxRates }: { positions: PositionWith
                     <div className="font-semibold tabular-nums text-foreground">
                       {fmt(Number(position.marketValue), position.currency)}
                     </div>
-                    <div className={`mt-0.5 flex justify-end gap-2 text-[11px] tabular-nums ${pnlTone}`}>
+                    <div className={`mt-0.5 flex justify-end gap-2 text-[11px] leading-[15px] tabular-nums ${pnlTone}`}>
                       <span>{fmtPctSigned(pnlPercent)}</span>
                       <span>{fmtPnl(unrealizedPnl, position.currency)}</span>
                     </div>
@@ -846,9 +846,9 @@ export function PositionsTable({ positions, fxRates }: { positions: PositionWith
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="font-medium text-foreground">{display.name}</span>
-                      <span className="rounded-sm bg-muted px-1 py-0.5 font-mono text-[10px] tracking-tight text-muted-foreground">{display.tag}</span>
+                      <span className="rounded-sm bg-muted px-1 py-0.5 font-mono text-[10px] leading-[14px] tracking-tight text-muted-foreground">{display.tag}</span>
                       {isShort && (
-                        <span className="rounded-sm bg-destructive/15 px-1 py-0.5 text-[10px] font-medium text-destructive">Short</span>
+                        <span className="rounded-sm bg-destructive/15 px-1 py-0.5 text-[10px] leading-[14px] font-medium text-destructive">Short</span>
                       )}
                       <span className="text-[10px] text-muted-foreground">{p.accountLabel}</span>
                     </div>
@@ -884,7 +884,7 @@ export function PositionsTable({ positions, fxRates }: { positions: PositionWith
 function FxRatesPanel({ rates }: { rates: FxRateInfo[] }) {
   return (
     <div>
-      <h3 className="mb-2 text-[13px] font-semibold text-foreground">
+      <h3 className="mb-2 text-[13px] leading-[18px] font-semibold text-foreground">
         FX Rates
       </h3>
       <div className="border border-border rounded-lg overflow-hidden">
@@ -929,7 +929,7 @@ function TradeLog({ commits }: { commits: CommitWithAccount[] }) {
 
   return (
     <div>
-      <h3 className="mb-3 text-[13px] font-semibold text-foreground">
+      <h3 className="mb-3 text-[13px] leading-[18px] font-semibold text-foreground">
         Recent Trades
       </h3>
       <div className="space-y-2">
@@ -942,13 +942,13 @@ function TradeLog({ commits }: { commits: CommitWithAccount[] }) {
           return (
             <div key={commit.hash} className="rounded-lg border border-border bg-card px-3 py-2.5">
               <div className="flex items-start gap-2">
-                <span className={`rounded-sm px-1.5 py-0.5 font-mono text-[10px] ${badgeColor}`}>
+                <span className={`rounded-sm px-1.5 py-0.5 font-mono text-[10px] leading-[14px] ${badgeColor}`}>
                   {commit.accountLabel}
                 </span>
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] text-foreground truncate">{commit.message}</p>
                   <div className="flex items-center gap-3 mt-1">
-                    <span className="text-[11px] text-muted-foreground font-mono">{commit.hash}</span>
+                    <span className="text-[11px] leading-[15px] text-muted-foreground font-mono">{commit.hash}</span>
                     <span className="text-[11px] text-muted-foreground">
                       {new Date(commit.timestamp).toLocaleString()}
                     </span>
@@ -956,7 +956,7 @@ function TradeLog({ commits }: { commits: CommitWithAccount[] }) {
                   {commit.operations.length > 0 && (
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
                       {commit.operations.map((op, i) => (
-                        <span key={i} className="rounded-sm border border-border/60 px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                        <span key={i} className="rounded-sm border border-border/60 px-1.5 py-0.5 text-[11px] leading-[15px] text-muted-foreground">
                           {op.symbol} {op.change}
                           <span className={`ml-1 ${op.status === 'filled' ? 'text-success' : op.status === 'rejected' ? 'text-destructive' : op.status === 'submitted' ? 'text-primary' : 'text-muted-foreground'}`}>
                             {op.status}
@@ -1012,7 +1012,7 @@ export function SnapshotSettings({ enabled, every, onEnabledChange, onEveryChang
   }, [every, isPreset])
 
   return (
-    <div className="flex min-h-12 flex-col gap-2 rounded-lg border border-border/70 bg-card px-3 py-2.5 text-[12px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex min-h-12 flex-col gap-2 rounded-lg border border-border/70 bg-card px-3 py-2.5 text-[12px] leading-[18px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-2">
         <span className="font-semibold text-foreground">Snapshots</span>
         <Toggle checked={enabled} onChange={onEnabledChange} size="sm" ariaLabel="Enable portfolio snapshots" />
@@ -1044,7 +1044,7 @@ export function SnapshotSettings({ enabled, every, onEnabledChange, onEveryChang
               aria-label="Custom portfolio snapshot interval"
               aria-invalid={!customEveryValid}
               aria-describedby={!customEveryValid ? 'snapshot-interval-error' : undefined}
-              className="w-20 rounded-md border border-border bg-background px-1.5 py-1 text-center text-[12px] text-foreground outline-none focus:border-primary"
+              className="w-20 rounded-md border border-border bg-background px-1.5 py-1 text-center text-[12px] leading-[18px] text-foreground outline-none focus:border-primary"
               value={customEvery}
               onChange={(e) => {
                 const next = e.target.value
@@ -1057,7 +1057,7 @@ export function SnapshotSettings({ enabled, every, onEnabledChange, onEveryChang
               <p
                 id="snapshot-interval-error"
                 role="alert"
-                className="absolute right-0 top-full z-10 mt-1 w-max max-w-64 rounded-xl border border-destructive/30 bg-popover px-2 py-1 text-[11px] text-destructive shadow-md"
+                className="absolute right-0 top-full z-10 mt-1 w-max max-w-64 rounded-xl border border-destructive/30 bg-popover px-2 py-1 text-[11px] leading-[15px] text-destructive shadow-md"
               >
                 Use a positive duration such as 15m, 1h, or 2h15m.
               </p>
