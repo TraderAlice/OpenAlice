@@ -13,17 +13,16 @@ export function BetaSettingsPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader title={t('settings.beta.title')} />
-      <SettingsScrollArea className="px-4 py-6 md:px-8">
+      <SettingsScrollArea className="px-4 py-5 md:px-8">
         <div className="mx-auto w-full max-w-[880px]">
-          <p className="mb-2 max-w-2xl text-[13px] leading-relaxed text-muted-foreground">
-            {t('settings.beta.description')}
-          </p>
           <ConfigSection
             title={t('settings.beta.office')}
             description={t('settings.beta.officeDescription')}
           >
-            <div className="flex items-center justify-end">
+            <div className="flex min-h-12 items-center justify-between gap-4">
+              <span className="text-[13px] font-medium text-foreground">{t('settings.beta.office')}</span>
               <Toggle
+                size="sm"
                 checked={office}
                 ariaLabel={t('settings.beta.office')}
                 onChange={setOffice}

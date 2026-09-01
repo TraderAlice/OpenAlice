@@ -14,6 +14,8 @@ import { useState, useRef, useEffect, type FormEvent } from 'react'
 import { useAuth } from './AuthContext'
 import { login } from './api'
 import { useTranslation } from 'react-i18next'
+import { Button } from '../components/ui/button'
+import { inputClass } from '../components/form'
 
 export function LoginPage() {
   const { t } = useTranslation()
@@ -41,7 +43,8 @@ export function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-[400px] rounded-lg border border-border bg-surface px-6 py-7 shadow-sm">
+      <div className="w-full max-w-[400px] rounded-lg border border-border bg-card px-6 py-7 shadow-sm">
+        <img src="/alice.ico" alt="" aria-hidden draggable={false} className="mb-4 size-8 object-contain" />
         <h1 className="text-[18px] font-semibold text-foreground mb-1">{t('auth.heading')}</h1>
         <p className="text-[12px] text-muted-foreground leading-relaxed mb-5">
           {t('auth.instruction')}
@@ -55,7 +58,7 @@ export function LoginPage() {
 
         <form onSubmit={onSubmit} className="space-y-3">
           <div>
-            <label className="block text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
+            <label className="mb-1 block text-[12px] font-medium text-muted-foreground">
               {t('auth.adminTokenLabel')}
             </label>
             <input
@@ -65,24 +68,25 @@ export function LoginPage() {
               value={token}
               onChange={(e) => setToken(e.target.value)}
               disabled={busy}
-              className="w-full rounded border border-border bg-background px-2.5 py-1.5 text-[13px] font-mono text-foreground focus:outline-none focus:border-primary disabled:opacity-60"
+              className={`${inputClass} h-9 font-mono`}
               placeholder="xKUT78dNUcRVDwoyDsUUROqffPJV8-..."
             />
           </div>
 
           {error && (
-            <div className="rounded border border-danger/40 bg-danger/10 px-2.5 py-1.5 text-[12px] text-danger">
+            <div className="rounded-md border border-destructive/35 bg-destructive/10 px-2.5 py-2 text-[12px] text-destructive" role="alert">
               {error}
             </div>
           )}
 
-          <button
+          <Button
             type="submit"
             disabled={busy || !token.trim()}
-            className="btn-primary w-full justify-center"
+            className="w-full"
+            size="lg"
           >
             {busy ? t('auth.signingIn') : t('auth.signIn')}
-          </button>
+          </Button>
         </form>
       </div>
     </div>
@@ -93,7 +97,8 @@ export function NoTokenPage() {
   const { t } = useTranslation()
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-[460px] rounded-lg border border-border bg-surface px-6 py-7">
+      <div className="w-full max-w-[460px] rounded-lg border border-border bg-card px-6 py-7">
+        <img src="/alice.ico" alt="" aria-hidden draggable={false} className="mb-4 size-8 object-contain" />
         <h1 className="text-[18px] font-semibold text-foreground mb-2">{t('auth.noTokenHeading')}</h1>
         <p className="text-[13px] text-foreground leading-relaxed mb-3">
           The backend did not generate <code className="font-mono">data/config/auth.json</code>.

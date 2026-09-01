@@ -5,13 +5,11 @@ import {
   ArrowRight,
   Bot,
   CheckCircle2,
-  Circle,
   Compass,
   GitBranch,
   KeyRound,
   Languages,
   Lock,
-  MousePointerClick,
   ShieldCheck,
   TerminalSquare,
   WalletCards,
@@ -40,6 +38,8 @@ import {
   probeAgentRuntimeReadiness,
   type AgentRuntimeReadinessSnapshot,
 } from './workspace/api'
+import { Button } from './ui/button'
+import { SelectionCheckIcon } from './ui/selection-check-icon'
 
 const BASE_DISMISS_KEY = 'openalice.onboarding.firstRunGuide.dismissed.v3'
 const STORAGE_SUFFIX = import.meta.env.VITE_OPENALICE_ONBOARDING_STORAGE_SUFFIX?.trim()
@@ -585,22 +585,21 @@ export function FirstRunGuide() {
         <div className="mx-auto flex h-full min-h-0 w-full max-w-[980px] flex-col">
           <header className="relative shrink-0 border-b border-border pb-4 pr-12">
             <div className="min-w-0">
-              <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                {t('firstRunGuide.header.setup')}
-              </div>
-              <div className="mt-1 text-[15px] font-semibold leading-snug text-foreground sm:text-[16px]">
+              <div className="text-[15px] font-semibold leading-snug text-foreground sm:text-[16px]">
                 {t('firstRunGuide.header.subtitle')}
               </div>
             </div>
             {guideAccess.canDismiss && (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={() => close()}
                 aria-label={t('firstRunGuide.header.close')}
-                className="absolute right-0 top-0 flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                className="absolute right-0 top-0 text-muted-foreground"
               >
                 <X className="h-4 w-4" />
-              </button>
+              </Button>
             )}
           </header>
 
@@ -616,7 +615,7 @@ export function FirstRunGuide() {
                 {activeStep.key === 'finish' && (
                   <CompletionMark />
                 )}
-                <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                <div className="text-[11px] font-medium text-muted-foreground">
                   {activeStep.eyebrow}
                 </div>
                 <h1 className="oa-onboarding-title mt-3 max-w-[660px] text-[28px] font-semibold leading-tight text-foreground sm:mt-4 sm:text-[38px] lg:text-[44px]">
@@ -628,7 +627,7 @@ export function FirstRunGuide() {
               </div>
 
               <aside className="min-w-0 border-t border-border pt-4 md:border-l md:border-t-0 md:pl-5 md:pt-0 lg:pl-6">
-                <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                <div className="text-[11px] font-medium text-muted-foreground">
                   {activeStep.panelTitle}
                 </div>
                 {activeStep.panelBody && (
@@ -678,7 +677,7 @@ export function FirstRunGuide() {
                         type="button"
                         onClick={() => goToStep(index)}
                         disabled={locked}
-                        className={`h-2.5 rounded-full transition-all ${
+                        className={`h-2.5 rounded-full transition-[width,background-color,opacity] ${
                           index === activeStepIndex
                             ? 'w-8 bg-primary'
                             : locked
@@ -691,7 +690,7 @@ export function FirstRunGuide() {
                     )
                   })}
                 </div>
-                <div className="min-w-0 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                <div className="min-w-0 text-[11px] font-medium text-muted-foreground">
                   {t('firstRunGuide.common.step', {
                     current: activeStepIndex + 1,
                     total: steps.length,
@@ -701,34 +700,36 @@ export function FirstRunGuide() {
               </div>
 
               <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2 sm:flex sm:items-center">
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={() => goToStep(activeStepIndex - 1)}
                   disabled={activeStepIndex === 0}
-                  className="rounded-md border border-border bg-background px-3 py-2 text-[13px] font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary disabled:cursor-default disabled:opacity-40 disabled:hover:border-border disabled:hover:text-muted-foreground"
+                  className="text-[13px] text-muted-foreground"
                 >
                   {t('firstRunGuide.common.back')}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   onClick={runPrimary}
                   disabled={primaryDisabled}
                   data-testid="first-run-guide-primary"
                   data-onboarding-action={primaryAction}
-                  className="flex min-w-0 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-default disabled:opacity-60 disabled:hover:bg-primary"
+                  className="min-w-0 text-[13px]"
                 >
                   <span className="min-w-0 truncate">{activeStep.primary}</span>
                   <ArrowRight className="h-4 w-4 shrink-0" />
-                </button>
+                </Button>
                 {activeStep.secondary && (
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
                     onClick={runSecondary}
                     data-testid="first-run-guide-secondary"
-                    className="col-span-2 rounded-md px-3 py-2 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground sm:col-span-1"
+                    className="col-span-2 text-[12px] text-muted-foreground sm:col-span-1"
                   >
                     {activeStep.secondary}
-                  </button>
+                  </Button>
                 )}
               </div>
             </footer>
@@ -825,8 +826,8 @@ function LanguageChoices({
                 : 'border-border bg-background text-muted-foreground hover:border-primary/35 hover:bg-muted hover:text-foreground'
             } active:scale-[0.99]`}
           >
-            <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${
-              active ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
+            <span className={`mt-0.5 flex h-7 w-5 shrink-0 items-center justify-center ${
+              active ? 'text-foreground' : 'text-muted-foreground'
             }`}>
               <Languages className="h-4 w-4" />
             </span>
@@ -835,17 +836,10 @@ function LanguageChoices({
               <span className="mt-0.5 block text-[12px] leading-relaxed text-muted-foreground">
                 {description}
               </span>
-              <span className={`mt-1.5 inline-flex text-[11px] font-medium ${
-                active ? 'text-primary' : 'text-muted-foreground/70'
-              }`}>
-                {active ? t('firstRunGuide.language.current') : t('firstRunGuide.language.choose')}
-              </span>
             </span>
-            {active ? (
-              <CheckCircle2 className="mt-1.5 h-4 w-4 shrink-0 text-success" />
-            ) : (
-              <Circle className="mt-1.5 h-4 w-4 shrink-0 text-muted-foreground" />
-            )}
+            <span className="mt-1.5 flex h-4 w-4 shrink-0 items-center justify-center">
+              {active && <SelectionCheckIcon />}
+            </span>
           </button>
         )
       })}
@@ -871,10 +865,8 @@ function StatusRow({
       ? 'text-destructive'
       : 'text-muted-foreground'
   return (
-    <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] gap-3 py-2.5 sm:py-3">
-      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-        {icon}
-      </div>
+    <div className="grid min-h-12 min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 py-2 sm:py-2.5">
+      <div className="flex h-7 w-5 shrink-0 items-center justify-center text-muted-foreground">{icon}</div>
       <div className="min-w-0">
         <div className="text-[12px] font-medium text-foreground">{label}</div>
         <div className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">{value}</div>
@@ -939,10 +931,6 @@ function TradingModeChoices({
   const disabled = envLocked || saving !== null
   return (
     <div className="mt-4 sm:mt-5">
-      <div className="mb-3 inline-flex items-center gap-2 rounded-md border border-primary/25 bg-primary/10 px-2.5 py-1.5 text-[11px] font-medium text-primary">
-        <MousePointerClick className="h-3.5 w-3.5" />
-        {t('firstRunGuide.tradingChoices.badge')}
-      </div>
       <div className="grid gap-2">
         {choices.map((choice) => {
           const active = choice.mode === mode
@@ -960,8 +948,8 @@ function TradingModeChoices({
                   : 'border-border bg-background text-muted-foreground hover:border-primary/35 hover:bg-muted hover:text-foreground'
               } ${disabled ? 'cursor-default opacity-75' : 'cursor-pointer active:scale-[0.99]'}`}
             >
-              <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${
-                active ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
+              <span className={`mt-0.5 flex h-7 w-5 shrink-0 items-center justify-center ${
+                active ? 'text-foreground' : 'text-muted-foreground'
               }`}>
                 {choice.icon}
               </span>
@@ -971,24 +959,14 @@ function TradingModeChoices({
                   {choice.description}
                 </span>
                 {isSaving && (
-                  <span className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] text-primary">
-                    <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" aria-hidden />
+                  <span className="mt-1.5 inline-flex text-[11px] text-primary">
                     {t('firstRunGuide.common.saving')}
                   </span>
                 )}
-                {!isSaving && (
-                  <span className={`mt-1.5 inline-flex text-[11px] font-medium ${
-                    active ? 'text-primary' : 'text-muted-foreground/70'
-                  }`}>
-                    {active ? t('firstRunGuide.common.selected') : t('firstRunGuide.common.chooseThisOption')}
-                  </span>
-                )}
               </span>
-              {active ? (
-                <CheckCircle2 className="mt-1.5 h-4 w-4 shrink-0 text-success" />
-              ) : (
-                <Circle className="mt-1.5 h-4 w-4 shrink-0 text-muted-foreground" />
-              )}
+              <span className="mt-1.5 flex h-4 w-4 shrink-0 items-center justify-center">
+                {active && <SelectionCheckIcon />}
+              </span>
             </button>
           )
         })}
@@ -1038,7 +1016,7 @@ function RuntimeScanTable({
         </div>
       )}
       <div className="overflow-hidden border-y border-border">
-      <div className="hidden border-b border-border py-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground sm:grid sm:grid-cols-[minmax(0,1fr)_72px_minmax(112px,140px)] sm:gap-3">
+      <div className="hidden border-b border-border py-2 text-[10px] font-medium text-muted-foreground sm:grid sm:grid-cols-[minmax(0,1fr)_72px_minmax(112px,140px)] sm:gap-3">
           <span>{t('firstRunGuide.ai.runtime')}</span>
           <span>{t('firstRunGuide.ai.cli')}</span>
           <span>{t('firstRunGuide.ai.readyProbe')}</span>

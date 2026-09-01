@@ -15,6 +15,7 @@ import { useAuth } from './AuthContext'
 import { getBackendConnection, type BackendConnection } from './backendConnection'
 import { LoginPage, NoTokenPage } from './LoginPage'
 import { Spinner } from '../components/StateViews'
+import { Button } from '../components/ui/button'
 
 function remoteTargetLabel(connection: Extract<BackendConnection, { kind: 'remote' }>): string {
   return connection.sshPort === 22
@@ -49,11 +50,11 @@ export function BackendUnavailableScreen({
       className="fixed inset-0 z-[100] flex min-h-dvh items-start justify-start overflow-y-auto bg-background px-5 py-10"
     >
       <section className="oa-view-enter mx-auto my-auto w-full max-w-[620px]">
-        <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-xl border border-destructive/25 bg-destructive/[0.08] text-destructive">
+        <div className="mb-5 flex h-12 w-12 items-center justify-center text-destructive">
           <CloudOff aria-hidden className="h-7 w-7" />
         </div>
 
-        <p className="mb-3 font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-destructive">
+        <p className="mb-2 text-[12px] font-medium text-destructive">
           {t('auth.backendUnavailableEyebrow')}
         </p>
         <h1 id="backend-unavailable-title" className="max-w-[560px] break-words text-2xl font-semibold leading-tight text-foreground sm:text-3xl">
@@ -67,7 +68,7 @@ export function BackendUnavailableScreen({
             : t('auth.backendUnavailableDescription')}
         </p>
 
-        <div className="oa-status-surface mt-7 rounded-xl border border-border bg-secondary/55 px-4 py-4 sm:px-5">
+        <div className="oa-status-surface mt-7 rounded-lg border border-border bg-secondary/55 px-4 py-4 sm:px-5">
           <div role="status" aria-live="polite" className="flex items-start gap-3">
             <Spinner size="sm" />
             <div className="min-w-0">
@@ -96,14 +97,14 @@ export function BackendUnavailableScreen({
         </div>
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <button
+          <Button
             type="button"
             onClick={() => void retry()}
-            className="btn-primary oa-pressable inline-flex min-h-10 items-center justify-center gap-2 px-4"
+            className="min-h-10 px-4"
           >
             <RefreshCw aria-hidden className="h-4 w-4" />
             {t('auth.retryNow')}
-          </button>
+          </Button>
           <p className="max-w-[390px] break-words text-[11px] leading-5 text-muted-foreground">
             {remote
               ? t('auth.backendUnavailableRemoteHelp', { target: remote.target })

@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight } from 'lucide-react'
 import { api, type AgentConversationRecord, type ToolCallRecord } from '../api'
 import { getIntlLocale } from '../lib/intl'
+import { AgentRuntimeIcon } from '../lib/agentRuntimeIcon'
 import { EmptyState, Skeleton } from '../components/StateViews'
 import { SegmentedControl } from '../components/SegmentedControl'
+import { Button } from '../components/ui/button'
 
 // ==================== Helpers ====================
 
@@ -129,7 +132,7 @@ function ToolCallLogSection() {
         <select
           value={nameFilter}
           onChange={(e) => handleNameChange(e.target.value)}
-          className="bg-muted text-foreground text-sm rounded-md border border-border px-2 py-1.5 outline-none focus:border-primary"
+          className="h-8 rounded-md border border-border bg-muted px-2 text-sm text-foreground outline-none focus:border-primary"
         >
           <option value="">All tools</option>
           {toolNames.map((n) => (
@@ -137,22 +140,24 @@ function ToolCallLogSection() {
           ))}
         </select>
 
-        <button
+        <Button
+          type="button"
+          variant="outline"
           onClick={() => setPaused(!paused)}
-          className={`text-xs px-3 py-1.5 rounded-md border transition-colors ${
+          className={`text-xs ${
             paused
               ? 'border-warning-border text-warning hover:bg-warning-background'
-              : 'border-border text-muted-foreground hover:bg-muted'
+              : 'text-muted-foreground'
           }`}
         >
           {paused ? 'Resume' : 'Pause'}
-        </button>
+        </Button>
 
         <span className="text-xs text-muted-foreground ml-auto">
           {failed && entries.length === 0
             ? 'Tool calls unavailable'
             : total > 0
-              ? `Page ${page} of ${totalPages} \u00b7 ${total} calls`
+              ? `Page ${page} of ${totalPages} — ${total} calls`
               : '0 calls'
           }
           {nameFilter && ' (filtered)'}
@@ -175,13 +180,14 @@ function ToolCallLogSection() {
               <p className="text-sm font-medium text-foreground">Could not load tool calls</p>
               <p className="mt-1 text-xs text-muted-foreground">The read-only audit log was not changed.</p>
             </div>
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={() => void fetchPage(page, nameFilter || undefined)}
-              className="oa-pressable rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="text-xs text-muted-foreground"
             >
               Retry
-            </button>
+            </Button>
           </div>
         ) : entries.length === 0 ? (
           <div className="px-4 py-8 text-center text-muted-foreground">No tool calls yet</div>
@@ -209,37 +215,49 @@ function ToolCallLogSection() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 shrink-0">
-          <button
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-xs"
+            aria-label="First page"
             onClick={() => goToPage(1)}
             disabled={page <= 1 || loading}
-            className="text-xs px-2 py-1 rounded border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            &laquo;&laquo;
-          </button>
-          <button
+            <ChevronFirst />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-xs"
+            aria-label="Previous page"
             onClick={() => goToPage(page - 1)}
             disabled={page <= 1 || loading}
-            className="text-xs px-2 py-1 rounded border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            &laquo;
-          </button>
+            <ChevronLeft />
+          </Button>
           <span className="text-xs text-muted-foreground px-2">
             {page} / {totalPages}
           </span>
-          <button
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-xs"
+            aria-label="Next page"
             onClick={() => goToPage(page + 1)}
             disabled={page >= totalPages || loading}
-            className="text-xs px-2 py-1 rounded border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            &raquo;
-          </button>
-          <button
+            <ChevronRight />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-xs"
+            aria-label="Last page"
             onClick={() => goToPage(totalPages)}
             disabled={page >= totalPages || loading}
-            className="text-xs px-2 py-1 rounded border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            &raquo;&raquo;
-          </button>
+            <ChevronLast />
+          </Button>
         </div>
       )}
     </div>
@@ -264,21 +282,24 @@ function ToolCallRow({ record }: { record: ToolCallRecord }) {
         <td className={`px-3 py-1.5 text-center ${statusColor(record.status)}`}>{record.status}</td>
         <td className="px-3 py-1.5 text-muted-foreground truncate max-w-0">
           {inputPreview}
-          <span className="ml-1 text-primary">{expanded ? '\u25be' : '\u25b8'}</span>
+          <ChevronRight
+            aria-hidden
+            className={`ml-1 inline size-3 text-primary transition-transform duration-110 motion-reduce:transition-none ${expanded ? 'rotate-90' : ''}`}
+          />
         </td>
       </tr>
       {expanded && (
         <tr className="border-t border-border/30">
           <td colSpan={6} className="px-3 py-2 space-y-2">
             <div>
-              <span className="text-muted-foreground text-[11px] uppercase tracking-wide">Input</span>
-              <pre className="text-muted-foreground whitespace-pre-wrap break-all bg-muted rounded p-2 text-[11px] mt-1">
+              <span className="text-[11px] font-medium text-muted-foreground">Input</span>
+              <pre className="mt-1 rounded-md bg-muted p-2 text-[11px] text-muted-foreground whitespace-pre-wrap break-all">
                 {JSON.stringify(record.input, null, 2)}
               </pre>
             </div>
             <div>
-              <span className="text-muted-foreground text-[11px] uppercase tracking-wide">Output</span>
-              <pre className="text-muted-foreground whitespace-pre-wrap break-all bg-muted rounded p-2 text-[11px] mt-1 max-h-64 overflow-y-auto">
+              <span className="text-[11px] font-medium text-muted-foreground">Output</span>
+              <pre className="mt-1 max-h-64 overflow-y-auto rounded-md bg-muted p-2 text-[11px] text-muted-foreground whitespace-pre-wrap break-all">
                 {formatOutput(record.output)}
               </pre>
             </div>
@@ -296,11 +317,11 @@ const CONVERSATION_PAGE_SIZE = 50
 function sourceLabel(source: AgentConversationRecord['source']): string {
   if (source.kind === 'human') return 'Human'
   if (source.kind === 'workspace') return source.workspaceId
-  return `${source.workspaceId} · ${source.agent}`
+  return `${source.workspaceId} / ${source.agent}`
 }
 
 function targetLabel(target: AgentConversationRecord['target']): string {
-  return `${target.workspaceId} · ${target.agent}`
+  return `${target.workspaceId} / ${target.agent}`
 }
 
 function requestedTargetLabel(target: AgentConversationRecord['requestedTarget']): string {
@@ -368,19 +389,20 @@ function ConversationLogSection() {
   return (
     <div className="flex flex-col gap-3 min-h-0 flex-1">
       <div className="flex items-center gap-3 shrink-0">
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={() => setPaused((value) => !value)}
-          className={`oa-pressable text-xs px-3 py-1.5 rounded-md border transition-colors ${
+          className={`text-xs ${
             paused
               ? 'border-warning-border text-warning hover:bg-warning-background'
-              : 'border-border text-muted-foreground hover:bg-muted'
+              : 'text-muted-foreground'
           }`}
         >
           {paused ? 'Resume live updates' : 'Pause live updates'}
-        </button>
+        </Button>
         <span className="text-xs text-muted-foreground ml-auto">
-          {total > 0 ? `Page ${page} of ${totalPages} · ${total} conversations` : '0 conversations'}
+          {total > 0 ? `Page ${page} of ${totalPages} — ${total} conversations` : '0 conversations'}
         </span>
       </div>
 
@@ -396,13 +418,14 @@ function ConversationLogSection() {
               <p className="text-sm font-medium text-foreground">Could not load Agent conversations</p>
               <p className="mt-1 text-xs text-muted-foreground">The private log was not changed.</p>
             </div>
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={() => void fetchPage(page)}
-              className="oa-pressable rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="text-xs text-muted-foreground"
             >
               Retry
-            </button>
+            </Button>
           </div>
         ) : entries.length === 0 ? (
           <EmptyState
@@ -438,23 +461,25 @@ function ConversationLogSection() {
 
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 shrink-0">
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={() => goToPage(page - 1)}
             disabled={page <= 1 || loading}
-            className="oa-icon-action rounded border border-border px-2 py-1 text-xs text-muted-foreground disabled:cursor-not-allowed disabled:opacity-30"
+            className="text-xs text-muted-foreground"
           >
             Previous
-          </button>
+          </Button>
           <span className="px-2 text-xs text-muted-foreground">{page} / {totalPages}</span>
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={() => goToPage(page + 1)}
             disabled={page >= totalPages || loading}
-            className="oa-icon-action rounded border border-border px-2 py-1 text-xs text-muted-foreground disabled:cursor-not-allowed disabled:opacity-30"
+            className="text-xs text-muted-foreground"
           >
             Next
-          </button>
+          </Button>
         </div>
       )}
     </div>
@@ -473,11 +498,19 @@ function ConversationRow({ record }: { record: AgentConversationRecord }) {
           {formatDateTime(record.dispatchedAt)}
         </td>
         <td className="px-3 py-2">
-          <div className="font-medium text-foreground">{sourceLabel(record.source)}</div>
+          <div className="flex items-center gap-1.5 font-medium text-foreground">
+            {record.source.kind === 'session' && (
+              <AgentRuntimeIcon agentId={record.source.agent} className="size-4 shrink-0" />
+            )}
+            <span>{sourceLabel(record.source)}</span>
+          </div>
           <div className="mt-0.5 font-mono text-[10px] text-muted-foreground">{record.source.kind}</div>
         </td>
         <td className="px-3 py-2">
-          <div className="font-medium text-foreground">{targetLabel(record.target)}</div>
+          <div className="flex items-center gap-1.5 font-medium text-foreground">
+            <AgentRuntimeIcon agentId={record.target.agent} className="size-4 shrink-0" />
+            <span>{targetLabel(record.target)}</span>
+          </div>
           <div className="mt-0.5 font-mono text-[10px] text-muted-foreground">{record.target.resumeId}</div>
         </td>
         <td className="px-3 py-2">
@@ -503,10 +536,13 @@ function ConversationRow({ record }: { record: AgentConversationRecord }) {
             type="button"
             aria-expanded={expanded}
             onClick={() => setExpanded((value) => !value)}
-            className="oa-nav-row flex w-full items-start gap-2 rounded px-1 py-0.5 text-left text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            className="oa-nav-row flex w-full items-start gap-2 rounded-md px-1 py-0.5 text-left text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           >
             <span className="min-w-0 flex-1 line-clamp-2">{preview}</span>
-            <span className="shrink-0 text-primary" aria-hidden>{expanded ? '▾' : '▸'}</span>
+            <ChevronRight
+              aria-hidden
+              className={`mt-0.5 size-3.5 shrink-0 text-primary transition-transform duration-110 motion-reduce:transition-none ${expanded ? 'rotate-90' : ''}`}
+            />
           </button>
         </td>
       </tr>
@@ -517,26 +553,26 @@ function ConversationRow({ record }: { record: AgentConversationRecord }) {
               <ConversationTextPanel title="Original prompt" text={record.prompt.original} />
               {promptChanged ? (
                 <ConversationTextPanel
-                  title="Delivered prompt · reconstruction guidance applied"
+                  title="Delivered prompt — reconstruction guidance applied"
                   text={record.prompt.delivered}
                   tone="warning"
                 />
               ) : (
                 <ConversationTextPanel
-                  title={record.status === 'running' ? 'Agent reply · running' : 'Agent reply'}
+                  title={record.status === 'running' ? 'Agent reply — running' : 'Agent reply'}
                   text={record.assistantText ?? record.error ?? 'No reply recorded.'}
                   tone={record.error ? 'error' : 'default'}
                 />
               )}
               {promptChanged && (
                 <ConversationTextPanel
-                  title={record.status === 'running' ? 'Agent reply · running' : 'Agent reply'}
+                  title={record.status === 'running' ? 'Agent reply — running' : 'Agent reply'}
                   text={record.assistantText ?? record.error ?? 'No reply recorded.'}
                   tone={record.error ? 'error' : 'default'}
                 />
               )}
               <div className="rounded-lg border border-border/70 bg-background p-3">
-                <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <div className="text-[10px] font-semibold text-muted-foreground">
                   Routing
                 </div>
                 <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1.5 font-mono text-[11px]">
@@ -584,7 +620,7 @@ function ConversationTextPanel({
       : 'border-border/70 bg-background'
   return (
     <section className={`min-w-0 rounded-lg border p-3 ${toneClass}`}>
-      <h3 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>
+      <h3 className="text-[10px] font-semibold text-muted-foreground">{title}</h3>
       <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words font-sans text-xs leading-relaxed text-foreground">
         {text}
       </pre>
