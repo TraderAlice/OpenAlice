@@ -606,6 +606,8 @@ export function createWorkspaceRoutes(
       runtimeBinding: binding,
       ...(identity?.displayName ? { displayName: identity.displayName } : {}),
       ...(identity ? { presence: sessionPresence(identity) } : {}),
+      ...(identity?.metadata?.createdBy ? { createdBy: identity.metadata.createdBy } : {}),
+      latestExecution: svc.headlessTasks?.latestForResumeId(record.resumeId) ?? null,
     });
   };
 
@@ -662,7 +664,7 @@ export function createWorkspaceRoutes(
     const spawned = await spawnInteractiveSession(meta, {
       agentId: identity.agent,
       resumeId,
-      title: task?.prompt ?? title ?? `Conversation ${resumeId}`,
+      title: title?.trim() || task?.prompt || `Conversation ${resumeId}`,
       ...(task ? { sourceRunId: task.taskId } : {}),
     });
     if (!spawned.ok) {

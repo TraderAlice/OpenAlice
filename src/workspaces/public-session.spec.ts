@@ -80,4 +80,22 @@ describe('projectPublicSession', () => {
       title: 'Investigate the market',
     });
   });
+
+  it('projects structured Issue identity without mutating the stored launch title', () => {
+    const scheduledPrompt = 'Run every instruction in the scheduled Issue body.';
+    expect(projectPublicSession({
+      ...record,
+      surface: 'headless',
+      fallbackTitle: scheduledPrompt,
+    }, {
+      createdBy: {
+        kind: 'issue',
+        workspaceId: 'workspace-1',
+        issueId: 'daily-close-review',
+        policy: 'new-then-resume',
+        fire: 'schedule',
+      },
+    })).toMatchObject({ title: 'Daily Close Review' });
+    expect(scheduledPrompt).toBe('Run every instruction in the scheduled Issue body.');
+  });
 });

@@ -11,6 +11,7 @@ import {
 } from './resume-registry.js'
 import { sessionPreferredTitle, type SessionRecord } from './session-registry.js'
 import type { SessionCreatedBy } from './session-metadata.js'
+import { projectSessionPresentationTitle } from './session-presentation.js'
 import {
   projectPublicSessionRuntime,
   type PublicSessionRuntime,
@@ -36,6 +37,8 @@ export interface WorkspaceSessionDirectoryEntry {
   /** Live Issue ownership/occupancy. Presentation preferences decide whether to show it. */
   issueAttached?: true
   runtime?: PublicSessionRuntime
+  /** Backend-authoritative title with internal launch wrappers projected away. */
+  presentationTitle?: string
   latestExecution?: {
     taskId: string
     status: HeadlessTaskStatus
@@ -104,6 +107,7 @@ export function buildWorkspaceSessionDirectory(input: {
   isActive(resumeId: string): boolean
   rosterVisibilityFor?(resumeId: string): 'hidden' | undefined
   issueAttachedFor?(resumeId: string): true | undefined
+  issueTitleFor?(workspaceId: string, issueId: string): string | undefined
 }): WorkspaceSessionDirectory {
   return {
     workspace: input.workspace,
@@ -111,6 +115,16 @@ export function buildWorkspaceSessionDirectory(input: {
       const execution = input.latestExecutionFor(identity.resumeId)
       const interactive = input.interactiveFor(identity.resumeId)
       const interactiveTitle = interactive ? sessionPreferredTitle(interactive) : undefined
+      const presentationTitle = interactive
+        ? projectSessionPresentationTitle({
+            record: interactive,
+            ...(identity.metadata?.createdBy
+              ? { createdBy: identity.metadata.createdBy }
+              : {}),
+            ...(execution ? { latestExecution: execution } : {}),
+            ...(input.issueTitleFor ? { issueTitleFor: input.issueTitleFor } : {}),
+          })
+        : undefined
       return {
         resumeId: identity.resumeId,
         agent: identity.agent,
@@ -132,6 +146,7 @@ export function buildWorkspaceSessionDirectory(input: {
         ...(identity.runtimeBinding
           ? { runtime: projectPublicSessionRuntime(identity.runtimeBinding) }
           : {}),
+        ...(presentationTitle ? { presentationTitle } : {}),
         ...(execution
           ? {
               latestExecution: {

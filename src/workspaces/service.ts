@@ -2672,6 +2672,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           }),
         })
       : new Set<string>();
+    const issueTitles = issueRead.ok
+      ? new Map(issueRead.issues.map((issue) => [issue.id, issue.title] as const))
+      : new Map<string, string>();
     return buildWorkspaceSessionDirectory({
       workspace: { id: ws.id, tag: ws.tag },
       identities: resumeRegistry.list({ wsId, limit }),
@@ -2680,6 +2683,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       isActive: (resumeId) => activeResumeIds.has(resumeId),
       rosterVisibilityFor: (resumeId) => rosterExclusions.has(resumeId) ? 'hidden' : undefined,
       issueAttachedFor: (resumeId) => issueAttachments.has(resumeId) ? true : undefined,
+      issueTitleFor: (workspaceId, issueId) => workspaceId === wsId
+        ? issueTitles.get(issueId)
+        : undefined,
     });
   };
 
@@ -3025,6 +3031,8 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         runtimeBinding: identity.runtimeBinding,
         displayName: identity.displayName,
         presence: sessionPresence(identity),
+        ...(identity.metadata?.createdBy ? { createdBy: identity.metadata.createdBy } : {}),
+        latestExecution: headlessTasks.latestForResumeId(record.resumeId),
       })];
     });
     // Deprecated native-project compatibility-export signals. Retained in the

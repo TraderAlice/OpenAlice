@@ -66,6 +66,9 @@ export function projectHarnessSessionPresentation(
   const coworkerName = session?.displayName?.trim() || entry?.displayName?.trim()
   if (coworkerName) return withProvenance(coworkerName)
 
+  const backendPresentation = entry?.presentationTitle?.trim()
+  if (backendPresentation) return withProvenance(backendPresentation)
+
   // Issue birth is roster identity. Do not surface the launch prompt, native
   // title seeded from that prompt, or a later assistant preview as the name.
   if (birthIssueId) {

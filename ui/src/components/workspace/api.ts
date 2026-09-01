@@ -880,6 +880,8 @@ export interface WorkspaceSessionDirectoryEntry {
     readonly model?: string;
     readonly reasoningEffort?: ModelReasoningEffort;
   };
+  /** Backend-authoritative title with internal launch wrappers projected away. */
+  readonly presentationTitle?: string;
   readonly latestExecution?: {
     readonly taskId: string;
     readonly status: 'running' | 'done' | 'failed' | 'interrupted';
