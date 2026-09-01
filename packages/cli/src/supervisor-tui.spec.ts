@@ -50,6 +50,7 @@ describe('Supervisor TUI screen', () => {
   })
 
   it('renders stable stopped-state application chrome', () => {
+    const actions: SupervisorAction[] = []
     const screen = new SupervisorScreen({
       version: '0.87.0-beta',
       channel: 'dev',
@@ -59,7 +60,7 @@ describe('Supervisor TUI screen', () => {
         owner: null,
         endpoints: {},
       },
-    })
+    }, { onAction: (action) => actions.push(action) })
 
     const lines = screen.render(80)
 
@@ -76,14 +77,24 @@ describe('Supervisor TUI screen', () => {
     const wideLines = screen.render(120)
     expect(wideLines[1]).toHaveLength(120)
     expect(wideLines[4]).toContain('AliceProject')
-    expect(wideLines[4]).toContain('Runtime telemetry')
+    expect(wideLines[4]).toContain('Runtime signal')
     expect(wideLines.join('\n')).toContain('○ COLD')
     expect(wideLines.every((line) => displayWidth(line) <= 120)).toBe(true)
 
     const foldedLines = screen.render(99)
-    expect(foldedLines.findIndex((line) => line.includes('╭ AliceProject')))
-      .toBeLessThan(foldedLines.findIndex((line) => line.includes('╭ Runtime')))
+    expect(foldedLines.findIndex((line) => line.includes('╭ Launchpad · AliceProject')))
+      .toBeLessThan(foldedLines.findIndex((line) => line.includes('╭ Runtime signal')))
     expect(foldedLines.every((line) => displayWidth(line) <= 99)).toBe(true)
+
+    expect(screen.handlePointer({
+      button: 35, col: 60, row: 10, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(80).join('\n')).toContain('│ › [ Enter ]  Start OpenAlice & open Workspace')
+    expect(screen.handlePointer(pointerClick(60, 10))).toBe(true)
+    expect(actions).toEqual(['start-open'])
+    expect(screen.handleKey(']', matchesKey)).toBe(true)
+    expect(screen.handleKey('[', matchesKey)).toBe(true)
+    expect(screen.render(80).join('\n')).toContain('│ ◆ [ Enter ]  Start OpenAlice & open Workspace')
 
     screen.update({
       update: {

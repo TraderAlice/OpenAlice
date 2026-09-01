@@ -24,6 +24,10 @@ const confirmationFixtureEntry = join(
   dirname(fileURLToPath(import.meta.url)),
   '__fixtures__/supervisor-confirmation-tui-fixture.ts',
 )
+const launchpadFixtureEntry = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '__fixtures__/supervisor-launchpad-tui-fixture.ts',
+)
 const cliPackageRoot = dirname(dirname(cliEntry))
 const cliVersion = JSON.parse(
   await readFile(join(cliPackageRoot, 'package.json'), 'utf8'),
@@ -37,6 +41,54 @@ afterEach(async () => {
 })
 
 describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
+  it('hovers and clicks the Launchpad primary surface outside its keycap', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-launchpad-pointer-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let hovered = false
+      let clicked = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Launchpad pointer timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!hovered && output.includes('◆ LAUNCH READY') && output.includes('[ Enter ]')) {
+          hovered = true
+          child.write('\u001b[<35;60;10M')
+        } else if (!clicked && output.includes('│ › [ Enter ]')) {
+          clicked = true
+          child.write('\u001b[<0;60;10M')
+        } else if (clicked && output.includes('OpenAlice started and opened in your browser.')) {
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor Launchpad pointer exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('│ › [ Enter ]')
+    expect(transcript).toContain('FIXTURE_RESULT starts=1 opens=1')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
   it('clicks the navigation rail and explores Help with raw pointer input', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-navigation-pointer-'))
     temporaryPaths.push(isolatedHome)
@@ -401,7 +453,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     })
 
     expect(transcript).toContain('Command Palette')
-    expect(transcript).toContain('╭ AliceProject')
+    expect(transcript).toContain('╭ Launchpad · AliceProject')
     expect(transcript).toContain('Setup · Default AliceProject')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
@@ -442,8 +494,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           && output.includes('○ COLD · OVERVIEW')
         ) {
           clickedProject = true
-          child.write('\u001b[<32;36;21M')
-          child.write('\u001b[<0;36;21M')
+          child.write('\u001b[<32;36;22M')
+          child.write('\u001b[<0;36;22M')
         } else if (!closedOverlay && output.includes('AliceProjects · Default AliceProject')) {
           closedOverlay = true
           child.write('\u001b')
@@ -453,7 +505,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           && output.includes('STATUS   AliceProject selection closed.')
         ) {
           clickedAfterNotice = true
-          child.write('\u001b[<0;2;21M')
+          child.write('\u001b[<0;2;22M')
         } else if (!openedPalette && output.includes('Command Palette')) {
           openedPalette = true
           child.write('q')

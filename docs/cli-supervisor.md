@@ -119,13 +119,16 @@ mouse reporting, and `OPENALICE_TUI_MOTION=0` replaces purposeful activity
 animation with a stable glyph without changing its text or layout. Its ordinary
 path is intentionally parameter-free:
 
-- the default Overview page is an AliceProject operational home: its status
-  card presents the selected project, current Runtime state, human guidance,
-  and the primary Enter action; its Runtime card keeps Home, Web endpoint,
+- the default Overview page is an AliceProject Launchpad rather than a status
+  report. Its hero presents the selected project, a semantic launch/live/
+  attention intent strip, human guidance, and a full-row primary action.
+  Pointer hover focuses that action anywhere across the row, and click routes
+  through the same Enter lifecycle/refusal state machine as the keycap. Its
+  Runtime Signal card keeps Home, Web endpoint,
   owner, provider identity, services, and uptime available without returning
   to the historical flat field dump. At 100 columns and wider those surfaces
-  become a two-column cockpit, with AliceProject identity/action on the left
-  and Runtime telemetry on the right. Narrower terminals fold the same fields
+  become a two-column cockpit, with the Launchpad on the left and Runtime
+  Signal on the right. Narrower terminals fold the same fields
   into the complete vertical flow instead of hiding them. The application
   divider follows the full terminal width, and an available-update notice is
   composed inside the responsive header instead of being appended beyond its

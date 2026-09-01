@@ -131,6 +131,7 @@ import {
   renderSupervisorPanel,
   supervisorCommandTargets,
   type SupervisorCommandTarget,
+  type SupervisorHomeTarget,
 } from './supervisor-tui-view.ts'
 import { connectSsh } from './ssh-connect.mjs'
 import { buildRemoteSshArgs } from './remote.mjs'
@@ -2649,6 +2650,8 @@ export class SupervisorScreen implements Component {
   private doctorTargets: SupervisorDoctorTarget[] = []
   private helpState: SupervisorHelpState = createSupervisorHelpState()
   private helpTargets: SupervisorHelpTarget[] = []
+  private homePrimaryHovered = false
+  private homePrimaryTarget?: SupervisorHomeTarget
   private renderWidth = 80
 
   constructor(
@@ -3121,6 +3124,13 @@ export class SupervisorScreen implements Component {
           && event.col <= target.endColumn
         ))
       : undefined
+    const homePrimaryTarget = !this.commandDeckOpen && this.snapshot.panel === 'overview'
+      && this.homePrimaryTarget
+      && event.row === this.homePrimaryTarget.row
+      && event.col >= this.homePrimaryTarget.startColumn
+      && event.col <= this.homePrimaryTarget.endColumn
+      ? this.homePrimaryTarget
+      : undefined
     const commandTarget = commandAtPosition(this.commandTargets, event.col, event.row)
     if (event.motion) {
       const fleetHoverChanged = fleetTarget?.focus !== this.hoveredFleetTarget?.focus
@@ -3131,18 +3141,22 @@ export class SupervisorScreen implements Component {
       const doctorHoverChanged = doctorHover !== this.doctorState.hovered
       const helpHover = helpTarget?.index ?? null
       const helpHoverChanged = helpHover !== this.helpState.hovered
+      const homeHover = Boolean(homePrimaryTarget)
+      const homeHoverChanged = homeHover !== this.homePrimaryHovered
       if (
         hovered !== this.hoveredPanel
         || fleetHoverChanged
         || commandHoverChanged
         || doctorHoverChanged
         || helpHoverChanged
+        || homeHoverChanged
       ) {
         this.hoveredPanel = hovered
         this.hoveredFleetTarget = fleetTarget
         this.hoveredCommandTarget = commandTarget
         this.doctorState = { ...this.doctorState, hovered: doctorHover }
         this.helpState = { ...this.helpState, hovered: helpHover }
+        this.homePrimaryHovered = homeHover
         this.requestRender?.()
       }
       return true
@@ -3154,6 +3168,9 @@ export class SupervisorScreen implements Component {
     }
     if (event.leftClick && commandTarget) {
       return this.activatePointerCommand(commandTarget.label)
+    }
+    if (event.leftClick && homePrimaryTarget) {
+      return this.handleKey('enter', (data, key) => data === key)
     }
     if (event.leftClick && helpTarget) {
       this.helpState = { selected: helpTarget.index, hovered: helpTarget.index }
@@ -3236,6 +3253,7 @@ export class SupervisorScreen implements Component {
 
     this.doctorTargets = []
     this.helpTargets = []
+    this.homePrimaryTarget = undefined
     if (this.snapshot.panel === 'fleet' && this.snapshot.fleet) {
       lines.push(...renderSupervisorFleet(
         this.snapshot.fleet,
@@ -3285,7 +3303,7 @@ export class SupervisorScreen implements Component {
       const uptime = Number.isInteger(runtime?.uptimeSeconds)
         ? formatDuration(runtime?.uptimeSeconds ?? 0)
         : undefined
-      lines.push(...renderSupervisorHome({
+      const home = renderSupervisorHome({
         projectName: this.snapshot.context?.aliceProject.displayName ?? 'Default AliceProject',
         state,
         home: this.snapshot.context?.home ?? runtime?.home ?? 'default',
@@ -3296,8 +3314,15 @@ export class SupervisorScreen implements Component {
         ...(uptime ? { uptime } : {}),
         guidance: renderGuidance(runtime, this.snapshot.context),
         primaryAction: primaryActionLabel(runtime),
+        primaryHovered: this.homePrimaryHovered,
         pulse: this.runtimePulse,
-      }, width))
+      }, width)
+      const rowOffset = lines.length
+      this.homePrimaryTarget = {
+        ...home.primaryTarget,
+        row: home.primaryTarget.row + rowOffset,
+      }
+      lines.push(...home.lines)
     }
 
     const activity = renderSupervisorActivitySlot({
@@ -3463,6 +3488,7 @@ export class SupervisorScreen implements Component {
 
   private selectPanel(panel: SupervisorPanel): void {
     this.setCommandPaletteOpen(false)
+    this.homePrimaryHovered = false
     this.update({ panel })
     if (panel === 'logs') this.onAction?.('logs')
     if (panel === 'doctor') this.onAction?.('doctor')

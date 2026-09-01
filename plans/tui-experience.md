@@ -79,6 +79,19 @@ not imply maintainer approval of the finished interaction.
   complete vertical flow. This is an autonomous topic decision, not recorded
   maintainer approval.
 
+### Launchpad action-surface decision
+
+- Keeping the current cockpit and merely recoloring its cards would improve a
+  screenshot while leaving the first screen organized like a field report.
+- Making the whole AliceProject card clickable would maximize target size but
+  blur identity, guidance, and mutation into one accidental activation zone.
+- The selected model promotes only the primary action row into an OMP-inspired
+  focus surface. A semantic intent strip distinguishes launch-ready, live,
+  attention, and settling states; the full action row owns hover and click,
+  while its visible `[ Enter ]` preserves keyboard/no-color meaning. Both input
+  paths feed the existing primary-action state machine. The 52:48 wide cockpit
+  and folded 80x24 layout retain every truthful Runtime field.
+
 ### Global command discovery decision
 
 - Restyling the legacy detach hint would improve finish but not discoverability.
@@ -282,6 +295,8 @@ already large `supervisor-tui.ts` application controller.
   preserve the static reduced-motion frame as the complete experience.
 - [x] Turn Overview into a responsive AliceProject/Runtime cockpit without
   changing lifecycle action semantics or sacrificing the 80x24 baseline.
+- [x] Promote Overview into an action-first Launchpad with a semantic intent
+  strip and whole-row primary-action pointer target.
 - [x] Replace the legacy global shortcut hint with a clickable command dock and
   contextual `/` Command Deck.
 - [x] Project structured Runtime logs into semantic event rows while preserving
@@ -564,6 +579,21 @@ already large `supervisor-tui.ts` application controller.
   TypeScript, and the 692-file suite pass (691 passed, 1 skipped; 6098 tests
   passed, 10 skipped). Docker installer smoke passes, and the package dry-run
   includes `src/supervisor-help-view.ts`.
+- Overview is now an action-first Launchpad instead of a decorated field
+  report. The AliceProject hero carries a semantic launch/live/attention/
+  settling intent strip and a full-row primary focus surface; hover changes the
+  whole action row, and clicks outside the visible keycap still feed the one
+  existing Enter action. Runtime Signal preserves Home, Web, Owner, Provider,
+  Services, and Uptime. Wide 52:48 and folded layouts keep the activity slot,
+  command bar, and context ribbon within the 80x24 baseline.
+- Launchpad acceptance passes with 118 focused Supervisor screen, Overview,
+  Help, navigation, pointer, modal, Palette, Fleet, Doctor, transfer, and
+  real-PTY tests. An isolated real 80x24 color fixture sent raw SGR motion and
+  click reports at column 60 of the hero row—outside `[ Enter ]`—observed the
+  focused surface, dispatched exactly one start plus open through test doubles,
+  and restored cursor, mouse, and bracketed-paste modes. CLI build/typecheck,
+  root TypeScript, and the 692-file suite pass (691 passed, 1 skipped; 6099
+  tests passed, 10 skipped). Docker installer smoke and package dry-run pass.
 
 ## Completion Criteria
 

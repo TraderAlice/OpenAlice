@@ -11,7 +11,19 @@ export interface SupervisorHomeView {
   uptime?: string
   guidance: string[]
   primaryAction: string
+  primaryHovered?: boolean
   pulse?: boolean
+}
+
+export interface SupervisorHomeTarget {
+  row: number
+  startColumn: number
+  endColumn: number
+}
+
+export interface SupervisorHomeRender {
+  lines: string[]
+  primaryTarget: SupervisorHomeTarget
 }
 
 export interface SupervisorCommand {
@@ -51,13 +63,14 @@ export function renderSupervisorHeader(
 export function renderSupervisorHome(
   view: SupervisorHomeView,
   width: number,
-): string[] {
+): SupervisorHomeRender {
   const cardWidth = Math.max(24, width)
   const state = stateBadge(view.state, view.pulse ?? false)
   const projectBody = [
     labelAndTail(view.projectName, state, cardWidth - 4),
+    launchIntent(view.state),
     ...view.guidance,
-    `[ Enter ]  ${view.primaryAction}`,
+    primaryLaunchRow(view),
   ]
   const details = [
     detailRow('Home', view.home, cardWidth - 4),
@@ -70,18 +83,22 @@ export function renderSupervisorHome(
 
   if (width >= 100) return renderWideCockpit(view, state, width)
 
-  return [
-    ...renderCard('AliceProject', projectBody, cardWidth),
+  const lines = [
+    ...renderCard('Launchpad · AliceProject', projectBody, cardWidth),
     '',
-    ...renderCard('Runtime', details, cardWidth),
+    ...renderCard('Runtime signal', details, cardWidth),
   ]
+  return {
+    lines,
+    primaryTarget: targetForLine(lines, '[ Enter ]', cardWidth),
+  }
 }
 
 function renderWideCockpit(
   view: SupervisorHomeView,
   state: string,
   width: number,
-): string[] {
+): SupervisorHomeRender {
   const gap = 3
   const leftWidth = Math.max(52, Math.floor(width * 0.52))
   const rightWidth = Math.max(1, width - leftWidth - gap)
@@ -97,14 +114,14 @@ function renderWideCockpit(
   ]
   const projectBody = [
     labelAndTail(view.projectName, state, leftInnerWidth),
-    '',
+    launchIntent(view.state),
     ...view.guidance,
     '',
-    `◆ [ Enter ]  ${view.primaryAction}`,
+    primaryLaunchRow(view),
   ]
   while (projectBody.length < runtimeBody.length) projectBody.splice(-1, 0, '')
-  const project = renderCard('AliceProject', projectBody, leftWidth)
-  const runtime = renderCard('Runtime telemetry', runtimeBody, rightWidth)
+  const project = renderCard('Launchpad · AliceProject', projectBody, leftWidth)
+  const runtime = renderCard('Runtime signal', runtimeBody, rightWidth)
 
   const cards = project.map((line, index) => joinColumns(
     line,
@@ -113,7 +130,35 @@ function renderWideCockpit(
     gap,
     width,
   ))
-  return [...cards, ...contextRail('⌂  Home', view.home, width)]
+  const lines = [...cards, ...contextRail('⌂  Home', view.home, width)]
+  return {
+    lines,
+    primaryTarget: targetForLine(lines, '[ Enter ]', leftWidth),
+  }
+}
+
+function launchIntent(state: string): string {
+  if (state === 'running' || state === 'owned_elsewhere') return '● LIVE SESSION · OPEN THE WORKSPACE'
+  if (state === 'absent') return '◆ LAUNCH READY · LOCAL RUNTIME'
+  if (state === 'incompatible') return '× ATTENTION · REVIEW DOCTOR BEFORE CHANGES'
+  return '◇ CHECKING · RUNTIME STATE IS SETTLING'
+}
+
+function primaryLaunchRow(view: SupervisorHomeView): string {
+  return `${view.primaryHovered ? '›' : '◆'} [ Enter ]  ${view.primaryAction}`
+}
+
+function targetForLine(
+  lines: string[],
+  needle: string,
+  endColumn: number,
+): SupervisorHomeTarget {
+  const index = lines.findIndex((line) => line.includes(needle))
+  return {
+    row: Math.max(1, index + 1),
+    startColumn: 2,
+    endColumn: Math.max(2, endColumn - 1),
+  }
 }
 
 export function renderSupervisorCommandBar(
