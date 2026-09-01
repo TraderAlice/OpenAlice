@@ -182,6 +182,45 @@ Default AliceProject 在同三种视口也无横向溢出或浏览器告警。�
 664 files / 5,947 tests（另 2 files / 13 tests skipped）、根/UI TypeScript、生产 build 与
 `git diff --check` 全部通过。真实 Inbox 只读复验当前 2/4 精确报告路线，没有为测试写入回执。
 
+### 诚实收班簿（2026-09-01，落地完成）
+
+当前中段已经能把用户带到准确报告，并把“巡检证据”和“作出判断”分开；新的北极星断点在
+终点：本班完成且仍有 backlog 时，HUD 直接把“开始下一班”做成主动作，会把有限日课重新
+变成清空 Inbox 的无尽队列。比较三个下一增量：
+
+| 方案 | 用户影响 | 结论 |
+|---|---|---|
+| 班前点名简报 | 能解释本班为何先看这些证据，但当前 HUD 已给出唯一下一项；额外弹窗会先增加启动摩擦 | 后做 |
+| Operations 收班簿 | 先定义什么叫“今天可以安心停”，消费既有巡检和判断真相，并把再开一班降为自选加班 | **是** |
+| 连勤、积分与世界成长 | 奖励感强，但容易诱导刷点击、制造 streak 焦虑，甚至把无功课日解释成失败 | 否 |
+
+选择一个只读、派生的收班簿，不新增 Office-Day 字段、浏览器持久状态、完成 API 或兼容路径。
+它分别展示本班 `completed / total`、当日 `maintain-plan`、`revise-plan`、单列且不计为判断的
+`evidence-unavailable`、仍在决策台的条目、已复核但未解决的 cadence，以及可进入下一班的
+backlog。历史判断只按当前 Office Day 的服务端时间窗统计；`complete` 只称本班巡检完成，
+只有 `clear` 才称值班已清，`loading / error / degraded` 绝不播放完成叙事。
+
+交互模型固定为：Decision Desk 仍优先于收班；巡检 settled 后，HUD 把 Alice 引到 Operations
+并打开收班簿，而不是直接开下一班。主动作是“本班先到这里”，只关闭只读窗口、不写任何
+进度；“再开一班”保留为次要动作，继续调用现有 Project-authoritative `start-next-shift`；准确
+cadence 跟进也从簿内显式进入。关闭、Escape 和打开本身都不算完成，不产生签到、积分或收益
+归因。收班后 HUD 只在当前页面会话中低调收起主 CTA；Operations 仍可随时重开簿，不把这层
+展示偏好伪装成跨标签页领域真相。
+
+响应式上，桌面使用 Operations 上方的紧凑像素账簿，手机占用可用工作区；标题与底部动作
+固定，只有正文滚动，390×844 为单列、844×390 保证短横屏动作可达且无页面横向滚动。弹窗
+由共享 Base UI `Dialog` 负责 portal、焦点圈、Escape、外部关闭和焦点返回；动作复用共享
+`Button`，Office 只拥有账簿内容与 `oa-office-*` 像素外观，不复制焦点陷阱。收获格只作视觉
+回顾，完整文字事实承担可访问语义；短促入场遵守 reduced motion，不增加循环庆祝动画。
+
+落地验收走完隔离 Demo 的真实四项值班：精确 Inbox 报告与附件、返回分流、另一领域周报、
+Scheduled Issue evidence receipt，最后由 HUD 把 Alice 引到 Operations 收班簿。桌面、390×844
+和 844×390 均无横向溢出；手机动作保持 44px，短横屏只有正文滚动，Escape 返回行动看板，
+“本班先到这里”只收起当前页面 CTA、不启动下一班、不留下持续感叹号，行动看板仍可重开。
+Default AliceProject 只读确认原有 2/4 精确 Inbox 动线未被改变，没有为验收写入真实回执或判断。
+收班簿/楼层/页面/响应式专项为 4 files / 129 tests；全仓为 665 files / 5,958 tests（另 2 files /
+13 tests skipped），根/UI TypeScript、生产 build 与 `git diff --check` 全部通过。
+
 ## Current diagnosis
 
 数据投影、休眠判断、Harness 分类和最小显示数量可以保留；当前视觉场景不可作为终稿继续

@@ -28,6 +28,7 @@ import {
   OfficeRoutineDecisionDesk,
   type OfficeRoutineDecisionItem,
 } from '../office/OfficeRoutineDecisionDesk'
+import { OfficeShiftCloseout } from '../office/OfficeShiftCloseout'
 import { OfficeWindowControlGlyph } from '../office/OfficeWindowControlGlyph'
 import { OFFICE_HUD_ASSETS } from '../office/hud-assets'
 import {
@@ -176,8 +177,8 @@ export function OfficePage() {
     startNextShiftAttemptRef.current.pending = false
     setStartNextShiftStatus('idle')
   }, [officeShift.canStartNext, officeShiftIdentity])
-  const startNextOfficeShift = async () => {
-    if (startNextShiftAttemptRef.current.pending) return
+  const startNextOfficeShift = async (): Promise<boolean> => {
+    if (startNextShiftAttemptRef.current.pending) return false
     const token = startNextShiftAttemptRef.current.token + 1
     startNextShiftAttemptRef.current = { token, pending: true }
     setStartNextShiftStatus('pending')
@@ -186,10 +187,12 @@ export function OfficePage() {
       if (startNextShiftAttemptRef.current.token === token) {
         setStartNextShiftStatus('idle')
       }
+      return true
     } catch {
       if (startNextShiftAttemptRef.current.token === token) {
         setStartNextShiftStatus('error')
       }
+      return false
     } finally {
       if (startNextShiftAttemptRef.current.token === token) {
         startNextShiftAttemptRef.current.pending = false
@@ -200,6 +203,8 @@ export function OfficePage() {
   const [cadenceInitialStep, setCadenceInitialStep] = useState<'exception' | 'evidence'>('exception')
   const [inboxDuty, setInboxDuty] = useState<OfficeInboxDutyCandidate | null>(null)
   const [decisionDeskOpen, setDecisionDeskOpen] = useState(false)
+  const [shiftCloseoutIdentity, setShiftCloseoutIdentity] = useState<string | null>(null)
+  const [acknowledgedShiftCloseout, setAcknowledgedShiftCloseout] = useState<string | null>(null)
   const [dutyAcknowledgement, setDutyAcknowledgement] = useState<{
     token: number
     targetId: OfficeDutyTargetId
@@ -212,6 +217,49 @@ export function OfficePage() {
     token: number
     text: string
   } | null>(null)
+  const shiftCloseoutAvailable = asOfSeq == null
+    && officeShiftIdentity != null
+    && (officeShift.state === 'complete' || officeShift.state === 'clear')
+    && routineFollowUps.followUps.length === 0
+  const shiftCloseoutOpen = shiftCloseoutIdentity != null
+  const shiftCloseoutAcknowledged = officeShiftIdentity != null
+    && acknowledgedShiftCloseout === officeShiftIdentity
+  const officeDayDecisionCounts = useMemo(() => {
+    const openedAt = officeDay.day?.openedAt
+    const closesAt = officeDay.nextRolloverAt
+    if (openedAt == null || closesAt == null) {
+      return { maintain: 0, revise: 0, evidenceUnavailable: 0 }
+    }
+    let maintain = 0
+    let revise = 0
+    let evidenceUnavailable = 0
+    for (const decision of routineFollowUps.decisions) {
+      if (decision.decidedAt < openedAt || decision.decidedAt >= closesAt) continue
+      if (decision.outcome === 'maintain-plan') maintain += 1
+      else if (decision.outcome === 'revise-plan') revise += 1
+      else evidenceUnavailable += 1
+    }
+    return { maintain, revise, evidenceUnavailable }
+  }, [officeDay.day?.openedAt, officeDay.nextRolloverAt, routineFollowUps.decisions])
+  useEffect(() => {
+    setAcknowledgedShiftCloseout((current) => (
+      current == null || current === officeShiftIdentity ? current : null
+    ))
+  }, [officeShiftIdentity])
+  useEffect(() => {
+    if (shiftCloseoutIdentity == null) return
+    const invalidated = shiftCloseoutIdentity !== officeShiftIdentity
+      || asOfSeq != null
+      || officeShift.candidates.length > 0
+      || routineFollowUps.followUps.length > 0
+    if (invalidated) setShiftCloseoutIdentity(null)
+  }, [
+    asOfSeq,
+    officeShift.candidates.length,
+    officeShiftIdentity,
+    routineFollowUps.followUps.length,
+    shiftCloseoutIdentity,
+  ])
   const retryFloor = async () => {
     setRetryingFloor(true)
     try {
@@ -295,13 +343,14 @@ export function OfficePage() {
       roomName: workspace ? workspaceDisplayName(workspace) : office.workspace.tag,
     }
   }, [building, cabinetWorkspaceId, workspaces])
-  const modalOpen = Boolean(logView)
+  const legacyModalOpen = Boolean(logView)
     || Boolean(selectedSeat)
     || Boolean(rosterOffice)
     || Boolean(cabinetOffice)
     || Boolean(cadenceDuty)
     || Boolean(inboxDuty)
     || decisionDeskOpen
+  const modalOpen = legacyModalOpen || shiftCloseoutOpen
   const closeLogWithDestination = (destination: 'origin' | 'floor') => {
     const origin = logView?.origin ?? 'menu'
     setLogView(null)
@@ -448,6 +497,30 @@ export function OfficePage() {
       if (returnFocus === 'target') document.getElementById('office-inbox-service')?.focus()
       else document.querySelector<HTMLElement>('[data-testid="office-floor"]')?.focus()
     })
+  }
+
+  const closeShiftCloseout = () => {
+    setShiftCloseoutIdentity(null)
+    requestAnimationFrame(() => {
+      document.getElementById('office-operations-board')?.focus()
+    })
+  }
+
+  const openShiftCloseout = () => {
+    if (!shiftCloseoutAvailable || !officeShiftIdentity) return
+    setShiftCloseoutIdentity(officeShiftIdentity)
+    setDecisionDeskOpen(false)
+    setCadenceDuty(null)
+    setInboxDuty(null)
+    setSelected(null)
+    setRosterWorkspaceId(null)
+    setCabinetWorkspaceId(null)
+    setLogView(null)
+  }
+
+  const finishShiftCloseout = () => {
+    if (officeShiftIdentity) setAcknowledgedShiftCloseout(officeShiftIdentity)
+    closeShiftCloseout()
   }
 
   const dutyName = (duty: OfficeDutyCandidate): string => {
@@ -989,7 +1062,7 @@ export function OfficePage() {
                 }}
                 productActivity={productActivity}
                 dutyCandidates={officeShift.candidates}
-                dutyStatus={dutyGuidanceStatus}
+                dutyStatus={officeShift.sourceStatus}
                 dutyShift={officeShift}
                 inboxBacklogCount={officeDuties.inboxCount}
                 routineFollowUpCount={routineFollowUps.followUps.length}
@@ -1004,6 +1077,8 @@ export function OfficePage() {
                 }}
                 reviewedCadenceFollowUps={officeDuties.reviewedCadenceFollowUps}
                 onOpenCadenceFollowUp={openReviewedCadenceFollowUp}
+                onOpenShiftCloseout={openShiftCloseout}
+                shiftCloseoutAcknowledged={shiftCloseoutAcknowledged}
                 onStartNextShift={() => { void startNextOfficeShift() }}
                 startNextShiftStatus={startNextShiftStatus}
                 onOpenService={(kind, seq) => {
@@ -1030,7 +1105,41 @@ export function OfficePage() {
                 onRetry={() => { void retryFloor() }}
               />
             )}
-            {modalOpen && <div className="oa-office-window-scrim" aria-hidden />}
+            {legacyModalOpen && <div className="oa-office-window-scrim" aria-hidden />}
+            <OfficeShiftCloseout
+              open={shiftCloseoutOpen}
+              onOpenChange={(open) => {
+                if (open) openShiftCloseout()
+                else closeShiftCloseout()
+              }}
+              state={officeShift.state === 'clear' ? 'clear' : 'complete'}
+              sourceStatus={officeShift.sourceStatus}
+              total={officeShift.total}
+              completed={officeShift.completed}
+              maintainCount={officeDayDecisionCounts.maintain}
+              reviseCount={officeDayDecisionCounts.revise}
+              evidenceUnavailableCount={officeDayDecisionCounts.evidenceUnavailable}
+              pendingDecisionCount={routineFollowUps.followUps.length}
+              cadenceFollowUpCount={officeDuties.reviewedCadenceFollowUps.length}
+              backlogCount={officeShift.backlogCount ?? 0}
+              canStartNext={officeShift.sourceStatus === 'ready' && officeShift.canStartNext}
+              startNextStatus={startNextShiftStatus}
+              onFinish={finishShiftCloseout}
+              onReviewDecisions={() => {
+                setShiftCloseoutIdentity(null)
+                setDecisionDeskOpen(true)
+              }}
+              onOpenCadenceFollowUp={officeDuties.reviewedCadenceFollowUps[0]
+                ? () => {
+                    setShiftCloseoutIdentity(null)
+                    openReviewedCadenceFollowUp(officeDuties.reviewedCadenceFollowUps[0]!)
+                  }
+                : undefined}
+              onStartNext={async () => {
+                const started = await startNextOfficeShift()
+                if (started) setShiftCloseoutIdentity(null)
+              }}
+            />
             {logView && (
               <section
                 role="dialog"

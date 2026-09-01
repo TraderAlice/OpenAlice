@@ -20,7 +20,7 @@ export function OfficeShiftHarvestMeter({
   state: OfficeShiftState
   acknowledgementToken?: number | undefined
   reducedMotion?: boolean
-  variant: 'hud' | 'board'
+  variant: 'hud' | 'board' | 'ledger'
 }) {
   const visibleTotal = boundedSlotCount(total, OFFICE_SHIFT_SLOT_LIMIT)
   if (visibleTotal === 0) return null

@@ -2366,6 +2366,80 @@ describe('OfficeBuilding', () => {
     expect(onStartNextShift).toHaveBeenCalledTimes(1)
   })
 
+  it('routes a settled shift through the Operations closeout before offering another shift', async () => {
+    const onOpenShiftCloseout = vi.fn()
+    const onStartNextShift = vi.fn()
+    const props = {
+      building: emptyBuilding(),
+      dutyCandidates: [],
+      dutyShift: {
+        state: 'complete' as const,
+        total: 4,
+        completed: 4,
+        position: null,
+        remainingMinutes: 0,
+        backlogCount: 3,
+        canStartNext: true,
+      },
+      initialPlayerState: { position: { x: 480, y: 264 }, direction: 'up' as const },
+      onSelectEmployee: vi.fn(),
+      onOpenEmployee: vi.fn(),
+      onOpenWorkspace: vi.fn(),
+      onOpenFiles: vi.fn(),
+      onOpenRoster: vi.fn(),
+      onOpenLog: vi.fn(),
+      onOpenShiftCloseout,
+      onStartNextShift,
+    }
+    const view = render(<OfficeBuilding {...props} />)
+
+    const closeout = screen.getByRole('button', {
+      name: 'Shift closeout: 4/4 settled',
+    })
+    expect(closeout.textContent).toContain('Patrol complete · review closeout')
+    expect(screen.queryByRole('button', {
+      name: 'This shift is complete with 3 more waiting. Start the next shift',
+    })).toBeNull()
+    const operations = screen.getByRole('button', {
+      name: 'Operations board · shift closeout',
+    })
+    expect(operations.title).toBe('Review shift ledger')
+
+    await userEvent.click(closeout)
+    await waitFor(() => expect(onOpenShiftCloseout).toHaveBeenCalledTimes(1))
+    expect(onStartNextShift).not.toHaveBeenCalled()
+
+    view.rerender(<OfficeBuilding {...props} dutyStatus="loading" />)
+    const syncingCloseout = screen.getByRole('button', {
+      name: 'Shift closeout: 4/4 settled',
+    })
+    expect(syncingCloseout.querySelector('strong')?.textContent).toBe('Checking duties…')
+    expect(screen.queryByRole('button', {
+      name: 'This shift is complete with 3 more waiting. Start the next shift',
+    })).toBeNull()
+
+    view.rerender(
+      <OfficeBuilding {...props} dutyStatus="loading" shiftCloseoutAcknowledged />,
+    )
+    expect(view.container.querySelector('.oa-office-hud__duty[role="status"]')?.textContent)
+      .toContain('Checking duties…')
+    expect(screen.queryByText('Shift wrapped · carryover recorded')).toBeNull()
+
+    view.rerender(<OfficeBuilding {...props} shiftCloseoutAcknowledged />)
+    expect(screen.queryByRole('button', {
+      name: 'Shift closeout: 4/4 settled',
+    })).toBeNull()
+    expect(screen.getByText('Shift wrapped · carryover recorded')).toBeTruthy()
+    expect(screen.getByRole('button', {
+      name: 'Operations board · shift closeout',
+    }).querySelector('.oa-office-operations-board__signal')).toBeNull()
+
+    await userEvent.click(screen.getByRole('button', {
+      name: 'Operations board · shift closeout',
+    }))
+    await waitFor(() => expect(onOpenShiftCloseout).toHaveBeenCalledTimes(2))
+  })
+
   it('names a safely joined Inbox duty as the exact routine while ordinary Inbox stays unchanged', () => {
     const routine = routineInboxDuty()
     const ordinary: OfficeInboxDutyCandidate = {

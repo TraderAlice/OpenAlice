@@ -151,6 +151,30 @@ describe('Office responsive style contract', () => {
     expect(css).not.toMatch(/oa-office-excursion-return[^}]*animation-iteration-count:\s*infinite/s)
   })
 
+  it('keeps the Operations closeout as one bounded game ledger on every viewport', () => {
+    expect(css).toMatch(
+      /\.oa-office-shift-closeout\s*\{[^}]*border:\s*4px solid var\(--gba-ink\);[^}]*animation:\s*oa-office-gba-window 140ms steps\(2, end\);/s,
+    )
+    expect(css).toMatch(
+      /\.oa-office-shift-closeout__body\s*\{[^}]*overscroll-behavior:\s*contain;/s,
+    )
+    expect(css).toMatch(
+      /\.oa-office-shift-closeout__footer \[data-slot="button"\]\s*\{[^}]*min-height:\s*44px;/s,
+    )
+    expect(css).toMatch(
+      /\.oa-office-shift-harvest--ledger\s*\{[^}]*--office-shift-harvest-slot-size:\s*18px;/s,
+    )
+    expect(css).toMatch(
+      /@media \(max-width: 520px\) \{[\s\S]*?\.oa-office-shift-closeout\s*\{[^}]*width:\s*calc\(100% - 8px\);[^}]*height:\s*calc\(100dvh - 8px\);/s,
+    )
+    expect(css).toMatch(
+      /@media \(max-height: 480px\) and \(orientation: landscape\) \{[\s\S]*?\.oa-office-shift-closeout\s*\{[^}]*height:\s*calc\(100dvh - 8px\);/s,
+    )
+    expect(css).toMatch(
+      /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.oa-office-shift-closeout,[\s\S]*?animation:\s*none;/s,
+    )
+  })
+
   it('keeps the cadence review readable and actionable on phone and short landscape stages', () => {
     expect(css).toMatch(
       /\.oa-office-cadence__review,[\s\S]*?\.oa-office-cadence__actions button\s*\{[^}]*min-height:\s*44px;/,

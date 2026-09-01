@@ -1520,8 +1520,14 @@ describe('OfficePage localization', () => {
     expect(markInboxReadMock).toHaveBeenCalledWith('inbox-a')
     expect(document.querySelector('.oa-office-landmark-ack')).toBeNull()
     expect(document.querySelector('.oa-office-page > p[role="status"]')).toBeNull()
-    expect(screen.getByText('值班已清')).toBeTruthy()
     await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('office-floor')))
+
+    await userEvent.click(screen.getByRole('button', {
+      name: '收班簿：本班已结算 1/1',
+    }))
+    const closeout = await screen.findByRole('dialog', { name: '今日值班已清 · 查看收班' })
+    expect(within(closeout).getByText('已结算 1 / 1')).toBeTruthy()
+    expect(within(closeout).getByText('已记录 0 项')).toBeTruthy()
   })
 
   it('waits for a post-Inbox routine read to reveal another tab\'s carry before settling', async () => {
@@ -1697,9 +1703,12 @@ describe('OfficePage localization', () => {
     testStartNextOverride = startNext
     render(<OfficePage />)
 
-    const start = await screen.findByRole('button', {
-      name: '本班已完成，另有 1 项待排。开始下一班',
+    const closeout = await screen.findByRole('button', {
+      name: '收班簿：本班已结算 4/4',
     })
+    await userEvent.click(closeout)
+    const ledger = await screen.findByRole('dialog', { name: '巡检完成 · 查看收班' })
+    const start = within(ledger).getByRole('button', { name: '开始下一班' })
     fireEvent.click(start)
     fireEvent.click(start)
 
@@ -1712,7 +1721,7 @@ describe('OfficePage localization', () => {
       pendingStart.resolve(testOfficeDayResponse(false, 'stale-shift'))
       await pendingStart.promise
     })
-    const retry = await screen.findByRole('button', { name: '下一班未开始 · 重试' })
+    const retry = await within(ledger).findByRole('button', { name: '下一班未开始 · 重试' })
     expect(retry.hasAttribute('disabled')).toBe(false)
     expect(within(retry).getByRole('status').textContent).toBe('下一班未开始 · 重试')
     expect(screen.getByTestId('office-shift-harvest-hud').dataset.state).toBe('complete')
@@ -1723,6 +1732,143 @@ describe('OfficePage localization', () => {
       name: /本班第 1\/1 项：.*下一班报告/,
     })).toBeTruthy()
     expect(testOfficeDayRecord?.shift.order).toEqual([officeDutyKey(waitingDuty)])
+  })
+
+  it('summarizes only today’s explicit judgments and keeps unavailable evidence separate at closeout', async () => {
+    const openedAt = Date.UTC(2026, 8, 1, 9)
+    const settled = ['settled-a', 'settled-b', 'settled-c', 'settled-d']
+      .map((id) => officeDutyKey(inboxCandidate(inboxEvidence(id, id, openedAt - 100))))
+    commitTestOfficeDay({
+      dayKey: TEST_OFFICE_DAY_KEY,
+      timeZone: TEST_OFFICE_TIME_ZONE,
+      openedAt,
+      updatedAt: openedAt,
+      seenDutyIds: settled,
+      shift: {
+        id: 1,
+        openedAt,
+        slots: settled,
+        order: [],
+        cleared: true,
+      },
+      evidenceReceipts: [],
+    }, openedAt)
+    routineFollowUpsMock.mockReturnValue({
+      status: 'ready',
+      followUps: [],
+      decisions: [
+        {
+          inboxEntryId: 'maintain-today',
+          reportTs: openedAt,
+          issueWorkspaceId: 'chat-1',
+          issueId: 'routine-maintain',
+          createdAt: openedAt,
+          outcome: 'maintain-plan',
+          decidedAt: openedAt + 10,
+        },
+        {
+          inboxEntryId: 'revise-today',
+          reportTs: openedAt,
+          issueWorkspaceId: 'chat-1',
+          issueId: 'routine-revise',
+          createdAt: openedAt,
+          outcome: 'revise-plan',
+          note: 'Raise the confirmation threshold.',
+          decidedAt: openedAt + 20,
+        },
+        {
+          inboxEntryId: 'unavailable-today',
+          reportTs: openedAt,
+          issueWorkspaceId: 'chat-1',
+          issueId: 'routine-unavailable',
+          createdAt: openedAt,
+          outcome: 'evidence-unavailable',
+          decidedAt: openedAt + 30,
+        },
+        {
+          inboxEntryId: 'maintain-before-day',
+          reportTs: openedAt - 2_000,
+          issueWorkspaceId: 'chat-1',
+          issueId: 'routine-old',
+          createdAt: openedAt - 2_000,
+          outcome: 'maintain-plan',
+          decidedAt: openedAt - 1,
+        },
+      ],
+      carry: routineCarryMock,
+      decide: routineDecideMock,
+      refresh: vi.fn(async () => undefined),
+    })
+    render(<OfficePage />)
+
+    await userEvent.click(await screen.findByRole('button', {
+      name: '收班簿：本班已结算 4/4',
+    }))
+    const ledger = await screen.findByRole('dialog', { name: '今日值班已清 · 查看收班' })
+    expect(within(ledger).getByText('已记录 2 项')).toBeTruthy()
+    expect(within(ledger).getByText('维持计划 1 项')).toBeTruthy()
+    expect(within(ledger).getByText('调整计划 1 项')).toBeTruthy()
+    expect(ledger.querySelector('[data-evidence-unavailable-count="1"]')).toBeTruthy()
+
+    await userEvent.click(within(ledger).getByRole('button', { name: '本班先到这里' }))
+    expect(await screen.findByText('今日收班 · 已全部清楚')).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: '行动看板 · 收班簿' }))
+    expect(await screen.findByRole('dialog', { name: '今日值班已清 · 查看收班' })).toBeTruthy()
+  })
+
+  it('keeps the same closeout open while the authoritative settlement barrier refreshes', async () => {
+    const openedAt = Date.UTC(2026, 8, 1, 9)
+    const settled = ['settled-a', 'settled-b', 'settled-c', 'settled-d']
+      .map((id) => officeDutyKey(inboxCandidate(inboxEvidence(id, id, openedAt - 100))))
+    commitTestOfficeDay({
+      dayKey: TEST_OFFICE_DAY_KEY,
+      timeZone: TEST_OFFICE_TIME_ZONE,
+      openedAt,
+      updatedAt: openedAt,
+      seenDutyIds: settled,
+      shift: {
+        id: 1,
+        openedAt,
+        slots: settled,
+        order: [],
+        cleared: true,
+      },
+      evidenceReceipts: [],
+    }, openedAt)
+    let pendingRefresh: ReturnType<typeof deferred<void>> | null = null
+    routineFollowUpsMock.mockReturnValue({
+      status: 'ready',
+      followUps: [],
+      decisions: [],
+      carry: routineCarryMock,
+      decide: routineDecideMock,
+      refresh: vi.fn(() => pendingRefresh?.promise ?? Promise.resolve()),
+    })
+    render(<OfficePage />)
+
+    await userEvent.click(await screen.findByRole('button', {
+      name: '收班簿：本班已结算 4/4',
+    }))
+    expect(await screen.findByRole('dialog', { name: '今日值班已清 · 查看收班' }))
+      .toBeTruthy()
+
+    pendingRefresh = deferred<void>()
+    act(() => {
+      acceptTestInboxSnapshot()
+      publishTestOfficeDay()
+    })
+
+    const syncing = await screen.findByRole('dialog', { name: '正在检查值班项…' })
+    expect(syncing).toBeTruthy()
+    expect(within(syncing).getByRole('status').textContent).toContain('最终来源仍在同步')
+    expect(within(syncing).queryByRole('button', { name: '开始下一班' })).toBeNull()
+
+    await act(async () => {
+      pendingRefresh?.resolve()
+      await pendingRefresh?.promise
+    })
+    expect(await screen.findByRole('dialog', { name: '今日值班已清 · 查看收班' }))
+      .toBeTruthy()
   })
 
   it('dismisses a returned durable Inbox duty on Escape without changing its order or read state', async () => {
@@ -1878,13 +2024,23 @@ describe('OfficePage localization', () => {
 
     await userEvent.click(screen.getByRole('button', { name: '盖章：本次值班已复核' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '检查周报排期' })).toBeNull())
-    expect(screen.getByRole('button', {
-      name: '本班已复核，仍有 1 项定时 Issue 未解决。跟进 chat 的“检查周报排期”。',
-    })).toBeTruthy()
     expect(screen.getByText('已复核')).toBeTruthy()
     expect(screen.getByText(
       '已复核“检查周报排期”。本班完成；仍有 1 项定时 Issue 待跟进。',
     )).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', {
+      name: '收班簿：本班已结算 1/1',
+    }))
+    const closeout = await screen.findByRole('dialog', { name: '巡检完成 · 查看收班' })
+    expect(within(closeout).getByText('1 项已复核例行任务仍需跟进')).toBeTruthy()
+    await userEvent.click(within(closeout).getByRole('button', { name: '跟进' }))
+    expect(navigateMock).toHaveBeenLastCalledWith('/office/return', {
+      state: { officeExcursion: true },
+    })
+    expect(openOrFocusMock).toHaveBeenLastCalledWith({
+      kind: 'issue-detail',
+      params: { wsId: 'chat-1', id: 'weekly-review' },
+    })
     expect(acknowledgeMock).not.toHaveBeenCalled()
     expect(testOfficeDayRecord?.evidenceReceipts.some((receipt) => (
       receipt.subjectKey.includes('weekly-review')
@@ -2025,7 +2181,13 @@ describe('OfficePage localization', () => {
     returned.rerender(<OfficePage />)
     await userEvent.click(screen.getByRole('button', { name: '返回下一值班项' }))
     expect(screen.queryByRole('dialog', { name: '检查周报排期' })).toBeNull()
-    expect(screen.getByText('值班已清')).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', {
+      name: '收班簿：本班已结算 1/1',
+    }))
+    const closeout = await screen.findByRole('dialog', { name: '今日值班已清 · 查看收班' })
+    expect(within(closeout).getByText('已结算 1 / 1')).toBeTruthy()
+    expect(within(closeout).queryByText(/已复核例行任务仍需跟进/)).toBeNull()
+    expect(within(closeout).queryByRole('button', { name: '跟进' })).toBeNull()
   })
 
   it('restores captured evidence but refuses a receipt while the cadence source is stale', async () => {

@@ -191,6 +191,8 @@ export function OfficeBuilding({
   onOpenRoutineFollowUps,
   reviewedCadenceFollowUps = [],
   onOpenCadenceFollowUp,
+  onOpenShiftCloseout,
+  shiftCloseoutAcknowledged = false,
   onStartNextShift,
   startNextShiftStatus = 'idle',
   onOpenService,
@@ -228,6 +230,8 @@ export function OfficeBuilding({
   onOpenRoutineFollowUps?: () => void
   reviewedCadenceFollowUps?: readonly OfficeCadenceDutyCandidate[]
   onOpenCadenceFollowUp?: (duty: OfficeCadenceDutyCandidate) => void
+  onOpenShiftCloseout?: () => void
+  shiftCloseoutAcknowledged?: boolean
   onStartNextShift?: () => void
   startNextShiftStatus?: 'idle' | 'pending' | 'error'
   onOpenService?: (kind: 'inbox' | 'news', seq?: number) => void
@@ -308,7 +312,7 @@ export function OfficeBuilding({
   const routeTimerRef = useRef<number | null>(null)
   const routeContinuationRef = useRef<(() => void) | null>(null)
   const routeContinuationDelayRef = useRef(0)
-  const routeObjectiveRef = useRef<'decision-desk' | null>(null)
+  const routeObjectiveRef = useRef<'decision-desk' | 'shift-closeout' | null>(null)
   const floorInteractionSuspendedRef = useRef(floorInteractionSuspended)
   const departureTimerRef = useRef<number | null>(null)
 
@@ -518,6 +522,17 @@ export function OfficeBuilding({
     && currentDutyCandidate == null
     && routineDecisionPending
     && Boolean(onOpenRoutineFollowUps)
+  const shiftCloseoutAvailable = replaySeq == null
+    && currentDutyCandidate == null
+    && (currentShiftState === 'complete' || currentShiftState === 'clear')
+    && Boolean(onOpenShiftCloseout)
+  const shiftCloseoutTitleKey = currentDutyStatus === 'loading'
+    ? 'office.dutySyncing'
+    : currentDutyStatus === 'error'
+      ? 'office.dutySignalInterrupted'
+      : currentShiftState === 'clear'
+        ? 'office.shiftCloseoutClear'
+        : 'office.shiftCloseoutReady'
   const nextDuty = replaySeq == null && currentDutyCandidate
     ? resolveOfficeDutyTarget(
         currentDutyCandidate,
@@ -585,13 +600,16 @@ export function OfficeBuilding({
     ? 'current-cadence'
     : routineDecisionPrimary
       ? 'decision-desk'
+      : shiftCloseoutAvailable
+        ? 'shift-closeout'
       : operationsFollowUp
         ? 'reviewed-follow-up'
         : 'ambient'
   const operationsNeedsAttention = productActivity.attention.agent
     || Boolean(queuedOperationsCadenceDuty)
     || routineDecisionPending
-    || reviewedCadenceFollowUpCount > 0
+    || (shiftCloseoutAvailable && !shiftCloseoutAcknowledged)
+    || (operationsInteractionMode !== 'shift-closeout' && reviewedCadenceFollowUpCount > 0)
   const passiveRoutineFollowUpCount = operationsInteractionMode === 'decision-desk'
     ? 0
     : activeRoutineFollowUpCount
@@ -599,6 +617,8 @@ export function OfficeBuilding({
     ? (currentCadenceDutyCandidate?.count ?? 0) + passiveRoutineFollowUpCount
     : operationsInteractionMode === 'decision-desk'
       ? activeRoutineFollowUpCount
+    : operationsInteractionMode === 'shift-closeout'
+      ? 0
     : operationsInteractionMode === 'reviewed-follow-up'
       ? reviewedCadenceFollowUpCount + passiveRoutineFollowUpCount
       : (queuedOperationsCadenceDuty?.count ?? productActivity.pending.agent)
@@ -973,6 +993,16 @@ export function OfficeBuilding({
         detail: null,
       }
     }
+    if (shiftCloseoutAvailable) {
+      return {
+        icon: OFFICE_HUD_ASSETS.drawerRecord,
+        action: t('office.shiftCloseoutAction'),
+        label: t(shiftCloseoutTitleKey),
+        detail: dutyShift?.backlogCount
+          ? t('office.shiftCloseoutBacklog', { count: dutyShift.backlogCount })
+          : null,
+      }
+    }
     if (reviewedCadenceFollowUp && !nextDuty) {
       return {
         icon: OFFICE_HUD_ASSETS.occupancyLog,
@@ -1129,6 +1159,8 @@ export function OfficeBuilding({
     } else {
       if (operationsInteractionMode === 'decision-desk' && onOpenRoutineFollowUps) {
         onOpenRoutineFollowUps()
+      } else if (operationsInteractionMode === 'shift-closeout' && onOpenShiftCloseout) {
+        onOpenShiftCloseout()
       } else if (operationsInteractionMode === 'reviewed-follow-up' && operationsFollowUp) {
         onOpenCadenceFollowUp?.(operationsFollowUp)
       } else {
@@ -1220,7 +1252,7 @@ export function OfficeBuilding({
       allowReplay?: boolean
       fallbackTargetId?: string
       fallbackActivate?: () => void
-      objective?: 'decision-desk'
+      objective?: 'decision-desk' | 'shift-closeout'
     } = {},
   ) => {
     if (selected || departingWorkspace || floorInteractionSuspended) return
@@ -1315,6 +1347,16 @@ export function OfficeBuilding({
   // The objective ref distinguishes this route from an ambient Operations trip.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routineDecisionPrimary])
+  useLayoutEffect(() => {
+    if (shiftCloseoutAvailable || routeObjectiveRef.current !== 'shift-closeout') return
+
+    // Closeout reflects the currently settled shift. New work or a source
+    // transition invalidates that destination before Alice reaches the board.
+    cancelAutoWalk()
+    setInteractionAnchorTargetId(null)
+  // The objective ref distinguishes this route from an ambient Operations trip.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shiftCloseoutAvailable])
   useEffect(() => {
     if (floorInteractionSuspended) pauseAutoWalk()
     else resumeAutoWalk()
@@ -1785,6 +1827,46 @@ export function OfficeBuilding({
                 <span>{activeRoutineFollowUpCount}</span>
               </em>
             </button>
+          ) : shiftCloseoutAvailable && onOpenShiftCloseout && !shiftCloseoutAcknowledged ? (
+            <button
+              type="button"
+              className="oa-office-hud__duty oa-office-hud__duty--complete"
+              data-kind="shift-closeout"
+              data-status={currentDutyStatus}
+              aria-label={t('office.shiftCloseoutDuty', {
+                completed: dutyShift?.completed ?? 0,
+                total: dutyShift?.total ?? 0,
+              })}
+              onClick={() => requestTargetInteraction('operations', {
+                activate: onOpenShiftCloseout,
+                objective: 'shift-closeout',
+              })}
+            >
+              <span className="oa-office-hud__duty-meta">
+                <span>{t('office.shiftReviewed')}</span>
+                <i className="oa-office-hud__duty-separator" aria-hidden>·</i>
+                <span>{t('office.shiftCloseoutAction')}</span>
+              </span>
+              <strong>{t(shiftCloseoutTitleKey)}</strong>
+              <em>
+                <OfficeShiftHarvestMeter {...shiftHarvestProps} variant="hud" />
+                <span>{dutyShift?.completed ?? 0}/{dutyShift?.total ?? 0}</span>
+              </em>
+            </button>
+          ) : shiftCloseoutAvailable && shiftCloseoutAcknowledged ? (
+            <div
+              className="oa-office-hud__duty oa-office-hud__duty--clear"
+              data-status={currentDutyStatus}
+              role="status"
+            >
+              <span className="oa-office-hud__duty-meta">{t('office.shiftLabel')}</span>
+              <strong>{t(currentDutyStatus === 'ready'
+                ? currentShiftState === 'clear'
+                  ? 'office.shiftCloseoutFinishedClear'
+                  : 'office.shiftCloseoutFinishedCarry'
+                : shiftCloseoutTitleKey)}</strong>
+              <OfficeShiftHarvestMeter {...shiftHarvestProps} variant="hud" />
+            </div>
           ) : currentShiftState === 'complete' && dutyShift?.canStartNext && onStartNextShift ? (
             <button
               type="button"
@@ -2358,6 +2440,7 @@ export function OfficeBuilding({
               data-has-activity={Boolean(productActivity.agent)
                 || Boolean(queuedOperationsCadenceDuty)
                 || routineDecisionPending
+                || shiftCloseoutAvailable
                 || reviewedCadenceFollowUpCount > 0
                 || undefined}
               data-routine-follow-ups={activeRoutineFollowUpCount || undefined}
@@ -2368,6 +2451,8 @@ export function OfficeBuilding({
               data-acknowledged={acknowledgedTargetId === 'operations' || undefined}
               aria-label={operationsInteractionMode === 'decision-desk'
                 ? t('office.decisionDeskPending', { count: activeRoutineFollowUpCount })
+                : operationsInteractionMode === 'shift-closeout'
+                  ? t('office.shiftCloseoutBoard')
                 : operationsInteractionMode === 'reviewed-follow-up'
                   && passiveRoutineFollowUpCount === 0
                 ? t('office.operationsFollowUpPending', {
@@ -2385,6 +2470,8 @@ export function OfficeBuilding({
                   : t('office.operationsBoard')}
               title={operationsInteractionMode === 'decision-desk'
                 ? t('office.decisionDeskAction')
+                : operationsInteractionMode === 'shift-closeout'
+                  ? t('office.shiftCloseoutAction')
                 : operationsInteractionMode === 'reviewed-follow-up' && operationsFollowUp
                 ? t('office.cadenceFollowUpIssue', {
                     name: operationsFollowUp.cadence.title,
@@ -2394,6 +2481,8 @@ export function OfficeBuilding({
                 'operations',
                 operationsInteractionMode === 'decision-desk'
                   ? { objective: 'decision-desk' }
+                  : operationsInteractionMode === 'shift-closeout'
+                    ? { objective: 'shift-closeout' }
                   : undefined,
               )}
               style={{
