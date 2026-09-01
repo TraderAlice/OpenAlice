@@ -27,7 +27,7 @@ export function InboxReplyThread({
   return (
     <section id="inquiries" className="mt-10 border-t border-border/60 pt-7">
       <div className="flex min-w-0 items-baseline gap-2">
-        <h2 className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground/60">{t('inbox.repliesTitle')}</h2>
+        <h2 className="text-[12px] font-medium leading-4 text-muted-foreground/70">{t('inbox.repliesTitle')}</h2>
         {records.length > 0 && (
           <span className="text-[11px] tabular-nums text-muted-foreground/45">{records.length}</span>
         )}

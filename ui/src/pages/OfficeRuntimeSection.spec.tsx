@@ -106,9 +106,9 @@ describe('OfficeRuntimeSection', () => {
       ],
     })
     const { container } = render(<OfficeRuntimeSection />)
-    expect(await screen.findByText('workspace_list · completed')).toBeTruthy()
+    expect(await screen.findByText('workspace_list: completed')).toBeTruthy()
     expect(screen.getByText('Desk is clear.')).toBeTruthy()
-    expect(screen.getByText(/1 text · 1 tools/)).toBeTruthy()
+    expect(screen.getByText(/1 text, 1 tools/)).toBeTruthy()
     expect(Array.from(container.querySelectorAll<HTMLImageElement>('.oa-office-runtime__badge img'))
       .map((image) => image.src)).toEqual([
       expect.stringContaining('/office/log/lifecycle-v1.png'),

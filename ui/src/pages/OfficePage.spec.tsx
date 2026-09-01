@@ -64,6 +64,23 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('OfficePage localization', () => {
+  it('renders a retry surface when the floor is unavailable', async () => {
+    const refresh = vi.fn(async () => undefined)
+    officeFloorMock.mockReturnValue({
+      building: null,
+      loading: false,
+      error: 'floor offline',
+      refresh,
+    })
+
+    render(<OfficePage />)
+
+    expect(screen.getByRole('heading', { name: i18n.t('office.loadFailed') })).toBeTruthy()
+    expect(screen.getByText('floor offline')).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: i18n.t('common.retry') }))
+    expect(refresh).toHaveBeenCalledOnce()
+  })
+
   it('renders an empty Office as a game floor instead of page copy', () => {
     officeFloorMock.mockReturnValue({
       ...defaultOfficeFloor(),

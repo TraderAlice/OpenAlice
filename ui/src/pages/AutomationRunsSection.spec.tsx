@@ -199,7 +199,7 @@ describe('AutomationRunsSection workspace identity', () => {
     render(<AutomationRunsSection />)
 
     expect(await screen.findByText('Departed Daily Scan')).toBeTruthy()
-    expect(screen.getByTitle(`Issue: departed-daily-scan · ${liveWorkspace.id}`)).toBeTruthy()
+    expect(screen.getByTitle(`Issue: departed-daily-scan, ${liveWorkspace.id}`)).toBeTruthy()
   })
 
   it('identifies an Issue comment follow-up as a reply to its owning Issue', async () => {
@@ -261,7 +261,7 @@ describe('AutomationRunsSection run controls', () => {
     expect(within(summary).getByText('42 attention')).toBeTruthy()
     expect(within(summary).getByText('CLI formats')).toBeTruthy()
     expect(within(summary).getByText('No workers active')).toBeTruthy()
-    expect(within(summary).getByText('Showing 1 · 105 completed · 42 need attention')).toBeTruthy()
+    expect(within(summary).getByText('Showing 1, 105 completed, 42 need attention')).toBeTruthy()
   })
 
   it('gives expanded run actions and pagination mobile-sized touch targets', async () => {
