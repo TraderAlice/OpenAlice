@@ -349,6 +349,12 @@ export const ja: Resources = {
   },
   settings: {
     title: '設定',
+    group: {
+      workspace: 'ワークスペース',
+      agents: 'エージェント',
+      operations: '運用',
+      connections: '接続',
+    },
     language: {
       title: '言語',
       description: 'インターフェースの言語。すぐに反映されます。',
@@ -1266,6 +1272,7 @@ export const ja: Resources = {
     customModelTitle: 'カスタムモデルを使用',
     customModelDescription: '選択した AI アクセスで利用できるモデル ID を入力します。',
     customModelId: 'モデル ID',
+    defaultLabel: 'デフォルト',
     defaultModelValue: 'デフォルト · {{model}}',
     defaultEffort: 'デフォルトの推論強度',
     defaultEffortValue: 'デフォルト · {{effort}}',

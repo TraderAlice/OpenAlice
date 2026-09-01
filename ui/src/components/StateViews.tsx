@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { AlertTriangle, CloudOff, RefreshCw } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 // ==================== Spinner ====================
 
@@ -93,8 +94,8 @@ interface EmptyStateProps {
 
 export function EmptyState({ icon, title, description }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="w-12 h-12 rounded-xl bg-secondary border border-border/60 flex items-center justify-center text-muted-foreground/30 mb-4">
+    <div className="flex flex-col items-center justify-center px-4 py-14 text-center">
+      <div className="mb-3 flex h-8 w-8 items-center justify-center text-muted-foreground/55 [&_svg]:h-6 [&_svg]:w-6">
         {icon ?? (
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -102,9 +103,9 @@ export function EmptyState({ icon, title, description }: EmptyStateProps) {
           </svg>
         )}
       </div>
-      <p className="text-sm font-medium text-muted-foreground">{title}</p>
+      <p className="text-body font-medium text-foreground">{title}</p>
       {description && (
-        <p className="text-[12px] text-muted-foreground/60 mt-1.5 max-w-[280px]">{description}</p>
+        <p className="mt-1 max-w-[300px] text-caption leading-5 text-muted-foreground">{description}</p>
       )}
     </div>
   )
@@ -143,20 +144,21 @@ export function RecoverySurface({
           {icon ?? <CloudOff aria-hidden className="h-6 w-6" />}
         </div>
         {eyebrow && (
-          <p className="mb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.15em] text-destructive">
+          <p className="mb-2 text-[12px] font-medium text-destructive">
             {eyebrow}
           </p>
         )}
         <h2 className="text-xl font-semibold text-foreground">{title}</h2>
         <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">{description}</p>
-        <button
+        <Button
           type="button"
           onClick={onAction}
-          className="btn-primary oa-pressable mt-5 inline-flex min-h-10 items-center justify-center gap-2 px-4"
+          className="mt-5"
+          size="lg"
         >
           <RefreshCw aria-hidden className="h-4 w-4" />
           {actionLabel}
-        </button>
+        </Button>
       </section>
     </div>
   )
@@ -179,20 +181,22 @@ export function RefreshNotice({
   return (
     <div
       role="status"
-      className={`flex flex-col gap-2 rounded-lg border border-warning/35 bg-warning/[0.08] px-3 py-2.5 text-[12px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between ${className}`}
+      className={`oa-status-surface flex flex-col gap-2 rounded-lg border border-border/70 bg-card/80 px-3 py-2.5 text-[12px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between ${className}`}
     >
       <span className="flex min-w-0 items-start gap-2 leading-5">
         <AlertTriangle aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
         <span>{message}</span>
       </span>
-      <button
+      <Button
         type="button"
         onClick={onAction}
-        className="oa-pressable inline-flex min-h-8 shrink-0 items-center justify-center gap-1.5 self-start rounded-md px-2 text-[12px] font-medium text-foreground hover:bg-warning/10 sm:self-auto"
+        className="shrink-0 self-start text-[12px] sm:self-auto"
+        variant="ghost"
+        size="sm"
       >
         <RefreshCw aria-hidden className="h-3.5 w-3.5" />
         {actionLabel}
-      </button>
+      </Button>
     </div>
   )
 }

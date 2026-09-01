@@ -19,6 +19,8 @@ import {
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { Sidebar } from './Sidebar'
 import { useRegisterMobilePageNavigation } from '../contexts/MobilePageNavigationContext'
+import { Button } from './ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 
 const MIN_WIDTH = 200
 const MAX_WIDTH = 420
@@ -690,15 +692,23 @@ export function PageSidebarLayout({
   const desktopActions = (
     <>
       {actionContent}
-      <button
-        type="button"
-        onClick={collapseSidebar}
-        className="oa-icon-action flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-        aria-label={t('common.collapsePanel', { title })}
-        title={t('common.focusContent')}
-      >
-        <PanelLeftClose size={15} strokeWidth={1.75} aria-hidden />
-      </button>
+      <Tooltip>
+        <TooltipTrigger
+          render={(
+            <Button
+              type="button"
+              onClick={collapseSidebar}
+              variant="ghost"
+              size="icon-sm"
+              className="text-muted-foreground"
+              aria-label={t('common.collapsePanel', { title })}
+            />
+          )}
+        >
+          <PanelLeftClose size={15} strokeWidth={1.75} aria-hidden />
+        </TooltipTrigger>
+        <TooltipContent side="right" sideOffset={8}>{t('common.focusContent')}</TooltipContent>
+      </Tooltip>
     </>
   )
 
@@ -736,12 +746,12 @@ export function PageSidebarLayout({
           collapsible
           groupResizeBehavior="preserve-pixel-size"
           onResize={handleSidebarResize}
-          className="h-full min-h-0 overflow-hidden bg-secondary"
+          className="h-full min-h-0 overflow-hidden bg-sidebar"
         >
           <div
             data-testid="page-sidebar-desktop"
             data-state={collapsed ? 'collapsed' : 'expanded'}
-            className="relative h-full min-h-0 w-full overflow-hidden bg-secondary"
+            className="relative h-full min-h-0 w-full overflow-hidden bg-sidebar"
           >
             <div
               data-testid="page-sidebar-expanded"
@@ -759,21 +769,29 @@ export function PageSidebarLayout({
               data-testid="page-sidebar-collapsed"
               aria-hidden={!collapsed}
               inert={!collapsed ? true : undefined}
-              className={`absolute inset-0 flex flex-col items-center bg-secondary py-1.5 transition-opacity duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-standard)] motion-reduce:delay-0 motion-reduce:transition-none ${
+              className={`absolute inset-0 flex flex-col items-center bg-sidebar py-1.5 transition-opacity duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-standard)] motion-reduce:delay-0 motion-reduce:transition-none ${
                 collapsed
                   ? 'opacity-100 delay-[80ms]'
                   : 'pointer-events-none opacity-0'
               }`}
             >
-              <button
-                type="button"
-                onClick={expandSidebar}
-                className="oa-icon-action flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                aria-label={t('common.openPanel', { title })}
-                title={t('common.openPanel', { title })}
-              >
-                <PanelLeftOpen size={16} strokeWidth={1.75} aria-hidden />
-              </button>
+              <Tooltip>
+                <TooltipTrigger
+                  render={(
+                    <Button
+                      type="button"
+                      onClick={expandSidebar}
+                      variant="ghost"
+                      size="icon"
+                      className="text-muted-foreground"
+                      aria-label={t('common.openPanel', { title })}
+                    />
+                  )}
+                >
+                  <PanelLeftOpen size={16} strokeWidth={1.75} aria-hidden />
+                </TooltipTrigger>
+                <TooltipContent side="right" sideOffset={8}>{t('common.openPanel', { title })}</TooltipContent>
+              </Tooltip>
             </aside>
           </div>
         </ResizablePanel>
@@ -791,7 +809,7 @@ export function PageSidebarLayout({
           }}
           onKeyUp={finishUserResize}
           onBlur={finishUserResize}
-          className="z-10 bg-border/80 transition-colors hover:bg-primary/50 active:bg-primary/70"
+          className="z-10 bg-sidebar-border/70 transition-colors hover:bg-foreground/18 active:bg-foreground/28"
         />
         <ResizablePanel
           id={`page-sidebar-${storageKey}-content`}
@@ -816,19 +834,20 @@ export function PageSidebarLayout({
       >
         {!usesAppContextBar && (
           <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border/70 bg-secondary/40 px-3">
-            <button
+            <Button
               ref={mobileTriggerRef}
               type="button"
               onClick={openMobileDrawer}
-              className="oa-icon-action flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              variant="ghost"
+              size="icon-lg"
+              className="h-10 w-10 text-muted-foreground"
               aria-label={t('common.openPanel', { title })}
               aria-expanded={drawerOpen}
               aria-controls={mobileDrawerId}
               aria-haspopup="dialog"
-              title={title}
             >
               <PanelLeftOpen size={17} strokeWidth={1.75} aria-hidden />
-            </button>
+            </Button>
             <span className="min-w-0 truncate text-[13px] font-semibold text-foreground">{title}</span>
           </div>
         )}
@@ -848,7 +867,7 @@ export function PageSidebarLayout({
           aria-modal="true"
           aria-describedby={undefined}
           showCloseButton={false}
-          className="oa-page-sidebar-dialog h-dvh max-h-none w-[280px] max-w-[85vw] gap-0 overflow-hidden border-0 bg-transparent p-0 text-foreground"
+          className="oa-page-sidebar-dialog h-dvh max-h-none w-[280px] max-w-[85vw] gap-0 overflow-hidden border-r border-sidebar-border/70 bg-sidebar p-0 text-sidebar-foreground"
           initialFocus={() => {
             const drawer = mobileDrawerRef.current
             const current = drawer?.querySelector<HTMLElement>('[aria-current="page"]')
@@ -864,14 +883,16 @@ export function PageSidebarLayout({
             title={title}
             actions={actionContent}
             leading={
-              <button
+              <Button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
-                className="oa-icon-action -ml-2 flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                variant="ghost"
+                size="icon-lg"
+                className="-ml-1 h-10 w-10 text-muted-foreground"
                 aria-label={t('common.closePanel', { title })}
               >
                 <X size={15} strokeWidth={1.75} aria-hidden />
-              </button>
+              </Button>
             }
           >
             {sidebarContent}

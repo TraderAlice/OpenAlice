@@ -4,6 +4,7 @@ export interface SegmentedOption<T extends string> {
   value: T
   label: ReactNode
   ariaLabel?: string
+  ariaControls?: string
 }
 
 interface SegmentedControlProps<T extends string> {
@@ -32,7 +33,7 @@ export function SegmentedControl<T extends string>({
     <div
       role="group"
       aria-label={ariaLabel}
-      className={`scrollbar-hide flex w-fit max-w-full items-center gap-0.5 overflow-x-auto rounded-lg border border-border/70 bg-muted/60 p-0.5 ${className}`}
+      className={`scrollbar-hide flex w-fit max-w-full items-center gap-0.5 overflow-x-auto rounded-lg border border-border/70 bg-muted/45 p-0.5 ${className}`}
     >
       {options.map((option) => {
         const active = option.value === value
@@ -42,12 +43,13 @@ export function SegmentedControl<T extends string>({
             type="button"
             aria-pressed={active}
             aria-label={option.ariaLabel}
+            aria-controls={option.ariaControls}
             onClick={() => onChange(option.value)}
-            className={`shrink-0 whitespace-nowrap rounded-md font-medium transition-[background-color,color,box-shadow] ${
+            className={`shrink-0 whitespace-nowrap rounded-md font-medium outline-none transition-[background-color,color,box-shadow,transform] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] focus-visible:ring-2 focus-visible:ring-ring/40 active:scale-[0.98] motion-reduce:transition-none ${
               compact ? 'min-h-6 px-2 text-[10px]' : 'min-h-7 px-2.5 text-[11px]'
             } ${
               active
-                ? 'bg-background text-primary shadow-sm ring-1 ring-border/60'
+                ? 'bg-background text-foreground shadow-sm ring-1 ring-border/60'
                 : 'text-muted-foreground hover:bg-accent hover:text-foreground'
             }`}
           >

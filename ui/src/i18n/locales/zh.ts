@@ -348,6 +348,12 @@ export const zh: Resources = {
   },
   settings: {
     title: '设置',
+    group: {
+      workspace: '工作区',
+      agents: '智能体',
+      operations: '运行',
+      connections: '连接',
+    },
     language: {
       title: '语言',
       description: '界面语言，立即生效。',
@@ -1265,6 +1271,7 @@ export const zh: Resources = {
     customModelTitle: '使用自定义模型',
     customModelDescription: '输入所选 AI 访问提供的模型 ID。',
     customModelId: '模型 ID',
+    defaultLabel: '默认',
     defaultModelValue: '默认 · {{model}}',
     defaultEffort: '默认思考强度',
     defaultEffortValue: '默认 · {{effort}}',

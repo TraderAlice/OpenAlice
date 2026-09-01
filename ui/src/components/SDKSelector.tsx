@@ -58,9 +58,9 @@ export function SDKSelector(props: SDKSelectorProps) {
             disabled={isDisabled}
             onClick={handleClick}
             className={`
-              relative text-left rounded-lg border px-4 py-3.5 transition-all
+              relative rounded-lg border px-4 py-3.5 text-left transition-[border-color,background-color,box-shadow,opacity]
               ${isSelected
-                ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
+                ? 'border-foreground/20 bg-muted/50 ring-1 ring-border'
                 : isDisabled
                   ? 'border-border/50 opacity-50 cursor-not-allowed'
                   : 'border-border hover:border-muted-foreground/40 hover:bg-muted/30 cursor-pointer'
@@ -70,14 +70,14 @@ export function SDKSelector(props: SDKSelectorProps) {
           >
             {/* Coming Soon badge */}
             {isDisabled && (
-              <span className="absolute top-2.5 right-2.5 text-[10px] font-medium text-muted-foreground/60 bg-muted px-1.5 py-0.5 rounded">
+              <span className="absolute right-2.5 top-2.5 rounded px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground/70">
                 Coming Soon
               </span>
             )}
 
             {/* Locked badge (always active) */}
             {isLocked && !isDisabled && (
-              <span className="absolute top-2.5 right-2.5 text-[10px] font-medium text-primary/70 bg-primary/10 px-1.5 py-0.5 rounded">
+              <span className="absolute right-2.5 top-2.5 rounded px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground/70">
                 Always On
               </span>
             )}
@@ -85,32 +85,17 @@ export function SDKSelector(props: SDKSelectorProps) {
             {/* Selected indicator (non-locked) */}
             {isSelected && !isLocked && !isDisabled && (
               <span className="absolute top-2.5 right-2.5">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <circle cx="8" cy="8" r="8" className="fill-primary" />
-                  <path d="M5 8l2 2 4-4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                <SelectionCheckIcon />
               </span>
             )}
 
-            <div className="flex items-start gap-3">
-              {/* Badge avatar */}
-              <div className={`
-                w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5
-                text-[11px] font-bold tracking-wide
-                ${isSelected ? 'bg-primary/15' : 'bg-muted'}
-                ${isSelected ? 'text-primary' : opt.badgeColor}
-              `}>
-                {opt.badge}
-              </div>
-
-              <div className="min-w-0 pr-5">
-                <p className={`text-[13px] font-medium ${isSelected ? 'text-foreground' : isDisabled ? 'text-muted-foreground' : 'text-foreground'}`}>
-                  {opt.name}
-                </p>
-                <p className="text-[11px] text-muted-foreground/70 mt-0.5 leading-relaxed">
-                  {opt.description}
-                </p>
-              </div>
+            <div className="min-w-0 pr-5">
+              <p className={`text-[13px] font-medium ${isDisabled ? 'text-muted-foreground' : 'text-foreground'}`}>
+                {opt.name}
+              </p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground/70">
+                {opt.description}
+              </p>
             </div>
           </button>
         )
@@ -229,3 +214,4 @@ export const DATASOURCE_OPTIONS: SDKOption[] = [
     badgeColor: 'text-ai-action',
   },
 ]
+import { SelectionCheckIcon } from './ui/selection-check-icon'
