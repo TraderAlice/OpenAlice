@@ -4,6 +4,15 @@ import { resolve, dirname } from 'node:path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
+const workspaceGlob = (pattern: string): string => (
+  resolve(__dirname, pattern).replaceAll('\\', '/')
+)
+
+export const collectionWideTestInputs = [
+  workspaceGlob('**/package.json'),
+  workspaceGlob('**/{vitest,vite}.config.*'),
+]
+
 // Workspace packages are aliased directly to their `src/*.ts` entry points so
 // vitest doesn't need them pre-built into `dist/`. Vite's import-analysis
 // resolver ignores `resolve.conditions` for npm packages (the deps optimizer
@@ -28,6 +37,11 @@ export default defineConfig({
     alias: workspaceAliases,
   },
   test: {
+    // Vitest's affected-test lane follows static imports, but collection-wide
+    // inputs must invalidate every project. Vitest compares changed files as
+    // absolute paths, so relative defaults do not match this workspace; keep
+    // absolute, slash-normalized globs explicit for every platform.
+    forceRerunTriggers: collectionWideTestInputs,
     // The Node suite includes installer, PTY, and Guardian specs that spawn
     // their own process trees. Leaving Vitest at `available CPUs - 1`
     // lets those children contend with a worker per core on constrained CI

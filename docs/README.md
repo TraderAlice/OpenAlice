@@ -29,6 +29,7 @@ GitHub navigation.
 | [[docs/workspace-lifecycle.md]] | [Workspace and Session lifecycle](workspace-lifecycle.md) | Offboarding, departed directories, handoff, restore/purge, Session retirement |
 | [[docs/workspace-manager.md]] | [Workspace Manager](workspace-manager.md) | Launcher-owned control plane, WebPi quick start, active-desk inventory, and management boundaries |
 | [[docs/workspace-template-upgrade.md]] | [Workspace Template Upgrade](workspace-template-upgrade.md) | Managed-asset baselines, three-way review, apply transactions, recovery, and the future Merge/Absorb boundary |
+| [[docs/workspace-absorb.md]] | [Workspace Absorb](workspace-absorb.md) | Directional Workspace consolidation, collision review, archived source identity, and recovery |
 | [[docs/workspace-issues-and-scheduling.md]] | [Workspace issues and scheduling](workspace-issues-and-scheduling.md) | Markdown issue contract, global board, schedule scanner, headless execution, Inbox delivery |
 | [[docs/conversation-provenance.md]] | [Workspace Session and artifact provenance](conversation-provenance.md) | `resumeId` identity, artifact trails, Issue execution responsibility, and provenance-before-collaboration sequencing |
 | [[docs/event-system.md]] | [Event-system retirement note](event-system.md) | Removed Alice event-bus scheduler and the remaining UTA journal boundary |
@@ -38,6 +39,9 @@ GitHub navigation.
 
 Other files under `docs/images/` are README/product assets rather than owner
 guides.
+
+Generated migration inventory: [[src/migrations/INDEX.md]]
+([Migration index](../src/migrations/INDEX.md)).
 
 ## User Quickstarts
 

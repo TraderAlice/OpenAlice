@@ -50,7 +50,7 @@ function commands(job: WorkflowJob): string[] {
 describe('CI workflow fast failure lanes', () => {
   it('leaves dev pushes to the CLI-only rolling publication workflow', () => {
     expect(workflow.on?.push?.branches).toEqual(['master'])
-    expect(workflow.on?.pull_request?.branches).toEqual(expect.arrayContaining(['dev', 'master']))
+    expect(workflow.on?.pull_request?.branches).toEqual(['dev', 'master'])
     expect(workflow.jobs['post-merge-dev-smoke']).toBeUndefined()
   })
 

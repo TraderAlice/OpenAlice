@@ -223,6 +223,38 @@ Do not append agent-vendor advertising or automatic co-author trailers.
 Credit human reports, designs, or reviews through `CONTRIBUTORS.md` and links to
 the issue/PR that shaped the work.
 
+## Local Feedback Ladder
+
+Routine development starts with the smallest gate that can falsify the change;
+it does not purchase the complete monorepo suite by default.
+
+| Change shape | Local gate |
+|---|---|
+| Leaf change inside one owner | `pnpm test:affected` or explicit affected specs, the owning typecheck, and the real affected surface |
+| Shared change inside one owner | The complete owner/project suite, the owning typecheck, and the real affected surface |
+| Cross-owner, shared test/build infrastructure, dependency/config change, or uncertain impact | Root and applicable package/UI typechecks, complete `pnpm test`, and every touched surface's acceptance |
+
+`pnpm test:affected` uses Vitest's changed-file dependency selection against a
+freshly fetched `origin/dev`, including committed and working-tree changes. It
+is a routine feature-branch feedback tool, not a release gate. Static imports
+are discoverable; dynamic imports, generated contracts, registries, implicit
+runtime coupling, and a zero-test selection require explicit specs or
+escalation. Changes to package manifests, Vitest/Vite configuration, aliases,
+or the test harness run the complete suite because they can change collection
+for every owner.
+
+Typecheck the code that changed. Root `npx tsc --noEmit` covers `src/`, UI uses
+`cd ui && npx tsc -b`, and Workspace packages use their own typecheck commands.
+A green command that did not include the changed code is not evidence. UI and
+runtime behavior still require their real browser, launcher, package, or native
+surface; affected unit tests do not replace that acceptance.
+
+Record the exact commands and real-surface result in the PR. Use `pnpm test:ui`
+or `pnpm test:node` as broad project fallbacks when one owner's impact is wider
+than the static dependency closure. Keep `pnpm test` as the explicit hermetic
+integration backstop for the third row and for master, scheduled, manual, and
+stable lanes.
+
 ## CI Feedback Lanes
 
 Pull-request CI and the rolling dev CLI publication provide change-level and
@@ -233,15 +265,16 @@ delivery lane:
   lane: workflow contracts, root typecheck, and the complete workspace build.
   The stable `build-and-test` check name remains successful by requiring that
   build and intentionally accepting the skipped full-test lane. The PR must
-  record the applicable local `npx tsc --noEmit`, `pnpm test`, browser,
-  Electron, Docker, installer, or native-runtime evidence; hosted CI is not a
-  second purchase of the same confidence.
+  record the applicable owner-scoped tests, typecheck, browser, Electron,
+  Docker, installer, or native-runtime evidence from the ladder above; hosted
+  CI is not a second purchase of the same confidence.
 - PRs to `master`, `master` pushes, scheduled runs, and manual validation retain
   the hermetic Ubuntu suite, the serialized local Railway lifecycle system
   suite, macOS/Windows build-and-test matrix, and native dev-smoke. Routine
-  integration PRs do not allocate those runners. There is no changed-test or
-  actor/label router: the branch boundary is intentionally simple, and current
-  `dev` receives a daily full cross-platform backstop.
+  integration PRs do not allocate those runners. There is no hosted changed-path
+  or actor/label router: the branch boundary is intentionally simple, local
+  development owns affected-test selection, and current `dev` receives a daily
+  full cross-platform backstop.
 - A `master`-targeted PR whose complete diff is exactly the synchronized,
   forward beta `version` value in `package.json` and
   `packages/cli/package.json` takes the release-preparation fast lane. It keeps
@@ -282,13 +315,14 @@ delivery lane:
   external Broker Pack fixture run once on Linux x64; `master`, scheduled, and
   final Release lanes keep the broader native-host coverage. The scheduled CI
   run remains the daily full cross-platform backstop for current `dev`.
-- Installer or distributed-CLI PRs to a routine integration base retain only
-  the cheap deterministic clean-container HTTP install against the checked-out
-  tree. Bun host feasibility, package-manager, and managed-SSH acceptance run
-  locally during development and in the `master`/manual lanes. After merge,
-  the `dev` push separately downloads `raw/.../dev/install` into a clean
-  container, installs `--channel dev`, and verifies the live preview channel's
-  provenance, commands, server control surface, and idempotent reuse.
+- Installer or distributed-CLI work proves the checked-out tree locally with
+  the deterministic clean-container HTTP install. A routine `dev` PR does not
+  purchase a second hosted copy of that fixture. After merge, the `dev` push
+  builds every native candidate, downloads `raw/.../dev/install` into a clean
+  host, installs `--channel dev`, and verifies the live preview channel's
+  provenance, commands, server control surface, and idempotent reuse. Hosted
+  checkout, Bun host, package-manager, and managed-SSH candidate acceptance
+  begins at the `master`/manual boundary.
 - A push to `master` always runs the complete matrix. Reusing PR evidence after
   merge remains a useful accepted-tree provenance backstop. For stable it is a
   synchronous release gate. For an exact beta, it may finish after dispatch and
@@ -301,15 +335,14 @@ delivery lane:
   daily cross-platform backstop for lightweight PRs.
 
 Routine integration has no hosted changed-path allowlist. Serial development
-uses the local Mac for the complete `npx tsc --noEmit` and hermetic `pnpm test`
-contract, adding `pnpm test:railway:local`, real browser, OrbStack, installer,
-unsigned Electron/package, and native runtime acceptance only when those
-surfaces change. Record those commands and results in the PR. The Railway local
-suite executes the image entrypoint and Linux mount-fence/PTY harness against
-disposable fixtures; it never invokes Railway CLI or a live Project. A
-promotion to `master` re-establishes full remote evidence; stable keeps the
-complete matrix even when routine integration and beta used lighter hosted
-feedback.
+uses the local ladder above, adding `pnpm test:railway:local`, real browser,
+OrbStack, installer, unsigned Electron/package, and native runtime acceptance
+only when those surfaces change. Record those commands and results in the PR.
+The Railway local suite executes the image entrypoint and Linux mount-fence/PTY
+harness against disposable fixtures; it never invokes Railway CLI or a live
+Project. A promotion to `master` re-establishes full remote evidence; stable
+keeps the complete matrix even when routine integration and beta used lighter
+hosted feedback.
 
 ### Package signing boundary
 
