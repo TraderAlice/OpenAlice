@@ -83,10 +83,23 @@ not imply maintainer approval of the finished interaction.
 
 - Restyling the legacy detach hint would improve finish but not discoverability.
 - Expanding Help would keep actions inside a passive keyboard manual.
-- The selected model is a persistent clickable command dock plus a contextual
-  Command Deck opened with `/`. It exposes only existing Supervisor actions and
-  routes every keypress and pointer click through the same action, confirmation,
-  refusal, and detach state machines.
+- The first selected model was a persistent clickable command dock plus a
+  contextual static Command Deck opened with `/`. It improved discovery but
+  remained a shortcut reference rather than an interactive control.
+
+### Command palette interaction decision
+
+- Keeping the static Command Deck would preserve a readable reference but leave
+  keyboard focus, row hover, wheel selection, and whole-row pointer activation
+  absent.
+- Embedding the installed `@earendil-works/pi-tui` SelectList directly would
+  split layout and pointer ownership between the Supervisor screen and a
+  dependency version that lacks OMP's current mouse-routing contract.
+- The selected model is a focused OpenAlice Command Palette projection inspired
+  by OMP SelectList: contextual commands, stable selection, full-row hit zones,
+  keyboard wrapping, clamped wheel movement, hover feedback, and click-to-run.
+  Every activation feeds the existing Supervisor key/action state machine, so
+  confirmation, refusal, recovery, and detach semantics remain single-owned.
 
 ### Runtime log presentation decision
 
@@ -176,6 +189,8 @@ already large `supervisor-tui.ts` application controller.
   log, and diagnostic status visible before opening each page.
 - [x] Add local severity views to Runtime Logs without widening the bounded
   reader or changing the snapshot contract.
+- [x] Replace the static Command Deck with a contextual, selectable, whole-row
+  mouse-capable Command Palette.
 
 ## Progress
 
@@ -306,6 +321,20 @@ already large `supervisor-tui.ts` application controller.
   repository suite (685 passed, 1 skipped; 6068 tests passed, 10 skipped). The
   Docker installer smoke passes, and `pnpm pack --dry-run --json` confirms the
   new log presentation module is present in the published CLI file set.
+- The `/` surface is now a true Command Palette rather than a shortcut card.
+  Commands are contextual to Runtime/recovery state and use an OMP-inspired
+  primary/description/group/shortcut layout. Up/Down wraps selection, the wheel
+  clamps it, pointer motion highlights the full row, a click selects and runs,
+  and direct shortcuts remain available. The dock changes to `Close palette`
+  while open. Real 80-column acceptance hovered Setup, moved selection with a
+  raw SGR wheel event, clicked Setup into the existing overlay, then used `l`
+  inside the reopened Palette to enter Logs; detach restored terminal modes.
+- Command-Palette acceptance passes with 65 focused screen, Fleet, Palette,
+  log-module, and real-PTY tests, CLI build/typecheck, root TypeScript check, and
+  the 687-file repository suite (686 passed, 1 skipped; 6071 tests passed, 10
+  skipped). The Docker installer smoke passes, and
+  `pnpm pack --dry-run --json` confirms the new Palette module is included in
+  the published CLI file set.
 
 ## Completion Criteria
 

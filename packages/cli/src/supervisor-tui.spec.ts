@@ -129,7 +129,7 @@ describe('Supervisor TUI screen', () => {
     expect(reduced.render(80).join('\n')).toContain('◆  WORKING  Starting Runtime…')
   })
 
-  it('opens a clickable command deck without creating a second action path', () => {
+  it('opens a selectable command palette without creating a second action path', () => {
     let settingsOpened = 0
     let detached = 0
     const screen = new SupervisorScreen({
@@ -143,25 +143,39 @@ describe('Supervisor TUI screen', () => {
 
     expect(screen.handleKey('/', matchesKey)).toBe(true)
     let lines = screen.render(80)
-    expect(lines.join('\n')).toContain('Command Deck · ABSENT')
-    expect(lines.join('\n')).toContain('Mouse: click any keycap.')
+    expect(lines.join('\n')).toContain('Command Palette · 1/9 · ABSENT')
+    expect(lines.join('\n')).toContain('› ◆ Start OpenAlice & open Workspace')
+    expect(lines.join('\n')).toContain('[ / ] Close palette')
     expect(screen.handlePointer({
       button: 65, col: 5, row: 10, release: false, wheel: 1, motion: false, leftClick: false,
     })).toBe(true)
+    expect(screen.render(80).join('\n')).toContain('›   Start quietly')
 
-    const setupRow = lines.findIndex((line) => line.includes('[ p ] Setup')) + 1
-    const setupColumn = lines[setupRow - 1]!.indexOf('[ p ]') + 2
-    expect(screen.handlePointer(pointerClick(setupColumn, setupRow))).toBe(true)
+    lines = screen.render(80)
+    const setupRow = lines.findIndex((line) => line.includes('Setup')) + 1
+    expect(screen.handlePointer({
+      button: 32, col: 4, row: setupRow, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(80)[setupRow - 1]).toContain('»   Setup')
+    expect(screen.handlePointer(pointerClick(4, setupRow))).toBe(true)
     expect(settingsOpened).toBe(1)
-    expect(screen.render(80).join('\n')).not.toContain('Command Deck')
+    expect(screen.render(80).join('\n')).not.toContain('Command Palette')
+
+    screen.handleKey('/', matchesKey)
+    for (let index = 0; index < 5; index += 1) {
+      expect(screen.handleKey('down', matchesKey)).toBe(true)
+    }
+    expect(screen.render(80).join('\n')).toContain('›   Setup')
+    expect(screen.handleKey('enter', matchesKey)).toBe(true)
+    expect(settingsOpened).toBe(2)
 
     screen.handleKey('/', matchesKey)
     const compactDeck = screen.render(52)
     expect(compactDeck.length).toBeLessThanOrEqual(20)
     expect(compactDeck.every((line) => displayWidth(line) <= 52)).toBe(true)
-    expect(compactDeck.join('\n')).toContain('[ u ] Update')
+    expect(compactDeck.join('\n')).toContain('Update')
     expect(screen.handleEscape()).toBe(true)
-    expect(screen.render(80).join('\n')).not.toContain('Command Deck')
+    expect(screen.render(80).join('\n')).not.toContain('Command Palette')
 
     lines = screen.render(80)
     const detachRow = lines.findIndex((line) => line.includes('[ q ] Detach')) + 1

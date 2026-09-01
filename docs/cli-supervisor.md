@@ -157,11 +157,15 @@ path is intentionally parameter-free:
   corresponding key. Confirmation and refusal semantics therefore do not have
   a separate mouse-only path;
 - a persistent command dock keeps `[ / ] Commands` and `[ q ] Detach` visible
-  on every Supervisor page. `/` opens a compact contextual Command Deck whose
-  primary, observe, manage, and navigation keycaps are all pointer targets;
-  clicking one feeds the existing keyboard action, confirmation, refusal, or
-  detach state machine. `/` or `Esc` closes the deck without exiting, while
-  `q` and `Ctrl+C` retain their global detach behavior;
+  on every Supervisor page. `/` opens a compact contextual Command Palette and
+  changes that dock action to `Close palette`. The Palette exposes only commands
+  valid for the current Runtime/recovery context; Up/Down wraps its selection,
+  the mouse wheel moves within its bounds, pointer hover highlights a complete
+  row, and clicking a row selects and runs it. Enter runs the selected command,
+  while its direct shortcut still works without navigation. All routes feed the
+  existing keyboard action, confirmation, refusal, or detach state machine.
+  `/` or `Esc` closes the Palette without exiting, while `q` and `Ctrl+C` retain
+  their global detach behavior;
 - asynchronous work and its result occupy a stable full-width activity rail
   above the command bar. Busy, informational, successful, actionable-warning,
   and failed states retain distinct glyph and text labels without depending on

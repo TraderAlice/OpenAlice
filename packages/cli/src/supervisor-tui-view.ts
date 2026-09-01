@@ -130,8 +130,11 @@ export function renderSupervisorCommandBar(
 export function renderSupervisorDock(
   panel: string,
   width: number,
+  commandPaletteOpen = false,
 ): string {
-  const controls = '[ / ] Commands   [ q ] Detach'
+  const controls = commandPaletteOpen
+    ? '[ / ] Close palette   [ q ] Detach'
+    : '[ / ] Commands   [ q ] Detach'
   if (width < 60) return truncateDisplayWidth(controls, width)
   return labelAndTail(controls, `${panel.toUpperCase()} · Esc / Ctrl+C`, width)
 }
