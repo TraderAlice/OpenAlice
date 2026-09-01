@@ -959,7 +959,7 @@ function TradingModeChoices({
                   {choice.description}
                 </span>
                 {isSaving && (
-                  <span className="mt-1.5 inline-flex text-[11px] text-primary">
+                  <span className="mt-1.5 inline-flex text-[11px] leading-[15px] text-primary">
                     {t('firstRunGuide.common.saving')}
                   </span>
                 )}

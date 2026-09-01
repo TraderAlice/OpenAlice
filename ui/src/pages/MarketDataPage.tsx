@@ -300,7 +300,7 @@ function HubCard({
   return (
     <section className="mb-6 rounded-lg border border-border/70 bg-card p-4">
       <div className="flex items-center justify-between mb-1.5">
-        <h2 className="text-[14px] font-semibold">Data Hub</h2>
+        <h2 className="text-[14px] leading-[19px] font-semibold">Data Hub</h2>
         <Toggle ariaLabel="Data Hub" size="sm" checked={hub.enabled} onChange={onToggle} />
       </div>
       {hub.enabled ? (
@@ -310,7 +310,7 @@ function HubCard({
           {ping === 'down' && <CircleAlert aria-hidden className="size-3.5 shrink-0 text-destructive" />}
           <span className="text-[13px] text-foreground">
             {ping === 'checking' && 'Checking…'}
-            {ping === 'ok' && <>Connected <span className="ml-1 font-mono text-[12px] text-muted-foreground">{host}</span></>}
+            {ping === 'ok' && <>Connected <span className="ml-1 font-mono text-[12px] leading-[18px] text-muted-foreground">{host}</span></>}
             {ping === 'down' && 'Unreachable — using local sources'}
           </span>
         </div>
@@ -333,7 +333,7 @@ function HubCard({
 function SourcesCard({ rows, onAddFmp }: { rows: SourceRow[]; onAddFmp: () => void }) {
   return (
     <section className="mb-6">
-      <h2 className="mb-2 text-[13px] font-semibold text-foreground">Data sources</h2>
+      <h2 className="mb-2 text-[13px] leading-[18px] font-semibold text-foreground">Data sources</h2>
       <div className="divide-y divide-border/40 overflow-hidden rounded-lg border border-border/70 bg-card">
         {rows.map((row) => (
           <div key={row.name} className="flex items-center gap-3 px-4 py-3">
@@ -376,7 +376,7 @@ function ChartVendorsSection({
 }) {
   return (
     <section className="mb-6">
-      <h2 className="mb-2 text-[13px] font-semibold text-foreground">Chart vendors</h2>
+      <h2 className="mb-2 text-[13px] leading-[18px] font-semibold text-foreground">Chart vendors</h2>
       <p className="text-[12px] text-muted-foreground/70 mb-2.5 max-w-[640px]">
         Live K-line &amp; quote sources — queried per symbol, never via the hub. Switch one on and it
         joins the search pool; what it covers is found by searching, not configured here. yfinance is
@@ -392,7 +392,7 @@ function ChartVendorsSection({
                   {on
                     ? <CheckCircle2 aria-hidden className="size-3.5 shrink-0 text-success" />
                     : <MinusCircle aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />}
-                  <span className="text-[13px] font-semibold text-foreground truncate">{v.name}</span>
+                  <span className="text-[13px] leading-[18px] font-semibold text-foreground truncate">{v.name}</span>
                 </div>
                 {v.alwaysOn ? (
                   <span className="shrink-0 text-[11px] font-medium text-muted-foreground">Always on</span>

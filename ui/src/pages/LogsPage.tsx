@@ -293,13 +293,13 @@ function ToolCallRow({ record }: { record: ToolCallRecord }) {
           <td colSpan={6} className="px-3 py-2 space-y-2">
             <div>
               <span className="text-[11px] font-medium text-muted-foreground">Input</span>
-              <pre className="mt-1 rounded-md bg-muted p-2 text-[11px] text-muted-foreground whitespace-pre-wrap break-all">
+              <pre className="mt-1 rounded-md bg-muted p-2 text-[11px] leading-[15px] text-muted-foreground whitespace-pre-wrap break-all">
                 {JSON.stringify(record.input, null, 2)}
               </pre>
             </div>
             <div>
               <span className="text-[11px] font-medium text-muted-foreground">Output</span>
-              <pre className="mt-1 max-h-64 overflow-y-auto rounded-md bg-muted p-2 text-[11px] text-muted-foreground whitespace-pre-wrap break-all">
+              <pre className="mt-1 max-h-64 overflow-y-auto rounded-md bg-muted p-2 text-[11px] leading-[15px] text-muted-foreground whitespace-pre-wrap break-all">
                 {formatOutput(record.output)}
               </pre>
             </div>
@@ -504,21 +504,21 @@ function ConversationRow({ record }: { record: AgentConversationRecord }) {
             )}
             <span>{sourceLabel(record.source)}</span>
           </div>
-          <div className="mt-0.5 font-mono text-[10px] text-muted-foreground">{record.source.kind}</div>
+          <div className="mt-0.5 font-mono text-[10px] leading-[14px] text-muted-foreground">{record.source.kind}</div>
         </td>
         <td className="px-3 py-2">
           <div className="flex items-center gap-1.5 font-medium text-foreground">
             <AgentRuntimeIcon agentId={record.target.agent} className="size-4 shrink-0" />
             <span>{targetLabel(record.target)}</span>
           </div>
-          <div className="mt-0.5 font-mono text-[10px] text-muted-foreground">{record.target.resumeId}</div>
+          <div className="mt-0.5 font-mono text-[10px] leading-[14px] text-muted-foreground">{record.target.resumeId}</div>
         </td>
         <td className="px-3 py-2">
           <div className="text-foreground">
             {record.resolution.mode === 'exact' ? 'Exact session' : 'Reconstructed provenance'}
           </div>
           {record.prompt.mode === 'reconstruction' && (
-            <div className="mt-1 inline-flex rounded-full border border-warning-border bg-warning-background px-1.5 py-0.5 text-[10px] text-warning">
+            <div className="mt-1 inline-flex rounded-full border border-warning-border bg-warning-background px-1.5 py-0.5 text-[10px] leading-[14px] text-warning">
               Guidance injected
             </div>
           )}
@@ -572,10 +572,10 @@ function ConversationRow({ record }: { record: AgentConversationRecord }) {
                 />
               )}
               <div className="rounded-lg border border-border/70 bg-background p-3">
-                <div className="text-[10px] font-semibold text-muted-foreground">
+                <div className="text-[10px] leading-[14px] font-semibold text-muted-foreground">
                   Routing
                 </div>
-                <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1.5 font-mono text-[11px]">
+                <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1.5 font-mono text-[11px] leading-[15px]">
                   <dt className="text-muted-foreground">Requested</dt>
                   <dd className="break-all text-foreground">{requestedTargetLabel(record.requestedTarget)}</dd>
                   <dt className="text-muted-foreground">Task</dt>
@@ -620,7 +620,7 @@ function ConversationTextPanel({
       : 'border-border/70 bg-background'
   return (
     <section className={`min-w-0 rounded-lg border p-3 ${toneClass}`}>
-      <h3 className="text-[10px] font-semibold text-muted-foreground">{title}</h3>
+      <h3 className="text-[10px] leading-[14px] font-semibold text-muted-foreground">{title}</h3>
       <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words font-sans text-xs leading-relaxed text-foreground">
         {text}
       </pre>

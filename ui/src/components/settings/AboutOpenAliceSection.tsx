@@ -207,20 +207,20 @@ export function AboutOpenAliceSection() {
               <img src="/alice.ico" alt="" className="h-11 w-11 shrink-0 object-contain" />
               <div className="min-w-0">
                 <p className="text-[14px] font-semibold text-foreground">OpenAlice</p>
-                <p className="mt-0.5 font-mono text-[12px] text-muted-foreground">v{currentVersion}</p>
+                <p className="mt-0.5 font-mono text-[12px] leading-[18px] text-muted-foreground">v{currentVersion}</p>
               </div>
             </div>
             <div className="flex flex-wrap justify-end gap-1.5">
-              <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] text-muted-foreground">
+              <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] leading-[14px] text-muted-foreground">
                 {t(`settings.about.runtime.${runtimeMode}`)}
               </span>
-              <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] text-muted-foreground">
+              <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] leading-[14px] text-muted-foreground">
                 {t(`settings.about.channel.${channel}`)}
               </span>
             </div>
           </div>
 
-          <div className={`oa-status-surface mt-4 flex items-center gap-2 rounded-lg border px-3 py-2.5 text-[12px] ${statusTone}`} aria-live="polite">
+          <div className={`oa-status-surface mt-4 flex items-center gap-2 rounded-lg border px-3 py-2.5 text-[12px] leading-[18px] ${statusTone}`} aria-live="polite">
             <StatusIcon className={`h-4 w-4 shrink-0 ${status.kind === 'checking' ? 'animate-spin motion-reduce:animate-none' : ''}`} />
             <span className="font-medium">{status.text}</span>
           </div>
@@ -304,7 +304,7 @@ export function AboutOpenAliceSection() {
                   <Cable size={18} aria-hidden />
                 </div>
                 <div className="min-w-0">
-                  <h4 id="backend-connection-title" className="text-[13px] font-semibold text-foreground">
+                  <h4 id="backend-connection-title" className="text-[13px] leading-[18px] font-semibold text-foreground">
                     {t('settings.about.connection.title')}
                   </h4>
                   <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
@@ -312,7 +312,7 @@ export function AboutOpenAliceSection() {
                   </p>
                 </div>
               </div>
-              <span className="inline-flex w-fit shrink-0 rounded-full border border-success/25 bg-success/10 px-2 py-1 text-[10px] font-medium text-success">
+              <span className="inline-flex w-fit shrink-0 rounded-full border border-success/25 bg-success/10 px-2 py-1 text-[10px] leading-[14px] font-medium text-success">
                 {t('settings.about.connection.connected')}
               </span>
             </div>
@@ -335,7 +335,7 @@ export function AboutOpenAliceSection() {
                 <FolderKanban size={18} aria-hidden />
               </div>
               <div className="min-w-0">
-                <h4 id="current-alice-project-title" className="text-[13px] font-semibold text-foreground">
+                <h4 id="current-alice-project-title" className="text-[13px] leading-[18px] font-semibold text-foreground">
                   {t('settings.about.aliceProject.title')}
                 </h4>
                 <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
@@ -344,7 +344,7 @@ export function AboutOpenAliceSection() {
               </div>
             </div>
             {!projectLoading && !projectError && project && (
-              <span className="inline-flex w-fit shrink-0 items-center rounded-full border border-success/25 bg-success/10 px-2 py-1 text-[10px] font-medium text-success">
+              <span className="inline-flex w-fit shrink-0 items-center rounded-full border border-success/25 bg-success/10 px-2 py-1 text-[10px] leading-[14px] font-medium text-success">
                 {t('settings.about.aliceProject.statusRunning')}
               </span>
             )}
@@ -354,7 +354,7 @@ export function AboutOpenAliceSection() {
             <>
               <div className="px-4 py-4">
                 <p className="truncate text-[14px] font-semibold text-foreground">{project.displayName}</p>
-                <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">{project.key}</p>
+                <p className="mt-0.5 font-mono text-[11px] leading-[15px] text-muted-foreground">{project.key}</p>
                 <dl className="mt-4 grid min-w-0 gap-2 sm:grid-cols-2">
                   <ProjectField label={t('settings.about.aliceProject.dataHome')} value={project.home} />
                   <ProjectField label={t('settings.about.aliceProject.stableId')} value={project.id} />

@@ -103,7 +103,7 @@ function PermissionSection({
   return (
     <div className="grid min-w-0 grid-cols-1 gap-4 border-b border-border/60 py-6 last:border-b-0 xl:grid-cols-[260px_minmax(0,1fr)] xl:gap-10">
       <div className="min-w-0 xl:pt-0.5">
-        <h3 className="text-[14px] font-semibold text-foreground">{title}</h3>
+        <h3 className="text-[14px] leading-[19px] font-semibold text-foreground">{title}</h3>
         {description && (
           <p className="mt-1.5 max-w-[42rem] text-[13px] leading-relaxed text-muted-foreground/70">{description}</p>
         )}

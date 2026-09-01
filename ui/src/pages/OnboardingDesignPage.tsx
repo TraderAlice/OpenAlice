@@ -135,7 +135,7 @@ export function OnboardingDesignPage() {
         {loading ? (
           <CenteredLoading label={t('onboardingChecklist.loading')} />
         ) : error ? (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-[13px] text-destructive">
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-[13px] leading-5 text-destructive">
             {error}
           </div>
         ) : (
@@ -149,7 +149,7 @@ export function OnboardingDesignPage() {
                   {t('onboardingChecklist.body')}
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-2 text-[11px] leading-[15px] text-muted-foreground">
                 <StatusChip>{model.tradingModeLabel}</StatusChip>
                 <StatusChip>{t('onboardingChecklist.summary.runtimes', {
                   installed: model.installedAgentCount,
@@ -504,7 +504,7 @@ function StepRow({
   return (
     <div className="min-h-12 min-w-0 border-b border-border/70 py-3 last:border-b-0">
       <div className="flex min-w-0 items-start gap-3">
-        <div className="mt-0.5 w-5 shrink-0 text-center text-[12px] font-semibold tabular-nums text-muted-foreground">
+        <div className="mt-0.5 w-5 shrink-0 text-center text-[12px] leading-[18px] font-semibold tabular-nums text-muted-foreground">
           {index}
         </div>
         <div className="min-w-0 flex-1">
@@ -569,7 +569,7 @@ function StateBadge({ state, label }: { state: Readiness; label?: string }) {
   const { t } = useTranslation()
   const Icon = STATE_ICON[state]
   return (
-    <span className={`inline-flex min-h-5 items-center gap-1.5 text-[10px] font-medium ${STATE_STYLE[state]}`}>
+    <span className={`inline-flex min-h-5 items-center gap-1.5 text-[10px] leading-[14px] font-medium ${STATE_STYLE[state]}`}>
       <Icon className="size-3" aria-hidden />
       {label ?? t(`onboardingChecklist.state.${state}`)}
     </span>
@@ -591,7 +591,7 @@ function StateDot({ state }: { state: Readiness }) {
 
 function StatusChip({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex h-8 items-center text-[11px] text-muted-foreground">
+    <span className="inline-flex h-8 items-center text-[11px] leading-[15px] text-muted-foreground">
       {children}
     </span>
   )

@@ -194,7 +194,7 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
                 if (mode !== 'auto') chooseSlot(mode)
               }}
               aria-pressed={theme === mode}
-              className={`oa-pressable min-h-10 rounded-md border px-3 py-1.5 text-[12px] font-medium transition-colors sm:min-h-0 ${
+              className={`oa-pressable min-h-10 rounded-md border px-3 py-1.5 text-[12px] leading-[18px] font-medium transition-colors sm:min-h-0 ${
                 theme === mode
                   ? 'border-primary bg-primary-muted text-primary'
                   : 'border-border bg-background text-muted-foreground hover:text-foreground'
@@ -206,7 +206,7 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
         </div>
         <div
           data-palette-preview={activePalette}
-          className="mt-3 inline-flex max-w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-[11px]"
+          className="mt-3 inline-flex max-w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-[11px] leading-[15px]"
           aria-live="polite"
         >
           <span className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden />
@@ -411,7 +411,7 @@ function PaletteSlotCard({
     >
       <span className="flex min-w-0 items-start justify-between gap-2 sm:gap-3">
         <span className="min-w-0">
-          <span className="flex items-center gap-1.5 text-[11px] font-medium">
+          <span className="flex items-center gap-1.5 text-[11px] leading-[15px] font-medium">
             <Icon className="h-3.5 w-3.5" />
             {t(`theme.mode.${slot}`)}
           </span>
@@ -422,12 +422,12 @@ function PaletteSlotCard({
         </span>
         <span className="flex shrink-0 flex-col items-end gap-1">
           {active && (
-            <span className="rounded-full bg-primary px-2 py-0.5 text-[9px] font-semibold text-primary-foreground">
+            <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] leading-[14px] font-semibold text-primary-foreground">
               {t('settings.appearance.activeSlot')}
             </span>
           )}
           {editing && (
-            <span className="rounded-full border border-primary/35 bg-primary/10 px-2 py-0.5 text-[9px] font-semibold text-primary">
+            <span className="rounded-full border border-primary/35 bg-primary/10 px-2 py-0.5 text-[10px] leading-[14px] font-semibold text-primary">
               {t('settings.appearance.editingSlot')}
             </span>
           )}
@@ -590,10 +590,10 @@ export function DataHomeSection() {
           ) : (
             <>
               <p className="text-[13px] text-foreground">{t('settings.dataHome.browserOnly')}</p>
-              <p className="mt-2 break-all font-mono text-[12px] text-muted-foreground">
+              <p className="mt-2 break-all font-mono text-[12px] leading-[18px] text-muted-foreground">
                 openalice start --home &lt;path&gt;
               </p>
-              <p className="mt-1 break-all font-mono text-[12px] text-muted-foreground">
+              <p className="mt-1 break-all font-mono text-[12px] leading-[18px] text-muted-foreground">
                 pnpm dev -- --home &lt;path&gt;
               </p>
             </>
@@ -647,12 +647,12 @@ export function DataHomeSection() {
             {t('settings.dataHome.current')}
           </p>
           {status && (
-            <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground">
+            <span className="rounded-full border border-border px-2 py-0.5 text-[10px] leading-[14px] text-muted-foreground">
               {t(`settings.dataHome.source.${status.source}`)}
             </span>
           )}
         </div>
-        <p data-testid="data-home-current" className="mt-1 break-all font-mono text-[12px] text-foreground">
+        <p data-testid="data-home-current" className="mt-1 break-all font-mono text-[12px] leading-[18px] text-foreground">
           {status?.currentHome ?? t('settings.dataHome.loading')}
         </p>
         <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
@@ -708,7 +708,7 @@ export function DataHomeSection() {
           <div className="space-y-2">
             {recentHomes.map((path) => (
               <div key={path} className="flex min-h-12 items-center gap-2 rounded-lg border border-border/60 px-3 py-2">
-                <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-foreground" title={path}>
+                <span className="min-w-0 flex-1 truncate font-mono text-[12px] leading-[18px] text-foreground" title={path}>
                   {path}
                 </span>
                 <Button
@@ -814,7 +814,7 @@ function WorkspaceShellSection() {
         <p className="text-[12px] font-medium text-muted-foreground">
           {t('settings.workspaceShell.resolved')}
         </p>
-        <p className="mt-1 break-all font-mono text-[12px] text-foreground">
+        <p className="mt-1 break-all font-mono text-[12px] leading-[18px] text-foreground">
           {status.resolvedPath ?? t('settings.workspaceShell.notFound')}
         </p>
         <p className={`mt-1 text-[11px] ${status.valid ? 'text-success' : 'text-destructive'}`}>
@@ -1075,7 +1075,7 @@ function ToolGroupCard({
                 }`}
               >
                 <div className="flex-1 min-w-0">
-                  <span className="text-[13px] text-foreground font-mono">{t.name}</span>
+                  <span className="text-[13px] leading-[18px] text-foreground font-mono">{t.name}</span>
                   {t.description && (
                     <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">
                       {t.description}

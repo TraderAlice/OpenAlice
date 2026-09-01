@@ -66,7 +66,7 @@ export function FrontendLabPage() {
 
         <section className="overflow-hidden rounded-lg border border-border bg-secondary/35">
           <div className="border-b border-border px-4 py-3">
-            <h3 className="text-[14px] font-semibold text-foreground">Activity Sonner</h3>
+            <h3 className="text-[14px] leading-[19px] font-semibold text-foreground">Activity Sonner</h3>
             <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
               Each button appends a dedicated test activity to the runtime journal. The global
               activity filter then projects it into the same Sonner bridge used by real work.
@@ -94,7 +94,7 @@ export function FrontendLabPage() {
         </section>
 
         {error ? (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] text-destructive">
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] leading-[18px] text-destructive">
             {error}
           </div>
         ) : null}

@@ -385,7 +385,7 @@ export function ActivityBarSettingsPage() {
                   <GripVertical size={14} strokeWidth={1.75} aria-hidden />
                 </Button>
                 {group.builtin ? (
-                  <h3 className="min-w-0 flex-1 text-[12px] font-semibold text-muted-foreground">
+                  <h3 className="min-w-0 flex-1 text-[12px] leading-[18px] font-semibold text-muted-foreground">
                     {group.labelKey ? t(group.labelKey) : t('settings.activityBar.primaryGroup')}
                   </h3>
                 ) : (
@@ -398,7 +398,7 @@ export function ActivityBarSettingsPage() {
                       if (!value.trim()) return
                       update(renameCustomGroup(draft, group.id, value))
                     }}
-                    className="h-8 min-w-0 flex-1 rounded-md bg-transparent px-2 text-[13px] font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
+                    className="h-8 min-w-0 flex-1 rounded-md bg-transparent px-2 text-[13px] leading-[18px] font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
                   />
                 )}
                 {!group.builtin && (

@@ -50,13 +50,13 @@ export function DesignProjectPage({ spec }: DesignProjectPageProps) {
               <h1 className="text-[28px] font-semibold leading-tight text-foreground sm:text-[34px]">
                 {project.title}
               </h1>
-              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-muted-foreground">
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] leading-[18px] text-muted-foreground">
                 <span>{project.eyebrow}</span>
                 <span>{project.status}</span>
                 <span>Updated {project.updatedAt}</span>
               </div>
             </div>
-            <code className="w-fit max-w-full overflow-x-auto rounded-md border border-border bg-secondary px-3 py-2 font-mono text-[12px] text-muted-foreground">
+            <code className="w-fit max-w-full overflow-x-auto rounded-md border border-border bg-secondary px-3 py-2 font-mono text-[12px] leading-[18px] text-muted-foreground">
               /design/{project.slug}
             </code>
           </div>
@@ -108,7 +108,7 @@ function UnknownDesignProject({ slug }: { slug: string }) {
                 <a
                   key={project.slug}
                   href={`/design/${project.slug}`}
-                  className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2 text-[13px] text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary"
+                  className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2 text-[13px] leading-[18px] text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary"
                 >
                   <span className="min-w-0 truncate">{project.title}</span>
                   <ChevronRight className="h-4 w-4 shrink-0" />
@@ -144,7 +144,7 @@ function BriefList({ title, icon: Icon, items }: { title: string; icon: LucideIc
         <div className="flex h-6 w-6 items-center justify-center text-muted-foreground">
           <Icon className="h-3.5 w-3.5" />
         </div>
-        <h2 className="text-[14px] font-semibold text-foreground">{title}</h2>
+        <h2 className="text-[14px] leading-[19px] font-semibold text-foreground">{title}</h2>
       </div>
       <ul className="mt-3 space-y-2">
         {items.map((item) => (
@@ -169,7 +169,7 @@ function VersionPreview({ variant }: { variant: DesignVariant }) {
           </div>
           <div className="min-w-0">
             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="font-mono text-[11px] font-medium text-muted-foreground">Draft {variant.id}</span>
+              <span className="font-mono text-[11px] leading-[15px] font-medium text-muted-foreground">Draft {variant.id}</span>
               <h3 className="text-[16px] font-semibold text-foreground">{variant.name}</h3>
             </div>
             <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">{variant.summary}</p>
@@ -203,7 +203,7 @@ function DesignCanvas({ variant }: { variant: DesignVariant }) {
     <div className="overflow-hidden rounded-lg border border-border bg-secondary">
       <div className="flex min-w-0 items-center justify-between gap-3 border-b border-border bg-muted/55 px-3 py-2">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="truncate font-mono text-[10px] text-muted-foreground">{variant.layout}/{variant.id.toLowerCase()}</span>
+          <span className="truncate font-mono text-[10px] leading-[14px] text-muted-foreground">{variant.layout}/{variant.id.toLowerCase()}</span>
         </div>
         <span className="shrink-0 text-[10px] font-medium text-muted-foreground">
           {variant.layout === 'semantic-colors' ? 'Live palette' : 'Desktop sketch'}
@@ -323,7 +323,7 @@ function SemanticColorCard() {
           <div className="text-[13px] font-semibold text-foreground">Resolved semantic tokens</div>
           <div className="mt-1 text-[11px] text-muted-foreground">Reading the live {effectivePalette} ({effectiveTheme}) card from palette.css</div>
         </div>
-        <span className="rounded-md border border-border bg-secondary px-2 py-1 text-[10px] font-medium text-muted-foreground">
+        <span className="rounded-md border border-border bg-secondary px-2 py-1 text-[10px] leading-[14px] font-medium text-muted-foreground">
           {effectivePalette}, {effectiveTheme}
         </span>
       </div>
@@ -338,9 +338,9 @@ function SemanticColorCard() {
         <div className="mb-2 text-[11px] font-medium text-muted-foreground">Pairing smoke test</div>
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
           <Button type="button" size="sm" className="justify-start text-[11px]">Primary action</Button>
-          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-[11px] text-destructive">Destructive state</div>
-          <div className="rounded-md border border-success/30 bg-success/10 px-3 py-2 text-[11px] text-success">Successful state</div>
-          <div className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-[11px] text-warning">Warning state</div>
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-[11px] leading-[15px] text-destructive">Destructive state</div>
+          <div className="rounded-md border border-success/30 bg-success/10 px-3 py-2 text-[11px] leading-[15px] text-success">Successful state</div>
+          <div className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-[11px] leading-[15px] text-warning">Warning state</div>
         </div>
       </section>
     </div>
@@ -377,7 +377,7 @@ function SafeLaunchMock() {
   return (
     <div className="grid h-full min-h-[300px] min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_230px] lg:items-center">
       <div className="min-w-0">
-        <div className="inline-flex items-center gap-2 rounded-md border border-success/30 bg-success/10 px-2.5 py-1 text-[11px] font-semibold text-success">
+        <div className="inline-flex items-center gap-2 rounded-md border border-success/30 bg-success/10 px-2.5 py-1 text-[11px] leading-[15px] font-semibold text-success">
           <ShieldCheck className="h-3.5 w-3.5" />
           Safe start
         </div>
@@ -466,7 +466,7 @@ function GoalPickerMock() {
             >
               <div className="flex items-center justify-between gap-2">
                 <Icon className={index === 0 ? 'h-4 w-4 text-primary' : 'h-4 w-4 text-muted-foreground'} />
-                <span className="rounded-md border border-border bg-secondary px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                <span className="rounded-md border border-border bg-secondary px-2 py-0.5 text-[10px] leading-[14px] font-semibold text-muted-foreground">
                   {goal.badge}
                 </span>
               </div>

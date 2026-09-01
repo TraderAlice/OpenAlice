@@ -117,7 +117,7 @@ function SnapshotsTab() {
           <select
             value={selectedAccount}
             onChange={e => setSelectedAccount(e.target.value)}
-            className="h-8 rounded-md border border-border bg-background px-2 py-1.5 text-[13px] text-foreground"
+            className="h-8 rounded-md border border-border bg-background px-2 py-1.5 text-[13px] leading-[18px] text-foreground"
           >
             {accounts.map(a => (
               <option key={a.id} value={a.id}>{a.label} ({a.id})</option>
@@ -187,7 +187,7 @@ function SnapshotRow({ snapshot: s, expanded, onToggle, onDelete }: {
         className="border-t border-border hover:bg-muted/30 transition-colors cursor-pointer"
         onClick={onToggle}
       >
-        <td className="px-3 py-2 font-mono text-[11px] text-foreground">
+        <td className="px-3 py-2 font-mono text-[11px] leading-[15px] text-foreground">
           {new Date(s.timestamp).toLocaleString()}
         </td>
         <td className="px-3 py-2">
@@ -506,7 +506,7 @@ function ToolExecutePanel({ detail, result, onResult }: ToolExecutePanelProps) {
           <h3 className="text-xs font-semibold text-muted-foreground">Input</h3>
           {properties.map((prop) => (
             <div key={prop.key}>
-              <label className="flex items-center gap-1.5 text-[13px] text-foreground mb-1">
+              <label className="flex items-center gap-1.5 text-[13px] leading-[18px] text-foreground mb-1">
                 <span className="font-mono">{prop.key}</span>
                 <span className="text-[10px] text-muted-foreground/60">{prop.type}</span>
                 {prop.required && <span className="text-[10px] text-primary/70">required</span>}
