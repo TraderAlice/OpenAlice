@@ -274,6 +274,23 @@ not imply maintainer approval of the finished interaction.
   pointer columns prevent Inspector actions from activating the adjacent list,
   and complete action labels still emit only Enter/Esc.
 
+### AliceProject Switchboard decision
+
+- Recoloring the existing `SelectList` would preserve its compactness, but Home,
+  Web port, current/default identity, and the consequence of Enter would remain
+  compressed into two hard-to-scan lines.
+- Turning the picker into a complete project-management dashboard would offer
+  more visible actions, but would duplicate Fleet lifecycle ownership and widen
+  this increment beyond selection and creation.
+- The selected model is an OMP-inspired AliceProject Switchboard. A bounded map
+  keeps up to eight project rows plus the create affordance visible; an
+  Inspector gives the selected row a stable identity, Home, Web mode, role, and
+  one explicit Enter action. Wide overlays pair both regions and the 80-column
+  baseline stacks them. Arrow keys, wheel, row hover, and click continue to
+  drive the existing `SelectList`; the existing select/create callbacks remain
+  the only mutation path. CLI-selected contexts expose a read-only action shelf,
+  and pointer columns keep Inspector clicks out of the adjacent map.
+
 ### Persistent context-ribbon decision
 
 - Expanding the animated brand header would make version/update presentation
@@ -400,6 +417,8 @@ already large `supervisor-tui.ts` application controller.
   Machine, and AliceProject windows without changing selection or pointer state.
 - [x] Replace the legacy Setup settings stack with a responsive Setup Studio
   map/Inspector while preserving the existing configuration mutation path.
+- [x] Replace the legacy AliceProject picker with a responsive Switchboard
+  map/Inspector while preserving its selection and creation state machine.
 
 ## Progress
 
@@ -747,6 +766,27 @@ already large `supervisor-tui.ts` application controller.
   suite pass (693 passed, 1 skipped; 6113 tests passed, 10 skipped). Docker
   installer smoke passes, and package dry-run includes
   `src/supervisor-setup-view.ts`.
+- AliceProject selection is now a responsive Switchboard rather than a legacy
+  `SelectList` projection. Wide layouts pair an eight-row project map with a
+  Home/Web/role/action Inspector; the 80-column baseline uses a five-row window
+  so its map, Inspector, two-line status, and borders remain within 24 rows,
+  while shorter terminals reduce only the map window instead of clipping the
+  Inspector or status.
+  Current, bare-start default, available, and create roles stay meaningful
+  without color, and an OMP-derived proportional rail exposes overflow. The
+  existing `SelectList`, select callback, and two-step creator remain the only
+  navigation and mutation path.
+- Switchboard acceptance passes with 78 focused view, pointer, screen, and
+  real-PTY tests. A real 110×30 fixture hovered Research in the map, then
+  clicked the Inspector's `Select` label outside `[ Enter ]`, persisted it as
+  the bare-start default, and restored terminal modes. A separate real 80×24
+  run against the current six-project registry scrolled from Default through
+  the five-row window to Create, kept long Home values bounded, and detached
+  cleanly. An 80×20 PTY additionally retained the complete Inspector and
+  two-line status by reducing only the map window. Root TypeScript, CLI
+  build/typecheck, and the 695-file suite pass (694 passed, 1 skipped; 6119
+  tests passed, 10 skipped). Docker installer smoke passes, and package dry-run includes
+  `src/supervisor-projects-view.ts`.
 
 ## Completion Criteria
 

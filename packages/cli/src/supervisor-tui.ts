@@ -93,6 +93,11 @@ import {
   type SupervisorSetupItem,
 } from './supervisor-setup-view.ts'
 import {
+  decorateSupervisorProjectSwitchboard,
+  renderSupervisorProjectSwitchboard,
+  type SupervisorProjectSwitchboardItem,
+} from './supervisor-projects-view.ts'
+import {
   createSupervisorHelpState,
   moveSupervisorHelpSelection,
   normalizeSupervisorHelpState,
@@ -1927,6 +1932,7 @@ export async function runSupervisorTui(
 
     projectsActive = true
     let changing = false
+    let projectsHoveredCommand: string | undefined
     let message = 'Selecting an AliceProject also makes it the next bare-start default. Copy AI credentials with openalice project copy-ai-creds.'
     const lock = instanceSelectionOverrideLock(projectContext)
     if (lock) message = lock
@@ -1964,6 +1970,23 @@ export async function runSupervisorTui(
         description: 'Register a separate complete home and select it.',
       })
     }
+    const switchboardItems: SupervisorProjectSwitchboardItem[] = visibleInstances.map((entry) => ({
+      key: entry.key,
+      label: entry.displayName,
+      kind: 'project',
+      home: entry.home,
+      port: entry.port,
+      portAutomatic: entry.portAutomatic,
+      current: entry.key === projectContext.project,
+      isDefault: entry.isDefault,
+    }))
+    if (!lock) {
+      switchboardItems.push({
+        key: createValue,
+        label: '+ Create AliceProject…',
+        kind: 'create',
+      })
+    }
 
     const theme: SelectListTheme = {
       selectedPrefix: (text) => tuiTheme.accentStrong(text),
@@ -1998,6 +2021,7 @@ export async function runSupervisorTui(
       projectsActive = false
       closeProjects = null
       overlayPointer.clear()
+      projectsHoveredCommand = undefined
       overlay.hide()
       ui.setShowHardwareCursor(false)
       screen.update({ notice })
@@ -2006,6 +2030,7 @@ export async function runSupervisorTui(
       ui.setShowHardwareCursor(false)
       component = list
       projectListActive = true
+      projectsHoveredCommand = undefined
       setMessage(lock ?? 'Selecting an AliceProject also makes it the next bare-start default. Copy AI credentials with openalice project copy-ai-creds.')
     }
     const activateContext = async (
@@ -2160,23 +2185,67 @@ export async function runSupervisorTui(
 
     const panel = new (class implements Component {
       render(width: number): string[] {
-        const lines = renderSupervisorPanel('AliceProjects', projectContext.aliceProject.displayName, [
-          ...component.render(Math.max(1, width - 4)),
-          '',
-          sanitize(message),
-        ], width)
+        if (!projectListActive) {
+          const lines = renderSupervisorPanel('AliceProject Creator', projectContext.aliceProject.displayName, [
+            ...component.render(Math.max(1, width - 4)),
+            '',
+            sanitize(message),
+          ], width)
+          captureOverlayPointer(lines, width, overlayOptions, (data) => this.handleInput(data))
+          return lines
+        }
+        const selectedItem = list.getSelectedItem()
+        const activeIndex = Math.max(0, items.findIndex((item) => item.value === selectedItem?.value))
+        const switchboard = renderSupervisorProjectSwitchboard({
+          currentProjectName: projectContext.aliceProject.displayName,
+          message: sanitize(message),
+          locked: Boolean(lock),
+          items: switchboardItems,
+          selected: activeIndex,
+          maxVisible: width >= 92
+            ? 8
+            : Math.max(1, Math.min(5, Math.floor(terminalSize().height * 0.9) - 16)),
+        }, width)
+        const baseList = selectListPointerTarget(items, list, 8, switchboard.targets[0]?.row ?? 2)
+        const firstTarget = switchboard.targets[0]
+        const listTarget: SupervisorOverlayListTarget = {
+          ...baseList,
+          indexes: switchboard.targets.map((target) => target.index),
+          startColumn: firstTarget?.startColumn ?? 2,
+          endColumn: firstTarget?.endColumn ?? Math.max(2, width - 1),
+          select: (index) => {
+            projectsHoveredCommand = undefined
+            baseList.select(index)
+          },
+          move: (delta) => {
+            projectsHoveredCommand = undefined
+            baseList.move(delta)
+          },
+        }
         captureOverlayPointer(
-          lines,
+          switchboard.lines,
           width,
           overlayOptions,
           (data) => this.handleInput(data),
-          projectListActive ? selectListPointerTarget(items, list, 8, 2) : undefined,
+          listTarget,
+          (label) => {
+            if (projectsHoveredCommand === label) return
+            projectsHoveredCommand = label
+            ui.requestRender()
+          },
         )
-        return lines
+        return decorateSupervisorProjectSwitchboard(
+          switchboard.lines,
+          tuiTheme,
+          projectsHoveredCommand,
+        )
       }
 
       handleInput(data: string): void {
-        if (!changing) component.handleInput?.(data)
+        if (!changing) {
+          if (projectListActive) projectsHoveredCommand = undefined
+          component.handleInput?.(data)
+        }
       }
 
       invalidate(): void {

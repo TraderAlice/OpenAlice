@@ -268,7 +268,10 @@ path is intentionally parameter-free:
   again;
 - `i` lists the implicit default plus registered AliceProjects, selects one
   without stopping another project, or creates a separate named complete home.
-  AI vault copy is a separate command: `openalice project copy-ai-creds`;
+  The responsive Switchboard pairs a bounded project map with Home, Web, role,
+  and action inspection on wide terminals, then stacks the same regions at the
+  80-column baseline. AI vault copy is a separate command:
+  `openalice project copy-ai-creds`;
 - `p` opens Setup for data home, browser port, update checks, and resolved
   Runtime/config provenance. Setup can edit either the selected AliceProject or
   machine defaults inherited by projects. Wide terminals present a Setup map
@@ -401,6 +404,18 @@ sibling such as
 project or complete home came from `OPENALICE_PROJECT`,
 `OPENALICE_HOME`, `--project`, or `--home` shows the registry read-only
 instead of pretending that a lower-priority selection can win.
+
+The registry appears as an AliceProject Switchboard rather than the underlying
+selection widget. Its map identifies current, bare-start default, available,
+and create rows; the Inspector keeps the selected Home, automatic or fixed Web
+port, role, consequence, and complete Enter/Esc Action Shelf together. Up to
+eight rows remain visible beside the Inspector on wide terminals, while the
+80-column layout uses a five-row scrolling window so map, Inspector, status,
+and borders remain complete within 24 rows; shorter terminals reduce the map
+window further instead of clipping the Inspector or status. The proportional
+rail reflects overflow without owning selection. Pointer input is
+column-bounded and feeds the existing list callbacks, so an Inspector click
+cannot select the project beside it and no second persistence path exists.
 
 `OPENALICE_INSTANCE` and `--instance` remain deprecated aliases at the released
 automation boundary; they are not current product terminology.

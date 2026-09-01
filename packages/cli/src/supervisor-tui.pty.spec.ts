@@ -668,7 +668,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           clickedProject = true
           child.write('\u001b[<32;36;22M')
           child.write('\u001b[<0;36;22M')
-        } else if (!closedOverlay && output.includes('AliceProjects · Default AliceProject')) {
+        } else if (!closedOverlay && output.includes('AliceProject Switchboard · 1 PROJECT')) {
           closedOverlay = true
           child.write('\u001b')
         } else if (
@@ -690,7 +690,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       })
     })
 
-    expect(transcript).toContain('AliceProjects · Default AliceProject')
+    expect(transcript).toContain('AliceProject Switchboard · 1 PROJECT')
     expect(transcript).toContain('STATUS   AliceProject selection closed.')
     expect(transcript).toContain('Command Palette')
     expect(transcript).toContain('\u001b[38;2;199;235;239;48;2;10;34;39m')
@@ -1181,10 +1181,12 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         } else if (
           reopenedProjects
           && !selectedDefault
-          && output.includes('Research · current · default')
+          && output.includes('Research')
+          && output.includes('CURRENT·DEFAULT')
         ) {
           selectedDefault = true
-          child.write('\u001b[A\r')
+          child.write('\u001b[A')
+          setTimeout(() => child.write('\r'), 40)
         } else if (
           !detached
           && output.includes('Selected AliceProject Default AliceProject; future bare starts use it.')
@@ -1209,12 +1211,156 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       name: 'research',
       home: await realpath(join(isolatedHome, '.openalice-research')),
     })
-    expect(transcript).toContain('AliceProjects · Default AliceProject')
+    expect(transcript).toContain('AliceProject Switchboard · 1 PROJECT')
     expect(transcript).toContain('Created and selected AliceProject Research.')
     expect(transcript).toContain('Selected AliceProject Default AliceProject; future bare starts use it.')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   }, 15_000)
+
+  it('selects a wide Switchboard row and clicks its Inspector action outside the keycap', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-switchboard-action-'))
+    temporaryPaths.push(isolatedHome)
+    const supervisorHome = join(isolatedHome, 'supervisor')
+    const researchHome = join(isolatedHome, 'research-home')
+    await mkdir(supervisorHome, { recursive: true })
+    await mkdir(researchHome, { recursive: true })
+    await writeFile(join(supervisorHome, 'config.json'), `${JSON.stringify({
+      schemaVersion: 2,
+      projects: {
+        research: {
+          name: 'research',
+          home: researchHome,
+        },
+      },
+    }, null, 2)}\n`)
+    const childEnv = { ...process.env }
+    delete childEnv.OPENALICE_HOME
+    delete childEnv.OPENALICE_INSTANCE
+    const child = pty.spawn(process.execPath, [cliEntry], {
+      cols: 110,
+      rows: 30,
+      cwd: dirname(cliEntry),
+      env: {
+        ...childEnv,
+        HOME: isolatedHome,
+        OPENALICE_SUPERVISOR_HOME: supervisorHome,
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let rowHovered = false
+      let actionHovered = false
+      let actionClicked = false
+      let detached = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Switchboard action timed out:\n${output}`))
+      }, 10_000)
+      child.onData((data) => {
+        output += data
+        if (!opened && output.includes('[ i ] Default AliceProject')) {
+          opened = true
+          child.write('i')
+        } else if (
+          !rowHovered
+          && output.includes('AliceProject Switchboard · 2 PROJECTS')
+          && output.includes('Research')
+        ) {
+          rowHovered = true
+          child.write('\u001b[<35;20;11M')
+        } else if (
+          !actionHovered
+          && output.includes('› Research')
+          && output.includes('Inspector · 2/3')
+        ) {
+          actionHovered = true
+          child.write('\u001b[<35;75;15M')
+        } else if (!actionClicked && output.includes('› [ Enter ] Select')) {
+          actionClicked = true
+          child.write('\u001b[<0;75;15M')
+        } else if (
+          !detached
+          && output.includes('Selected AliceProject Research; future bare starts use it.')
+        ) {
+          detached = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && detached) resolve(output)
+        else reject(new Error(`Supervisor Switchboard action exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    const config = JSON.parse(await readFile(join(supervisorHome, 'config.json'), 'utf8'))
+    expect(config.defaultProject).toBe('research')
+    expect(transcript).toContain('› Research')
+    expect(transcript).toContain('› [ Enter ] Select')
+    expect(transcript).toContain('Selected AliceProject Research; future bare starts use it.')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 15_000)
+
+  it('keeps the Switchboard Inspector and status complete in an 80x20 terminal', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-switchboard-short-'))
+    temporaryPaths.push(isolatedHome)
+    const childEnv = { ...process.env }
+    delete childEnv.OPENALICE_HOME
+    delete childEnv.OPENALICE_INSTANCE
+    const child = pty.spawn(process.execPath, [cliEntry], {
+      cols: 80,
+      rows: 20,
+      cwd: dirname(cliEntry),
+      env: {
+        ...childEnv,
+        HOME: isolatedHome,
+        OPENALICE_SUPERVISOR_HOME: join(isolatedHome, 'supervisor'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let closed = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Short Supervisor Switchboard timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!opened && output.includes('[ i ] Default AliceProject')) {
+          opened = true
+          child.write('i')
+        } else if (
+          !closed
+          && output.includes('Inspector · 1/2 · SELECT & CREATE')
+          && output.includes('Switchboard status · Default AliceProject')
+          && output.includes('Copy AI credentials with openalice project copy-ai-creds.')
+        ) {
+          closed = true
+          child.write('\u001b')
+          setTimeout(() => child.write('q'), 40)
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && closed) resolve(output)
+        else reject(new Error(`Short Supervisor Switchboard exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('AliceProject Switchboard · 1 PROJECT')
+    expect(transcript).toContain('Inspector · 1/2 · SELECT & CREATE')
+    expect(transcript).toContain('Switchboard status · Default AliceProject')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
 
   it('recovers in the AliceProject picker when the remembered complete home is missing', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-instance-recovery-'))
@@ -1267,7 +1413,9 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         } else if (
           openedProjects
           && !repairedDefault
-          && output.includes('Default AliceProject · current')
+          && output.includes('AliceProject Switchboard')
+          && output.includes('Default AliceProject')
+          && output.includes('CURRENT')
           && output.includes('+ Create AliceProject')
         ) {
           repairedDefault = true
@@ -1397,7 +1545,10 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         } else if (
           !closedInstances
           && output.includes('AliceProject selection is read-only.')
-          && output.includes('Research · current')
+          && output.includes('AliceProject Switchboard')
+          && output.includes('Research')
+          && output.includes('CURRENT')
+          && output.includes('READ ONLY')
         ) {
           closedInstances = true
           child.write('\u001b')
@@ -1417,7 +1568,9 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     })
 
     expect(transcript).toContain('Locked by --instance.')
-    expect(transcript).toContain('Research · current')
+    expect(transcript).toContain('Research')
+    expect(transcript).toContain('CURRENT')
+    expect(transcript).toContain('READ ONLY')
     expect(transcript).not.toContain('+ Create AliceProject')
   })
 
