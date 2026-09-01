@@ -1,4 +1,7 @@
-import type { SupervisorTuiTheme } from './supervisor-tui-theme.ts'
+import {
+  decorateSupervisorActionShelf,
+  type SupervisorTuiTheme,
+} from './supervisor-tui-theme.ts'
 import {
   renderSupervisorCommandBar,
   renderSupervisorPanel,
@@ -58,12 +61,14 @@ function decorateConfirmation(
   destructive: boolean,
   hoveredCommand?: string,
 ): string[] {
-  if (!theme.enabled) return lines
-  return lines.map((line, index) => {
-    if (hoveredCommand) {
-      const keycap = `[ ${hoveredCommand} ]`
-      if (line.includes(keycap)) return line.replace(keycap, theme.selected(keycap))
-    }
+  const decorated = lines.map((line) => (
+    /^│ [◆·] \[ [^\]]+ \] /u.test(line)
+      ? decorateSupervisorActionShelf(line, theme, hoveredCommand)
+      : line
+  ))
+  if (!theme.enabled) return decorated
+  return decorated.map((line, index) => {
+    if (/^│ \u001b\[/u.test(line) && line.includes('[ Enter ]')) return line
     if (index === 0) return destructive ? theme.danger(line) : theme.accentStrong(line)
     if (index === lines.length - 1) return theme.muted(line)
     if (line.includes('RUNTIME MUTATION')) return theme.danger(line)

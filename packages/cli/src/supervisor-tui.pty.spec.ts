@@ -480,6 +480,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     const transcript = await new Promise<string>((resolve, reject) => {
       let output = ''
       let requested = false
+      let hoveredCancel = false
       let clickedCancel = false
       let cancelled = false
       const timeout = setTimeout(() => {
@@ -491,10 +492,12 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         if (!requested && output.includes('[ / ] Commands') && output.includes('○ COLD')) {
           requested = true
           child.write('m')
-        } else if (!clickedCancel && output.includes('Confirm Managed Source') && output.includes('[ Esc ] Not now')) {
+        } else if (!hoveredCancel && output.includes('Confirm Managed Source') && output.includes('[ Esc ] Not now')) {
+          hoveredCancel = true
+          child.write('\u001b[<32;49;16M')
+        } else if (!clickedCancel && output.includes('│ › [ Esc ] Not now')) {
           clickedCancel = true
-          child.write('\u001b[<32;38;16M')
-          child.write('\u001b[<0;38;16M')
+          child.write('\u001b[<0;49;16M')
         } else if (!cancelled && output.includes('STATUS   Action cancelled.')) {
           cancelled = true
           child.write('q')
@@ -512,6 +515,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('IMPACT')
     expect(transcript).toContain('[ Enter ] Prepare source')
     expect(transcript).toContain('[ Esc ] Not now')
+    expect(transcript).toContain('│ › [ Esc ] Not now')
     expect(transcript).toContain('[ / ] Commands')
     expect(transcript).toContain('STATUS   Action cancelled.')
     expect(transcript).toContain('\u001b[?25h')

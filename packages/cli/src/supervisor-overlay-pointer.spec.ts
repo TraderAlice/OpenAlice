@@ -62,22 +62,28 @@ describe('Supervisor overlay pointer routing', () => {
     expect(supervisorVisibleListIndexes(9, 10, 5)).toEqual([5, 6, 7, 8, 9])
   })
 
-  it('reports command hover without inventing an action', () => {
+  it('routes an embedded Action Shelf across complete labels', () => {
     const hoverCommand = vi.fn()
     const input = vi.fn()
     const router = new SupervisorOverlayPointerRouter()
     router.capture({
-      lines: ['╭──────────────╮', '│ [ Enter ] Go │', '╰──────────────╯'],
-      width: 16,
-      terminalWidth: 40,
+      lines: [
+        '╭───────────────────────────────────╮',
+        '│ ◆ [ Enter ] Go  │  [ Esc ] Cancel │',
+        '╰───────────────────────────────────╯',
+      ],
+      width: 37,
+      terminalWidth: 50,
       terminalHeight: 11,
-      options: { width: 16, anchor: 'center' },
+      options: { width: 37, anchor: 'center' },
       input,
       hoverCommand,
     })
 
-    expect(router.route(pointer(17, 6, 'motion'))).toBe(true)
-    expect(hoverCommand).toHaveBeenLastCalledWith('Enter')
+    expect(router.route(pointer(37, 6, 'motion'))).toBe(true)
+    expect(hoverCommand).toHaveBeenLastCalledWith('Esc')
     expect(input).not.toHaveBeenCalled()
+    expect(router.route(pointer(37, 6))).toBe(true)
+    expect(input).toHaveBeenCalledWith('\u001b')
   })
 })

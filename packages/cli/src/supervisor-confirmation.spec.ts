@@ -55,8 +55,10 @@ describe('Supervisor confirmation modal', () => {
     )
 
     expect(plain.join('\n')).not.toContain('\u001b[')
+    expect(plain.join('\n')).toContain('│ › [ Esc ] Not now')
     expect(colored.join('\n')).toContain('\u001b[')
     expect(colored.join('\n')).toContain('[ Esc ]')
+    expect(plain.every((line) => displayWidth(line) === 60)).toBe(true)
   })
 
   it('keeps both actions visible at the narrow dogfood width', () => {

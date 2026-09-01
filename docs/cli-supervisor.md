@@ -168,7 +168,10 @@ path is intentionally parameter-free:
   reflow and invoke the same input state machine as the corresponding key.
   Hover changes the leading `◆`/`·` or divider to `›`, preserving a visible
   focus signal even under `NO_COLOR`. Confirmation and refusal semantics
-  therefore do not have a separate mouse-only path;
+  therefore do not have a separate mouse-only path. The same parser recognizes
+  Action Shelves framed inside overlays and confirmation modals: their complete
+  Enter/Esc labels share hover/click semantics with the application footer,
+  while activation still emits only the existing keyboard input;
 - a persistent full-width context ribbon keeps `[ / ] Commands` and
   `[ q ] Detach` visible on every Supervisor page. At 60 columns and wider it
   also retains the selected AliceProject and compact Runtime signal; when space
@@ -217,8 +220,8 @@ path is intentionally parameter-free:
   Lifecycle, managed-source, and update confirmations are focused centered
   compositor modals over an unchanged application frame. Each modal separates
   the question from an explicit Impact section, exposes distinct Enter/Esc
-  keycaps, and routes pointer hover/click through the same confirmation state
-  machine. Acceptance closes the modal before work appears in the fixed
+  Action Shelf segments, and routes complete-segment pointer hover/click through
+  the same confirmation state machine. Acceptance closes the modal before work appears in the fixed
   activity slot; cancellation changes no Runtime or configuration state.
   Existing validation and hardware-cursor contracts remain unchanged;
 - registered Machines refresh in the background with one bounded,

@@ -256,7 +256,10 @@ function supervisorActionShelfTargets(
   line: string,
   row: number,
 ): SupervisorCommandTarget[] {
-  const body = line.trimEnd()
+  const trimmed = line.trimEnd()
+  const framed = trimmed.startsWith('│ ') && trimmed.endsWith(' │')
+  const contentOffset = framed ? 2 : 0
+  const body = (framed ? trimmed.slice(2, -2) : trimmed).trimEnd()
   if (!/^[◆·] \[ [^\]]+ \] /u.test(body)) return []
   const parts = body.split('  │  ')
   if (!parts.every((part) => /^(?:[◆·] )?\[ [^\]]+ \] \S/u.test(part))) return []
@@ -266,7 +269,7 @@ function supervisorActionShelfTargets(
   for (const part of parts) {
     const match = /^([◆·] )?\[ ([^\]]+) \] /u.exec(part)
     if (!match?.[2]) return []
-    const startColumn = displayWidth(body.slice(0, codeUnitOffset)) + 1
+    const startColumn = displayWidth(line.slice(0, contentOffset + codeUnitOffset)) + 1
     targets.push({
       row,
       startColumn,

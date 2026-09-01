@@ -85,8 +85,8 @@ export function decorateSupervisorFrame(
 ): string[] {
   if (!theme.enabled) {
     return lines.map((line, index) => (
-      /^[◆·] \[ [^\]]+ \] /u.test(line)
-        ? decorateActionShelf(
+      isSupervisorActionShelf(line)
+        ? decorateSupervisorActionShelf(
             line,
             theme,
             options.hoveredCommand?.row === index + 1
@@ -97,8 +97,8 @@ export function decorateSupervisorFrame(
     ))
   }
   return lines.map((line, index) => {
-    if (/^[◆·] \[ [^\]]+ \] /u.test(line)) {
-      return decorateActionShelf(
+    if (isSupervisorActionShelf(line)) {
+      return decorateSupervisorActionShelf(
         line,
         theme,
         options.hoveredCommand?.row === index + 1
@@ -170,14 +170,23 @@ export function decorateSupervisorFrame(
   })
 }
 
-function decorateActionShelf(
+export function decorateSupervisorActionShelf(
   line: string,
   theme: SupervisorTuiTheme,
   hoveredCommand?: string,
 ): string {
   const separator = '  │  '
-  const parts = line.split(separator)
-  return parts.map((part, index) => {
+  const trimmed = line.trimEnd()
+  const framed = trimmed.startsWith('│ ') && trimmed.endsWith(' │')
+  const prefix = framed ? '│ ' : ''
+  const suffix = framed ? ' │' : ''
+  const rawContent = framed ? trimmed.slice(2, -2) : trimmed
+  const content = rawContent.trimEnd()
+  const trailing = framed
+    ? rawContent.slice(content.length)
+    : line.slice(trimmed.length)
+  const parts = content.split(separator)
+  const decorated = parts.map((part, index) => {
     const key = /^(?:[◆·] )?\[ ([^\]]+) \]/u.exec(part)?.[1]
     const hovered = Boolean(key && key === hoveredCommand)
     const semantic = hovered && index === 0
@@ -193,6 +202,15 @@ function decorateActionShelf(
     const joiner = key && key === hoveredCommand ? ' │ › ' : separator
     return `${result}${theme.actionRail(joiner)}${part}`
   }, '')
+  return `${prefix}${decorated}${theme.actionRail(trailing)}${suffix}`
+}
+
+function isSupervisorActionShelf(line: string): boolean {
+  const trimmed = line.trimEnd()
+  const content = trimmed.startsWith('│ ') && trimmed.endsWith(' │')
+    ? trimmed.slice(2, -2).trimEnd()
+    : trimmed
+  return /^[◆·] \[ [^\]]+ \] /u.test(content)
 }
 
 function decorateDock(

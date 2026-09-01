@@ -173,6 +173,19 @@ not imply maintainer approval of the finished interaction.
   preceding divider to `│ ›`, so focus remains visible under `NO_COLOR`; click
   still feeds the existing key state machine.
 
+### Overlay Action Shelf parity decision
+
+- Leaving cards and modals on keycap-only hit regions would make the same shelf
+  change interaction rules when an overlay takes focus, particularly around
+  consequential Enter/Esc confirmations.
+- Maintaining overlay-specific coordinates would duplicate responsive geometry
+  and regress whenever prompt or impact copy changes modal height.
+- The selected model teaches the shared shelf parser to recognize both bare
+  application rows and framed `│ … │` rows. The overlay router consumes those
+  render-derived complete-segment targets, and confirmation decoration reuses
+  the same color/`NO_COLOR` focus marker. Activation still emits only the
+  existing Enter/Esc input.
+
 ### Operational navigation decision
 
 - Static route labels are simple but require opening every page to discover
@@ -354,6 +367,8 @@ already large `supervisor-tui.ts` application controller.
 - [x] Promote the Command Palette from page replacement to a focused overlay.
 - [x] Replace spaced footer keycap prose with a responsive, whole-segment
   contextual Action Shelf whose hover semantics survive `NO_COLOR`.
+- [x] Carry whole-segment Action Shelf geometry and focus semantics through
+  overlay cards and confirmation modals without new action paths.
 
 ## Progress
 
@@ -660,6 +675,18 @@ already large `supervisor-tui.ts` application controller.
   build/typecheck, root TypeScript, and the 692-file suite pass (691 passed, 1
   skipped; 6104 tests passed, 10 skipped). Docker installer smoke and package
   dry-run pass with the shared theme/view modules retained.
+- Framed Action Shelves inside overlays and confirmation modals now use the same
+  complete-segment geometry and semantic focus marker as the application
+  footer. The shared parser accounts for card rails without fixed coordinates;
+  the overlay router still emits only the rendered key's existing input, and
+  modal width remains stable in both color and `NO_COLOR` modes.
+- Overlay-Shelf parity acceptance passes with the 123 focused Supervisor suite.
+  A real 80x24 managed-source confirmation hovered the `Not now` label outside
+  `[ Esc ]`, rendered `│ › [ Esc ] Not now`, clicked it into the existing
+  cancellation state, and restored cursor, mouse, and bracketed-paste modes.
+  The 692-file suite passes (691 passed, 1 skipped; 6104 tests passed, 10
+  skipped), together with CLI/root typechecks, CLI build, Docker installer smoke,
+  and package dry-run.
 
 ## Completion Criteria
 
