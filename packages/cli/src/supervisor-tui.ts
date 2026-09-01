@@ -98,6 +98,12 @@ import {
   type SupervisorProjectSwitchboardItem,
 } from './supervisor-projects-view.ts'
 import {
+  decorateSupervisorProjectFoundry,
+  renderSupervisorProjectFoundry,
+  supervisorProjectFoundryFieldWidth,
+  type SupervisorProjectFoundryView,
+} from './supervisor-project-foundry-view.ts'
+import {
   decorateSupervisorReleaseObservatory,
   renderSupervisorReleaseObservatory,
 } from './supervisor-release-view.ts'
@@ -2049,6 +2055,7 @@ export async function runSupervisorTui(
     list.setSelectedIndex(Math.max(0, selectedIndex))
     let component: Component = list
     let projectListActive = true
+    let creatorView: Omit<SupervisorProjectFoundryView, 'fieldLines'> | null = null
     const overlayOptions = {
       width: '92%',
       maxHeight: '90%',
@@ -2066,6 +2073,7 @@ export async function runSupervisorTui(
       closeProjects = null
       overlayPointer.clear()
       projectsHoveredCommand = undefined
+      overlay.unfocus?.({ target: screen })
       overlay.hide()
       ui.setShowHardwareCursor(false)
       screen.update({ notice })
@@ -2074,6 +2082,7 @@ export async function runSupervisorTui(
       ui.setShowHardwareCursor(false)
       component = list
       projectListActive = true
+      creatorView = null
       projectsHoveredCommand = undefined
       setMessage(lock ?? 'Selecting an AliceProject also makes it the next bare-start default. Copy AI credentials with openalice project copy-ai-creds.')
     }
@@ -2114,25 +2123,19 @@ export async function runSupervisorTui(
         `.openalice-${name}`,
       )
       const input = new (class extends piTui.Input {
-        detail = 'Use a separate complete home. An empty directory is prepared when registered.'
+        detail = 'Use a separate complete home; empty paths are prepared.'
 
         setDetail(next: string): void {
           this.detail = next
+          if (creatorView?.step === 'home' && creatorView.projectKey === name) {
+            creatorView = { ...creatorView, detail: next }
+          }
           this.invalidate()
           ui.requestRender()
         }
 
         override render(width: number): string[] {
-          return [
-            `Create AliceProject · ${name}`,
-            '',
-            'Complete home',
-            ...super.render(width),
-            '',
-            sanitize(this.detail),
-            '',
-            '[ Enter ] Create and select · [ Esc ] Back',
-          ]
+          return super.render(width)
         }
       })()
       input.setValue(suggestedHome)
@@ -2154,6 +2157,13 @@ export async function runSupervisorTui(
         )
       }
       component = input
+      creatorView = {
+        step: 'home',
+        currentProjectName: projectContext.aliceProject.displayName,
+        projectKey: name,
+        detail: sanitize(input.detail),
+        message: 'The new AliceProject owns only its registry entry; existing data is never copied or deleted.',
+      }
       setMessage('The new AliceProject owns only its registry entry; existing data is never copied or deleted.')
     }
     const showCreateNameInput = () => {
@@ -2163,21 +2173,15 @@ export async function runSupervisorTui(
 
         setDetail(next: string): void {
           this.detail = next
+          if (creatorView?.step === 'identity') {
+            creatorView = { ...creatorView, detail: next }
+          }
           this.invalidate()
           ui.requestRender()
         }
 
         override render(width: number): string[] {
-          return [
-            'Create AliceProject',
-            '',
-            'AliceProject key',
-            ...super.render(width),
-            '',
-            sanitize(this.detail),
-            '',
-            '[ Enter ] Continue · [ Esc ] Back',
-          ]
+          return super.render(width)
         }
       })()
       input.focused = true
@@ -2201,6 +2205,12 @@ export async function runSupervisorTui(
         showCreateHomeInput(name)
       }
       component = input
+      creatorView = {
+        step: 'identity',
+        currentProjectName: projectContext.aliceProject.displayName,
+        detail: sanitize(input.detail),
+        message: 'Create a named AliceProject without leaving the Supervisor.',
+      }
       setMessage('Create a named AliceProject without leaving the Supervisor.')
     }
 
@@ -2230,13 +2240,30 @@ export async function runSupervisorTui(
     const panel = new (class implements Component {
       render(width: number): string[] {
         if (!projectListActive) {
-          const lines = renderSupervisorPanel('AliceProject Creator', projectContext.aliceProject.displayName, [
-            ...component.render(Math.max(1, width - 4)),
-            '',
-            sanitize(message),
-          ], width)
-          captureOverlayPointer(lines, width, overlayOptions, (data) => this.handleInput(data))
-          return lines
+          if (!creatorView) return []
+          const foundry = renderSupervisorProjectFoundry({
+            ...creatorView,
+            detail: sanitize(creatorView.detail),
+            message: sanitize(message),
+            fieldLines: component.render(supervisorProjectFoundryFieldWidth(width)),
+          }, width)
+          captureOverlayPointer(
+            foundry.lines,
+            width,
+            overlayOptions,
+            (data) => this.handleInput(data),
+            undefined,
+            (label) => {
+              if (projectsHoveredCommand === label) return
+              projectsHoveredCommand = label
+              ui.requestRender()
+            },
+          )
+          return decorateSupervisorProjectFoundry(
+            foundry.lines,
+            tuiTheme,
+            projectsHoveredCommand,
+          )
         }
         const selectedItem = list.getSelectedItem()
         const activeIndex = Math.max(0, items.findIndex((item) => item.value === selectedItem?.value))
@@ -2287,7 +2314,7 @@ export async function runSupervisorTui(
 
       handleInput(data: string): void {
         if (!changing) {
-          if (projectListActive) projectsHoveredCommand = undefined
+          projectsHoveredCommand = undefined
           component.handleInput?.(data)
         }
       }

@@ -325,6 +325,21 @@ not imply maintainer approval of the finished interaction.
   from the rendered Flight Deck so both responsive forms keep the existing
   keyboard and mutation paths.
 
+### AliceProject Foundry decision
+
+- Keeping the creator as a bordered raw `Input` would preserve its compactness,
+  but entering it from the Switchboard would continue to erase project context,
+  progress, field purpose, and the difference between identity and storage.
+- Adding both fields directly to the Switchboard Inspector would look faster,
+  but would turn selection into a form, weaken the existing validation order,
+  and make accidental creation easier from a frequently used navigation view.
+- The selected model is a two-stage AliceProject Foundry. A Build Path keeps
+  Identity and Complete Home visible while a Field Inspector owns the existing
+  focused `Input`, validation detail, and contextual action. Wide terminals pair
+  them; the 80-column baseline stacks a compact completed/current/next route.
+  The Switchboard remains the entry/back surface, and the existing
+  `createProject` call is still the only mutation boundary.
+
 ### Persistent context-ribbon decision
 
 - Expanding the animated brand header would make version/update presentation
@@ -457,6 +472,8 @@ already large `supervisor-tui.ts` application controller.
   Observatory while preserving one-channel, explicit-Enter network behavior.
 - [x] Replace the legacy Remote Transfer shell with a responsive Transfer
   Flight Deck while preserving its planner, sender, and recovery state machine.
+- [x] Replace the legacy AliceProject Creator card with a responsive Foundry
+  while preserving its ordered key/Home validation and creation boundary.
 
 ## Progress
 
@@ -851,6 +868,19 @@ already large `supervisor-tui.ts` application controller.
   CLI build/typecheck pass; the 697-file suite passes (696 passed, 1 skipped;
   6126 tests passed, 10 skipped). Docker installer smoke passes, and package
   dry-run includes `src/supervisor-transfer-view.ts`.
+- AliceProject creation now stays inside a responsive Foundry rather than
+  falling back from the Switchboard to a raw input card. Identity and Complete
+  Home remain visible beside the focused Field Inspector on wide terminals;
+  the narrow path keeps current/next context, field guidance, action surface,
+  and creation contract within the 80×24 baseline.
+- Foundry acceptance passes with 83 focused view, Switchboard, pointer, screen,
+  and real-PTY tests. A 110×32 run clicked the full `Continue` and
+  `Create & select` labels outside their keycaps, created and selected Research,
+  then restored Default; a separate 80×24 run retained the complete Identity
+  step and returned without mutation. Root TypeScript and CLI build/typecheck
+  pass; the 698-file suite passes (697 passed, 1 skipped; 6130 tests passed, 10
+  skipped). Docker installer smoke passes, and package dry-run includes
+  `src/supervisor-project-foundry-view.ts`.
 
 ## Completion Criteria
 

@@ -1222,6 +1222,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       let submittedName = false
       let acceptedHome = false
       let reopenedProjects = false
+      let focusedDefault = false
+      let defaultFocusOffset = 0
       let selectedDefault = false
       let detached = false
       const timeout = setTimeout(() => {
@@ -1241,14 +1243,19 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           && output.includes('AliceProject key')
         ) {
           submittedName = true
-          child.write('research\r')
+          child.write('research')
+          setTimeout(() => {
+            child.write('\u001b[<35;60;17M')
+            setTimeout(() => child.write('\u001b[<0;60;17M'), 100)
+          }, 100)
         } else if (
           !acceptedHome
           && output.includes('Create AliceProject · research')
           && output.includes('Complete home')
         ) {
           acceptedHome = true
-          child.write('\r')
+          child.write('\u001b[<35;64;17M')
+          setTimeout(() => child.write('\u001b[<0;64;17M'), 100)
         } else if (
           !reopenedProjects
           && output.includes('Created and selected AliceProject Research.')
@@ -1258,13 +1265,21 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           child.write('i')
         } else if (
           reopenedProjects
+          && !focusedDefault
           && !selectedDefault
           && output.includes('Research')
           && output.includes('CURRENT·DEFAULT')
         ) {
-          selectedDefault = true
+          focusedDefault = true
+          defaultFocusOffset = output.length
           child.write('\u001b[A')
-          setTimeout(() => child.write('\r'), 40)
+        } else if (
+          focusedDefault
+          && !selectedDefault
+          && output.slice(defaultFocusOffset).includes('◆ Default AliceProject · 1/3')
+        ) {
+          selectedDefault = true
+          child.write('\r')
         } else if (
           !detached
           && output.includes('Selected AliceProject Default AliceProject; future bare starts use it.')
@@ -1290,11 +1305,74 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       home: await realpath(join(isolatedHome, '.openalice-research')),
     })
     expect(transcript).toContain('AliceProject Switchboard · 1 PROJECT')
+    expect(transcript).toContain('› [ Enter ] Continue')
+    expect(transcript).toContain('› [ Enter ] Create & select')
     expect(transcript).toContain('Created and selected AliceProject Research.')
     expect(transcript).toContain('Selected AliceProject Default AliceProject; future bare starts use it.')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   }, 15_000)
+
+  it('keeps the Foundry identity step complete at the 80-column baseline', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-foundry-narrow-'))
+    temporaryPaths.push(isolatedHome)
+    const childEnv = { ...process.env }
+    delete childEnv.OPENALICE_HOME
+    delete childEnv.OPENALICE_INSTANCE
+    const child = pty.spawn(process.execPath, [cliEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...childEnv,
+        HOME: isolatedHome,
+        OPENALICE_SUPERVISOR_HOME: join(isolatedHome, 'supervisor'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let requestedCreate = false
+      let foundry = false
+      let returned = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor narrow Foundry timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!opened && output.includes('Start OpenAlice & open Workspace')) {
+          opened = true
+          child.write('i')
+        } else if (!requestedCreate && output.includes('+ Create AliceProject')) {
+          requestedCreate = true
+          child.write('\u001b[B\r')
+        } else if (!foundry && output.includes('AliceProject Foundry · 1/2 · IDENTITY')) {
+          foundry = true
+          child.write('\u001b')
+        } else if (foundry && !returned && data.includes('AliceProject Switchboard')) {
+          returned = true
+          child.write('\u001b')
+        } else if (returned && output.includes('AliceProject selection closed.')) {
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor narrow Foundry exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('AliceProject Foundry · 1/2 · IDENTITY')
+    expect(transcript).toContain('◆ Identity  → Complete Home')
+    expect(transcript).toContain('Create AliceProject · Project key')
+    expect(transcript).toContain('◆ CONTRACT')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
 
   it('selects a wide Switchboard row and clicks its Inspector action outside the keycap', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-switchboard-action-'))

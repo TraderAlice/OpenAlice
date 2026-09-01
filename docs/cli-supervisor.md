@@ -278,7 +278,11 @@ path is intentionally parameter-free:
   without stopping another project, or creates a separate named complete home.
   The responsive Switchboard pairs a bounded project map with Home, Web, role,
   and action inspection on wide terminals, then stacks the same regions at the
-  80-column baseline. AI vault copy is a separate command:
+  80-column baseline. Its Create row opens a two-stage AliceProject Foundry:
+  Identity and Complete Home remain visible beside the focused Field Inspector
+  on wide terminals and stack as a compact route at 80 columns. Validation
+  remains ordered, and only the final `Create & select` action registers the
+  new complete home. AI vault copy is a separate command:
   `openalice project copy-ai-creds`;
 - `p` opens Setup for data home, browser port, update checks, and resolved
   Runtime/config provenance. Setup can edit either the selected AliceProject or
