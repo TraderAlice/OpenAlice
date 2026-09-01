@@ -1,5 +1,5 @@
 import { fetchJson } from './client'
-import type { UTASummary, AccountInfo, SubAccountRef, Position, WalletCommitLog, ReconnectResult, UTAConfig, WalletStatus, WalletPushResult, WalletRejectResult, TestConnectionResult, BrokerPreset, BrokerEngine, BrokerPackStatus, UTASnapshotSummary, EquityCurvePoint, PlaceOrderRequest, ClosePositionRequest, CancelOrderRequest, OrderErrorResponse, OrderHistoryEntry, TradeHistoryEntry } from './types'
+import type { UTASummary, AccountInfo, SubAccountRef, Position, WalletCommitLog, ReconnectResult, UTAConfig, WalletStatus, WalletPushResult, WalletRejectResult, TestConnectionResult, BrokerPreset, BrokerEngine, BrokerPackStatus, BrokerPackReadinessResponse, UTASnapshotSummary, EquityCurvePoint, PlaceOrderRequest, ClosePositionRequest, CancelOrderRequest, OrderErrorResponse, OrderHistoryEntry, TradeHistoryEntry } from './types'
 
 /** Thrown by the one-shot order endpoints when the server returns non-2xx. Carries the phase. */
 export class OrderEntryError extends Error {
@@ -190,7 +190,7 @@ export const tradingApi = {
     return fetchJson('/api/trading/config/broker-presets')
   },
 
-  async getBrokerPacks(): Promise<{ packs: BrokerPackStatus[] }> {
+  async getBrokerPacks(): Promise<BrokerPackReadinessResponse> {
     return fetchJson('/api/trading/config/broker-packs')
   },
 

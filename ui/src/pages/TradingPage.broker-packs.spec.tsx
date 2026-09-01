@@ -42,7 +42,7 @@ describe('MissingBrokerPacksNotice', () => {
         { engine: 'alpaca', installed: false, source: 'missing', requiredBy: [] },
         { engine: 'ibkr', installed: true, source: 'downloaded', requiredBy: ['IBKR Main'] },
       ]}
-      onInstalled={vi.fn()}
+      onInstall={vi.fn().mockResolvedValue(undefined)}
     />)
 
     expect(screen.getByText('Broker support needs attention')).toBeTruthy()
@@ -62,7 +62,7 @@ describe('MissingBrokerPacksNotice', () => {
         version: '0.84.0-beta',
         updateAvailable: true,
       }]}
-      onInstalled={vi.fn()}
+      onInstall={vi.fn().mockResolvedValue(undefined)}
     />)
 
     expect(screen.getByText('Installed support is from OpenAlice 0.84.0-beta')).toBeTruthy()
@@ -70,16 +70,16 @@ describe('MissingBrokerPacksNotice', () => {
   })
 
   it('installs from the notice and reports a failed repair in place', async () => {
-    const onInstalled = vi.fn()
+    const onInstall = vi.fn(async (engine: string) => { await installBrokerPack(engine) })
     const { rerender } = render(
-      <MissingBrokerPacksNotice packs={[missingCcxt]} onInstalled={onInstalled} />,
+      <MissingBrokerPacksNotice packs={[missingCcxt]} onInstall={onInstall} />,
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Install' }))
-    await waitFor(() => expect(onInstalled).toHaveBeenCalledWith(expect.objectContaining({ installed: true })))
+    await waitFor(() => expect(onInstall).toHaveBeenCalledWith('ccxt'))
 
     installBrokerPack.mockRejectedValueOnce(new Error('download failed'))
-    rerender(<MissingBrokerPacksNotice packs={[missingCcxt]} onInstalled={onInstalled} />)
+    rerender(<MissingBrokerPacksNotice packs={[missingCcxt]} onInstall={onInstall} />)
     fireEvent.click(screen.getByRole('button', { name: 'Install' }))
     await waitFor(() => expect(screen.getByText('download failed')).toBeTruthy())
   })
@@ -91,7 +91,7 @@ describe('KeylessDataSourcesRow', () => {
       trading: { observeExternalOrdersEvery: '15m', keylessDataSources: ['binance'] },
     }), { status: 200, headers: { 'content-type': 'application/json' } })))
 
-    render(<KeylessDataSourcesRow ccxtPack={missingCcxt} onPackInstalled={vi.fn()} />)
+    render(<KeylessDataSourcesRow ccxtPack={missingCcxt} onInstall={vi.fn().mockResolvedValue(undefined)} />)
 
     const binance = await screen.findByRole('switch', { name: 'Binance public data source' })
     const okx = screen.getByRole('switch', { name: 'OKX public data source' })
@@ -106,13 +106,13 @@ describe('KeylessDataSourcesRow', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       trading: { observeExternalOrdersEvery: '15m', keylessDataSources: [] },
     }), { status: 200, headers: { 'content-type': 'application/json' } })))
-    const onPackInstalled = vi.fn()
-    render(<KeylessDataSourcesRow ccxtPack={missingCcxt} onPackInstalled={onPackInstalled} />)
+    const onInstall = vi.fn(async () => { await installBrokerPack('ccxt') })
+    render(<KeylessDataSourcesRow ccxtPack={missingCcxt} onInstall={onInstall} />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Install data support' }))
 
     await waitFor(() => expect(installBrokerPack).toHaveBeenCalledWith('ccxt'))
-    expect(onPackInstalled).toHaveBeenCalledWith(expect.objectContaining({ engine: 'ccxt', installed: true }))
+    expect(onInstall).toHaveBeenCalledOnce()
     expect(screen.getByText('Installed — choose the feeds you want')).toBeTruthy()
   })
 })
