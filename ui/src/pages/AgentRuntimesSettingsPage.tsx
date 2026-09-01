@@ -170,9 +170,9 @@ export function AgentRuntimesSettingsPage() {
                       key={agent.id}
                       className="flex min-h-12 min-w-0 items-center gap-2 border-b border-border/60 px-3 py-2 last:border-b-0"
                     >
-                      <span className="w-5 shrink-0 text-[11px] tabular-nums text-muted-foreground">{index + 1}</span>
+                      <span className="w-5 shrink-0 text-[11px] leading-[15px] tabular-nums text-muted-foreground">{index + 1}</span>
                       <AgentRuntimeIcon agentId={agent.id} className="size-4 shrink-0" />
-                      <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{agent.displayName}</span>
+                      <span className="min-w-0 flex-1 truncate text-[13px] leading-[18px] font-medium">{agent.displayName}</span>
                       <div className="flex shrink-0 items-center gap-1">
                         <Button
                           variant="ghost"
@@ -279,14 +279,14 @@ function RuntimeSettingsCard({
           <AgentRuntimeIcon agentId={agent.id} className="mt-0.5 size-5 shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <h3 className="min-w-0 truncate text-[13px] font-semibold text-foreground">{agent.displayName}</h3>
-              <span className="font-mono text-[11px] text-muted-foreground">{agent.id}</span>
+              <h3 className="min-w-0 truncate text-[13px] leading-[18px] font-semibold text-foreground">{agent.displayName}</h3>
+              <span className="font-mono text-[11px] leading-[15px] text-muted-foreground">{agent.id}</span>
             </div>
-            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[12px] text-muted-foreground">
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[12px] leading-[18px] text-muted-foreground">
               <span>{installed ? t('settings.agentRuntimes.installed') : t('settings.agentRuntimes.notInstalled')}</span>
               <span>{t(agentRuntimeSettingsStatusKey(row))}</span>
             </p>
-            <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground" title={binPath ?? undefined}>
+            <p className="mt-0.5 truncate font-mono text-[11px] leading-[15px] text-muted-foreground" title={binPath ?? undefined}>
               {binPath ?? t('settings.agentRuntimes.unknownPath')}
             </p>
             {row?.message && (

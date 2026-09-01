@@ -466,7 +466,7 @@ function ConnectorSettingsSurface({
                         <Power className="size-4" aria-hidden="true" />
                       </span>
                       <div className="min-w-0">
-                        <h4 className="text-[13px] font-medium text-foreground">{t('connectorSettings.runService')}</h4>
+                      <h4 className="text-[13px] leading-[18px] font-medium text-foreground">{t('connectorSettings.runService')}</h4>
                         <p className="mt-0.5 max-w-2xl text-[12px] leading-5 text-muted-foreground">
                           {t('connectorSettings.runServiceDescription')}
                         </p>
@@ -833,7 +833,7 @@ function ConnectorSectionNav({
                   {definition.label}
                 </span>
               </span>
-              <span className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-medium ${connectorNavBadgeClass(setup.stage)}`}>
+              <span className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] leading-[14px] font-medium ${connectorNavBadgeClass(setup.stage)}`}>
                 {badge}
               </span>
             </Button>
@@ -1123,13 +1123,13 @@ function ConnectorCredentialsEditor({
         <span className="flex min-w-0 items-center gap-2.5">
           <KeyRound size={15} className="shrink-0 text-muted-foreground" aria-hidden />
           <span className="text-[12px] font-medium text-foreground">{t('connectorSettings.connectionDetails')}</span>
-          <span className={`rounded-md px-2 py-0.5 text-[9.5px] font-medium ${
+          <span className={`rounded-md px-2 py-0.5 text-[9.5px] leading-[14px] font-medium ${
             ready ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'
           }`}>
             {ready ? t('connectorSettings.saved') : t('connectorSettings.required')}
           </span>
         </span>
-        <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground" aria-hidden>
+        <span className="flex shrink-0 items-center gap-1.5 text-[11px] leading-[15px] text-muted-foreground" aria-hidden>
           {open ? t('connectorSettings.hide') : t('connectorSettings.manage')}
           <ChevronDown
             size={14}
@@ -1165,7 +1165,7 @@ function ConnectorCredentialsEditor({
           const fieldLabelContent = fieldMissing ? (
             <span className="flex items-center gap-1.5">
               <span>{fieldLabel}</span>
-              <span className="rounded-md bg-warning/10 px-1.5 py-0.5 text-[9.5px] font-medium leading-none text-warning">
+              <span className="rounded-md bg-warning/10 px-1.5 py-0.5 text-[9.5px] leading-[14px] font-medium text-warning">
                 {t('connectorSettings.required')}
               </span>
             </span>
@@ -1384,7 +1384,7 @@ function ConnectorSetupGuide({ definition, t }: { definition: ConnectorDefinitio
                 target="_blank"
                 rel="noreferrer"
                 aria-label={t('connectorSettings.setupGuide.openSetupAria', { label })}
-                className="oa-pressable inline-flex h-8 items-center gap-1.5 rounded-md border border-primary/20 bg-background/65 px-2.5 py-1.5 text-[11px] font-medium text-primary hover:border-primary/40 hover:bg-primary/5"
+                className="oa-pressable inline-flex h-8 items-center gap-1.5 rounded-md border border-primary/20 bg-background/65 px-2.5 py-1.5 text-[11px] leading-[15px] font-medium text-primary hover:border-primary/40 hover:bg-primary/5"
               >
                 {label}
                 <ExternalLink size={12} aria-hidden />
@@ -1397,7 +1397,7 @@ function ConnectorSetupGuide({ definition, t }: { definition: ConnectorDefinitio
         <ol className="mt-3 space-y-2 pl-11 text-[11.5px] leading-5 text-foreground/90">
           {steps.map((step, index) => (
             <li key={step} className="flex gap-2">
-              <span className="w-4 shrink-0 text-right text-[10px] font-medium tabular-nums text-muted-foreground">
+              <span className="w-4 shrink-0 text-right text-[10px] leading-[14px] font-medium tabular-nums text-muted-foreground">
                 {index + 1}.
               </span>
               <span>{step}</span>
@@ -1451,7 +1451,7 @@ function SetupStatePanel({
           <div aria-live="polite" aria-atomic="true">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-[13px] font-semibold text-foreground">{presentation.title}</p>
-              <span className="rounded-md border border-current/15 px-2 py-0.5 text-[10px] font-medium">
+              <span className="rounded-md border border-current/15 px-2 py-0.5 text-[10px] leading-[14px] font-medium">
                 {presentation.badge}
               </span>
             </div>
@@ -1679,7 +1679,7 @@ function HealthBadge({ health, t }: { health: ConnectorHealth | null; t: TFuncti
   const state = getConnectorServiceState(health)
   if (state === 'stopped') {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
+      <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-[10px] leading-[14px] font-medium text-muted-foreground">
         <ShieldCheck size={12} aria-hidden />
         {t('connectorSettings.serviceStopped')}
       </span>
@@ -1687,7 +1687,7 @@ function HealthBadge({ health, t }: { health: ConnectorHealth | null; t: TFuncti
   }
   if (state === 'healthy') {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-md bg-success/10 px-2.5 py-1 text-[10px] font-medium text-success">
+      <span className="inline-flex items-center gap-1.5 rounded-md bg-success/10 px-2.5 py-1 text-[10px] leading-[14px] font-medium text-success">
         <ShieldCheck size={12} aria-hidden />
         {t('connectorSettings.serviceOnline')}
       </span>
@@ -1696,7 +1696,7 @@ function HealthBadge({ health, t }: { health: ConnectorHealth | null; t: TFuncti
   if (state === 'running') {
     return (
       <span
-        className="inline-flex items-center gap-1.5 rounded-md bg-warning/12 px-2.5 py-1 text-[10px] font-medium text-warning"
+        className="inline-flex items-center gap-1.5 rounded-md bg-warning/12 px-2.5 py-1 text-[10px] leading-[14px] font-medium text-warning"
         title={t('connectorStatus.service.runningDescription')}
       >
         <CircleAlert size={12} aria-hidden />
@@ -1706,7 +1706,7 @@ function HealthBadge({ health, t }: { health: ConnectorHealth | null; t: TFuncti
   }
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-md bg-destructive/10 px-2.5 py-1 text-[10px] font-medium text-destructive"
+      className="inline-flex items-center gap-1.5 rounded-md bg-destructive/10 px-2.5 py-1 text-[10px] leading-[14px] font-medium text-destructive"
       title={t('connectorSettings.serviceUnavailableDescription')}
     >
       <CircleAlert size={12} aria-hidden />

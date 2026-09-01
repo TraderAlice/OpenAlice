@@ -127,7 +127,7 @@ export function AIProviderPage() {
           <section className="min-w-0">
             <div className="flex items-center justify-between mb-3">
               <div className="flex min-w-0 items-baseline gap-1.5">
-                <h2 className="text-[14px] font-semibold text-foreground">{t('aiProvider.credentials')}</h2>
+                <h2 className="text-[14px] leading-[19px] font-semibold text-foreground">{t('aiProvider.credentials')}</h2>
                 {credentials.length > 0 && (
                   <span className="text-[11px] text-muted-foreground">
                     {vaultQuery.trim()
@@ -177,10 +177,10 @@ export function AIProviderPage() {
                             <span className="text-[11px] text-muted-foreground">{displayVendor}</span>
                           )}
                           {cred.label && (
-                            <span className="font-mono text-[11px] text-muted-foreground">{cred.slug}</span>
+                            <span className="font-mono text-[11px] leading-[15px] text-muted-foreground">{cred.slug}</span>
                           )}
                           {cred.hasApiKey && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-success">
+                            <span className="inline-flex items-center gap-1 text-[10px] leading-[14px] font-medium text-success">
                               <Check aria-hidden className="size-3" />
                               {t('aiProvider.keySet')}
                             </span>
@@ -445,7 +445,7 @@ function WorkspaceDefaultsSection({
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-2">
               <span className="text-[13px] font-medium text-foreground">{agent.name}</span>
-              <span className="font-mono text-[11px] text-muted-foreground">{agent.id}</span>
+              <span className="font-mono text-[11px] leading-[15px] text-muted-foreground">{agent.id}</span>
             </div>
             {note && <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{note}</p>}
             {options.length === 0 && (
@@ -519,7 +519,7 @@ function WorkspaceDefaultsSection({
   return (
     <section className="min-w-0">
       <div className="mb-3 flex min-h-5 items-center justify-between gap-3">
-        <h2 className="text-[14px] font-semibold text-foreground">{t('aiProvider.defaultsTitle')}</h2>
+        <h2 className="text-[14px] leading-[19px] font-semibold text-foreground">{t('aiProvider.defaultsTitle')}</h2>
         <span aria-live="polite" className={`text-[11px] ${saveStatus === 'saved' ? 'text-success' : 'text-muted-foreground'}`}>
           {saveStatus === 'saving' ? t('common.saving') : saveStatus === 'saved' ? t('common.saved') : ''}
         </span>

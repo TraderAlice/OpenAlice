@@ -406,18 +406,18 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
 
               <div className="border-y border-border/60 py-2.5">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="mr-1 text-[11px] font-medium text-foreground">{t('aiProvider.credentialModal.compatibleRuntimes')}</span>
+                  <span className="mr-1 text-[11px] leading-[15px] font-medium text-foreground">{t('aiProvider.credentialModal.compatibleRuntimes')}</span>
                   {compatibleAgents.map((agentId) => (
-                    <span key={agentId} className="inline-flex min-h-6 items-center gap-1.5 text-[10.5px] text-muted-foreground">
+                    <span key={agentId} className="inline-flex min-h-6 items-center gap-1.5 text-[10.5px] leading-[15px] text-muted-foreground">
                       <AgentRuntimeIcon agentId={agentId} className="size-4 shrink-0" />
                       <span>{AGENT_LABELS[agentId] ?? agentId}</span>
                     </span>
                   ))}
                   {compatibleAgents.length === 0 && (
-                    <span className="text-[10.5px] text-muted-foreground">{t('aiProvider.credentialModal.chooseSupportedMode')}</span>
+                    <span className="text-[10.5px] leading-[15px] text-muted-foreground">{t('aiProvider.credentialModal.chooseSupportedMode')}</span>
                   )}
                 </div>
-                <p className="mt-1.5 text-[10.5px] leading-relaxed text-muted-foreground">
+                <p className="mt-1.5 text-[10.5px] leading-4 text-muted-foreground">
                   {t('aiProvider.credentialModal.injectionHelp')}
                 </p>
               </div>
