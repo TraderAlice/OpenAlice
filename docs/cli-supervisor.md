@@ -137,7 +137,11 @@ mouse reporting. Its ordinary path is intentionally parameter-free:
 - the footer is a contextual command bar, not a complete shortcut legend. It
   exposes the current primary action and a few adjacent actions as keycaps;
   `?` keeps the complete keyboard reference available without crowding every
-  operational page;
+  operational page. Every visible keycap in the Supervisor frame derives a
+  display-width-aware pointer target from the final responsive layout, so hover
+  and click survive reflow and invoke the same input state machine as the
+  corresponding key. Confirmation and refusal semantics therefore do not have
+  a separate mouse-only path;
 - Help is a grouped keyboard map rather than another prose screen. Update,
   Setup, AliceProject selection, Runtime Source, and Remote Transfer use the
   same bordered overlay shell and semantic selected/description states.

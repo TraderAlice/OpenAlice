@@ -69,6 +69,8 @@ import {
   renderSupervisorHeader,
   renderSupervisorHome,
   renderSupervisorPanel,
+  supervisorCommandTargets,
+  type SupervisorCommandTarget,
 } from './supervisor-tui-view.ts'
 import { connectSsh } from './ssh-connect.mjs'
 import { buildRemoteSshArgs } from './remote.mjs'
@@ -2185,6 +2187,7 @@ export async function runSupervisorTui(
       canvas.stop()
       resolve(code)
     }
+    screen.setDetachHandler(() => finish())
     const onTerminate = () => finish()
     const removeInputListener = ui.addInputListener((data) => {
       const pointer = parseSupervisorPointer(data)
@@ -2287,8 +2290,11 @@ export class SupervisorScreen implements Component {
   private readonly onPrepareManagedSource?: () => void
   private readonly requestRender?: () => void
   private readonly theme: SupervisorTuiTheme
+  private onDetach?: () => void
   private hoveredPanel?: SupervisorPanel
   private hoveredFleetTarget?: SupervisorFleetPointerTarget
+  private hoveredCommandTarget?: SupervisorCommandTarget
+  private commandTargets: SupervisorCommandTarget[] = []
   private logsFromEnd = 0
   private doctorOffset = 0
   private renderWidth = 80
@@ -2314,6 +2320,7 @@ export class SupervisorScreen implements Component {
       onPrepareManagedSource?: () => void
       requestRender?: () => void
       theme?: SupervisorTuiTheme
+      onDetach?: () => void
     } = {},
   ) {
     this.snapshot = {
@@ -2332,6 +2339,11 @@ export class SupervisorScreen implements Component {
     this.onPrepareManagedSource = callbacks.onPrepareManagedSource
     this.requestRender = callbacks.requestRender
     this.theme = callbacks.theme ?? createSupervisorTuiTheme({ NO_COLOR: '1' })
+    this.onDetach = callbacks.onDetach
+  }
+
+  setDetachHandler(handler: () => void): void {
+    this.onDetach = handler
   }
 
   update(patch: Partial<SupervisorSnapshot>): void {
@@ -2576,12 +2588,16 @@ export class SupervisorScreen implements Component {
     const fleetTarget = fleet
       ? supervisorFleetTargetAt(fleet, this.renderWidth, event.col, event.row - 4)
       : undefined
+    const commandTarget = commandAtPosition(this.commandTargets, event.col, event.row)
     if (event.motion) {
       const fleetHoverChanged = fleetTarget?.focus !== this.hoveredFleetTarget?.focus
         || fleetTarget?.index !== this.hoveredFleetTarget?.index
-      if (hovered !== this.hoveredPanel || fleetHoverChanged) {
+      const commandHoverChanged = commandTarget?.row !== this.hoveredCommandTarget?.row
+        || commandTarget?.label !== this.hoveredCommandTarget?.label
+      if (hovered !== this.hoveredPanel || fleetHoverChanged || commandHoverChanged) {
         this.hoveredPanel = hovered
         this.hoveredFleetTarget = fleetTarget
+        this.hoveredCommandTarget = commandTarget
         this.requestRender?.()
       }
       return true
@@ -2590,6 +2606,9 @@ export class SupervisorScreen implements Component {
       this.hoveredPanel = hovered
       this.selectPanel(hovered)
       return true
+    }
+    if (event.leftClick && commandTarget) {
+      return this.activatePointerCommand(commandTarget.label)
     }
     if (event.leftClick && fleet && fleetTarget) {
       const selected = fleetTarget.focus === 'machines'
@@ -2723,18 +2742,32 @@ export class SupervisorScreen implements Component {
               : actionBar(runtime, this.snapshot.context, width, isConfigRecovery(this.snapshot))),
       'q / Esc / Ctrl+C  Detach without stopping',
     )
+    const visibleLines = lines.map((line) => truncate(line, width))
+    this.commandTargets = supervisorCommandTargets(visibleLines)
     return decorateSupervisorFrame(
-      lines.map((line) => truncate(line, width)),
+      visibleLines,
       this.theme,
       {
         panel: this.snapshot.panel ?? 'overview',
         hoveredPanel: this.hoveredPanel,
+        hoveredCommand: this.hoveredCommandTarget,
         runtimeClass: runtime?.class,
       },
     )
   }
 
   invalidate(): void {}
+
+  private activatePointerCommand(label: string): boolean {
+    if (label === 'q' || label === 'q / Esc') {
+      this.onDetach?.()
+      return true
+    }
+    const input = pointerCommandInput(label)
+    if (!input) return true
+    if (input === 'escape') return this.handleEscape()
+    return this.handleKey(input, (data, key) => data === key)
+  }
 
   private scrollOperationalPanel(direction: number): void {
     if (this.snapshot.panel === 'logs') {
@@ -2883,6 +2916,47 @@ function panelAtColumn(
     offset = end + 3
   }
   return undefined
+}
+
+function commandAtPosition(
+  targets: SupervisorCommandTarget[],
+  column: number,
+  row: number,
+): SupervisorCommandTarget | undefined {
+  return targets.find((target) => (
+    target.row === row
+    && column >= target.startColumn
+    && column <= target.endColumn
+  ))
+}
+
+function pointerCommandInput(label: string): KeyId | undefined {
+  const inputs: Record<string, KeyId> = {
+    Enter: 'enter',
+    'y / Enter': 'enter',
+    'n / Esc': 'n',
+    'Tab / →': 'tab',
+    'Shift+Tab / ←': 'shift+tab',
+    Tab: 'tab',
+    'PgUp / PgDn': 'pageDown',
+    '↑ / ↓': 'down',
+    End: 'end',
+    Home: 'home',
+    '←': 'left',
+    s: 's',
+    o: 'o',
+    r: 'r',
+    x: 'x',
+    l: 'l',
+    d: 'd',
+    u: 'u',
+    i: 'i',
+    p: 'p',
+    m: 'm',
+    c: 'c',
+    '?': '?',
+  }
+  return inputs[label]
 }
 
 function fleetActionBar(

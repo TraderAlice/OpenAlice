@@ -4,6 +4,7 @@ import { resolveLaunchContext } from './launch-context.ts'
 import type { MachineFleetEnvelope, MachineInventory } from './machine-inventory.ts'
 import { createSupervisorFleetState, selectedFleetProject } from './supervisor-fleet.ts'
 import { createSupervisorTuiTheme } from './supervisor-tui-theme.ts'
+import { supervisorCommandTargets } from './supervisor-tui-view.ts'
 import {
   resolveSupervisorChannel,
   runSupervisorTui,
@@ -172,6 +173,81 @@ describe('Supervisor TUI screen', () => {
     })).toBe(true)
     expect(screen.snapshot.panel).toBe('logs')
     expect(actions).toContain('logs')
+  })
+
+  it('derives responsive keycap hit regions and clicks visible commands through keyboard semantics', () => {
+    expect(supervisorCommandTargets(['界 [ p ] Setup'])).toEqual([{
+      row: 1,
+      startColumn: 4,
+      endColumn: 8,
+      label: 'p',
+    }])
+    const actions: SupervisorAction[] = []
+    const settings = vi.fn()
+    const detach = vi.fn()
+    const requestRender = vi.fn()
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'overview',
+      runtime: { class: 'absent', endpoints: {} },
+    }, {
+      onAction: (action) => actions.push(action),
+      onSettings: settings,
+      onDetach: detach,
+      requestRender,
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+    })
+
+    let lines = screen.render(80)
+    let plainLines = lines.map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
+    let row = plainLines.findIndex((line) => line.includes('[ p ] Setup')) + 1
+    let col = plainLines[row - 1]!.indexOf('[ p ]') + 2
+    expect(screen.handlePointer({
+      button: 35, col, row, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(requestRender).toHaveBeenCalled()
+    expect(screen.render(80)[row - 1]).toContain('\u001b[1;38;2;230;255;252;48;2;24;64;69m[ p ]')
+    expect(screen.handlePointer({
+      button: 0, col, row, release: false, wheel: null, motion: false, leftClick: true,
+    })).toBe(true)
+    expect(settings).toHaveBeenCalledOnce()
+
+    lines = screen.render(80)
+    plainLines = lines.map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
+    row = plainLines.findIndex((line) => line.includes('[ Enter ]  Start')) + 1
+    col = plainLines[row - 1]!.indexOf('[ Enter ]') + 2
+    screen.handlePointer({
+      button: 0, col, row, release: false, wheel: null, motion: false, leftClick: true,
+    })
+    expect(actions).toContain('start-open')
+
+    screen.update({
+      runtime: {
+        class: 'running',
+        owner: { surface: 'cli-server', pid: 42 },
+        endpoints: { web: 'http://127.0.0.1:47331' },
+      },
+    })
+    screen.handleKey('x', matchesKey)
+    lines = screen.render(80)
+    plainLines = lines.map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
+    row = plainLines.findIndex((line) => line.includes('[ y / Enter ] Stop Runtime')) + 1
+    col = plainLines[row - 1]!.indexOf('[ y / Enter ]') + 2
+    screen.handlePointer({
+      button: 0, col, row, release: false, wheel: null, motion: false, leftClick: true,
+    })
+    expect(actions).toContain('stop')
+
+    screen.update({ panel: 'help' })
+    lines = screen.render(80)
+    plainLines = lines.map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
+    row = plainLines.findIndex((line) => line.includes('[ q ] Detach')) + 1
+    col = plainLines[row - 1]!.indexOf('[ q ]') + 2
+    screen.handlePointer({
+      button: 0, col, row, release: false, wheel: null, motion: false, leftClick: true,
+    })
+    expect(detach).toHaveBeenCalledOnce()
   })
 
   it('scrolls Logs and Doctor with keyboard and pointer while keeping contextual controls', () => {

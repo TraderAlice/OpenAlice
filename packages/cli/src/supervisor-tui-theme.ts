@@ -12,6 +12,7 @@ export interface SupervisorTuiTheme {
 export interface SupervisorFrameStyleOptions {
   panel: string
   hoveredPanel?: string
+  hoveredCommand?: { row: number; label: string }
   runtimeClass?: string
 }
 
@@ -45,6 +46,10 @@ export function decorateSupervisorFrame(
 ): string[] {
   if (!theme.enabled) return lines
   return lines.map((line, index) => {
+    if (options.hoveredCommand?.row === index + 1) {
+      const keycap = `[ ${options.hoveredCommand.label} ]`
+      return line.replace(keycap, theme.selected(keycap))
+    }
     if (index === 0) return theme.accentStrong(line)
     if (index === 1) return theme.accent(line)
     if (index === 2) return decorateTabs(line, theme, options.panel, options.hoveredPanel)

@@ -19,6 +19,13 @@ export interface SupervisorCommand {
   primary?: boolean
 }
 
+export interface SupervisorCommandTarget {
+  row: number
+  startColumn: number
+  endColumn: number
+  label: string
+}
+
 export function renderSupervisorHeader(
   version: string,
   channel: string,
@@ -83,6 +90,23 @@ export function renderSupervisorPanel(
   width: number,
 ): string[] {
   return renderCard(`${title}${meta ? ` · ${meta}` : ''}`, rows, Math.max(24, width))
+}
+
+export function supervisorCommandTargets(lines: string[]): SupervisorCommandTarget[] {
+  const targets: SupervisorCommandTarget[] = []
+  for (const [rowIndex, line] of lines.entries()) {
+    for (const match of line.matchAll(/\[ ([^\]]+) \]/gu)) {
+      if (match.index === undefined || !match[1]) continue
+      const startColumn = displayWidth(line.slice(0, match.index)) + 1
+      targets.push({
+        row: rowIndex + 1,
+        startColumn,
+        endColumn: startColumn + displayWidth(match[0]) - 1,
+        label: match[1],
+      })
+    }
+  }
+  return targets
 }
 
 function renderCard(title: string, body: string[], width: number): string[] {

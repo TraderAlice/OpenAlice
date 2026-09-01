@@ -131,9 +131,7 @@ already large `supervisor-tui.ts` application controller.
   selected the Railway Machine, and detach restored cursor, mouse, bracketed
   paste, and alternate-screen modes.
 - Focused screen/pointer specs, all 18 real-PTY workflows, CLI build/typecheck,
-  and the repository suite pass for the current increment. Help and modal
-  workflows still retain old presentation and remain active work rather than
-  accepted completion.
+  and the repository suite pass through the completed Fleet increment.
 - Runtime Logs now render as a numbered bounded snapshot with range position,
   live-tail state, keyboard paging, End-to-latest, mouse-wheel navigation, and a
   contextual reload bar. Doctor renders its summary and checks as semantic
@@ -144,6 +142,12 @@ already large `supervisor-tui.ts` application controller.
   states. Runtime Source and lifecycle/update confirmations now use the same
   framed cards and contextual keycaps. Their existing PTY-driven input,
   validation, and recovery state machines remain intact.
+- Visible keycaps now derive responsive, Unicode-display-width hit regions from
+  the final rendered frame. Pointer hover gives direct affordance feedback and
+  clicks feed the existing keyboard state machine, including confirmation and
+  detach behavior. A real 80x24 Default AliceProject run clicked Overview Help
+  and then Help Detach; teardown restored cursor, mouse, bracketed-paste, and
+  alternate-screen modes.
 
 ## Completion Criteria
 
