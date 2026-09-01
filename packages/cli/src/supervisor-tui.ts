@@ -441,15 +441,19 @@ export async function runSupervisorTui(
   let closeUpdateChannel: (() => void) | null = null
   let motionTimer: NodeJS.Timeout | undefined
   let screen: SupervisorScreen
-  const setMotionActive = (busy: boolean) => {
-    if (!motionEnabled || !busy) {
-      if (motionTimer) clearInterval(motionTimer)
-      motionTimer = undefined
+  const stopMotionTimer = () => {
+    if (motionTimer) clearInterval(motionTimer)
+    motionTimer = undefined
+  }
+  const syncMotionTimer = () => {
+    if (!motionEnabled || !screen.hasActiveMotion()) {
+      stopMotionTimer()
       return
     }
     if (motionTimer) return
     motionTimer = setInterval(() => {
       if (screen.advanceMotion()) ui.requestRender()
+      if (!screen.hasActiveMotion()) stopMotionTimer()
     }, 80)
     motionTimer.unref()
   }
@@ -499,7 +503,7 @@ export async function runSupervisorTui(
     requestRender: () => ui.requestRender(),
     theme: tuiTheme,
     motionEnabled,
-    onBusyChange: setMotionActive,
+    onMotionDemandChange: syncMotionTimer,
   })
   ui.addChild(screen)
 
@@ -607,18 +611,14 @@ export async function runSupervisorTui(
       screen.update({
         runtime: nextRuntime,
         fleet: currentFleet && context
-          ? selectFleetProjectByKey(
-              replaceFleetInventory(
-                currentFleet,
-                currentFleet.generatedAt,
-                alignLocalFleetProject(
-                  currentFleet.machines,
-                  context,
-                  nextRuntime,
-                ),
+          ? replaceFleetInventory(
+              currentFleet,
+              currentFleet.generatedAt,
+              alignLocalFleetProject(
+                currentFleet.machines,
+                context,
+                nextRuntime,
               ),
-              'local',
-              context.project,
             )
           : currentFleet,
         diagnostic: undefined,
@@ -2194,7 +2194,7 @@ export async function runSupervisorTui(
       settled = true
       active = false
       clearInterval(poll)
-      setMotionActive(false)
+      stopMotionTimer()
       for (const controller of tunnelControllers.values()) controller.abort()
       tunnelControllers.clear()
       closeSourcePrompt?.()
@@ -2254,13 +2254,14 @@ export async function runSupervisorTui(
     } catch (error: unknown) {
       active = false
       clearInterval(poll)
-      setMotionActive(false)
+      stopMotionTimer()
       removeInputListener()
       process.off('SIGTERM', onTerminate)
       process.off('SIGINT', onTerminate)
       canvas.stop()
       throw error
     }
+    syncMotionTimer()
     void refreshFleet({ quiet: true })
     void discoverUpdateInBackground()
   })
@@ -2314,13 +2315,15 @@ export class SupervisorScreen implements Component {
   private readonly requestRender?: () => void
   private readonly theme: SupervisorTuiTheme
   private readonly motionEnabled: boolean
-  private readonly onBusyChange?: (busy: boolean) => void
+  private readonly onMotionDemandChange?: () => void
   private onDetach?: () => void
   private hoveredPanel?: SupervisorPanel
   private hoveredFleetTarget?: SupervisorFleetPointerTarget
   private hoveredCommandTarget?: SupervisorCommandTarget
   private commandTargets: SupervisorCommandTarget[] = []
   private motionFrame = 0
+  private introFrame?: number
+  private runtimePulse = false
   private logsFromEnd = 0
   private doctorOffset = 0
   private renderWidth = 80
@@ -2347,7 +2350,7 @@ export class SupervisorScreen implements Component {
       requestRender?: () => void
       theme?: SupervisorTuiTheme
       motionEnabled?: boolean
-      onBusyChange?: (busy: boolean) => void
+      onMotionDemandChange?: () => void
       onDetach?: () => void
     } = {},
   ) {
@@ -2368,7 +2371,8 @@ export class SupervisorScreen implements Component {
     this.requestRender = callbacks.requestRender
     this.theme = callbacks.theme ?? createSupervisorTuiTheme({ NO_COLOR: '1' })
     this.motionEnabled = callbacks.motionEnabled ?? true
-    this.onBusyChange = callbacks.onBusyChange
+    this.onMotionDemandChange = callbacks.onMotionDemandChange
+    this.introFrame = this.motionEnabled ? 0 : undefined
     this.onDetach = callbacks.onDetach
   }
 
@@ -2381,16 +2385,43 @@ export class SupervisorScreen implements Component {
     if (patch.logs !== undefined && patch.logs !== this.snapshot.logs) this.logsFromEnd = 0
     if (patch.doctor !== undefined && patch.doctor !== this.snapshot.doctor) this.doctorOffset = 0
     if (patch.busy !== undefined && patch.busy !== this.snapshot.busy) this.motionFrame = 0
+    if (patch.runtime !== undefined) {
+      const nextFleet = patch.fleet ?? this.snapshot.fleet
+      const anyFleetRuntime = nextFleet?.machines.some((machine) => (
+        machine.projects.some((project) => (
+          project.runtime.class === 'running' || project.runtime.class === 'owned_elsewhere'
+        ))
+      )) ?? false
+      this.runtimePulse = this.motionEnabled
+        && (patch.runtime?.class === 'running'
+          || patch.runtime?.class === 'owned_elsewhere'
+          || anyFleetRuntime)
+        ? !this.runtimePulse
+        : false
+    }
     this.snapshot = { ...this.snapshot, ...patch }
     const isBusy = Boolean(this.snapshot.busy)
-    if (isBusy !== wasBusy) this.onBusyChange?.(isBusy)
+    if (isBusy !== wasBusy) this.onMotionDemandChange?.()
     this.requestRender?.()
   }
 
   advanceMotion(): boolean {
-    if (!this.motionEnabled || !this.snapshot.busy) return false
-    this.motionFrame = (this.motionFrame + 1) % 10
-    return true
+    if (!this.motionEnabled) return false
+    let changed = false
+    if (this.introFrame !== undefined) {
+      this.introFrame = this.introFrame >= 8 ? undefined : this.introFrame + 1
+      changed = true
+    }
+    if (this.snapshot.busy) {
+      this.motionFrame = (this.motionFrame + 1) % 10
+      changed = true
+    }
+    return changed
+  }
+
+  hasActiveMotion(): boolean {
+    return this.motionEnabled
+      && (this.introFrame !== undefined || Boolean(this.snapshot.busy))
   }
 
   cancelConfirmation(): void {
@@ -2702,6 +2733,7 @@ export class SupervisorScreen implements Component {
         this.snapshot.fleet,
         width,
         this.hoveredFleetTarget,
+        this.runtimePulse,
       ))
     } else if (this.snapshot.panel === 'logs') {
       lines.push(...renderLogs(this.snapshot.logs, width, this.logsFromEnd))
@@ -2733,6 +2765,7 @@ export class SupervisorScreen implements Component {
         ...(uptime ? { uptime } : {}),
         guidance: renderGuidance(runtime, this.snapshot.context)[0] ?? 'Runtime status is unavailable.',
         primaryAction: primaryActionLabel(runtime),
+        pulse: this.runtimePulse,
       }, width))
     }
 
@@ -2793,6 +2826,7 @@ export class SupervisorScreen implements Component {
         hoveredPanel: this.hoveredPanel,
         hoveredCommand: this.hoveredCommandTarget,
         runtimeClass: runtime?.class,
+        introFrame: this.introFrame,
       },
     )
   }

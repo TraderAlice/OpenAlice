@@ -11,6 +11,7 @@ export interface SupervisorHomeView {
   uptime?: string
   guidance: string
   primaryAction: string
+  pulse?: boolean
 }
 
 export interface SupervisorCommand {
@@ -43,7 +44,7 @@ export function renderSupervisorHome(
   width: number,
 ): string[] {
   const cardWidth = Math.max(24, width)
-  const state = stateBadge(view.state)
+  const state = stateBadge(view.state, view.pulse ?? false)
   const hero = renderCard('AliceProject', [
     labelAndTail(view.projectName, state, cardWidth - 4),
     view.guidance,
@@ -139,9 +140,10 @@ function labelAndTail(label: string, tail: string, width: number): string {
   return `${safeLabel}${' '.repeat(Math.max(1, width - displayWidth(safeLabel) - tailWidth))}${safeTail}`
 }
 
-function stateBadge(state: string): string {
-  if (state === 'running') return '● RUNNING'
-  if (state === 'owned_elsewhere') return '● RUNNING ELSEWHERE'
+function stateBadge(state: string, pulse: boolean): string {
+  const runningGlyph = pulse ? '◉' : '●'
+  if (state === 'running') return `${runningGlyph} RUNNING`
+  if (state === 'owned_elsewhere') return `${runningGlyph} RUNNING ELSEWHERE`
   if (state === 'absent') return '○ STOPPED'
   if (state === 'incompatible') return '◆ NEEDS ATTENTION'
   if (state === 'unhealthy') return '◆ UNHEALTHY'

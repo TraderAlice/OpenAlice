@@ -130,7 +130,9 @@ path is intentionally parameter-free:
   bordered panes with a stable Selection inspector, while narrow terminals
   drill down from Machines to Projects;
   selection and list windows survive resize, use Unicode display width, and
-  keep the action/detach footer visible at the supported 80×24 baseline;
+  keep the action/detach footer visible at the supported 80×24 baseline.
+  Background refresh of the selected local Runtime updates its inventory row
+  without moving a user who is inspecting another Machine or AliceProject;
 - the Overview/Fleet/Logs/Doctor/Help navigation accepts Tab, left/right, and
   `[`/`]`; the visible tabs accept pointer hover and click. `↑`/`↓` move within
   the active Fleet pane and the mouse wheel moves the focused Fleet selection.
@@ -151,6 +153,11 @@ path is intentionally parameter-free:
   and failed states retain distinct glyph and text labels without depending on
   color; only the busy glyph animates. The rail is a presentation of existing
   Supervisor state and does not introduce a second lifecycle or error path;
+- color-capable motion-enabled sessions play one bounded brand-color sweep on
+  entry, then settle to the static OpenAlice header. A successfully refreshed
+  running Runtime alternates `●`/`◉` as a low-frequency heartbeat in Overview
+  and Fleet; the adjacent `RUNNING`/`running` text never changes, and failed
+  probes still surface through the diagnostic rail rather than animation;
 - Help is a grouped keyboard map rather than another prose screen. Update,
   Setup, AliceProject selection, Runtime Source, and Remote Transfer use the
   same bordered overlay shell and semantic selected/description states.

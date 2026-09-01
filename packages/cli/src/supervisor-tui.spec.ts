@@ -79,7 +79,7 @@ describe('Supervisor TUI screen', () => {
   })
 
   it('renders semantic activity rails and advances only enabled busy motion', () => {
-    const busyChanges = vi.fn()
+    const motionDemandChanges = vi.fn()
     const animated = new SupervisorScreen({
       version: 'dev',
       channel: 'dev',
@@ -87,17 +87,17 @@ describe('Supervisor TUI screen', () => {
     }, {
       theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
       motionEnabled: true,
-      onBusyChange: busyChanges,
+      onMotionDemandChange: motionDemandChanges,
     })
     animated.update({ busy: 'Starting Runtime' })
-    expect(busyChanges).toHaveBeenLastCalledWith(true)
+    expect(motionDemandChanges).toHaveBeenCalledOnce()
     const first = animated.render(80).find((line) => line.includes('WORKING'))
     expect(first).toContain('\u001b[1;38;2;183;255;248;48;2;12;42;45m')
     expect(animated.advanceMotion()).toBe(true)
     const second = animated.render(80).find((line) => line.includes('WORKING'))
     expect(second).not.toBe(first)
     animated.update({ busy: undefined })
-    expect(busyChanges).toHaveBeenLastCalledWith(false)
+    expect(motionDemandChanges).toHaveBeenCalledTimes(2)
 
     const reduced = new SupervisorScreen({
       version: 'dev',
@@ -106,7 +106,47 @@ describe('Supervisor TUI screen', () => {
       busy: 'Starting Runtime',
     }, { motionEnabled: false })
     expect(reduced.advanceMotion()).toBe(false)
+    expect(reduced.hasActiveMotion()).toBe(false)
     expect(reduced.render(80).join('\n')).toContain('◆  WORKING  Starting Runtime…')
+  })
+
+  it('settles a bounded brand entrance and pulses running state only on refresh', () => {
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'running', endpoints: {} },
+    }, {
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+      motionEnabled: true,
+    })
+
+    expect(screen.hasActiveMotion()).toBe(true)
+    const intro = screen.render(80)[0]
+    expect(intro).toContain('\u001b[1;38;2;116;235;226m◆')
+    screen.advanceMotion()
+    expect(screen.render(80)[0]).not.toBe(intro)
+    for (let frame = 0; frame < 8; frame += 1) screen.advanceMotion()
+    expect(screen.hasActiveMotion()).toBe(false)
+    expect(screen.render(80)[0]).toContain('\u001b[1;38;2;116;235;226m◆  OpenAlice Supervisor')
+
+    screen.update({ runtime: { class: 'running', endpoints: {} } })
+    expect(screen.render(80).join('\n')).toContain('◉ RUNNING')
+    screen.update({ runtime: { class: 'running', endpoints: {} } })
+    expect(screen.render(80).join('\n')).toContain('● RUNNING')
+
+    const fleetScreen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'fleet',
+      runtime: { class: 'absent', endpoints: {} },
+      fleet: createSupervisorFleetState(
+        '2026-08-23T00:00:00Z',
+        fleetMachines(),
+        'default',
+      ),
+    }, { motionEnabled: true })
+    fleetScreen.update({ runtime: { class: 'absent', endpoints: {} } })
+    expect(fleetScreen.render(100).join('\n')).toContain('◉ running')
   })
 
   it('describes an externally owned Runtime without offering refused mutations', () => {
@@ -582,6 +622,50 @@ describe('Supervisor TUI screen', () => {
     })).resolves.toBe(0)
 
     expect(tunnelAborted).toBe(true)
+  })
+
+  it('preserves remote Fleet focus while the selected local Runtime polls', async () => {
+    let inputListener: ((data: string) => unknown) | undefined
+    let screen: SupervisorScreen | undefined
+    const fleet: MachineFleetEnvelope = {
+      schemaVersion: 1,
+      generatedAt: '2026-08-23T00:00:00Z',
+      machines: fleetMachines(),
+    }
+    class FakeTui {
+      addChild(component: SupervisorScreen): void { screen = component }
+      addInputListener(listener: (data: string) => unknown): () => void {
+        inputListener = listener
+        return () => undefined
+      }
+      requestRender(): void {}
+      setShowHardwareCursor(): void {}
+      start(): void {
+        queueMicrotask(() => {
+          inputListener?.('tab')
+          inputListener?.('down')
+          inputListener?.('tab')
+          setTimeout(() => inputListener?.('q'), 40)
+        })
+      }
+      stop(): void {}
+    }
+
+    await expect(runSupervisorTui({}, {
+      stdin: { isTTY: true } as NodeJS.ReadStream,
+      stdout: { isTTY: true } as NodeJS.WriteStream,
+      resolveContext: () => resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' }),
+      inspect: async () => ({ class: 'absent', owner: null, endpoints: {} }),
+      seedFleet: async () => fleet,
+      inspectFleet: async () => fleet,
+      pollIntervalMs: 5,
+      discoverUpdate: async () => null,
+      loadTui: async () => ({ ProcessTerminal: class {}, TUI: FakeTui, matchesKey }) as never,
+    })).resolves.toBe(0)
+
+    const selectedFleet = screen?.snapshot.fleet
+    expect(selectedFleet?.machines[selectedFleet.selectedMachine]?.key).toBe('cloud')
+    expect(selectedFleet?.focus).toBe('projects')
   })
 
   it('re-probes and starts a selected stopped remote AliceProject', async () => {

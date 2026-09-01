@@ -172,15 +172,16 @@ export function renderSupervisorFleet(
   state: SupervisorFleetState,
   width: number,
   hovered?: SupervisorFleetPointerTarget,
+  pulse = false,
 ): string[] {
-  if (width < 72) return renderNarrowFleet(state, width, hovered)
+  if (width < 72) return renderNarrowFleet(state, width, hovered, pulse)
   const leftWidth = Math.max(28, Math.min(36, Math.floor(width * 0.38)))
   const gap = 3
   const rightWidth = Math.max(1, width - leftWidth - gap)
   const machine = selectedFleetMachine(state)
   const projectIndex = machine ? state.selectedProjects[machine.key] ?? 0 : 0
   const machineRows = renderMachineRows(state, leftWidth - 4, hovered)
-  const projectRows = renderProjectRows(state, rightWidth - 4, hovered)
+  const projectRows = renderProjectRows(state, rightWidth - 4, hovered, pulse)
   const leftPane = renderPane(
     `Machines · ${positionLabel(state.selectedMachine, state.machines.length)}`,
     machineRows,
@@ -203,7 +204,7 @@ export function renderSupervisorFleet(
       gap,
     ))
   }
-  lines.push('', ...renderDetailCard(state, width))
+  lines.push('', ...renderDetailCard(state, width, pulse))
   return lines.map((line) => truncateDisplayWidth(line, width))
 }
 
@@ -211,6 +212,7 @@ function renderNarrowFleet(
   state: SupervisorFleetState,
   width: number,
   hovered?: SupervisorFleetPointerTarget,
+  pulse = false,
 ): string[] {
   const machine = selectedFleetMachine(state)
   if (state.focus === 'machines') {
@@ -222,18 +224,18 @@ function renderNarrowFleet(
         true,
       ),
       '',
-      ...renderDetailCard(state, width),
+      ...renderDetailCard(state, width, pulse),
     ].map((line) => truncateDisplayWidth(line, width))
   }
   return [
     ...renderPane(
       `AliceProjects · ${machine?.displayName ?? 'none'} · ${positionLabel(state.selectedProjects[machine?.key ?? ''] ?? 0, machine?.projects.length ?? 0)}`,
-      renderProjectRows(state, width - 4, hovered),
+      renderProjectRows(state, width - 4, hovered, pulse),
       width,
       true,
     ),
     '',
-    ...renderDetailCard(state, width),
+    ...renderDetailCard(state, width, pulse),
   ].map((line) => truncateDisplayWidth(line, width))
 }
 
@@ -294,6 +296,7 @@ function renderProjectRows(
   state: SupervisorFleetState,
   width: number,
   hovered?: SupervisorFleetPointerTarget,
+  pulse = false,
 ): string[] {
   const machine = selectedFleetMachine(state)
   if (!machine) return ['  Select a Machine']
@@ -308,13 +311,13 @@ function renderProjectRows(
       : hovered?.focus === 'projects' && hovered.index === index ? '» ' : '  '
     const marks = [
       item.isDefault ? 'default' : '',
-      projectStatus(item),
+      projectStatus(item, pulse),
     ].filter(Boolean).join(' · ')
     return labelAndTail(`${prefix}${item.displayName}`, marks, width)
   })
 }
 
-function fleetSelectionDetail(state: SupervisorFleetState): string[] {
+function fleetSelectionDetail(state: SupervisorFleetState, pulse = false): string[] {
   const machine = selectedFleetMachine(state)
   const project = selectedFleetProject(state)
   if (!machine) return ['No Machine selected.']
@@ -327,13 +330,13 @@ function fleetSelectionDetail(state: SupervisorFleetState): string[] {
   }
   const tunnel = state.tunnels[fleetTunnelKey(machine.key, project.key)]
   return [
-    `${projectStatus(project)} ${project.displayName} · ${project.product === 'nano' ? 'NanoAlice' : 'TraderAlice'} · ${project.runtime.ownerSurface ?? 'no owner'}`,
+    `${projectStatus(project, pulse)} ${project.displayName} · ${project.product === 'nano' ? 'NanoAlice' : 'TraderAlice'} · ${project.runtime.ownerSurface ?? 'no owner'}`,
     [project.home, tunnel ? `tunnel ${tunnel}` : ''].filter(Boolean).join(' · '),
   ]
 }
 
-function renderDetailCard(state: SupervisorFleetState, width: number): string[] {
-  return renderPane('Selection', fleetSelectionDetail(state), width, false, 2)
+function renderDetailCard(state: SupervisorFleetState, width: number, pulse = false): string[] {
+  return renderPane('Selection', fleetSelectionDetail(state, pulse), width, false, 2)
 }
 
 function renderPane(
@@ -371,10 +374,11 @@ function machineGlyph(machine: MachineInventory): string {
   return '◆'
 }
 
-function projectStatus(project: MachineProjectInventory): string {
+function projectStatus(project: MachineProjectInventory, pulse = false): string {
   if (!project.available) return '◇ missing'
-  if (project.runtime.class === 'running') return '● running'
-  if (project.runtime.class === 'owned_elsewhere') return '● external'
+  const runningGlyph = pulse ? '◉' : '●'
+  if (project.runtime.class === 'running') return `${runningGlyph} running`
+  if (project.runtime.class === 'owned_elsewhere') return `${runningGlyph} external`
   if (project.runtime.class === 'absent') return '○ stopped'
   if (project.runtime.class === 'incompatible') return '◆ incompatible'
   if (project.runtime.class === 'unhealthy') return '◆ unhealthy'

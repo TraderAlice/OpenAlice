@@ -112,7 +112,7 @@ already large `supervisor-tui.ts` application controller.
   when the distributed payload changes.
 - [x] Replace the plain Working/Notice/Diagnostic tail with a semantic,
   full-width activity rail and purposeful OMP-inspired busy animation.
-- [ ] Add a bounded one-shot entrance treatment and subtle Runtime heartbeat;
+- [x] Add a bounded one-shot entrance treatment and subtle Runtime heartbeat;
   preserve the static reduced-motion frame as the complete experience.
 
 ## Progress
@@ -180,6 +180,18 @@ already large `supervisor-tui.ts` application controller.
   is present in the published CLI file set. The 80 ms motion timer now exists
   only while `busy` is true and is torn down on completion, reduced motion,
   detach, signal exit, and TUI startup failure.
+- A nine-frame brand-color entrance now settles in under a second, after which
+  no intro timer remains. Successful Runtime probes drive a low-frequency
+  `●`/`◉` heartbeat without changing status text. Real Fleet acceptance against
+  Railway Beta / Main Cloud exposed and fixed a pre-existing selection bug:
+  the local Runtime poll no longer snaps a remote Machine/Project inspection
+  back to the selected local AliceProject. Repeated live probes preserved the
+  remote pane focus while repainting only Main Cloud's running glyph; a focused
+  runSupervisorTui regression covers the same boundary.
+- Entrance/heartbeat acceptance passes with 56 focused feedback, screen, and
+  real-PTY tests, CLI build/typecheck, root TypeScript check, and the 685-file
+  repository suite (684 passed, 1 skipped; 6064 tests passed, 10 skipped). The
+  Docker installer smoke also passes for the updated distributed CLI payload.
 
 ## Completion Criteria
 
