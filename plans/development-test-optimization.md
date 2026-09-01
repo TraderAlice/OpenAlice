@@ -74,9 +74,9 @@ currently purchases.
   macOS x64; a separate run accepted all candidates before R2 activation failed.
   Candidate correctness and mutable-channel activation should be separable so
   an external upload failure does not encourage rebuilding accepted bytes.
-- The historical `codex/usability-improvements` branch remains in routine
-  workflow triggers even though new work no longer targets it. Trigger cleanup
-  should follow a live branch/consumer check rather than preserving it forever.
+- The historical `codex/usability-improvements` branch had no open PR using it
+  as base or head but remained in routine workflow triggers. The branch itself
+  stays intact; only the stale CI routing is removed.
 
 ## Objective
 
@@ -187,7 +187,7 @@ make development metrics look better.
   same vocabulary, escalation rules, and PR evidence contract.
 - [x] Add focused contract coverage for the command and collection-wide
   force-rerun boundaries.
-- [ ] Remove or narrow confirmed routine hosted over-triggers, beginning with
+- [x] Remove or narrow confirmed routine hosted over-triggers, beginning with
   the UI-only CLI installer fixture, only when the final Bun/master acceptance
   route remains explicit.
 - [x] Measure the rolling `dev` native CLI publication path and identify its

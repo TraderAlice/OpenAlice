@@ -102,8 +102,10 @@ describe('exact beta release-preparation workflow lane', () => {
   })
 
   it('skips CLI PR acceptance without changing the dev publication chain', () => {
-    const jobs = workflow('cli-installer-smoke.yml').jobs
+    const cli = workflow('cli-installer-smoke.yml')
+    const jobs = cli.jobs
     const scope = jobs['release-prep-scope']
+    expect(cli.on?.pull_request?.branches).toEqual(['master'])
     expectTrustedClassifier(scope)
     expectOutcomeGatedOutput(scope)
     expect(scope.if).toBe("github.event_name != 'push'")

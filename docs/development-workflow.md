@@ -315,13 +315,14 @@ delivery lane:
   external Broker Pack fixture run once on Linux x64; `master`, scheduled, and
   final Release lanes keep the broader native-host coverage. The scheduled CI
   run remains the daily full cross-platform backstop for current `dev`.
-- Installer or distributed-CLI PRs to a routine integration base retain only
-  the cheap deterministic clean-container HTTP install against the checked-out
-  tree. Bun host feasibility, package-manager, and managed-SSH acceptance run
-  locally during development and in the `master`/manual lanes. After merge,
-  the `dev` push separately downloads `raw/.../dev/install` into a clean
-  container, installs `--channel dev`, and verifies the live preview channel's
-  provenance, commands, server control surface, and idempotent reuse.
+- Installer or distributed-CLI work proves the checked-out tree locally with
+  the deterministic clean-container HTTP install. A routine `dev` PR does not
+  purchase a second hosted copy of that fixture. After merge, the `dev` push
+  builds every native candidate, downloads `raw/.../dev/install` into a clean
+  host, installs `--channel dev`, and verifies the live preview channel's
+  provenance, commands, server control surface, and idempotent reuse. Hosted
+  checkout, Bun host, package-manager, and managed-SSH candidate acceptance
+  begins at the `master`/manual boundary.
 - A push to `master` always runs the complete matrix. Reusing PR evidence after
   merge remains a useful accepted-tree provenance backstop. For stable it is a
   synchronous release gate. For an exact beta, it may finish after dispatch and
