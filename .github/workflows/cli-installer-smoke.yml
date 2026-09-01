@@ -83,6 +83,7 @@ jobs:
     if: >-
       !cancelled() &&
       github.event_name != 'push' &&
+      (github.event_name != 'pull_request' || github.base_ref == 'master') &&
       (
         needs.release-prep-scope.result != 'success' ||
         needs.release-prep-scope.outputs.beta_release_prep != 'true'
@@ -171,6 +172,7 @@ jobs:
     if: >-
       !cancelled() &&
       github.event_name != 'push' &&
+      (github.event_name != 'pull_request' || github.base_ref == 'master') &&
       (
         needs.release-prep-scope.result != 'success' ||
         needs.release-prep-scope.outputs.beta_release_prep != 'true'
