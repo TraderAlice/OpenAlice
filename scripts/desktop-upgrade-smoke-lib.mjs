@@ -1,6 +1,106 @@
-import { resolve } from 'node:path'
+import { existsSync, lstatSync, readlinkSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 
 export const DESKTOP_UPGRADE_RECEIPT_SCHEMA_VERSION = 1
+export const CHROMIUM_PROFILE_SINGLETON_NAMES = Object.freeze([
+  'SingletonLock',
+  'SingletonSocket',
+  'SingletonCookie',
+])
+
+export function chromiumProfileReleaseState(entries) {
+  const pending = entries
+    .filter((entry) => entry.present)
+    .map((entry) => {
+      const kind = entry.kind ? ` [${entry.kind}]` : ''
+      const target = entry.target ? ` -> ${entry.target}` : ''
+      const detail = entry.detail ? ` (${entry.detail})` : ''
+      return `${entry.name}${kind}${target}${detail}`
+    })
+  return { released: pending.length === 0, pending }
+}
+
+// Chromium's macOS singleton entries are symlinks. Their targets can disappear
+// before Chromium removes the profile entry itself, so existsSync() alone
+// would mistake the exact dangling-link restart race for a released profile.
+export function inspectChromiumProfileSingleton(profileRoot, name) {
+  const path = join(profileRoot, name)
+  try {
+    const stat = lstatSync(path)
+    if (stat.isSymbolicLink()) {
+      let target
+      try {
+        target = readlinkSync(path)
+      } catch (error) {
+        if (error?.code === 'ENOENT') return { name, present: false }
+        return {
+          name,
+          present: true,
+          kind: 'symlink',
+          detail: `readlink failed: ${error instanceof Error ? error.message : String(error)}`,
+        }
+      }
+      return {
+        name,
+        present: true,
+        kind: 'symlink',
+        target,
+        ...(!existsSync(path) ? { detail: 'dangling target' } : {}),
+      }
+    }
+    return {
+      name,
+      present: true,
+      kind: stat.isSocket() ? 'socket' : stat.isFile() ? 'file' : 'other',
+    }
+  } catch (error) {
+    if (error?.code === 'ENOENT') return { name, present: false }
+    return {
+      name,
+      present: true,
+      kind: 'inspection-error',
+      detail: error instanceof Error ? error.message : String(error),
+    }
+  }
+}
+
+export async function waitForChromiumProfileRelease(profileRoot, options = {}) {
+  const {
+    label = 'OpenAlice',
+    childExitCode = 'unknown',
+    childPid = '<unknown>',
+    timeoutMs = 10_000,
+    pollIntervalMs = 100,
+    inspect = inspectChromiumProfileSingleton,
+    now = Date.now,
+    sleep = (ms) => new Promise((resolveSleep) => setTimeout(resolveSleep, ms)),
+    log = console.log,
+  } = options
+  const startedAt = now()
+  const deadline = startedAt + timeoutMs
+  let lastState = { released: false, pending: [] }
+  let observedPending = false
+  while (true) {
+    lastState = chromiumProfileReleaseState(
+      CHROMIUM_PROFILE_SINGLETON_NAMES.map((name) => inspect(profileRoot, name)),
+    )
+    if (lastState.released) {
+      if (observedPending) {
+        log(`[desktop-upgrade] ${label} Chromium profile released after ${now() - startedAt}ms`)
+      }
+      return
+    }
+    observedPending = true
+    const remainingMs = deadline - now()
+    if (remainingMs <= 0) break
+    await sleep(Math.min(pollIntervalMs, remainingMs))
+  }
+  throw new Error(
+    `${label} exited ${childExitCode ?? 'unknown'} but Chromium profile remained claimed ` +
+    `after ${timeoutMs}ms (pid=${childPid ?? '<unknown>'}, profile=${profileRoot}): ` +
+    lastState.pending.join(', '),
+  )
+}
 
 export function versionFromTag(tag) {
   return typeof tag === 'string' ? tag.replace(/^v/, '') : ''

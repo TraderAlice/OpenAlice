@@ -54,6 +54,7 @@
     "vendor:runtime": "node scripts/vendor-managed-runtime.mjs",
     "test": "vitest run",
     "test:cli": "pnpm -F @traderalice/openalice-cli test",
+    "test:platform-contracts": "vitest run --project node packages/cli/src packages/guardian-runtime/src scripts/guardian/shared.spec.ts scripts/pnpm-command.spec.ts scripts/railway-entrypoint.spec.ts services/connector/src/core/io-journal.spec.ts services/uta/src/uta-startup-resilience.spec.ts src/core/windows-workspace-shell.spec.ts src/services/auth/session-store.spec.ts src/services/auth/token-store.spec.ts src/workspaces/adapters/ai-config.spec.ts src/workspaces/adapters/shell.spec.ts src/workspaces/agent-conversation-log.spec.ts src/workspaces/agent-detect.spec.ts src/workspaces/cli/shim.spec.ts src/workspaces/headless-task-win-shim.spec.ts src/workspaces/spawn-env.spec.ts src/workspaces/win-command.spec.ts src/workspaces/workspace-creator.spec.ts",
     "test:watch": "vitest",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "test:uta:live-paper": "vitest run --config vitest.uta-live.config.ts",

@@ -1,5 +1,6 @@
-import { resolve } from 'node:path'
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
@@ -8,9 +9,13 @@ import {
   buildUpgradeSeedExpression,
   buildUpgradeVerifyExpression,
   candidateDesktopAssetName,
+  CHROMIUM_PROFILE_SINGLETON_NAMES,
+  chromiumProfileReleaseState,
   desktopUpgradeWorkspaceTags,
+  inspectChromiumProfileSingleton,
   previousDesktopAssetName,
   selectPreviousDesktopTag,
+  waitForChromiumProfileRelease,
   windowsInstallerArgs,
 } from './desktop-upgrade-smoke-lib.mjs'
 
@@ -51,6 +56,113 @@ describe('desktop upgrade smoke planning', () => {
     })
     expect(tags.tag).toMatch(/^[a-z0-9][a-z0-9_-]{0,32}$/)
     expect(tags.postUpgradeTag).toMatch(/^[a-z0-9][a-z0-9_-]{0,32}$/)
+  })
+
+  it('requires every Chromium profile singleton entry to be absent', () => {
+    expect(CHROMIUM_PROFILE_SINGLETON_NAMES).toEqual([
+      'SingletonLock',
+      'SingletonSocket',
+      'SingletonCookie',
+    ])
+    expect(chromiumProfileReleaseState(
+      CHROMIUM_PROFILE_SINGLETON_NAMES.map((name) => ({ name, present: false })),
+    )).toEqual({ released: true, pending: [] })
+
+    expect(chromiumProfileReleaseState([
+      {
+        name: 'SingletonLock',
+        present: true,
+        kind: 'symlink',
+        target: 'runner.local-1234',
+        detail: 'dangling target',
+      },
+      { name: 'SingletonSocket', present: false },
+      { name: 'SingletonCookie', present: false },
+    ])).toEqual({
+      released: false,
+      pending: ['SingletonLock [symlink] -> runner.local-1234 (dangling target)'],
+    })
+  })
+
+  it.skipIf(process.platform === 'win32')(
+    'treats a real dangling singleton symlink as claimed until it is unlinked',
+    () => {
+      const profileRoot = mkdtempSync(join(tmpdir(), 'openalice-chromium-singleton-'))
+      const lockPath = join(profileRoot, 'SingletonLock')
+      try {
+        symlinkSync('runner.local-1234', lockPath)
+        expect(inspectChromiumProfileSingleton(profileRoot, 'SingletonLock')).toEqual({
+          name: 'SingletonLock',
+          present: true,
+          kind: 'symlink',
+          target: 'runner.local-1234',
+          detail: 'dangling target',
+        })
+
+        unlinkSync(lockPath)
+        expect(inspectChromiumProfileSingleton(profileRoot, 'SingletonLock')).toEqual({
+          name: 'SingletonLock',
+          present: false,
+        })
+      } finally {
+        rmSync(profileRoot, { recursive: true, force: true })
+      }
+    },
+  )
+
+  it('polls until Chromium removes the profile claim', async () => {
+    let nowMs = 0
+    let lockPresent = true
+    const logs: string[] = []
+
+    await waitForChromiumProfileRelease('/tmp/released-profile', {
+      label: 'candidate restart 0.91.0',
+      timeoutMs: 500,
+      pollIntervalMs: 100,
+      now: () => nowMs,
+      sleep: async (ms: number) => {
+        nowMs += ms
+        lockPresent = false
+      },
+      inspect: (_profileRoot: string, name: string) => ({
+        name,
+        present: name === 'SingletonLock' && lockPresent,
+      }),
+      log: (message: string) => logs.push(message),
+    })
+
+    expect(nowMs).toBe(100)
+    expect(logs).toEqual([
+      '[desktop-upgrade] candidate restart 0.91.0 Chromium profile released after 100ms',
+    ])
+  })
+
+  it('fails at the bounded deadline with the remaining singleton details', async () => {
+    let nowMs = 0
+
+    await expect(waitForChromiumProfileRelease('/tmp/stuck-profile', {
+      label: 'candidate 0.91.0',
+      childExitCode: 0,
+      childPid: 4321,
+      timeoutMs: 250,
+      pollIntervalMs: 100,
+      now: () => nowMs,
+      sleep: async (ms: number) => { nowMs += ms },
+      inspect: (_profileRoot: string, name: string) => name === 'SingletonLock'
+        ? {
+            name,
+            present: true,
+            kind: 'symlink',
+            target: 'runner.local-4321',
+            detail: 'dangling target',
+          }
+        : { name, present: false },
+    })).rejects.toThrow(
+      'candidate 0.91.0 exited 0 but Chromium profile remained claimed after 250ms ' +
+      '(pid=4321, profile=/tmp/stuck-profile): ' +
+      'SingletonLock [symlink] -> runner.local-4321 (dangling target)',
+    )
+    expect(nowMs).toBe(250)
   })
 
   it('maps native release artifacts by host architecture', () => {

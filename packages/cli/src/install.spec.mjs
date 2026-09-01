@@ -272,6 +272,8 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
 
     await expect(runInstaller(fixture, installRoot, ['--yes'], { PATH: path }))
       .resolves.toMatchObject({ stdout: expect.stringContaining('OpenAlice 0.91.0 is ready') })
+    await expect(access(join(installRoot, '.cli-install.lock.guard')))
+      .rejects.toMatchObject({ code: 'ENOENT' })
   })
 
   it('recovers a stale lock and refuses to race a live installer', async () => {
@@ -333,7 +335,6 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
     const fixture = await makeReleaseArchive('0.91.0', '6'.repeat(16), { versionDelaySeconds: 2 })
     const installRoot = join(fixture.root, 'installed')
     const lockDir = join(installRoot, '.cli-install.lock')
-    const guard = join(installRoot, '.cli-install.lock.guard')
     const first = runInstaller(fixture, installRoot, ['--yes'])
     await waitForPath(lockDir)
 
@@ -341,7 +342,13 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
       .rejects.toMatchObject({ stderr: expect.stringContaining('Another OpenAlice CLI installer is running') })
     await expect(first).resolves.toMatchObject({ stdout: expect.stringContaining('OpenAlice 0.91.0 is ready') })
     await expect(access(lockDir)).rejects.toMatchObject({ code: 'ENOENT' })
-    await expect(access(guard)).resolves.toBeUndefined()
+
+    // lockf/flock keep a harmless inode after releasing their advisory lock;
+    // shlock represents the lock by the file itself and removes it. A third
+    // successful install is the backend-independent proof that no live guard
+    // remains after the first owner exits.
+    await expect(runInstaller(fixture, installRoot, ['--yes']))
+      .resolves.toMatchObject({ stdout: expect.stringContaining('OpenAlice 0.91.0 is ready') })
   })
 
   it('uses the fixed dev-channel archive and records dev provenance', async () => {

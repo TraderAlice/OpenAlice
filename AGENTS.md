@@ -141,10 +141,14 @@ credentials, destructive actions, security boundaries, or substantial
 cross-surface structure. A later interactive message does not retroactively
 authorize merging an autonomous topic PR. Related work may continue while its
 latest CI is pending, but a known failure must be repaired before adding more
-scope. In serial work, pending CI likewise must not become a synchronous lock;
-inspect the previous PR checks and post-merge `dev` run before publishing the
-next increment. `master` promotions, releases, explicit review pauses, and
-untrusted contributions keep their full synchronous gates. Detailed topic,
+scope. A hosted-runner or resource-starvation failure may be classified as
+infrastructure only when its log is captured, the affected contract passes in
+the proportional local/native lane, and no product assertion failed; it should
+be repaired or removed from the routine lane instead of retried blindly. In
+serial work, pending CI likewise must not become a synchronous lock; inspect the
+previous PR checks and post-merge `dev` run before publishing the next
+increment. `master` promotions, releases, explicit review pauses, and untrusted
+contributions keep their full synchronous gates. Detailed topic,
 branch, PR, promotion, hotfix, and external-contribution procedures live in
 [[docs/development-workflow.md]]
 ([Development workflow](docs/development-workflow.md)).

@@ -2,11 +2,11 @@ name: CI
 
 on:
   push:
-    branches: [master, dev]
+    branches: [master]
   pull_request:
     branches: [dev, master, codex/usability-improvements]
   # Keep a full cross-platform safety net for lightweight PRs that intentionally
-  # skip the expensive host matrix. Scheduled workflows run from the default
+  # skip the focused host matrix. Scheduled workflows run from the default
   # branch, while checkout below points the jobs at the current dev branch.
   schedule:
     - cron: "0 19 * * *"
@@ -17,11 +17,11 @@ permissions:
   pull-requests: read
 
 # Agent-driven iterations often supersede an earlier commit before its Windows
-# job finishes. Keep only the latest PR/dev run while never cancelling a master
-# or scheduled validation.
+# job finishes. Keep only the latest PR run while never cancelling a master or
+# scheduled validation.
 concurrency:
   group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.ref == 'refs/heads/dev' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # UI and prose changes are built and tested on Ubuntu, but do not need to
@@ -82,15 +82,14 @@ jobs:
 
             core.info(`Changed paths: ${paths.join(", ") || "none reported"}`);
             if (platformSensitive.length > 0) {
-              core.info(`Full matrix required by: ${platformSensitive.join(", ")}`);
+              core.info(`Native host contracts required by: ${platformSensitive.join(", ")}`);
             } else {
               core.info("Only UI/docs paths changed; Ubuntu remains the PR gate.");
             }
             core.setOutput("cross_platform", String(runCrossPlatform));
 
   build:
-    # A dev push is the already-tested result of merging a PR. It gets the
-    # focused post-merge smoke below instead of repeating the whole PR suite.
+    # Dev pushes belong exclusively to the rolling CLI publication workflow.
     if: github.event_name != 'push' || github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
 
@@ -151,10 +150,12 @@ jobs:
             exit 1
           fi
 
-  # The full Vitest suite includes path, port-binding, process-launch, and
-  # packaged-toolchain behavior whose semantics differ materially by host OS.
-  # Ubuntu remains the build gate above; this matrix prevents a Linux-only
-  # green check from shipping regressions to macOS or Windows users.
+  # Routine dev PRs run the complete build and test suite once on Ubuntu, then
+  # exercise only native CLI/Guardian/path/process contracts on macOS and
+  # Windows. Repeating all 5,000+ platform-neutral tests on constrained hosted
+  # runners amplified resource starvation into false serial blockers. Stable
+  # promotion, master, scheduled, and manual validation still run the complete
+  # build and test suite on both hosts.
   cross-platform-test:
     needs: change-scope
     if: >-
@@ -188,10 +189,19 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm build
+      - name: Build complete workspace for stable and scheduled validation
+        if: github.event_name != 'pull_request' || github.base_ref == 'master'
+        run: pnpm build
         timeout-minutes: 15
 
-      - run: pnpm test
+      - name: Run native platform contracts for routine integration PRs
+        if: github.event_name == 'pull_request' && github.base_ref != 'master'
+        run: pnpm test:platform-contracts
+        timeout-minutes: 8
+
+      - name: Run complete suite for stable and scheduled validation
+        if: github.event_name != 'pull_request' || github.base_ref == 'master'
+        run: pnpm test
         timeout-minutes: 15
 
   # Boots the real `pnpm dev` stack and asserts UTA/Alice/Vite all spawn.
@@ -237,31 +247,6 @@ jobs:
       # Exercises duplicate-start rejection, graceful takeover, crash-stale
       # reclamation, heartbeat renewal, and forced recovery with real child
       # processes before the heavier full-stack boot smoke.
-      - run: pnpm test:guardian-recovery
-        timeout-minutes: 3
-
-      - run: pnpm test:smoke
-        timeout-minutes: 8
-
-  # Merging a green PR changes the commit SHA but normally not its tested tree.
-  # Keep a cheap real-process integration check on dev without paying for a
-  # second complete Linux/macOS/Windows pass.
-  post-merge-dev-smoke:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: pnpm/action-setup@v6
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
-
       - run: pnpm test:guardian-recovery
         timeout-minutes: 3
 

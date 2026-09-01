@@ -232,11 +232,15 @@ jobs:
 
       - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
 
-      - name: Build Alice and native CLI
-        run: |
-          pnpm build:server
-          pnpm build:bun-runtime:feasibility
-          pnpm build:bun:release
+      - name: Build Alice server
+        run: pnpm build:server
+
+      - name: Accept multiprocess recovery once per dev commit
+        if: matrix.platform == 'linux' && matrix.arch == 'x64'
+        run: pnpm build:bun-runtime:feasibility
+
+      - name: Build native CLI
+        run: pnpm build:bun:release
 
       - name: Name the native acceptance report
         shell: bash
