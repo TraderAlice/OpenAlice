@@ -43,7 +43,9 @@ the durable truth after it changes. Git history is the archive.
 - [[plans/remote-project-fleet.md]] — Adds a machine-aware Supervisor fleet,
   remote AliceProject inventory/connection, and safe local-to-SSH project
   transfer for portable configuration and Workspaces while deliberately
-  excluding native/OpenAlice Session continuation state.
+  excluding native/OpenAlice Session continuation state. The next increment
+  unifies controller/remote release negotiation and adds a consented Railway
+  redeploy adapter without background polling or SSH-owned installation.
 - [[plans/auto-prediction-harness.md]] — Auto Prediction Beta conversation
   Harness is in `dev`; managed AP/AQ Studio supervision, opaque routing, and
   embedded product surfaces are implemented. Shared verified/unverified source
