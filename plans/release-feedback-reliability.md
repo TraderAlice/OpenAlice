@@ -23,13 +23,17 @@ Owner guides:
 Make release failures arrive earlier and carry enough evidence to diagnose
 without rerunning an hour-long pipeline. The first batch repairs deterministic
 feedback defects observed during the 0.89.3-beta release without changing any
-release gate. The second batch records the dependency and provenance redesign
-needed to shorten the successful release critical path.
+release gate. The second batch separates a fast beta candidate lane from the
+complete stable compatibility lane.
 
-This initiative does not weaken signing, notarization, N-1 upgrade, native
-platform, package-content, installer, or publication checks. Routine local and
-PR verification remains unsigned; release-only credentials stay confined to
-the versioned release lane.
+Beta still proves every published desktop, CLI, Broker Pack, installer,
+checksum, update-metadata, and channel-isolation artifact, including signed and
+notarized macOS bytes and current-candidate runtime startup. Cross-version and
+package-manager compatibility belong to stable: N-1 desktop upgrades, managed
+SSH deployment, legacy CLI cutover, Broker Pack upgrades, and npm/Bun/Homebrew/
+Linuxbrew/AUR acceptance remain full stable release gates. Routine local and PR
+verification remains unsigned; release-only credentials stay confined to the
+versioned release lane.
 
 ## Decisions
 
@@ -47,6 +51,17 @@ the versioned release lane.
   `dev`/`master` pull-request coverage remain available.
 - Defer DAG fan-in removal and accepted-tree provenance to a second batch. Both
   need explicit artifact/provenance contracts rather than YAML-only shortcuts.
+- Keep the existing desktop build and N-1 matrices. Beta stops after signed or
+  packaged candidate construction, current Workspace smoke, update-byte
+  verification, and artifact upload. The downstream N-1 matrix runs only for
+  stable. Preserve candidate artifacts for at least three days so delayed
+  diagnosis does not immediately lose the release bytes.
+- Treat a master-targeted release-preparation PR as a narrow semantic fast lane
+  only when its complete diff is exactly the matching top-level `version`
+  change in `package.json` and `packages/cli/package.json`. It still runs Linux
+  build/test plus workflow contracts, and the exact merged `master` SHA still
+  runs every release candidate/publication gate. Any extra path, JSON field,
+  mismatch, invalid version, or classifier failure keeps the full PR matrix.
 - Keep beta and stable as separate serial release intents. A changed source tree
   invalidates prior candidate evidence and must be accepted again; unchanged
   beta source may be selected only through a later explicit stable decision.
@@ -76,21 +91,26 @@ the versioned release lane.
   packaged Workspace smoke pass locally. Native Intel/Windows, signing, and
   notarization remain CI/release evidence and are not claimed locally.
 
-### Batch 2: critical-path and provenance redesign
+### Batch 2: beta fast lane and provenance redesign
 
-- [ ] Each platform's N-1 desktop acceptance begins as soon as its matching
-  candidate artifact is available; it does not wait for the entire desktop
-  build matrix. Per-platform artifact identity and retriable acceptance remain
-  explicit.
+- [x] Beta publication requires every current desktop, CLI, Broker Pack, and
+  installer candidate plus integrity/channel-isolation checks, but does not
+  wait for cross-version or package-manager compatibility suites.
+- [x] Stable publication still requires desktop N-1, managed SSH, legacy CLI
+  cutover, Broker Pack N-1, public-channel authority, and every supported
+  package-manager acceptance gate.
 - [ ] A trusted promotion receipt binds the accepted commit tree to the exact
   required PR checks. A `master` release may reuse it only for the identical
   tree; direct hotfixes or missing/stale receipts run the full master CI gates.
 - [ ] Release status presents one coherent view of publication and CI evidence,
   so a green release beside an unrelated red duplicate workflow is no longer
   the normal successful path.
-- [ ] Successful-path timing is measured before and after the DAG change, and
-  no signing, notarization, upgrade, cross-platform, installer, or publication
-  gate is removed to achieve the reduction.
+- [ ] An exact two-manifest release-preparation PR takes the bounded semantic
+  fast lane, while near misses demonstrably fall back to the ordinary full PR
+  matrix.
+- [ ] Successful beta timing is measured before and after the channel split;
+  signing, notarization, current-candidate startup, artifact integrity, and
+  stable-alias isolation are never removed from beta.
 
 ## Work
 
@@ -105,8 +125,12 @@ the versioned release lane.
 
 ### Batch 2
 
-- [ ] Choose and document either explicit per-platform build/accept pairs or a
-  reusable per-platform workflow; retain downloadable candidate artifacts.
+- [x] Define the minimal beta candidate contract and the complete stable
+  compatibility contract.
+- [x] Implement and validate the beta/stable release split while retaining
+  downloadable desktop candidates for three days.
+- [ ] Add the exact release-preparation semantic classifier and use it to skip
+  only redundant host/package PR jobs, never the final Release gates.
 - [ ] Define the signed accepted-tree receipt, trust boundary, invalidation
   rules, and hotfix fallback.
 - [ ] Implement the release DAG and master-CI provenance changes with timing
@@ -140,6 +164,21 @@ later promotion, version-only, and release gates all passed. This supports a
 future accepted-tree receipt that skips only identical post-merge CI; it does
 not justify reusing evidence after additional commits, weakening release gates,
 or combining beta and stable publication.
+
+The successful `v0.91.0-beta.1` Release run took 35:03 without a failed job or
+rerun. Its beta publication spent about 37 runner-minutes on compatibility
+checks that remain appropriate for stable but do not validate whether a beta
+candidate is installable now: desktop N-1, Broker Pack N-1, npm/Bun packaging,
+managed SSH, and legacy cutover. Keeping final candidate construction, signing,
+notarization, current-runtime smoke, installer fixture, integrity, and channel
+isolation makes the Intel signed desktop build the expected critical path. The
+new beta lane is therefore expected to finish in roughly 22-25 minutes, while
+stable retains the former full gate set. The same checkpoint's version-only PR
+changed only the two product manifest versions but waited about 15 minutes for
+Docker, unsigned desktop, and CLI host matrices; its independent Linux
+build/test completed in under four minutes. That evidence motivates the strict
+semantic release-preparation fast lane above rather than a title-, label-, or
+commit-message bypass.
 
 ## Completion
 
