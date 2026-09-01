@@ -293,7 +293,7 @@ function AutomationRunTitle({
     )
   }
 
-  const issueTitle = issue?.title ?? source.issueId
+  const issueTitle = issue?.title ?? presentation.title
   const issueWorkspace = issue?.workspaceTag ?? source.workspaceId
   const crossWorkspace = source.workspaceId !== task.wsId
 
@@ -304,8 +304,8 @@ function AutomationRunTitle({
           {source.label}
         </span>
         <span
-          className={`truncate text-[13px] font-medium text-foreground${issue ? '' : ' font-mono'}`}
-          title={`Issue: ${issueTitle} · ${issueWorkspace}`}
+          className="truncate text-[13px] font-medium text-foreground"
+          title={`Issue: ${source.issueId} · ${issueWorkspace}`}
         >
           {issueTitle}
         </span>
