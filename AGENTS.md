@@ -21,7 +21,8 @@ pnpm install              # full local install, including Electron
 pnpm dev                  # Guardian -> UTA + Alice + Vite
 pnpm dev --takeover       # replace the recorded local Guardian owner tree
 pnpm build                # packages + UI + UTA + Alice
-pnpm test                 # monorepo Vitest suite
+pnpm test                 # hermetic monorepo Vitest suite
+pnpm test:railway:local   # explicit local Railway entrypoint/fence system suite
 pnpm test:e2e             # non-trading product/integration E2E
 ```
 
@@ -101,6 +102,12 @@ for current ownership and entry points.
   installer, while stable CDN product aliases and package-manager metadata are
   updated only by a stable release tag. Mirror repair never rewrites the shared
   installer.
+- The root and CLI package versions are runtime-visible build metadata, including
+  in source mode. After a release succeeds and its public surface is accepted,
+  synchronize those two version values back to `dev` in a focused dev-targeted
+  PR without importing unrelated `master` changes. Runtime identity still owns
+  channel selection: `OPENALICE_LAUNCHER=dev` and `electron-dev` remain
+  `dev`/source even when the synchronized package version is stable or beta.
 - An exact forward beta version-only PR uses a lightweight trusted-classifier,
   workflow-contract, and typecheck lane. Beta publication is gated by the
   Release workflow's final artifact build/install/start/update acceptance, not
@@ -191,7 +198,7 @@ Add checks according to the touched surface:
 | Guardian locks, process ownership, takeover | `pnpm test:guardian-recovery`; exercise the real launcher path |
 | Desktop, IPC, PTY, managed Pi, shell, packaging | Follow [Managed Workspace runtime](docs/managed-workspace-runtime.md) and run the matching Electron/package smoke |
 | Root installer or distributed CLI payload | Follow [CLI installer](docs/cli-installer.md) and run `pnpm test:install:docker`; manually walk the interactive playground before release |
-| Docker/server image, Compose, remote deployment | Follow [Docker deployment](docs/docker-deployment.md) and run `pnpm docker:smoke`; before release, opt into the credentialed agent/CLI check documented there |
+| Docker/server image, Compose, remote deployment | Follow [Docker deployment](docs/docker-deployment.md); run `pnpm test:railway:local` for Railway lifecycle/fence changes and `pnpm docker:smoke` for the server image; before release, opt into the credentialed agent/CLI check documented there |
 | Persisted data shape | First apply the release-boundary rule above. For a shipped shape, add an idempotent migration + spec, register it, then run `pnpm build:migration-index`; replace unreleased shapes directly |
 | Onboarding/first run/auth | Use isolated data; exercise dev and packaged onboarding paths where relevant |
 
@@ -202,6 +209,13 @@ routine CI or against real-money accounts. Inspect the account mode and the
 pre-test positions/orders before acknowledging it, then verify the account is
 flat after the run even when a test fails. Do not call a change verified when
 the surface-specific path was skipped; state the remaining gap.
+
+`pnpm test` is the hermetic default contract. It must not invoke Railway CLI,
+open real remote SSH, read cloud credentials, deploy, publish, or contend for a
+host-global Railway lifecycle fence. The local entrypoint and Linux fence/PTY
+harnesses run only through `pnpm test:railway:local`; real Railway migration,
+restart, and upgrade journeys remain explicit external acceptance and are not a
+routine `dev` or beta gate.
 
 For local package verification, prefer `pnpm electron:smoke:workspace`: it owns
 an isolated package output and removes that large expanded app after the smoke

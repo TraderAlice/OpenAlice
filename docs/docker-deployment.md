@@ -275,9 +275,8 @@ plugins, and upgrades remain outside the OpenAlice release transaction.
 Local contract checks for this profile are:
 
 ```bash
-bash -n scripts/railway/*.sh
+pnpm test:railway:local
 pnpm exec vitest run \
-  scripts/railway-entrypoint.spec.ts \
   packages/guardian-runtime/src/runtime-lock.spec.ts \
   packages/cli/src/lifecycle.spec.mjs \
   packages/cli/src/server-control.spec.mjs \
@@ -286,6 +285,13 @@ pnpm exec vitest run \
   packages/cli/src/project-transfer-ssh.spec.ts \
   packages/cli/src/project-transfer-stream.spec.ts
 ```
+
+`pnpm test:railway:local` owns shell syntax, the fake-installer/fake-Runtime
+entrypoint journey, and the Linux `/dev/shm` lifecycle-fence/PTY proof. It is a
+serialized local system test: it does not call Railway CLI, open remote SSH,
+read cloud credentials, or touch a hosted Project. It is intentionally outside
+the default hermetic `pnpm test` suite. The retained and disposable hosted
+Volume journeys below remain explicit operator acceptance.
 
 The entrypoint fixture must cover empty-volume bootstrap, verified-install
 reuse without installer access, failed forced-refresh fallback, and fail-closed

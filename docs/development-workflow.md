@@ -237,10 +237,11 @@ delivery lane:
   Electron, Docker, installer, or native-runtime evidence; hosted CI is not a
   second purchase of the same confidence.
 - PRs to `master`, `master` pushes, scheduled runs, and manual validation retain
-  the full Ubuntu test lane, macOS/Windows build-and-test matrix, and native
-  dev-smoke. Routine integration PRs do not allocate those runners. There is no
-  changed-test or actor/label router: the branch boundary is intentionally
-  simple, and current `dev` receives a daily full cross-platform backstop.
+  the hermetic Ubuntu suite, the serialized local Railway lifecycle system
+  suite, macOS/Windows build-and-test matrix, and native dev-smoke. Routine
+  integration PRs do not allocate those runners. There is no changed-test or
+  actor/label router: the branch boundary is intentionally simple, and current
+  `dev` receives a daily full cross-platform backstop.
 - A `master`-targeted PR whose complete diff is exactly the synchronized,
   forward beta `version` value in `package.json` and
   `packages/cli/package.json` takes the release-preparation fast lane. It keeps
@@ -300,12 +301,15 @@ delivery lane:
   daily cross-platform backstop for lightweight PRs.
 
 Routine integration has no hosted changed-path allowlist. Serial development
-uses the local Mac for the complete `npx tsc --noEmit` and `pnpm test` contract,
-adding real browser, OrbStack, installer, unsigned Electron/package, and native
-runtime acceptance when those surfaces change. Record those commands and
-results in the PR. A promotion to `master` re-establishes full remote evidence;
-stable keeps the complete matrix even when routine integration and beta used
-lighter hosted feedback.
+uses the local Mac for the complete `npx tsc --noEmit` and hermetic `pnpm test`
+contract, adding `pnpm test:railway:local`, real browser, OrbStack, installer,
+unsigned Electron/package, and native runtime acceptance only when those
+surfaces change. Record those commands and results in the PR. The Railway local
+suite executes the image entrypoint and Linux mount-fence/PTY harness against
+disposable fixtures; it never invokes Railway CLI or a live Project. A
+promotion to `master` re-establishes full remote evidence; stable keeps the
+complete matrix even when routine integration and beta used lighter hosted
+feedback.
 
 ### Package signing boundary
 
@@ -405,11 +409,15 @@ Before merging a promotion:
 After promotion, a maintainer may prepare a focused version-only branch from
 `master` and target its PR back to `master` when the source is ready to release.
 This maintainer-directed release-prep PR is the narrow exception to the normal
-`dev` base. Keep this publication-only version commit on `master`: the `dev`
-preview keeps its integration version, and a later merge preserves the
-master-only change unless the manifests themselves conflict. Run the `Release`
-workflow manually from `master`, choose the `release` operation, and supply both
-the channel and tag:
+`dev` base. Keep this publication-only commit on `master` until the release and
+its public surface are accepted. Then copy only the synchronized root and CLI
+`version` values back to `dev` through a focused dev-targeted PR; do not merge
+unrelated `master` changes or turn that bookkeeping into a second implementation
+lane. Source runtime identity remains independent of that value:
+`OPENALICE_LAUNCHER=dev` and `electron-dev` select the `dev` channel, while
+`package.json` supplies the display/build baseline. Run the `Release` workflow
+manually from `master`, choose the `release` operation, and supply both the
+channel and tag:
 `beta` accepts `vX.Y.Z-beta` or `vX.Y.Z-beta.N`; `stable` accepts only
 `vX.Y.Z`. The workflow rejects an existing tag, a channel/tag mismatch, or a
 version that disagrees with either the root or `packages/cli` package. It binds

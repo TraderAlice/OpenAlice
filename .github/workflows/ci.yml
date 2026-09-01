@@ -88,7 +88,8 @@ jobs:
   test:
     needs: change-scope
     # Local verification plus build/type/contracts are the routine dev gate.
-    # Keep the full suite for master, scheduled, and manually requested runs.
+    # Keep the hermetic suite and serialized local Railway lifecycle suite for
+    # master, scheduled, and manually requested runs.
     # A classifier/preflight failure falls back to the full suite only where
     # full validation already belongs: master, scheduled, and manual lanes.
     if: >-
@@ -114,7 +115,12 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm test
+      - name: Run hermetic monorepo suite
+        run: pnpm test
+
+      - name: Run local Railway lifecycle system suite
+        run: pnpm test:railway:local
+        timeout-minutes: 5
 
   # Preserve the established check name for branch protection and external
   # consumers while the two independent validations report failures earlier.

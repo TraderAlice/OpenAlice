@@ -298,7 +298,9 @@ change channels or trust boundaries.
 Installed provenance and the runtime profile determine which surface may
 offer an update; package semver alone is not authority:
 
-- source checkouts use Git and may show source-update guidance;
+- source checkouts launched by `pnpm dev` or Electron development identify as
+  `dev`/source before package-semver fallback, use Git for source movement, and
+  may show source-update guidance;
 - packaged Electron uses the native desktop updater;
 - installed stable and beta releases use `openalice update` as the update entry
   point; that command defers to npm, Bun, Homebrew, or AUR when provenance says
@@ -315,6 +317,12 @@ channel and update authority. They never expose the provenance file path.
 Service-managed, dev, pinned, and custom contexts do not fetch a release
 manifest through these routes, so the Web UI cannot invent a second update
 path beside the native CLI or deployment workflow.
+
+The root and CLI package versions still supply runtime-visible build metadata.
+After a beta or stable release is publicly accepted, copy the two synchronized
+version values back to `dev` in a focused PR. That bookkeeping keeps source
+display and consumers of `getCurrentVersion()` current; it does not select the
+source checkout's update channel or import unrelated `master` changes.
 
 The standalone launcher propagates the already-discovered `install-source.json`
 path into Guardian and Alice. This covers metadata beside the install prefix
@@ -497,14 +505,18 @@ pnpm test
 For a volume-backed Railway bootstrap or managed cross-target change, also run:
 
 ```bash
-bash -n scripts/railway/*.sh
+pnpm test:railway:local
 pnpm exec vitest run \
-  scripts/railway-entrypoint.spec.ts \
   packages/cli/src/remote.spec.mjs \
   packages/cli/src/project-transfer.spec.ts \
   packages/cli/src/project-transfer-ssh.spec.ts \
   packages/cli/src/project-transfer-stream.spec.ts
 ```
+
+The explicit Railway-local command is serialized because its entrypoint and
+Linux fence/PTY fixtures may own a host-global mount lock. It uses fake
+installer/Runtime processes and never calls Railway CLI or a hosted Project;
+the two hosted acceptance journeys below remain manual and external.
 
 These local checks replace neither hosted acceptance journey: a disposable
 empty-Volume bootstrap/fail-closed drill, nor a non-destructive deployment,
