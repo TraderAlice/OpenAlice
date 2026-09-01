@@ -876,6 +876,17 @@ with its Pack missing. The remaining Increment 8 acceptance item is a retained
 Railway long-outage journey on the released candidate; it intentionally stays
 open until beta3 replaces beta2 on that service.
 
+Increment 8 review follow-up (2026-09-01): a read-only recovery-state review
+found six races that isolated happy-path tests had missed. Broker readiness now
+invalidates old operational data on refresh failure or backend loss and reloads
+on backend recovery; Trading status/equity polling starts and stops with the
+same readable-account gate. Terminal retry history resets only after the
+authoritative `attached` frame, Agent inventory rediscovers on backend recovery,
+scheduled health reuses the assignee Session projection so a missing Workspace
+cannot appear ready, and in-flight Agent probes are shared only for the same
+executable path and fingerprint. Combined focused tests cover all six cases;
+the full repository/package and retained Railway gates remain below.
+
 Always:
 
 ```bash
