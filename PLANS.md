@@ -39,7 +39,10 @@ the durable truth after it changes. Git history is the archive.
   real migration, OpenCode resume, normal restart, hard-kill recovery, and a
   non-destructive dev-to-pinned-beta2 replacement; disposable empty-Volume and
   failure-fallback journeys, native PowerShell, and external package-manager
-  activation remain open on focused branches from current `dev`.
+  activation remain open on focused branches from current `dev`. Routine dev
+  and exact-beta source feedback is reduced to local-first, lightweight
+  hosted lanes while `master` promotion, stable, and final artifact acceptance
+  retain the complete gates.
 - [[plans/remote-project-fleet.md]] — Adds a machine-aware Supervisor fleet,
   remote AliceProject inventory/connection, and safe local-to-SSH project
   transfer for portable configuration and Workspaces while deliberately

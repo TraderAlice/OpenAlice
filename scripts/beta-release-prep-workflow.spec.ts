@@ -20,6 +20,9 @@ interface WorkflowJob {
 }
 
 interface Workflow {
+  on?: {
+    pull_request?: { branches?: string[] }
+  }
   jobs: Record<string, WorkflowJob>
 }
 
@@ -50,27 +53,50 @@ function expectOutcomeGatedOutput(job: WorkflowJob): void {
 }
 
 describe('exact beta release-preparation workflow lane', () => {
-  it('keeps Linux build/test while skipping only CI host matrices', () => {
+  it('keeps contracts and typecheck while skipping root build, test, and host matrices', () => {
     const jobs = workflow('ci.yml').jobs
     expectTrustedClassifier(jobs['change-scope'])
     expectOutcomeGatedOutput(jobs['change-scope'])
-    expect(jobs.build.needs).toBeUndefined()
-    expect(jobs.test.needs).toBeUndefined()
-    expect(jobs['build-and-test'].needs).toEqual(['build', 'test'])
-    for (const name of ['cross-platform-test', 'dev-smoke']) {
+    expect(step(jobs.build, 'Verify CI workflow contracts').run)
+      .toBe('pnpm test:workflow-contracts')
+    expect(step(jobs.build, 'Typecheck root workspace').run)
+      .toBe('npx tsc --noEmit')
+    expect(jobs.build.needs).toBe('change-scope')
+    expect(jobs.build.if).toContain('!cancelled()')
+    expect(step(jobs.build, 'Build complete workspace').if)
+      .toContain("needs.change-scope.result != 'success'")
+    expect(step(jobs.build, 'Build complete workspace').if)
+      .toContain("beta_release_prep != 'true'")
+    for (const name of ['test', 'cross-platform-test', 'dev-smoke']) {
+      expect(jobs[name].needs).toBe('change-scope')
       expect(jobs[name].if).toContain('!cancelled()')
       expect(jobs[name].if).toContain("needs.change-scope.result != 'success'")
       expect(jobs[name].if).toContain("beta_release_prep != 'true'")
-      expect(jobs[name].if).toContain("github.ref == 'refs/heads/master'")
     }
+    const aggregate = jobs['build-and-test']
+    expect(aggregate.needs).toEqual(['change-scope', 'build', 'test'])
+    expect(aggregate.if).toContain('always()')
+    const gate = step(aggregate, 'Require successful build and test lanes').run ?? ''
+    expect(gate).toContain('[[ "$BETA_RELEASE_PREP" == "true" ]]')
+    expect(gate).toContain('[[ "$BUILD_RESULT" == "success" ]]')
+    expect(gate).toContain('[[ "$TEST_RESULT" == "skipped" ]]')
   })
 
-  it('keeps desktop contracts and typecheck while skipping package matrices', () => {
-    const jobs = workflow('desktop-package-smoke.yml').jobs
+  it('keeps desktop classification cheap while central CI owns contracts and typecheck', () => {
+    const desktop = workflow('desktop-package-smoke.yml')
+    const jobs = desktop.jobs
+    expect(desktop.on?.pull_request?.branches).toEqual(['master'])
     expectTrustedClassifier(jobs.preflight)
     expectOutcomeGatedOutput(jobs.preflight)
-    expect(step(jobs.preflight, 'Verify CI workflow contracts')).toBeDefined()
-    expect(step(jobs.preflight, 'Typecheck root workspace')).toBeDefined()
+    for (const name of [
+      'Install dependencies',
+      'Verify CI workflow contracts',
+      'Typecheck root workspace',
+    ]) {
+      const candidate = step(jobs.preflight, name)
+      expect(candidate.if).toContain("steps.beta-release-prep.outcome != 'success'")
+      expect(candidate.if).toContain("beta_release_prep != 'true'")
+    }
     expect(jobs['broker-packs-windows'].if).toContain("beta_release_prep != 'true'")
     expect(jobs.package.if).toContain("beta_release_prep != 'true'")
   })
@@ -87,13 +113,18 @@ describe('exact beta release-preparation workflow lane', () => {
       expect(jobs[name].if).toContain("needs.release-prep-scope.result != 'success'")
       expect(jobs[name].if).toContain("beta_release_prep != 'true'")
     }
+    expect(jobs['bun-cli-feasibility'].if).toContain("github.base_ref == 'master'")
+    expect(jobs['checkout-remote'].if).toContain("github.base_ref == 'master'")
+    expect(jobs['checkout-install'].if).not.toContain("github.base_ref == 'master'")
     expect(jobs['build-dev-cli'].if).toBe("github.event_name == 'push'")
     expect(jobs['build-dev-cli'].needs).toBeUndefined()
     expect(jobs['publish-dev-cli'].needs).toBe('build-dev-cli')
   })
 
   it('keeps the Docker check green but omits setup, build, and smoke on an exact match', () => {
-    const smoke = workflow('docker-smoke.yml').jobs.smoke
+    const docker = workflow('docker-smoke.yml')
+    const smoke = docker.jobs.smoke
+    expect(docker.on?.pull_request?.branches).toEqual(['master'])
     expectTrustedClassifier(smoke)
     const expensive = smoke.steps?.filter((candidate) => [
       'actions/setup-node@v7',
