@@ -73,7 +73,7 @@ describe('Portfolio broker support gating', () => {
     render(<PortfolioPage />)
 
     expect(await screen.findByText('Remote OKX')).toBeTruthy()
-    expect(screen.getByText('Broker support is not installed')).toBeTruthy()
+    expect(screen.getByText('Support not installed')).toBeTruthy()
     await waitFor(() => expect(mocks.snapshots).toHaveBeenCalledWith(uta.id, { limit: 200 }))
     expect(mocks.equity).not.toHaveBeenCalled()
     expect(mocks.fxRates).not.toHaveBeenCalled()

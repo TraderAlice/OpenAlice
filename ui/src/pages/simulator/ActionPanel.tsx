@@ -17,11 +17,14 @@ import { api } from '../../api'
 import { simulatorApi, type SimulatorState } from '../../api/simulator'
 import { InstrumentInput } from './InstrumentInput'
 import { buildInstrument, type InstrumentDraft } from './instruments'
+import { Button } from '../../components/ui/button'
+import { inputClass as sharedInputClass } from '../../components/form'
+import { SegmentedControl } from '../../components/SegmentedControl'
 
 const inputClass =
-  'px-2 py-1 bg-background text-foreground border border-border rounded text-sm outline-none transition-colors focus:border-primary'
+  `${sharedInputClass} min-h-8 py-1 text-sm`
 const inputClassMono =
-  'px-2 py-1 bg-background text-foreground border border-border rounded font-mono text-xs outline-none transition-colors focus:border-primary'
+  `${sharedInputClass} min-h-8 py-1 font-mono text-xs`
 
 type TabId = 'tick' | 'deposit' | 'trade' | 'order'
 
@@ -47,27 +50,18 @@ export function ActionPanel({ utaId, state, run, loading }: {
   }, [state])
 
   return (
-    <div className="sticky bottom-0 -mx-4 md:-mx-6 px-4 md:px-6 py-3 bg-secondary/95 backdrop-blur border-t border-border z-10">
-      {/* Tab strip */}
-      <div className="flex items-center gap-1 mb-3" role="tablist">
-        {TABS.map((t, i) => (
-          <button
-            key={t.id}
-            role="tab"
-            aria-selected={tab === t.id}
-            title={`${t.hint} (${i + 1})`}
-            onClick={() => setTab(t.id)}
-            className={`px-2.5 py-1 text-xs rounded transition-colors ${
-              tab === t.id
-                ? 'bg-primary/20 text-primary font-medium'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-            }`}
-          >
-            <span className="text-[10px] text-muted-foreground/60 mr-1.5">{i + 1}</span>
-            {t.label}
-          </button>
-        ))}
-      </div>
+    <div className="sticky bottom-0 z-10 -mx-4 border-t border-border bg-background/95 px-4 py-3 backdrop-blur md:-mx-6 md:px-6">
+      <SegmentedControl
+        value={tab}
+        options={TABS.map((item, index) => ({
+          value: item.id,
+          label: item.label,
+          ariaLabel: `${item.label}: ${item.hint} (${index + 1})`,
+        }))}
+        onChange={setTab}
+        ariaLabel="Simulator action"
+        className="mb-3"
+      />
 
       {/* Tab content */}
       {tab === 'tick' && <QuickTickTab utaId={utaId} knownKeys={knownKeys} run={run} loading={loading} />}
@@ -112,11 +106,10 @@ function QuickTickTab({ utaId, knownKeys, run, loading }: {
     <div className="flex items-center gap-2 flex-wrap">
       <KeySelect value={key} onChange={setKey} options={knownKeys} placeholder="symbol" />
       <span className="text-muted-foreground text-xs">Δ</span>
-      <button disabled={loading || !key} onClick={() => tick(-5)} className="btn-secondary-sm">−5%</button>
-      <button disabled={loading || !key} onClick={() => tick(-1)} className="btn-secondary-sm">−1%</button>
-      <button disabled={loading || !key} onClick={() => tick(1)} className="btn-secondary-sm">+1%</button>
-      <button disabled={loading || !key} onClick={() => tick(5)} className="btn-secondary-sm">+5%</button>
-      <span className="text-muted-foreground/60 text-xs px-1">|</span>
+      <Button disabled={loading || !key} onClick={() => tick(-5)} variant="outline" size="sm">−5%</Button>
+      <Button disabled={loading || !key} onClick={() => tick(-1)} variant="outline" size="sm">−1%</Button>
+      <Button disabled={loading || !key} onClick={() => tick(1)} variant="outline" size="sm">+1%</Button>
+      <Button disabled={loading || !key} onClick={() => tick(5)} variant="outline" size="sm">+5%</Button>
       <input
         className={`${inputClassMono} w-32`}
         placeholder="set exact"
@@ -124,7 +117,7 @@ function QuickTickTab({ utaId, knownKeys, run, loading }: {
         onChange={(e) => setSetPriceInput(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') setExact() }}
       />
-      <button disabled={loading || !key || !setPriceInput} onClick={setExact} className="btn-primary-sm">Set</button>
+      <Button disabled={loading || !key || !setPriceInput} onClick={setExact} size="sm">Set</Button>
     </div>
   )
 }
@@ -176,16 +169,16 @@ function DepositTab({ utaId, knownKeys, run, loading }: {
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 flex-wrap">
-        <div className="flex rounded overflow-hidden border border-border">
-          <button
-            onClick={() => setMode('in')}
-            className={`px-2 py-1 text-xs ${mode === 'in' ? 'bg-success/20 text-success' : 'text-muted-foreground hover:text-foreground'}`}
-          >Deposit</button>
-          <button
-            onClick={() => setMode('out')}
-            className={`px-2 py-1 text-xs ${mode === 'out' ? 'bg-destructive/20 text-destructive' : 'text-muted-foreground hover:text-foreground'}`}
-          >Withdraw</button>
-        </div>
+        <SegmentedControl
+          value={mode}
+          options={[
+            { value: 'in', label: 'Deposit' },
+            { value: 'out', label: 'Withdraw' },
+          ]}
+          onChange={setMode}
+          ariaLabel="Transfer direction"
+          compact
+        />
 
         {mode === 'in' ? (
           <>
@@ -197,12 +190,12 @@ function DepositTab({ utaId, knownKeys, run, loading }: {
               onChange={(e) => setQty(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') submitDeposit() }}
             />
-            <button
+            <Button
               disabled={loading || !draftOk || !qty}
               onClick={submitDeposit}
-              className="btn-primary-sm"
-            >Deposit</button>
-            {draftOk && <span className="text-[11px] text-muted-foreground/70 font-mono">→ {draftOk.nativeKey}</span>}
+              size="sm"
+            >Deposit</Button>
+            {draftOk && <span className="text-[11px] leading-[15px] text-muted-foreground/70 font-mono">→ {draftOk.nativeKey}</span>}
             {draftError && draft.symbol && <span className="text-[11px] text-warning">{draftError}</span>}
           </>
         ) : (
@@ -215,15 +208,14 @@ function DepositTab({ utaId, knownKeys, run, loading }: {
               onChange={(e) => setWithdrawQty(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') submitWithdraw() }}
             />
-            <button
+            <Button
               disabled={loading || !withdrawKey || !withdrawQty}
               onClick={submitWithdraw}
-              className="btn-primary-sm"
-            >Withdraw</button>
+              size="sm"
+            >Withdraw</Button>
           </>
         )}
 
-        <span className="text-[11px] text-muted-foreground ml-auto">Cash unchanged. Triggers UTA reconcile pipeline.</span>
       </div>
     </div>
   )
@@ -265,23 +257,22 @@ function TradeTab({ utaId, run, loading }: {
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <div className="flex rounded overflow-hidden border border-border">
-        <button
-          onClick={() => setSide('BUY')}
-          className={`px-2 py-1 text-xs ${side === 'BUY' ? 'bg-success/20 text-success' : 'text-muted-foreground hover:text-foreground'}`}
-        >BUY</button>
-        <button
-          onClick={() => setSide('SELL')}
-          className={`px-2 py-1 text-xs ${side === 'SELL' ? 'bg-destructive/20 text-destructive' : 'text-muted-foreground hover:text-foreground'}`}
-        >SELL</button>
-      </div>
+      <SegmentedControl
+        value={side}
+        options={[
+          { value: 'BUY', label: 'BUY' },
+          { value: 'SELL', label: 'SELL' },
+        ]}
+        onChange={setSide}
+        ariaLabel="Trade side"
+        compact
+      />
       <InstrumentInput draft={draft} onChange={setDraft} />
       <input className={`${inputClassMono} w-24`} placeholder="qty" value={qty} onChange={(e) => setQty(e.target.value)} />
       <input className={`${inputClassMono} w-24`} placeholder="price" value={price} onChange={(e) => setPrice(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} />
-      <button disabled={loading || !draftOk || !qty || !price} onClick={submit} className="btn-primary-sm">Submit</button>
-      {draftOk && <span className="text-[11px] text-muted-foreground/70 font-mono">→ {draftOk.nativeKey}</span>}
+      <Button disabled={loading || !draftOk || !qty || !price} onClick={submit} size="sm">Submit</Button>
+      {draftOk && <span className="text-[11px] leading-[15px] text-muted-foreground/70 font-mono">→ {draftOk.nativeKey}</span>}
       {draftError && draft.symbol && <span className="text-[11px] text-warning">{draftError}</span>}
-      <span className="text-[11px] text-muted-foreground ml-auto">Cash {side === 'BUY' ? '−' : '+'} qty × price.</span>
     </div>
   )
 }
@@ -326,10 +317,16 @@ function OrderTab({ utaId, knownKeys, run, loading }: {
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <div className="flex rounded overflow-hidden border border-border">
-        <button onClick={() => setSide('BUY')} className={`px-2 py-1 text-xs ${side === 'BUY' ? 'bg-success/20 text-success' : 'text-muted-foreground hover:text-foreground'}`}>BUY</button>
-        <button onClick={() => setSide('SELL')} className={`px-2 py-1 text-xs ${side === 'SELL' ? 'bg-destructive/20 text-destructive' : 'text-muted-foreground hover:text-foreground'}`}>SELL</button>
-      </div>
+      <SegmentedControl
+        value={side}
+        options={[
+          { value: 'BUY', label: 'BUY' },
+          { value: 'SELL', label: 'SELL' },
+        ]}
+        onChange={setSide}
+        ariaLabel="Order side"
+        compact
+      />
       <select value={orderType} onChange={(e) => setOrderType(e.target.value as 'MKT' | 'LMT')} className={`${inputClass} w-20`}>
         <option value="MKT">MKT</option>
         <option value="LMT">LMT</option>
@@ -339,8 +336,7 @@ function OrderTab({ utaId, knownKeys, run, loading }: {
       {orderType === 'LMT' && (
         <input className={`${inputClassMono} w-28`} placeholder="limit price" value={lmtPrice} onChange={(e) => setLmtPrice(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} />
       )}
-      <button disabled={loading || !key || !qty || (orderType === 'LMT' && !lmtPrice)} onClick={submit} className="btn-primary-sm">Place</button>
-      <span className="text-[11px] text-muted-foreground">Stage → commit → push via Alice's trading pipeline.</span>
+      <Button disabled={loading || !key || !qty || (orderType === 'LMT' && !lmtPrice)} onClick={submit} size="sm">Place</Button>
     </div>
   )
 }
