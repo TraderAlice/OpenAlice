@@ -4,17 +4,18 @@ import {
   ArrowRight,
   CircleAlert,
   Clock3,
-  Hash,
   Link2,
   MessageCircle,
-  MessagesSquare,
   Plug,
   RefreshCw,
   Send,
   Settings2,
-  type LucideIcon,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import discordIcon from '../assets/connectors/discord.svg'
+import feishuIcon from '../assets/connectors/feishu.png'
+import slackIcon from '../assets/connectors/slack.svg'
+import telegramIcon from '../assets/connectors/telegram.png'
 import type {
   ConnectorDefinition,
   ConnectorHealth,
@@ -122,7 +123,7 @@ export function ConnectorStatusPage() {
             )}
             <button
               type="button"
-              className="oa-pressable inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-[13px] text-muted-foreground hover:text-foreground hover:border-primary/50 disabled:opacity-50"
+              className="oa-pressable inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-[13px] text-muted-foreground hover:border-primary/50 hover:text-foreground disabled:opacity-50"
               disabled={refreshing}
               onClick={() => void refreshConnectorHealth()}
             >
@@ -158,7 +159,7 @@ export function ConnectorStatusPage() {
               />
             </>
           ) : error ? (
-            <div className="h-[28rem] overflow-hidden rounded-2xl border border-border/70">
+            <div className="h-[28rem] overflow-hidden rounded-lg border border-border/70">
               <RecoverySurface
                 title={t('connectorStatus.loadErrorTitle')}
                 description={t('connectorStatus.loadErrorDescription')}
@@ -208,9 +209,9 @@ export function ConnectorStatusPage() {
 function ConnectorOverviewSkeleton({ label }: { label: string }) {
   return (
     <div role="status" aria-label={label} aria-busy="true" className="space-y-6">
-      <section className="rounded-xl border border-border bg-secondary/20 px-4 py-3.5">
+      <section className="rounded-lg border border-border bg-secondary/20 px-4 py-3.5">
         <div className="flex items-center gap-3">
-          <Skeleton className="h-9 w-9 shrink-0 rounded-lg" />
+          <Skeleton className="h-7 w-7 shrink-0 rounded-md" />
           <div className="min-w-0 flex-1 space-y-2">
             <Skeleton className="h-3.5 w-36" />
             <Skeleton className="h-3 w-full max-w-lg" />
@@ -224,9 +225,9 @@ function ConnectorOverviewSkeleton({ label }: { label: string }) {
         </div>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {Array.from({ length: 4 }).map((_, index) => (
-            <article key={index} className="rounded-2xl border border-border bg-secondary/15 p-5 lg:min-h-[250px]">
+            <article key={index} className="rounded-lg border border-border bg-secondary/15 p-5 lg:min-h-[250px]">
               <div className="flex items-center gap-3">
-                <Skeleton className="h-10 w-10 shrink-0 rounded-xl" />
+                <Skeleton className="h-7 w-7 shrink-0 rounded-md" />
                 <div className="min-w-0 flex-1 space-y-2">
                   <Skeleton className={`h-4 ${index % 2 === 0 ? 'w-24' : 'w-20'}`} />
                   <Skeleton className="h-3 w-2/3" />
@@ -241,7 +242,7 @@ function ConnectorOverviewSkeleton({ label }: { label: string }) {
                 <Skeleton className="h-3 w-24" />
                 <Skeleton className="h-3 w-20" />
               </div>
-              <Skeleton className="mt-12 h-9 w-28 rounded-lg" />
+              <Skeleton className="mt-12 h-9 w-28 rounded-md" />
             </article>
           ))}
         </div>
@@ -306,7 +307,7 @@ function ConnectorOverview({
   return (
     <>
       {showServiceSummary && (
-        <section className={`oa-status-surface rounded-xl border px-4 py-3.5 ${service.tone === 'danger'
+        <section className={`oa-status-surface rounded-lg border px-4 py-3.5 ${service.tone === 'danger'
           ? 'border-destructive/25 bg-destructive/[0.035]'
           : service.tone === 'warning'
             ? 'border-warning/25 bg-warning/[0.035]'
@@ -314,13 +315,13 @@ function ConnectorOverview({
         }`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
-              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${service.tone === 'danger'
-                ? 'border-destructive/20 bg-destructive/10 text-destructive'
+              <div className={`flex h-8 w-8 shrink-0 items-center justify-center ${service.tone === 'danger'
+                ? 'text-destructive'
                 : service.tone === 'healthy'
-                  ? 'border-success/20 bg-success/10 text-success'
+                  ? 'text-success'
                   : service.tone === 'warning'
-                    ? 'border-warning/20 bg-warning/10 text-warning'
-                  : 'border-border bg-background text-muted-foreground'
+                    ? 'text-warning'
+                    : 'text-muted-foreground'
               }`}>
                 <Plug size={17} aria-hidden />
               </div>
@@ -473,7 +474,7 @@ function AvailableConnectorGroup({
         {adapters.map(({ definition }) => (
           <article
             key={definition.id}
-            className="oa-status-surface flex min-w-0 flex-col gap-3 rounded-xl border border-border/80 bg-secondary/10 p-4 sm:flex-row sm:items-center"
+            className="oa-status-surface flex min-w-0 flex-col gap-3 rounded-lg border border-border/70 bg-secondary/10 p-4 sm:flex-row sm:items-center"
           >
             <div className="flex min-w-0 flex-1 items-center gap-3">
               <ConnectorGlyph id={definition.id} />
@@ -495,7 +496,7 @@ function AvailableConnectorGroup({
             </div>
             <button
               type="button"
-              className="oa-pressable inline-flex min-h-10 w-full shrink-0 items-center justify-center gap-2 rounded-lg border border-border bg-background/60 px-3 py-2 text-[12px] font-medium text-foreground hover:border-primary/45 hover:text-primary sm:w-auto"
+              className="oa-pressable inline-flex min-h-10 w-full shrink-0 items-center justify-center gap-2 rounded-md border border-transparent bg-transparent px-2.5 py-1.5 text-[12px] font-medium text-muted-foreground hover:bg-muted/65 hover:text-foreground sm:min-h-9 sm:w-auto"
               onClick={(event) => onConfigure(definition.id, event.currentTarget)}
             >
               {t('connectorStatus.configureAdapter', { name: definition.label })}
@@ -543,7 +544,7 @@ function ConnectorOverviewCard({
     : t('connectorSettings.useConnector', { name: definition.label })
 
   return (
-    <article className="oa-status-surface flex flex-col rounded-2xl border border-border/80 bg-secondary/15 p-5">
+    <article className="oa-status-surface flex flex-col rounded-lg border border-border/70 bg-secondary/15 p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <ConnectorGlyph id={definition.id} />
@@ -613,7 +614,7 @@ function ConnectorOverviewCard({
           {setup.stage === 'error' && (
             <button
               type="button"
-              className="oa-pressable inline-flex min-h-10 items-center gap-2 rounded-lg border border-primary bg-primary px-3 py-2 text-[12px] font-medium text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
+              className="oa-pressable inline-flex min-h-10 items-center gap-2 rounded-md border border-primary bg-primary px-3 py-2 text-[12px] font-medium text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
               disabled={actionsBusy}
               onClick={() => void onReconnect(definition.id)}
             >
@@ -623,7 +624,7 @@ function ConnectorOverviewCard({
           )}
           <button
             type="button"
-            className={`oa-pressable inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-medium ${prioritizeConfiguration
+            className={`oa-pressable inline-flex min-h-10 items-center gap-2 rounded-md px-3 py-2 text-[12px] font-medium ${prioritizeConfiguration
               ? 'border border-primary bg-primary text-primary-foreground shadow-sm hover:bg-primary/90'
               : 'border border-border bg-background/50 text-foreground hover:border-primary/45 hover:text-primary'
             }`}
@@ -759,7 +760,7 @@ function StatusBadge({ tone, children }: { tone: StatusTone; children: string })
     neutral: 'border-border bg-muted text-muted-foreground',
   }
   return (
-    <span className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[10.5px] font-medium ${styles[tone]}`}>
+    <span className={`inline-flex shrink-0 items-center rounded-md border px-2 py-0.5 text-[10.5px] font-medium ${styles[tone]}`}>
       {children}
     </span>
   )
@@ -767,7 +768,7 @@ function StatusBadge({ tone, children }: { tone: StatusTone; children: string })
 
 function SummaryPill({ tone = 'neutral', children }: { tone?: 'neutral' | 'danger'; children: string }) {
   return (
-    <span className={`inline-flex rounded-full border px-2.5 py-1 ${tone === 'danger'
+    <span className={`inline-flex rounded-md border px-2.5 py-1 ${tone === 'danger'
       ? 'border-destructive/20 bg-destructive/10 text-destructive'
       : 'border-border/80 bg-background/55'
     }`}>
@@ -777,20 +778,28 @@ function SummaryPill({ tone = 'neutral', children }: { tone?: 'neutral' | 'dange
 }
 
 function ConnectorGlyph({ id }: { id: string }) {
-  const glyphs: Record<string, LucideIcon> = {
-    discord: MessageCircle,
-    telegram: Send,
-    slack: Hash,
-    feishu: MessagesSquare,
+  const brands: Record<string, { src: string; className: string }> = {
+    discord: { src: discordIcon, className: 'h-[21px] w-7' },
+    telegram: { src: telegramIcon, className: 'h-6 w-6' },
+    slack: { src: slackIcon, className: 'h-[23px] w-[23px]' },
+    feishu: { src: feishuIcon, className: 'h-6 w-6' },
   }
-  const Icon = glyphs[id] ?? Plug
+  const brand = brands[id]
   return (
     <span
       data-connector-glyph
-      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-secondary/60 text-muted-foreground"
+      className="flex h-10 w-10 shrink-0 items-center justify-center text-muted-foreground"
       aria-hidden
     >
-      <Icon size={18} />
+      {brand ? (
+        <img
+          src={brand.src}
+          alt=""
+          data-connector-brand={id}
+          draggable={false}
+          className={`${brand.className} object-contain`}
+        />
+      ) : <Plug size={18} />}
     </span>
   )
 }

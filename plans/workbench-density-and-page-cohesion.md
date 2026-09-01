@@ -44,6 +44,8 @@ criteria.
 - [x] Convert the Market overview to a quieter data-first hierarchy.
 - [x] Compact Connector and Agent Runtime settings through shared section and
   list ownership.
+- [x] Replace generic Connector glyph tiles with official transparent brand
+  marks and normalize Connector card, badge, action, and session-menu geometry.
 - [x] Verify primary routes, narrow layouts, both theme families, keyboard
   access, reduced motion, type checking, tests, and production build.
 - [x] Publish current screenshots and update PR #1279 with the completed scope

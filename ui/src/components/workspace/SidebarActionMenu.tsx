@@ -1,10 +1,11 @@
-import { useRef, type ReactNode } from 'react'
+import { Fragment, useRef, type ReactNode } from 'react'
 import { Ellipsis } from 'lucide-react'
 
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
@@ -52,28 +53,30 @@ export function SidebarActionMenu({
         align="end"
         sideOffset={4}
         aria-label={label}
-        className="z-30 w-[220px] max-w-[calc(100vw-2rem)] rounded-lg border border-border/70 bg-secondary py-1 shadow-lg ring-0"
+        className="z-30 w-auto min-w-[184px] max-w-[calc(100vw-2rem)] rounded-[10px] border border-border/70 bg-popover p-1 shadow-md ring-0"
       >
-        {items.map((item) => (
-          <DropdownMenuItem
-            key={item.label}
-            aria-label={item.ariaLabel}
-            disabled={item.disabled}
-            variant={item.danger ? 'destructive' : 'default'}
-            className="flex min-h-9 w-full cursor-default items-center gap-2 rounded-none px-3 py-2 text-left text-[12px] transition-colors focus:bg-muted"
-            onClick={() => {
-              if (item.disabled) return
-              // Base UI restores focus to the trigger as the menu finishes
-              // closing. Run follow-up dialogs only after that handoff so they
-              // capture a durable return target instead of an unmounted item.
-              pendingActionRef.current = item.onSelect
-            }}
-          >
-            <span className="flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden>
-              {item.icon}
-            </span>
-            <span className="min-w-0 flex-1 truncate">{item.label}</span>
-          </DropdownMenuItem>
+        {items.map((item, index) => (
+          <Fragment key={item.label}>
+            {item.danger && index > 0 ? <DropdownMenuSeparator className="my-1" /> : null}
+            <DropdownMenuItem
+              aria-label={item.ariaLabel}
+              disabled={item.disabled}
+              variant={item.danger ? 'destructive' : 'default'}
+              className="flex min-h-8 w-full cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] leading-4 transition-colors focus:bg-accent"
+              onClick={() => {
+                if (item.disabled) return
+                // Base UI restores focus to the trigger as the menu finishes
+                // closing. Run follow-up dialogs after that handoff so they
+                // capture a durable return target.
+                pendingActionRef.current = item.onSelect
+              }}
+            >
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden>
+                {item.icon}
+              </span>
+              <span className="min-w-0 flex-1 truncate">{item.label}</span>
+            </DropdownMenuItem>
+          </Fragment>
         ))}
       </DropdownMenuContent>
     </DropdownMenu>

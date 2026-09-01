@@ -23,7 +23,7 @@ import {
   Network,
   PanelsTopLeft,
   Settings as SettingsIcon,
-  X,
+  Trash2,
 } from 'lucide-react'
 
 import { useWorkspaces } from '../../contexts/workspaces-context'
@@ -1408,7 +1408,7 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
             {
               label: t('chat.deleteWorkspace'),
               ariaLabel: t('chat.workspaceActions.offboard', { workspace: actionWorkspace }),
-              icon: <X size={13} strokeWidth={2.5} />,
+              icon: <Trash2 size={13} strokeWidth={2} />,
               onSelect: props.onDelete,
               danger: true,
             },

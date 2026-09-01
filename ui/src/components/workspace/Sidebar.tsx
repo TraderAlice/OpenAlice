@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatRelativeTime } from '../../lib/intl';
 import type { ReactElement } from 'react';
-import { Archive, ChevronDown, ChevronRight, LayoutGrid, Library, LoaderCircle, Pencil, Play, Plus, RotateCcw, Settings as SettingsIcon, Square, Terminal, X, type LucideIcon } from 'lucide-react';
+import { Archive, ChevronDown, ChevronRight, LayoutGrid, Library, LoaderCircle, Pencil, Play, Plus, RotateCcw, Settings as SettingsIcon, Square, Terminal, Trash2, type LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { headlessApi, type HeadlessTaskRecord } from '../../api/headless';
@@ -487,7 +487,7 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
             }] : []),
             {
               label: t('workspace.deleteWorkspace'),
-              icon: <X size={13} strokeWidth={2.5} />,
+              icon: <Trash2 size={13} strokeWidth={2} />,
               onSelect: () => void props.onDelete(w.id),
               danger: true,
             },
@@ -695,7 +695,7 @@ export function SessionRow(props: SessionRowProps): ReactElement {
     ...(canDelete ? [{
       label: t('workspace.deleteSessionAction'),
       ariaLabel: deleteLabel,
-      icon: <X size={13} strokeWidth={2.5} />,
+      icon: <Trash2 size={13} strokeWidth={2} />,
       onSelect: props.onDelete,
       danger: true,
     }] : []),
@@ -706,7 +706,7 @@ export function SessionRow(props: SessionRowProps): ReactElement {
       data-reorder-id={props.reorderId}
       data-active={props.isActive}
       aria-busy={headlessOccupying || undefined}
-      className={`oa-session-row group relative mx-1.5 flex min-h-9 items-center gap-1 rounded-[10px] px-2 py-1.5 text-[13px] leading-[18px] transition-colors ${
+      className={`oa-session-row group relative mx-1.5 flex min-h-9 items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] leading-[18px] transition-colors ${
         props.isActive ? 'bg-accent-strong' : 'hover:bg-accent'
       }`}
     >
