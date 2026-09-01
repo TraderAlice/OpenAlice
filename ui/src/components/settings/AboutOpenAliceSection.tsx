@@ -2,10 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { Cable, CheckCircle2, Download, ExternalLink, FolderKanban, LoaderCircle, RefreshCw, Server } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import { api } from '../../api'
-import type { VersionInfo } from '../../api/types'
 import { getBackendConnection } from '../../auth/backendConnection'
 import { useAliceProject } from '../../hooks/useAliceProject'
+import { useVersionInfo } from '../../hooks/useVersionInfo'
 import { Button } from '../ui/button'
 import { ConfigSection } from '../form'
 
@@ -32,12 +31,16 @@ export function AboutOpenAliceSection() {
       ? remoteConnection.target
       : `${remoteConnection.target}:${remoteConnection.sshPort}`
     : null
-  const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null)
   const [runtimeMode, setRuntimeMode] = useState<RuntimeMode>('browser')
   const [nativeStatus, setNativeStatus] = useState<NativeUpdaterStatus | null>(null)
   const [checking, setChecking] = useState(false)
   const [installing, setInstalling] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const {
+    info: versionInfo,
+    error: versionError,
+    check: checkVersion,
+  } = useVersionInfo()
   const {
     project,
     loading: projectLoading,
@@ -47,14 +50,6 @@ export function AboutOpenAliceSection() {
 
   useEffect(() => {
     let active = true
-    void api.version.get()
-      .then((next) => {
-        if (active) setVersionInfo(next)
-      })
-      .catch(() => {
-        if (active) setError(t('settings.about.checkError'))
-      })
-
     const runtime = window.openAlice?.runtime
     if (runtime) {
       void runtime.info()
@@ -78,7 +73,7 @@ export function AboutOpenAliceSection() {
       active = false
       unsubscribe()
     }
-  }, [t])
+  }, [])
 
   const currentVersion = versionInfo?.current ?? t('settings.about.versionLoading')
   const updateVersion = nativeStatus && 'version' in nativeStatus && nativeStatus.version
@@ -128,7 +123,7 @@ export function AboutOpenAliceSection() {
           : t('settings.about.status.availableUnknown'),
       }
     }
-    if (nativeStatus?.phase === 'error' || versionInfo?.error || error) {
+    if (nativeStatus?.phase === 'error' || versionInfo?.error || versionError || error) {
       return { kind: 'error' as const, text: t('settings.about.status.error') }
     }
     if (versionInfo?.updateAuthority === 'service') {
@@ -144,7 +139,7 @@ export function AboutOpenAliceSection() {
       return { kind: 'current' as const, text: t('settings.about.status.current') }
     }
     return { kind: 'checking' as const, text: t('settings.about.status.loading') }
-  }, [checking, error, nativeStatus, t, updateVersion, versionInfo])
+  }, [checking, error, nativeStatus, t, updateVersion, versionError, versionInfo])
 
   const checkForUpdates = async () => {
     setChecking(true)
@@ -153,10 +148,9 @@ export function AboutOpenAliceSection() {
       const nativeCheck = window.openAlice?.updater?.checkForUpdates().catch(() => null)
       const [, next] = await Promise.all([
         nativeCheck ?? Promise.resolve(null),
-        api.version.check(),
+        checkVersion(),
       ])
-      setVersionInfo(next)
-      if (next.error) setError(t('settings.about.checkError'))
+      if (next?.error) setError(t('settings.about.checkError'))
     } catch {
       setError(t('settings.about.checkError'))
     } finally {
