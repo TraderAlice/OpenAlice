@@ -4,7 +4,11 @@ import { resolveLaunchContext } from './launch-context.ts'
 import type { MachineFleetEnvelope, MachineInventory } from './machine-inventory.ts'
 import { createSupervisorFleetState, displayWidth, selectedFleetProject } from './supervisor-fleet.ts'
 import { createSupervisorTuiTheme } from './supervisor-tui-theme.ts'
-import { renderSupervisorDock, supervisorCommandTargets } from './supervisor-tui-view.ts'
+import {
+  renderSupervisorCommandBar,
+  renderSupervisorDock,
+  supervisorCommandTargets,
+} from './supervisor-tui-view.ts'
 import {
   resolveSupervisorChannel,
   runSupervisorTui,
@@ -425,6 +429,24 @@ describe('Supervisor TUI screen', () => {
       endColumn: 8,
       label: 'p',
     }])
+    expect(supervisorCommandTargets(['◆ [ Enter ] Start  │  [ p ] Setup'])).toEqual([
+      {
+        row: 1,
+        startColumn: 1,
+        endColumn: 17,
+        label: 'Enter',
+        surface: '◆ [ Enter ] Start',
+        primary: true,
+      },
+      {
+        row: 1,
+        startColumn: 23,
+        endColumn: 33,
+        label: 'p',
+        surface: '[ p ] Setup',
+        primary: false,
+      },
+    ])
     const actions: SupervisorAction[] = []
     const settings = vi.fn()
     const detach = vi.fn()
@@ -445,12 +467,13 @@ describe('Supervisor TUI screen', () => {
     let lines = screen.render(80)
     let plainLines = lines.map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
     let row = plainLines.findIndex((line) => line.includes('[ p ] Setup')) + 1
-    let col = plainLines[row - 1]!.indexOf('[ p ]') + 2
+    let col = plainLines[row - 1]!.indexOf('Setup') + 2
     expect(screen.handlePointer({
       button: 35, col, row, release: false, wheel: null, motion: true, leftClick: false,
     })).toBe(true)
     expect(requestRender).toHaveBeenCalled()
-    expect(screen.render(80)[row - 1]).toContain('\u001b[1;38;2;230;255;252;48;2;24;64;69m[ p ]')
+    expect(screen.render(80)[row - 1]).toContain('\u001b[1;38;2;230;255;252;48;2;24;64;69m[ p ] Setup')
+    expect(screen.render(80)[row - 1]!.replace(/\u001b\[[0-9;]*m/gu, '')).toContain('│ › [ p ] Setup')
     expect(screen.handlePointer({
       button: 0, col, row, release: false, wheel: null, motion: false, leftClick: true,
     })).toBe(true)
@@ -488,6 +511,23 @@ describe('Supervisor TUI screen', () => {
       button: 0, col, row, release: false, wheel: null, motion: false, leftClick: true,
     })
     expect(detach).toHaveBeenCalledOnce()
+  })
+
+  it('wraps Action Shelf segments atomically at narrow widths', () => {
+    const lines = renderSupervisorCommandBar([
+      { key: 'Enter', label: 'Start & open', primary: true },
+      { key: 's', label: 'Start quietly' },
+      { key: 'p', label: 'Setup' },
+      { key: '?', label: 'More' },
+    ], 46)
+    expect(lines).toHaveLength(3)
+    expect(lines[0]).toMatch(/^◆ \[ Enter \] Start & open/u)
+    expect(lines[1]).toMatch(/^· \[ s \] Start quietly  │  \[ p \] Setup/u)
+    expect(lines[2]).toMatch(/^· \[ \? \] More/u)
+    expect(lines.every((line) => displayWidth(line) === 46)).toBe(true)
+    expect(supervisorCommandTargets(lines).map((target) => target.label)).toEqual([
+      'Enter', 's', 'p', '?',
+    ])
   })
 
   it('scrolls Logs and Doctor with keyboard and pointer while keeping contextual controls', () => {

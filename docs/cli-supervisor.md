@@ -158,14 +158,17 @@ path is intentionally parameter-free:
   and a second click on the focused selected AliceProject invokes Enter's
   primary action.
   With only the local Machine, Fleet focus starts on its current AliceProject;
-- the footer is a contextual command bar, not a complete shortcut legend. It
-  exposes the current primary action and a few adjacent actions as keycaps;
+- the footer is a contextual Action Shelf, not a complete shortcut legend. It
+  exposes the current primary action as a high-priority `◆` segment and a few
+  adjacent actions as quieter chips on one full-width surface. Segments wrap
+  atomically instead of clipping labels;
   `?` keeps the complete keyboard reference available without crowding every
-  operational page. Every visible keycap in the Supervisor frame derives a
-  display-width-aware pointer target from the final responsive layout, so hover
-  and click survive reflow and invoke the same input state machine as the
-  corresponding key. Confirmation and refusal semantics therefore do not have
-  a separate mouse-only path;
+  operational page. Each complete action segment derives a display-width-aware
+  pointer target from the final responsive layout, so hover and click survive
+  reflow and invoke the same input state machine as the corresponding key.
+  Hover changes the leading `◆`/`·` or divider to `›`, preserving a visible
+  focus signal even under `NO_COLOR`. Confirmation and refusal semantics
+  therefore do not have a separate mouse-only path;
 - a persistent full-width context ribbon keeps `[ / ] Commands` and
   `[ q ] Detach` visible on every Supervisor page. At 60 columns and wider it
   also retains the selected AliceProject and compact Runtime signal; when space

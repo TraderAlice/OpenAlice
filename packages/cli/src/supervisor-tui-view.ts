@@ -37,6 +37,8 @@ export interface SupervisorCommandTarget {
   startColumn: number
   endColumn: number
   label: string
+  surface?: string
+  primary?: boolean
 }
 
 export interface SupervisorDockView {
@@ -165,19 +167,20 @@ export function renderSupervisorCommandBar(
   commands: SupervisorCommand[],
   width: number,
 ): string[] {
-  const rendered = commands.map((command) => `${command.primary ? '◆ ' : ''}[ ${command.key} ] ${command.label}`)
   const lines: string[] = []
   let current = ''
-  for (const command of rendered) {
-    const candidate = current ? `${current}   ${command}` : command
+  for (const command of commands) {
+    const inline = `${command.primary ? '◆ ' : ''}[ ${command.key} ] ${command.label}`
+    const leading = `${command.primary ? '◆' : '·'} [ ${command.key} ] ${command.label}`
+    const candidate = current ? `${current}  │  ${inline}` : leading
     if (current && displayWidth(candidate) > width) {
-      lines.push(current)
-      current = command
+      lines.push(fillLine(current, width))
+      current = leading
     } else {
       current = candidate
     }
   }
-  if (current) lines.push(current)
+  if (current) lines.push(fillLine(current, width))
   return lines.length > 0 ? lines : ['No actions available']
 }
 
@@ -230,6 +233,11 @@ export function renderSupervisorPanel(
 export function supervisorCommandTargets(lines: string[]): SupervisorCommandTarget[] {
   const targets: SupervisorCommandTarget[] = []
   for (const [rowIndex, line] of lines.entries()) {
+    const shelf = supervisorActionShelfTargets(line, rowIndex + 1)
+    if (shelf.length > 0) {
+      targets.push(...shelf)
+      continue
+    }
     for (const match of line.matchAll(/\[ ([^\]]+) \]/gu)) {
       if (match.index === undefined || !match[1]) continue
       const startColumn = displayWidth(line.slice(0, match.index)) + 1
@@ -240,6 +248,34 @@ export function supervisorCommandTargets(lines: string[]): SupervisorCommandTarg
         label: match[1],
       })
     }
+  }
+  return targets
+}
+
+function supervisorActionShelfTargets(
+  line: string,
+  row: number,
+): SupervisorCommandTarget[] {
+  const body = line.trimEnd()
+  if (!/^[◆·] \[ [^\]]+ \] /u.test(body)) return []
+  const parts = body.split('  │  ')
+  if (!parts.every((part) => /^(?:[◆·] )?\[ [^\]]+ \] \S/u.test(part))) return []
+
+  const targets: SupervisorCommandTarget[] = []
+  let codeUnitOffset = 0
+  for (const part of parts) {
+    const match = /^([◆·] )?\[ ([^\]]+) \] /u.exec(part)
+    if (!match?.[2]) return []
+    const startColumn = displayWidth(body.slice(0, codeUnitOffset)) + 1
+    targets.push({
+      row,
+      startColumn,
+      endColumn: startColumn + displayWidth(part) - 1,
+      label: match[2],
+      surface: part,
+      primary: match[1] === '◆ ',
+    })
+    codeUnitOffset += part.length + '  │  '.length
   }
   return targets
 }

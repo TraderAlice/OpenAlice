@@ -15,6 +15,8 @@ export interface SupervisorTuiTheme {
   dangerRail(value: string): string
   navigationRail(value: string): string
   navigationHover(value: string): string
+  actionRail(value: string): string
+  actionPrimary(value: string): string
   dockRail(value: string): string
 }
 
@@ -70,6 +72,8 @@ export function createSupervisorTuiTheme(
     dangerRail: style('\u001b[1;38;2;255;190;201;48;2;55;20;31m'),
     navigationRail: style('\u001b[38;2;162;190;198;48;2;11;28;34m'),
     navigationHover: style('\u001b[1;38;2;203;250;246;48;2;19;49;55m'),
+    actionRail: style('\u001b[38;2;173;202;208;48;2;13;31;38m'),
+    actionPrimary: style('\u001b[1;38;2;183;255;248;48;2;18;54;59m'),
     dockRail: style('\u001b[38;2;199;235;239;48;2;10;34;39m'),
   }
 }
@@ -79,8 +83,29 @@ export function decorateSupervisorFrame(
   theme: SupervisorTuiTheme,
   options: SupervisorFrameStyleOptions,
 ): string[] {
-  if (!theme.enabled) return lines
+  if (!theme.enabled) {
+    return lines.map((line, index) => (
+      /^[◆·] \[ [^\]]+ \] /u.test(line)
+        ? decorateActionShelf(
+            line,
+            theme,
+            options.hoveredCommand?.row === index + 1
+              ? options.hoveredCommand.label
+              : undefined,
+          )
+        : line
+    ))
+  }
   return lines.map((line, index) => {
+    if (/^[◆·] \[ [^\]]+ \] /u.test(line)) {
+      return decorateActionShelf(
+        line,
+        theme,
+        options.hoveredCommand?.row === index + 1
+          ? options.hoveredCommand.label
+          : undefined,
+      )
+    }
     if (line.startsWith('[ / ]')) {
       return decorateDock(line, theme, options.hoveredCommand?.row === index + 1
         ? options.hoveredCommand.label
@@ -143,6 +168,31 @@ export function decorateSupervisorFrame(
     ) return theme.accentStrong(line)
     return line
   })
+}
+
+function decorateActionShelf(
+  line: string,
+  theme: SupervisorTuiTheme,
+  hoveredCommand?: string,
+): string {
+  const separator = '  │  '
+  const parts = line.split(separator)
+  return parts.map((part, index) => {
+    const key = /^(?:[◆·] )?\[ ([^\]]+) \]/u.exec(part)?.[1]
+    const hovered = Boolean(key && key === hoveredCommand)
+    const semantic = hovered && index === 0
+      ? `›${part.slice(1)}`
+      : part
+    if (hovered) return theme.selected(semantic)
+    return semantic.startsWith('◆ ')
+      ? theme.actionPrimary(semantic)
+      : theme.actionRail(semantic)
+  }).reduce((result, part, index) => {
+    if (index === 0) return part
+    const key = /^(?:[◆·] )?\[ ([^\]]+) \]/u.exec(parts[index] ?? '')?.[1]
+    const joiner = key && key === hoveredCommand ? ' │ › ' : separator
+    return `${result}${theme.actionRail(joiner)}${part}`
+  }, '')
 }
 
 function decorateDock(

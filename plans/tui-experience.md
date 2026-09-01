@@ -158,6 +158,21 @@ not imply maintainer approval of the finished interaction.
   Wide terminals use a stream/Inspector split and 80-column terminals stack the
   same model without another read or lifecycle path.
 
+### Contextual Action Shelf decision
+
+- Keeping the footer as spaced keycap prose preserves compact implementation,
+  but hierarchy exists only in reading order and mouse targets remain much
+  smaller than their visible labels.
+- Turning every action into a heavy bordered button would consume scarce rows,
+  especially when the 80-column baseline wraps, and compete with the persistent
+  context ribbon directly beneath it.
+- The selected model follows OMP's status-line composition: one full-width
+  shelf with a high-contrast `◆` primary segment, quieter secondary segments,
+  stable dividers, and complete-segment hit regions. Segments wrap atomically.
+  Pointer hover replaces `◆`/`·` with `›` for the first segment or changes the
+  preceding divider to `│ ›`, so focus remains visible under `NO_COLOR`; click
+  still feeds the existing key state machine.
+
 ### Operational navigation decision
 
 - Static route labels are simple but require opening every page to discover
@@ -337,6 +352,8 @@ already large `supervisor-tui.ts` application controller.
 - [x] Replace expanding feedback rows with a stable single-line activity slot.
 - [x] Replace inline confirmation cards with stable, focused compositor modals.
 - [x] Promote the Command Palette from page replacement to a focused overlay.
+- [x] Replace spaced footer keycap prose with a responsive, whole-segment
+  contextual Action Shelf whose hover semantics survive `NO_COLOR`.
 
 ## Progress
 
@@ -627,6 +644,22 @@ already large `supervisor-tui.ts` application controller.
   passed, 1 skipped; 6102 tests passed, 10 skipped). Docker installer smoke
   passes, and package dry-run retains `src/supervisor-tui-logs.ts` while
   excluding the PTY fixture.
+- Operational footers are now contextual Action Shelves rather than spaced
+  shortcut prose. The primary segment uses a high-contrast `◆` surface,
+  secondary actions share quieter divided chips, and the complete label—not
+  only its keycap—is hoverable and clickable. Narrow layouts wrap only between
+  complete segments. Hover uses a stable-width `›` marker in both color and
+  `NO_COLOR` sessions while all clicks continue through the keyboard action
+  map.
+- Action-Shelf acceptance passes with 123 focused Supervisor screen, shared
+  view, pointer, modal, Palette, Fleet, Logs, Doctor, transfer, and real-PTY
+  tests. A real 80x24 session hovered the `Setup` label outside `[ p ]`, observed
+  `│ › [ p ] Setup` without relying on color, clicked into the real Setup
+  overlay, closed it, and restored cursor, mouse, and bracketed-paste modes. A
+  46-column render preserved all four actions across three atomic rows. CLI
+  build/typecheck, root TypeScript, and the 692-file suite pass (691 passed, 1
+  skipped; 6104 tests passed, 10 skipped). Docker installer smoke and package
+  dry-run pass with the shared theme/view modules retained.
 
 ## Completion Criteria
 
