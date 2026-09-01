@@ -5,6 +5,8 @@ import { formatRelativeTime } from '../lib/intl'
 import { api, type NewsArticle } from '../api'
 import { PageHeader } from '../components/PageHeader'
 import { EmptyState, Skeleton } from '../components/StateViews'
+import { Button, buttonVariants } from '../components/ui/button'
+import { inputClass } from '../components/form'
 
 // ==================== Helpers ====================
 
@@ -74,7 +76,7 @@ function ArticleRow({ article }: { article: NewsArticle }) {
   const titleId = `news-title-${disclosureId}`
   const panelId = `news-details-${disclosureId}`
   const hasPreview = article.content.trim().length > 0
-  const categories = article.categories?.replaceAll(',', ' · ')
+  const categories = article.categories?.replaceAll(',', ', ')
 
   return (
     <article data-density={hasPreview ? 'preview' : 'compact'}>
@@ -84,7 +86,7 @@ function ArticleRow({ article }: { article: NewsArticle }) {
         aria-expanded={expanded}
         aria-controls={panelId}
         onClick={() => setExpanded((current) => !current)}
-        className={`group w-full px-1 text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40 sm:px-2 ${
+        className={`group w-full px-1 text-left hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40 sm:px-2 ${
           hasPreview ? 'py-3 sm:py-3.5' : 'py-2.5'
         }`}
       >
@@ -102,18 +104,16 @@ function ArticleRow({ article }: { article: NewsArticle }) {
                   {article.source}
                 </span>
               )}
-              {article.source && <span className="text-muted-foreground/40" aria-hidden>·</span>}
               <span className="shrink-0 tabular-nums">{formatRelativeTime(article.time)}</span>
               {categories && (
                 <>
-                  <span className="hidden text-muted-foreground/40 sm:inline" aria-hidden>·</span>
                   <span className="hidden truncate text-muted-foreground/75 sm:inline">{categories}</span>
                 </>
               )}
             </div>
           </div>
           <span
-            className={`mt-0.5 inline-flex size-5 shrink-0 items-center justify-center text-muted-foreground transition-transform group-hover:text-foreground ${expanded ? 'rotate-90' : ''}`}
+            className={`mt-0.5 inline-flex size-5 shrink-0 items-center justify-center text-muted-foreground group-hover:text-foreground ${expanded ? 'rotate-90' : ''}`}
             aria-hidden
           >
             <svg viewBox="0 0 20 20" fill="none" className="size-3.5" stroke="currentColor" strokeWidth="1.8">
@@ -144,7 +144,7 @@ function ArticleRow({ article }: { article: NewsArticle }) {
               href={article.link}
               target="_blank"
               rel="noopener noreferrer"
-              className="-ml-3 inline-flex min-h-10 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium text-primary transition-colors hover:bg-primary/5 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className={buttonVariants({ variant: 'ghost', size: 'sm', className: '-ml-3 min-h-10 text-[13px] text-primary hover:underline' })}
             >
               {t('news.openOriginal')}
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -264,7 +264,7 @@ export function NewsPage() {
               aria-label={t('news.lookbackLabel')}
               value={lookback}
               onChange={(e) => setLookback(e.target.value)}
-              className="min-h-10 min-w-0 w-full rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 sm:w-auto"
+              className={`${inputClass} min-h-10 w-full py-2 text-sm sm:w-auto`}
             >
               {LOOKBACK_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
@@ -275,7 +275,7 @@ export function NewsPage() {
               aria-label={t('news.sourceLabel')}
               value={sourceFilter}
               onChange={(e) => setSourceFilter(e.target.value)}
-              className="min-h-10 min-w-0 w-full max-w-full rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 sm:w-auto"
+              className={`${inputClass} min-h-10 w-full max-w-full py-2 text-sm sm:w-auto`}
             >
               <option value="">{t('news.allSources')}</option>
               {sources.map((s) => (
@@ -362,14 +362,16 @@ function NewsLoadError({
       <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
         {t('news.loadErrorDescription')}
       </p>
-      <button
+      <Button
         type="button"
         onClick={onRetry}
         disabled={refreshing}
-        className="oa-pressable mt-4 rounded-md border border-border bg-secondary px-3 py-1.5 text-[12px] font-medium text-foreground transition-colors hover:border-primary/50 hover:bg-muted disabled:cursor-wait disabled:opacity-60"
+        className="mt-4 text-[12px]"
+        variant="outline"
+        size="sm"
       >
         {refreshing ? t('common.loading') : t('common.retry')}
-      </button>
+      </Button>
     </div>
   )
 }
@@ -385,18 +387,20 @@ function NewsStaleNotice({
   return (
     <div
       role="status"
-      className="flex items-center gap-2 rounded-md border border-warning/25 bg-warning/[0.06] px-3 py-2 text-[12px] text-muted-foreground"
+      className="flex items-center gap-2 rounded-lg border border-warning/25 bg-warning/[0.06] px-3 py-2 text-[12px] text-muted-foreground"
     >
       <CircleAlert size={14} className="shrink-0 text-warning" aria-hidden />
       <span className="min-w-0 flex-1">{t('news.stale')}</span>
-      <button
+      <Button
         type="button"
         onClick={onRetry}
         disabled={refreshing}
-        className="oa-pressable shrink-0 rounded px-2 py-1 font-medium text-foreground hover:bg-warning/10 disabled:cursor-wait disabled:opacity-60"
+        className="shrink-0"
+        variant="ghost"
+        size="xs"
       >
         {refreshing ? t('common.loading') : t('common.retry')}
-      </button>
+      </Button>
     </div>
   )
 }

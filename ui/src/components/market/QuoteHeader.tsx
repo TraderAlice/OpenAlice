@@ -42,7 +42,7 @@ export function QuoteHeader({ symbol }: Props) {
   const loading = !quote && !error
 
   return (
-    <div className="flex flex-wrap items-end gap-x-6 gap-y-2 px-4 py-3 border border-border rounded bg-secondary/30">
+    <div className="flex flex-wrap items-end gap-x-6 gap-y-2 rounded-lg border border-border bg-card px-4 py-3">
       <div className="flex flex-col min-w-0">
         <div className="flex items-baseline gap-2 min-w-0">
           <span className="text-[20px] font-semibold text-foreground tracking-tight">{symbol}</span>
@@ -52,12 +52,12 @@ export function QuoteHeader({ symbol }: Props) {
             <>
               {name && <span className="text-[13px] text-muted-foreground truncate">{name}</span>}
               {exchange && (
-                <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
+                <span className="text-[11px] font-medium text-muted-foreground">
                   {exchange}
                 </span>
               )}
               {provider && (
-                <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
+                <span className="text-[11px] font-medium text-muted-foreground">
                   {provider}
                 </span>
               )}
@@ -108,7 +108,7 @@ export function QuoteHeader({ symbol }: Props) {
 function Field({ label, value, loading }: { label: string; value: string; loading?: boolean }) {
   return (
     <div className="flex flex-col min-w-0">
-      <dt className="text-muted-foreground/60 uppercase tracking-wide">{label}</dt>
+      <dt className="font-medium text-muted-foreground/70">{label}</dt>
       <dd className="font-mono text-foreground truncate">
         {loading ? <Skeleton className="h-3 w-12 rounded mt-0.5" /> : value}
       </dd>

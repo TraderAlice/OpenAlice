@@ -18,7 +18,7 @@ describe('EquityDetail provider namespaces', () => {
   it('keeps Eastmoney native secids on the supported K-line-only surface', () => {
     render(<EquityDetail symbol="1.600519" source="eastmoney|1.600519" />)
 
-    expect(screen.getByText(/Eastmoney provides Chinese A-share discovery/)).toBeTruthy()
+    expect(screen.getByText(/This Eastmoney view includes Chinese A-share discovery/)).toBeTruthy()
     expect(screen.getByText('kline-panel')).toBeTruthy()
     expect(screen.getByText('contracts-panel')).toBeTruthy()
     expect(screen.queryByText('quote-panel')).toBeNull()

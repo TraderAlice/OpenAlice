@@ -5,6 +5,7 @@ import { Card } from '../../components/market/Card'
 import { KlinePanel, type KlineSnapshot } from '../../components/market/KlinePanel'
 import { SegmentedControl } from '../../components/SegmentedControl'
 import { Skeleton } from '../../components/StateViews'
+import { Button } from '../../components/ui/button'
 import { fmtPctSigned, fmtPnl } from '../../lib/format'
 import { useWorkspace } from '../../tabs/store'
 import {
@@ -112,7 +113,7 @@ export function CurrencyDetail({ symbol, source }: Props) {
   if (!pair) {
     return (
       <div className="flex flex-col gap-3 min-h-0 flex-1">
-        <div className="rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-[12px] text-muted-foreground">
+        <div className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[12px] text-muted-foreground">
           Open a six-letter currency pair such as EURUSD or USDJPY to use the FX workbench.
         </div>
         <div className="h-[420px] shrink-0">
@@ -124,12 +125,11 @@ export function CurrencyDetail({ symbol, source }: Props) {
 
   return (
     <div className="flex flex-col gap-3">
-      <section className="rounded-lg border border-border bg-secondary/35 px-4 py-3.5">
+      <section className="rounded-lg border border-border bg-card px-4 py-3.5">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <div className="flex items-baseline gap-2">
               <span className="font-mono text-[22px] font-semibold tracking-tight text-foreground">{pair.base}/{pair.quote}</span>
-              <span className="text-[11px] text-muted-foreground">spot research · no account required</span>
             </div>
             <div className="mt-1 flex items-baseline gap-2">
               <span className="font-mono text-[26px] font-semibold text-foreground">{fmtFx(stats?.spot, pair)}</span>
@@ -163,13 +163,14 @@ export function CurrencyDetail({ symbol, source }: Props) {
           title="Macro divergence"
           info="Country-level OECD proxies. EUR uses Germany and CNH uses onshore China; dates can differ by indicator. Read the dates before treating a spread as current."
           right={
-            <button
+            <Button
               type="button"
-              className="text-[11px] font-medium text-primary hover:text-primary/80"
+              variant="ghost"
+              size="xs"
               onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'global-macro' } })}
             >
               Open board
-            </button>
+            </Button>
           }
           contentClassName="p-0"
         >
@@ -181,7 +182,7 @@ export function CurrencyDetail({ symbol, source }: Props) {
             <div>
               <div className="overflow-x-auto">
                 <div className="min-w-[430px]">
-                  <div className="grid grid-cols-[minmax(110px,1fr)_minmax(90px,1fr)_minmax(90px,1fr)_80px] border-b border-border/60 bg-muted/25 px-3 py-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <div className="grid grid-cols-[minmax(110px,1fr)_minmax(90px,1fr)_minmax(90px,1fr)_80px] border-b border-border/60 bg-muted/25 px-3 py-2 text-[11px] font-medium text-muted-foreground">
                     <span>Driver</span><span className="text-right">{pair.base}</span><span className="text-right">{pair.quote}</span><span className="text-right">Spread</span>
                   </div>
                   <MacroCompareRow label="Short rate" base={baseRow?.shortRate} quote={quoteRow?.shortRate} diff={rateDiff} cellSuffix="%" diffSuffix="pp" />
@@ -190,9 +191,9 @@ export function CurrencyDetail({ symbol, source }: Props) {
                 </div>
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 px-3 py-2 text-[10px] text-muted-foreground">
-                <span>{baseCountry?.label}{baseCountry?.proxy ? ` · ${baseCountry.proxy}` : ''} vs {quoteCountry?.label}{quoteCountry?.proxy ? ` · ${quoteCountry.proxy}` : ''}</span>
+                <span>{baseCountry?.label}{baseCountry?.proxy ? ` (${baseCountry.proxy})` : ''} vs {quoteCountry?.label}{quoteCountry?.proxy ? ` (${quoteCountry.proxy})` : ''}</span>
                 {pair.symbol.includes('USD') && dollar && (
-                  <span>Broad USD {dollar.latest.toFixed(1)} · 20 obs {fmtPctSigned(dollar.changePct)}</span>
+                  <span>Broad USD {dollar.latest.toFixed(1)}, 20 obs {fmtPctSigned(dollar.changePct)}</span>
                 )}
               </div>
             </div>
@@ -214,8 +215,8 @@ export function CurrencyDetail({ symbol, source }: Props) {
               Short-rate data is unavailable for one or both currencies. Price history remains usable; carry is left blank instead of guessed.
             </p>
           ) : (
-            <table className="w-full text-[12px]">
-              <thead><tr className="border-b border-border/60 bg-muted/25 text-[10px] uppercase tracking-wide text-muted-foreground">
+            <table className="w-full text-caption">
+              <thead><tr className="border-b border-border/60 bg-muted/25 text-[11px] text-muted-foreground">
                 <th className="px-3 py-2 text-left font-medium">Tenor</th><th className="px-3 py-2 text-right font-medium">Outright</th><th className="px-3 py-2 text-right font-medium">Forward points</th>
               </tr></thead>
               <tbody>{forwards.map((point) => (
@@ -236,7 +237,7 @@ export function CurrencyDetail({ symbol, source }: Props) {
       >
         <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[auto_minmax(150px,220px)_minmax(180px,1fr)_minmax(210px,1fr)] 2xl:items-end">
           <div>
-            <label className="mb-1.5 block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Exposure side</label>
+            <label className="mb-1.5 block text-[11px] font-medium text-muted-foreground">Exposure side</label>
             <SegmentedControl
               value={side}
               options={[
@@ -248,7 +249,7 @@ export function CurrencyDetail({ symbol, source }: Props) {
             />
           </div>
           <label className="block">
-            <span className="mb-1.5 block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Notional · {pair.base}</span>
+            <span className="mb-1.5 block text-[11px] font-medium text-muted-foreground">Notional ({pair.base})</span>
             <input
               type="number"
               min="0"
@@ -259,18 +260,20 @@ export function CurrencyDetail({ symbol, source }: Props) {
             />
           </label>
           <div>
-            <label className="mb-1.5 block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Pair move · pips</label>
+            <label className="mb-1.5 block text-[11px] font-medium text-muted-foreground">Pair move (pips)</label>
             <div className="flex flex-wrap gap-1.5">
               {SHOCKS.map((shock) => (
-                <button
+                <Button
                   key={shock}
                   type="button"
                   aria-pressed={Number(movePips) === shock}
                   onClick={() => setMovePips(String(shock))}
-                  className={`min-h-8 rounded-md border px-2 text-[11px] font-medium transition-colors ${Number(movePips) === shock ? 'border-primary/60 bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+                  variant={Number(movePips) === shock ? 'secondary' : 'outline'}
+                  size="sm"
+                  className="font-mono text-[11px]"
                 >
                   {shock > 0 ? '+' : ''}{shock}
-                </button>
+                </Button>
               ))}
               <input
                 aria-label="Custom pair move in pips"
@@ -282,28 +285,25 @@ export function CurrencyDetail({ symbol, source }: Props) {
               />
             </div>
           </div>
-          <div className="rounded-md border border-border/70 bg-muted/25 px-3 py-2">
+          <div className="border-l-2 border-primary/30 py-1 pl-3">
             <div className="flex items-end justify-between gap-3">
               <div>
-                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Estimated P&amp;L · {pair.quote}</p>
+                <p className="text-[11px] font-medium text-muted-foreground">Estimated P&amp;L ({pair.quote})</p>
                 <p className={`mt-0.5 font-mono text-[20px] font-semibold ${scenario && scenario.quotePnl >= 0 ? 'text-success' : 'text-destructive'}`}>
                   {scenario ? fmtPnl(scenario.quotePnl, pair.quote) : '—'}
                 </p>
               </div>
               <div className="text-right text-[10px] text-muted-foreground">
                 <p>spot {scenario ? fmtFx(scenario.shockedSpot, pair) : '—'}</p>
-                <p>{scenario ? fmtPctSigned(scenario.movePercent) : '—'} · ≈ {scenario ? fmtPnl(scenario.basePnlApprox, pair.base) : '—'}</p>
+                <p className="flex justify-end gap-2"><span>{scenario ? fmtPctSigned(scenario.movePercent) : '—'}</span><span>≈ {scenario ? fmtPnl(scenario.basePnlApprox, pair.base) : '—'}</span></p>
               </div>
             </div>
           </div>
         </div>
-        <p className="mt-3 text-[10px] leading-relaxed text-muted-foreground">
-          Manual research only. OpenAlice does not need the bank account or position feed; enter a receivable, payable or hedge notional here and take the result back to the desk system.
-        </p>
       </Card>
 
       <div className="flex flex-wrap items-center gap-2 pb-2">
-        <span className="mr-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Continue analysis</span>
+        <span className="mr-1 text-[11px] font-medium text-muted-foreground">Continue analysis</span>
         <DeskLink label="Global Macro" onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'global-macro' } })} />
         <DeskLink label="US Macro" onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'macro' } })} />
         <DeskLink label="Fed" onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'fed' } })} />
@@ -315,8 +315,8 @@ export function CurrencyDetail({ symbol, source }: Props) {
 function FxMetric({ label, value, subvalue }: { label: string; value: string; subvalue?: string }) {
   return (
     <div className="min-w-0">
-      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-0.5 truncate font-mono text-[12px] font-medium text-foreground">{value}</p>
+      <p className="text-[11px] font-medium text-muted-foreground">{label}</p>
+      <p className="mt-0.5 truncate font-mono text-caption font-medium text-foreground">{value}</p>
       {subvalue && <p className="truncate text-[9px] text-muted-foreground">{subvalue}</p>}
     </div>
   )
@@ -344,12 +344,13 @@ function MacroCompareRow({ label, base, quote, diff, cellSuffix, diffSuffix }: {
 
 function DeskLink({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <button
+    <Button
       type="button"
       onClick={onClick}
-      className="rounded-md border border-border bg-secondary/50 px-2.5 py-1.5 text-[11px] font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-muted"
+      variant="outline"
+      size="sm"
     >
       {label} →
-    </button>
+    </Button>
   )
 }
