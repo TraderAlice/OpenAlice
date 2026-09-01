@@ -1,18 +1,16 @@
 # OpenAlice
 
-OpenAlice is a local trading workspace for native coding-agent CLIs. The main
-process is a Workspace launcher and trading-context injector; broker credentials,
-connections, and trading state belong to the separate UTA process. Persisted
-state is file-backed rather than database-backed.
+OpenAlice is a local trading workspace for native coding-agent CLIs. Alice
+launches Workspaces and injects trading context; the separate UTA process owns
+broker credentials, connections, state, and every trading write. Persisted state
+is file-backed rather than database-backed.
 
-Keep this file short. It contains rules that apply to every task. Detailed
-architecture and operating procedures live in the owner guides linked below.
-Current code, tests, rendered behavior, and GitHub state override stale prose.
-
-Durable subsystem truth lives under [[docs/README.md]]. Active multi-step
-implementation work lives under [[PLANS.md]]. Keep both indexes current when a
-change introduces a new owner guide or execution plan, or deletes a completed
-plan.
+This file contains only rules that apply at the start of every task. Current
+code, tests, rendered behavior, and GitHub state override stale prose. Before
+editing a subsystem, select and read its owner guide from [[docs/README.md]].
+Detailed delivery and release procedure lives in
+[[docs/development-workflow.md]], and active multi-step work lives in
+[[PLANS.md]].
 
 ## Start Here
 
@@ -21,8 +19,10 @@ pnpm install              # full local install, including Electron
 pnpm dev                  # Guardian -> UTA + Alice + Vite
 pnpm dev --takeover       # replace the recorded local Guardian owner tree
 pnpm build                # packages + UI + UTA + Alice
-pnpm test                 # hermetic monorepo Vitest suite
-pnpm test:railway:local   # explicit local Railway entrypoint/fence system suite
+pnpm test:affected        # feature-branch test closure against origin/dev
+pnpm test:node            # complete Node Vitest project
+pnpm test:ui              # complete UI Vitest project
+pnpm test                 # complete hermetic monorepo Vitest suite
 pnpm test:e2e             # non-trading product/integration E2E
 ```
 
@@ -33,311 +33,145 @@ Before changing files:
    them merely to obtain a clean tree.
 3. Routine work starts from current `dev` on a focused feature branch. If the
    checkout is on `master`, a merged branch, or a surprising historical branch,
-   stop and establish the intended base before editing.
-4. Start from the real surface: reproduce UI/runtime behavior, inspect the
-   relevant current code, and read the applicable owner guide before designing.
-5. Before adding a data migration, compatibility parser, or dual-read path,
-   establish whether the affected persisted shape shipped in a released
-   version. Unreleased `dev`-only shapes are not supported upgrade boundaries:
-   replace them directly, adjust local development state once when necessary,
-   and do not leave permanent migration or compatibility code behind.
+   establish the intended base before editing.
+4. Start from the real surface: reproduce UI/runtime behavior, inspect current
+   code, and read the applicable owner guide before designing.
+5. Before adding a migration, compatibility parser, or dual-read path, establish
+   whether the persisted shape shipped. Replace unreleased `dev`-only shapes
+   directly; do not turn them into permanent upgrade boundaries.
 
 ## UI Design Workflow
 
 For frontend visual, layout, or interaction changes, separate product design
-from implementation instead of treating the first workable patch as the
-design.
+from implementation.
 
-- In serial/interactive work, first present multiple viable approaches with
-  their user impact and tradeoffs, recommend one, and align with the maintainer
-  before moving into detailed design and implementation.
-- After alignment, state the chosen interaction model, responsive behavior,
-  accessibility implications, and shared primitive ownership before editing
-  the feature surface. Verify the result in the real browser route.
-- In autonomous/topic work, follow the same sequence without waiting for live
-  approval: record the alternatives and comparison in the execution plan or PR,
-  explicitly choose one, and explain why it is the best fit before implementing
-  it. Do not imply that the maintainer approved an autonomously selected design.
-- Keep the ceremony proportional for small fixes, but do not skip the design
-  decision merely because implementation is easy.
+- In serial work, present viable approaches and tradeoffs, recommend one, and
+  align with the maintainer before detailed design or implementation.
+- State the selected interaction model, responsive behavior, accessibility
+  implications, and shared primitive ownership before editing. Verify the real
+  browser route afterward.
+- Autonomous work follows the same sequence in its plan or PR, explicitly
+  records its own choice, and never implies maintainer approval it did not get.
+- Keep ceremony proportional for small fixes without skipping the design
+  decision.
 
 ## Product and Architecture Boundaries
 
 - `src/` is Alice: Workspace lifecycle, tools, data domains, HTTP/IPC surfaces,
   file-backed state, and the UTA client boundary.
-- `services/uta/` owns broker implementations, accounts, approvals, snapshots,
-  FX, and every trading write. Do not move broker state back into Alice.
-- The model loop runs in native CLIs (`claude`, `codex`, `cursor-agent`, `agy`, `grok`, `omp`, `opencode`, `pi`).
-  Alice owns credentials and injection, not an in-process chat-agent loop.
+- `services/uta/` owns brokers, accounts, approvals, snapshots, FX, and trading
+  writes. Do not move broker state back into Alice.
+- The model loop runs in native CLIs (`claude`, `codex`, `cursor-agent`, `agy`,
+  `grok`, `omp`, `opencode`, `pi`). Alice owns credentials and injection, not an
+  in-process agent loop.
 - New agent-facing capabilities normally ship as Workspace templates, skills,
   or satellite repositories. Do not grow a parallel workflow engine in `src/`.
-- UTA is optional for non-trading use. Startup, onboarding, and Chat must remain
-  usable in lite/read-only mode when no broker carrier is available.
-- Chat and AutoQuant V2 workspaces are durable and reusable by default.
-  AutoQuant's internal projects and experiments remain owned by its Coding
-  Agent; do not reproduce that lifecycle in Alice.
-- `OPENALICE_HOME` is the user-state root. Changes to persisted state must use
-  the migration framework; never hide one-off cleanup in startup code.
+- UTA is optional for non-trading use. Startup, onboarding, and Chat must work
+  in lite/read-only mode without a broker carrier.
+- Chat and AutoQuant V2 Workspaces are durable and reusable. AutoQuant's
+  internal projects and experiments remain owned by its coding agent.
+- `OPENALICE_HOME` is the user-state root. Shipped persisted-state changes use
+  the migration framework and generated [[src/migrations/INDEX.md]]; never hide
+  one-off cleanup in startup code.
 - Secrets never belong in tracked files, logs, fixtures, PR bodies, or agent
-  instructions. Treat account, auth, provider, and sealing paths as sensitive.
+  instructions. Treat account, auth, provider, sealing, signing, and
+  notarization paths as sensitive.
 
-See [[docs/project-structure.md]] ([Project structure](docs/project-structure.md))
-for current ownership and entry points.
+See [[docs/project-structure.md]] for current ownership and entry points.
 
-## Delivery and Branch Policy
+## Delivery Authority
 
-- `dev` is the integration lane. Routine PRs target `dev`.
-- `dev` is also the active preview channel: installer work must pass against
-  both the checked-out tree and the matching `raw/.../dev/install` +
-  `--channel dev` network path before promotion.
-- `master` is the release-source/user-facing lane. Human-directed promotions
-  from `dev`, explicit emergency hotfixes, and focused maintainer-directed
-  version-only release-prep PRs may target `master`, but a merge to `master`
-  does not by itself choose or publish a product version.
-- Beta and stable releases are explicit manual actions. The maintainer supplies
-  a channel and tag from `master`; release automation requires that tag and both
-  product package manifests to declare the same version before it builds
-  accepted candidates, including the immutable installer snapshot. A new beta
-  release may update only beta feeds/manifests and the shared channel-neutral
-  installer, while stable CDN product aliases and package-manager metadata are
-  updated only by a stable release tag. Mirror repair never rewrites the shared
-  installer.
-- The root and CLI package versions are runtime-visible build metadata, including
-  in source mode. After a release succeeds and its public surface is accepted,
-  synchronize those two version values back to `dev` in a focused dev-targeted
-  PR without importing unrelated `master` changes. Runtime identity still owns
-  channel selection: `OPENALICE_LAUNCHER=dev` and `electron-dev` remain
-  `dev`/source even when the synchronized package version is stable or beta.
-- An exact forward beta version-only PR uses a lightweight trusted-classifier,
-  workflow-contract, and typecheck lane. Beta publication is gated by the
-  Release workflow's final artifact build/install/start/update acceptance, not
-  by repeating the development unit suite or waiting for the post-merge
-  `master` safety-net run. Stable preparation and publication retain the full
-  promotion, cross-platform, package, signing, and upgrade gates.
+- `dev` is the routine integration lane and active preview channel. Routine PRs
+  target `dev`.
+- `master` is the release-source/user-facing lane. Promotion, beta/stable tags,
+  version synchronization, feeds, and publication follow the manual contract in
+  [[docs/development-workflow.md]]; merging to `master` does not itself publish.
 - Do not commit directly to `master`. Avoid direct commits to `dev` unless the
-  maintainer explicitly requests integration work.
-- Never force-push or delete `master` or `dev`.
-- Feature branches are disposable execution lanes. Keep them while work is
-  unmerged; delete them after GitHub records a successful merge.
-- Prefer merge commits for ordinary PRs so intentional commit history survives.
-  Squash only when the user asks or the branch history is genuinely disposable.
-- The remote `local` branch is a legacy collaboration lane, not the default
-  workflow. Do not use or delete it without first auditing its unmerged state.
+  maintainer explicitly requests integration work. Never force-push or delete
+  either branch.
+- Prefer merge commits for ordinary PRs. Preserve a feature branch while its
+  work is unmerged and delete it only after GitHub records a successful merge.
 
 Choose delivery authority before implementation:
 
-Feature-branch iteration is an explicit integration hold, not a third delivery
-mode. When the maintainer says to keep iterating on a feature branch until they
-are satisfied, keep all related increments on one owned branch and do not open
-or merge its PR to `dev` until the maintainer says it is ready. This instruction
-applies independently to serial or parallel work. It does not relax
-verification, known-failure handling, scope coherence, or the single-integrator
-rule; parallel workers still hand commits to the branch owner instead of racing
-to push it.
-
-| Mode | Trigger | Delivery to `dev` |
+| Mode | Trigger | Delivery |
 |---|---|---|
-| Serial / interactive | Default: the user is actively requesting and steering concrete work | After proportional local verification, open and merge the PR without waiting for pending remote CI; delete the feature branch and return to updated `dev` unless the user says to pause or declares feature-branch iteration |
-| Autonomous / topic contribution | Explicit `/goal` or direct request to autonomously find and contribute improvements | Keep one community-facing Draft PR for the active topic, add related work as atomic commits, and leave the topic unmerged for later acceptance; an explicit feature-branch iteration hold delays opening that PR until the maintainer says the branch is ready |
+| Serial / interactive | Default when the user is actively steering concrete work | After proportional local verification, open and merge a PR to `dev` without treating pending remote CI as a synchronous lock |
+| Autonomous / topic | Explicit `/goal` or autonomous contribution request | Keep one coherent Draft PR open for later acceptance; CI never grants merge authority |
 
-Internal agent decomposition must not become one GitHub PR per finding. Define a
-coherent topic and acceptance boundary, keep a single integrator responsible for
-its branch, and accumulate independently reviewable commits in that Draft PR.
-Finish or freeze the active topic before opening another by default. Split only
-for a genuinely different topic, a material risk/release boundary, or explicit
-maintainer direction.
+An explicit feature-branch iteration request overrides PR timing in either
+mode: keep all related increments on one owned branch and do not open or merge
+its PR until the maintainer accepts it. One integrator owns that branch;
+parallel workers hand off commits rather than racing to push or creating one PR
+per finding.
 
-Label the topic PR with `workflow:parallel`, exactly one `theme:*`, and at least
-one `area:*`; add another area only when the topic intentionally crosses owner
-boundaries. Add `review:deep` for trading writes, persisted configuration,
-credentials, destructive actions, security boundaries, or substantial
-cross-surface structure. A later interactive message does not retroactively
-authorize merging an autonomous topic PR. Related work may continue while its
-latest CI is pending, but a known failure must be repaired before adding more
-scope. A hosted-runner or resource-starvation failure may be classified as
-infrastructure only when its log is captured, the affected contract passes in
-the proportional local/native lane, and no product assertion failed; it should
-be repaired or removed from the routine lane instead of retried blindly. In
-serial work, pending CI likewise must not become a synchronous lock; inspect the
-previous PR checks and post-merge `dev` run before publishing the next
-increment. `master` promotions, stable releases, explicit review pauses, and
-untrusted contributions keep their full synchronous gates. Exact beta
-preparation is the bounded exception above: its own artifact acceptance stays
-synchronous, while the redundant source-test backstop may trail publication.
-Detailed topic,
-branch, PR, promotion, hotfix, and external-contribution procedures live in
-[[docs/development-workflow.md]]
-([Development workflow](docs/development-workflow.md)).
+Pending CI alone does not block serial progress, but a known product or contract
+failure must be understood and repaired before adding scope. Master promotion,
+stable release, explicit review pauses, and untrusted contributions retain
+their synchronous gates.
 
-## Verification
+## Verification Ladder
 
-For code changes, always run:
+Use the smallest gate that can realistically falsify the change, then escalate
+with ownership breadth and risk:
 
-```bash
-npx tsc --noEmit
-pnpm test
-```
-
-These local checks are the primary routine-development evidence. Hosted CI for
-a `dev` PR intentionally performs only a clean Ubuntu build, root typecheck,
-and workflow contracts; it does not repeat the full Vitest suite, native-host
-matrix, Electron smoke, or Docker smoke. Record the applicable local
-surface-specific commands and real-runtime result in the PR so the lighter
-hosted lane does not become an excuse to skip acceptance.
-
-Add checks according to the touched surface:
-
-| Surface | Required extra verification |
+| Change shape | Minimum evidence |
 |---|---|
-| `ui/` | `cd ui && npx tsc -b`; verify the real route in browser/dev |
-| UI `/api/*` contract or demo surface | Update `ui/src/demo/` handlers and walk `pnpm -F open-alice-ui dev:demo` |
-| `packages/<name>/` | `pnpm -F @traderalice/<name> typecheck` |
-| UTA state machine, ledger, staging, or sync logic | `pnpm test:e2e` for the MockBroker lifecycle, plus the targeted unit specs listed in [UTA live testing](docs/uta-live-testing.md) |
-| Broker adapter, order writes, or UTA permissions | Choose the smallest live-paper scenario from [UTA live testing](docs/uta-live-testing.md); verify the configured account is demo/paper first and leave it flat |
-| Workspace issues, schedules, headless dispatch | Follow [Workspace issues and scheduling](docs/workspace-issues-and-scheduling.md) |
-| Guardian locks, process ownership, takeover | `pnpm test:guardian-recovery`; exercise the real launcher path |
-| Desktop, IPC, PTY, managed Pi, shell, packaging | Follow [Managed Workspace runtime](docs/managed-workspace-runtime.md) and run the matching Electron/package smoke |
-| Root installer or distributed CLI payload | Follow [CLI installer](docs/cli-installer.md) and run `pnpm test:install:docker`; manually walk the interactive playground before release |
-| Docker/server image, Compose, remote deployment | Follow [Docker deployment](docs/docker-deployment.md); run `pnpm test:railway:local` for Railway lifecycle/fence changes and `pnpm docker:smoke` for the server image; before release, opt into the credentialed agent/CLI check documented there |
-| Persisted data shape | First apply the release-boundary rule above. For a shipped shape, add an idempotent migration + spec, register it, then run `pnpm build:migration-index`; replace unreleased shapes directly |
-| Onboarding/first run/auth | Use isolated data; exercise dev and packaged onboarding paths where relevant |
+| Leaf change inside one owner | `pnpm test:affected` or explicit affected specs; owning typecheck; real affected surface |
+| Shared change inside one owner | Complete owner/project suite such as `pnpm test:ui`, `pnpm test:node`, or a subsystem command; owning typecheck; real affected surface |
+| Cross-owner, shared test/build infrastructure, dependency/config change, or uncertain impact | Root and applicable package/UI typechecks; complete `pnpm test`; every touched surface's acceptance |
+| Master promotion, scheduled/manual backstop, or stable release | Complete remote matrix and release gates from [[docs/development-workflow.md]] |
 
-`pnpm test:e2e` is non-trading: it must never load configured broker accounts
-or submit orders. Live-paper acceptance is a separate, explicit lane:
-`OPENALICE_UTA_LIVE_PAPER=1 pnpm test:uta:live-paper`. Never run that lane as
-routine CI or against real-money accounts. Inspect the account mode and the
-pre-test positions/orders before acknowledging it, then verify the account is
-flat after the run even when a test fails. Do not call a change verified when
-the surface-specific path was skipped; state the remaining gap.
+`pnpm test:affected` compares the feature branch and working tree with freshly
+fetched `origin/dev`. It follows Vitest's static import graph; dynamic imports,
+generated contracts, registries, implicit runtime coupling, and a zero-test
+selection require explicit specs or escalation. It is development feedback,
+not a release gate. `pnpm test` retains the deterministic full-suite meaning.
 
-`pnpm test` is the hermetic default contract. It must not invoke Railway CLI,
-open real remote SSH, read cloud credentials, deploy, publish, or contend for a
-host-global Railway lifecycle fence. The local entrypoint and Linux fence/PTY
-harnesses run only through `pnpm test:railway:local`; real Railway migration,
-restart, and upgrade journeys remain explicit external acceptance and are not a
-routine `dev` or beta gate.
+Typecheck the owner that changed: root `npx tsc --noEmit` covers `src/`; UI uses
+`cd ui && npx tsc -b`; a package uses its own `typecheck` command. Do not cite a
+green typecheck that did not include the changed code.
 
-For local package verification, prefer `pnpm electron:smoke:workspace`: it owns
-an isolated package output and removes that large expanded app after the smoke
-exits. Use `pnpm electron:pack` only when a persistent artifact is actually
-needed. A package passed through `--skip-pack` is externally owned and must
-never be deleted by the smoke runner; use `--keep-package` to preserve a
-temporary smoke package for investigation.
+Add the applicable surface gate:
 
-Code signing and notarization are release gates, not routine development
-checks. Serial/parallel `dev` work, ordinary PR package smokes, and local
-packaged-runtime debugging must build unsigned (`CSC_IDENTITY_AUTO_DISCOVERY=false`)
-and must not read release signing secrets. Run a real signed/notarized build
-only for a versioned release candidate, an explicit release rehearsal, or a
-change whose subject is the signing/notarization/update chain. State that
-release-only residual risk instead of making every development iteration pay
-the signing cost.
+| Surface | Required evidence |
+|---|---|
+| `ui/` | UI typecheck, affected/full UI specs as appropriate, and the real browser route |
+| UI `/api/*` contract or demo | Update `ui/src/demo/` handlers and walk `pnpm -F open-alice-ui dev:demo` |
+| `packages/<name>/` | `pnpm -F @traderalice/<name> typecheck` plus package/affected specs |
+| UTA state, ledger, staging, or sync | MockBroker lifecycle plus targeted specs from [[docs/uta-live-testing.md]] |
+| Broker adapter, order write, or permission | Smallest explicit live-paper scenario; verify demo/paper mode and leave the account flat |
+| Workspace issues, schedules, headless dispatch | Follow [[docs/workspace-issues-and-scheduling.md]] |
+| Guardian lock, ownership, or takeover | `pnpm test:guardian-recovery` and the real launcher path |
+| Desktop, IPC, PTY, managed runtime, or packaging | Matching unsigned Electron/package smoke from [[docs/managed-workspace-runtime.md]] |
+| Root installer or distributed CLI | [[docs/cli-installer.md]], `pnpm test:install:docker`, and the interactive playground before release |
+| Docker/server/remote deployment | [[docs/docker-deployment.md]], the applicable local Railway/Docker smoke, and explicit external acceptance only when needed |
+| Persisted state | Apply the shipped-boundary rule above; shipped shapes need an idempotent migration, spec, and regenerated index |
+| Onboarding, first run, or auth | Isolated state plus dev and packaged paths where relevant |
 
-When optimizing CI/CD, preserve the lane boundaries above. First remove
-duplicate jobs, cancel superseded runs, narrow path triggers, reuse caches and
-unsigned build artifacts, and measure the slow step before considering larger
-runners. Routine `dev` and exact-beta feedback should stay deliberately light;
-do not trade away the full `master` promotion or stable-release gates merely to
-make those final acceptance lanes look faster.
+`pnpm test` is hermetic: it must not invoke Railway CLI, open real SSH, read
+cloud credentials, deploy, publish, or contend for a host-global Railway fence.
+Those system paths remain explicit commands. `pnpm test:e2e` is non-trading and
+must never load configured broker accounts or submit orders. Live-paper tests
+require explicit `OPENALICE_UTA_LIVE_PAPER=1`, a verified demo/paper account,
+and a flat-account check even after failure.
 
-## Deferred Work and Issues
+Routine development and package smoke must not read release signing secrets.
+If an applicable native, browser, package, or external gate cannot run, state
+the exact residual risk; an unrelated green test is not substitute evidence.
 
-Use GitHub issues for concrete deferred findings. Do not create repo TODO files
-or route new work to Linear.
+## Repository Records
 
-An actionable issue includes:
-
-- symptom and reproduction evidence;
-- suspected files or subsystem;
-- why it is deferred;
-- related PRs, commits, logs, or screenshots.
-
-Handle in-scope findings in the current PR instead of filing an issue for work
-the same change already owns. Product-roadmap ideas still belong to the user's
-planning surface rather than being silently converted into engineering tasks.
-
-## Implementation Plans
-
-Use `plans/<topic>.md` for substantial work that spans multiple surfaces,
-increments, or sessions. [[PLANS.md]] is the compact index and lifecycle
-contract.
-
-- A plan records scope, decisions, ordered work, verification, and live
-  progress. It is not an owner guide and must link to the relevant `docs/`
-  contract instead of copying it.
-- Update the plan in the same change as meaningful progress, newly discovered
-  constraints, scope changes, or completion. Checkboxes must reflect repository
-  truth rather than intent.
-- Keep one canonical plan per initiative. Extend or supersede it explicitly
-  instead of creating parallel TODO notes.
-- Active plans stay in `plans/` and [[PLANS.md]]. When a plan is accepted,
-  delete the file and its index bullet in the same change. Git history is the
-  archive; do not accumulate a Completed section.
-- GitHub issues remain the external defect/deferred-work surface. Reference
-  related issues and PRs from the plan; do not use a plan to hide actionable
-  deferred findings from the issue tracker.
-
-## Owner Guides
-
-Read the relevant guide before editing its subsystem:
-
-- [[docs/README.md]] — [Owner-guide index](docs/README.md) and maintenance rules.
-- [[docs/project-structure.md]] — [Project structure](docs/project-structure.md): process boundaries,
-  directories, state roots, and architectural ownership.
-- [[docs/alice-project.md]] — [AliceProject](docs/alice-project.md): top-level runtime
-  identity, complete-home ownership, concurrent projects, and discovery.
-- [[docs/development-workflow.md]] — [Development workflow](docs/development-workflow.md): branches, PRs,
-  delivery modes, promotions, external contributions, and risk gates.
-- [[docs/managed-workspace-runtime.md]] — [Managed Workspace runtime](docs/managed-workspace-runtime.md): Electron
-  packaging, managed Pi, PortableGit/Bash, runtime profiles, and Workspace PATH.
-- [[docs/harness-web-surfaces.md]] — [Harness web surfaces](docs/harness-web-surfaces.md): Harness
-  manifests, managed Studio ports, readiness, routing, transport, lifecycle, and embedding.
-- [[docs/model-semantics-and-runtime-injection.md]] — [Model semantics and runtime injection](docs/model-semantics-and-runtime-injection.md):
-  credential access, model/effort semantics, Workspace-local defaults, and
-  one-run native CLI overrides.
-- [[docs/broker-packs.md]] — [Broker Packs](docs/broker-packs.md): optional broker SDK
-  packaging, UI installation, activation, runtime loading, and release assets.
-- [[docs/cli-installer.md]] — [CLI installer](docs/cli-installer.md): consent, installed layout,
-  atomic updates, PATH integration, installer tests, and release checks.
-- [[docs/cli-package-managers.md]] — [CLI package-manager channels](docs/cli-package-managers.md):
-  npm/Bun platform packages, Homebrew and AUR metadata, provenance, update
-  ownership, and publication order.
-- [[docs/cli-supervisor.md]] — [Shell CLI Supervisor](docs/cli-supervisor.md): top-level
-  Runtime lifecycle, status/JSON presentation, browser opening, completion,
-  compatibility aliases, and Supervisor TUI boundary.
-- [[docs/local-runtime.md]] — [Local Runtime and CLI bootstrap](docs/local-runtime.md): source-backed
-  localhost startup, dependency bootstrap, Runtime ownership, and the headless bundle boundary.
-- [[docs/data-locations.md]] — [Data locations](docs/data-locations.md): complete-home selection,
-  desktop launcher preferences, concurrent instances, and directory safety.
-- [[docs/docker-deployment.md]] — [Docker deployment](docs/docker-deployment.md): server image topology,
-  remote-host safety, persistence, health, and container acceptance.
-- [[docs/remote-access.md]] — [Remote access](docs/remote-access.md): SSH tunnel experiment,
-  local/remote ownership, and staged remote-control boundaries.
-- [[docs/connector-service.md]] — [Connector Service](docs/connector-service.md): optional external Inbox
-  notification adapters, sealed credentials, health, and Guardian lifecycle.
-- [[docs/ui-interaction-and-motion.md]] — [UI interaction and motion](docs/ui-interaction-and-motion.md):
-  clickable affordances, shared motion primitives, and reduced-motion policy.
-- [[docs/workspace-agent-guidance.md]] — [Workspace agent guidance](docs/workspace-agent-guidance.md): prompt
-  layers, skill ownership, live CLI authority, and guidance versioning.
-- [[docs/workspace-lifecycle.md]] — [Workspace and Session lifecycle](docs/workspace-lifecycle.md): offboarding,
-  departed desks, handoff, restore/purge, and resumeId retirement.
-- [[docs/workspace-manager.md]] — [Workspace Manager](docs/workspace-manager.md): launcher-owned
-  control-plane cwd, WebPi quick start, peer inventory, and no-root-artifact boundary.
-- [[docs/workspace-template-upgrade.md]] — [Workspace Template Upgrade](docs/workspace-template-upgrade.md):
-  managed-asset baselines, three-way review, safe apply, recovery, and the future Merge/Absorb boundary.
-- [[docs/workspace-absorb.md]] — [Workspace Absorb](docs/workspace-absorb.md): directional
-  Workspace consolidation, file collisions, archived source identity, and recovery.
-- [[docs/uta-live-testing.md]] — [UTA live testing](docs/uta-live-testing.md): broker/trading acceptance loops.
-- [[docs/ibkr-wire-protocol.md]] — [IBKR wire protocol](docs/ibkr-wire-protocol.md): TWS/Gateway inbound framing and decoder failure isolation.
-- [[docs/workspace-issues-and-scheduling.md]] — [Workspace issues and scheduling](docs/workspace-issues-and-scheduling.md): Issue board, schedules, headless runs, and Inbox delivery.
-- [[docs/conversation-provenance.md]] — [Workspace Session and artifact provenance](docs/conversation-provenance.md): `resumeId` identity, artifact trails, Issue responsibility, and the provenance-before-collaboration delivery order.
-- [[docs/event-system.md]] — [Event-system retirement note](docs/event-system.md): removed Alice event-bus scheduler; UTA journal utility only.
-- [[docs/market-data-architecture.md]] — [Market data architecture](docs/market-data-architecture.md): TraderHub, K-line providers, and the private compatibility package.
-- `src/migrations/INDEX.md` — generated migration inventory and affected paths.
-
-`README.md` is public product positioning. After a genuinely large product
-shift, identify stale sections, but ask the user for framing before rewriting
-the tagline, pillars, or other marketing copy.
+- Concrete deferred defects go to GitHub Issues with symptom, reproduction,
+  suspected subsystem, reason for deferral, and evidence. Do not create repo
+  TODO files or Linear tasks; handle findings already owned by the current
+  change in that change.
+- Substantial multi-session work uses one canonical `plans/<topic>.md` entry and
+  follows [[PLANS.md]].
+- Durable subsystem truth and the complete guide catalog live in
+  [[docs/README.md]]. Keep that index current instead of copying it here.
+- `README.md` is public positioning. Ask for product framing before rewriting
+  its tagline, pillars, hero, or other marketing copy.
 
 ## Code Conventions
 
@@ -345,13 +179,11 @@ the tagline, pillars, or other marketing copy.
 - Strict TypeScript, ES2023 target.
 - Zod for config schemas; TypeBox for tool parameter schemas.
 - `decimal.js` for financial arithmetic.
-- For standard UI controls, prefer the shared shadcn/Base UI primitives under
-  `ui/src/components/ui/`. Extend that layer before hand-rolling portals,
-  positioning, focus, dismissal, keyboard behavior, or bespoke control styling
-  inside a feature component.
-- Frontend reads of backend-owned data must go through a domain hook rather
-  than calling an API or reaching into a transport/polling context from a
-  feature component. Keep presentation components prop-driven, and cover each
-  data hook with unit tests for its selection plus loading/error semantics.
+- Prefer shared shadcn/Base UI primitives under `ui/src/components/ui/`.
+  Extend that layer before hand-rolling portals, positioning, focus, dismissal,
+  keyboard behavior, or bespoke control styling inside a feature.
+- Frontend reads of backend-owned data go through a domain hook. Keep
+  presentation components prop-driven and test each hook's selection plus
+  loading/error semantics.
 - Prefer structured Workspace launcher logs; the main process currently uses
-  `console` and does not have a universal pino sink.
+  `console` and has no universal pino sink.

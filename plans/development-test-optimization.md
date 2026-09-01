@@ -58,6 +58,26 @@ Counts and timings are measurements, not permanent thresholds. The durable
 claim is the ownership mismatch between a small change and the work it
 currently purchases.
 
+## Audit Discoveries
+
+- Vitest's Git provider supplies absolute changed-file paths. Its 4.1.5 default
+  force-rerun globs do not reliably match a repository nested below a hidden
+  directory such as `.codex`; collection-wide manifest/config triggers must be
+  absolute and slash-normalized in the resolved workspace configuration.
+- Scheduled Actions load their workflow definition from the default `master`
+  branch even when jobs check out `dev`. Until the recent Railway-suite split is
+  deliberately promoted, the old scheduled definition can combine with the new
+  `dev` test exclusions and miss `pnpm test:railway:local`. Treat that as a
+  current residual gap, not as evidence that nightly already owns the lane.
+- The rolling `dev` CLI workflow builds the platform-neutral server in all four
+  native jobs. A recent run spent about 13.7 runner-minutes and was dominated by
+  macOS x64; a separate run accepted all candidates before R2 activation failed.
+  Candidate correctness and mutable-channel activation should be separable so
+  an external upload failure does not encourage rebuilding accepted bytes.
+- The historical `codex/usability-improvements` branch remains in routine
+  workflow triggers even though new work no longer targets it. Trigger cleanup
+  should follow a live branch/consumer check rather than preserving it forever.
+
 ## Objective
 
 Create a boring, predictable feedback system in which:
@@ -158,19 +178,22 @@ make development metrics look better.
   changed-file selection.
 - [x] Trace the 6,000-test run to local policy rather than hosted CI and locate
   the contradictory rules.
-- [ ] Add explicit affected, Node-owner, and UI-owner package scripts while
+- [x] Add explicit affected, Node-project, and UI-project package scripts while
   preserving `pnpm test` as the full hermetic contract.
-- [ ] Rewrite the root verification policy around the owner/risk ladder and
+- [x] Rewrite the root verification policy around the owner/risk ladder and
   remove duplicated workflow prose from `AGENTS.md` without losing global
   safety invariants.
-- [ ] Update `docs/development-workflow.md` and applicable skills to use the
+- [x] Update `docs/development-workflow.md` and applicable skills to use the
   same vocabulary, escalation rules, and PR evidence contract.
-- [ ] Add focused contract coverage for the command and workflow boundaries.
+- [x] Add focused contract coverage for the command and collection-wide
+  force-rerun boundaries.
 - [ ] Remove or narrow confirmed routine hosted over-triggers, beginning with
   the UI-only CLI installer fixture, only when the final Bun/master acceptance
   route remains explicit.
-- [ ] Measure the rolling `dev` native CLI publication path and remove only
-  duplicate work that does not contribute to an accepted platform artifact.
+- [x] Measure the rolling `dev` native CLI publication path and identify its
+  repeated platform-neutral build plus candidate/activation coupling.
+- [ ] Remove only duplicate rolling-publication work that does not contribute
+  to an accepted platform artifact, and make activation safely retryable.
 - [ ] Run proportional local acceptance for each increment, then run the full
   hermetic and workflow backstops once for the completed initiative.
 - [ ] Present the final branch, measurements, and residual platform/release
