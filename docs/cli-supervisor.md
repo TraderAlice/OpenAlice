@@ -123,9 +123,13 @@ path is intentionally parameter-free:
   card presents the selected project, current Runtime state, human guidance,
   and the primary Enter action; its Runtime card keeps Home, Web endpoint,
   owner, provider identity, services, and uptime available without returning
-  to the historical flat field dump. The application divider follows the full
-  terminal width, and an available-update notice is composed inside the
-  responsive header instead of being appended beyond its clipping boundary;
+  to the historical flat field dump. At 100 columns and wider those surfaces
+  become a two-column cockpit, with AliceProject identity/action on the left
+  and Runtime telemetry on the right. Narrower terminals fold the same fields
+  into the complete vertical flow instead of hiding them. The application
+  divider follows the full terminal width, and an available-update notice is
+  composed inside the responsive header instead of being appended beyond its
+  clipping boundary;
 - the Fleet page renders `Machine → AliceProject`: ordinary terminals use two
   bordered panes with a stable Selection inspector, while narrow terminals
   drill down from Machines to Projects;

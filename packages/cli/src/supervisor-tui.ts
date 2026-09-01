@@ -2763,7 +2763,7 @@ export class SupervisorScreen implements Component {
         provider: providerLabel,
         components: formatComponents(runtime),
         ...(uptime ? { uptime } : {}),
-        guidance: renderGuidance(runtime, this.snapshot.context)[0] ?? 'Runtime status is unavailable.',
+        guidance: renderGuidance(runtime, this.snapshot.context),
         primaryAction: primaryActionLabel(runtime),
         pulse: this.runtimePulse,
       }, width))

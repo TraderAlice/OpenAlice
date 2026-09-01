@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { resolveLaunchContext } from './launch-context.ts'
 import type { MachineFleetEnvelope, MachineInventory } from './machine-inventory.ts'
-import { createSupervisorFleetState, selectedFleetProject } from './supervisor-fleet.ts'
+import { createSupervisorFleetState, displayWidth, selectedFleetProject } from './supervisor-fleet.ts'
 import { createSupervisorTuiTheme } from './supervisor-tui-theme.ts'
 import { supervisorCommandTargets } from './supervisor-tui-view.ts'
 import {
@@ -65,6 +65,15 @@ describe('Supervisor TUI screen', () => {
 
     const wideLines = screen.render(120)
     expect(wideLines[1]).toHaveLength(120)
+    expect(wideLines[4]).toContain('AliceProject')
+    expect(wideLines[4]).toContain('Runtime telemetry')
+    expect(wideLines.join('\n')).toContain('○ COLD')
+    expect(wideLines.every((line) => displayWidth(line) <= 120)).toBe(true)
+
+    const foldedLines = screen.render(99)
+    expect(foldedLines.findIndex((line) => line.includes('╭ AliceProject')))
+      .toBeLessThan(foldedLines.findIndex((line) => line.includes('╭ Runtime')))
+    expect(foldedLines.every((line) => displayWidth(line) <= 99)).toBe(true)
 
     screen.update({
       update: {
@@ -442,9 +451,9 @@ describe('Supervisor TUI screen', () => {
 
     const output = screen.render(100).join('\n')
     expect(output).toContain('Provider')
-    expect(output).toContain(
-      'OpenAlice 0.87.0-beta · bundle 1234567890abcdef',
-    )
+    expect(output).toContain('OpenAlice 0.87.0-beta ·')
+    expect(output).toContain('bundle')
+    expect(output).toContain('1234567890abcdef')
     expect(output).not.toContain('/opt/openalice/releases/runtime')
   })
 

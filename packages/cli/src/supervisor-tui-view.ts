@@ -9,7 +9,7 @@ export interface SupervisorHomeView {
   provider: string
   components: string
   uptime?: string
-  guidance: string
+  guidance: string[]
   primaryAction: string
   pulse?: boolean
 }
@@ -45,11 +45,11 @@ export function renderSupervisorHome(
 ): string[] {
   const cardWidth = Math.max(24, width)
   const state = stateBadge(view.state, view.pulse ?? false)
-  const hero = renderCard('AliceProject', [
+  const projectBody = [
     labelAndTail(view.projectName, state, cardWidth - 4),
-    view.guidance,
+    ...view.guidance,
     `[ Enter ]  ${view.primaryAction}`,
-  ], cardWidth)
+  ]
   const details = [
     detailRow('Home', view.home, cardWidth - 4),
     detailRow('Web', view.web, cardWidth - 4),
@@ -58,11 +58,53 @@ export function renderSupervisorHome(
     detailRow('Services', view.components, cardWidth - 4),
   ]
   if (view.uptime) details.push(detailRow('Uptime', view.uptime, cardWidth - 4))
+
+  if (width >= 100) return renderWideCockpit(view, state, width)
+
   return [
-    ...hero,
+    ...renderCard('AliceProject', projectBody, cardWidth),
     '',
     ...renderCard('Runtime', details, cardWidth),
   ]
+}
+
+function renderWideCockpit(
+  view: SupervisorHomeView,
+  state: string,
+  width: number,
+): string[] {
+  const gap = 3
+  const leftWidth = Math.max(52, Math.floor(width * 0.52))
+  const rightWidth = Math.max(1, width - leftWidth - gap)
+  const leftInnerWidth = leftWidth - 4
+  const rightInnerWidth = rightWidth - 4
+  const runtimeBody = [
+    labelAndTail('Process', runtimeSignal(view.state, view.pulse ?? false), rightInnerWidth),
+    detailRow('Web', view.web, rightInnerWidth),
+    detailRow('Owner', view.owner, rightInnerWidth),
+    ...wrappedDetailRows('Provider', view.provider, rightInnerWidth),
+    detailRow('Services', view.components, rightInnerWidth),
+    detailRow('Uptime', view.uptime ?? 'Waiting for Runtime', rightInnerWidth),
+  ]
+  const projectBody = [
+    labelAndTail(view.projectName, state, leftInnerWidth),
+    '',
+    ...view.guidance,
+    '',
+    `◆ [ Enter ]  ${view.primaryAction}`,
+  ]
+  while (projectBody.length < runtimeBody.length) projectBody.splice(-1, 0, '')
+  const project = renderCard('AliceProject', projectBody, leftWidth)
+  const runtime = renderCard('Runtime telemetry', runtimeBody, rightWidth)
+
+  const cards = project.map((line, index) => joinColumns(
+    line,
+    runtime[index] ?? '',
+    leftWidth,
+    gap,
+    width,
+  ))
+  return [...cards, ...contextRail('⌂  Home', view.home, width)]
 }
 
 export function renderSupervisorCommandBar(
@@ -133,11 +175,66 @@ function detailRow(label: string, value: string, width: number): string {
   return `${safeLabel}${' '.repeat(Math.max(1, labelWidth - displayWidth(safeLabel)))}${truncateDisplayWidth(value, valueWidth)}`
 }
 
+function wrappedDetailRows(label: string, value: string, width: number): string[] {
+  const labelWidth = width < 50 ? 9 : 12
+  const chunks = wrapDisplayText(value, Math.max(1, width - labelWidth - 1))
+  return chunks.map((chunk, index) => {
+    const prefix = index === 0 ? truncateDisplayWidth(label, labelWidth) : ''
+    return `${prefix}${' '.repeat(Math.max(1, labelWidth - displayWidth(prefix)))}${chunk}`
+  })
+}
+
+function contextRail(label: string, value: string, width: number): string[] {
+  const labelWidth = displayWidth(label) + 2
+  const chunks = wrapDisplayText(value, Math.max(1, width - labelWidth))
+  return chunks.map((chunk, index) => (
+    `${index === 0 ? label : ''}${' '.repeat(index === 0 ? 2 : labelWidth)}${chunk}`
+  ))
+}
+
+function wrapDisplayText(value: string, width: number): string[] {
+  const lines: string[] = []
+  let line = ''
+  for (const word of value.split(/\s+/u).filter(Boolean)) {
+    const candidate = line ? `${line} ${word}` : word
+    if (displayWidth(candidate) <= width) {
+      line = candidate
+      continue
+    }
+    if (line) lines.push(line)
+    line = ''
+    let chunk = ''
+    for (const character of word) {
+      if (chunk && displayWidth(`${chunk}${character}`) > width) {
+        lines.push(chunk)
+        chunk = character
+      } else {
+        chunk += character
+      }
+    }
+    line = chunk
+  }
+  if (line || lines.length === 0) lines.push(line)
+  return lines
+}
+
 function labelAndTail(label: string, tail: string, width: number): string {
   const safeTail = truncateDisplayWidth(tail, Math.max(1, Math.floor(width / 2)))
   const tailWidth = displayWidth(safeTail)
   const safeLabel = truncateDisplayWidth(label, Math.max(1, width - tailWidth - 1))
   return `${safeLabel}${' '.repeat(Math.max(1, width - displayWidth(safeLabel) - tailWidth))}${safeTail}`
+}
+
+function joinColumns(
+  left: string,
+  right: string,
+  leftWidth: number,
+  gap: number,
+  width: number,
+): string {
+  const safeLeft = truncateDisplayWidth(left, leftWidth)
+  const combined = `${safeLeft}${' '.repeat(Math.max(0, leftWidth - displayWidth(safeLeft) + gap))}${right}`
+  return truncateDisplayWidth(combined, width)
 }
 
 function stateBadge(state: string, pulse: boolean): string {
@@ -148,5 +245,16 @@ function stateBadge(state: string, pulse: boolean): string {
   if (state === 'incompatible') return '◆ NEEDS ATTENTION'
   if (state === 'unhealthy') return '◆ UNHEALTHY'
   if (state === 'unavailable') return '◇ UNAVAILABLE'
+  return `◌ ${state.toUpperCase()}`
+}
+
+function runtimeSignal(state: string, pulse: boolean): string {
+  const runningGlyph = pulse ? '◉' : '●'
+  if (state === 'running') return `${runningGlyph} LIVE`
+  if (state === 'owned_elsewhere') return `${runningGlyph} EXTERNAL`
+  if (state === 'absent') return '○ COLD'
+  if (state === 'incompatible') return '◆ BLOCKED'
+  if (state === 'unhealthy') return '◆ DEGRADED'
+  if (state === 'unavailable') return '◇ OFFLINE'
   return `◌ ${state.toUpperCase()}`
 }

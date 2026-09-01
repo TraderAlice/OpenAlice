@@ -67,6 +67,18 @@ not imply maintainer approval of the finished interaction.
 - The Supervisor uses an alternate-screen application canvas and restores the
   terminal, cursor, and mouse modes on every normal and signal-driven exit.
 
+### Overview composition decision
+
+- Extending the existing stacked cards with more decoration would preserve a
+  low-density status-report layout, so it is not the selected direction.
+- A single-column command center would improve narrow terminals but continue to
+  waste wide terminal space.
+- The selected model is a responsive cockpit: at 100 columns and wider,
+  AliceProject identity/guidance/action and Runtime telemetry occupy balanced
+  side-by-side cards; below that threshold the same fields fold into the
+  complete vertical flow. This is an autonomous topic decision, not recorded
+  maintainer approval.
+
 ## Responsive and Accessibility Contract
 
 - `80x24` remains the minimum full experience. Wide terminals show the
@@ -114,6 +126,8 @@ already large `supervisor-tui.ts` application controller.
   full-width activity rail and purposeful OMP-inspired busy animation.
 - [x] Add a bounded one-shot entrance treatment and subtle Runtime heartbeat;
   preserve the static reduced-motion frame as the complete experience.
+- [x] Turn Overview into a responsive AliceProject/Runtime cockpit without
+  changing lifecycle action semantics or sacrificing the 80x24 baseline.
 
 ## Progress
 
@@ -192,6 +206,16 @@ already large `supervisor-tui.ts` application controller.
   real-PTY tests, CLI build/typecheck, root TypeScript check, and the 685-file
   repository suite (684 passed, 1 skipped; 6064 tests passed, 10 skipped). The
   Docker installer smoke also passes for the updated distributed CLI payload.
+- Overview now uses a 52:48 AliceProject/Runtime telemetry cockpit at 100
+  columns and wider, plus a full-width Home context rail. The project card keeps
+  both guidance lines and the complete Enter action; the telemetry card keeps
+  provider identity width-aware without exposing the managed Runtime path.
+  Real 100x30 and 80x24 runs confirmed the responsive transition, complete
+  baseline content, and terminal restoration after detach.
+- Cockpit acceptance passes with 58 focused screen, Fleet, and real-PTY tests,
+  CLI build/typecheck, root TypeScript check, and the 685-file repository suite
+  (684 passed, 1 skipped; 6064 tests passed, 10 skipped). The Docker installer
+  smoke also passes for the changed distributed TUI payload.
 
 ## Completion Criteria
 

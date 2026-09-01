@@ -97,6 +97,7 @@ export function decorateSupervisorFrame(
     }
     if (line.startsWith('╭')) return theme.accent(line)
     if (line.startsWith('╰')) return theme.muted(line)
+    if (line.startsWith('⌂  Home')) return theme.muted(line)
     if (line.includes('[ Enter ]') || line.startsWith('◆ [')) return theme.accentStrong(line)
     if (line.includes('● RUNNING') || line.includes('◉ RUNNING')) return theme.success(line)
     if (line.includes('◆ NEEDS ATTENTION')) return theme.danger(line)
