@@ -68,5 +68,7 @@ describe('Supervisor Runtime log presentation', () => {
     expect(rendered.lines.join('\n')).toContain('Event Lens · LINE 11 · INFO · TEXT')
     expect(rendered.targets).toHaveLength(7)
     expect(rendered.targets.find((target) => target.fromEnd === 10)?.row).toBe(4)
+    expect(rendered.lines.join('\n')).toContain('█')
+    expect(rendered.lines.join('\n')).toContain('│')
   })
 })

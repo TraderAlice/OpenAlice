@@ -158,6 +158,18 @@ not imply maintainer approval of the finished interaction.
   Wide terminals use a stream/Inspector split and 80-column terminals stack the
   same model without another read or lifecycle path.
 
+### Visible scroll rail decision
+
+- Keeping only numeric ranges in pane titles is compact, but position remains
+  indirect and disappears from peripheral vision while the user scans rows.
+- Importing OMP's complete `ScrollView` would duplicate OpenAlice's existing
+  selection, wheel, pointer-target, and responsive-window state.
+- The selected model adapts OMP's proportional thumb geometry into a shared,
+  render-only primitive. It reserves the final content column for an explicit
+  `│` track and `█` thumb whenever a collection overflows, while Event Lens,
+  Doctor, and each Fleet pane retain their current state and full-row targets.
+  The glyph contract remains complete under `NO_COLOR` and adds no input path.
+
 ### Contextual Action Shelf decision
 
 - Keeping the footer as spaced keycap prose preserves compact implementation,
@@ -369,6 +381,8 @@ already large `supervisor-tui.ts` application controller.
   contextual Action Shelf whose hover semantics survive `NO_COLOR`.
 - [x] Carry whole-segment Action Shelf geometry and focus semantics through
   overlay cards and confirmation modals without new action paths.
+- [x] Add a shared proportional scroll rail to overflowing Event Lens, Doctor,
+  Machine, and AliceProject windows without changing selection or pointer state.
 
 ## Progress
 
@@ -687,6 +701,19 @@ already large `supervisor-tui.ts` application controller.
   The 692-file suite passes (691 passed, 1 skipped; 6104 tests passed, 10
   skipped), together with CLI/root typechecks, CLI build, Docker installer smoke,
   and package dry-run.
+- Overflowing Event Lens, Doctor, Machine, and AliceProject windows now expose
+  an OMP-derived proportional `│`/`█` rail in their final content column. The
+  shared primitive owns only rendering; existing selection, wheel, pointer,
+  filter, responsive window, and full-row activation state remain authoritative.
+  Unicode-aware truncation moved into a neutral display primitive so Fleet is
+  no longer the dependency root for shared layout math.
+- Scroll-rail acceptance passes with 42 focused primitive, Fleet, Logs, Doctor,
+  and real-PTY tests. The 80×24 Event Lens fixture rendered the bottom-positioned
+  rail and still selected warning line 9 through raw SGR hover/click. Root
+  TypeScript, CLI build/typecheck, and the 693-file suite pass (692 passed, 1
+  skipped; 6108 tests passed, 10 skipped). Docker installer smoke passes, and
+  package dry-run includes both `src/supervisor-display.ts` and
+  `src/supervisor-scroll-rail.ts`.
 
 ## Completion Criteria
 

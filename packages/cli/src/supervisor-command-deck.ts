@@ -1,4 +1,4 @@
-import { displayWidth, truncateDisplayWidth } from './supervisor-fleet.ts'
+import { displayWidth, truncateDisplayWidth } from './supervisor-display.ts'
 import type { SupervisorOverlayOptions } from './supervisor-overlay-pointer.ts'
 import type { SupervisorTuiTheme } from './supervisor-tui-theme.ts'
 import { renderSupervisorPanel } from './supervisor-tui-view.ts'

@@ -138,6 +138,9 @@ path is intentionally parameter-free:
   drill down from Machines to Projects;
   selection and list windows survive resize, use Unicode display width, and
   keep the action/detach footer visible at the supported 80×24 baseline.
+  Overflowing Machine and AliceProject panes reserve their final content column
+  for a proportional `│` track and `█` thumb, exposing each pane's independent
+  window position without changing keyboard or pointer selection.
   Background refresh of the selected local Runtime updates its inventory row
   without moving a user who is inspecting another Machine or AliceProject;
 - the Overview/Fleet/Logs/Doctor/Help navigation accepts Tab, left/right, and
@@ -595,6 +598,8 @@ latest matching entry, and shows an explicit healthy empty state; it performs
 no extra read and does not change the Logs command contract. This is navigation
 over a redacted snapshot, not an unbounded file follower. Follow, pause, and
 component filtering remain later work and must reuse this bounded reader.
+When the stream exceeds its responsive window, its final content column renders
+a proportional `│` track and `█` thumb that follows the same selected window.
 
 ## Doctor
 
@@ -628,6 +633,8 @@ narrower terminals stack the same complete regions. The Inspector separates the
 check summary, existing Doctor evidence, and conservative status guidance. It
 does not run a repair, invent a command, or issue another diagnostic request;
 `d` remains the explicit read-only rerun action.
+An overflowing checklist uses the same proportional `│`/`█` rail as Event Lens
+and Fleet; the rail is positional evidence rather than another control.
 
 ## Shell Completion
 

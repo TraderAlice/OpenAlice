@@ -148,6 +148,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
 
     expect(transcript).toContain('│ » !  9  03:04:09Z Fixture event 9')
     expect(transcript).toContain('Event Lens · LINE 9 · WARNING · JSON')
+    expect(transcript).toContain('█')
     expect(transcript).toContain('FIXTURE_RESULT event-lens')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')

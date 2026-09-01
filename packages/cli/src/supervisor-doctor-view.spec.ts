@@ -53,4 +53,22 @@ describe('Supervisor Doctor inspector', () => {
     expect(narrow.lines.every((line) => [...line].length <= 52)).toBe(true)
     expect(narrow.lines.join('\n')).toContain('1F/1W/1P')
   })
+
+  it('shows the selected check position with a proportional scroll rail', () => {
+    const checks = Array.from({ length: 12 }, (_, index) => ({
+      status: 'pass',
+      summary: `Check ${index + 1}`,
+      detail: 'Verified.',
+    }))
+    const rendered = renderSupervisorDoctor(
+      { overall: 'pass', checks },
+      { selected: 11, hovered: null },
+      80,
+    )
+    const output = rendered.lines.join('\n')
+    expect(output).toContain('8–12/12')
+    expect(output).toContain('› ✓ Check 12')
+    expect(output).toContain('█')
+    expect(output).toContain('│')
+  })
 })

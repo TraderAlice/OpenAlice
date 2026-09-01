@@ -1,4 +1,5 @@
-import { displayWidth, truncateDisplayWidth } from './supervisor-fleet.ts'
+import { displayWidth, truncateDisplayWidth } from './supervisor-display.ts'
+import { withSupervisorScrollRail } from './supervisor-scroll-rail.ts'
 import { renderSupervisorPanel } from './supervisor-tui-view.ts'
 
 export type SupervisorLogFilter = 'all' | 'attention' | 'errors'
@@ -102,13 +103,19 @@ export function renderSupervisorLogs(
   const end = Math.min(entries.length, start + visible)
   const numberWidth = String(sourceEntries.length).length
   const omitted = Boolean(logs.truncated && start === 0)
-  const listRows = entries.slice(start, end).map((entry, relativeIndex) => {
+  let listRows = entries.slice(start, end).map((entry, relativeIndex) => {
     const index = start + relativeIndex
     const rowFromEnd = entries.length - 1 - index
     const marker = index === selectedIndex ? '›' : rowFromEnd === hoveredFromEnd ? '»' : ' '
     return `${marker} ${entry.glyph} ${String(entry.number).padStart(numberWidth, ' ')}  ${entry.text}`.trimEnd()
   })
   if (omitted) listRows.unshift('· … earlier lines were omitted by the bounded reader')
+  listRows = withSupervisorScrollRail(listRows, wide
+    ? Math.max(44, Math.floor(width * 0.54) - 4)
+    : Math.max(1, width - 4), {
+    offset: omitted ? 0 : start + (logs.truncated ? 1 : 0),
+    total: entries.length + (logs.truncated ? 1 : 0),
+  })
 
   const filterMeta = filter === 'all'
     ? 'ALL'

@@ -1,4 +1,5 @@
-import { displayWidth, truncateDisplayWidth } from './supervisor-fleet.ts'
+import { displayWidth, truncateDisplayWidth } from './supervisor-display.ts'
+import { withSupervisorScrollRail } from './supervisor-scroll-rail.ts'
 import { renderSupervisorPanel } from './supervisor-tui-view.ts'
 
 export interface SupervisorDoctorCheck {
@@ -108,11 +109,14 @@ export function renderSupervisorDoctor(
   const visible = wide ? 10 : width < 60 ? 4 : 5
   const start = windowStart(normalized.selected, checks.length, visible)
   const end = Math.min(checks.length, start + visible)
-  const listRows = checks.slice(start, end).map((check, relativeIndex) => {
+  const listRows = withSupervisorScrollRail(checks.slice(start, end).map((check, relativeIndex) => {
     const index = start + relativeIndex
     const status = doctorStatus(check.status)
     const marker = index === normalized.selected ? '›' : index === normalized.hovered ? '»' : ' '
     return `${marker} ${status.glyph} ${sanitize(check.summary ?? 'Unnamed check')}`
+  }), wide ? Math.max(38, Math.floor(width * 0.46) - 4) : Math.max(1, width - 4), {
+    offset: start,
+    total: checks.length,
   })
   const selected = checks[normalized.selected]!
   const status = doctorStatus(selected.status)

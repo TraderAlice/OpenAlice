@@ -1,4 +1,4 @@
-import { displayWidth, truncateDisplayWidth } from './supervisor-fleet.ts'
+import { displayWidth, truncateDisplayWidth } from './supervisor-display.ts'
 
 export interface SupervisorHomeView {
   projectName: string

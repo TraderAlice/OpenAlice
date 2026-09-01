@@ -2,6 +2,10 @@ import type {
   MachineInventory,
   MachineProjectInventory,
 } from './machine-inventory.ts'
+import { displayWidth, truncateDisplayWidth } from './supervisor-display.ts'
+import { withSupervisorScrollRail } from './supervisor-scroll-rail.ts'
+
+export { displayWidth, truncateDisplayWidth } from './supervisor-display.ts'
 
 export type FleetFocus = 'machines' | 'projects'
 
@@ -281,7 +285,8 @@ function renderMachineRows(
   hovered?: SupervisorFleetPointerTarget,
 ): string[] {
   if (state.machines.length === 0) return ['  No Machines registered']
-  return visibleWindow(state.machines, state.selectedMachine, FLEET_VISIBLE_ROWS).map(({ item, index }) => {
+  const start = visibleWindowStart(state.machines.length, state.selectedMachine, FLEET_VISIBLE_ROWS)
+  const rows = visibleWindow(state.machines, state.selectedMachine, FLEET_VISIBLE_ROWS).map(({ item, index }) => {
     const selected = index === state.selectedMachine
     const prefix = selected ? '› ' : hovered?.focus === 'machines' && hovered.index === index ? '» ' : '  '
     const status = machineStatus(item)
@@ -290,6 +295,7 @@ function renderMachineRows(
       : `${machineGlyph(item)} ${status}`
     return labelAndTail(prefix + item.displayName, count, width)
   })
+  return withSupervisorScrollRail(rows, width, { offset: start, total: state.machines.length })
 }
 
 function renderProjectRows(
@@ -305,7 +311,8 @@ function renderProjectRows(
   }
   if (machine.projects.length === 0) return ['  No registered AliceProjects']
   const selectedIndex = state.selectedProjects[machine.key] ?? 0
-  return visibleWindow(machine.projects, selectedIndex, FLEET_VISIBLE_ROWS).map(({ item, index }) => {
+  const start = visibleWindowStart(machine.projects.length, selectedIndex, FLEET_VISIBLE_ROWS)
+  const rows = visibleWindow(machine.projects, selectedIndex, FLEET_VISIBLE_ROWS).map(({ item, index }) => {
     const prefix = index === selectedIndex
       ? '› '
       : hovered?.focus === 'projects' && hovered.index === index ? '» ' : '  '
@@ -315,6 +322,7 @@ function renderProjectRows(
     ].filter(Boolean).join(' · ')
     return labelAndTail(`${prefix}${item.displayName}`, marks, width)
   })
+  return withSupervisorScrollRail(rows, width, { offset: start, total: machine.projects.length })
 }
 
 function fleetSelectionDetail(state: SupervisorFleetState, pulse = false): string[] {
@@ -434,53 +442,4 @@ function wrapIndex(index: number, length: number): number {
 
 function clampIndex(index: number, length: number): number {
   return length <= 0 ? 0 : Math.min(Math.max(0, index), length - 1)
-}
-
-export function displayWidth(value: string): number {
-  let width = 0
-  for (const { segment } of graphemes(value)) width += graphemeWidth(segment)
-  return width
-}
-
-export function truncateDisplayWidth(value: string, width: number): string {
-  if (width <= 0) return ''
-  if (displayWidth(value) <= width) return value
-  const ellipsis = '…'
-  const budget = Math.max(0, width - graphemeWidth(ellipsis))
-  let output = ''
-  let used = 0
-  for (const { segment } of graphemes(value)) {
-    const next = graphemeWidth(segment)
-    if (used + next > budget) break
-    output += segment
-    used += next
-  }
-  return `${output}${ellipsis}`
-}
-
-function graphemes(value: string): Iterable<{ segment: string }> {
-  return new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(value)
-}
-
-function graphemeWidth(value: string): number {
-  if (/^\p{Mark}+$/u.test(value)) return 0
-  if (/\p{Extended_Pictographic}/u.test(value)) return 2
-  const code = value.codePointAt(0) ?? 0
-  return isWideCodePoint(code) ? 2 : 1
-}
-
-function isWideCodePoint(code: number): boolean {
-  return code >= 0x1100 && (
-    code <= 0x115f
-    || code === 0x2329
-    || code === 0x232a
-    || (code >= 0x2e80 && code <= 0xa4cf && code !== 0x303f)
-    || (code >= 0xac00 && code <= 0xd7a3)
-    || (code >= 0xf900 && code <= 0xfaff)
-    || (code >= 0xfe10 && code <= 0xfe19)
-    || (code >= 0xfe30 && code <= 0xfe6f)
-    || (code >= 0xff00 && code <= 0xff60)
-    || (code >= 0xffe0 && code <= 0xffe6)
-    || (code >= 0x20000 && code <= 0x3fffd)
-  )
 }
