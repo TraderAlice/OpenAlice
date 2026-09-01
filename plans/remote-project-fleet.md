@@ -703,34 +703,34 @@ This is the current beta-blocking increment and may land before the remaining
 Increment 7 release-apply work. It does not grant the SSH path deployment
 authority or broaden Agent/broker ownership.
 
-- [ ] Reconcile Agent readiness from fresh PATH discovery, expose a cheap
+- [x] Reconcile Agent readiness from fresh PATH discovery, expose a cheap
   rediscovery action distinct from active probing, and refresh on focus,
   visibility restoration, and backend recovery without spawning an Agent.
-- [ ] Project effective Agent availability into scheduled Issue health with a
+- [x] Project effective Agent availability into scheduled Issue health with a
   stable `agent_runtime_missing` blocker and recover it after installation.
-- [ ] Join configured trading accounts to Broker Pack readiness in one
+- [x] Join configured trading accounts to Broker Pack readiness in one
   Alice-owned contract and one UI domain hook. Propagate the result through
   Trading, Portfolio, account detail, reconnect, order entry, and position-close
   actions; preserve configured disabled state and never contact a real broker in
   acceptance.
-- [ ] Add healthy remote identity and deployment-owned Data Home guidance.
+- [x] Add healthy remote identity and deployment-owned Data Home guidance.
   Preserve full-client-URL and same-tab reload identity, and make any cross-tab
   reuse bounded and backend-validated before presenting it as current truth.
-- [ ] Make recoverable terminal reconnect survive outages beyond the current
+- [x] Make recoverable terminal reconnect survive outages beyond the current
   retry budget, add an explicit retry for closed terminals, and retain fatal
   auth/ownership/not-found behavior.
-- [ ] Reuse the existing Issue/Headless Session presentation projection across
+- [x] Reuse the existing Issue/Headless Session presentation projection across
   Workspaces and Automation, including historical read-side presentation and
   "Open as session". Unify sidebar/card timestamps on latest activity rather
   than unlabeled Workspace creation time.
-- [ ] Add an authoritative Issue assignee-Session projection so a newly claimed
+- [x] Add an authoritative Issue assignee-Session projection so a newly claimed
   or cross-Workspace owner cannot coexist with a stale "Session is no longer
   available" warning.
 - [ ] Extend the Docker SSH journey with dynamic free Runtime discovery,
   missing-Pack account projection, complete client URL retention, and a real
   shell PTY tunnel reconnect. Cover the longer logical retry window with fake
   timers and run one retained Railway long-outage journey before beta release.
-- [ ] Update the remote access, Agent/runtime, scheduling, Broker Pack, and
+- [x] Update the remote access, Agent/runtime, scheduling, Broker Pack, and
   Docker owner guides with the shipped layered-readiness contract.
 
 ## Verification Matrix
@@ -862,6 +862,19 @@ directory. A deliberate tunnel cut restored both open pages automatically;
 the remaining terminal retry budget beyond roughly 85 seconds is a separate
 component recovery gap. No Agent was started, no Connector message was sent,
 and no broker call or order submission occurred.
+
+Increment 8 implementation evidence (2026-09-01): layered Agent, Issue,
+Session, connection, Terminal, and per-account Broker Pack projections now use
+their owning authorities and fail closed only on dependent actions. Targeted
+tests cover binary-identity cache invalidation, GET-only rediscovery,
+structured schedule blockers, authoritative cross-Workspace owners, public
+title projection, long terminal retry exhaustion, and trading-mode/health/write
+gates. The disposable OrbStack Linux arm64 SSH journey passed both its ordinary
+and full TUI paths: an inert Pi shim was discovered and removed without ever
+executing, and a migrated Alpaca account stayed configured but non-operational
+with its Pack missing. The remaining Increment 8 acceptance item is a retained
+Railway long-outage journey on the released candidate; it intentionally stays
+open until beta3 replaces beta2 on that service.
 
 Always:
 
