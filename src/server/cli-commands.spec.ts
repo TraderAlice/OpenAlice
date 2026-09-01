@@ -32,6 +32,7 @@ import { provenanceShowFactory } from '../tool/provenance-show.js'
 import { conversationToolFactories } from '../tool/conversation.js'
 import { artifactConversationToolFactories } from '../tool/conversation-artifacts.js'
 import { createTradingTools } from '../tool/trading.js'
+import { createChinaTools } from '../tool/china.js'
 
 /**
  * Anti-rot: each export's alias map is hand-authored, so guard it against drift —
@@ -85,6 +86,18 @@ describe('CLI_EXPORTS — uta export (global trading tools)', () => {
   it('binary alice-uta resolves to the uta export', () => {
     expect(exportKeyForBinary('alice-uta')).toBe('uta')
     expect(getExport('uta')?.scope).toBe('global')
+  })
+})
+
+describe('CLI_EXPORTS — native China data', () => {
+  it('maps every traderhub china verb to a Tushare-backed tool', () => {
+    const tools = createChinaTools(any)
+    const commands = CLI_EXPORTS.traderhub.commands.china
+    expect(Object.keys(commands)).toEqual([
+      'calendar', 'daily-basic', 'status', 'forecast', 'express', 'disclosures',
+      'industry', 'index-basic', 'index-members', 'index-weights',
+    ])
+    for (const toolName of Object.values(commands)) expect(tools[toolName as keyof typeof tools]).toBeTruthy()
   })
 })
 

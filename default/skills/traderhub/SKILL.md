@@ -6,11 +6,14 @@ description: >
   term structure, sector rotation), equity fundamentals (profile, financials,
   ratios, estimates, insiders, short interest), ETF drilldowns, FRED/BLS/EIA
   macro series, OECD cross-country indicators, IMF PortWatch shipping, and
-  Deribit crypto curves. Use whenever you need a macro number, a fundamental,
+  Deribit crypto curves. With an enabled Tushare token it also covers A-share
+  fundamentals, calendars, status, disclosures, industries, and index members.
+  Use whenever you need a macro number, a fundamental,
   a calendar, or a ready-made board: "what's CPI", "AAPL ratios", "earnings
   this week", "which sectors are rotating in", "Suez canal traffic", "Fed
   balance sheet". Data is served hub-first (hosted TraderHub) with local
-  fallback — no API keys needed. Discover flags live with
+  fallback. Hosted boards need no API keys; native China data requires the
+  user's Tushare token. Discover flags live with
   `traderhub <group> <verb> --help`; do NOT guess flags.
 ---
 
@@ -57,6 +60,8 @@ seeing the last good snapshot — say so if it matters to the conclusion.
 traderhub equity profile --symbol AAPL
 traderhub equity financials --symbol AAPL --type income --period annual --limit 5
 traderhub equity ratios --symbol AAPL --period annual --limit 5   # ttm=include by default
+traderhub equity financials --symbol 600519.SH --type income --period annual --limit 5 --as-of 2026-04-01
+traderhub equity ratios --symbol 600519.SH --period annual --limit 5 --as-of 2026-04-01
 traderhub equity estimates --symbol NVDA                          # analyst consensus + price targets
 traderhub equity insiders --symbol NVDA --limit 20                # Form-4 transactions
 traderhub equity short-interest --symbol GME                      # short shares/ratio/float %
@@ -64,6 +69,34 @@ traderhub equity earnings --start-date 2026-06-15 --end-date 2026-06-30
 traderhub equity discover --list gainers                          # or: losers, active,
                                    # undervalued_growth, growth_tech, small_caps, undervalued_large
 ```
+
+Symbols ending `.SH`, `.SZ`, or `.BJ` route profile, financials, and ratios to
+the native Tushare provider. `--as-of` is an announcement-date cutoff: a later
+restatement is excluded even when its reporting period is earlier.
+
+## China market data (Tushare)
+
+Tushare must be enabled and its token configured in Settings → Market Data.
+Use Tushare `ts_code` identities; dates accept `YYYY-MM-DD` or `YYYYMMDD`.
+
+```bash
+traderhub china calendar --exchange SSE --start-date 2026-09-01 --end-date 2026-09-30
+traderhub china daily-basic --ts-code 600519.SH --trade-date 2026-08-31
+traderhub china status --type st
+traderhub china status --type namechange --ts-code 600519.SH
+traderhub china status --type suspension --trade-date 2026-09-01
+traderhub china forecast --ts-code 600519.SH
+traderhub china express --ts-code 600519.SH
+traderhub china disclosures --ts-code 600519.SH
+traderhub china industry --level L1 --src SW2021
+traderhub china index-basic --market SSE
+traderhub china index-members --l1-code 801010.SI --is-new Y
+traderhub china index-weights --index-code 000300.SH --trade-date 2026-08-31
+```
+
+For K-lines, discover the operational id with `alice analysis search-bars` and
+use the returned `tushare|<ts_code>` barId. P0 is daily qfq only; metadata names
+the adjustment anchor and normalized units (shares and CNY).
 
 ## ETF drilldown (the theme workflow)
 

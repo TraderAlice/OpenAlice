@@ -104,6 +104,7 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
       fed: 'Read FOMC documents, the Fed balance sheet, and dealer positioning',
       crypto: 'Inspect crypto derivatives markets',
       index: 'Discover index identifiers',
+      china: 'Read Tushare-backed China calendars, valuation, status, disclosures, industries, and index constituents',
     },
     commands: {
       board: {
@@ -160,6 +161,18 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
       },
       index: {
         search: 'indexSearch',
+      },
+      china: {
+        calendar: 'chinaTradeCalendar',
+        'daily-basic': 'chinaDailyBasic',
+        status: 'chinaSecurityStatus',
+        forecast: 'chinaForecast',
+        express: 'chinaExpress',
+        disclosures: 'chinaDisclosures',
+        industry: 'chinaIndustry',
+        'index-basic': 'chinaIndexCatalog',
+        'index-members': 'chinaIndexMembers',
+        'index-weights': 'chinaIndexWeights',
       },
     },
   },

@@ -34,4 +34,16 @@ describe('aggregateSymbolSearch limits', () => {
     expect(searchDeps.symbolIndex.search).toHaveBeenCalledWith('EURUSD', 2)
     expect(searchDeps.commodityCatalog.search).toHaveBeenCalledWith('EURUSD', 2)
   })
+
+  it('keeps native equity results in their provider namespace', async () => {
+    const searchDeps = deps()
+    searchDeps.nativeEquitySources = [{
+      sourceId: 'tushare',
+      search: async () => [{ symbol: '600519.SH', name: '贵州茅台', assetClass: 'equity' }],
+    }]
+    const results = await aggregateSymbolSearch(searchDeps, '贵州茅台', 5)
+    expect(results[0]).toMatchObject({
+      symbol: '600519.SH', name: '贵州茅台', assetClass: 'equity', sourceId: 'tushare',
+    })
+  })
 })

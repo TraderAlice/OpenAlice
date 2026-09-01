@@ -101,12 +101,19 @@ function deriveSourceRows(
   ping: HubPing,
   keys: Record<string, string>,
   extraVendors: string[],
+  tushareEnabled: boolean,
 ): SourceRow[] {
   const hubLive = hubOn && ping !== 'down' // optimistic while checking
   const hub = { source: 'Hub', state: 'ok' as const }
-  const chartVendors = ['yfinance', ...extraVendors].join(' · ')
+  const chartVendors = ['yfinance', ...extraVendors, ...(tushareEnabled ? ['tushare'] : [])].join(' · ')
 
   return [
+    {
+      name: 'China market data',
+      detail: 'A-shares · qfq bars · fundamentals · indices',
+      source: tushareEnabled ? 'Tushare Pro' : 'Off',
+      state: tushareEnabled ? 'ok' as const : 'off' as const,
+    },
     {
       name: 'Market boards',
       detail: 'valuation · macro · futures · risk · rotation',
@@ -207,7 +214,8 @@ export function MarketDataPage() {
 
   const providerKeys = (config.providerKeys ?? {}) as Record<string, string>
   const extraVendors = (config.extraVendors ?? []) as string[]
-  const sourceRows = deriveSourceRows(hub.enabled, ping, providerKeys, extraVendors)
+  const tushare = (config.tushare ?? { enabled: false, baseUrl: 'https://api.tushare.pro' }) as { enabled: boolean; baseUrl: string }
+  const sourceRows = deriveSourceRows(hub.enabled, ping, providerKeys, extraVendors, tushare.enabled)
 
   const handleExtraVendorToggle = (id: string, on: boolean) => {
     const next = on ? [...new Set([...extraVendors, id])] : extraVendors.filter((v) => v !== id)
@@ -216,12 +224,10 @@ export function MarketDataPage() {
 
   const handleKeyChange = (keyName: string, value: string) => {
     const all = (config.providerKeys ?? {}) as Record<string, string>
-    const updated = { ...all, [keyName]: value }
-    const cleaned: Record<string, string> = {}
-    for (const [k, v] of Object.entries(updated)) {
-      if (v) cleaned[k] = v
-    }
-    updateConfig({ providerKeys: cleaned })
+    // Preserve an explicit empty string: the config writer uses it as the
+    // deletion signal for the user-global provider-key store. Omitting the key
+    // would resurrect the old global token on the next read.
+    updateConfig({ providerKeys: { ...all, [keyName]: value } })
   }
 
   const jumpToFmp = () => {
@@ -261,6 +267,13 @@ export function MarketDataPage() {
             onToggle={(v) => updateConfigImmediate({ hub: { ...hub, enabled: v } })}
           />
 
+          <TushareCard
+            settings={tushare}
+            token={providerKeys.tushare ?? ''}
+            onSettingsChange={(next) => updateConfigImmediate({ tushare: next })}
+            onTokenChange={(token) => handleKeyChange('tushare', token)}
+          />
+
           <SourcesCard rows={sourceRows} onAddFmp={jumpToFmp} />
 
           <ChartVendorsSection extraVendors={extraVendors} onToggle={handleExtraVendorToggle} />
@@ -279,6 +292,89 @@ export function MarketDataPage() {
         {loadError && <p className="text-[13px] text-destructive mt-4 max-w-[880px] mx-auto">Failed to load configuration.</p>}
       </SettingsScrollArea>
     </div>
+  )
+}
+
+// ==================== Native Tushare card ====================
+
+function TushareCard({
+  settings,
+  token,
+  onSettingsChange,
+  onTokenChange,
+}: {
+  settings: { enabled: boolean; baseUrl: string }
+  token: string
+  onSettingsChange: (next: { enabled: boolean; baseUrl: string }) => void
+  onTokenChange: (token: string) => void
+}) {
+  const [localToken, setLocalToken] = useState(token)
+  const [testStatus, setTestStatus] = useState<ProviderTestStatus>('idle')
+  const [capabilities, setCapabilities] = useState<Array<{ name: string; ok: boolean }>>([])
+
+  const test = async () => {
+    if (!localToken) return
+    setTestStatus('testing')
+    setCapabilities([])
+    try {
+      const result = await api.marketData.testProvider('tushare', localToken, settings.baseUrl)
+      setCapabilities(result.capabilities ?? [])
+      setTestStatus(result.ok ? 'ok' : 'error')
+    } catch {
+      setTestStatus('error')
+    }
+  }
+
+  return (
+    <section className="mb-6 border border-border/60 rounded-xl bg-secondary/50 p-5">
+      <div className="flex items-center justify-between mb-1.5">
+        <div>
+          <h2 className="text-[14px] font-semibold">Tushare Pro · China</h2>
+          <p className="text-[12px] text-muted-foreground mt-1">A-share search, qfq daily bars, fundamentals, calendars, industries and indices.</p>
+        </div>
+        <Toggle
+          ariaLabel="Tushare Pro"
+          size="sm"
+          checked={settings.enabled}
+          onChange={(enabled) => onSettingsChange({ ...settings, enabled })}
+        />
+      </div>
+      <div className="grid gap-2 mt-4 sm:grid-cols-[1fr_auto]">
+        <input
+          type="password"
+          value={localToken}
+          onChange={(event) => {
+            const value = event.target.value
+            setLocalToken(value)
+            setTestStatus('idle')
+            onTokenChange(value)
+          }}
+          aria-label="Tushare Pro token"
+          placeholder="Token not configured"
+          className={inputClass}
+        />
+        <TestButton
+          providerName="Tushare Pro"
+          status={testStatus}
+          disabled={!localToken || testStatus === 'testing'}
+          onClick={test}
+        />
+      </div>
+      <input
+        type="url"
+        value={settings.baseUrl}
+        onChange={(event) => onSettingsChange({ ...settings, baseUrl: event.target.value })}
+        aria-label="Tushare endpoint"
+        className={`${inputClass} mt-2 font-mono`}
+        placeholder="https://api.tushare.pro"
+      />
+      <p className="text-[11px] text-muted-foreground/60 mt-2">HTTPS only. The token is sent in the POST body and configuration changes take effect without restart.</p>
+      {capabilities.length > 0 && (
+        <p className="text-[11px] text-muted-foreground mt-2">
+          {capabilities.map((item) => `${item.name}: ${item.ok ? 'ok' : 'unavailable'}`).join(' · ')}
+        </p>
+      )}
+    </section>
   )
 }
 

@@ -13,9 +13,9 @@
 import { tool } from 'ai'
 import { z } from 'zod'
 import type { QueryExecutor } from '@traderalice/opentypebb'
-import { listMarketVendors, setMarketVendor } from '@/domain/market-data/vendors.js'
+import { listMarketVendors, setMarketVendor, type NativeMarketVendor } from '@/domain/market-data/vendors.js'
 
-export function createVendorTools(executor: QueryExecutor) {
+export function createVendorTools(executor: QueryExecutor, nativeVendors: NativeMarketVendor[] = []) {
   return {
     listMarketVendors: tool({
       description: `List the market-data vendors available for symbol search, each with its
@@ -26,7 +26,7 @@ working a market you haven't queried (CN A-shares, Taiwan, etc.) — it tells yo
 covers it and how to address symbols. If the right vendor is off, turn it on with
 setMarketVendor; the change is live immediately, no restart.`,
       inputSchema: z.object({}).meta({ examples: [{}] }),
-      execute: async () => ({ vendors: await listMarketVendors(executor) }),
+      execute: async () => ({ vendors: await listMarketVendors(executor, nativeVendors) }),
     }),
 
     setMarketVendor: tool({
@@ -41,7 +41,7 @@ always-on primary vendor (yfinance) cannot be toggled.`,
           enabled: z.boolean().describe('true to turn on, false to turn off'),
         })
         .meta({ examples: [{ vendor: 'twse', enabled: true }] }),
-      execute: async ({ vendor, enabled }) => setMarketVendor(executor, vendor, enabled),
+      execute: async ({ vendor, enabled }) => setMarketVendor(executor, vendor, enabled, nativeVendors),
     }),
   }
 }

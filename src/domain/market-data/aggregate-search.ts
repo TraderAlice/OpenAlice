@@ -30,6 +30,12 @@ export interface MarketSearchDeps {
   cryptoClient: CryptoClientLike
   currencyClient: CurrencyClientLike
   commodityCatalog: CommodityCatalog
+  /** Product-native equity sources that do not belong to the OpenTypeBB
+   * compatibility package. Each source owns its operational namespace. */
+  nativeEquitySources?: Array<{
+    sourceId: string
+    search(query: string, limit: number): Promise<MarketSearchResult[]>
+  }>
 }
 
 export interface MarketSearchResult {
@@ -103,7 +109,7 @@ export async function aggregateSymbolSearch(
   // eastmoney). Each equity vendor lives in its own symbol namespace — yfinance
   // returns Yahoo tickers (600519.SS), eastmoney returns secids (1.600519) for
   // CN names yfinance can't match — so all are kept as redundant candidates.
-  const [coreSettled, equitySettled] = await Promise.all([
+  const [coreSettled, equitySettled, nativeEquitySettled] = await Promise.all([
     Promise.allSettled([
       deps.cryptoClient.search({ query: q, provider: 'yfinance' }),
       deps.currencyClient.search({ query: q, provider: 'yfinance' }),
@@ -113,6 +119,11 @@ export async function aggregateSymbolSearch(
         deps.equityClient
           .search({ query: q, provider: v, is_symbol: false })
           .then((rows) => ({ vendor: v, rows })),
+      ),
+    ),
+    Promise.allSettled(
+      (deps.nativeEquitySources ?? []).map((source) =>
+        source.search(q, boundedLimit).then((rows) => ({ sourceId: source.sourceId, rows })),
       ),
     ),
   ])
@@ -146,6 +157,17 @@ export async function aggregateSymbolSearch(
       if (!sym || seenEquity.has(key)) continue
       seenEquity.add(key)
       equityOnlineResults.push({ ...r, symbol: sym, assetClass: 'equity', sourceId: vendor })
+    }
+  }
+  for (const settled of nativeEquitySettled) {
+    if (settled.status !== 'fulfilled') continue
+    const { sourceId, rows } = settled.value
+    for (const row of rows) {
+      const sym = String(row.symbol ?? '')
+      const key = `${sourceId}|${sym.toUpperCase()}`
+      if (!sym || seenEquity.has(key)) continue
+      seenEquity.add(key)
+      equityOnlineResults.push({ ...row, symbol: sym, assetClass: 'equity', sourceId })
     }
   }
 

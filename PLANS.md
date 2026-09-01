@@ -29,6 +29,10 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
+- [[plans/tushare-cn-data.md]] — Adds an opt-in native Tushare provider for
+  A-share search, point-in-time-safe qfq bars, fundamentals, and typed China
+  reference datasets. Credentials and endpoint are hot-read; the provider is
+  disabled by default and exposes no arbitrary API passthrough.
 - [[plans/bun-cli-distribution.md]] — Replaces the expanded Node headless
   Runtime with a Bun-compiled, multi-process CLI distribution. Direct,
   npm/Bun, Homebrew, and AUR channels consume one accepted artifact set. The

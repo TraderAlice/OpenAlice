@@ -89,6 +89,13 @@ export interface BarMeta {
   isLatestActual?: boolean
   /** Trading-day gap between the last bar and `asOf` (0 when current). */
   staleTradingDays?: number
+  /** Price adjustment performed by the source. */
+  adjustment?: 'none' | 'qfq' | 'hfq'
+  /** Point-in-time factor anchor used for adjusted prices. */
+  adjustmentAnchor?: string
+  priceUnit?: string
+  volumeUnit?: string
+  amountUnit?: string
 }
 
 export interface BarSourceCandidate {
@@ -166,4 +173,9 @@ export interface BarServiceDeps {
   utaManager: UtaBarGateway
   /** Configured default provider per asset class — the `provider` we report. */
   vendorProviders: Record<AssetClass, string>
+  /** Product-native bar providers keyed by sourceId. */
+  nativeVendors?: Record<string, {
+    getBars(symbol: string, opts: GetBarsOpts): Promise<BarsResult>
+    barCapability?: BarCapability
+  }>
 }

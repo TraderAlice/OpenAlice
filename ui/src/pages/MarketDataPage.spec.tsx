@@ -27,6 +27,7 @@ vi.mock('../hooks/useConfigPage', () => ({
     config: {
       enabled: true,
       hub: { enabled: false, baseUrl: 'https://traderhub.openalice.ai' },
+      tushare: { enabled: false, baseUrl: 'https://api.tushare.pro' },
       extraVendors: [],
       providerKeys: {
         fmp: 'test-fmp-key',
@@ -35,6 +36,7 @@ vi.mock('../hooks/useConfigPage', () => ({
         eia: 'test-eia-key',
         econdb: 'test-econdb-key',
         intrinio: 'test-intrinio-key',
+        tushare: 'test-tushare-token',
       },
     },
     status: 'idle',
@@ -58,6 +60,26 @@ function openProviderKeys() {
 }
 
 describe('MarketDataPage provider credentials', () => {
+  it('configures and probes the native Tushare provider without exposing the token', async () => {
+    render(<MarketDataPage />)
+
+    const token = screen.getByLabelText('Tushare Pro token') as HTMLInputElement
+    expect(token.type).toBe('password')
+    expect(token.value).toBe('test-tushare-token')
+    expect((screen.getByLabelText('Tushare endpoint') as HTMLInputElement).value).toBe('https://api.tushare.pro')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Test Tushare Pro key' }))
+    expect(await screen.findByRole('button', { name: 'Tushare Pro key test passed' })).toBeTruthy()
+    expect(mocks.testProvider).toHaveBeenCalledWith(
+      'tushare', 'test-tushare-token', 'https://api.tushare.pro',
+    )
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Tushare Pro' }))
+    expect(mocks.updateConfigImmediate).toHaveBeenCalledWith({
+      tushare: { enabled: true, baseUrl: 'https://api.tushare.pro' },
+    })
+  })
+
   it('gives every key field and test action a provider-specific name', () => {
     openProviderKeys()
 

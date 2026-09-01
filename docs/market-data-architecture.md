@@ -65,6 +65,10 @@ Configuration lives in
   },
   "extraVendors": [],
   "providerKeys": {},
+  "tushare": {
+    "enabled": false,
+    "baseUrl": "https://api.tushare.pro"
+  },
   "hub": {
     "enabled": true,
     "baseUrl": "https://traderhub.openalice.ai"
@@ -100,6 +104,27 @@ New K-line sources should implement the bar/provider contract and appear in bar
 source discovery. They should not require a new OpenBB-style asset-class client
 or a copied OpenBB route hierarchy.
 
+### Native Tushare provider
+
+`src/domain/market-data/tushare/` is the native China-market adapter. It is
+deliberately outside `packages/opentypebb`: A-share symbols, point-in-time
+financial filings, classifications, and Tushare's daily-plus-adjustment-factor
+bar construction are product contracts rather than OpenBB compatibility
+models.
+
+The adapter is disabled by default. `marketData.tushare` controls enabled state
+and endpoint; `marketData.providerKeys.tushare` is mirrored to the user-global
+provider-key store. All three values are read from disk for each request, so
+token rotation and endpoint changes do not require a restart. Endpoints must be
+HTTPS, except loopback HTTP for development, and may not include URL
+credentials, queries, or fragments. Tokens are sent only in the POST body.
+
+Tushare bar identities use `tushare|<ts_code>`. P0 supports daily qfq bars.
+Qfq factors are anchored at the request `end`/`asOf` boundary, so future
+corporate actions cannot leak into historical snapshots. Raw `vol` hands are
+normalized to shares and raw `amount` thousands of CNY to CNY; the units and
+adjustment anchor are carried in `BarMeta`.
+
 ## Embedded Compatibility Package
 
 `packages/opentypebb/` is private to this monorepo. It still supplies useful
@@ -125,7 +150,7 @@ contracts should not start there.
 | New low-frequency board or hosted dataset | `src/domain/market-data/reference/`, TraderHub tool/CLI mapping |
 | New K-line vendor or broker source | `src/domain/market-data/bars/`, provider discovery, UTA when broker-owned |
 | Existing fundamentals/search provider fix | `packages/opentypebb/src/providers/` plus the typed Alice client |
-| New user credential name | market-data config schema and `src/domain/market-data/credential-map.ts` |
+| New user credential name | market-data config schema; add `credential-map.ts` projection only when an embedded compatibility provider consumes it |
 | Compatibility HTTP behavior | `src/server/market-data-compat.ts` and focused route tests |
 
 Provider discovery is self-described. Optional vendors expose `vendorMeta`, and
