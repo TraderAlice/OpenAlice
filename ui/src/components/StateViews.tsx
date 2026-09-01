@@ -35,7 +35,7 @@ export function PageLoading() {
  *  expand. */
 export function CenteredLoading({ label }: { label?: string }) {
   return (
-    <div className="flex items-center justify-center gap-2.5 py-20 text-[13px] text-muted-foreground">
+    <div className="text-body flex items-center justify-center gap-2.5 py-20 text-muted-foreground">
       <Spinner size="sm" />
       {label && <span>{label}</span>}
     </div>
@@ -144,7 +144,7 @@ export function RecoverySurface({
           {icon ?? <CloudOff aria-hidden className="h-6 w-6" />}
         </div>
         {eyebrow && (
-          <p className="mb-2 text-[12px] font-medium text-destructive">
+          <p className="text-caption mb-2 font-medium text-destructive">
             {eyebrow}
           </p>
         )}
@@ -181,7 +181,7 @@ export function RefreshNotice({
   return (
     <div
       role="status"
-      className={`oa-status-surface flex flex-col gap-2 rounded-lg border border-border/70 bg-card/80 px-3 py-2.5 text-[12px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between ${className}`}
+      className={`oa-status-surface text-caption flex flex-col gap-2 rounded-lg border border-border/70 bg-card/80 px-3 py-2.5 text-muted-foreground sm:flex-row sm:items-center sm:justify-between ${className}`}
     >
       <span className="flex min-w-0 items-start gap-2 leading-5">
         <AlertTriangle aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
@@ -190,7 +190,7 @@ export function RefreshNotice({
       <Button
         type="button"
         onClick={onAction}
-        className="shrink-0 self-start text-[12px] sm:self-auto"
+        className="shrink-0 self-start sm:self-auto"
         variant="ghost"
         size="sm"
       >

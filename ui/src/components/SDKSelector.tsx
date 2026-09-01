@@ -72,14 +72,14 @@ export function SDKSelector(props: SDKSelectorProps) {
           >
             {/* Coming Soon badge */}
             {isDisabled && (
-              <span className="absolute right-2.5 top-2.5 rounded px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground/70">
+              <span className="text-micro absolute right-2.5 top-2.5 rounded px-1.5 py-0.5 font-medium text-muted-foreground/70">
                 Coming Soon
               </span>
             )}
 
             {/* Locked badge (always active) */}
             {isLocked && !isDisabled && (
-              <span className="absolute right-2.5 top-2.5 rounded px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground/70">
+              <span className="text-micro absolute right-2.5 top-2.5 rounded px-1.5 py-0.5 font-medium text-muted-foreground/70">
                 Always On
               </span>
             )}
@@ -92,7 +92,7 @@ export function SDKSelector(props: SDKSelectorProps) {
             )}
 
             <div className="min-w-0 pr-5">
-              <p className={`text-[13px] font-medium ${isDisabled ? 'text-muted-foreground' : 'text-foreground'}`}>
+              <p className={`text-[13px] leading-[18px] font-medium ${isDisabled ? 'text-muted-foreground' : 'text-foreground'}`}>
                 {opt.name}
               </p>
               <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground/70">

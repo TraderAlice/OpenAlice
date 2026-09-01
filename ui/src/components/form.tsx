@@ -42,7 +42,7 @@ interface SectionProps {
 export function Section({ id, title, description, children }: SectionProps) {
   return (
     <section id={id} className="border-b border-border/60 py-5 last:border-b-0">
-      <h3 className="text-[14px] font-semibold text-foreground">{title}</h3>
+      <h3 className="text-[14px] leading-[19px] font-semibold text-foreground">{title}</h3>
       {description && (
         <p className="mt-1 max-w-2xl text-[12px] leading-5 text-muted-foreground">{description}</p>
       )}
