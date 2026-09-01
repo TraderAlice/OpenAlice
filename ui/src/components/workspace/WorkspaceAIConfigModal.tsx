@@ -9,7 +9,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, BrainCircuit, GitMerge, Info, Layers3, Rocket, RotateCcw, Settings, X } from 'lucide-react'
+import { AlertTriangle, ArrowUpCircle, BrainCircuit, GitMerge, Info, Layers3, Rocket, RotateCcw, Settings, X } from 'lucide-react'
 import {
   getAgentConfig,
   listCredentials,
@@ -41,6 +41,7 @@ import { ModelCombobox } from '../credentials/PresetFields'
 import { useTestGate } from '../../lib/useTestGate'
 import { useWorkspaces } from '../../contexts/workspaces-context'
 import { notifyWorkspaceAgentConfigChanged } from '../../lib/workspaceAiEvents'
+import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon'
 import { WorkspaceTemplateUpgradePanel } from './WorkspaceTemplateUpgradePanel'
 import { WorkspaceSourceUpgradePanel } from './WorkspaceSourceUpgradePanel'
 import { WorkspaceAbsorbPanel } from './WorkspaceAbsorbPanel'
@@ -77,7 +78,7 @@ export interface WorkspaceAiSaveResult {
 }
 
 const inputClass =
-  'w-full bg-secondary border border-border rounded-md px-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary'
+  'h-8 w-full rounded-md border border-border bg-secondary px-2.5 py-1 text-[13px] text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary'
 
 const TAB_LABEL: Record<Tab, string> = { claude: 'Claude Code', codex: 'Codex', opencode: 'opencode', pi: 'Pi' }
 const CONTEXT_WINDOW_OPTIONS = [
@@ -677,7 +678,7 @@ export function WorkspaceAIConfigModal({
         aria-labelledby={dialogTitleId}
         aria-describedby={dialogDescriptionId}
         tabIndex={-1}
-        className="flex h-full w-full flex-col overflow-hidden border-y border-border bg-background shadow-2xl sm:h-auto sm:w-[calc(100vw-24px)] sm:max-w-3xl sm:max-h-[85dvh] sm:rounded-xl sm:border"
+        className="flex h-full w-full flex-col overflow-hidden border-y border-border bg-background shadow-2xl sm:h-auto sm:w-[calc(100vw-24px)] sm:max-w-3xl sm:max-h-[85dvh] sm:rounded-lg sm:border"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -706,7 +707,7 @@ export function WorkspaceAIConfigModal({
               type="button"
               onClick={() => setSection('general')}
               aria-current={section === 'general' ? 'page' : undefined}
-              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:min-h-0 sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-0 sm:h-8 sm:min-h-8 sm:w-full ${
                 section === 'general'
                   ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -719,7 +720,7 @@ export function WorkspaceAIConfigModal({
               type="button"
               onClick={() => setSection('launch')}
               aria-current={section === 'launch' ? 'page' : undefined}
-              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:min-h-0 sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
                 section === 'launch'
                   ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -732,7 +733,7 @@ export function WorkspaceAIConfigModal({
               type="button"
               onClick={() => setSection('preferences')}
               aria-current={section === 'preferences' ? 'page' : undefined}
-              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:min-h-0 sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
                 section === 'preferences'
                   ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -745,7 +746,7 @@ export function WorkspaceAIConfigModal({
               type="button"
               onClick={() => setSection('template')}
               aria-current={section === 'template' ? 'page' : undefined}
-              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:min-h-0 sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
                 section === 'template'
                   ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -754,14 +755,14 @@ export function WorkspaceAIConfigModal({
               <Layers3 size={15} />
               <span>{t('workspaceSettings.section.template')}</span>
               {workspace?.upgradeAvailable && (
-                <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" aria-label="Update available" />
+                <ArrowUpCircle className="ml-auto size-3.5 shrink-0 text-primary" aria-label="Update available" />
               )}
             </button>
             <button
               type="button"
               onClick={() => setSection('absorb')}
               aria-current={section === 'absorb' ? 'page' : undefined}
-              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:min-h-0 sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
                 section === 'absorb'
                   ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -880,12 +881,13 @@ export function WorkspaceAIConfigModal({
                 setPickedCredential('')
                 setPickedWireShape('')
               }}
-              className={`min-h-11 flex-none whitespace-nowrap px-3 py-2 text-[13px] font-medium transition-colors sm:flex-1 sm:px-4 sm:py-2.5 ${
+              className={`flex min-h-11 flex-none items-center justify-center gap-2 whitespace-nowrap px-3 py-2 text-[13px] font-medium transition-colors sm:h-9 sm:min-h-9 sm:flex-1 sm:px-4 ${
                 tab === id
                   ? 'text-primary border-b-2 border-primary -mb-px'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
+              <AgentRuntimeIcon agentId={id} className="size-[18px] shrink-0" />
               <span className="sm:hidden">{id === 'claude' ? 'Claude' : TAB_LABEL[id]}</span>
               <span className="hidden sm:inline">{TAB_LABEL[id]}</span>
             </button>
@@ -960,13 +962,13 @@ export function WorkspaceAIConfigModal({
                         ))}
                       </select>
                     )}
-                    <button
+                    <Button
                       onClick={applyCredential}
                       disabled={!pickedCredential}
-                      className="px-3 py-2 rounded-md bg-primary text-primary-foreground text-[13px] font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
+                      size="sm"
                     >
                       {t('workspaceSettings.ai.load')}
-                    </button>
+                    </Button>
                   </div>
                   <p className="text-[11px] text-muted-foreground/80 leading-snug mt-1.5">
                     {compatible.length === 0 && credentials.length > 0

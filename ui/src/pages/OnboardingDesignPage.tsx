@@ -65,10 +65,16 @@ const INITIAL_STATE: OnboardingRuntimeState = {
 }
 
 const STATE_STYLE: Record<Readiness, string> = {
-  ready: 'border-success/25 bg-success/10 text-success',
-  attention: 'border-destructive/25 bg-destructive/10 text-destructive',
-  optional: 'border-border bg-muted/60 text-muted-foreground',
-  locked: 'border-border bg-secondary text-muted-foreground',
+  ready: 'text-success',
+  attention: 'text-destructive',
+  optional: 'text-muted-foreground',
+  locked: 'text-muted-foreground',
+}
+const STATE_ICON: Record<Readiness, LucideIcon> = {
+  ready: CheckCircle2,
+  attention: AlertTriangle,
+  optional: Circle,
+  locked: XCircle,
 }
 
 export function OnboardingDesignPage() {
@@ -561,8 +567,10 @@ function SmallAction({ icon, label, onClick }: { icon: ReactNode; label: string;
 
 function StateBadge({ state, label }: { state: Readiness; label?: string }) {
   const { t } = useTranslation()
+  const Icon = STATE_ICON[state]
   return (
-    <span className={`inline-flex min-h-5 items-center rounded-full border px-2 text-[10px] font-medium ${STATE_STYLE[state]}`}>
+    <span className={`inline-flex min-h-5 items-center gap-1.5 text-[10px] font-medium ${STATE_STYLE[state]}`}>
+      <Icon className="size-3" aria-hidden />
       {label ?? t(`onboardingChecklist.state.${state}`)}
     </span>
   )
@@ -570,13 +578,7 @@ function StateBadge({ state, label }: { state: Readiness; label?: string }) {
 
 function StateDot({ state }: { state: Readiness }) {
   const { t } = useTranslation()
-  const Icon = state === 'ready'
-    ? CheckCircle2
-    : state === 'attention'
-      ? AlertTriangle
-      : state === 'locked'
-        ? XCircle
-        : Circle
+  const Icon = STATE_ICON[state]
   return (
     <span
       className="flex h-7 w-7 shrink-0 items-center justify-center text-muted-foreground"
@@ -589,7 +591,7 @@ function StateDot({ state }: { state: Readiness }) {
 
 function StatusChip({ children }: { children: ReactNode }) {
   return (
-    <span className="rounded-md border border-border bg-secondary px-2 py-1">
+    <span className="inline-flex h-8 items-center text-[11px] text-muted-foreground">
       {children}
     </span>
   )

@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 // ==================== Shared class constants ====================
 
 export const inputClass =
-  'w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 font-sans text-[13px] text-foreground outline-none transition-[border-color,background-color,box-shadow] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] placeholder:text-muted-foreground focus:border-ring focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--ring)_35%,transparent)] motion-reduce:transition-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50'
+  'h-8 w-full min-w-0 rounded-md border border-input bg-background px-3 py-1.5 font-sans text-[13px] text-foreground outline-none transition-[border-color,background-color,box-shadow] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] placeholder:text-muted-foreground focus:border-ring focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--ring)_35%,transparent)] motion-reduce:transition-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50'
 
 // ==================== Settings scroll area ====================
 

@@ -41,7 +41,7 @@ export function HarnessSettingsPage() {
           <ConfigSection
             title={t('settings.harness.shared')}
           >
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex min-h-12 items-start justify-between gap-4 py-3">
               <div className="min-w-0">
                 <label htmlFor={rosterToggleId} className="block text-sm font-medium text-foreground">
                   {t('settings.harness.showHeadlessBorn')}
@@ -61,7 +61,7 @@ export function HarnessSettingsPage() {
                 <SaveIndicator status={status === 'idle' && error ? 'error' : status} />
               </div>
             </div>
-            <div className="mt-5 flex items-start justify-between gap-4 border-t border-border pt-5">
+            <div className="flex min-h-12 items-start justify-between gap-4 border-t border-border py-3">
               <div className="min-w-0">
                 <label htmlFor={issueRosterToggleId} className="block text-sm font-medium text-foreground">
                   {t('settings.harness.showIssueAttached')}
@@ -80,7 +80,7 @@ export function HarnessSettingsPage() {
                 />
               </div>
             </div>
-            <div className="mt-5 flex items-start justify-between gap-4 border-t border-border pt-5">
+            <div className="flex min-h-12 items-start justify-between gap-4 border-t border-border py-3">
               <div className="min-w-0">
                 <label htmlFor={releasesToggleId} className="block text-sm font-medium text-foreground">
                   {t('settings.harness.showUnverifiedReleases')}

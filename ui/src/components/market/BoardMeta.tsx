@@ -1,5 +1,6 @@
 import type { ReferenceMeta } from '../../api/reference'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { TriangleAlert } from 'lucide-react'
 
 /**
  * The one meta line for board headers — single source word, not a badge
@@ -33,8 +34,9 @@ export function BoardMeta({ meta, extra }: { meta: ReferenceMeta; extra?: string
         {extra && <>{extra}, </>}
         {sourceWord}
         {meta.stale && (
-          <span className="ml-1.5 rounded-md bg-warning/15 px-1 py-px text-[9px] font-medium text-warning">
-            Stale
+          <span className="ml-1.5 inline-flex items-center gap-1 text-warning">
+            <TriangleAlert aria-hidden className="size-3" />
+            <span>Stale</span>
           </span>
         )}
       </TooltipTrigger>

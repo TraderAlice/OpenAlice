@@ -17,7 +17,7 @@
  */
 
 import { useEffect } from 'react'
-import { Bot, Monitor, Settings } from 'lucide-react'
+import { Monitor, Settings } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import '@xterm/xterm/css/xterm.css'
 
@@ -28,6 +28,7 @@ import { workspaceDisplayName, workspaceDisplayTitle } from '../components/works
 import { WorkspaceView } from '../components/workspace/WorkspaceView'
 import { WorkspaceFilesToggle } from '../components/workspace/WorkspaceFilesToggle'
 import { Button } from '../components/ui/button'
+import { AgentRuntimeIcon } from '../lib/agentRuntimeIcon'
 import type { ViewSpec } from '../tabs/types'
 
 interface Props {
@@ -125,7 +126,7 @@ export function WorkspacePage({ spec, visible }: Props) {
         >
           {(activeRecord.surface ?? 'terminal') === 'webpi'
             ? <Monitor size={13} strokeWidth={2.25} aria-hidden="true" />
-            : <Bot size={13} strokeWidth={2.25} aria-hidden="true" />}
+            : <AgentRuntimeIcon agentId="pi" className="h-[13px] w-[13px]" />}
           {(activeRecord.surface ?? 'terminal') === 'webpi' ? 'Open TUI' : 'WebPi Beta'}
         </Button>
       )}

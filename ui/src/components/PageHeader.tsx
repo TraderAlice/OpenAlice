@@ -33,17 +33,17 @@ export function PageHeader({
           stackActionsOnNarrow ? 'oa-page-header-stack-actions' : ''
         }`}
       >
-        <div className="min-w-0">
-          <h2 className="truncate text-title font-semibold tracking-[-0.012em] text-foreground">{title}</h2>
+        <div className="flex min-w-0 flex-col justify-center">
+          <h2 className="truncate text-title font-semibold leading-[22px] tracking-[-0.012em] text-foreground">{title}</h2>
           {(description || live) && (
-            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-muted-foreground">
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] leading-4 text-muted-foreground">
               {description && <span className="min-w-0">{description}</span>}
               {live && <LiveIndicator lastUpdated={live.lastUpdated} />}
             </div>
           )}
         </div>
         {right && (
-          <div className={`shrink-0 ${stackActionsOnNarrow ? 'oa-page-header-actions' : ''}`}>
+          <div className={`flex shrink-0 items-center ${stackActionsOnNarrow ? 'oa-page-header-actions' : ''}`}>
             {right}
           </div>
         )}

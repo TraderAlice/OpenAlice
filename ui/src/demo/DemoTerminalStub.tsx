@@ -9,7 +9,7 @@ export function DemoTerminalStub({ label }: DemoTerminalStubProps): ReactElement
   return (
     <div className="flex h-full w-full items-center justify-center bg-background p-8 text-muted-foreground">
       <div className="max-w-md text-left space-y-3">
-        <div className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground/70">
+        <div className="font-mono text-[11px] leading-4 text-muted-foreground/70">
           {label}
         </div>
         <div className="text-base font-semibold text-foreground">

@@ -1,10 +1,9 @@
 import { useId, useMemo, useState } from 'react'
-import { Bot } from 'lucide-react'
-
 import { ConfigSection, Field, SettingsScrollArea, inputClass } from '../components/form'
 import { PageHeader } from '../components/PageHeader'
 import { SaveIndicator } from '../components/SaveIndicator'
 import { useWorkspaces } from '../contexts/workspaces-context'
+import { AgentRuntimeIcon } from '../lib/agentRuntimeIcon'
 
 export function IssueSettingsPage() {
   const { agents, defaultAgent, issueDefaultAgent, setIssueDefaultAgent } = useWorkspaces()
@@ -52,10 +51,9 @@ export function IssueSettingsPage() {
             >
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <div className="relative flex-1">
-                  <Bot
-                    size={14}
-                    aria-hidden
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60"
+                  <AgentRuntimeIcon
+                    agentId={issueDefaultAgent ?? installationDefault?.id}
+                    className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
                   />
                   <select
                     id={runtimeSelectId}
@@ -63,7 +61,7 @@ export function IssueSettingsPage() {
                     value={issueDefaultAgent ?? ''}
                     disabled={status === 'saving'}
                     onChange={(event) => void save(event.target.value || null)}
-                    className={`${inputClass} h-8 py-1.5 pl-9`}
+                    className={`${inputClass} pl-9`}
                   >
                     <option value="">Use each Workspace default</option>
                     {runtimeAgents.map((agent) => (

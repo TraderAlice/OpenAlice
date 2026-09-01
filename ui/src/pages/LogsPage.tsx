@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight } from 'lucide-react'
 import { api, type AgentConversationRecord, type ToolCallRecord } from '../api'
 import { getIntlLocale } from '../lib/intl'
+import { AgentRuntimeIcon } from '../lib/agentRuntimeIcon'
 import { EmptyState, Skeleton } from '../components/StateViews'
 import { SegmentedControl } from '../components/SegmentedControl'
 import { Button } from '../components/ui/button'
@@ -497,11 +498,19 @@ function ConversationRow({ record }: { record: AgentConversationRecord }) {
           {formatDateTime(record.dispatchedAt)}
         </td>
         <td className="px-3 py-2">
-          <div className="font-medium text-foreground">{sourceLabel(record.source)}</div>
+          <div className="flex items-center gap-1.5 font-medium text-foreground">
+            {record.source.kind === 'session' && (
+              <AgentRuntimeIcon agentId={record.source.agent} className="size-4 shrink-0" />
+            )}
+            <span>{sourceLabel(record.source)}</span>
+          </div>
           <div className="mt-0.5 font-mono text-[10px] text-muted-foreground">{record.source.kind}</div>
         </td>
         <td className="px-3 py-2">
-          <div className="font-medium text-foreground">{targetLabel(record.target)}</div>
+          <div className="flex items-center gap-1.5 font-medium text-foreground">
+            <AgentRuntimeIcon agentId={record.target.agent} className="size-4 shrink-0" />
+            <span>{targetLabel(record.target)}</span>
+          </div>
           <div className="mt-0.5 font-mono text-[10px] text-muted-foreground">{record.target.resumeId}</div>
         </td>
         <td className="px-3 py-2">

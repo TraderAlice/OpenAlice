@@ -135,7 +135,7 @@ export function ExternalOrderMonitoringRow() {
           aria-describedby={`${descriptionId} ${statusId}`}
           value={value}
           onChange={(e) => { void save(e.target.value) }}
-          className={`${inputClass} h-8 w-full py-1.5 sm:w-auto`}
+          className={`${inputClass} w-full sm:w-auto`}
         >
           {OBSERVE_CADENCE_OPTIONS.map((v) => (
             <option key={v} value={v}>{v === 'off' ? 'Off' : `Every ${v}`}</option>
@@ -289,9 +289,9 @@ export function MissingBrokerPacksNotice({ packs, onInstall }: {
           <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
             Update or repair only the integrations already used by these accounts or K-line sources.
           </p>
-          <div className="mt-3 space-y-2">
+          <div className="mt-3 divide-y divide-border/60 border-y border-border/60">
             {actionable.map((pack) => (
-              <div key={pack.engine} className="flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2">
+              <div key={pack.engine} className="flex items-center justify-between gap-3 py-2.5">
                 <div className="min-w-0">
                   <div className="text-[12px] font-medium text-foreground">{pack.engine}</div>
                   <div className="truncate text-[11px] text-muted-foreground">Required by {pack.requiredBy.join(', ')}</div>
@@ -624,7 +624,7 @@ function UTACard({ uta, preset, health, readiness, equity, onClick }: {
     <button
       type="button"
       onClick={onClick}
-      className={`oa-pressable w-full rounded-lg border border-border bg-secondary/30 px-4 py-3 text-left transition-[border-color,background-color,opacity] duration-[var(--motion-fast)] hover:border-muted-foreground/40 hover:bg-muted/20 ${isDisabled ? 'opacity-50' : ''}`}
+      className={`oa-pressable w-full rounded-lg border border-border bg-card px-4 py-3 text-left transition-[border-color,background-color,opacity] duration-[var(--motion-fast)] hover:border-muted-foreground/40 hover:bg-muted/20 ${isDisabled ? 'opacity-50' : ''}`}
     >
       <div className="flex items-center gap-3">
         <div className="flex-1 min-w-0">

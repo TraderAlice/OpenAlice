@@ -57,7 +57,7 @@ function CollectorSettings() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Fetch interval (min)">
               <input
-                className={`${inputClass} h-8 py-1.5`}
+                className={inputClass}
                 type="number"
                 min={1}
                 value={cfg.intervalMinutes}
@@ -66,7 +66,7 @@ function CollectorSettings() {
             </Field>
             <Field label="Retention (days)">
               <input
-                className={`${inputClass} h-8 py-1.5`}
+                className={inputClass}
                 type="number"
                 min={1}
                 value={cfg.retentionDays}
@@ -207,15 +207,15 @@ export function FeedsSection({
         <p className="text-[13px] font-medium text-foreground">Add Feed</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Name">
-            <input className={`${inputClass} h-8 py-1.5`} value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. CoinDesk" />
+            <input className={inputClass} value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. CoinDesk" />
           </Field>
           <Field label="Source Tag">
-            <input className={`${inputClass} h-8 py-1.5`} value={newSource} onChange={(e) => setNewSource(e.target.value)} placeholder="e.g. coindesk" />
+            <input className={inputClass} value={newSource} onChange={(e) => setNewSource(e.target.value)} placeholder="e.g. coindesk" />
           </Field>
         </div>
         <Field label="Feed URL">
           <input
-            className={`${inputClass} h-8 py-1.5`}
+            className={inputClass}
             type="url"
             value={newUrl}
             onChange={(e) => setNewUrl(e.target.value)}
@@ -230,7 +230,7 @@ export function FeedsSection({
           )}
         </Field>
         <Field label="Description (optional)">
-          <input className={`${inputClass} h-8 py-1.5`} value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Short description shown in the feed list" />
+          <input className={inputClass} value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Short description shown in the feed list" />
         </Field>
         <Button
           type="button"

@@ -63,10 +63,10 @@ function MoversBoardView() {
       <PageHeader
         title={t('market.boardMovers')}
         description={
-          <>
-            {t('market.moversSubtitle')}
+          <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <span>{t('market.moversSubtitle')}</span>
             {data && <BoardMeta meta={data.meta} />}
-          </>
+          </span>
         }
         live={{ lastUpdated: updatedAt }}
       />
@@ -197,10 +197,10 @@ function CalendarBoardView() {
       <PageHeader
         title={t('market.boardCalendar')}
         description={
-          <>
-            {t('market.calendarSubtitle')}
+          <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <span>{t('market.calendarSubtitle')}</span>
             {data && <BoardMeta meta={data.meta} extra={`${data.window.start} → ${data.window.end}`} />}
-          </>
+          </span>
         }
         live={{ lastUpdated: updatedAt }}
       />
@@ -571,10 +571,10 @@ function MacroBoardView() {
       <PageHeader
         title={t('market.boardMacro')}
         description={
-          <>
-            {t('market.macroSubtitle')}
+          <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <span>{t('market.macroSubtitle')}</span>
             {data && <BoardMeta meta={data.meta} />}
-          </>
+          </span>
         }
         live={{ lastUpdated: updatedAt }}
       />
@@ -628,10 +628,10 @@ function TermStructureBoardView() {
       <PageHeader
         title={t('market.boardTermStructure')}
         description={
-          <>
-            {t('market.termSubtitle')}
+          <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <span>{t('market.termSubtitle')}</span>
             {data && <BoardMeta meta={data.meta} />}
-          </>
+          </span>
         }
         live={{ lastUpdated: updatedAt }}
       />
@@ -738,10 +738,10 @@ function GlobalMacroBoardView() {
       <PageHeader
         title={t('market.boardGlobalMacro')}
         description={
-          <>
-            {t('market.globalMacroSubtitle')}
+          <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <span>{t('market.globalMacroSubtitle')}</span>
             {data && <BoardMeta meta={data.meta} />}
-          </>
+          </span>
         }
         live={{ lastUpdated: updatedAt }}
       />
@@ -891,10 +891,10 @@ function ShippingBoardView() {
       <PageHeader
         title={t('market.boardShipping')}
         description={
-          <>
-            {t('market.shippingSubtitle')}
+          <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <span>{t('market.shippingSubtitle')}</span>
             {data && <BoardMeta meta={data.meta} />}
-          </>
+          </span>
         }
         live={{ lastUpdated: updatedAt }}
       />
@@ -962,10 +962,10 @@ function FedBoardView() {
       <PageHeader
         title={t('market.boardFed')}
         description={
-          <>
-            {t('market.fedSubtitle')}
+          <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <span>{t('market.fedSubtitle')}</span>
             {data && <BoardMeta meta={data.meta} />}
-          </>
+          </span>
         }
         live={{ lastUpdated: updatedAt }}
       />

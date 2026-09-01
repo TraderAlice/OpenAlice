@@ -103,7 +103,7 @@ export function MarketRotationPage() {
         {error && (
           <div
             role="alert"
-            className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive"
+            className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive"
           >
             <span className="min-w-0 break-words">{error}</span>
             <Button

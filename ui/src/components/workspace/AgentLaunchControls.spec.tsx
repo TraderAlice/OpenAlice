@@ -243,7 +243,8 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     expect(selectRuntimeDefault).toHaveBeenCalledOnce()
   })
 
-  it('shows the provider as the saved access identity instead of exposing only its slug', () => {
+  it('shows the provider as the saved access identity instead of exposing only its slug', async () => {
+    const user = userEvent.setup()
     const deepseek = {
       ...credentials[0]!,
       slug: 'deepseek-1',
@@ -267,6 +268,11 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     const trigger = screen.getByRole('button', { name: i18n.t('chatLanding.selectCredential') })
     expect(trigger.textContent).toContain('DeepSeek API')
     expect(trigger.textContent).toContain('deepseek-1')
+    expect(trigger.querySelector('[data-ai-provider-icon="deepseek"]')).not.toBeNull()
+
+    await user.click(trigger)
+    const savedCredential = screen.getByRole('menuitem', { name: /deepseek-1/ })
+    expect(savedCredential.querySelector('[data-ai-provider-icon="deepseek"]')).not.toBeNull()
   })
 
   it('renders paused-session settings as two full-width rows', () => {

@@ -1,5 +1,16 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { ChevronDown } from 'lucide-react'
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  ChevronDown,
+  CircleCheck,
+  CircleMinus,
+  CircleX,
+  Clock3,
+  LoaderCircle,
+  Minus,
+  TriangleAlert,
+} from 'lucide-react'
 import { api, type Position, type WalletCommitLog, type EquityCurvePoint, type UTASnapshotSummary } from '../api'
 import { useAutoSave } from '../hooks/useAutoSave'
 import { useAccountHealth } from '../hooks/useAccountHealth'
@@ -313,6 +324,7 @@ export function PortfolioPage() {
                     installingEngine={brokerReadiness.installingEngine}
                     onInstall={brokerReadiness.install}
                     onRetry={brokerReadiness.refresh}
+                    compact
                   />
                 </div>
               )
@@ -550,7 +562,7 @@ function PortfolioSkeleton() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
         {Array.from({ length: 2 }).map((_, i) => (
           <div key={i} className="flex items-center gap-3 rounded-lg border border-border bg-card px-3.5 py-3">
-            <Skeleton className="h-1.5 w-1.5 rounded-full" />
+            <Skeleton className="size-3 rounded-sm" />
             <div className="flex-1 space-y-2">
               <Skeleton className="h-3 w-24" />
               <Skeleton className="h-2.5 w-16" />
@@ -581,12 +593,6 @@ function PortfolioSkeleton() {
 
 // ==================== Account Strip ====================
 
-const HEALTH_DOT: Record<string, string> = {
-  healthy: 'bg-success',
-  degraded: 'bg-warning',
-  offline: 'bg-destructive',
-}
-
 function AccountStrip({ sources, perAccountCurve }: {
   sources: Array<{ id: string; label: string; provider: string; equity: string; unrealizedPnL: number; error?: string; health?: string; disabled?: boolean; connecting?: boolean }>
   perAccountCurve: Record<string, CurvePointSummary>
@@ -599,19 +605,45 @@ function AccountStrip({ sources, perAccountCurve }: {
         // optimistically 'healthy' here, so this can only come from the flag.
         const isConnecting = !!s.connecting && !isDisabled
         const isOffline = s.health === 'offline' && !isDisabled && !isConnecting
-        const dotColor = isDisabled
-          ? 'bg-muted-foreground/40'
+        const StatusIcon = isDisabled
+          ? CircleMinus
           : isConnecting
-            ? 'bg-primary'
-            : (HEALTH_DOT[s.health ?? 'healthy'] ?? 'bg-muted-foreground')
+            ? LoaderCircle
+            : isOffline
+              ? CircleX
+              : s.health === 'degraded'
+                ? TriangleAlert
+                : CircleCheck
+        const statusColor = isDisabled
+          ? 'text-muted-foreground/50'
+          : isConnecting
+            ? 'text-primary'
+            : isOffline
+              ? 'text-destructive'
+              : s.health === 'degraded'
+                ? 'text-warning'
+                : 'text-success'
 
         const curve = perAccountCurve[s.id]
         const todayDelta = computeTodayDelta(curve ?? null)
+        const TodayDeltaIcon = !todayDelta || todayDelta.delta === 0
+          ? Minus
+          : todayDelta.delta > 0
+            ? ArrowUpRight
+            : ArrowDownRight
+        const todayDeltaTone = !todayDelta || todayDelta.delta === 0
+          ? 'text-muted-foreground'
+          : todayDelta.delta > 0
+            ? 'text-success'
+            : 'text-destructive'
         const showSpark = !isDisabled && !isOffline && !isConnecting && curve && curve.values.length >= 2
 
         return (
           <div key={s.id} className={`flex items-center gap-3 rounded-lg border border-border bg-card px-3.5 py-3 ${isOffline || isDisabled ? 'opacity-60' : ''}`}>
-            <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor} ${isConnecting ? 'animate-pulse' : ''}`} />
+            <StatusIcon
+              aria-hidden
+              className={`size-3.5 shrink-0 ${statusColor} ${isConnecting ? 'animate-spin motion-reduce:animate-none' : ''}`}
+            />
             <div className="flex-1 min-w-0">
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-foreground font-medium text-[13px] truncate">{s.label}</span>
@@ -629,8 +661,9 @@ function AccountStrip({ sources, perAccountCurve }: {
                     : (
                       <span className="text-[11px] tabular-nums">
                         {todayDelta ? (
-                          <span className={todayDelta.delta >= 0 ? 'text-success' : 'text-destructive'}>
-                            {todayDelta.delta >= 0 ? '▲' : '▼'} {fmtPnl(todayDelta.delta)} today
+                          <span className={`inline-flex items-center gap-1 ${todayDeltaTone}`}>
+                            <TodayDeltaIcon aria-hidden className="size-3 shrink-0" />
+                            {fmtPnl(todayDelta.delta)} today
                           </span>
                         ) : s.unrealizedPnL !== 0 ? (
                           <span className={s.unrealizedPnL >= 0 ? 'text-success' : 'text-destructive'}>
@@ -861,7 +894,11 @@ function FxRatesPanel({ rates }: { rates: FxRateInfo[] }) {
               <tr key={r.currency} className="border-t border-border first:border-t-0">
                 <td className="px-2.5 py-1.5">
                   <div className="flex items-center gap-1.5">
-                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${r.source === 'live' ? 'bg-success' : r.source === 'cached' ? 'bg-warning' : 'bg-muted-foreground/40'}`} />
+                    {r.source === 'live'
+                      ? <CircleCheck aria-hidden className="size-3 shrink-0 text-success" />
+                      : r.source === 'cached'
+                        ? <Clock3 aria-hidden className="size-3 shrink-0 text-warning" />
+                        : <CircleMinus aria-hidden className="size-3 shrink-0 text-muted-foreground/50" />}
                     <span className="font-medium text-foreground">{r.currency}</span>
                   </div>
                 </td>

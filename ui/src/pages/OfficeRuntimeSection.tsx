@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { ArrowUpRight } from 'lucide-react'
 
 import { api } from '../api'
 import type { AgentRuntimeEvent, AgentRuntimeEventType } from '../api/agentRuntimeLog'
@@ -139,7 +140,7 @@ export function OfficeRuntimeSection() {
                   className="oa-office-runtime__open"
                   onClick={() => openOrFocus({ kind: 'automation', params: { section: 'runs' } })}
                 >
-                  <span aria-hidden>A</span>
+                  <span aria-hidden><ArrowUpRight size={14} /></span>
                   {t('office.openRun')}
                 </button>
               )}

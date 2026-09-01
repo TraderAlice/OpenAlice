@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { inputClass } from '@/components/form'
 import { SelectionCheckIcon } from '@/components/ui/selection-check-icon'
 import {
   Dialog,
@@ -46,6 +47,7 @@ import {
 import { formatContextWindow, type AgentLaunchConfigState } from '../../hooks/useAgentLaunchConfig'
 import { useAgentRuntimes } from '../../hooks/useAgentRuntimes'
 import { projectAgentRuntimeQuickAccess } from '../../lib/agentRuntimeQuickAccess'
+import { AIProviderIcon } from '@/lib/aiProviderIcon'
 import {
   AgentRuntimePicker,
   type AgentRuntimePickerHandle,
@@ -55,12 +57,14 @@ const PROVIDER_ACCESS_LABELS: Readonly<Record<string, string>> = {
   anthropic: 'Anthropic API',
   openai: 'OpenAI API',
   google: 'Google Gemini API',
+  xai: 'xAI API',
   minimax: 'MiniMax API',
   glm: 'Z.AI GLM API',
   kimi: 'Kimi API',
   deepseek: 'DeepSeek API',
   longcat: 'LongCat API',
   openrouter: 'OpenRouter',
+  cursor: 'Cursor',
 }
 
 export function credentialAccessLabel(credential: AgentLaunchConfigState['credential']): string {
@@ -392,7 +396,7 @@ function AgentLaunchInferenceMenu({
             aria-label={t('chatLanding.customModelId')}
             placeholder={t('chatLanding.customModelId')}
             autoFocus
-            className="min-h-9 w-full rounded-lg border border-border bg-background px-3 text-[12px] text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
+            className={`${inputClass} min-h-9 text-[12px]`}
           />
           <DialogFooter>
             <DialogClose render={<Button variant="outline" />}>
@@ -458,6 +462,7 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
         ? t('chatLanding.workspaceAccessDetail', { credential: credentialAccessDetail(config.credential) })
         : t('chatLanding.savedAccessDetail', { credential: credentialAccessDetail(config.credential) })
       : config.detectedCredential?.model ?? t('chatLanding.workspaceAccessDetailFallback')
+  const selectedVaultVendor = config.accessMode === 'vault' ? config.credential?.vendor : undefined
 
   useImperativeHandle(ref, () => ({
     openAgentMenu() {
@@ -482,14 +487,16 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
       )}
 
       {showAi && showAccess && config.needsCredential && config.noCredentials && (
-        <button
+        <Button
           type="button"
           onClick={onConfigureProvider}
-          className="oa-pressable inline-flex min-h-8 items-center gap-1.5 rounded-md bg-warning/10 px-2.5 py-1 text-[11px] text-warning hover:bg-warning/20"
+          variant="ghost"
+          size="sm"
+          className="bg-warning/10 text-[11px] text-warning hover:bg-warning/20 hover:text-warning"
         >
           <KeyRound className="h-3 w-3" />
           {t('chatLanding.configureProvider')}
-        </button>
+        </Button>
       )}
 
       {showAi && showAccess && config.canSelectCredential && !config.noCredentials && config.credentials && (
@@ -505,7 +512,11 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
             }}
             className={`oa-pressable inline-flex min-w-0 items-center rounded-lg text-left text-muted-foreground transition-colors hover:text-foreground ${settingsLayout ? 'min-h-14 w-full gap-2 border border-border/70 bg-muted/25 px-3 py-2 hover:bg-muted/45' : toolbar ? 'min-h-7 max-w-[190px] gap-1.5 bg-transparent px-1.5 py-1 hover:bg-muted' : labeled ? 'min-h-12 w-full max-w-none gap-2 bg-muted px-2.5 py-1.5 sm:w-auto sm:max-w-[240px]' : 'min-h-8 max-w-[240px] gap-2 bg-muted px-2.5 py-1'}`}
           >
-            <KeyRound className={settingsLayout ? 'h-4 w-4 shrink-0' : 'h-3 w-3 shrink-0'} />
+            <span className={`flex shrink-0 items-center justify-center ${settingsLayout ? 'h-[18px] w-[18px]' : 'h-4 w-4'}`}>
+              {selectedVaultVendor
+                ? <AIProviderIcon vendor={selectedVaultVendor} className="h-full w-full" />
+                : <KeyRound className={settingsLayout ? 'h-[18px] w-[18px]' : 'h-4 w-4'} />}
+            </span>
             <span className="min-w-0 flex-1">
               {(labeled || settingsLayout) && (
                 <span className={`block truncate font-medium text-muted-foreground ${settingsLayout ? 'text-[10px]' : 'text-[9.5px]'}`}>
@@ -568,6 +579,9 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
                     }}
                     className={`min-h-11 px-2.5 py-2 text-[12px] ${active ? 'text-primary' : 'text-foreground'}`}
                   >
+                    <span className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground">
+                      <AIProviderIcon vendor={credential.vendor} className="h-4 w-4" />
+                    </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate">{credentialAccessLabel(credential)}</span>
                       <span className="block truncate text-[10px] text-muted-foreground">
@@ -691,16 +705,18 @@ export function AgentLaunchDetails({
             </span>
           )}
           {scope.actionLabel && onAdjustAi && (
-            <button
+            <Button
               type="button"
               onClick={onAdjustAi}
-              className="oa-pressable ml-auto inline-flex min-h-7 shrink-0 items-center gap-1 rounded-md px-2 py-1 text-primary hover:bg-primary/10"
+              variant="ghost"
+              size="sm"
+              className="ml-auto shrink-0 text-[11.5px] text-primary hover:bg-primary/10 hover:text-primary"
               aria-label={scope.actionLabel}
               title={scope.actionLabel}
             >
               <Settings2 className="h-3 w-3" />
               {scope.actionLabel}
-            </button>
+            </Button>
           )}
         </div>
       )}

@@ -343,7 +343,7 @@ export function ChatWorkspaceSection({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="grid grid-cols-1 gap-1 px-1.5 pb-2 pt-2">
-        <button
+        <Button
           type="button"
           onClick={() => navigate({
             kind: landingKind,
@@ -351,25 +351,28 @@ export function ChatWorkspaceSection({
               ? { targetWsId: focusedWorkspace.id }
               : {},
           })}
-          className="oa-chat-new-action oa-pressable flex min-h-10 w-full items-center gap-2 rounded-md bg-sidebar-accent px-2 py-2 text-left text-sm font-medium text-sidebar-accent-foreground hover:bg-muted"
+          variant="secondary"
+          className="oa-chat-new-action min-h-10 w-full justify-start px-2 text-sm text-sidebar-accent-foreground"
         >
           <MessageSquarePlus size={16} strokeWidth={2} className="shrink-0 text-primary" />
           <span>{mode === 'auto-quant'
             ? t('autoQuant.newResearch')
             : mode === 'prediction' ? t('autoPrediction.newResearch') : t('chat.newChat')}</span>
-        </button>
+        </Button>
         {mode !== 'chat' && focusedWorkspace && (
-          <button
+          <Button
             type="button"
             onClick={() => navigate({
               kind: 'harness-surface',
               params: { wsId: focusedWorkspace.id, capability: 'studio', source: mode },
             })}
-            className="oa-pressable flex min-h-9 w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+            variant="ghost"
+            size="lg"
+            className="w-full justify-start px-2.5 text-sm text-muted-foreground"
           >
             <AppWindow size={15} strokeWidth={2.05} className="shrink-0 text-primary" />
             <span>{t('harnessSurface.studio')}</span>
-          </button>
+          </Button>
         )}
       </div>
 

@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { X } from 'lucide-react'
 
 import type { OfficeDrawerItem, OfficeFloorEmployee } from '../api/office'
 import { PageLoading, RecoverySurface, RefreshNotice } from '../components/StateViews'
@@ -221,7 +222,7 @@ export function OfficePage() {
                       <span>{t('office.timeline')}</span>
                     </div>
                     <button type="button" autoFocus aria-label={t('common.close')} onClick={closeLog}>
-                      <span aria-hidden>×</span>
+                      <X size={18} aria-hidden />
                     </button>
                   </header>
                   <div className="oa-office-window__body">

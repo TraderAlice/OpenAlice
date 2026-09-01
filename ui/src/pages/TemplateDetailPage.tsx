@@ -24,6 +24,7 @@ import { fetchTemplateReadme } from '../components/workspace/api'
 import { CreateWorkspaceDialog } from '../components/workspace/CreateWorkspaceDialog'
 import { EmptyState } from '../components/StateViews'
 import { Button } from '../components/ui/button'
+import { AgentRuntimeIcon } from '../lib/agentRuntimeIcon'
 
 interface Props {
   spec: { kind: 'template-detail'; params: { name: string } }
@@ -107,7 +108,7 @@ export function TemplateDetailPage({ spec }: Props) {
                 v{template.version}
               </span>
               {template.community && (
-                <span className="shrink-0 rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[10px] text-muted-foreground">
+                <span className="shrink-0 rounded-md border border-border px-2 py-0.5 text-[10px] text-muted-foreground">
                   {t('templates.communityBadge')}
                 </span>
               )}
@@ -125,8 +126,9 @@ export function TemplateDetailPage({ spec }: Props) {
                 {agents.map((a) => (
                   <span
                     key={a.id}
-                    className="text-[11px] font-mono text-muted-foreground px-1.5 py-0.5 rounded bg-muted"
+                    className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground"
                   >
+                    <AgentRuntimeIcon agentId={a.id} className="size-3.5 shrink-0" />
                     {a.id}
                   </span>
                 ))}

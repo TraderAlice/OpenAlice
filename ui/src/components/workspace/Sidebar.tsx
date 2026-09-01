@@ -21,6 +21,8 @@ import { SidebarActionMenu } from './SidebarActionMenu';
 import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon';
 import { SelectionIndicator } from '../SelectionIndicator';
 import { projectHeadlessTaskPresentation } from './headless-task-presentation';
+import { Button } from '../ui/button';
+import { SidebarRow } from '../SidebarRow';
 
 /**
  * Workspace launcher sidebar.
@@ -136,14 +138,16 @@ export function Sidebar(props: SidebarProps): ReactElement {
           title, so there's no in-list header; mirrors the chat sidebar's
           "New chat" affordance). */}
       <div className="px-2 pb-1.5">
-        <button
+        <Button
           type="button"
           onClick={() => setShowCreate(true)}
-          className="oa-pressable flex min-h-9 w-full items-center gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-[13px] font-medium text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground"
+          variant="outline"
+          size="lg"
+          className="w-full justify-start bg-muted/30 px-3 text-[13px] text-muted-foreground hover:text-foreground"
         >
           <Plus size={15} strokeWidth={2.25} className="shrink-0" />
           <span className="truncate">{t('workspace.newWorkspace')}</span>
-        </button>
+        </Button>
       </div>
 
       {showCreate && (
@@ -243,18 +247,13 @@ function NavRow({
   title?: string;
 }): ReactElement {
   return (
-    <button
-      type="button"
+    <SidebarRow
+      label={label}
+      active={active}
       onClick={onClick}
       title={title}
-      className={`oa-nav-row relative flex items-center gap-2.5 w-full px-3 py-1.5 text-[13px] text-left ${
-        active ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-foreground hover:bg-sidebar-accent/65'
-      }`}
-    >
-      {active && <SelectionIndicator />}
-      <Icon size={14} strokeWidth={2} className="shrink-0 text-muted-foreground/70" aria-hidden="true" />
-      <span className="truncate">{label}</span>
-    </button>
+      icon={<Icon size={14} strokeWidth={2} className="text-muted-foreground/70" aria-hidden="true" />}
+    />
   );
 }
 

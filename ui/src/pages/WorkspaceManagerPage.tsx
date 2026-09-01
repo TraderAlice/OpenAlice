@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft,
   ArrowUp,
-  Bot,
   ClipboardCheck,
   GitMerge,
   Loader2,
@@ -29,6 +28,7 @@ import { useWorkspaces } from '../contexts/workspaces-context'
 import { useAgentLaunchConfig, useAgentLaunchPreferences } from '../hooks/useAgentLaunchConfig'
 import { useAgentRuntimes } from '../hooks/useAgentRuntimes'
 import { isWorkspaceAiAgent } from '../lib/agentRuntime'
+import { AgentRuntimeIcon } from '../lib/agentRuntimeIcon'
 import { useWorkspace } from '../tabs/store'
 import type { ViewSpec } from '../tabs/types'
 
@@ -150,7 +150,8 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
     )
     const runtimeBadge = (
       <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background px-2 py-1 text-[10px] font-medium text-muted-foreground">
-        <Bot size={11} /> {runtimeLabel(session.agent, agents)} {session.surface === 'webpi' ? 'WebPi' : 'TUI'}
+        <AgentRuntimeIcon agentId={session.agent} className="h-[11px] w-[11px]" />
+        {runtimeLabel(session.agent, agents)} {session.surface === 'webpi' ? 'WebPi' : 'TUI'}
       </span>
     )
 

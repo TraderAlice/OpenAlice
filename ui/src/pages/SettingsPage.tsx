@@ -788,7 +788,7 @@ function WorkspaceShellSection() {
     >
       <Field label={t('settings.workspaceShell.mode')}>
         <select
-          className={`${inputClass} h-8 py-1.5`}
+          className={inputClass}
           value={mode}
           onChange={(event) => setMode(event.target.value as 'auto' | 'custom')}
         >
@@ -803,7 +803,7 @@ function WorkspaceShellSection() {
         >
           <input
             data-testid="workspace-shell-path"
-            className={`${inputClass} h-8 py-1.5 font-mono`}
+            className={`${inputClass} font-mono`}
             value={customPath}
             placeholder="C:\\Program Files\\Git\\bin\\bash.exe"
             onChange={(event) => setCustomPath(event.target.value)}

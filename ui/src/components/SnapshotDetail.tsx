@@ -1,5 +1,6 @@
 import type { UTASnapshotSummary } from '../api'
 import { getIntlLocale } from '../lib/intl'
+import { X } from 'lucide-react'
 
 // ==================== Props ====================
 
@@ -26,10 +27,12 @@ export function SnapshotDetail({ snapshot, onClose }: SnapshotDetailProps) {
           <span className="text-[11px] text-muted-foreground">{snapshot.accountId}</span>
         </div>
         <button
+          type="button"
           onClick={onClose}
-          className="text-muted-foreground hover:text-foreground text-[13px] px-1.5 transition-colors"
+          aria-label="Close snapshot"
+          className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
-          &times;
+          <X aria-hidden className="size-4" />
         </button>
       </div>
 
@@ -44,7 +47,7 @@ export function SnapshotDetail({ snapshot, onClose }: SnapshotDetailProps) {
       {/* Positions */}
       {snapshot.positions.length > 0 && (
         <div className="px-4 pb-3">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-1.5">
+          <p className="mb-1.5 text-[11px] font-medium leading-4 text-muted-foreground">
             Positions ({snapshot.positions.length})
           </p>
           <div className="border border-border rounded overflow-x-auto">
@@ -71,8 +74,8 @@ export function SnapshotDetail({ snapshot, onClose }: SnapshotDetailProps) {
                           {p.side}
                         </span>
                       </td>
+                      <td className="px-2.5 py-1.5 text-center text-[10px] text-muted-foreground tabular-nums">{p.currency}</td>
                       <td className="px-2.5 py-1.5 text-right text-foreground tabular-nums">{p.quantity}</td>
-                      <td className="px-2.5 py-1.5 text-center text-muted-foreground text-[10px] tabular-nums">{p.currency}</td>
                       <td className="px-2.5 py-1.5 text-right text-muted-foreground tabular-nums">{fmtStr(p.avgCost, p.currency)}</td>
                       <td className="px-2.5 py-1.5 text-right text-foreground tabular-nums">{fmtStr(p.marketPrice, p.currency)}</td>
                       <td className="px-2.5 py-1.5 text-right text-foreground tabular-nums">{fmtStr(p.marketValue, p.currency)}</td>
@@ -91,7 +94,7 @@ export function SnapshotDetail({ snapshot, onClose }: SnapshotDetailProps) {
       {/* Open Orders */}
       {snapshot.openOrders.length > 0 && (
         <div className="px-4 pb-3">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-1.5">
+          <p className="mb-1.5 text-[11px] font-medium leading-4 text-muted-foreground">
             Open Orders ({snapshot.openOrders.length})
           </p>
           <div className="space-y-1">
@@ -124,7 +127,7 @@ function HealthDot({ health }: { health: string }) {
     : health === 'degraded' ? 'bg-warning'
     : health === 'disabled' ? 'bg-muted-foreground/40'
     : 'bg-destructive'
-  return <div className={`w-1.5 h-1.5 rounded-full ${color}`} />
+  return <div aria-hidden className={`h-1.5 w-1.5 rounded-full ${color}`} />
 }
 
 function TriggerBadge({ trigger }: { trigger: string }) {
@@ -142,7 +145,7 @@ function MetricItem({ label, value, pnl }: { label: string; value: string; pnl?:
   const color = pnl == null ? 'text-foreground' : pnl >= 0 ? 'text-success' : 'text-destructive'
   return (
     <div>
-      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</p>
+      <p className="text-[10px] font-medium leading-4 text-muted-foreground">{label}</p>
       <p className={`text-[16px] font-bold tabular-nums ${color}`}>{value}</p>
     </div>
   )

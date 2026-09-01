@@ -147,7 +147,7 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
             onChange={(event) => setQuery(event.target.value)}
             placeholder={t('inbox.searchPlaceholder')}
             aria-label={t('inbox.searchPlaceholder')}
-            className={`${inputClass} h-8 bg-background/65 py-1.5 pl-7.5 pr-7 text-[11px]`}
+            className={`${inputClass} bg-background/65 pl-7.5 pr-7 text-[11px]`}
           />
           {query && (
             <Button
@@ -231,7 +231,7 @@ export function InboxViewToggle() {
   const setMode = useInboxViewMode((s) => s.setMode)
 
   return (
-    <div className="flex items-center overflow-hidden rounded-md border border-border/70 bg-background p-0.5">
+    <div className="flex items-center overflow-hidden rounded-md border border-border/70 bg-background p-px">
       <ToggleBtn
         active={mode === 'time'}
         onClick={() => setMode('time')}

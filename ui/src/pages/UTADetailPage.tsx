@@ -1,6 +1,6 @@
 import { Fragment, useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, CircleCheck, Clock3, TriangleAlert } from 'lucide-react'
 import type { ViewSpec } from '../tabs/types'
 import { api } from '../api'
 import { getIntlLocale } from '../lib/intl'
@@ -290,13 +290,13 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
       <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
         <div className="max-w-[1240px] mx-auto">
           {dataError && (
-            <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] text-destructive mb-4">
+            <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] text-destructive">
               Failed to load live data: {dataError}
             </div>
           )}
 
           {interactionNotice && (
-            <div className="mb-4 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-[12px] text-warning" role="status">
+            <div className="mb-4 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[12px] text-warning" role="status">
               {interactionNotice}
             </div>
           )}
@@ -918,10 +918,15 @@ function PositionRow({ position: p, onClose, canClose, closeDisabledReason }: { 
 type MarketClockState = { isOpen: boolean; nextOpen?: string; nextClose?: string } | 'error' | null
 
 function MarketClockChip({ clock }: { clock: NonNullable<MarketClockState> }) {
-  let dotClass = 'bg-success'
+  let Icon = CircleCheck
+  let iconClass = 'text-success'
   let label = '24/7'
 
-  if (clock !== 'error') {
+  if (clock === 'error') {
+    Icon = TriangleAlert
+    iconClass = 'text-warning'
+    label = 'Schedule unavailable'
+  } else {
     if (clock.isOpen) {
       const closes = clock.nextClose ? new Date(clock.nextClose) : null
       if (closes && !Number.isNaN(closes.getTime())) {
@@ -933,7 +938,8 @@ function MarketClockChip({ clock }: { clock: NonNullable<MarketClockState> }) {
         label = 'Market Open'
       }
     } else {
-      dotClass = 'bg-muted-foreground/50'
+      Icon = Clock3
+      iconClass = 'text-muted-foreground/70'
       const opens = clock.nextOpen ? new Date(clock.nextOpen) : null
       if (opens && !Number.isNaN(opens.getTime())) {
         const mins = Math.max(0, Math.round((opens.getTime() - Date.now()) / 60_000))
@@ -948,7 +954,7 @@ function MarketClockChip({ clock }: { clock: NonNullable<MarketClockState> }) {
 
   return (
     <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-muted-foreground">
-      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotClass}`} aria-hidden />
+      <Icon aria-hidden className={`size-3 shrink-0 ${iconClass}`} />
       {label}
     </span>
   )

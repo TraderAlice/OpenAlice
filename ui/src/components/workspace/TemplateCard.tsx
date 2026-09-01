@@ -1,7 +1,7 @@
-import { Bot, Code, Cpu, Sparkles, Terminal, type LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '../ui/button'
+import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon'
 import type { AgentInfo, TemplateInfo } from './api'
 
 /**
@@ -11,18 +11,8 @@ import type { AgentInfo, TemplateInfo } from './api'
  * detail tab where the README and spawn form live.
  */
 
-const AGENT_ICONS: Record<string, LucideIcon> = {
-  claude: Sparkles,
-  codex: Cpu,
-  opencode: Code,
-  pi: Bot,
-  shell: Terminal,
-}
-
 function AgentGlyph({ agent }: { agent: string }) {
-  const Icon = AGENT_ICONS[agent]
-  if (Icon) return <Icon size={12} strokeWidth={2.25} aria-hidden="true" />
-  return <Bot size={12} strokeWidth={2.25} aria-hidden="true" />
+  return <AgentRuntimeIcon agentId={agent} className="size-3.5 shrink-0" />
 }
 
 function humanize(name: string): string {
@@ -75,7 +65,7 @@ export function TemplateCard({ template: t, agents, onOpen }: Props) {
         </div>
       </div>
 
-      <div className="border-t border-border pt-3 flex items-center gap-3 flex-wrap">
+      <div className="flex flex-wrap items-center gap-3 border-t border-border pt-3">
         <div className="text-[11px] font-medium text-muted-foreground/70">
           {tr('templates.agentsLabel')}
         </div>

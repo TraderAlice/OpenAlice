@@ -31,18 +31,18 @@ const CHART_VENDORS: ChartVendor[] = [
   {
     id: 'yfinance',
     name: 'yfinance',
-    desc: 'Global default — charts & quotes for every market Yahoo lists (US, CN, HK, TW, VN, EU, JP, KR…). Free, no key.',
+    desc: 'Global charts and quotes across Yahoo-listed markets. Free and keyless.',
     alwaysOn: true,
   },
   {
     id: 'eastmoney',
     name: 'Eastmoney 东方财富',
-    desc: 'CN A-shares — 中文搜索 (茅台 → 600519) and 前复权 K-lines yfinance can’t give. Public endpoints, no key. Served from China, so slower than yfinance for users abroad.',
+    desc: 'Chinese search and adjusted A-share K-lines from public keyless endpoints.',
   },
   {
     id: 'twse',
     name: 'TWSE + TPEx 臺灣證交所',
-    desc: 'Taiwan listed + OTC (上市/上櫃) — 中文/英文 search over the official company roster, plus official P/E·殖利率·股價淨值比 and company profiles yfinance lacks. No key. K-lines come from Yahoo (2330.TW / 6488.TWO).',
+    desc: 'Official Taiwan company roster, valuation ratios, and profiles. Yahoo serves K-lines for .TW and .TWO symbols.',
   },
 ]
 
@@ -400,7 +400,7 @@ function ChartVendorsSection({
                   <Toggle ariaLabel={v.name} size="sm" checked={on} onChange={(val) => onToggle(v.id, val)} />
                 )}
               </div>
-              <p className="text-[12px] text-muted-foreground/70 mt-1.5 leading-relaxed">{v.desc}</p>
+              <p className="mt-1.5 max-w-2xl text-[12px] leading-5 text-muted-foreground/70">{v.desc}</p>
             </div>
           )
         })}
@@ -440,7 +440,7 @@ function AdvancedSection({
         size="sm"
         aria-expanded={open}
       >
-        <ChevronRight aria-hidden className={`size-3.5 transition-transform duration-[var(--motion-fast)] ${open ? 'rotate-90' : ''}`} />
+        <ChevronRight aria-hidden className={`size-3.5 ${open ? 'rotate-90' : ''}`} />
         Advanced
       </Button>
 
@@ -515,7 +515,10 @@ function TestButton({
             : 'text-muted-foreground'
       }`}
     >
-      {status === 'testing' ? '...' : status === 'ok' ? 'OK' : status === 'error' ? 'Fail' : 'Test'}
+      {status === 'testing' && <LoaderCircle aria-hidden className="size-3.5 animate-spin motion-reduce:animate-none" />}
+      {status === 'ok' && <CheckCircle2 aria-hidden className="size-3.5" />}
+      {status === 'error' && <CircleAlert aria-hidden className="size-3.5" />}
+      {status === 'testing' ? 'Testing' : status === 'ok' ? 'Passed' : status === 'error' ? 'Failed' : 'Test'}
     </Button>
   )
 }

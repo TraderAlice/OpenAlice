@@ -49,7 +49,7 @@ export function MCPPage() {
               <Field label="Port" controlId="mcp-server-port">
                 <input
                   id="mcp-server-port"
-                  className={`${inputClass} h-8 py-1.5`}
+                  className={inputClass}
                   type="number"
                   disabled={!config.enabled}
                   value={config.port}

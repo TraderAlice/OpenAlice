@@ -84,6 +84,8 @@ describe('WorkspaceView Session library', () => {
     expect(screen.getByRole('heading', { name: 'Sessions' })).toBeTruthy()
     expect(screen.getByText('12', { selector: '.workspace-session-library-count' })).toBeTruthy()
     expect(screen.getAllByRole('button', { name: /^(Open|Resume) Conversation/ })).toHaveLength(12)
+    expect(document.querySelector('[data-agent-runtime-icon="pi"]')).toBeTruthy()
+    expect(document.querySelector('[data-agent-runtime-icon="opencode"]')).toBeTruthy()
 
     fireEvent.change(screen.getByRole('searchbox', { name: 'Search sessions' }), {
       target: { value: 'Conversation 10' },

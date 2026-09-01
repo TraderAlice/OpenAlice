@@ -20,6 +20,7 @@ import { designProjects, getDesignProject, type DesignProject, type DesignVarian
 import { readSemanticColor } from '../theme/semanticColors'
 import { useEffectivePalette, useEffectiveTheme } from '../theme/useEffectiveTheme'
 import type { ViewSpec } from '../tabs/types'
+import { Button } from '../components/ui/button'
 
 interface DesignProjectPageProps {
   spec: Extract<ViewSpec, { kind: 'design-project' }>
@@ -148,7 +149,7 @@ function BriefList({ title, icon: Icon, items }: { title: string; icon: LucideIc
       <ul className="mt-3 space-y-2">
         {items.map((item) => (
           <li key={item} className="grid grid-cols-[auto_minmax(0,1fr)] gap-2 text-[12px] leading-relaxed text-muted-foreground">
-            <span className="mt-[7px] h-1 w-1 rounded-full bg-muted-foreground" aria-hidden />
+            <ChevronRight className="mt-[3px] size-3.5 text-muted-foreground/70" aria-hidden />
             <span>{item}</span>
           </li>
         ))}
@@ -336,7 +337,7 @@ function SemanticColorCard() {
       <section>
         <div className="mb-2 text-[11px] font-medium text-muted-foreground">Pairing smoke test</div>
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-          <button type="button" className="rounded-md bg-primary px-3 py-2 text-[11px] font-medium text-primary-foreground">Primary action</button>
+          <Button type="button" size="sm" className="justify-start text-[11px]">Primary action</Button>
           <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-[11px] text-destructive">Destructive state</div>
           <div className="rounded-md border border-success/30 bg-success/10 px-3 py-2 text-[11px] text-success">Successful state</div>
           <div className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-[11px] text-warning">Warning state</div>
@@ -535,16 +536,14 @@ function MockStatusRow({ icon: Icon, label, value, state }: { icon: LucideIcon; 
 
 function MockButton({ children, primary = false }: { children: string; primary?: boolean }) {
   return (
-    <button
+    <Button
       type="button"
-      className={`inline-flex min-h-9 items-center justify-center gap-2 rounded-md px-3.5 py-2 text-[13px] font-semibold ${
-        primary
-          ? 'bg-primary text-primary-foreground'
-          : 'border border-border bg-background text-muted-foreground'
-      }`}
+      size="sm"
+      variant={primary ? 'default' : 'outline'}
+      className="text-[13px] font-semibold"
     >
       {children}
       {primary ? <ArrowRight className="h-4 w-4" /> : null}
-    </button>
+    </Button>
   )
 }

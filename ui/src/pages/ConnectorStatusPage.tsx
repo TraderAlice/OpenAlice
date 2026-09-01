@@ -232,7 +232,7 @@ function ConnectorOverviewSkeleton({ label }: { label: string }) {
                   <Skeleton className={`h-4 ${index % 2 === 0 ? 'w-24' : 'w-20'}`} />
                   <Skeleton className="h-3 w-2/3" />
                 </div>
-                <Skeleton className="h-5 w-20 rounded-full" />
+                <Skeleton className="h-5 w-20 rounded-md" />
               </div>
               <div className="mt-5 space-y-2">
                 <Skeleton className="h-3 w-full" />
@@ -477,7 +477,7 @@ function AvailableConnectorGroup({
             className="oa-status-surface flex min-w-0 flex-col gap-3 rounded-lg border border-border/70 bg-secondary/10 p-4 sm:flex-row sm:items-center"
           >
             <div className="flex min-w-0 flex-1 items-center gap-3">
-              <ConnectorBrandMark id={definition.id} className="size-10" />
+              <ConnectorBrandMark id={definition.id} className="size-7" />
               <div className="min-w-0">
                 <h4 className="text-[14px] font-semibold text-foreground">{definition.label}</h4>
                 <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11.5px] text-muted-foreground">
@@ -498,7 +498,7 @@ function AvailableConnectorGroup({
               type="button"
               variant="ghost"
               size="lg"
-              className="min-h-10 w-full bg-transparent text-[12px] text-muted-foreground sm:min-h-9 sm:w-auto"
+              className="h-8 w-full bg-transparent text-[12px] text-muted-foreground sm:h-8 sm:w-auto"
               onClick={(event) => onConfigure(definition.id, event.currentTarget)}
             >
               {t('connectorStatus.configureAdapter', { name: definition.label })}
@@ -549,7 +549,7 @@ function ConnectorOverviewCard({
     <article className="oa-status-surface flex flex-col rounded-lg border border-border/70 bg-secondary/15 p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <ConnectorBrandMark id={definition.id} className="size-10" />
+          <ConnectorBrandMark id={definition.id} className="size-7" />
           <h4 className="min-w-0 text-[15px] font-semibold text-foreground">{definition.label}</h4>
         </div>
         <StatusBadge tone={presentation.tone}>{presentation.label}</StatusBadge>
@@ -595,7 +595,7 @@ function ConnectorOverviewCard({
         {setup.ready && (
           <div
             data-connector-runtime-control
-            className="flex min-h-10 min-w-[7.5rem] flex-1 items-center justify-between gap-3"
+            className="flex h-8 min-w-[7.5rem] flex-1 items-center justify-between gap-3"
           >
             <span className={`text-[12.5px] font-medium ${setup.stage === 'ready_to_link'
               ? 'text-primary'
@@ -616,7 +616,7 @@ function ConnectorOverviewCard({
           {setup.stage === 'error' && (
             <Button
               type="button"
-              className="min-h-10 px-3 text-[12px]"
+              className="h-8 px-3 text-[12px]"
               disabled={actionsBusy}
               onClick={() => void onReconnect(definition.id)}
             >
@@ -627,7 +627,7 @@ function ConnectorOverviewCard({
           <Button
             type="button"
             variant={prioritizeConfiguration ? 'default' : 'outline'}
-            className={`min-h-10 px-3 text-[12px] ${prioritizeConfiguration ? '' : 'bg-background/50'}`}
+            className={`h-8 px-3 text-[12px] ${prioritizeConfiguration ? '' : 'bg-background/50'}`}
             onClick={(event) => onConfigure(definition.id, event.currentTarget)}
           >
             <ActionIcon size={13} aria-hidden />

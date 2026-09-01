@@ -6,7 +6,6 @@ import {
   Copy,
   RefreshCw,
   ShieldCheck,
-  TerminalSquare,
 } from 'lucide-react'
 
 import {
@@ -16,6 +15,7 @@ import {
 } from './api'
 import { Button } from '@/components/ui/button'
 import { SegmentedControl } from '@/components/SegmentedControl'
+import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon'
 
 interface Props {
   readonly wsId: string
@@ -154,7 +154,15 @@ export function WorkspaceLaunchConfigurationPanel({
             <SegmentedControl
               className="mt-3"
               value={selectedAgent}
-              options={runtimeIds.map((id) => ({ value: id, label: RUNTIME_LABELS[id] ?? id }))}
+              options={runtimeIds.map((id) => ({
+                value: id,
+                label: (
+                  <span className="inline-flex items-center gap-1.5">
+                    <AgentRuntimeIcon agentId={id} className="h-3.5 w-3.5" />
+                    <span>{RUNTIME_LABELS[id] ?? id}</span>
+                  </span>
+                ),
+              }))}
               onChange={setSelectedAgent}
               ariaLabel={t('workspaceSettings.launch.previewTitle')}
             />
@@ -183,7 +191,7 @@ export function WorkspaceLaunchConfigurationPanel({
               <div className="oa-status-surface rounded-lg border border-border bg-secondary/30 p-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="flex min-w-0 items-start gap-2.5">
-                    <TerminalSquare size={17} className="mt-0.5 shrink-0 text-muted-foreground" />
+                    <AgentRuntimeIcon agentId={selectedAgent} className="mt-0.5 h-[17px] w-[17px] shrink-0 text-muted-foreground" />
                     <div className="min-w-0">
                       <div className="font-medium text-foreground">{plan.agent.displayName}</div>
                       <div className="mt-0.5 break-all font-mono text-[11px] text-muted-foreground">

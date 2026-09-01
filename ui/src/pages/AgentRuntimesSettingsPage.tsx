@@ -157,7 +157,6 @@ export function AgentRuntimesSettingsPage() {
 
           <ConfigSection
             title={t('settings.agentRuntimes.quickAccess')}
-            description={t('settings.agentRuntimes.quickAccessDescription')}
           >
             {pinned.length === 0 ? (
               <div className="[&>div]:py-8">
@@ -172,7 +171,7 @@ export function AgentRuntimesSettingsPage() {
                       className="flex min-h-12 min-w-0 items-center gap-2 border-b border-border/60 px-3 py-2 last:border-b-0"
                     >
                       <span className="w-5 shrink-0 text-[11px] tabular-nums text-muted-foreground">{index + 1}</span>
-                      <AgentRuntimeIcon agentId={agent.id} className="h-4 w-4 shrink-0" />
+                      <AgentRuntimeIcon agentId={agent.id} className="size-4 shrink-0" />
                       <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{agent.displayName}</span>
                       <div className="flex shrink-0 items-center gap-1">
                         <Button
@@ -210,14 +209,13 @@ export function AgentRuntimesSettingsPage() {
 
           <ConfigSection
             title={t('settings.agentRuntimes.catalog')}
-            description={t('settings.agentRuntimes.catalogDescription')}
           >
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={t('settings.agentRuntimes.search')}
               aria-label={t('settings.agentRuntimes.search')}
-              className={`${inputClass} mb-3 h-8 py-1.5`}
+              className={`${inputClass} mb-3`}
             />
             {visible.length === 0 ? (
               <div className="rounded-lg border border-dashed border-border">
@@ -278,7 +276,7 @@ function RuntimeSettingsCard({
     <article className="min-w-0 border-b border-border/60 px-3 py-3 last:border-b-0 sm:px-4">
       <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start">
         <div className="flex min-w-0 flex-1 items-start gap-3">
-          <AgentRuntimeIcon agentId={agent.id} className="mt-0.5 h-5 w-5 shrink-0" />
+          <AgentRuntimeIcon agentId={agent.id} className="mt-0.5 size-5 shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
               <h3 className="min-w-0 truncate text-[13px] font-semibold text-foreground">{agent.displayName}</h3>

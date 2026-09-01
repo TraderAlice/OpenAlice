@@ -146,7 +146,7 @@ describe('Connector overview state hierarchy', () => {
     expect(glyph.className).not.toContain('border')
     expect(glyph.querySelector('img')?.getAttribute('data-connector-brand')).toBe('discord')
     expect(setup.className).toContain('bg-transparent')
-    expect(setup.className).toContain('min-h-10')
+    expect(setup.className).toContain('h-8')
     expect(setup.className).not.toContain('bg-primary')
   })
 
@@ -169,7 +169,7 @@ describe('Connector overview state hierarchy', () => {
     expect(actionRail.className).toContain('flex-wrap')
     expect(actionRail.className).toContain('gap-y-3')
     expect(runtimeControl.className).toContain('flex-1')
-    expect(manage.className).toContain('min-h-10')
+    expect(manage.className).toContain('h-8')
     expect(toggle.getAttribute('aria-checked')).toBe('false')
     expect(screen.queryByRole('switch', { name: 'Turn Slack on or off' })).toBeNull()
 
@@ -259,8 +259,8 @@ describe('Connector overview state hierarchy', () => {
     const discord = screen.getByRole('heading', { name: 'Discord' }).closest('article') as HTMLElement
     const reconnect = within(discord).getByRole('button', { name: 'Reconnect' })
     const review = within(discord).getByRole('button', { name: 'Review Discord' })
-    expect(reconnect.className).toContain('min-h-10')
-    expect(review.className).toContain('min-h-10')
+    expect(reconnect.className).toContain('h-8')
+    expect(review.className).toContain('h-8')
     fireEvent.click(reconnect)
 
     const alert = await within(discord).findByRole('alert')

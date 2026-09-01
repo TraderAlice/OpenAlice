@@ -45,6 +45,8 @@ import {
 import { notifyWorkspaceDefaultsChanged } from '../lib/workspaceAiEvents'
 import type { AgentInfo } from '../components/workspace/api'
 import { useAgentRuntimes } from '../hooks/useAgentRuntimes'
+import { AgentRuntimeIcon } from '../lib/agentRuntimeIcon'
+import { AIProviderIcon } from '../lib/aiProviderIcon'
 import { useWorkspace } from '../tabs/store'
 import { Button } from '../components/ui/button'
 
@@ -150,7 +152,7 @@ export function AIProviderPage() {
 
             {credentials.length > 0 && (
               <input
-                className={`${inputClass} mb-3 h-8 py-1.5`}
+                className={`${inputClass} mb-3`}
                 value={vaultQuery}
                 onChange={(event) => setVaultQuery(event.target.value)}
                 placeholder={t('aiProvider.searchCredentials')}
@@ -166,32 +168,42 @@ export function AIProviderPage() {
                 const showVendor = displayVendor.toLocaleLowerCase() !== displayLabel.toLocaleLowerCase()
                 return (
                   <div key={cred.slug} className="flex min-h-12 min-w-0 flex-col gap-3 rounded-lg border border-border bg-background px-4 py-3 sm:flex-row sm:items-center">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                        <span className="text-[13px] font-medium text-foreground">{displayLabel}</span>
-                        {showVendor && (
-                          <span className="text-[11px] text-muted-foreground">{displayVendor}</span>
-                        )}
-                        {cred.label && (
-                          <span className="text-[11px] text-muted-foreground font-mono">{cred.slug}</span>
-                        )}
-                        {cred.hasApiKey && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-success">
-                            <Check aria-hidden className="size-3" />
-                            {t('aiProvider.keySet')}
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-0.5 flex min-w-0 flex-col gap-0.5 text-[11px] text-muted-foreground">
-                        <span className="truncate">
-                          {t('aiProvider.defaultModel')}: <span className="font-mono">{cred.lastModel || t('aiProvider.notSet')}</span>
-                        </span>
-                        <span className="flex min-w-0 flex-wrap gap-x-2 gap-y-0.5">
-                          <span className="truncate font-mono">{Object.values(cred.wires)[0] || t('aiProvider.officialEndpoint')}</span>
-                          {compatibleAgents.length > 0 && (
-                            <span>{compatibleAgents.map((agentId) => AGENT_LABELS[agentId] ?? agentId).join(', ')}</span>
+                    <div className="flex min-w-0 flex-1 items-start gap-3">
+                      <AIProviderIcon vendor={cred.vendor} className="mt-0.5 size-5 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                          <span className="text-[13px] font-medium text-foreground">{displayLabel}</span>
+                          {showVendor && (
+                            <span className="text-[11px] text-muted-foreground">{displayVendor}</span>
                           )}
-                        </span>
+                          {cred.label && (
+                            <span className="font-mono text-[11px] text-muted-foreground">{cred.slug}</span>
+                          )}
+                          {cred.hasApiKey && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-success">
+                              <Check aria-hidden className="size-3" />
+                              {t('aiProvider.keySet')}
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-0.5 flex min-w-0 flex-col gap-0.5 text-[11px] text-muted-foreground">
+                          <span className="truncate">
+                            {t('aiProvider.defaultModel')}: <span className="font-mono">{cred.lastModel || t('aiProvider.notSet')}</span>
+                          </span>
+                          <span className="flex min-w-0 flex-wrap gap-x-2 gap-y-0.5">
+                            <span className="truncate font-mono">{Object.values(cred.wires)[0] || t('aiProvider.officialEndpoint')}</span>
+                            {compatibleAgents.length > 0 && (
+                              <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+                                {compatibleAgents.map((agentId) => (
+                                  <span key={agentId} className="inline-flex items-center gap-1.5">
+                                    <AgentRuntimeIcon agentId={agentId} className="size-4 shrink-0" />
+                                    <span>{AGENT_LABELS[agentId] ?? agentId}</span>
+                                  </span>
+                                ))}
+                              </span>
+                            )}
+                          </span>
+                        </div>
                       </div>
                     </div>
                     <div className="flex shrink-0 gap-2 self-end sm:self-auto">
@@ -428,20 +440,23 @@ function WorkspaceDefaultsSection({
     const semanticsSummary = describeModelSemantics(selectedSemantics)
     return (
       <div key={agent.id} className="flex min-h-12 flex-col gap-3 rounded-lg border border-border bg-background px-4 py-3 sm:flex-row sm:items-center">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-2">
-            <span className="text-[13px] font-medium text-foreground">{agent.name}</span>
-            <span className="text-[11px] text-muted-foreground font-mono">{agent.id}</span>
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <AgentRuntimeIcon agentId={agent.id} className="mt-0.5 size-5 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline gap-2">
+              <span className="text-[13px] font-medium text-foreground">{agent.name}</span>
+              <span className="font-mono text-[11px] text-muted-foreground">{agent.id}</span>
+            </div>
+            {note && <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{note}</p>}
+            {options.length === 0 && (
+              <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground/70">{t('aiProvider.noCompatible')}</p>
+            )}
           </div>
-          {note && <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{note}</p>}
-          {options.length === 0 && (
-            <p className="text-[11px] text-muted-foreground/70 mt-0.5 leading-snug">{t('aiProvider.noCompatible')}</p>
-          )}
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[260px]">
           <select
             aria-label={t('aiProvider.defaultCredentialLabel', { agent: agent.name })}
-            className={`${inputClass} h-8 py-1.5`}
+            className={inputClass}
             value={current}
             disabled={saving || options.length === 0}
             onChange={(e) => void setAgentDefault(agent.id, e.target.value)}
@@ -452,7 +467,7 @@ function WorkspaceDefaultsSection({
           {current && wireShapes.length > 1 && (
             <select
               aria-label={t('aiProvider.apiProtocolLabel', { agent: agent.name })}
-              className={`${inputClass} h-8 py-1.5`}
+              className={inputClass}
               value={selectedWire}
               disabled={saving}
               onChange={(e) => void setAgentWire(agent.id, e.target.value as WireShape)}
@@ -478,7 +493,7 @@ function WorkspaceDefaultsSection({
               <summary className="inline-flex min-h-8 cursor-pointer items-center">{t('aiProvider.advancedReasoning')}</summary>
               <select
                 aria-label={t('aiProvider.reasoningOverrideLabel', { agent: agent.name })}
-                className={`${inputClass} mt-1.5 h-8 py-1.5`}
+                className={`${inputClass} mt-1.5`}
                 value={typeof data?.defaults[agent.id]?.reasoning !== 'boolean' ||
                   data.defaults[agent.id]?.reasoningModel !== selectedModelId
                   ? 'auto'
@@ -514,6 +529,7 @@ function WorkspaceDefaultsSection({
         <div className="space-y-2.5" aria-hidden="true">
           {PRIMARY_DEFAULT_AGENTS.map((a) => (
             <div key={a.id} className="flex items-center gap-3 rounded-lg border border-border bg-background px-4 py-3">
+              <Skeleton className="size-5 shrink-0 rounded" />
               <div className="flex-1 min-w-0 space-y-1.5">
                 <Skeleton className="h-3.5 w-28 rounded" />
                 <Skeleton className="h-2.5 w-44 rounded" />
@@ -543,9 +559,6 @@ function WorkspaceDefaultsSection({
 
           {showAdvanced && (
             <>
-              <p className="text-[11px] text-muted-foreground/80 leading-snug px-1">
-                {t('aiProvider.advancedAgentsDescription')}
-              </p>
               {ADVANCED_DEFAULT_AGENTS.map((a) => renderAgent(a))}
             </>
           )}
