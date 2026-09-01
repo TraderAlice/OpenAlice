@@ -27,6 +27,15 @@ export interface SupervisorCommandTarget {
   label: string
 }
 
+export interface SupervisorDockView {
+  panel: string
+  projectName?: string
+  runtimeState?: string
+  pulse?: boolean
+  commandPaletteOpen?: boolean
+  recovery?: boolean
+}
+
 export function renderSupervisorHeader(
   version: string,
   channel: string,
@@ -128,15 +137,40 @@ export function renderSupervisorCommandBar(
 }
 
 export function renderSupervisorDock(
-  panel: string,
+  view: SupervisorDockView,
   width: number,
-  commandPaletteOpen = false,
 ): string {
-  const controls = commandPaletteOpen
+  const controls = view.commandPaletteOpen
     ? '[ / ] Close palette   [ q ] Detach'
     : '[ / ] Commands   [ q ] Detach'
-  if (width < 60) return truncateDisplayWidth(controls, width)
-  return labelAndTail(controls, `${panel.toUpperCase()} · Esc / Ctrl+C`, width)
+  if (width < 60) return fillLine(controls, width)
+
+  const panel = view.panel.toUpperCase()
+  if (view.recovery) {
+    return dockColumns(controls, `RECOVERY · ${panel}`, width)
+  }
+
+  const signal = runtimeSignal(view.runtimeState ?? 'unavailable', view.pulse ?? false)
+  const fullProjectName = view.projectName ?? 'AliceProject'
+  const contextBudget = Math.max(1, width - displayWidth(controls) - 3)
+  const panelSuffix = ` · ${panel}`
+  const projectPrefix = '[ i ] '
+  const signalSuffix = ` · ${signal}`
+  const fixedContextWidth = displayWidth(projectPrefix) + displayWidth(signalSuffix)
+  const fullNameWidth = contextBudget
+    - fixedContextWidth
+    - displayWidth(panelSuffix)
+  const mediumNameWidth = contextBudget - fixedContextWidth
+  const projectName = truncateDisplayWidth(
+    fullProjectName,
+    Math.max(1, fullNameWidth >= 8 ? fullNameWidth : mediumNameWidth),
+  )
+  const context = fullNameWidth >= 8
+    ? `[ i ] ${projectName} · ${signal}${panelSuffix}`
+    : mediumNameWidth >= 8
+      ? `[ i ] ${projectName} · ${signal}`
+      : `${signal} · ${panel}`
+  return dockColumns(controls, context, width)
 }
 
 export function renderSupervisorPanel(
@@ -235,6 +269,20 @@ function labelAndTail(label: string, tail: string, width: number): string {
   const tailWidth = displayWidth(safeTail)
   const safeLabel = truncateDisplayWidth(label, Math.max(1, width - tailWidth - 1))
   return `${safeLabel}${' '.repeat(Math.max(1, width - displayWidth(safeLabel) - tailWidth))}${safeTail}`
+}
+
+function dockColumns(left: string, right: string, width: number): string {
+  const safeLeft = truncateDisplayWidth(left, width)
+  const remaining = Math.max(0, width - displayWidth(safeLeft) - 1)
+  if (remaining === 0) return fillLine(safeLeft, width)
+  const safeRight = truncateDisplayWidth(right, remaining)
+  const gap = Math.max(1, width - displayWidth(safeLeft) - displayWidth(safeRight))
+  return fillLine(`${safeLeft}${' '.repeat(gap)}${safeRight}`, width)
+}
+
+function fillLine(value: string, width: number): string {
+  const safe = truncateDisplayWidth(value, Math.max(1, width))
+  return `${safe}${' '.repeat(Math.max(0, width - displayWidth(safe)))}`
 }
 
 function joinColumns(

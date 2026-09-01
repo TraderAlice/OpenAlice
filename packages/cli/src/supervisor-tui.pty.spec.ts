@@ -243,6 +243,60 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
 
+  it('keeps project and Runtime context in a clickable status ribbon', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-context-ribbon-'))
+    temporaryPaths.push(isolatedHome)
+    const childEnv: NodeJS.ProcessEnv = {
+      ...process.env,
+      HOME: isolatedHome,
+      OPENALICE_HOME: join(isolatedHome, 'state'),
+      TERM: 'xterm-256color',
+    }
+    delete childEnv.NO_COLOR
+    const child = pty.spawn(process.execPath, [cliEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: childEnv,
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let clickedProject = false
+      let closedOverlay = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor context ribbon timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (
+          !clickedProject
+          && output.includes('[ i ] Default AliceProject')
+          && output.includes('○ COLD · OVERVIEW')
+        ) {
+          clickedProject = true
+          child.write('\u001b[<32;36;21M')
+          child.write('\u001b[<0;36;21M')
+        } else if (!closedOverlay && output.includes('AliceProjects · Default AliceProject')) {
+          closedOverlay = true
+          child.write('\u001b')
+          setTimeout(() => child.write('q'), 50)
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && closedOverlay) resolve(output)
+        else reject(new Error(`Supervisor context ribbon exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('AliceProjects · Default AliceProject')
+    expect(transcript).toContain('\u001b[38;2;199;235;239;48;2;10;34;39m')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
   it('renders an offline registered Machine and preserves drill-down across resize', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-fleet-offline-'))
     temporaryPaths.push(isolatedHome)

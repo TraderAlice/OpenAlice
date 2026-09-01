@@ -3144,7 +3144,14 @@ export class SupervisorScreen implements Component {
                   { key: 'q', label: 'Detach' },
                 ], width)
               : actionBar(runtime, this.snapshot.context, width, isConfigRecovery(this.snapshot))),
-      renderSupervisorDock(this.snapshot.panel ?? 'overview', width, this.commandDeckOpen),
+      renderSupervisorDock({
+        panel: this.snapshot.panel ?? 'overview',
+        projectName: this.snapshot.context?.aliceProject.displayName,
+        runtimeState: state,
+        pulse: this.runtimePulse,
+        commandPaletteOpen: this.commandDeckOpen,
+        recovery: isConfigRecovery(this.snapshot),
+      }, width),
     )
     const visibleLines = lines.map((line) => truncate(line, width))
     this.commandTargets = supervisorCommandTargets(visibleLines)

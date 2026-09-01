@@ -13,6 +13,7 @@ export interface SupervisorTuiTheme {
   successRail(value: string): string
   warningRail(value: string): string
   dangerRail(value: string): string
+  dockRail(value: string): string
 }
 
 export interface SupervisorFrameStyleOptions {
@@ -65,6 +66,7 @@ export function createSupervisorTuiTheme(
     successRail: style('\u001b[1;38;2;170;255;207;48;2;13;45;31m'),
     warningRail: style('\u001b[1;38;2;255;222;151;48;2;54;40;16m'),
     dangerRail: style('\u001b[1;38;2;255;190;201;48;2;55;20;31m'),
+    dockRail: style('\u001b[38;2;199;235;239;48;2;10;34;39m'),
   }
 }
 
@@ -75,6 +77,11 @@ export function decorateSupervisorFrame(
 ): string[] {
   if (!theme.enabled) return lines
   return lines.map((line, index) => {
+    if (line.startsWith('[ / ]')) {
+      return decorateDock(line, theme, options.hoveredCommand?.row === index + 1
+        ? options.hoveredCommand.label
+        : undefined)
+    }
     if (options.hoveredCommand?.row === index + 1) {
       const keycap = `[ ${options.hoveredCommand.label} ]`
       return line.replace(keycap, theme.selected(keycap))
@@ -126,9 +133,24 @@ export function decorateSupervisorFrame(
       || line.startsWith('Supervisor controls')
       || line.startsWith('Supervisor recovery controls')
     ) return theme.accentStrong(line)
-    if (line.startsWith('[ / ] Commands')) return theme.muted(line)
     return line
   })
+}
+
+function decorateDock(
+  line: string,
+  theme: SupervisorTuiTheme,
+  hoveredCommand?: string,
+): string {
+  if (!hoveredCommand) return theme.dockRail(line)
+  const keycap = `[ ${hoveredCommand} ]`
+  const offset = line.indexOf(keycap)
+  if (offset < 0) return theme.dockRail(line)
+  return [
+    theme.dockRail(line.slice(0, offset)),
+    theme.selected(keycap),
+    theme.dockRail(line.slice(offset + keycap.length)),
+  ].join('')
 }
 
 function decorateHeader(

@@ -156,9 +156,14 @@ path is intentionally parameter-free:
   and click survive reflow and invoke the same input state machine as the
   corresponding key. Confirmation and refusal semantics therefore do not have
   a separate mouse-only path;
-- a persistent command dock keeps `[ / ] Commands` and `[ q ] Detach` visible
-  on every Supervisor page. `/` opens a compact contextual Command Palette and
-  changes that dock action to `Close palette`. The Palette exposes only commands
+- a persistent full-width context ribbon keeps `[ / ] Commands` and
+  `[ q ] Detach` visible on every Supervisor page. At 60 columns and wider it
+  also retains the selected AliceProject and compact Runtime signal; when space
+  allows it adds the active view. `[ i ]` makes the project identity a direct
+  pointer/keyboard route into the existing AliceProjects overlay. Narrow
+  terminals retain the two essential controls instead of clipping them. `/`
+  opens a compact contextual Command Palette and changes the ribbon action to
+  `Close palette`. The Palette exposes only commands
   valid for the current Runtime/recovery context; Up/Down wraps its selection,
   the mouse wheel moves within its bounds, pointer hover highlights a complete
   row, and clicking a row selects and runs it. Enter runs the selected command,

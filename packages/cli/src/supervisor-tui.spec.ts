@@ -4,7 +4,7 @@ import { resolveLaunchContext } from './launch-context.ts'
 import type { MachineFleetEnvelope, MachineInventory } from './machine-inventory.ts'
 import { createSupervisorFleetState, displayWidth, selectedFleetProject } from './supervisor-fleet.ts'
 import { createSupervisorTuiTheme } from './supervisor-tui-theme.ts'
-import { supervisorCommandTargets } from './supervisor-tui-view.ts'
+import { renderSupervisorDock, supervisorCommandTargets } from './supervisor-tui-view.ts'
 import {
   resolveSupervisorChannel,
   runSupervisorTui,
@@ -71,7 +71,7 @@ describe('Supervisor TUI screen', () => {
     expect(lines.join('\n')).toContain('[ s ] Start quietly')
     expect(lines.join('\n')).toContain('[ ? ] More')
     expect(lines.at(-1)).toContain('[ / ] Commands   [ q ] Detach')
-    expect(lines.at(-1)).toContain('OVERVIEW · Esc / Ctrl+C')
+    expect(lines.at(-1)).toContain('[ i ] AliceProject · ○ COLD · OVERVIEW')
 
     const wideLines = screen.render(120)
     expect(wideLines[1]).toHaveLength(120)
@@ -95,6 +95,42 @@ describe('Supervisor TUI screen', () => {
       },
     })
     expect(screen.render(120)[0]).toContain('v0.87.0-beta · DEV · update 0.90.0')
+  })
+
+  it('renders a responsive persistent context ribbon without adding a row', () => {
+    const full = renderSupervisorDock({
+      panel: 'doctor',
+      projectName: 'Default AliceProject',
+      runtimeState: 'running',
+      pulse: true,
+    }, 100)
+    expect(full).toHaveLength(100)
+    expect(full).toContain('[ / ] Commands')
+    expect(full).toContain('[ i ] Default AliceProject · ◉ LIVE · DOCTOR')
+
+    const compact = renderSupervisorDock({
+      panel: 'logs',
+      projectName: '研究 AliceProject with a very long name',
+      runtimeState: 'absent',
+    }, 60)
+    expect(displayWidth(compact)).toBe(60)
+    expect(compact).toContain('[ i ]')
+    expect(compact).toContain('○ COLD')
+
+    const narrow = renderSupervisorDock({
+      panel: 'overview',
+      projectName: 'Default AliceProject',
+      runtimeState: 'absent',
+    }, 52)
+    expect(narrow).toHaveLength(52)
+    expect(narrow).toContain('[ q ] Detach')
+    expect(narrow).not.toContain('[ i ]')
+
+    const recovery = renderSupervisorDock({
+      panel: 'overview',
+      recovery: true,
+    }, 80)
+    expect(recovery).toContain('RECOVERY · OVERVIEW')
   })
 
   it('renders semantic activity rails and advances only enabled busy motion', () => {
@@ -131,6 +167,7 @@ describe('Supervisor TUI screen', () => {
 
   it('opens a selectable command palette without creating a second action path', () => {
     let settingsOpened = 0
+    let projectsOpened = 0
     let detached = 0
     const screen = new SupervisorScreen({
       version: 'dev',
@@ -138,6 +175,7 @@ describe('Supervisor TUI screen', () => {
       runtime: { class: 'absent', endpoints: {} },
     }, {
       onSettings: () => { settingsOpened += 1 },
+      onProjects: () => { projectsOpened += 1 },
       onDetach: () => { detached += 1 },
     })
 
@@ -178,6 +216,11 @@ describe('Supervisor TUI screen', () => {
     expect(screen.render(80).join('\n')).not.toContain('Command Palette')
 
     lines = screen.render(80)
+    const projectRow = lines.findIndex((line) => line.includes('[ i ] AliceProject')) + 1
+    const projectColumn = lines[projectRow - 1]!.indexOf('[ i ]') + 2
+    expect(screen.handlePointer(pointerClick(projectColumn, projectRow))).toBe(true)
+    expect(projectsOpened).toBe(1)
+
     const detachRow = lines.findIndex((line) => line.includes('[ q ] Detach')) + 1
     const detachColumn = lines[detachRow - 1]!.indexOf('[ q ]') + 2
     expect(screen.handlePointer(pointerClick(detachColumn, detachRow))).toBe(true)

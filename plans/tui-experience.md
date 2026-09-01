@@ -158,6 +158,19 @@ not imply maintainer approval of the finished interaction.
   and adapts hover, wheel, and click into each existing component’s keyboard
   state machine. No lifecycle or configuration action gains a second path.
 
+### Persistent context-ribbon decision
+
+- Expanding the animated brand header would make version/update presentation
+  compete with operational identity.
+- Adding a separate status row would preserve those concerns but consume one of
+  the 80x24 baseline's scarce content rows.
+- The selected model upgrades the existing bottom dock into an OMP-inspired
+  full-width context ribbon. Commands and Detach stay left; the selected
+  AliceProject, compact Runtime signal, and current view stay right according
+  to available width. The project segment exposes its existing `i` action as a
+  visible clickable keycap. This keeps identity present in Logs, Doctor, Fleet,
+  Help, and the Command Palette without adding a route or backend read.
+
 ## Responsive and Accessibility Contract
 
 - `80x24` remains the minimum full experience. Wide terminals show the
@@ -221,6 +234,8 @@ already large `supervisor-tui.ts` application controller.
   checklist and detail Inspector.
 - [x] Give every Supervisor overlay list, input, and visible command keycap the
   same pointer semantics as the application frame.
+- [x] Turn the bottom command dock into a persistent, pointer-aware
+  AliceProject/Runtime/view context ribbon.
 
 ## Progress
 
@@ -395,6 +410,20 @@ already large `supervisor-tui.ts` application controller.
   pass (688 passed, 1 skipped; 6079 tests passed, 10 skipped). Docker installer
   smoke passes, and the package dry-run contains
   `src/supervisor-overlay-pointer.ts`.
+- The bottom command dock is now an OMP-inspired full-width context ribbon.
+  It keeps Commands and Detach stable, adds a clickable `[ i ]` AliceProject
+  identity plus compact Runtime signal from 60 columns upward, and adds the
+  active view when space permits. Long Unicode project names shrink before the
+  signal; sub-60 terminals retain both essential controls. Color-capable
+  terminals paint the complete ribbon on a dark brand surface and preserve that
+  surface around a hovered keycap.
+- Context-ribbon acceptance passes with 82 focused screen, overlay, Fleet,
+  Doctor, Palette, transfer, and real-PTY tests. A real 80x24 color session
+  verified the full background escape, sent raw SGR motion/click events to the
+  ribbon's project keycap, opened the existing AliceProjects overlay, and
+  restored terminal modes after close/detach. CLI build/typecheck, root
+  TypeScript, and the 689-file suite pass (688 passed, 1 skipped; 6081 tests
+  passed, 10 skipped). Docker installer smoke also passes.
 
 ## Completion Criteria
 
