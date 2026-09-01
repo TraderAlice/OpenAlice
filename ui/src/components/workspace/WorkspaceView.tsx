@@ -1,12 +1,13 @@
 import { useId, useMemo, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
-import { ArrowUpRight, MessageSquarePlus, Search } from 'lucide-react';
+import { ArrowUpRight, CirclePause, MessageSquarePlus, Radio, Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { AgentInfo, PausedSessionRuntimeUpdate, SessionRecord } from './api';
+import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon';
 import { sessionCoworkerLabel } from './display';
 import { FilesPanel } from './FilesPanel';
-import { ResumeCta, prefixOf } from './ResumeCta';
+import { ResumeCta } from './ResumeCta';
 import { formatRelativeTime } from '../../lib/intl';
 import { TerminalView } from './Terminal';
 import { WebPiView } from './WebPiView';
@@ -304,6 +305,7 @@ function SessionRow(props: {
   const { t } = useTranslation();
   const record = props.record;
   const isPaused = record.state === 'paused';
+  const StateIcon = isPaused ? CirclePause : Radio;
   const title = sessionCoworkerLabel(record);
   const showInternalName = title !== record.name;
   return (
@@ -317,7 +319,7 @@ function SessionRow(props: {
           : t('workspace.openNamed', { name: title })}
       >
         <span className="workspace-session-agent" aria-hidden="true">
-          {prefixOf(record.agent)}
+          <AgentRuntimeIcon agentId={record.agent} className="size-[18px]" />
         </span>
         <span className="workspace-session-row-copy">
           <span className="workspace-session-row-title" title={title}>{title}</span>
@@ -328,7 +330,7 @@ function SessionRow(props: {
           </span>
         </span>
         <span className={`workspace-session-state is-${record.state}`}>
-          <span aria-hidden="true" />
+          <StateIcon aria-hidden="true" size={11} />
           {isPaused ? t('workspace.paused') : t('workspace.filterRunning')}
         </span>
         <ArrowUpRight className="workspace-session-open-icon" size={15} strokeWidth={2} aria-hidden="true" />

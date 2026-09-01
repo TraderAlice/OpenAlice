@@ -3,6 +3,7 @@ import { Info } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
+import { inputClass } from '@/components/form'
 import {
   Dialog,
   DialogContent,
@@ -21,9 +22,6 @@ import type {
 } from './api'
 
 const DISPLAY_NAME_MAX = 120
-
-const inputClass =
-  'w-full bg-secondary border border-border rounded-md px-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary'
 
 export interface SessionSettingsDialogProps {
   readonly open: boolean
@@ -145,7 +143,7 @@ export function SessionSettingsDialog({
               className={inputClass}
               disabled={saving}
             />
-            <div className="mt-1 flex items-center justify-between gap-3 text-[11px] text-muted-foreground/70">
+            <div className="mt-1 flex items-center justify-between gap-3 text-[11px] leading-[15px] text-muted-foreground/70">
               <span>{t('workspace.sessionSettings.displayNameHelp')}</span>
               <span className="tabular-nums">{displayName.trim().length}/{DISPLAY_NAME_MAX}</span>
             </div>

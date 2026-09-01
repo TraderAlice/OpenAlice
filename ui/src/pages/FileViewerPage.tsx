@@ -15,6 +15,8 @@ import { ArrowLeft, FileText } from 'lucide-react'
 
 import { FileContentView } from '../components/FileContentView'
 import { CenteredLoading } from '../components/StateViews'
+import { Button } from '../components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { readWorkspaceFile, type ReadFileResult } from '../components/workspace/api'
 import { workspaceDisplayName, workspaceDisplayTitle } from '../components/workspace/display'
@@ -85,16 +87,23 @@ export function FileViewerPage({ spec }: Props) {
   return (
     <div className="h-full flex flex-col min-h-0">
       <div className="flex shrink-0 items-start gap-2 border-b border-border bg-secondary/30 px-4 py-2 sm:items-center">
-        <button
-          type="button"
-          onClick={goBack}
-          aria-label={backLabel}
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center gap-1.5 rounded-md border border-border bg-background px-0 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:h-7 sm:w-auto sm:px-2"
-          title={backLabel}
-        >
-          <ArrowLeft size={14} strokeWidth={1.8} aria-hidden />
-          <span className="hidden sm:inline">{t('fileViewer.back')}</span>
-        </button>
+        <Tooltip>
+          <TooltipTrigger
+            render={(
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goBack}
+                aria-label={backLabel}
+                className="h-10 w-10 shrink-0 px-0 sm:h-8 sm:w-auto sm:px-2.5"
+              >
+                <ArrowLeft size={14} strokeWidth={1.8} aria-hidden />
+                <span className="hidden sm:inline">{t('fileViewer.back')}</span>
+              </Button>
+            )}
+          />
+          <TooltipContent>{backLabel}</TooltipContent>
+        </Tooltip>
         <FileText size={13} strokeWidth={1.75} className="mt-1 shrink-0 text-muted-foreground/70 sm:mt-0" aria-hidden />
         <div className="min-w-0 flex-1 sm:contents">
           <span
