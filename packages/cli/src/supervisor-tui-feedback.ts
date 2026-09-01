@@ -16,14 +16,18 @@ export function supervisorMotionEnabled(env: NodeJS.ProcessEnv = process.env): b
     && env['OPENALICE_TUI_MOTION'] !== '0'
 }
 
-export function renderSupervisorFeedback(
+export function renderSupervisorActivitySlot(
   input: { busy?: string; notice?: string; diagnostic?: string },
   width: number,
   frame = 0,
   motion = true,
-): string[] {
+): string {
   const feedback = collectFeedback(input, frame, motion)
-  return feedback.map((item) => renderFeedbackRail(item, width))
+  const selected = feedback.find((item) => item.tone === 'busy')
+    ?? feedback.find((item) => item.tone === 'danger')
+    ?? feedback.at(-1)
+  if (selected) return renderFeedbackRail(selected, width)
+  return ' '.repeat(Math.max(1, width))
 }
 
 export function classifySupervisorNotice(message: string): SupervisorFeedbackTone {

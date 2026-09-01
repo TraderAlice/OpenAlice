@@ -264,6 +264,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       let output = ''
       let clickedProject = false
       let closedOverlay = false
+      let clickedAfterNotice = false
+      let openedPalette = false
       const timeout = setTimeout(() => {
         child.kill()
         reject(new Error(`Supervisor context ribbon timed out:\n${output}`))
@@ -281,17 +283,28 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         } else if (!closedOverlay && output.includes('AliceProjects · Default AliceProject')) {
           closedOverlay = true
           child.write('\u001b')
-          setTimeout(() => child.write('q'), 50)
+        } else if (
+          closedOverlay
+          && !clickedAfterNotice
+          && output.includes('STATUS   AliceProject selection closed.')
+        ) {
+          clickedAfterNotice = true
+          child.write('\u001b[<0;2;21M')
+        } else if (!openedPalette && output.includes('Command Palette')) {
+          openedPalette = true
+          child.write('q')
         }
       })
       child.onExit(({ exitCode }) => {
         clearTimeout(timeout)
-        if (exitCode === 0 && closedOverlay) resolve(output)
+        if (exitCode === 0 && openedPalette) resolve(output)
         else reject(new Error(`Supervisor context ribbon exited ${exitCode}:\n${output}`))
       })
     })
 
     expect(transcript).toContain('AliceProjects · Default AliceProject')
+    expect(transcript).toContain('STATUS   AliceProject selection closed.')
+    expect(transcript).toContain('Command Palette')
     expect(transcript).toContain('\u001b[38;2;199;235;239;48;2;10;34;39m')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')

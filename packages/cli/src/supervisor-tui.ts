@@ -81,7 +81,7 @@ import {
   type SupervisorTuiTheme,
 } from './supervisor-tui-theme.ts'
 import {
-  renderSupervisorFeedback,
+  renderSupervisorActivitySlot,
   supervisorMotionEnabled,
 } from './supervisor-tui-feedback.ts'
 import {
@@ -3102,14 +3102,13 @@ export class SupervisorScreen implements Component {
         width,
       ))
     }
-    const feedback = renderSupervisorFeedback({
+    const activity = renderSupervisorActivitySlot({
       ...(this.snapshot.busy ? { busy: sanitize(this.snapshot.busy) } : {}),
       ...(this.snapshot.notice ? { notice: sanitize(this.snapshot.notice) } : {}),
       ...(this.snapshot.diagnostic ? { diagnostic: sanitize(this.snapshot.diagnostic) } : {}),
     }, width, this.motionFrame, this.motionEnabled)
-    if (feedback.length > 0) lines.push('', ...feedback)
     lines.push(
-      '',
+      activity,
       ...(this.commandDeckOpen
         ? []
         : this.snapshot.panel === 'fleet' && this.snapshot.fleet

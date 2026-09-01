@@ -163,6 +163,30 @@ describe('Supervisor TUI screen', () => {
     expect(reduced.advanceMotion()).toBe(false)
     expect(reduced.hasActiveMotion()).toBe(false)
     expect(reduced.render(80).join('\n')).toContain('◆  WORKING  Starting Runtime…')
+
+    const stable = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'absent' },
+    }, { motionEnabled: false })
+    const controlRows = () => {
+      const lines = stable.render(80)
+      return {
+        height: lines.length,
+        action: lines.findIndex((line) => line.includes('[ Enter ] Start & open')),
+        ribbon: lines.findIndex((line) => line.includes('[ / ] Commands')),
+      }
+    }
+    const idleRows = controlRows()
+    stable.update({ notice: 'Runtime started.', diagnostic: undefined, busy: undefined })
+    expect(controlRows()).toEqual(idleRows)
+    stable.update({
+      busy: 'Refreshing Runtime',
+      notice: 'Runtime started.',
+      diagnostic: 'Previous probe failed.',
+    })
+    expect(controlRows()).toEqual(idleRows)
+    expect(stable.render(80).join('\n')).toContain('◆  WORKING  Refreshing Runtime…')
   })
 
   it('opens a selectable command palette without creating a second action path', () => {

@@ -171,6 +171,19 @@ not imply maintainer approval of the finished interaction.
   visible clickable keycap. This keeps identity present in Logs, Doctor, Fleet,
   Help, and the Command Palette without adding a route or backend read.
 
+### Fixed activity-slot decision
+
+- Keeping the existing append-only feedback stack makes Working, Notice, and
+  Error insert one or more rows between content and controls, so action targets
+  move while the user is operating them.
+- A transient overlay toast would preserve layout but cover content, introduce
+  dismissal/timer ownership, and split feedback from keyboard users.
+- The selected model reserves the existing separator row as one fixed activity
+  slot. Working wins while an operation is active, otherwise Error wins over
+  Notice; idle renders the same-width blank separator. Feedback content and
+  tone still come from the existing snapshot, but action bar and context ribbon
+  never change rows merely because feedback appears.
+
 ## Responsive and Accessibility Contract
 
 - `80x24` remains the minimum full experience. Wide terminals show the
@@ -236,6 +249,7 @@ already large `supervisor-tui.ts` application controller.
   same pointer semantics as the application frame.
 - [x] Turn the bottom command dock into a persistent, pointer-aware
   AliceProject/Runtime/view context ribbon.
+- [x] Replace expanding feedback rows with a stable single-line activity slot.
 
 ## Progress
 
@@ -424,6 +438,17 @@ already large `supervisor-tui.ts` application controller.
   restored terminal modes after close/detach. CLI build/typecheck, root
   TypeScript, and the 689-file suite pass (688 passed, 1 skipped; 6081 tests
   passed, 10 skipped). Docker installer smoke also passes.
+- Feedback now occupies one fixed activity slot instead of an append-only row
+  stack. Idle keeps the separator blank; active work has priority, then Error,
+  then Notice. The action bar and context ribbon therefore retain both their
+  row numbers and total frame height while feedback changes, including when
+  stale lower-priority fields coexist in a snapshot.
+- Fixed-activity acceptance passes with 83 focused screen, feedback, overlay,
+  Fleet, Doctor, Palette, transfer, and real-PTY tests. A real 80x24 color
+  session closed AliceProjects to produce a Notice, then clicked Commands at
+  the ribbon's unchanged row and opened the Command Palette. CLI
+  build/typecheck, root TypeScript, and the 689-file suite pass (688 passed, 1
+  skipped; 6082 tests passed, 10 skipped). Docker installer smoke also passes.
 
 ## Completion Criteria
 

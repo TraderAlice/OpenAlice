@@ -171,10 +171,13 @@ path is intentionally parameter-free:
   existing keyboard action, confirmation, refusal, or detach state machine.
   `/` or `Esc` closes the Palette without exiting, while `q` and `Ctrl+C` retain
   their global detach behavior;
-- asynchronous work and its result occupy a stable full-width activity rail
-  above the command bar. Busy, informational, successful, actionable-warning,
-  and failed states retain distinct glyph and text labels without depending on
-  color; only the busy glyph animates. The rail is a presentation of existing
+- asynchronous work and its result occupy one fixed full-width activity slot
+  above the command bar. Idle uses that same row as the content/control
+  separator; feedback therefore never inserts rows or moves action/ribbon
+  pointer targets. Working wins while an operation is active, otherwise Error
+  wins over Notice. Busy, informational, successful, actionable-warning, and
+  failed states retain distinct glyph and text labels without depending on
+  color; only the busy glyph animates. The slot is a presentation of existing
   Supervisor state and does not introduce a second lifecycle or error path;
 - color-capable motion-enabled sessions play one bounded brand-color sweep on
   entry, then settle to the static OpenAlice header. A successfully refreshed
