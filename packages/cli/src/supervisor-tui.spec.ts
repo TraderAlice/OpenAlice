@@ -367,7 +367,7 @@ describe('Supervisor TUI screen', () => {
     })
 
     expect(screen.render(100).join('\n')).toContain('\u001b[38;2;')
-    expect(screen.render(100)[2]!.replace(/\u001b\[[0-9;]*m/gu, '')).toContain('Machines ·2')
+    expect(screen.render(100)[2]!.replace(/\u001b\[[0-9;]*m/gu, '')).toContain('[Machines]·2')
     expect(screen.snapshot.fleet?.selectedMachine).toBe(0)
     expect(screen.handlePointer({
       button: 65, col: 2, row: 7, release: false, wheel: 1, motion: false, leftClick: false,
@@ -393,8 +393,15 @@ describe('Supervisor TUI screen', () => {
       button: 0, col: 50, row: 6, release: false, wheel: null, motion: false, leftClick: true,
     })).toBe(true)
     expect(activated).toEqual(['cloud/research'])
+    const logsColumn = screen.render(100)[2]!
+      .replace(/\u001b\[[0-9;]*m/gu, '')
+      .indexOf('Logs') + 1
     expect(screen.handlePointer({
-      button: 0, col: 28, row: 3, release: false, wheel: null, motion: false, leftClick: true,
+      button: 35, col: logsColumn, row: 3, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(100)[2]).toContain('\u001b[1;38;2;203;250;246;48;2;19;49;55m≋ Logs')
+    expect(screen.handlePointer({
+      button: 0, col: logsColumn, row: 3, release: false, wheel: null, motion: false, leftClick: true,
     })).toBe(true)
     expect(screen.snapshot.panel).toBe('logs')
     expect(actions).toContain('logs')

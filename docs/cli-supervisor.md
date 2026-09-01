@@ -138,8 +138,15 @@ path is intentionally parameter-free:
   Background refresh of the selected local Runtime updates its inventory row
   without moving a user who is inspecting another Machine or AliceProject;
 - the Overview/Fleet/Logs/Doctor/Help navigation accepts Tab, left/right, and
-  `[`/`]`; the visible tabs accept pointer hover and click. `↑`/`↓` move within
-  the active Fleet pane and the mouse wheel moves the focused Fleet selection.
+  `[`/`]`; the visible tabs are composed as a full-width segmented rail with a
+  stable glyph, label, and optional status badge. Color terminals render the
+  rail, selected chip, and hover chip as distinct surfaces; `NO_COLOR` keeps
+  the selected label in brackets. Wide labels collapse through compact and
+  minimal variants so all five destinations remain reachable at 46 columns.
+  The renderer publishes the exact final segment geometry used for pointer
+  hover and click, rather than reconstructing hit regions from labels.
+  `↑`/`↓` move within the active Fleet pane and the mouse wheel moves the
+  focused Fleet selection.
   Fleet and loaded Logs expose their available counts in the navigation rail;
   Doctor exposes `✓`, warning count, or failure count without relying on color.
   Each status badge is part of its tab's pointer target rather than a separate

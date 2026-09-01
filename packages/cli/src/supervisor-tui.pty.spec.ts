@@ -37,6 +37,51 @@ afterEach(async () => {
 })
 
 describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
+  it('hovers and clicks the full-width navigation rail with raw pointer input', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-navigation-pointer-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [cliEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_SUPERVISOR_HOME: join(isolatedHome, 'supervisor'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let clicked = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor navigation pointer timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!clicked && output.includes('◆ [Overview]') && output.includes('? Help')) {
+          clicked = true
+          child.write('\u001b[<35;52;3M')
+          child.write('\u001b[<0;52;3M')
+        } else if (clicked && output.includes('Help · Keyboard map')) {
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor navigation pointer exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('Help · Keyboard map')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
   it.each([
     ['default-no', 50, 'sends=0 aborted=false'],
     ['success', 100, 'sends=1 aborted=false'],

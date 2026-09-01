@@ -139,6 +139,18 @@ not imply maintainer approval of the finished interaction.
   Machine and loaded-log counts plus Doctor pass/warn/fail state. Badges extend
   the original pointer target and do not introduce separate controls.
 
+### Segmented navigation-rail decision
+
+- Recoloring the existing flat labels would preserve geometry but leave the
+  most persistent line of the application looking like a legacy CLI menu.
+- An icon-only rail would be compact and visually louder, but it would make
+  first-use navigation and no-color output depend on memorized symbols.
+- The selected model is a single-height, full-width segmented surface: stable
+  glyph plus label on ordinary terminals, progressively shorter labels on
+  narrow terminals, and brackets retained as the semantic selected state.
+  Rendered segments and pointer targets come from one layout primitive, so
+  asynchronous Machine, Logs, and Doctor badges cannot desynchronize clicks.
+
 ### Doctor inspector decision
 
 - Keeping Doctor as a flat list of summary/detail text preserves the old output
@@ -262,6 +274,8 @@ already large `supervisor-tui.ts` application controller.
   bounded, redacted plain-text fallback behavior.
 - [x] Turn the global tabs into an operational navigation rail with inventory,
   log, and diagnostic status visible before opening each page.
+- [x] Promote the operational tabs into a full-width segmented surface with
+  responsive labels and render-derived hover/click geometry.
 - [x] Add local severity views to Runtime Logs without widening the bounded
   reader or changing the snapshot contract.
 - [x] Replace the static Command Deck with a contextual, selectable, whole-row
@@ -504,6 +518,21 @@ already large `supervisor-tui.ts` application controller.
   build/typecheck, root TypeScript, and the 690-file suite pass (689 passed, 1
   skipped; 6089 tests passed, 10 skipped). Docker installer smoke passes, and
   the package dry-run retains both Palette and Supervisor modules.
+- The operational navigation is now a continuous segmented rail rather than a
+  loose string of tabs. At ordinary widths its five destinations carry stable
+  glyphs, labels, and inline Machine/Logs/Doctor evidence; at 46 columns it
+  retains every destination using minimal labels. Active and hover states use
+  separate surfaces in color terminals while bracketed labels preserve the
+  no-color contract. One layout result owns both the line and its pointer hit
+  regions, including dynamically changing badge edges.
+- Segmented-navigation acceptance passes with 113 focused Supervisor screen,
+  navigation, pointer, modal, Palette, Fleet, Doctor, transfer, and real-PTY
+  tests. A real 80x24 color session sent raw SGR motion and click reports to
+  the Help chip, opened the keyboard map, detached, and restored cursor, mouse,
+  and bracketed-paste modes. CLI build/typecheck, root TypeScript, and the
+  691-file suite pass (690 passed, 1 skipped; 6094 tests passed, 10 skipped).
+  Docker installer smoke passes, and the package dry-run includes
+  `src/supervisor-navigation.ts`.
 
 ## Completion Criteria
 

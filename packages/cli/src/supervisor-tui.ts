@@ -88,6 +88,11 @@ import {
   type SupervisorTuiTheme,
 } from './supervisor-tui-theme.ts'
 import {
+  renderSupervisorNavigation,
+  supervisorNavigationPanelAt,
+  type SupervisorNavigationTarget,
+} from './supervisor-navigation.ts'
+import {
   renderSupervisorActivitySlot,
   supervisorMotionEnabled,
 } from './supervisor-tui-feedback.ts'
@@ -2620,6 +2625,7 @@ export class SupervisorScreen implements Component {
   private readonly onMotionDemandChange?: () => void
   private onDetach?: () => void
   private hoveredPanel?: SupervisorPanel
+  private navigationTargets: SupervisorNavigationTarget[] = []
   private hoveredFleetTarget?: SupervisorFleetPointerTarget
   private hoveredCommandTarget?: SupervisorCommandTarget
   private commandTargets: SupervisorCommandTarget[] = []
@@ -3061,11 +3067,7 @@ export class SupervisorScreen implements Component {
 
   handlePointer(event: SupervisorPointerEvent): boolean {
     const hovered = !this.commandDeckOpen && event.row === 3
-      ? panelAtColumn(
-          event.col,
-          this.snapshot,
-          this.renderWidth < 60,
-        )
+      ? supervisorNavigationPanelAt(this.navigationTargets, event.col)
       : undefined
     const fleet = !this.commandDeckOpen && this.snapshot.panel === 'fleet'
       ? this.snapshot.fleet
@@ -3150,15 +3152,27 @@ export class SupervisorScreen implements Component {
   render(width: number): string[] {
     this.renderWidth = width
     const runtime = this.snapshot.runtime
-    const narrow = width < 60
     const state = runtime?.class ?? 'unavailable'
     const updateBadge = this.snapshot.update?.status === 'available'
       ? ` · update ${formatUpdateCandidate(this.snapshot.update)}`
       : ''
+    const navigation = renderSupervisorNavigation({
+      selected: this.snapshot.panel ?? 'overview',
+      recovery: isConfigRecovery(this.snapshot),
+      machineCount: this.snapshot.fleet?.machines.length,
+      logCount: this.snapshot.logs?.entries?.length,
+      doctor: this.snapshot.doctor
+        ? {
+            failures: this.snapshot.doctor.summary?.failures ?? 0,
+            warnings: this.snapshot.doctor.summary?.warnings ?? 0,
+          }
+        : undefined,
+    }, width)
+    this.navigationTargets = navigation.targets
     const lines = [
       renderSupervisorHeader(this.snapshot.version, this.snapshot.channel, width, updateBadge),
       '─'.repeat(Math.max(1, width)),
-      renderTabs(this.snapshot, narrow),
+      navigation.line,
       '',
     ]
 
@@ -3436,79 +3450,6 @@ function createServices(
     applyUpdate: dependencies.applyUpdate
       ?? ((result) => applyVerifiedSupervisorUpdate(result, { env })),
   }
-}
-
-function renderTabs(
-  snapshot: SupervisorSnapshot,
-  narrow: boolean,
-): string {
-  const selected = snapshot.panel ?? 'overview'
-  return tabLabels(narrow, isConfigRecovery(snapshot))
-    .map(([panel, label]) => renderTab(panel, label, panel === selected, snapshot))
-    .join('  ')
-}
-
-function renderTab(
-  panel: SupervisorPanel,
-  label: string,
-  selected: boolean,
-  snapshot: SupervisorSnapshot,
-): string {
-  const badge = tabBadge(panel, snapshot)
-  return `${selected ? `[${label}]` : label}${badge}`
-}
-
-function tabBadge(panel: SupervisorPanel, snapshot: SupervisorSnapshot): string {
-  if (panel === 'fleet') {
-    const count = snapshot.fleet?.machines.length ?? 0
-    return count > 0 ? `·${count}` : ''
-  }
-  if (panel === 'logs') {
-    const count = snapshot.logs?.entries?.length ?? 0
-    return count > 0 ? `·${count}` : ''
-  }
-  if (panel === 'doctor' && snapshot.doctor) {
-    const failures = snapshot.doctor.summary?.failures ?? 0
-    const warnings = snapshot.doctor.summary?.warnings ?? 0
-    if (failures > 0) return `×${failures}`
-    if (warnings > 0) return `!${warnings}`
-    return '✓'
-  }
-  return ''
-}
-
-function tabLabels(
-  narrow: boolean,
-  recovery = false,
-): Array<[SupervisorPanel, string]> {
-  return recovery
-    ? [
-        ['overview', narrow ? 'Home' : 'Overview'],
-        ['help', 'Help'],
-      ]
-    : [
-        ['overview', narrow ? 'Home' : 'Overview'],
-        ['fleet', narrow ? 'Fleet' : 'Machines'],
-        ['logs', 'Logs'],
-        ['doctor', 'Doctor'],
-        ['help', 'Help'],
-      ]
-}
-
-function panelAtColumn(
-  column: number,
-  snapshot: SupervisorSnapshot,
-  narrow: boolean,
-): SupervisorPanel | undefined {
-  const selected = snapshot.panel ?? 'overview'
-  let offset = 1
-  for (const [panel, label] of tabLabels(narrow, isConfigRecovery(snapshot))) {
-    const rendered = renderTab(panel, label, panel === selected, snapshot)
-    const end = offset + displayWidth(rendered) - 1
-    if (column >= offset && column <= end) return panel
-    offset = end + 3
-  }
-  return undefined
 }
 
 function commandAtPosition(

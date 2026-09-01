@@ -13,6 +13,8 @@ export interface SupervisorTuiTheme {
   successRail(value: string): string
   warningRail(value: string): string
   dangerRail(value: string): string
+  navigationRail(value: string): string
+  navigationHover(value: string): string
   dockRail(value: string): string
 }
 
@@ -66,6 +68,8 @@ export function createSupervisorTuiTheme(
     successRail: style('\u001b[1;38;2;170;255;207;48;2;13;45;31m'),
     warningRail: style('\u001b[1;38;2;255;222;151;48;2;54;40;16m'),
     dangerRail: style('\u001b[1;38;2;255;190;201;48;2;55;20;31m'),
+    navigationRail: style('\u001b[38;2;162;190;198;48;2;11;28;34m'),
+    navigationHover: style('\u001b[1;38;2;203;250;246;48;2;19;49;55m'),
     dockRail: style('\u001b[38;2;199;235;239;48;2;10;34;39m'),
   }
 }
@@ -177,21 +181,26 @@ function decorateTabs(
     fleet: ['Machines', 'Fleet'],
     overview: ['Overview', 'Home'],
     logs: ['Logs'],
-    doctor: ['Doctor'],
+    doctor: ['Doctor', 'Doc'],
     help: ['Help'],
   }
-  let output = line
-  for (const [panel, candidates] of Object.entries(labels)) {
-    for (const label of candidates) {
-      const active = `[${label}]`
-      if (output.includes(active)) output = output.replace(active, theme.selected(` ${label} `))
-      else if (panel === hoveredPanel && panel !== selectedPanel) output = output.replace(label, theme.accent(label))
-    }
-  }
-  const failure = /×\d+/u.exec(output)?.[0]
-  if (failure) output = output.replace(failure, theme.danger(failure))
-  const warning = /!\d+/u.exec(output)?.[0]
-  if (warning) output = output.replace(warning, theme.warning(warning))
-  if (output.includes('✓')) output = output.replace('✓', theme.success('✓'))
-  return output
+  const parts = line.split(' │ ')
+  return parts.map((part, index) => {
+    const content = part.trimEnd()
+    const padding = part.slice(content.length)
+    const panel = Object.entries(labels).find(([, candidates]) => (
+      candidates.some((label) => content.includes(label))
+    ))?.[0]
+    const style = panel === selectedPanel
+      ? theme.selected
+      : panel === hoveredPanel
+        ? theme.navigationHover
+        : theme.navigationRail
+    const suffix = index < parts.length - 1 ? ' │ ' : ''
+    return [
+      style(content),
+      padding ? theme.navigationRail(padding) : '',
+      suffix ? theme.navigationRail(suffix) : '',
+    ].join('')
+  }).join('')
 }
