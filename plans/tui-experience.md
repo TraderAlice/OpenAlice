@@ -110,6 +110,10 @@ already large `supervisor-tui.ts` application controller.
 - [x] Run the owning package typecheck and tests, affected tests, full hermetic
   tests at dependency/shared-renderer boundaries, and installer/package smoke
   when the distributed payload changes.
+- [x] Replace the plain Working/Notice/Diagnostic tail with a semantic,
+  full-width activity rail and purposeful OMP-inspired busy animation.
+- [ ] Add a bounded one-shot entrance treatment and subtle Runtime heartbeat;
+  preserve the static reduced-motion frame as the complete experience.
 
 ## Progress
 
@@ -162,6 +166,20 @@ already large `supervisor-tui.ts` application controller.
   repository suite (683 passed, 1 skipped; 6058 tests passed, 10 skipped).
   Installer/package smoke is not applicable because this branch does not change
   the distributed payload topology.
+- Continuous polish now gives asynchronous operations a shared activity rail:
+  Braille spinner frames for work, stable STATUS/READY/NOTICE/ERROR roles for
+  results, and dark semantic backgrounds in color-capable terminals. A real
+  Default AliceProject Doctor run displayed multiple busy frames before the
+  result panel; `OPENALICE_TUI_MOTION=0` displayed the same state as a static
+  `◆ WORKING` rail. The new module is part of the CLI package payload, so this
+  continuation requires the installer smoke before its own acceptance.
+- Activity-rail acceptance passes: 54 focused feedback/screen/real-PTY tests,
+  CLI build/typecheck, root TypeScript check, and the 685-file repository suite
+  (684 passed, 1 skipped; 6062 tests passed, 10 skipped). The Docker installer
+  smoke passed, and `pnpm pack --dry-run --json` confirms the new feedback module
+  is present in the published CLI file set. The 80 ms motion timer now exists
+  only while `busy` is true and is torn down on completion, reduced motion,
+  detach, signal exit, and TUI startup failure.
 
 ## Completion Criteria
 

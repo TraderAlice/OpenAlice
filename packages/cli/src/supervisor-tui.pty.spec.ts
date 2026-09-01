@@ -501,7 +501,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           child.write('\u001b')
         } else if (
           !detached
-          && output.includes('Notice: Setup closed.')
+          && output.includes('STATUS   Setup closed.')
         ) {
           detached = true
           child.write('q')
@@ -521,7 +521,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('Setup · Default AliceProject')
     expect(transcript).toContain('Set AliceProject browser port')
     expect(transcript).toContain('Saved browser port for AliceProject "Default AliceProject".')
-    expect(transcript).toContain('Notice: Setup closed.')
+    expect(transcript).toContain('STATUS   Setup closed.')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   }, 15_000)
@@ -589,7 +589,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           child.write('\u001b')
         } else if (
           !detached
-          && output.includes('Notice: Setup closed.')
+          && output.includes('STATUS   Setup closed.')
         ) {
           detached = true
           child.write('q')
@@ -609,7 +609,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('Editing machine defaults.')
     expect(transcript).toContain('Set machine-default browser port')
     expect(transcript).toContain('Saved browser port for machine default.')
-    expect(transcript).toContain('Notice: Setup closed.')
+    expect(transcript).toContain('STATUS   Setup closed.')
   }, 15_000)
 
   it('creates, selects, remembers, and switches named AliceProjects inside the TUI', async () => {

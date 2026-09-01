@@ -115,7 +115,9 @@ explicit commands. It owns an alternate-screen application canvas and restores
 the screen, cursor, and mouse modes on detach or signal exit. `NO_COLOR` and
 `TERM=dumb` remove decorative color without removing state text;
 `OPENALICE_TUI_MOUSE=0` keeps the full keyboard surface while disabling terminal
-mouse reporting. Its ordinary path is intentionally parameter-free:
+mouse reporting, and `OPENALICE_TUI_MOTION=0` replaces purposeful activity
+animation with a stable glyph without changing its text or layout. Its ordinary
+path is intentionally parameter-free:
 
 - the default Overview page is an AliceProject operational home: its status
   card presents the selected project, current Runtime state, human guidance,
@@ -144,6 +146,11 @@ mouse reporting. Its ordinary path is intentionally parameter-free:
   and click survive reflow and invoke the same input state machine as the
   corresponding key. Confirmation and refusal semantics therefore do not have
   a separate mouse-only path;
+- asynchronous work and its result occupy a stable full-width activity rail
+  above the command bar. Busy, informational, successful, actionable-warning,
+  and failed states retain distinct glyph and text labels without depending on
+  color; only the busy glyph animates. The rail is a presentation of existing
+  Supervisor state and does not introduce a second lifecycle or error path;
 - Help is a grouped keyboard map rather than another prose screen. Update,
   Setup, AliceProject selection, Runtime Source, and Remote Transfer use the
   same bordered overlay shell and semantic selected/description states.

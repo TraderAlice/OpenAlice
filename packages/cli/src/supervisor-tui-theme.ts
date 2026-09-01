@@ -7,6 +7,11 @@ export interface SupervisorTuiTheme {
   warning(value: string): string
   danger(value: string): string
   selected(value: string): string
+  busyRail(value: string): string
+  infoRail(value: string): string
+  successRail(value: string): string
+  warningRail(value: string): string
+  dangerRail(value: string): string
 }
 
 export interface SupervisorFrameStyleOptions {
@@ -36,6 +41,11 @@ export function createSupervisorTuiTheme(
     warning: style('\u001b[38;2;245;190;83m'),
     danger: style('\u001b[38;2;255;107;129m'),
     selected: style('\u001b[1;38;2;230;255;252;48;2;24;64;69m'),
+    busyRail: style('\u001b[1;38;2;183;255;248;48;2;12;42;45m'),
+    infoRail: style('\u001b[38;2;189;229;255;48;2;17;35;52m'),
+    successRail: style('\u001b[1;38;2;170;255;207;48;2;13;45;31m'),
+    warningRail: style('\u001b[1;38;2;255;222;151;48;2;54;40;16m'),
+    dangerRail: style('\u001b[1;38;2;255;190;201;48;2;55;20;31m'),
   }
 }
 
@@ -50,6 +60,11 @@ export function decorateSupervisorFrame(
       const keycap = `[ ${options.hoveredCommand.label} ]`
       return line.replace(keycap, theme.selected(keycap))
     }
+    if (/^[⠀-⣿◆]  WORKING /u.test(line)) return theme.busyRail(line)
+    if (line.startsWith('✓  READY')) return theme.successRail(line)
+    if (line.startsWith('!  NOTICE')) return theme.warningRail(line)
+    if (line.startsWith('×  ERROR')) return theme.dangerRail(line)
+    if (line.startsWith('◆  STATUS')) return theme.infoRail(line)
     if (index === 0) return theme.accentStrong(line)
     if (index === 1) return theme.accent(line)
     if (index === 2) return decorateTabs(line, theme, options.panel, options.hoveredPanel)

@@ -78,6 +78,37 @@ describe('Supervisor TUI screen', () => {
     expect(screen.render(120)[0]).toContain('v0.87.0-beta · DEV · update 0.90.0')
   })
 
+  it('renders semantic activity rails and advances only enabled busy motion', () => {
+    const busyChanges = vi.fn()
+    const animated = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'absent' },
+    }, {
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+      motionEnabled: true,
+      onBusyChange: busyChanges,
+    })
+    animated.update({ busy: 'Starting Runtime' })
+    expect(busyChanges).toHaveBeenLastCalledWith(true)
+    const first = animated.render(80).find((line) => line.includes('WORKING'))
+    expect(first).toContain('\u001b[1;38;2;183;255;248;48;2;12;42;45m')
+    expect(animated.advanceMotion()).toBe(true)
+    const second = animated.render(80).find((line) => line.includes('WORKING'))
+    expect(second).not.toBe(first)
+    animated.update({ busy: undefined })
+    expect(busyChanges).toHaveBeenLastCalledWith(false)
+
+    const reduced = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'absent' },
+      busy: 'Starting Runtime',
+    }, { motionEnabled: false })
+    expect(reduced.advanceMotion()).toBe(false)
+    expect(reduced.render(80).join('\n')).toContain('◆  WORKING  Starting Runtime…')
+  })
+
   it('describes an externally owned Runtime without offering refused mutations', () => {
     const screen = new SupervisorScreen({
       version: 'dev',
