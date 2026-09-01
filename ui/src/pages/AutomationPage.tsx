@@ -5,16 +5,6 @@ import type { ViewSpec } from '../tabs/types'
 import { AutomationApiSection } from './AutomationApiSection'
 import { AutomationRunsSection } from './AutomationRunsSection'
 
-type AutomationSection = Extract<ViewSpec, { kind: 'automation' }>['params']['section']
-
-const SECTION_DESCRIPTION_KEY: Record<
-  AutomationSection,
-  'automation.runsDescription' | 'automation.apiDescription'
-> = {
-  runs: 'automation.runsDescription',
-  api: 'automation.apiDescription',
-}
-
 interface AutomationPageProps {
   spec: Extract<ViewSpec, { kind: 'automation' }>
 }
@@ -34,7 +24,6 @@ export function AutomationPage({ spec }: AutomationPageProps) {
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
         title={t(section === 'runs' ? 'automation.runs' : 'automation.api')}
-        description={t(SECTION_DESCRIPTION_KEY[section])}
       />
       <div
         data-testid="automation-scroll-region"

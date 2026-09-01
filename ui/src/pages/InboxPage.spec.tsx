@@ -390,7 +390,7 @@ describe('InboxPage responsive detail header', () => {
     expect(sender.textContent).toContain('from pi')
     expect(sender.textContent).not.toContain('resume-plain-linen-river-2218b6')
     expect(sender.className).toContain('min-h-10')
-    expect(sender.className).toContain('sm:min-h-0')
+    expect(sender.className).toContain('sm:min-h-8')
     expect(screen.queryByText('@resume-plain-linen-river-2218b6')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Open conversation' })).toBeNull()
 
@@ -398,11 +398,11 @@ describe('InboxPage responsive detail header', () => {
       name: 'from daily-us-market-close-with-a-long-name',
     })
     expect(issue.className).toContain('min-h-10')
-    expect(issue.className).toContain('sm:min-h-0')
+    expect(issue.className).toContain('sm:min-h-8')
 
     fireEvent.click(sender)
     expect(screen.getByRole('dialog', {
-      name: 'Sender identity: pi · @resume-plain-linen-river-2218b6',
+      name: 'Sender identity: pi — @resume-plain-linen-river-2218b6',
     })).toBeTruthy()
     expect(screen.getByText('@resume-plain-linen-river-2218b6').className).toContain('break-all')
     const openConversation = screen.getByRole('button', { name: 'Open conversation' })
@@ -410,7 +410,7 @@ describe('InboxPage responsive detail header', () => {
 
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.queryByRole('dialog', {
-      name: 'Sender identity: pi · @resume-plain-linen-river-2218b6',
+      name: 'Sender identity: pi — @resume-plain-linen-river-2218b6',
     })).toBeNull()
     await waitFor(() => expect(document.activeElement).toBe(sender))
 
@@ -422,7 +422,7 @@ describe('InboxPage responsive detail header', () => {
       { title: 'A durable research update.' },
     ))
     expect(screen.queryByRole('dialog', {
-      name: 'Sender identity: pi · @resume-plain-linen-river-2218b6',
+      name: 'Sender identity: pi — @resume-plain-linen-river-2218b6',
     })).toBeNull()
 
     const deleteEntry = screen.getByRole('button', { name: 'Delete this inbox entry' })

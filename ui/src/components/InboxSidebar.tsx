@@ -15,6 +15,14 @@ import {
 } from '../office/inbox-duty-excursion'
 import { workspaceDisplayName } from './workspace/display'
 import { Skeleton } from './StateViews'
+import { Button } from './ui/button'
+import { inputClass } from './form'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from './ui/tooltip'
+import { SelectionIndicator } from './SelectionIndicator'
 import type { InboxEntry } from '../api/inbox'
 
 /**
@@ -136,9 +144,6 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
     return (
       <div className="px-3 py-4 text-[12px] text-muted-foreground/70 leading-relaxed">
         {t('inbox.noMessages')}
-        <div className="mt-1 text-muted-foreground/50">
-          {t('inbox.emptyHint')}
-        </div>
       </div>
     )
   }
@@ -160,23 +165,25 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
             onChange={(event) => setQuery(event.target.value)}
             placeholder={t('inbox.searchPlaceholder')}
             aria-label={t('inbox.searchPlaceholder')}
-            className="h-8 w-full rounded-md border border-border/70 bg-background/65 pl-7.5 pr-7 text-[11px] text-foreground outline-none transition-colors placeholder:text-muted-foreground/45 focus:border-primary/50 focus:ring-2 focus:ring-primary/10"
+            className={`${inputClass} bg-background/65 pl-7.5 pr-7 text-[11px]`}
           />
           {query && (
-            <button
+            <Button
               type="button"
               onClick={() => setQuery('')}
               aria-label={t('inbox.clearSearch')}
-              className="oa-icon-action absolute right-1 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center text-muted-foreground/55 hover:text-foreground"
+              variant="ghost"
+              size="icon-xs"
+              className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground/55"
             >
               <X size={12} strokeWidth={1.8} aria-hidden />
-            </button>
+            </Button>
           )}
         </div>
         {normalizedQuery && (
           <div
             aria-live="polite"
-            className="px-1 pt-1 text-[10px] tabular-nums text-muted-foreground/55"
+            className="px-1 pt-1 text-[10px] leading-[14px] tabular-nums text-muted-foreground/55"
           >
             {t('inbox.searchResults', { count: filteredEntries.length, total: entries.length })}
           </div>
@@ -242,7 +249,7 @@ export function InboxViewToggle() {
   const setMode = useInboxViewMode((s) => s.setMode)
 
   return (
-    <div className="flex items-center rounded-md border border-border/70 overflow-hidden">
+    <div className="flex items-center overflow-hidden rounded-md border border-border/70 bg-background p-px">
       <ToggleBtn
         active={mode === 'time'}
         onClick={() => setMode('time')}
@@ -270,18 +277,24 @@ function ToggleBtn({
   children: React.ReactNode
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      aria-label={title}
-      aria-pressed={active}
-      className={`flex items-center justify-center w-8 h-8 transition-colors ${
-        active ? 'bg-muted text-foreground' : 'text-muted-foreground/60 hover:text-foreground hover:bg-muted/50'
-      }`}
-    >
-      {children}
-    </button>
+    <Tooltip>
+      <TooltipTrigger
+        render={(
+          <Button
+            type="button"
+            onClick={onClick}
+            aria-label={title}
+            aria-pressed={active}
+            variant="ghost"
+            size="icon-sm"
+            className={active ? 'bg-muted text-foreground' : 'text-muted-foreground/60'}
+          />
+        )}
+      >
+        {children}
+      </TooltipTrigger>
+      <TooltipContent>{title}</TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -310,7 +323,7 @@ function WorkspaceView({
                 {workspaceLabel}
               </span>
               {unread > 0 && (
-                <span className="shrink-0 min-w-[15px] h-[15px] px-1 rounded-full bg-primary text-primary-foreground text-[9px] font-semibold tabular-nums flex items-center justify-center">
+                <span className="shrink-0 min-w-[15px] h-[15px] px-1 rounded-full bg-primary text-primary-foreground text-[10px] leading-[14px] font-semibold tabular-nums flex items-center justify-center">
                   {unread}
                 </span>
               )}
@@ -377,9 +390,7 @@ function ClusterRow({
         active ? 'bg-muted' : 'hover:bg-muted/50'
       }`}
     >
-      {active && (
-        <span aria-hidden className="absolute left-0 top-0 bottom-0 w-[2px] bg-primary" />
-      )}
+      {active && <SelectionIndicator />}
       <span
         aria-hidden
         className={`mt-[7px] shrink-0 w-1.5 h-1.5 rounded-full ${unread ? 'bg-primary' : 'bg-transparent'}`}
@@ -423,7 +434,7 @@ function TimeView({
     <>
       {groups.map(([bucket, items]) => (
         <div key={bucket} className="mb-1">
-          <div className="px-3 mt-2 mb-1 text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
+          <div className="mb-1 mt-2 px-3 text-[11px] font-medium text-muted-foreground/65">
             {t(BUCKET_KEYS[bucket])}
           </div>
           <div className="flex flex-col">
@@ -483,9 +494,7 @@ function TimeRow({
         active ? 'bg-muted' : 'hover:bg-muted/50'
       }`}
     >
-      {active && (
-        <span aria-hidden className="absolute left-0 top-0 bottom-0 w-[2px] bg-primary" />
-      )}
+      {active && <SelectionIndicator />}
 
       <div className="flex min-w-0 items-start gap-1.5">
         <span

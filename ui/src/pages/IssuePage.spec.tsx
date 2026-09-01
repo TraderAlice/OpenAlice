@@ -34,7 +34,7 @@ describe('IssuePage', () => {
     render(<IssuePage />)
 
     expect(screen.getByText('议题')).toBeTruthy()
-    expect(screen.getByText('集中查看所有工作区追踪的工作。')).toBeTruthy()
+    expect(screen.queryByText('集中查看所有工作区追踪的工作。')).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: '议题设置' }))
     expect(mocks.openOrFocus).toHaveBeenCalledWith({
