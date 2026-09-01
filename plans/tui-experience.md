@@ -145,6 +145,19 @@ not imply maintainer approval of the finished interaction.
   checklist/Inspector cards; 80-column and narrow terminals stack the same two
   regions. All evidence remains the existing read-only Doctor snapshot.
 
+### Overlay pointer parity decision
+
+- Leaving overlays keyboard-only would make pointer support disappear exactly
+  when a user enters Setup, project selection, update, source, or transfer work.
+- Patching each overlay with fixed terminal coordinates would couple interaction
+  to today’s copy, wrapping, and responsive height.
+- Replacing the locked `pi-tui` dependency for its newer mouse-aware components
+  would cross the Node distribution boundary rejected above. The selected model
+  is therefore a shared Supervisor compatibility router: it mirrors the
+  compositor’s resolved overlay origin, captures final rendered rows/keycaps,
+  and adapts hover, wheel, and click into each existing component’s keyboard
+  state machine. No lifecycle or configuration action gains a second path.
+
 ## Responsive and Accessibility Contract
 
 - `80x24` remains the minimum full experience. Wide terminals show the
@@ -206,6 +219,8 @@ already large `supervisor-tui.ts` application controller.
   mouse-capable Command Palette.
 - [x] Replace Doctor's flat line scroller with a responsive, selectable
   checklist and detail Inspector.
+- [x] Give every Supervisor overlay list, input, and visible command keycap the
+  same pointer semantics as the application frame.
 
 ## Progress
 
@@ -365,6 +380,21 @@ already large `supervisor-tui.ts` application controller.
   passed, 10 skipped). The Docker installer smoke passes, and
   `pnpm pack --dry-run --json` confirms the new Doctor view module is included
   in the published CLI file set.
+- Overlay pointer input no longer disappears behind the application frame.
+  One shared compatibility router mirrors `pi-tui` center/margin/max-height
+  placement, captures final list rows and rendered keycaps, and translates
+  hover, wheel, and click into the existing component input path. Update
+  Channel, Setup (including input submenus), AliceProjects creation, Runtime
+  Source, and every Remote Transfer phase use it; the workflows retain their
+  original validation, confirmation, and failure ownership.
+- Overlay-pointer acceptance passes with 80 focused screen, overlay, Fleet,
+  Doctor, Palette, transfer, and real-PTY tests. A real 80x24 session sent raw
+  SGR motion/click events into centered Setup, changed Editing from the current
+  AliceProject to Machine defaults, closed the overlay, detached, and restored
+  terminal modes. CLI build/typecheck, root TypeScript, and the 689-file suite
+  pass (688 passed, 1 skipped; 6079 tests passed, 10 skipped). Docker installer
+  smoke passes, and the package dry-run contains
+  `src/supervisor-overlay-pointer.ts`.
 
 ## Completion Criteria
 

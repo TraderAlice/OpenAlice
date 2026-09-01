@@ -60,6 +60,12 @@ import {
   type SupervisorPointerEvent,
 } from './supervisor-tui-pointer.ts'
 import {
+  SupervisorOverlayPointerRouter,
+  supervisorVisibleListIndexes,
+  type SupervisorOverlayListTarget,
+  type SupervisorOverlayOptions,
+} from './supervisor-overlay-pointer.ts'
+import {
   createSupervisorCommandDeckState,
   moveSupervisorCommandDeckSelection,
   normalizeSupervisorCommandDeckState,
@@ -433,6 +439,7 @@ export async function runSupervisorTui(
     join(supervisorRoot, 'logs'),
   )
   const canvas = createSupervisorTerminalCanvas(stdout, dependencies.env ?? process.env)
+  const overlayPointer = new SupervisorOverlayPointerRouter()
   const tuiTheme = createSupervisorTuiTheme(dependencies.env ?? process.env)
   const motionEnabled = supervisorMotionEnabled(dependencies.env ?? process.env)
   let active = true
@@ -452,6 +459,56 @@ export async function runSupervisorTui(
   let closeUpdateChannel: (() => void) | null = null
   let motionTimer: NodeJS.Timeout | undefined
   let screen: SupervisorScreen
+  const terminalSize = () => ({
+    width: stdout.columns ?? 80,
+    height: stdout.rows ?? 24,
+  })
+  const captureOverlayPointer = (
+    lines: string[],
+    width: number,
+    options: SupervisorOverlayOptions,
+    input: (data: string) => void,
+    list?: SupervisorOverlayListTarget,
+  ) => {
+    const terminal = terminalSize()
+    overlayPointer.capture({
+      lines,
+      width,
+      terminalWidth: terminal.width,
+      terminalHeight: terminal.height,
+      options,
+      input,
+      list,
+    })
+  }
+  const selectListPointerTarget = (
+    items: SelectItem[],
+    list: {
+      getSelectedItem(): SelectItem | null
+      setSelectedIndex(index: number): void
+      handleInput(data: string): void
+    },
+    maxVisible: number,
+    firstRow: number,
+  ): SupervisorOverlayListTarget => {
+    const selected = list.getSelectedItem()
+    const selectedIndex = Math.max(0, items.findIndex((item) => item.value === selected?.value))
+    return {
+      firstRow,
+      indexes: supervisorVisibleListIndexes(selectedIndex, items.length, maxVisible),
+      select(index) {
+        list.setSelectedIndex(index)
+        ui.requestRender()
+      },
+      activate() {
+        list.handleInput('\r')
+      },
+      move(delta) {
+        list.handleInput(delta < 0 ? '\u001b[A' : '\u001b[B')
+        ui.requestRender()
+      },
+    }
+  }
   const stopMotionTimer = () => {
     if (motionTimer) clearInterval(motionTimer)
     motionTimer = undefined
@@ -858,10 +915,17 @@ export async function runSupervisorTui(
       0,
       items.findIndex((item) => item.value === screen.snapshot.channel),
     ))
+    const overlayOptions = {
+      width: '72%',
+      maxHeight: '70%',
+      anchor: 'center',
+      margin: 1,
+    } as const
     const close = (notice?: string) => {
       if (!updateChannelActive) return
       updateChannelActive = false
       closeUpdateChannel = null
+      overlayPointer.clear()
       overlay.hide()
       if (notice) screen.update({ notice })
     }
@@ -879,7 +943,7 @@ export async function runSupervisorTui(
     }
     const panel = new (class implements Component {
       render(width: number): string[] {
-        return renderSupervisorPanel('Update Channel', 'Choose release lane', [
+        const lines = renderSupervisorPanel('Update Channel', 'Choose release lane', [
           ...list.render(Math.max(1, width - 4)),
           '',
           ...renderSupervisorCommandBar([
@@ -887,6 +951,14 @@ export async function runSupervisorTui(
             { key: 'Esc', label: 'Cancel' },
           ], Math.max(1, width - 4)),
         ], width)
+        captureOverlayPointer(
+          lines,
+          width,
+          overlayOptions,
+          (data) => this.handleInput(data),
+          selectListPointerTarget(items, list, items.length, 2),
+        )
+        return lines
       }
 
       handleInput(data: string): void {
@@ -897,12 +969,7 @@ export async function runSupervisorTui(
         list.invalidate()
       }
     })()
-    const overlay = ui.showOverlay(panel, {
-      width: '72%',
-      maxHeight: '70%',
-      anchor: 'center',
-      margin: 1,
-    })
+    const overlay = ui.showOverlay(panel, overlayOptions)
     closeUpdateChannel = () => close()
     overlay.focus()
   }
@@ -1151,6 +1218,12 @@ export async function runSupervisorTui(
 
     sourcePromptActive = true
     let saving = false
+    const overlayOptions = {
+      width: '80%',
+      maxHeight: 10,
+      anchor: 'center',
+      margin: 1,
+    } as const
     const input = new (class extends piTui.Input {
       detail = reason
         ? `Start needs an OpenAlice source checkout. ${reason}`
@@ -1163,7 +1236,7 @@ export async function runSupervisorTui(
       }
 
       override render(width: number): string[] {
-        return renderSupervisorPanel('Runtime Source', 'AliceProject setting', [
+        const lines = renderSupervisorPanel('Runtime Source', 'AliceProject setting', [
           sanitize(this.detail),
           '',
           ...super.render(Math.max(1, width - 4)),
@@ -1173,22 +1246,20 @@ export async function runSupervisorTui(
             { key: 'Esc', label: 'Cancel' },
           ], Math.max(1, width - 4)),
         ], width)
+        captureOverlayPointer(lines, width, overlayOptions, (data) => this.handleInput(data))
+        return lines
       }
     })()
     input.setValue(sourceContext.appDir ?? process.cwd())
     input.handleInput('\u0005')
-    const overlay = ui.showOverlay(input, {
-      width: '80%',
-      maxHeight: 10,
-      anchor: 'center',
-      margin: 1,
-    })
+    const overlay = ui.showOverlay(input, overlayOptions)
     ui.setShowHardwareCursor(true)
 
     const close = (notice?: string) => {
       if (!sourcePromptActive) return
       sourcePromptActive = false
       closeSourcePrompt = null
+      overlayPointer.clear()
       overlay.hide()
       ui.setShowHardwareCursor(false)
       if (notice) screen.update({ notice })
@@ -1266,6 +1337,8 @@ export async function runSupervisorTui(
 
     settingsActive = true
     let saving = false
+    let settingsSelectedIndex = 0
+    let settingsSubmenuOpen = false
     let scope: typeof PROJECT_SCOPE | typeof MACHINE_SCOPE = PROJECT_SCOPE
     let message = 'Changes apply to this AliceProject. Environment and command-line overrides remain locked.'
     const items: SettingItem[] = []
@@ -1279,6 +1352,7 @@ export async function runSupervisorTui(
       if (!settingsActive) return
       settingsActive = false
       closeSettings = null
+      overlayPointer.clear()
       overlay.hide()
       ui.setShowHardwareCursor(false)
       screen.update({ notice })
@@ -1307,7 +1381,7 @@ export async function runSupervisorTui(
             '',
             sanitize(this.detail),
             '',
-            'Enter  Save · Esc  Cancel',
+            '[ Enter ] Save · [ Esc ] Cancel',
           ]
         }
       })()
@@ -1317,6 +1391,7 @@ export async function runSupervisorTui(
       input.onEscape = () => {
         input.focused = false
         ui.setShowHardwareCursor(false)
+        settingsSubmenuOpen = false
         done()
       }
       input.onSubmit = (value) => {
@@ -1327,6 +1402,7 @@ export async function runSupervisorTui(
         }
         input.focused = false
         ui.setShowHardwareCursor(false)
+        settingsSubmenuOpen = false
         done(value.trim() || INHERIT_SETTING)
       }
       return input
@@ -1580,29 +1656,72 @@ export async function runSupervisorTui(
       },
       () => close(),
     )
+    const moveSettings = (delta: -1 | 1) => {
+      settingsSelectedIndex = delta < 0
+        ? settingsSelectedIndex === 0 ? items.length - 1 : settingsSelectedIndex - 1
+        : settingsSelectedIndex === items.length - 1 ? 0 : settingsSelectedIndex + 1
+      settings.handleInput(delta < 0 ? '\u001b[A' : '\u001b[B')
+    }
+    const handleSettingsInput = (data: string) => {
+      if (saving) return
+      if (!settingsSubmenuOpen) {
+        if (piTui.matchesKey(data, 'up')) {
+          moveSettings(-1)
+          return
+        } else if (piTui.matchesKey(data, 'down')) {
+          moveSettings(1)
+          return
+        } else if (
+          (piTui.matchesKey(data, 'enter') || data === ' ')
+          && items[settingsSelectedIndex]?.submenu
+        ) {
+          settingsSubmenuOpen = true
+        }
+      }
+      settings.handleInput(data)
+    }
+    const overlayOptions = {
+      width: '90%',
+      maxHeight: '90%',
+      anchor: 'center',
+      margin: 1,
+    } as const
     const panel = new (class implements Component {
       render(width: number): string[] {
-        return renderSupervisorPanel('Setup', settingsContext.aliceProject.displayName, [
-          ...settings.render(Math.max(1, width - 4)),
+        const settingsLines = settings.render(Math.max(1, width - 4))
+        const lines = renderSupervisorPanel('Setup', settingsContext.aliceProject.displayName, [
+          ...settingsLines,
           '',
           sanitize(message),
         ], width)
+        const list = settingsSubmenuOpen
+          ? undefined
+          : {
+              firstRow: 2,
+              indexes: supervisorVisibleListIndexes(settingsSelectedIndex, items.length, 6),
+              select: (index: number) => {
+                while (settingsSelectedIndex !== index) moveSettings(1)
+                ui.requestRender()
+              },
+              activate: () => handleSettingsInput('\r'),
+              move: (delta: -1 | 1) => {
+                moveSettings(delta)
+                ui.requestRender()
+              },
+            }
+        captureOverlayPointer(lines, width, overlayOptions, (data) => this.handleInput(data), list)
+        return lines
       }
 
       handleInput(data: string): void {
-        if (!saving) settings.handleInput(data)
+        handleSettingsInput(data)
       }
 
       invalidate(): void {
         settings.invalidate()
       }
     })()
-    const overlay = ui.showOverlay(panel, {
-      width: '90%',
-      maxHeight: '90%',
-      anchor: 'center',
-      margin: 1,
-    })
+    const overlay = ui.showOverlay(panel, overlayOptions)
     closeSettings = () => close()
     overlay.focus()
   }
@@ -1696,6 +1815,13 @@ export async function runSupervisorTui(
     )
     list.setSelectedIndex(Math.max(0, selectedIndex))
     let component: Component = list
+    let projectListActive = true
+    const overlayOptions = {
+      width: '92%',
+      maxHeight: '90%',
+      anchor: 'center',
+      margin: 1,
+    } as const
 
     const setMessage = (next: string) => {
       message = next
@@ -1705,6 +1831,7 @@ export async function runSupervisorTui(
       if (!projectsActive) return
       projectsActive = false
       closeProjects = null
+      overlayPointer.clear()
       overlay.hide()
       ui.setShowHardwareCursor(false)
       screen.update({ notice })
@@ -1712,6 +1839,7 @@ export async function runSupervisorTui(
     const showList = () => {
       ui.setShowHardwareCursor(false)
       component = list
+      projectListActive = true
       setMessage(lock ?? 'Selecting an AliceProject also makes it the next bare-start default. Copy AI credentials with openalice project copy-ai-creds.')
     }
     const activateContext = async (
@@ -1742,6 +1870,7 @@ export async function runSupervisorTui(
       }
     }
     const showCreateHomeInput = (name: string) => {
+      projectListActive = false
       const defaultHome = registry.projects.find(
         (entry) => entry.key === 'default',
       )?.home ?? projectContext.home
@@ -1767,7 +1896,7 @@ export async function runSupervisorTui(
             '',
             sanitize(this.detail),
             '',
-            'Enter  Create and select · Esc  Back',
+            '[ Enter ] Create and select · [ Esc ] Back',
           ]
         }
       })()
@@ -1793,6 +1922,7 @@ export async function runSupervisorTui(
       setMessage('The new AliceProject owns only its registry entry; existing data is never copied or deleted.')
     }
     const showCreateNameInput = () => {
+      projectListActive = false
       const input = new (class extends piTui.Input {
         detail = 'Use a short lowercase name such as research or paper.'
 
@@ -1811,7 +1941,7 @@ export async function runSupervisorTui(
             '',
             sanitize(this.detail),
             '',
-            'Enter  Continue · Esc  Back',
+            '[ Enter ] Continue · [ Esc ] Back',
           ]
         }
       })()
@@ -1864,11 +1994,19 @@ export async function runSupervisorTui(
 
     const panel = new (class implements Component {
       render(width: number): string[] {
-        return renderSupervisorPanel('AliceProjects', projectContext.aliceProject.displayName, [
+        const lines = renderSupervisorPanel('AliceProjects', projectContext.aliceProject.displayName, [
           ...component.render(Math.max(1, width - 4)),
           '',
           sanitize(message),
         ], width)
+        captureOverlayPointer(
+          lines,
+          width,
+          overlayOptions,
+          (data) => this.handleInput(data),
+          projectListActive ? selectListPointerTarget(items, list, 8, 2) : undefined,
+        )
+        return lines
       }
 
       handleInput(data: string): void {
@@ -1879,12 +2017,7 @@ export async function runSupervisorTui(
         component.invalidate()
       }
     })()
-    const overlay = ui.showOverlay(panel, {
-      width: '92%',
-      maxHeight: '90%',
-      anchor: 'center',
-      margin: 1,
-    })
+    const overlay = ui.showOverlay(panel, overlayOptions)
     closeProjects = () => close()
     overlay.focus()
   }
@@ -1916,6 +2049,11 @@ export async function runSupervisorTui(
     }
     transferActive = true
     let component: Component
+    let activeChoice: {
+      items: SelectItem[]
+      list: InstanceType<typeof piTui.SelectList>
+      maxVisible: number
+    } | null = null
     let message = 'Choose the SSH Machine that will own the new AliceProject.'
     let transferController: AbortController | null = null
     const theme: SelectListTheme = {
@@ -1931,6 +2069,7 @@ export async function runSupervisorTui(
       transferController?.abort()
       transferActive = false
       closeTransfer = null
+      overlayPointer.clear()
       overlay.hide()
       ui.setShowHardwareCursor(false)
       screen.update({ notice })
@@ -1943,10 +2082,11 @@ export async function runSupervisorTui(
       submit: (value: string) => void,
       back: () => void,
     ) => {
+      activeChoice = null
       const input = new (class extends piTui.Input {
         detailText = detail
         override render(width: number): string[] {
-          return [title, '', ...super.render(width), '', sanitize(this.detailText), '', 'Enter  Continue · Esc  Back']
+          return [title, '', ...super.render(width), '', sanitize(this.detailText), '', '[ Enter ] Continue · [ Esc ] Back']
         }
       })()
       input.setValue(initial)
@@ -1970,9 +2110,11 @@ export async function runSupervisorTui(
       select: (value: string) => void,
       back: () => void,
     ) => {
-      const list = new piTui.SelectList(items, Math.min(8, items.length), theme)
+      const maxVisible = Math.min(8, items.length)
+      const list = new piTui.SelectList(items, maxVisible, theme)
       list.onSelect = (item) => select(item.value)
       list.onCancel = back
+      activeChoice = { items, list, maxVisible }
       component = new (class implements Component {
         render(width: number): string[] { return [title, '', ...list.render(width)] }
         handleInput(data: string): void { list.handleInput(data) }
@@ -2027,6 +2169,7 @@ export async function runSupervisorTui(
     const buildReview = async () => {
       const destination = selectedTransferDestination(state)!
       state.phase = 'planning'
+      activeChoice = null
       setMessage('Building a checksum and exclusion plan…')
       component = { render: () => ['Planning transfer…'], invalidate: () => undefined }
       try {
@@ -2070,8 +2213,8 @@ export async function runSupervisorTui(
         sanitize(state.error ?? 'Unknown error'),
         '',
         state.plan?.readyToApply
-          ? 'r  Retry the same transaction · Enter / Esc  Close'
-          : 'r  Rebuild the plan · Enter / Esc  Close',
+          ? '[ r ] Retry the same transaction · [ Enter ] / [ Esc ] Close'
+          : '[ r ] Rebuild the plan · [ Enter ] / [ Esc ] Close',
       ].map((line) => truncate(line, width)),
       handleInput: (data) => {
         if (piTui.matchesKey(data, 'r')) {
@@ -2098,7 +2241,7 @@ export async function runSupervisorTui(
           '',
           `${progress.files}/${progress.totalFiles} files · ${formatTransferProgress(progress.bytes, progress.totalBytes)}`,
           'Checksums are verified before atomic publish.',
-          'Esc / Ctrl+C  Cancel',
+          '[ Esc ] Cancel · Ctrl+C Detach',
         ],
         handleInput: (data) => {
           if (piTui.matchesKey(data, 'escape')) {
@@ -2156,18 +2299,35 @@ export async function runSupervisorTui(
       invalidate: () => undefined,
     })
     showDestination()
+    const overlayOptions = {
+      width: '92%',
+      maxHeight: '92%',
+      anchor: 'center',
+      margin: 1,
+    } as const
     const panel = new (class implements Component {
       render(width: number): string[] {
-        return renderSupervisorPanel('Remote Transfer', source.displayName, [
+        const lines = renderSupervisorPanel('Remote Transfer', source.displayName, [
           ...component.render(Math.max(1, width - 4)),
           '',
           sanitize(message),
         ], width)
+        const choice = activeChoice
+        captureOverlayPointer(
+          lines,
+          width,
+          overlayOptions,
+          (data) => this.handleInput(data),
+          choice
+            ? selectListPointerTarget(choice.items, choice.list, choice.maxVisible, 4)
+            : undefined,
+        )
+        return lines
       }
       handleInput(data: string): void { component.handleInput?.(data) }
       invalidate(): void { component.invalidate() }
     })()
-    const overlay = ui.showOverlay(panel, { width: '92%', maxHeight: '92%', anchor: 'center', margin: 1 })
+    const overlay = ui.showOverlay(panel, overlayOptions)
     closeTransfer = () => close()
     overlay.focus()
   }
@@ -2225,7 +2385,9 @@ export async function runSupervisorTui(
     const removeInputListener = ui.addInputListener((data) => {
       const pointer = parseSupervisorPointer(data)
       if (pointer) {
-        if (!sourcePromptActive && !settingsActive && !projectsActive && !transferActive && !updateChannelActive) {
+        if (sourcePromptActive || settingsActive || projectsActive || transferActive || updateChannelActive) {
+          overlayPointer.route(pointer)
+        } else {
           screen.handlePointer(pointer)
         }
         return { consume: true }

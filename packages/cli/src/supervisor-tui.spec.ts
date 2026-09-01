@@ -1651,6 +1651,50 @@ describe('Supervisor TUI screen', () => {
     expect(calls).toEqual(['check:beta', 'apply:beta:0.90.2-beta.1'])
   })
 
+  it('routes pointer selection through the centered update-channel overlay', async () => {
+    let inputListener: ((data: string) => unknown) | undefined
+    const checked: string[] = []
+    class FakeTui {
+      addChild(): void {}
+      addInputListener(listener: (data: string) => unknown): () => void {
+        inputListener = listener
+        return () => undefined
+      }
+      requestRender(): void {}
+      setShowHardwareCursor(): void {}
+      showOverlay(component: { render(width: number): string[] }) {
+        return {
+          hide: () => undefined,
+          focus: () => {
+            const lines = component.render(72)
+            const overlayRow = 1 + Math.floor((28 - lines.length) / 2)
+            queueMicrotask(() => inputListener?.(`\u001b[<0;20;${overlayRow + 4}M`))
+          },
+        }
+      }
+      start(): void { queueMicrotask(() => inputListener?.('u')) }
+      stop(): void {}
+    }
+    const realTui = await (await import('./pi-tui-loader.ts')).loadPiTui()
+
+    await expect(runSupervisorTui({}, {
+      stdin: { isTTY: true } as NodeJS.ReadStream,
+      stdout: { isTTY: true, columns: 100, rows: 30 } as NodeJS.WriteStream,
+      resolveContext: () => resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' }),
+      inspect: async () => ({ class: 'absent', owner: null, endpoints: {} }),
+      checkUpdate: async (channel) => {
+        checked.push(channel)
+        queueMicrotask(() => inputListener?.('q'))
+        return { status: 'current', currentVersion: 'dev', channel, sourceChannel: channel }
+      },
+      discoverUpdate: async () => null,
+      loadTui: async () => ({ ...realTui, TUI: FakeTui }) as never,
+      channel: 'stable',
+    })).resolves.toBe(0)
+
+    expect(checked).toEqual(['dev'])
+  })
+
   it('does not replace a package-manager installation from the TUI', async () => {
     let inputListener: ((data: string) => unknown) | undefined
     const applyUpdate = vi.fn(async () => 0)

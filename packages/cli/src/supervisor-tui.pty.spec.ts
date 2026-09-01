@@ -192,6 +192,57 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   })
 
+  it('uses raw pointer input inside the centered Setup overlay', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-overlay-pointer-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [cliEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let setupOpened = false
+      let clickedScope = false
+      let closed = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor overlay pointer timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!setupOpened && output.includes('[ / ] Commands') && output.includes('[ q ] Detach')) {
+          setupOpened = true
+          child.write('p')
+        } else if (!clickedScope && output.includes('Setup · Default AliceProject') && output.includes('Editing')) {
+          clickedScope = true
+          child.write('\u001b[<32;10;6M')
+          child.write('\u001b[<0;10;6M')
+        } else if (!closed && output.includes('› Editing          Machine defaults')) {
+          closed = true
+          child.write('\u001b')
+          setTimeout(() => child.write('q'), 50)
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && closed) resolve(output)
+        else reject(new Error(`Supervisor overlay pointer exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('› Editing          Machine defaults')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
   it('renders an offline registered Machine and preserves drill-down across resize', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-fleet-offline-'))
     temporaryPaths.push(isolatedHome)

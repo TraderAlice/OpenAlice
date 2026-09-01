@@ -179,6 +179,12 @@ path is intentionally parameter-free:
 - Help is a grouped keyboard map rather than another prose screen. Update,
   Setup, AliceProject selection, Runtime Source, and Remote Transfer use the
   same bordered overlay shell and semantic selected/description states.
+  Overlay lists share the application pointer contract: motion moves the
+  visible selection, the wheel moves its list window, and a click invokes the
+  same Enter path. Rendered keycaps remain clickable inside list, input,
+  review, failure, and completion phases; the pointer router derives the
+  overlay origin from the same terminal dimensions, anchor, margin, and
+  rendered height used by the TUI compositor.
   Lifecycle, managed-source, and update confirmations use matching framed cards
   with explicit confirm/cancel keycaps. Existing Esc, validation, confirmation,
   and hardware-cursor contracts remain unchanged;
