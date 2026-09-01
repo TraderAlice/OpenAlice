@@ -742,6 +742,19 @@ writes. Restart/resume and hard-kill persistence are owned by the Bun CLI
 distribution plan's still-open Railway acceptance, not by this transfer
 increment.
 
+Increment 7 live authority observation (2026-09-01): the retained Railway
+service changed explicitly from rolling `dev` to pinned `beta`
+`0.91.0-beta.2` through local Railway deployment authority and one redeploy.
+The controller and SSH path remained inspection-only: no remote installer,
+pointer mutation, stop, or takeover ran through SSH. Re-probe found the exact
+accepted Linux x64 checksum/content identity, Bun provider, both Railway
+Runtime capabilities, ready Alice/UTA/Connector components, the same selected
+Project id with 10,763 files and six Workspace directories, and persistent Pi
+and OpenCode executables. This validates the manual destination-owner journey
+and its post-redeploy evidence, but does not complete Increment 7: the typed
+release relation, consented Railway adapter, controller-behind guard, and TUI
+presentation remain implementation work.
+
 Always:
 
 ```bash
