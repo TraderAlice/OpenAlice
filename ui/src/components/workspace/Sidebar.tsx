@@ -19,6 +19,7 @@ import { orderSessionsForSidebar, orderWorkspacesForSidebar, workspaceActivityMs
 import { useReorderMotion } from './useReorderMotion';
 import { SidebarActionMenu } from './SidebarActionMenu';
 import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon';
+import { projectHeadlessTaskPresentation } from './headless-task-presentation';
 
 /**
  * Workspace launcher sidebar.
@@ -523,7 +524,7 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
         <HeadlessGroup
           tasks={props.headlessTasks!}
           onOpenAsSession={(task) => props.onOpenHeadlessRun(w.id, task.resumeId, {
-            title: task.prompt,
+            title: projectHeadlessTaskPresentation(task).title,
           })}
         />
       )}
@@ -594,10 +595,12 @@ function HeadlessTaskRow(props: {
 }): ReactElement {
   const { t } = useTranslation();
   const task = props.task;
+  const presentation = projectHeadlessTaskPresentation(task);
   const openable = task.status !== 'running' && task.resumable;
   const titleParts = [`${task.agent} · ${task.status}`, formatRelativeTime(task.startedAt)];
   if (task.error) titleParts.push(task.error);
-  titleParts.push(task.prompt);
+  titleParts.push(presentation.title);
+  if (presentation.summary) titleParts.push(presentation.summary);
 
   return (
     <div className="group flex items-center gap-1.5 pl-3 pr-2 py-1 text-[11px]" title={titleParts.join('\n')}>
@@ -605,7 +608,7 @@ function HeadlessTaskRow(props: {
       <span className="shrink-0 flex items-center justify-center w-3.5 text-muted-foreground/50">
         <AgentBadgeGlyph agentId={task.agent} />
       </span>
-      <span className="flex-1 truncate text-muted-foreground">{task.prompt}</span>
+      <span className="flex-1 truncate text-muted-foreground">{presentation.title}</span>
       {openable && (
         <button
           type="button"

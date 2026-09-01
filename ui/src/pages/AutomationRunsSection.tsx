@@ -21,6 +21,7 @@ import type {
 } from '../api/headless'
 import { MarkdownContent } from '../components/MarkdownContent'
 import { Skeleton } from '../components/StateViews'
+import { projectHeadlessTaskPresentation } from '../components/workspace/headless-task-presentation'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { useIssues } from '../hooks/useIssues'
 import { formatRelativeTime } from '../lib/intl'
@@ -34,7 +35,6 @@ const STATUS_STYLE: Record<HeadlessTaskStatus, string> = {
 }
 
 const RUNS_PAGE_SIZE = 25
-const RUN_PROMPT_SUMMARY_LENGTH = 96
 
 function fmtDuration(ms?: number): string {
   if (ms == null) return '—'
@@ -51,15 +51,6 @@ function formatValue(value: unknown): string {
   } catch {
     return String(value)
   }
-}
-
-function summarizeRunPrompt(prompt: string): string {
-  const normalized = prompt.replace(/\s+/g, ' ').trim()
-  if (!normalized) return 'Untitled task'
-
-  const characters = Array.from(normalized)
-  if (characters.length <= RUN_PROMPT_SUMMARY_LENGTH) return normalized
-  return `${characters.slice(0, RUN_PROMPT_SUMMARY_LENGTH - 1).join('').trimEnd()}…`
 }
 
 function ToolBlock({ block }: { block: Extract<HeadlessMessageBlock, { type: 'tool' }> }) {
@@ -293,10 +284,11 @@ function AutomationRunTitle({
   source: IssueRunSource | null
   issue?: IssueRunIdentity
 }) {
+  const presentation = projectHeadlessTaskPresentation(task)
   if (!source) {
     return (
       <span className="block max-h-10 overflow-hidden text-[13px] leading-5 text-foreground">
-        {task.prompt}
+        {presentation.title}
       </span>
     )
   }
@@ -323,9 +315,11 @@ function AutomationRunTitle({
           </span>
         )}
       </span>
-      <span className="mt-0.5 block truncate text-[12px] leading-5 text-muted-foreground">
-        {task.prompt}
-      </span>
+      {presentation.summary && (
+        <span className="mt-0.5 block truncate text-[12px] leading-5 text-muted-foreground">
+          {presentation.summary}
+        </span>
+      )}
     </>
   )
 }
@@ -452,7 +446,9 @@ export function AutomationRunsSection() {
       return next
     })
     try {
-      await openHeadlessRun(task.wsId, task.resumeId, { title: task.prompt })
+      await openHeadlessRun(task.wsId, task.resumeId, {
+        title: projectHeadlessTaskPresentation(task).title,
+      })
     } catch (e) {
       setOpenErrors((previous) => ({
         ...previous,
@@ -530,9 +526,9 @@ export function AutomationRunsSection() {
                 ? issueIdentities.get(issueIdentityKey(issueSource.workspaceId, issueSource.issueId))
                 : undefined
               const workspaceName = workspaceLabel?.label ?? task.wsId
+              const presentation = projectHeadlessTaskPresentation(task)
               const runSubject = issueIdentity?.title
-                ?? issueSource?.issueId
-                ?? summarizeRunPrompt(task.prompt)
+                ?? presentation.title
               const runLabel = `Run details, ${task.status}: ${runSubject}. ${task.agent} in ${workspaceName}.`
               const toolSummary = task.output?.toolCalls
                 ? `${task.output.toolCalls} tool${task.output.toolCalls === 1 ? '' : 's'}`
