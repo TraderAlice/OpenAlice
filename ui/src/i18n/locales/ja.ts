@@ -205,6 +205,7 @@ export const ja: Resources = {
         due: '実行時刻を迎え、ディスパッチを待っています。',
         running: 'スケジュール実行中です。',
         healthy: '直近のスケジュール実行が完了しました。',
+        runtimeMissing: 'このホストには {{agent}} がインストールされていません。次回のスケジュール実行前にインストールしてください。',
         missingSession: '割り当てたセッションが存在しません。アクティブなセッションまたは実行ごとの新しいセッションを選択してください。',
         retiredSession: '割り当てたセッションはアーカイブ済みです。次回実行前に課題を再割り当てしてください。',
         unboundSession: '割り当てたセッションには、再開可能なランタイム会話がまだありません。',
@@ -398,6 +399,11 @@ export const ja: Resources = {
     about: {
       title: 'OpenAlice について',
       description: 'インストール、実行環境、更新状況、現在開いている AliceProject を確認します。',
+      connection: {
+        title: 'バックエンド接続',
+        description: 'このブラウザーは SSH トンネル経由でリモート OpenAlice Runtime に接続しています。',
+        connected: '接続済み',
+      },
       aliceProject: {
         title: '現在の AliceProject',
         description: 'このデータホーム、Guardian、バックエンド、フロントエンド接続先を所有する最上位プロジェクトです。',
@@ -481,6 +487,7 @@ export const ja: Resources = {
       recent: '最近使った場所',
       useAndRestart: '使用して再起動',
       browserOnly: 'フォルダー選択はデスクトップアプリで利用できます。ブラウザーと開発起動では次のコマンドで同じ境界を選べます：',
+      remoteManaged: 'このデータホームは接続先のリモート Runtime が所有しています。場所はリモートホストまたはデプロイサービスで管理してください。',
       lockedByHome: 'この起動は OPENALICE_HOME で固定されています。デスクトップ UI から切り替える前に環境変数を外してください。',
       lockedByWorkspace: 'この起動は AQ_LAUNCHER_ROOT で固定されています。完全なホームを切り替える前に環境変数を外してください。',
       loadError: 'デスクトップのデータ保存場所を読み込めませんでした。',

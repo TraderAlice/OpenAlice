@@ -15,11 +15,12 @@ import { CreateWorkspaceDialog } from './CreateWorkspaceDialog';
 import { WorkspaceOffboardingDialog } from './WorkspaceOffboardingDialog';
 import { Skeleton } from '../StateViews';
 import { sessionCoworkerLabel, workspaceDisplayName, workspaceDisplayTitle } from './display';
-import { orderSessionsForSidebar, orderWorkspacesForSidebar } from './sidebar-order';
+import { orderSessionsForSidebar, orderWorkspacesForSidebar, workspaceActivityMs } from './sidebar-order';
 import { useReorderMotion } from './useReorderMotion';
 import { SidebarActionMenu } from './SidebarActionMenu';
 import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon';
 import { SelectionIndicator } from '../SelectionIndicator';
+import { projectHeadlessTaskPresentation } from './headless-task-presentation';
 
 /**
  * Workspace launcher sidebar.
@@ -373,6 +374,9 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
     : w.sessions.length > 0
       ? 'bg-muted-foreground/40'
       : 'border border-border';
+  const activityLabel = t('workspace.activeAgo', {
+    time: formatRelativeTime(workspaceActivityMs(w)),
+  });
 
   return (
     <div data-reorder-id={props.reorderId}>
@@ -386,6 +390,7 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
           type="button"
           onClick={() => props.onSelectWorkspace(w.id)}
           title={workspaceDisplayTitle(w)}
+          aria-label={`${label}. ${activityLabel}`}
           aria-current={isSelected ? 'page' : undefined}
           className="flex-1 min-w-0 flex items-center gap-2 text-left"
         >
@@ -393,8 +398,13 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
             className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusClass}`}
             title={hasRunning ? t('workspace.runningCount', { count: runningCount }) : t('workspace.idle')}
           />
-          <span className="flex-1 truncate font-medium">{label}</span>
-          <span className="text-[10px] text-muted-foreground/50 tabular-nums shrink-0">{formatRelativeTime(w.createdAt)}</span>
+          <span className="min-w-0 flex-1 truncate font-medium">{label}</span>
+          <span
+            className="text-[10px] text-muted-foreground/50 tabular-nums shrink-0"
+            title={activityLabel}
+          >
+            {formatRelativeTime(workspaceActivityMs(w))}
+          </span>
         </button>
         {props.agents.length > 0 && (
           <div ref={spawnControlsRef} className="relative flex shrink-0 items-center">
@@ -515,7 +525,7 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
         <HeadlessGroup
           tasks={props.headlessTasks!}
           onOpenAsSession={(task) => props.onOpenHeadlessRun(w.id, task.resumeId, {
-            title: task.prompt,
+            title: projectHeadlessTaskPresentation(task).title,
           })}
         />
       )}
@@ -586,10 +596,12 @@ function HeadlessTaskRow(props: {
 }): ReactElement {
   const { t } = useTranslation();
   const task = props.task;
+  const presentation = projectHeadlessTaskPresentation(task);
   const openable = task.status !== 'running' && task.resumable;
   const titleParts = [`${task.agent}, ${task.status}`, formatRelativeTime(task.startedAt)];
   if (task.error) titleParts.push(task.error);
-  titleParts.push(task.prompt);
+  titleParts.push(presentation.title);
+  if (presentation.summary) titleParts.push(presentation.summary);
 
   return (
     <div className="group flex items-center gap-1.5 pl-3 pr-2 py-1 text-[11px]" title={titleParts.join('\n')}>
@@ -597,7 +609,7 @@ function HeadlessTaskRow(props: {
       <span className="shrink-0 flex items-center justify-center w-3.5 text-muted-foreground/50">
         <AgentBadgeGlyph agentId={task.agent} />
       </span>
-      <span className="flex-1 truncate text-muted-foreground">{task.prompt}</span>
+      <span className="flex-1 truncate text-muted-foreground">{presentation.title}</span>
       {openable && (
         <button
           type="button"

@@ -212,6 +212,7 @@ export const zhHant: Resources = {
         due: '已到執行時間，正在等待派發。',
         running: '排程工作正在執行。',
         healthy: '最近一次排程工作已完成。',
+        runtimeMissing: '這台主機尚未安裝 {{agent}}。請在下次排程執行前完成安裝。',
         missingSession: '指定的工作階段不存在。請選擇活躍工作階段或「每次執行都建立新工作階段」。',
         retiredSession: '指定的工作階段已封存。請在下次執行前重新分配議題。',
         unboundSession: '指定的工作階段還沒有可恢復的執行環境對話。',
@@ -405,6 +406,11 @@ export const zhHant: Resources = {
     about: {
       title: '關於 OpenAlice',
       description: '查看目前安裝、執行環境、更新狀態，以及此處開啟的 AliceProject。',
+      connection: {
+        title: '後端連線',
+        description: '此瀏覽器正透過 SSH 通道連線遠端 OpenAlice Runtime。',
+        connected: '已連線',
+      },
       aliceProject: {
         title: '目前 AliceProject',
         description: '擁有此資料目錄、Guardian、後端與前端入口的頂層專案。',
@@ -488,6 +494,7 @@ export const zhHant: Resources = {
       recent: '最近使用的位置',
       useAndRestart: '使用並重新啟動',
       browserOnly: '桌面端可以直接選擇資料夾；瀏覽器與開發模式可用下列命令選擇相同邊界：',
+      remoteManaged: '此資料目錄屬於目前連線的遠端 Runtime。請在遠端主機或其部署服務中管理該位置。',
       lockedByHome: '本次啟動被 OPENALICE_HOME 鎖定。請先移除該環境變數，再從桌面 UI 切換。',
       lockedByWorkspace: '本次啟動固定了 AQ_LAUNCHER_ROOT。請先移除該環境變數，再從桌面 UI 切換完整主目錄。',
       loadError: '無法讀取桌面端的資料位置設定。',

@@ -31,6 +31,7 @@ import type { IssuePriority, IssueRecord, IssueStatus, IssueTimeout } from './de
 import type { IssueComment } from './comments.js'
 import type { IssueAutomationHealth } from './automation-health.js'
 import { issueRunFailure, type IssueRunFailure } from './run-failure.js'
+import type { PublicSessionRuntime } from '../public-session.js'
 
 /** One board row: the issue's display fields, plus — iff it self-schedules — its
  *  `when` and the scanner's firing markers. No markdown What (Phase 2 loads it). */
@@ -267,10 +268,27 @@ export interface IssueDetailIssue {
   telegramConnector?: true
 }
 
+/** Authoritative resolution of an Issue's exact @resume owner. Unlike a
+ * Workspace directory page, this lookup is global, uncapped, and tied to the
+ * detail read, so it cannot become stale while the Issue assignee advances. */
+export interface IssueAssigneeSession {
+  resumeId: string
+  state: 'ready' | 'missing' | 'retired' | 'deleted' | 'unbound' | 'workspace_missing'
+  workspace?: { id: string; tag: string }
+  agent?: string
+  displayName?: string
+  createdAt?: number
+  updatedAt?: number
+  active: boolean
+  runtime?: PublicSessionRuntime
+}
+
 /** GET /api/issues/:wsId/:id — one issue + its human-facing Activity timeline,
  *  operational run history, and the inbox reports it produced. */
 export interface IssueDetail {
   issue: IssueDetailIssue
+  /** Present when assignee is an exact @resume identity. */
+  assigneeSession?: IssueAssigneeSession
   /** Structured markdown comments loaded from the adjacent JSON sidecar. */
   comments: IssueComment[]
   /** This issue's headless runs (wsId + issueId match), newest first.

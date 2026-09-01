@@ -5,8 +5,9 @@ import { EmptyState as SharedEmptyState, RecoverySurface, Skeleton } from '../co
 import { Toggle } from '../components/Toggle'
 import { useTradingConfig } from '../hooks/useTradingConfig'
 import { useAccountHealth } from '../hooks/useAccountHealth'
+import { useBrokerPackReadiness, deriveAccountInteractionPolicy } from '../hooks/useBrokerPackReadiness'
 import { PageHeader } from '../components/PageHeader'
-import { HealthBadge } from '../components/uta/HealthBadge'
+import { AccountReadinessBadge } from '../components/uta/BrokerPackGate'
 import { CreateUTADialog } from '../components/uta/CreateUTADialog'
 import { EditUTADialog } from '../components/uta/EditUTADialog'
 import { fmt } from '../lib/format'
@@ -15,6 +16,7 @@ import type { TradingServiceStatus } from '../api/trading'
 import { useWorkspace } from '../tabs/store'
 import type { UTAConfig, BrokerPreset, BrokerHealthInfo, BrokerPackStatus } from '../api/types'
 import { Button } from '../components/ui/button'
+import type { AccountPackReadiness } from '../hooks/useBrokerPackReadiness'
 
 // ==================== External order monitoring cadence ====================
 //
@@ -144,9 +146,9 @@ export function ExternalOrderMonitoringRow() {
   )
 }
 
-export function KeylessDataSourcesRow({ ccxtPack, onPackInstalled }: {
+export function KeylessDataSourcesRow({ ccxtPack, onInstall }: {
   ccxtPack?: BrokerPackStatus
-  onPackInstalled: (status: BrokerPackStatus) => void
+  onInstall: () => Promise<void>
 }) {
   const [runtimeConfig, setRuntimeConfig] = useState<TradingRuntimeConfig | null>(null)
   const [msg, setMsg] = useState('')
@@ -188,8 +190,7 @@ export function KeylessDataSourcesRow({ ccxtPack, onPackInstalled }: {
     setInstalling(true)
     setMsg('Installing crypto data support…')
     try {
-      const installed = await api.trading.installBrokerPack('ccxt')
-      onPackInstalled(installed)
+      await onInstall()
       setMsg('Installed — choose the feeds you want')
     } catch (err) {
       setMsg(err instanceof Error ? err.message : 'Install failed')
@@ -254,9 +255,9 @@ interface EquitySummary {
   accounts: Array<{ id: string; label: string; equity: string; cash: string }>
 }
 
-export function MissingBrokerPacksNotice({ packs, onInstalled }: {
+export function MissingBrokerPacksNotice({ packs, onInstall }: {
   packs: BrokerPackStatus[]
-  onInstalled: (status: BrokerPackStatus) => void
+  onInstall: (engine: Exclude<BrokerPackStatus['engine'], 'mock'>) => Promise<void>
 }) {
   const actionable = packs.filter(
     (pack) => (!pack.installed || pack.updateAvailable) && pack.requiredBy.length > 0,
@@ -271,7 +272,7 @@ export function MissingBrokerPacksNotice({ packs, onInstalled }: {
     setInstalling(pack.engine)
     setError('')
     try {
-      onInstalled(await api.trading.installBrokerPack(pack.engine))
+      await onInstall(pack.engine)
     } catch (err) {
       setError(err instanceof Error ? err.message : `Failed to install ${pack.engine} support`)
     } finally {
@@ -331,6 +332,7 @@ export function MissingBrokerPacksNotice({ packs, onInstalled }: {
 export function TradingPage() {
   const tc = useTradingConfig()
   const healthMap = useAccountHealth()
+  const brokerReadiness = useBrokerPackReadiness()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const setSidebar = useWorkspace((s) => s.setSidebar)
   const [showAdd, setShowAdd] = useState(false)
@@ -339,18 +341,19 @@ export function TradingPage() {
   const [equity, setEquity] = useState<EquitySummary | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [serviceStatus, setServiceStatus] = useState<TradingServiceStatus | null>(null)
-  const [brokerPacks, setBrokerPacks] = useState<BrokerPackStatus[]>([])
-
-  const updateBrokerPack = (status: BrokerPackStatus) => {
-    setBrokerPacks((rows) => [...rows.filter((row) => row.engine !== status.engine), status])
-  }
+  const brokerPacks = brokerReadiness.data?.packs ?? []
 
   useEffect(() => {
     api.trading.getBrokerPresets().then(r => setPresets(r.presets)).catch(() => {})
-    api.trading.getBrokerPacks().then(r => setBrokerPacks(r.packs)).catch(() => {})
   }, [])
 
+  const hasReadableAccount = tc.utas.some((uta) => brokerReadiness.forAccount(uta).operational && uta.enabled !== false)
+
   useEffect(() => {
+    if (!hasReadableAccount) {
+      setServiceStatus(null)
+      return
+    }
     let cancelled = false
     const refresh = async () => {
       try {
@@ -372,26 +375,31 @@ export function TradingPage() {
     void refresh()
     const id = setInterval(refresh, 15_000)
     return () => { cancelled = true; clearInterval(id) }
-  }, [])
+  }, [hasReadableAccount])
 
   // Per-card liveness signal — `equity()` lets each card show "this
   // connection actually returned an account balance" rather than just
   // "ping went through". 60s cadence is enough; trend/sparkline/aggregate
   // moved to Portfolio.
   useEffect(() => {
+    if (!hasReadableAccount) {
+      setEquity(null)
+      setLastUpdated(null)
+      return
+    }
     let cancelled = false
     const refresh = async () => {
       const eq = await api.trading.equity().catch(() => null)
       if (cancelled) return
-      if (eq) {
+      if (eq && eq.accounts.length > 0) {
         setEquity(eq)
         setLastUpdated(new Date())
       }
     }
-    refresh()
+    void refresh()
     const id = setInterval(refresh, 60_000)
     return () => { cancelled = true; clearInterval(id) }
-  }, [])
+  }, [hasReadableAccount])
 
   const editingUTA = editingId ? tc.utas.find(u => u.id === editingId) : null
   const editingPreset = editingUTA ? presets.find(p => p.id === editingUTA.presetId) : undefined
@@ -435,13 +443,15 @@ export function TradingPage() {
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
         title="Trading"
-        live={tc.utas.length > 0 ? { lastUpdated } : undefined}
+        live={lastUpdated && equity?.accounts.some((row) => brokerReadiness.data?.accounts.some(
+          (account) => account.accountId === row.id && account.operational,
+        )) ? { lastUpdated } : undefined}
       />
 
       <SettingsScrollArea className="px-4 py-5 md:px-6">
         <div className="max-w-[820px] mx-auto space-y-4">
           {serviceStatus?.available === false && <TradingServiceOfflineBanner status={serviceStatus} />}
-          <MissingBrokerPacksNotice packs={brokerPacks} onInstalled={updateBrokerPack} />
+          <MissingBrokerPacksNotice packs={brokerPacks} onInstall={brokerReadiness.install} />
           {tc.utas.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border pb-8 text-center">
               <SharedEmptyState
@@ -454,12 +464,14 @@ export function TradingPage() {
             <div className="space-y-2.5">
               {tc.utas.map((uta) => {
                 const equityRow = equity?.accounts.find(a => a.id === uta.id) ?? null
+                const readiness = brokerReadiness.forAccount(uta)
                 return (
                   <UTACard
                     key={uta.id}
                     uta={uta}
                     preset={presets.find(p => p.id === uta.presetId)}
                     health={healthMap[uta.id]}
+                    readiness={readiness}
                     equity={equityRow}
                     onClick={() => setEditingId(uta.id)}
                   />
@@ -478,7 +490,7 @@ export function TradingPage() {
 
           <KeylessDataSourcesRow
             ccxtPack={brokerPacks.find((row) => row.engine === 'ccxt')}
-            onPackInstalled={updateBrokerPack}
+            onInstall={() => brokerReadiness.install('ccxt')}
           />
           {tc.utas.length > 0 && <ExternalOrderMonitoringRow />}
         </div>
@@ -506,7 +518,7 @@ export function TradingPage() {
             setEditingId(id)
           }}
           onClose={() => setShowAdd(false)}
-          onPackInstalled={updateBrokerPack}
+          onPackInstalled={() => { void brokerReadiness.refresh() }}
         />
       )}
 
@@ -515,6 +527,16 @@ export function TradingPage() {
           uta={editingUTA}
           preset={editingPreset}
           health={healthMap[editingUTA.id]}
+          readiness={brokerReadiness.forAccount(editingUTA)}
+          policy={deriveAccountInteractionPolicy({
+            account: editingUTA,
+            readiness: brokerReadiness.forAccount(editingUTA),
+            health: healthMap[editingUTA.id],
+            tradingMode: serviceStatus?.mode ?? 'lite',
+          })}
+          installingEngine={brokerReadiness.installingEngine}
+          onInstallBrokerPack={brokerReadiness.install}
+          onRetryBrokerPack={brokerReadiness.refresh}
           onSave={async (next) => { await tc.saveUTA(next) }}
           onDelete={async () => {
             await tc.deleteUTA(editingUTA.id)
@@ -579,10 +601,11 @@ function buildSubtitle(uta: UTAConfig, preset?: BrokerPreset): string {
 
 // ==================== UTA Card ====================
 
-function UTACard({ uta, preset, health, equity, onClick }: {
+function UTACard({ uta, preset, health, readiness, equity, onClick }: {
   uta: UTAConfig
   preset?: BrokerPreset
   health?: BrokerHealthInfo
+  readiness: AccountPackReadiness
   equity?: { equity: string; cash: string } | null
   onClick: () => void
 }) {
@@ -616,10 +639,7 @@ function UTACard({ uta, preset, health, equity, onClick }: {
           {equityNode && (
             <span className="text-[11px] text-muted-foreground/80 hidden sm:inline">{equityNode}</span>
           )}
-          {uta.enabled === false
-            ? <span className="text-[11px] text-muted-foreground">Disabled</span>
-            : <HealthBadge health={health} />
-          }
+          <AccountReadinessBadge readiness={readiness} health={health} />
         </div>
       </div>
     </button>

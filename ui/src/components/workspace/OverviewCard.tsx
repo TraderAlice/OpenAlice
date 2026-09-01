@@ -1,9 +1,9 @@
-import { useMemo } from 'react'
 import { formatRelativeTime } from '../../lib/intl'
 import { ArrowUpCircle, Bot, ChevronRight, Code, Cpu, GitBranch, ScrollText, Sparkles, Terminal, type LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { GitLogEntry, Workspace } from './api'
 import { sessionCoworkerLabel, workspaceDisplayName, workspaceDisplayTitle } from './display'
+import { workspaceActivityMs } from './sidebar-order'
 
 /**
  * Single-workspace summary for the Workspaces Overview dashboard. The header,
@@ -57,13 +57,7 @@ export function OverviewCard({
   const hiddenSessionCount = w.sessions.length - previewSessions.length
   const mobileHiddenSessionCount = Math.max(0, w.sessions.length - MOBILE_SESSION_PREVIEW_LIMIT)
 
-  const lastActivityMs = useMemo(() => {
-    const sessionTs = w.sessions
-      .map((s) => new Date(s.lastActiveAt).getTime())
-      .filter((n) => Number.isFinite(n))
-    if (sessionTs.length === 0) return new Date(w.createdAt).getTime()
-    return Math.max(...sessionTs)
-  }, [w.sessions, w.createdAt])
+  const lastActivityMs = workspaceActivityMs(w)
 
   const dotClass = hasRunning
     ? 'bg-success'

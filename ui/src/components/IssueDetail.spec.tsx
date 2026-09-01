@@ -145,6 +145,7 @@ beforeEach(async () => {
   resetAgentRuntimesStore()
   await i18n.changeLanguage('en')
   delete scheduledIssue.issue.automationHealth
+  delete scheduledIssue.assigneeSession
   delete scheduledIssue.issue.credential
   delete scheduledIssue.issue.model
   delete scheduledIssue.issue.effort
@@ -462,21 +463,20 @@ describe('IssueDetail property controls', () => {
   it('confirms a bound Session capability change without rewriting Issue frontmatter', async () => {
     scheduledIssue.issue.assignee = '@resume-kind-owl-abc123'
     delete scheduledIssue.issue.agent
-    mocks.getWorkspaceSessionDirectory.mockResolvedValue({
-      sessions: [{
-        resumeId: 'resume-kind-owl-abc123',
-        agent: 'codex',
-        createdAt: Date.now() - 86_400_000,
-        updatedAt: Date.now() - 60_000,
-        resumable: true,
-        active: false,
-        runtime: {
-          credentialSource: 'native',
-          model: 'claude-sonnet-4-5',
-          reasoningEffort: 'high',
-        },
-      }],
-    })
+    scheduledIssue.assigneeSession = {
+      resumeId: 'resume-kind-owl-abc123',
+      state: 'ready',
+      workspace: { id: 'demo-ws-remote', tag: 'remote' },
+      agent: 'codex',
+      displayName: 'Remote researcher',
+      active: false,
+      runtime: {
+        credentialSource: 'native',
+        model: 'claude-sonnet-4-5',
+        reasoningEffort: 'high',
+      },
+    }
+    mocks.getWorkspaceSessionDirectory.mockResolvedValue({ sessions: [] })
 
     render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
 
@@ -486,6 +486,7 @@ describe('IssueDetail property controls', () => {
     expect(trigger.textContent).toContain('claude-sonnet-4-5, high')
     expect(screen.queryByRole('combobox', { name: 'Runtime' })).toBeNull()
     expect(screen.getByText('codex')).toBeTruthy()
+    expect(screen.queryByText('This bound Session is no longer available.')).toBeNull()
 
     fireEvent.click(trigger)
     expect(screen.queryByRole('checkbox', { name: 'Follow Workspace headless preference' })).toBeNull()
@@ -501,7 +502,7 @@ describe('IssueDetail property controls', () => {
     fireEvent.click(within(confirm).getByRole('button', { name: 'Change capabilities' }))
 
     await waitFor(() => expect(mocks.updateResumeRuntime).toHaveBeenCalledWith(
-      'demo-ws-auto-quant',
+      'demo-ws-remote',
       'resume-kind-owl-abc123',
       {
         credentialSource: 'native',

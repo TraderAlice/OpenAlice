@@ -1,13 +1,14 @@
 # Bun-native CLI Distribution
 
 Status: Active — macOS/Linux native CLI is public in v0.90.2 and the separately
-dispatched v0.91.0-beta.1 is externally verified; stable remains v0.90.2 while
+dispatched v0.91.0-beta.2 is externally verified; stable remains v0.90.2 while
 stable/beta discovery authority is converged on the OpenAlice CDN;
 the Railway native CLI SSH host passes local empty-Volume, normal replacement,
 hard-kill recovery, real retained-Volume transfer, hosted Agent turns, and live
-v2 normal-restart/hard-kill reacceptance; the disposable hosted empty-Volume
-and forced installer-failure fallback journeys remain open; native PowerShell
-and external package-manager activation remain deferred
+v2 normal-restart/hard-kill reacceptance, plus a non-destructive switch from a
+rolling dev Runtime to pinned beta2; the disposable hosted empty-Volume and
+forced installer-failure fallback journeys remain open; native PowerShell and
+external package-manager activation remain deferred
 
 Delivery mode: Serial / interactive from current `dev`. The accepted native CLI
 increments have already reached `dev`; the old `codex/usability-improvements`
@@ -578,6 +579,10 @@ artifacts.
   mutable surface stayed byte-for-byte unchanged.
 - [x] Leave later fixes on `dev`. A `beta.2` checkpoint is optional; stable is
   a separate later decision after beta testing and maintainer acceptance.
+- [x] After later `dev` fixes and the beta fast-lane redesign, publish only
+  `v0.91.0-beta.2`, independently verify its public surface and stable-channel
+  isolation, then replace the retained Railway dev Runtime through the
+  service-owned selector rather than an SSH-owned install.
 
 ### 11. Converge channel discovery authority
 
@@ -1283,3 +1288,29 @@ This plan is complete only when:
   The disposable hosted empty-Volume/bootstrap-failure drill and retained
   valid-release forced-refresh fallback remain pending. No stable/beta release,
   tag, or channel promotion was performed.
+- 2026-09-01: Published only
+  [`v0.91.0-beta.2`](https://github.com/TraderAlice/OpenAlice/releases/tag/v0.91.0-beta.2)
+  from `87b5a81aa608c6c687c21d24259ea78054a632ac` in
+  [release run 33475817953](https://github.com/TraderAlice/OpenAlice/actions/runs/33475817953).
+  The beta fast lane completed in 17:53 wall time and 64:04 aggregate runner
+  time across 16 jobs, versus 35:03 and 110:09 across 21 jobs for beta1: 49.0%
+  less wall time and 41.8% less runner time. The signed/notarized Intel macOS
+  current candidate remained the 14:44 critical path. Independent verification
+  accepted all 49 GitHub assets, versioned desktop downloads, four native CLI
+  archives and sidecars, shared/versioned installers, updater feeds, Broker
+  Packs, and the beta CDN manifest. The default installer and GitHub latest
+  release still resolve stable `v0.90.2`; the captured stable manifest, feeds,
+  aliases, ETags, and sizes remained unchanged.
+- 2026-09-01: The retained no-domain Railway service then changed explicitly
+  from rolling `dev` to pinned `beta` `0.91.0-beta.2` through service variables
+  and one platform-owned redeploy (`0b8b36f9-3400-401d-965b-88c38ba42247`).
+  The entrypoint installed the accepted Linux x64 archive with SHA-256
+  `aae9e485e48e3ec56a108d64471c6b7e1c80da5f35408d236fbeb5f2d36582f7`
+  and content identity `02fb66323ca9fbf9`; the running provider is Bun and
+  advertises both Railway Runtime capabilities with no pending activation or
+  fallback. Alice, UTA, and Connector returned ready on the same
+  `/data/projects/main-cloud` Project id, whose 10,763 files and six Workspace
+  directories remained present. User-owned Pi 0.84.4 and OpenCode 1.18.25
+  remained executable under `/data/home`, and a fresh inspection-only SSH
+  tunnel served the beta2 UI on local loopback. No installer or release-pointer
+  mutation ran through Railway SSH.

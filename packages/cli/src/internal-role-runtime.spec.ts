@@ -3,8 +3,11 @@ import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
+
+const cliBinPath = fileURLToPath(new URL('../bin/openalice-bun.ts', import.meta.url))
 
 // Each case starts a real TypeScript child process with its own 10-second
 // process ceiling. Windows hosted runners can need more than Vitest's default
@@ -16,7 +19,7 @@ describe('private Runtime role fencing', { timeout: 15_000 }, () => {
     const result = spawnSync(process.execPath, [
       '--import',
       'tsx',
-      'packages/cli/bin/openalice-bun.ts',
+      cliBinPath,
       '--internal-role',
       'connector',
     ], {
@@ -47,7 +50,7 @@ describe('private Runtime role fencing', { timeout: 15_000 }, () => {
     const result = spawnSync(process.execPath, [
       '--import',
       'tsx',
-      'packages/cli/bin/openalice-bun.ts',
+      cliBinPath,
       '--internal-role',
       'alice',
     ], {

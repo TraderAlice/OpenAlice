@@ -8,6 +8,7 @@ import type { HeadlessTaskStatus, HeadlessTurnProgress } from '../api/headless'
 import type { InboxEntry } from '../api/inbox'
 import type {
   IssueDetail as IssueDetailData,
+  IssueAssigneeSession,
   IssueDetailIssue,
   IssuePatch,
   IssueActivityRecord,
@@ -23,7 +24,6 @@ import { DEFAULT_ISSUE_COMMENT_PROMPT, ISSUE_TIMEOUTS, issuesApi } from '../api/
 
 import {
   getAgentReadiness,
-  getWorkspaceSessionDirectory,
   listAgentCredentials,
   updateResumeRuntime,
   type AgentCredentialReadiness,
@@ -41,6 +41,7 @@ import {
   usePinnedRuntimeDraft,
 } from '../hooks/usePinnedRuntimeDraft'
 import { useIssueDetail } from '../hooks/useIssueDetail'
+import { useWorkspaceSessionDirectory } from '../hooks/useWorkspaceSessionDirectory'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { formatRelativeTime } from '../lib/intl'
 import { useInboxRead } from '../live/inbox-read'
@@ -148,12 +149,14 @@ function AssigneeEditor({
   value,
   scheduled,
   sessions,
+  authoritativeOwner,
   disabled,
   onChange,
 }: {
   value: string
   scheduled: boolean
   sessions: readonly WorkspaceSessionDirectoryEntry[]
+  authoritativeOwner?: IssueAssigneeSession
   disabled?: boolean
   onChange: (next: string) => Promise<boolean>
 }) {
@@ -171,7 +174,12 @@ function AssigneeEditor({
     .toSorted((a, b) => Number(b.active) - Number(a.active) || b.updatedAt - a.updatedAt)
   const selectedResumeId = value.startsWith('@resume-') ? value.slice(1) : null
   const draftResumeId = draftValue.startsWith('@resume-') ? draftValue.slice(1) : null
-  const hasSelected = !selectedResumeId || sessionChoices.some((session) => session.resumeId === selectedResumeId)
+  const authoritativeSelected = selectedResumeId && authoritativeOwner?.resumeId === selectedResumeId
+    ? authoritativeOwner
+    : undefined
+  const hasSelected = !selectedResumeId
+    || sessionChoices.some((session) => session.resumeId === selectedResumeId)
+    || authoritativeSelected?.state === 'ready'
   const contextFor = (session: WorkspaceSessionDirectoryEntry) => {
     const rawContext = session.interactive?.title
       || session.interactive?.name
@@ -202,9 +210,13 @@ function AssigneeEditor({
   const selectedPolicy = policyChoices.find((choice) => choice.value === value)
   const selectedLabel = selectedSession
     ? contextFor(selectedSession) ?? selectedSession.resumeId
+    : authoritativeSelected?.state === 'ready'
+      ? authoritativeSelected.displayName ?? authoritativeSelected.resumeId
     : selectedPolicy?.label ?? (selectedResumeId ? selectedResumeId : value)
   const selectedDescription = selectedSession
     ? `${selectedSession.agent}, ${selectedSession.active ? t('issues.detail.activeNow') : formatRelativeTime(selectedSession.updatedAt)}`
+    : authoritativeSelected?.state === 'ready'
+      ? [authoritativeSelected.agent, authoritativeSelected.workspace?.tag].filter(Boolean).join(', ')
     : selectedPolicy?.description
   const draftSession = draftResumeId
     ? sessionChoices.find((session) => session.resumeId === draftResumeId)
@@ -306,6 +318,19 @@ function AssigneeEditor({
               <AssigneeChoice
                 label={t('issues.detail.signedSession', { resumeId: selectedResumeId })}
                 description={t('issues.detail.sessionUnavailable')}
+                selected={draftValue === value}
+                onClick={() => setDraftValue(value)}
+              />
+            )}
+            {authoritativeSelected?.state === 'ready'
+              && !sessionChoices.some((session) => session.resumeId === authoritativeSelected.resumeId) && (
+              <AssigneeChoice
+                label={authoritativeSelected.displayName ?? authoritativeSelected.resumeId}
+                description={[
+                  authoritativeSelected.resumeId,
+                  authoritativeSelected.agent,
+                  authoritativeSelected.workspace?.tag,
+                ].filter(Boolean).join(', ')}
                 selected={draftValue === value}
                 onClick={() => setDraftValue(value)}
               />
@@ -493,7 +518,11 @@ function runtimeUpdateToIssuePatch(
   }
 }
 
-function ownerSessionBusy(session: WorkspaceSessionDirectoryEntry | undefined): boolean {
+function ownerSessionBusy(session: {
+  active?: boolean
+  interactive?: { state: string }
+  latestExecution?: { status: string }
+} | undefined): boolean {
   return Boolean(
     session?.active
     || session?.interactive?.state === 'running'
@@ -946,6 +975,7 @@ function PropertiesRail({
   headlessRuntime,
   agentReadiness,
   sessions,
+  assigneeSession,
   saving,
   retrying,
   error,
@@ -966,6 +996,7 @@ function PropertiesRail({
   headlessRuntime: WorkspaceRuntimeModeSettings | null
   agentReadiness: Readonly<Record<string, AgentCredentialReadiness>>
   sessions: readonly WorkspaceSessionDirectoryEntry[]
+  assigneeSession?: IssueAssigneeSession
   saving: boolean
   retrying: boolean
   error: string | null
@@ -992,10 +1023,18 @@ function PropertiesRail({
   const ownerResumeId = issue.assignee.startsWith('@resume-')
     ? issue.assignee.slice(1)
     : null
-  const ownerSession = ownerResumeId
+  const directoryOwner = ownerResumeId
     ? sessions.find((session) => session.resumeId === ownerResumeId)
     : undefined
-  const effectiveAgent = ownerSession?.agent || issue.agent || issueDefaultInOptions || defaultInOptions || agents[0]?.id || null
+  const authoritativeOwner = ownerResumeId && assigneeSession?.resumeId === ownerResumeId
+    ? assigneeSession
+    : undefined
+  const ownerSession = authoritativeOwner
+    ? (authoritativeOwner.state === 'ready' ? authoritativeOwner : undefined)
+    : directoryOwner
+  const ownerResolved = Boolean(ownerSession)
+  const ownerResolutionLoaded = Boolean(authoritativeOwner) || sessionsLoaded
+  const effectiveAgent = authoritativeOwner?.agent || directoryOwner?.agent || issue.agent || issueDefaultInOptions || defaultInOptions || agents[0]?.id || null
   const selectedReadiness = effectiveAgent ? agentReadiness[effectiveAgent] : undefined
   const [credentialOptions, setCredentialOptions] = useState<{
     agent: string
@@ -1041,6 +1080,11 @@ function PropertiesRail({
     // Failure/interruption messages may contain authoritative runtime diagnostics.
     // Keep those verbatim; only localize launcher-owned, deterministic states.
     if (health.state === 'failed' || health.state === 'interrupted') return health.message
+    if (health.blocker?.kind === 'agent_runtime_missing') {
+      return t('issues.detail.healthMessage.runtimeMissing', {
+        agent: health.blocker.displayName || health.blocker.agent,
+      })
+    }
     if (health.state === 'inactive') {
       return t('issues.detail.healthMessage.inactive', {
         status: t(`issues.status.${issue.status}`),
@@ -1162,6 +1206,7 @@ function PropertiesRail({
               value={issue.assignee}
               scheduled={Boolean(issue.when)}
               sessions={sessions}
+              authoritativeOwner={authoritativeOwner}
               disabled={saving}
               onChange={(assignee) => onPatch({ assignee })}
             />
@@ -1234,7 +1279,7 @@ function PropertiesRail({
                     agents={agents}
                     mode={headlessRuntime}
                     credentials={availableCredentials}
-                    disabled={saving || Boolean(ownerResumeId && (ownerSessionBusy(ownerSession) || (sessionsLoaded && !ownerSession)))}
+                    disabled={saving || Boolean(ownerResumeId && (ownerSessionBusy(ownerSession) || (ownerResolutionLoaded && !ownerResolved)))}
                     bound={Boolean(ownerResumeId)}
                     boundRuntime={ownerSession?.runtime}
                     onConfigureProvider={() => {
@@ -1259,7 +1304,7 @@ function PropertiesRail({
               {ownerResumeId && ownerSessionBusy(ownerSession) && (
                 <p className="mt-2 text-xs leading-snug text-muted-foreground">{t('issues.detail.sessionTurnInProgress')}</p>
               )}
-              {ownerResumeId && sessionsLoaded && !ownerSession && (
+              {ownerResumeId && ownerResolutionLoaded && !ownerResolved && (
                 <p className="mt-2 text-xs leading-snug text-muted-foreground">{t('issues.detail.sessionUnavailable')}</p>
               )}
               {agentNeedsCredential && (
@@ -1295,7 +1340,7 @@ function PropertiesRail({
           variant="primary"
           onConfirm={async () => {
             try {
-              await updateResumeRuntime(wsId, ownerResumeId, pendingCapability.update)
+              await updateResumeRuntime(authoritativeOwner?.workspace?.id ?? wsId, ownerResumeId, pendingCapability.update)
               await onRefreshSessions()
               setPendingCapability(null)
               setRuntimeError(null)
@@ -2027,8 +2072,9 @@ export function IssueDetail({
   const [retrying, setRetrying] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [agentReadiness, setAgentReadiness] = useState<Record<string, AgentCredentialReadiness>>({})
-  const [sessionDirectory, setSessionDirectory] = useState<readonly WorkspaceSessionDirectoryEntry[]>([])
-  const [sessionsLoaded, setSessionsLoaded] = useState(false)
+  const sessionSnapshot = useWorkspaceSessionDirectory(wsId)
+  const sessionDirectory = sessionSnapshot.directory?.sessions ?? []
+  const sessionsLoaded = !sessionSnapshot.loading
   // Set when a clicked `[[name]]` resolves to >1 target — drives the picker.
   const [picker, setPicker] = useState<WikilinkResolution | null>(null)
   const workspace = workspaces.find((candidate) => candidate.id === wsId) ?? null
@@ -2049,21 +2095,7 @@ export function IssueDetail({
     return () => { live = false }
   }, [wsId])
 
-  const refreshSessions = useCallback(async () => {
-    try {
-      const directory = await getWorkspaceSessionDirectory(wsId)
-      setSessionDirectory(Array.isArray(directory.sessions) ? directory.sessions : [])
-    } catch {
-      setSessionDirectory([])
-    } finally {
-      setSessionsLoaded(true)
-    }
-  }, [wsId])
-
-  useEffect(() => {
-    setSessionsLoaded(false)
-    void refreshSessions()
-  }, [refreshSessions])
+  const refreshSessions = sessionSnapshot.refresh
 
   const gotoIssue = useCallback(
     (ref: WikilinkIssueRef) => {
@@ -2272,6 +2304,7 @@ export function IssueDetail({
           headlessRuntime={workspace?.runtimeSettings?.runtime.headless ?? null}
           agentReadiness={agentReadiness}
           sessions={sessionDirectory}
+          assigneeSession={data.assigneeSession}
           saving={saving}
           retrying={retrying}
           error={actionError}

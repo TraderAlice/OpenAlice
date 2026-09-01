@@ -86,4 +86,26 @@ describe('UTADetailPage responsive positions', () => {
     fireEvent.click(close)
     expect(onCloseClick).toHaveBeenCalledWith(aapl)
   })
+
+  it('disables close actions on both layouts when the account cannot trade', () => {
+    const aapl = position('AAPL')
+    const onCloseClick = vi.fn()
+    render(
+      <PositionsSection
+        positions={[aapl]}
+        onCloseClick={onCloseClick}
+        canClose={false}
+        closeDisabledReason="Account is read-only"
+      />,
+    )
+
+    const buttons = screen.getAllByRole('button', { name: 'Close AAPL position' })
+    expect(buttons).toHaveLength(2)
+    for (const button of buttons) {
+      expect(button.hasAttribute('disabled')).toBe(true)
+      expect(button.getAttribute('title')).toBe('Account is read-only')
+      fireEvent.click(button)
+    }
+    expect(onCloseClick).not.toHaveBeenCalled()
+  })
 })
