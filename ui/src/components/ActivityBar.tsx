@@ -231,6 +231,7 @@ export function ActivityBar({
                           key={item.page}
                           type="button"
                           onClick={handleClick}
+                          aria-label={label}
                           aria-current={isActive ? 'page' : undefined}
                           className={`oa-nav-item relative flex items-center rounded-[10px] text-left ${
                             compactRail
