@@ -537,9 +537,13 @@ OpenAlice JSON log lines are rendered best-effort as severity, clock time,
 message, then compact context so the useful event survives terminal clipping;
 unrecognized and third-party lines remain plain text. Up/Down, Page Up/Page
 Down, Home/End, and the mouse wheel navigate the snapshot; End returns to the
-`LATEST` edge and `l` reloads it. This is navigation over a redacted snapshot,
-not an unbounded file follower. Follow, pause, and component filtering remain
-later work and must reuse this bounded reader.
+`LATEST` edge and `l` reloads it. `f`, or its clickable footer keycap, cycles
+All, Attention (warning plus error), and Errors views locally over that loaded
+snapshot. Filtering retains the source line numbers, resets navigation to the
+latest matching entry, and shows an explicit healthy empty state; it performs
+no extra read and does not change the Logs command contract. This is navigation
+over a redacted snapshot, not an unbounded file follower. Follow, pause, and
+component filtering remain later work and must reuse this bounded reader.
 
 ## Doctor
 

@@ -99,6 +99,17 @@ not imply maintainer approval of the finished interaction.
   sanitized plain-text fallback. The bounded snapshot edge is named `LATEST`,
   not the misleading `LIVE TAIL`.
 
+### Runtime log filtering decision
+
+- Leaving the semantic log panel unfiltered keeps the implementation small but
+  still makes operators scan routine events for the few lines that need action.
+- Adding a backend severity query would widen the Logs contract and risk
+  different keyboard/mouse views reading different data.
+- The selected model filters the already loaded bounded, redacted snapshot in
+  memory. `f` and its clickable keycap cycle All, Attention, and Errors while
+  preserving original source line numbers; the navigation badge continues to
+  report the complete loaded snapshot.
+
 ### Operational navigation decision
 
 - Static route labels are simple but require opening every page to discover
@@ -163,6 +174,8 @@ already large `supervisor-tui.ts` application controller.
   bounded, redacted plain-text fallback behavior.
 - [x] Turn the global tabs into an operational navigation rail with inventory,
   log, and diagnostic status visible before opening each page.
+- [x] Add local severity views to Runtime Logs without widening the bounded
+  reader or changing the snapshot contract.
 
 ## Progress
 
@@ -280,6 +293,19 @@ already large `supervisor-tui.ts` application controller.
   real-PTY tests, CLI build/typecheck, root TypeScript check, and the 685-file
   repository suite (684 passed, 1 skipped; 6065 tests passed, 10 skipped). The
   Docker installer smoke also passes for the changed distributed TUI payload.
+- Runtime Logs now own their semantic projection in a focused frontend module.
+  The `f` key and clickable footer keycap cycle All, Attention, and Errors over
+  the loaded snapshot, retain original line numbers, reset to the latest edge,
+  and render an explicit healthy empty state. Parsed projection is cached per
+  snapshot so repeated redraws do not reparse up to 5,000 JSON lines. Real
+  80-column acceptance caught and corrected a wrapping footer label; raw SGR
+  clicks then cycled through both empty severity views and keyboard input
+  returned to All before detach restored the terminal.
+- Log-filter acceptance passes with 62 focused screen, Fleet, log-module, and
+  real-PTY tests, CLI build/typecheck, root TypeScript check, and the 686-file
+  repository suite (685 passed, 1 skipped; 6068 tests passed, 10 skipped). The
+  Docker installer smoke passes, and `pnpm pack --dry-run --json` confirms the
+  new log presentation module is present in the published CLI file set.
 
 ## Completion Criteria
 
