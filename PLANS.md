@@ -29,6 +29,11 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
+- [[plans/development-test-optimization.md]] — Rebuilds local and hosted
+  development feedback around affected/owner/cross-owner verification, keeps
+  full hermetic and release backstops explicit, and returns `AGENTS.md` to a
+  compact repository entry point. Work stays on
+  `codex/dev-test-optimization` until maintainer acceptance.
 - [[plans/bun-cli-distribution.md]] — Replaces the expanded Node headless
   Runtime with a Bun-compiled, multi-process CLI distribution. Direct,
   npm/Bun, Homebrew, and AUR channels consume one accepted artifact set. The
