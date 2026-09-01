@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { formatRelativeTime } from '../../lib/intl';
 import type { ReactElement } from 'react';
-import { Bot, ChevronDown, Settings2, SquareTerminal } from 'lucide-react';
+import { Bot, ChevronDown, CirclePause, Settings2, SquareTerminal } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon';
 import { SessionSettingsDialog } from './SessionSettingsDialog';
 import { sessionCoworkerLabel } from './display';
 import type {
@@ -72,10 +73,13 @@ export function ResumeCta(props: ResumeCtaProps): ReactElement {
           <div className="resume-cta-card-main">
             <div className="resume-cta-card-header">
               <div className="resume-cta-kicker">
-                <span className="resume-cta-state-dot" aria-hidden="true" />
+                <CirclePause aria-hidden="true" size={13} />
                 <span>Session paused</span>
               </div>
-              <h2 className="resume-cta-name">{sessionTitle}</h2>
+              <div className="resume-cta-name-row">
+                <AgentRuntimeIcon agentId={r.agent} className="size-[18px] shrink-0" />
+                <h2 className="resume-cta-name">{sessionTitle}</h2>
+              </div>
               <p className="resume-cta-state">
                 {agentDisplayName(r.agent)} · {formatRelativeTime(r.lastActiveAt)}
               </p>
@@ -245,13 +249,6 @@ function FauxTuiBackdrop(): ReactElement {
       </div>
     </div>
   );
-}
-
-export function prefixOf(agent: string): string {
-  if (agent === 'claude') return 'c';
-  if (agent === 'codex') return 'x';
-  if (agent === 'shell') return 'sh';
-  return agent[0] ?? '?';
 }
 
 function agentDisplayName(agent: string): string {

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
+import { Play } from 'lucide-react'
 
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
@@ -119,8 +120,8 @@ function ReplayPane({ label, transcript }: { label: string; transcript: Transcri
   return (
     <div className="terminal-shell">
       <header className="terminal-header">
-        <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-warning">
-          <span className="w-1.5 h-1.5 rounded-full bg-warning animate-pulse" />
+        <span className="inline-flex items-center gap-1.5 text-[10px] font-medium leading-4 text-warning">
+          <Play aria-hidden className="size-3 fill-current" />
           Replay
         </span>
         <span className="text-[11px] text-muted-foreground truncate">{label}</span>

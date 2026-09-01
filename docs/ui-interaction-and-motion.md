@@ -236,7 +236,7 @@ Motion tokens and primitives live in `ui/src/index.css`:
 | `.oa-pressable` | primary or bordered controls with tonal hover and compact press feedback |
 | `.oa-icon-action` | compact icon/add/collapse controls |
 | `.oa-nav-item` / `.oa-nav-row` | rail and secondary-sidebar navigation |
-| `.oa-view-enter` | focused view entrance, owned by `TabHost` |
+| `.oa-view-enter` | focused route or state entrance, currently used by `AuthGate` |
 | `.oa-dialog-*` | shared dialog surface and backdrop entrance |
 | `.oa-disclosure-enter` | newly expanded hierarchical content |
 | `.oa-popover-enter` | menus and compact floating choices |

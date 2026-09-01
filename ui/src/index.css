@@ -651,19 +651,19 @@ body {
    - .text-micro    badges, timestamps, table metadata */
 
 .text-display {
-  @apply text-[28px] md:text-[36px] font-bold leading-tight tabular-nums;
+  @apply text-[28px] leading-[34px] font-bold tabular-nums md:text-[36px] md:leading-[42px];
 }
 .text-title {
-  @apply text-[16px] font-semibold leading-snug;
+  @apply text-[16px] leading-[22px] font-semibold;
 }
 .text-body {
-  @apply text-[13px] leading-relaxed;
+  @apply text-[13px] leading-5;
 }
 .text-caption {
-  @apply text-[12px] leading-relaxed;
+  @apply text-[12px] leading-[18px];
 }
 .text-micro {
-  @apply text-[11px] tracking-wide;
+  @apply text-[11px] leading-[15px];
 }
 
 /* Page headers normally keep compact actions inline. Dense operational
@@ -981,7 +981,7 @@ html[lang="ja"] .oa-onboarding-title {
 /* ==================== Button utility classes ==================== */
 
 .btn-primary {
-  @apply px-4 py-2 text-[13px] font-medium rounded-md
+  @apply px-4 py-2 text-[13px] leading-[18px] font-medium rounded-md
     bg-primary border border-primary text-primary-foreground
     hover:bg-primary/90 transition-[color,background-color,border-color,box-shadow,transform] duration-[var(--motion-fast)] active:scale-[0.98]
     disabled:opacity-40 disabled:cursor-default cursor-pointer
@@ -989,21 +989,21 @@ html[lang="ja"] .oa-onboarding-title {
 }
 
 .btn-secondary {
-  @apply px-4 py-2 text-[13px] font-medium rounded-md border border-border text-muted-foreground
+  @apply px-4 py-2 text-[13px] leading-[18px] font-medium rounded-md border border-border text-muted-foreground
     hover:bg-muted hover:text-foreground transition-[color,background-color,border-color,box-shadow,transform] duration-[var(--motion-fast)] active:scale-[0.98]
     disabled:opacity-40 disabled:cursor-default cursor-pointer
     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
 }
 
 .btn-danger {
-  @apply px-4 py-2 text-[13px] font-medium rounded-md border border-destructive/30 text-destructive
+  @apply px-4 py-2 text-[13px] leading-[18px] font-medium rounded-md border border-destructive/30 text-destructive
     hover:bg-destructive/10 transition-[color,background-color,border-color,box-shadow,transform] duration-[var(--motion-fast)] active:scale-[0.98]
     disabled:opacity-40 disabled:cursor-default cursor-pointer
     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
 }
 
 .btn-primary-sm {
-  @apply px-3 py-1.5 text-xs font-medium rounded-md
+  @apply px-3 py-1.5 text-xs leading-4 font-medium rounded-md
     bg-primary border border-primary text-primary-foreground
     hover:bg-primary/90 transition-[color,background-color,border-color,box-shadow,transform] duration-[var(--motion-fast)] active:scale-[0.98]
     disabled:opacity-40 disabled:cursor-default cursor-pointer
@@ -1011,7 +1011,7 @@ html[lang="ja"] .oa-onboarding-title {
 }
 
 .btn-secondary-sm {
-  @apply px-3 py-1.5 text-xs font-medium rounded-md border border-border text-muted-foreground
+  @apply px-3 py-1.5 text-xs leading-4 font-medium rounded-md border border-border text-muted-foreground
     hover:bg-muted hover:text-foreground transition-[color,background-color,border-color,box-shadow,transform] duration-[var(--motion-fast)] active:scale-[0.98]
     disabled:opacity-40 disabled:cursor-default cursor-pointer
     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background;

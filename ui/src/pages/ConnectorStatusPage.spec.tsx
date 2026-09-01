@@ -141,11 +141,12 @@ describe('Connector overview state hierarchy', () => {
     const discord = within(chooser).getByRole('heading', { name: 'Discord' }).closest('article') as HTMLElement
     const setup = within(discord).getByRole('button', { name: 'Set up Discord' })
     const glyph = discord.querySelector('[data-connector-glyph]') as HTMLElement
-    expect(discord.className).toContain('rounded-xl')
-    expect(glyph.className).toContain('bg-secondary/60')
-    expect(glyph.className).not.toContain('bg-primary')
-    expect(setup.className).toContain('bg-background/60')
-    expect(setup.className).toContain('min-h-10')
+    expect(discord.className).toContain('rounded-lg')
+    expect(glyph.className).not.toContain('bg-')
+    expect(glyph.className).not.toContain('border')
+    expect(glyph.querySelector('img')?.getAttribute('data-connector-brand')).toBe('discord')
+    expect(setup.className).toContain('bg-transparent')
+    expect(setup.className).toContain('h-8')
     expect(setup.className).not.toContain('bg-primary')
   })
 
@@ -163,12 +164,12 @@ describe('Connector overview state hierarchy', () => {
     const runtimeControl = discord.querySelector('[data-connector-runtime-control]') as HTMLElement
     const manage = within(discord).getByRole('button', { name: 'Manage Discord' })
     const glyph = discord.querySelector('[data-connector-glyph]') as HTMLElement
-    expect(glyph.className).toContain('bg-secondary/60')
-    expect(glyph.className).not.toContain('bg-primary')
+    expect(glyph.className).not.toContain('bg-')
+    expect(glyph.querySelector('img')?.getAttribute('data-connector-brand')).toBe('discord')
     expect(actionRail.className).toContain('flex-wrap')
     expect(actionRail.className).toContain('gap-y-3')
     expect(runtimeControl.className).toContain('flex-1')
-    expect(manage.className).toContain('min-h-10')
+    expect(manage.className).toContain('h-8')
     expect(toggle.getAttribute('aria-checked')).toBe('false')
     expect(screen.queryByRole('switch', { name: 'Turn Slack on or off' })).toBeNull()
 
@@ -258,8 +259,8 @@ describe('Connector overview state hierarchy', () => {
     const discord = screen.getByRole('heading', { name: 'Discord' }).closest('article') as HTMLElement
     const reconnect = within(discord).getByRole('button', { name: 'Reconnect' })
     const review = within(discord).getByRole('button', { name: 'Review Discord' })
-    expect(reconnect.className).toContain('min-h-10')
-    expect(review.className).toContain('min-h-10')
+    expect(reconnect.className).toContain('h-8')
+    expect(review.className).toContain('h-8')
     fireEvent.click(reconnect)
 
     const alert = await within(discord).findByRole('alert')

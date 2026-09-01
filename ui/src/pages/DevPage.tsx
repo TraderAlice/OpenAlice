@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { ChevronRight } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { Spinner, EmptyState } from '../components/StateViews'
 import { getIntlLocale } from '../lib/intl'
@@ -17,6 +18,8 @@ import {
 import { api, type UTASnapshotSummary } from '../api'
 import type { ViewSpec } from '../tabs/types'
 import { filterAccountTierUTAs } from '../lib/uta-account-filter'
+import { Button } from '../components/ui/button'
+import { SelectionCheckIcon } from '../components/ui/selection-check-icon'
 
 // ==================== Tab Types ====================
 
@@ -114,18 +117,21 @@ function SnapshotsTab() {
           <select
             value={selectedAccount}
             onChange={e => setSelectedAccount(e.target.value)}
-            className="text-[13px] px-2 py-1.5 rounded-md border border-border bg-background text-foreground"
+            className="h-8 rounded-md border border-border bg-background px-2 py-1.5 text-[13px] leading-[18px] text-foreground"
           >
             {accounts.map(a => (
               <option key={a.id} value={a.id}>{a.label} ({a.id})</option>
             ))}
           </select>
-          <button
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
             onClick={loadSnapshots}
-            className="text-[13px] px-2.5 py-1.5 rounded-md border border-border hover:bg-muted transition-colors text-muted-foreground"
+            className="text-muted-foreground"
           >
             Refresh
-          </button>
+          </Button>
           <span className="text-[11px] text-muted-foreground/50">{snapshots.length} snapshots</span>
         </div>
 
@@ -138,7 +144,7 @@ function SnapshotsTab() {
           <div className="border border-border rounded-lg overflow-hidden">
             <table className="w-full text-[13px]">
               <thead>
-                <tr className="bg-secondary text-muted-foreground text-left text-[11px] uppercase tracking-wide">
+                <tr className="bg-secondary text-left text-[11px] text-muted-foreground">
                   <th className="px-3 py-2 font-medium">Timestamp</th>
                   <th className="px-3 py-2 font-medium">Trigger</th>
                   <th className="px-3 py-2 font-medium text-center">Health</th>
@@ -181,7 +187,7 @@ function SnapshotRow({ snapshot: s, expanded, onToggle, onDelete }: {
         className="border-t border-border hover:bg-muted/30 transition-colors cursor-pointer"
         onClick={onToggle}
       >
-        <td className="px-3 py-2 font-mono text-[11px] text-foreground">
+        <td className="px-3 py-2 font-mono text-[11px] leading-[15px] text-foreground">
           {new Date(s.timestamp).toLocaleString()}
         </td>
         <td className="px-3 py-2">
@@ -197,20 +203,23 @@ function SnapshotRow({ snapshot: s, expanded, onToggle, onDelete }: {
         <td className="px-3 py-2 text-right" onClick={e => e.stopPropagation()}>
           {confirming ? (
             <div className="flex gap-1 justify-end">
-              <button onClick={onDelete} className="text-[11px] px-2 py-0.5 rounded bg-destructive/15 text-destructive hover:bg-destructive/25 transition-colors">
+              <Button type="button" variant="destructive" size="xs" onClick={onDelete}>
                 Confirm
-              </button>
-              <button onClick={() => setConfirming(false)} className="text-[11px] px-2 py-0.5 rounded bg-muted text-muted-foreground hover:bg-muted/80 transition-colors">
+              </Button>
+              <Button type="button" variant="ghost" size="xs" onClick={() => setConfirming(false)}>
                 Cancel
-              </button>
+              </Button>
             </div>
           ) : (
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
               onClick={() => setConfirming(true)}
-              className="text-[11px] px-2 py-0.5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              className="text-muted-foreground hover:text-destructive"
             >
               Delete
-            </button>
+            </Button>
           )}
         </td>
       </tr>
@@ -338,33 +347,40 @@ function ToolsTab() {
             onChange={(e) => setFilter(e.target.value)}
             placeholder={t('dev.filterTools')}
             aria-label={t('dev.filterTools')}
-            className="w-full px-2.5 py-1.5 bg-background text-foreground border border-border rounded-md text-xs outline-none focus:border-primary"
+            className="h-8 w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-foreground outline-none focus:border-primary"
           />
         </div>
         <div className="flex-1 overflow-y-auto px-1 pb-3">
           {[...grouped.entries()].map(([group, tools]) => (
             <div key={group} className="mb-1">
               <button
+                type="button"
                 onClick={() => toggleGroup(group)}
-                className="w-full flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                className="flex min-h-8 w-full items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                aria-expanded={expandedGroups.has(group)}
               >
-                <span className="text-[10px]">{expandedGroups.has(group) ? '\u25BC' : '\u25B6'}</span>
-                <span className="font-semibold uppercase tracking-wider">{group}</span>
+                <ChevronRight
+                  aria-hidden
+                  className={`size-3.5 transition-transform duration-[var(--motion-fast)] ${expandedGroups.has(group) ? 'rotate-90' : ''}`}
+                />
+                <span className="font-semibold">{group}</span>
                 <span className="text-muted-foreground/50">({tools.length})</span>
               </button>
               {expandedGroups.has(group) && (
                 <div className="ml-2">
                   {tools.map((t) => (
                     <button
+                      type="button"
                       key={t.name}
                       onClick={() => selectTool(t.name)}
-                      className={`w-full text-left px-2 py-1 text-xs rounded transition-colors ${
+                      className={`flex min-h-8 w-full items-center justify-between gap-2 rounded-md px-2 py-1 text-left text-xs ${
                         selected === t.name
                           ? 'bg-primary/10 text-primary'
                           : 'text-foreground hover:bg-muted/50'
                       }`}
                     >
-                      {t.name}
+                      <span className="truncate">{t.name}</span>
+                      {selected === t.name && <SelectionCheckIcon />}
                     </button>
                   ))}
                 </div>
@@ -480,17 +496,17 @@ function ToolExecutePanel({ detail, result, onResult }: ToolExecutePanelProps) {
       {/* Header */}
       <div>
         <h2 className="text-base font-semibold text-foreground">{detail.name}</h2>
-        {detail.group && <span className="text-xs text-muted-foreground uppercase tracking-wider">{detail.group}</span>}
+        {detail.group && <span className="text-xs text-muted-foreground">{detail.group}</span>}
         <p className="text-sm text-muted-foreground mt-1">{detail.description}</p>
       </div>
 
       {/* Input form */}
       {properties.length > 0 && (
         <div className="space-y-3">
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Input</h3>
+          <h3 className="text-xs font-semibold text-muted-foreground">Input</h3>
           {properties.map((prop) => (
             <div key={prop.key}>
-              <label className="flex items-center gap-1.5 text-[13px] text-foreground mb-1">
+              <label className="flex items-center gap-1.5 text-[13px] leading-[18px] text-foreground mb-1">
                 <span className="font-mono">{prop.key}</span>
                 <span className="text-[10px] text-muted-foreground/60">{prop.type}</span>
                 {prop.required && <span className="text-[10px] text-primary/70">required</span>}
@@ -499,7 +515,7 @@ function ToolExecutePanel({ detail, result, onResult }: ToolExecutePanelProps) {
                 <select
                   value={inputs[prop.key] ?? ''}
                   onChange={(e) => setInputs((prev) => ({ ...prev, [prop.key]: e.target.value }))}
-                  className="px-2.5 py-1.5 bg-background text-foreground border border-border rounded-md text-xs outline-none focus:border-primary"
+                  className="h-8 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-foreground outline-none focus:border-primary"
                 >
                   <option value="">-</option>
                   <option value="true">true</option>
@@ -511,7 +527,7 @@ function ToolExecutePanel({ detail, result, onResult }: ToolExecutePanelProps) {
                   value={inputs[prop.key] ?? ''}
                   onChange={(e) => setInputs((prev) => ({ ...prev, [prop.key]: e.target.value }))}
                   placeholder={prop.description || prop.key}
-                  className="w-full px-2.5 py-1.5 bg-background text-foreground border border-border rounded-md text-xs font-mono outline-none focus:border-primary"
+                  className="h-8 w-full rounded-md border border-border bg-background px-2.5 py-1.5 font-mono text-xs text-foreground outline-none focus:border-primary"
                 />
               )}
               {prop.description && (
@@ -523,13 +539,14 @@ function ToolExecutePanel({ detail, result, onResult }: ToolExecutePanelProps) {
       )}
 
       {/* Execute button */}
-      <button
+      <Button
+        type="button"
         onClick={handleExecute}
         disabled={executing}
-        className="btn-primary-sm"
+        size="sm"
       >
         {executing ? 'Executing...' : 'Execute'}
-      </button>
+      </Button>
 
       {/* Result */}
       {result && result.name === detail.name && (

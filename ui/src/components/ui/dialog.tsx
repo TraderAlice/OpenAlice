@@ -29,7 +29,7 @@ function DialogOverlay({
     <DialogPrimitive.Backdrop
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 isolate z-50 bg-black/10 supports-backdrop-filter:backdrop-blur-xs transition-opacity duration-[var(--motion-standard)] [transition-timing-function:var(--motion-ease-standard)] data-starting-style:opacity-0 data-ending-style:opacity-0 data-ending-style:duration-[var(--motion-fast)] motion-reduce:transition-none",
+        "fixed inset-0 isolate z-50 bg-backdrop supports-backdrop-filter:backdrop-blur-xs transition-opacity duration-[var(--motion-standard)] [transition-timing-function:var(--motion-ease-standard)] data-starting-style:opacity-0 data-ending-style:opacity-0 data-ending-style:duration-[var(--motion-fast)] motion-reduce:transition-none",
         className
       )}
       {...props}

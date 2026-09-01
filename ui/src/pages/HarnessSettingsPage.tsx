@@ -36,13 +36,12 @@ export function HarnessSettingsPage() {
         title={t('settings.harness.title')}
         description={t('settings.harness.description')}
       />
-      <SettingsScrollArea className="px-4 py-6 md:px-8">
+      <SettingsScrollArea className="px-4 py-5 md:px-8">
         <div className="mx-auto max-w-[880px]">
           <ConfigSection
             title={t('settings.harness.shared')}
-            description={t('settings.harness.sharedDescription')}
           >
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex min-h-12 items-start justify-between gap-4 py-3">
               <div className="min-w-0">
                 <label htmlFor={rosterToggleId} className="block text-sm font-medium text-foreground">
                   {t('settings.harness.showHeadlessBorn')}
@@ -53,6 +52,7 @@ export function HarnessSettingsPage() {
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <Toggle
+                  id={rosterToggleId}
                   ariaLabel={t('settings.harness.showHeadlessBorn')}
                   checked={preferences.showHeadlessBornSessions}
                   disabled={status === 'saving'}
@@ -61,7 +61,7 @@ export function HarnessSettingsPage() {
                 <SaveIndicator status={status === 'idle' && error ? 'error' : status} />
               </div>
             </div>
-            <div className="mt-5 flex items-start justify-between gap-4 border-t border-border pt-5">
+            <div className="flex min-h-12 items-start justify-between gap-4 border-t border-border py-3">
               <div className="min-w-0">
                 <label htmlFor={issueRosterToggleId} className="block text-sm font-medium text-foreground">
                   {t('settings.harness.showIssueAttached')}
@@ -72,6 +72,7 @@ export function HarnessSettingsPage() {
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <Toggle
+                  id={issueRosterToggleId}
                   ariaLabel={t('settings.harness.showIssueAttached')}
                   checked={preferences.showIssueAttachedSessions}
                   disabled={status === 'saving'}
@@ -79,7 +80,7 @@ export function HarnessSettingsPage() {
                 />
               </div>
             </div>
-            <div className="mt-5 flex items-start justify-between gap-4 border-t border-border pt-5">
+            <div className="flex min-h-12 items-start justify-between gap-4 border-t border-border py-3">
               <div className="min-w-0">
                 <label htmlFor={releasesToggleId} className="block text-sm font-medium text-foreground">
                   {t('settings.harness.showUnverifiedReleases')}
@@ -89,39 +90,13 @@ export function HarnessSettingsPage() {
                 </p>
               </div>
               <Toggle
+                id={releasesToggleId}
                 ariaLabel={t('settings.harness.showUnverifiedReleases')}
                 checked={preferences.showUnverifiedHarnessReleases}
                 disabled={status === 'saving'}
                 onChange={(next) => void persist({ ...preferences, showUnverifiedHarnessReleases: next })}
               />
             </div>
-          </ConfigSection>
-
-          <ConfigSection
-            title={t('settings.harness.askAlice')}
-            description={t('settings.harness.askAliceDescription')}
-          >
-            <p className="text-[13px] leading-relaxed text-muted-foreground">
-              {t('settings.harness.usesSharedRoster')}
-            </p>
-          </ConfigSection>
-
-          <ConfigSection
-            title={t('settings.harness.autoQuant')}
-            description={t('settings.harness.autoQuantDescription')}
-          >
-            <p className="text-[13px] leading-relaxed text-muted-foreground">
-              {t('settings.harness.usesSharedRoster')}
-            </p>
-          </ConfigSection>
-
-          <ConfigSection
-            title={t('settings.harness.autoPrediction')}
-            description={t('settings.harness.autoPredictionDescription')}
-          >
-            <p className="text-[13px] leading-relaxed text-muted-foreground">
-              {t('settings.harness.usesSharedRoster')}
-            </p>
           </ConfigSection>
         </div>
       </SettingsScrollArea>

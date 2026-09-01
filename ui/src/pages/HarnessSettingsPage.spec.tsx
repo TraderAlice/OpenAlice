@@ -44,9 +44,9 @@ describe('HarnessSettingsPage', () => {
     const toggle = screen.getByRole('switch', { name: 'Show headless-born Sessions' })
     expect(toggle.getAttribute('aria-checked')).toBe('false')
     expect(screen.getByText('Shared Harness behavior')).toBeTruthy()
-    expect(screen.getByText('Ask Alice')).toBeTruthy()
-    expect(screen.getByText('Auto Quant')).toBeTruthy()
-    expect(screen.getByText('Auto Prediction')).toBeTruthy()
+    expect(screen.queryByText('Ask Alice')).toBeNull()
+    expect(screen.queryByText('Auto Quant')).toBeNull()
+    expect(screen.queryByText('Auto Prediction')).toBeNull()
 
     fireEvent.click(toggle)
     await waitFor(() => expect(mocks.save).toHaveBeenCalledWith({

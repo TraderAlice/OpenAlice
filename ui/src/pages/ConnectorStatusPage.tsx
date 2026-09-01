@@ -4,15 +4,12 @@ import {
   ArrowRight,
   CircleAlert,
   Clock3,
-  Hash,
   Link2,
   MessageCircle,
-  MessagesSquare,
   Plug,
   RefreshCw,
   Send,
   Settings2,
-  type LucideIcon,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type {
@@ -27,6 +24,8 @@ import { PageHeader } from '../components/PageHeader'
 import { SaveIndicator } from '../components/SaveIndicator'
 import { RecoverySurface, RefreshNotice, Skeleton } from '../components/StateViews'
 import { Toggle } from '../components/Toggle'
+import { ConnectorBrandMark } from '../components/ConnectorBrandMark'
+import { Button } from '../components/ui/button'
 import type { SaveStatus } from '../hooks/useAutoSave'
 import { ConnectorSettingsPanel } from './ConnectorsPage'
 import {
@@ -120,15 +119,17 @@ export function ConnectorStatusPage() {
                 })}
               </span>
             )}
-            <button
+            <Button
               type="button"
-              className="oa-pressable inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-[13px] text-muted-foreground hover:text-foreground hover:border-primary/50 disabled:opacity-50"
+              variant="outline"
+              size="lg"
+              className="text-[13px] text-muted-foreground"
               disabled={refreshing}
               onClick={() => void refreshConnectorHealth()}
             >
               <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
               {t('connectorStatus.refresh')}
-            </button>
+            </Button>
           </div>
         )}
       />
@@ -158,7 +159,7 @@ export function ConnectorStatusPage() {
               />
             </>
           ) : error ? (
-            <div className="h-[28rem] overflow-hidden rounded-2xl border border-border/70">
+            <div className="h-[28rem] overflow-hidden rounded-lg border border-border/70">
               <RecoverySurface
                 title={t('connectorStatus.loadErrorTitle')}
                 description={t('connectorStatus.loadErrorDescription')}
@@ -208,9 +209,9 @@ export function ConnectorStatusPage() {
 function ConnectorOverviewSkeleton({ label }: { label: string }) {
   return (
     <div role="status" aria-label={label} aria-busy="true" className="space-y-6">
-      <section className="rounded-xl border border-border bg-secondary/20 px-4 py-3.5">
+      <section className="rounded-lg border border-border bg-secondary/20 px-4 py-3.5">
         <div className="flex items-center gap-3">
-          <Skeleton className="h-9 w-9 shrink-0 rounded-lg" />
+          <Skeleton className="h-7 w-7 shrink-0 rounded-md" />
           <div className="min-w-0 flex-1 space-y-2">
             <Skeleton className="h-3.5 w-36" />
             <Skeleton className="h-3 w-full max-w-lg" />
@@ -224,14 +225,14 @@ function ConnectorOverviewSkeleton({ label }: { label: string }) {
         </div>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {Array.from({ length: 4 }).map((_, index) => (
-            <article key={index} className="rounded-2xl border border-border bg-secondary/15 p-5 lg:min-h-[250px]">
+            <article key={index} className="rounded-lg border border-border bg-secondary/15 p-5 lg:min-h-[250px]">
               <div className="flex items-center gap-3">
-                <Skeleton className="h-10 w-10 shrink-0 rounded-xl" />
+                <Skeleton className="h-7 w-7 shrink-0 rounded-md" />
                 <div className="min-w-0 flex-1 space-y-2">
                   <Skeleton className={`h-4 ${index % 2 === 0 ? 'w-24' : 'w-20'}`} />
                   <Skeleton className="h-3 w-2/3" />
                 </div>
-                <Skeleton className="h-5 w-20 rounded-full" />
+                <Skeleton className="h-5 w-20 rounded-md" />
               </div>
               <div className="mt-5 space-y-2">
                 <Skeleton className="h-3 w-full" />
@@ -241,7 +242,7 @@ function ConnectorOverviewSkeleton({ label }: { label: string }) {
                 <Skeleton className="h-3 w-24" />
                 <Skeleton className="h-3 w-20" />
               </div>
-              <Skeleton className="mt-12 h-9 w-28 rounded-lg" />
+              <Skeleton className="mt-12 h-9 w-28 rounded-md" />
             </article>
           ))}
         </div>
@@ -306,7 +307,7 @@ function ConnectorOverview({
   return (
     <>
       {showServiceSummary && (
-        <section className={`oa-status-surface rounded-xl border px-4 py-3.5 ${service.tone === 'danger'
+        <section className={`oa-status-surface rounded-lg border px-4 py-3.5 ${service.tone === 'danger'
           ? 'border-destructive/25 bg-destructive/[0.035]'
           : service.tone === 'warning'
             ? 'border-warning/25 bg-warning/[0.035]'
@@ -314,19 +315,19 @@ function ConnectorOverview({
         }`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
-              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${service.tone === 'danger'
-                ? 'border-destructive/20 bg-destructive/10 text-destructive'
+              <div className={`flex h-8 w-8 shrink-0 items-center justify-center ${service.tone === 'danger'
+                ? 'text-destructive'
                 : service.tone === 'healthy'
-                  ? 'border-success/20 bg-success/10 text-success'
+                  ? 'text-success'
                   : service.tone === 'warning'
-                    ? 'border-warning/20 bg-warning/10 text-warning'
-                  : 'border-border bg-background text-muted-foreground'
+                    ? 'text-warning'
+                    : 'text-muted-foreground'
               }`}>
                 <Plug size={17} aria-hidden />
               </div>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-[13px] font-semibold text-foreground">{t('connectorStatus.serviceTitle')}</h3>
+                  <h3 className="text-[13px] leading-[18px] font-semibold text-foreground">{t('connectorStatus.serviceTitle')}</h3>
                   <StatusBadge tone={service.tone}>{service.label}</StatusBadge>
                 </div>
                 <p className="mt-0.5 max-w-[660px] text-[12px] leading-5 text-muted-foreground">
@@ -334,7 +335,7 @@ function ConnectorOverview({
                 </p>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] leading-[15px] text-muted-foreground">
               <SummaryPill>{t('connectorStatus.configuredCount', { count: configuredCount })}</SummaryPill>
               <SummaryPill>{t('connectorStatus.activeCount', { count: activeCount })}</SummaryPill>
               {attentionCount > 0 && (
@@ -427,7 +428,7 @@ function ConnectorGroup({
   return (
     <section>
       <div className="mb-3.5 px-0.5">
-        <h3 className="text-[14px] font-semibold text-foreground">{title}</h3>
+        <h3 className="text-[14px] leading-[19px] font-semibold text-foreground">{title}</h3>
         <p className="mt-0.5 text-[12px] text-muted-foreground">{description}</p>
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -466,19 +467,19 @@ function AvailableConnectorGroup({
   return (
     <section>
       <div className="mb-3.5 px-0.5">
-        <h3 className="text-[14px] font-semibold text-foreground">{title}</h3>
+        <h3 className="text-[14px] leading-[19px] font-semibold text-foreground">{title}</h3>
         <p className="mt-0.5 text-[12px] text-muted-foreground">{description}</p>
       </div>
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         {adapters.map(({ definition }) => (
           <article
             key={definition.id}
-            className="oa-status-surface flex min-w-0 flex-col gap-3 rounded-xl border border-border/80 bg-secondary/10 p-4 sm:flex-row sm:items-center"
+            className="oa-status-surface flex min-w-0 flex-col gap-3 rounded-lg border border-border/70 bg-secondary/10 p-4 sm:flex-row sm:items-center"
           >
             <div className="flex min-w-0 flex-1 items-center gap-3">
-              <ConnectorGlyph id={definition.id} />
+              <ConnectorBrandMark id={definition.id} className="size-7" />
               <div className="min-w-0">
-                <h4 className="text-[14px] font-semibold text-foreground">{definition.label}</h4>
+            <h4 className="text-[14px] leading-[19px] font-semibold text-foreground">{definition.label}</h4>
                 <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11.5px] text-muted-foreground">
                   <span className="inline-flex items-center gap-1.5">
                     <Send size={12} aria-hidden />
@@ -493,14 +494,16 @@ function AvailableConnectorGroup({
                 </div>
               </div>
             </div>
-            <button
+            <Button
               type="button"
-              className="oa-pressable inline-flex min-h-10 w-full shrink-0 items-center justify-center gap-2 rounded-lg border border-border bg-background/60 px-3 py-2 text-[12px] font-medium text-foreground hover:border-primary/45 hover:text-primary sm:w-auto"
+              variant="ghost"
+              size="lg"
+              className="h-8 w-full bg-transparent text-[12px] text-muted-foreground sm:h-8 sm:w-auto"
               onClick={(event) => onConfigure(definition.id, event.currentTarget)}
             >
               {t('connectorStatus.configureAdapter', { name: definition.label })}
               <ArrowRight size={13} aria-hidden />
-            </button>
+            </Button>
           </article>
         ))}
       </div>
@@ -543,10 +546,10 @@ function ConnectorOverviewCard({
     : t('connectorSettings.useConnector', { name: definition.label })
 
   return (
-    <article className="oa-status-surface flex flex-col rounded-2xl border border-border/80 bg-secondary/15 p-5">
+    <article className="oa-status-surface flex flex-col rounded-lg border border-border/70 bg-secondary/15 p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <ConnectorGlyph id={definition.id} />
+          <ConnectorBrandMark id={definition.id} className="size-7" />
           <h4 className="min-w-0 text-[15px] font-semibold text-foreground">{definition.label}</h4>
         </div>
         <StatusBadge tone={presentation.tone}>{presentation.label}</StatusBadge>
@@ -592,7 +595,7 @@ function ConnectorOverviewCard({
         {setup.ready && (
           <div
             data-connector-runtime-control
-            className="flex min-h-10 min-w-[7.5rem] flex-1 items-center justify-between gap-3"
+            className="flex h-8 min-w-[7.5rem] flex-1 items-center justify-between gap-3"
           >
             <span className={`text-[12.5px] font-medium ${setup.stage === 'ready_to_link'
               ? 'text-primary'
@@ -611,27 +614,25 @@ function ConnectorOverviewCard({
         )}
         <div data-connector-card-actions className="flex flex-wrap items-center gap-2">
           {setup.stage === 'error' && (
-            <button
+            <Button
               type="button"
-              className="oa-pressable inline-flex min-h-10 items-center gap-2 rounded-lg border border-primary bg-primary px-3 py-2 text-[12px] font-medium text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
+              className="h-8 px-3 text-[12px]"
               disabled={actionsBusy}
               onClick={() => void onReconnect(definition.id)}
             >
               <RefreshCw size={13} className={reconnecting ? 'animate-spin motion-reduce:animate-none' : ''} />
               {reconnecting ? t('connectorStatus.reconnecting') : t('connectorStatus.reconnect')}
-            </button>
+            </Button>
           )}
-          <button
+          <Button
             type="button"
-            className={`oa-pressable inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-medium ${prioritizeConfiguration
-              ? 'border border-primary bg-primary text-primary-foreground shadow-sm hover:bg-primary/90'
-              : 'border border-border bg-background/50 text-foreground hover:border-primary/45 hover:text-primary'
-            }`}
+            variant={prioritizeConfiguration ? 'default' : 'outline'}
+            className={`h-8 px-3 text-[12px] ${prioritizeConfiguration ? '' : 'bg-background/50'}`}
             onClick={(event) => onConfigure(definition.id, event.currentTarget)}
           >
             <ActionIcon size={13} aria-hidden />
             {adapterActionLabel(setup.stage, definition.label, t)}
-          </button>
+          </Button>
         </div>
       </div>
       {(toggling || reconnecting) && (
@@ -759,7 +760,7 @@ function StatusBadge({ tone, children }: { tone: StatusTone; children: string })
     neutral: 'border-border bg-muted text-muted-foreground',
   }
   return (
-    <span className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[10.5px] font-medium ${styles[tone]}`}>
+    <span className={`inline-flex shrink-0 items-center rounded-md border px-2 py-0.5 text-[10.5px] leading-[15px] font-medium ${styles[tone]}`}>
       {children}
     </span>
   )
@@ -767,30 +768,11 @@ function StatusBadge({ tone, children }: { tone: StatusTone; children: string })
 
 function SummaryPill({ tone = 'neutral', children }: { tone?: 'neutral' | 'danger'; children: string }) {
   return (
-    <span className={`inline-flex rounded-full border px-2.5 py-1 ${tone === 'danger'
+    <span className={`inline-flex rounded-md border px-2.5 py-1 ${tone === 'danger'
       ? 'border-destructive/20 bg-destructive/10 text-destructive'
       : 'border-border/80 bg-background/55'
     }`}>
       {children}
-    </span>
-  )
-}
-
-function ConnectorGlyph({ id }: { id: string }) {
-  const glyphs: Record<string, LucideIcon> = {
-    discord: MessageCircle,
-    telegram: Send,
-    slack: Hash,
-    feishu: MessagesSquare,
-  }
-  const Icon = glyphs[id] ?? Plug
-  return (
-    <span
-      data-connector-glyph
-      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-secondary/60 text-muted-foreground"
-      aria-hidden
-    >
-      <Icon size={18} />
     </span>
   )
 }

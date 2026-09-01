@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 // ==================== Shared class constants ====================
 
 export const inputClass =
-  'oa-field-control h-8 w-full min-w-0 rounded-md border border-input bg-background px-3 py-1.5 font-sans text-[13px] text-foreground outline-none transition-[border-color,background-color,box-shadow] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] placeholder:text-muted-foreground focus:border-ring focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--ring)_35%,transparent)] motion-reduce:transition-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50'
+  'oa-field-control h-8 w-full min-w-0 rounded-md border border-input bg-background px-3 py-1.5 font-sans text-[13px] leading-[18px] text-foreground outline-none transition-[border-color,background-color,box-shadow] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] placeholder:text-muted-foreground focus:border-ring focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--ring)_35%,transparent)] motion-reduce:transition-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50'
 
 // ==================== Settings scroll area ====================
 
@@ -42,7 +42,7 @@ interface SectionProps {
 export function Section({ id, title, description, children }: SectionProps) {
   return (
     <section id={id} className="border-b border-border/60 py-5 last:border-b-0">
-      <h3 className="text-[14px] font-semibold text-foreground">{title}</h3>
+      <h3 className="text-[14px] leading-[19px] font-semibold text-foreground">{title}</h3>
       {description && (
         <p className="mt-1 max-w-2xl text-[12px] leading-5 text-muted-foreground">{description}</p>
       )}

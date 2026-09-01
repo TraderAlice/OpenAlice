@@ -25,10 +25,15 @@ describe('Toggle', () => {
     expect(toggle.className).toContain('size-10')
     expect(toggle.className).toContain('-my-[9px]')
 
-    const track = toggle.firstElementChild as HTMLElement | null
+    const track = toggle.querySelector<HTMLElement>('[data-slot="switch-track"]')
+    const thumb = toggle.querySelector<HTMLElement>('[data-slot="switch-thumb"]')
     expect(track?.getAttribute('aria-hidden')).toBe('true')
     expect(track?.className).toContain('w-10')
     expect(track?.className).toContain('h-[22px]')
+    expect(track?.className).toContain('p-[3px]')
+    expect(thumb?.className).toContain('size-4')
+    expect(thumb?.className).toContain('data-checked:translate-x-[18px]')
+    expect(thumb?.className).toContain('transition-[translate,background-color]')
 
     fireEvent.click(toggle)
     expect(onChange).toHaveBeenCalledWith(true)
@@ -45,13 +50,16 @@ describe('Toggle', () => {
     )
 
     const toggle = screen.getByRole('switch', { name: 'Enable compact tool' })
-    const track = toggle.firstElementChild as HTMLElement | null
+    const track = toggle.querySelector<HTMLElement>('[data-slot="switch-track"]')
+    const thumb = toggle.querySelector<HTMLElement>('[data-slot="switch-thumb"]')
 
     expect(toggle.className).toContain('size-10')
     expect(toggle.className).toContain('-mx-1')
     expect(toggle.className).toContain('-my-[11px]')
     expect(track?.className).toContain('w-8')
     expect(track?.className).toContain('h-[18px]')
+    expect(thumb?.className).toContain('size-3')
+    expect(thumb?.className).toContain('data-checked:translate-x-[14px]')
   })
 
   it('keeps native keyboard activation and a visible focus treatment', async () => {
@@ -66,7 +74,7 @@ describe('Toggle', () => {
     )
 
     const toggle = screen.getByRole('switch', { name: 'Enable keyboard control' })
-    expect(toggle.className).toContain('focus-visible:ring-2')
+    expect(toggle.className).toContain('focus-visible:[&_[data-slot=switch-track]]:ring-2')
 
     toggle.focus()
     await user.keyboard(' ')

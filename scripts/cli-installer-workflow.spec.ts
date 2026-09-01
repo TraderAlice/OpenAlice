@@ -40,12 +40,12 @@ function step(job: WorkflowJob, name: string): WorkflowStep {
 }
 
 describe('CLI installer dev publication workflow', () => {
-  it('owns every dev push as the only rolling publication lane', () => {
+  it('owns every dev push while reserving hosted PR acceptance for master', () => {
     expect(workflow.on?.push?.branches).toEqual(['dev'])
-    expect(workflow.on?.pull_request?.branches).toEqual(expect.arrayContaining(['dev', 'master']))
+    expect(workflow.on?.pull_request?.branches).toEqual(['master'])
   })
 
-  it('keeps dev PR acceptance to the current checkout installer', () => {
+  it('keeps master and manual acceptance behind the trusted preflight', () => {
     const feasibility = workflow.jobs['bun-cli-feasibility']
     const checkoutInstall = workflow.jobs['checkout-install']
     const checkoutRemote = workflow.jobs['checkout-remote']

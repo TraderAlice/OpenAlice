@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { X } from 'lucide-react'
 
 import { api, type Preset, type WireShape } from '../../api'
 import type { CredentialSummary } from '../../api/config'
@@ -19,7 +20,10 @@ import {
   vendorPreset,
 } from '../../lib/presetHelpers'
 import { useTestGate } from '../../lib/useTestGate'
+import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon'
+import { AIProviderIcon } from '../../lib/aiProviderIcon'
 import { Dialog } from '../uta/Dialog'
+import { Button } from '../ui/button'
 import { ModelCombobox } from './PresetFields'
 
 const SHAPE_ORDER: WireShape[] = ['anthropic', 'google-generative-ai', 'openai-chat', 'openai-responses']
@@ -247,14 +251,16 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
           <h2 className="text-[15px] font-semibold text-foreground">{title}</h2>
           <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{t('aiProvider.credentialModal.subtitle')}</p>
         </div>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-sm"
           onClick={onClose}
           aria-label={t('aiProvider.credentialModal.close')}
-          className="ml-3 shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="ml-3 shrink-0 text-muted-foreground"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-        </button>
+          <X aria-hidden className="size-[18px]" />
+        </Button>
       </div>
 
       <div
@@ -276,8 +282,9 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                   <button
                     key={item.id}
                     onClick={() => pickPreset(item)}
-                    className="flex min-h-[46px] w-full items-center gap-3 border-b border-border/60 px-3 py-2 text-left transition-colors last:border-b-0 hover:bg-muted/60"
+                    className="flex min-h-12 w-full items-center gap-3 border-b border-border/60 px-3 py-2 text-left transition-colors last:border-b-0 hover:bg-muted/60"
                   >
+                    <AIProviderIcon vendor={VENDOR_BY_PRESET[item.id] ?? 'custom'} className="size-5 shrink-0" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[12.5px] font-medium text-foreground">{item.label}</span>
                       <span className="block truncate text-[10.5px] text-muted-foreground">{item.description}</span>
@@ -290,7 +297,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                       </span>
                     </span>
                     {item.category === 'custom' && (
-                      <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                      <span className="shrink-0 text-[10px] text-muted-foreground">
                         {t('aiProvider.credentialModal.freeForm')}
                       </span>
                     )}
@@ -306,9 +313,10 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
         ) : (
           <>
               <div className="flex items-center justify-between">
-                <div className="flex items-baseline gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <AIProviderIcon vendor={VENDOR_BY_PRESET[preset.id] ?? 'custom'} className="size-5 shrink-0" />
                   <span className="text-[13px] font-semibold text-foreground">{preset.label}</span>
-                  <span className="text-[11px] text-muted-foreground">{preset.description}</span>
+                  <span className="min-w-0 truncate text-[11px] text-muted-foreground">{preset.description}</span>
                 </div>
                 {mode === 'add' && (
                   <button onClick={() => { setPreset(null); gate.reset() }} className="text-[11px] text-primary hover:underline">{t('common.change')}</button>
@@ -396,19 +404,20 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                 </>
               )}
 
-              <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5">
+              <div className="border-y border-border/60 py-2.5">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="mr-1 text-[11px] font-medium text-foreground">{t('aiProvider.credentialModal.compatibleRuntimes')}</span>
+                  <span className="mr-1 text-[11px] leading-[15px] font-medium text-foreground">{t('aiProvider.credentialModal.compatibleRuntimes')}</span>
                   {compatibleAgents.map((agentId) => (
-                    <span key={agentId} className="rounded border border-primary/25 bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                      {AGENT_LABELS[agentId] ?? agentId}
+                    <span key={agentId} className="inline-flex min-h-6 items-center gap-1.5 text-[10.5px] leading-[15px] text-muted-foreground">
+                      <AgentRuntimeIcon agentId={agentId} className="size-4 shrink-0" />
+                      <span>{AGENT_LABELS[agentId] ?? agentId}</span>
                     </span>
                   ))}
                   {compatibleAgents.length === 0 && (
-                    <span className="text-[10.5px] text-muted-foreground">{t('aiProvider.credentialModal.chooseSupportedMode')}</span>
+                    <span className="text-[10.5px] leading-[15px] text-muted-foreground">{t('aiProvider.credentialModal.chooseSupportedMode')}</span>
                   )}
                 </div>
-                <p className="mt-1.5 text-[10.5px] leading-relaxed text-muted-foreground">
+                <p className="mt-1.5 text-[10.5px] leading-4 text-muted-foreground">
                   {t('aiProvider.credentialModal.injectionHelp')}
                 </p>
               </div>
@@ -428,13 +437,14 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                     autoCapitalize="off"
                     autoCorrect="off"
                   />
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={() => setShowKey(!showKey)}
-                    className="px-3 rounded-md border border-border text-muted-foreground hover:text-foreground text-[12px]"
                   >
                     {showKey ? t('common.hide') : t('common.show')}
-                  </button>
+                  </Button>
                 </div>
               </Field>
 
@@ -532,23 +542,23 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
             )}
           </div>
           <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={onClose}
-              className="rounded-md px-2 py-1.5 text-[12px] text-muted-foreground hover:text-foreground sm:px-3"
             >
               {t('common.cancel')}
-            </button>
-            <button
+            </Button>
+            <Button
               data-testid="credential-modal-primary"
               type="button"
               onClick={handlePrimaryAction}
               disabled={primaryDisabled}
               title={needsConnectionTest && !canTest ? formProblem : undefined}
-              className="btn-primary disabled:cursor-not-allowed disabled:opacity-40"
             >
               {gate.testing ? t('common.testing') : needsConnectionTest ? t('common.testConnection') : saving ? t('common.saving') : t('common.save')}
-            </button>
+            </Button>
           </div>
         </div>
       )}

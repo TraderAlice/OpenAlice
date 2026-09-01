@@ -1,10 +1,9 @@
 import { useId, useMemo, useState } from 'react'
-import { Bot } from 'lucide-react'
-
 import { ConfigSection, Field, SettingsScrollArea, inputClass } from '../components/form'
 import { PageHeader } from '../components/PageHeader'
 import { SaveIndicator } from '../components/SaveIndicator'
 import { useWorkspaces } from '../contexts/workspaces-context'
+import { AgentRuntimeIcon } from '../lib/agentRuntimeIcon'
 
 export function IssueSettingsPage() {
   const { agents, defaultAgent, issueDefaultAgent, setIssueDefaultAgent } = useWorkspaces()
@@ -33,15 +32,12 @@ export function IssueSettingsPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <PageHeader
-        title="Issue Settings"
-        description="Defaults for scheduled issue runs and issue-owned headless work."
-      />
-      <SettingsScrollArea className="px-4 py-6 md:px-8">
+      <PageHeader title="Issue Settings" />
+      <SettingsScrollArea className="px-4 py-5 md:px-8">
         <div className="mx-auto max-w-[880px]">
           <ConfigSection
             title="Default agent runtime"
-            description="Used when an issue does not set its own agent frontmatter. Explicit issue runtime overrides still win."
+            description="Applied to scheduled and headless issue runs whose frontmatter omits an agent runtime."
           >
             <Field
               label="Agent runtime"
@@ -55,10 +51,9 @@ export function IssueSettingsPage() {
             >
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <div className="relative flex-1">
-                  <Bot
-                    size={14}
-                    aria-hidden
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60"
+                  <AgentRuntimeIcon
+                    agentId={issueDefaultAgent ?? installationDefault?.id}
+                    className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
                   />
                   <select
                     id={runtimeSelectId}

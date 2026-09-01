@@ -85,10 +85,10 @@ describe('FileViewerPage back navigation', () => {
     )
 
     const back = screen.getByRole('button', { name: 'Back to Semis and supply chain' })
-    expect(back.getAttribute('title')).toBe('Back to Semis and supply chain')
+    expect(back.getAttribute('title')).toBeNull()
     expect(back.className).toContain('h-10')
     expect(back.className).toContain('w-10')
-    expect(back.className).toContain('sm:h-7')
+    expect(back.className).toContain('sm:h-8')
     expect(screen.getByText('research/note.md').className).toContain('break-all')
     const workspaceIdentity = screen.getByText('Semis and supply chain')
     expect(workspaceIdentity.getAttribute('title')).toBe('Semis and supply chain\nchat-jul20')

@@ -127,11 +127,6 @@ export function HarnessSetupPage({
       data-testid={`${testIdPrefix}-scroll`}
       className="relative flex h-full w-full items-start justify-start overflow-auto bg-background px-5 py-10"
     >
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-accent to-transparent" />
-        <div className="absolute inset-0 opacity-[0.045] [background-image:linear-gradient(to_right,var(--foreground)_1px,transparent_1px),linear-gradient(to_bottom,var(--foreground)_1px,transparent_1px)] [background-size:96px_96px]" />
-      </div>
-
       <main data-testid={`${testIdPrefix}-stack`} className="relative z-10 mx-auto my-auto w-full max-w-xl">
         {ctx.listError !== null && (
           <RefreshNotice
@@ -142,10 +137,8 @@ export function HarnessSetupPage({
           />
         )}
         <div className="mb-6 flex flex-col items-center text-center">
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
-            <Icon className="h-6 w-6" />
-          </div>
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
+          <Icon className="mb-4 size-7 text-primary" />
+          <p className="mb-2 text-[12px] font-medium leading-4 text-muted-foreground">
             {t(`${copyPrefix}.eyebrow`)}
           </p>
           <h1 className="text-2xl font-semibold text-foreground">
@@ -166,11 +159,9 @@ export function HarnessSetupPage({
                   type="button"
                   disabled={pendingWorkspaceId !== null}
                   onClick={() => void chooseWorkspace(workspace.id)}
-                  className="oa-pressable group flex w-full items-center gap-3 rounded-xl border border-border/75 bg-secondary/75 px-4 py-3 text-left hover:border-primary/40 hover:bg-muted disabled:opacity-60"
+                  className="oa-pressable group flex w-full items-center gap-3 rounded-lg border border-border/75 bg-secondary/75 px-4 py-3 text-left hover:border-primary/40 hover:bg-muted disabled:opacity-60"
                 >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-primary">
-                    <PanelsTopLeft className="h-4 w-4" />
-                  </span>
+                  <PanelsTopLeft className="size-4 shrink-0 text-muted-foreground group-hover:text-primary" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium text-foreground">
                       {workspaceDisplayTitle(workspace)}
