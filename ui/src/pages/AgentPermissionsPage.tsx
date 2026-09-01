@@ -6,7 +6,7 @@ import { api, type AppConfig } from '../api'
 import type { TradingMode } from '../api/types'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { PageHeader } from '../components/PageHeader'
-import { PageLoading } from '../components/StateViews'
+import { PageLoading, RecoverySurface } from '../components/StateViews'
 import { Toggle } from '../components/Toggle'
 import { SettingsScrollArea } from '../components/form'
 import { ensureTradingModePolling, useTradingMode } from '../live/trading-mode'
@@ -81,27 +81,13 @@ function PermissionsLoadError({ onRetry }: { onRetry: () => void }) {
   const { t } = useTranslation()
 
   return (
-    <div className="flex flex-1 items-center justify-center px-6 py-12">
-      <div
-        role="alert"
-        className="flex max-w-md flex-col items-center rounded-xl border border-destructive/30 bg-destructive/5 px-6 py-7 text-center"
-      >
-        <CircleAlert className="mb-3 text-destructive" size={28} strokeWidth={1.7} aria-hidden />
-        <h2 className="text-sm font-semibold text-foreground">
-          {t('settings.agentPermissions.loadErrorTitle')}
-        </h2>
-        <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
-          {t('settings.agentPermissions.loadErrorDescription')}
-        </p>
-        <button
-          type="button"
-          onClick={onRetry}
-          className="mt-5 rounded-md border border-border bg-background px-3.5 py-2 text-[12px] font-medium text-foreground transition-colors hover:border-primary/50 hover:bg-muted"
-        >
-          {t('common.retry')}
-        </button>
-      </div>
-    </div>
+    <RecoverySurface
+      title={t('settings.agentPermissions.loadErrorTitle')}
+      description={t('settings.agentPermissions.loadErrorDescription')}
+      actionLabel={t('common.retry')}
+      onAction={onRetry}
+      icon={<CircleAlert className="size-6" strokeWidth={1.7} aria-hidden />}
+    />
   )
 }
 
@@ -117,7 +103,7 @@ function PermissionSection({
   return (
     <div className="grid min-w-0 grid-cols-1 gap-4 border-b border-border/60 py-6 last:border-b-0 xl:grid-cols-[260px_minmax(0,1fr)] xl:gap-10">
       <div className="min-w-0 xl:pt-0.5">
-        <h3 className="text-[14px] font-semibold text-foreground">{title}</h3>
+        <h3 className="text-[14px] leading-[19px] font-semibold text-foreground">{title}</h3>
         {description && (
           <p className="mt-1.5 max-w-[42rem] text-[13px] leading-relaxed text-muted-foreground/70">{description}</p>
         )}
@@ -155,21 +141,20 @@ function TradingModeSection() {
                 if (mode === status.mode) return
                 void setMode(mode).catch(() => {})
               }}
-              className={`flex min-h-[82px] items-start gap-3 rounded-lg border px-3.5 py-3 text-left transition-[border-color,background-color] ${
+              className={`oa-pressable flex min-h-[82px] items-start gap-3 rounded-lg border px-3.5 py-3 text-left transition-[border-color,background-color] duration-[var(--motion-fast)] ${
                 active
                   ? 'border-primary/50 bg-primary/10 text-foreground'
                   : 'border-border bg-background text-muted-foreground hover:border-primary/40 hover:bg-muted hover:text-foreground'
               } ${disabled ? 'cursor-default opacity-70' : ''}`}
             >
-              <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-md ${active ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'}`}>
+              <span className={`grid h-8 w-8 shrink-0 place-items-center ${active ? 'text-primary' : 'text-muted-foreground'}`}>
                 <meta.Icon size={16} strokeWidth={1.8} aria-hidden />
               </span>
               <span className="min-w-0">
                 <span className="block text-[13px] font-semibold">{t(meta.labelKey)}</span>
                 <span className="mt-1 block text-[12px] leading-relaxed text-muted-foreground">{t(meta.descriptionKey)}</span>
                 {saving === mode && (
-                  <span className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-primary">
-                    <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" aria-hidden />
+                  <span className="mt-2 block text-[11px] text-primary">
                     {t('settings.agentPermissions.mode.saving')}
                   </span>
                 )}
@@ -224,7 +209,7 @@ function AiTradingToggle({
 
   return (
     <>
-      <div className="flex items-center justify-between gap-4 py-1">
+      <div className="flex min-h-12 items-center justify-between gap-4 py-1">
         <div className="min-w-0 flex-1">
           <span className="text-sm font-medium text-foreground">{t('settings.agent.allowAiTrading')}</span>
           <p className="text-[12px] text-muted-foreground mt-0.5 leading-relaxed">

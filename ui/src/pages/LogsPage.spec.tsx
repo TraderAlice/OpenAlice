@@ -83,14 +83,14 @@ describe('LogsPage Agent conversations', () => {
     expect(await screen.findByText(/2 conversations/)).toBeTruthy()
     expect(screen.getAllByText('Reconstructed provenance')).toHaveLength(2)
     expect(screen.getByText('Guidance injected')).toBeTruthy()
-    expect(screen.getAllByText('chat-desk · codex')).toHaveLength(2)
-    expect(screen.getAllByText('quant-desk · codex')).toHaveLength(2)
+    expect(screen.getAllByText('chat-desk / codex')).toHaveLength(2)
+    expect(screen.getAllByText('quant-desk / codex')).toHaveLength(2)
 
     fireEvent.click(screen.getByRole('button', { name: /Run an ordinary research task/ }))
 
     expect(screen.getByText('Original prompt')).toBeTruthy()
     expect(screen.getByText('Research complete.')).toBeTruthy()
-    expect(screen.queryByText('Delivered prompt · reconstruction guidance applied')).toBeNull()
+    expect(screen.queryByText('Delivered prompt — reconstruction guidance applied')).toBeNull()
   })
 
   it('shows original and delivered prompts only for explicit reconstruction', async () => {
@@ -98,7 +98,7 @@ describe('LogsPage Agent conversations', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /Why was this artifact created/ }))
 
-    expect(screen.getByText('Delivered prompt · reconstruction guidance applied')).toBeTruthy()
+    expect(screen.getByText('Delivered prompt — reconstruction guidance applied')).toBeTruthy()
     expect(screen.getByText(/You are a reconstruction analyst/)).toBeTruthy()
     expect(screen.getByText('This is a reconstructed explanation.')).toBeTruthy()
     expect(screen.getByText('run-reconstructed')).toBeTruthy()
