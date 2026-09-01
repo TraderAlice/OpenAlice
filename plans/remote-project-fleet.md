@@ -699,9 +699,10 @@ Rules:
 
 ### Increment 8 — remote readiness and browser truth
 
-This is the current beta-blocking increment and may land before the remaining
-Increment 7 release-apply work. It does not grant the SSH path deployment
-authority or broaden Agent/broker ownership.
+This increment supplied the beta3 remote-readiness boundary; the recovery
+journey's Settings identity fix follows on `dev` after that release. It remains
+independent of the unfinished Increment 7 release-apply work and does not grant
+the SSH path deployment authority or broaden Agent/broker ownership.
 
 - [x] Reconcile Agent readiness from fresh PATH discovery, expose a cheap
   rediscovery action distinct from active probing, and refresh on focus,
@@ -726,10 +727,10 @@ authority or broaden Agent/broker ownership.
 - [x] Add an authoritative Issue assignee-Session projection so a newly claimed
   or cross-Workspace owner cannot coexist with a stale "Session is no longer
   available" warning.
-- [ ] Extend the Docker SSH journey with dynamic free Runtime discovery,
+- [x] Extend the Docker SSH journey with dynamic free Runtime discovery,
   missing-Pack account projection, complete client URL retention, and a real
   shell PTY tunnel reconnect. Cover the longer logical retry window with fake
-  timers and run one retained Railway long-outage journey before beta release.
+  timers and run one retained Railway long-outage journey for beta acceptance.
 - [x] Update the remote access, Agent/runtime, scheduling, Broker Pack, and
   Docker owner guides with the shipped layered-readiness contract.
 
@@ -872,9 +873,26 @@ title projection, long terminal retry exhaustion, and trading-mode/health/write
 gates. The disposable OrbStack Linux arm64 SSH journey passed both its ordinary
 and full TUI paths: an inert Pi shim was discovered and removed without ever
 executing, and a migrated Alpaca account stayed configured but non-operational
-with its Pack missing. The remaining Increment 8 acceptance item is a retained
-Railway long-outage journey on the released candidate; it intentionally stays
-open until beta3 replaces beta2 on that service.
+with its Pack missing.
+
+Increment 8 release acceptance (2026-09-01): public `v0.91.0-beta.3` replaced
+beta2 on the retained Railway service through platform-owned deployment
+`745fbb1f-ed13-4df0-ab20-4d03d6e35ec0`. The accepted Runtime preserved the
+same `/data/projects/main-cloud` AliceProject, six Workspace directories, Pi,
+OpenCode, and ready Alice/UTA/Connector components. A real shell PTY kept PID
+893 while a 120-second command crossed a tunnel outage longer than the terminal
+retry budget. Replacing only the local tunnel made the existing browser page
+recover automatically and reattach that exact PTY without clicking Retry or
+reloading. The journey also found one read-side recovery bug: About retained
+the old Runtime version and Project source after owner replacement. Version and
+AliceProject domain hooks now invalidate outage-era requests, refetch on the
+shared backend-recovery generation, and ignore late stale responses. Confirmed
+snapshots are valid only for their recovery generation, so a failed recovery
+read shows unavailable instead of reviving the old owner; version reads also
+abort when the transport disappears. The source UI repeated the real Railway
+tunnel cut while staying on Settings;
+proxy evidence recorded fresh `/api/version` and `/api/alice-project` reads,
+and the visible beta3 Runtime source remained correct after automatic recovery.
 
 Increment 8 review follow-up (2026-09-01): a read-only recovery-state review
 found six races that isolated happy-path tests had missed. Broker readiness now

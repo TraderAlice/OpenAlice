@@ -34,10 +34,12 @@ the durable truth after it changes. Git history is the archive.
   npm/Bun, Homebrew, and AUR channels consume one accepted artifact set. The
   CLI package owns OpenAlice only: Agent Runtime installation and Electron
   packaging stay outside this plan. The native CLI is public through the
-  separately dispatched `v0.91.0-beta.2`; stable/beta discovery now uses the
+  separately dispatched `v0.91.0-beta.3`; stable/beta discovery now uses the
   OpenAlice CDN manifests. The retained no-domain Railway profile has passed
   real migration, OpenCode resume, normal restart, hard-kill recovery, and a
-  non-destructive dev-to-pinned-beta2 replacement; disposable empty-Volume and
+  non-destructive dev-to-pinned-beta3 replacement. Beta3 core Runtime/PTY state
+  survives a long tunnel outage, and the following `dev` increment refreshes
+  Settings identity after recovery; disposable empty-Volume and
   failure-fallback journeys, native PowerShell, and external package-manager
   activation remain open on focused branches from current `dev`. Routine dev
   and exact-beta source feedback is reduced to local-first, lightweight
@@ -46,8 +48,8 @@ the durable truth after it changes. Git history is the archive.
 - [[plans/remote-project-fleet.md]] — Adds a machine-aware Supervisor fleet,
   remote AliceProject inventory/connection, and safe local-to-SSH project
   transfer for portable configuration and Workspaces while deliberately
-  excluding native/OpenAlice Session continuation state. The current
-  beta-blocking increment makes the attached browser truthful about remote
+  excluding native/OpenAlice Session continuation state. The completed
+  remote-readiness increment makes the attached browser truthful about remote
   identity, Agent and Broker Pack capability, scheduled-work blockers,
   reconnect recovery, and public Session titles. Controller/remote release
   negotiation and a consented Railway redeploy adapter remain a separate

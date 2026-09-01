@@ -692,6 +692,10 @@ when Alice transitions from unavailable back to available. PTY views use that
 signal to re-attach the same Session after a recoverable tunnel/backend outage,
 including after their bounded exponential retry budget has expired. A stopped
 retry loop remains visibly closed with an explicit **Retry** action.
+Runtime-identity reads such as the running version/update authority and current
+AliceProject also invalidate outage-era requests and refetch on that recovery
+generation, so a replacement owner cannot leave Settings describing the old
+Runtime after the global overlay disappears.
 Authentication failures, another controller's ownership, and a missing Session
 remain fatal to that attachment: recovery never implies takeover, Session
 recreation, or a new Agent Runtime.
