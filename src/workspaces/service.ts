@@ -101,6 +101,7 @@ import {
   type IssuesSnapshotWorkspace,
   type WikilinkIssueRef,
 } from './issues/board.js';
+import { projectIssueAssigneeSession } from './issues/assignee-session.js';
 import {
   buildWorkspaceSessionDirectory,
   connectorDeskRosterExclusions,
@@ -152,13 +153,15 @@ import {
 import { sessionSignature } from './session-signature.js';
 import { issueRunFailure } from './issues/run-failure.js';
 import type { IInboxStore } from '@/core/inbox-store.js';
+import { OfficeDayStore } from '@/core/office-day-store.js';
+import { RoutineFollowUpStore } from '@/core/routine-follow-up-store.js';
 import { toSafeInboxOrigin } from '@/core/workspace-tool-center.js';
 import {
   AgentConversationLog,
   type AgentConversationDispatch,
 } from './agent-conversation-log.js';
 import {
-  AgentRuntimeLog,
+  ProductActivityJournal,
   conversationCause,
   issueCause,
   type AgentRuntimeCause,
@@ -359,7 +362,7 @@ import {
   type SessionRecord,
 } from './session-registry.js';
 import { ProductSessionCoordinator } from './product-session-coordinator.js';
-import { projectPublicSession, projectPublicSessionRuntime } from './public-session.js';
+import { projectPublicSession } from './public-session.js';
 import { NativeSessionTitleResolver } from './session-title-resolver.js';
 import { buildCliPath, buildSpawnEnv } from './spawn-env.js';
 import { TemplateRegistry } from './template-registry.js';
@@ -612,10 +615,18 @@ export interface WorkspaceService {
   resumeRegistry: ResumeRegistry;
   /** Durable product Session -> business artifact attribution index. */
   provenanceStore: ArtifactProvenanceStore;
+  /** Global Inbox delivery source used to prove Office routine-report identity. */
+  inboxStore?: IInboxStore;
+  /** AliceProject-owned daily Office patrol and exact evidence receipts. */
+  officeDayStore: OfficeDayStore;
+  /** Durable human-carried queue for scheduled reports that need a decision. */
+  routineFollowUpStore: RoutineFollowUpStore;
   /** Append-only analysis/audit projection of cross-Agent messages. */
   agentConversationLog: AgentConversationLog;
-  /** Append-only desk/employee occupancy journal. Never a dispatch authority. */
-  agentRuntimeLog: AgentRuntimeLog;
+  /** Standard append-only product activity journal. Never a dispatch authority. */
+  activityJournal: ProductActivityJournal;
+  /** Compatibility alias for older Agent-runtime routes and callers. */
+  agentRuntimeLog: ProductActivityJournal;
   recordAgentRuntime(
     type: AgentRuntimeEventType,
     payload: AgentRuntimePayload,
@@ -673,6 +684,18 @@ export function resumeFromRecord(
 export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions): Promise<WorkspaceService> {
   const config = loadConfig({ webPort: opts.webPort });
   const inboxStore = opts.inboxStore;
+  const officeDayStore = await OfficeDayStore.loadOrUnavailable();
+  if (!officeDayStore.available) {
+    launcherLogger.error('office_day_store.load_failed', {
+      error: officeDayStore.loadError,
+    });
+  }
+  const routineFollowUpStore = await RoutineFollowUpStore.loadOrUnavailable();
+  if (!routineFollowUpStore.available) {
+    launcherLogger.error('routine_follow_up_store.load_failed', {
+      error: routineFollowUpStore.loadError,
+    });
+  }
   const registry = await WorkspaceRegistry.load(
     `${config.launcherRoot}/workspaces.json`,
     launcherLogger.child({ scope: 'registry' }),
@@ -722,10 +745,29 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     join(config.launcherRoot, 'state', 'agent-conversations.jsonl'),
     launcherLogger.child({ scope: 'agent-conversation-log' }),
   );
-  const agentRuntimeLog = await AgentRuntimeLog.open(
+  const agentRuntimeLog = await ProductActivityJournal.open(
     join(config.launcherRoot, 'state', 'agent-runtime.jsonl'),
     launcherLogger.child({ scope: 'agent-runtime-log' }),
   );
+  const inboxActivity = agentRuntimeLog.registerFamily({
+    family: 'inbox',
+    types: ['inbox.received'] as const,
+  });
+  const stopInboxActivity = inboxStore?.onAppended((entry) => {
+    const summary = entry.comments?.replace(/\s+/g, ' ').trim().slice(0, 240);
+    void inboxActivity.record('inbox.received', {
+      workspaceId: entry.workspaceId,
+      inboxEntryId: entry.id,
+      ...(entry.workspaceLabel ? { workspaceLabel: entry.workspaceLabel } : {}),
+      ...(entry.origin?.agent ? { agent: entry.origin.agent } : {}),
+      ...(entry.origin?.resumeId ? { resumeId: entry.origin.resumeId } : {}),
+      ...(entry.origin?.sessionId ? { sessionRecordId: entry.origin.sessionId } : {}),
+      ...(entry.origin?.runId ? { taskId: entry.origin.runId } : {}),
+      ...(entry.origin?.kind ? { originKind: entry.origin.kind } : {}),
+      ...(summary ? { summary } : {}),
+      documentCount: entry.docs?.length ?? 0,
+    });
+  });
   const recordAgentRuntime = async (
     type: AgentRuntimeEventType,
     payload: AgentRuntimePayload,
@@ -1082,35 +1124,20 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       await resolveDefaultAgentId(wsMeta);
   };
 
-  const projectIssueAssigneeSession = (assignee: string): IssueAssigneeSession | undefined => {
+  const resolveIssueAssigneeSession = (assignee: string): IssueAssigneeSession | undefined => {
     const resumeId = issueAssigneeResumeId(assignee);
     if (!resumeId) return undefined;
     const identity = resumeRegistry.get(resumeId);
-    if (!identity) return { resumeId, state: 'missing', active: false };
-    const workspace = registry.get(identity.wsId);
-    const presence = sessionPresence(identity);
-    const state: IssueAssigneeSession['state'] = identity.lifecycle === 'retired'
-      ? 'retired'
-      : presence === 'deleted'
-        ? 'deleted'
-        : !workspace
-          ? 'workspace_missing'
-          : identity.agentSessionId
-            ? 'ready'
-            : 'unbound';
-    return {
-      resumeId,
-      state,
+    const workspace = identity ? registry.get(identity.wsId) : undefined;
+    return projectIssueAssigneeSession({
+      assignee,
+      ...(identity ? { identity } : {}),
       ...(workspace ? { workspace: { id: workspace.id, tag: workspace.tag } } : {}),
-      agent: identity.agent,
-      ...(identity.displayName ? { displayName: identity.displayName } : {}),
-      createdAt: identity.createdAt,
-      updatedAt: identity.updatedAt,
-      active: state === 'ready' && activeResumeIds.has(resumeId),
-      ...(identity.runtimeBinding
-        ? { runtime: projectPublicSessionRuntime(identity.runtimeBinding) }
+      ...(identity
+        ? { interactive: sessionRegistry.findByResumeId(identity.wsId, resumeId) }
         : {}),
-    };
+      headlessActive: activeResumeIds.has(resumeId),
+    });
   };
 
   const issueRuntimeAvailability = (
@@ -2358,6 +2385,13 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           }
           return { wsId: ws.id, tag: ws.tag, status: 'invalid', error: res.error, issues: [] };
         }
+        const ownerWorkspaceIds = new Set(
+          res.issues
+            .map((issue) => issueAssigneeResumeId(issue.assignee))
+            .map((resumeId) => resumeId ? resumeRegistry.get(resumeId)?.wsId : undefined)
+            .filter((wsId): wsId is string => Boolean(wsId)),
+        );
+        await Promise.all([...ownerWorkspaceIds].map((wsId) => sessionRegistry.ensureLoaded(wsId)));
         await observeIssueRecords(ws, res.issues);
         const needsDefaultAgent = res.issues.some((issue) =>
           Boolean(issue.when) && !issueAssigneeResumeId(issue.assignee) && !issue.agent,
@@ -2379,7 +2413,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
             scheduleMarkers.getHeld(ws.id, issue.id) ?? null,
           );
           const latestRun = headlessTasks.list({ issue: { workspaceId: ws.id, issueId: issue.id } })[0];
-          const assigneeSession = projectIssueAssigneeSession(issue.assignee);
+          const assigneeSession = resolveIssueAssigneeSession(issue.assignee);
           return snapshotBoardIssue(
             issue,
             {
@@ -2419,7 +2453,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     await observeIssueRecords(ws, res.issues);
     const issue = res.issues.find((i) => i.id === id);
     if (!issue) return null;
-    const assigneeSession = projectIssueAssigneeSession(issue.assignee);
+    const ownerResumeId = issueAssigneeResumeId(issue.assignee);
+    const ownerIdentity = ownerResumeId ? resumeRegistry.get(ownerResumeId) : undefined;
+    if (ownerIdentity) await sessionRegistry.ensureLoaded(ownerIdentity.wsId);
+    const assigneeSession = resolveIssueAssigneeSession(issue.assignee);
     const defaultIssueAgent = issue.when && !issueAssigneeResumeId(issue.assignee) && !issue.agent
       ? await resolveIssueDefaultAgentId(ws)
       : undefined;
@@ -3108,6 +3145,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     shuttingDown = true;
     launcherLogger.info('workspaces.dispose', { reason, activeSessions: pool.size() });
     scheduleScanner.stop();
+    stopInboxActivity?.();
     await harnessSurfaces.dispose();
     pool.disposeAll('plugin shutdown');
     await webPi.stopAll('plugin shutdown');
@@ -3250,7 +3288,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     headlessTasks,
     resumeRegistry,
     provenanceStore,
+    inboxStore,
+    officeDayStore,
+    routineFollowUpStore,
     agentConversationLog,
+    activityJournal: agentRuntimeLog,
     agentRuntimeLog,
     recordAgentRuntime,
     isResumeActive: (resumeId) => activeResumeIds.has(resumeId),

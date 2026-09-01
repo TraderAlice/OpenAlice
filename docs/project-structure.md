@@ -344,7 +344,8 @@ sealing, and Broker Packs must remain coherent.
 │   ├── config/                JSON config + migration journal
 │   ├── sessions/              web/admin sessions
 │   ├── trading/               account history and snapshots
-│   ├── inbox/                 Inbox records
+│   ├── inbox/                 Inbox records + Office routine follow-up queue
+│   ├── office/                shared Office Day shift + evidence receipts
 │   ├── event-log/             UTA account-health and snapshot journal
 │   ├── cron/                  schedules/jobs
 │   ├── news-collector/        RSS archive

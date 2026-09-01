@@ -10,6 +10,8 @@ export type AgentRuntimeEventType =
   | 'runtime.turn.tool'
   | 'runtime.turn.error'
   | 'dev.sonner_test'
+  | 'inbox.received'
+  | 'news.ingested'
 
 export type AgentRuntimeSurface = 'terminal' | 'webpi' | 'headless'
 
@@ -29,9 +31,9 @@ export type AgentRuntimeCause =
   | { kind: 'http' }
 
 export interface AgentRuntimePayload {
-  workspaceId: string
-  resumeId: string
-  agent: string
+  workspaceId?: string
+  resumeId?: string
+  agent?: string
   sessionRecordId?: string
   taskId?: string
   surface?: AgentRuntimeSurface
@@ -54,6 +56,18 @@ export interface AgentRuntimePayload {
   }
   truncated?: boolean
   testState?: 'running' | 'success' | 'error'
+  inboxEntryId?: string
+  workspaceLabel?: string
+  originKind?: 'headless' | 'interactive' | 'manual'
+  summary?: string
+  documentCount?: number
+  newsItemId?: number
+  dedupKey?: string
+  title?: string
+  source?: string
+  link?: string
+  publishedAt?: number
+  ingestSource?: string
 }
 
 export interface AgentRuntimeEvent {
@@ -80,6 +94,8 @@ export const agentRuntimeLogApi = {
     afterSeq?: number
     limit?: number
     type?: AgentRuntimeEventType
+    types?: AgentRuntimeEventType[]
+    family?: string
   } = {}): Promise<AgentRuntimePage> {
     const params = new URLSearchParams()
     if (opts.afterSeq !== undefined) params.set('afterSeq', String(opts.afterSeq))
@@ -87,6 +103,8 @@ export const agentRuntimeLogApi = {
     if (opts.page) params.set('page', String(opts.page))
     if (opts.pageSize) params.set('pageSize', String(opts.pageSize))
     if (opts.type) params.set('type', opts.type)
+    if (opts.types?.length) params.set('types', opts.types.join(','))
+    if (opts.family) params.set('family', opts.family)
     const qs = params.toString()
     return fetchJson<AgentRuntimePage>(`/api/agent-runtime${qs ? `?${qs}` : ''}`)
   },
@@ -97,4 +115,14 @@ export const agentRuntimeLogApi = {
       body: JSON.stringify({ state }),
     })
   },
+  async triggerProductActivityTest(family: 'inbox' | 'news'): Promise<void> {
+    await fetchJson('/api/agent-runtime/product-test', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ family }),
+    })
+  },
 }
+
+/** Product name; the older export remains for compatibility. */
+export const productActivityJournalApi = agentRuntimeLogApi

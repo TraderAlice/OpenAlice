@@ -61,10 +61,10 @@ the durable truth after it changes. Git history is the archive.
 - [[plans/antigravity-adapter.md]] — Antigravity (`agy`) CliAdapter.
   PATH `agy` only; never spawn `antigravity` / `gemini`.
   Serial PR from `feat/agy-adapter`; do not merge until Ame says so.
-- [[plans/agent-runtime-log.md]] — Append-only agent runtime lifecycle log
-  (`session.born` / started / stopped / rejected / headless turn assets).
-  Occupancy + Office timeline + headless text/tool/completion are in;
-  the floor canvas lives in [[plans/office-floor.md]].
+- [[plans/product-activity-journal.md]] — Standard append-only product activity
+  journal consumed by Office and Sonner. Agent runtime facts are live; Inbox
+  and per-item News facts are the current increment. It remains a projection,
+  never a dispatch bus.
 - [[plans/office-floor.md]] — Office overworld rebuild: one continuous 4:3
   top-down tilemap; Harness=functional neighborhood, Workspace=furniture pod,
   `resumeId`=employee. Scene graph, top-down placeholders, game chrome, camera,

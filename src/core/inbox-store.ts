@@ -298,11 +298,19 @@ export function createInboxStore(opts: InboxStoreOptions = {}): IInboxStore {
     }
     for (const line of raw.split('\n')) {
       if (!line.trim()) continue
+      let entry: InboxEntry
       try {
-        const entry = JSON.parse(line) as InboxEntry
-        if (entry.id === id) return entry
+        entry = JSON.parse(line) as InboxEntry
       } catch {
         // A malformed sibling entry must not hide a later valid id.
+        continue
+      }
+      if (entry.id === id) {
+        const readState = await readReadState()
+        const readAt = readState.read[id]
+        return typeof readAt === 'number' && Number.isFinite(readAt) && readAt > 0
+          ? { ...entry, readAt }
+          : entry
       }
     }
     return null

@@ -11,12 +11,13 @@ afterEach(() => {
 })
 
 describe('OfficeAliceSprite', () => {
-  it('uses the generated rear view for north and authored rows for other directions', () => {
+  it('uses dedicated idle and walk poses for all four directions', () => {
     expect(officeAlicePose('right', true)).toBe('walk-right')
     expect(officeAlicePose('left', true)).toBe('walk-left')
-    expect(officeAlicePose('up', true)).toBe('idle-back')
-    expect(officeAlicePose('up', false)).toBe('idle-back')
-    expect(officeAlicePose('down', true)).toBe('idle')
+    expect(officeAlicePose('up', true)).toBe('walk-up')
+    expect(officeAlicePose('up', false)).toBe('idle-up')
+    expect(officeAlicePose('down', true)).toBe('walk-down')
+    expect(officeAlicePose('down', false)).toBe('idle-down')
 
     const { container, rerender } = render(
       <OfficeAliceSprite
@@ -24,7 +25,7 @@ describe('OfficeAliceSprite', () => {
         walking
         reducedMotion
         label="Alice"
-        scale={0.2}
+        scale={1}
       />,
     )
     expect(container.firstElementChild?.getAttribute('data-pose')).toBe('walk-right')
@@ -36,7 +37,7 @@ describe('OfficeAliceSprite', () => {
         walking
         reducedMotion
         label="Alice"
-        scale={0.2}
+        scale={1}
       />,
     )
     expect(container.firstElementChild?.getAttribute('data-pose')).toBe('walk-left')
@@ -47,29 +48,49 @@ describe('OfficeAliceSprite', () => {
         walking={false}
         reducedMotion
         label="Alice"
-        scale={0.2}
+        scale={1}
       />,
     )
-    expect(container.firstElementChild?.getAttribute('data-pose')).toBe('idle-back')
-    expect((container.firstElementChild as HTMLElement).style.backgroundImage).toContain('back-v1.png')
+    expect(container.firstElementChild?.getAttribute('data-pose')).toBe('idle-up')
+    expect((container.firstElementChild as HTMLElement).style.backgroundImage)
+      .toContain('alice-overworld-v1.png')
+    expect((container.firstElementChild as HTMLElement).style.backgroundPosition)
+      .toBe('-48px -144px')
   })
 
   it('advances the authored run cycle while Alice keeps moving', () => {
     vi.useFakeTimers()
-    const { container } = render(
+    const { container, rerender } = render(
       <OfficeAliceSprite
         direction="right"
         walking
         reducedMotion={false}
         label="Alice"
-        scale={0.2}
+        scale={1}
       />,
     )
 
     expect(container.firstElementChild?.getAttribute('data-frame')).toBe('0')
-    act(() => vi.advanceTimersByTime(80))
+    act(() => vi.advanceTimersByTime(120))
     expect(container.firstElementChild?.getAttribute('data-frame')).toBe('1')
-    act(() => vi.advanceTimersByTime(80))
+    act(() => vi.advanceTimersByTime(120))
     expect(container.firstElementChild?.getAttribute('data-frame')).toBe('2')
+
+    rerender(
+      <OfficeAliceSprite
+        direction="right"
+        walking
+        sprinting
+        reducedMotion={false}
+        label="Alice"
+        scale={1}
+      />,
+    )
+    expect(container.firstElementChild?.getAttribute('data-frame')).toBe('0')
+    expect(container.firstElementChild?.getAttribute('data-sprinting')).toBe('true')
+    act(() => vi.advanceTimersByTime(79))
+    expect(container.firstElementChild?.getAttribute('data-frame')).toBe('0')
+    act(() => vi.advanceTimersByTime(1))
+    expect(container.firstElementChild?.getAttribute('data-frame')).toBe('1')
   })
 })

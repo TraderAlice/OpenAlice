@@ -19,7 +19,7 @@ import { preferencesApi } from './preferences'
 import { inquiriesApi } from './inquiries'
 import { connectorsApi } from './connectors'
 import { agentConversationsApi } from './agentConversations'
-import { agentRuntimeLogApi } from './agentRuntimeLog'
+import { agentRuntimeLogApi, productActivityJournalApi } from './agentRuntimeLog'
 import { officeApi } from './office'
 import { aliceProjectApi } from './aliceProject'
 import { uiLayoutApi } from './ui-layout'
@@ -42,6 +42,7 @@ export const api = {
   connectors: connectorsApi,
   agentConversations: agentConversationsApi,
   agentRuntime: agentRuntimeLogApi,
+  productActivity: productActivityJournalApi,
   office: officeApi,
   aliceProject: aliceProjectApi,
   uiLayout: uiLayoutApi,

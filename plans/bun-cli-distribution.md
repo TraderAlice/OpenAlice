@@ -357,6 +357,11 @@ by the native CLI or deployment through checksum and content identity, not by
 package semver in the browser. Pinned, custom, and invalid provenance fail
 closed without an implicit update action.
 
+Package semver remains build/display metadata rather than source-channel
+authority. Once a release is accepted, a focused two-manifest PR synchronizes
+its root and CLI versions back to `dev`; explicit source launcher identity keeps
+that checkout on the dev channel.
+
 ## Alternatives Considered
 
 | Shape | Decision | Reason |
@@ -571,7 +576,8 @@ artifacts.
 - [x] Promote the exact accepted `dev` tip, including the GitHub-safe AUR
   metadata asset contract, to `master` through the full promotion gate.
 - [x] Use a focused `master` branch and PR to set both product manifests to
-  `0.91.0-beta.1`; do not merge that version-only commit back to `dev`.
+  `0.91.0-beta.1`; keep release preparation isolated from implementation, then
+  synchronize only the accepted published version metadata back to `dev`.
 - [x] Dispatch one `beta` release for `v0.91.0-beta.1`. Do not produce or queue
   a stable release from the same run.
 - [x] Externally verify the beta GitHub Release, updater feeds, CLI manifest,
@@ -588,6 +594,9 @@ artifacts.
   replace the retained Railway beta2 Runtime through its service-owned selector
   and pass the retained core Runtime/PTY long-outage journey. Record the
   resulting Settings identity-refresh fix as the following `dev` increment.
+- [x] Synchronize the root and CLI package baselines to `0.91.0-beta.3` on
+  `dev`, while making explicit source launcher identity—not package semver—the
+  authority for the `dev` update channel.
 
 ### 11. Converge channel discovery authority
 
@@ -790,8 +799,8 @@ pnpm test:install:dev-channel
 pnpm test:remote:docker
 pnpm electron:smoke:pty
 pnpm electron:smoke:workspace
-bash -n scripts/railway/*.sh
-pnpm exec vitest run scripts/railway-entrypoint.spec.ts \
+pnpm test:railway:local
+pnpm exec vitest run \
   packages/cli/src/install.spec.mjs \
   packages/cli/src/lifecycle.spec.mjs \
   packages/cli/src/project-command.spec.ts \

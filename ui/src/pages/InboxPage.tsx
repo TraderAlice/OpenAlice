@@ -33,6 +33,12 @@ import { useWorkspaces } from '../contexts/workspaces-context'
 import { readWorkspaceFile, type ReadFileResult } from '../components/workspace/api'
 import { workspaceDisplayName, workspaceDisplayTitle } from '../components/workspace/display'
 import { presentInboxEntry } from '../lib/inbox-presentation'
+import {
+  isActiveOfficeInboxDutyReviewTarget,
+  readOfficeInboxDutyExcursion,
+} from '../office/inbox-duty-excursion'
+import { OfficeInboxDutyReturnBar } from '../office/OfficeInboxDutyReturnBar'
+import { useOfficeInboxDutyReturn } from '../office/useOfficeInboxDutyReturn'
 import type { InboxEntry, InboxDoc } from '../api/inbox'
 
 interface InboxPageProps {
@@ -52,8 +58,9 @@ interface InboxPageProps {
  * background or open the same Session interactively.
  *
  * Selection (an entryId) is owned by `useInboxSelection`; the sidebar
- * drives it and marks the entry read on select. Confirmed Delete (header
- * trash + page-level Delete/Backspace) advances selection to the next entry.
+ * drives it and ordinarily marks the entry read on select. An active Office
+ * review target remains unread for dossier disposition. Confirmed Delete
+ * (header trash + page-level Delete/Backspace) advances to the next entry.
  */
 export function InboxPage({ visible }: InboxPageProps) {
   const { t } = useTranslation()
@@ -64,9 +71,22 @@ export function InboxPage({ visible }: InboxPageProps) {
   const markRead = useInboxRead((s) => s.markRead)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const returnToOffice = useOfficeInboxDutyReturn()
 
-  const selected = entries.find((e) => e.id === selectedId) ?? null
+  const capturedOfficeEntry = readOfficeInboxDutyExcursion()?.duty.delivery.entry ?? null
+  const capturedOfficeEntryId = capturedOfficeEntry?.id ?? null
+  const selectedFromLive = entries.find((e) => e.id === selectedId) ?? null
+  const selected = selectedFromLive
+    ?? (capturedOfficeEntry?.id === selectedId ? capturedOfficeEntry : null)
   const pendingDelete = entries.find((e) => e.id === pendingDeleteId) ?? null
+
+  // Selection is normally disposable UI state. An Office field trip is the
+  // exception: after reload, restore its exact captured delivery before an
+  // ordinary Inbox default can sever the route and select a newer row.
+  useEffect(() => {
+    if (!visible || selectedId !== null || !capturedOfficeEntryId) return
+    select(capturedOfficeEntryId)
+  }, [capturedOfficeEntryId, select, selectedId, visible])
 
   /** Hard-delete an entry. The durable DELETE must succeed before the UI
    *  removes anything: a failed destructive action should keep both the
@@ -79,7 +99,7 @@ export function InboxPage({ visible }: InboxPageProps) {
 
     // entries is newest-first; the "next" one is the next older entry.
     // Fall back to the previous (newer) if we deleted the tail.
-    const nextId = entries[idx + 1]?.id ?? entries[idx - 1]?.id ?? null
+    const nextEntry = entries[idx + 1] ?? entries[idx - 1] ?? null
 
     try {
       await api.inbox.delete(id)
@@ -90,9 +110,14 @@ export function InboxPage({ visible }: InboxPageProps) {
     }
 
     removeInboxAfterDelete(id)
-    if (nextId) {
-      select(nextId)
-      markRead(nextId)
+    if (nextEntry) {
+      select(nextEntry.id)
+      if (!isActiveOfficeInboxDutyReviewTarget({
+        workspaceId: nextEntry.workspaceId,
+        inboxEntryId: nextEntry.id,
+      })) {
+        markRead(nextEntry.id)
+      }
     } else {
       select(null)
     }
@@ -112,6 +137,7 @@ export function InboxPage({ visible }: InboxPageProps) {
   useEffect(() => {
     if (!visible) return
     if (!selectedId) return
+    if (!entries.some((entry) => entry.id === selectedId)) return
     function onKey(e: KeyboardEvent) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
       if (e.metaKey || e.ctrlKey || e.altKey) return
@@ -121,18 +147,37 @@ export function InboxPage({ visible }: InboxPageProps) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [visible, selectedId, requestDelete])
+  }, [entries, visible, selectedId, requestDelete])
 
   return (
     <>
       <div className="flex flex-col flex-1 min-h-0">
-        <PageHeader
-          title={t('nav.item.inbox')}
-        />
+        {selected ? (
+          <OfficeInboxDutyReturnBar
+            surface={{
+              kind: 'inbox',
+              visible,
+              workspaceId: selected.workspaceId,
+              inboxEntryId: selected.id,
+            }}
+            onReturn={returnToOffice}
+            fallback={(
+              <PageHeader
+                title={t('nav.item.inbox')}
+                description={t('inbox.pageDescription', { count: entries.length })}
+              />
+            )}
+          />
+        ) : (
+          <PageHeader
+            title={t('nav.item.inbox')}
+            description={t('inbox.pageDescription', { count: entries.length })}
+          />
+        )}
         <div className="flex-1 overflow-y-auto min-h-0">
-          {loading && entries.length === 0 ? (
+          {loading && entries.length === 0 && !selected ? (
             <InboxLoadingSkeleton />
-          ) : entries.length === 0 ? (
+          ) : entries.length === 0 && !selected ? (
             <SharedEmptyState
               icon={<MessageSquare aria-hidden />}
               title={t('inbox.noMessages')}
@@ -146,7 +191,7 @@ export function InboxPage({ visible }: InboxPageProps) {
             <Detail
               key={selected.id}
               entry={selected}
-              onDelete={() => requestDelete(selected.id)}
+              onDelete={selectedFromLive ? () => requestDelete(selected.id) : undefined}
             />
           )}
         </div>
@@ -203,7 +248,7 @@ function InboxLoadingSkeleton() {
 
 // ==================== Detail (single push) ====================
 
-function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }) {
+function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete?: () => void }) {
   const { t } = useTranslation()
   const hasDocs = (entry.docs?.length ?? 0) > 0
   const hasComments = (entry.comments ?? '').trim().length > 0
@@ -448,21 +493,23 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
                 </span>
               </Button>
             )}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={onDelete}
-              className="h-10 w-10 shrink-0 text-muted-foreground/55 hover:bg-destructive/10 hover:text-destructive sm:h-8 sm:w-8"
-              title={t('inbox.deleteEntryTitle')}
-              aria-label={t('inbox.deleteEntryAriaLabel')}
-            >
-              <Trash2 size={14} strokeWidth={1.75} />
-            </Button>
+            {onDelete && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={onDelete}
+                className="h-10 w-10 shrink-0 text-muted-foreground/55 hover:bg-destructive/10 hover:text-destructive sm:h-8 sm:w-8"
+                title={t('inbox.deleteEntryTitle')}
+                aria-label={t('inbox.deleteEntryAriaLabel')}
+              >
+                <Trash2 size={14} strokeWidth={1.75} />
+              </Button>
+            )}
           </div>
         </div>
       </header>
-      {continueError && <div className="-mt-4 mb-6 text-[12px] text-destructive">{continueError}</div>}
+      {continueError && <div className="-mt-4 mb-6 text-[12px] leading-[18px] text-destructive">{continueError}</div>}
 
       {hasComments && (
         <div className="min-w-0">
