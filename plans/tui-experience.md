@@ -164,6 +164,20 @@ not imply maintainer approval of the finished interaction.
   checklist/Inspector cards; 80-column and narrow terminals stack the same two
   regions. All evidence remains the existing read-only Doctor snapshot.
 
+### Help Control Atlas decision
+
+- Restyling the grouped keyboard map would make the shortcut wall prettier but
+  leave every command equally prominent and give mouse users nothing to
+  explore.
+- Reusing the Command Palette would make Help executable, but duplicate a
+  surface optimized for speed rather than understanding and context.
+- The selected model follows OMP's selectable list/detail language: Navigation,
+  Runtime, and AliceProject are stable focus groups, while the selected group
+  owns a purpose statement and unambiguous clickable keycaps. Wide terminals
+  split the atlas and inspector; 80-column and narrow terminals stack the same
+  state. Recovery projects only safe update and detach groups. Arrow/Home/End,
+  wheel, hover, and whole-row click all update one shared selection.
+
 ### Overlay pointer parity decision
 
 - Leaving overlays keyboard-only would make pointer support disappear exactly
@@ -282,6 +296,8 @@ already large `supervisor-tui.ts` application controller.
   mouse-capable Command Palette.
 - [x] Replace Doctor's flat line scroller with a responsive, selectable
   checklist and detail Inspector.
+- [x] Replace Help's static shortcut wall with a responsive, pointer-aware
+  Control Atlas while keeping the Command Palette as the fast execution path.
 - [x] Give every Supervisor overlay list, input, and visible command keycap the
   same pointer semantics as the application frame.
 - [x] Turn the bottom command dock into a persistent, pointer-aware
@@ -533,6 +549,21 @@ already large `supervisor-tui.ts` application controller.
   691-file suite pass (690 passed, 1 skipped; 6094 tests passed, 10 skipped).
   Docker installer smoke passes, and the package dry-run includes
   `src/supervisor-navigation.ts`.
+- Help is now a Control Atlas instead of a static shortcut wall. Wide terminals
+  use a stable group/Inspector split; 80-column and 46-column terminals stack
+  the same Navigation, Runtime, and AliceProject focus model. Each selected
+  group explains its ownership and exposes only single-meaning clickable
+  keycaps. Recovery substitutes safe Recovery and Exit groups. Arrow/Home/End,
+  pointer wheel, whole-row hover, and click all update one selection without
+  creating another action state machine.
+- Control-Atlas acceptance passes with 117 focused Supervisor screen, Help,
+  navigation, pointer, modal, Palette, Fleet, Doctor, transfer, and real-PTY
+  tests. A real 80x24 color session clicked the top Help chip, then used raw SGR
+  motion/click reports to select Runtime inside the Atlas before detaching with
+  cursor, mouse, and bracketed-paste modes restored. CLI build/typecheck, root
+  TypeScript, and the 692-file suite pass (691 passed, 1 skipped; 6098 tests
+  passed, 10 skipped). Docker installer smoke passes, and the package dry-run
+  includes `src/supervisor-help-view.ts`.
 
 ## Completion Criteria
 

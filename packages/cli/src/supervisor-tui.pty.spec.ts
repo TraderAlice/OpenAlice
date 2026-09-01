@@ -37,7 +37,7 @@ afterEach(async () => {
 })
 
 describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
-  it('hovers and clicks the full-width navigation rail with raw pointer input', async () => {
+  it('clicks the navigation rail and explores Help with raw pointer input', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-navigation-pointer-'))
     temporaryPaths.push(isolatedHome)
     const child = pty.spawn(process.execPath, [cliEntry], {
@@ -56,6 +56,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     const transcript = await new Promise<string>((resolve, reject) => {
       let output = ''
       let clicked = false
+      let inspected = false
       const timeout = setTimeout(() => {
         child.kill()
         reject(new Error(`Supervisor navigation pointer timed out:\n${output}`))
@@ -66,7 +67,11 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           clicked = true
           child.write('\u001b[<35;52;3M')
           child.write('\u001b[<0;52;3M')
-        } else if (clicked && output.includes('Help · Keyboard map')) {
+        } else if (!inspected && clicked && output.includes('Control atlas · 1/3 · Navigation')) {
+          inspected = true
+          child.write('\u001b[<35;10;7M')
+          child.write('\u001b[<0;10;7M')
+        } else if (inspected && output.includes('Control atlas · 2/3 · Runtime')) {
           child.write('q')
         }
       })
@@ -77,7 +82,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       })
     })
 
-    expect(transcript).toContain('Help · Keyboard map')
+    expect(transcript).toContain('Control atlas · 1/3 · Navigation')
+    expect(transcript).toContain('Control atlas · 2/3 · Runtime')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
@@ -221,7 +227,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         if (!openedHelp && output.includes('[ / ] Commands') && output.includes('[ q ] Detach')) {
           openedHelp = true
           child.write('?')
-        } else if (!detached && output.includes('Help · Keyboard map')) {
+        } else if (!detached && output.includes('Control atlas · 1/3 · Navigation')) {
           detached = true
           child.write('q')
         }
@@ -236,7 +242,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('OpenAlice Supervisor')
     expect(transcript).toContain(`v${cliVersion} · DEV`)
     expect(transcript).toContain('○ STOPPED')
-    expect(transcript).toContain('Help · Keyboard map')
+    expect(transcript).toContain('Control atlas · 1/3 · Navigation')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   })

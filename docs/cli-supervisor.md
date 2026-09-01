@@ -193,9 +193,15 @@ path is intentionally parameter-free:
   running Runtime alternates `●`/`◉` as a low-frequency heartbeat in Overview
   and Fleet; the adjacent `RUNNING`/`running` text never changes, and failed
   probes still surface through the diagnostic rail rather than animation;
-- Help is a grouped keyboard map rather than another prose screen. Update,
-  Setup, AliceProject selection, Runtime Source, and Remote Transfer use the
-  same bordered overlay shell and semantic selected/description states.
+- Help is a responsive Control Atlas rather than a prose screen or static
+  shortcut wall. Ordinary terminals split Navigation, Runtime, and
+  AliceProject groups from the selected group's explanation and executable
+  keycaps; narrower terminals stack the same focus model. Arrow/Home/End keys,
+  wheel movement, and whole-row pointer hover/click share one selection.
+  Recovery mode projects only safe update and detach groups. Help remains the
+  place to understand controls, while `/` remains the faster Command Palette.
+  Update, Setup, AliceProject selection, Runtime Source, and Remote Transfer
+  use the same bordered overlay shell and semantic selected/description states.
   Overlay lists share the application pointer contract: motion moves the
   visible selection, the wheel moves its list window, and a click invokes the
   same Enter path. Rendered keycaps remain clickable inside list, input,

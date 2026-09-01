@@ -88,6 +88,15 @@ import {
   type SupervisorTuiTheme,
 } from './supervisor-tui-theme.ts'
 import {
+  createSupervisorHelpState,
+  moveSupervisorHelpSelection,
+  normalizeSupervisorHelpState,
+  renderSupervisorHelp,
+  selectSupervisorHelpBoundary,
+  type SupervisorHelpState,
+  type SupervisorHelpTarget,
+} from './supervisor-help-view.ts'
+import {
   renderSupervisorNavigation,
   supervisorNavigationPanelAt,
   type SupervisorNavigationTarget,
@@ -2638,6 +2647,8 @@ export class SupervisorScreen implements Component {
   private logFilter: SupervisorLogFilter = 'all'
   private doctorState: SupervisorDoctorState = createSupervisorDoctorState()
   private doctorTargets: SupervisorDoctorTarget[] = []
+  private helpState: SupervisorHelpState = createSupervisorHelpState()
+  private helpTargets: SupervisorHelpTarget[] = []
   private renderWidth = 80
 
   constructor(
@@ -2962,6 +2973,27 @@ export class SupervisorScreen implements Component {
         return true
       }
     }
+    if (this.snapshot.panel === 'help') {
+      const recovery = isConfigRecovery(this.snapshot)
+      const direction = matchesKey(data, 'up') || matchesKey(data, 'pageUp')
+        ? -1
+        : matchesKey(data, 'down') || matchesKey(data, 'pageDown') ? 1 : 0
+      if (direction !== 0) {
+        this.helpState = moveSupervisorHelpSelection(
+          this.helpState,
+          direction,
+          recovery,
+          !matchesKey(data, 'pageUp') && !matchesKey(data, 'pageDown'),
+        )
+        this.requestRender?.()
+        return true
+      }
+      if (matchesKey(data, 'home') || matchesKey(data, 'end')) {
+        this.helpState = selectSupervisorHelpBoundary(recovery, matchesKey(data, 'end'))
+        this.requestRender?.()
+        return true
+      }
+    }
     if (matchesKey(data, 'enter')) {
       if (isConfigRecovery(this.snapshot)) {
         this.update({ notice: configRecoveryBlockedNotice() })
@@ -3082,6 +3114,13 @@ export class SupervisorScreen implements Component {
           && event.col <= target.endColumn
         ))
       : undefined
+    const helpTarget = !this.commandDeckOpen && this.snapshot.panel === 'help'
+      ? this.helpTargets.find((target) => (
+          target.row === event.row
+          && event.col >= target.startColumn
+          && event.col <= target.endColumn
+        ))
+      : undefined
     const commandTarget = commandAtPosition(this.commandTargets, event.col, event.row)
     if (event.motion) {
       const fleetHoverChanged = fleetTarget?.focus !== this.hoveredFleetTarget?.focus
@@ -3090,16 +3129,20 @@ export class SupervisorScreen implements Component {
         || commandTarget?.label !== this.hoveredCommandTarget?.label
       const doctorHover = doctorTarget?.index ?? null
       const doctorHoverChanged = doctorHover !== this.doctorState.hovered
+      const helpHover = helpTarget?.index ?? null
+      const helpHoverChanged = helpHover !== this.helpState.hovered
       if (
         hovered !== this.hoveredPanel
         || fleetHoverChanged
         || commandHoverChanged
         || doctorHoverChanged
+        || helpHoverChanged
       ) {
         this.hoveredPanel = hovered
         this.hoveredFleetTarget = fleetTarget
         this.hoveredCommandTarget = commandTarget
         this.doctorState = { ...this.doctorState, hovered: doctorHover }
+        this.helpState = { ...this.helpState, hovered: helpHover }
         this.requestRender?.()
       }
       return true
@@ -3111,6 +3154,11 @@ export class SupervisorScreen implements Component {
     }
     if (event.leftClick && commandTarget) {
       return this.activatePointerCommand(commandTarget.label)
+    }
+    if (event.leftClick && helpTarget) {
+      this.helpState = { selected: helpTarget.index, hovered: helpTarget.index }
+      this.requestRender?.()
+      return true
     }
     if (event.leftClick && doctorTarget) {
       this.doctorState = { selected: doctorTarget.index, hovered: doctorTarget.index }
@@ -3146,6 +3194,16 @@ export class SupervisorScreen implements Component {
       this.scrollOperationalPanel(event.wheel)
       return true
     }
+    if (event.wheel !== null && this.snapshot.panel === 'help') {
+      this.helpState = moveSupervisorHelpSelection(
+        this.helpState,
+        event.wheel,
+        isConfigRecovery(this.snapshot),
+        false,
+      )
+      this.requestRender?.()
+      return true
+    }
     return event.release
   }
 
@@ -3177,6 +3235,7 @@ export class SupervisorScreen implements Component {
     ]
 
     this.doctorTargets = []
+    this.helpTargets = []
     if (this.snapshot.panel === 'fleet' && this.snapshot.fleet) {
       lines.push(...renderSupervisorFleet(
         this.snapshot.fleet,
@@ -3204,7 +3263,15 @@ export class SupervisorScreen implements Component {
       }))
       lines.push(...doctor.lines)
     } else if (this.snapshot.panel === 'help') {
-      lines.push(...renderHelp(isConfigRecovery(this.snapshot), width))
+      const recovery = isConfigRecovery(this.snapshot)
+      this.helpState = normalizeSupervisorHelpState(this.helpState, recovery)
+      const help = renderSupervisorHelp(this.helpState, recovery, width)
+      const rowOffset = lines.length
+      this.helpTargets = help.targets.map((target) => ({
+        ...target,
+        row: target.row + rowOffset,
+      }))
+      lines.push(...help.lines)
     } else if (isConfigRecovery(this.snapshot)) {
       lines.push(...renderConfigRecovery(this.snapshot))
     } else {
@@ -3267,8 +3334,8 @@ export class SupervisorScreen implements Component {
               ], width)
             : this.snapshot.panel === 'help'
               ? renderSupervisorCommandBar([
-                  { key: '?', label: 'Close help', primary: true },
-                  { key: 'Tab', label: 'Next view' },
+                  { key: '↑↓', label: 'Explore', primary: true },
+                  { key: '?', label: 'Close help' },
                   { key: 'q', label: 'Detach' },
                 ], width)
           : actionBar(runtime, this.snapshot.context, width, isConfigRecovery(this.snapshot))),
@@ -3474,6 +3541,7 @@ function pointerCommandInput(label: string): KeyId | undefined {
     Tab: 'tab',
     'PgUp / PgDn': 'pageDown',
     '↑ / ↓': 'down',
+    '↑↓': 'down',
     End: 'end',
     Home: 'home',
     '←': 'left',
@@ -3563,38 +3631,6 @@ function renderGuidance(
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(Math.max(value, minimum), maximum)
-}
-
-function renderHelp(recovery: boolean, width: number): string[] {
-  if (recovery) {
-    return renderSupervisorPanel('Help', 'Recovery mode', [
-      'AliceProject configuration cannot be read by this OpenAlice.',
-      'This shell will not inspect, start, stop, open, or configure a project.',
-      '',
-      'RECOVERY',
-      '[ u ]       Choose a channel, then check and install',
-      '[ ? ]       Close this help',
-      '[ q / Esc ] Detach only',
-      '',
-      'After a successful update, exit and run openalice again. This process does not reload.',
-    ], width)
-  }
-  return renderSupervisorPanel('Help', 'Keyboard map', [
-    'NAVIGATION',
-    '[ Tab / → ] Next view          [ Shift+Tab / ← ] Previous view',
-    '[ ↑ / ↓ ]   Move or scroll     [ PgUp / PgDn ]  Page content',
-    '',
-    'RUNTIME',
-    '[ Enter ] Primary action       [ s ] Start quietly   [ o ] Open',
-    '[ r ] Restart with confirm     [ x ] Stop with confirm',
-    '[ l ] Logs                     [ d ] Doctor           [ u ] Update',
-    '',
-    'PROJECT',
-    '[ i ] AliceProjects            [ p ] Setup             [ m ] Transfer / managed source',
-    '[ c ] Source checkout          [ ? ] Close help        [ q / Esc ] Detach',
-    '',
-    'Runtime control stays here; Workspaces, trading, and chat stay in the Web UI.',
-  ], width)
 }
 
 function renderConfigRecovery(snapshot: SupervisorSnapshot): string[] {

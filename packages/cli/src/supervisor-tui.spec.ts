@@ -1391,12 +1391,14 @@ describe('Supervisor TUI screen', () => {
 
   it('navigates detail panels and requests their read-only data', () => {
     const actions: SupervisorAction[] = []
+    let settingsRequests = 0
     const screen = new SupervisorScreen({
       version: 'dev',
       channel: 'development',
       runtime: { class: 'absent' },
     }, {
       onAction: (action) => actions.push(action),
+      onSettings: () => { settingsRequests += 1 },
     })
 
     expect(screen.handleKey('tab', matchesKey)).toBe(true)
@@ -1409,7 +1411,25 @@ describe('Supervisor TUI screen', () => {
 
     expect(screen.handleKey('?', matchesKey)).toBe(true)
     expect(screen.snapshot.panel).toBe('help')
-    expect(screen.render(100).join('\n')).toContain('Help · Keyboard map')
+    expect(screen.render(100).join('\n')).toContain('Control atlas · 1/3')
+    expect(screen.handleKey('down', matchesKey)).toBe(true)
+    expect(screen.render(100).join('\n')).toContain('› ● Runtime')
+    expect(screen.handlePointer({
+      button: 35, col: 8, row: 8, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(100).join('\n')).toContain('» ◇ AliceProject')
+    expect(screen.handlePointer(pointerClick(8, 8))).toBe(true)
+    expect(screen.render(100).join('\n')).toContain('AliceProject · Shape the workspace')
+    expect(screen.handlePointer({
+      button: 64, col: 8, row: 8, release: false, wheel: -1, motion: false, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(100).join('\n')).toContain('Runtime · Operate locally')
+    expect(screen.handlePointer(pointerClick(8, 8))).toBe(true)
+    const projectHelp = screen.render(100)
+    const setupRow = projectHelp.findIndex((line) => line.includes('[ p ]'))
+    const setupColumn = projectHelp[setupRow]!.indexOf('[ p ]') + 2
+    expect(screen.handlePointer(pointerClick(setupColumn, setupRow + 1))).toBe(true)
+    expect(settingsRequests).toBe(1)
   })
 
   it('renders a machine-level recovery shell and gates project actions', () => {
@@ -1469,7 +1489,7 @@ describe('Supervisor TUI screen', () => {
 
     expect(screen.handleKey('tab', matchesKey)).toBe(true)
     expect(screen.snapshot.panel).toBe('help')
-    expect(screen.render(100).join('\n')).toContain('Help · Recovery mode')
+    expect(screen.render(100).join('\n')).toContain('Safe controls · 1/2')
     expect(screen.render(100).join('\n')).not.toContain('i  Select or create')
 
     expect(screen.handleKey('u', matchesKey)).toBe(true)
