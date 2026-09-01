@@ -1,3 +1,5 @@
+import { SelectionCheckIcon } from './ui/selection-check-icon'
+
 export interface SDKOption {
   id: string
   name: string
@@ -214,4 +216,3 @@ export const DATASOURCE_OPTIONS: SDKOption[] = [
     badgeColor: 'text-ai-action',
   },
 ]
-import { SelectionCheckIcon } from './ui/selection-check-icon'
