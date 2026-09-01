@@ -62,6 +62,20 @@ describe('Supervisor TUI screen', () => {
     expect(lines.join('\n')).toContain('[ s ] Start quietly')
     expect(lines.join('\n')).toContain('[ ? ] More')
     expect(lines).toContain('q / Esc / Ctrl+C  Detach without stopping')
+
+    const wideLines = screen.render(120)
+    expect(wideLines[1]).toHaveLength(120)
+
+    screen.update({
+      update: {
+        status: 'available',
+        currentVersion: '0.87.0-beta',
+        latestVersion: '0.90.0',
+        channel: 'dev',
+        sourceChannel: 'dev',
+      },
+    })
+    expect(screen.render(120)[0]).toContain('v0.87.0-beta · DEV · update 0.90.0')
   })
 
   it('describes an externally owned Runtime without offering refused mutations', () => {

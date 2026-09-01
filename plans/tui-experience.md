@@ -105,9 +105,9 @@ already large `supervisor-tui.ts` application controller.
   presentation inside the existing read-only contracts.
 - [x] Upgrade Help, Setup, Project selection, Update, source, and transfer flows
   to consistent overlays and dialogs.
-- [ ] Dogfood the real `pnpm cli` surface across wide, 80x24, and narrow sizes;
+- [x] Dogfood the real `pnpm cli` surface across wide, 80x24, and narrow sizes;
   inspect mouse, resize, copy/selection, signal exit, and failure recovery.
-- [ ] Run the owning package typecheck and tests, affected tests, full hermetic
+- [x] Run the owning package typecheck and tests, affected tests, full hermetic
   tests at dependency/shared-renderer boundaries, and installer/package smoke
   when the distributed payload changes.
 
@@ -148,6 +148,20 @@ already large `supervisor-tui.ts` application controller.
   detach behavior. A real 80x24 Default AliceProject run clicked Overview Help
   and then Help Detach; teardown restored cursor, mouse, bracketed-paste, and
   alternate-screen modes.
+- Final real-surface dogfood covered 120x36, 80x24, 52x20, and 46x24 frames.
+  Live resize from narrow Fleet drill-down to a 100-column dual pane and back
+  preserved focus and the selected AliceProject. The exercise caught and fixed
+  a stale 80-column divider cap plus an update notice that had been appended
+  beyond the clipped header. Ctrl+C restored every terminal mode; the
+  `TERM=dumb`, `NO_COLOR=1`, `OPENALICE_TUI_MOUSE=0` path retained the complete
+  keyboard surface without alternate-screen or mouse reporting. Host-terminal
+  drag selection is outside PTY automation; keyboard-only mode is the verified
+  selection escape hatch.
+- Final verification passes with the CLI build/typecheck, root TypeScript
+  check, all 50 focused Supervisor screen and real-PTY cases, and the 684-file
+  repository suite (683 passed, 1 skipped; 6058 tests passed, 10 skipped).
+  Installer/package smoke is not applicable because this branch does not change
+  the distributed payload topology.
 
 ## Completion Criteria
 

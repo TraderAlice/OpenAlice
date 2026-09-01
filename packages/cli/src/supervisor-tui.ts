@@ -2651,8 +2651,8 @@ export class SupervisorScreen implements Component {
       ? ` · update ${formatUpdateCandidate(this.snapshot.update)}`
       : ''
     const lines = [
-      `${renderSupervisorHeader(this.snapshot.version, this.snapshot.channel, width)}${updateBadge}`,
-      '─'.repeat(Math.max(1, Math.min(width, 80))),
+      renderSupervisorHeader(this.snapshot.version, this.snapshot.channel, width, updateBadge),
+      '─'.repeat(Math.max(1, width)),
       renderTabs(this.snapshot.panel ?? 'overview', narrow, isConfigRecovery(this.snapshot)),
       '',
     ]

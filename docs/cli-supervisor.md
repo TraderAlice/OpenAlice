@@ -121,7 +121,9 @@ mouse reporting. Its ordinary path is intentionally parameter-free:
   card presents the selected project, current Runtime state, human guidance,
   and the primary Enter action; its Runtime card keeps Home, Web endpoint,
   owner, provider identity, services, and uptime available without returning
-  to the historical flat field dump;
+  to the historical flat field dump. The application divider follows the full
+  terminal width, and an available-update notice is composed inside the
+  responsive header instead of being appended beyond its clipping boundary;
 - the Fleet page renders `Machine → AliceProject`: ordinary terminals use two
   bordered panes with a stable Selection inspector, while narrow terminals
   drill down from Machines to Projects;

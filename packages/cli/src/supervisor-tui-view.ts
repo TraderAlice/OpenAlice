@@ -30,9 +30,10 @@ export function renderSupervisorHeader(
   version: string,
   channel: string,
   width: number,
+  notice = '',
 ): string {
   const left = '◆  OpenAlice Supervisor'
-  const right = `v${version} · ${channel.toUpperCase()}`
+  const right = `v${version} · ${channel.toUpperCase()}${notice}`
   if (width < 54) return truncateDisplayWidth(`◆ OpenAlice · ${right}`, width)
   return labelAndTail(left, right, width)
 }
