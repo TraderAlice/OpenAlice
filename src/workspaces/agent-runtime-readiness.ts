@@ -37,6 +37,8 @@ export interface AgentRuntimeReadinessRow {
   readonly displayName: string
   readonly installed: boolean
   readonly binPath: string | null
+  /** Binary identity this probe result was produced against. */
+  readonly fingerprint?: string | null
   readonly status: AgentRuntimeReadinessStatus
   readonly ready: boolean
   readonly source: AgentRuntimeReadinessSource
@@ -62,6 +64,7 @@ export function initialRuntimeReadinessRow(
     displayName: adapter.displayName,
     installed,
     binPath: availability?.path ?? null,
+    fingerprint: availability?.fingerprint ?? null,
     status: installed ? 'unknown' : 'not_installed',
     ready: false,
     source: 'unknown',
@@ -87,11 +90,25 @@ export function checkingRuntimeReadinessRow(row: AgentRuntimeReadinessRow): Agen
 export function snapshotRuntimeReadiness(
   adapters: readonly CliAdapter[],
   availability: Record<string, AgentAvailability>,
-  cache: ReadonlyMap<string, AgentRuntimeReadinessRow>,
+  cache: Map<string, AgentRuntimeReadinessRow>,
 ): AgentRuntimeReadinessSnapshot {
-  const rows = adapters.map((adapter) =>
-    cache.get(adapter.id) ?? initialRuntimeReadinessRow(adapter, availability[adapter.id]),
-  );
+  const rows = adapters.map((adapter) => {
+    const fresh = initialRuntimeReadinessRow(adapter, availability[adapter.id]);
+    const cached = cache.get(adapter.id);
+    if (
+      cached
+      && cached.installed === fresh.installed
+      && cached.binPath === fresh.binPath
+      && (cached.fingerprint ?? null) === (fresh.fingerprint ?? null)
+    ) {
+      return cached;
+    }
+    // Discovery is authoritative for install identity. A probe made against a
+    // prior executable must not survive an install, uninstall, PATH change, or
+    // in-place package-manager replacement.
+    cache.set(adapter.id, fresh);
+    return fresh;
+  });
   const checked = rows
     .map((row) => row.checkedAt)
     .filter((value): value is string => value !== null)
@@ -112,6 +129,7 @@ export function notInstalledRuntimeReadinessRow(
     displayName: adapter.displayName,
     installed: false,
     binPath: availability?.path ?? null,
+    fingerprint: availability?.fingerprint ?? null,
     status: 'not_installed',
     ready: false,
     source: 'unknown',
@@ -133,6 +151,7 @@ export function readyRuntimeReadinessRow(opts: {
     displayName: opts.adapter.displayName,
     installed: true,
     binPath: opts.availability?.path ?? null,
+    fingerprint: opts.availability?.fingerprint ?? null,
     status: 'ready',
     ready: true,
     source: opts.source,
@@ -154,6 +173,7 @@ export function failedRuntimeReadinessRow(opts: {
     displayName: opts.adapter.displayName,
     installed: true,
     binPath: opts.availability?.path ?? null,
+    fingerprint: opts.availability?.fingerprint ?? null,
     status,
     ready: false,
     source: opts.source ?? 'unknown',

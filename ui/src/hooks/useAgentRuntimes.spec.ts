@@ -150,6 +150,55 @@ describe('useAgentRuntimes', () => {
     expect(second.result.current.refreshing).toBe(false)
   })
 
+  it('rediscovers installed runtimes on focus without starting a readiness probe', async () => {
+    const runtimes = renderHook(() => useAgentRuntimes())
+    await waitFor(() => expect(runtimes.result.current.loading).toBe(false))
+
+    const updatedAgents = agents.map((entry) => entry.id === 'codex'
+      ? { ...entry, installed: true, binPath: '/usr/local/bin/codex', fingerprint: 'codex-v2' }
+      : entry)
+    const updatedReadiness = {
+      ...readiness,
+      overallReady: false,
+      checkedAt: null,
+      agents: {
+        ...readiness.agents,
+        codex: {
+          agent: 'codex',
+          displayName: 'Codex',
+          installed: true,
+          binPath: '/usr/local/bin/codex',
+          fingerprint: 'codex-v2',
+          status: 'unknown' as const,
+          ready: false,
+          source: 'unknown' as const,
+          checkedAt: null,
+          durationMs: null,
+        },
+      },
+    }
+    vi.mocked(listAgents).mockResolvedValue(updatedAgents)
+    vi.mocked(getAgentRuntimeReadiness).mockResolvedValue(updatedReadiness)
+
+    act(() => window.dispatchEvent(new Event('focus')))
+
+    await waitFor(() => expect(runtimes.result.current.catalog.find((entry) => entry.id === 'codex')?.installed).toBe(true))
+    expect(listAgents).toHaveBeenCalledTimes(2)
+    expect(getAgentRuntimeReadiness).toHaveBeenCalledTimes(2)
+    expect(probeAgentRuntimeReadiness).not.toHaveBeenCalled()
+    expect(runtimes.result.current.readiness?.agents.codex?.status).toBe('unknown')
+
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+    act(() => document.dispatchEvent(new Event('visibilitychange')))
+    expect(listAgents).toHaveBeenCalledTimes(2)
+    visibility.mockReturnValue('visible')
+    act(() => document.dispatchEvent(new Event('visibilitychange')))
+    await waitFor(() => expect(listAgents).toHaveBeenCalledTimes(3))
+    expect(getAgentRuntimeReadiness).toHaveBeenCalledTimes(3)
+    expect(probeAgentRuntimeReadiness).not.toHaveBeenCalled()
+    visibility.mockRestore()
+  })
+
   it('restores the last confirmed pins and exposes an error when an optimistic save fails', async () => {
     const { result } = renderHook(() => useAgentRuntimes())
     await waitFor(() => expect(result.current.loading).toBe(false))

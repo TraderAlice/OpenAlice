@@ -142,6 +142,7 @@ describe('agent runtime readiness helpers', () => {
       displayName: 'Pi',
       installed: true,
       binPath: '/usr/bin/pi',
+      fingerprint: 'pi-v1',
       status: 'ready',
       ready: true,
       source: 'global-config',
@@ -151,12 +152,53 @@ describe('agent runtime readiness helpers', () => {
 
     const ready = snapshotRuntimeReadiness(
       [piAdapter],
-      { pi: { installed: true, path: '/usr/bin/pi' } },
+      { pi: { installed: true, path: '/usr/bin/pi', fingerprint: 'pi-v1' } },
       cache,
     );
 
     expect(ready.overallReady).toBe(true);
     expect(ready.checkedAt).toBe('2026-07-08T00:00:00.000Z');
     expect(ready.agents.pi?.source).toBe('global-config');
+  });
+
+  it('invalidates a cached probe when fresh install identity changes', () => {
+    const cache = new Map<string, AgentRuntimeReadinessRow>([['pi', {
+      agent: 'pi',
+      displayName: 'Pi',
+      installed: true,
+      binPath: '/usr/bin/pi',
+      fingerprint: 'pi-v1',
+      status: 'ready',
+      ready: true,
+      source: 'global-config',
+      checkedAt: '2026-07-08T00:00:00.000Z',
+      durationMs: 25,
+    }]]);
+
+    const replaced = snapshotRuntimeReadiness(
+      [piAdapter],
+      { pi: { installed: true, path: '/usr/bin/pi', fingerprint: 'pi-v2' } },
+      cache,
+    );
+
+    expect(replaced.agents.pi).toMatchObject({
+      installed: true,
+      fingerprint: 'pi-v2',
+      status: 'unknown',
+      ready: false,
+      checkedAt: null,
+    });
+    expect(cache.get('pi')).toEqual(replaced.agents.pi);
+
+    const uninstalled = snapshotRuntimeReadiness(
+      [piAdapter],
+      { pi: { installed: false, path: null, fingerprint: null } },
+      cache,
+    );
+    expect(uninstalled.agents.pi).toMatchObject({
+      installed: false,
+      status: 'not_installed',
+      ready: false,
+    });
   });
 });

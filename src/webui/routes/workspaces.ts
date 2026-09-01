@@ -903,6 +903,7 @@ export function createWorkspaceRoutes(
           capabilities: a.capabilities,
           installed: av?.installed ?? true,
           binPath: av?.path ?? null,
+          fingerprint: av?.fingerprint ?? null,
         };
       }),
     });

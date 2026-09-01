@@ -24,6 +24,8 @@ export interface AgentRuntimesState extends AgentRuntimeQuickAccessProjection {
   readonly loading: boolean
   readonly refreshing: boolean
   readonly error: string | null
+  /** Cheap host rediscovery: GET inventory + cached readiness, never a probe. */
+  rediscover(): Promise<void>
   refresh(agent?: string): Promise<void>
   saveQuickAccess(ids: readonly string[]): Promise<void>
   recordSuccessfulUse(agentId: string): Promise<void>
@@ -41,12 +43,14 @@ interface AgentRuntimesStore {
   error: string | null
   loaded: boolean
   inflight: Promise<void> | null
+  rediscoveryInflight: Promise<void> | null
   loadGeneration: number
   saveGeneration: number
   saveQueue: Promise<unknown>
   recentGeneration: number
   recentQueue: Promise<unknown>
   ensureLoaded(): Promise<void>
+  rediscover(): Promise<void>
   refresh(agent?: string): Promise<void>
   saveQuickAccess(ids: readonly string[]): Promise<void>
   recordSuccessfulUse(agentId: string): Promise<void>
@@ -77,6 +81,7 @@ const emptyStoreSlice = {
   error: null as string | null,
   loaded: false,
   inflight: null as Promise<void> | null,
+  rediscoveryInflight: null as Promise<void> | null,
 }
 
 export const useAgentRuntimesStore = create<AgentRuntimesStore>((set, get) => ({
@@ -153,6 +158,32 @@ export const useAgentRuntimesStore = create<AgentRuntimesStore>((set, get) => ({
       if (get().loadGeneration !== generation) return
       set({ refreshing: false, error: errorMessage(cause) })
       throw cause
+    }
+  },
+
+  async rediscover() {
+    if (!get().loaded) return get().ensureLoaded()
+    const inflight = get().rediscoveryInflight
+    if (inflight) return inflight
+    const generation = get().loadGeneration
+    const request = (async () => {
+      const [listed, snapshot] = await Promise.all([
+        asSettled(() => listAgents()),
+        asSettled(() => getAgentRuntimeReadiness()),
+      ])
+      if (get().loadGeneration !== generation) return
+      const failed = [listed, snapshot].find((result) => result.status === 'rejected')
+      set({
+        agents: listed.status === 'fulfilled' ? listed.value ?? [] : get().agents,
+        readiness: snapshot.status === 'fulfilled' ? snapshot.value ?? null : get().readiness,
+        error: failed && failed.status === 'rejected' ? errorMessage(failed.reason) : null,
+      })
+    })()
+    set({ rediscoveryInflight: request })
+    try {
+      await request
+    } finally {
+      if (get().rediscoveryInflight === request) set({ rediscoveryInflight: null })
     }
   },
 
@@ -244,6 +275,7 @@ export function useAgentRuntimes(): AgentRuntimesState {
   const refreshing = useAgentRuntimesStore((state) => state.refreshing)
   const error = useAgentRuntimesStore((state) => state.error)
   const ensureLoaded = useAgentRuntimesStore((state) => state.ensureLoaded)
+  const rediscoverStore = useAgentRuntimesStore((state) => state.rediscover)
   const refreshStore = useAgentRuntimesStore((state) => state.refresh)
   const saveStore = useAgentRuntimesStore((state) => state.saveQuickAccess)
   const recordSuccessfulUseStore = useAgentRuntimesStore((state) => state.recordSuccessfulUse)
@@ -251,6 +283,19 @@ export function useAgentRuntimes(): AgentRuntimesState {
   useEffect(() => {
     void ensureLoaded()
   }, [ensureLoaded])
+
+  useEffect(() => {
+    const rediscover = () => void rediscoverStore()
+    const rediscoverWhenVisible = () => {
+      if (document.visibilityState === 'visible') rediscover()
+    }
+    window.addEventListener('focus', rediscover)
+    document.addEventListener('visibilitychange', rediscoverWhenVisible)
+    return () => {
+      window.removeEventListener('focus', rediscover)
+      document.removeEventListener('visibilitychange', rediscoverWhenVisible)
+    }
+  }, [rediscoverStore])
 
   const projection = useMemo(
     () => projectAgentRuntimeQuickAccess(agents, quickAccessIds, recentAgentIds),
@@ -266,6 +311,7 @@ export function useAgentRuntimes(): AgentRuntimesState {
     loading,
     refreshing,
     error,
+    rediscover: useCallback(() => rediscoverStore(), [rediscoverStore]),
     refresh: useCallback((agent?: string) => refreshStore(agent), [refreshStore]),
     saveQuickAccess: useCallback(
       (ids: readonly string[]) => saveStore(ids),

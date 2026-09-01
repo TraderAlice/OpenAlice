@@ -90,6 +90,7 @@ import {
   issueProvenanceRecords,
   snapshotBoardIssue,
   type IssueDetail,
+  type IssueAssigneeSession,
   issueRunRecord,
   type IssueFiringMarkers,
   type IssuesSnapshot,
@@ -123,6 +124,7 @@ import {
 import { updateIssueFields } from './issues/mutate.js';
 import {
   issueAutomationHealth,
+  issueAutomationRuntime,
   type IssueAutomationOwnerState,
 } from './issues/automation-health.js';
 import {
@@ -366,7 +368,7 @@ import {
   type SessionRecord,
 } from './session-registry.js';
 import { ProductSessionCoordinator } from './product-session-coordinator.js';
-import { projectPublicSession } from './public-session.js';
+import { projectPublicSession, projectPublicSessionRuntime } from './public-session.js';
 import { NativeSessionTitleResolver } from './session-title-resolver.js';
 import { buildCliPath, buildSpawnEnv } from './spawn-env.js';
 import { TemplateRegistry } from './template-registry.js';
@@ -1085,6 +1087,53 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         : null) ??
       validRegisteredRuntime(await readIssueDefaultAgent().catch(() => null)) ??
       await resolveDefaultAgentId(wsMeta);
+  };
+
+  const projectIssueAssigneeSession = (assignee: string): IssueAssigneeSession | undefined => {
+    const resumeId = issueAssigneeResumeId(assignee);
+    if (!resumeId) return undefined;
+    const identity = resumeRegistry.get(resumeId);
+    if (!identity) return { resumeId, state: 'missing', active: false };
+    const workspace = registry.get(identity.wsId);
+    const presence = sessionPresence(identity);
+    const state: IssueAssigneeSession['state'] = identity.lifecycle === 'retired'
+      ? 'retired'
+      : presence === 'deleted'
+        ? 'deleted'
+        : !workspace
+          ? 'workspace_missing'
+          : identity.agentSessionId
+            ? 'ready'
+            : 'unbound';
+    return {
+      resumeId,
+      state,
+      ...(workspace ? { workspace: { id: workspace.id, tag: workspace.tag } } : {}),
+      agent: identity.agent,
+      ...(identity.displayName ? { displayName: identity.displayName } : {}),
+      createdAt: identity.createdAt,
+      updatedAt: identity.updatedAt,
+      active: state === 'ready' && activeResumeIds.has(resumeId),
+      ...(identity.runtimeBinding
+        ? { runtime: projectPublicSessionRuntime(identity.runtimeBinding) }
+        : {}),
+    };
+  };
+
+  const issueRuntimeAvailability = (
+    issue: IssueRecord,
+    defaultAgent: string | undefined,
+    availability: Record<string, AgentAvailability>,
+  ): { agent: string; displayName: string; installed: boolean } | undefined => {
+    const resumeId = issueAssigneeResumeId(issue.assignee);
+    const sessionAgent = resumeId ? resumeRegistry.get(resumeId)?.agent : undefined;
+    return issueAutomationRuntime({
+      ...(sessionAgent ? { sessionAgent } : {}),
+      ...(issue.agent ? { issueAgent: issue.agent } : {}),
+      ...(defaultAgent ? { defaultAgent } : {}),
+      availability,
+      displayNameFor: (agent) => adapters.get(agent)?.displayName,
+    });
   };
 
   /**
@@ -2301,6 +2350,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   // board's unscheduled work items — and the board is a low-frequency poll.
   const issuesSnapshot = async (): Promise<IssuesSnapshot> => {
     const nowMs = Date.now();
+    const availability = detectAgents();
     const workspaces = await Promise.all(
       registry.list().map(async (ws): Promise<IssuesSnapshotWorkspace> => {
         const res = await readWorkspaceIssues(ws.dir);
@@ -2314,6 +2364,12 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           return { wsId: ws.id, tag: ws.tag, status: 'invalid', error: res.error, issues: [] };
         }
         await observeIssueRecords(ws, res.issues);
+        const needsDefaultAgent = res.issues.some((issue) =>
+          Boolean(issue.when) && !issueAssigneeResumeId(issue.assignee) && !issue.agent,
+        );
+        const defaultIssueAgent = needsDefaultAgent
+          ? await resolveIssueDefaultAgentId(ws)
+          : undefined;
         const issues: IssuesSnapshotIssue[] = res.issues.filter((issue) => !isConnectorDeskIssue(issue)).map((issue) => {
           // Unscheduled ⇒ pure board work item, no firing markers.
           if (!issue.when) return snapshotBoardIssue(issue, null);
@@ -2338,6 +2394,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
                 nowMs,
                 nextDueAtMs: fired.nextDueAtMs,
                 ownerState: automationOwnerState(issue.assignee, resumeRegistry),
+                runtime: issueRuntimeAvailability(issue, defaultIssueAgent, availability),
                 ...(latestRun ? { latestRun: automationLatestRun(latestRun) } : {}),
               }),
             },
@@ -2366,6 +2423,13 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     await observeIssueRecords(ws, res.issues);
     const issue = res.issues.find((i) => i.id === id);
     if (!issue) return null;
+    const assigneeSession = projectIssueAssigneeSession(issue.assignee);
+    const defaultIssueAgent = issue.when && !issueAssigneeResumeId(issue.assignee) && !issue.agent
+      ? await resolveIssueDefaultAgentId(ws)
+      : undefined;
+    const runtimeAvailability = issue.when
+      ? issueRuntimeAvailability(issue, defaultIssueAgent, detectAgents())
+      : undefined;
     const commentsResult = await readIssueComments(ws.dir, issue.id);
     const comments = commentsResult.ok ? commentsResult.comments : [];
     if (!commentsResult.ok) {
@@ -2396,6 +2460,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         nowMs: Date.now(),
         nextDueAtMs: scheduledSnapshot.nextDueAtMs,
         ownerState: automationOwnerState(issue.assignee, resumeRegistry),
+        runtime: runtimeAvailability,
         ...(runs[0] ? {
           latestRun: {
             taskId: runs[0].taskId,
@@ -2428,7 +2493,15 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       artifact: { kind: 'issue', workspaceId: ws.id, issueId: issue.id },
     }));
     const activity = issueActivityRecords(provenance, comments);
-    return { issue: detailIssue(issue, markers), comments, runs, inboxReports, provenance, activity };
+    return {
+      issue: detailIssue(issue, markers),
+      ...(assigneeSession ? { assigneeSession } : {}),
+      comments,
+      runs,
+      inboxReports,
+      provenance,
+      activity,
+    };
   };
 
   const retryingIssueKeys = new Set<string>();
