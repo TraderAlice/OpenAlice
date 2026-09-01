@@ -11,7 +11,7 @@ export const OFFICE_LOG_ASSETS = {
 export type OfficeLogAssetKind = keyof typeof OFFICE_LOG_ASSETS
 
 export function officeLogAssetKind(type: AgentRuntimeEventType): OfficeLogAssetKind {
-  if (type === 'runtime.turn.text') return 'message'
+  if (type === 'runtime.turn.text' || type === 'inbox.received' || type === 'news.ingested') return 'message'
   if (type === 'runtime.turn.tool') return 'tool'
   if (type === 'runtime.spawn_failed' || type === 'runtime.rejected' || type === 'runtime.turn.error') {
     return 'alert'

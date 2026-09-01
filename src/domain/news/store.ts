@@ -131,6 +131,21 @@ export class NewsCollectorStore implements INewsProvider {
     dedupKey: string
     metadata: Record<string, string | null>
   }): Promise<boolean> {
+    return (await this.ingestRecord(item)) !== null
+  }
+
+  /**
+   * Ingest and return the durable record. Optional product integrations use
+   * the returned identity to publish an activity fact without coupling this
+   * store to Office, Sonner, or a particular Alice product.
+   */
+  async ingestRecord(item: {
+    title: string
+    content: string
+    pubTime: Date
+    dedupKey: string
+    metadata: Record<string, string | null>
+  }): Promise<NewsRecord | null> {
     const next = this.writeChain.then(() => this._ingestImpl(item))
     this.writeChain = next.catch(() => {})
     return next
@@ -142,8 +157,8 @@ export class NewsCollectorStore implements INewsProvider {
     pubTime: Date
     dedupKey: string
     metadata: Record<string, string | null>
-  }): Promise<boolean> {
-    if (this.dedupSet.has(item.dedupKey)) return false
+  }): Promise<NewsRecord | null> {
+    if (this.dedupSet.has(item.dedupKey)) return null
 
     this.seq += 1
     const record: NewsRecord = {
@@ -169,7 +184,7 @@ export class NewsCollectorStore implements INewsProvider {
       this.buffer = this.buffer.slice(-this.maxInMemory)
     }
 
-    return true
+    return record
   }
 
   /**

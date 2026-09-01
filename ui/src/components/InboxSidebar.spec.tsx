@@ -6,6 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { InboxEntry } from '../api/inbox'
 import { i18n } from '../i18n'
+import {
+  clearOfficeInboxDutyExcursion,
+  rememberOfficeInboxDutyExcursion,
+} from '../office/inbox-duty-excursion'
+import { inboxUnreadDutyRegistration, type OfficeInboxDutyCandidate } from '../office/duty-registry'
 import { InboxSidebar } from './InboxSidebar'
 
 const mocks = vi.hoisted(() => ({
@@ -56,8 +61,16 @@ vi.mock('../contexts/workspaces-context', () => ({
   useWorkspaces: () => ({ workspaces: mocks.workspaces }),
 }))
 
+function officeInboxDuty(entry: InboxEntry): OfficeInboxDutyCandidate {
+  return inboxUnreadDutyRegistration([{
+    title: entry.comments ?? entry.docs?.[0]?.path ?? 'Inbox delivery',
+    entry,
+  }], 'ready').candidates[0] as OfficeInboxDutyCandidate
+}
+
 beforeEach(async () => {
   await i18n.changeLanguage('en')
+  window.sessionStorage.clear()
   mocks.entries = [{
     id: 'inbox-1',
     ts: Date.now(),
@@ -73,6 +86,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   cleanup()
+  window.sessionStorage.clear()
   vi.clearAllMocks()
 })
 
@@ -214,5 +228,83 @@ describe('InboxSidebar search', () => {
     expect(screen.getByText('Research is ready')).toBeTruthy()
     expect(screen.getByText('Macro alert published')).toBeTruthy()
     expect(screen.queryByText(/updates match/)).toBeNull()
+  })
+})
+
+describe('InboxSidebar Office review selection', () => {
+  it('restores the captured Office target before the ordinary newest-row default', async () => {
+    const newest = mocks.entries[0]!
+    const captured: InboxEntry = {
+      ...newest,
+      id: 'inbox-office-older-than-feed',
+      ts: newest.ts - 10_000,
+      comments: 'Exact older Office report.',
+    }
+    mocks.mode = 'time'
+    mocks.selectedEntryId = null
+    rememberOfficeInboxDutyExcursion({
+      duty: officeInboxDuty(captured),
+      purpose: 'review',
+      phase: 'presented',
+      shift: { position: 2, total: 4 },
+    })
+
+    render(<InboxSidebar />)
+
+    await vi.waitFor(() => expect(mocks.select).toHaveBeenCalledWith(captured.id))
+    expect(mocks.select).not.toHaveBeenCalledWith(newest.id)
+    expect(mocks.markRead).not.toHaveBeenCalled()
+  })
+
+  it.each(['away', 'presented', 'returned'] as const)(
+    'does not auto-read the exact Office target while its %s checkpoint is active',
+    async (phase) => {
+      const user = userEvent.setup()
+      const target = mocks.entries[0]!
+      mocks.mode = 'time'
+      mocks.selectedEntryId = 'another-entry'
+      rememberOfficeInboxDutyExcursion({
+        duty: officeInboxDuty(target),
+        purpose: 'review',
+        phase,
+        shift: { position: 1, total: 2 },
+      })
+
+      render(<InboxSidebar />)
+      await user.click(screen.getByRole('button', { name: /Research is ready/ }))
+
+      expect(mocks.select).toHaveBeenCalledWith(target.id)
+      expect(mocks.markRead).not.toHaveBeenCalled()
+    },
+  )
+
+  it('keeps unrelated and post-excursion selections on ordinary auto-read semantics', async () => {
+    const user = userEvent.setup()
+    const target = mocks.entries[0]!
+    const unrelated: InboxEntry = {
+      id: 'inbox-2',
+      ts: target.ts - 1,
+      workspaceId: 'workspace-1',
+      workspaceLabel: 'old-desk',
+      comments: 'Unrelated update.',
+    }
+    mocks.entries = [target, unrelated]
+    mocks.mode = 'time'
+    mocks.selectedEntryId = target.id
+    rememberOfficeInboxDutyExcursion({
+      duty: officeInboxDuty(target),
+      purpose: 'review',
+      phase: 'presented',
+      shift: { position: 1, total: 2 },
+    })
+
+    render(<InboxSidebar />)
+    await user.click(screen.getByRole('button', { name: /Unrelated update/ }))
+    expect(mocks.markRead).toHaveBeenCalledWith(unrelated.id)
+
+    mocks.markRead.mockClear()
+    clearOfficeInboxDutyExcursion()
+    await user.click(screen.getByRole('button', { name: /Research is ready/ }))
+    expect(mocks.markRead).toHaveBeenCalledWith(target.id)
   })
 })

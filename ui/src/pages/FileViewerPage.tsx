@@ -19,6 +19,8 @@ import { useWorkspaces } from '../contexts/workspaces-context'
 import { readWorkspaceFile, type ReadFileResult } from '../components/workspace/api'
 import { workspaceDisplayName, workspaceDisplayTitle } from '../components/workspace/display'
 import { useTrackedSelection } from '../live/tracked-selection'
+import { OfficeInboxDutyReturnBar } from '../office/OfficeInboxDutyReturnBar'
+import { useOfficeInboxDutyReturn } from '../office/useOfficeInboxDutyReturn'
 import { useWorkspace } from '../tabs/store'
 import type { ViewSpec } from '../tabs/types'
 
@@ -33,6 +35,7 @@ export function FileViewerPage({ spec }: Props) {
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const setSidebar = useWorkspace((s) => s.setSidebar)
   const selectTracked = useTrackedSelection((s) => s.select)
+  const returnToOffice = useOfficeInboxDutyReturn()
   const workspace = workspaces.find((w) => w.id === wsId)
   const workspaceName = workspace ? workspaceDisplayName(workspace) : wsId.slice(0, 8)
   const workspaceTitle = workspace ? workspaceDisplayTitle(workspace) : workspaceName
@@ -108,6 +111,10 @@ export function FileViewerPage({ spec }: Props) {
           </span>
         </div>
       </div>
+      <OfficeInboxDutyReturnBar
+        surface={{ kind: 'file', workspaceId: wsId, path }}
+        onReturn={returnToOffice}
+      />
       <div className="flex-1 overflow-y-auto min-h-0">
         <div className="mx-auto max-w-[48rem] px-5 py-8 sm:px-8 sm:py-10 lg:py-12">
           {result === null ? (

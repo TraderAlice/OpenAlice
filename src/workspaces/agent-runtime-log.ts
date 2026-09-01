@@ -23,6 +23,8 @@ export const AGENT_RUNTIME_EVENT_TYPES = [
   'runtime.turn.tool',
   'runtime.turn.error',
   'dev.sonner_test',
+  'inbox.received',
+  'news.ingested',
 ] as const
 
 export type AgentRuntimeEventType = (typeof AGENT_RUNTIME_EVENT_TYPES)[number]
@@ -30,6 +32,22 @@ export type AgentRuntimeSurface = 'terminal' | 'webpi' | 'headless'
 export type AgentRuntimeStopStatus = 'done' | 'failed' | 'interrupted' | 'paused'
 export type AgentRuntimeToolStatus = 'running' | 'completed' | 'failed'
 export type SonnerTestState = 'running' | 'success' | 'error'
+
+export type ProductActivityFamily = 'agent' | 'inbox' | 'news' | 'dev' | (string & {})
+
+export interface ProductActivityFamilyDefinition<TType extends string, TPayload> {
+  readonly family: ProductActivityFamily
+  readonly types: readonly TType[]
+  readonly accepts?: (type: TType, payload: unknown) => payload is TPayload
+}
+
+export interface ProductActivityRecorder<TType extends string, TPayload> {
+  record(
+    type: TType,
+    payload: TPayload,
+    opts?: { readonly causedBy?: number },
+  ): Promise<AgentRuntimeEvent | null>
+}
 
 export interface AgentRuntimeTurnMetrics {
   readonly textBlocks: number
@@ -60,6 +78,29 @@ export interface AgentRuntimeSubject {
   readonly taskId?: string
   readonly surface?: AgentRuntimeSurface
   readonly cause?: AgentRuntimeCause
+}
+
+export interface InboxActivityPayload {
+  readonly workspaceId: string
+  readonly inboxEntryId: string
+  readonly workspaceLabel?: string
+  readonly agent?: string
+  readonly resumeId?: string
+  readonly sessionRecordId?: string
+  readonly taskId?: string
+  readonly originKind?: 'headless' | 'interactive' | 'manual'
+  readonly summary?: string
+  readonly documentCount: number
+}
+
+export interface NewsActivityPayload {
+  readonly newsItemId: number
+  readonly dedupKey: string
+  readonly title: string
+  readonly source?: string
+  readonly link?: string
+  readonly publishedAt: number
+  readonly ingestSource: string
 }
 
 export type AgentRuntimePayload =
@@ -94,6 +135,8 @@ export type AgentRuntimePayload =
       readonly testState: SonnerTestState
       readonly message: string
     })
+  | InboxActivityPayload
+  | NewsActivityPayload
 
 export type AgentRuntimeEvent = EventLogEntry<AgentRuntimePayload> & {
   readonly type: AgentRuntimeEventType
@@ -103,8 +146,14 @@ interface LoggerLike {
   warn(message: string, meta?: Record<string, unknown>): void
 }
 
-export class AgentRuntimeLog {
+export class ProductActivityJournal {
+  private static readonly FAMILY_BUFFER_SIZE = 500
   private readonly latestBySession = new Map<string, AgentRuntimeEvent>()
+  private readonly registeredFamilies = new Map<string, ProductActivityFamily>()
+  private readonly recentByFamily = new Map<ProductActivityFamily, AgentRuntimeEvent[]>()
+  private readonly familyTotals = new Map<ProductActivityFamily, number>()
+  private readonly recentByType = new Map<string, AgentRuntimeEvent[]>()
+  private readonly typeTotals = new Map<string, number>()
   private total = 0
   private first = 0
 
@@ -113,14 +162,46 @@ export class AgentRuntimeLog {
     private readonly logger: LoggerLike,
   ) {}
 
-  static async open(path: string, logger: LoggerLike): Promise<AgentRuntimeLog> {
+  static async open(path: string, logger: LoggerLike): Promise<ProductActivityJournal> {
     const events = await createEventLog({ logPath: path, bufferSize: 2_000 })
-    const log = new AgentRuntimeLog(events, logger)
+    const log = new ProductActivityJournal(events, logger)
+    log.registerTypes('agent', AGENT_RUNTIME_EVENT_TYPES.filter((type) =>
+      type === 'session.born' || type.startsWith('runtime.'),
+    ))
+    log.registerTypes('dev', ['dev.sonner_test'])
     // EventLog restores only its bounded recent ring. Recover the compact live
     // projection once here so Office polling never has to rescan the journal.
     // The projection keeps one enriched event per Session, not the full log.
     log.recoverProjection(await events.read())
     return log
+  }
+
+  /**
+   * Install one product activity family and receive a scoped recorder.
+   * Optional products call this at startup; the journal itself does not import
+   * or start those products and never dispatches work from recorded facts.
+   */
+  registerFamily<TType extends string, TPayload>(
+    definition: ProductActivityFamilyDefinition<TType, TPayload>,
+  ): ProductActivityRecorder<TType, TPayload> {
+    this.registerTypes(definition.family, definition.types)
+    return {
+      record: async (type, payload, opts) => {
+        if (definition.accepts && !definition.accepts(type, payload)) {
+          this.logger.warn('product_activity_log.payload_rejected', {
+            family: definition.family,
+            type,
+          })
+          return null
+        }
+        return this.record(type as AgentRuntimeEventType, payload as AgentRuntimePayload, opts)
+      },
+    }
+  }
+
+  familyOf(type: string): ProductActivityFamily {
+    return this.registeredFamilies.get(type)
+      ?? (type === 'session.born' || type.startsWith('runtime.') ? 'agent' : type.split('.')[0] || 'unknown')
   }
 
   lastSeq(): number {
@@ -144,6 +225,10 @@ export class AgentRuntimeLog {
     payload: AgentRuntimePayload,
     opts?: { readonly causedBy?: number },
   ): Promise<AgentRuntimeEvent | null> {
+    if (!this.registeredFamilies.has(type)) {
+      this.logger.warn('product_activity_log.type_not_registered', { type })
+      return null
+    }
     try {
       const entry = await this.events.append(type, payload, opts)
       const event = { ...entry, type }
@@ -183,9 +268,71 @@ export class AgentRuntimeLog {
     readonly page?: number
     readonly pageSize?: number
     readonly type?: AgentRuntimeEventType
+    readonly types?: readonly AgentRuntimeEventType[]
+    readonly family?: ProductActivityFamily
   } = {}): Promise<EventLogQueryResult> {
     const page = Math.max(1, opts.page ?? 1)
     const pageSize = Math.max(1, opts.pageSize ?? 100)
+    const requestedTypes = opts.types?.length
+      ? [...new Set(opts.types)]
+      : opts.type
+        ? [opts.type]
+        : []
+    if (requestedTypes.length > 0 && page * pageSize <= ProductActivityJournal.FAMILY_BUFFER_SIZE) {
+      const matching = requestedTypes
+        .flatMap((type) => this.recentByType.get(type) ?? [])
+        .sort((a, b) => a.seq - b.seq)
+      const total = requestedTypes.reduce((sum, type) => sum + (this.typeTotals.get(type) ?? 0), 0)
+      const start = Math.max(0, matching.length - page * pageSize)
+      const end = matching.length - (page - 1) * pageSize
+      return {
+        entries: matching.slice(start, end).reverse(),
+        total,
+        page,
+        pageSize,
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      }
+    }
+    if (requestedTypes.length > 0) {
+      const typeSet = new Set(requestedTypes)
+      const matching = this.asAgentRuntimeEvents(await this.events.read())
+        .filter((event) => typeSet.has(event.type))
+      const start = Math.max(0, matching.length - page * pageSize)
+      const end = matching.length - (page - 1) * pageSize
+      return {
+        entries: matching.slice(start, end).reverse(),
+        total: matching.length,
+        page,
+        pageSize,
+        totalPages: Math.max(1, Math.ceil(matching.length / pageSize)),
+      }
+    }
+    if (opts.family) {
+      const total = this.familyTotals.get(opts.family) ?? 0
+      const recent = this.recentByFamily.get(opts.family) ?? []
+      if (page * pageSize <= ProductActivityJournal.FAMILY_BUFFER_SIZE) {
+        const start = Math.max(0, recent.length - page * pageSize)
+        const end = recent.length - (page - 1) * pageSize
+        return {
+          entries: recent.slice(start, end).reverse(),
+          total,
+          page,
+          pageSize,
+          totalPages: Math.max(1, Math.ceil(total / pageSize)),
+        }
+      }
+      const matching = this.asAgentRuntimeEvents(await this.events.read())
+        .filter((event) => this.familyOf(event.type) === opts.family)
+      const start = Math.max(0, matching.length - page * pageSize)
+      const end = matching.length - (page - 1) * pageSize
+      return {
+        entries: matching.slice(start, end).reverse(),
+        total: matching.length,
+        page,
+        pageSize,
+        totalPages: Math.max(1, Math.ceil(matching.length / pageSize)),
+      }
+    }
     if (page === 1 && !opts.type) {
       const recent = this.asAgentRuntimeEvents(this.events.recent())
         .slice(-pageSize)
@@ -204,6 +351,10 @@ export class AgentRuntimeLog {
   async close(): Promise<void> {
     await this.events.close()
     this.latestBySession.clear()
+    this.recentByFamily.clear()
+    this.familyTotals.clear()
+    this.recentByType.clear()
+    this.typeTotals.clear()
     this.total = 0
     this.first = 0
   }
@@ -215,6 +366,21 @@ export class AgentRuntimeLog {
   private accept(event: AgentRuntimeEvent): void {
     this.total += 1
     if (this.first === 0 || event.seq < this.first) this.first = event.seq
+    const family = this.familyOf(event.type)
+    const familyEvents = this.recentByFamily.get(family) ?? []
+    familyEvents.push(event)
+    if (familyEvents.length > ProductActivityJournal.FAMILY_BUFFER_SIZE) {
+      familyEvents.splice(0, familyEvents.length - ProductActivityJournal.FAMILY_BUFFER_SIZE)
+    }
+    this.recentByFamily.set(family, familyEvents)
+    this.familyTotals.set(family, (this.familyTotals.get(family) ?? 0) + 1)
+    const typeEvents = this.recentByType.get(event.type) ?? []
+    typeEvents.push(event)
+    if (typeEvents.length > ProductActivityJournal.FAMILY_BUFFER_SIZE) {
+      typeEvents.splice(0, typeEvents.length - ProductActivityJournal.FAMILY_BUFFER_SIZE)
+    }
+    this.recentByType.set(event.type, typeEvents)
+    this.typeTotals.set(event.type, (this.typeTotals.get(event.type) ?? 0) + 1)
     // Dev-only notification probes belong to the append-only diagnostic stream
     // so they exercise the real UI projection, but never represent occupancy.
     if (event.type === 'dev.sonner_test') return
@@ -232,11 +398,28 @@ export class AgentRuntimeLog {
 
   private asAgentRuntimeEvents(entries: readonly EventLogEntry[]): AgentRuntimeEvent[] {
     return entries.flatMap((entry) => {
-      if (!isAgentRuntimeEventType(entry.type)) return []
-      return [{ ...entry, type: entry.type, payload: entry.payload as AgentRuntimePayload }]
+      if (!isAgentRuntimeEventType(entry.type) && !this.registeredFamilies.has(entry.type)) return []
+      return [{
+        ...entry,
+        type: entry.type as AgentRuntimeEventType,
+        payload: entry.payload as AgentRuntimePayload,
+      }]
     })
   }
+
+  private registerTypes(family: ProductActivityFamily, types: readonly string[]): void {
+    for (const type of types) {
+      const existing = this.registeredFamilies.get(type)
+      if (existing && existing !== family) {
+        throw new Error(`Product activity type ${type} is already registered by ${existing}`)
+      }
+      this.registeredFamilies.set(type, family)
+    }
+  }
 }
+
+/** Compatibility name for the first shipped Agent-only journal surface. */
+export { ProductActivityJournal as AgentRuntimeLog }
 
 export function isAgentRuntimeEventType(value: string): value is AgentRuntimeEventType {
   return (AGENT_RUNTIME_EVENT_TYPES as readonly string[]).includes(value)

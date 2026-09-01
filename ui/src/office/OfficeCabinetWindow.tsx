@@ -1,0 +1,259 @@
+import { useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+
+import type { OfficeDrawerItem, OfficeFloorEmployee, OfficeRoomSnapshot } from '../api/office'
+import { formatRelativeTime } from '../lib/intl'
+import { employeesForOffice } from './desk-slots'
+import { officeDrawerKindLabel, officeDrawerTitle } from './drawer-presentation'
+import { OFFICE_FURNITURE, officePixelImg } from './furniture'
+import { nextOfficeGridIndex, nextOfficeGridPageIndex } from './grid-navigation'
+import { OFFICE_HUD_ASSETS } from './hud-assets'
+import { isOfficeConfirmKey } from './input'
+import { OfficeWindowControlGlyph } from './OfficeWindowControlGlyph'
+import { officeCoworkerCast, type OfficeCoworkerSpriteAsset } from './coworker-sprites'
+import { officeCoworkerCallsign } from './label'
+
+interface CabinetRecord {
+  employee: OfficeFloorEmployee
+  item: OfficeDrawerItem
+}
+
+export function OfficeCabinetWindow({
+  group,
+  roomName,
+  onOpenWorkspaceFiles,
+  onOpenRecord,
+  onClose,
+  coworkerAssets,
+}: {
+  group: OfficeRoomSnapshot
+  roomName: string
+  onOpenWorkspaceFiles: () => void
+  onOpenRecord: (employee: OfficeFloorEmployee, item: OfficeDrawerItem) => void
+  onClose: () => void
+  coworkerAssets?: ReadonlyMap<string, OfficeCoworkerSpriteAsset>
+}) {
+  const { t } = useTranslation()
+  const records = useMemo(() => employeesForOffice(group.employees)
+    .flatMap((employee) => employee.drawers.map((item) => ({ employee, item })))
+    .sort((a, b) => b.item.at - a.item.at), [group.employees])
+  const coworkerCast = useMemo(() => officeCoworkerCast(group.employees), [group.employees])
+  const recordKey = ({ employee, item }: CabinetRecord) => `${employee.resumeId}:${item.id}`
+  const initialFocusKey = records[0] ? recordKey(records[0]) : null
+  const [focusedRecordKey, setFocusedRecordKey] = useState(initialFocusKey)
+  const focusedRecordIndex = Math.max(0, records.findIndex((record) => recordKey(record) === focusedRecordKey))
+  const positionWidth = Math.max(2, String(records.length).length)
+  const positionLabel = records.length > 0
+    ? `${String(focusedRecordIndex + 1).padStart(positionWidth, '0')}/${String(records.length).padStart(positionWidth, '0')}`
+    : '00/00'
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const recordListRef = useRef<HTMLUListElement>(null)
+  const workspaceFilesRef = useRef<HTMLButtonElement>(null)
+  const focusedRecordButton = () => Array.from(
+    recordListRef.current?.querySelectorAll<HTMLButtonElement>('button[data-record-key]') ?? [],
+  ).find((button) => button.dataset.recordKey === focusedRecordKey)
+
+  return (
+    <section
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${t('office.cabinet')} · ${roomName}`}
+      data-testid="office-cabinet-window"
+      data-empty={records.length === 0 || undefined}
+      data-dense={records.length >= 5 || undefined}
+      data-record-count={records.length}
+      className="oa-office-window oa-office-cabinet-window"
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') onClose()
+      }}
+    >
+      <header className="oa-office-window__header">
+        <div className="oa-office-window__title">
+          <img src={OFFICE_HUD_ASSETS.drawerRecord} alt="" aria-hidden style={officePixelImg} />
+          <span className="oa-office-window__title-copy">
+            <span className="oa-office-window__title-room">{roomName}</span>
+            <span className="oa-office-window__title-separator" aria-hidden>·</span>
+            <span className="oa-office-window__title-kind">{t('office.cabinet')}</span>
+          </span>
+        </div>
+        <span
+          className="oa-office-window__title-count"
+          aria-label={records.length > 0
+            ? t('office.cabinetPosition', { index: focusedRecordIndex + 1, count: records.length })
+            : t('office.cabinetRecords', { count: records.length })}
+        >
+          {positionLabel}
+        </span>
+        <button
+          type="button"
+          ref={closeButtonRef}
+          aria-label={t('common.close')}
+          onClick={onClose}
+          onKeyDown={(event) => {
+            if (event.key !== 'Tab') return
+            event.preventDefault()
+            if (event.shiftKey) workspaceFilesRef.current?.focus()
+            else if (records.length > 0) focusedRecordButton()?.focus()
+            else workspaceFilesRef.current?.focus()
+          }}
+        >
+          <OfficeWindowControlGlyph kind="close" />
+        </button>
+      </header>
+
+      <div className="oa-office-cabinet-window__body">
+        <div className="oa-office-cabinet-window__summary">
+          <span>{t('office.cabinetRecords', { count: records.length })}</span>
+          <small className="oa-office-window__input-hint">
+            <span data-input="keyboard">
+              {t(records.length === 0
+                ? 'office.cabinetEmptyKeyboardHint'
+                : 'office.cabinetKeyboardHint')}
+            </span>
+            <span data-input="touch">{t('office.cabinetInspectHint')}</span>
+          </small>
+        </div>
+
+        {records.length > 0 ? (
+          <ul
+            ref={recordListRef}
+            className="oa-office-cabinet-window__records"
+            aria-label={t('office.cabinet')}
+            aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown PageUp PageDown Home End Enter Space"
+            onKeyDown={(event) => {
+              if (event.key === 'Tab') {
+                event.preventDefault()
+                if (event.shiftKey) closeButtonRef.current?.focus()
+                else workspaceFilesRef.current?.focus()
+                return
+              }
+              const direction = ({
+                ArrowLeft: 'left',
+                ArrowRight: 'right',
+                ArrowUp: 'up',
+                ArrowDown: 'down',
+              } as const)[event.key]
+              const buttons = Array.from(
+                event.currentTarget.querySelectorAll<HTMLButtonElement>('button[data-record-key]'),
+              )
+              const currentIndex = buttons.indexOf(document.activeElement as HTMLButtonElement)
+              if (currentIndex < 0) return
+              let nextIndex = currentIndex
+              if (direction) {
+                nextIndex = nextOfficeGridIndex(
+                  buttons.map((button) => button.getBoundingClientRect()),
+                  currentIndex,
+                  direction,
+                )
+              } else if (event.key === 'PageUp' || event.key === 'PageDown') {
+                nextIndex = nextOfficeGridPageIndex(
+                  buttons.map((button) => button.getBoundingClientRect()),
+                  currentIndex,
+                  event.key === 'PageUp' ? 'up' : 'down',
+                  event.currentTarget.clientHeight,
+                )
+              } else if (event.key === 'Home') {
+                nextIndex = 0
+              } else if (event.key === 'End') {
+                nextIndex = buttons.length - 1
+              } else {
+                return
+              }
+              event.preventDefault()
+              const nextButton = buttons[nextIndex]
+              nextButton?.focus({ preventScroll: true })
+              nextButton?.scrollIntoView?.({ block: 'nearest' })
+            }}
+          >
+            {records.map((record: CabinetRecord) => {
+              const { employee, item } = record
+              const key = recordKey(record)
+              const title = officeDrawerTitle(item, t)
+              const kind = officeDrawerKindLabel(item, t)
+              const relativeTime = formatRelativeTime(item.at)
+              return (
+                <li key={key}>
+                  <button
+                    type="button"
+                    autoFocus={key === initialFocusKey}
+                    data-record-key={key}
+                    tabIndex={key === focusedRecordKey ? 0 : -1}
+                    aria-label={t('office.drawerOpenRecord', { record: title, kind, time: relativeTime })}
+                    onFocus={() => setFocusedRecordKey(key)}
+                    onClick={() => onOpenRecord(employee, item)}
+                    onKeyDown={(event) => {
+                      if (!isOfficeConfirmKey(event.key)) return
+                      event.preventDefault()
+                      onOpenRecord(employee, item)
+                    }}
+                  >
+                    <img src={OFFICE_HUD_ASSETS.drawerRecord} alt="" aria-hidden style={officePixelImg} />
+                    <span className="oa-office-cabinet-window__record-copy">
+                      <strong
+                        title={title.length > 28 ? title : undefined}
+                      >
+                        {title}
+                      </strong>
+                      <small className="oa-office-cabinet-window__record-meta">
+                        <b>{kind}</b>
+                        <time dateTime={new Date(item.at).toISOString()}>{relativeTime}</time>
+                      </small>
+                      <small>{t('office.cabinetRecordOwner', {
+                        name: officeCoworkerCallsign(
+                          employee,
+                          coworkerAssets?.get(employee.resumeId) ?? coworkerCast.get(employee.resumeId),
+                        ),
+                      })}</small>
+                    </span>
+                    <span className="oa-office-cabinet-window__destination" aria-hidden>
+                      <img
+                        className="oa-office-cabinet-window__destination-portal"
+                        src={OFFICE_HUD_ASSETS.sessionPortal}
+                        alt=""
+                        style={officePixelImg}
+                      />
+                      <img
+                        className="oa-office-cabinet-window__cursor"
+                        src={OFFICE_HUD_ASSETS.journalCursor}
+                        alt=""
+                        style={officePixelImg}
+                      />
+                      <small>{t('office.drawerRecordAction')}</small>
+                    </span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        ) : (
+          <div className="oa-office-cabinet-window__empty">
+            <img src={OFFICE_FURNITURE.generated.emptyCabinet} alt="" aria-hidden style={officePixelImg} />
+            <p>{t('office.cabinetEmpty')}</p>
+          </div>
+        )}
+
+        <button
+          type="button"
+          ref={workspaceFilesRef}
+          autoFocus={records.length === 0}
+          className="oa-office-cabinet-window__open"
+          onClick={onOpenWorkspaceFiles}
+          onKeyDown={(event) => {
+            if (isOfficeConfirmKey(event.key)) {
+              event.preventDefault()
+              onOpenWorkspaceFiles()
+              return
+            }
+            if (event.key !== 'Tab') return
+            event.preventDefault()
+            if (event.shiftKey && records.length > 0) focusedRecordButton()?.focus()
+            else closeButtonRef.current?.focus()
+          }}
+        >
+          <span>{t('office.openWorkspaceFiles')}</span>
+          <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" aria-hidden style={officePixelImg} />
+        </button>
+      </div>
+    </section>
+  )
+}

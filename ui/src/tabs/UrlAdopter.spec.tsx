@@ -206,6 +206,18 @@ describe('UrlAdopter Settings Beta', () => {
 })
 
 describe('UrlAdopter Office occupancy', () => {
+  it('keeps the internal Office return checkpoint passive during an excursion', async () => {
+    render(
+      <MemoryRouter initialEntries={['/office/return']}>
+        <UrlAdopter />
+      </MemoryRouter>,
+    )
+
+    await Promise.resolve()
+    expect(mocks.openOrFocus).not.toHaveBeenCalled()
+    expect(mocks.setSidebar).not.toHaveBeenCalled()
+  })
+
   it('adopts the Office surface from /office', async () => {
     render(
       <MemoryRouter initialEntries={['/office']}>

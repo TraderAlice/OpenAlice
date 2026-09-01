@@ -130,4 +130,41 @@ export const agentRuntimeHandlers = [
     demoSonnerEvents.unshift(entry)
     return HttpResponse.json({ entry }, { status: 201 })
   }),
+  http.post('/api/agent-runtime/product-test', async ({ request }) => {
+    const body = await request.json() as { family?: 'inbox' | 'news' }
+    if (!body.family || !['inbox', 'news'].includes(body.family)) {
+      return HttpResponse.json({ error: 'invalid family' }, { status: 400 })
+    }
+    demoSonnerSeq += 1
+    const entry = body.family === 'inbox'
+      ? {
+          seq: demoSonnerSeq,
+          ts: Date.now(),
+          type: 'inbox.received',
+          payload: {
+            workspaceId: '__dev__',
+            workspaceLabel: 'Frontend lab',
+            inboxEntryId: `inbox-test-${demoSonnerSeq}`,
+            agent: 'Dev Panel',
+            originKind: 'headless',
+            summary: 'Product activity journal Inbox test',
+            documentCount: 0,
+          },
+        }
+      : {
+          seq: demoSonnerSeq,
+          ts: Date.now(),
+          type: 'news.ingested',
+          payload: {
+            newsItemId: demoSonnerSeq,
+            dedupKey: `dev:${demoSonnerSeq}`,
+            title: 'Product activity journal News test',
+            source: 'Frontend lab',
+            publishedAt: Date.now(),
+            ingestSource: 'dev',
+          },
+        }
+    demoSonnerEvents.unshift(entry)
+    return HttpResponse.json({ entry }, { status: 201 })
+  }),
 ]

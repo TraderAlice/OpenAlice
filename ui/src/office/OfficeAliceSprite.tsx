@@ -8,20 +8,20 @@ export function officeAlicePose(
   direction: OfficeAliceDirection,
   walking: boolean,
 ): OfficeAlicePose {
-  if (direction === 'up') return 'idle-back'
-  if (!walking || direction === 'down') return 'idle'
-  return direction === 'left' ? 'walk-left' : 'walk-right'
+  return `${walking ? 'walk' : 'idle'}-${direction}` as OfficeAlicePose
 }
 
 export function OfficeAliceSprite({
   direction,
   walking,
+  sprinting = false,
   reducedMotion,
   label,
-  scale = 0.5,
+  scale = 1,
 }: {
   direction: OfficeAliceDirection
   walking: boolean
+  sprinting?: boolean
   reducedMotion: boolean
   label: string
   scale?: number
@@ -37,7 +37,8 @@ export function OfficeAliceSprite({
     let index = 0
     let timer: number
     const tick = () => {
-      const duration = pose.durationsMs[index] ?? pose.durationsMs[pose.durationsMs.length - 1] ?? 200
+      const authoredDuration = pose.durationsMs[index] ?? pose.durationsMs[pose.durationsMs.length - 1] ?? 200
+      const duration = sprinting ? Math.round(authoredDuration * 2 / 3) : authoredDuration
       timer = window.setTimeout(() => {
         index = (index + 1) % pose.frames
         setFrame(index)
@@ -46,7 +47,7 @@ export function OfficeAliceSprite({
     }
     tick()
     return () => window.clearTimeout(timer)
-  }, [action, pose.durationsMs, pose.frames, reducedMotion])
+  }, [action, pose.durationsMs, pose.frames, reducedMotion, sprinting])
 
   const displayWidth = pose.cell.width * scale
   const displayHeight = pose.cell.height * scale
@@ -57,13 +58,14 @@ export function OfficeAliceSprite({
       className="shrink-0"
       data-pose={action}
       data-frame={frame}
+      data-sprinting={sprinting || undefined}
       style={{
         width: displayWidth,
         height: displayHeight,
         backgroundImage: `url(${pose.sheetUrl})`,
         backgroundRepeat: 'no-repeat',
         backgroundSize: `${pose.atlas.columns * displayWidth}px ${pose.atlas.rows * displayHeight}px`,
-        backgroundPosition: `-${frame * displayWidth}px -${pose.row * displayHeight}px`,
+        backgroundPosition: `-${(pose.column + frame) * displayWidth}px -${pose.row * displayHeight}px`,
         imageRendering: 'pixelated',
       }}
     />

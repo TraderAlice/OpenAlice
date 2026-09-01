@@ -1,81 +1,363 @@
-import type { ReactNode } from 'react'
+import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { OfficeDrawerItem, OfficeFloorEmployee } from '../api/office'
+import { formatRelativeTime } from '../lib/intl'
+import { officeActivityText } from './activity-text'
+import { officeDrawerKindLabel, officeDrawerTitles } from './drawer-presentation'
 import { officeBubbleText } from './bubble-text'
 import { officePixelImg } from './furniture'
+import { nextOfficeGridIndex } from './grid-navigation'
 import { OFFICE_HUD_ASSETS } from './hud-assets'
+import { isOfficeConfirmKey } from './input'
 import { OfficeCoworkerSprite } from './OfficeCoworkerSprite'
-import { officeCoworkerLabel } from './label'
+import type { OfficeCoworkerSpriteAsset } from './coworker-sprites'
+import { OfficeWindowControlGlyph } from './OfficeWindowControlGlyph'
+import { officeCoworkerAssignment, officeCoworkerCallsign, officeCoworkerStatusKey } from './label'
+import type { OfficeReplayFocus } from './replay-focus'
+import { officeRunModeLabel } from './runtime-presentation'
 import { useReducedMotion } from './use-reduced-motion'
 
 export function OfficeInspectRail({
   employee,
+  coworkerAsset,
   roomName,
+  replayFocus = null,
+  dutyPending = false,
+  dutyReviewIntent = 'result',
   onOpen,
+  onReviewActivity,
   onOpenDrawer,
   onClose,
+  returnToRoster = false,
   children,
 }: {
   employee: OfficeFloorEmployee | null
+  coworkerAsset?: OfficeCoworkerSpriteAsset
   roomName?: string
+  replayFocus?: OfficeReplayFocus | null
+  dutyPending?: boolean
+  dutyReviewIntent?: 'result' | 'run'
   onOpen: () => void
+  onReviewActivity?: () => void
   onOpenDrawer: (item: OfficeDrawerItem) => void
   onClose?: () => void
+  returnToRoster?: boolean
   children?: ReactNode
 }) {
   const { t } = useTranslation()
   const reducedMotion = useReducedMotion()
+  const titleId = useId()
+  const resultId = useId()
+  const [titleExpanded, setTitleExpanded] = useState(false)
+  const [assignmentHasMore, setAssignmentHasMore] = useState(false)
+  const [resultExpanded, setResultExpanded] = useState(false)
+  const [focusedDrawerId, setFocusedDrawerId] = useState(employee?.drawers[0]?.id ?? null)
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const profileRef = useRef<HTMLDivElement>(null)
+  const assignmentRef = useRef<HTMLParagraphElement>(null)
+  const resultRef = useRef<HTMLParagraphElement>(null)
+  const resultWasExpandedRef = useRef(false)
+  const titleToggleRef = useRef<HTMLButtonElement>(null)
+  const resultToggleRef = useRef<HTMLButtonElement>(null)
+  const reviewActivityRef = useRef<HTMLButtonElement>(null)
+  const openButtonRef = useRef<HTMLButtonElement>(null)
+  const drawerListRef = useRef<HTMLUListElement>(null)
+  const employeeAssignment = employee ? officeCoworkerAssignment(employee) : null
+  const drawerButtons = () => Array.from(
+    drawerListRef.current?.querySelectorAll<HTMLButtonElement>('button[data-drawer-id]') ?? [],
+  )
+  const drawerIdentity = employee?.drawers.map((drawer) => drawer.id).join('\u001f') ?? ''
+  const focusedDrawerButton = () => {
+    const buttons = drawerButtons()
+    return buttons.find((button) => button.dataset.drawerId === focusedDrawerId) ?? buttons[0]
+  }
+
+  const updateAssignmentScrollCue = () => {
+    const assignment = assignmentRef.current
+    setAssignmentHasMore(Boolean(
+      titleExpanded
+      && assignment
+      && assignment.scrollHeight - assignment.clientHeight - assignment.scrollTop > 1,
+    ))
+  }
+
+  useEffect(() => {
+    setFocusedDrawerId(employee?.drawers[0]?.id ?? null)
+    setTitleExpanded(false)
+    setAssignmentHasMore(false)
+    setResultExpanded(false)
+  }, [employee?.resumeId])
+
+  useEffect(() => {
+    setFocusedDrawerId((current) => current && employee?.drawers.some((drawer) => drawer.id === current)
+      ? current
+      : employee?.drawers[0]?.id ?? null)
+    // Drawer objects refresh with live snapshots; ids change only when the playable inventory changes.
+  }, [drawerIdentity])
+
+  useLayoutEffect(() => {
+    if (!titleExpanded || !profileRef.current) {
+      setAssignmentHasMore(false)
+      return
+    }
+    profileRef.current.scrollTop = 0
+    if (assignmentRef.current) {
+      assignmentRef.current.scrollTop = 0
+      assignmentRef.current.focus({ preventScroll: true })
+    }
+    updateAssignmentScrollCue()
+  }, [employeeAssignment, titleExpanded])
+
+  useLayoutEffect(() => {
+    const wasExpanded = resultWasExpandedRef.current
+    resultWasExpandedRef.current = resultExpanded
+    if (resultExpanded && resultRef.current) {
+      resultRef.current.scrollTop = 0
+      resultRef.current.scrollIntoView?.({ block: 'nearest' })
+      resultRef.current.focus({ preventScroll: true })
+    } else if (wasExpanded) {
+      resultToggleRef.current?.focus({ preventScroll: true })
+    }
+  }, [resultExpanded])
+
+  const employeeLabel = employee ? officeCoworkerCallsign(employee, coworkerAsset) : ''
+  const latestResultText = officeActivityText(employee?.latestResult?.text)
+  const replayActive = replayFocus != null
+  const employeeDialogue = replayFocus?.summary
+    ?? (employee?.bubble
+      ? officeBubbleText(employee.bubble, t)
+      : employee
+        ? t(employee.mood === 'idle' && !employee.awake
+          ? 'office.moodDialogue.resting'
+          : `office.moodDialogue.${employee.mood}`)
+        : '')
+  const dialogueIsResult = !replayFocus
+    && employee?.mood === 'review'
+    && employee.bubble?.kind === 'text'
+  const employeeByline = employee
+    ? [employee.agent, employee.name].filter(Boolean).join(' · ')
+    : ''
+  const titleCanExpand = (employeeAssignment?.length ?? 0) > 72
+  const resultCanExpand = (latestResultText?.length ?? 0) > 120
+  const drawerTitles = officeDrawerTitles(employee?.drawers ?? [], t)
+  const toggleLatestResult = () => {
+    setTitleExpanded(false)
+    setResultExpanded((expanded) => !expanded)
+  }
 
   return (
     <aside
       role="dialog"
       aria-modal="true"
-      aria-label={employee ? officeCoworkerLabel(employee) : t('office.employeeFile')}
+      aria-label={employee ? employeeLabel : t('office.employeeFile')}
       data-testid="office-inspect"
+      data-awake={employee?.awake}
+      data-replay={replayActive || undefined}
       className="oa-office-inspect oa-office-window"
       onKeyDown={(event) => {
-        if (event.key === 'Escape') onClose?.()
+        if (event.key !== 'Escape') return
+        if (titleExpanded || resultExpanded) {
+          event.preventDefault()
+          event.stopPropagation()
+          if (resultExpanded) {
+            setResultExpanded(false)
+          } else {
+            setTitleExpanded(false)
+            requestAnimationFrame(() => titleToggleRef.current?.focus({ preventScroll: true }))
+          }
+          return
+        }
+        onClose?.()
       }}
     >
       {onClose && (
-        <button type="button" autoFocus className="oa-office-window__close" aria-label={t('common.close')} onClick={onClose}>
-          <img src={OFFICE_HUD_ASSETS.windowClose} alt="" aria-hidden style={officePixelImg} />
+        <button
+          type="button"
+          ref={closeButtonRef}
+          autoFocus={returnToRoster || !employee}
+          className="oa-office-window__close"
+          aria-label={returnToRoster ? t('office.backToRoster') : t('common.close')}
+          onClick={onClose}
+          onKeyDown={(event) => {
+            if (isOfficeConfirmKey(event.key)) {
+              event.preventDefault()
+              onClose()
+              return
+            }
+            if (event.key !== 'Tab' || !employee) return
+            event.preventDefault()
+            if (event.shiftKey) (focusedDrawerButton() ?? openButtonRef.current)?.focus()
+            else (
+              titleToggleRef.current
+              ?? resultToggleRef.current
+              ?? reviewActivityRef.current
+              ?? openButtonRef.current
+            )?.focus()
+          }}
+        >
+          <OfficeWindowControlGlyph kind={returnToRoster ? 'back' : 'close'} />
         </button>
       )}
-      <div className="oa-office-inspect__profile">
+      <div ref={profileRef} className="oa-office-inspect__profile">
         {employee ? (
           <>
             <div className="oa-office-inspect__portrait" aria-hidden>
               <OfficeCoworkerSprite
                 agent={employee.agent}
+                identity={employee.resumeId}
+                asset={coworkerAsset}
                 mood={employee.mood}
                 reducedMotion={reducedMotion}
-                label={officeCoworkerLabel(employee)}
-                scale={0.34}
+                label={employeeLabel}
+                scale={0.42}
               />
             </div>
             <div className="oa-office-inspect__dialogue">
               <div className="oa-office-inspect__kicker">
-                <span className="oa-office-live-dot" aria-hidden />
+                {replayFocus ? (
+                  <img
+                    className="oa-office-inspect__replay-icon"
+                    src={OFFICE_HUD_ASSETS.replayLatch}
+                    alt=""
+                    aria-hidden
+                    style={officePixelImg}
+                  />
+                ) : (
+                  <span className="oa-office-live-dot" aria-hidden />
+                )}
                 {t('office.employeeFile')}
+                {replayFocus && (
+                  <span className="oa-office-inspect__replay-seq">
+                    {t('office.replayAt', { seq: replayFocus.seq })}
+                  </span>
+                )}
               </div>
               <div className="oa-office-inspect__identity">
-                <p>{officeCoworkerLabel(employee)}</p>
-                <span>@{employee.resumeId}</span>
+                <p>{employeeLabel}</p>
+                <span>{employeeByline}</span>
               </div>
-              <blockquote>
-                {employee.bubble
-                  ? officeBubbleText(employee.bubble, t)
-                  : `${t(`office.mood.${employee.mood}`)} · ${employee.surface || roomName || '—'}`}
+              {employeeAssignment && (
+                <div className="oa-office-inspect__assignment">
+                  <small>{t('office.assignment')}</small>
+                  <p
+                    ref={assignmentRef}
+                    id={titleId}
+                    role={titleExpanded ? 'region' : undefined}
+                    aria-label={titleExpanded ? t('office.assignment') : undefined}
+                    data-expanded={titleExpanded || undefined}
+                    tabIndex={titleExpanded ? 0 : undefined}
+                    title={employeeAssignment}
+                    onScroll={updateAssignmentScrollCue}
+                  >
+                    {employeeAssignment}
+                  </p>
+                {titleExpanded && assignmentHasMore && (
+                  <span
+                    className="oa-office-inspect__assignment-scroll-cue"
+                    data-reduced-motion={reducedMotion || undefined}
+                    aria-hidden
+                  >
+                    <i />
+                  </span>
+                )}
+                {titleCanExpand && (
+                  <button
+                    type="button"
+                    ref={titleToggleRef}
+                    className="oa-office-inspect__title-toggle"
+                    aria-controls={titleId}
+                    aria-expanded={titleExpanded}
+                    onClick={() => {
+                      setResultExpanded(false)
+                      setTitleExpanded((expanded) => !expanded)
+                    }}
+                    onKeyDown={(event) => {
+                      if (isOfficeConfirmKey(event.key)) {
+                        event.preventDefault()
+                        setResultExpanded(false)
+                        setTitleExpanded((expanded) => !expanded)
+                        return
+                      }
+                      if (event.key !== 'Tab') return
+                      event.preventDefault()
+                      if (event.shiftKey) closeButtonRef.current?.focus()
+                      else (
+                        resultToggleRef.current
+                        ?? reviewActivityRef.current
+                        ?? openButtonRef.current
+                      )?.focus()
+                    }}
+                  >
+                    {titleExpanded ? t('office.collapseAssignment') : t('office.showFullAssignment')}
+                  </button>
+                )}
+                </div>
+              )}
+              <blockquote data-result={dialogueIsResult || undefined}>
+                {dialogueIsResult && <small>{t('office.eventResult')}</small>}
+                <span>{employeeDialogue}</span>
               </blockquote>
+              {!replayFocus && !employee.bubble && employee.latestResult && latestResultText && (
+                <div className="oa-office-inspect__latest-result">
+                  <small>{t('office.latestResult')}</small>
+                  {resultCanExpand && (
+                    <button
+                      type="button"
+                      ref={resultToggleRef}
+                      className="oa-office-inspect__result-toggle"
+                      aria-controls={resultId}
+                      aria-expanded={resultExpanded}
+                      onClick={toggleLatestResult}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Escape' && resultExpanded) {
+                          event.preventDefault()
+                          event.stopPropagation()
+                          setResultExpanded(false)
+                          return
+                        }
+                        if (isOfficeConfirmKey(event.key)) {
+                          event.preventDefault()
+                          toggleLatestResult()
+                          return
+                        }
+                        if (event.key !== 'Tab') return
+                        event.preventDefault()
+                        if (event.shiftKey) (titleToggleRef.current ?? closeButtonRef.current)?.focus()
+                        else (reviewActivityRef.current ?? openButtonRef.current)?.focus()
+                      }}
+                    >
+                      {resultExpanded ? t('office.collapseResult') : t('office.showFullResult')}
+                    </button>
+                  )}
+                  <p
+                    ref={resultRef}
+                    id={resultId}
+                    role={resultExpanded ? 'region' : undefined}
+                    aria-label={resultExpanded ? t('office.latestResult') : undefined}
+                    data-expanded={resultExpanded || undefined}
+                    tabIndex={resultExpanded ? 0 : undefined}
+                    title={latestResultText}
+                  >
+                    {latestResultText}
+                  </p>
+                  <time dateTime={new Date(employee.latestResult.at).toISOString()}>
+                    {formatRelativeTime(employee.latestResult.at)}
+                  </time>
+                </div>
+              )}
             </div>
             <dl className="oa-office-inspect__facts">
               <div>
                 <dt>{t('office.status')}</dt>
-                <dd data-mood={employee.mood}>
+                <dd
+                  data-mood={employee.mood}
+                  data-power={replayActive ? 'replay' : employee.awake ? 'awake' : 'asleep'}
+                >
                   <span aria-hidden />
-                  {t(`office.mood.${employee.mood}`)}
+                  <b className="oa-office-inspect__fact-value">
+                    {t(replayActive ? 'office.power.replayActive' : officeCoworkerStatusKey(employee))}
+                  </b>
                 </dd>
               </div>
               <div>
@@ -83,36 +365,85 @@ export function OfficeInspectRail({
                 <dd>{roomName || '—'}</dd>
               </div>
               <div>
-                <dt>{t('office.surface')}</dt>
-                <dd>{employee.surface || '—'}</dd>
+                <dt>{t('office.eventRunMode')}</dt>
+                <dd>{officeRunModeLabel(employee.surface, t) || '—'}</dd>
               </div>
             </dl>
-            <div className="oa-office-inspect__actions">
-              <button
-                type="button"
-                className="oa-office-inspect__open"
-                onClick={onOpen}
-              >
-                {t('office.openSession')}
-                <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" aria-hidden style={officePixelImg} />
-              </button>
-            </div>
             {employee.drawers.length > 0 && (
               <div className="oa-office-drawers">
                 <p>{t('office.deskDrawers')}</p>
-                <ul>
-                  {employee.drawers.map((item) => (
-                    <li key={item.id}>
-                      <button
-                        type="button"
-                        className="oa-office-drawer"
-                        onClick={() => onOpenDrawer(item)}
-                      >
-                        <img src={OFFICE_HUD_ASSETS.drawerRecord} alt="" aria-hidden style={officePixelImg} />
-                        <span>{item.label}</span>
-                      </button>
-                    </li>
-                  ))}
+                <ul
+                  ref={drawerListRef}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Tab') {
+                      event.preventDefault()
+                      if (event.shiftKey) openButtonRef.current?.focus()
+                      else (closeButtonRef.current ?? openButtonRef.current)?.focus()
+                      return
+                    }
+                    const direction = ({
+                      ArrowLeft: 'left',
+                      ArrowRight: 'right',
+                      ArrowUp: 'up',
+                      ArrowDown: 'down',
+                    } as const)[event.key]
+                    const buttons = drawerButtons()
+                    const currentIndex = buttons.indexOf(document.activeElement as HTMLButtonElement)
+                    if (currentIndex < 0) return
+                    let nextIndex = currentIndex
+                    if (direction) {
+                      nextIndex = nextOfficeGridIndex(
+                        buttons.map((button) => button.getBoundingClientRect()),
+                        currentIndex,
+                        direction,
+                      )
+                    } else if (event.key === 'Home') {
+                      nextIndex = 0
+                    } else if (event.key === 'End') {
+                      nextIndex = buttons.length - 1
+                    } else {
+                      return
+                    }
+                    event.preventDefault()
+                    buttons[nextIndex]?.focus()
+                  }}
+                >
+                  {employee.drawers.map((item, index) => {
+                    const title = drawerTitles.get(item.id)!
+                    const kind = officeDrawerKindLabel(item, t)
+                    const relativeTime = formatRelativeTime(item.at)
+                    return (
+                      <li key={item.id}>
+                        <button
+                          type="button"
+                          data-drawer-id={item.id}
+                          tabIndex={item.id === focusedDrawerId || (focusedDrawerId == null && index === 0) ? 0 : -1}
+                          className="oa-office-drawer"
+                          aria-label={t('office.drawerOpenRecord', { record: title, kind, time: relativeTime })}
+                          onFocus={() => setFocusedDrawerId(item.id)}
+                          onClick={() => onOpenDrawer(item)}
+                          onKeyDown={(event) => {
+                            if (!isOfficeConfirmKey(event.key)) return
+                            event.preventDefault()
+                            onOpenDrawer(item)
+                          }}
+                        >
+                          <img src={OFFICE_HUD_ASSETS.drawerRecord} alt="" aria-hidden style={officePixelImg} />
+                          <span className="oa-office-drawer__copy">
+                            <span className="oa-office-drawer__label">{title}</span>
+                            <small>
+                              <b>{kind}</b>
+                              <time dateTime={new Date(item.at).toISOString()}>{relativeTime}</time>
+                            </small>
+                          </span>
+                          <span className="oa-office-drawer__destination" aria-hidden>
+                            <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" style={officePixelImg} />
+                            <small>{t('office.drawerRecordAction')}</small>
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  })}
                 </ul>
               </div>
             )}
@@ -125,6 +456,73 @@ export function OfficeInspectRail({
           </div>
         )}
       </div>
+      {employee && (
+        <div
+          className="oa-office-inspect__actions"
+          data-has-activity={Boolean(onReviewActivity) || undefined}
+          data-duty-pending={dutyPending || undefined}
+        >
+          {onReviewActivity && (
+            <button
+              type="button"
+              ref={reviewActivityRef}
+              autoFocus={!returnToRoster}
+              className="oa-office-inspect__activity"
+              onClick={onReviewActivity}
+              onKeyDown={(event) => {
+                if (isOfficeConfirmKey(event.key)) {
+                  event.preventDefault()
+                  onReviewActivity()
+                  return
+                }
+                if (event.key !== 'Tab') return
+                event.preventDefault()
+                if (event.shiftKey) (
+                  resultToggleRef.current
+                  ?? titleToggleRef.current
+                  ?? closeButtonRef.current
+                )?.focus()
+                else openButtonRef.current?.focus()
+              }}
+            >
+              {t(dutyPending
+                ? dutyReviewIntent === 'result'
+                  ? 'office.reviewDutyResult'
+                  : 'office.reviewDutyRun'
+                : 'office.reviewActivity')}
+              <img src={OFFICE_HUD_ASSETS.occupancyLog} alt="" aria-hidden style={officePixelImg} />
+            </button>
+          )}
+          <button
+            type="button"
+            ref={openButtonRef}
+            autoFocus={!returnToRoster && !onReviewActivity}
+            className="oa-office-inspect__open"
+            onClick={onOpen}
+            onKeyDown={(event) => {
+              if (isOfficeConfirmKey(event.key)) {
+                event.preventDefault()
+                onOpen()
+                return
+              }
+              if (event.key !== 'Tab' || !onClose) return
+              event.preventDefault()
+              if (event.shiftKey) {
+                (
+                  reviewActivityRef.current
+                  ?? resultToggleRef.current
+                  ?? titleToggleRef.current
+                  ?? closeButtonRef.current
+                )?.focus()
+              }
+              else (focusedDrawerButton() ?? closeButtonRef.current)?.focus()
+            }}
+          >
+            {t('office.openSession')}
+            <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" aria-hidden style={officePixelImg} />
+          </button>
+        </div>
+      )}
       {children && (
         <div className="oa-office-inspect__timeline">
           <div className="oa-office-inspect__timeline-title">

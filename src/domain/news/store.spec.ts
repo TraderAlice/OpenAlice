@@ -67,6 +67,28 @@ describe('NewsCollectorStore', () => {
     expect(store.dedupCount).toBe(1)
   })
 
+  it('returns the durable record identity for optional activity producers', async () => {
+    const record = await store.ingestRecord({
+      title: 'Activity-ready article',
+      content: 'Stored before its activity is published.',
+      pubTime: new Date('2026-02-27T10:00:00Z'),
+      dedupKey: 'guid:activity-1',
+      metadata: { source: 'reuters', ingestSource: 'rss' },
+    })
+    expect(record).toMatchObject({
+      seq: 1,
+      dedupKey: 'guid:activity-1',
+      title: 'Activity-ready article',
+    })
+    expect(await store.ingestRecord({
+      title: 'Activity-ready article',
+      content: 'Stored before its activity is published.',
+      pubTime: new Date('2026-02-27T10:00:00Z'),
+      dedupKey: 'guid:activity-1',
+      metadata: { source: 'reuters', ingestSource: 'rss' },
+    })).toBeNull()
+  })
+
   it('rejects duplicate items', async () => {
     const item = {
       title: 'BTC at $90k',

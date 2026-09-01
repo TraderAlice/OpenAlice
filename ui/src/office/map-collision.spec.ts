@@ -2,8 +2,17 @@ import { describe, expect, it } from 'vitest'
 
 import { nearestOfficeInteractionTarget } from './interaction-targets'
 import { layoutOfficeMap } from './map-layout'
-import { moveAliceOnOfficeMap, officeCollisionRects } from './map-collision'
+import {
+  OFFICE_ALICE_VISUAL_HALF_HEIGHT,
+  OFFICE_ALICE_VISUAL_HALF_WIDTH,
+  OFFICE_FLOOR_BOTTOM_EDGE,
+  OFFICE_FLOOR_SIDE_EDGE,
+  isOfficePositionWalkable,
+  moveAliceOnOfficeMap,
+  officeCollisionRects,
+} from './map-collision'
 import { OFFICE_CABINET_CENTER, OFFICE_DESK_CENTERS } from './pod-geometry'
+import { officeServiceLandmarks } from './map-landmarks'
 
 const layout = layoutOfficeMap([
   { id: 'chat-1', harness: 'chat' },
@@ -11,15 +20,43 @@ const layout = layoutOfficeMap([
 ])
 
 describe('Office map collision', () => {
+  it('accepts remembered floor positions only inside walkable map space', () => {
+    const openFloor = { x: layout.alice.x, y: layout.alice.y + 48 }
+    const desk = layout.pods[0]!
+
+    expect(isOfficePositionWalkable(openFloor, layout)).toBe(true)
+    expect(isOfficePositionWalkable({ x: 0, y: openFloor.y }, layout)).toBe(false)
+    expect(isOfficePositionWalkable({
+      x: desk.x + OFFICE_DESK_CENTERS[0].x,
+      y: desk.y + OFFICE_DESK_CENTERS[0].y,
+    }, layout)).toBe(false)
+  })
+
   it('blocks the wall, desks, filing cabinets, props, and landmarks', () => {
     const ids = officeCollisionRects(layout).map((rect) => rect.id)
     expect(ids).toContain('wall')
+    expect(ids).toContain('sign:chat-1')
     expect(ids).toContain('desk:chat-1:0')
     expect(ids).toContain('cabinet:chat-1')
     expect(ids).toContain('harness-prop:chat-1')
     expect(ids).toContain('landmark:plant')
     expect(ids).toContain('landmark:terminal')
+    expect(ids).toContain('landmark:inbox-service')
+    expect(ids).toContain('landmark:news-service')
     expect(ids).toContain('operations')
+  })
+
+  it('keeps Alice out of the visible service cabinet body', () => {
+    const service = officeServiceLandmarks(layout)[1]!
+    const current = { x: service.x, y: service.y + 48 }
+    const move = moveAliceOnOfficeMap(current, { x: 24, y: 0 }, layout)
+
+    expect(service.collision).toEqual({ x: 12, y: 16, width: 112, height: 94 })
+    expect(move).toMatchObject({
+      position: current,
+      bumped: true,
+      obstacleId: 'landmark:news-service',
+    })
   })
 
   it('stops Alice before a workstation while keeping its employee interactable', () => {
@@ -42,6 +79,7 @@ describe('Office map collision', () => {
         resumeId: 'resume-1',
         agent: 'codex',
         name: 'c1',
+        awake: true,
         mood: 'working',
         bubble: null,
         lastSeq: 1,
@@ -49,6 +87,19 @@ describe('Office map collision', () => {
         drawers: [],
       },
     }])?.id).toBe('employee:chat-1:resume-1')
+  })
+
+  it('slides along a free axis when a diagonal step meets a corner', () => {
+    const current = { x: 100, y: 100 }
+    const move = moveAliceOnOfficeMap(current, { x: 17, y: 17 }, layout, [{
+      id: 'corner',
+      x: 114,
+      y: 114,
+      width: 20,
+      height: 20,
+    }])
+
+    expect(move).toEqual({ position: { x: 117, y: 100 }, bumped: false })
   })
 
   it('stops at a cabinet within interaction range and preserves open aisles', () => {
@@ -84,6 +135,38 @@ describe('Office map collision', () => {
     })
   })
 
+  it('keeps Alice inside the visible side and bottom floor barriers', () => {
+    const right = moveAliceOnOfficeMap(
+      { x: layout.width - 48, y: layout.height - 96 },
+      { x: 48, y: 0 },
+      layout,
+    )
+    const bottom = moveAliceOnOfficeMap(
+      { x: layout.width / 2, y: layout.height - 72 },
+      { x: 0, y: 48 },
+      layout,
+    )
+
+    expect(right).toEqual({
+      position: {
+        x: layout.width - OFFICE_FLOOR_SIDE_EDGE - OFFICE_ALICE_VISUAL_HALF_WIDTH,
+        y: layout.height - 96,
+      },
+      bumped: true,
+    })
+    expect(bottom).toEqual({
+      position: {
+        x: layout.width / 2,
+        y: layout.height - OFFICE_FLOOR_BOTTOM_EDGE - OFFICE_ALICE_VISUAL_HALF_HEIGHT,
+      },
+      bumped: false,
+    })
+    expect(isOfficePositionWalkable({ x: layout.width - 24, y: layout.height - 96 }, layout))
+      .toBe(false)
+    expect(isOfficePositionWalkable({ x: layout.width / 2, y: layout.height - 24 }, layout))
+      .toBe(false)
+  })
+
   it('stops Alice at the operations board while keeping its log interaction in range', () => {
     const current = { x: layout.width / 2, y: 264 }
     expect(moveAliceOnOfficeMap(current, { x: 0, y: -24 }, layout)).toMatchObject({
@@ -103,5 +186,27 @@ describe('Office map collision', () => {
     expect(officeCollisionRects(layout).map((rect) => rect.id)).not.toContain('roster:chat-1')
     expect(officeCollisionRects(layout, new Set(['chat-1'])).map((rect) => rect.id))
       .toContain('roster:chat-1')
+  })
+
+  it('turns a partial final row into a collidable service bay', () => {
+    const partialLayout = layoutOfficeMap(Array.from({ length: 3 }, (_, index) => ({
+      id: `workspace-${index}`,
+      harness: 'chat' as const,
+    })))
+    expect(partialLayout).toMatchObject({ columns: 2, rows: 2 })
+    const ids = officeCollisionRects(partialLayout).map((rect) => rect.id)
+    expect(ids).toContain('landmark:inbox-service')
+    expect(ids).toContain('landmark:news-service')
+  })
+
+  it('reserves collidable services after complete multi-row Workspace floors', () => {
+    const completeLayout = layoutOfficeMap(Array.from({ length: 4 }, (_, index) => ({
+      id: `workspace-${index}`,
+      harness: 'chat' as const,
+    })))
+    expect(completeLayout).toMatchObject({ columns: 2, rows: 3 })
+    const ids = officeCollisionRects(completeLayout).map((rect) => rect.id)
+    expect(ids).toContain('landmark:inbox-service')
+    expect(ids).toContain('landmark:news-service')
   })
 })

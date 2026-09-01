@@ -1,10 +1,19 @@
 import type { OfficeMapLayout } from './map-layout'
-import { officeOperationsBoardPosition } from './map-landmarks'
-import { OFFICE_CABINET_CENTER, OFFICE_DESK_CENTERS, OFFICE_ROSTER_CENTER } from './pod-geometry'
+import { officeOperationsBoardPosition, officeServiceLandmarks } from './map-landmarks'
+import {
+  OFFICE_CABINET_CENTER,
+  OFFICE_DESK_CENTERS,
+  OFFICE_SIGN_CENTER,
+  officeRosterCenter,
+} from './pod-geometry'
 
 export const OFFICE_WALL_FLOOR_EDGE = 112
+export const OFFICE_FLOOR_SIDE_EDGE = 24
+export const OFFICE_FLOOR_BOTTOM_EDGE = 24
 export const OFFICE_ALICE_HALF_WIDTH = 10
 export const OFFICE_ALICE_HALF_HEIGHT = 12
+export const OFFICE_ALICE_VISUAL_HALF_WIDTH = 24
+export const OFFICE_ALICE_VISUAL_HALF_HEIGHT = 28
 
 export interface OfficeCollisionRect {
   id: string
@@ -38,7 +47,24 @@ export function officeCollisionRects(
     },
   ]
 
+  for (const landmark of officeServiceLandmarks(layout)) {
+    rects.push({
+      id: `landmark:${landmark.id}`,
+      x: landmark.x + landmark.collision.x,
+      y: landmark.y + landmark.collision.y,
+      width: landmark.collision.width,
+      height: landmark.collision.height,
+    })
+  }
+
   for (const pod of layout.pods) {
+    rects.push({
+      id: `sign:${pod.id}`,
+      x: pod.x + OFFICE_SIGN_CENTER.x - 126,
+      y: pod.y + OFFICE_SIGN_CENTER.y - 22,
+      width: 252,
+      height: 44,
+    })
     OFFICE_DESK_CENTERS.forEach((center, index) => {
       rects.push({
         id: `desk:${pod.id}:${index}`,
@@ -56,10 +82,11 @@ export function officeCollisionRects(
       height: 48,
     })
     if (rosterWorkspaceIds.has(pod.id)) {
+      const rosterCenter = officeRosterCenter(pod, layout.width)
       rects.push({
         id: `roster:${pod.id}`,
-        x: pod.x + OFFICE_ROSTER_CENTER.x - 18,
-        y: pod.y + OFFICE_ROSTER_CENTER.y - 25,
+        x: pod.x + rosterCenter.x - 18,
+        y: pod.y + rosterCenter.y - 25,
         width: 36,
         height: 50,
       })
@@ -86,20 +113,49 @@ function intersectsAlice(
     && position.y - OFFICE_ALICE_HALF_HEIGHT < rect.y + rect.height
 }
 
+export function isOfficePositionWalkable(
+  position: { x: number; y: number },
+  layout: OfficeMapLayout,
+  collisionRects: readonly OfficeCollisionRect[] = officeCollisionRects(layout),
+): boolean {
+  return position.x >= OFFICE_FLOOR_SIDE_EDGE + OFFICE_ALICE_VISUAL_HALF_WIDTH
+    && position.x <= layout.width - OFFICE_FLOOR_SIDE_EDGE - OFFICE_ALICE_VISUAL_HALF_WIDTH
+    && position.y >= 24
+    && position.y <= layout.height - OFFICE_FLOOR_BOTTOM_EDGE - OFFICE_ALICE_VISUAL_HALF_HEIGHT
+    && !collisionRects.some((rect) => intersectsAlice(position, rect))
+}
+
 export function moveAliceOnOfficeMap(
   current: { x: number; y: number },
   movement: { x: number; y: number },
   layout: OfficeMapLayout,
-  collisionRects = officeCollisionRects(layout),
+  collisionRects: readonly OfficeCollisionRect[] = officeCollisionRects(layout),
 ): OfficeMoveResult {
-  const candidate = {
-    x: Math.min(layout.width - 24, Math.max(24, current.x + movement.x)),
-    y: Math.min(layout.height - 24, Math.max(24, current.y + movement.y)),
-  }
+  const candidateFor = (step: { x: number; y: number }) => ({
+    x: Math.min(
+      layout.width - OFFICE_FLOOR_SIDE_EDGE - OFFICE_ALICE_VISUAL_HALF_WIDTH,
+      Math.max(OFFICE_FLOOR_SIDE_EDGE + OFFICE_ALICE_VISUAL_HALF_WIDTH, current.x + step.x),
+    ),
+    y: Math.min(
+      layout.height - OFFICE_FLOOR_BOTTOM_EDGE - OFFICE_ALICE_VISUAL_HALF_HEIGHT,
+      Math.max(24, current.y + step.y),
+    ),
+  })
+  const candidate = candidateFor(movement)
   const obstacle = collisionRects.find((rect) => intersectsAlice(candidate, rect))
   const boundaryBump = candidate.x === current.x
     && candidate.y === current.y
     && (movement.x !== 0 || movement.y !== 0)
+
+  if (obstacle && movement.x !== 0 && movement.y !== 0) {
+    for (const axis of [{ x: movement.x, y: 0 }, { x: 0, y: movement.y }]) {
+      const slide = candidateFor(axis)
+      const stationary = slide.x === current.x && slide.y === current.y
+      if (!stationary && !collisionRects.some((rect) => intersectsAlice(slide, rect))) {
+        return { position: slide, bumped: false }
+      }
+    }
+  }
 
   if (obstacle || boundaryBump) {
     return {
