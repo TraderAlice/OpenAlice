@@ -9,11 +9,12 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { Section } from '../../components/form'
+import { Section, inputClass as sharedInputClass } from '../../components/form'
 import { simulatorApi, type SimulatorState } from '../../api/simulator'
+import { Button } from '../../components/ui/button'
 
 const inputClass =
-  'w-full px-2 py-1 bg-background text-foreground border border-border rounded font-mono text-xs outline-none transition-colors focus:border-primary'
+  `${sharedInputClass} min-h-8 py-1 font-mono text-xs`
 
 const FLASH_MS = 500
 
@@ -107,10 +108,7 @@ export function MarkPrices({ utaId, state, run, loading }: {
   }
 
   return (
-    <Section
-      title="Mark Prices"
-      description="Per-symbol mark price. Editing or ticking auto-matches any pending limit/stop order whose trigger the new price crosses. Focus a price input and press ↑/↓ for ±1%, Shift+↑/↓ for ±5%."
-    >
+    <Section title="Mark Prices">
       <div className="space-y-1">
         {state.markPrices.length === 0 ? (
           <p className="text-xs text-muted-foreground">No prices set yet — add one below.</p>
@@ -127,7 +125,7 @@ export function MarkPrices({ utaId, state, run, loading }: {
               {state.markPrices.map((m) => (
                 <tr
                   key={m.nativeKey}
-                  className={`text-foreground transition-colors duration-500 ${flashClass(m.nativeKey)}`}
+                  className={`text-foreground ${flashClass(m.nativeKey)}`}
                 >
                   <td className="py-1 pr-3 font-mono text-xs">{m.nativeKey}</td>
                   <td className="py-1 pr-3">
@@ -139,10 +137,10 @@ export function MarkPrices({ utaId, state, run, loading }: {
                     />
                   </td>
                   <td className="py-1 text-right space-x-1">
-                    <button disabled={loading} onClick={() => tick(m.nativeKey, -5)} className="btn-secondary-xs">−5%</button>
-                    <button disabled={loading} onClick={() => tick(m.nativeKey, -1)} className="btn-secondary-xs">−1%</button>
-                    <button disabled={loading} onClick={() => tick(m.nativeKey, 1)} className="btn-secondary-xs">+1%</button>
-                    <button disabled={loading} onClick={() => tick(m.nativeKey, 5)} className="btn-secondary-xs">+5%</button>
+                    <Button disabled={loading} onClick={() => tick(m.nativeKey, -5)} variant="outline" size="xs">−5%</Button>
+                    <Button disabled={loading} onClick={() => tick(m.nativeKey, -1)} variant="outline" size="xs">−1%</Button>
+                    <Button disabled={loading} onClick={() => tick(m.nativeKey, 1)} variant="outline" size="xs">+1%</Button>
+                    <Button disabled={loading} onClick={() => tick(m.nativeKey, 5)} variant="outline" size="xs">+5%</Button>
                   </td>
                 </tr>
               ))}
@@ -163,7 +161,7 @@ export function MarkPrices({ utaId, state, run, loading }: {
             value={newPrice}
             onChange={(e) => setNewPrice(e.target.value)}
           />
-          <button
+          <Button
             disabled={loading || !newKey || !newPrice}
             onClick={() => run(
               `Add ${newKey} = ${newPrice}`,
@@ -173,8 +171,8 @@ export function MarkPrices({ utaId, state, run, loading }: {
                 setNewPrice('')
               },
             )}
-            className="btn-primary-sm"
-          >Add</button>
+            size="sm"
+          >Add</Button>
         </div>
       </div>
     </Section>
