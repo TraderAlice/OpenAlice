@@ -269,6 +269,7 @@ describe('SessionRow actions', () => {
     expect(more.getAttribute('aria-haspopup')).toBe('menu')
     more.focus()
     await user.keyboard('{ArrowDown}')
+    expect(screen.getByRole('menuitem', { name: 'Stop Review AAPL earnings' })).toBeTruthy()
     fireEvent.click(screen.getByRole('menuitem', { name: 'Settings for Review AAPL earnings' }))
     expect(onSettings).toHaveBeenCalledOnce()
 
@@ -295,7 +296,10 @@ describe('SessionRow actions', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Resume p1' }))
     expect(onResume).toHaveBeenCalledOnce()
-    expect(screen.getByRole('button', { name: 'More actions for p1' })).toBeTruthy()
+    const pausedMore = screen.getByRole('button', { name: 'More actions for p1' })
+    pausedMore.focus()
+    await user.keyboard('{ArrowDown}')
+    expect(screen.getByRole('menuitem', { name: 'Resume p1' })).toBeTruthy()
   })
 
   it('marks the active session as the current page', () => {
