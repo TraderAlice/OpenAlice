@@ -18,10 +18,11 @@ import { AuthGate, BackendUnavailableScreen } from './AuthGate'
 import { BACKEND_PROBE_REQUESTED_EVENT } from './backendConnectivity'
 
 function WorkspaceHarness() {
-  const { refresh } = useAuth()
+  const { backendRecoveryGeneration, refresh } = useAuth()
   return (
     <>
       <div>workspace-app</div>
+      <span data-testid="backend-recovery-generation">{backendRecoveryGeneration}</span>
       <button type="button" onClick={() => void refresh()}>Refresh auth</button>
     </>
   )
@@ -121,6 +122,37 @@ describe('AuthProvider backend recovery', () => {
 
     expect(screen.getByText('workspace-app')).toBeTruthy()
     expect(screen.queryByRole('status')).toBeNull()
+    expect(screen.getByTestId('backend-recovery-generation').textContent).toBe('1')
+  })
+
+  it('increments the recovery generation once per unavailable-to-available transition', async () => {
+    vi.useFakeTimers()
+    mocks.getStatus
+      .mockResolvedValueOnce({ authed: true, tokenConfigured: true })
+      .mockRejectedValueOnce(new Error('backend restarting'))
+      .mockResolvedValueOnce({ authed: true, tokenConfigured: true })
+      .mockResolvedValueOnce({ authed: true, tokenConfigured: true })
+
+    render(
+      <AuthProvider>
+        <AuthGate><WorkspaceHarness /></AuthGate>
+      </AuthProvider>,
+    )
+    await flushEffects()
+    expect(screen.getByTestId('backend-recovery-generation').textContent).toBe('0')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh auth' }))
+    await flushEffects()
+    expect(screen.getByTestId('backend-recovery-generation').textContent).toBe('0')
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250)
+    })
+    expect(screen.getByTestId('backend-recovery-generation').textContent).toBe('1')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh auth' }))
+    await flushEffects()
+    expect(screen.getByTestId('backend-recovery-generation').textContent).toBe('1')
   })
 
   it('detects a quiet backend shutdown with the core heartbeat', async () => {

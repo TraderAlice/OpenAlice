@@ -47,6 +47,9 @@ interface AuthContextValue {
   /** The last status check was inconclusive because Alice is unavailable.
    *  Keep the last confirmed auth decision while retrying. */
   backendUnavailable: boolean
+  /** Monotonic signal for consumers with their own transport. Increments only
+   *  when Alice answers again after a confirmed transport outage. */
+  backendRecoveryGeneration: number
   /** Re-check /api/auth/status. Called after login success. */
   refresh: () => Promise<void>
   /** Locally flip state to login-required (e.g. after logout). */
@@ -71,8 +74,10 @@ function deriveState(status: AuthStatus | null): AuthState {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus | null>(null)
   const [backendUnavailable, setBackendUnavailable] = useState(false)
+  const [backendRecoveryGeneration, setBackendRecoveryGeneration] = useState(0)
   const [retryAttempt, setRetryAttempt] = useState(0)
   const mountedRef = useRef(false)
+  const backendUnavailableRef = useRef(false)
   const requestGenerationRef = useRef(0)
   const requestedProbeTimerRef = useRef<number | null>(null)
   const state = deriveState(status)
@@ -83,6 +88,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const next = await getStatus()
       if (!mountedRef.current || generation !== requestGenerationRef.current) return
       setStatus(next)
+      if (backendUnavailableRef.current) {
+        backendUnavailableRef.current = false
+        setBackendRecoveryGeneration((current) => current + 1)
+      }
       setBackendUnavailable(false)
       setRetryAttempt(0)
     } catch {
@@ -90,6 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Absence of an answer is not an authentication decision. Preserve the
       // last confirmed status (and therefore the mounted App) while Alice's
       // watch process comes back, then retry with a short capped backoff.
+      backendUnavailableRef.current = true
       setBackendUnavailable(true)
       setRetryAttempt((attempt) => attempt + 1)
     }
@@ -97,6 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const markUnauthorized = useCallback(() => {
     requestGenerationRef.current += 1
+    backendUnavailableRef.current = false
     setStatus({ authed: false, tokenConfigured: true })
     setBackendUnavailable(false)
     setRetryAttempt(0)
@@ -166,6 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       state,
       status,
       backendUnavailable,
+      backendRecoveryGeneration,
       refresh,
       markUnauthorized,
     }}>
