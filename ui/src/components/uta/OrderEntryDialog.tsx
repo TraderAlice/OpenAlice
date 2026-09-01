@@ -1,7 +1,10 @@
 import { useEffect, useId, useState } from 'react'
 import Decimal from 'decimal.js'
-import { Check, Loader2, Search } from 'lucide-react'
+import { ChevronRight, CircleAlert, Loader2, Search, X } from 'lucide-react'
 import { Field, inputClass } from '../form'
+import { Button } from '../ui/button'
+import { SegmentedControl } from '../SegmentedControl'
+import { SelectionCheckIcon } from '../ui/selection-check-icon'
 import { Dialog } from './Dialog'
 import { tradingApi, OrderEntryError, type ContractSearchHit } from '../../api/trading'
 import type { WalletPushResult, PlaceOrderRequest, ClosePositionRequest, SubAccountRef } from '../../api/types'
@@ -67,9 +70,9 @@ export function OrderEntryDialog({ utaId, mode, onClose, subAccounts, defaultSub
       </div>
 
       <div className="shrink-0 flex items-center justify-end px-6 py-4 border-t border-border">
-        <button onClick={handleClose} className="btn-secondary">
+        <Button variant="outline" onClick={handleClose}>
           {result ? 'Done' : 'Cancel'}
-        </button>
+        </Button>
       </div>
     </Dialog>
   )
@@ -80,17 +83,16 @@ export function OrderEntryDialog({ utaId, mode, onClose, subAccounts, defaultSub
 function Header({ title, onClose }: { title: string; onClose: () => void }) {
   return (
     <div className="shrink-0 px-6 py-4 border-b border-border flex items-center justify-between">
-      <h3 className="text-[14px] font-semibold text-foreground">{title}</h3>
-      <button
-        type="button"
+      <h3 className="text-[14px] leading-[19px] font-semibold text-foreground">{title}</h3>
+      <Button
+        variant="ghost"
+        size="icon-sm"
         onClick={onClose}
         aria-label={`Close ${title}`}
-        className="text-muted-foreground hover:text-foreground p-1 transition-colors"
+        className="text-muted-foreground"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-          <path d="M18 6L6 18M6 6l12 12" />
-        </svg>
-      </button>
+        <X aria-hidden />
+      </Button>
     </div>
   )
 }
@@ -245,12 +247,19 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
         </Field>
       )}
 
-      <button
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={() => setShowAdvanced(!showAdvanced)}
-        className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+        className="px-0 text-muted-foreground hover:bg-transparent"
+        aria-expanded={showAdvanced}
       >
-        {showAdvanced ? '▾ Hide advanced' : '▸ Show advanced (cash qty, TIF)'}
-      </button>
+        <ChevronRight
+          aria-hidden
+          className={`transition-transform duration-[110ms] [transition-timing-function:var(--motion-ease-out)] motion-reduce:transition-none ${showAdvanced ? 'rotate-90' : ''}`}
+        />
+        {showAdvanced ? 'Hide advanced' : 'Show advanced'}
+      </Button>
       {showAdvanced && (
         <div className="space-y-3 border-l border-border pl-3">
           {orderType === 'MKT' && (
@@ -296,13 +305,13 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
       {p.error && <ErrorPanel message={p.error.message} phase={p.error.phase} />}
 
       <div className="pt-2">
-        <button
+        <Button
           onClick={handleSubmit}
           disabled={!canSubmit}
-          className="btn-primary w-full"
+          className="w-full"
         >
           {p.submitting ? 'Submitting…' : 'Place Order'}
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -450,18 +459,18 @@ function ContractPicker({
       </p>
 
       {selected && value && (
-        <div className="mt-2 flex min-w-0 items-start gap-2 rounded-lg border border-primary/30 bg-primary/[0.06] px-3 py-2">
-          <Check aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+        <div className="mt-2 flex min-w-0 items-start gap-2 rounded-lg border border-border bg-muted/35 px-3 py-2">
+          <span className="mt-0.5"><SelectionCheckIcon /></span>
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-1.5 text-[12px] font-medium text-foreground">
+            <div className="flex flex-wrap items-center gap-1.5 text-[12px] leading-[18px] font-medium text-foreground">
               <span>{contractLabel(selected)}</span>
               {selected.contract.secType && (
-                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                   {selected.contract.secType}
                 </span>
               )}
             </div>
-            <div className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground" title={value}>
+            <div className="mt-0.5 truncate font-mono text-[10px] leading-[14px] text-muted-foreground" title={value}>
               {value}
             </div>
           </div>
@@ -485,7 +494,7 @@ function ContractPicker({
               hit.contract.description,
               hit.contract.primaryExchange ?? hit.contract.exchange,
               hit.contract.currency,
-            ].filter(Boolean).join(' · ')
+            ].filter(Boolean).join(', ')
             return (
               <button
                 key={aliceId}
@@ -495,11 +504,11 @@ function ContractPicker({
               >
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-center gap-1.5">
-                    <span className="font-mono text-[13px] font-semibold text-foreground">
+                    <span className="font-mono text-[13px] leading-[18px] font-semibold text-foreground">
                       {contractLabel(hit)}
                     </span>
                     {hit.contract.secType && (
-                      <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-muted-foreground">
+                      <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                         {hit.contract.secType}
                       </span>
                     )}
@@ -517,13 +526,13 @@ function ContractPicker({
       )}
 
       {showNoMatches && (
-        <div id={resultsId} role="status" className="mt-2 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-[12px] text-muted-foreground">
+        <div id={resultsId} role="status" className="mt-2 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-[12px] leading-[18px] text-muted-foreground">
           No matching tradeable contract on this account.
         </div>
       )}
 
       {hasExactAliceId && selected === null && value && (
-        <div id={resultsId} role="status" className="mt-2 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-[11px] text-muted-foreground">
+        <div id={resultsId} role="status" className="mt-2 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-[11px] leading-[15px] text-muted-foreground">
           Exact aliceId entered. It will still be validated by the account before the order is staged.
         </div>
       )}
@@ -590,8 +599,8 @@ function CloseForm({ aliceId, initialQty, symbol, ...p }: SharedFormProps & { al
   return (
     <div className="space-y-4">
       <div className="rounded-md border border-border bg-secondary/50 px-3 py-2.5 space-y-1">
-        <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Closing</div>
-        <div className="font-mono text-[13px] text-foreground">{aliceId}</div>
+        <div className="text-[11px] font-medium text-muted-foreground">Closing</div>
+        <div className="font-mono text-[13px] leading-[18px] text-foreground">{aliceId}</div>
       </div>
 
       <WalletPicker subAccounts={p.subAccounts} value={subAccountId} onChange={setSubAccountId} />
@@ -629,13 +638,14 @@ function CloseForm({ aliceId, initialQty, symbol, ...p }: SharedFormProps & { al
       {p.error && <ErrorPanel message={p.error.message} phase={p.error.phase} />}
 
       <div className="pt-2">
-        <button
+        <Button
+          variant="destructive"
           onClick={handleSubmit}
           disabled={!canSubmit}
-          className="btn-danger w-full"
+          className="w-full"
         >
           {p.submitting ? 'Closing…' : 'Close Position'}
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -707,7 +717,7 @@ interface OpRow {
 function OpTable({ title, rows, kind }: { title: string; rows: OpRow[]; kind: 'submitted' | 'rejected' }) {
   return (
     <div>
-      <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">{title} ({rows.length})</p>
+      <p className="mb-1.5 text-[11px] font-medium text-muted-foreground">{title} ({rows.length})</p>
       <div className="rounded-md border border-border overflow-hidden">
         <table className="w-full text-[12px]">
           <thead>
@@ -721,7 +731,7 @@ function OpTable({ title, rows, kind }: { title: string; rows: OpRow[]; kind: 's
             {rows.map((r, i) => (
               <tr key={i} className="border-t border-border">
                 <td className="px-2.5 py-1.5 text-foreground">{r.action}</td>
-                <td className="px-2.5 py-1.5 font-mono text-muted-foreground text-[11px]">{r.orderId ?? '—'}</td>
+                <td className="px-2.5 py-1.5 font-mono text-muted-foreground text-[11px] leading-[15px]">{r.orderId ?? '—'}</td>
                 <td className={`px-2.5 py-1.5 ${kind === 'rejected' ? 'text-destructive' : 'text-foreground'}`}>
                   {kind === 'rejected' ? (r.error ?? r.status) : r.status}
                 </td>
@@ -740,7 +750,7 @@ function ErrorPanel({ message, phase }: { message: string; phase?: string }) {
   return (
     <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5">
       <div className="flex items-center gap-2 mb-1">
-        <span className="w-2 h-2 rounded-full bg-destructive shrink-0" />
+        <CircleAlert className="size-4 shrink-0 text-destructive" aria-hidden />
         <span className="text-[12px] font-medium text-destructive">
           {phase ? `Failed at ${phase} step` : 'Failed'}
         </span>
@@ -757,21 +767,10 @@ function Segmented({ value, options, onChange }: {
   options: Array<{ id: string; label?: string }>
   onChange: (v: string) => void
 }) {
-  return (
-    <div className="inline-flex rounded-md border border-border overflow-hidden">
-      {options.map((o) => (
-        <button
-          key={o.id}
-          onClick={() => onChange(o.id)}
-          className={`px-3 py-1.5 text-[12px] font-medium transition-colors ${
-            value === o.id
-              ? 'bg-primary/15 text-primary'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
-          }`}
-        >
-          {o.label ?? o.id}
-        </button>
-      ))}
-    </div>
-  )
+  return <SegmentedControl
+    value={value}
+    options={options.map((option) => ({ value: option.id, label: option.label ?? option.id }))}
+    onChange={onChange}
+    ariaLabel="Order option"
+  />
 }

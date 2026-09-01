@@ -17,7 +17,7 @@ describe('Broker Pack account gates', () => {
     const onInstall = vi.fn().mockResolvedValue(undefined)
     render(<BrokerSupportGate readiness={missing} onInstall={onInstall} onRetry={vi.fn()} />)
 
-    expect(screen.getByText(/account is still configured/i)).toBeTruthy()
+    expect(screen.getByText(/Runtime can load the configured account/i)).toBeTruthy()
     expect(onInstall).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Install' }))
     expect(onInstall).toHaveBeenCalledWith('ccxt')
@@ -30,6 +30,14 @@ describe('Broker Pack account gates', () => {
     expect(screen.getByText('Runtime offline')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
     expect(onRetry).toHaveBeenCalledOnce()
+  })
+
+  it('keeps compact account gates focused on the reason and action', () => {
+    render(<BrokerSupportGate readiness={missing} onInstall={vi.fn()} onRetry={vi.fn()} compact />)
+
+    expect(screen.queryByText('Broker support is not installed')).toBeNull()
+    expect(screen.getByText(/Runtime can load the configured account/i)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Install' })).toBeTruthy()
   })
 
   it('reports an install failure instead of leaking a rejected promise', async () => {
