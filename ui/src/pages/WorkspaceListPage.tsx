@@ -222,8 +222,8 @@ export function WorkspaceListPage() {
             className="mb-4 sm:mb-5"
           />
         )}
-        <div className="mb-4 flex items-baseline justify-between gap-4 sm:mb-6">
-          <h2 className="text-[18px] font-semibold text-foreground">{t('workspace.overviewTitle')}</h2>
+        <div className="mb-4 flex items-baseline justify-between gap-4 sm:mb-5">
+          <h2 className="text-[18px] font-semibold tracking-[-0.012em] text-foreground">{t('workspace.overviewTitle')}</h2>
           <span className="text-[12px] text-muted-foreground">
             {hasLoaded
               ? t(workspaces.length === 1 ? 'workspace.workspaceSingular' : 'workspace.workspacePlural', {
@@ -233,14 +233,14 @@ export function WorkspaceListPage() {
           </span>
         </div>
 
-        <div className="space-y-5 sm:space-y-7">
+        <div className="space-y-5 sm:space-y-6">
           {sections.map((sec) => (
             <section key={sec.key}>
-              <div className="mb-3 flex items-baseline gap-2">
-                <h3 className="text-[12px] font-semibold text-foreground/85 uppercase tracking-wider">
+              <div className="mb-2.5 flex items-baseline gap-2">
+                <h3 className="text-[12px] font-semibold text-foreground/85">
                   {sec.title}
                 </h3>
-                <span className="text-[11px] text-muted-foreground">· {sec.workspaces.length}</span>
+                <span className="text-[11px] tabular-nums text-muted-foreground">{sec.workspaces.length}</span>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2">
                 {sec.workspaces.map((w) => (
@@ -267,10 +267,10 @@ export function WorkspaceListPage() {
           {(departed.length > 0 || departedError) && (
             <section className="border-t border-border pt-6">
               <div className="mb-3 flex items-baseline gap-2">
-                <h3 className="text-[12px] font-semibold uppercase tracking-wider text-foreground/85">
+                <h3 className="text-[12px] font-semibold text-foreground/85">
                   {t('workspace.departedTitle')}
                 </h3>
-                <span className="text-[11px] text-muted-foreground">· {departed.length}</span>
+                <span className="text-[11px] tabular-nums text-muted-foreground">{departed.length}</span>
               </div>
               <p className="mb-3 max-w-2xl text-[12px] leading-relaxed text-muted-foreground">
                 {t('workspace.departedDescription')}

@@ -607,7 +607,7 @@ function UTACard({ uta, preset, health, equity, onClick }: {
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left rounded-lg border border-border bg-secondary/30 px-4 py-3 transition-all hover:border-muted-foreground/40 hover:bg-muted/20 ${isDisabled ? 'opacity-50' : ''}`}
+      className={`w-full rounded-lg border border-border bg-secondary/30 px-4 py-3 text-left transition-[border-color,background-color,opacity] hover:border-muted-foreground/40 hover:bg-muted/20 ${isDisabled ? 'opacity-50' : ''}`}
     >
       <div className="flex items-center gap-3">
         <span className={`text-[10px] font-bold px-2 py-1 rounded-md shrink-0 ${badge.color}`}>

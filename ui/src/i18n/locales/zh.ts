@@ -347,6 +347,12 @@ export const zh: Resources = {
   },
   settings: {
     title: '设置',
+    group: {
+      workspace: '工作区',
+      agents: '智能体',
+      operations: '运行',
+      connections: '连接',
+    },
     language: {
       title: '语言',
       description: '界面语言，立即生效。',
@@ -1683,7 +1689,6 @@ export const zh: Resources = {
     noMatches: '无匹配',
     watchlist: '自选',
     emptyWatchlistHint: '在详情页把资产固定到这里。',
-    fxEyebrow: '外汇工作台',
     fxTitle: '从现货、套息到宏观，集中在一个货币对视图。',
     fxDescription: '打开主要货币对，查看价格风险、利率与通胀分化、指示性远期，以及手动敞口情景；无需连接券商或银行账户。',
     fxGlobalTitle: '跨国宏观',
@@ -1692,7 +1697,6 @@ export const zh: Resources = {
     fxUsDescription: '美元、美债收益率曲线、通胀与就业信号。',
     fxFedTitle: '美联储政策',
     fxFedDescription: '资产负债表、交易商持仓与 FOMC 文件。',
-    overviewEyebrow: '市场脉搏',
     overviewTitle: '先看市场，而不是面对空白页。',
     overviewHint: '从当日异动、宏观环境、板块轮动或近期催化中选择一个实时看板。',
     removeFromWatchlist: '移除 {{symbol}}',

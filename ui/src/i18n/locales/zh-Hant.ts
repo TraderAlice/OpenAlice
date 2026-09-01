@@ -355,6 +355,12 @@ export const zhHant: Resources = {
   },
   settings: {
     title: '設定',
+    group: {
+      workspace: '工作區',
+      agents: '智慧體',
+      operations: '運行',
+      connections: '連接',
+    },
     language: {
       title: '語言',
       description: '介面語言，立即生效。',
@@ -1691,7 +1697,6 @@ export const zhHant: Resources = {
     noMatches: '無相符項目',
     watchlist: '自選',
     emptyWatchlistHint: '在詳細頁面將資產釘選到這裡。',
-    fxEyebrow: '外匯工作台',
     fxTitle: '從現貨、套利到宏觀，集中在一個貨幣對視圖。',
     fxDescription: '開啟主要貨幣對，查看價格風險、利率與通膨分歧、指示性遠期，以及手動曝險情境；無需連接券商或銀行帳戶。',
     fxGlobalTitle: '跨國宏觀',
@@ -1700,7 +1705,6 @@ export const zhHant: Resources = {
     fxUsDescription: '美元、美債殖利率曲線、通膨與就業訊號。',
     fxFedTitle: '聯準會政策',
     fxFedDescription: '資產負債表、交易商持倉與 FOMC 文件。',
-    overviewEyebrow: '市場脈搏',
     overviewTitle: '先看市場，而不是面對空白頁。',
     overviewHint: '從當日異動、宏觀環境、類股輪動或近期催化中選擇一個即時看板。',
     removeFromWatchlist: '移除 {{symbol}}',

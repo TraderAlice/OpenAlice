@@ -36,7 +36,7 @@ export function HarnessSettingsPage() {
         title={t('settings.harness.title')}
         description={t('settings.harness.description')}
       />
-      <SettingsScrollArea className="px-4 py-6 md:px-8">
+      <SettingsScrollArea className="px-4 py-5 md:px-8">
         <div className="mx-auto max-w-[880px]">
           <ConfigSection
             title={t('settings.harness.shared')}

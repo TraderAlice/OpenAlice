@@ -93,8 +93,8 @@ interface EmptyStateProps {
 
 export function EmptyState({ icon, title, description }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="w-12 h-12 rounded-xl bg-secondary border border-border/60 flex items-center justify-center text-muted-foreground/30 mb-4">
+    <div className="flex flex-col items-center justify-center px-4 py-14 text-center">
+      <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-muted-foreground/50">
         {icon ?? (
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -102,9 +102,9 @@ export function EmptyState({ icon, title, description }: EmptyStateProps) {
           </svg>
         )}
       </div>
-      <p className="text-sm font-medium text-muted-foreground">{title}</p>
+      <p className="text-[13px] font-medium text-foreground">{title}</p>
       {description && (
-        <p className="text-[12px] text-muted-foreground/60 mt-1.5 max-w-[280px]">{description}</p>
+        <p className="mt-1 max-w-[300px] text-[12px] leading-5 text-muted-foreground">{description}</p>
       )}
     </div>
   )
@@ -179,7 +179,7 @@ export function RefreshNotice({
   return (
     <div
       role="status"
-      className={`oa-status-surface flex flex-col gap-2 rounded-xl border border-border/70 bg-card/80 px-3 py-2.5 text-[12px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between ${className}`}
+      className={`oa-status-surface flex flex-col gap-2 rounded-lg border border-border/70 bg-card/80 px-3 py-2.5 text-[12px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between ${className}`}
     >
       <span className="flex min-w-0 items-start gap-2 leading-5">
         <AlertTriangle aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />

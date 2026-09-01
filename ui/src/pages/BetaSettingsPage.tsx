@@ -12,12 +12,9 @@ export function BetaSettingsPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <PageHeader title={t('settings.beta.title')} />
-      <SettingsScrollArea className="px-4 py-6 md:px-8">
+      <PageHeader title={t('settings.beta.title')} description={t('settings.beta.description')} />
+      <SettingsScrollArea className="px-4 py-5 md:px-8">
         <div className="mx-auto w-full max-w-[880px]">
-          <p className="mb-2 max-w-2xl text-[13px] leading-relaxed text-muted-foreground">
-            {t('settings.beta.description')}
-          </p>
           <ConfigSection
             title={t('settings.beta.office')}
             description={t('settings.beta.officeDescription')}

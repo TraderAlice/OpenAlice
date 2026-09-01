@@ -37,7 +37,7 @@ export function IssueSettingsPage() {
         title="Issue Settings"
         description="Defaults for scheduled issue runs and issue-owned headless work."
       />
-      <SettingsScrollArea className="px-4 py-6 md:px-8">
+      <SettingsScrollArea className="px-4 py-5 md:px-8">
         <div className="mx-auto max-w-[880px]">
           <ConfigSection
             title="Default agent runtime"

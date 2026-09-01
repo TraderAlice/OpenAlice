@@ -1046,7 +1046,7 @@ function ToolGroupCard({
         id={toolListId}
         aria-hidden={!expanded}
         inert={!expanded ? true : undefined}
-        className={`transition-all duration-150 ${
+        className={`transition-[max-height,opacity] duration-150 ${
           expanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
         } overflow-hidden`}
       >
@@ -1089,7 +1089,7 @@ export function SettingsPage() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader title={t('settings.category.general')} />
-      <SettingsScrollArea className="px-4 py-6 md:px-8">
+      <SettingsScrollArea className="px-4 py-5 md:px-8">
         <SettingsSection />
       </SettingsScrollArea>
     </div>
@@ -1101,12 +1101,12 @@ export function AppearanceSettingsPage() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <PageHeader title={t('settings.appearance.title')} />
-      <SettingsScrollArea className="px-4 py-6 md:px-8">
+      <PageHeader
+        title={t('settings.appearance.title')}
+        description={t('settings.appearance.description')}
+      />
+      <SettingsScrollArea className="px-4 py-5 md:px-8">
         <div className="mx-auto w-full max-w-[1100px]">
-          <p className="mb-4 max-w-2xl text-[13px] leading-relaxed text-muted-foreground">
-            {t('settings.appearance.description')}
-          </p>
           <AppearanceSection standalone />
         </div>
       </SettingsScrollArea>
@@ -1120,7 +1120,7 @@ export function ToolsSettingsPage() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader title={t('settings.category.tools')} />
-      <SettingsScrollArea className="px-4 py-6 md:px-8">
+      <SettingsScrollArea className="px-4 py-5 md:px-8">
         <ToolsSection />
       </SettingsScrollArea>
     </div>

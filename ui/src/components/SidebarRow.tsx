@@ -1,16 +1,16 @@
 import type { ReactNode } from 'react'
+import { SelectionIndicator } from './SelectionIndicator'
 
 interface SidebarRowProps {
-  /** Row label. ReactNode so callers can prepend sigils like `#` for chat channels. */
+  /** Row label. ReactNode supports sigils such as `#` for chat channels. */
   label: ReactNode
   /** Whether the row is the currently-active item in this sidebar. */
   active?: boolean
   /** Click handler for the row body. Trailing actions should `stopPropagation`. */
   onClick: () => void
   /**
-   * Optional leading glyph (shrink-0), e.g. an entity-type icon. Pass the
-   * fully-styled node — the row doesn't impose a size or colour so callers
-   * keep control (e.g. `<TrendingUp size={13} className="text-muted-foreground/70" />`).
+   * Optional leading glyph. Callers provide the styled node and the row owns
+   * its fixed optical slot.
    */
   icon?: ReactNode
   /**
@@ -30,14 +30,12 @@ interface SidebarRowProps {
  * Settings categories, Dev tabs, Portfolio accounts, etc.).
  *
  * Visual contract:
- * - Inactive rows render in full text colour, not muted, so they read as
- *   navigation items rather than paragraph copy.
- * - Active rows get a tinted background AND a 2px accent bar on the left
- *   edge — the bar makes "selected" unmistakable even at a glance.
+ * - Inactive rows render in full text colour for fast navigation scanning.
+ * - Active rows use a muted fill and the project-owned neutral selection mark.
  * - Hover state is a half-opacity tint of the active background.
  *
- * The element is a `div role="button"` rather than `<button>` so callers
- * can nest action buttons inside `trail` (HTML disallows nested buttons).
+ * The `div role="button"` owns row activation and lets `trail` contain action
+ * buttons within valid HTML.
  * Enter / Space activate the row for keyboard users.
  */
 export function SidebarRow({ label, active = false, onClick, icon, trail, title, dim = false }: SidebarRowProps) {
@@ -54,19 +52,14 @@ export function SidebarRow({ label, active = false, onClick, icon, trail, title,
           onClick()
         }
       }}
-      className={`oa-nav-row group relative flex min-h-10 items-center gap-1.5 px-3 py-2 text-[13px] cursor-pointer outline-none focus-visible:bg-muted/70 ${
+      className={`oa-nav-row group relative mx-2 flex min-h-10 cursor-pointer items-center gap-2 rounded-[8px] px-2 py-1.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/35 md:min-h-8 ${
         active
           ? 'bg-muted text-foreground'
           : 'text-foreground hover:bg-muted/50'
       } ${dim ? 'opacity-60' : ''}`}
     >
-      {active && (
-        <span
-          aria-hidden="true"
-          className="absolute left-0 top-0 bottom-0 w-[2px] bg-primary"
-        />
-      )}
-      {icon && <span className="shrink-0 flex items-center">{icon}</span>}
+      {active && <SelectionIndicator />}
+      {icon && <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center">{icon}</span>}
       <span className="truncate flex-1">{label}</span>
       {trail && <div className="shrink-0 flex items-center gap-0.5">{trail}</div>}
     </div>

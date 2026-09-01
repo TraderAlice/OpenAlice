@@ -58,7 +58,7 @@ export function SDKSelector(props: SDKSelectorProps) {
             disabled={isDisabled}
             onClick={handleClick}
             className={`
-              relative text-left rounded-lg border px-4 py-3.5 transition-all
+              relative rounded-lg border px-4 py-3.5 text-left transition-[border-color,background-color,box-shadow,opacity]
               ${isSelected
                 ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
                 : isDisabled

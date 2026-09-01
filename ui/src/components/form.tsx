@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 // ==================== Shared class constants ====================
 
 export const inputClass =
-  'w-full min-w-0 px-3 py-2 bg-background text-foreground border border-border rounded-lg font-sans text-sm outline-none transition-all duration-200 focus:border-primary/60 focus:shadow-[0_0_0_1px_var(--primary-muted)]'
+  'w-full min-w-0 rounded-md border border-border bg-background px-3 py-2 font-sans text-[13px] text-foreground outline-none transition-[border-color,background-color,box-shadow] duration-150 focus:border-primary/60 focus:shadow-[0_0_0_2px_var(--primary-muted)]'
 
 // ==================== Settings scroll area ====================
 
@@ -30,21 +30,6 @@ export function SettingsScrollArea({ children, className = '', scroll = true }: 
   )
 }
 
-// ==================== Card ====================
-
-interface CardProps {
-  children: ReactNode
-  className?: string
-}
-
-export function Card({ children, className = '' }: CardProps) {
-  return (
-    <div className={`bg-secondary/50 border border-border/60 rounded-xl p-5 transition-colors hover:border-primary/20 ${className}`}>
-      {children}
-    </div>
-  )
-}
-
 // ==================== Section ====================
 
 interface SectionProps {
@@ -56,23 +41,18 @@ interface SectionProps {
 
 export function Section({ id, title, description, children }: SectionProps) {
   return (
-    <Card>
-      <div id={id}>
-        <h3 className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-          {title}
-        </h3>
-        {description && (
-          <p className="text-[13px] text-muted-foreground/70 mb-4 leading-relaxed">{description}</p>
-        )}
-        {children}
-      </div>
-    </Card>
+    <section id={id} className="border-b border-border/60 py-5 last:border-b-0">
+      <h3 className="text-[14px] font-semibold text-foreground">{title}</h3>
+      {description && (
+        <p className="mt-1 max-w-2xl text-[12px] leading-5 text-muted-foreground">{description}</p>
+      )}
+      <div className="mt-4">{children}</div>
+    </section>
   )
 }
 
 // ==================== ConfigSection ====================
 
-/** Two-column settings layout once the whole app shell has genuine room. */
 interface ConfigSectionProps {
   title: ReactNode
   description?: string
@@ -89,8 +69,8 @@ export function ConfigSection({
   focusableTitle = false,
 }: ConfigSectionProps) {
   return (
-    <div className="grid min-w-0 grid-cols-1 gap-4 border-b border-border/60 py-6 last:border-b-0 xl:grid-cols-[240px_minmax(0,1fr)] xl:gap-10">
-      <div className="min-w-0 xl:pt-0.5">
+    <section className="min-w-0 border-b border-border/60 py-5 last:border-b-0">
+      <div className="mb-3 min-w-0">
         <h3
           id={titleId}
           tabIndex={focusableTitle ? -1 : undefined}
@@ -102,11 +82,11 @@ export function ConfigSection({
           {title}
         </h3>
         {description && (
-          <p className="text-[13px] text-muted-foreground/70 mt-1.5 leading-relaxed">{description}</p>
+          <p className="mt-1 max-w-2xl text-[12px] leading-5 text-muted-foreground">{description}</p>
         )}
       </div>
       <div className="min-w-0">{children}</div>
-    </div>
+    </section>
   )
 }
 

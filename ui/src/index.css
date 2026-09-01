@@ -954,21 +954,21 @@ html[lang="ja"] .oa-onboarding-title {
 .btn-primary {
   @apply px-4 py-2 text-[13px] font-medium rounded-lg
     bg-primary border border-primary text-primary-foreground
-    hover:bg-primary/90 transition-all active:scale-[0.98]
+    hover:bg-primary/90 transition-[color,background-color,border-color,box-shadow,transform] duration-150 active:scale-[0.98]
     disabled:opacity-40 disabled:cursor-default cursor-pointer
     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
 }
 
 .btn-secondary {
   @apply px-4 py-2 text-[13px] font-medium rounded-lg border border-border text-muted-foreground
-    hover:bg-muted hover:text-foreground transition-all active:scale-[0.98]
+    hover:bg-muted hover:text-foreground transition-[color,background-color,border-color,box-shadow,transform] duration-150 active:scale-[0.98]
     disabled:opacity-40 disabled:cursor-default cursor-pointer
     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
 }
 
 .btn-danger {
   @apply px-4 py-2 text-[13px] font-medium rounded-lg border border-destructive/30 text-destructive
-    hover:bg-destructive/10 transition-all active:scale-[0.98]
+    hover:bg-destructive/10 transition-[color,background-color,border-color,box-shadow,transform] duration-150 active:scale-[0.98]
     disabled:opacity-40 disabled:cursor-default cursor-pointer
     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
 }
@@ -976,14 +976,14 @@ html[lang="ja"] .oa-onboarding-title {
 .btn-primary-sm {
   @apply px-3 py-1.5 text-xs font-medium rounded-md
     bg-primary border border-primary text-primary-foreground
-    hover:bg-primary/90 transition-all active:scale-[0.98]
+    hover:bg-primary/90 transition-[color,background-color,border-color,box-shadow,transform] duration-150 active:scale-[0.98]
     disabled:opacity-40 disabled:cursor-default cursor-pointer
     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background;
 }
 
 .btn-secondary-sm {
   @apply px-3 py-1.5 text-xs font-medium rounded-md border border-border text-muted-foreground
-    hover:bg-muted hover:text-foreground transition-all active:scale-[0.98]
+    hover:bg-muted hover:text-foreground transition-[color,background-color,border-color,box-shadow,transform] duration-150 active:scale-[0.98]
     disabled:opacity-40 disabled:cursor-default cursor-pointer
     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background;
 }

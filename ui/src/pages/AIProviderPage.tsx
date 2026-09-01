@@ -122,7 +122,7 @@ export function AIProviderPage() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader title={t('aiProvider.title')} description={t('aiProvider.description')} />
-      <SettingsScrollArea className="px-4 py-6 md:px-8">
+      <SettingsScrollArea className="px-4 py-5 md:px-8">
         <div className="mx-auto grid min-w-0 max-w-[1100px] gap-6 2xl:grid-cols-2">
           {/* ============== Credentials ============== */}
           <section className="min-w-0">
@@ -230,7 +230,7 @@ export function AIProviderPage() {
               {credentials.length === 0 && (
                 <button
                   onClick={() => setModal({ mode: 'add' })}
-                  className="w-full p-4 rounded-xl border-2 border-dashed border-border text-muted-foreground hover:border-primary/50 hover:text-primary transition-all text-[13px] font-medium"
+                  className="w-full rounded-lg border border-dashed border-border p-4 text-[13px] font-medium text-muted-foreground transition-[color,border-color,background-color] hover:border-primary/50 hover:bg-primary/[0.035] hover:text-primary"
                 >
                   + {t('aiProvider.addFirst')}
                 </button>
@@ -249,7 +249,7 @@ export function AIProviderPage() {
           <button
             type="button"
             onClick={() => openOrFocus({ kind: 'settings', params: { category: 'agent-runtimes' } })}
-            className="oa-pressable mt-2 text-[12px] font-medium text-primary hover:underline"
+            className="oa-pressable mt-1 inline-flex min-h-10 items-center rounded-md text-[12px] font-medium text-primary hover:underline sm:min-h-8"
           >
             {t('aiProvider.openAgentRuntimes')}
           </button>
@@ -470,7 +470,7 @@ function WorkspaceDefaultsSection({
           )}
           {(agent.id === 'pi' || agent.id === 'opencode') && current && !selectedSemantics?.reasoning && (
             <details className="px-1 text-[10.5px] text-muted-foreground">
-              <summary className="cursor-pointer">{t('aiProvider.advancedReasoning')}</summary>
+              <summary className="inline-flex min-h-8 cursor-pointer items-center">{t('aiProvider.advancedReasoning')}</summary>
               <select
                 aria-label={t('aiProvider.reasoningOverrideLabel', { agent: agent.name })}
                 className={inputClass + ' mt-1.5'}
@@ -529,7 +529,7 @@ function WorkspaceDefaultsSection({
 
           <button
             onClick={() => setShowAdvanced((v) => !v)}
-            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors pt-1"
+            className="inline-flex min-h-10 items-center rounded-md pt-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground sm:min-h-8"
           >
             {showAdvanced ? '▾' : '▸'} {t('aiProvider.advancedAgents')}
           </button>

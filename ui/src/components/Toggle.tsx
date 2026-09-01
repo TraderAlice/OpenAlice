@@ -30,12 +30,12 @@ export function Toggle({ id, checked, onChange, size = 'md', ariaLabel, disabled
     >
       <span
         aria-hidden="true"
-        className={`relative block rounded-full transition-colors ${track} ${
+        className={`relative block rounded-full transition-colors duration-150 ${track} ${
           checked ? 'bg-primary' : 'bg-muted'
         }`}
       >
         <span
-          className={`absolute rounded-full transition-all ${thumb} ${
+          className={`absolute rounded-full transition-[transform,background-color] duration-150 ${thumb} ${
             checked ? `${translate} bg-primary-foreground` : 'bg-muted-foreground'
           }`}
         />

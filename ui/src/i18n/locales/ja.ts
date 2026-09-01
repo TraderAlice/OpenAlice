@@ -348,6 +348,12 @@ export const ja: Resources = {
   },
   settings: {
     title: '設定',
+    group: {
+      workspace: 'ワークスペース',
+      agents: 'エージェント',
+      operations: '運用',
+      connections: '接続',
+    },
     language: {
       title: '言語',
       description: 'インターフェースの言語。すぐに反映されます。',
@@ -1684,7 +1690,6 @@ export const ja: Resources = {
     noMatches: '一致なし',
     watchlist: 'ウォッチリスト',
     emptyWatchlistHint: '詳細ページから銘柄をここにピン留めできます。',
-    fxEyebrow: 'FX デスク',
     fxTitle: 'スポット、キャリー、マクロを一つの通貨ペア画面で。',
     fxDescription: '主要通貨ペアを開き、価格リスク、金利・インフレ格差、参考フォワード、手動エクスポージャーシナリオを確認できます。ブローカーや銀行口座との接続は不要です。',
     fxGlobalTitle: '国別マクロ',
@@ -1693,7 +1698,6 @@ export const ja: Resources = {
     fxUsDescription: 'ドル、米国債カーブ、インフレ、労働市場の指標。',
     fxFedTitle: 'FRB 政策',
     fxFedDescription: 'バランスシート、ディーラーポジション、FOMC 文書。',
-    overviewEyebrow: 'マーケット・パルス',
     overviewTitle: '空白ではなく、まず市場から始める。',
     overviewHint: '本日の値動き、マクロ環境、セクターローテーション、今後の材料からライブボードを開けます。',
     removeFromWatchlist: '{{symbol}} を削除',

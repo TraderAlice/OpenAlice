@@ -359,6 +359,12 @@ export const en = {
   },
   settings: {
     title: 'Settings',
+    group: {
+      workspace: 'Workspace',
+      agents: 'Agents',
+      operations: 'Operations',
+      connections: 'Connections',
+    },
     language: {
       title: 'Language',
       description: 'Interface language. Takes effect immediately.',
@@ -1716,7 +1722,6 @@ export const en = {
     noMatches: 'No matches',
     watchlist: 'Watchlist',
     emptyWatchlistHint: 'Pin assets here from a detail page.',
-    fxEyebrow: 'FX desk',
     fxTitle: 'From spot to carry and macro — in one pair view.',
     fxDescription: 'Open a major pair for price risk, rate and inflation divergence, indicative forwards, and a manual exposure scenario. No broker or bank-account connection required.',
     fxGlobalTitle: 'Cross-country macro',
@@ -1725,7 +1730,6 @@ export const en = {
     fxUsDescription: 'Dollar, Treasury curve, inflation and labor inputs.',
     fxFedTitle: 'Fed policy',
     fxFedDescription: 'Balance sheet, dealer positioning and FOMC documents.',
-    overviewEyebrow: 'Market pulse',
     overviewTitle: 'Start with the market, not an empty screen.',
     overviewHint: 'Open a live board for the day’s movement, macro regime, sector rotation, or upcoming catalysts.',
     removeFromWatchlist: 'Remove {{symbol}}',

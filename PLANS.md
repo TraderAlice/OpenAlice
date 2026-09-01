@@ -29,6 +29,10 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
+- [[plans/workbench-density-and-page-cohesion.md]] — Aligns shared page
+  structure, navigation density, state presentation, motion, and the densest
+  Workspaces, Market, and Settings surfaces with the workbench interaction
+  guide. This is the final page-cohesion increment for PR #1279.
 - [[plans/bun-cli-distribution.md]] — Replaces the expanded Node headless
   Runtime with a Bun-compiled, multi-process CLI distribution. Direct,
   npm/Bun, Homebrew, and AUR channels consume one accepted artifact set. The

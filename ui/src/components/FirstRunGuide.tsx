@@ -678,7 +678,7 @@ export function FirstRunGuide() {
                         type="button"
                         onClick={() => goToStep(index)}
                         disabled={locked}
-                        className={`h-2.5 rounded-full transition-all ${
+                        className={`h-2.5 rounded-full transition-[width,background-color,opacity] ${
                           index === activeStepIndex
                             ? 'w-8 bg-primary'
                             : locked

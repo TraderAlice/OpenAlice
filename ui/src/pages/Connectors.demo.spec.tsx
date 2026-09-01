@@ -626,9 +626,8 @@ describe('Connector demo routes', () => {
     expect(navigationButtons).toHaveLength(4)
     navigationButtons.forEach((button) => {
       expect(button.className).toContain('min-h-10')
-      expect(button.className).toContain('min-[380px]:min-h-12')
-      expect(button.className).toContain('min-[380px]:flex-col')
-      expect(button.className).toContain('sm:flex-row')
+      expect(button.className).toContain('items-center')
+      expect(button.className).toContain('justify-between')
     })
     const discordNavigation = within(navigation).getByRole('button', { name: /^Discord settings,/ })
     const slackNavigation = within(navigation).getByRole('button', { name: /^Slack settings,/ })

@@ -977,7 +977,7 @@ function HarnessSessionRoster(props: HarnessSessionRosterProps): ReactElement {
           <ChevronRight
             size={13}
             strokeWidth={2.2}
-            className="shrink-0 text-primary/65 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
+            className="shrink-0 text-primary/65"
             aria-hidden
           />
         </button>
@@ -1164,7 +1164,7 @@ function ManagerWorkspaceRow(props: ManagerWorkspaceRowProps): ReactElement {
           aria-current={props.isFocused && props.activeSessionId === null ? 'page' : undefined}
           className="oa-pressable relative flex min-w-0 flex-1 items-center gap-2.5 py-2.5 pl-1 pr-3 text-left"
         >
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-transform group-hover:scale-105">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary/15">
             <Network size={14} strokeWidth={2.1} />
           </span>
           <span className="min-w-0 flex-1">

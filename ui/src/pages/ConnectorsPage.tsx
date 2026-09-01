@@ -458,9 +458,9 @@ function ConnectorSettingsSurface({
                   title={t('connectorStatus.serviceTitle')}
                   description={t('connectorSettings.serviceDescription')}
                 >
-                  <div className="flex flex-col gap-4 rounded-xl border border-border/70 bg-card/70 px-4 py-3.5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-secondary/25 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex min-w-0 items-start gap-3">
-                      <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
                         <Power className="size-4" aria-hidden="true" />
                       </span>
                       <div className="min-w-0">
@@ -777,18 +777,15 @@ function ConnectorSectionNav({
     <nav
       ref={navigationRef}
       aria-label={t('connectorSettings.channelNavigation')}
-      className="mb-2 rounded-xl border border-border/70 bg-background/95 p-3 shadow-sm backdrop-blur-sm md:sticky md:top-0 md:z-20"
+      className="mb-2 border-y border-border/60 bg-background/95 py-2 backdrop-blur-sm md:sticky md:top-0 md:z-20"
     >
-      <div className="mb-2 flex items-center gap-2">
-        <ListChecks size={14} className="shrink-0 text-muted-foreground" aria-hidden />
-        <p className="text-[12px] font-semibold text-foreground">{t('connectorSettings.channelNavigation')}</p>
-        <p className="hidden text-[11.5px] text-muted-foreground sm:block">
-          {t('connectorSettings.channelNavigationDescription')}
-        </p>
+      <div className="mb-1.5 flex items-center gap-2 px-1">
+        <ListChecks size={13} className="shrink-0 text-muted-foreground" aria-hidden />
+        <p className="text-[12px] font-medium text-foreground">{t('connectorSettings.channelNavigation')}</p>
       </div>
       <div
         data-connector-channel-grid
-        className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-2 xl:grid-cols-4"
+        className="grid grid-cols-1 gap-1.5 min-[380px]:grid-cols-2 xl:grid-cols-4"
       >
         {definitions.map((definition) => {
           const adapter = config.adapters[definition.id] ?? emptyAdapter()
@@ -817,7 +814,7 @@ function ConnectorSectionNav({
                 name: definition.label,
                 status: badge,
               })}
-              className={`oa-pressable flex min-h-10 min-w-0 items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left min-[380px]:min-h-12 min-[380px]:flex-col min-[380px]:items-start min-[380px]:justify-center min-[380px]:gap-1 sm:min-h-10 sm:flex-row sm:items-center sm:justify-between sm:gap-2 ${active
+              className={`oa-pressable flex min-h-10 min-w-0 items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-left ${active
                 ? 'border-primary/40 bg-primary/[0.06] ring-1 ring-primary/10'
                 : 'border-border/70 bg-secondary/20 hover:border-primary/35 hover:bg-primary/[0.035]'
               }`}
@@ -916,13 +913,13 @@ function ConnectorPreferences({
   const fields = definition.fields.filter((field) => field.group === 'preferences')
   if (fields.length === 0) return null
   return (
-    <div className="space-y-3">
+    <div className="overflow-hidden rounded-lg border border-border/70 bg-background">
       {fields.map((field) => {
         const fieldLabel = t(`connectorSettings.fields.${field.key}`, { defaultValue: field.label })
         const value = adapter.settings[field.key]
         const checked = typeof value === 'boolean' ? value : field.defaultValue !== false
         return (
-          <section key={field.key} className="rounded-xl border border-border/70 bg-secondary/10 px-3.5 py-3">
+          <section key={field.key} className="border-b border-border/60 px-3.5 py-3 last:border-b-0">
             <div className="flex items-start justify-between gap-4">
               <div className="flex min-w-0 items-start gap-2.5">
                 <Send size={15} className="mt-0.5 shrink-0 text-muted-foreground" aria-hidden />
@@ -1102,7 +1099,7 @@ function ConnectorCredentialsEditor({
       ? t('connectorSettings.enterCredentialToSave')
       : t('connectorSettings.saveConnectionHint')
   return (
-    <section className="overflow-hidden rounded-xl border border-border/70 bg-secondary/10">
+    <section className="overflow-hidden rounded-lg border border-border/70 bg-background">
       <button
         type="button"
         aria-label={t(open
