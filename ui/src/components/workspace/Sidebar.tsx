@@ -15,7 +15,7 @@ import { CreateWorkspaceDialog } from './CreateWorkspaceDialog';
 import { WorkspaceOffboardingDialog } from './WorkspaceOffboardingDialog';
 import { Skeleton } from '../StateViews';
 import { sessionCoworkerLabel, workspaceDisplayName, workspaceDisplayTitle } from './display';
-import { orderSessionsForSidebar, orderWorkspacesForSidebar } from './sidebar-order';
+import { orderSessionsForSidebar, orderWorkspacesForSidebar, workspaceActivityMs } from './sidebar-order';
 import { useReorderMotion } from './useReorderMotion';
 import { SidebarActionMenu } from './SidebarActionMenu';
 import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon';
@@ -372,6 +372,9 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
     : w.sessions.length > 0
       ? 'bg-muted-foreground/40'
       : 'border border-border';
+  const activityLabel = t('workspace.activeAgo', {
+    time: formatRelativeTime(workspaceActivityMs(w)),
+  });
 
   return (
     <div data-reorder-id={props.reorderId}>
@@ -385,6 +388,7 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
           type="button"
           onClick={() => props.onSelectWorkspace(w.id)}
           title={workspaceDisplayTitle(w)}
+          aria-label={`${label}. ${activityLabel}`}
           aria-current={isSelected ? 'page' : undefined}
           className="flex-1 min-w-0 flex items-center gap-2 text-left"
         >
@@ -393,7 +397,12 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
             title={hasRunning ? t('workspace.runningCount', { count: runningCount }) : t('workspace.idle')}
           />
           <span className="truncate font-medium">{label}</span>
-          <span className="text-[10px] text-muted-foreground/50 tabular-nums shrink-0">{formatRelativeTime(w.createdAt)}</span>
+          <span
+            className="text-[10px] text-muted-foreground/50 tabular-nums shrink-0"
+            title={activityLabel}
+          >
+            {formatRelativeTime(workspaceActivityMs(w))}
+          </span>
         </button>
         {props.agents.length > 0 && (
           <div ref={spawnControlsRef} className="relative flex shrink-0 items-center">
