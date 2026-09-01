@@ -15,7 +15,7 @@ import { createHash, randomBytes } from 'node:crypto'
 
 // ==================== Types ====================
 
-export type BrokerEngine = 'ccxt' | 'alpaca' | 'ibkr' | 'leverup' | 'longbridge' | 'mock'
+export type BrokerEngine = 'ccxt' | 'alpaca' | 'ibkr' | 'leverup' | 'longbridge' | 'snaptrade' | 'mock'
 
 export interface ModeOption {
   id: string
@@ -494,6 +494,36 @@ export const SIMULATOR_PRESET: BrokerPresetDef = {
   isPaper: () => true,
 }
 
+/**
+ * SnapTrade deliberately exposes an observation-only adapter. The connection
+ * must have been created through SnapTrade OAuth beforehand and must report
+ * `type=read` plus `data_freshness_mode=realtime` during broker init.
+ */
+export const SNAPTRADE_PRESET: BrokerPresetDef = {
+  id: 'snaptrade',
+  label: 'SnapTrade (read-only)',
+  description: 'Read-only securities monitoring through SnapTrade. No order operation is available.',
+  category: 'recommended',
+  hint: 'Connect your broker in SnapTrade first. Enter the Personal API Client ID, Consumer Key, Connection ID, and the specific account ID. The adapter refuses disabled, delayed, or trade-enabled connections.',
+  defaultName: 'snaptrade-securities',
+  badge: 'ST',
+  badgeColor: 'text-info',
+  engine: 'snaptrade',
+  guardCategory: 'securities',
+  zodSchema: z.object({
+    clientId: z.string().min(1).describe('SnapTrade Client ID'),
+    consumerKey: z.string().min(1).describe('SnapTrade Consumer Key'),
+    authorizationId: z.string().min(1).describe('Connection ID'),
+    accountId: z.string().min(1).describe('Account ID'),
+    baseCurrency: z.string().length(3).default('USD').describe('Base Currency'),
+  }),
+  subtitleFields: [{ field: 'baseCurrency', prefix: 'SnapTrade · ' }],
+  writeOnlyFields: ['clientId', 'consumerKey'],
+  fingerprintFields: ['clientId', 'authorizationId', 'accountId'],
+  toEngineConfig: (d) => ({ clientId: d.clientId, consumerKey: d.consumerKey, authorizationId: d.authorizationId, accountId: d.accountId, baseCurrency: d.baseCurrency }),
+  isPaper: () => false,
+}
+
 // ==================== Catalog ====================
 
 // Order matters — the wizard renders presets top-down within each
@@ -507,6 +537,7 @@ export const BROKER_PRESET_CATALOG: BrokerPresetDef[] = [
   // prototype was modeled on its API).
   IBKR_PRESET,
   ALPACA_PRESET,
+  SNAPTRADE_PRESET,
   LONGBRIDGE_PRESET,
   HYPERLIQUID_PRESET,
   // ---- Crypto ----

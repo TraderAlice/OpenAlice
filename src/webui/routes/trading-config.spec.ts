@@ -134,7 +134,7 @@ describe('GET /broker-packs — optional engine requirements', () => {
     const { status, body } = await req(makeRoutes(), 'GET', '/broker-packs')
 
     expect(status).toBe(200)
-    expect((body as { packs: unknown[] }).packs).toHaveLength(6)
+    expect((body as { packs: unknown[] }).packs).toHaveLength(7)
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining('legacy-account'),
       expect.stringMatching(/unknown broker preset/i),
