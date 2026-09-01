@@ -12,10 +12,6 @@ import {
   Settings2,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import discordIcon from '../assets/connectors/discord.svg'
-import feishuIcon from '../assets/connectors/feishu.png'
-import slackIcon from '../assets/connectors/slack.svg'
-import telegramIcon from '../assets/connectors/telegram.png'
 import type {
   ConnectorDefinition,
   ConnectorHealth,
@@ -28,6 +24,8 @@ import { PageHeader } from '../components/PageHeader'
 import { SaveIndicator } from '../components/SaveIndicator'
 import { RecoverySurface, RefreshNotice, Skeleton } from '../components/StateViews'
 import { Toggle } from '../components/Toggle'
+import { ConnectorBrandMark } from '../components/ConnectorBrandMark'
+import { Button } from '../components/ui/button'
 import type { SaveStatus } from '../hooks/useAutoSave'
 import { ConnectorSettingsPanel } from './ConnectorsPage'
 import {
@@ -121,15 +119,17 @@ export function ConnectorStatusPage() {
                 })}
               </span>
             )}
-            <button
+            <Button
               type="button"
-              className="oa-pressable inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-[13px] text-muted-foreground hover:border-primary/50 hover:text-foreground disabled:opacity-50"
+              variant="outline"
+              size="lg"
+              className="text-[13px] text-muted-foreground"
               disabled={refreshing}
               onClick={() => void refreshConnectorHealth()}
             >
               <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
               {t('connectorStatus.refresh')}
-            </button>
+            </Button>
           </div>
         )}
       />
@@ -494,14 +494,16 @@ function AvailableConnectorGroup({
                 </div>
               </div>
             </div>
-            <button
+            <Button
               type="button"
-              className="oa-pressable inline-flex min-h-10 w-full shrink-0 items-center justify-center gap-2 rounded-md border border-transparent bg-transparent px-2.5 py-1.5 text-[12px] font-medium text-muted-foreground hover:bg-muted/65 hover:text-foreground sm:min-h-9 sm:w-auto"
+              variant="ghost"
+              size="lg"
+              className="min-h-10 w-full bg-transparent text-[12px] text-muted-foreground sm:min-h-9 sm:w-auto"
               onClick={(event) => onConfigure(definition.id, event.currentTarget)}
             >
               {t('connectorStatus.configureAdapter', { name: definition.label })}
               <ArrowRight size={13} aria-hidden />
-            </button>
+            </Button>
           </article>
         ))}
       </div>
@@ -612,27 +614,25 @@ function ConnectorOverviewCard({
         )}
         <div data-connector-card-actions className="flex flex-wrap items-center gap-2">
           {setup.stage === 'error' && (
-            <button
+            <Button
               type="button"
-              className="oa-pressable inline-flex min-h-10 items-center gap-2 rounded-md border border-primary bg-primary px-3 py-2 text-[12px] font-medium text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
+              className="min-h-10 px-3 text-[12px]"
               disabled={actionsBusy}
               onClick={() => void onReconnect(definition.id)}
             >
               <RefreshCw size={13} className={reconnecting ? 'animate-spin motion-reduce:animate-none' : ''} />
               {reconnecting ? t('connectorStatus.reconnecting') : t('connectorStatus.reconnect')}
-            </button>
+            </Button>
           )}
-          <button
+          <Button
             type="button"
-            className={`oa-pressable inline-flex min-h-10 items-center gap-2 rounded-md px-3 py-2 text-[12px] font-medium ${prioritizeConfiguration
-              ? 'border border-primary bg-primary text-primary-foreground shadow-sm hover:bg-primary/90'
-              : 'border border-border bg-background/50 text-foreground hover:border-primary/45 hover:text-primary'
-            }`}
+            variant={prioritizeConfiguration ? 'default' : 'outline'}
+            className={`min-h-10 px-3 text-[12px] ${prioritizeConfiguration ? '' : 'bg-background/50'}`}
             onClick={(event) => onConfigure(definition.id, event.currentTarget)}
           >
             <ActionIcon size={13} aria-hidden />
             {adapterActionLabel(setup.stage, definition.label, t)}
-          </button>
+          </Button>
         </div>
       </div>
       {(toggling || reconnecting) && (
@@ -778,30 +778,7 @@ function SummaryPill({ tone = 'neutral', children }: { tone?: 'neutral' | 'dange
 }
 
 function ConnectorGlyph({ id }: { id: string }) {
-  const brands: Record<string, { src: string; className: string }> = {
-    discord: { src: discordIcon, className: 'h-[21px] w-7' },
-    telegram: { src: telegramIcon, className: 'h-6 w-6' },
-    slack: { src: slackIcon, className: 'h-[23px] w-[23px]' },
-    feishu: { src: feishuIcon, className: 'h-6 w-6' },
-  }
-  const brand = brands[id]
-  return (
-    <span
-      data-connector-glyph
-      className="flex h-10 w-10 shrink-0 items-center justify-center text-muted-foreground"
-      aria-hidden
-    >
-      {brand ? (
-        <img
-          src={brand.src}
-          alt=""
-          data-connector-brand={id}
-          draggable={false}
-          className={`${brand.className} object-contain`}
-        />
-      ) : <Plug size={18} />}
-    </span>
-  )
+  return <ConnectorBrandMark id={id} className="size-10" />
 }
 
 function formatDate(value: string): string {

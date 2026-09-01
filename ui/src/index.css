@@ -79,6 +79,15 @@
     "Microsoft YaHei", "Hiragino Sans GB", "Noto Sans CJK SC", sans-serif;
   --font-mono: "SF Mono", "Fira Code", "Cascadia Code", Menlo, Consolas,
     monospace;
+
+  /* Compact workbench geometry. Composer and drawer silhouettes keep their
+     dedicated larger radii at the component boundary. */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-2xl: 12px;
+  --radius-3xl: 16px;
 }
 
 /* Base resolution (no attribute / explicit light). */
@@ -952,23 +961,23 @@ html[lang="ja"] .oa-onboarding-title {
 /* ==================== Button utility classes ==================== */
 
 .btn-primary {
-  @apply px-4 py-2 text-[13px] font-medium rounded-lg
+  @apply px-4 py-2 text-[13px] font-medium rounded-md
     bg-primary border border-primary text-primary-foreground
-    hover:bg-primary/90 transition-[color,background-color,border-color,box-shadow,transform] duration-150 active:scale-[0.98]
+    hover:bg-primary/90 transition-[color,background-color,border-color,box-shadow,transform] duration-[var(--motion-fast)] active:scale-[0.98]
     disabled:opacity-40 disabled:cursor-default cursor-pointer
     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
 }
 
 .btn-secondary {
-  @apply px-4 py-2 text-[13px] font-medium rounded-lg border border-border text-muted-foreground
-    hover:bg-muted hover:text-foreground transition-[color,background-color,border-color,box-shadow,transform] duration-150 active:scale-[0.98]
+  @apply px-4 py-2 text-[13px] font-medium rounded-md border border-border text-muted-foreground
+    hover:bg-muted hover:text-foreground transition-[color,background-color,border-color,box-shadow,transform] duration-[var(--motion-fast)] active:scale-[0.98]
     disabled:opacity-40 disabled:cursor-default cursor-pointer
     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
 }
 
 .btn-danger {
-  @apply px-4 py-2 text-[13px] font-medium rounded-lg border border-destructive/30 text-destructive
-    hover:bg-destructive/10 transition-[color,background-color,border-color,box-shadow,transform] duration-150 active:scale-[0.98]
+  @apply px-4 py-2 text-[13px] font-medium rounded-md border border-destructive/30 text-destructive
+    hover:bg-destructive/10 transition-[color,background-color,border-color,box-shadow,transform] duration-[var(--motion-fast)] active:scale-[0.98]
     disabled:opacity-40 disabled:cursor-default cursor-pointer
     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
 }
@@ -976,14 +985,14 @@ html[lang="ja"] .oa-onboarding-title {
 .btn-primary-sm {
   @apply px-3 py-1.5 text-xs font-medium rounded-md
     bg-primary border border-primary text-primary-foreground
-    hover:bg-primary/90 transition-[color,background-color,border-color,box-shadow,transform] duration-150 active:scale-[0.98]
+    hover:bg-primary/90 transition-[color,background-color,border-color,box-shadow,transform] duration-[var(--motion-fast)] active:scale-[0.98]
     disabled:opacity-40 disabled:cursor-default cursor-pointer
     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background;
 }
 
 .btn-secondary-sm {
   @apply px-3 py-1.5 text-xs font-medium rounded-md border border-border text-muted-foreground
-    hover:bg-muted hover:text-foreground transition-[color,background-color,border-color,box-shadow,transform] duration-150 active:scale-[0.98]
+    hover:bg-muted hover:text-foreground transition-[color,background-color,border-color,box-shadow,transform] duration-[var(--motion-fast)] active:scale-[0.98]
     disabled:opacity-40 disabled:cursor-default cursor-pointer
     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background;
 }
@@ -995,7 +1004,14 @@ html[lang="ja"] .oa-onboarding-title {
 }
 
 *[data-scrollbar-active],
-*:hover {
+:where(
+  [data-settings-scroll-area],
+  [data-scroll-surface],
+  [class*="overflow-auto"],
+  [class*="overflow-y-auto"],
+  [class*="overflow-x-auto"],
+  [class*="overflow-scroll"]
+):hover {
   scrollbar-color: color-mix(in srgb, var(--muted-foreground) 34%, transparent) transparent;
 }
 
@@ -1013,7 +1029,14 @@ html[lang="ja"] .oa-onboarding-title {
   background-clip: padding-box;
 }
 *[data-scrollbar-active]::-webkit-scrollbar-thumb,
-*:hover::-webkit-scrollbar-thumb {
+:where(
+  [data-settings-scroll-area],
+  [data-scroll-surface],
+  [class*="overflow-auto"],
+  [class*="overflow-y-auto"],
+  [class*="overflow-x-auto"],
+  [class*="overflow-scroll"]
+):hover::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--muted-foreground) 34%, transparent);
   background-clip: padding-box;
 }

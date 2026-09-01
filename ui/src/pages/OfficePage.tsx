@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { OfficeDrawerItem, OfficeFloorEmployee } from '../api/office'
+import { PageLoading, RecoverySurface, RefreshNotice } from '../components/StateViews'
 import { workspaceDisplayName } from '../components/workspace/display'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { useOfficeFloor } from '../hooks/useOfficeFloor'
@@ -35,7 +36,7 @@ export function OfficePage() {
   const [logOpen, setLogOpen] = useState(false)
   const logOriginRef = useRef<'menu' | 'operations'>('menu')
   const [rosterWorkspaceId, setRosterWorkspaceId] = useState<string | null>(null)
-  const { building, loading, error } = useOfficeFloor(asOfSeq)
+  const { building, loading, error, refresh } = useOfficeFloor(asOfSeq)
 
   const selectedSeat = useMemo(() => {
     if (!building || !selected) return null
@@ -138,6 +139,23 @@ export function OfficePage() {
     }
   }
 
+  if (loading && !building) {
+    return <div className="oa-office-page"><PageLoading /></div>
+  }
+
+  if (error && !building) {
+    return (
+      <div className="oa-office-page">
+        <RecoverySurface
+          title={t('office.loadFailed')}
+          description={error}
+          actionLabel={t('common.retry')}
+          onAction={() => void refresh()}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="oa-office-page">
       <div className="sr-only">
@@ -145,10 +163,12 @@ export function OfficePage() {
         <p>{t('office.description')}</p>
       </div>
       {error && (
-        <p role="alert" className="px-4 pt-3 text-sm text-destructive md:px-6">{t('office.loadFailed')}: {error}</p>
-      )}
-      {loading && !building && (
-        <p className="px-4 pt-3 text-sm text-muted-foreground md:px-6">{t('office.loadingFloor')}</p>
+        <RefreshNotice
+          message={`${t('office.loadFailed')}: ${error}`}
+          actionLabel={t('common.retry')}
+          onAction={() => void refresh()}
+          className="mx-4 mt-3 md:mx-6"
+        />
       )}
       {building && (
         <div className="oa-office-layout">

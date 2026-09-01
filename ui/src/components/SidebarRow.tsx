@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { SelectionIndicator } from './SelectionIndicator'
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 
 interface SidebarRowProps {
   /** Row label. ReactNode supports sigils such as `#` for chat channels. */
@@ -39,23 +40,22 @@ interface SidebarRowProps {
  * Enter / Space activate the row for keyboard users.
  */
 export function SidebarRow({ label, active = false, onClick, icon, trail, title, dim = false }: SidebarRowProps) {
-  return (
+  const row = (
     <div
       role="button"
       tabIndex={0}
       aria-current={active ? 'page' : undefined}
       onClick={onClick}
-      title={title}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()
           onClick()
         }
       }}
-      className={`oa-nav-row group relative mx-2 flex min-h-10 cursor-pointer items-center gap-2 rounded-[8px] px-2 py-1.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/35 md:min-h-8 ${
+      className={`oa-nav-row group relative mx-2 flex min-h-10 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[13px] leading-[18px] outline-none focus-visible:ring-2 focus-visible:ring-ring/45 md:min-h-8 ${
         active
-          ? 'bg-muted text-foreground'
-          : 'text-foreground hover:bg-muted/50'
+          ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+          : 'text-sidebar-foreground hover:bg-sidebar-accent/60'
       } ${dim ? 'opacity-60' : ''}`}
     >
       {active && <SelectionIndicator />}
@@ -63,5 +63,12 @@ export function SidebarRow({ label, active = false, onClick, icon, trail, title,
       <span className="truncate flex-1">{label}</span>
       {trail && <div className="shrink-0 flex items-center gap-0.5">{trail}</div>}
     </div>
+  )
+  if (!title) return row
+  return (
+    <Tooltip>
+      <TooltipTrigger render={row} />
+      <TooltipContent side="right" sideOffset={8}>{title}</TooltipContent>
+    </Tooltip>
   )
 }

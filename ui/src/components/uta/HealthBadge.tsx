@@ -31,7 +31,7 @@ export function HealthBadge({ health, size = 'sm' }: { health?: BrokerHealthInfo
       return pill(
         'text-success',
         'bg-success',
-        health.tier === 'data' ? 'Data source' : health.tier === 'account' ? 'Connected · read-only' : 'Connected',
+        health.tier === 'data' ? 'Data source' : health.tier === 'account' ? 'Connected, read-only' : 'Connected',
       )
     case 'degraded':
       // Reachable but below target — e.g. transport up but account-read failing.

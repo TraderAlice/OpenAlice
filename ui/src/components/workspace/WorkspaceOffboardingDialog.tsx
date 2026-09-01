@@ -2,6 +2,9 @@ import { useEffect, useState, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Dialog } from '../uta/Dialog'
+import { Button } from '../ui/button'
+import { inputClass } from '../form'
+import { Textarea } from '../ui/textarea'
 import {
   getWorkspaceOffboardingAssessment,
   offboardWorkspace,
@@ -88,7 +91,7 @@ export function WorkspaceOffboardingDialog({
             )}
 
             <div>
-              <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">
+              <div className="mb-2 text-[11px] font-medium text-muted-foreground/70">
                 {t('workspace.offboardHandoffSnapshot')}
               </div>
               <div className="grid grid-cols-2 gap-2 text-[12px] sm:grid-cols-3">
@@ -109,19 +112,19 @@ export function WorkspaceOffboardingDialog({
             value={reason}
             onChange={(event) => setReason(event.target.value)}
             disabled={busy}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none transition-colors placeholder:text-muted-foreground/50 focus:border-primary"
+            className={inputClass}
             placeholder={t('workspace.offboardReasonPlaceholder')}
           />
         </label>
 
         <label className="block">
           <span className="mb-1.5 block text-[12px] font-medium text-foreground">{t('workspace.offboardNotes')}</span>
-          <textarea
+          <Textarea
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
             disabled={busy}
             rows={4}
-            className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none transition-colors placeholder:text-muted-foreground/50 focus:border-primary"
+            className="min-h-24 resize-y"
             placeholder={t('workspace.offboardNotesPlaceholder')}
           />
         </label>
@@ -130,17 +133,16 @@ export function WorkspaceOffboardingDialog({
       </div>
 
       <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
-        <button type="button" onClick={onClose} disabled={busy} className="btn-secondary">
+        <Button variant="outline" onClick={onClose} disabled={busy}>
           {t('createWorkspace.cancel')}
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="destructive"
           onClick={() => void submit()}
           disabled={busy || !assessment?.canOffboard || !reason.trim()}
-          className="btn-danger"
         >
           {busy ? t('workspace.offboardWorking') : t('workspace.offboardConfirm')}
-        </button>
+        </Button>
       </div>
     </Dialog>
   )

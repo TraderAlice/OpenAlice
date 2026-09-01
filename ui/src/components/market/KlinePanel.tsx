@@ -14,6 +14,7 @@ import { barsApi, type AssetClass, type HistoricalBar, type BarSourceCandidate, 
 import { readSemanticColor } from '../../theme/semanticColors'
 import { useEffectivePalette, useEffectiveTheme } from '../../theme/useEffectiveTheme'
 import { Skeleton } from '../StateViews'
+import { SegmentedControl } from '../SegmentedControl'
 
 export type KlineInterval = '1m' | '5m' | '1h' | '1d'
 export type KlineTimeframe = '1D' | '5D' | '1M' | '3M' | '1Y' | '5Y' | 'All'
@@ -288,7 +289,7 @@ export function KlinePanel({ selection, source, onSnapshot }: Props) {
 
   const title = useMemo(() => {
     if (!selectionSymbol || !selectionAssetClass) return 'Select a symbol'
-    return `${selectionSymbol} · ${selectionAssetClass}`
+    return `${selectionSymbol} ${selectionAssetClass}`
   }, [selectionSymbol, selectionAssetClass])
 
   // Source options for the picker — always include the currently-shown provider
@@ -308,31 +309,31 @@ export function KlinePanel({ selection, source, onSnapshot }: Props) {
           <span className="text-[13px] font-medium text-foreground truncate">{title}</span>
           {meta && (
             <span
-              className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium"
+              className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground"
               title={`Provider: ${meta.barId}${meta.barCapability ? ` (${meta.barCapability})` : ''}`}
             >
-              {meta.sourceId}{meta.barCapability ? ` · ${meta.barCapability}` : ''}
+              <span>{meta.sourceId}</span>{meta.barCapability && <span>{meta.barCapability}</span>}
             </span>
           )}
           {bars && bars.length > 0 && (
             <span className="text-[11px] text-muted-foreground/60 truncate">
-              {bars.length} bars · {bars[0].date} → {bars[bars.length - 1].date}
+              {bars.length} bars, {bars[0].date} → {bars[bars.length - 1].date}
             </span>
           )}
         </div>
         <div className="flex items-center gap-5 flex-wrap">
           {sourceOptions.length > 1 && (
             <label className="flex items-center gap-2">
-              <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70">Source</span>
+              <span className="text-[11px] font-medium text-muted-foreground/70">Source</span>
               <select
                 value={selectedBarId ?? meta?.barId ?? ''}
                 onChange={(e) => setSelectedBarId(e.target.value || null)}
-                className="bg-muted border border-border rounded px-2 py-1 text-[12px] text-foreground cursor-pointer max-w-[240px]"
+                className="max-w-[240px] cursor-pointer rounded-md border border-border bg-background px-2 py-1 text-[12px] text-foreground"
                 title="Which provider's K-line to show — sources are never merged; you pick"
               >
                 {sourceOptions.map((c) => (
                   <option key={c.barId} value={c.barId}>
-                    {c.sourceId} · {c.symbol}{c.barCapability ? ` (${c.barCapability})` : ''}
+                    {c.sourceId}, {c.symbol}{c.barCapability ? ` (${c.barCapability})` : ''}
                   </option>
                 ))}
               </select>
@@ -340,54 +341,34 @@ export function KlinePanel({ selection, source, onSnapshot }: Props) {
           )}
           <div
             className="flex items-center gap-2"
-            role="group"
-            aria-label="Interval"
             title="Candle width (how much time each bar covers)"
           >
-            <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70">Interval</span>
-            <div className="flex border border-border rounded overflow-hidden">
-              {INTERVALS.map((iv, i) => (
-                <button
-                  key={iv}
-                  type="button"
-                  onClick={() => selectInterval(iv)}
-                  aria-pressed={interval === iv}
-                  className={`px-2 py-1 text-[12px] transition-colors cursor-pointer ${
-                    i > 0 ? 'border-l border-border' : ''
-                  } ${interval === iv ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                >
-                  {iv}
-                </button>
-              ))}
-            </div>
+            <span className="text-[11px] font-medium text-muted-foreground/70">Interval</span>
+            <SegmentedControl
+              value={interval}
+              options={INTERVALS.map((value) => ({ value, label: value }))}
+              onChange={selectInterval}
+              ariaLabel="Interval"
+              compact
+            />
           </div>
           <div
             className="flex items-center gap-2"
-            role="group"
-            aria-label="Range"
             title="How far back to load history"
           >
-            <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70">Range</span>
-            <div className="flex border border-border rounded overflow-hidden">
-              {TIMEFRAMES.map((t, i) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setTf(t)}
-                  aria-pressed={tf === t}
-                  className={`px-2 py-1 text-[12px] transition-colors cursor-pointer ${
-                    i > 0 ? 'border-l border-border' : ''
-                  } ${tf === t ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
+            <span className="text-[11px] font-medium text-muted-foreground/70">Range</span>
+            <SegmentedControl
+              value={tf}
+              options={TIMEFRAMES.map((value) => ({ value, label: value }))}
+              onChange={setTf}
+              ariaLabel="Range"
+              compact
+            />
           </div>
         </div>
       </div>
 
-      <div className="relative flex-1 min-h-0 border border-border rounded bg-secondary/30">
+      <div className="relative min-h-0 flex-1 rounded-lg border border-border bg-card">
         <div ref={containerRef} className="absolute inset-0" />
         {!selection && (
           <div className="absolute inset-0 flex items-center justify-center text-[13px] text-muted-foreground">

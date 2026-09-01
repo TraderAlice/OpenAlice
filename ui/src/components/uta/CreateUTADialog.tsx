@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { ArrowLeft, CheckCircle2, CircleAlert, X } from 'lucide-react'
 
 import { api } from '../../api'
 import type { AccountInfo, BrokerPackStatus, BrokerPreset, Position, TestConnectionResult, UTAConfig } from '../../api/types'
@@ -6,6 +7,7 @@ import type { SDKOption } from '../SDKSelector'
 import { SDKSelector } from '../SDKSelector'
 import { Toggle } from '../Toggle'
 import { Field, inputClass } from '../form'
+import { Button } from '../ui/button'
 import { useSchemaForm } from '../../hooks/useSchemaForm'
 import { Dialog } from './Dialog'
 import { SchemaFormFields } from './SchemaFormFields'
@@ -187,20 +189,20 @@ export function CreateUTADialog({
   }
 
   const headerLabel =
-    step === 'pick'   ? 'Connect Broker · Pick Platform' :
-    step === 'install' ? `Connect Broker · Install ${preset?.label ?? ''}` :
-    step === 'config' ? `Connect Broker · Configure ${preset?.label ?? ''}` :
-                        `Connect Broker · Test ${preset?.label ?? ''}`
+    step === 'pick' ? 'Connect broker — Choose platform' :
+    step === 'install' ? `Connect broker — Install ${preset?.label ?? ''}` :
+    step === 'config' ? `Connect broker — Configure ${preset?.label ?? ''}` :
+                        `Connect broker — Test ${preset?.label ?? ''}`
 
   const escapeButton = escapeAction ? (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
+      size="sm"
       onClick={() => { void escapeAction.onClick() }}
       disabled={escapeAction.disabled}
-      className="rounded-md px-3 py-2 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
     >
       {escapeAction.label}
-    </button>
+    </Button>
   ) : null
 
   return (
@@ -208,13 +210,11 @@ export function CreateUTADialog({
       <div className="shrink-0 px-6 py-4 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0">
           <h3 className="text-[14px] font-semibold text-foreground truncate">{headerLabel}</h3>
-          <StepDots current={step} />
+          <StepProgress current={step} />
         </div>
-        <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1 transition-colors" aria-label="Close broker setup">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg>
-        </button>
+        <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close broker setup">
+          <X aria-hidden />
+        </Button>
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 py-6">
@@ -267,12 +267,14 @@ export function CreateUTADialog({
                 showSecrets={showSecrets}
               />
               {hasSensitive && (
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setShowSecrets(!showSecrets)}
-                  className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                  className="px-0 text-muted-foreground hover:bg-transparent"
                 >
                   {showSecrets ? 'Hide secrets' : 'Show secrets'}
-                </button>
+                </Button>
               )}
               {error && <p className="text-[12px] text-destructive">{error}</p>}
             </div>
@@ -298,37 +300,36 @@ export function CreateUTADialog({
 
       <div className="shrink-0 flex items-center justify-between gap-3 px-6 py-4 border-t border-border">
         <div className="flex min-w-0 items-center gap-2">
-          {step === 'pick' && <button onClick={onClose} className="btn-secondary">Cancel</button>}
-          {step === 'install' && <button onClick={() => setStep('pick')} className="btn-secondary">← Back</button>}
-          {step === 'config' && <button onClick={() => setStep('pick')} className="btn-secondary">← Back</button>}
-          {step === 'test' && <button onClick={() => setStep('config')} className="btn-secondary">← Back</button>}
+          {step === 'pick' && <Button variant="outline" onClick={onClose}>Cancel</Button>}
+          {step === 'install' && <Button variant="outline" onClick={() => setStep('pick')}><ArrowLeft aria-hidden />Back</Button>}
+          {step === 'config' && <Button variant="outline" onClick={() => setStep('pick')}><ArrowLeft aria-hidden />Back</Button>}
+          {step === 'test' && <Button variant="outline" onClick={() => setStep('config')}><ArrowLeft aria-hidden />Back</Button>}
           {escapeButton}
         </div>
         <div className="flex shrink-0 items-center justify-end">
-          {step === 'pick' && <span className="text-[11px] text-muted-foreground">Pick a platform to continue</span>}
           {step === 'install' && (
             packStatuses === null ? (
               <span className="text-[11px] text-muted-foreground">Checking installed support…</span>
             ) : (
-              <button onClick={() => { void handleInstallPack() }} disabled={installingPack} className="btn-primary">
+              <Button onClick={() => { void handleInstallPack() }} disabled={installingPack}>
                 {installingPack ? 'Installing…' : packStatus?.source === 'broken' ? 'Repair support' : `Install ${preset?.label ?? 'broker'} support`}
-              </button>
+              </Button>
             )
           )}
           {step === 'config' && (
-            <button onClick={handleTest} disabled={testing} className="btn-primary">
-              {testing ? 'Testing...' : 'Test Connection →'}
-            </button>
+            <Button onClick={handleTest} disabled={testing}>
+              {testing ? 'Testing…' : 'Test connection'}
+            </Button>
           )}
           {step === 'test' && (
             conflict ? (
-              <button onClick={() => onOpenExisting(conflict.existing.id)} className="btn-primary">
+              <Button onClick={() => onOpenExisting(conflict.existing.id)}>
                 Open existing
-              </button>
+              </Button>
             ) : testResult?.success ? (
-              <button onClick={handleSave} disabled={saving} className="btn-primary">
-                {saving ? 'Saving...' : 'Save connector'}
-              </button>
+              <Button onClick={handleSave} disabled={saving}>
+                {saving ? 'Saving…' : 'Save connector'}
+              </Button>
             ) : (
               <span className="text-[11px] text-muted-foreground">Fix the config and try again</span>
             )
@@ -341,25 +342,18 @@ export function CreateUTADialog({
 
 function PickerSectionHeader({ title }: { title: string }) {
   return (
-    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+    <p className="text-[12px] font-medium text-muted-foreground">
       {title}
     </p>
   )
 }
 
-function StepDots({ current }: { current: WizardStep }) {
+function StepProgress({ current }: { current: WizardStep }) {
   const order: WizardStep[] = ['pick', 'install', 'config', 'test']
   return (
-    <div className="flex items-center gap-1.5">
-      {order.map((s) => (
-        <span
-          key={s}
-          className={`w-1.5 h-1.5 rounded-full transition-colors ${
-            s === current ? 'bg-primary' : 'bg-border'
-          }`}
-        />
-      ))}
-    </div>
+    <span className="text-[11px] tabular-nums text-muted-foreground">
+      Step {order.indexOf(current) + 1} of {order.length}
+    </span>
   )
 }
 
@@ -371,16 +365,11 @@ function BrokerPackInstallPanel({ preset, status, error }: {
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-border bg-secondary/40 px-4 py-4">
-        <div className="flex items-start gap-3">
-          <span className={`mt-0.5 flex h-8 w-8 items-center justify-center rounded-md text-[11px] font-semibold ${preset.badgeColor} ${preset.badgeColor.replace('text-', 'bg-')}/10`}>
-            {preset.badge}
-          </span>
-          <div className="min-w-0">
-            <div className="text-[13px] font-medium text-foreground">Install {preset.label} support</div>
-            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-              OpenAlice installs broker integrations separately so the desktop app stays small and unused SDKs never load at startup.
-            </p>
-          </div>
+        <div className="min-w-0">
+          <div className="text-[13px] font-medium text-foreground">Install {preset.label} support</div>
+          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+            OpenAlice installs the broker integration on demand and loads it when this account connects.
+          </p>
         </div>
       </div>
       <div className="rounded-md border border-border px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
@@ -415,7 +404,7 @@ function BrokerConflictPanel({ existing, onOpenExisting }: {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <span className="w-2 h-2 rounded-full bg-warning shrink-0" />
+        <CircleAlert className="size-4 shrink-0 text-warning" aria-hidden />
         <span className="text-[13px] font-medium text-foreground">Broker already configured</span>
       </div>
       <div className="rounded-md border border-warning/30 bg-warning/5 px-3 py-2.5">
@@ -429,9 +418,9 @@ function BrokerConflictPanel({ existing, onOpenExisting }: {
         </p>
       </div>
       <p className="text-[11px] text-muted-foreground">
-        Click <strong className="text-foreground">Open existing</strong> to use it, or <strong className="text-foreground">← Back</strong> to point this connector at a different account.
+        Open the existing connector or go back and enter another account.
       </p>
-      <button onClick={onOpenExisting} className="btn-secondary w-full">Open existing connector</button>
+      <Button variant="outline" onClick={onOpenExisting} className="w-full">Open existing connector</Button>
     </div>
   )
 }
@@ -441,14 +430,14 @@ function TestResultPanel({ result, utaId }: { result: TestConnectionResult; utaI
     return (
       <div className="space-y-3">
         <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-destructive shrink-0" />
+          <CircleAlert className="size-4 shrink-0 text-destructive" aria-hidden />
           <span className="text-[13px] font-medium text-destructive">Connection failed</span>
         </div>
         <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5">
           <p className="text-[12px] text-foreground leading-relaxed whitespace-pre-wrap">{result.error ?? 'Unknown error'}</p>
         </div>
         <p className="text-[11px] text-muted-foreground">
-          Click <strong className="text-foreground">← Back</strong> to fix the configuration and try again.
+          Go back, update the configuration, and test the connection again.
         </p>
       </div>
     )
@@ -462,7 +451,7 @@ function TestResultPanel({ result, utaId }: { result: TestConnectionResult; utaI
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
-        <span className="w-2 h-2 rounded-full bg-success shrink-0" />
+        <CheckCircle2 className="size-4 shrink-0 text-success" aria-hidden />
         <span className="text-[13px] font-medium text-success">Connected as {utaId}</span>
       </div>
 
@@ -486,7 +475,7 @@ function TestResultPanel({ result, utaId }: { result: TestConnectionResult; utaI
       )}
 
       <div>
-        <p className="text-[12px] font-medium text-muted-foreground uppercase tracking-wide mb-2">
+        <p className="mb-2 text-[12px] font-medium text-muted-foreground">
           Positions ({positions.length})
         </p>
         {positions.length === 0 ? (

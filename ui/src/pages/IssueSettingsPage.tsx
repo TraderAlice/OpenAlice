@@ -33,15 +33,12 @@ export function IssueSettingsPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <PageHeader
-        title="Issue Settings"
-        description="Defaults for scheduled issue runs and issue-owned headless work."
-      />
+      <PageHeader title="Issue Settings" />
       <SettingsScrollArea className="px-4 py-5 md:px-8">
         <div className="mx-auto max-w-[880px]">
           <ConfigSection
             title="Default agent runtime"
-            description="Used when an issue does not set its own agent frontmatter. Explicit issue runtime overrides still win."
+            description="Applied to scheduled and headless issue runs whose frontmatter omits an agent runtime."
           >
             <Field
               label="Agent runtime"
@@ -66,7 +63,7 @@ export function IssueSettingsPage() {
                     value={issueDefaultAgent ?? ''}
                     disabled={status === 'saving'}
                     onChange={(event) => void save(event.target.value || null)}
-                    className={`${inputClass} pl-9`}
+                    className={`${inputClass} h-8 py-1.5 pl-9`}
                   >
                     <option value="">Use each Workspace default</option>
                     {runtimeAgents.map((agent) => (

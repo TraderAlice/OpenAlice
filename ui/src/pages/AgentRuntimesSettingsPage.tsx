@@ -4,7 +4,7 @@ import { ArrowDown, ArrowUp, RefreshCw } from 'lucide-react'
 
 import { ConfigSection, SettingsScrollArea, inputClass } from '../components/form'
 import { PageHeader } from '../components/PageHeader'
-import { PageLoading } from '../components/StateViews'
+import { EmptyState, PageLoading } from '../components/StateViews'
 import { Button } from '../components/ui/button'
 import { Toggle } from '../components/Toggle'
 import { installHintFor } from '../components/workspace/agentInstall'
@@ -125,10 +125,7 @@ export function AgentRuntimesSettingsPage() {
   if (loading && catalog.length === 0 && !error) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
-        <PageHeader
-          title={t('settings.agentRuntimes.title')}
-          description={t('settings.agentRuntimes.description')}
-        />
+        <PageHeader title={t('settings.agentRuntimes.title')} />
         <PageLoading />
       </div>
     )
@@ -138,7 +135,6 @@ export function AgentRuntimesSettingsPage() {
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
         title={t('settings.agentRuntimes.title')}
-        description={t('settings.agentRuntimes.description')}
         right={(
           <Button
             variant="outline"
@@ -164,14 +160,16 @@ export function AgentRuntimesSettingsPage() {
             description={t('settings.agentRuntimes.quickAccessDescription')}
           >
             {pinned.length === 0 ? (
-              <p className="text-[13px] text-muted-foreground">{t('settings.agentRuntimes.quickAccessEmpty')}</p>
+              <div className="[&>div]:py-8">
+                <EmptyState title={t('settings.agentRuntimes.quickAccessEmpty')} />
+              </div>
             ) : (
               <ol className="overflow-hidden rounded-lg border border-border/70 bg-background">
                 {pinned.map((agent, index) => {
                   return (
                     <li
                       key={agent.id}
-                      className="flex min-w-0 items-center gap-2 border-b border-border/60 px-3 py-2 last:border-b-0"
+                      className="flex min-h-12 min-w-0 items-center gap-2 border-b border-border/60 px-3 py-2 last:border-b-0"
                     >
                       <span className="w-5 shrink-0 text-[11px] tabular-nums text-muted-foreground">{index + 1}</span>
                       <AgentRuntimeIcon agentId={agent.id} className="h-4 w-4 shrink-0" />
@@ -219,14 +217,15 @@ export function AgentRuntimesSettingsPage() {
               onChange={(event) => setQuery(event.target.value)}
               placeholder={t('settings.agentRuntimes.search')}
               aria-label={t('settings.agentRuntimes.search')}
-              className={`${inputClass} mb-3`}
+              className={`${inputClass} mb-3 h-8 py-1.5`}
             />
             {visible.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-[12px] text-muted-foreground">
-                {catalog.length === 0
+              <div className="rounded-lg border border-dashed border-border">
+                <EmptyState title={catalog.length === 0
                   ? t('settings.agentRuntimes.emptyCatalog')
                   : t('settings.agentRuntimes.noMatches', { query })}
-              </p>
+                />
+              </div>
             ) : (
               <div className="overflow-hidden rounded-lg border border-border/70 bg-background">
                 {visible.map((agent) => (

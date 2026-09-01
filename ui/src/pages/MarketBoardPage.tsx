@@ -6,6 +6,8 @@ import { useReferenceBoard } from '../components/market/useReferenceBoard'
 import { BoardMeta } from '../components/market/BoardMeta'
 import { PageHeader } from '../components/PageHeader'
 import { CenteredLoading } from '../components/StateViews'
+import { Button } from '../components/ui/button'
+import { inputClass } from '../components/form'
 import { SeriesCard } from '../components/market/SeriesCard'
 import { MeasuredChartFrame } from '../components/MeasuredChartFrame'
 import {
@@ -75,25 +77,23 @@ function MoversBoardView() {
           aria-label={t('market.boardMovers')}
         >
           {(['gainers', 'losers', 'active', 'undervaluedGrowth', 'growthTech', 'smallCaps', 'undervaluedLarge'] as const).map((k) => (
-            <button
+            <Button
               key={k}
               type="button"
               onClick={() => setList(k)}
               aria-pressed={list === k}
-              className={`shrink-0 whitespace-nowrap px-3 py-1 rounded-md text-[12px] font-medium transition-colors ${
-                list === k
-                  ? 'bg-muted text-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
-              }`}
+              className="shrink-0 whitespace-nowrap text-[12px]"
+              variant={list === k ? 'secondary' : 'ghost'}
+              size="sm"
             >
               {t(listLabelKey(k))}
-            </button>
+            </Button>
           ))}
         </div>
 
         {loading && !data && <CenteredLoading label={t('common.loading')} />}
         {error && (
-          <div className="text-[13px] text-destructive border border-destructive/30 rounded-md px-3 py-2 bg-destructive/5">{error}</div>
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive">{error}</div>
         )}
         {data && rows.length === 0 && !loading && (
           <div className="text-[13px] text-muted-foreground">{t('market.noMatches')}</div>
@@ -206,7 +206,7 @@ function CalendarBoardView() {
       />
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 flex flex-col gap-4 min-h-0">
         <div
-          className="grid grid-cols-3 gap-1 rounded-lg bg-secondary/50 p-1"
+          className="grid grid-cols-3 gap-0.5 rounded-lg border border-border/70 bg-muted/60 p-0.5"
           role="group"
           aria-label={t('market.boardCalendar')}
         >
@@ -217,9 +217,9 @@ function CalendarBoardView() {
               onClick={() => setList(k)}
               aria-pressed={list === k}
               aria-label={`${t(calendarLabelKey(k))} (${data?.[k].length ?? 0})`}
-              className={`oa-pressable flex min-h-11 min-w-0 flex-col items-center justify-center rounded-md px-2 py-1 text-[12px] font-medium transition-colors sm:flex-row sm:gap-1.5 ${
+              className={`oa-pressable flex min-h-11 min-w-0 flex-col items-center justify-center rounded-md px-2 py-1 text-[12px] font-medium sm:flex-row sm:gap-1.5 ${
                 list === k
-                  ? 'bg-background text-foreground shadow-sm'
+                  ? 'bg-background text-foreground shadow-sm ring-1 ring-border/60'
                   : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
               }`}
             >
@@ -235,20 +235,22 @@ function CalendarBoardView() {
           <CenteredLoading label={slow ? t('market.calendarSlowLoading') : t('common.loading')} />
         )}
         {error && (
-          <div className="flex items-center justify-between gap-3 text-[13px] text-destructive border border-destructive/30 rounded-md px-3 py-2 bg-destructive/5">
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive">
             <span className="min-w-0 break-words">{error}</span>
-            <button
+            <Button
               type="button"
               onClick={retry}
-              className="shrink-0 text-[12px] font-medium text-destructive hover:text-destructive/80"
+              className="shrink-0"
+              size="sm"
+              variant="destructive"
             >
               {t('common.retry')}
-            </button>
+            </Button>
           </div>
         )}
         {/* Per-list upstream failure — loud, with the provider's own message. */}
         {data?.errors?.[list] && (
-          <div className="text-[13px] text-destructive border border-destructive/30 rounded-md px-3 py-2 bg-destructive/5">{data.errors[list]}</div>
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive">{data.errors[list]}</div>
         )}
 
         {data && data[list].length > 0 && !data.errors?.[list] && (
@@ -267,7 +269,7 @@ function CalendarBoardView() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder={t('market.calendarSearchPlaceholder')}
-                className="min-h-11 w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-[13px] text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary/60"
+                className={`${inputClass} min-h-11 py-2 pl-9 pr-3`}
               />
             </div>
             {activeRows.length > 0 && (
@@ -294,15 +296,16 @@ function CalendarBoardView() {
           <DividendTable rows={filteredRows.dividends.slice(0, visibleCount)} />
         )}
         {activeVisibleCount < activeRows.length && (
-          <button
+          <Button
             type="button"
             onClick={() => setVisibleCount((count) => count + CALENDAR_PAGE_SIZE)}
-            className="oa-pressable min-h-11 w-full rounded-lg border border-border bg-secondary/50 px-4 py-2 text-[12px] font-medium text-foreground hover:border-primary/40 hover:bg-secondary"
+            className="min-h-11 w-full"
+            variant="outline"
           >
             {t('market.calendarShowMore', {
               count: Math.min(CALENDAR_PAGE_SIZE, activeRows.length - activeVisibleCount),
             })}
-          </button>
+          </Button>
         )}
       </div>
     </div>
@@ -503,7 +506,7 @@ function CalendarMobileList<T>({
           <div className="border-b border-border/70 pb-1 text-[11px] font-medium text-muted-foreground">
             {group.date}
           </div>
-          <div className="overflow-hidden rounded-lg border border-border/70 bg-secondary/25">
+          <div className="overflow-hidden rounded-lg border border-border/70 bg-card">
             {group.rows.map(({ row, index }) => {
               const rowSymbol = symbol(row)
               const rowName = name(row)
@@ -522,7 +525,7 @@ function CalendarMobileList<T>({
                   <dl className="grid shrink-0 grid-cols-2 gap-x-3 text-right">
                     {metrics(row).map((metric) => (
                       <div key={metric.label}>
-                        <dt className="text-[9px] uppercase tracking-wide text-muted-foreground/70">
+                        <dt className="text-[10px] font-medium text-muted-foreground/70">
                           {metric.label}
                         </dt>
                         <dd className="mt-0.5 whitespace-nowrap font-mono text-[11px] text-foreground">
@@ -578,7 +581,7 @@ function MacroBoardView() {
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 min-h-0">
         {loading && !data && <CenteredLoading label={t('common.loading')} />}
         {error && (
-          <div className="text-[13px] text-destructive border border-destructive/30 rounded-md px-3 py-2 bg-destructive/5">{error}</div>
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive">{error}</div>
         )}
         {data && (
           <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
@@ -635,10 +638,10 @@ function TermStructureBoardView() {
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 flex flex-col gap-6 min-h-0">
         {loading && !data && <CenteredLoading label={t('common.loading')} />}
         {error && (
-          <div className="text-[13px] text-destructive border border-destructive/30 rounded-md px-3 py-2 bg-destructive/5">{error}</div>
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive">{error}</div>
         )}
         {data?.errors && Object.entries(data.errors).map(([sym, msg]) => (
-          <div key={sym} className="text-[13px] text-destructive border border-destructive/30 rounded-md px-3 py-2 bg-destructive/5">{sym}: {msg}</div>
+          <div key={sym} className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive">{sym}: {msg}</div>
         ))}
         {data?.curves.map((curve) => <TermCurveCard key={curve.symbol} curve={curve} />)}
       </div>
@@ -657,13 +660,13 @@ function TermCurveCard({ curve }: { curve: TermCurve }) {
     .filter((p) => p.price != null)
     .map((p) => ({ ...p, label: p.expiration.slice(2) }))
   return (
-    <div className="border border-border rounded-md bg-secondary/40 px-3 sm:px-4 py-3 flex flex-col gap-2">
+    <div className="flex flex-col gap-2 rounded-lg border border-border bg-card px-3 py-3 sm:px-4">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="shrink-0 text-[15px] font-semibold font-mono text-foreground">{curve.symbol}</span>
         {curve.spot != null && (
           <span className="whitespace-nowrap text-[12px] text-muted-foreground">{t('market.termSpotPerp')} <span className="font-mono text-foreground">{curve.spot.toLocaleString('en-US')}</span></span>
         )}
-        {regime && <span className="whitespace-nowrap text-[11px] uppercase tracking-wide text-muted-foreground/70">{regime}</span>}
+        {regime && <span className="whitespace-nowrap text-[11px] font-medium text-muted-foreground/70">{regime}</span>}
       </div>
       <MeasuredChartFrame className="h-40">
         {({ width, height }) => {
@@ -697,7 +700,7 @@ function TermCurveCard({ curve }: { curve: TermCurve }) {
       </MeasuredChartFrame>
       <div className="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap">
         {curve.points.map((p) => (
-          <span key={p.expiration} className="flex items-center justify-between gap-2 whitespace-nowrap text-[11px] px-1.5 py-0.5 rounded bg-muted/60 font-mono" title={`${p.daysToExpiry ?? '—'}d`}>
+          <span key={p.expiration} className="flex items-center justify-between gap-2 whitespace-nowrap rounded-sm bg-muted/60 px-1.5 py-0.5 font-mono text-[11px]" title={`${p.daysToExpiry ?? '—'}d`}>
             {p.expiration.slice(2)}{' '}
             <span className={p.annualizedBasis == null ? 'text-muted-foreground' : p.annualizedBasis >= 0 ? 'text-success' : 'text-destructive'}>
               {p.annualizedBasis == null ? '—' : `${p.annualizedBasis >= 0 ? '+' : ''}${p.annualizedBasis.toFixed(1)}%`}
@@ -745,7 +748,7 @@ function GlobalMacroBoardView() {
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 min-h-0">
         {loading && !data && <CenteredLoading label={t('common.loading')} />}
         {error && (
-          <div className="text-[13px] text-destructive border border-destructive/30 rounded-md px-3 py-2 bg-destructive/5">{error}</div>
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive">{error}</div>
         )}
         {data && (
           <>
@@ -858,7 +861,7 @@ function GlobalMetric({
       <dt className="min-h-8 text-[10px] leading-4 text-muted-foreground">{label}</dt>
       <dd
         className={`truncate font-mono text-[13px] font-medium tabular-nums ${globalCellColor(cell, colorBy)}`}
-        aria-label={`${label}: ${value}${title ? ` · ${title}` : ''}`}
+        aria-label={`${label}: ${value}${title ? `, ${title}` : ''}`}
       >
         {value}
       </dd>
@@ -898,10 +901,10 @@ function ShippingBoardView() {
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 min-h-0">
         {loading && !data && <CenteredLoading label={t('common.loading')} />}
         {error && (
-          <div className="text-[13px] text-destructive border border-destructive/30 rounded-md px-3 py-2 bg-destructive/5">{error}</div>
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive">{error}</div>
         )}
         {data?.errors && Object.entries(data.errors).map(([key, msg]) => (
-          <div key={key} className="mb-3 text-[13px] text-destructive border border-destructive/30 rounded-md px-3 py-2 bg-destructive/5">{key}: {msg}</div>
+          <div key={key} className="mb-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive">{key}: {msg}</div>
         ))}
         {data && (
           <div className="grid gap-3 grid-cols-1 lg:grid-cols-2">
@@ -919,7 +922,7 @@ function ChokepointCard({ curve }: { curve: ShippingCurve }) {
     .filter((p) => p.tons != null)
     .map((p) => ({ ...p, mt: (p.tons as number) / 1e6, label: p.date.slice(5) }))
   return (
-    <div className="border border-border rounded-md bg-secondary/40 px-3 sm:px-4 py-3 flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-card px-3 py-3 sm:px-4">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
         <span className="text-[13px] font-semibold text-foreground sm:shrink-0">{curve.name}</span>
         {curve.latest && (
@@ -969,10 +972,10 @@ function FedBoardView() {
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 flex flex-col gap-5 min-h-0">
         {loading && !data && <CenteredLoading label={t('common.loading')} />}
         {error && (
-          <div className="text-[13px] text-destructive border border-destructive/30 rounded-md px-3 py-2 bg-destructive/5">{error}</div>
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive">{error}</div>
         )}
         {data?.errors && Object.entries(data.errors).map(([k, msg]) => (
-          <div key={k} className="text-[13px] text-destructive border border-destructive/30 rounded-md px-3 py-2 bg-destructive/5">{k}: {msg}</div>
+          <div key={k} className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive">{k}: {msg}</div>
         ))}
         {data && data.cards.length > 0 && (
           <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
@@ -986,17 +989,17 @@ function FedBoardView() {
         )}
         {data && data.documents.length > 0 && (
           <div className="flex flex-col gap-1.5">
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">{t('market.fedDocuments')}</h3>
+            <h3 className="text-[12px] font-semibold text-muted-foreground">{t('market.fedDocuments')}</h3>
             {data.documents.map((d) => (
               <a
                 key={`${d.type}-${d.date}`}
                 href={d.url}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center gap-3 px-3 py-1.5 rounded-md border border-border/60 bg-secondary/30 hover:bg-secondary text-[12px]"
+                className="flex items-center gap-3 rounded-lg border border-border/60 bg-card px-3 py-1.5 text-[12px] hover:bg-secondary"
               >
                 <span className="font-mono text-muted-foreground shrink-0">{d.date}</span>
-                <span className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0 ${
+                <span className={`shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] font-medium ${
                   d.type === 'statement' ? 'bg-primary/15 text-primary'
                   : d.type === 'minutes' ? 'bg-success/15 text-success'
                   : 'bg-muted text-muted-foreground'

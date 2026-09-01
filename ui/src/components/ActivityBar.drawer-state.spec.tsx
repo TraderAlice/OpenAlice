@@ -111,7 +111,7 @@ describe('ActivityBar mobile drawer state', () => {
     expect(primaryAction.className).toContain('md:min-h-8')
     expect(sectionToggle.className).toContain('min-h-10')
     expect(sectionToggle.className).toContain('md:min-h-6')
-    expect(sectionToggle.getAttribute('title')).toBe('nav.betaDescription')
+    expect(sectionToggle.getAttribute('title')).toBeNull()
     expect(screen.queryByRole('button', { name: 'nav.about' })).toBeNull()
   })
 

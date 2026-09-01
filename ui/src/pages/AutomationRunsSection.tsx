@@ -20,7 +20,8 @@ import type {
   HeadlessTaskStatus,
 } from '../api/headless'
 import { MarkdownContent } from '../components/MarkdownContent'
-import { Skeleton } from '../components/StateViews'
+import { EmptyState, Skeleton } from '../components/StateViews'
+import { Button } from '../components/ui/button'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { useIssues } from '../hooks/useIssues'
 import { formatRelativeTime } from '../lib/intl'
@@ -74,14 +75,14 @@ function ToolBlock({ block }: { block: Extract<HeadlessMessageBlock, { type: 'to
       <summary className={`flex min-h-10 cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs sm:min-h-0 ${statusClass}`}>
         <Wrench size={13} className="shrink-0" />
         <span className="min-w-0 flex-1 truncate font-medium text-foreground">{block.name}</span>
-        <span className="shrink-0 uppercase tracking-wide">{block.status}</span>
-        {hasDetails && <ChevronRight size={12} className="shrink-0 transition-transform group-open/tool:rotate-90" />}
+        <span className="shrink-0 text-[11px] font-medium">{block.status}</span>
+        {hasDetails && <ChevronRight size={12} className="shrink-0 transition-transform duration-[var(--motion-fast)] group-open/tool:rotate-90 motion-reduce:transition-none" />}
       </summary>
       {hasDetails && (
         <div className="space-y-2 border-t border-border/50 px-3 py-2">
           {block.input !== undefined && (
             <div>
-              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Input</div>
+              <div className="mb-1 text-[11px] font-medium text-muted-foreground/70">Input</div>
               <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words text-[11px] leading-relaxed text-muted-foreground">
                 {formatValue(block.input)}
               </pre>
@@ -89,7 +90,7 @@ function ToolBlock({ block }: { block: Extract<HeadlessMessageBlock, { type: 'to
           )}
           {block.output !== undefined && (
             <div>
-              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Output</div>
+              <div className="mb-1 text-[11px] font-medium text-muted-foreground/70">Output</div>
               <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words text-[11px] leading-relaxed text-muted-foreground">
                 {formatValue(block.output)}
               </pre>
@@ -132,15 +133,20 @@ function RunOutput({ task }: { task: HeadlessTaskRecord }) {
 
   if (error && !output) {
     return (
-      <div role="alert" className="flex flex-wrap items-center justify-between gap-2 border-l-2 border-destructive/60 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-        <span>Output unavailable: {error}</span>
-        <button
+      <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive/25 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+        <span className="flex min-w-0 items-start gap-2">
+          <CircleAlert size={13} className="mt-0.5 shrink-0" aria-hidden />
+          <span>Output unavailable: {error}</span>
+        </span>
+        <Button
           type="button"
-          className="min-h-10 rounded-md border border-destructive/30 px-2.5 py-1 font-medium hover:bg-destructive/10 sm:min-h-0"
+          variant="destructive"
+          size="sm"
+          className="min-h-10 sm:min-h-0"
           onClick={() => setRetryKey((key) => key + 1)}
         >
           Retry output
-        </button>
+        </Button>
       </div>
     )
   }
@@ -156,19 +162,24 @@ function RunOutput({ task }: { task: HeadlessTaskRecord }) {
   return (
     <div className="space-y-3">
       {error && (
-        <div role="status" className="flex flex-wrap items-center justify-between gap-2 border-l-2 border-warning/60 bg-warning/5 px-3 py-2 text-xs text-warning">
-          <span>Live update paused: {error}. Showing the last available output.</span>
-          <button
+        <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-warning/25 bg-warning/5 px-3 py-2 text-xs text-warning">
+          <span className="flex min-w-0 items-start gap-2">
+            <CircleAlert size={13} className="mt-0.5 shrink-0" aria-hidden />
+            <span>Live update paused: {error}. Showing the last available output.</span>
+          </span>
+          <Button
             type="button"
-            className="min-h-10 rounded-md border border-warning/30 px-2.5 py-1 font-medium hover:bg-warning/10 sm:min-h-0"
+            variant="outline"
+            size="sm"
+            className="min-h-10 border-warning/30 text-warning hover:bg-warning/10 sm:min-h-0"
             onClick={() => setRetryKey((key) => key + 1)}
           >
             Retry now
-          </button>
+          </Button>
         </div>
       )}
       <section className="border-l-2 border-primary/30 pl-3">
-        <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+        <div className="mb-2 flex items-center gap-2 text-[12px] font-medium text-muted-foreground">
           <MessageSquareText size={14} />
           Reply
         </div>
@@ -183,9 +194,10 @@ function RunOutput({ task }: { task: HeadlessTaskRecord }) {
 
       {(tools.length > 0 || errors.length > 0) && (
         <section>
-          <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+          <div className="mb-2 flex items-center gap-2 text-[12px] font-medium text-muted-foreground">
             <Wrench size={13} />
-            Activity · {tools.length} tool{tools.length === 1 ? '' : 's'}
+            <span>Activity</span>
+            <span className="font-normal text-muted-foreground/70">{tools.length} tool{tools.length === 1 ? '' : 's'}</span>
           </div>
           <div className="space-y-1.5">
             {tools.map((block) => <ToolBlock key={block.id} block={block} />)}
@@ -242,7 +254,7 @@ function SummaryMetric({
 }) {
   return (
     <div className="min-w-0 flex-1 px-2.5 py-2.5 first:pl-0 last:pr-0 sm:px-4">
-      <div className="truncate text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70 sm:tracking-[0.1em]">
+      <div className="truncate text-[11px] font-medium text-muted-foreground/70">
         <span className="sm:hidden">{mobileLabel}</span>
         <span className="hidden sm:inline">{label}</span>
       </div>
@@ -308,18 +320,18 @@ function AutomationRunTitle({
   return (
     <>
       <span className="flex min-w-0 items-center gap-2">
-        <span className="shrink-0 rounded border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-primary">
+        <span className="shrink-0 rounded-sm border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
           {source.label}
         </span>
         <span
           className={`truncate text-[13px] font-medium text-foreground${issue ? '' : ' font-mono'}`}
-          title={`Issue: ${issueTitle} · ${issueWorkspace}`}
+          title={`Issue: ${issueTitle} — ${issueWorkspace}`}
         >
           {issueTitle}
         </span>
         {crossWorkspace && (
           <span className="shrink-0 truncate text-[10px] text-muted-foreground" title={issueWorkspace}>
-            · {issueWorkspace}
+            {issueWorkspace}
           </span>
         )}
       </span>
@@ -495,27 +507,30 @@ export function AutomationRunsSection() {
         <SummaryMetric
           label="Runs"
           value={String(snapshot.page.total)}
-          detail={`Showing ${snapshot.tasks.length} · ${snapshot.summary.done} completed · ${snapshot.summary.needsAttention} need attention`}
+          detail={`Showing ${snapshot.tasks.length}, ${snapshot.summary.done} completed, ${snapshot.summary.needsAttention} need attention`}
           mobileDetail={snapshot.summary.needsAttention === 0 ? 'All clear' : `${snapshot.summary.needsAttention} attention`}
         />
         <SummaryMetric
           label="Runtime parsers"
           mobileLabel="Parsers"
           value="4"
-          detail="Claude · Codex · OpenCode · Pi"
+          detail="Claude, Codex, OpenCode, Pi"
           mobileDetail="CLI formats"
         />
       </div>
 
       {snapshot.tasks.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border p-5 text-sm text-muted-foreground">
-          No headless runs yet. Dispatch one with <code className="text-xs">POST /api/workspaces/:id/headless</code>.
-        </div>
+        <EmptyState
+          icon={<Bot aria-hidden />}
+          title="No automation runs"
+          description="Workspace runs appear here after they start."
+        />
       ) : (
         <div className="space-y-3">
           {listError && (
-            <div role="status" className="border-l-2 border-warning/60 bg-warning/5 px-3 py-2 text-xs text-warning">
-              Live updates paused: {listError}. Showing the last available run list.
+            <div role="status" className="flex items-start gap-2 rounded-lg border border-warning/25 bg-warning/5 px-3 py-2 text-xs text-warning">
+              <CircleAlert size={13} className="mt-0.5 shrink-0" aria-hidden />
+              <span>Live updates paused: {listError}. Showing the last available run list.</span>
             </div>
           )}
           <div data-testid="runs-list" className="divide-y divide-border/60 border-y border-border/70">
@@ -552,7 +567,7 @@ export function AutomationRunsSection() {
                     aria-expanded={isExpanded}
                     aria-label={runLabel}
                   >
-                    <span className={`mt-1 inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] ${STATUS_STYLE[task.status]}`}>
+                    <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${STATUS_STYLE[task.status]}`}>
                       {task.status}
                     </span>
                     <Bot size={14} className="mt-1 shrink-0 text-muted-foreground/70" />
@@ -593,9 +608,11 @@ export function AutomationRunsSection() {
                       {(issueSource || openable) && (
                         <div className="flex flex-wrap items-center gap-2">
                           {issueSource && (
-                            <button
+                            <Button
                               type="button"
-                              className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-primary hover:bg-primary/10 sm:min-h-0"
+                              variant="outline"
+                              size="sm"
+                              className="min-h-10 text-primary hover:bg-primary/10 sm:min-h-0"
                               onClick={() => openOrFocus({
                                 kind: 'issue-detail',
                                 params: {
@@ -606,26 +623,29 @@ export function AutomationRunsSection() {
                             >
                               <ListChecks size={12} />
                               Open Issue
-                            </button>
+                            </Button>
                           )}
                           {openable && (
-                            <button
+                            <Button
                               type="button"
                               disabled={isOpening}
                               aria-busy={isOpening}
-                              className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-success hover:bg-success/10 disabled:cursor-wait disabled:opacity-60 sm:min-h-0"
+                              variant="outline"
+                              size="sm"
+                              className="min-h-10 text-success hover:bg-success/10 disabled:cursor-wait sm:min-h-0"
                               title="Resume this run's conversation in an interactive session"
                               onClick={() => void openAsSession(task)}
                             >
                               <ExternalLink size={12} />
                               {isOpening ? 'Opening…' : 'Open as session'}
-                            </button>
+                            </Button>
                           )}
                         </div>
                       )}
                       {openError && (
-                        <div role="alert" className="border-l-2 border-destructive/60 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-                          Could not open this run as a session: {openError}
+                        <div role="alert" className="flex items-start gap-2 rounded-lg border border-destructive/25 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                          <CircleAlert size={13} className="mt-0.5 shrink-0" aria-hidden />
+                          <span>Could not open this run as a session: {openError}</span>
                         </div>
                       )}
                       <RunOutput task={task} />
@@ -637,15 +657,16 @@ export function AutomationRunsSection() {
           </div>
           {snapshot.page.hasMore && (
             <div className="flex flex-col items-center gap-1 pt-2">
-              <button
+              <Button
                 type="button"
                 data-testid="runs-load-more"
                 disabled={loadingMore}
                 onClick={() => void loadMore()}
-                className="min-h-10 rounded-lg border border-border bg-secondary/35 px-4 py-2 text-xs font-medium text-foreground hover:bg-muted disabled:cursor-wait disabled:opacity-60 sm:min-h-0"
+                variant="outline"
+                className="min-h-10 px-4 disabled:cursor-wait sm:min-h-0"
               >
                 {loadingMore ? 'Loading older runs…' : `Load ${Math.min(RUNS_PAGE_SIZE, snapshot.page.total - snapshot.tasks.length)} older runs`}
-              </button>
+              </Button>
               <span className="text-[11px] text-muted-foreground">
                 {snapshot.tasks.length} of {snapshot.page.total} loaded
               </span>

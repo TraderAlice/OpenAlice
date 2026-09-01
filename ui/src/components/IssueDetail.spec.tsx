@@ -341,7 +341,7 @@ describe('IssueActivity provenance identity', () => {
 
     expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull()
     fireEvent.click(screen.getByRole('button', {
-      name: 'Show Session details for opencode · resume-open-coral-harbor-j76vuu',
+      name: 'Show Session details for opencode, resume-open-coral-harbor-j76vuu',
     }))
     expect(onOpenSession).not.toHaveBeenCalled()
     expect(screen.getByRole('dialog', {
@@ -354,7 +354,7 @@ describe('IssueActivity provenance identity', () => {
     })).toBeNull()
 
     fireEvent.click(screen.getByRole('button', {
-      name: 'Show Session details for opencode · resume-open-coral-harbor-j76vuu',
+      name: 'Show Session details for opencode, resume-open-coral-harbor-j76vuu',
     }))
     fireEvent.click(screen.getByRole('button', { name: 'Open conversation' }))
     await waitFor(() => expect(onOpenSession).toHaveBeenCalledWith(expect.objectContaining(record)))
@@ -483,7 +483,7 @@ describe('IssueDetail property controls', () => {
     const trigger = await screen.findByRole('button', { name: 'AI configuration' })
     await waitFor(() => expect((trigger as HTMLButtonElement).disabled).toBe(false))
     expect(trigger.textContent).toContain('Runtime managed')
-    expect(trigger.textContent).toContain('claude-sonnet-4-5 · high')
+    expect(trigger.textContent).toContain('claude-sonnet-4-5, high')
     expect(screen.queryByRole('combobox', { name: 'Runtime' })).toBeNull()
     expect(screen.getByText('codex')).toBeTruthy()
 
@@ -770,13 +770,13 @@ describe('IssueDetail property controls', () => {
 
     expect(activeIndex).toBeGreaterThanOrEqual(0)
     expect(recentIndex).toBeGreaterThan(activeIndex)
-    expect(choices[activeIndex]?.textContent).toContain('resume-active-owner · pi · active')
-    expect(choices[recentIndex]?.textContent).toContain('resume-recent-worker · codex')
+    expect(choices[activeIndex]?.textContent).toContain('resume-active-owner, pi, active')
+    expect(choices[recentIndex]?.textContent).toContain('resume-recent-worker, codex')
 
     fireEvent.click(choices[activeIndex]!)
     expect(mocks.updateIssue).not.toHaveBeenCalled()
     expect(within(dialog).getByText('Pending assignment')).toBeTruthy()
-    expect(within(dialog).getByText('resume-active-owner · pi · active now')).toBeTruthy()
+    expect(within(dialog).getByText('resume-active-owner, pi, active now')).toBeTruthy()
     fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm assignment' }))
     await waitFor(() => expect(mocks.updateIssue).toHaveBeenCalledWith(
       'demo-ws-auto-quant',

@@ -1,7 +1,7 @@
 import { useState, useEffect, useId, useMemo } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { SettingsScrollArea, inputClass } from '../components/form'
-import { Skeleton } from '../components/StateViews'
+import { EmptyState as SharedEmptyState, RecoverySurface, Skeleton } from '../components/StateViews'
 import { Toggle } from '../components/Toggle'
 import { useTradingConfig } from '../hooks/useTradingConfig'
 import { useAccountHealth } from '../hooks/useAccountHealth'
@@ -14,6 +14,7 @@ import { api } from '../api'
 import type { TradingServiceStatus } from '../api/trading'
 import { useWorkspace } from '../tabs/store'
 import type { UTAConfig, BrokerPreset, BrokerHealthInfo, BrokerPackStatus } from '../api/types'
+import { Button } from '../components/ui/button'
 
 // ==================== External order monitoring cadence ====================
 //
@@ -108,7 +109,7 @@ export function ExternalOrderMonitoringRow() {
   if (value === null) return null
 
   return (
-    <div className="flex flex-col items-stretch gap-3 rounded-lg border border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex min-h-12 flex-col items-stretch gap-3 rounded-lg border border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
         <label htmlFor={selectId} className="text-[12px] font-medium text-foreground">
           External order monitoring
@@ -132,7 +133,7 @@ export function ExternalOrderMonitoringRow() {
           aria-describedby={`${descriptionId} ${statusId}`}
           value={value}
           onChange={(e) => { void save(e.target.value) }}
-          className={inputClass + ' w-full sm:w-auto'}
+          className={`${inputClass} h-8 w-full py-1.5 sm:w-auto`}
         >
           {OBSERVE_CADENCE_OPTIONS.map((v) => (
             <option key={v} value={v}>{v === 'off' ? 'Off' : `Every ${v}`}</option>
@@ -211,9 +212,9 @@ export function KeylessDataSourcesRow({ ccxtPack, onPackInstalled }: {
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
           {msg && <span className="text-[11px] text-muted-foreground">{msg}</span>}
           {ccxtPack && !ccxtPack.installed && (
-            <button className="btn-secondary" disabled={installing} onClick={() => { void install() }}>
+            <Button type="button" variant="outline" disabled={installing} onClick={() => { void install() }}>
               {installing ? 'Installing…' : ccxtPack.source === 'broken' ? 'Repair data support' : 'Install data support'}
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -221,7 +222,7 @@ export function KeylessDataSourcesRow({ ccxtPack, onPackInstalled }: {
         {KEYLESS_DATA_SOURCE_OPTIONS.map((source) => {
           const checked = runtimeConfig.keylessDataSources.includes(source.id)
           return (
-            <div key={source.id} className="flex items-center justify-between gap-2 rounded-md border border-border bg-secondary/40 px-3 py-2">
+            <div key={source.id} className="flex min-h-12 items-center justify-between gap-2 rounded-md border border-border bg-secondary/40 px-3 py-2">
               <span className="text-[12px] text-foreground">{source.label}</span>
               <Toggle
                 size="sm"
@@ -291,7 +292,7 @@ export function MissingBrokerPacksNotice({ packs, onInstalled }: {
             {actionable.map((pack) => (
               <div key={pack.engine} className="flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2">
                 <div className="min-w-0">
-                  <div className="text-[12px] font-medium uppercase text-foreground">{pack.engine}</div>
+                  <div className="text-[12px] font-medium text-foreground">{pack.engine}</div>
                   <div className="truncate text-[11px] text-muted-foreground">Required by {pack.requiredBy.join(', ')}</div>
                   {pack.updateAvailable && pack.version && (
                     <div className="mt-0.5 text-[11px] text-warning">
@@ -300,8 +301,10 @@ export function MissingBrokerPacksNotice({ packs, onInstalled }: {
                   )}
                   {pack.reason && <div className="mt-0.5 text-[11px] text-warning">{pack.reason}</div>}
                 </div>
-                <button
-                  className="btn-secondary shrink-0"
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="shrink-0"
                   disabled={installing !== null}
                   onClick={() => { void install(pack) }}
                 >
@@ -312,7 +315,7 @@ export function MissingBrokerPacksNotice({ packs, onInstalled }: {
                       : pack.updateAvailable
                         ? 'Update'
                         : 'Install'}
-                </button>
+                </Button>
               </div>
             ))}
           </div>
@@ -400,7 +403,7 @@ export function TradingPage() {
   }
 
   if (tc.loading) return (
-    <PageShell subtitle="Configure your UTAs (Unified Trading Accounts).">
+    <PageShell>
       <div className="max-w-[820px] mx-auto space-y-2.5" aria-hidden="true">
         {Array.from({ length: 3 }).map((_, i) => (
           <div key={i} className="flex items-center gap-3 px-4 py-3.5 rounded-lg border border-border bg-secondary">
@@ -417,9 +420,13 @@ export function TradingPage() {
   )
   if (tc.error) {
     return (
-      <PageShell subtitle="Failed to load trading configuration.">
-        <p className="text-[13px] text-destructive">{tc.error}</p>
-        <button onClick={tc.refresh} className="mt-2 btn-secondary">Retry</button>
+      <PageShell scroll={false}>
+        <RecoverySurface
+          title="Failed to load trading configuration"
+          description={tc.error}
+          actionLabel="Retry"
+          onAction={tc.refresh}
+        />
       </PageShell>
     )
   }
@@ -428,7 +435,6 @@ export function TradingPage() {
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
         title="Trading"
-        description="Configure your UTAs (Unified Trading Accounts)."
         live={tc.utas.length > 0 ? { lastUpdated } : undefined}
       />
 
@@ -437,7 +443,13 @@ export function TradingPage() {
           {serviceStatus?.available === false && <TradingServiceOfflineBanner status={serviceStatus} />}
           <MissingBrokerPacksNotice packs={brokerPacks} onInstalled={updateBrokerPack} />
           {tc.utas.length === 0 ? (
-            <EmptyState onAdd={() => setShowAdd(true)} />
+            <div className="rounded-lg border border-dashed border-border pb-8 text-center">
+              <SharedEmptyState
+                title="No UTAs configured"
+                description="Connect a crypto exchange or brokerage to start automated trading."
+              />
+              <Button type="button" onClick={() => setShowAdd(true)}>+ Add UTA</Button>
+            </div>
           ) : (
             <div className="space-y-2.5">
               {tc.utas.map((uta) => {
@@ -453,12 +465,14 @@ export function TradingPage() {
                   />
                 )
               })}
-              <button
+              <Button
+                type="button"
+                variant="outline"
                 onClick={() => setShowAdd(true)}
-                className="w-full py-2.5 text-[12px] text-muted-foreground hover:text-foreground border border-dashed border-border hover:border-muted-foreground/40 rounded-lg transition-colors"
+                className="h-auto min-h-12 w-full border-dashed text-muted-foreground"
               >
                 + Add UTA
-              </button>
+              </Button>
             </div>
           )}
 
@@ -516,11 +530,11 @@ export function TradingPage() {
 
 // ==================== Page Shell ====================
 
-function PageShell({ subtitle, children }: { subtitle: string; children?: React.ReactNode }) {
+function PageShell({ children, scroll = true }: { children?: React.ReactNode; scroll?: boolean }) {
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <PageHeader title="Trading" description={subtitle} />
-      <SettingsScrollArea className="px-4 py-5 md:px-6">{children}</SettingsScrollArea>
+      <PageHeader title="Trading" />
+      <SettingsScrollArea scroll={scroll} className={scroll ? 'px-4 py-5 md:px-6' : ''}>{children}</SettingsScrollArea>
     </div>
   )
 }
@@ -539,24 +553,6 @@ function TradingServiceOfflineBanner({ status }: { status: TradingServiceStatus 
     </div>
   )
 }
-
-// ==================== Empty State ====================
-
-function EmptyState({ onAdd }: { onAdd: () => void }) {
-  return (
-    <div className="rounded-xl border border-dashed border-border p-6 text-center sm:p-12">
-      <h3 className="text-[16px] font-semibold text-foreground mb-2">No UTAs configured</h3>
-      <p className="text-[13px] text-muted-foreground mb-6 max-w-[320px] mx-auto leading-relaxed">
-        Connect a crypto exchange or brokerage to start automated trading.
-      </p>
-      <button onClick={onAdd} className="btn-primary">
-        + Add UTA
-      </button>
-    </div>
-  )
-}
-
-// ==================== Portfolio banner (hero) ====================
 
 // ==================== Subtitle builder ====================
 
@@ -578,7 +574,7 @@ function buildSubtitle(uta: UTAConfig, preset?: BrokerPreset): string {
       parts.push(`${sf.prefix ?? ''}${display}`)
     }
   }
-  return parts.join(' · ') || preset.label
+  return parts.join(', ') || preset.label
 }
 
 // ==================== UTA Card ====================
@@ -591,9 +587,6 @@ function UTACard({ uta, preset, health, equity, onClick }: {
   onClick: () => void
 }) {
   const isDisabled = health?.disabled || uta.enabled === false
-  const badge = preset
-    ? { text: preset.badge, color: `${preset.badgeColor} ${preset.badgeColor.replace('text-', 'bg-')}/10` }
-    : { text: uta.presetId.slice(0, 2).toUpperCase(), color: 'text-muted-foreground bg-muted-foreground/10' }
 
   // Per-card equity is a liveness signal, not a portfolio view —
   // proves the connection returned a real account balance, not just
@@ -606,20 +599,17 @@ function UTACard({ uta, preset, health, equity, onClick }: {
 
   return (
     <button
+      type="button"
       onClick={onClick}
-      className={`w-full rounded-lg border border-border bg-secondary/30 px-4 py-3 text-left transition-[border-color,background-color,opacity] hover:border-muted-foreground/40 hover:bg-muted/20 ${isDisabled ? 'opacity-50' : ''}`}
+      className={`oa-pressable w-full rounded-lg border border-border bg-secondary/30 px-4 py-3 text-left transition-[border-color,background-color,opacity] duration-[var(--motion-fast)] hover:border-muted-foreground/40 hover:bg-muted/20 ${isDisabled ? 'opacity-50' : ''}`}
     >
       <div className="flex items-center gap-3">
-        <span className={`text-[10px] font-bold px-2 py-1 rounded-md shrink-0 ${badge.color}`}>
-          {badge.text}
-        </span>
         <div className="flex-1 min-w-0">
           <div className="text-[13px] font-medium text-foreground truncate">{uta.label || uta.id}</div>
-          <div className="text-[11px] text-muted-foreground truncate mt-0.5 font-mono">
-            {uta.id}
-            <span className="mx-1.5 text-muted-foreground/40">·</span>
-            {buildSubtitle(uta, preset)}
-            {uta.guards.length > 0 && <span className="ml-1.5 text-muted-foreground/50">{uta.guards.length} guard{uta.guards.length > 1 ? 's' : ''}</span>}
+          <div className="mt-0.5 flex min-w-0 flex-wrap gap-x-2 text-[11px] text-muted-foreground">
+            <span className="truncate font-mono">{uta.id}</span>
+            <span className="truncate font-mono">{buildSubtitle(uta, preset)}</span>
+            {uta.guards.length > 0 && <span className="text-muted-foreground/70">{uta.guards.length} guard{uta.guards.length > 1 ? 's' : ''}</span>}
           </div>
         </div>
         <div className="shrink-0 flex items-center gap-3">

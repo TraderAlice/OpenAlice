@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/tooltip'
 import { SelectionIndicator } from './SelectionIndicator'
 import { useScrollEdgeFade } from '../hooks/useScrollEdgeFade'
+import { Button } from '@/components/ui/button'
 
 /**
  * Map ActivityBar page enum (visual layout grouping) to the ActivitySection
@@ -136,19 +137,21 @@ export function ActivityBar({
           <img
             src="/alice.ico"
             alt="Alice"
-            className={`${denseRail ? 'h-6 w-6 md:h-5 md:w-5' : 'h-[22px] w-[22px]'} shrink-0 rounded-full ring-1 ring-border/70`}
+            className={`${denseRail ? 'h-6 w-6 md:h-5 md:w-5' : 'h-[22px] w-[22px]'} shrink-0 object-contain`}
             draggable={false}
           />
           <h1 className={`min-w-0 flex-1 truncate text-[13px] font-semibold leading-[18px] tracking-[-0.01em] text-foreground ${compactRail ? 'md:hidden' : ''}`}>OpenAlice</h1>
           {!desktopStatic && (
-            <button
+            <Button
               type="button"
               onClick={onClose}
               aria-label={t('common.closePanel', { title: t('nav.primaryNavigation') })}
-              className="oa-icon-action -mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] text-muted-foreground hover:bg-accent hover:text-foreground"
+              className="-mr-1 shrink-0 text-muted-foreground"
+              variant="ghost"
+              size="icon"
             >
               <X size={15} strokeWidth={1.75} aria-hidden />
-            </button>
+            </Button>
           )}
         </div>
 
@@ -195,7 +198,7 @@ export function ActivityBar({
                   />
                 )}
                 {showItems && (
-                  <div className={`oa-disclosure-enter flex flex-col ${denseRail ? 'gap-1 md:gap-px' : 'gap-px'}`} id={`activity-section-${section.id}`}>
+                  <div className={`flex flex-col ${denseRail ? 'gap-1 md:gap-px' : 'gap-px'}`} id={`activity-section-${section.id}`}>
                     {section.items.map((item) => {
                       const sec = activitySectionFor(item.page)
                       const isActive = selectedSidebar === sec
@@ -233,7 +236,7 @@ export function ActivityBar({
                           onClick={handleClick}
                           aria-label={label}
                           aria-current={isActive ? 'page' : undefined}
-                          className={`oa-nav-item relative flex items-center rounded-[10px] text-left ${
+                          className={`oa-nav-item relative flex items-center rounded-md text-left ${
                             compactRail
                               ? denseRail
                                 ? 'md:h-[26px] md:w-8 md:min-h-[26px] md:justify-center md:gap-0 md:px-0 md:py-0'
@@ -243,8 +246,8 @@ export function ActivityBar({
                                 : 'min-h-10 gap-2.5 px-2.5 py-1 text-[13px] leading-[18px] md:min-h-8'
                           } ${
                             isActive
-                              ? 'bg-accent-strong text-foreground'
-                              : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                              : 'text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'
                           }`}
                         >
                           {isActive && <SelectionIndicator />}
@@ -283,19 +286,29 @@ export function ActivityBar({
         <div className={`flex shrink-0 items-center ${compactRail ? `${denseRail ? 'py-2 md:py-0.5 md:gap-px' : 'py-2 md:gap-1'} px-4 md:flex-col md:items-center md:px-2` : 'justify-between gap-2 border-t border-border/55 px-2 py-1'}`}>
           <ThemeToggle compact={denseRail} />
           {!forcedCompactRail && (
-            <button
-              type="button"
-              onClick={() => setRailCollapsed(!railCollapsed)}
-              title={t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
-              aria-label={t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
-              aria-hidden={!desktopStatic ? true : undefined}
-              tabIndex={!desktopStatic ? -1 : undefined}
-              className={`oa-icon-action hidden ${denseRail ? 'h-9 w-9 md:h-[26px] md:w-[26px]' : 'h-9 w-9'} shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground md:flex`}
-            >
-              {railCollapsed
-                ? <PanelLeftOpen size={denseRail ? 14 : 17} strokeWidth={1.75} aria-hidden />
-                : <PanelLeftClose size={denseRail ? 14 : 17} strokeWidth={1.75} aria-hidden />}
-            </button>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    onClick={() => setRailCollapsed(!railCollapsed)}
+                    aria-label={t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
+                    aria-hidden={!desktopStatic ? true : undefined}
+                    tabIndex={!desktopStatic ? -1 : undefined}
+                    className={`hidden ${denseRail ? 'md:h-[26px] md:w-[26px]' : ''} shrink-0 text-muted-foreground md:flex`}
+                    variant="ghost"
+                    size="icon"
+                  />
+                }
+              >
+                {railCollapsed
+                  ? <PanelLeftOpen size={denseRail ? 14 : 17} strokeWidth={1.75} aria-hidden />
+                  : <PanelLeftClose size={denseRail ? 14 : 17} strokeWidth={1.75} aria-hidden />}
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={8}>
+                {t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
+              </TooltipContent>
+            </Tooltip>
           )}
         </div>
     </TooltipProvider>
@@ -366,24 +379,31 @@ function SectionHeader({
   onToggleCollapse: () => void
   controlsId: string
 }) {
-  return (
+  const control = (
     <button
       type="button"
       onClick={onToggleCollapse}
       className="mb-0.5 flex min-h-10 w-full items-center gap-1.5 px-2.5 py-1 text-left text-[12px] font-medium leading-4 text-muted-foreground/75 transition-colors hover:text-foreground md:min-h-6"
       aria-expanded={!isCollapsed}
       aria-controls={controlsId}
-      title={description ?? label}
+      aria-label={label}
     >
       <ChevronDown
         size={11}
         strokeWidth={2.25}
-        className={`shrink-0 transition-transform duration-150 ${
+        className={`shrink-0 transition-transform duration-[var(--motion-fast)] ${
           isCollapsed ? '-rotate-90' : 'rotate-0'
         }`}
         aria-hidden
       />
       <span className="truncate">{label}</span>
     </button>
+  )
+  if (!description) return control
+  return (
+    <Tooltip>
+      <TooltipTrigger render={control} />
+      <TooltipContent side="right" sideOffset={8}>{description}</TooltipContent>
+    </Tooltip>
   )
 }

@@ -28,6 +28,8 @@ import { Positions } from './simulator/Positions'
 import { PendingOrders } from './simulator/PendingOrders'
 import { ActionPanel } from './simulator/ActionPanel'
 import { EventLog } from './simulator/EventLog'
+import { Button } from '../components/ui/button'
+import { SegmentedControl } from '../components/SegmentedControl'
 
 export function SimulatorPage() {
   const sim = useSimulatorState()
@@ -52,7 +54,7 @@ export function SimulatorPage() {
       {sim.utas.length === 0 ? (
         <EmptyState
           title="No simulator account yet."
-          description='Click "+ New simulator account" to create one. Each sim is a fresh in-memory MockBroker UTA — wiped on dev server restart.'
+          description="Create an in-memory MockBroker UTA to start a scenario."
         />
       ) : !sim.selectedId ? null : !sim.state ? (
         <div className="flex justify-center py-12"><Spinner /></div>
@@ -90,38 +92,28 @@ function TopBar({ utas, selectedId, onSelect, cash, onRefresh }: {
 
   return (
     <div className="flex items-center gap-3 flex-wrap">
-      <div className="flex items-center gap-1 flex-wrap" role="tablist" aria-label="Simulator accounts">
-        {utas.map((u) => {
-          const active = u.id === selectedId
-          return (
-            <button
-              key={u.id}
-              role="tab"
-              aria-selected={active}
-              onClick={() => onSelect(u.id)}
-              title={u.id}
-              className={`px-2.5 py-1 text-sm rounded transition-colors ${
-                active
-                  ? 'bg-primary/15 text-primary font-medium border border-primary/30'
-                  : 'text-muted-foreground hover:text-foreground border border-transparent hover:bg-muted/50'
-              }`}
-            >
-              {u.label}
-            </button>
-          )
-        })}
-      </div>
+      <SegmentedControl
+        value={selectedId}
+        options={utas.map((uta) => ({
+          value: uta.id,
+          label: uta.label,
+          ariaLabel: `${uta.label}: ${uta.id}`,
+        }))}
+        onChange={onSelect}
+        ariaLabel="Simulator accounts"
+      />
 
-      <button
+      <Button
         onClick={onRefresh}
-        className="px-2.5 py-1 text-xs bg-muted text-muted-foreground rounded hover:text-foreground transition-colors"
+        variant="outline"
+        size="sm"
       >
         Refresh
-      </button>
+      </Button>
 
       {cash !== undefined && (
-        <span className="ml-auto text-[12px] text-muted-foreground uppercase tracking-wide">
-          Cash <span className="font-mono text-foreground text-sm normal-case ml-1.5">
+        <span className="ml-auto text-[12px] font-medium text-muted-foreground">
+          Cash <span className="ml-1.5 font-mono text-sm text-foreground">
             ${Number(cash).toLocaleString(getIntlLocale(), { minimumFractionDigits: 2 })}
           </span>
         </span>

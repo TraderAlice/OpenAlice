@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { CheckCircle2, ChevronRight, CircleAlert, LoaderCircle, MinusCircle } from 'lucide-react'
 import { api, type AppConfig } from '../api'
 import { SaveIndicator } from '../components/SaveIndicator'
 import { ConfigSection, SettingsScrollArea, inputClass } from '../components/form'
@@ -6,6 +7,7 @@ import { Toggle } from '../components/Toggle'
 import { useConfigPage } from '../hooks/useConfigPage'
 import { PageHeader } from '../components/PageHeader'
 import { CenteredLoading } from '../components/StateViews'
+import { Button } from '@/components/ui/button'
 
 type MarketDataConfig = Record<string, unknown>
 
@@ -104,12 +106,12 @@ function deriveSourceRows(
 ): SourceRow[] {
   const hubLive = hubOn && ping !== 'down' // optimistic while checking
   const hub = { source: 'Hub', state: 'ok' as const }
-  const chartVendors = ['yfinance', ...extraVendors].join(' · ')
+  const chartVendors = ['yfinance', ...extraVendors].join(', ')
 
   return [
     {
       name: 'Market boards',
-      detail: 'valuation · macro · futures · risk · rotation',
+      detail: 'Valuation, macro, futures, risk, rotation',
       ...(hubLive
         ? hub
         : keys.fmp || keys.fred
@@ -118,7 +120,7 @@ function deriveSourceRows(
     },
     {
       name: 'Economy series',
-      detail: 'FRED · EIA · BLS',
+      detail: 'FRED, EIA, BLS',
       ...(hubLive
         ? hub
         : keys.fred || keys.eia || keys.bls
@@ -127,7 +129,7 @@ function deriveSourceRows(
     },
     {
       name: 'Calendars',
-      detail: 'earnings · IPO · dividends',
+      detail: 'Earnings, IPOs, dividends',
       ...(hubLive
         ? hub
         : keys.fmp
@@ -146,7 +148,7 @@ function deriveSourceRows(
     },
     {
       name: 'Equity fundamentals',
-      detail: 'profile · financials · ratios · discovery',
+      detail: 'Profile, financials, ratios, discovery',
       ...(keys.fmp
         ? { source: 'FMP', state: 'ok' as const }
         : { source: 'Needs FMP key', state: 'off' as const, cta: true }),
@@ -296,25 +298,25 @@ function HubCard({
   const host = hub.baseUrl.replace(/^https?:\/\//, '').replace(/\/+$/, '')
 
   return (
-    <section className="mb-6 border border-border/60 rounded-xl bg-secondary/50 p-5">
+    <section className="mb-6 rounded-lg border border-border/70 bg-card p-4">
       <div className="flex items-center justify-between mb-1.5">
         <h2 className="text-[14px] font-semibold">Data Hub</h2>
         <Toggle ariaLabel="Data Hub" size="sm" checked={hub.enabled} onChange={onToggle} />
       </div>
       {hub.enabled ? (
         <div className="flex items-center gap-2 mb-1.5">
-          {ping === 'checking' && <span className="w-2 h-2 rounded-full bg-muted-foreground/40 animate-pulse shrink-0" />}
-          {ping === 'ok' && <span className="w-2 h-2 rounded-full bg-success shrink-0" />}
-          {ping === 'down' && <span className="w-2 h-2 rounded-full bg-destructive shrink-0" />}
+          {ping === 'checking' && <LoaderCircle aria-hidden className="size-3.5 shrink-0 animate-spin text-muted-foreground motion-reduce:animate-none" />}
+          {ping === 'ok' && <CheckCircle2 aria-hidden className="size-3.5 shrink-0 text-success" />}
+          {ping === 'down' && <CircleAlert aria-hidden className="size-3.5 shrink-0 text-destructive" />}
           <span className="text-[13px] text-foreground">
             {ping === 'checking' && 'Checking…'}
-            {ping === 'ok' && <>Connected · <span className="font-mono text-[12px]">{host}</span></>}
+            {ping === 'ok' && <>Connected <span className="ml-1 font-mono text-[12px] text-muted-foreground">{host}</span></>}
             {ping === 'down' && 'Unreachable — using local sources'}
           </span>
         </div>
       ) : (
         <div className="flex items-center gap-2 mb-1.5">
-          <span className="w-2 h-2 rounded-full border border-muted-foreground/40 shrink-0" />
+          <MinusCircle aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
           <span className="text-[13px] text-muted-foreground">Off — boards and series use your own keys and vendors.</span>
         </div>
       )}
@@ -331,13 +333,13 @@ function HubCard({
 function SourcesCard({ rows, onAddFmp }: { rows: SourceRow[]; onAddFmp: () => void }) {
   return (
     <section className="mb-6">
-      <h2 className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Data Sources</h2>
-      <div className="border border-border/60 rounded-xl bg-secondary/50 divide-y divide-border/40">
+      <h2 className="mb-2 text-[13px] font-semibold text-foreground">Data sources</h2>
+      <div className="divide-y divide-border/40 overflow-hidden rounded-lg border border-border/70 bg-card">
         {rows.map((row) => (
           <div key={row.name} className="flex items-center gap-3 px-4 py-3">
-            <span
-              className={`w-2 h-2 rounded-full shrink-0 ${row.state === 'ok' ? 'bg-success' : 'border border-muted-foreground/50'}`}
-            />
+            {row.state === 'ok'
+              ? <CheckCircle2 aria-hidden className="size-3.5 shrink-0 text-success" />
+              : <MinusCircle aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />}
             <div className="flex-1 min-w-0">
               <span className="text-[13px] text-foreground font-medium">{row.name}</span>
               {row.detail && <span className="text-[12px] text-muted-foreground/60 ml-2">{row.detail}</span>}
@@ -346,12 +348,15 @@ function SourcesCard({ rows, onAddFmp }: { rows: SourceRow[]; onAddFmp: () => vo
               {row.source}
             </span>
             {row.cta && (
-              <button
+              <Button
+                type="button"
                 onClick={onAddFmp}
-                className="shrink-0 border border-primary/40 text-primary rounded-md px-2.5 py-1 text-[12px] font-medium cursor-pointer hover:bg-primary/10 transition-colors"
+                className="shrink-0 text-[12px]"
+                size="sm"
+                variant="outline"
               >
                 Add key
-              </button>
+              </Button>
             )}
           </div>
         ))}
@@ -371,7 +376,7 @@ function ChartVendorsSection({
 }) {
   return (
     <section className="mb-6">
-      <h2 className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Chart Vendors</h2>
+      <h2 className="mb-2 text-[13px] font-semibold text-foreground">Chart vendors</h2>
       <p className="text-[12px] text-muted-foreground/70 mb-2.5 max-w-[640px]">
         Live K-line &amp; quote sources — queried per symbol, never via the hub. Switch one on and it
         joins the search pool; what it covers is found by searching, not configured here. yfinance is
@@ -381,14 +386,16 @@ function ChartVendorsSection({
         {CHART_VENDORS.map((v) => {
           const on = v.alwaysOn || extraVendors.includes(v.id)
           return (
-            <div key={v.id} className="border border-border/60 rounded-xl bg-secondary/50 px-4 py-3.5">
+            <div key={v.id} className="rounded-lg border border-border/70 bg-card px-4 py-3.5">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${on ? 'bg-success' : 'border border-muted-foreground/50'}`} />
+                  {on
+                    ? <CheckCircle2 aria-hidden className="size-3.5 shrink-0 text-success" />
+                    : <MinusCircle aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />}
                   <span className="text-[13px] font-semibold text-foreground truncate">{v.name}</span>
                 </div>
                 {v.alwaysOn ? (
-                  <span className="text-[11px] text-muted-foreground/60 uppercase tracking-wider shrink-0">always on</span>
+                  <span className="shrink-0 text-[11px] font-medium text-muted-foreground">Always on</span>
                 ) : (
                   <Toggle ariaLabel={v.name} size="sm" checked={on} onChange={(val) => onToggle(v.id, val)} />
                 )}
@@ -425,16 +432,20 @@ function AdvancedSection({
 }) {
   return (
     <section className="mb-8">
-      <button
+      <Button
+        type="button"
         onClick={onToggle}
-        className="flex items-center gap-1.5 text-[13px] font-semibold text-muted-foreground hover:text-foreground cursor-pointer transition-colors py-1"
+        className="px-1 text-[13px]"
+        variant="ghost"
+        size="sm"
+        aria-expanded={open}
       >
-        <span className={`inline-block transition-transform text-[10px] ${open ? 'rotate-90' : ''}`}>▶</span>
+        <ChevronRight aria-hidden className={`size-3.5 transition-transform duration-[var(--motion-fast)] ${open ? 'rotate-90' : ''}`} />
         Advanced
-      </button>
+      </Button>
 
       {open && (
-        <div className="mt-2 border border-border/60 rounded-xl bg-secondary/30 px-5">
+        <div className="mt-2 rounded-lg border border-border/70 bg-card px-5">
           <KeyProvidersSection
             providerKeys={providerKeys}
             onKeyChange={onKeyChange}
@@ -451,7 +462,7 @@ function AdvancedSection({
               value={hub.baseUrl}
               onChange={(e) => onHubChange({ ...hub, baseUrl: e.target.value })}
               placeholder="https://traderhub.openalice.ai"
-              className="w-full max-w-[420px] px-2.5 py-1.5 bg-background text-foreground border border-border rounded-md text-[12px] font-mono outline-none focus:border-primary"
+              className={`${inputClass} max-w-[420px] font-mono text-[12px]`}
             />
           </ConfigSection>
         </div>
@@ -489,21 +500,23 @@ function TestButton({
   onClick: () => void
 }) {
   return (
-    <button
+    <Button
       type="button"
       onClick={onClick}
       disabled={disabled}
       aria-label={providerTestStatusLabel(providerName, status)}
-      className={`shrink-0 border rounded-md px-3 py-2 text-[13px] font-medium cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-default ${
+      variant="outline"
+      size="default"
+      className={`shrink-0 text-[13px] ${
         status === 'ok'
-          ? 'border-success text-success'
+          ? 'border-success/50 text-success'
           : status === 'error'
-            ? 'border-destructive text-destructive'
-            : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground'
+            ? 'border-destructive/50 text-destructive'
+            : 'text-muted-foreground'
       }`}
     >
       {status === 'testing' ? '...' : status === 'ok' ? 'OK' : status === 'error' ? 'Fail' : 'Test'}
-    </button>
+    </Button>
   )
 }
 
@@ -554,7 +567,7 @@ function KeyProvidersSection({
         {KEY_GROUPS.map((group, gi) => (
           <div key={gi}>
             {group.label && (
-              <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wider border-t border-border/40 pt-3 mb-3">
+              <p className="mb-3 border-t border-border/40 pt-3 text-[11px] font-medium text-muted-foreground">
                 {group.label}
               </p>
             )}

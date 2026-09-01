@@ -9,8 +9,10 @@ import { useTradingConfig } from '../hooks/useTradingConfig'
 import { useAccountHealth } from '../hooks/useAccountHealth'
 import { PageHeader } from '../components/PageHeader'
 import { EmptyState, Skeleton } from '../components/StateViews'
+import { Button, buttonVariants } from '../components/ui/button'
 import { ReconnectButton } from '../components/ReconnectButton'
 import { Toggle } from '../components/Toggle'
+import { SegmentedControl } from '../components/SegmentedControl'
 import { HealthBadge } from '../components/uta/HealthBadge'
 import { EditUTADialog } from '../components/uta/EditUTADialog'
 import { OrderEntryDialog, type OrderEntryMode } from '../components/uta/OrderEntryDialog'
@@ -192,7 +194,7 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
           description="It may have been deleted or never configured. Head back to Trading to create one or pick a different UTA."
         />
         <div className="mt-4">
-          <Link to="/trading" className="btn-secondary">← Back to Trading</Link>
+          <Link to="/trading" className={buttonVariants({ variant: 'outline', size: 'sm' })}>← Back to Trading</Link>
         </div>
       </Shell>
     )
@@ -208,20 +210,13 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
         live={{ lastUpdated }}
         stackActionsOnNarrow
         description={
-          <>
+          <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
             <Link to="/trading" className="text-muted-foreground hover:text-foreground">← Trading</Link>
-            <span className="mx-2 text-muted-foreground/40">·</span>
             <span className="font-mono text-muted-foreground">{uta.id}</span>
-            <span className="mx-2 text-muted-foreground/40">·</span>
             <HealthBadge health={health} size="sm" />
-          </>
+          </span>
         }
         right={
-          // One action row, one visual language: the enable toggle (state
-          // control) sits apart from the buttons behind a divider; the
-          // secondary actions share btn-secondary-sm; Place Order is the
-          // single filled-accent primary at the same size. No hand-rolled
-          // paddings — mixed sizes were what made this row look drunk.
           <div className="flex w-full flex-wrap items-center gap-2">
             <div className="mr-auto flex items-center gap-2">
               <Toggle
@@ -237,16 +232,16 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
             <div className="oa-uta-header-divider h-5 w-px bg-border" />
             <div className="flex flex-wrap items-center gap-2">
               <ReconnectButton accountId={uta.id} />
-              <button onClick={() => setEditing(true)} className="btn-secondary-sm">
+              <Button onClick={() => setEditing(true)} variant="outline" size="sm">
                 Edit
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => setOrderMode({ kind: 'place' })}
                 disabled={isDisabled}
-                className="btn-primary-sm"
+                size="sm"
               >
                 + Place Order
-              </button>
+              </Button>
             </div>
           </div>
         }
@@ -368,19 +363,16 @@ function SubAccountSelector({ subAccounts, selected, onSelect }: {
   selected: string | undefined
   onSelect: (id: string | undefined) => void
 }) {
-  const pill = (active: boolean) =>
-    `px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-      active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-    }`
   return (
-    <div className="flex items-center gap-1 p-1 rounded-lg bg-surface border border-border">
-      <button type="button" className={pill(selected === undefined)} onClick={() => onSelect(undefined)}>All</button>
-      {subAccounts.map(s => (
-        <button key={s.id} type="button" className={pill(selected === s.id)} onClick={() => onSelect(s.id)} title={`${s.kind} wallet`}>
-          {s.label}
-        </button>
-      ))}
-    </div>
+    <SegmentedControl
+      value={selected ?? 'all'}
+      options={[
+        { value: 'all', label: 'All' },
+        ...subAccounts.map(account => ({ value: account.id, label: account.label, ariaLabel: `${account.label}, ${account.kind} wallet` })),
+      ]}
+      onChange={(value) => onSelect(value === 'all' ? undefined : value)}
+      ariaLabel="Trading wallet"
+    />
   )
 }
 
@@ -434,7 +426,7 @@ function AccountPanel({ account, positions, delta24h, clock, connecting }: {
 }) {
   if (!account) {
     return (
-      <div className="border border-border rounded-lg bg-secondary p-4">
+      <div className="rounded-lg border border-border bg-card p-4">
         {clock != null && (
           <div className="text-[12px] mb-3"><MarketClockChip clock={clock} /></div>
         )}
@@ -491,7 +483,7 @@ function AccountPanel({ account, positions, delta24h, clock, connecting }: {
     : null
 
   return (
-    <div className="border border-border rounded-lg bg-secondary p-4">
+    <div className="rounded-lg border border-border bg-card p-4">
       {clock != null && (
         <div className="text-[12px] mb-3"><MarketClockChip clock={clock} /></div>
       )}
@@ -514,7 +506,7 @@ function AccountPanel({ account, positions, delta24h, clock, connecting }: {
         {utilizationPct != null && (
           <div className="py-2">
             <div className="flex items-baseline justify-between gap-3">
-              <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Utilization</span>
+              <span className="text-[11px] font-medium text-muted-foreground">Utilization</span>
               <span className="text-[13px] font-medium tabular-nums text-foreground">{utilizationPct.toFixed(1)}%</span>
             </div>
             <div className="mt-1.5 h-[2px] rounded-full bg-muted overflow-hidden">
@@ -566,7 +558,7 @@ function AccountRow({ label, value, sign }: {
   const valueColor = sign === 'up' ? 'text-success' : sign === 'down' ? 'text-destructive' : 'text-foreground'
   return (
     <div className="flex items-baseline justify-between gap-3 py-2">
-      <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
       <span className={`text-[13px] font-medium tabular-nums text-right ${valueColor}`}>{value}</span>
     </div>
   )
@@ -578,7 +570,7 @@ function Section({ title, action, children }: { title: string; action?: React.Re
   return (
     <section>
       <div className="flex items-center justify-between mb-2.5">
-        <h3 className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide">{title}</h3>
+        <h3 className="text-[13px] font-semibold text-foreground">{title}</h3>
         {action}
       </div>
       {children}
@@ -609,9 +601,7 @@ export function PositionsSection({ positions, onCloseClick }: {
   if (positions.length === 0) {
     return (
       <Section title="Positions (0)">
-        <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-muted-foreground">
-          No open positions.
-        </div>
+        <p className="py-3 text-caption text-muted-foreground">No open positions.</p>
       </Section>
     )
   }
@@ -634,7 +624,6 @@ export function PositionsSection({ positions, onCloseClick }: {
               <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 bg-muted/40 px-3 py-2 text-[11px]">
                 <div className="flex items-center gap-1.5">
                   <span className="font-semibold text-foreground">{assetClassLabel(g.class)}</span>
-                  <span className="text-muted-foreground/60">·</span>
                   <span className="text-muted-foreground">
                     {g.positions.length} position{g.positions.length > 1 ? 's' : ''}
                   </span>
@@ -692,7 +681,6 @@ export function PositionsSection({ positions, onCloseClick }: {
                       <div className="flex items-center justify-between text-[12px]">
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-foreground">{assetClassLabel(g.class)}</span>
-                          <span className="text-muted-foreground/60">·</span>
                           <span className="text-muted-foreground">{g.positions.length} position{g.positions.length > 1 ? 's' : ''}</span>
                           {!groupCcy && (
                             <span className="text-muted-foreground/60 text-[11px]">mixed ccy</span>
@@ -731,8 +719,8 @@ function PositionMetric({
 }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</dt>
-      <dd className={`mt-0.5 truncate text-[12px] tabular-nums ${valueClassName}`} title={value}>{value}</dd>
+      <dt className="text-[11px] font-medium text-muted-foreground">{label}</dt>
+      <dd className={`mt-0.5 truncate text-caption tabular-nums ${valueClassName}`} title={value}>{value}</dd>
     </div>
   )
 }
@@ -749,19 +737,20 @@ function PositionMobileRow({ position: p, onClose }: { position: Position; onClo
     <details className="group border-t border-border">
       <summary
         aria-label={`${name} ${p.side} position, market value ${fmt(p.marketValue, ccy)}, PnL ${fmtPnl(pnl, ccy)}, ${fmtPctSigned(pct)}. Expand for position details.`}
-        className="list-none px-3 py-3 outline-none transition-colors hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary [&::-webkit-details-marker]:hidden"
+        className="list-none px-3 py-3 outline-none hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary [&::-webkit-details-marker]:hidden"
       >
         <div className="grid grid-cols-[minmax(0,1fr)_auto_16px] items-start gap-2">
           <div className="min-w-0">
             <ContractCell contract={p.contract} />
-            <span className={`mt-1 inline-flex rounded px-1.5 py-0.5 text-[10px] font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
+            <span className={`mt-1 inline-flex rounded-sm px-1.5 py-0.5 text-[10px] font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
               {p.side}
             </span>
           </div>
           <div className="shrink-0 text-right">
             <div className="text-[13px] font-semibold tabular-nums text-foreground">{fmt(p.marketValue, ccy)}</div>
-            <div className={`mt-1 text-[11px] tabular-nums ${pnlTone}`}>
-              {fmtPnl(pnl, ccy)} · {fmtPctSigned(pct)}
+            <div className={`mt-1 flex justify-end gap-2 text-[11px] tabular-nums ${pnlTone}`}>
+              <span>{fmtPnl(pnl, ccy)}</span>
+              <span>{fmtPctSigned(pct)}</span>
             </div>
           </div>
           <ChevronDown
@@ -783,14 +772,16 @@ function PositionMobileRow({ position: p, onClose }: { position: Position; onClo
       </dl>
       <div className="flex items-center justify-between gap-3 border-t border-border bg-secondary/20 px-3 py-2">
         <span className="text-[11px] text-muted-foreground">Position action</span>
-        <button
+        <Button
           type="button"
           onClick={onClose}
           aria-label={`Close ${name} position`}
-          className="oa-pressable inline-flex min-h-10 items-center justify-center rounded-md border border-destructive/30 px-3 text-[12px] font-medium text-destructive transition-colors hover:bg-destructive/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/40"
+          className="min-h-10"
+          variant="destructive"
+          size="sm"
         >
           Close position
-        </button>
+        </Button>
       </div>
     </details>
   )
@@ -803,12 +794,12 @@ function PositionRow({ position: p, onClose }: { position: Position; onClose: ()
   const pct = cost > 0 ? (pnl / cost) * 100 : 0
 
   return (
-    <tr className="border-t border-border hover:bg-muted/30 transition-colors">
+    <tr className="border-t border-border hover:bg-muted/30">
       <td className="px-3 py-2">
         <ContractCell contract={p.contract} />
       </td>
       <td className="px-3 py-2">
-        <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
+        <span className={`rounded-sm px-1.5 py-0.5 text-[10px] font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
           {p.side}
         </span>
       </td>
@@ -822,14 +813,16 @@ function PositionRow({ position: p, onClose }: { position: Position; onClose: ()
         <div className="text-[11px] font-normal opacity-80">{fmtPctSigned(pct)}</div>
       </td>
       <td className="px-3 py-2 text-right">
-        <button
+        <Button
           type="button"
           onClick={onClose}
           aria-label={`Close ${contractPrimary(p.contract)} position`}
-          className="text-[11px] text-muted-foreground hover:text-destructive transition-colors"
+          variant="ghost"
+          size="xs"
+          className="text-muted-foreground hover:text-destructive"
         >
           Close
-        </button>
+        </Button>
       </td>
     </tr>
   )
@@ -848,7 +841,7 @@ function MarketClockChip({ clock }: { clock: NonNullable<MarketClockState> }) {
       const closes = clock.nextClose ? new Date(clock.nextClose) : null
       if (closes && !Number.isNaN(closes.getTime())) {
         const at = closes.toLocaleTimeString(getIntlLocale(), { hour: '2-digit', minute: '2-digit', hour12: false })
-        label = `Market Open · closes ${at}`
+        label = `Market open, closes ${at}`
       } else if (!clock.nextOpen && !clock.nextClose) {
         label = '24/7'  // crypto venues report open with no schedule
       } else {
@@ -861,7 +854,7 @@ function MarketClockChip({ clock }: { clock: NonNullable<MarketClockState> }) {
         const mins = Math.max(0, Math.round((opens.getTime() - Date.now()) / 60_000))
         const h = Math.floor(mins / 60)
         const m = mins % 60
-        label = `Market Closed · opens in ${h > 0 ? `${h}h ` : ''}${m}m`
+        label = `Market closed, opens in ${h > 0 ? `${h}h ` : ''}${m}m`
       } else {
         label = 'Market Closed'
       }
@@ -927,24 +920,17 @@ export function OrdersArea({ utaId, openOrders }: { utaId: string; openOrders: u
     <Section
       title="Orders"
       action={
-        <div className="flex gap-1" role="group" aria-label="Order views">
-          {tabs.map(t => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTab(t.id)}
-              aria-pressed={tab === t.id}
-              aria-controls={`orders-${t.id}-panel`}
-              className={`px-2 py-0.5 text-[11px] rounded transition-colors ${
-                tab === t.id
-                  ? 'bg-primary/15 text-primary font-medium'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          value={tab}
+          options={tabs.map(candidate => ({
+            value: candidate.id,
+            label: candidate.label,
+            ariaControls: `orders-${candidate.id}-panel`,
+          }))}
+          onChange={setTab}
+          ariaLabel="Order views"
+          compact
+        />
       }
     >
       <div
@@ -964,9 +950,7 @@ function OpenOrdersTable({ orders }: { orders: unknown[] }) {
   const rows = orders as OpenOrderRow[]
   if (rows.length === 0) {
     return (
-      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-muted-foreground">
-        No open orders.
-      </div>
+      <p className="py-3 text-caption text-muted-foreground">No open orders.</p>
     )
   }
   return (
@@ -1019,7 +1003,7 @@ const ORDER_HISTORY_COMPACT_WIDTH = 760
 
 function OrderStatusBadge({ status }: { status: OrderHistoryStatus }) {
   return (
-    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${ORDER_STATUS_STYLES[status] ?? 'bg-muted text-muted-foreground'}`}>
+    <span className={`rounded-sm px-1.5 py-0.5 text-[10px] font-medium ${ORDER_STATUS_STYLES[status] ?? 'bg-muted text-muted-foreground'}`}>
       {status}
     </span>
   )
@@ -1027,7 +1011,7 @@ function OrderStatusBadge({ status }: { status: OrderHistoryStatus }) {
 
 function SideBadge({ side }: { side: 'BUY' | 'SELL' }) {
   return (
-    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${side === 'BUY' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
+    <span className={`rounded-sm px-1.5 py-0.5 text-[10px] font-medium ${side === 'BUY' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
       {side}
     </span>
   )
@@ -1035,7 +1019,7 @@ function SideBadge({ side }: { side: 'BUY' | 'SELL' }) {
 
 function SourceChip({ label }: { label: string }) {
   return (
-    <span className="text-[10px] px-1.5 rounded bg-muted text-muted-foreground">
+    <span className="rounded-sm bg-muted px-1.5 text-[10px] text-muted-foreground">
       {label}
     </span>
   )
@@ -1057,16 +1041,12 @@ export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | nu
 
   if (orders == null) {
     return (
-      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-muted-foreground">
-        Loading order history…
-      </div>
+      <p className="py-3 text-caption text-muted-foreground">Loading order history…</p>
     )
   }
   if (orders.length === 0) {
     return (
-      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-muted-foreground">
-        No order history yet.
-      </div>
+      <p className="py-3 text-caption text-muted-foreground">No order history yet.</p>
     )
   }
 
@@ -1078,7 +1058,7 @@ export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | nu
             const detailsId = `order-history-card-details-${i}`
             const isExpanded = expanded === i
             return (
-              <li key={`${o.commitHash}-${i}`} className="overflow-hidden rounded-lg border border-border bg-background">
+              <li key={`${o.commitHash}-${i}`} className="overflow-hidden rounded-lg border border-border bg-card">
                 <div className="p-3">
                   <div className="flex items-start justify-between gap-3">
                     <ContractCell contract={o.contract} />
@@ -1090,46 +1070,46 @@ export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | nu
 
                   <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
                     <span className="tabular-nums">{formatHistoryTime(o.timestamp)}</span>
-                    <span aria-hidden>·</span>
                     <SideBadge side={o.side} />
-                    <span aria-hidden>·</span>
                     <span>{o.orderType ?? '—'}</span>
                   </div>
 
                   <dl className="mt-3 grid grid-cols-3 gap-2">
-                    <div className="min-w-0 rounded-md bg-muted/35 px-2.5 py-2">
-                      <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">Qty</dt>
+                    <div className="min-w-0 border-l border-border pl-2.5">
+                      <dt className="text-[11px] font-medium text-muted-foreground">Qty</dt>
                       <dd className="mt-0.5 truncate text-[12px] text-foreground tabular-nums">
                         {o.quantity != null ? fmtNum(o.quantity) : '—'}
                       </dd>
                     </div>
-                    <div className="min-w-0 rounded-md bg-muted/35 px-2.5 py-2">
-                      <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">Limit</dt>
+                    <div className="min-w-0 border-l border-border pl-2.5">
+                      <dt className="text-[11px] font-medium text-muted-foreground">Limit</dt>
                       <dd className="mt-0.5 truncate text-[12px] text-foreground tabular-nums">{o.limitPrice ?? '—'}</dd>
                     </div>
-                    <div className="min-w-0 rounded-md bg-muted/35 px-2.5 py-2">
-                      <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">Fill</dt>
+                    <div className="min-w-0 border-l border-border pl-2.5">
+                      <dt className="text-[11px] font-medium text-muted-foreground">Fill</dt>
                       <dd className="mt-0.5 truncate text-[12px] text-foreground tabular-nums">
                         {o.avgFillPrice ? `${o.avgFillPrice}${o.filledQty ? ` × ${o.filledQty}` : ''}` : '—'}
                       </dd>
                     </div>
                   </dl>
 
-                  <button
+                  <Button
                     type="button"
                     aria-expanded={isExpanded}
                     aria-controls={detailsId}
                     aria-label={`${isExpanded ? 'Hide' : 'Show'} details for ${contractPrimary(o.contract)} order`}
                     onClick={() => setExpanded(prev => prev === i ? null : i)}
-                    className="oa-pressable mt-3 flex w-full items-center justify-between rounded-md border border-border px-3 py-2 text-[11px] text-muted-foreground hover:text-foreground"
+                    className="mt-3 w-full justify-between text-[11px]"
+                    variant="outline"
+                    size="sm"
                   >
                     <span>Order details</span>
                     <span>{isExpanded ? 'Hide' : 'Show'}</span>
-                  </button>
+                  </Button>
                 </div>
 
                 {isExpanded && (
-                  <div id={detailsId} className="oa-disclosure-enter border-t border-border bg-muted/20 px-3 py-2.5 text-[11px] text-muted-foreground">
+                  <div id={detailsId} className="border-t border-border bg-muted/20 px-3 py-2.5 text-[11px] text-muted-foreground">
                     <div className="font-mono text-foreground">{o.commitHash}</div>
                     <p className="mt-1 break-words leading-5">{o.message}</p>
                     {o.error && <p className="mt-1 break-words text-destructive">{o.error}</p>}
@@ -1164,7 +1144,7 @@ export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | nu
           {orders.map((o, i) => (
             <Fragment key={`${o.commitHash}-${i}`}>
               <tr
-                className="border-t border-border hover:bg-muted/30 transition-colors cursor-pointer"
+                className="cursor-pointer border-t border-border hover:bg-muted/30"
                 onClick={() => setExpanded(prev => prev === i ? null : i)}
               >
                 <td className="px-3 py-2 text-muted-foreground tabular-nums whitespace-nowrap">{formatHistoryTime(o.timestamp)}</td>
@@ -1183,7 +1163,7 @@ export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | nu
                   </span>
                 </td>
                 <td className="px-3 py-2 text-right">
-                  <button
+                  <Button
                     type="button"
                     aria-expanded={expanded === i}
                     aria-controls={`order-history-details-${i}`}
@@ -1192,10 +1172,12 @@ export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | nu
                       event.stopPropagation()
                       setExpanded(prev => prev === i ? null : i)
                     }}
-                    className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                    className="text-muted-foreground"
+                    variant="ghost"
+                    size="xs"
                   >
                     {expanded === i ? 'Hide' : 'Details'}
-                  </button>
+                  </Button>
                 </td>
               </tr>
               {expanded === i && (
@@ -1223,16 +1205,12 @@ export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | nu
 function TradeHistoryTable({ trades }: { trades: TradeHistoryEntry[] | null }) {
   if (trades == null) {
     return (
-      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-muted-foreground">
-        Loading trade history…
-      </div>
+      <p className="py-3 text-caption text-muted-foreground">Loading trade history…</p>
     )
   }
   if (trades.length === 0) {
     return (
-      <div className="border border-border rounded-lg px-4 py-3 text-[12px] text-muted-foreground">
-        No trades yet.
-      </div>
+      <p className="py-3 text-caption text-muted-foreground">No trades yet.</p>
     )
   }
   return (
@@ -1251,7 +1229,7 @@ function TradeHistoryTable({ trades }: { trades: TradeHistoryEntry[] | null }) {
         </thead>
         <tbody>
           {trades.map((t, i) => (
-            <tr key={`${t.commitHash}-${i}`} className="border-t border-border hover:bg-muted/30 transition-colors">
+            <tr key={`${t.commitHash}-${i}`} className="border-t border-border hover:bg-muted/30">
               <td className="px-3 py-2 text-muted-foreground tabular-nums whitespace-nowrap">{formatHistoryTime(t.timestamp)}</td>
               <td className="px-3 py-2"><ContractCell contract={t.contract} /></td>
               <td className="px-3 py-2"><SideBadge side={t.side} /></td>

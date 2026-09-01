@@ -252,7 +252,7 @@ describe('AutomationRunsSection run controls', () => {
     expect(within(summary).getByText('42 attention')).toBeTruthy()
     expect(within(summary).getByText('CLI formats')).toBeTruthy()
     expect(within(summary).getByText('No workers active')).toBeTruthy()
-    expect(within(summary).getByText('Showing 1 · 105 completed · 42 need attention')).toBeTruthy()
+    expect(within(summary).getByText('Showing 1, 105 completed, 42 need attention')).toBeTruthy()
   })
 
   it('gives expanded run actions and pagination mobile-sized touch targets', async () => {

@@ -13,6 +13,9 @@ import {
   Users,
 } from 'lucide-react'
 
+import { inputClass } from '../form'
+import { Button } from '../ui/button'
+import { SelectionCheckIcon } from '../ui/selection-check-icon'
 import {
   applyWorkspaceAbsorb,
   getWorkspaceAbsorbPlan,
@@ -118,7 +121,7 @@ export function WorkspaceAbsorbPanel({
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex flex-1 items-center justify-center overflow-y-auto p-6 text-center">
           <div className="max-w-md">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-success/10 text-success">
+            <div className="mx-auto flex h-8 w-8 items-center justify-center text-success">
               <Check size={24} />
             </div>
             <h3 className="mt-4 text-[16px] font-semibold text-foreground">Workspace absorbed</h3>
@@ -126,13 +129,13 @@ export function WorkspaceAbsorbPanel({
               The source desk is archived intact. {result.changedPaths.length} reviewed file{result.changedPaths.length === 1 ? '' : 's'} landed in this Workspace.
             </p>
             <div className="mt-4 rounded-lg border border-border bg-secondary/35 px-3 py-2 text-left">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Audit commit</div>
+              <div className="text-[11px] font-medium text-muted-foreground">Audit commit</div>
               <code className="mt-1 block font-mono text-[12px] text-foreground">{result.commit}</code>
             </div>
           </div>
         </div>
         <div className="flex justify-end border-t border-border bg-secondary/30 p-3">
-          <button type="button" onClick={onClose} className="btn-primary">Done</button>
+          <Button type="button" onClick={onClose}>Done</Button>
         </div>
       </div>
     )
@@ -141,9 +144,9 @@ export function WorkspaceAbsorbPanel({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
-        <section className="overflow-hidden rounded-xl border border-border bg-secondary/25">
+        <section className="overflow-hidden rounded-lg border border-border bg-secondary/25">
           <div className="p-4">
-            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/75">
+            <div className="flex items-center gap-2 text-[12px] font-semibold text-muted-foreground">
               <FileInput size={14} />
               Absorb another Workspace
             </div>
@@ -154,7 +157,7 @@ export function WorkspaceAbsorbPanel({
               <DirectionCard label="Keep this Workspace" workspace={target} tone="target" />
               <ArrowRight size={16} className="mx-auto rotate-90 text-muted-foreground sm:rotate-0" />
               <label className="flex min-w-0 flex-col justify-center rounded-lg border border-dashed border-border bg-background px-3 py-2.5">
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Archive after absorb</span>
+                <span className="text-[11px] font-medium text-muted-foreground">Archive after absorb</span>
                 <select
                   value={sourceId}
                   onChange={(event) => {
@@ -163,7 +166,7 @@ export function WorkspaceAbsorbPanel({
                     setResult(null)
                     setError(null)
                   }}
-                  className="mt-1 min-w-0 bg-transparent text-[13px] font-semibold text-foreground outline-none"
+                  className={`${inputClass} mt-1 font-semibold`}
                   aria-label="Workspace to absorb"
                 >
                   <option value="">Choose a Workspace…</option>
@@ -193,21 +196,22 @@ export function WorkspaceAbsorbPanel({
 
         {plan && (
           <>
-            <section className="overflow-hidden rounded-xl border border-border bg-secondary/25">
+            <section className="overflow-hidden rounded-lg border border-border bg-secondary/25">
               <div className="flex items-center justify-between gap-3 p-3.5">
                 <div>
                   <div className="text-[12px] font-semibold text-foreground">What comes over</div>
                   <p className="mt-0.5 text-[11px] text-muted-foreground">Git-tracked and non-ignored working files only.</p>
                 </div>
-                <button
+                <Button
                   type="button"
                   onClick={() => void load()}
                   disabled={loading || applying}
-                  className="oa-pressable inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-50"
+                  variant="outline"
+                  size="sm"
                 >
                   <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
                   Refresh
-                </button>
+                </Button>
               </div>
               <div className="grid grid-cols-4 border-t border-border bg-background/45">
                 <Metric value={plan.summary.ready} label="New" tone="accent" />
@@ -230,7 +234,6 @@ export function WorkspaceAbsorbPanel({
             {plan.summary.ready > 0 && (
               <FileGroup
                 title="Ready to bring over"
-                description="These paths are free in the target Workspace."
                 files={plan.files.filter((file) => file.status === 'ready')}
                 icon="ready"
                 defaultOpen
@@ -240,14 +243,13 @@ export function WorkspaceAbsorbPanel({
             {plan.summary.duplicates > 0 && (
               <FileGroup
                 title="Already identical"
-                description="No second copy or rewrite is needed."
                 files={plan.files.filter((file) => file.status === 'duplicate')}
                 icon="same"
               />
             )}
 
             {conflicts.length > 0 && (
-              <section className="overflow-hidden rounded-xl border border-warning/35 bg-secondary/20">
+              <section className="overflow-hidden rounded-lg border border-warning/35 bg-secondary/20">
                 <div className="border-b border-border px-4 py-3">
                   <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
                     <AlertTriangle size={15} className="text-warning" />
@@ -288,16 +290,16 @@ export function WorkspaceAbsorbPanel({
           {plan && unresolved > 0 && <>Resolve {unresolved} path collision{unresolved === 1 ? '' : 's'} first.</>}
         </div>
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} disabled={applying} className="btn-secondary">Cancel</button>
-          <button
+          <Button type="button" variant="outline" onClick={onClose} disabled={applying}>Cancel</Button>
+          <Button
             type="button"
             onClick={() => void apply()}
             disabled={!canApply}
-            className="oa-pressable inline-flex min-h-9 items-center gap-2 whitespace-nowrap rounded-lg bg-primary px-4 text-[12px] font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
+            className="whitespace-nowrap"
           >
             {applying ? <LoaderCircle size={14} className="animate-spin" /> : <Archive size={14} />}
             {applying ? 'Absorbing…' : plan ? 'Absorb and archive source' : 'Choose a Workspace'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -311,7 +313,7 @@ function DirectionCard({ label, workspace, tone }: {
 }): ReactElement {
   return (
     <div className={`min-w-0 rounded-lg border px-3 py-2.5 ${tone === 'target' ? 'border-primary/35 bg-primary/6' : 'border-border bg-background'}`}>
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-[11px] font-medium text-muted-foreground">{label}</div>
       <div className="mt-1 truncate text-[13px] font-semibold text-foreground">{workspace.displayName?.trim() || workspace.tag}</div>
       <code className="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground">{workspace.tag}</code>
     </div>
@@ -341,13 +343,13 @@ function RetirementImpact({ plan }: { plan: WorkspaceAbsorbPlan }): ReactElement
     `${inventory.scheduledIssues.length} schedule${inventory.scheduledIssues.length === 1 ? '' : 's'} stopped`,
   ]
   return (
-    <section className="rounded-xl border border-border bg-secondary/20 px-4 py-3">
+    <section className="rounded-lg border border-border bg-secondary/20 px-4 py-3">
       <div className="flex items-start gap-3">
         <Users size={16} className="mt-0.5 shrink-0 text-muted-foreground" />
         <div className="min-w-0">
           <div className="text-[12px] font-semibold text-foreground">What retires with {plan.source.tag}</div>
           <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-            {facts.join(' · ')}. They remain in the archived desk for audit and restore; they do not become target identities.
+            {facts.join(', ')}. They remain in the archived desk for audit and restore; they do not become target identities.
           </p>
         </div>
       </div>
@@ -376,28 +378,26 @@ function ActivityBlockers({ plan }: { plan: WorkspaceAbsorbPlan }): ReactElement
   )
 }
 
-function FileGroup({ title, description, files, icon, defaultOpen = false }: {
+function FileGroup({ title, files, icon, defaultOpen = false }: {
   title: string
-  description: string
   files: readonly WorkspaceAbsorbFilePlan[]
   icon: 'ready' | 'same'
   defaultOpen?: boolean
 }): ReactElement {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <section className="rounded-xl border border-border bg-secondary/20">
-      <button type="button" onClick={() => setOpen((value) => !value)} className="oa-pressable flex w-full items-start gap-3 rounded-xl px-4 py-3 text-left" aria-expanded={open}>
+    <section className="rounded-lg border border-border bg-secondary/20">
+      <Button type="button" variant="ghost" onClick={() => setOpen((value) => !value)} className="h-auto w-full justify-start gap-3 whitespace-normal rounded-lg px-4 py-3 text-left" aria-expanded={open}>
         {open ? <ChevronDown size={15} className="mt-0.5 text-muted-foreground" /> : <ChevronRight size={15} className="mt-0.5 text-muted-foreground" />}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
             {title}
             <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">{files.length}</span>
           </div>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">{description}</p>
         </div>
-      </button>
+      </Button>
       {open && (
-        <div className="oa-disclosure-enter border-t border-border px-4 py-2">
+        <div className="border-t border-border px-4 py-2">
           {files.map((file) => (
             <div key={file.path} className="flex items-center gap-2 border-b border-border/60 py-2 last:border-b-0">
               {icon === 'ready' ? <Check size={13} className="text-primary" /> : <ShieldCheck size={13} className="text-muted-foreground" />}
@@ -422,7 +422,7 @@ function ConflictFile({ file, value, onChange }: {
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <code className="block truncate font-mono text-[11px] font-semibold text-foreground" title={file.path}>{file.path}</code>
-          <p className="mt-1 text-[10px] text-muted-foreground">Source {formatBytes(file.sourceSize)} · Target {file.targetSize === null ? 'non-file path' : formatBytes(file.targetSize)}</p>
+          <p className="mt-1 text-[10px] text-muted-foreground">Source {formatBytes(file.sourceSize)}, target {file.targetSize === null ? 'non-file path' : formatBytes(file.targetSize)}</p>
         </div>
         <div className="flex shrink-0 flex-wrap rounded-lg border border-border bg-background p-0.5" role="radiogroup" aria-label={file.path}>
           <Choice active={value === 'target'} onClick={() => onChange('target')}>Keep target</Choice>
@@ -430,12 +430,12 @@ function ConflictFile({ file, value, onChange }: {
           <Choice active={value === 'both'} onClick={() => onChange('both')}>Keep both</Choice>
         </div>
       </div>
-      <button type="button" onClick={() => setPreviewOpen((open) => !open)} className="oa-pressable mt-2 inline-flex items-center gap-1.5 rounded-md px-1 py-1 text-[11px] text-muted-foreground hover:text-foreground" aria-expanded={previewOpen}>
+      <Button type="button" variant="ghost" size="sm" onClick={() => setPreviewOpen((open) => !open)} className="mt-2 px-1 text-[11px] text-muted-foreground" aria-expanded={previewOpen}>
         {previewOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         Compare
-      </button>
+      </Button>
       {previewOpen && (
-        <div className="oa-disclosure-enter mt-2 grid gap-2 lg:grid-cols-2">
+        <div className="mt-2 grid gap-2 lg:grid-cols-2">
           <Preview title="Target copy" value={file.targetPreview} truncated={file.targetTruncated} />
           <Preview title="Source copy" value={file.sourcePreview} truncated={file.sourceTruncated} />
         </div>
@@ -451,9 +451,10 @@ function Choice({ active, disabled = false, onClick, children }: {
   children: React.ReactNode
 }): ReactElement {
   return (
-    <button type="button" role="radio" aria-checked={active} disabled={disabled} onClick={onClick} className={`oa-pressable rounded-md px-2.5 py-1.5 text-[10px] font-medium disabled:cursor-not-allowed disabled:opacity-35 ${active ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
+    <Button type="button" role="radio" aria-checked={active} disabled={disabled} onClick={onClick} variant="ghost" size="xs" className={active ? 'bg-muted text-foreground' : 'text-muted-foreground'}>
+      {active && <SelectionCheckIcon />}
       {children}
-    </button>
+    </Button>
   )
 }
 

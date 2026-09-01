@@ -27,6 +27,7 @@ import {
 } from '../theme/styleProfiles'
 import { useEffectivePreferenceSlot } from '../theme/useEffectiveTheme'
 import { AboutOpenAliceSection } from '../components/settings/AboutOpenAliceSection'
+import { Button } from '../components/ui/button'
 
 // ==================== Appearance ====================
 
@@ -157,20 +158,18 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
                 })}
               </p>
             </div>
-            <button
+            <Button
               type="button"
               onClick={applyRecommendedPalette}
               aria-pressed={recommendedPaletteApplied}
-              className={`oa-pressable min-h-10 shrink-0 rounded-md border px-3 py-1.5 text-[11px] font-medium sm:min-h-8 ${
-                recommendedPaletteApplied
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-border bg-background text-foreground hover:border-primary/35 hover:text-primary'
-              }`}
+              variant={recommendedPaletteApplied ? 'default' : 'outline'}
+              size="sm"
+              className="min-h-10 shrink-0 sm:min-h-8"
             >
               {t(recommendedPaletteApplied
                 ? 'settings.appearance.useSavedPalettes'
                 : 'settings.appearance.applyRecommendedPalette')}
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -217,8 +216,8 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
             })}
           </span>
           {theme === 'auto' && (
-            <span className="oa-palette-preview-muted shrink-0">
-              · {t('settings.appearance.followsSystem')}
+            <span className="oa-palette-preview-muted ml-1 shrink-0">
+              {t('settings.appearance.followsSystem')}
             </span>
           )}
         </div>
@@ -234,21 +233,23 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
               {t('settings.appearance.themePairDescription')}
             </p>
           </div>
-          <button
+          <Button
             type="button"
             onClick={() => setCustomizingPalettes((current) => !current)}
             aria-expanded={customizingPalettes}
             aria-controls={paletteEditorId}
-            className="oa-pressable inline-flex min-h-10 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-[11px] font-medium text-foreground hover:border-primary/35 hover:text-primary sm:min-h-8"
+            variant="outline"
+            size="sm"
+            className="min-h-10 sm:min-h-8"
           >
             {t(customizingPalettes
               ? 'settings.appearance.hidePaletteEditor'
               : 'settings.appearance.customizePalettes')}
             <ChevronDown
-              className={`h-3.5 w-3.5 transition-transform ${customizingPalettes ? 'rotate-180' : ''}`}
+              className={`h-3.5 w-3.5 transition-transform duration-[var(--motion-fast)] ${customizingPalettes ? 'rotate-180' : ''}`}
               aria-hidden
             />
-          </button>
+          </Button>
         </div>
 
         <div className="mt-3 grid grid-cols-2 gap-2.5 sm:gap-3">
@@ -272,7 +273,7 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
           id={paletteEditorId}
           hidden={!customizingPalettes}
           inert={!customizingPalettes ? true : undefined}
-          className="oa-disclosure-enter mt-4 border-t border-border/60 pt-4"
+          className="mt-4 border-t border-border/60 pt-4"
         >
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -284,15 +285,17 @@ export function AppearanceSection({ standalone = false }: { standalone?: boolean
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <button
+              <Button
                 type="button"
                 onClick={resetPair}
                 disabled={isDefaultPair}
-                className="oa-pressable inline-flex min-h-10 items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[11px] text-muted-foreground hover:text-foreground disabled:cursor-default disabled:opacity-45 sm:min-h-8"
+                variant="outline"
+                size="sm"
+                className="min-h-10 text-muted-foreground sm:min-h-8"
               >
                 <RotateCcw className="h-3.5 w-3.5" aria-hidden />
                 {t('settings.appearance.resetPair')}
-              </button>
+              </Button>
               <div
                 className="inline-flex rounded-md border border-border bg-background p-0.5"
                 role="group"
@@ -403,7 +406,7 @@ function PaletteSlotCard({
         palette: t(palette.labelKey),
       })}
       onClick={onSelect}
-      className="oa-palette-preview oa-pressable min-w-0 rounded-xl border p-2.5 text-left shadow-sm transition-[border-color,box-shadow,transform] sm:p-3"
+      className="oa-palette-preview oa-pressable min-w-0 rounded-lg border p-2.5 text-left shadow-sm transition-[border-color,box-shadow,transform] sm:p-3"
     >
       <span className="flex min-w-0 items-start justify-between gap-2 sm:gap-3">
         <span className="min-w-0">
@@ -538,19 +541,16 @@ export function LanguageSection() {
         aria-label={t('settings.language.title')}
       >
         {(['en', 'zh', 'ja', 'zh-Hant'] as const).map((l) => (
-          <button
+          <Button
             key={l}
             type="button"
             onClick={() => setLocale(l)}
             aria-pressed={locale === l}
-            className={`min-h-10 rounded border px-3 py-1.5 text-sm transition-colors sm:min-h-0 ${
-              locale === l
-                ? 'border-primary text-primary bg-primary/10'
-                : 'border-border text-muted-foreground hover:text-foreground'
-            }`}
+            variant={locale === l ? 'secondary' : 'outline'}
+            className={`min-h-10 sm:min-h-8 ${locale === l ? 'text-primary' : 'text-muted-foreground'}`}
           >
             {LOCALE_LABELS[l]}
-          </button>
+          </Button>
         ))}
       </div>
     </ConfigSection>
@@ -633,7 +633,7 @@ export function DataHomeSection() {
     >
       <div className="rounded-lg border border-border/60 bg-secondary/50 px-3 py-3">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+          <p className="text-[12px] font-medium text-muted-foreground">
             {t('settings.dataHome.current')}
           </p>
           {status && (
@@ -651,28 +651,31 @@ export function DataHomeSection() {
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <button
+        <Button
           type="button"
-          className="btn-secondary-sm min-h-10 sm:min-h-0"
+          variant="outline"
+          size="sm"
+          className="min-h-10 sm:min-h-8"
           disabled={!status || busy}
           onClick={() => void bridge.openCurrent()
             .then((message) => { if (message) setError(t('settings.dataHome.openError')) })
             .catch(() => setError(t('settings.dataHome.openError')))}
         >
           {t('settings.dataHome.open')}
-        </button>
-        <button
+        </Button>
+        <Button
           data-testid="data-home-choose"
           type="button"
-          className="btn-primary-sm min-h-10 sm:min-h-0"
+          size="sm"
+          className="min-h-10 sm:min-h-8"
           disabled={!status || busy || restarting || status.selectionLocked}
           onClick={() => void runAction(() => bridge.chooseAndRestart())}
         >
           {restarting ? t('settings.dataHome.restarting') : t('settings.dataHome.chooseAndRestart')}
-        </button>
+        </Button>
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-4 rounded-lg border border-border/60 px-3 py-2.5">
+      <div className="mt-4 flex min-h-12 items-center justify-between gap-4 rounded-lg border border-border/60 px-3 py-2.5">
         <div className="flex-1">
           <p className="text-[13px] font-medium text-foreground">{t('settings.dataHome.askOnStartup')}</p>
           <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
@@ -689,23 +692,25 @@ export function DataHomeSection() {
 
       {recentHomes.length > 0 && (
         <div className="mt-4">
-          <p className="mb-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+          <p className="mb-2 text-[12px] font-medium text-muted-foreground">
             {t('settings.dataHome.recent')}
           </p>
           <div className="space-y-2">
             {recentHomes.map((path) => (
-              <div key={path} className="flex items-center gap-2 rounded-lg border border-border/60 px-3 py-2">
+              <div key={path} className="flex min-h-12 items-center gap-2 rounded-lg border border-border/60 px-3 py-2">
                 <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-foreground" title={path}>
                   {path}
                 </span>
-                <button
+                <Button
                   type="button"
-                  className="btn-secondary-sm min-h-10 shrink-0 sm:min-h-0"
+                  variant="outline"
+                  size="sm"
+                  className="min-h-10 shrink-0 sm:min-h-8"
                   disabled={busy || restarting || status?.selectionLocked}
                   onClick={() => void runAction(() => bridge.useRecentAndRestart(path))}
                 >
                   {t('settings.dataHome.useAndRestart')}
-                </button>
+                </Button>
               </div>
             ))}
           </div>
@@ -773,7 +778,7 @@ function WorkspaceShellSection() {
     >
       <Field label={t('settings.workspaceShell.mode')}>
         <select
-          className={inputClass}
+          className={`${inputClass} h-8 py-1.5`}
           value={mode}
           onChange={(event) => setMode(event.target.value as 'auto' | 'custom')}
         >
@@ -788,7 +793,7 @@ function WorkspaceShellSection() {
         >
           <input
             data-testid="workspace-shell-path"
-            className={`${inputClass} font-mono`}
+            className={`${inputClass} h-8 py-1.5 font-mono`}
             value={customPath}
             placeholder="C:\\Program Files\\Git\\bin\\bash.exe"
             onChange={(event) => setCustomPath(event.target.value)}
@@ -796,7 +801,7 @@ function WorkspaceShellSection() {
         </Field>
       )}
       <div className="rounded-lg border border-border/60 bg-secondary/50 px-3 py-2.5 mb-3">
-        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+        <p className="text-[12px] font-medium text-muted-foreground">
           {t('settings.workspaceShell.resolved')}
         </p>
         <p className="mt-1 break-all font-mono text-[12px] text-foreground">
@@ -809,14 +814,15 @@ function WorkspaceShellSection() {
         </p>
       </div>
       <div className="flex items-center gap-2">
-        <button
+        <Button
           type="button"
-          className="btn-primary-sm min-h-10 sm:min-h-0"
+          size="sm"
+          className="min-h-10 sm:min-h-8"
           disabled={saving || (mode === 'custom' && customPath.trim().length === 0)}
           onClick={() => void save()}
         >
           {saving ? t('settings.workspaceShell.saving') : t('settings.workspaceShell.save')}
-        </button>
+        </Button>
         {error && <span className="text-[11px] text-destructive">{error}</span>}
       </div>
     </ConfigSection>
@@ -948,9 +954,9 @@ export function ToolsSection() {
         loadError ? (
           <div role="alert" className="flex flex-col items-center justify-center py-16 text-center">
             <p className="text-sm font-medium text-foreground">{t('settings.tools.loadError')}</p>
-            <button type="button" className="btn-secondary-sm mt-4 min-h-10 sm:min-h-0" onClick={() => void loadTools()}>
+            <Button type="button" variant="outline" size="sm" className="mt-4 min-h-10 sm:min-h-8" onClick={() => void loadTools()}>
               {t('common.retry')}
-            </button>
+            </Button>
           </div>
         ) : (
           <PageLoading />
@@ -1024,7 +1030,7 @@ function ToolGroupCard({
           <svg
             width="14" height="14" viewBox="0 0 24 24"
             fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-            className={`shrink-0 transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`}
+            className={`shrink-0 transition-transform duration-[var(--motion-fast)] ${expanded ? 'rotate-90' : ''}`}
           >
             <polyline points="9 18 15 12 9 6" />
           </svg>
@@ -1046,9 +1052,7 @@ function ToolGroupCard({
         id={toolListId}
         aria-hidden={!expanded}
         inert={!expanded ? true : undefined}
-        className={`transition-[max-height,opacity] duration-150 ${
-          expanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
-        } overflow-hidden`}
+        hidden={!expanded}
       >
         <div className="divide-y divide-border">
           {group.tools.map((t) => {
@@ -1056,7 +1060,7 @@ function ToolGroupCard({
             return (
               <div
                 key={t.name}
-                className={`flex items-center gap-3 px-4 py-2 ${
+                className={`flex min-h-12 items-center gap-3 px-4 py-2 ${
                   enabled ? '' : 'opacity-50'
                 }`}
               >
@@ -1101,10 +1105,7 @@ export function AppearanceSettingsPage() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <PageHeader
-        title={t('settings.appearance.title')}
-        description={t('settings.appearance.description')}
-      />
+      <PageHeader title={t('settings.appearance.title')} />
       <SettingsScrollArea className="px-4 py-5 md:px-8">
         <div className="mx-auto w-full max-w-[1100px]">
           <AppearanceSection standalone />

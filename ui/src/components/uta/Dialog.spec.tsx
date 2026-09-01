@@ -58,6 +58,6 @@ describe('Dialog modal behavior', () => {
     const dialog = screen.getByRole('dialog', { name: 'Long form' })
     expect(dialog.className).toContain('h-full')
     expect(dialog.className).toContain('sm:max-h-[85vh]')
-    expect(dialog.className).toContain('sm:rounded-xl')
+    expect(dialog.className).toContain('sm:rounded-2xl')
   })
 })

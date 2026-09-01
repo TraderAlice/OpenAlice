@@ -25,6 +25,7 @@ import { tradingApi, type TradingServiceStatus } from '../api/trading'
 import type { AppConfig, UTAConfig } from '../api/types'
 import type { AgentInfo } from '../components/workspace/api'
 import { CenteredLoading } from '../components/StateViews'
+import { Button } from '../components/ui/button'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { useWorkspace } from '../tabs/store'
 import type { ViewSpec } from '../tabs/types'
@@ -135,10 +136,7 @@ export function OnboardingDesignPage() {
           <>
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div className="min-w-0">
-                <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                  {t('onboardingChecklist.eyebrow')}
-                </div>
-                <h1 className="mt-1 text-[24px] font-semibold leading-tight text-foreground">
+                <h1 className="text-[24px] font-semibold leading-tight text-foreground">
                   {t('onboardingChecklist.title')}
                 </h1>
                 <p className="mt-2 max-w-[680px] text-[13px] leading-relaxed text-muted-foreground">
@@ -161,9 +159,7 @@ export function OnboardingDesignPage() {
               <section className="min-w-0 rounded-lg border border-border bg-secondary/50">
                 <div className="border-b border-border px-4 py-3">
                   <div className="flex items-start gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary-muted text-primary">
-                      <TerminalSquare className="h-4 w-4" />
-                    </div>
+                    <TerminalSquare className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                     <div className="min-w-0">
                       <h2 className="text-[16px] font-semibold text-foreground">
                         {t('onboardingChecklist.path.title')}
@@ -192,7 +188,7 @@ export function OnboardingDesignPage() {
               <aside className="min-w-0 space-y-5">
                 <CapabilityPanel model={model} />
                 <div className="rounded-lg border border-border bg-secondary/50 px-4 py-4">
-                  <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  <div className="text-[11px] font-medium text-muted-foreground">
                     {t('onboardingChecklist.shortcuts.title')}
                   </div>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
@@ -446,7 +442,7 @@ function StatusBand({ model }: { model: ReturnType<typeof buildOnboardingModel> 
 function StatusMetric({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
     <div className="min-w-0 px-3 py-3">
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-[10px] font-medium text-muted-foreground">{label}</div>
       <div className="mt-1 truncate text-[14px] font-semibold text-foreground">{value}</div>
       <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{sub}</div>
     </div>
@@ -459,9 +455,7 @@ function CapabilityPanel({ model }: { model: ReturnType<typeof buildOnboardingMo
     <section className="min-w-0 rounded-lg border border-border bg-secondary/50">
       <div className="border-b border-border px-4 py-3">
         <div className="flex items-start gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary-muted text-primary">
-            <Compass className="h-4 w-4" />
-          </div>
+          <Compass className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
           <div className="min-w-0">
             <h2 className="text-[16px] font-semibold text-foreground">
               {t('onboardingChecklist.capabilities.title')}
@@ -476,10 +470,8 @@ function CapabilityPanel({ model }: { model: ReturnType<typeof buildOnboardingMo
         {model.capabilities.map((capability) => {
           const Icon = capability.icon
           return (
-            <div key={capability.id} className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] gap-3 py-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                <Icon className="h-4 w-4" />
-              </div>
+            <div key={capability.id} className="grid min-h-12 min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 py-2">
+              <Icon className="h-4 w-4 text-muted-foreground" />
               <div className="min-w-0">
                 <div className="truncate text-[13px] font-semibold text-foreground">{capability.label}</div>
                 <div className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">{capability.detail}</div>
@@ -504,9 +496,9 @@ function StepRow({
 }) {
   const Icon = step.icon
   return (
-    <div className="min-w-0 border-b border-border/70 py-4 last:border-b-0">
+    <div className="min-h-12 min-w-0 border-b border-border/70 py-3 last:border-b-0">
       <div className="flex min-w-0 items-start gap-3">
-        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-[12px] font-semibold text-muted-foreground">
+        <div className="mt-0.5 w-5 shrink-0 text-center text-[12px] font-semibold tabular-nums text-muted-foreground">
           {index}
         </div>
         <div className="min-w-0 flex-1">
@@ -517,15 +509,17 @@ function StepRow({
           </div>
           <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">{step.body}</p>
         </div>
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="icon"
           onClick={() => onAction(step.target)}
-          className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary"
+          className="mt-0.5 text-muted-foreground hover:text-primary"
           aria-label={step.action}
           title={step.action}
         >
           <ArrowRight className="h-3.5 w-3.5" />
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -540,27 +534,28 @@ function PrimaryAction({
 }) {
   if (!step) return null
   return (
-    <button
+    <Button
       type="button"
       onClick={() => onAction(step.target)}
-      className="flex w-full items-center justify-between gap-3 rounded-lg bg-primary px-3 py-2.5 text-left text-primary-foreground transition-colors hover:bg-primary/90"
+      className="w-full justify-between text-left"
     >
       <span className="min-w-0 truncate text-[13px] font-semibold">{step.action}</span>
       <ArrowRight className="h-4 w-4 shrink-0" />
-    </button>
+    </Button>
   )
 }
 
 function SmallAction({ icon, label, onClick }: { icon: ReactNode; label: string; onClick: () => void }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="outline"
       onClick={onClick}
-      className="flex min-h-9 min-w-0 items-center justify-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-[12px] font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary"
+      className="min-w-0 text-[12px] text-muted-foreground hover:text-primary"
     >
       {icon}
       <span className="truncate">{label}</span>
-    </button>
+    </Button>
   )
 }
 
@@ -584,10 +579,10 @@ function StateDot({ state }: { state: Readiness }) {
         : Circle
   return (
     <span
-      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border ${STATE_STYLE[state]}`}
+      className="flex h-7 w-7 shrink-0 items-center justify-center text-muted-foreground"
       title={t(`onboardingChecklist.state.${state}`)}
     >
-      <Icon className="h-3.5 w-3.5" />
+      <Icon className={`h-3.5 w-3.5 ${state === 'ready' ? 'text-success' : state === 'attention' ? 'text-destructive' : ''}`} />
     </span>
   )
 }

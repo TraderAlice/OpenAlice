@@ -5,11 +5,12 @@
  */
 
 import { useMemo, useState } from 'react'
-import { Section } from '../../components/form'
+import { Section, inputClass as sharedInputClass } from '../../components/form'
 import { simulatorApi, type SimulatorState } from '../../api/simulator'
+import { Button } from '../../components/ui/button'
 
 const inputClass =
-  'w-full px-2 py-1 bg-background text-foreground border border-border rounded font-mono text-xs outline-none transition-colors focus:border-primary'
+  `${sharedInputClass} min-h-8 py-1 font-mono text-xs`
 
 export function PendingOrders({ utaId, state, run, loading }: {
   utaId: string
@@ -29,10 +30,7 @@ export function PendingOrders({ utaId, state, run, loading }: {
   }, [state.markPrices])
 
   return (
-    <Section
-      title="Pending Orders"
-      description="Submitted limit/stop orders waiting on a price trigger or manual fill."
-    >
+    <Section title="Pending Orders">
       {state.pendingOrders.length === 0 ? (
         <p className="text-xs text-muted-foreground">No pending orders.</p>
       ) : (
@@ -88,7 +86,7 @@ export function PendingOrders({ utaId, state, run, loading }: {
                     />
                   </td>
                   <td className="py-1 text-right space-x-1">
-                    <button
+                    <Button
                       disabled={loading}
                       onClick={() => run(
                         `Fill ${o.orderId}`,
@@ -97,13 +95,16 @@ export function PendingOrders({ utaId, state, run, loading }: {
                           ...(form.qty && { qty: form.qty }),
                         }),
                       )}
-                      className="btn-secondary-xs"
-                    >Fill</button>
-                    <button
+                      variant="outline"
+                      size="xs"
+                    >Fill</Button>
+                    <Button
                       disabled={loading}
                       onClick={() => run(`Cancel ${o.orderId}`, () => simulatorApi.cancelOrder(utaId, o.orderId))}
-                      className="btn-secondary-xs"
-                    >×</button>
+                      variant="outline"
+                      size="xs"
+                      aria-label={`Cancel order ${o.orderId}`}
+                    >×</Button>
                   </td>
                 </tr>
               )

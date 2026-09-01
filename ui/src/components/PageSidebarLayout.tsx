@@ -19,6 +19,8 @@ import {
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { Sidebar } from './Sidebar'
 import { useRegisterMobilePageNavigation } from '../contexts/MobilePageNavigationContext'
+import { Button } from './ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 
 const MIN_WIDTH = 200
 const MAX_WIDTH = 420
@@ -690,15 +692,23 @@ export function PageSidebarLayout({
   const desktopActions = (
     <>
       {actionContent}
-      <button
-        type="button"
-        onClick={collapseSidebar}
-        className="oa-icon-action flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-        aria-label={t('common.collapsePanel', { title })}
-        title={t('common.focusContent')}
-      >
-        <PanelLeftClose size={15} strokeWidth={1.75} aria-hidden />
-      </button>
+      <Tooltip>
+        <TooltipTrigger
+          render={(
+            <Button
+              type="button"
+              onClick={collapseSidebar}
+              variant="ghost"
+              size="icon-sm"
+              className="text-muted-foreground"
+              aria-label={t('common.collapsePanel', { title })}
+            />
+          )}
+        >
+          <PanelLeftClose size={15} strokeWidth={1.75} aria-hidden />
+        </TooltipTrigger>
+        <TooltipContent side="right" sideOffset={8}>{t('common.focusContent')}</TooltipContent>
+      </Tooltip>
     </>
   )
 
@@ -765,15 +775,23 @@ export function PageSidebarLayout({
                   : 'pointer-events-none opacity-0'
               }`}
             >
-              <button
-                type="button"
-                onClick={expandSidebar}
-                className="oa-icon-action flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                aria-label={t('common.openPanel', { title })}
-                title={t('common.openPanel', { title })}
-              >
-                <PanelLeftOpen size={16} strokeWidth={1.75} aria-hidden />
-              </button>
+              <Tooltip>
+                <TooltipTrigger
+                  render={(
+                    <Button
+                      type="button"
+                      onClick={expandSidebar}
+                      variant="ghost"
+                      size="icon"
+                      className="text-muted-foreground"
+                      aria-label={t('common.openPanel', { title })}
+                    />
+                  )}
+                >
+                  <PanelLeftOpen size={16} strokeWidth={1.75} aria-hidden />
+                </TooltipTrigger>
+                <TooltipContent side="right" sideOffset={8}>{t('common.openPanel', { title })}</TooltipContent>
+              </Tooltip>
             </aside>
           </div>
         </ResizablePanel>
@@ -816,19 +834,20 @@ export function PageSidebarLayout({
       >
         {!usesAppContextBar && (
           <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border/70 bg-secondary/40 px-3">
-            <button
+            <Button
               ref={mobileTriggerRef}
               type="button"
               onClick={openMobileDrawer}
-              className="oa-icon-action flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              variant="ghost"
+              size="icon-lg"
+              className="h-10 w-10 text-muted-foreground"
               aria-label={t('common.openPanel', { title })}
               aria-expanded={drawerOpen}
               aria-controls={mobileDrawerId}
               aria-haspopup="dialog"
-              title={title}
             >
               <PanelLeftOpen size={17} strokeWidth={1.75} aria-hidden />
-            </button>
+            </Button>
             <span className="min-w-0 truncate text-[13px] font-semibold text-foreground">{title}</span>
           </div>
         )}
@@ -864,14 +883,16 @@ export function PageSidebarLayout({
             title={title}
             actions={actionContent}
             leading={
-              <button
+              <Button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
-                className="oa-icon-action -ml-1 flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                variant="ghost"
+                size="icon-lg"
+                className="-ml-1 h-10 w-10 text-muted-foreground"
                 aria-label={t('common.closePanel', { title })}
               >
                 <X size={15} strokeWidth={1.75} aria-hidden />
-              </button>
+              </Button>
             }
           >
             {sidebarContent}

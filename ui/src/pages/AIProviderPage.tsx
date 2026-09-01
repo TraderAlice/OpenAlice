@@ -17,6 +17,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Check, ChevronDown, Plus } from 'lucide-react'
 import { api, type Preset, type WireShape } from '../api'
 import type {
   CredentialSummary,
@@ -24,7 +25,7 @@ import type {
   WorkspaceCredentialDefaultsResponse,
 } from '../api/config'
 import { PageHeader } from '../components/PageHeader'
-import { PageLoading, Skeleton } from '../components/StateViews'
+import { EmptyState, PageLoading, RecoverySurface, Skeleton } from '../components/StateViews'
 import { SettingsScrollArea, inputClass } from '../components/form'
 import { CredentialModal } from '../components/credentials/CredentialModal'
 import { ConfirmDialog } from '../components/ConfirmDialog'
@@ -45,6 +46,7 @@ import { notifyWorkspaceDefaultsChanged } from '../lib/workspaceAiEvents'
 import type { AgentInfo } from '../components/workspace/api'
 import { useAgentRuntimes } from '../hooks/useAgentRuntimes'
 import { useWorkspace } from '../tabs/store'
+import { Button } from '../components/ui/button'
 
 function credentialLabel(cred: Pick<CredentialSummary, 'slug' | 'vendor' | 'label'>): string {
   return cred.label?.trim() || cred.slug
@@ -99,19 +101,14 @@ export function AIProviderPage() {
   if (!credentials) {
     return (
       <div className="flex flex-col flex-1 min-h-0">
-        <PageHeader title={t('aiProvider.title')} description={t('aiProvider.description')} />
+        <PageHeader title={t('aiProvider.title')} />
         {credentialsLoadError ? (
-          <div className="flex flex-1 items-center justify-center px-6 py-12">
-            <div role="alert" className="max-w-md text-center">
-              <h2 className="text-sm font-semibold text-foreground">{t('aiProvider.loadErrorTitle')}</h2>
-              <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
-                {t('aiProvider.loadErrorDescription')}
-              </p>
-              <button type="button" className="btn-secondary-sm mt-4" onClick={() => void reload()}>
-                {t('common.retry')}
-              </button>
-            </div>
-          </div>
+          <RecoverySurface
+            title={t('aiProvider.loadErrorTitle')}
+            description={t('aiProvider.loadErrorDescription')}
+            actionLabel={t('common.retry')}
+            onAction={() => void reload()}
+          />
         ) : (
           <PageLoading />
         )}
@@ -121,20 +118,14 @@ export function AIProviderPage() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <PageHeader title={t('aiProvider.title')} description={t('aiProvider.description')} />
+      <PageHeader title={t('aiProvider.title')} />
       <SettingsScrollArea className="px-4 py-5 md:px-8">
         <div className="mx-auto grid min-w-0 max-w-[1100px] gap-6 2xl:grid-cols-2">
           {/* ============== Credentials ============== */}
           <section className="min-w-0">
-            <div className="rounded-lg border border-border/50 bg-secondary/50 px-4 py-3 mb-4">
-              <p className="text-[13px] text-muted-foreground leading-relaxed">
-                {t('aiProvider.vaultIntro')}
-              </p>
-            </div>
-
             <div className="flex items-center justify-between mb-3">
               <div className="flex min-w-0 items-baseline gap-1.5">
-                <h2 className="text-[13px] font-semibold text-foreground uppercase tracking-wide">{t('aiProvider.credentials')}</h2>
+                <h2 className="text-[14px] font-semibold text-foreground">{t('aiProvider.credentials')}</h2>
                 {credentials.length > 0 && (
                   <span className="text-[11px] text-muted-foreground">
                     {vaultQuery.trim()
@@ -146,17 +137,20 @@ export function AIProviderPage() {
                   </span>
                 )}
               </div>
-              <button
+              <Button
+                type="button"
                 onClick={() => setModal({ mode: 'add' })}
-                className="text-[11px] px-2 py-1 rounded-md border border-border text-muted-foreground hover:text-primary hover:border-primary transition-colors"
+                variant="outline"
+                size="sm"
               >
-                + {t('common.add')}
-              </button>
+                <Plus aria-hidden className="size-3.5" />
+                {t('common.add')}
+              </Button>
             </div>
 
             {credentials.length > 0 && (
               <input
-                className={`${inputClass} mb-3`}
+                className={`${inputClass} mb-3 h-8 py-1.5`}
                 value={vaultQuery}
                 onChange={(event) => setVaultQuery(event.target.value)}
                 placeholder={t('aiProvider.searchCredentials')}
@@ -167,73 +161,84 @@ export function AIProviderPage() {
             <div className="space-y-2.5">
               {visibleCredentials.map((cred) => {
                 const compatibleAgents = compatibleAgentIds(cred.wires, agents)
+                const displayLabel = credentialLabel(cred)
+                const displayVendor = vendorLabel(cred.vendor)
+                const showVendor = displayVendor.toLocaleLowerCase() !== displayLabel.toLocaleLowerCase()
                 return (
-                  <div key={cred.slug} className="flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-background px-4 py-3 sm:flex-row sm:items-center">
+                  <div key={cred.slug} className="flex min-h-12 min-w-0 flex-col gap-3 rounded-lg border border-border bg-background px-4 py-3 sm:flex-row sm:items-center">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[13px] font-medium text-foreground">{credentialLabel(cred)}</span>
-                        <span className="text-[11px] text-muted-foreground">{vendorLabel(cred.vendor)}</span>
+                      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                        <span className="text-[13px] font-medium text-foreground">{displayLabel}</span>
+                        {showVendor && (
+                          <span className="text-[11px] text-muted-foreground">{displayVendor}</span>
+                        )}
                         {cred.label && (
                           <span className="text-[11px] text-muted-foreground font-mono">{cred.slug}</span>
                         )}
-                        {compatibleAgents.map((agentId) => (
-                          <span key={agentId} className="text-[10px] text-muted-foreground border border-border rounded px-1">{AGENT_LABELS[agentId] ?? agentId}</span>
-                        ))}
                         {cred.hasApiKey && (
-                          <span className="text-[10px] text-success border border-success/40 rounded px-1">{t('aiProvider.keySet')}</span>
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-success">
+                            <Check aria-hidden className="size-3" />
+                            {t('aiProvider.keySet')}
+                          </span>
                         )}
                       </div>
-                      <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                        {t('aiProvider.defaultModel')}: <span className="font-mono">{cred.lastModel || t('aiProvider.notSet')}</span>
-                        <span className="px-1.5 text-muted-foreground/50">·</span>
-                        <span className="font-mono">{Object.values(cred.wires)[0] || t('aiProvider.officialEndpoint')}</span>
+                      <div className="mt-0.5 flex min-w-0 flex-col gap-0.5 text-[11px] text-muted-foreground">
+                        <span className="truncate">
+                          {t('aiProvider.defaultModel')}: <span className="font-mono">{cred.lastModel || t('aiProvider.notSet')}</span>
+                        </span>
+                        <span className="flex min-w-0 flex-wrap gap-x-2 gap-y-0.5">
+                          <span className="truncate font-mono">{Object.values(cred.wires)[0] || t('aiProvider.officialEndpoint')}</span>
+                          {compatibleAgents.length > 0 && (
+                            <span>{compatibleAgents.map((agentId) => AGENT_LABELS[agentId] ?? agentId).join(', ')}</span>
+                          )}
+                        </span>
                       </div>
                     </div>
                     <div className="flex shrink-0 gap-2 self-end sm:self-auto">
-                      <button
+                      <Button
                         type="button"
                         onClick={() => setModal({ mode: 'edit', cred })}
-                        title={t('aiProvider.editCredentialAria', {
-                          credential: credentialLabel(cred),
-                        })}
                         aria-label={t('aiProvider.editCredentialAria', {
                           credential: credentialLabel(cred),
                         })}
-                        className="text-[11px] px-2 py-1 rounded-md border border-border text-muted-foreground hover:text-foreground transition-colors"
+                        variant="outline"
+                        size="sm"
                       >
                         {t('common.edit')}
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
                         onClick={() => setPendingDelete(cred)}
-                        title={t('aiProvider.deleteCredentialAria', {
-                          credential: credentialLabel(cred),
-                        })}
                         aria-label={t('aiProvider.deleteCredentialAria', {
                           credential: credentialLabel(cred),
                         })}
-                        className="text-[11px] px-2 py-1 rounded-md border border-border text-muted-foreground hover:text-destructive transition-colors"
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-destructive"
                       >
                         {t('common.delete')}
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )
               })}
 
               {credentials.length > 0 && visibleCredentials.length === 0 && (
-                <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-[12px] text-muted-foreground">
-                  {t('aiProvider.noCredentialMatches', { query: vaultQuery })}
-                </p>
+                <div className="rounded-lg border border-dashed border-border">
+                  <EmptyState title={t('aiProvider.noCredentialMatches', { query: vaultQuery })} />
+                </div>
               )}
 
               {credentials.length === 0 && (
-                <button
+                <Button
+                  type="button"
                   onClick={() => setModal({ mode: 'add' })}
-                  className="w-full rounded-lg border border-dashed border-border p-4 text-[13px] font-medium text-muted-foreground transition-[color,border-color,background-color] hover:border-primary/50 hover:bg-primary/[0.035] hover:text-primary"
+                  variant="outline"
+                  className="h-auto min-h-12 w-full border-dashed text-muted-foreground hover:text-primary"
                 >
-                  + {t('aiProvider.addFirst')}
-                </button>
+                  <Plus aria-hidden className="size-3.5" />
+                  {t('aiProvider.addFirst')}
+                </Button>
               )}
             </div>
           </section>
@@ -242,17 +247,17 @@ export function AIProviderPage() {
           <WorkspaceDefaultsSection credentials={credentials} presets={presets} agents={agents} />
         </div>
 
-        <div className="mx-auto mt-6 max-w-[1100px] rounded-lg border border-border/70 bg-background px-4 py-3">
-          <p className="text-[13px] leading-relaxed text-muted-foreground">
-            {t('aiProvider.openAgentRuntimesDescription')}
-          </p>
-          <button
+        <div className="mx-auto mt-6 flex min-h-12 max-w-[1100px] items-center justify-between gap-4 border-t border-border/60 py-3">
+          <p className="min-w-0 text-[12px] leading-5 text-muted-foreground">{t('aiProvider.openAgentRuntimesDescription')}</p>
+          <Button
             type="button"
             onClick={() => openOrFocus({ kind: 'settings', params: { category: 'agent-runtimes' } })}
-            className="oa-pressable mt-1 inline-flex min-h-10 items-center rounded-md text-[12px] font-medium text-primary hover:underline sm:min-h-8"
+            variant="outline"
+            size="sm"
+            className="shrink-0"
           >
             {t('aiProvider.openAgentRuntimes')}
-          </button>
+          </Button>
         </div>
       </SettingsScrollArea>
 
@@ -330,7 +335,7 @@ function WorkspaceDefaultsSection({
 
   const credLabel = (slug: string) => {
     const c = credentials.find((x) => x.slug === slug)
-    return c ? `${credentialLabel(c)} · ${slug}` : slug
+    return c ? `${credentialLabel(c)} — ${slug}` : slug
   }
 
   const persist = async (
@@ -422,7 +427,7 @@ function WorkspaceDefaultsSection({
     const selectedSemantics = presetModel(selectedPreset, selectedModelId)?.semantics ?? null
     const semanticsSummary = describeModelSemantics(selectedSemantics)
     return (
-      <div key={agent.id} className="flex flex-col gap-3 rounded-lg border border-border bg-background px-4 py-3 sm:flex-row sm:items-center">
+      <div key={agent.id} className="flex min-h-12 flex-col gap-3 rounded-lg border border-border bg-background px-4 py-3 sm:flex-row sm:items-center">
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2">
             <span className="text-[13px] font-medium text-foreground">{agent.name}</span>
@@ -436,7 +441,7 @@ function WorkspaceDefaultsSection({
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[260px]">
           <select
             aria-label={t('aiProvider.defaultCredentialLabel', { agent: agent.name })}
-            className={inputClass}
+            className={`${inputClass} h-8 py-1.5`}
             value={current}
             disabled={saving || options.length === 0}
             onChange={(e) => void setAgentDefault(agent.id, e.target.value)}
@@ -447,7 +452,7 @@ function WorkspaceDefaultsSection({
           {current && wireShapes.length > 1 && (
             <select
               aria-label={t('aiProvider.apiProtocolLabel', { agent: agent.name })}
-              className={inputClass}
+              className={`${inputClass} h-8 py-1.5`}
               value={selectedWire}
               disabled={saving}
               onChange={(e) => void setAgentWire(agent.id, e.target.value as WireShape)}
@@ -473,7 +478,7 @@ function WorkspaceDefaultsSection({
               <summary className="inline-flex min-h-8 cursor-pointer items-center">{t('aiProvider.advancedReasoning')}</summary>
               <select
                 aria-label={t('aiProvider.reasoningOverrideLabel', { agent: agent.name })}
-                className={inputClass + ' mt-1.5'}
+                className={`${inputClass} mt-1.5 h-8 py-1.5`}
                 value={typeof data?.defaults[agent.id]?.reasoning !== 'boolean' ||
                   data.defaults[agent.id]?.reasoningModel !== selectedModelId
                   ? 'auto'
@@ -498,14 +503,8 @@ function WorkspaceDefaultsSection({
 
   return (
     <section className="min-w-0">
-      <div className="rounded-lg border border-border/50 bg-secondary/50 px-4 py-3 mb-4">
-        <p className="text-[13px] text-muted-foreground leading-relaxed">
-          {t('aiProvider.defaultsIntro')}
-        </p>
-      </div>
-
       <div className="mb-3 flex min-h-5 items-center justify-between gap-3">
-        <h2 className="text-[13px] font-semibold text-foreground uppercase tracking-wide">{t('aiProvider.defaultsTitle')}</h2>
+        <h2 className="text-[14px] font-semibold text-foreground">{t('aiProvider.defaultsTitle')}</h2>
         <span aria-live="polite" className={`text-[11px] ${saveStatus === 'saved' ? 'text-success' : 'text-muted-foreground'}`}>
           {saveStatus === 'saving' ? t('common.saving') : saveStatus === 'saved' ? t('common.saved') : ''}
         </span>
@@ -527,12 +526,20 @@ function WorkspaceDefaultsSection({
         <div className="space-y-2.5">
           {PRIMARY_DEFAULT_AGENTS.map((a) => renderAgent(a))}
 
-          <button
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => setShowAdvanced((v) => !v)}
-            className="inline-flex min-h-10 items-center rounded-md pt-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground sm:min-h-8"
+            aria-expanded={showAdvanced}
+            className="text-muted-foreground"
           >
-            {showAdvanced ? '▾' : '▸'} {t('aiProvider.advancedAgents')}
-          </button>
+            <ChevronDown
+              aria-hidden
+              className={`size-3.5 transition-transform duration-[var(--motion-fast)] ${showAdvanced ? 'rotate-180' : ''}`}
+            />
+            {t('aiProvider.advancedAgents')}
+          </Button>
 
           {showAdvanced && (
             <>

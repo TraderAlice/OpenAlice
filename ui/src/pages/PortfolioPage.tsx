@@ -6,6 +6,7 @@ import { useAccountHealth } from '../hooks/useAccountHealth'
 import { useWorkspace } from '../tabs/store'
 import { PageHeader } from '../components/PageHeader'
 import { EmptyState, Skeleton } from '../components/StateViews'
+import { Button } from '../components/ui/button'
 import { EquityCurve } from '../components/EquityCurve'
 import { SnapshotDetail } from '../components/SnapshotDetail'
 import { Toggle } from '../components/Toggle'
@@ -249,13 +250,14 @@ export function PortfolioPage() {
         description="Live portfolio overview across all trading accounts."
         live={{ lastUpdated: lastRefresh }}
         right={
-          <button
+          <Button
             onClick={refresh}
             disabled={loading}
-            className="btn-secondary-sm"
+            variant="outline"
+            size="sm"
           >
-            {loading ? 'Loading...' : 'Refresh'}
-          </button>
+            {loading ? 'Loading…' : 'Refresh'}
+          </Button>
         }
       />
 
@@ -381,17 +383,17 @@ function NoAccountsEmpty() {
     openOrFocus({ kind: 'settings', params: { category: 'trading' } })
   }
   return (
-    <div className="flex flex-col items-center justify-center py-16 text-center">
-      <p className="text-sm font-medium text-muted-foreground">No trading accounts connected.</p>
-      <p className="mt-1.5 max-w-[320px] text-[12px] text-muted-foreground">
-        Portfolio shows live equity, positions and PnL across all your brokers. Add a connection to get started.
-      </p>
-      <button
+    <div className="flex flex-col items-center justify-center py-8 text-center">
+      <EmptyState
+        title="No trading accounts connected."
+        description="Add a broker connection to see account equity and positions."
+      />
+      <Button
         onClick={goToTradingSettings}
-        className="mt-4 btn-primary text-[12px]"
+        size="sm"
       >
         Add broker in Settings → Trading
-      </button>
+      </Button>
     </div>
   )
 }
@@ -404,7 +406,7 @@ function HeroMetrics({ equity, curve }: {
 }) {
   if (!equity) {
     return (
-      <div className="border border-border rounded-lg bg-secondary p-5 text-center">
+      <div className="rounded-lg border border-border bg-card p-5 text-center">
         <p className="text-[13px] text-muted-foreground">Unable to load portfolio data.</p>
       </div>
     )
@@ -427,10 +429,10 @@ function HeroMetrics({ equity, curve }: {
   }
 
   return (
-    <div className="border border-border rounded-lg bg-secondary px-5 py-5 space-y-4">
+    <div className="space-y-4 rounded-lg border border-border bg-card px-5 py-5">
       <Metric
         size="lg"
-        label="Total Equity · USD"
+        label="Total Equity (USD)"
         value={fmt(total, 'USD')}
         delta={todayDelta ?? { value: '— today', sign: 'flat' }}
       />
@@ -463,7 +465,7 @@ function PortfolioSkeleton() {
   return (
     <div className="space-y-5" aria-hidden="true">
       {/* Hero metrics */}
-      <div className="rounded-lg border border-border bg-secondary p-5">
+      <div className="rounded-lg border border-border bg-card p-5">
         <Skeleton className="h-3 w-24" />
         <Skeleton className="h-9 w-48 mt-3" />
         <div className="flex flex-wrap gap-5 sm:gap-8 mt-5">
@@ -480,7 +482,7 @@ function PortfolioSkeleton() {
       {/* Account strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
         {Array.from({ length: 2 }).map((_, i) => (
-          <div key={i} className="flex items-center gap-3 px-3.5 py-3 rounded-lg border border-border bg-secondary">
+          <div key={i} className="flex items-center gap-3 rounded-lg border border-border bg-card px-3.5 py-3">
             <Skeleton className="h-1.5 w-1.5 rounded-full" />
             <div className="flex-1 space-y-2">
               <Skeleton className="h-3 w-24" />
@@ -541,7 +543,7 @@ function AccountStrip({ sources, perAccountCurve }: {
         const showSpark = !isDisabled && !isOffline && !isConnecting && curve && curve.values.length >= 2
 
         return (
-          <div key={s.id} className={`flex items-center gap-3 px-3.5 py-3 rounded-lg border border-border bg-secondary ${isOffline || isDisabled ? 'opacity-60' : ''}`}>
+          <div key={s.id} className={`flex items-center gap-3 rounded-lg border border-border bg-card px-3.5 py-3 ${isOffline || isDisabled ? 'opacity-60' : ''}`}>
             <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor} ${isConnecting ? 'animate-pulse' : ''}`} />
             <div className="flex-1 min-w-0">
               <div className="flex items-baseline justify-between gap-2">
@@ -554,7 +556,7 @@ function AccountStrip({ sources, perAccountCurve }: {
                 {isDisabled
                   ? <span className="text-muted-foreground text-[11px]">Disabled</span>
                   : isConnecting
-                    ? <span className="text-primary text-[11px]">Connecting...</span>
+                    ? <span className="text-primary text-[11px]">Connecting…</span>
                   : isOffline
                     ? <span className="text-destructive text-[11px]">Reconnecting…</span>
                     : (
@@ -622,8 +624,8 @@ function PositionDetail({
 }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</dt>
-      <dd className={`mt-0.5 truncate text-[12px] tabular-nums ${valueClassName}`} title={value}>{value}</dd>
+      <dt className="text-[11px] font-medium text-muted-foreground">{label}</dt>
+      <dd className={`mt-0.5 truncate text-caption tabular-nums ${valueClassName}`} title={value}>{value}</dd>
     </div>
   )
 }
@@ -653,7 +655,7 @@ export function PositionsTable({ positions, fxRates }: { positions: PositionWith
 
   return (
     <div>
-      <h3 className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+      <h3 className="mb-3 text-[13px] font-semibold text-foreground">
         Positions
       </h3>
       <div
@@ -666,31 +668,33 @@ export function PositionsTable({ positions, fxRates }: { positions: PositionWith
             <details key={key} className="group border-t border-border first:border-t-0">
               <summary
                 aria-label={`${display.name} in ${position.accountLabel}, market value ${fmt(Number(position.marketValue), position.currency)}, PnL ${fmtPctSigned(pnlPercent)}, ${fmtPnl(unrealizedPnl, position.currency)}. Expand for position details.`}
-                className="list-none px-3 py-3 outline-none transition-colors hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary [&::-webkit-details-marker]:hidden"
+                className="list-none px-3 py-3 outline-none hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary [&::-webkit-details-marker]:hidden"
               >
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 items-center gap-1.5">
                       <span className="truncate font-medium text-foreground" title={display.name}>{display.name}</span>
-                      <span className="shrink-0 rounded bg-muted px-1 py-0.5 font-mono text-[9px] tracking-tight text-muted-foreground">
+                      <span className="shrink-0 rounded-sm bg-muted px-1 py-0.5 font-mono text-[9px] tracking-tight text-muted-foreground">
                         {display.tag}
                       </span>
                       {isShort && (
-                        <span className="shrink-0 rounded bg-destructive/15 px-1 py-0.5 text-[9px] font-medium text-destructive">
-                          SHORT
+                        <span className="shrink-0 rounded-sm bg-destructive/15 px-1 py-0.5 text-[9px] font-medium text-destructive">
+                          Short
                         </span>
                       )}
                     </div>
-                    <div className="mt-1 truncate text-[10px] text-muted-foreground">
-                      {position.accountLabel} · {currency}
+                    <div className="mt-1 flex min-w-0 items-center gap-2 text-[10px] text-muted-foreground">
+                      <span className="truncate">{position.accountLabel}</span>
+                      <span className="shrink-0 font-mono">{currency}</span>
                     </div>
                   </div>
                   <div className="shrink-0 text-right">
                     <div className="font-semibold tabular-nums text-foreground">
                       {fmt(Number(position.marketValue), position.currency)}
                     </div>
-                    <div className={`mt-0.5 text-[11px] tabular-nums ${pnlTone}`}>
-                      {fmtPctSigned(pnlPercent)} · {fmtPnl(unrealizedPnl, position.currency)}
+                    <div className={`mt-0.5 flex justify-end gap-2 text-[11px] tabular-nums ${pnlTone}`}>
+                      <span>{fmtPctSigned(pnlPercent)}</span>
+                      <span>{fmtPnl(unrealizedPnl, position.currency)}</span>
                     </div>
                   </div>
                   <ChevronDown
@@ -738,13 +742,13 @@ export function PositionsTable({ positions, fxRates }: { positions: PositionWith
           <tbody>
             {rows.map(({ key, position: p, display, currency: ccy, usdValue, unrealizedPnl, pnlPercent, isShort }) => {
               return (
-                <tr key={key} className="border-t border-border hover:bg-muted/30 transition-colors">
+                <tr key={key} className="border-t border-border hover:bg-muted/30">
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="font-medium text-foreground">{display.name}</span>
-                      <span className="text-[10px] px-1 py-0.5 rounded bg-muted text-muted-foreground font-mono tracking-tight">{display.tag}</span>
+                      <span className="rounded-sm bg-muted px-1 py-0.5 font-mono text-[10px] tracking-tight text-muted-foreground">{display.tag}</span>
                       {isShort && (
-                        <span className="text-[10px] px-1 py-0.5 rounded font-medium bg-destructive/15 text-destructive">SHORT</span>
+                        <span className="rounded-sm bg-destructive/15 px-1 py-0.5 text-[10px] font-medium text-destructive">Short</span>
                       )}
                       <span className="text-[10px] text-muted-foreground">{p.accountLabel}</span>
                     </div>
@@ -780,7 +784,7 @@ export function PositionsTable({ positions, fxRates }: { positions: PositionWith
 function FxRatesPanel({ rates }: { rates: FxRateInfo[] }) {
   return (
     <div>
-      <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+      <h3 className="mb-2 text-[13px] font-semibold text-foreground">
         FX Rates
       </h3>
       <div className="border border-border rounded-lg overflow-hidden">
@@ -821,7 +825,7 @@ function TradeLog({ commits }: { commits: CommitWithAccount[] }) {
 
   return (
     <div>
-      <h3 className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+      <h3 className="mb-3 text-[13px] font-semibold text-foreground">
         Recent Trades
       </h3>
       <div className="space-y-2">
@@ -832,9 +836,9 @@ function TradeLog({ commits }: { commits: CommitWithAccount[] }) {
               ? 'bg-success/15 text-success'
               : 'bg-muted text-muted-foreground'
           return (
-            <div key={commit.hash} className="border border-border rounded-lg bg-secondary px-3 py-2.5">
+            <div key={commit.hash} className="rounded-lg border border-border bg-card px-3 py-2.5">
               <div className="flex items-start gap-2">
-                <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${badgeColor}`}>
+                <span className={`rounded-sm px-1.5 py-0.5 font-mono text-[10px] ${badgeColor}`}>
                   {commit.accountLabel}
                 </span>
                 <div className="flex-1 min-w-0">
@@ -848,7 +852,7 @@ function TradeLog({ commits }: { commits: CommitWithAccount[] }) {
                   {commit.operations.length > 0 && (
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
                       {commit.operations.map((op, i) => (
-                        <span key={i} className="text-[11px] text-muted-foreground bg-background px-1.5 py-0.5 rounded">
+                        <span key={i} className="rounded-sm border border-border/60 px-1.5 py-0.5 text-[11px] text-muted-foreground">
                           {op.symbol} {op.change}
                           <span className={`ml-1 ${op.status === 'filled' ? 'text-success' : op.status === 'rejected' ? 'text-destructive' : op.status === 'submitted' ? 'text-primary' : 'text-muted-foreground'}`}>
                             {op.status}
@@ -904,15 +908,15 @@ export function SnapshotSettings({ enabled, every, onEnabledChange, onEveryChang
   }, [every, isPreset])
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-border/70 bg-secondary/45 px-3 py-2.5 text-[12px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex min-h-12 flex-col gap-2 rounded-lg border border-border/70 bg-card px-3 py-2.5 text-[12px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-2">
-        <span className="font-semibold uppercase tracking-wide">Snapshots</span>
+        <span className="font-semibold text-foreground">Snapshots</span>
         <Toggle checked={enabled} onChange={onEnabledChange} size="sm" ariaLabel="Enable portfolio snapshots" />
-        {saveStatus === 'saving' && <span className="text-[10px] text-primary">saving...</span>}
-        {saveStatus === 'error' && <span className="text-[10px] text-destructive">save failed</span>}
+        {saveStatus === 'saving' && <span className="text-[10px] text-primary">Saving…</span>}
+        {saveStatus === 'error' && <span className="text-[10px] text-destructive">Save failed</span>}
       </div>
       <div className="flex min-w-0 items-center gap-2">
-        <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Every</span>
+        <span className="shrink-0 text-[11px] font-medium text-muted-foreground">Every</span>
         <SegmentedControl
           value={showCustom ? 'custom' : every}
           options={[
@@ -949,7 +953,7 @@ export function SnapshotSettings({ enabled, every, onEnabledChange, onEveryChang
               <p
                 id="snapshot-interval-error"
                 role="alert"
-                className="absolute right-0 top-full z-10 mt-1 w-max max-w-64 rounded-md border border-destructive/30 bg-background px-2 py-1 text-[11px] text-destructive shadow-md"
+                className="absolute right-0 top-full z-10 mt-1 w-max max-w-64 rounded-xl border border-destructive/30 bg-popover px-2 py-1 text-[11px] text-destructive shadow-md"
               >
                 Use a positive duration such as 15m, 1h, or 2h15m.
               </p>

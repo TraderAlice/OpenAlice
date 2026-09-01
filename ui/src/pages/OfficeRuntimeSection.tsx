@@ -19,7 +19,7 @@ function eventDetail(event: AgentRuntimeEvent): string | null {
   const payload = event.payload
   if (event.type === 'runtime.turn.text') return payload.text ?? null
   if (event.type === 'runtime.turn.tool') {
-    return [payload.toolName, payload.toolStatus].filter(Boolean).join(' · ') || null
+    return [payload.toolName, payload.toolStatus].filter(Boolean).join(': ') || null
   }
   if (event.type === 'runtime.turn.error') return payload.message ?? payload.error ?? null
   if (event.type === 'dev.sonner_test') return payload.message ?? null
@@ -104,7 +104,7 @@ export function OfficeRuntimeSection() {
             causeLabel(event),
             payload.status,
             payload.metrics
-              ? `${payload.metrics.textBlocks} text · ${payload.metrics.toolCalls} tools${payload.metrics.toolFailures > 0 ? ` · ${payload.metrics.toolFailures} failed` : ''}`
+              ? `${payload.metrics.textBlocks} text, ${payload.metrics.toolCalls} tools${payload.metrics.toolFailures > 0 ? `, ${payload.metrics.toolFailures} failed` : ''}`
               : null,
             payload.reason,
             payload.launchErrorCode,
@@ -122,7 +122,7 @@ export function OfficeRuntimeSection() {
                 </header>
                 <div className="oa-office-runtime__identity">
                   <strong>@{payload.resumeId || '—'}</strong>
-                  <span>{payload.agent || '—'} · {payload.workspaceId || '—'}</span>
+                  <span>{payload.agent || '—'}, {payload.workspaceId || '—'}</span>
                 </div>
                 {detail && (
                   <p className="oa-office-runtime__detail">

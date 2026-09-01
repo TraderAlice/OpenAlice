@@ -16,8 +16,6 @@ import {
   WalletCards,
   type LucideIcon,
 } from 'lucide-react'
-import type { ReactNode } from 'react'
-
 import { designProjects, getDesignProject, type DesignProject, type DesignVariant } from '../design/projects'
 import { readSemanticColor } from '../theme/semanticColors'
 import { useEffectivePalette, useEffectiveTheme } from '../theme/useEffectiveTheme'
@@ -48,16 +46,13 @@ export function DesignProjectPage({ spec }: DesignProjectPageProps) {
         <header className="border-b border-border pb-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Hidden design project
-              </div>
-              <h1 className="mt-2 text-[28px] font-semibold leading-tight text-foreground sm:text-[34px]">
+              <h1 className="text-[28px] font-semibold leading-tight text-foreground sm:text-[34px]">
                 {project.title}
               </h1>
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
-                <InfoPill>{project.eyebrow}</InfoPill>
-                <InfoPill>{project.status}</InfoPill>
-                <InfoPill>Updated {project.updatedAt}</InfoPill>
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-muted-foreground">
+                <span>{project.eyebrow}</span>
+                <span>{project.status}</span>
+                <span>Updated {project.updatedAt}</span>
               </div>
             </div>
             <code className="w-fit max-w-full overflow-x-auto rounded-md border border-border bg-secondary px-3 py-2 font-mono text-[12px] text-muted-foreground">
@@ -99,7 +94,7 @@ function UnknownDesignProject({ slug }: { slug: string }) {
     <div className="flex min-h-full items-center justify-center bg-background px-4 py-10">
       <div className="w-full max-w-[620px] rounded-lg border border-border bg-secondary px-5 py-5">
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center text-muted-foreground">
             <Monitor className="h-5 w-5" />
           </div>
           <div className="min-w-0">
@@ -130,7 +125,7 @@ function ProjectBrief({ project }: { project: DesignProject }) {
   return (
     <aside className="min-w-0 rounded-lg border border-border bg-secondary/55 p-4 md:sticky md:top-5 md:self-start">
       <div>
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Context</div>
+        <div className="text-[12px] font-medium text-muted-foreground">Context</div>
         <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">{project.context.why}</p>
       </div>
 
@@ -145,7 +140,7 @@ function BriefList({ title, icon: Icon, items }: { title: string; icon: LucideIc
   return (
     <section className="mt-4 border-t border-border pt-4">
       <div className="flex items-center gap-2">
-        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-muted text-muted-foreground">
+        <div className="flex h-6 w-6 items-center justify-center text-muted-foreground">
           <Icon className="h-3.5 w-3.5" />
         </div>
         <h2 className="text-[14px] font-semibold text-foreground">{title}</h2>
@@ -168,12 +163,12 @@ function VersionPreview({ variant }: { variant: DesignVariant }) {
     <section className="min-w-0 overflow-hidden rounded-lg border border-border bg-secondary/45">
       <div className="border-b border-border px-4 py-3">
         <div className="flex min-w-0 items-start gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary-muted text-primary">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center text-muted-foreground">
             <Icon className="h-4 w-4" />
           </div>
           <div className="min-w-0">
             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-primary">Draft {variant.id}</span>
+              <span className="font-mono text-[11px] font-medium text-muted-foreground">Draft {variant.id}</span>
               <h3 className="text-[16px] font-semibold text-foreground">{variant.name}</h3>
             </div>
             <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">{variant.summary}</p>
@@ -196,7 +191,7 @@ function VersionPreview({ variant }: { variant: DesignVariant }) {
 function VersionNote({ label, text }: { label: string; text: string }) {
   return (
     <div className="min-w-0">
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-[11px] font-medium text-muted-foreground">{label}</div>
       <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">{text}</p>
     </div>
   )
@@ -207,12 +202,9 @@ function DesignCanvas({ variant }: { variant: DesignVariant }) {
     <div className="overflow-hidden rounded-lg border border-border bg-secondary">
       <div className="flex min-w-0 items-center justify-between gap-3 border-b border-border bg-muted/55 px-3 py-2">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-destructive/70" aria-hidden />
-          <span className="h-2.5 w-2.5 rounded-full bg-warning/70" aria-hidden />
-          <span className="h-2.5 w-2.5 rounded-full bg-success/70" aria-hidden />
-          <span className="ml-1 truncate font-mono text-[10px] text-muted-foreground">{variant.layout}/{variant.id.toLowerCase()}</span>
+          <span className="truncate font-mono text-[10px] text-muted-foreground">{variant.layout}/{variant.id.toLowerCase()}</span>
         </div>
-        <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        <span className="shrink-0 text-[10px] font-medium text-muted-foreground">
           {variant.layout === 'semantic-colors' ? 'Live palette' : 'Desktop sketch'}
         </span>
       </div>
@@ -330,8 +322,8 @@ function SemanticColorCard() {
           <div className="text-[13px] font-semibold text-foreground">Resolved semantic tokens</div>
           <div className="mt-1 text-[11px] text-muted-foreground">Reading the live {effectivePalette} ({effectiveTheme}) card from palette.css</div>
         </div>
-        <span className="rounded-full border border-border bg-secondary px-2 py-1 text-[10px] font-medium text-muted-foreground">
-          {effectivePalette} · {effectiveTheme}
+        <span className="rounded-md border border-border bg-secondary px-2 py-1 text-[10px] font-medium text-muted-foreground">
+          {effectivePalette}, {effectiveTheme}
         </span>
       </div>
 
@@ -342,7 +334,7 @@ function SemanticColorCard() {
       <ColorTokenGroup title="Terminal projection" tokens={TERMINAL_COLOR_TOKENS} />
 
       <section>
-        <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Pairing smoke test</div>
+        <div className="mb-2 text-[11px] font-medium text-muted-foreground">Pairing smoke test</div>
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
           <button type="button" className="rounded-md bg-primary px-3 py-2 text-[11px] font-medium text-primary-foreground">Primary action</button>
           <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-[11px] text-destructive">Destructive state</div>
@@ -357,7 +349,7 @@ function SemanticColorCard() {
 function ColorTokenGroup({ title, tokens }: { title: string; tokens: readonly string[] }) {
   return (
     <section>
-      <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{title}</div>
+      <div className="mb-2 text-[11px] font-medium text-muted-foreground">{title}</div>
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         {tokens.map((token) => {
           const value = readSemanticColor(token)
@@ -417,7 +409,7 @@ function ModeLadderMock() {
   return (
     <div className="flex min-h-[300px] min-w-0 flex-col justify-center gap-5">
       <div>
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Choose the level of access</div>
+        <div className="text-[12px] font-medium text-muted-foreground">Choose the level of access</div>
         <h4 className="mt-2 text-[28px] font-semibold leading-tight text-foreground">OpenAlice starts with brokers disconnected.</h4>
       </div>
       <div className="grid gap-2 md:grid-cols-3">
@@ -458,7 +450,7 @@ function GoalPickerMock() {
   return (
     <div className="flex min-h-[300px] min-w-0 flex-col justify-center gap-5">
       <div className="max-w-[620px]">
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">What do you want first?</div>
+        <div className="text-[12px] font-medium text-muted-foreground">What do you want first?</div>
         <h4 className="mt-2 text-[30px] font-semibold leading-tight text-foreground">Pick a starting point. Alice will only ask for what that path needs.</h4>
       </div>
       <div className="grid gap-2 md:grid-cols-3">
@@ -496,7 +488,7 @@ function QuietChecklistMock() {
   return (
     <div className="grid min-h-[300px] min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-center">
       <div className="min-w-0">
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Welcome</div>
+        <div className="text-[12px] font-medium text-muted-foreground">Welcome</div>
         <h4 className="mt-2 text-[30px] font-semibold leading-tight text-foreground">Alice is open. Finish setup at your own pace.</h4>
         <p className="mt-4 max-w-[560px] text-[13px] leading-relaxed text-muted-foreground">
           The opening guide stays short, then hands durable tasks to the setup checklist.
@@ -511,7 +503,7 @@ function QuietChecklistMock() {
           const Icon = task.icon
           return (
             <div key={task.title} className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-3 border-b border-border py-3 last:border-b-0">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted text-muted-foreground">
+              <div className="flex h-7 w-7 items-center justify-center text-muted-foreground">
                 <Icon className="h-4 w-4" />
               </div>
               <div className="min-w-0">
@@ -530,7 +522,7 @@ function QuietChecklistMock() {
 function MockStatusRow({ icon: Icon, label, value, state }: { icon: LucideIcon; label: string; value: string; state?: 'ok' }) {
   return (
     <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-border py-3 last:border-b-0">
-      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted text-muted-foreground">
+      <div className="flex h-7 w-7 items-center justify-center text-muted-foreground">
         <Icon className="h-4 w-4" />
       </div>
       <div className="min-w-0 text-[13px] font-semibold text-foreground">{label}</div>
@@ -554,13 +546,5 @@ function MockButton({ children, primary = false }: { children: string; primary?:
       {children}
       {primary ? <ArrowRight className="h-4 w-4" /> : null}
     </button>
-  )
-}
-
-function InfoPill({ children }: { children: ReactNode }) {
-  return (
-    <span className="inline-flex min-h-6 items-center rounded-md border border-border bg-secondary px-2 text-[11px] font-medium text-muted-foreground">
-      {children}
-    </span>
   )
 }

@@ -99,7 +99,7 @@ describe('WorkspaceAIPreferencesPanel', () => {
     expect(screen.getByText('无头运行')).toBeTruthy()
     expect((screen.getByRole('combobox', { name: '交互式 Session的默认 Agent Runtime' }) as HTMLSelectElement).value).toBe('pi')
     expect((await screen.findAllByText('DeepSeek API')).length).toBeGreaterThan(0)
-    expect(screen.getAllByText('deepseek-v4-flash · high').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('deepseek-v4-flash, high').length).toBeGreaterThan(0)
     expect(screen.getByRole('option', { name: '跟随最近使用 — Pi' })).toBeTruthy()
     expect(screen.getByText('最近成功使用的 Runtime')).toBeTruthy()
     expect(screen.getByText('当前解析为')).toBeTruthy()

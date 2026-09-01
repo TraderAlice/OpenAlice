@@ -91,7 +91,7 @@ export function PortfolioSidebar() {
                 }
                 trail={
                   !uta.enabled ? (
-                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('common.off')}</span>
+                    <span className="text-[10px] font-medium text-muted-foreground">{t('common.off')}</span>
                   ) : undefined
                 }
               />

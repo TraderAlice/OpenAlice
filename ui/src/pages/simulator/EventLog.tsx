@@ -10,6 +10,7 @@ import { useState } from 'react'
 import { Section } from '../../components/form'
 import { formatRelativeTime } from '../../lib/intl'
 import type { SimulatorEvent } from './useSimulatorState'
+import { Button } from '../../components/ui/button'
 
 const COLLAPSED_COUNT = 5
 
@@ -23,10 +24,7 @@ export function EventLog({ events }: { events: SimulatorEvent[] }) {
   const visible = expanded ? events : events.slice(0, COLLAPSED_COUNT)
 
   return (
-    <Section
-      title="Event Log"
-      description="Every simulator action issued through this panel, newest first. Useful for retracing steps after a surprising state change."
-    >
+    <Section title="Event Log">
       {events.length === 0 ? (
         <p className="text-xs text-muted-foreground">No actions yet.</p>
       ) : (
@@ -51,12 +49,14 @@ export function EventLog({ events }: { events: SimulatorEvent[] }) {
           </table>
 
           {events.length > COLLAPSED_COUNT && (
-            <button
+            <Button
               onClick={() => setExpanded(!expanded)}
-              className="mt-2 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+              className="mt-2 text-[11px] text-muted-foreground"
+              variant="ghost"
+              size="xs"
             >
               {expanded ? `Collapse (${COLLAPSED_COUNT})` : `Show all (${events.length})`}
-            </button>
+            </Button>
           )}
         </>
       )}

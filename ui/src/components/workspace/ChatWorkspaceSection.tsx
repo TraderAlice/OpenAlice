@@ -353,7 +353,7 @@ export function ChatWorkspaceSection({
               ? { targetWsId: focusedWorkspace.id }
               : {},
           })}
-          className="oa-chat-new-action oa-pressable flex min-h-10 w-full items-center gap-2 rounded-[10px] bg-accent-strong px-2 py-2 text-left text-sm font-medium text-foreground hover:bg-muted"
+          className="oa-chat-new-action oa-pressable flex min-h-10 w-full items-center gap-2 rounded-md bg-sidebar-accent px-2 py-2 text-left text-sm font-medium text-sidebar-accent-foreground hover:bg-muted"
         >
           <MessageSquarePlus size={16} strokeWidth={2} className="shrink-0 text-primary" />
           <span>{mode === 'auto-quant'
@@ -367,7 +367,7 @@ export function ChatWorkspaceSection({
               kind: 'harness-surface',
               params: { wsId: focusedWorkspace.id, capability: 'studio', source: mode },
             })}
-            className="oa-pressable flex min-h-9 w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="oa-pressable flex min-h-9 w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
           >
             <AppWindow size={15} strokeWidth={2.05} className="shrink-0 text-primary" />
             <span>{t('harnessSurface.studio')}</span>
@@ -713,7 +713,7 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
             aria-label={upgrade
               ? t('chat.workspaceContextUpdateLabel', { name: title, version: upgradeVersion })
               : contextLabel}
-            className="oa-pressable flex min-h-8 w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="oa-pressable flex min-h-8 w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
           />}
         >
           <TriggerIcon className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -732,7 +732,7 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
           side="top"
           align="start"
           sideOffset={4}
-          className="z-40 max-h-[min(30rem,calc(100vh-1rem))] w-60 max-w-[calc(100vw-1rem)] overflow-y-auto overscroll-contain rounded-lg border border-border/70 bg-popover p-1 text-popover-foreground shadow-lg ring-0 [scrollbar-gutter:stable]"
+          className="z-40 max-h-[min(30rem,calc(100vh-1rem))] w-60 max-w-[calc(100vw-1rem)] overflow-y-auto overscroll-contain rounded-xl border border-border/70 bg-popover p-1 text-popover-foreground shadow-lg ring-0 [scrollbar-gutter:stable]"
         >
           <span id={contextMenuLabelId} className="sr-only">{contextMenuLabel}</span>
           <DropdownMenuRadioGroup
@@ -741,7 +741,7 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
               queueAction(() => props.onRequestDisplayMode(value as ChatDisplayMode))
             }}
           >
-            <DropdownMenuLabel className="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">
+            <DropdownMenuLabel className="px-2 py-1 text-[11px] font-medium text-muted-foreground/70">
               {t('chat.view')}
             </DropdownMenuLabel>
             <DropdownMenuRadioItem
@@ -787,11 +787,11 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
             <DropdownMenuItem
               onClick={() => queueAction(props.onUpgrade)}
               aria-label={t('chat.reviewWorkspaceUpdateLabel', { version: upgradeVersion })}
-              className={`${menuItemClass} bg-primary/10 font-medium text-primary focus:bg-primary/15 focus:text-primary`}
+              className={`${menuItemClass} bg-muted font-medium text-foreground focus:bg-muted focus:text-foreground`}
             >
               <Layers3 size={14} strokeWidth={2} aria-hidden />
               <span className="min-w-0 flex-1 truncate">{t('chat.reviewWorkspaceUpdate')}</span>
-              <span className="shrink-0 tabular-nums text-[10px] text-primary/75">v{upgradeVersion}</span>
+              <span className="shrink-0 tabular-nums text-[10px] text-muted-foreground">v{upgradeVersion}</span>
             </DropdownMenuItem>
           )}
           <DropdownMenuItem
@@ -912,7 +912,7 @@ function HarnessSessionRoster(props: HarnessSessionRosterProps): ReactElement {
         <section className="border-b border-border/55 pb-1" aria-label={t('chat.runningInBackground')}>
           <button
             type="button"
-            className="oa-nav-row flex min-h-8 w-full items-center gap-2 px-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground hover:text-foreground"
+            className="oa-nav-row flex min-h-8 w-full items-center gap-2 px-3 text-left text-[11px] font-medium text-muted-foreground hover:text-foreground"
             onClick={() => setRunningExpanded((expanded) => !expanded)}
             aria-expanded={runningExpanded}
           >
@@ -929,7 +929,7 @@ function HarnessSessionRoster(props: HarnessSessionRosterProps): ReactElement {
               : <ChevronRight size={12} strokeWidth={2.25} aria-hidden />}
           </button>
           {runningExpanded && (
-            <div ref={runningRef} className="oa-disclosure-enter">
+            <div ref={runningRef}>
               {running.map(renderRow)}
             </div>
           )}
@@ -964,7 +964,7 @@ function HarnessSessionRoster(props: HarnessSessionRosterProps): ReactElement {
       {recent.length > visibleRecent.length && (
         <button
           type="button"
-          className="oa-nav-row group mx-1.5 flex min-h-8 w-[calc(100%-0.75rem)] items-center gap-2 rounded-[10px] px-2 py-1 text-left text-[13px] leading-[18px] font-medium text-primary hover:bg-primary/5"
+          className="oa-nav-row group mx-1.5 flex min-h-8 w-[calc(100%-0.75rem)] items-center gap-2 rounded-md px-2 py-1 text-left text-[13px] leading-[18px] font-medium text-foreground hover:bg-sidebar-accent"
           onClick={(event) => props.onBrowseSessions(event.currentTarget)}
         >
           <span className="min-w-0 flex-1 truncate">
@@ -977,7 +977,7 @@ function HarnessSessionRoster(props: HarnessSessionRosterProps): ReactElement {
           <ChevronRight
             size={13}
             strokeWidth={2.2}
-            className="shrink-0 text-primary/65"
+            className="shrink-0 text-muted-foreground"
             aria-hidden
           />
         </button>
@@ -1037,14 +1037,14 @@ function AllWorkspaceRecentSessions(props: AllWorkspaceRecentSessionsProps): Rea
 
       {props.workspaces.length === 0 && (
         <div className="border-t border-border/60 p-2">
-          <button
-            type="button"
+          <Button
+            variant="outline"
             onClick={props.onCreateWorkspace}
-            className="btn-secondary w-full justify-center"
+            className="w-full"
           >
             <PanelsTopLeft size={14} strokeWidth={2} aria-hidden />
             {t('chat.newWorkspace')}
-          </button>
+          </Button>
         </div>
       )}
     </div>
@@ -1077,14 +1077,14 @@ function FocusedChatWorkspace(props: FocusedChatWorkspaceProps): ReactElement {
         <p className="text-xs leading-relaxed text-muted-foreground">
           {t('chat.focusedEmpty')}
         </p>
-        <button
-          type="button"
+        <Button
+          variant="outline"
           onClick={props.onCreateWorkspace}
-          className="btn-secondary mt-3 w-full justify-center"
+          className="mt-3 w-full"
         >
           <PanelsTopLeft size={14} strokeWidth={2} aria-hidden />
           {t('chat.newWorkspace')}
-        </button>
+        </Button>
       </div>
     )
   }
@@ -1136,15 +1136,15 @@ function ManagerWorkspaceRow(props: ManagerWorkspaceRowProps): ReactElement {
   const hasRunning = sessions.some((session) => session.state === 'running')
 
   return (
-    <div className="px-2 pb-1 pt-1">
+    <div className="pb-1 pt-1">
       <div
-        className={`group relative flex w-full items-center overflow-hidden rounded-lg border transition-colors ${
+        className={`group relative flex w-full items-center transition-colors ${
           props.isFocused
-            ? 'border-primary/35 bg-primary/10 text-foreground'
-            : 'border-border/70 bg-secondary/45 text-foreground hover:border-primary/25 hover:bg-muted'
+            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+            : 'text-foreground hover:bg-sidebar-accent/65'
         }`}
       >
-        <span className="pointer-events-none absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-accent/[0.07] to-transparent" />
+        {props.isFocused && <SelectionIndicator />}
         <button
           type="button"
           onClick={() => setExpanded((current) => !current)}
@@ -1162,15 +1162,10 @@ function ManagerWorkspaceRow(props: ManagerWorkspaceRowProps): ReactElement {
           onClick={props.onOpen}
           aria-label={t('workspaceManager.title')}
           aria-current={props.isFocused && props.activeSessionId === null ? 'page' : undefined}
-          className="oa-pressable relative flex min-w-0 flex-1 items-center gap-2.5 py-2.5 pl-1 pr-3 text-left"
+          className="oa-pressable relative flex min-w-0 flex-1 items-center gap-2 py-2 pl-1 pr-3 text-left"
         >
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary/15">
-            <Network size={14} strokeWidth={2.1} />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-[12px] font-semibold">{t('workspaceManager.title')}</span>
-            <span className="mt-0.5 block truncate text-[10px] text-muted-foreground">{t('workspaceManager.sidebarDescription')}</span>
-          </span>
+          <Network size={14} strokeWidth={2.1} className="shrink-0 text-muted-foreground" />
+          <span className="min-w-0 flex-1 truncate text-[12px] font-medium">{t('workspaceManager.title')}</span>
           {!props.loaded ? (
             <span aria-hidden className="h-2.5 w-4 animate-pulse rounded bg-muted-foreground/15" />
           ) : sessions.length > 0 ? (
@@ -1183,7 +1178,7 @@ function ManagerWorkspaceRow(props: ManagerWorkspaceRowProps): ReactElement {
       </div>
 
       {expanded && sessions.length > 0 && (
-        <div ref={sessionListRef} className="oa-disclosure-enter ml-[18px] border-l border-border/50">
+        <div ref={sessionListRef} className="ml-[18px] border-l border-border/50">
           {sessions.map((session) => (
             <SessionRow
               key={session.id}
@@ -1336,7 +1331,7 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
     <li className="group relative" data-reorder-id={w.id}>
       <div
         className={`relative flex items-center gap-1 py-1 pl-2 pr-2 text-[13px] leading-[18px] transition-colors ${
-          isSelected ? 'bg-accent-strong text-foreground' : 'text-foreground hover:bg-accent'
+          isSelected ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-foreground hover:bg-sidebar-accent/65'
         }`}
       >
         {isSelected && <SelectionIndicator />}
@@ -1416,7 +1411,7 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
         />
       </div>
       {expanded && orderedSessions.length > 0 && (
-        <div ref={sessionListRef} className="oa-disclosure-enter ml-[18px] border-l border-border/50">
+        <div ref={sessionListRef} className="ml-[18px] border-l border-border/50">
           {orderedSessions.map((row) => (
             <HarnessSessionRow
               key={row.resumeId}

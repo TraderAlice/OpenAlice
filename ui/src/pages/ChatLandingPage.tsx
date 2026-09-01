@@ -23,6 +23,7 @@ import {
   LayoutGrid,
   Loader2,
   MessageSquare,
+  ExternalLink,
   RefreshCw,
   SearchCheck,
   X,
@@ -45,6 +46,13 @@ import {
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu'
 import { RecoverySurface, RefreshNotice } from '../components/StateViews'
+import { Button } from '../components/ui/button'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '../components/ui/tooltip'
 import { workspaceDisplayName, workspaceDisplayTitle } from '../components/workspace/display'
 import { useWorkspace } from '../tabs/store'
 import { useAliceProject } from '../hooks/useAliceProject'
@@ -103,7 +111,7 @@ function ComposerNotice({
     <div
       role={tone === 'error' ? 'alert' : 'status'}
       data-tone={tone}
-      className="oa-composer-notice mt-2 flex min-w-0 items-start gap-2.5 rounded-xl border px-3 py-2 text-[12px] leading-[18px] text-muted-foreground"
+      className="oa-composer-notice mt-2 flex min-w-0 items-start gap-2.5 rounded-lg border px-3 py-2 text-[12px] leading-[18px] text-muted-foreground"
     >
       <Icon
         aria-hidden
@@ -191,18 +199,26 @@ function HarnessWorkspacePicker({
 
   if (locked || options.length === 0) {
     return (
-      <div className="flex min-h-7 min-w-0 max-w-[17rem] items-center gap-1.5 rounded-lg px-2 text-[12px] font-medium text-foreground">
+      <div className="flex min-h-7 min-w-0 max-w-[17rem] items-center gap-1.5 rounded-md px-2 text-[12px] font-medium text-foreground">
         {triggerContents}
         {onClear && (
-          <button
-            type="button"
-            onClick={onClear}
-            aria-label={t('chatLanding.clearTarget')}
-            title={t('chatLanding.clearTarget')}
-            className="oa-icon-action -mr-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            <X className="h-3 w-3" aria-hidden />
-          </button>
+          <Tooltip>
+            <TooltipTrigger
+              render={(
+                <Button
+                  type="button"
+                  onClick={onClear}
+                  aria-label={t('chatLanding.clearTarget')}
+                  variant="ghost"
+                  size="icon-xs"
+                  className="-mr-1 shrink-0 text-muted-foreground"
+                />
+              )}
+            >
+              <X className="h-3 w-3" aria-hidden />
+            </TooltipTrigger>
+            <TooltipContent>{t('chatLanding.clearTarget')}</TooltipContent>
+          </Tooltip>
         )}
       </div>
     )
@@ -212,10 +228,12 @@ function HarnessWorkspacePicker({
     <DropdownMenu>
       <DropdownMenuTrigger
         render={(
-          <button
+          <Button
             type="button"
             aria-label={`${t('chatLanding.startIn')}: ${label}`}
-            className="oa-pressable flex min-h-7 min-w-0 max-w-[17rem] items-center gap-1.5 rounded-lg px-2 text-[12px] font-medium text-foreground hover:bg-muted"
+            variant="ghost"
+            size="sm"
+            className="min-w-0 max-w-[17rem] justify-start text-[12px]"
           />
         )}
       >
@@ -275,9 +293,8 @@ function HarnessLandingPage({
     ? 'autoQuantLanding'
     : mode === 'prediction' ? 'autoPredictionLanding' : 'chatLanding'
   // Targeted launch: the chat sidebar's Workspace row and per-workspace "+"
-  // route here with a targetWsId — "Ask Alice, but spawn the session in THIS
-  // workspace" rather than the recent Chat workspace. Same composer; the send
-  // just carries the target.
+  // route here with a targetWsId. The composer launches the session in this
+  // workspace and carries the selected target through send.
   const targetWsId = spec.params.targetWsId
   const targetWs = targetWsId ? workspaces.find((w) => w.id === targetWsId) : undefined
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null)
@@ -433,10 +450,11 @@ function HarnessLandingPage({
   const showStarterIntents = value.trim().length === 0 && !launching
 
   return (
-    <div
-      data-testid="harness-landing-root"
-      className="@container/harness flex h-full min-h-0 w-full flex-col overflow-hidden bg-background"
-    >
+    <TooltipProvider delay={250} timeout={300}>
+      <div
+        data-testid="harness-landing-root"
+        className="@container/harness flex h-full min-h-0 w-full flex-col overflow-hidden bg-background"
+      >
       <div
         data-testid="harness-landing-scroll"
         className="oa-harness-scroll flex min-h-0 flex-1 justify-start overflow-x-hidden overflow-y-auto overscroll-contain px-5 py-8 @min-[42rem]/harness:px-8 @min-[42rem]/harness:py-10"
@@ -477,16 +495,24 @@ function HarnessLandingPage({
                   {t(`${copyKey}.examplesLabel`)}
                 </span>
                 {mode === 'chat' && exampleGroups.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => setExamplePage((page) => (page + 1) % exampleGroups.length)}
-                    disabled={launching}
-                    className="oa-icon-action inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
-                    aria-label={t('chatLanding.moreExamples')}
-                    title={t('chatLanding.moreExamples')}
-                  >
-                    <RefreshCw aria-hidden className="h-3.5 w-3.5" />
-                  </button>
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={(
+                        <Button
+                          type="button"
+                          onClick={() => setExamplePage((page) => (page + 1) % exampleGroups.length)}
+                          disabled={launching}
+                          variant="ghost"
+                          size="icon-sm"
+                          className="text-muted-foreground"
+                          aria-label={t('chatLanding.moreExamples')}
+                        />
+                      )}
+                    >
+                      <RefreshCw aria-hidden className="h-3.5 w-3.5" />
+                    </TooltipTrigger>
+                    <TooltipContent>{t('chatLanding.moreExamples')}</TooltipContent>
+                  </Tooltip>
                 )}
               </div>
               <div role="group" aria-label={t(`${copyKey}.examplesLabel`)}>
@@ -571,19 +597,26 @@ function HarnessLandingPage({
                     toolbar
                   />
                 </div>
-                <button
-                  type="button"
-                  onClick={() => void submit()}
-                  disabled={!canSend}
-                  title={t('chatLanding.send')}
-                  aria-label={t('chatLanding.send')}
-                  aria-busy={launching}
-                  className="oa-icon-action flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-foreground text-background hover:opacity-90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground/55 disabled:opacity-100"
-                >
-                  {launching
-                    ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                    : <ArrowUp className="h-4 w-4" aria-hidden />}
-                </button>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={(
+                      <Button
+                        type="button"
+                        onClick={() => void submit()}
+                        disabled={!canSend}
+                        aria-label={t('chatLanding.send')}
+                        aria-busy={launching}
+                        size="icon"
+                        className="rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground/55 disabled:opacity-100"
+                      />
+                    )}
+                  >
+                    {launching
+                      ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                      : <ArrowUp className="h-4 w-4" aria-hidden />}
+                  </TooltipTrigger>
+                  <TooltipContent>{t('chatLanding.send')}</TooltipContent>
+                </Tooltip>
               </div>
               <AgentLaunchDetails
                 config={launchConfig}
@@ -617,8 +650,9 @@ function HarnessLandingPage({
                   </code>
                 )}
                 {installHint?.url && (
-                  <a href={installHint.url} target="_blank" rel="noreferrer" className="font-medium text-primary hover:underline">
-                    {t('chatLanding.installDocs')} ↗
+                  <a href={installHint.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
+                    {t('chatLanding.installDocs')}
+                    <ExternalLink className="h-3 w-3" aria-hidden />
                   </a>
                 )}
               </div>
@@ -629,15 +663,17 @@ function HarnessLandingPage({
             <ComposerNotice tone="warning" icon={KeyRound}>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <span>{t('chatLanding.noCredBody', { name: selectedInfo.displayName })}</span>
-                <button type="button" onClick={goConfigureProvider} className="font-medium text-primary hover:underline">
-                  {t('chatLanding.configureProvider')} ↗
-                </button>
+                <Button type="button" onClick={goConfigureProvider} variant="link" size="xs" className="h-auto px-0 py-0">
+                  {t('chatLanding.configureProvider')}
+                  <ExternalLink className="h-3 w-3" aria-hidden />
+                </Button>
               </div>
             </ComposerNotice>
           )}
         </div>
       </div>
     </div>
+    </TooltipProvider>
   )
 }
 

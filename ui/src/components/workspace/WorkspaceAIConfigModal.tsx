@@ -46,6 +46,7 @@ import { WorkspaceSourceUpgradePanel } from './WorkspaceSourceUpgradePanel'
 import { WorkspaceAbsorbPanel } from './WorkspaceAbsorbPanel'
 import { WorkspaceLaunchConfigurationPanel } from './WorkspaceLaunchConfigurationPanel'
 import { WorkspaceAIPreferencesPanel } from './WorkspaceAIPreferencesPanel'
+import { Button } from '@/components/ui/button'
 
 // The agent tab implies a default vendor when the baseUrl alone can't say:
 // claude → Anthropic, codex → OpenAI; opencode/pi run anything so they have no
@@ -685,15 +686,15 @@ export function WorkspaceAIConfigModal({
             <h2 id={dialogTitleId} className="text-[15px] font-semibold text-foreground">{t('workspaceSettings.title')}</h2>
             <p id={dialogDescriptionId} className="mt-0.5 truncate text-[11px] text-muted-foreground">{workspaceLabel}</p>
           </div>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon-sm"
             onClick={onClose}
-            className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             aria-label={t('workspaceSettings.close')}
-            title={t('common.close')}
           >
             <X size={18} />
-          </button>
+          </Button>
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden sm:flex-row">
@@ -707,7 +708,7 @@ export function WorkspaceAIConfigModal({
               aria-current={section === 'general' ? 'page' : undefined}
               className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:min-h-0 sm:w-full ${
                 section === 'general'
-                  ? 'bg-primary/10 text-primary'
+                  ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
             >
@@ -720,7 +721,7 @@ export function WorkspaceAIConfigModal({
               aria-current={section === 'launch' ? 'page' : undefined}
               className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:min-h-0 sm:w-full ${
                 section === 'launch'
-                  ? 'bg-primary/10 text-primary'
+                  ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
             >
@@ -733,7 +734,7 @@ export function WorkspaceAIConfigModal({
               aria-current={section === 'preferences' ? 'page' : undefined}
               className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:min-h-0 sm:w-full ${
                 section === 'preferences'
-                  ? 'bg-primary/10 text-primary'
+                  ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
             >
@@ -746,7 +747,7 @@ export function WorkspaceAIConfigModal({
               aria-current={section === 'template' ? 'page' : undefined}
               className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:min-h-0 sm:w-full ${
                 section === 'template'
-                  ? 'bg-primary/10 text-primary'
+                  ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
             >
@@ -762,7 +763,7 @@ export function WorkspaceAIConfigModal({
               aria-current={section === 'absorb' ? 'page' : undefined}
               className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:min-h-0 sm:w-full ${
                 section === 'absorb'
-                  ? 'bg-primary/10 text-primary'
+                  ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
             >
@@ -811,7 +812,7 @@ export function WorkspaceAIConfigModal({
                     <div className="flex items-start gap-2">
                       <Info size={14} className="mt-0.5 shrink-0 text-muted-foreground" />
                       <div className="min-w-0">
-                        <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{t('workspaceSettings.general.stableTag')}</div>
+                        <div className="text-[11px] font-medium text-muted-foreground">{t('workspaceSettings.general.stableTag')}</div>
                         <div className="mt-1 truncate font-mono text-[12px] text-foreground">{stableTag}</div>
                         <p className="mt-1 text-[11px] leading-snug text-muted-foreground/75">
                           {t('workspaceSettings.general.stableTagHelp')}
@@ -837,22 +838,21 @@ export function WorkspaceAIConfigModal({
                     {t('workspaceSettings.general.storedIn')}
                   </p>
                   <div className="flex justify-end gap-2">
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
                       onClick={onClose}
                       disabled={metadataSaving}
-                      className="whitespace-nowrap px-3 py-2 rounded-md text-muted-foreground hover:text-foreground text-[13px] disabled:opacity-40"
                     >
                       {t('common.cancel')}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
                       onClick={handleSaveMetadata}
                       disabled={metadataSaving || !metadataDirty}
-                      className="whitespace-nowrap px-4 py-2 rounded-md bg-primary text-primary-foreground text-[13px] font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
                     >
                       {metadataSaving ? t('common.saving') : t('common.save')}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -943,7 +943,7 @@ export function WorkspaceAIConfigModal({
                         const shapes = agentWireShapes(cred.wires, agents, tab, cred.vendor)
                         return (
                           <option key={cred.slug} value={cred.slug}>
-                            {(cred.label?.trim() || cred.slug)}{shapes.length > 1 ? ` · ${t('workspaceSettings.ai.protocolCount', { count: shapes.length })}` : ''}
+                            {(cred.label?.trim() || cred.slug)}{shapes.length > 1 ? `, ${t('workspaceSettings.ai.protocolCount', { count: shapes.length })}` : ''}
                           </option>
                         )
                       })}
@@ -1051,13 +1051,13 @@ export function WorkspaceAIConfigModal({
                 autoCapitalize="off"
                 autoCorrect="off"
               />
-              <button
-                onClick={() => setShowKey(!showKey)}
-                className="px-3 rounded-md border border-border text-muted-foreground hover:text-foreground text-[12px]"
+              <Button
                 type="button"
+                variant="outline"
+                onClick={() => setShowKey(!showKey)}
               >
                 {showKey ? t('common.hide') : t('common.show')}
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -1259,20 +1259,23 @@ export function WorkspaceAIConfigModal({
                 {t('workspaceSettings.ai.saveCredentialPrompt')}
               </span>
               <div className="flex gap-2 shrink-0">
-                <button
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => setDismissedCredentialKey(enteredApiKey)}
                   disabled={savingCred}
-                  className="px-2.5 py-1 rounded-md border border-border text-muted-foreground hover:text-foreground text-[12px] disabled:opacity-40"
                 >
                   {t('workspaceSettings.ai.notNow')}
-                </button>
-                <button
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
                   onClick={handleSaveCredential}
                   disabled={savingCred}
-                  className="px-2.5 py-1 rounded-md bg-primary text-primary-foreground text-[12px] font-medium disabled:opacity-40 hover:bg-primary/90"
                 >
                   {savingCred ? t('common.saving') : t('workspaceSettings.ai.saveToAlice')}
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -1333,45 +1336,46 @@ export function WorkspaceAIConfigModal({
           className="flex shrink-0 items-center justify-between gap-2 border-t border-border bg-secondary/30 px-3 py-2.5"
         >
           <div className="flex gap-2">
-            <button
+            <Button
               type="button"
+              variant="outline"
               aria-label={t('workspaceSettings.ai.reset')}
               onClick={handleReset}
               disabled={saving}
-              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-2.5 text-[12px] text-muted-foreground hover:text-foreground disabled:opacity-40"
             >
               <RotateCcw size={14} />
               <span className="hidden sm:inline">{t('workspaceSettings.ai.reset')}</span>
-            </button>
+            </Button>
           </div>
           <div className="flex justify-end gap-2">
-            <button
+            <Button
+              type="button"
+              variant="ghost"
               onClick={onClose}
               disabled={saving}
-              className="whitespace-nowrap px-3 py-2 rounded-md text-muted-foreground hover:text-foreground text-[13px]"
             >
               {t('common.cancel')}
-            </button>
+            </Button>
             {/* Single primary CTA that walks the connection gate. Managed
                 transport/auth/model changes show Test first; native-login
                 model/effort and local runtime metadata save directly. */}
             {needsTest ? (
-              <button
+              <Button
+                type="button"
                 onClick={handleTest}
                 disabled={!canTest || testing || saving}
-                title={!canTest ? t('workspaceSettings.ai.fillRequired') : undefined}
-                className="whitespace-nowrap px-4 py-2 rounded-md bg-primary text-primary-foreground text-[13px] font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
+                aria-description={!canTest ? t('workspaceSettings.ai.fillRequired') : undefined}
               >
                 {testing ? t('common.testing') : t('common.test')}
-              </button>
+              </Button>
             ) : (
-              <button
+              <Button
+                type="button"
                 onClick={handleSave}
                 disabled={saving || !dirty}
-                className="whitespace-nowrap px-4 py-2 rounded-md bg-primary text-primary-foreground text-[13px] font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
               >
                 {saving ? t('common.saving') : t('common.save')}
-              </button>
+              </Button>
             )}
           </div>
         </div>

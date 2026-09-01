@@ -71,9 +71,9 @@ function AgentRuntimeRow({
     <button
       type="button"
       onClick={onSelect}
-      className={`flex w-full min-w-0 items-start gap-2 rounded-md px-2.5 py-2 text-left text-[13px] transition-colors hover:bg-muted ${
-        selected ? 'text-primary' : 'text-foreground'
-      } min-h-11`}
+      className={`flex min-h-11 w-full min-w-0 items-start gap-2 rounded-md px-2.5 py-2 text-left text-[13px] transition-colors hover:bg-muted ${
+        selected ? 'bg-muted/50 text-foreground' : 'text-foreground'
+      }`}
     >
       <AgentRuntimeIcon agentId={agent.id} className="mt-0.5 h-4 w-4 shrink-0" />
       <span className="min-w-0 flex-1">
@@ -136,7 +136,7 @@ function UninstalledRuntimeGuidance({ agent }: { agent: AgentInfo }) {
               target="_blank"
               rel="noreferrer"
               aria-label={t('chatLanding.openInstallDocs', { name: agent.displayName })}
-              className="inline-flex h-6 items-center gap-1 rounded-[min(var(--radius-md),10px)] border border-border bg-background px-2 text-xs text-foreground hover:bg-muted"
+              className="inline-flex h-6 items-center gap-1 rounded-md border border-border bg-background px-2 text-xs text-foreground hover:bg-muted"
             >
               <ExternalLink className="size-3" />
               {t('chatLanding.installDocs')}
@@ -217,7 +217,7 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
               onClick={() => {
                 if (!menuOpen) setMenuOpen(true)
               }}
-              className={`oa-pressable inline-flex min-h-7 min-w-0 max-w-[190px] items-center gap-1.5 rounded-lg py-1 text-[12px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 ${toolbar ? 'bg-transparent px-2' : 'bg-muted px-2.5'}`}
+              className={`oa-pressable inline-flex min-h-7 min-w-0 max-w-[190px] items-center gap-1.5 rounded-md py-1 text-[12px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 ${toolbar ? 'bg-transparent px-2' : 'bg-muted px-2.5'}`}
             />}
           >
             <AgentRuntimeIcon agentId={selected?.id} className="h-3.5 w-3.5 shrink-0" />
@@ -228,7 +228,7 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
             align="start"
             side={menuPlacement === 'down' ? 'bottom' : 'top'}
             sideOffset={6}
-            className="w-[min(16rem,calc(100vw-2rem))] rounded-lg border border-border/70 bg-secondary p-1 shadow-lg ring-0"
+            className="w-[min(16rem,calc(100vw-2rem))] rounded-xl border border-border/70 bg-secondary p-1 shadow-lg ring-0"
           >
             {primary.map((agent) => {
               const active = agent.id === selectedId
@@ -241,7 +241,7 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
                     if (missing) return
                     choose(agent.id)
                   }}
-                  className={`min-h-9 gap-2 px-2.5 text-[12px] ${active ? 'text-primary' : missing ? 'text-muted-foreground' : 'text-foreground'}`}
+                  className={`min-h-9 gap-2 px-2.5 text-[12px] ${active ? 'bg-muted text-foreground' : missing ? 'text-muted-foreground' : 'text-foreground'}`}
                 >
                   <AgentRuntimeIcon agentId={agent.id} className="h-3.5 w-3.5 shrink-0" />
                   <span className="min-w-0 flex-1 truncate">{agent.displayName}</span>
@@ -258,7 +258,7 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
-                  <DropdownMenuLabel className="px-2.5 py-1 text-[10px] uppercase tracking-wide">
+                  <DropdownMenuLabel className="px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
                     {t('chatLanding.currentRuntime')}
                   </DropdownMenuLabel>
                   <DropdownMenuItem
@@ -268,7 +268,7 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
                       choose(selected.id)
                     }}
                     className={`min-h-9 gap-2 px-2.5 text-[12px] ${
-                      selected.installed === false ? 'text-muted-foreground' : 'text-primary'
+                      selected.installed === false ? 'text-muted-foreground' : 'bg-muted text-foreground'
                     }`}
                   >
                     <AgentRuntimeIcon agentId={selectedOutsidePrimary ? selected?.id : null} className="h-3.5 w-3.5 shrink-0" />
@@ -324,7 +324,7 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
                 <div className="flex flex-col gap-4 pb-1">
                   {installed.length > 0 && (
                     <section>
-                      <h3 className="px-2.5 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      <h3 className="px-2.5 pb-1 text-[11px] font-medium text-muted-foreground">
                         {t('chatLanding.installedRuntimes')}
                       </h3>
                       <div className="flex flex-col">
@@ -342,7 +342,7 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
                   )}
                   {notInstalled.length > 0 && (
                     <section>
-                      <h3 className="px-2.5 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      <h3 className="px-2.5 pb-1 text-[11px] font-medium text-muted-foreground">
                         {t('chatLanding.notInstalledRuntimes')}
                       </h3>
                       <div className="flex flex-col">

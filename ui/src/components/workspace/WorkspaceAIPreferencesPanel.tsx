@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Bot, Check, Cpu, KeyRound, Pencil, RotateCcw } from 'lucide-react'
+import { Bot, Cpu, KeyRound, Pencil, RotateCcw } from 'lucide-react'
 
 import type { QuickChatLaunchPreference } from '@/api/preferences'
 import { Button } from '@/components/ui/button'
+import { SelectionCheckIcon } from '@/components/ui/selection-check-icon'
 import {
   Dialog,
   DialogContent,
@@ -87,7 +88,7 @@ function preferenceSummary(
   const access = preference.accessMode === 'vault'
     ? credentialAccessLabel(credential ?? null) || preference.credentialSlug || 'Vault'
     : nativeLabel
-  const inference = [preference.model, preference.reasoningEffort].filter(Boolean).join(' · ') || 'Runtime default'
+  const inference = [preference.model, preference.reasoningEffort].filter(Boolean).join(', ') || 'Runtime default'
   return { access, inference }
 }
 
@@ -149,12 +150,12 @@ function RuntimePreferenceDialog({
             role="radio"
             aria-checked={!useFixed}
             onClick={() => setUseFixed(false)}
-            className={`rounded-lg border p-3 text-left transition-colors ${!useFixed ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50'}`}
+            className={`rounded-lg border p-3 text-left transition-colors ${!useFixed ? 'border-foreground/25 bg-muted/60' : 'border-border hover:bg-muted/40'}`}
           >
             <div className="flex items-center gap-2 text-sm font-medium text-foreground">
               <RotateCcw size={15} />
               {t('workspaceSettings.preferences.followRecent')}
-              {!useFixed && <Check size={14} className="ml-auto text-primary" />}
+              {!useFixed && <span className="ml-auto"><SelectionCheckIcon /></span>}
             </div>
             <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
               {t('workspaceSettings.preferences.followRecentHelp')}
@@ -165,12 +166,12 @@ function RuntimePreferenceDialog({
             role="radio"
             aria-checked={useFixed}
             onClick={() => setUseFixed(true)}
-            className={`rounded-lg border p-3 text-left transition-colors ${useFixed ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50'}`}
+            className={`rounded-lg border p-3 text-left transition-colors ${useFixed ? 'border-foreground/25 bg-muted/60' : 'border-border hover:bg-muted/40'}`}
           >
             <div className="flex items-center gap-2 text-sm font-medium text-foreground">
               <Bot size={15} />
               {t('workspaceSettings.preferences.fixedDefault')}
-              {useFixed && <Check size={14} className="ml-auto text-primary" />}
+              {useFixed && <span className="ml-auto"><SelectionCheckIcon /></span>}
             </div>
             <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
               {t('workspaceSettings.preferences.fixedDefaultHelp')}
@@ -332,7 +333,7 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
               )
               : null
             return (
-              <section key={mode} className="overflow-hidden rounded-xl border border-border bg-card">
+              <section key={mode} className="overflow-hidden rounded-lg border border-border bg-card">
                 <div className="border-b border-border bg-muted/25 px-4 py-3">
                   <h4 className="text-[13px] font-semibold text-foreground">{title}</h4>
                   <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
@@ -365,17 +366,15 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
                   </label>
 
                   {recentAgentName && recentSummary && (
-                    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-x-1 gap-y-1 text-[11px] text-muted-foreground">
                       <span>
                         {drafts[mode].defaultAgent
                           ? t('workspaceSettings.preferences.recentRuntime')
                           : t('workspaceSettings.preferences.currentlyResolvesTo')}
                       </span>
-                      <span className="font-medium text-foreground">{recentAgentName}</span>
-                      <span aria-hidden="true">·</span>
-                      <span>{recentSummary.access}</span>
-                      <span aria-hidden="true">·</span>
-                      <span>{recentSummary.inference}</span>
+                      <span className="font-medium text-foreground">
+                        {[recentAgentName, recentSummary.access, recentSummary.inference].join(', ')}
+                      </span>
                     </div>
                   )}
 
@@ -403,7 +402,7 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
                   )}
 
                   <div className="overflow-hidden rounded-lg border border-border">
-                    <div className="grid grid-cols-[minmax(7rem,1fr)_minmax(0,2fr)_auto] gap-3 border-b border-border bg-muted/40 px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <div className="grid grid-cols-[minmax(7rem,1fr)_minmax(0,2fr)_auto] gap-3 border-b border-border bg-muted/40 px-3 py-2 text-[11px] font-medium text-muted-foreground">
                       <span>{t('workspaceSettings.preferences.runtime')}</span>
                       <span>{t('workspaceSettings.preferences.resolvedPreference')}</span>
                       <span className="sr-only">{t('common.edit')}</span>

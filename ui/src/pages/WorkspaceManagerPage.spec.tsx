@@ -678,7 +678,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
     expect(terminal.getAttribute('data-session-label')).toBe('Inspect the floor')
     expect(container.firstElementChild?.classList.contains('workspace-manager-terminal-canvas')).toBe(true)
     expect(screen.getAllByRole('button', { name: i18n.t('workspaceManager.back') })).toHaveLength(1)
-    expect(screen.getByText('Codex · TUI')).toBeTruthy()
+    expect(screen.getByText('Codex TUI')).toBeTruthy()
   })
 
   it('reopens a paused Pi Manager Session in its saved WebPi surface', () => {

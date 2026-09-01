@@ -19,9 +19,8 @@ export function EquityDetail({ symbol, source }: Props) {
   return (
     <div className="flex flex-col gap-3">
       {klineOnly ? (
-        <div className="rounded-md border border-border bg-secondary/40 px-3 py-2 text-[12px] leading-relaxed text-muted-foreground">
-          Eastmoney provides Chinese A-share discovery and forward-adjusted price history for this source.
-          Quote and fundamental panels are not available in its native symbol namespace.
+        <div className="rounded-lg border border-border bg-card px-3 py-2 text-[12px] leading-relaxed text-muted-foreground">
+          This Eastmoney view includes Chinese A-share discovery and forward-adjusted price history.
         </div>
       ) : (
         <QuoteHeader symbol={symbol} />

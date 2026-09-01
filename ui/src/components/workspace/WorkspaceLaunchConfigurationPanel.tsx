@@ -14,6 +14,8 @@ import {
   type WorkspaceLaunchEnvironmentEntry,
   type WorkspaceLaunchPlan,
 } from './api'
+import { Button } from '@/components/ui/button'
+import { SegmentedControl } from '@/components/SegmentedControl'
 
 interface Props {
   readonly wsId: string
@@ -149,22 +151,13 @@ export function WorkspaceLaunchConfigurationPanel({
             <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
               {t('workspaceSettings.launch.previewDescription')}
             </p>
-            <div className="mt-3 flex gap-1 overflow-x-auto rounded-lg border border-border bg-secondary/40 p-1.5">
-              {runtimeIds.map((id) => (
-                <button
-                  type="button"
-                  key={id}
-                  onClick={() => setSelectedAgent(id)}
-                  className={`oa-pressable shrink-0 rounded-md px-3 py-1.5 text-[12px] font-medium ${
-                    selectedAgent === id
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                  }`}
-                >
-                  {RUNTIME_LABELS[id] ?? id}
-                </button>
-              ))}
-            </div>
+            <SegmentedControl
+              className="mt-3"
+              value={selectedAgent}
+              options={runtimeIds.map((id) => ({ value: id, label: RUNTIME_LABELS[id] ?? id }))}
+              onChange={setSelectedAgent}
+              ariaLabel={t('workspaceSettings.launch.previewTitle')}
+            />
           </section>
 
           {loading && (
@@ -190,7 +183,7 @@ export function WorkspaceLaunchConfigurationPanel({
               <div className="oa-status-surface rounded-lg border border-border bg-secondary/30 p-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="flex min-w-0 items-start gap-2.5">
-                    <TerminalSquare size={17} className="mt-0.5 shrink-0 text-primary" />
+                    <TerminalSquare size={17} className="mt-0.5 shrink-0 text-muted-foreground" />
                     <div className="min-w-0">
                       <div className="font-medium text-foreground">{plan.agent.displayName}</div>
                       <div className="mt-0.5 break-all font-mono text-[11px] text-muted-foreground">
@@ -231,20 +224,20 @@ export function WorkspaceLaunchConfigurationPanel({
                       {t('workspaceSettings.launch.commandHelp')}
                     </p>
                   </div>
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon-sm"
                     onClick={() => void copyCommand()}
-                    className="oa-icon-action shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
                     aria-label={t('workspaceSettings.launch.copyCommand')}
-                    title={t('workspaceSettings.launch.copyCommand')}
                   >
                     {copied ? <Check size={14} /> : <Copy size={14} />}
-                  </button>
+                  </Button>
                 </div>
                 <CommandTokens command={plan.launch.composedCommand} />
                 {resolvedDiffers && (
-                  <div className="oa-disclosure-enter mt-3 border-t border-border/70 pt-3">
-                    <div className="mb-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  <div className="mt-3 border-t border-border/70 pt-3">
+                    <div className="mb-2 text-[11px] font-medium text-muted-foreground">
                       {t('workspaceSettings.launch.resolvedCommand')}
                     </div>
                     <CommandTokens command={plan.launch.resolvedCommand} />
@@ -254,7 +247,7 @@ export function WorkspaceLaunchConfigurationPanel({
 
               <section className="grid gap-2 sm:grid-cols-2">
                 <div className="rounded-lg border border-border p-3">
-                  <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  <div className="text-[11px] font-medium text-muted-foreground">
                     {t('workspaceSettings.launch.cwd')}
                   </div>
                   <div className="mt-1 break-all font-mono text-[11px] text-foreground">
@@ -262,7 +255,7 @@ export function WorkspaceLaunchConfigurationPanel({
                   </div>
                 </div>
                 <div className="rounded-lg border border-border p-3">
-                  <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  <div className="text-[11px] font-medium text-muted-foreground">
                     {t('workspaceSettings.launch.transcript')}
                   </div>
                   <div className="mt-1 break-all font-mono text-[11px] text-foreground">
@@ -329,13 +322,15 @@ export function WorkspaceLaunchConfigurationPanel({
                     <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
                       {t('workspaceSettings.launch.compatibilityDescription')}
                     </p>
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
+                      size="sm"
                       onClick={onOpenCompatibilityConfig}
-                      className="mt-3 rounded-md border border-border bg-background px-3 py-2 text-[11px] font-medium text-foreground hover:bg-muted"
+                      className="mt-3"
                     >
                       {t('workspaceSettings.launch.openCompatibility')}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -348,15 +343,16 @@ export function WorkspaceLaunchConfigurationPanel({
         <p className="text-[10px] leading-relaxed text-muted-foreground">
           {t('workspaceSettings.launch.previewReadOnly')}
         </p>
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           onClick={() => setRefreshToken((value) => value + 1)}
           disabled={loading}
-          className="oa-pressable flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground disabled:opacity-40"
         >
           <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
           {t('common.retry')}
-        </button>
+        </Button>
       </div>
     </div>
   )

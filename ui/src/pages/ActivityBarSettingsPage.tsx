@@ -344,7 +344,6 @@ export function ActivityBarSettingsPage() {
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
         title={t('settings.activityBar.title')}
-        description={t('settings.activityBar.description')}
         right={<SaveIndicator status={status} onRetry={retry} />}
       />
       <SettingsScrollArea className="px-4 py-5 md:px-8">
@@ -357,14 +356,16 @@ export function ActivityBarSettingsPage() {
               key={group.id}
               data-nav-group-card={group.id}
               data-flip-id={`group:${group.id}`}
-              className={`rounded-xl border border-border/60 bg-secondary/40 ${
+              className={`rounded-lg border border-border/60 bg-secondary/40 ${
                 active?.kind === 'group' && active.id === group.id ? 'oa-sortable-placeholder' : ''
               }`}
             >
-              <div data-nav-group-header className="flex items-center gap-2 border-b border-border/50 px-3 py-2">
-                <button
+              <div data-nav-group-header className="flex min-h-12 items-center gap-2 border-b border-border/50 px-3 py-2">
+                <Button
                   type="button"
-                  className="oa-icon-action flex size-8 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
+                  variant="ghost"
+                  size="icon"
+                  className="cursor-grab touch-none text-muted-foreground hover:text-foreground"
                   onPointerDown={(event) => {
                     const header = event.currentTarget.closest<HTMLElement>('[data-nav-group-header]')
                     const rect = header?.getBoundingClientRect()
@@ -382,7 +383,7 @@ export function ActivityBarSettingsPage() {
                   aria-label={t('settings.activityBar.dragGroup')}
                 >
                   <GripVertical size={14} strokeWidth={1.75} aria-hidden />
-                </button>
+                </Button>
                 {group.builtin ? (
                   <h3 className="min-w-0 flex-1 text-[12px] font-semibold text-muted-foreground">
                     {group.labelKey ? t(group.labelKey) : t('settings.activityBar.primaryGroup')}
@@ -397,18 +398,20 @@ export function ActivityBarSettingsPage() {
                       if (!value.trim()) return
                       update(renameCustomGroup(draft, group.id, value))
                     }}
-                    className="min-w-0 flex-1 bg-transparent text-[13px] font-semibold text-foreground outline-none"
+                    className="h-8 min-w-0 flex-1 rounded-md bg-transparent px-2 text-[13px] font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
                   />
                 )}
                 {!group.builtin && (
-                  <button
+                  <Button
                     type="button"
-                    className="oa-icon-action flex size-8 items-center justify-center rounded-md text-muted-foreground hover:text-destructive"
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:text-destructive"
                     onClick={() => update(deleteCustomGroup(draft, group.id))}
                     aria-label={t('settings.activityBar.deleteGroup')}
                   >
                     <Trash2 size={14} strokeWidth={1.75} aria-hidden />
-                  </button>
+                  </Button>
                 )}
               </div>
               <div data-nav-item-list className="flex flex-col py-1">
@@ -421,13 +424,15 @@ export function ActivityBarSettingsPage() {
                       key={item.page}
                       data-nav-item={item.page}
                       data-flip-id={`item:${item.page}`}
-                      className={`flex items-center gap-2 px-3 py-1.5 ${item.hidden ? 'opacity-50' : ''} ${
+                      className={`flex min-h-12 items-center gap-2 px-3 py-1.5 ${item.hidden ? 'opacity-50' : ''} ${
                         lifting ? 'oa-sortable-placeholder' : ''
                       }`}
                     >
-                      <button
+                      <Button
                         type="button"
-                        className="oa-icon-action flex size-8 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
+                        variant="ghost"
+                        size="icon"
+                        className="cursor-grab touch-none text-muted-foreground hover:text-foreground"
                         onPointerDown={(event) => {
                           event.stopPropagation()
                           const row = event.currentTarget.closest<HTMLElement>('[data-nav-item]')
@@ -446,7 +451,7 @@ export function ActivityBarSettingsPage() {
                         aria-label={t('settings.activityBar.dragItem', { label })}
                       >
                         <GripVertical size={14} strokeWidth={1.75} aria-hidden />
-                      </button>
+                      </Button>
                       <Icon size={14} strokeWidth={1.75} className="text-muted-foreground" aria-hidden />
                       <span className="min-w-0 flex-1 truncate text-[13px] text-foreground">{label}</span>
                       {item.pinned ? (

@@ -32,7 +32,7 @@ export function AutomationApiSection() {
       </section>
 
       <section className="space-y-2">
-        <h3 className="font-semibold text-foreground">1 · Self-scheduled (the workspace declares it)</h3>
+        <h3 className="font-semibold text-foreground">1. Self-scheduled</h3>
         <p className="text-muted-foreground">
           A workspace declares its work as <strong className="text-foreground">one
           markdown file per issue</strong> under{' '}
@@ -110,7 +110,7 @@ research/premarket.md --comments "Pre-market brief".`}</Block>
       </section>
 
       <section className="space-y-2">
-        <h3 className="font-semibold text-foreground">2 · External trigger (POST a run)</h3>
+        <h3 className="font-semibold text-foreground">2. External trigger</h3>
         <p className="text-muted-foreground">Trigger a one-off headless run in a specific workspace over HTTP:</p>
         <Block>{`POST /api/workspaces/:id/headless
 {

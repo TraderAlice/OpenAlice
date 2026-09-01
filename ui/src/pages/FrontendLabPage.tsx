@@ -64,7 +64,7 @@ export function FrontendLabPage() {
           </p>
         </div>
 
-        <section className="overflow-hidden rounded-xl border border-border bg-secondary/35">
+        <section className="overflow-hidden rounded-lg border border-border bg-secondary/35">
           <div className="border-b border-border px-4 py-3">
             <h3 className="text-[14px] font-semibold text-foreground">Activity Sonner</h3>
             <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
@@ -74,7 +74,7 @@ export function FrontendLabPage() {
           </div>
           <div className="divide-y divide-border">
             {TESTS.map((test) => (
-              <div key={test.state} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div key={test.state} className="flex min-h-12 flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <div className="text-[13px] font-medium text-foreground">{test.label}</div>
                   <div className="mt-0.5 text-[12px] text-muted-foreground">{test.description}</div>

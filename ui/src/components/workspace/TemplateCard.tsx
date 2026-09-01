@@ -1,6 +1,7 @@
 import { Bot, Code, Cpu, Sparkles, Terminal, type LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { Button } from '../ui/button'
 import type { AgentInfo, TemplateInfo } from './api'
 
 /**
@@ -21,7 +22,7 @@ const AGENT_ICONS: Record<string, LucideIcon> = {
 function AgentGlyph({ agent }: { agent: string }) {
   const Icon = AGENT_ICONS[agent]
   if (Icon) return <Icon size={12} strokeWidth={2.25} aria-hidden="true" />
-  return <span aria-hidden="true" className="text-[11px] font-mono">·</span>
+  return <Bot size={12} strokeWidth={2.25} aria-hidden="true" />
 }
 
 function humanize(name: string): string {
@@ -45,10 +46,11 @@ export function TemplateCard({ template: t, agents, onOpen }: Props) {
   const { t: tr } = useTranslation()
   const title = t.displayName ?? humanize(t.name)
   return (
-    <button
+    <Button
       type="button"
+      variant="outline"
       onClick={onOpen}
-      className="group rounded-lg border border-border bg-secondary hover:bg-muted/40 hover:border-border/80 transition-colors cursor-pointer p-4 flex flex-col gap-3 text-left"
+      className="group h-auto min-h-0 w-full cursor-pointer items-stretch justify-start gap-3 rounded-lg bg-secondary/45 p-4 text-left whitespace-normal"
     >
       <div className="flex items-start gap-2.5">
         <div className="flex-1 min-w-0">
@@ -60,7 +62,7 @@ export function TemplateCard({ template: t, agents, onOpen }: Props) {
               v{t.version}
             </span>
             {t.community && (
-              <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border border-border text-muted-foreground">
+              <span className="rounded-sm border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
                 {tr('templates.communityBadge')}
               </span>
             )}
@@ -74,7 +76,7 @@ export function TemplateCard({ template: t, agents, onOpen }: Props) {
       </div>
 
       <div className="border-t border-border pt-3 flex items-center gap-3 flex-wrap">
-        <div className="text-[10px] uppercase tracking-wider text-muted-foreground/70">
+        <div className="text-[11px] font-medium text-muted-foreground/70">
           {tr('templates.agentsLabel')}
         </div>
         <div className="flex items-center gap-2 text-muted-foreground flex-wrap">
@@ -95,6 +97,6 @@ export function TemplateCard({ template: t, agents, onOpen }: Props) {
           })}
         </div>
       </div>
-    </button>
+    </Button>
   )
 }

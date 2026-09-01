@@ -139,7 +139,7 @@ export function Sidebar(props: SidebarProps): ReactElement {
         <button
           type="button"
           onClick={() => setShowCreate(true)}
-          className="oa-pressable w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-border/60 bg-muted/30 text-[13px] font-medium text-muted-foreground hover:text-foreground hover:border-primary/50 hover:bg-muted/60"
+          className="oa-pressable flex min-h-9 w-full items-center gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-[13px] font-medium text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground"
         >
           <Plus size={15} strokeWidth={2.25} className="shrink-0" />
           <span className="truncate">{t('workspace.newWorkspace')}</span>
@@ -248,7 +248,7 @@ function NavRow({
       onClick={onClick}
       title={title}
       className={`oa-nav-row relative flex items-center gap-2.5 w-full px-3 py-1.5 text-[13px] text-left ${
-        active ? 'bg-muted text-foreground' : 'text-foreground hover:bg-muted/50'
+        active ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-foreground hover:bg-sidebar-accent/65'
       }`}
     >
       {active && <SelectionIndicator />}
@@ -379,7 +379,7 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
     <div data-reorder-id={props.reorderId}>
       <div
         className={`group relative flex items-center gap-1 pl-3 pr-2 py-1.5 text-[12px] transition-colors ${
-          isSelected ? 'bg-muted text-foreground' : 'text-foreground hover:bg-muted/50'
+          isSelected ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-foreground hover:bg-sidebar-accent/65'
         }`}
       >
         {isSelected && <SelectionIndicator />}
@@ -563,15 +563,15 @@ function HeadlessGroup(props: {
             ? t('workspace.headlessRunning', { count: runningCount })
             : t('workspace.headlessAutomation')
         }
-        className="group flex items-center gap-1 w-full pl-3 pr-2 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors select-none"
+        className="group flex w-full items-center gap-1 py-1 pl-3 pr-2 text-[11px] font-medium text-muted-foreground/70 transition-colors hover:text-foreground select-none"
       >
         {open ? <ChevronDown size={11} strokeWidth={2.25} aria-hidden="true" /> : <ChevronRight size={11} strokeWidth={2.25} aria-hidden="true" />}
         <span>{t('workspace.headless')}</span>
         <span className="text-muted-foreground/45 tabular-nums">{props.tasks.length}</span>
-        {runningCount > 0 && <span className="ml-0.5 w-1.5 h-1.5 rounded-full bg-primary" />}
+        {runningCount > 0 && <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-success" />}
       </button>
       {open && (
-        <div className="oa-disclosure-enter ml-[7px] border-l border-border/50">
+        <div className="ml-[7px] border-l border-border/50">
           {props.tasks.map((t) => (
             <HeadlessTaskRow key={t.taskId} task={t} onOpenAsSession={props.onOpenAsSession} />
           ))}
@@ -588,7 +588,7 @@ function HeadlessTaskRow(props: {
   const { t } = useTranslation();
   const task = props.task;
   const openable = task.status !== 'running' && task.resumable;
-  const titleParts = [`${task.agent} · ${task.status}`, formatRelativeTime(task.startedAt)];
+  const titleParts = [`${task.agent}, ${task.status}`, formatRelativeTime(task.startedAt)];
   if (task.error) titleParts.push(task.error);
   titleParts.push(task.prompt);
 
@@ -706,8 +706,8 @@ export function SessionRow(props: SessionRowProps): ReactElement {
       data-reorder-id={props.reorderId}
       data-active={props.isActive}
       aria-busy={headlessOccupying || undefined}
-      className={`oa-session-row group relative mx-1.5 flex min-h-9 items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] leading-[18px] transition-colors ${
-        props.isActive ? 'bg-accent-strong' : 'hover:bg-accent'
+      className={`oa-session-row group relative mx-1.5 flex min-h-9 items-center gap-1 rounded-md px-2 py-1.5 text-[13px] leading-[18px] transition-colors ${
+        props.isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'hover:bg-sidebar-accent/65'
       }`}
     >
       {props.isActive && <SelectionIndicator />}

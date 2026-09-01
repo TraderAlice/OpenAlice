@@ -18,7 +18,8 @@ import { ArchiveRestore, GitMerge, Trash2 } from 'lucide-react'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { useWorkspace } from '../tabs/store'
 import { ConfirmDialog } from '../components/ConfirmDialog'
-import { PageLoading, RecoverySurface, RefreshNotice } from '../components/StateViews'
+import { EmptyState, PageLoading, RecoverySurface, RefreshNotice } from '../components/StateViews'
+import { Button } from '../components/ui/button'
 import { OverviewCard } from '../components/workspace/OverviewCard'
 import {
   getGitLog,
@@ -180,7 +181,6 @@ export function WorkspaceListPage() {
   if (!hasLoaded && listError !== null && departed.length === 0) {
     return (
       <RecoverySurface
-        eyebrow={t('workspace.dataUnavailableEyebrow')}
         title={t('workspace.dataUnavailableTitle')}
         description={t('workspace.dataUnavailableDescription')}
         actionLabel={t('common.retry')}
@@ -191,18 +191,15 @@ export function WorkspaceListPage() {
 
   if (hasLoaded && workspaces.length === 0 && departed.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-muted-foreground px-6">
-        <h2 className="text-lg font-medium text-foreground mb-2">{t('workspace.emptyTitle')}</h2>
-        <p className="text-sm max-w-md text-center">
-          {t('workspace.emptyBody')}
-        </p>
-        <button
+      <div className="flex h-full flex-col items-center justify-center px-6">
+        <EmptyState title={t('workspace.emptyTitle')} description={t('workspace.emptyBody')} />
+        <Button
           type="button"
           onClick={() => openOrFocus({ kind: 'template-catalog', params: {} })}
-          className="btn-primary oa-pressable mt-5 inline-flex min-h-10 items-center justify-center px-4"
+          className="mt-1 min-h-10"
         >
           {t('workspace.createFromTemplates')}
-        </button>
+        </Button>
       </div>
     )
   }
@@ -300,7 +297,7 @@ export function WorkspaceListPage() {
                           <div className="truncate text-[14px] font-medium text-foreground">{workspace.tag}</div>
                           <div className="mt-0.5 font-mono text-[10px] text-muted-foreground">{workspace.id}</div>
                         </div>
-                        <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                        <span className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[10px] text-muted-foreground">
                           {lifecycleLabel}
                         </span>
                       </div>
@@ -317,7 +314,7 @@ export function WorkspaceListPage() {
                                 ?? workspaces.find((candidate) => candidate.id === workspace.absorbedIntoWorkspaceId)?.tag
                                 ?? workspace.absorbedIntoWorkspaceId}
                             </strong>
-                            {workspace.absorbCommit ? ` · ${workspace.absorbCommit.slice(0, 8)}` : ''}
+                            {workspace.absorbCommit ? `, ${workspace.absorbCommit.slice(0, 8)}` : ''}
                           </span>
                         </div>
                       )}
@@ -342,9 +339,10 @@ export function WorkspaceListPage() {
                       </div>
                       <div className="mt-4 flex justify-end gap-2">
                         {!purged && workspace.lifecycle === 'departed' && (
-                          <button
+                          <Button
                             type="button"
-                            className="btn-secondary inline-flex min-h-10 items-center gap-1.5 sm:min-h-0"
+                            variant="outline"
+                            className="min-h-10 sm:min-h-8"
                             aria-label={t('workspace.restoreWorkspaceAria', { workspace: workspace.tag })}
                             disabled={lifecycleBusy !== null}
                             onClick={() => {
@@ -357,18 +355,19 @@ export function WorkspaceListPage() {
                           >
                             <ArchiveRestore size={13} />
                             {restoring ? t('workspace.restoringWorkspace') : t('workspace.restoreWorkspace')}
-                          </button>
+                          </Button>
                         )}
                         {!purged && workspace.lifecycle === 'departed' && (
-                          <button
+                          <Button
                             type="button"
-                            className="btn-danger inline-flex min-h-10 items-center gap-1.5 sm:min-h-0"
+                            variant="destructive"
+                            className="min-h-10 sm:min-h-8"
                             aria-label={t('workspace.purgeFilesAria', { workspace: workspace.tag })}
                             disabled={lifecycleBusy !== null}
                             onClick={() => setPendingPurge(workspace)}
                           >
                             <Trash2 size={13} /> {t('workspace.purgeFiles')}
-                          </button>
+                          </Button>
                         )}
                       </div>
                     </article>

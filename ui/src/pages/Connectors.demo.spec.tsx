@@ -468,7 +468,7 @@ describe('Connector demo routes', () => {
     expect(within(appTokenLabel).getByText('Required')).toBeTruthy()
     expect(botToken.required).toBe(true)
     expect(appToken.required).toBe(true)
-    const initialHint = within(dialog).getByText('Still needed: Bot token · App-level token.')
+    const initialHint = within(dialog).getByText('Still needed: Bot token, App-level token.')
     expect(saveConnection.getAttribute('aria-describedby')).toBe(initialHint.id)
     expect(botToken.className).toContain('min-h-10')
     expect(appToken.className).toContain('min-h-10')
@@ -514,7 +514,7 @@ describe('Connector demo routes', () => {
 
     expect(within(dialog).getByLabelText('Feishu 应用 ID')).toBeTruthy()
     expect(within(dialog).getByLabelText('Feishu 应用密钥')).toBeTruthy()
-    expect(within(dialog).getByText('还需要填写：应用 ID · 应用密钥。')).toBeTruthy()
+    expect(within(dialog).getByText('还需要填写：应用 ID, 应用密钥。')).toBeTruthy()
   })
 
   it('returns grouped token validation to the first invalid field', async () => {
