@@ -342,8 +342,8 @@ if [[ "$plan_only" == true ]]; then
 fi
 
 if [[ "$platform" == darwin ]]; then
-  command -v lockf >/dev/null 2>&1 \
-    || fail 'macOS lockf is required for safe concurrent installation'
+  { command -v lockf >/dev/null 2>&1 || command -v shlock >/dev/null 2>&1; } \
+    || fail 'macOS lockf or shlock is required for safe concurrent installation'
 else
   command -v flock >/dev/null 2>&1 \
     || fail 'Linux flock is required for safe concurrent installation'
@@ -370,6 +370,7 @@ bin_dir="$INSTALL_DIR/bin"
 lock_dir="$INSTALL_DIR/.cli-install.lock"
 lock_guard_path="$INSTALL_DIR/.cli-install.lock.guard"
 lock_guard_owned=false
+lock_guard_backend=""
 staging_dir=""
 lock_owned=false
 previous_release_name=""
@@ -385,18 +386,28 @@ acquire_install_lock() {
     [[ -f "$lock_guard_path" && ! -L "$lock_guard_path" ]] \
       || fail "CLI installer advisory lock is not a safe file: $lock_guard_path"
   fi
-  exec 9>>"$lock_guard_path" \
-    || fail "Cannot open CLI installer advisory lock at $lock_guard_path"
   if [[ "$platform" == darwin ]]; then
-    command -v lockf >/dev/null 2>&1 \
-      || fail 'macOS lockf is required for safe concurrent installation'
-    lockf -t 0 9 2>/dev/null \
-      || fail 'Another OpenAlice CLI installer is running'
+    if command -v lockf >/dev/null 2>&1; then
+      exec 9>>"$lock_guard_path" \
+        || fail "Cannot open CLI installer advisory lock at $lock_guard_path"
+      lockf -t 0 9 2>/dev/null \
+        || fail 'Another OpenAlice CLI installer is running'
+      lock_guard_backend=lockf
+    else
+      command -v shlock >/dev/null 2>&1 \
+        || fail 'macOS lockf or shlock is required for safe concurrent installation'
+      shlock -p "$$" -f "$lock_guard_path" 2>/dev/null \
+        || fail 'Another OpenAlice CLI installer is running'
+      lock_guard_backend=shlock
+    fi
   else
+    exec 9>>"$lock_guard_path" \
+      || fail "Cannot open CLI installer advisory lock at $lock_guard_path"
     command -v flock >/dev/null 2>&1 \
       || fail 'Linux flock is required for safe concurrent installation'
     flock -n 9 2>/dev/null \
       || fail 'Another OpenAlice CLI installer is running'
+    lock_guard_backend=flock
   fi
   lock_guard_owned=true
 
@@ -490,7 +501,13 @@ EOF
   fi
   [[ -z "$staging_dir" ]] || rm -rf "$staging_dir"
   if [[ "$lock_owned" == true ]]; then rm -rf "$lock_dir"; fi
-  if [[ "$lock_guard_owned" == true ]]; then exec 9>&-; fi
+  if [[ "$lock_guard_owned" == true ]]; then
+    if [[ "$lock_guard_backend" == shlock ]]; then
+      rm -f "$lock_guard_path"
+    else
+      exec 9>&-
+    fi
+  fi
   exit "$cleanup_status"
 }
 trap cleanup EXIT

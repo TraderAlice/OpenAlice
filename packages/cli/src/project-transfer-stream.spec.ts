@@ -11,7 +11,7 @@ import {
   writeFile,
 } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, join, posix } from 'node:path'
 import { promisify } from 'node:util'
 
 import { afterEach, describe, expect, it } from 'vitest'
@@ -55,7 +55,7 @@ describe('AliceProject transfer stream', () => {
     expect(registered).toEqual(['remote-copy'])
     expect(await readFile(join(destination, 'portable.txt'), 'utf8')).toBe('PORTABLE-CONTENT\n')
     const registry = JSON.parse(await readFile(join(destination, 'workspaces', 'workspaces.json'), 'utf8'))
-    expect(registry.workspaces[0].dir).toBe(join(plan.destination.home, 'workspaces', 'workspaces', 'ws-one'))
+    expect(registry.workspaces[0].dir).toBe(posix.join(plan.destination.home, 'workspaces', 'workspaces', 'ws-one'))
     const catalog = JSON.parse(await readFile(join(destination, 'workspaces', 'state', 'workspace-catalog.json'), 'utf8'))
     expect(catalog.workspaces.map((workspace: { id: string }) => workspace.id)).toEqual(['ws-one'])
     await expect(stat(join(destination, 'workspaces', 'state', 'resume-identities.json'))).rejects.toMatchObject({ code: 'ENOENT' })

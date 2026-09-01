@@ -11,9 +11,10 @@ dependencies, build tools, or an Agent Runtime.
 
 The direct installer expects Bash, `tar` with gzip support, `diff`, and either `sha256sum` or
 `shasum`; a network install also needs `curl`. Safe transaction ownership uses
-the platform kernel: macOS must provide `lockf`, while Linux must provide
-`flock` (normally from `util-linux`). These are host prerequisites, not packages
-that the installer silently adds. Minimal images and remote hosts should install
+the platform kernel: macOS uses `lockf` when available and falls back to the
+system `shlock` utility on older releases, while Linux must provide `flock`
+(normally from `util-linux`). These are host prerequisites, not packages that
+the installer silently adds. Minimal images and remote hosts should install
 them before running the shared installer.
 
 npm, Bun, Homebrew, and Arch/AUR installation consume the same accepted native

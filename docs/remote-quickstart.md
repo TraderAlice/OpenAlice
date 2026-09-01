@@ -41,7 +41,7 @@ On the remote host:
 - Linux or macOS;
 - Bash, `tar` with gzip support, `diff`, and a SHA-256 utility;
 - `curl` for a network install;
-- `lockf` on macOS or `flock` on Linux (normally from `util-linux`);
+- `lockf` or the older system `shlock` on macOS, or `flock` on Linux (normally from `util-linux`);
 - enough disk and memory for the installed Runtime.
 
 The same shared-installer prerequisites apply on the laptop when it installs
