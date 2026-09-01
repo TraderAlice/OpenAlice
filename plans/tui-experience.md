@@ -93,13 +93,13 @@ already large `supervisor-tui.ts` application controller.
 
 - [x] Audit the current Supervisor, current OMP TUI package, license, runtime,
   distribution dependencies, and select the implementation route.
-- [ ] Add the semantic theme, application frame, panels, status badges, command
+- [x] Add the semantic theme, application frame, panels, status badges, command
   bar, notice treatment, and ANSI-safe width utilities.
-- [ ] Add alternate-screen lifecycle, SGR pointer parsing, hover/click/wheel
+- [x] Add alternate-screen lifecycle, SGR pointer parsing, hover/click/wheel
   routing, and terminal restoration tests.
-- [ ] Rebuild Fleet with pointer-aware responsive panes, clear primary actions,
+- [x] Rebuild Fleet with pointer-aware responsive panes, clear primary actions,
   and stable selection/scroll behavior.
-- [ ] Rebuild Overview as the selected AliceProject's operational home rather
+- [x] Rebuild Overview as the selected AliceProject's operational home rather
   than a flat field dump.
 - [ ] Upgrade Logs and Doctor with scroll/follow/filter or actionable diagnostic
   presentation inside the existing read-only contracts.
@@ -113,15 +113,27 @@ already large `supervisor-tui.ts` application controller.
 
 ## Progress
 
-- The first implementation increment adds the Node-compatible semantic theme,
+- The first implementation increment added the Node-compatible semantic theme,
   alternate-screen and SGR mouse lifecycle, pointer parser, hoverable/clickable
   top navigation, Fleet wheel routing, and exit restoration coverage.
 - The ordinary launch now enters Overview and renders a selected-AliceProject
   status card plus a compact Runtime card. Fleet remains available as a
   management page instead of defining the first-run information architecture.
-- Focused screen/pointer specs and the complete real-PTY Supervisor suite pass.
-  Fleet rows, command bars, logs, diagnostics, and overlays still retain old
-  presentation and remain active work rather than accepted completion.
+- Fleet now uses responsive bordered Machine and AliceProject panes, compact
+  textual status glyphs, a persistent Selection inspector, hoverable rows, and
+  click-to-select/focus followed by click-to-activate semantics. Its command bar
+  shows only the primary and adjacent actions instead of the historical full
+  shortcut wall. Pane titles expose the visible selection position, and
+  externally owned Runtimes use human-facing labels without advertising refused
+  Stop or Restart actions.
+- The rebuilt Fleet was exercised against the real Default AliceProject at
+  80x24 with two Machines and six local AliceProjects. Raw SGR hover and click
+  selected the Railway Machine, and detach restored cursor, mouse, bracketed
+  paste, and alternate-screen modes.
+- Focused screen/pointer specs, all 18 real-PTY workflows, CLI build/typecheck,
+  and the repository suite pass for the current increment. Logs,
+  diagnostics, and overlays still retain old presentation and remain active
+  work rather than accepted completion.
 
 ## Completion Criteria
 

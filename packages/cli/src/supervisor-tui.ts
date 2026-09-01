@@ -65,6 +65,7 @@ import {
   type SupervisorTuiTheme,
 } from './supervisor-tui-theme.ts'
 import {
+  renderSupervisorCommandBar,
   renderSupervisorHeader,
   renderSupervisorHome,
 } from './supervisor-tui-view.ts'
@@ -79,10 +80,13 @@ import {
   moveFleetSelection,
   renderSupervisorFleet,
   replaceFleetInventory,
+  selectFleetIndex,
   selectedFleetMachine,
   selectedFleetProject,
   selectFleetProjectByKey,
   setFleetFocus,
+  supervisorFleetTargetAt,
+  type SupervisorFleetPointerTarget,
   type SupervisorFleetState,
 } from './supervisor-fleet.ts'
 import {
@@ -2282,6 +2286,7 @@ export class SupervisorScreen implements Component {
   private readonly requestRender?: () => void
   private readonly theme: SupervisorTuiTheme
   private hoveredPanel?: SupervisorPanel
+  private hoveredFleetTarget?: SupervisorFleetPointerTarget
   private renderWidth = 80
 
   constructor(
@@ -2547,9 +2552,16 @@ export class SupervisorScreen implements Component {
           isConfigRecovery(this.snapshot),
         )
       : undefined
+    const fleet = this.snapshot.panel === 'fleet' ? this.snapshot.fleet : undefined
+    const fleetTarget = fleet
+      ? supervisorFleetTargetAt(fleet, this.renderWidth, event.col, event.row - 4)
+      : undefined
     if (event.motion) {
-      if (hovered !== this.hoveredPanel) {
+      const fleetHoverChanged = fleetTarget?.focus !== this.hoveredFleetTarget?.focus
+        || fleetTarget?.index !== this.hoveredFleetTarget?.index
+      if (hovered !== this.hoveredPanel || fleetHoverChanged) {
         this.hoveredPanel = hovered
+        this.hoveredFleetTarget = fleetTarget
         this.requestRender?.()
       }
       return true
@@ -2559,9 +2571,28 @@ export class SupervisorScreen implements Component {
       this.selectPanel(hovered)
       return true
     }
-    if (event.wheel !== null && this.snapshot.panel === 'fleet' && this.snapshot.fleet) {
+    if (event.leftClick && fleet && fleetTarget) {
+      const selected = fleetTarget.focus === 'machines'
+        ? fleet.selectedMachine
+        : fleet.selectedProjects[selectedFleetMachine(fleet)?.key ?? ''] ?? 0
+      if (selected === fleetTarget.index) {
+        if (fleetTarget.focus === 'machines') {
+          this.update({ fleet: setFleetFocus(fleet, 'projects') })
+        } else if (fleet.focus !== 'projects') {
+          this.update({ fleet: setFleetFocus(fleet, 'projects') })
+        } else {
+          const machine = selectedFleetMachine(fleet)
+          const project = selectedFleetProject(fleet)
+          if (machine && project) this.onActivateFleet?.(machine, project)
+        }
+      } else {
+        this.update({ fleet: selectFleetIndex(fleet, fleetTarget.focus, fleetTarget.index) })
+      }
+      return true
+    }
+    if (event.wheel !== null && fleet) {
       this.update({
-        fleet: moveFleetSelection(this.snapshot.fleet, event.wheel),
+        fleet: moveFleetSelection(fleet, event.wheel),
       })
       return true
     }
@@ -2584,21 +2615,11 @@ export class SupervisorScreen implements Component {
     ]
 
     if (this.snapshot.panel === 'fleet' && this.snapshot.fleet) {
-      lines.push(...renderSupervisorFleet(this.snapshot.fleet, width))
-      const fleetMachine = selectedFleetMachine(this.snapshot.fleet)
-      const fleetProject = selectedFleetProject(this.snapshot.fleet)
-      if (fleetMachine?.key === 'local' && fleetProject) {
-        lines.push(
-          '',
-          narrow ? `Runtime: ${state}` : `Runtime state: ${state}`,
-          `AliceProject: ${fleetProject.displayName}`,
-          `Home: ${fleetProject.home}`,
-        )
-        if (!narrow && this.snapshot.context) {
-          lines.push(`Resolved: home ${formatProvenance(this.snapshot.context.provenance.home)} · port ${formatPortResolution(this.snapshot.context)}`)
-        }
-        lines.push('', ...renderGuidance(runtime, this.snapshot.context))
-      }
+      lines.push(...renderSupervisorFleet(
+        this.snapshot.fleet,
+        width,
+        this.hoveredFleetTarget,
+      ))
     } else if (this.snapshot.panel === 'logs') {
       lines.push(...renderLogs(this.snapshot.logs))
     } else if (this.snapshot.panel === 'doctor') {
@@ -2802,44 +2823,42 @@ function panelAtColumn(
 function fleetActionBar(
   fleet: SupervisorFleetState,
   runtime: RuntimeSummary | null,
-  context: ResolvedLaunchContext | undefined,
+  _context: ResolvedLaunchContext | undefined,
   width: number,
 ): string[] {
   const machine = selectedFleetMachine(fleet)
   const project = selectedFleetProject(fleet)
   if (machine?.key === 'local') {
-    return [
-      ...actionBar(runtime, context, width, false)
-        .map((line) => line
-          .replace(' · m Managed', '')
-          .replace('m Managed · ', '')
-          .replace('  m Managed', '')),
-      width < 72
-        ? 'm Transfer · ↑/↓ Select · ←/→ Pane'
-        : 'm Transfer · ↑/↓ Select · Tab/←/→ Pane · [ / ] Pages',
-    ]
+    return renderSupervisorCommandBar(fleet.focus === 'machines'
+      ? [
+          { key: 'Enter', label: 'Browse projects', primary: true },
+          { key: 'm', label: 'Transfer' },
+          { key: '↑↓', label: 'Select' },
+          { key: '?', label: 'More' },
+        ]
+      : [
+          { key: 'Enter', label: runtime?.class === 'absent' ? 'Start & open' : 'Open', primary: true },
+          { key: 'm', label: 'Transfer' },
+          { key: '←', label: 'Machines' },
+          { key: '?', label: 'More' },
+        ], width)
   }
-  if (width < 72) {
-    if (fleet.focus === 'machines') {
-      return ['↑/↓ Select · Enter/→ Projects · ] Pages · ? Help']
-    }
-    return [
-      machine?.key === 'local'
-        ? '↑/↓ Select · Enter Activate · ← Machines · ] Pages'
-        : project?.runtime.class === 'absent'
-          ? '↑/↓ Select · s Start · r Refresh · ← Machines'
-          : '↑/↓ Select · Enter/o Connect · r Refresh · ← Machines',
-    ]
+  if (fleet.focus === 'machines') {
+    return renderSupervisorCommandBar([
+      { key: 'Enter', label: 'Browse projects', primary: true },
+      { key: '↑↓', label: 'Select' },
+      { key: 'r', label: 'Refresh' },
+      { key: '?', label: 'More' },
+    ], width)
   }
-  const primary = project?.runtime.class === 'absent'
-    ? 's Start stopped AliceProject'
-    : project
-      ? 'Enter/o Connect running AliceProject'
-      : 'Enter AliceProjects'
-  return [
-    `${primary} · ↑/↓ Select · Tab/←/→ Pane · r Refresh`,
-    '[ / ] Pages · i AliceProjects · p Setup · ? Help',
-  ]
+  return renderSupervisorCommandBar([
+    project?.runtime.class === 'absent'
+      ? { key: 's', label: 'Start project', primary: true }
+      : { key: 'Enter', label: 'Connect', primary: true },
+    { key: '←', label: 'Machines' },
+    { key: 'r', label: 'Refresh' },
+    { key: '?', label: 'More' },
+  ], width)
 }
 
 function renderGuidance(
@@ -2982,29 +3001,45 @@ function renderConfirmation(
 
 function actionBar(
   runtime: RuntimeSummary | null,
-  context: ResolvedLaunchContext | undefined,
+  _context: ResolvedLaunchContext | undefined,
   width: number,
   recovery = false,
 ): string[] {
   if (recovery) {
-    const actions = 'u Update · ? Help'
-    return actions.length <= width ? [actions] : ['u Update', '? Help']
+    return renderSupervisorCommandBar([
+      { key: 'u', label: 'Update', primary: true },
+      { key: '?', label: 'Help' },
+    ], width)
   }
-  const primary = runtime?.class === 'absent'
-    ? context?.runtimeProvider.kind === 'bundle'
-      ? 'Enter Start & open · s Background · p Setup · i AliceProjects'
-      : 'Enter Start & open · s Background · p Setup · i AliceProjects · m Managed · c Source'
-    : 'Enter / o Open · i AliceProjects · p Setup · r Restart · x Stop'
-  const secondary = 'd Doctor · l Logs · u Update · ? Help'
-  const actions = `${primary} · ${secondary}`
-  if (actions.length <= width) return [actions]
-  if (width < 60) {
-    return [
-      primary.replaceAll(' · ', '  '),
-      secondary.replaceAll(' · ', '  '),
-    ]
+  if (runtime?.class === 'absent') {
+    return renderSupervisorCommandBar([
+      { key: 'Enter', label: 'Start & open', primary: true },
+      { key: 's', label: 'Start quietly' },
+      { key: 'p', label: 'Setup' },
+      { key: '?', label: 'More' },
+    ], width)
   }
-  return [primary, secondary]
+  if (runtime?.endpoints?.web) {
+    return renderSupervisorCommandBar(runtime.owner?.surface === 'cli-server'
+      ? [
+          { key: 'Enter', label: 'Open workspace', primary: true },
+          { key: 'r', label: 'Restart' },
+          { key: 'x', label: 'Stop' },
+          { key: '?', label: 'More' },
+        ]
+      : [
+          { key: 'Enter', label: 'Open workspace', primary: true },
+          { key: 'd', label: 'Doctor' },
+          { key: 'l', label: 'Logs' },
+          { key: '?', label: 'More' },
+        ], width)
+  }
+  return renderSupervisorCommandBar([
+    { key: 'd', label: 'Review Doctor', primary: true },
+    { key: 'l', label: 'Logs' },
+    { key: 'u', label: 'Update' },
+    { key: '?', label: 'More' },
+  ], width)
 }
 
 function unavailableActionMessage(

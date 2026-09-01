@@ -7,8 +7,10 @@ import {
   moveFleetSelection,
   renderSupervisorFleet,
   replaceFleetInventory,
+  selectFleetIndex,
   selectedFleetProject,
   setFleetFocus,
+  supervisorFleetTargetAt,
 } from './supervisor-fleet.ts'
 
 describe('Supervisor fleet state and presentation', () => {
@@ -39,11 +41,29 @@ describe('Supervisor fleet state and presentation', () => {
 
   it('uses a narrow drill-down and handles wide Unicode labels', () => {
     let state = createSupervisorFleetState('2026-08-23T00:00:00Z', machines())
-    expect(renderSupervisorFleet(state, 40).join('\n')).toContain('Enter / →  AliceProjects')
+    expect(renderSupervisorFleet(state, 40).join('\n')).toContain('◆ Machines · 1/2')
     state = setFleetFocus(state, 'projects')
     const lines = renderSupervisorFleet(state, 40)
-    expect(lines.join('\n')).toContain('← / Esc  Machines')
+    expect(lines.join('\n')).toContain('◆ AliceProjects · This Mac')
     expect(lines.every((line) => displayWidth(line) <= 40)).toBe(true)
+  })
+
+  it('maps pointer rows to visible Machine and AliceProject selections', () => {
+    let state = createSupervisorFleetState('2026-08-23T00:00:00Z', machines())
+    expect(supervisorFleetTargetAt(state, 80, 4, 3)).toEqual({
+      focus: 'machines',
+      index: 1,
+    })
+    state = selectFleetIndex(state, 'machines', 1)
+    expect(supervisorFleetTargetAt(state, 80, 40, 2)).toEqual({
+      focus: 'projects',
+      index: 0,
+    })
+    state = setFleetFocus(state, 'projects')
+    expect(supervisorFleetTargetAt(state, 40, 8, 3)).toEqual({
+      focus: 'projects',
+      index: 1,
+    })
   })
 
   it('keeps unauthorized and incompatible Machines as truthful rows', () => {

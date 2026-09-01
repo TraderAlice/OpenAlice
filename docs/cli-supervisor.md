@@ -123,13 +123,21 @@ mouse reporting. Its ordinary path is intentionally parameter-free:
   owner, provider identity, services, and uptime available without returning
   to the historical flat field dump;
 - the Fleet page renders `Machine → AliceProject`: ordinary terminals use two
-  panes and narrow terminals drill down from Machines to Projects;
+  bordered panes with a stable Selection inspector, while narrow terminals
+  drill down from Machines to Projects;
   selection and list windows survive resize, use Unicode display width, and
   keep the action/detach footer visible at the supported 80×24 baseline;
 - the Overview/Fleet/Logs/Doctor/Help navigation accepts Tab, left/right, and
   `[`/`]`; the visible tabs accept pointer hover and click. `↑`/`↓` move within
   the active Fleet pane and the mouse wheel moves the focused Fleet selection.
+  Fleet rows expose pointer hover and click: the first click selects or focuses,
+  and a second click on the focused selected AliceProject invokes Enter's
+  primary action.
   With only the local Machine, Fleet focus starts on its current AliceProject;
+- the footer is a contextual command bar, not a complete shortcut legend. It
+  exposes the current primary action and a few adjacent actions as keycaps;
+  `?` keeps the complete keyboard reference available without crowding every
+  operational page;
 - registered Machines refresh in the background with one bounded,
   non-interactive (`BatchMode=yes`) SSH inventory request each. Registered,
   checking, online, unauthorized, offline, and incompatible remain distinct

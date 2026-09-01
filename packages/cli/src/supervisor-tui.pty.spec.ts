@@ -71,7 +71,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           ) {
             openedFleet = true
             child.write('\t')
-          } else if (stage === 0 && output.includes('m Transfer')) {
+          } else if (stage === 0 && output.includes('[ m ] Transfer')) {
             stage = 1
             child.write('m')
           } else if (stage === 1 && output.includes('destination Machine')) {
@@ -226,6 +226,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       let selectedRemote = false
       let drilledDown = false
       let returned = false
+      let returnOffset = 0
       const timeout = setTimeout(() => {
         child.kill()
         reject(new Error(`Supervisor offline fleet timed out:\n${output}`))
@@ -241,8 +242,14 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           child.write('\u001b[B\u001b[C')
         } else if (!drilledDown && output.includes('AliceProjects · Cloud fixture')) {
           drilledDown = true
-          child.write('\u001b')
-        } else if (drilledDown && !returned && output.includes('Enter / →  AliceProjects')) {
+          returnOffset = output.length
+          child.write('\u001b[D')
+        } else if (
+          drilledDown
+          && !returned
+          && output.slice(returnOffset).includes('Machines · ')
+          && output.slice(returnOffset).includes('[ Enter ] Browse projects')
+        ) {
           returned = true
           child.write('q')
         }
@@ -337,7 +344,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 8_000)
       child.onData((data) => {
         output += data
-        if (!requestedStart && output.includes('c Source')) {
+        if (!requestedStart && output.includes('Start OpenAlice & open Workspace')) {
           requestedStart = true
           child.write('s')
         } else if (!submittedInvalidPath && output.includes('Configure Runtime source')) {
@@ -477,7 +484,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 10_000)
       child.onData((data) => {
         output += data
-        if (!openedSettings && output.includes('p Setup')) {
+        if (!openedSettings && output.includes('[ p ] Setup')) {
           openedSettings = true
           child.write('p')
         } else if (!selectedPort && output.includes('OpenAlice setup · Default AliceProject')) {
@@ -552,7 +559,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 10_000)
       child.onData((data) => {
         output += data
-        if (!openedSetup && output.includes('p Setup')) {
+        if (!openedSetup && output.includes('[ p ] Setup')) {
           openedSetup = true
           child.write('p')
         } else if (
@@ -639,7 +646,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 12_000)
       child.onData((data) => {
         output += data
-        if (!openedProjects && output.includes('i AliceProjects')) {
+        if (!openedProjects && output.includes('Start OpenAlice & open Workspace')) {
           openedProjects = true
           child.write('i')
         } else if (!requestedCreate && output.includes('+ Create AliceProject')) {
@@ -816,7 +823,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 10_000)
       child.onData((data) => {
         output += data
-        if (!openedSettings && output.includes('p Setup')) {
+        if (!openedSettings && output.includes('[ p ] Setup')) {
           openedSettings = true
           child.write('p')
         } else if (!selectedPort && output.includes('44000 · locked')) {
@@ -874,7 +881,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 10_000)
       child.onData((data) => {
         output += data
-        if (!openedInstances && output.includes('i AliceProjects')) {
+        if (!openedInstances && output.includes('Start OpenAlice & open Workspace')) {
           openedInstances = true
           child.write('i')
         } else if (
@@ -923,7 +930,6 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     const transcript = await new Promise<string>((resolve, reject) => {
       let output = ''
       let openedOverview = false
-      let requestedManaged = false
       let detached = false
       const timeout = setTimeout(() => {
         child.kill()
@@ -931,11 +937,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 8_000)
       child.onData((data) => {
         output += data
-        if (!openedOverview && output.includes('m Transfer')) {
+        if (!openedOverview && output.includes('Start OpenAlice & open Workspace')) {
           openedOverview = true
-          child.write(']')
-        } else if (!requestedManaged && output.includes('m Managed')) {
-          requestedManaged = true
           child.write('m')
         } else if (!detached && output.includes('Managed source preparation is available from an installed')) {
           detached = true

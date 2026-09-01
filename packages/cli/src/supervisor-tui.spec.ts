@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { resolveLaunchContext } from './launch-context.ts'
 import type { MachineFleetEnvelope, MachineInventory } from './machine-inventory.ts'
-import { createSupervisorFleetState } from './supervisor-fleet.ts'
+import { createSupervisorFleetState, selectedFleetProject } from './supervisor-fleet.ts'
 import { createSupervisorTuiTheme } from './supervisor-tui-theme.ts'
 import {
   resolveSupervisorChannel,
@@ -57,10 +57,30 @@ describe('Supervisor TUI screen', () => {
     expect(lines[0]).toContain('v0.87.0-beta · DEV')
     expect(lines.join('\n')).toContain('○ STOPPED')
     expect(lines.join('\n')).toContain('[ Enter ]  Start OpenAlice & open Workspace')
-    expect(lines.join('\n')).toContain('Enter Start & open · s Background · p Setup')
-    expect(lines.join('\n')).toContain('i AliceProjects')
-    expect(lines).toContain('d Doctor · l Logs · u Update · ? Help')
+    expect(lines.join('\n')).toContain('◆ [ Enter ] Start & open')
+    expect(lines.join('\n')).toContain('[ s ] Start quietly')
+    expect(lines.join('\n')).toContain('[ ? ] More')
     expect(lines).toContain('q / Esc / Ctrl+C  Detach without stopping')
+  })
+
+  it('describes an externally owned Runtime without offering refused mutations', () => {
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'overview',
+      runtime: {
+        class: 'owned_elsewhere',
+        owner: { surface: 'dev', pid: 42 },
+        endpoints: { web: 'http://127.0.0.1:5173' },
+      },
+    })
+
+    const output = screen.render(80).join('\n')
+    expect(output).toContain('● RUNNING ELSEWHERE')
+    expect(output).toContain('[ Enter ] Open workspace')
+    expect(output).toContain('[ d ] Doctor')
+    expect(output).not.toContain('[ r ] Restart')
+    expect(output).not.toContain('[ x ] Stop')
   })
 
   it('renders and navigates the Machine to AliceProject fleet', () => {
@@ -84,7 +104,7 @@ describe('Supervisor TUI screen', () => {
 
     const localFleet = screen.render(100).join('\n')
     expect(localFleet).toContain('AliceProjects · This computer')
-    expect(localFleet.match(/m Transfer/gu)).toHaveLength(1)
+    expect(localFleet.match(/\[ m \] Transfer/gu)).toHaveLength(1)
     expect(localFleet).not.toContain('m Managed')
     expect(screen.handleKey('m', matchesKey)).toBe(true)
     expect(transfers).toEqual(['default'])
@@ -103,6 +123,8 @@ describe('Supervisor TUI screen', () => {
 
   it('styles the application frame and routes pointer tabs and Fleet wheel input', () => {
     const actions: SupervisorAction[] = []
+    const activated: string[] = []
+    const requestRender = vi.fn()
     const screen = new SupervisorScreen({
       version: 'dev',
       channel: 'dev',
@@ -114,6 +136,8 @@ describe('Supervisor TUI screen', () => {
       ),
     }, {
       onAction: (action) => actions.push(action),
+      onActivateFleet: (machine, project) => activated.push(`${machine.key}/${project.key}`),
+      requestRender,
       theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
     })
 
@@ -123,6 +147,26 @@ describe('Supervisor TUI screen', () => {
       button: 65, col: 2, row: 7, release: false, wheel: 1, motion: false, leftClick: false,
     })).toBe(true)
     expect(screen.snapshot.fleet?.selectedMachine).toBe(1)
+    expect(screen.handlePointer({
+      button: 0, col: 8, row: 6, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(requestRender).toHaveBeenCalled()
+    expect(screen.render(100).join('\n')).toContain('» This computer')
+    expect(screen.handlePointer({
+      button: 0, col: 8, row: 6, release: false, wheel: null, motion: false, leftClick: true,
+    })).toBe(true)
+    expect(screen.handlePointer({
+      button: 0, col: 8, row: 7, release: false, wheel: null, motion: false, leftClick: true,
+    })).toBe(true)
+    expect(screen.handlePointer({
+      button: 0, col: 50, row: 6, release: false, wheel: null, motion: false, leftClick: true,
+    })).toBe(true)
+    expect(screen.snapshot.fleet?.focus).toBe('projects')
+    expect(screen.snapshot.fleet && selectedFleetProject(screen.snapshot.fleet)?.key).toBe('research')
+    expect(screen.handlePointer({
+      button: 0, col: 50, row: 6, release: false, wheel: null, motion: false, leftClick: true,
+    })).toBe(true)
+    expect(activated).toEqual(['cloud/research'])
     expect(screen.handlePointer({
       button: 0, col: 24, row: 3, release: false, wheel: null, motion: false, leftClick: true,
     })).toBe(true)
@@ -152,8 +196,8 @@ describe('Supervisor TUI screen', () => {
     screen.handleKey('down', matchesKey)
     screen.handleKey('tab', matchesKey)
 
-    expect(screen.render(100).join('\n')).toContain('s Start stopped AliceProject')
-    expect(screen.render(50).join('\n')).toContain('s Start')
+    expect(screen.render(100).join('\n')).toContain('[ s ] Start project')
+    expect(screen.render(50).join('\n')).toContain('[ s ] Start project')
     expect(screen.handleKey('s', matchesKey)).toBe(true)
     expect(starts).toEqual(['cloud/research'])
   })
@@ -953,7 +997,8 @@ describe('Supervisor TUI screen', () => {
     expect(output).toContain('AliceProject configuration cannot be read.')
     expect(output).toContain('requires a newer OpenAlice')
     expect(output).toContain('will not inspect, start, open, stop, restart, or configure a project')
-    expect(output).toContain('u Update · ? Help')
+    expect(output).toContain('[ u ] Update')
+    expect(output).toContain('[ ? ] Help')
     expect(output).not.toContain('Enter Start & open')
     expect(output).not.toContain('i AliceProjects')
     expect(output).not.toContain('Default AliceProject')

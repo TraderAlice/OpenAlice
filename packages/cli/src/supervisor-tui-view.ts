@@ -13,6 +13,12 @@ export interface SupervisorHomeView {
   primaryAction: string
 }
 
+export interface SupervisorCommand {
+  key: string
+  label: string
+  primary?: boolean
+}
+
 export function renderSupervisorHeader(
   version: string,
   channel: string,
@@ -50,6 +56,26 @@ export function renderSupervisorHome(
   ]
 }
 
+export function renderSupervisorCommandBar(
+  commands: SupervisorCommand[],
+  width: number,
+): string[] {
+  const rendered = commands.map((command) => `${command.primary ? '◆ ' : ''}[ ${command.key} ] ${command.label}`)
+  const lines: string[] = []
+  let current = ''
+  for (const command of rendered) {
+    const candidate = current ? `${current}   ${command}` : command
+    if (current && displayWidth(candidate) > width) {
+      lines.push(current)
+      current = command
+    } else {
+      current = candidate
+    }
+  }
+  if (current) lines.push(current)
+  return lines.length > 0 ? lines : ['No actions available']
+}
+
 function renderCard(title: string, body: string[], width: number): string[] {
   const safeWidth = Math.max(12, width)
   const innerWidth = safeWidth - 4
@@ -81,8 +107,10 @@ function labelAndTail(label: string, tail: string, width: number): string {
 
 function stateBadge(state: string): string {
   if (state === 'running') return '● RUNNING'
+  if (state === 'owned_elsewhere') return '● RUNNING ELSEWHERE'
   if (state === 'absent') return '○ STOPPED'
   if (state === 'incompatible') return '◆ NEEDS ATTENTION'
+  if (state === 'unhealthy') return '◆ UNHEALTHY'
   if (state === 'unavailable') return '◇ UNAVAILABLE'
   return `◌ ${state.toUpperCase()}`
 }
