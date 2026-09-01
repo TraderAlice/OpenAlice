@@ -84,6 +84,7 @@ import { transferProjectOverSsh } from './project-transfer-ssh.ts'
 import type { ProjectTransferReceipt } from './project-transfer-stream.ts'
 import {
   createSupervisorFleetState,
+  displayWidth,
   fleetTunnelKey,
   moveFleetSelection,
   renderSupervisorFleet,
@@ -2667,9 +2668,8 @@ export class SupervisorScreen implements Component {
     const hovered = event.row === 3
       ? panelAtColumn(
           event.col,
-          this.snapshot.panel ?? 'overview',
+          this.snapshot,
           this.renderWidth < 60,
-          isConfigRecovery(this.snapshot),
         )
       : undefined
     const fleet = !this.commandDeckOpen && this.snapshot.panel === 'fleet'
@@ -2744,7 +2744,7 @@ export class SupervisorScreen implements Component {
     const lines = [
       renderSupervisorHeader(this.snapshot.version, this.snapshot.channel, width, updateBadge),
       '─'.repeat(Math.max(1, width)),
-      renderTabs(this.snapshot.panel ?? 'overview', narrow, isConfigRecovery(this.snapshot)),
+      renderTabs(this.snapshot, narrow),
       '',
     ]
 
@@ -2984,13 +2984,42 @@ function createServices(
 }
 
 function renderTabs(
-  selected: SupervisorPanel,
+  snapshot: SupervisorSnapshot,
   narrow: boolean,
-  recovery = false,
 ): string {
-  return tabLabels(narrow, recovery)
-    .map(([panel, label]) => panel === selected ? `[${label}]` : label)
+  const selected = snapshot.panel ?? 'overview'
+  return tabLabels(narrow, isConfigRecovery(snapshot))
+    .map(([panel, label]) => renderTab(panel, label, panel === selected, snapshot))
     .join('  ')
+}
+
+function renderTab(
+  panel: SupervisorPanel,
+  label: string,
+  selected: boolean,
+  snapshot: SupervisorSnapshot,
+): string {
+  const badge = tabBadge(panel, snapshot)
+  return `${selected ? `[${label}]` : label}${badge}`
+}
+
+function tabBadge(panel: SupervisorPanel, snapshot: SupervisorSnapshot): string {
+  if (panel === 'fleet') {
+    const count = snapshot.fleet?.machines.length ?? 0
+    return count > 0 ? `·${count}` : ''
+  }
+  if (panel === 'logs') {
+    const count = snapshot.logs?.entries?.length ?? 0
+    return count > 0 ? `·${count}` : ''
+  }
+  if (panel === 'doctor' && snapshot.doctor) {
+    const failures = snapshot.doctor.summary?.failures ?? 0
+    const warnings = snapshot.doctor.summary?.warnings ?? 0
+    if (failures > 0) return `×${failures}`
+    if (warnings > 0) return `!${warnings}`
+    return '✓'
+  }
+  return ''
 }
 
 function tabLabels(
@@ -3013,14 +3042,14 @@ function tabLabels(
 
 function panelAtColumn(
   column: number,
-  selected: SupervisorPanel,
+  snapshot: SupervisorSnapshot,
   narrow: boolean,
-  recovery = false,
 ): SupervisorPanel | undefined {
+  const selected = snapshot.panel ?? 'overview'
   let offset = 1
-  for (const [panel, label] of tabLabels(narrow, recovery)) {
-    const rendered = panel === selected ? `[${label}]` : label
-    const end = offset + rendered.length - 1
+  for (const [panel, label] of tabLabels(narrow, isConfigRecovery(snapshot))) {
+    const rendered = renderTab(panel, label, panel === selected, snapshot)
+    const end = offset + displayWidth(rendered) - 1
     if (column >= offset && column <= end) return panel
     offset = end + 3
   }

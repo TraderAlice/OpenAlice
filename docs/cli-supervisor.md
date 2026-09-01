@@ -140,6 +140,10 @@ path is intentionally parameter-free:
 - the Overview/Fleet/Logs/Doctor/Help navigation accepts Tab, left/right, and
   `[`/`]`; the visible tabs accept pointer hover and click. `↑`/`↓` move within
   the active Fleet pane and the mouse wheel moves the focused Fleet selection.
+  Fleet and loaded Logs expose their available counts in the navigation rail;
+  Doctor exposes `✓`, warning count, or failure count without relying on color.
+  Each status badge is part of its tab's pointer target rather than a separate
+  control.
   Fleet rows expose pointer hover and click: the first click selects or focuses,
   and a second click on the focused selected AliceProject invokes Enter's
   primary action.

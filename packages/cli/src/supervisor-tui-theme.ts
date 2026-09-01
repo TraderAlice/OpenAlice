@@ -166,5 +166,10 @@ function decorateTabs(
       else if (panel === hoveredPanel && panel !== selectedPanel) output = output.replace(label, theme.accent(label))
     }
   }
+  const failure = /×\d+/u.exec(output)?.[0]
+  if (failure) output = output.replace(failure, theme.danger(failure))
+  const warning = /!\d+/u.exec(output)?.[0]
+  if (warning) output = output.replace(warning, theme.warning(warning))
+  if (output.includes('✓')) output = output.replace('✓', theme.success('✓'))
   return output
 }

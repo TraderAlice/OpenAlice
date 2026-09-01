@@ -99,6 +99,15 @@ not imply maintainer approval of the finished interaction.
   sanitized plain-text fallback. The bounded snapshot edge is named `LATEST`,
   not the misleading `LIVE TAIL`.
 
+### Operational navigation decision
+
+- Static route labels are simple but require opening every page to discover
+  inventory, loaded logs, or diagnostic attention.
+- Color-only dots would be ambiguous and violate the no-color contract.
+- The selected model adds compact textual/glyph badges to the existing tabs:
+  Machine and loaded-log counts plus Doctor pass/warn/fail state. Badges extend
+  the original pointer target and do not introduce separate controls.
+
 ## Responsive and Accessibility Contract
 
 - `80x24` remains the minimum full experience. Wide terminals show the
@@ -152,6 +161,8 @@ already large `supervisor-tui.ts` application controller.
   contextual `/` Command Deck.
 - [x] Project structured Runtime logs into semantic event rows while preserving
   bounded, redacted plain-text fallback behavior.
+- [x] Turn the global tabs into an operational navigation rail with inventory,
+  log, and diagnostic status visible before opening each page.
 
 ## Progress
 
@@ -260,6 +271,15 @@ already large `supervisor-tui.ts` application controller.
   tests, CLI build/typecheck, root TypeScript check, and the 685-file repository
   suite (684 passed, 1 skipped; 6065 tests passed, 10 skipped). The Docker
   installer smoke also passes for the changed distributed TUI payload.
+- The navigation rail now surfaces Machine and loaded-log counts plus Doctor
+  pass/warn/fail state using compact glyph badges that remain meaningful without
+  color. Real 100x30 acceptance observed `Machines·2`, then `Logs·42`, then
+  `Doctor!4` as each background result arrived; raw SGR clicks continued to hit
+  tabs after each width change, including the Machine badge edge.
+- Operational-navigation acceptance passes with 59 focused screen, Fleet, and
+  real-PTY tests, CLI build/typecheck, root TypeScript check, and the 685-file
+  repository suite (684 passed, 1 skipped; 6065 tests passed, 10 skipped). The
+  Docker installer smoke also passes for the changed distributed TUI payload.
 
 ## Completion Criteria
 

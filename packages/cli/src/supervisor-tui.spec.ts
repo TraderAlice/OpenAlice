@@ -288,6 +288,7 @@ describe('Supervisor TUI screen', () => {
     })
 
     expect(screen.render(100).join('\n')).toContain('\u001b[38;2;')
+    expect(screen.render(100)[2]!.replace(/\u001b\[[0-9;]*m/gu, '')).toContain('Machines ·2')
     expect(screen.snapshot.fleet?.selectedMachine).toBe(0)
     expect(screen.handlePointer({
       button: 65, col: 2, row: 7, release: false, wheel: 1, motion: false, leftClick: false,
@@ -314,7 +315,7 @@ describe('Supervisor TUI screen', () => {
     })).toBe(true)
     expect(activated).toEqual(['cloud/research'])
     expect(screen.handlePointer({
-      button: 0, col: 24, row: 3, release: false, wheel: null, motion: false, leftClick: true,
+      button: 0, col: 28, row: 3, release: false, wheel: null, motion: false, leftClick: true,
     })).toBe(true)
     expect(screen.snapshot.panel).toBe('logs')
     expect(actions).toContain('logs')
@@ -433,15 +434,22 @@ describe('Supervisor TUI screen', () => {
       },
     })
     const semanticLogs = screen.render(80).join('\n')
+    expect(screen.render(80)[2]).toContain('[Logs]·2')
     expect(semanticLogs).toContain('! 1  03:04:05Z Runtime probe slowed · scope=guardian waitMs=120')
     expect(semanticLogs).toContain('· 2  plain adapter output')
     expect(semanticLogs).not.toContain('"msg"')
 
     screen.update({ panel: 'doctor' })
+    expect(screen.render(80)[2]).toContain('[Doctor]×1')
     expect(screen.render(80).join('\n')).toContain('✓ Runtime reachable')
     expect(screen.render(80).join('\n')).toContain('! Update available')
     expect(screen.render(80).join('\n')).toContain('× Port collision')
     expect(screen.render(80).join('\n')).toContain('[ d ] Rerun')
+    screen.update({ panel: 'overview' })
+    const navigation = screen.render(80)[2]!
+    const doctorBadgeColumn = navigation.indexOf('×1') + 2
+    expect(screen.handlePointer(pointerClick(doctorBadgeColumn, 3))).toBe(true)
+    expect(screen.snapshot.panel).toBe('doctor')
     expect(screen.handlePointer({
       button: 65, col: 10, row: 8, release: false, wheel: 1, motion: false, leftClick: false,
     })).toBe(true)
