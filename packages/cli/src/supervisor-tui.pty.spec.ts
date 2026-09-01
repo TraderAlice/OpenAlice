@@ -169,7 +169,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 8_000)
       child.onData((data) => {
         output += data
-        if (!openedHelp && output.includes('q / Esc / Ctrl+C  Detach without stopping')) {
+        if (!openedHelp && output.includes('[ / ] Commands') && output.includes('[ q ] Detach')) {
           openedHelp = true
           child.write('?')
         } else if (!detached && output.includes('Help · Keyboard map')) {

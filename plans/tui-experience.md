@@ -79,6 +79,15 @@ not imply maintainer approval of the finished interaction.
   complete vertical flow. This is an autonomous topic decision, not recorded
   maintainer approval.
 
+### Global command discovery decision
+
+- Restyling the legacy detach hint would improve finish but not discoverability.
+- Expanding Help would keep actions inside a passive keyboard manual.
+- The selected model is a persistent clickable command dock plus a contextual
+  Command Deck opened with `/`. It exposes only existing Supervisor actions and
+  routes every keypress and pointer click through the same action, confirmation,
+  refusal, and detach state machines.
+
 ## Responsive and Accessibility Contract
 
 - `80x24` remains the minimum full experience. Wide terminals show the
@@ -128,6 +137,8 @@ already large `supervisor-tui.ts` application controller.
   preserve the static reduced-motion frame as the complete experience.
 - [x] Turn Overview into a responsive AliceProject/Runtime cockpit without
   changing lifecycle action semantics or sacrificing the 80x24 baseline.
+- [x] Replace the legacy global shortcut hint with a clickable command dock and
+  contextual `/` Command Deck.
 
 ## Progress
 
@@ -216,6 +227,16 @@ already large `supervisor-tui.ts` application controller.
   CLI build/typecheck, root TypeScript check, and the 685-file repository suite
   (684 passed, 1 skipped; 6064 tests passed, 10 skipped). The Docker installer
   smoke also passes for the changed distributed TUI payload.
+- The legacy detach sentence is now a persistent command dock with clickable
+  Commands and Detach keycaps plus page context. `/` opens a compact Command
+  Deck that groups the existing primary, observe, manage, and navigation
+  actions; visible keycaps route into the original keyboard state machine.
+  Real 80x24 acceptance opened and closed the deck by keyboard and raw SGR
+  clicks, then detached by clicking `[ q ]` with complete terminal restoration.
+- Command Deck acceptance passes with 59 focused screen, Fleet, and real-PTY
+  tests, CLI build/typecheck, root TypeScript check, and the 685-file repository
+  suite (684 passed, 1 skipped; 6065 tests passed, 10 skipped). The Docker
+  installer smoke also passes for the changed distributed TUI payload.
 
 ## Completion Criteria
 

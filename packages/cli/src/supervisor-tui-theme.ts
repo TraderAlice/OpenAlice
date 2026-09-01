@@ -92,7 +92,7 @@ export function decorateSupervisorFrame(
     if (line.includes('│ × ')) return theme.danger(line)
     if (line.includes('│ ! ')) return theme.warning(line)
     if (line.includes('│ ✓ ')) return theme.success(line)
-    if (line.includes('│ NAVIGATION') || line.includes('│ RUNTIME') || line.includes('│ PROJECT') || line.includes('│ RECOVERY')) {
+    if (line.includes('│ NAVIGATION') || line.includes('│ RUNTIME') || line.includes('│ PROJECT') || line.includes('│ RECOVERY') || line.includes('│ PRIMARY') || line.includes('│ OBSERVE') || line.includes('│ MANAGE')) {
       return theme.accentStrong(line)
     }
     if (line.startsWith('╭')) return theme.accent(line)
@@ -126,7 +126,7 @@ export function decorateSupervisorFrame(
       || line.startsWith('Supervisor controls')
       || line.startsWith('Supervisor recovery controls')
     ) return theme.accentStrong(line)
-    if (line.startsWith('q / Esc / Ctrl+C')) return theme.muted(line)
+    if (line.startsWith('[ / ] Commands')) return theme.muted(line)
     return line
   })
 }

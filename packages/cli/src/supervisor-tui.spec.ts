@@ -13,6 +13,15 @@ import {
 } from './supervisor-tui.ts'
 
 const matchesKey = (data: string, key: string) => data === key
+const pointerClick = (col: number, row: number) => ({
+  button: 0,
+  col,
+  row,
+  release: false,
+  wheel: null,
+  motion: false,
+  leftClick: true,
+} as const)
 
 describe('Supervisor TUI screen', () => {
   it('labels source-run, stable, beta, and dev channels from install provenance', async () => {
@@ -61,7 +70,8 @@ describe('Supervisor TUI screen', () => {
     expect(lines.join('\n')).toContain('◆ [ Enter ] Start & open')
     expect(lines.join('\n')).toContain('[ s ] Start quietly')
     expect(lines.join('\n')).toContain('[ ? ] More')
-    expect(lines).toContain('q / Esc / Ctrl+C  Detach without stopping')
+    expect(lines.at(-1)).toContain('[ / ] Commands   [ q ] Detach')
+    expect(lines.at(-1)).toContain('OVERVIEW · Esc / Ctrl+C')
 
     const wideLines = screen.render(120)
     expect(wideLines[1]).toHaveLength(120)
@@ -117,6 +127,47 @@ describe('Supervisor TUI screen', () => {
     expect(reduced.advanceMotion()).toBe(false)
     expect(reduced.hasActiveMotion()).toBe(false)
     expect(reduced.render(80).join('\n')).toContain('◆  WORKING  Starting Runtime…')
+  })
+
+  it('opens a clickable command deck without creating a second action path', () => {
+    let settingsOpened = 0
+    let detached = 0
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'absent', endpoints: {} },
+    }, {
+      onSettings: () => { settingsOpened += 1 },
+      onDetach: () => { detached += 1 },
+    })
+
+    expect(screen.handleKey('/', matchesKey)).toBe(true)
+    let lines = screen.render(80)
+    expect(lines.join('\n')).toContain('Command Deck · ABSENT')
+    expect(lines.join('\n')).toContain('Mouse: click any keycap.')
+    expect(screen.handlePointer({
+      button: 65, col: 5, row: 10, release: false, wheel: 1, motion: false, leftClick: false,
+    })).toBe(true)
+
+    const setupRow = lines.findIndex((line) => line.includes('[ p ] Setup')) + 1
+    const setupColumn = lines[setupRow - 1]!.indexOf('[ p ]') + 2
+    expect(screen.handlePointer(pointerClick(setupColumn, setupRow))).toBe(true)
+    expect(settingsOpened).toBe(1)
+    expect(screen.render(80).join('\n')).not.toContain('Command Deck')
+
+    screen.handleKey('/', matchesKey)
+    const compactDeck = screen.render(52)
+    expect(compactDeck.length).toBeLessThanOrEqual(20)
+    expect(compactDeck.every((line) => displayWidth(line) <= 52)).toBe(true)
+    expect(compactDeck.join('\n')).toContain('[ u ] Update')
+    expect(screen.handleEscape()).toBe(true)
+    expect(screen.render(80).join('\n')).not.toContain('Command Deck')
+
+    lines = screen.render(80)
+    const detachRow = lines.findIndex((line) => line.includes('[ q ] Detach')) + 1
+    const detachColumn = lines[detachRow - 1]!.indexOf('[ q ]') + 2
+    expect(screen.handlePointer(pointerClick(detachColumn, detachRow))).toBe(true)
+    expect(detached).toBe(1)
   })
 
   it('settles a bounded brand entrance and pulses running state only on refresh', () => {

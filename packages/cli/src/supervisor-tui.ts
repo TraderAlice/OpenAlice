@@ -70,6 +70,7 @@ import {
 } from './supervisor-tui-feedback.ts'
 import {
   renderSupervisorCommandBar,
+  renderSupervisorDock,
   renderSupervisorHeader,
   renderSupervisorHome,
   renderSupervisorPanel,
@@ -2321,6 +2322,7 @@ export class SupervisorScreen implements Component {
   private hoveredFleetTarget?: SupervisorFleetPointerTarget
   private hoveredCommandTarget?: SupervisorCommandTarget
   private commandTargets: SupervisorCommandTarget[] = []
+  private commandDeckOpen = false
   private motionFrame = 0
   private introFrame?: number
   private runtimePulse = false
@@ -2429,6 +2431,11 @@ export class SupervisorScreen implements Component {
   }
 
   handleEscape(): boolean {
+    if (this.commandDeckOpen) {
+      this.commandDeckOpen = false
+      this.requestRender?.()
+      return true
+    }
     if (
       this.snapshot.panel === 'fleet'
       && this.snapshot.fleet?.focus === 'projects'
@@ -2460,6 +2467,16 @@ export class SupervisorScreen implements Component {
         return true
       }
       return false
+    }
+    if (data === '/') {
+      this.commandDeckOpen = !this.commandDeckOpen
+      this.requestRender?.()
+      return true
+    }
+    if (this.commandDeckOpen) {
+      const commandKeys: KeyId[] = ['enter', 'tab', 'i', 'p', 'l', 'd', 'u', '?']
+      if (!commandKeys.some((key) => matchesKey(data, key))) return true
+      this.commandDeckOpen = false
     }
     if (matchesKey(data, '?')) {
       this.update({ panel: this.snapshot.panel === 'help' ? 'overview' : 'help' })
@@ -2655,7 +2672,9 @@ export class SupervisorScreen implements Component {
           isConfigRecovery(this.snapshot),
         )
       : undefined
-    const fleet = this.snapshot.panel === 'fleet' ? this.snapshot.fleet : undefined
+    const fleet = !this.commandDeckOpen && this.snapshot.panel === 'fleet'
+      ? this.snapshot.fleet
+      : undefined
     const fleetTarget = fleet
       ? supervisorFleetTargetAt(fleet, this.renderWidth, event.col, event.row - 4)
       : undefined
@@ -2700,6 +2719,7 @@ export class SupervisorScreen implements Component {
       }
       return true
     }
+    if (event.wheel !== null && this.commandDeckOpen) return true
     if (event.wheel !== null && fleet) {
       this.update({
         fleet: moveFleetSelection(fleet, event.wheel),
@@ -2728,7 +2748,13 @@ export class SupervisorScreen implements Component {
       '',
     ]
 
-    if (this.snapshot.panel === 'fleet' && this.snapshot.fleet) {
+    if (this.commandDeckOpen) {
+      lines.push(...renderCommandDeck(
+        runtime,
+        isConfigRecovery(this.snapshot),
+        width,
+      ))
+    } else if (this.snapshot.panel === 'fleet' && this.snapshot.fleet) {
       lines.push(...renderSupervisorFleet(
         this.snapshot.fleet,
         width,
@@ -2786,7 +2812,9 @@ export class SupervisorScreen implements Component {
     if (feedback.length > 0) lines.push('', ...feedback)
     lines.push(
       '',
-      ...(this.snapshot.panel === 'fleet' && this.snapshot.fleet
+      ...(this.commandDeckOpen
+        ? []
+        : this.snapshot.panel === 'fleet' && this.snapshot.fleet
         ? fleetActionBar(
             this.snapshot.fleet,
             runtime,
@@ -2814,7 +2842,7 @@ export class SupervisorScreen implements Component {
                   { key: 'q', label: 'Detach' },
                 ], width)
               : actionBar(runtime, this.snapshot.context, width, isConfigRecovery(this.snapshot))),
-      'q / Esc / Ctrl+C  Detach without stopping',
+      renderSupervisorDock(this.snapshot.panel ?? 'overview', width),
     )
     const visibleLines = lines.map((line) => truncate(line, width))
     this.commandTargets = supervisorCommandTargets(visibleLines)
@@ -2836,6 +2864,11 @@ export class SupervisorScreen implements Component {
   private activatePointerCommand(label: string): boolean {
     if (label === 'q' || label === 'q / Esc') {
       this.onDetach?.()
+      return true
+    }
+    if (label === '/') {
+      this.commandDeckOpen = !this.commandDeckOpen
+      this.requestRender?.()
       return true
     }
     const input = pointerCommandInput(label)
@@ -2893,6 +2926,7 @@ export class SupervisorScreen implements Component {
   }
 
   private selectPanel(panel: SupervisorPanel): void {
+    this.commandDeckOpen = false
     this.update({ panel })
     if (panel === 'logs') this.onAction?.('logs')
     if (panel === 'doctor') this.onAction?.('doctor')
@@ -3188,6 +3222,43 @@ function renderHelp(recovery: boolean, width: number): string[] {
     '[ c ] Source checkout          [ ? ] Close help        [ q / Esc ] Detach',
     '',
     'Runtime control stays here; Workspaces, trading, and chat stay in the Web UI.',
+  ], width)
+}
+
+function renderCommandDeck(
+  runtime: RuntimeSummary | null,
+  recovery: boolean,
+  width: number,
+): string[] {
+  if (recovery) {
+    return renderSupervisorPanel('Command Deck', 'Recovery mode', [
+      'PRIMARY',
+      '[ u ] Check for an OpenAlice update',
+      '',
+      'NAVIGATION',
+      '[ ? ] Recovery help',
+      '[ / ] Close commands',
+      '',
+      'Mouse: click any keycap.',
+    ], width)
+  }
+  const manageRows = width < 60
+    ? ['[ i ] AliceProjects   [ p ] Setup', '[ u ] Update']
+    : ['[ i ] AliceProjects   [ p ] Setup   [ u ] Update']
+  const pointerHint = width < 60 ? [] : ['Mouse: click any keycap.']
+  return renderSupervisorPanel('Command Deck', runtime?.class?.toUpperCase() ?? 'UNAVAILABLE', [
+    'PRIMARY',
+    `[ Enter ] ${primaryActionLabel(runtime)}`,
+    '',
+    'OBSERVE',
+    '[ l ] Logs   [ d ] Doctor',
+    '',
+    'MANAGE',
+    ...manageRows,
+    '',
+    'NAVIGATION',
+    '[ Tab ] Next   [ ? ] Help   [ / ] Close',
+    ...pointerHint,
   ], width)
 }
 

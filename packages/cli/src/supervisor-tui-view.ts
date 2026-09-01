@@ -127,6 +127,15 @@ export function renderSupervisorCommandBar(
   return lines.length > 0 ? lines : ['No actions available']
 }
 
+export function renderSupervisorDock(
+  panel: string,
+  width: number,
+): string {
+  const controls = '[ / ] Commands   [ q ] Detach'
+  if (width < 60) return truncateDisplayWidth(controls, width)
+  return labelAndTail(controls, `${panel.toUpperCase()} · Esc / Ctrl+C`, width)
+}
+
 export function renderSupervisorPanel(
   title: string,
   meta: string,

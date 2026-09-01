@@ -152,6 +152,12 @@ path is intentionally parameter-free:
   and click survive reflow and invoke the same input state machine as the
   corresponding key. Confirmation and refusal semantics therefore do not have
   a separate mouse-only path;
+- a persistent command dock keeps `[ / ] Commands` and `[ q ] Detach` visible
+  on every Supervisor page. `/` opens a compact contextual Command Deck whose
+  primary, observe, manage, and navigation keycaps are all pointer targets;
+  clicking one feeds the existing keyboard action, confirmation, refusal, or
+  detach state machine. `/` or `Esc` closes the deck without exiting, while
+  `q` and `Ctrl+C` retain their global detach behavior;
 - asynchronous work and its result occupy a stable full-width activity rail
   above the command bar. Busy, informational, successful, actionable-warning,
   and failed states retain distinct glyph and text labels without depending on
