@@ -16,9 +16,17 @@ import { sealProjectTransferJson } from './project-transfer-secrets.ts'
 
 const homes: string[] = []
 const execFile = promisify(execFileCallback)
+// Hosted Windows runners can spend well over Vitest's default 5s in real Git
+// and submodule I/O. Keep the larger budget scoped to those integration fixtures.
+const gitFixtureTimeoutMs = process.platform === 'win32' ? 20_000 : 5_000
 
 afterEach(async () => {
-  await Promise.all(homes.splice(0).map((path) => rm(path, { recursive: true, force: true })))
+  await Promise.all(homes.splice(0).map((path) => rm(path, {
+    recursive: true,
+    force: true,
+    maxRetries: process.platform === 'win32' ? 5 : 0,
+    retryDelay: 100,
+  })))
 })
 
 describe('AliceProject transfer planner', () => {
@@ -303,7 +311,7 @@ describe('AliceProject transfer planner', () => {
     expect(plan.blockers).toContainEqual(expect.objectContaining({ code: 'EGITPORTABILITY' }))
     expect(plan.blockers.find((blocker) => blocker.code === 'EGITPORTABILITY')?.message)
       .toContain('alternate object database')
-  })
+  }, gitFixtureTimeoutMs)
 
   it('blocks an independent nested Git repository instead of silently emptying it', async () => {
     const home = await fixtureHome()
@@ -327,7 +335,7 @@ describe('AliceProject transfer planner', () => {
     expect(plan.blockers).toContainEqual(expect.objectContaining({ code: 'ENESTEDGIT' }))
     expect(plan.blockers.find((blocker) => blocker.code === 'ENESTEDGIT')?.message)
       .toContain('nested-repository')
-  })
+  }, gitFixtureTimeoutMs)
 
   it.each([
     ['clean', false],
@@ -365,7 +373,7 @@ describe('AliceProject transfer planner', () => {
     expect(plan.blockers).toContainEqual(expect.objectContaining({ code: 'ENESTEDGIT' }))
     expect(plan.blockers.find((blocker) => blocker.code === 'ENESTEDGIT')?.message)
       .toContain('vendor/module')
-  })
+  }, gitFixtureTimeoutMs)
 
   it('uses one cached Git index per Workspace to skip ignored generated trees', async () => {
     const home = await fixtureHome()
@@ -432,7 +440,7 @@ describe('AliceProject transfer planner', () => {
     expect(plan.excluded.find((entry) => entry.reason === 'git-ignored')?.files)
       .toBeGreaterThanOrEqual(3)
     expect(JSON.stringify(plan)).not.toContain('ignored-agent-secret-canary')
-  })
+  }, gitFixtureTimeoutMs)
 })
 
 async function fixtureHome(): Promise<string> {
