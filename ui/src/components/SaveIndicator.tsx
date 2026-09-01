@@ -1,6 +1,7 @@
 import { Check, CircleAlert, LoaderCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { SaveStatus } from '../hooks/useAutoSave'
+import { Button } from './ui/button'
 
 export function SaveIndicator({ status, onRetry }: { status: SaveStatus; onRetry?: () => void }) {
   const { t } = useTranslation()
@@ -30,13 +31,15 @@ export function SaveIndicator({ status, onRetry }: { status: SaveStatus; onRetry
           <CircleAlert className="size-3 text-destructive" aria-hidden />
           <span className="text-destructive">{t('common.saveFailed')}</span>
           {onRetry && (
-            <button
+            <Button
               type="button"
               onClick={onRetry}
-              className="oa-pressable ml-0.5 rounded-sm text-destructive underline underline-offset-2 hover:text-foreground"
+              variant="link"
+              size="xs"
+              className="ml-0.5 h-auto px-0 py-0 text-destructive"
             >
               {t('common.retry')}
-            </button>
+            </Button>
           )}
         </>
       )}

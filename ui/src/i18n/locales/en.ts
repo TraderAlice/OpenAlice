@@ -360,6 +360,12 @@ export const en = {
   },
   settings: {
     title: 'Settings',
+    group: {
+      workspace: 'Workspace',
+      agents: 'Agents',
+      operations: 'Operations',
+      connections: 'Connections',
+    },
     language: {
       title: 'Language',
       description: 'Interface language. Takes effect immediately.',
@@ -1292,6 +1298,7 @@ export const en = {
     customModelTitle: 'Use a custom model',
     customModelDescription: 'Enter the model ID exposed by the selected AI access.',
     customModelId: 'Model ID',
+    defaultLabel: 'Default',
     defaultModelValue: 'Default · {{model}}',
     defaultEffort: 'Default effort',
     defaultEffortValue: 'Default · {{effort}}',

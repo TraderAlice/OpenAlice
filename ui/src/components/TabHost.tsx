@@ -70,7 +70,7 @@ function TabFrame({ tab, visible }: { tab: Tab; visible: boolean }) {
     <div
       data-view-frame={tab.spec.kind}
       data-view-visible={visible ? 'true' : 'false'}
-      className={`absolute inset-0 flex min-h-0 min-w-0 flex-col ${visible ? 'oa-view-enter' : ''}`}
+      className="absolute inset-0 flex min-h-0 min-w-0 flex-col"
       style={{
         visibility: visible ? 'visible' : 'hidden',
         pointerEvents: visible ? 'auto' : 'none',

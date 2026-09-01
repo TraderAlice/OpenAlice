@@ -356,6 +356,12 @@ export const zhHant: Resources = {
   },
   settings: {
     title: '設定',
+    group: {
+      workspace: '工作區',
+      agents: '智慧體',
+      operations: '運行',
+      connections: '連接',
+    },
     language: {
       title: '語言',
       description: '介面語言，立即生效。',
@@ -1273,6 +1279,7 @@ export const zhHant: Resources = {
     customModelTitle: '使用自訂模型',
     customModelDescription: '輸入所選 AI 存取提供的模型 ID。',
     customModelId: '模型 ID',
+    defaultLabel: '預設',
     defaultModelValue: '預設 · {{model}}',
     defaultEffort: '預設思考強度',
     defaultEffortValue: '預設 · {{effort}}',
