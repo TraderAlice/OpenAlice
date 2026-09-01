@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest'
 
 import {
   createSupervisorCommandDeckState,
+  decorateSupervisorCommandDeck,
   moveSupervisorCommandDeckSelection,
   renderSupervisorCommandDeck,
+  SUPERVISOR_COMMAND_PALETTE_OVERLAY_OPTIONS,
   supervisorCommandDeckItems,
 } from './supervisor-command-deck.ts'
+import { createSupervisorTuiTheme } from './supervisor-tui-theme.ts'
 
 describe('Supervisor Command Palette', () => {
   const context = {
@@ -52,6 +55,32 @@ describe('Supervisor Command Palette', () => {
     expect(narrow.lines.every((line) => displayWidthWithoutAnsi(line) <= 52)).toBe(true)
     expect(narrow.lines.join('\n')).not.toContain('Confirm before reconnecting')
     expect(narrow.lines.join('\n')).toContain('[ ↑ / ↓ ] Select')
+  })
+
+  it('owns focused overlay chrome without hiding no-color meaning', () => {
+    const deck = renderSupervisorCommandDeck(
+      supervisorCommandDeckItems(context),
+      createSupervisorCommandDeckState(),
+      'running',
+      76,
+    )
+    const plain = decorateSupervisorCommandDeck(
+      deck.lines,
+      createSupervisorTuiTheme({ NO_COLOR: '1' }),
+    )
+    const colored = decorateSupervisorCommandDeck(
+      deck.lines,
+      createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+    )
+
+    expect(plain).toEqual(deck.lines)
+    expect(colored.join('\n')).toContain('\u001b[')
+    expect(colored.join('\n')).toContain('› ◆ Open Workspace')
+    expect(SUPERVISOR_COMMAND_PALETTE_OVERLAY_OPTIONS).toMatchObject({
+      width: 76,
+      anchor: 'center',
+      maxHeight: '90%',
+    })
   })
 })
 

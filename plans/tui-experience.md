@@ -100,6 +100,13 @@ not imply maintainer approval of the finished interaction.
   keyboard wrapping, clamped wheel movement, hover feedback, and click-to-run.
   Every activation feeds the existing Supervisor key/action state machine, so
   confirmation, refusal, recovery, and detach semantics remain single-owned.
+- Rendering that Palette in place of the active page still made command
+  discovery a route replacement and discarded the user's visual context. The
+  final selected model therefore follows OMP's menu-controller pattern: a
+  centered compositor overlay owns focus while the current page, action bar,
+  activity slot, and context ribbon retain their exact geometry underneath.
+  Closing restores the same page; activation closes the Palette before opening
+  a child overlay or confirmation modal, so overlay ownership never forks.
 
 ### Runtime log presentation decision
 
@@ -267,6 +274,7 @@ already large `supervisor-tui.ts` application controller.
   AliceProject/Runtime/view context ribbon.
 - [x] Replace expanding feedback rows with a stable single-line activity slot.
 - [x] Replace inline confirmation cards with stable, focused compositor modals.
+- [x] Promote the Command Palette from page replacement to a focused overlay.
 
 ## Progress
 
@@ -481,6 +489,21 @@ already large `supervisor-tui.ts` application controller.
   TypeScript, and the 690-file suite pass (689 passed, 1 skipped; 6087 tests
   passed, 10 skipped). Docker installer smoke passes, and the package dry-run
   includes `src/supervisor-confirmation.ts`.
+- The Command Palette is no longer a substitute page inside the Supervisor
+  frame. It is now a focused centered overlay over the current Overview, Fleet,
+  Logs, Doctor, Help, or recovery page; the page's activity slot, action bar,
+  and context ribbon remain geometrically unchanged. Keyboard selection still
+  wraps, pointer-wheel movement clamps, and pointer motion/click uses whole-row
+  targets. Running a command closes the Palette before handing focus to Setup,
+  Update, AliceProjects, or a confirmation modal.
+- Command-Palette-overlay acceptance passes with 108 focused Supervisor screen,
+  Palette, pointer, modal, Fleet, Doctor, transfer, and real-PTY tests. A real
+  80x24 color session opened the Palette over the visible AliceProject card,
+  clicked the Setup row with raw SGR pointer input, transferred focus to the
+  Setup overlay, then restored terminal modes after close/detach. CLI
+  build/typecheck, root TypeScript, and the 690-file suite pass (689 passed, 1
+  skipped; 6089 tests passed, 10 skipped). Docker installer smoke passes, and
+  the package dry-run retains both Palette and Supervisor modules.
 
 ## Completion Criteria
 

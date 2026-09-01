@@ -162,13 +162,15 @@ path is intentionally parameter-free:
   allows it adds the active view. `[ i ]` makes the project identity a direct
   pointer/keyboard route into the existing AliceProjects overlay. Narrow
   terminals retain the two essential controls instead of clipping them. `/`
-  opens a compact contextual Command Palette and changes the ribbon action to
-  `Close palette`. The Palette exposes only commands
+  opens a compact centered Command Palette overlay over the unchanged current
+  page and changes the ribbon action to `Close palette`. The Palette exposes only commands
   valid for the current Runtime/recovery context; Up/Down wraps its selection,
   the mouse wheel moves within its bounds, pointer hover highlights a complete
   row, and clicking a row selects and runs it. Enter runs the selected command,
   while its direct shortcut still works without navigation. All routes feed the
   existing keyboard action, confirmation, refusal, or detach state machine.
+  Activation closes the Palette before Setup, Update, project selection, or a
+  confirmation modal takes focus; only one overlay owns input at a time.
   `/` or `Esc` closes the Palette without exiting, while `q` and `Ctrl+C` retain
   their global detach behavior;
 - asynchronous work and its result occupy one fixed full-width activity slot

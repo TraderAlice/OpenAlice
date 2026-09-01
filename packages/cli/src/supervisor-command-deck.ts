@@ -1,5 +1,14 @@
 import { displayWidth, truncateDisplayWidth } from './supervisor-fleet.ts'
+import type { SupervisorOverlayOptions } from './supervisor-overlay-pointer.ts'
+import type { SupervisorTuiTheme } from './supervisor-tui-theme.ts'
 import { renderSupervisorPanel } from './supervisor-tui-view.ts'
+
+export const SUPERVISOR_COMMAND_PALETTE_OVERLAY_OPTIONS = {
+  width: 76,
+  maxHeight: '90%',
+  anchor: 'center',
+  margin: 1,
+} as const satisfies SupervisorOverlayOptions
 
 export type SupervisorCommandDeckInput =
   | 'enter'
@@ -156,6 +165,21 @@ export function renderSupervisorCommandDeck(
       index,
     })),
   }
+}
+
+export function decorateSupervisorCommandDeck(
+  lines: string[],
+  theme: SupervisorTuiTheme,
+): string[] {
+  if (!theme.enabled) return lines
+  return lines.map((line, index) => {
+    if (index === 0) return theme.accentStrong(line)
+    if (index === lines.length - 1) return theme.muted(line)
+    if (line.includes('│ › ')) return theme.selected(line)
+    if (line.includes('│ » ')) return theme.accent(line)
+    if (line.includes('[ Enter ]') || line.includes('[ / ]')) return theme.accentStrong(line)
+    return line
+  })
 }
 
 function command(

@@ -303,6 +303,59 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
 
+  it('opens Setup by clicking a command-palette overlay row', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-command-palette-overlay-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [cliEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let clickedSetup = false
+      let setupOpened = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor command palette overlay timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!opened && output.includes('[ / ] Commands') && output.includes('○ COLD')) {
+          opened = true
+          child.write('/')
+        } else if (!clickedSetup && output.includes('Command Palette') && output.includes('› ◆ Start OpenAlice')) {
+          clickedSetup = true
+          child.write('\u001b[<32;6;12M')
+          child.write('\u001b[<0;6;12M')
+        } else if (!setupOpened && output.includes('Setup · Default AliceProject')) {
+          setupOpened = true
+          child.write('\u001b')
+          setTimeout(() => child.write('q'), 50)
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && setupOpened) resolve(output)
+        else reject(new Error(`Supervisor command palette overlay exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('Command Palette')
+    expect(transcript).toContain('╭ AliceProject')
+    expect(transcript).toContain('Setup · Default AliceProject')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
   it('keeps project and Runtime context in a clickable status ribbon', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-context-ribbon-'))
     temporaryPaths.push(isolatedHome)

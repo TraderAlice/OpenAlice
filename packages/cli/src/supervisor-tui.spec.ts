@@ -193,6 +193,7 @@ describe('Supervisor TUI screen', () => {
     let settingsOpened = 0
     let projectsOpened = 0
     let detached = 0
+    const paletteChanges: boolean[] = []
     const screen = new SupervisorScreen({
       version: 'dev',
       channel: 'dev',
@@ -201,43 +202,40 @@ describe('Supervisor TUI screen', () => {
       onSettings: () => { settingsOpened += 1 },
       onProjects: () => { projectsOpened += 1 },
       onDetach: () => { detached += 1 },
+      onCommandPaletteChange: (open) => paletteChanges.push(open),
     })
 
     expect(screen.handleKey('/', matchesKey)).toBe(true)
-    let lines = screen.render(80)
+    expect(paletteChanges).toEqual([true])
+    expect(screen.render(80).join('\n')).not.toContain('Command Palette')
+    let lines = screen.renderCommandPalette(80).lines
     expect(lines.join('\n')).toContain('Command Palette · 1/9 · ABSENT')
     expect(lines.join('\n')).toContain('› ◆ Start OpenAlice & open Workspace')
-    expect(lines.join('\n')).toContain('[ / ] Close palette')
-    expect(screen.handlePointer({
-      button: 65, col: 5, row: 10, release: false, wheel: 1, motion: false, leftClick: false,
-    })).toBe(true)
-    expect(screen.render(80).join('\n')).toContain('›   Start quietly')
+    expect(screen.render(80).join('\n')).toContain('[ / ] Close palette')
+    screen.moveCommandPaletteSelection(1)
+    expect(screen.renderCommandPalette(80).lines.join('\n')).toContain('›   Start quietly')
 
-    lines = screen.render(80)
-    const setupRow = lines.findIndex((line) => line.includes('Setup')) + 1
-    expect(screen.handlePointer({
-      button: 32, col: 4, row: setupRow, release: false, wheel: null, motion: true, leftClick: false,
-    })).toBe(true)
-    expect(screen.render(80)[setupRow - 1]).toContain('»   Setup')
-    expect(screen.handlePointer(pointerClick(4, setupRow))).toBe(true)
+    screen.selectCommandPaletteItem(5)
+    expect(screen.renderCommandPalette(80).lines.join('\n')).toContain('›   Setup')
+    expect(screen.activateCommandPaletteItem()).toBe(true)
     expect(settingsOpened).toBe(1)
-    expect(screen.render(80).join('\n')).not.toContain('Command Palette')
+    expect(paletteChanges).toEqual([true, false])
 
     screen.handleKey('/', matchesKey)
     for (let index = 0; index < 5; index += 1) {
       expect(screen.handleKey('down', matchesKey)).toBe(true)
     }
-    expect(screen.render(80).join('\n')).toContain('›   Setup')
+    expect(screen.renderCommandPalette(80).lines.join('\n')).toContain('›   Setup')
     expect(screen.handleKey('enter', matchesKey)).toBe(true)
     expect(settingsOpened).toBe(2)
 
     screen.handleKey('/', matchesKey)
-    const compactDeck = screen.render(52)
+    const compactDeck = screen.renderCommandPalette(52).lines
     expect(compactDeck.length).toBeLessThanOrEqual(20)
     expect(compactDeck.every((line) => displayWidth(line) <= 52)).toBe(true)
     expect(compactDeck.join('\n')).toContain('Update')
     expect(screen.handleEscape()).toBe(true)
-    expect(screen.render(80).join('\n')).not.toContain('Command Palette')
+    expect(paletteChanges.at(-1)).toBe(false)
 
     lines = screen.render(80)
     const projectRow = lines.findIndex((line) => line.includes('[ i ] AliceProject')) + 1

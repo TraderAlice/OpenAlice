@@ -73,13 +73,14 @@ import {
 } from './supervisor-confirmation.ts'
 import {
   createSupervisorCommandDeckState,
+  decorateSupervisorCommandDeck,
   moveSupervisorCommandDeckSelection,
   normalizeSupervisorCommandDeckState,
   renderSupervisorCommandDeck,
+  SUPERVISOR_COMMAND_PALETTE_OVERLAY_OPTIONS,
   supervisorCommandDeckItems,
   type SupervisorCommandDeckItem,
   type SupervisorCommandDeckState,
-  type SupervisorCommandDeckTarget,
 } from './supervisor-command-deck.ts'
 import {
   createSupervisorTuiTheme,
@@ -453,6 +454,7 @@ export async function runSupervisorTui(
   let transferActive = false
   let updateChannelActive = false
   let confirmationActive = false
+  let commandPaletteActive = false
   let fleetRefreshing = false
   const tunnelControllers = new Map<string, AbortController>()
   let managedStartAction: 'start' | 'start-open' = 'start'
@@ -462,6 +464,7 @@ export async function runSupervisorTui(
   let closeTransfer: (() => void) | null = null
   let closeUpdateChannel: (() => void) | null = null
   let closeConfirmation: (() => void) | null = null
+  let closeCommandPalette: (() => void) | null = null
   let motionTimer: NodeJS.Timeout | undefined
   let screen: SupervisorScreen
   const terminalSize = () => ({
@@ -589,6 +592,48 @@ export async function runSupervisorTui(
     overlay.focus()
   }
 
+  function syncCommandPaletteOverlay(open: boolean): void {
+    closeCommandPalette?.()
+    if (!open) return
+
+    commandPaletteActive = true
+    const panel = new (class implements Component {
+      render(width: number): string[] {
+        const deck = screen.renderCommandPalette(width)
+        captureOverlayPointer(
+          deck.lines,
+          width,
+          SUPERVISOR_COMMAND_PALETTE_OVERLAY_OPTIONS,
+          (data) => this.handleInput(data),
+          {
+            firstRow: 2,
+            indexes: Array.from({ length: screen.commandPaletteItemCount() }, (_, index) => index),
+            select: (index) => screen.selectCommandPaletteItem(index),
+            activate: () => screen.activateCommandPaletteItem(),
+            move: (delta) => screen.moveCommandPaletteSelection(delta),
+          },
+        )
+        return decorateSupervisorCommandDeck(deck.lines, tuiTheme)
+      }
+
+      handleInput(data: string): void {
+        if (piTui.matchesKey(data, 'escape')) screen.handleEscape()
+        else screen.handleKey(data, piTui.matchesKey)
+      }
+
+      invalidate(): void {}
+    })()
+    const overlay = ui.showOverlay(panel, SUPERVISOR_COMMAND_PALETTE_OVERLAY_OPTIONS)
+    closeCommandPalette = () => {
+      if (!commandPaletteActive) return
+      commandPaletteActive = false
+      closeCommandPalette = null
+      overlayPointer.clear()
+      overlay.hide()
+    }
+    overlay.focus()
+  }
+
   screen = new SupervisorScreen({
     version: dependencies.version ?? readCliVersion(),
     channel,
@@ -633,6 +678,7 @@ export async function runSupervisorTui(
       void prepareManagedSourceAndStart()
     },
     onConfirmationChange: syncConfirmationOverlay,
+    onCommandPaletteChange: syncCommandPaletteOverlay,
     requestRender: () => ui.requestRender(),
     theme: tuiTheme,
     motionEnabled,
@@ -2439,6 +2485,7 @@ export async function runSupervisorTui(
       closeTransfer?.()
       closeUpdateChannel?.()
       closeConfirmation?.()
+      closeCommandPalette?.()
       removeInputListener()
       process.off('SIGTERM', onTerminate)
       process.off('SIGINT', onTerminate)
@@ -2451,7 +2498,7 @@ export async function runSupervisorTui(
     const removeInputListener = ui.addInputListener((data) => {
       const pointer = parseSupervisorPointer(data)
       if (pointer) {
-        if (sourcePromptActive || settingsActive || projectsActive || transferActive || updateChannelActive || confirmationActive) {
+        if (sourcePromptActive || settingsActive || projectsActive || transferActive || updateChannelActive || confirmationActive || commandPaletteActive) {
           overlayPointer.route(pointer)
         } else {
           screen.handlePointer(pointer)
@@ -2464,6 +2511,15 @@ export async function runSupervisorTui(
           return { consume: true }
         }
         if (piTui.matchesKey(data, 'escape')) screen.cancelConfirmation()
+        else screen.handleKey(data, piTui.matchesKey)
+        return { consume: true }
+      }
+      if (commandPaletteActive) {
+        if (piTui.matchesKey(data, 'q') || piTui.matchesKey(data, 'ctrl+c')) {
+          finish()
+          return { consume: true }
+        }
+        if (piTui.matchesKey(data, 'escape')) screen.handleEscape()
         else screen.handleKey(data, piTui.matchesKey)
         return { consume: true }
       }
@@ -2557,6 +2613,7 @@ export class SupervisorScreen implements Component {
   private readonly onRequestManagedSource?: () => void
   private readonly onPrepareManagedSource?: () => void
   private readonly onConfirmationChange?: (action?: SupervisorConfirmation) => void
+  private readonly onCommandPaletteChange?: (open: boolean) => void
   private readonly requestRender?: () => void
   private readonly theme: SupervisorTuiTheme
   private readonly motionEnabled: boolean
@@ -2568,7 +2625,6 @@ export class SupervisorScreen implements Component {
   private commandTargets: SupervisorCommandTarget[] = []
   private commandDeckOpen = false
   private commandDeckState: SupervisorCommandDeckState = createSupervisorCommandDeckState()
-  private commandDeckTargets: SupervisorCommandDeckTarget[] = []
   private motionFrame = 0
   private introFrame?: number
   private runtimePulse = false
@@ -2598,6 +2654,7 @@ export class SupervisorScreen implements Component {
       onRequestManagedSource?: () => void
       onPrepareManagedSource?: () => void
       onConfirmationChange?: (action?: SupervisorConfirmation) => void
+      onCommandPaletteChange?: (open: boolean) => void
       requestRender?: () => void
       theme?: SupervisorTuiTheme
       motionEnabled?: boolean
@@ -2621,6 +2678,7 @@ export class SupervisorScreen implements Component {
     this.onRequestManagedSource = callbacks.onRequestManagedSource
     this.onPrepareManagedSource = callbacks.onPrepareManagedSource
     this.onConfirmationChange = callbacks.onConfirmationChange
+    this.onCommandPaletteChange = callbacks.onCommandPaletteChange
     this.requestRender = callbacks.requestRender
     this.theme = callbacks.theme ?? createSupervisorTuiTheme({ NO_COLOR: '1' })
     this.motionEnabled = callbacks.motionEnabled ?? true
@@ -2687,11 +2745,53 @@ export class SupervisorScreen implements Component {
     this.update({ confirmation: undefined, notice: 'Action cancelled.' })
   }
 
+  renderCommandPalette(width: number) {
+    const items = this.commandDeckItems()
+    this.commandDeckState = normalizeSupervisorCommandDeckState(
+      this.commandDeckState,
+      items.length,
+    )
+    return renderSupervisorCommandDeck(
+      items,
+      this.commandDeckState,
+      isConfigRecovery(this.snapshot)
+        ? 'recovery'
+        : this.snapshot.runtime?.class ?? 'unavailable',
+      width,
+    )
+  }
+
+  commandPaletteItemCount(): number {
+    return this.commandDeckItems().length
+  }
+
+  selectCommandPaletteItem(index: number): void {
+    this.commandDeckState = normalizeSupervisorCommandDeckState({
+      selected: index,
+      hovered: index,
+    }, this.commandPaletteItemCount())
+    this.requestRender?.()
+  }
+
+  moveCommandPaletteSelection(delta: -1 | 1): void {
+    this.commandDeckState = moveSupervisorCommandDeckSelection(
+      this.commandDeckState,
+      delta,
+      this.commandPaletteItemCount(),
+      false,
+    )
+    this.requestRender?.()
+  }
+
+  activateCommandPaletteItem(): boolean {
+    return this.activateCommandDeckItem(
+      this.commandDeckItems()[this.commandDeckState.selected],
+    )
+  }
+
   handleEscape(): boolean {
     if (this.commandDeckOpen) {
-      this.commandDeckOpen = false
-      this.commandDeckState = { ...this.commandDeckState, hovered: null }
-      this.requestRender?.()
+      this.setCommandPaletteOpen(false)
       return true
     }
     if (
@@ -2729,13 +2829,7 @@ export class SupervisorScreen implements Component {
       return false
     }
     if (data === '/') {
-      this.commandDeckOpen = !this.commandDeckOpen
-      if (this.commandDeckOpen) {
-        this.commandDeckState = createSupervisorCommandDeckState()
-      } else {
-        this.commandDeckState = { ...this.commandDeckState, hovered: null }
-      }
-      this.requestRender?.()
+      this.setCommandPaletteOpen(!this.commandDeckOpen)
       return true
     }
     if (this.commandDeckOpen) {
@@ -2973,13 +3067,6 @@ export class SupervisorScreen implements Component {
           this.renderWidth < 60,
         )
       : undefined
-    const commandDeckTarget = this.commandDeckOpen
-      ? this.commandDeckTargets.find((target) => (
-          target.row === event.row
-          && event.col >= target.startColumn
-          && event.col <= target.endColumn
-        ))
-      : undefined
     const fleet = !this.commandDeckOpen && this.snapshot.panel === 'fleet'
       ? this.snapshot.fleet
       : undefined
@@ -2999,21 +3086,17 @@ export class SupervisorScreen implements Component {
         || fleetTarget?.index !== this.hoveredFleetTarget?.index
       const commandHoverChanged = commandTarget?.row !== this.hoveredCommandTarget?.row
         || commandTarget?.label !== this.hoveredCommandTarget?.label
-      const deckHover = commandDeckTarget?.index ?? null
-      const deckHoverChanged = deckHover !== this.commandDeckState.hovered
       const doctorHover = doctorTarget?.index ?? null
       const doctorHoverChanged = doctorHover !== this.doctorState.hovered
       if (
         hovered !== this.hoveredPanel
         || fleetHoverChanged
         || commandHoverChanged
-        || deckHoverChanged
         || doctorHoverChanged
       ) {
         this.hoveredPanel = hovered
         this.hoveredFleetTarget = fleetTarget
         this.hoveredCommandTarget = commandTarget
-        this.commandDeckState = { ...this.commandDeckState, hovered: deckHover }
         this.doctorState = { ...this.doctorState, hovered: doctorHover }
         this.requestRender?.()
       }
@@ -3026,14 +3109,6 @@ export class SupervisorScreen implements Component {
     }
     if (event.leftClick && commandTarget) {
       return this.activatePointerCommand(commandTarget.label)
-    }
-    if (event.leftClick && commandDeckTarget) {
-      const items = this.commandDeckItems()
-      this.commandDeckState = {
-        selected: commandDeckTarget.index,
-        hovered: commandDeckTarget.index,
-      }
-      return this.activateCommandDeckItem(items[commandDeckTarget.index])
     }
     if (event.leftClick && doctorTarget) {
       this.doctorState = { selected: doctorTarget.index, hovered: doctorTarget.index }
@@ -3059,16 +3134,6 @@ export class SupervisorScreen implements Component {
       }
       return true
     }
-    if (event.wheel !== null && this.commandDeckOpen) {
-      this.commandDeckState = moveSupervisorCommandDeckSelection(
-        this.commandDeckState,
-        event.wheel,
-        this.commandDeckItems().length,
-        false,
-      )
-      this.requestRender?.()
-      return true
-    }
     if (event.wheel !== null && fleet) {
       this.update({
         fleet: moveFleetSelection(fleet, event.wheel),
@@ -3079,7 +3144,7 @@ export class SupervisorScreen implements Component {
       this.scrollOperationalPanel(event.wheel)
       return true
     }
-    return this.commandDeckOpen || event.release
+    return event.release
   }
 
   render(width: number): string[] {
@@ -3097,27 +3162,8 @@ export class SupervisorScreen implements Component {
       '',
     ]
 
-    this.commandDeckTargets = []
     this.doctorTargets = []
-    if (this.commandDeckOpen) {
-      const items = this.commandDeckItems()
-      this.commandDeckState = normalizeSupervisorCommandDeckState(
-        this.commandDeckState,
-        items.length,
-      )
-      const deck = renderSupervisorCommandDeck(
-        items,
-        this.commandDeckState,
-        isConfigRecovery(this.snapshot) ? 'recovery' : state,
-        width,
-      )
-      const rowOffset = lines.length
-      this.commandDeckTargets = deck.targets.map((target) => ({
-        ...target,
-        row: target.row + rowOffset,
-      }))
-      lines.push(...deck.lines)
-    } else if (this.snapshot.panel === 'fleet' && this.snapshot.fleet) {
+    if (this.snapshot.panel === 'fleet' && this.snapshot.fleet) {
       lines.push(...renderSupervisorFleet(
         this.snapshot.fleet,
         width,
@@ -3180,9 +3226,7 @@ export class SupervisorScreen implements Component {
     }, width, this.motionFrame, this.motionEnabled)
     lines.push(
       activity,
-      ...(this.commandDeckOpen
-        ? []
-        : this.snapshot.panel === 'fleet' && this.snapshot.fleet
+      ...(this.snapshot.panel === 'fleet' && this.snapshot.fleet
         ? fleetActionBar(
             this.snapshot.fleet,
             runtime,
@@ -3213,7 +3257,7 @@ export class SupervisorScreen implements Component {
                   { key: 'Tab', label: 'Next view' },
                   { key: 'q', label: 'Detach' },
                 ], width)
-              : actionBar(runtime, this.snapshot.context, width, isConfigRecovery(this.snapshot))),
+          : actionBar(runtime, this.snapshot.context, width, isConfigRecovery(this.snapshot))),
       renderSupervisorDock({
         panel: this.snapshot.panel ?? 'overview',
         projectName: this.snapshot.context?.aliceProject.displayName,
@@ -3246,9 +3290,7 @@ export class SupervisorScreen implements Component {
       return true
     }
     if (label === '/') {
-      this.commandDeckOpen = !this.commandDeckOpen
-      if (this.commandDeckOpen) this.commandDeckState = createSupervisorCommandDeckState()
-      this.requestRender?.()
+      this.setCommandPaletteOpen(!this.commandDeckOpen)
       return true
     }
     const input = pointerCommandInput(label)
@@ -3272,9 +3314,18 @@ export class SupervisorScreen implements Component {
 
   private activateCommandDeckItem(item?: SupervisorCommandDeckItem): boolean {
     if (!item) return true
-    this.commandDeckOpen = false
-    this.commandDeckState = { ...this.commandDeckState, hovered: null }
+    this.setCommandPaletteOpen(false)
     return this.handleKey(item.input, (data, key) => data === key)
+  }
+
+  private setCommandPaletteOpen(open: boolean): void {
+    if (this.commandDeckOpen === open) return
+    this.commandDeckOpen = open
+    this.commandDeckState = open
+      ? createSupervisorCommandDeckState()
+      : { ...this.commandDeckState, hovered: null }
+    this.onCommandPaletteChange?.(open)
+    this.requestRender?.()
   }
 
   private scrollOperationalPanel(direction: number): void {
@@ -3330,7 +3381,7 @@ export class SupervisorScreen implements Component {
   }
 
   private selectPanel(panel: SupervisorPanel): void {
-    this.commandDeckOpen = false
+    this.setCommandPaletteOpen(false)
     this.update({ panel })
     if (panel === 'logs') this.onAction?.('logs')
     if (panel === 'doctor') this.onAction?.('doctor')
