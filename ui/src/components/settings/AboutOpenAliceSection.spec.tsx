@@ -7,6 +7,9 @@ const mocks = vi.hoisted(() => ({
   getVersion: vi.fn(),
   checkVersion: vi.fn(),
   getAliceProject: vi.fn(),
+  getBackendConnection: vi.fn(),
+  backendUnavailable: false,
+  backendRecoveryGeneration: 0,
 }))
 
 vi.mock('../../api', () => ({
@@ -19,6 +22,17 @@ vi.mock('../../api', () => ({
       get: mocks.getAliceProject,
     },
   },
+}))
+
+vi.mock('../../auth/backendConnection', () => ({
+  getBackendConnection: mocks.getBackendConnection,
+}))
+
+vi.mock('../../auth/AuthContext', () => ({
+  useBackendRecoverySignal: () => ({
+    backendUnavailable: mocks.backendUnavailable,
+    backendRecoveryGeneration: mocks.backendRecoveryGeneration,
+  }),
 }))
 
 import '../../i18n'
@@ -50,9 +64,12 @@ beforeAll(async () => {
 })
 
 beforeEach(() => {
+  mocks.backendUnavailable = false
+  mocks.backendRecoveryGeneration = 0
   mocks.getVersion.mockResolvedValue(currentVersion)
   mocks.checkVersion.mockResolvedValue(currentVersion)
   mocks.getAliceProject.mockResolvedValue({ project: currentProject })
+  mocks.getBackendConnection.mockReturnValue({ kind: 'local', endpoint: '127.0.0.1:47331' })
 })
 
 afterEach(() => {
@@ -91,6 +108,77 @@ describe('AboutOpenAliceSection', () => {
     render(<AboutOpenAliceSection />)
 
     expect(await screen.findByText('Development channel')).toBeTruthy()
+  })
+
+  it('refreshes Runtime and AliceProject identity after backend recovery without remounting', async () => {
+    const recoveredVersion = {
+      ...currentVersion,
+      current: '0.91.0-beta.3',
+      latest: '0.91.0-beta.3',
+      updateAuthority: 'service' as const,
+    }
+    const recoveredProject = {
+      ...currentProject,
+      displayName: 'Railway AliceProject',
+      appRoot: '/data/home/.local/share/openalice/releases/0.91.0-beta.3',
+    }
+    const view = render(<AboutOpenAliceSection />)
+
+    expect(await screen.findByText('v0.82.0-beta')).toBeTruthy()
+    expect(await screen.findByText('Research AliceProject')).toBeTruthy()
+
+    mocks.backendUnavailable = true
+    view.rerender(<AboutOpenAliceSection />)
+
+    mocks.getVersion.mockResolvedValueOnce(recoveredVersion)
+    mocks.getAliceProject.mockResolvedValueOnce({ project: recoveredProject })
+    mocks.backendUnavailable = false
+    mocks.backendRecoveryGeneration = 1
+    view.rerender(<AboutOpenAliceSection />)
+
+    expect(await screen.findByText('v0.91.0-beta.3')).toBeTruthy()
+    expect(await screen.findByText('Railway AliceProject')).toBeTruthy()
+    expect(screen.getByText('/data/home/.local/share/openalice/releases/0.91.0-beta.3')).toBeTruthy()
+    expect(mocks.getVersion).toHaveBeenCalledTimes(2)
+    expect(mocks.getAliceProject).toHaveBeenCalledTimes(2)
+  })
+
+  it('hides the previous Runtime identity when recovery reads fail', async () => {
+    const view = render(<AboutOpenAliceSection />)
+    expect(await screen.findByText('v0.82.0-beta')).toBeTruthy()
+    expect(await screen.findByText('Research AliceProject')).toBeTruthy()
+
+    mocks.backendUnavailable = true
+    view.rerender(<AboutOpenAliceSection />)
+
+    mocks.getVersion.mockRejectedValueOnce(new Error('version unavailable'))
+    mocks.getAliceProject.mockRejectedValueOnce(new Error('project unavailable'))
+    mocks.backendUnavailable = false
+    mocks.backendRecoveryGeneration = 1
+    view.rerender(<AboutOpenAliceSection />)
+
+    expect(screen.queryByText('v0.82.0-beta')).toBeNull()
+    expect(screen.queryByText('Research AliceProject')).toBeNull()
+    expect(await screen.findByText('Couldn’t check for updates.')).toBeTruthy()
+    expect(await screen.findByText('AliceProject information is unavailable.')).toBeTruthy()
+  })
+
+  it('shows the healthy SSH route that owns this browser surface', async () => {
+    mocks.getBackendConnection.mockReturnValue({
+      kind: 'remote',
+      target: 'alice@example.com',
+      sshPort: 2222,
+      runtimePort: 47331,
+      localEndpoint: '127.0.0.1:40123',
+    })
+
+    render(<AboutOpenAliceSection />)
+
+    expect(await screen.findByRole('heading', { name: 'Backend connection' })).toBeTruthy()
+    expect(screen.getByText('Connected')).toBeTruthy()
+    expect(screen.getByText('alice@example.com:2222')).toBeTruthy()
+    expect(screen.getByText('127.0.0.1:40123')).toBeTruthy()
+    expect(screen.getByText('127.0.0.1:47331')).toBeTruthy()
   })
 
   it.each([

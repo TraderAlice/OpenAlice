@@ -134,13 +134,14 @@ previous release still validates, the host starts the previous release. An
 empty or damaged install with a failed bootstrap stops instead of running an
 unverified fallback.
 
-The Railway profile currently requires `railway-runtime-lock-v2`. Public
-stable `v0.90.2` and beta `v0.91.0-beta.1` predate that capability, so they are
-not eligible Railway fallbacks. A completed dev artifact that explicitly
-advertises both Railway capabilities has passed retained-Volume acceptance; a
-stable or beta host still requires a later explicit release that carries the
-same capabilities. Do not infer eligibility from package version or branch
-name, and do not treat this guide as authority to publish or promote a channel.
+The Railway profile currently requires `railway-runtime-lock-v2`. Public stable
+`v0.90.2` predates that capability and is not an eligible Railway fallback.
+Accepted beta `v0.91.0-beta.3` and completed dev artifacts that explicitly
+advertise both Railway capabilities are eligible; beta3 has passed retained
+Volume replacement plus core Runtime/PTY recovery through a long tunnel outage.
+The Settings identity-refresh fix found by that journey lands after beta3. Do
+not infer eligibility from package version or branch name, and do not treat this
+guide as authority to publish or promote a channel.
 
 After selection, the image atomically replaces the persistent `openalice`,
 `alice`, `alice-workspace`, `alice-uta`, and `traderhub` shims with its Railway
@@ -316,10 +317,13 @@ show that a replacement still cannot acquire the fence; only process/container
 death may release it, and simultaneous replacements must produce one winner.
 
 The retained-data Railway journey has passed through migration, a real Agent
-turn, normal restart, and hard-kill replacement. The disposable clean-bootstrap
-and forced installer-failure journeys remain separate required acceptance;
-never relabel or clear an existing user Volume merely to obtain an empty-host
-result:
+turn, normal restart, hard-kill replacement, beta3 replacement, and a tunnel
+outage beyond the Terminal retry budget with automatic core browser and PTY
+recovery. That beta3 journey exposed a stale Settings identity read which is
+fixed on the following development increment.
+The disposable clean-bootstrap and forced installer-failure journeys remain
+separate required acceptance; never relabel or clear an existing user Volume
+merely to obtain an empty-host result:
 
 1. on a disposable service and empty `/data` Volume, bootstrap the image and
    prove that a failed initial install stops without an unverified fallback;
@@ -439,6 +443,18 @@ The smoke uses no AI credential and no broker. It deliberately checks an
 observable CLI round trip rather than only asserting that files exist. Docker
 build cache is shared infrastructure and is retained; only resources owned by
 the smoke are deleted. Use `--keep` or `--keep-image` for investigation.
+
+`pnpm test:remote:docker` is the corresponding disposable existing-host SSH
+journey. In addition to install, Server lifecycle, tunnel, TUI, and Project
+transfer acceptance, it exercises the layered-readiness contract without
+starting an Agent or contacting a broker: a temporary inert CLI shim must
+appear and disappear through cheap discovery while cached readiness follows
+the exact executable identity, and a transferred configured account whose
+machine-local Broker Pack is absent must remain visible as `needs-install` and
+non-operational. The fixture asserts that the shim was never executed and that
+no Pack installation or trading path ran. `--keep-container` preserves only
+the disposable fixture and prints its scratch SSH credentials for explicit
+investigation; the default path removes the container, owned image, and keys.
 
 Before a release, an operator can add a real multi-turn agent check with a
 credential already stored in the local Alice vault:

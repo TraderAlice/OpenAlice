@@ -101,6 +101,12 @@ for current ownership and entry points.
   installer, while stable CDN product aliases and package-manager metadata are
   updated only by a stable release tag. Mirror repair never rewrites the shared
   installer.
+- An exact forward beta version-only PR uses a lightweight trusted-classifier,
+  workflow-contract, and typecheck lane. Beta publication is gated by the
+  Release workflow's final artifact build/install/start/update acceptance, not
+  by repeating the development unit suite or waiting for the post-merge
+  `master` safety-net run. Stable preparation and publication retain the full
+  promotion, cross-platform, package, signing, and upgrade gates.
 - Do not commit directly to `master`. Avoid direct commits to `dev` unless the
   maintainer explicitly requests integration work.
 - Never force-push or delete `master` or `dev`.
@@ -141,10 +147,17 @@ credentials, destructive actions, security boundaries, or substantial
 cross-surface structure. A later interactive message does not retroactively
 authorize merging an autonomous topic PR. Related work may continue while its
 latest CI is pending, but a known failure must be repaired before adding more
-scope. In serial work, pending CI likewise must not become a synchronous lock;
-inspect the previous PR checks and post-merge `dev` run before publishing the
-next increment. `master` promotions, releases, explicit review pauses, and
-untrusted contributions keep their full synchronous gates. Detailed topic,
+scope. A hosted-runner or resource-starvation failure may be classified as
+infrastructure only when its log is captured, the affected contract passes in
+the proportional local/native lane, and no product assertion failed; it should
+be repaired or removed from the routine lane instead of retried blindly. In
+serial work, pending CI likewise must not become a synchronous lock; inspect the
+previous PR checks and post-merge `dev` run before publishing the next
+increment. `master` promotions, stable releases, explicit review pauses, and
+untrusted contributions keep their full synchronous gates. Exact beta
+preparation is the bounded exception above: its own artifact acceptance stays
+synchronous, while the redundant source-test backstop may trail publication.
+Detailed topic,
 branch, PR, promotion, hotfix, and external-contribution procedures live in
 [[docs/development-workflow.md]]
 ([Development workflow](docs/development-workflow.md)).
@@ -157,6 +170,13 @@ For code changes, always run:
 npx tsc --noEmit
 pnpm test
 ```
+
+These local checks are the primary routine-development evidence. Hosted CI for
+a `dev` PR intentionally performs only a clean Ubuntu build, root typecheck,
+and workflow contracts; it does not repeat the full Vitest suite, native-host
+matrix, Electron smoke, or Docker smoke. Record the applicable local
+surface-specific commands and real-runtime result in the PR so the lighter
+hosted lane does not become an excuse to skip acceptance.
 
 Add checks according to the touched surface:
 
@@ -202,8 +222,9 @@ the signing cost.
 When optimizing CI/CD, preserve the lane boundaries above. First remove
 duplicate jobs, cancel superseded runs, narrow path triggers, reuse caches and
 unsigned build artifacts, and measure the slow step before considering larger
-runners. Do not trade away the full `master` promotion/release gates merely to
-make routine `dev` feedback look faster.
+runners. Routine `dev` and exact-beta feedback should stay deliberately light;
+do not trade away the full `master` promotion or stable-release gates merely to
+make those final acceptance lanes look faster.
 
 ## Deferred Work and Issues
 

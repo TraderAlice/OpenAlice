@@ -19,6 +19,9 @@ Owner guides:
 - [[docs/data-locations.md]]
 - [[docs/workspace-lifecycle.md]]
 - [[docs/conversation-provenance.md]]
+- [[docs/model-semantics-and-runtime-injection.md]]
+- [[docs/workspace-issues-and-scheduling.md]]
+- [[docs/broker-packs.md]]
 - [[docs/managed-workspace-runtime.md]]
 - [[docs/development-workflow.md]]
 
@@ -46,6 +49,13 @@ machines:
   loopback transport;
 - copy a local AliceProject's portable configuration and Workspace estate to a
   new remote complete home through a reviewable, resumable transaction;
+- negotiate one OpenAlice release graph across independently activated local
+  and remote Runtimes, so a current controller may deliberately advance an
+  older remote while an older controller can never downgrade or mutate a newer
+  remote;
+- keep the browser truthful after attaching to a remote Runtime: connection,
+  AliceProject authority, Agent availability, Broker Pack availability, and
+  recovery state remain distinct instead of collapsing into one green status;
 - deliberately exclude native Agent conversations and OpenAlice Session
   continuation state, so the remote AliceProject starts with zero resumable
   Sessions while retaining its Workspace repositories and Workspace ids.
@@ -419,6 +429,109 @@ The remote importer is the only writer for a transfer staging home. Guardian
 remains the only Runtime writer. Transfer never invents another Runtime lock,
 signals a guessed PID, exposes the Guardian socket, or performs trading writes.
 
+## Remote Release Negotiation
+
+The controller and remote Runtime activate versions independently but consume
+the same release authority. Opening a tunnel must not silently align them, and
+the remote must not run a background updater merely because it is registered
+in the fleet. The controller owns comparison, plan presentation, and consent;
+the destination's deployment owner verifies, installs, atomically activates,
+and falls back.
+
+Release comparison uses logical and artifact identities rather than a displayed
+version string alone:
+
+- stable and beta use channel plus exact release version, then validate the
+  destination platform's archive checksum and content identity;
+- dev uses the latest completed dev manifest commit plus the local and remote
+  platform targets from that one manifest. The reused package version does not
+  order dev builds;
+- control protocol range and capabilities are negotiated separately from
+  release order. A newer release is not assumed compatible merely because its
+  version sorts higher.
+
+The plan classifies every connection before proposing a mutation:
+
+| Relation | Required behavior |
+|---|---|
+| `aligned` | Reuse the compatible Runtime and open the loopback tunnel without mutation. |
+| `remote-behind` | Show the exact release/artifact target and Runtime interruption; after explicit consent, ask the destination deployment owner to upgrade, then re-probe before tunneling. |
+| `controller-behind` | Never downgrade the remote. Permit compatible read-only status/tunneling, but block install, start, stop, restart, takeover, or update until the controller upgrades. |
+| `channel-conflict` | Do not infer ordering across stable, beta, and dev. Require an explicit channel-switch intent before any release mutation. |
+| `incompatible` | Fail closed with the required controller or remote upgrade; do not guess a PID, selector, or fallback. |
+
+Ordinary SSH and Railway share this relation model but keep distinct apply
+authorities:
+
+- an ordinary SSH host continues to use the normal installer with the
+  controller's verified logical release and the destination-specific artifact;
+- a Railway host remains service-managed. The controller never runs an
+  installer through Railway SSH or changes the live release pointer. A Railway
+  adapter uses locally held deployment authority to request restart/redeploy;
+  the image entrypoint resolves and validates the selected release, owns the
+  lifecycle fence, and retains the previous verified release on failure;
+- Railway credentials and project/environment/service identifiers stay on the
+  controller. They are not discovered from remote secrets or copied into an
+  AliceProject;
+- rolling dev is checked when the service starts; no polling or hot-update loop
+  is added. A controller-triggered redeploy is the normal deliberate refresh
+  path.
+
+A real regression fixture comes from the retained Railway host: the installed
+0.90.2 stable controller treated a newer dev Railway release as an ordinary SSH
+target and proposed replacing it with stable, while the current dev controller
+correctly recognized `Lifecycle: Railway (dev channel)` and planned a tunnel
+only. The unified relation must make the former `controller-behind` or
+`channel-conflict`, never an update plan.
+
+## Browser Remote Readiness and Recovery
+
+Remote readiness is a layered projection, not one `remoteReady` boolean:
+
+| Layer | Authority | User-visible meaning |
+|---|---|---|
+| Connection | Browser connection context plus backend auth probe | The local page can currently reach this remote OpenAlice Runtime. |
+| Environment | Version info, AliceProject identity, and deployment authority | Which Project and release are running, and whether CLI, desktop, or a deployment service owns lifecycle and updates. |
+| Agent capability | Fresh executable discovery plus an optional explicit readiness probe | A particular native Agent Runtime is installed; separately, whether the user chose to run a potentially credentialed probe. |
+| Broker capability | Alice-owned account configuration joined with machine-local Broker Pack status | A configured account has the local integration required to become operational on this server. |
+
+Rules:
+
+- A missing Agent Runtime or Broker Pack does not make the SSH tunnel or core
+  OpenAlice Runtime unhealthy. It blocks only the schedule, Session launch,
+  account read, reconnect, or trading action that depends on that capability.
+- Cheap rediscovery may run on focus, visibility restoration, and backend
+  recovery. It must never silently run a native Agent, test credentials,
+  install software, contact a broker, or submit an order.
+- Fresh executable presence and path always outrank a cached probe row. When an
+  executable appears, disappears, or moves, the active-probe result becomes
+  `unknown` until the user explicitly checks it.
+- Scheduled Issue health resolves the effective Agent first. A missing exact
+  Session Runtime or fresh-run override is `blocked` with a stable reason code,
+  not `healthy` or `not_started`; installation makes the read-side projection
+  recover without rewriting the Issue.
+- A transferred account whose Pack is absent is "configured, support needed",
+  never "no account" and never Live. Historical snapshots may remain visible
+  only when clearly marked stale. Reconnect, order entry, position close, and
+  deep-linked order forms stay gated until Pack, account reachability,
+  permissions, and trading mode all allow the action.
+- Healthy browser chrome shows the SSH target, local tunnel, remote Runtime
+  endpoint, current AliceProject, and lifecycle/update owner. A Railway-owned
+  Data Home must not recommend local `openalice start` or `pnpm dev` commands.
+- The full CLI-issued client URL is the authority for establishing browser-side
+  SSH identity; same-tab reload must retain it. A scrubbed bare origin cannot
+  be asserted as a particular SSH target unless a bounded, backend-validated
+  origin context exists. Stale target labels are worse than generic recovery
+  guidance.
+- Recoverable transport loss keeps the page mounted. Backend recovery advances
+  a shared generation and causes stale domain reads and recoverable terminal
+  sockets to retry. Authentication, ownership conflict, and terminal-not-found
+  close codes remain explicit and never auto-take over or create a replacement.
+- Public Session and Automation titles use business provenance already present
+  in Issue/conversation/headless metadata. Delivered reconstruction wrappers,
+  raw target JSON, and scheduled instructions remain diagnostic detail and are
+  never the collapsed-row or Session display name.
+
 ## Ordered Delivery
 
 ### Increment 0 — contract and plan
@@ -556,6 +669,71 @@ signals a guessed PID, exposes the Guardian socket, or performs trading writes.
   imported Project, and verify portable Workspace/configuration state plus a
   new user-owned Agent Runtime turn without importing native Session state.
 
+### Increment 7 — controller-driven remote release convergence
+
+- [x] Audit ordinary SSH and Railway release authority, dev-manifest selection,
+  target-specific artifact identity, and the retained-host stale-controller
+  failure described above; record the chosen relation model in this plan.
+- [ ] Add one typed release-relation result shared by raw-target Remote, fleet
+  inventory/detail, CLI plans, and Supervisor TUI presentation.
+- [ ] Preserve the existing latest-dev-controller gate and add directional
+  stable/beta comparison so an older controller cannot downgrade a newer
+  remote. Cross-channel changes remain an explicit separate intent.
+- [ ] Keep compatible read-only status/tunnel access available when the
+  controller is behind, while blocking every remote lifecycle or release
+  mutation with actionable local-upgrade guidance.
+- [ ] Add a Railway deployment adapter that validates locally configured
+  project/environment/service identity, shows the exact restart/PTY impact,
+  requires consent, requests a service-owned redeploy, and waits for a bounded
+  target-identity/readiness re-probe. It must not inherit write authority from
+  Railway SSH or run the installer inside the foreground container.
+- [ ] Treat transport loss, owner replacement, configured-selector fallback,
+  deployment failure, and readiness timeout as non-convergence. Report the
+  verified running release and never claim that the remote upgraded.
+- [ ] Add focused ordinary-SSH, dev-manifest, stale-controller, cross-channel,
+  Railway-adapter, consent/default-No, and post-redeploy identity tests. Extend
+  the disposable Docker SSH journey and run one retained Railway convergence
+  acceptance without exposing a public Web port.
+- [ ] Update `docs/remote-access.md`, `docs/docker-deployment.md`, CLI help, and
+  Supervisor wording with the shipped apply authority and downgrade rules.
+
+### Increment 8 — remote readiness and browser truth
+
+This increment supplied the beta3 remote-readiness boundary; the recovery
+journey's Settings identity fix follows on `dev` after that release. It remains
+independent of the unfinished Increment 7 release-apply work and does not grant
+the SSH path deployment authority or broaden Agent/broker ownership.
+
+- [x] Reconcile Agent readiness from fresh PATH discovery, expose a cheap
+  rediscovery action distinct from active probing, and refresh on focus,
+  visibility restoration, and backend recovery without spawning an Agent.
+- [x] Project effective Agent availability into scheduled Issue health with a
+  stable `agent_runtime_missing` blocker and recover it after installation.
+- [x] Join configured trading accounts to Broker Pack readiness in one
+  Alice-owned contract and one UI domain hook. Propagate the result through
+  Trading, Portfolio, account detail, reconnect, order entry, and position-close
+  actions; preserve configured disabled state and never contact a real broker in
+  acceptance.
+- [x] Add healthy remote identity and deployment-owned Data Home guidance.
+  Preserve full-client-URL and same-tab reload identity, and make any cross-tab
+  reuse bounded and backend-validated before presenting it as current truth.
+- [x] Make recoverable terminal reconnect survive outages beyond the current
+  retry budget, add an explicit retry for closed terminals, and retain fatal
+  auth/ownership/not-found behavior.
+- [x] Reuse the existing Issue/Headless Session presentation projection across
+  Workspaces and Automation, including historical read-side presentation and
+  "Open as session". Unify sidebar/card timestamps on latest activity rather
+  than unlabeled Workspace creation time.
+- [x] Add an authoritative Issue assignee-Session projection so a newly claimed
+  or cross-Workspace owner cannot coexist with a stale "Session is no longer
+  available" warning.
+- [x] Extend the Docker SSH journey with dynamic free Runtime discovery,
+  missing-Pack account projection, complete client URL retention, and a real
+  shell PTY tunnel reconnect. Cover the longer logical retry window with fake
+  timers and run one retained Railway long-outage journey for beta acceptance.
+- [x] Update the remote access, Agent/runtime, scheduling, Broker Pack, and
+  Docker owner guides with the shipped layered-readiness contract.
+
 ## Verification Matrix
 
 Increment 1 progress (2026-08-23): the focused Machine specs (16 tests), CLI
@@ -655,6 +833,78 @@ writes. Restart/resume and hard-kill persistence are owned by the Bun CLI
 distribution plan's still-open Railway acceptance, not by this transfer
 increment.
 
+Increment 7 live authority observation (2026-09-01): the retained Railway
+service changed explicitly from rolling `dev` to pinned `beta`
+`0.91.0-beta.2` through local Railway deployment authority and one redeploy.
+The controller and SSH path remained inspection-only: no remote installer,
+pointer mutation, stop, or takeover ran through SSH. Re-probe found the exact
+accepted Linux x64 checksum/content identity, Bun provider, both Railway
+Runtime capabilities, ready Alice/UTA/Connector components, the same selected
+Project id with 10,763 files and six Workspace directories, and persistent Pi
+and OpenCode executables. This validates the manual destination-owner journey
+and its post-redeploy evidence, but does not complete Increment 7: the typed
+release relation, consented Railway adapter, controller-behind guard, and TUI
+presentation remain implementation work.
+
+Increment 8 discovery evidence (2026-09-01): a real retained-Railway browser
+journey proved that the core SSH/backend recovery path survives a short outage,
+but optional capability and presentation state is not yet truthful. Pi appeared
+only after an explicit probe because cached `not_installed` overrode fresh PATH
+discovery; four Grok schedules said their schedule was valid while Grok was
+missing; six configured trading accounts collapsed to "No trading accounts
+connected", while Alpaca still showed a green indicator, stale equity, enabled
+Reconnect, and an order-entry dialog despite its missing Pack. Healthy Settings
+omitted the SSH target and advised local start commands for a Railway-owned
+Data Home. A copied scrubbed URL lost remote recovery identity, while the full
+CLI-issued URL retained exact target and port guidance. Workspaces and
+Automation exposed reconstruction wrappers/raw target JSON as public titles,
+and one polled Issue owner briefly coexisted with a stale unavailable-Session
+directory. A deliberate tunnel cut restored both open pages automatically;
+the remaining terminal retry budget beyond roughly 85 seconds is a separate
+component recovery gap. No Agent was started, no Connector message was sent,
+and no broker call or order submission occurred.
+
+Increment 8 implementation evidence (2026-09-01): layered Agent, Issue,
+Session, connection, Terminal, and per-account Broker Pack projections now use
+their owning authorities and fail closed only on dependent actions. Targeted
+tests cover binary-identity cache invalidation, GET-only rediscovery,
+structured schedule blockers, authoritative cross-Workspace owners, public
+title projection, long terminal retry exhaustion, and trading-mode/health/write
+gates. The disposable OrbStack Linux arm64 SSH journey passed both its ordinary
+and full TUI paths: an inert Pi shim was discovered and removed without ever
+executing, and a migrated Alpaca account stayed configured but non-operational
+with its Pack missing.
+
+Increment 8 release acceptance (2026-09-01): public `v0.91.0-beta.3` replaced
+beta2 on the retained Railway service through platform-owned deployment
+`745fbb1f-ed13-4df0-ab20-4d03d6e35ec0`. The accepted Runtime preserved the
+same `/data/projects/main-cloud` AliceProject, six Workspace directories, Pi,
+OpenCode, and ready Alice/UTA/Connector components. A real shell PTY kept PID
+893 while a 120-second command crossed a tunnel outage longer than the terminal
+retry budget. Replacing only the local tunnel made the existing browser page
+recover automatically and reattach that exact PTY without clicking Retry or
+reloading. The journey also found one read-side recovery bug: About retained
+the old Runtime version and Project source after owner replacement. Version and
+AliceProject domain hooks now invalidate outage-era requests, refetch on the
+shared backend-recovery generation, and ignore late stale responses. Confirmed
+snapshots are valid only for their recovery generation, so a failed recovery
+read shows unavailable instead of reviving the old owner; version reads also
+abort when the transport disappears. The source UI repeated the real Railway
+tunnel cut while staying on Settings;
+proxy evidence recorded fresh `/api/version` and `/api/alice-project` reads,
+and the visible beta3 Runtime source remained correct after automatic recovery.
+
+Increment 8 review follow-up (2026-09-01): a read-only recovery-state review
+found six races that isolated happy-path tests had missed. Broker readiness now
+invalidates old operational data on refresh failure or backend loss and reloads
+on backend recovery; Trading status/equity polling starts and stops with the
+same readable-account gate. Terminal retry history resets only after the
+authoritative `attached` frame, Agent inventory rediscovers on backend recovery,
+scheduled health reuses the assignee Session projection so a missing Workspace
+cannot appear ready, and in-flight Agent probes are shared only for the same
+executable path and fingerprint. Combined focused tests cover all six cases;
+the full repository/package and retained Railway gates remain below.
+
 Always:
 
 ```bash
@@ -731,6 +981,16 @@ normal `~/.openalice`.
   machine-bound data with a distinct remote key.
 - Exact-Session scheduled Issues are never silently reassigned; the chosen
   policy is visible in plan and result.
+- Missing Agent Runtimes and Broker Packs block only their dependent features,
+  recover through cheap rediscovery, and never appear as a healthy schedule,
+  absent configured account, Live broker, or available trading action.
+- Healthy and offline browser states identify a CLI-issued SSH attachment
+  truthfully; deployment-owned homes never receive local lifecycle guidance.
+- Recoverable SSH outages restore domain reads and terminal sockets without
+  starting a replacement Agent, taking ownership, or losing the current page.
+- Workspaces, Sessions, and Automation use business-facing provenance for
+  public titles and latest activity; internal reconstruction prompts and raw
+  target JSON remain diagnostic-only.
 - Interrupted or failed transfer never publishes a partial home, overwrites an
   existing project, mutates an unrelated path, or changes source project data.
 - TUI narrow/wide layouts, scrolling, cancellation, disconnect, resize, and

@@ -37,6 +37,8 @@ export interface AgentRuntimeReadinessRow {
   readonly displayName: string
   readonly installed: boolean
   readonly binPath: string | null
+  /** Binary identity this probe result was produced against. */
+  readonly fingerprint?: string | null
   readonly status: AgentRuntimeReadinessStatus
   readonly ready: boolean
   readonly source: AgentRuntimeReadinessSource
@@ -52,6 +54,64 @@ export interface AgentRuntimeReadinessSnapshot {
   readonly checkedAt: string | null;
 }
 
+export interface AgentRuntimeReadinessProbeInFlight {
+  readonly identity: string
+  readonly epoch: symbol
+  readonly promise: Promise<AgentRuntimeReadinessRow>
+}
+
+export interface AgentRuntimeReadinessProbeAuthority {
+  readonly identity: string
+  readonly epoch: symbol
+}
+
+function runtimeReadinessProbeIdentity(
+  agent: string,
+  availability: AgentAvailability | undefined,
+): string {
+  return JSON.stringify([
+    agent,
+    availability?.installed ?? true,
+    availability?.path ?? null,
+    availability?.fingerprint ?? null,
+  ])
+}
+
+/** Share only probes that target the same executable identity. A package
+ * manager may replace a binary in place while the old probe is still running;
+ * that fresh path/fingerprint must start its own probe instead of inheriting
+ * the result Promise for the retired executable. */
+export function shareRuntimeReadinessProbe(
+  inFlight: Map<string, AgentRuntimeReadinessProbeInFlight>,
+  authority: Map<string, AgentRuntimeReadinessProbeAuthority>,
+  agent: string,
+  availability: AgentAvailability | undefined,
+  start: (mayPublish: () => boolean) => Promise<AgentRuntimeReadinessRow>,
+): Promise<AgentRuntimeReadinessRow> {
+  const identity = runtimeReadinessProbeIdentity(agent, availability)
+  const existing = inFlight.get(agent)
+  if (
+    existing?.identity === identity
+    && authority.get(agent)?.epoch === existing.epoch
+  ) {
+    return existing.promise
+  }
+
+  // Identity is repeatable (A -> B -> A), so it cannot itself be publication
+  // authority. Every newly started probe gets a unique epoch that outlives its
+  // in-flight entry; only the latest epoch may publish to the cache.
+  const epoch = Symbol(`${agent}:runtime-readiness-probe`)
+  authority.set(agent, { identity, epoch })
+  const promise = start(() => authority.get(agent)?.epoch === epoch)
+  const entry = { identity, epoch, promise }
+  inFlight.set(agent, entry)
+  const clear = () => {
+    if (inFlight.get(agent) === entry) inFlight.delete(agent)
+  }
+  void promise.then(clear, clear)
+  return promise
+}
+
 export function initialRuntimeReadinessRow(
   adapter: CliAdapter,
   availability: AgentAvailability | undefined,
@@ -62,6 +122,7 @@ export function initialRuntimeReadinessRow(
     displayName: adapter.displayName,
     installed,
     binPath: availability?.path ?? null,
+    fingerprint: availability?.fingerprint ?? null,
     status: installed ? 'unknown' : 'not_installed',
     ready: false,
     source: 'unknown',
@@ -87,11 +148,38 @@ export function checkingRuntimeReadinessRow(row: AgentRuntimeReadinessRow): Agen
 export function snapshotRuntimeReadiness(
   adapters: readonly CliAdapter[],
   availability: Record<string, AgentAvailability>,
-  cache: ReadonlyMap<string, AgentRuntimeReadinessRow>,
+  cache: Map<string, AgentRuntimeReadinessRow>,
+  authority?: Map<string, AgentRuntimeReadinessProbeAuthority>,
 ): AgentRuntimeReadinessSnapshot {
-  const rows = adapters.map((adapter) =>
-    cache.get(adapter.id) ?? initialRuntimeReadinessRow(adapter, availability[adapter.id]),
-  );
+  const rows = adapters.map((adapter) => {
+    const freshAvailability = availability[adapter.id]
+    const fresh = initialRuntimeReadinessRow(adapter, freshAvailability);
+    const activeAuthority = authority?.get(adapter.id)
+    if (
+      activeAuthority
+      && activeAuthority.identity !== runtimeReadinessProbeIdentity(adapter.id, freshAvailability)
+      && authority?.get(adapter.id) === activeAuthority
+    ) {
+      // Discovery is authoritative even while a probe is running. Retiring
+      // the epoch prevents a late result for a replaced or uninstalled binary
+      // from repopulating the cache after this snapshot invalidates it.
+      authority.delete(adapter.id)
+    }
+    const cached = cache.get(adapter.id);
+    if (
+      cached
+      && cached.installed === fresh.installed
+      && cached.binPath === fresh.binPath
+      && (cached.fingerprint ?? null) === (fresh.fingerprint ?? null)
+    ) {
+      return cached;
+    }
+    // Discovery is authoritative for install identity. A probe made against a
+    // prior executable must not survive an install, uninstall, PATH change, or
+    // in-place package-manager replacement.
+    cache.set(adapter.id, fresh);
+    return fresh;
+  });
   const checked = rows
     .map((row) => row.checkedAt)
     .filter((value): value is string => value !== null)
@@ -112,6 +200,7 @@ export function notInstalledRuntimeReadinessRow(
     displayName: adapter.displayName,
     installed: false,
     binPath: availability?.path ?? null,
+    fingerprint: availability?.fingerprint ?? null,
     status: 'not_installed',
     ready: false,
     source: 'unknown',
@@ -133,6 +222,7 @@ export function readyRuntimeReadinessRow(opts: {
     displayName: opts.adapter.displayName,
     installed: true,
     binPath: opts.availability?.path ?? null,
+    fingerprint: opts.availability?.fingerprint ?? null,
     status: 'ready',
     ready: true,
     source: opts.source,
@@ -154,6 +244,7 @@ export function failedRuntimeReadinessRow(opts: {
     displayName: opts.adapter.displayName,
     installed: true,
     binPath: opts.availability?.path ?? null,
+    fingerprint: opts.availability?.fingerprint ?? null,
     status,
     ready: false,
     source: opts.source ?? 'unknown',

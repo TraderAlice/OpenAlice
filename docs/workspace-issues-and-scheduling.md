@@ -295,7 +295,8 @@ by that Workspace; otherwise dispatch fails with an actionable message instead
 of mutating provider registration during a concurrent run.
 
 The Issue API also derives an `automationHealth` projection from these markers,
-the latest scheduled run, and the assignee's resume availability. It is not
+the latest scheduled run, the assignee's resume availability, and the effective
+Agent runtime installed on the current host. It is not
 persisted in markdown and does not create another Issue workflow status:
 
 - `not_started`, `due`, `running`, and `healthy` describe normal progress;
@@ -304,8 +305,11 @@ persisted in markdown and does not create another Issue workflow status:
   launcher suspension); this is operational interruption, not an agent-work failure;
 - `failed` retains a real timeout, launch error, runtime error, or non-zero
   process exit until a later success;
-- `blocked` means the schedule has no future fire, or an exact Session owner is
-  missing, retired, or not resumable;
+- `blocked` means the schedule has no future fire, an exact Session owner is
+  missing, retired, deleted, or not resumable, or the effective Agent runtime
+  is not installed. Runtime absence is exposed as the structured blocker
+  `agent_runtime_missing`; this read path performs only cheap executable
+  discovery and never starts a readiness probe or Agent;
 - `inactive` means Issue status `done`/`canceled` has stopped the schedule.
 
 Health measures scheduler fulfillment, not human attention. A successful run

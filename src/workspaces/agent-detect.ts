@@ -30,6 +30,12 @@ export interface AgentAvailability {
   readonly installed: boolean;
   /** Absolute path the binary resolved to, or null when not found. */
   readonly path: string | null;
+  /**
+   * Cheap identity for the resolved file. A readiness probe is valid only for
+   * the exact binary it checked; replacing an executable in place must retire
+   * the cached result even when PATH still resolves to the same string.
+   */
+  readonly fingerprint?: string | null;
 }
 
 export function detectAgentBinary(
@@ -39,7 +45,7 @@ export function detectAgentBinary(
 ): AgentAvailability {
   const env = opts.env ?? process.env;
   const managed = id === 'pi' ? runtimeProfileFromEnv(env).managedPiPath : null;
-  if (managed && isFile(managed)) return { installed: true, path: managed };
+  if (managed && isFile(managed)) return availabilityForPath(managed);
   return detectBinary(binary, opts);
 }
 
@@ -126,7 +132,24 @@ export function detectBinary(
   opts: { platform?: NodeJS.Platform; env?: NodeJS.ProcessEnv } = {},
 ): AgentAvailability {
   const path = findExecutableOnPath(binary, opts);
-  return { installed: path !== null, path };
+  return path ? availabilityForPath(path) : { installed: false, path: null, fingerprint: null };
+}
+
+function availabilityForPath(path: string): AgentAvailability {
+  try {
+    const stat = statSync(path);
+    if (!stat.isFile()) return { installed: false, path: null, fingerprint: null };
+    return {
+      installed: true,
+      path,
+      // Metadata is intentionally sufficient here: this runs on every cheap
+      // discovery. Package managers replace or rewrite shims with at least one
+      // of inode/size/mtime changing, without the cost of hashing binaries.
+      fingerprint: `${stat.dev}:${stat.ino}:${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}`,
+    };
+  } catch {
+    return { installed: false, path: null, fingerprint: null };
+  }
 }
 
 function isFile(p: string): boolean {

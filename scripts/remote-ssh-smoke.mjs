@@ -10,44 +10,48 @@ import { writeAliceProjectProductStamp } from '../packages/cli/src/alice-project
 import { planProjectTransfer } from '../packages/cli/src/project-transfer.ts'
 import { sealProjectTransferJson } from '../packages/cli/src/project-transfer-secrets.ts'
 import { writeProjectTransferStream } from '../packages/cli/src/project-transfer-stream.ts'
+import { parseRemoteSshSmokeOptions } from './remote-ssh-smoke-options.mjs'
+import {
+  requireBrokerAccountNeedsInstall,
+  requireDiscoveredAgentRuntime,
+  requireMissingAgentRuntime,
+} from './remote-ssh-smoke-targets.mjs'
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url))
 const cliEntry = join(repoRoot, 'packages/cli/bin/openalice.ts')
 const suffix = `${process.pid}-${Date.now().toString(36)}`
-const image = `openalice-remote-smoke:${suffix}`
-const args = process.argv.slice(2)
-const keepImage = args.includes('--keep-image')
-const keepContainer = args.includes('--keep-container')
-const skipTui = args.includes('--skip-tui')
+let options
+try {
+  options = parseRemoteSshSmokeOptions(process.argv.slice(2))
+} catch (error) {
+  console.error(`remote docker smoke: ${error instanceof Error ? error.message : String(error)}`)
+  process.exit(1)
+}
+const image = options.image ?? `openalice-remote-smoke:${suffix}`
+const { keepImage, keepContainer, skipBuild, skipTui } = options
 let imageBuilt = false
 let container = ''
 let scratch = ''
 
-if (args.includes('--help') || args.includes('-h')) {
+if (options.help) {
   console.log(`Usage: pnpm test:remote:docker [--keep-image] [--keep-container]
+  [--image <name> [--skip-build]] [--skip-tui]
 
 Builds a clean local SSH host, serves the real OpenAlice installer inside that
 host, and exercises plan, install, detached Server start, browser tunnel,
-disconnect persistence, reconnect, structured stop, and absent status. This is
-the clean Linux acceptance gate used by the CLI installer workflow.
+dynamic Agent discovery, disconnect persistence, reconnect, structured stop,
+AliceProject transfer, and missing Broker Pack readiness. This is the clean
+Linux acceptance gate used by the CLI installer workflow.
 
 Options:
   --keep-image      Preserve the temporary Docker image
   --keep-container  Preserve the running fixture container (also keeps image)
+  --image <name>    Build with this image name, or select it with --skip-build
+  --skip-build      Reuse --image instead of rebuilding the fixture
   --skip-tui        Skip the dependency-backed interactive TUI journey
   -h, --help        Show this help
 `)
   process.exit(0)
-}
-
-const unknownArgs = args.filter((arg) => ![
-  '--keep-image',
-  '--keep-container',
-  '--skip-tui',
-].includes(arg))
-if (unknownArgs.length > 0) {
-  console.error(`remote docker smoke: unknown option: ${unknownArgs[0]}`)
-  process.exit(1)
 }
 
 try {
@@ -55,14 +59,19 @@ try {
   const keyPath = join(scratch, 'id_ed25519')
   run('ssh-keygen', ['-q', '-t', 'ed25519', '-N', '', '-f', keyPath])
 
-  console.log(`[remote-ssh-smoke] building ${image}`)
-  run('docker', [
-    'build',
-    '--file', 'scripts/remote-smoke/Dockerfile',
-    '--tag', image,
-    '.',
-  ], { cwd: repoRoot, inherit: true })
-  imageBuilt = true
+  if (skipBuild) {
+    console.log(`[remote-ssh-smoke] reusing ${image}`)
+    run('docker', ['image', 'inspect', image])
+  } else {
+    console.log(`[remote-ssh-smoke] building ${image}`)
+    run('docker', [
+      'build',
+      '--file', 'scripts/remote-smoke/Dockerfile',
+      '--tag', image,
+      '.',
+    ], { cwd: repoRoot, inherit: true })
+    imageBuilt = true
+  }
 
   container = run('docker', [
     'run', '--detach', '--rm',
@@ -124,6 +133,7 @@ try {
   const firstTunnelUrl = await attachAndProbe(remoteTarget, smokeEnv, [
     '--yes', '--no-open', '--wait', '30',
   ])
+  requireRemoteClientUrl(firstTunnelUrl, remoteTarget)
   const running = remoteJson(remoteTarget, smokeEnv, '"$HOME/.openalice/bin/openalice" server status --json')
   if (running.class !== 'running' || running.owner?.surface !== 'cli-server') {
     throw new Error(`Remote Server did not survive tunnel disconnect: ${JSON.stringify(running)}`)
@@ -136,6 +146,9 @@ try {
   if (running.provider?.kind !== 'bun') {
     throw new Error(`Remote Server did not report the Bun provider: ${JSON.stringify(running.provider)}`)
   }
+
+  console.log('[remote-ssh-smoke] checking dynamic Agent Runtime discovery without a probe')
+  await verifyDynamicAgentRuntimeDiscovery(container, remoteTarget, smokeEnv)
 
   console.log('[remote-ssh-smoke] registering the host and reading aggregate AliceProject inventory')
   run('ssh', [remoteTarget,
@@ -299,6 +312,17 @@ try {
   if (migratedRuntimeClass !== 'running') {
     throw new Error(`Transferred AliceProject did not start: ${JSON.stringify(migratedStatus)}`)
   }
+  console.log('[remote-ssh-smoke] checking migrated account readiness without loading a Broker Pack')
+  const migratedWebEndpoint = webEndpointFromStatus(migratedStatus)
+  const brokerPackReadiness = remoteJson(remoteTarget, smokeEnv, [
+    'curl --fail --silent --show-error',
+    shellQuote(`${migratedWebEndpoint}/api/trading/config/broker-packs`),
+  ].join(' '))
+  requireBrokerAccountNeedsInstall(brokerPackReadiness, {
+    accountId: 'paper',
+    presetId: 'alpaca',
+    engine: 'alpaca',
+  })
   run('ssh', [remoteTarget,
     '"$HOME/.openalice/bin/openalice" down --project migrated --wait 15 >/tmp/migrated-down.log',
   ], { env: smokeEnv })
@@ -318,7 +342,11 @@ try {
   } else if (imageBuilt) {
     run('docker', ['image', 'rm', '--force', image], { allowFailure: true, inherit: true })
   }
-  if (scratch) await rm(scratch, { recursive: true, force: true })
+  if (scratch && keepContainer) {
+    console.log(`[remote-ssh-smoke] kept SSH fixture credentials ${scratch}`)
+  } else if (scratch) {
+    await rm(scratch, { recursive: true, force: true })
+  }
 }
 
 async function prepareTransferSource(home) {
@@ -333,7 +361,15 @@ async function prepareTransferSource(home) {
     providerKeys: { fmp: 'synthetic-provider-transfer-secret' },
   }, null, 2)}\n`)
   await sealProjectTransferJson(home, join('data', 'config', 'accounts.json'), [
-    { id: 'paper', presetId: 'alpaca-paper', presetConfig: { apiKey: 'synthetic-broker-transfer-secret' } },
+    {
+      id: 'paper',
+      presetId: 'alpaca',
+      presetConfig: {
+        mode: 'paper',
+        apiKey: 'synthetic-broker-transfer-key',
+        apiSecret: 'synthetic-broker-transfer-secret',
+      },
+    },
   ])
   await sealProjectTransferJson(home, join('data', 'config', 'connectors.json'), {
     version: 1,
@@ -489,6 +525,65 @@ async function waitForSsh(target, env) {
 }
 
 async function attachAndProbe(target, env, remoteArgs) {
+  const tunnel = await startTunnel(target, env, remoteArgs)
+  try {
+    const response = await fetch(`${tunnel.origin}/api/auth/status`, { signal: AbortSignal.timeout(5_000) })
+    const body = await response.json()
+    if (!response.ok || body.authed !== true || body.tokenConfigured !== true || body.passthrough !== 'localhost') {
+      throw new Error(`Tunnel returned the wrong Runtime response: ${JSON.stringify(body)}`)
+    }
+    return tunnel.clientUrl
+  } finally {
+    await tunnel.close()
+  }
+}
+
+async function verifyDynamicAgentRuntimeDiscovery(containerId, target, env) {
+  const agent = 'pi'
+  const shimPath = '/usr/local/bin/pi'
+  const executionMarker = '/tmp/openalice-remote-smoke-agent-shim-executed'
+  const tunnel = await startTunnel(target, env, ['--no-open', '--wait', '30'])
+  try {
+    const missingReadiness = await fetchRemoteJson(tunnel.origin, '/api/workspaces/agent-runtime-readiness')
+    const missingCatalog = await fetchRemoteJson(tunnel.origin, '/api/workspaces/agents')
+    requireMissingAgentRuntime({ readiness: missingReadiness, catalog: missingCatalog }, agent)
+
+    run('docker', ['exec', containerId, 'sh', '-c', [
+      'set -eu',
+      `rm -f ${executionMarker}`,
+      `printf '%s\\n' '#!/bin/sh' 'touch ${executionMarker}' 'exit 97' > ${shimPath}`,
+      `chmod 0755 ${shimPath}`,
+    ].join('; ')])
+
+    const discoveredCatalog = await fetchRemoteJson(tunnel.origin, '/api/workspaces/agents')
+    const discoveredReadiness = await fetchRemoteJson(tunnel.origin, '/api/workspaces/agent-runtime-readiness')
+    requireDiscoveredAgentRuntime({
+      readiness: discoveredReadiness,
+      catalog: discoveredCatalog,
+    }, agent, shimPath)
+    run('docker', ['exec', containerId, 'test', '!', '-e', executionMarker])
+
+    run('docker', ['exec', containerId, 'rm', '-f', shimPath])
+    const removedReadiness = await fetchRemoteJson(tunnel.origin, '/api/workspaces/agent-runtime-readiness')
+    const removedCatalog = await fetchRemoteJson(tunnel.origin, '/api/workspaces/agents')
+    requireMissingAgentRuntime({ readiness: removedReadiness, catalog: removedCatalog }, agent)
+    run('docker', ['exec', containerId, 'test', '!', '-e', executionMarker])
+  } finally {
+    run('docker', ['exec', containerId, 'rm', '-f', shimPath, executionMarker], { allowFailure: true })
+    await tunnel.close()
+  }
+}
+
+async function fetchRemoteJson(origin, path) {
+  const response = await fetch(`${origin}${path}`, { signal: AbortSignal.timeout(5_000) })
+  const body = await response.json()
+  if (!response.ok) {
+    throw new Error(`Remote Runtime ${path} returned ${response.status}: ${JSON.stringify(body)}`)
+  }
+  return body
+}
+
+async function startTunnel(target, env, remoteArgs) {
   const child = spawn(process.execPath, [cliEntry, 'remote', target, ...remoteArgs], {
     cwd: repoRoot,
     env,
@@ -505,7 +600,7 @@ async function attachAndProbe(target, env, remoteArgs) {
   child.stdout.on('data', (chunk) => {
     process.stdout.write(chunk)
     output += chunk
-    const match = /Local OpenAlice UI: (http:\/\/127\.0\.0\.1:\d+)/.exec(output)
+    const match = /Local OpenAlice UI: (http:\/\/127\.0\.0\.1:\d+\/[^\r\n]*)\r?\n/.exec(output)
     if (match) resolveUrl(match[1])
   })
   child.once('error', rejectUrl)
@@ -519,19 +614,63 @@ async function attachAndProbe(target, env, remoteArgs) {
   let url
   try {
     url = await urlReady
+  } catch (error) {
+    child.kill('SIGTERM')
+    await waitForExit(child, 10_000).catch(() => undefined)
+    throw error
   } finally {
     clearTimeout(timeout)
   }
-  const response = await fetch(`${url}/api/auth/status`, { signal: AbortSignal.timeout(5_000) })
-  const body = await response.json()
-  if (!response.ok || body.authed !== true || body.tokenConfigured !== true || body.passthrough !== 'localhost') {
-    child.kill('SIGTERM')
-    throw new Error(`Tunnel returned the wrong Runtime response: ${JSON.stringify(body)}`)
+  const parsed = new URL(url)
+  let closed = false
+  return {
+    child,
+    clientUrl: url,
+    origin: parsed.origin,
+    async close() {
+      if (closed) return
+      closed = true
+      child.kill('SIGTERM')
+      const exit = await waitForExit(child, 10_000)
+      if (exit.code !== 0) {
+        throw new Error(`remote CLI did not close cleanly after tunnel disconnect (${JSON.stringify(exit)})`)
+      }
+    },
   }
-  child.kill('SIGTERM')
-  const exit = await waitForExit(child, 10_000)
-  if (exit.code !== 0) throw new Error(`remote CLI did not close cleanly after tunnel disconnect (${JSON.stringify(exit)})`)
-  return url
+}
+
+function requireRemoteClientUrl(value, target) {
+  const parsed = new URL(value)
+  const fragment = new URLSearchParams(parsed.hash.slice(1))
+  if (
+    fragment.get('openalice-remote') !== '1'
+    || fragment.get('target') !== target
+    || !fragment.get('ssh-port')
+    || !fragment.get('runtime-port')
+  ) {
+    throw new Error(`Remote smoke client URL lost its connection identity: ${value}`)
+  }
+}
+
+function webEndpointFromStatus(status) {
+  const candidates = [
+    status?.result?.status?.endpoints?.web,
+    status?.runtime?.endpoints?.web,
+    status?.status?.endpoints?.web,
+    status?.endpoints?.web,
+  ]
+  for (const candidate of candidates) {
+    if (typeof candidate !== 'string') continue
+    const parsed = new URL(candidate)
+    if (
+      parsed.protocol === 'http:'
+      && parsed.hostname === '127.0.0.1'
+      && /^\d+$/.test(parsed.port)
+    ) {
+      return parsed.origin
+    }
+  }
+  throw new Error(`Remote Runtime status did not expose a safe loopback Web endpoint: ${JSON.stringify(status)}`)
 }
 
 function waitForExit(child, timeoutMs) {

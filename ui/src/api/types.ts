@@ -535,6 +535,8 @@ export interface UTAConfig {
   presetConfig: Record<string, unknown>
   /** Whether broker-side account mutations are refused. */
   readOnly: boolean
+  /** Public-data-only UTA; excluded from account and portfolio surfaces. */
+  keyless?: boolean
   /** Whether this UTA participates in broker-backed market-data discovery. */
   asVendor: boolean
 }
@@ -579,6 +581,29 @@ export interface BrokerPackStatus {
   updateAvailable?: boolean
   reason?: string
   requiredBy: string[]
+}
+
+export type BrokerAccountPackState =
+  | 'ready'
+  | 'needs-install'
+  | 'needs-repair'
+  | 'unsupported-preset'
+
+export interface BrokerAccountPackReadiness {
+  accountId: string
+  label: string
+  presetId: string
+  configuredEnabled: boolean
+  engine?: BrokerEngine
+  state: BrokerAccountPackState
+  operational: boolean
+  action?: 'install' | 'repair' | 'update'
+  reason?: string
+}
+
+export interface BrokerPackReadinessResponse {
+  packs: BrokerPackStatus[]
+  accounts: BrokerAccountPackReadiness[]
 }
 
 export interface GuardEntry {

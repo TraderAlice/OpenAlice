@@ -449,6 +449,25 @@ function findBoardIssue(wsId: string, id: string) {
   return ws?.issues.find((i) => i.id === id) ?? null
 }
 
+const demoAssigneeSessions: Record<string, NonNullable<IssueDetail['assigneeSession']>> = {
+  'resume-demo-thesis-owner': {
+    resumeId: 'resume-demo-thesis-owner',
+    state: 'ready',
+    workspace: { id: 'demo-ws-auto-quant', tag: 'auto-quant' },
+    agent: 'codex',
+    displayName: 'Thesis monitor',
+    createdAt: now - 14 * DAY,
+    updatedAt: now - HOUR / 2,
+    active: false,
+    runtime: { credentialSource: 'native' },
+  },
+  'resume-demo-cpi-owner': {
+    resumeId: 'resume-demo-cpi-owner',
+    state: 'missing',
+    active: false,
+  },
+}
+
 /** Build the IssueDetail the GET /api/issues/:wsId/:id mock returns, or null if
  *  the (wsId, id) pair doesn't exist on the board (→ 404). Display fields come
  *  from the board snapshot; body / what / agent / runs come from the extras map
@@ -464,6 +483,9 @@ export function demoIssueDetail(wsId: string, id: string): IssueDetail | null {
     : explicitWhat || legacyBody || boardIssue.title
   const runs = extras?.runs ?? []
   const comments = demoIssueComments[`${wsId}/${id}`] ?? []
+  const assigneeResumeId = boardIssue.assignee.startsWith('@resume-')
+    ? boardIssue.assignee.slice(1)
+    : null
   return {
     issue: {
       ...boardIssue,
@@ -471,6 +493,13 @@ export function demoIssueDetail(wsId: string, id: string): IssueDetail | null {
       ...(extras?.agent ? { agent: extras.agent } : {}),
       ...(extras?.commentPrompt ? { commentPrompt: extras.commentPrompt } : {}),
     },
+    ...(assigneeResumeId
+      ? { assigneeSession: demoAssigneeSessions[assigneeResumeId] ?? {
+          resumeId: assigneeResumeId,
+          state: 'missing' as const,
+          active: false,
+        } }
+      : {}),
     comments,
     runs,
     activity: comments

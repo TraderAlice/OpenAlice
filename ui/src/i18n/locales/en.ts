@@ -216,6 +216,7 @@ export const en = {
         due: 'The schedule is due and waiting to dispatch.',
         running: 'A scheduled run is in progress.',
         healthy: 'Latest scheduled run completed.',
+        runtimeMissing: '{{agent}} is not installed on this host. Install it before the next scheduled run.',
         missingSession: 'Assigned Session does not exist. Choose an active Session or New Session each run.',
         retiredSession: 'Assigned Session is retired. Reassign the Issue before its next run.',
         unboundSession: 'Assigned Session has no resumable runtime conversation yet.',
@@ -403,6 +404,11 @@ export const en = {
     about: {
       title: 'About OpenAlice',
       description: 'Installation, runtime, update status, and the AliceProject currently open here.',
+      connection: {
+        title: 'Backend connection',
+        description: 'This browser is connected to a remote OpenAlice Runtime through an SSH tunnel.',
+        connected: 'Connected',
+      },
       aliceProject: {
         title: 'Current AliceProject',
         description: 'The top-level project that owns this data home, Guardian, backend, and frontend endpoint.',
@@ -486,6 +492,7 @@ export const en = {
       recent: 'Recent locations',
       useAndRestart: 'Use and restart',
       browserOnly: 'Folder selection is available in the desktop app. Browser and development launches can select the same boundary from the command line:',
+      remoteManaged: 'This data home belongs to the connected remote Runtime. Manage its location on that host or through its deployment service.',
       lockedByHome: 'This launch is locked by OPENALICE_HOME. Remove that environment override before switching from the desktop UI.',
       lockedByWorkspace: 'This launch has a fixed AQ_LAUNCHER_ROOT. Remove that environment override before switching the complete home from the desktop UI.',
       loadError: 'Could not read the desktop data-location setting.',

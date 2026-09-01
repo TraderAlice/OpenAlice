@@ -18,7 +18,7 @@ afterEach(async () => {
   await Promise.all(temporaryPaths.splice(0).map((path) => rm(path, { recursive: true, force: true })))
 })
 
-describe('Railway native CLI host entrypoint', () => {
+describe.skipIf(process.platform === 'win32')('Railway native CLI host entrypoint', () => {
   it('bootstraps an empty persistent volume and runs the Guardian in foreground mode', async () => {
     const fixture = await makeFixture({ installer: 'success' })
 

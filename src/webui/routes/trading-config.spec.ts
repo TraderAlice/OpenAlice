@@ -101,6 +101,14 @@ describe('GET /broker-packs — optional engine requirements', () => {
     const ccxt = (body as { packs: Array<{ engine: string; requiredBy: string[] }> }).packs
       .find((pack) => pack.engine === 'ccxt')
     expect(ccxt?.requiredBy).toEqual(['Main OKX', 'binance K-line vendor'])
+    expect((body as { accounts: unknown[] }).accounts).toEqual([
+      expect.objectContaining({
+        accountId: 'okx-main', configuredEnabled: true, engine: 'ccxt', state: 'needs-install', operational: false, action: 'install',
+      }),
+      expect.objectContaining({
+        accountId: 'okx-disabled', configuredEnabled: false, engine: 'ccxt', state: 'needs-install', operational: false, action: 'install',
+      }),
+    ])
   })
 
   it('surfaces broken local status without dropping the accounts that require it', async () => {
@@ -122,6 +130,9 @@ describe('GET /broker-packs — optional engine requirements', () => {
       reason: 'API version mismatch',
       requiredBy: ['Main OKX'],
     }))
+    expect((body as { accounts: unknown[] }).accounts).toContainEqual(expect.objectContaining({
+      accountId: 'okx-main', state: 'needs-repair', operational: false, action: 'repair', reason: 'API version mismatch',
+    }))
   })
 
   it('keeps pack recovery UI available when a legacy account references a removed preset', async () => {
@@ -135,11 +146,32 @@ describe('GET /broker-packs — optional engine requirements', () => {
 
     expect(status).toBe(200)
     expect((body as { packs: unknown[] }).packs).toHaveLength(6)
+    expect((body as { accounts: unknown[] }).accounts).toEqual([
+      expect.objectContaining({
+        accountId: 'legacy-account', state: 'unsupported-preset', operational: false,
+      }),
+    ])
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining('legacy-account'),
       expect.stringMatching(/unknown broker preset/i),
     )
     warn.mockRestore()
+  })
+
+  it('keeps an installed Pack operational while advertising an update', async () => {
+    utaStore = [{
+      id: 'okx-main', label: 'Main OKX', presetId: 'okx', enabled: true,
+      presetConfig: {}, guards: [], asVendor: true,
+    }]
+    brokerPackMocks.getBrokerPackLocalStatus.mockImplementation(async (engine: string) => engine === 'ccxt'
+      ? { engine, installed: true, source: 'downloaded', version: '0.90.2', updateAvailable: true }
+      : { engine, installed: engine === 'mock', source: engine === 'mock' ? 'builtin' : 'missing' })
+
+    const { body } = await req(makeRoutes(), 'GET', '/broker-packs')
+
+    expect((body as { accounts: unknown[] }).accounts).toContainEqual(expect.objectContaining({
+      accountId: 'okx-main', state: 'ready', operational: true, action: 'update',
+    }))
   })
 })
 

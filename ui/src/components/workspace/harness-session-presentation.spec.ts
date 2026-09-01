@@ -144,6 +144,30 @@ describe('projectHarnessSessionPresentation', () => {
     })
   })
 
+  it('uses the backend read-side title without exposing the stored reconstruction wrapper', () => {
+    expect(projectHarnessSessionPresentation(
+      session({ title: ISSUE_PROMPT, surface: 'headless' }),
+      entry({
+        presentationTitle: 'Telegram support desk',
+        createdBy: {
+          kind: 'conversation',
+          caller: { kind: 'human' },
+          reason: 'issue-comment',
+          subject: {
+            kind: 'issue',
+            workspaceId: 'ws-1',
+            issueId: 'telegram-phone-desk',
+            relation: 'owner',
+          },
+        },
+      }),
+    )).toEqual({
+      title: 'Telegram support desk',
+      sourceKind: 'conversation',
+      issueId: 'telegram-phone-desk',
+    })
+  })
+
   it('prefers birth issueId over a later execution id', () => {
     expect(projectHarnessSessionPresentation(
       session({ title: ISSUE_PROMPT }),

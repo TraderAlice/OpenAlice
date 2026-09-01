@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { VersionInfo } from '../api/types'
 
 const mocks = vi.hoisted(() => ({
   getVersion: vi.fn(),
+  backendUnavailable: false,
+  backendRecoveryGeneration: 0,
 }))
 
 vi.mock('../api', () => ({
@@ -15,6 +17,13 @@ vi.mock('../api', () => ({
       get: mocks.getVersion,
     },
   },
+}))
+
+vi.mock('../auth/AuthContext', () => ({
+  useBackendRecoverySignal: () => ({
+    backendUnavailable: mocks.backendUnavailable,
+    backendRecoveryGeneration: mocks.backendRecoveryGeneration,
+  }),
 }))
 
 import { UpdateBanner } from './UpdateBanner'
@@ -33,6 +42,8 @@ const availableUpdate: VersionInfo = {
 
 beforeEach(() => {
   localStorage.clear()
+  mocks.backendUnavailable = false
+  mocks.backendRecoveryGeneration = 0
   mocks.getVersion.mockResolvedValue(availableUpdate)
 })
 
@@ -87,4 +98,60 @@ describe('UpdateBanner', () => {
       expect(screen.queryByText('v0.90.2')).toBeNull()
     },
   )
+
+  it('shows a newer recovered version after the previous version was skipped', async () => {
+    const view = render(<UpdateBanner />)
+    expect(await screen.findByText('v0.90.2')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: /Skip this version/ }))
+    expect(screen.queryByText('v0.90.2')).toBeNull()
+
+    mocks.backendUnavailable = true
+    view.rerender(<UpdateBanner />)
+    mocks.getVersion.mockResolvedValueOnce({
+      ...availableUpdate,
+      latest: '0.90.3',
+      releaseUrl: 'https://example.test/v0.90.3',
+    })
+    mocks.backendUnavailable = false
+    mocks.backendRecoveryGeneration = 1
+    view.rerender(<UpdateBanner />)
+
+    expect(await screen.findByText('v0.90.3')).toBeTruthy()
+  })
+
+  it('keeps the close action dismissed for the rest of the page session', async () => {
+    const view = render(<UpdateBanner />)
+    expect(await screen.findByText('v0.90.2')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    mocks.backendUnavailable = true
+    view.rerender(<UpdateBanner />)
+    mocks.getVersion.mockResolvedValueOnce({
+      ...availableUpdate,
+      latest: '0.90.3',
+      releaseUrl: 'https://example.test/v0.90.3',
+    })
+    mocks.backendUnavailable = false
+    mocks.backendRecoveryGeneration = 1
+    view.rerender(<UpdateBanner />)
+
+    await waitFor(() => expect(mocks.getVersion).toHaveBeenCalledTimes(2))
+    expect(screen.queryByText('v0.90.3')).toBeNull()
+  })
+
+  it('hides an old update when the recovered version read fails', async () => {
+    const view = render(<UpdateBanner />)
+    expect(await screen.findByText('v0.90.2')).toBeTruthy()
+
+    mocks.backendUnavailable = true
+    view.rerender(<UpdateBanner />)
+    mocks.getVersion.mockRejectedValueOnce(new Error('version unavailable'))
+    mocks.backendUnavailable = false
+    mocks.backendRecoveryGeneration = 1
+    view.rerender(<UpdateBanner />)
+
+    await waitFor(() => expect(mocks.getVersion).toHaveBeenCalledTimes(2))
+    expect(screen.queryByText('v0.90.2')).toBeNull()
+  })
 })

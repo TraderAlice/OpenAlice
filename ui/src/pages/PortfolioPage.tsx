@@ -3,6 +3,8 @@ import { ChevronDown } from 'lucide-react'
 import { api, type Position, type WalletCommitLog, type EquityCurvePoint, type UTASnapshotSummary } from '../api'
 import { useAutoSave } from '../hooks/useAutoSave'
 import { useAccountHealth } from '../hooks/useAccountHealth'
+import { useTradingConfig } from '../hooks/useTradingConfig'
+import { useBrokerPackReadiness } from '../hooks/useBrokerPackReadiness'
 import { useWorkspace } from '../tabs/store'
 import { PageHeader } from '../components/PageHeader'
 import { EmptyState, Skeleton } from '../components/StateViews'
@@ -14,8 +16,9 @@ import { Metric, signFromDelta } from '../components/Metric'
 import { Sparkline } from '../components/Sparkline'
 import { fmt, fmtPnl, fmtNum, fmtPctSigned } from '../lib/format'
 import { contractPrimary } from '../lib/contract-display'
-import { displayProviderForUTA, filterAccountTierUTAs } from '../lib/uta-account-filter'
+import { displayProviderForUTA } from '../lib/uta-account-filter'
 import { TradingModeGate } from '../components/TradingModeGate'
+import { AccountReadinessBadge, BrokerSupportGate } from '../components/uta/BrokerPackGate'
 import { ensureTradingModePolling, useTradingMode } from '../live/trading-mode'
 import { computeTodayDelta, type CurvePointSummary } from './portfolio-metrics'
 
@@ -114,9 +117,12 @@ export function PortfolioPage() {
   const tradingMode = useTradingMode((s) => s.status.mode)
   const tradingModeLoading = useTradingMode((s) => s.loading)
   const healthMap = useAccountHealth()
+  const tradingConfig = useTradingConfig()
+  const brokerReadiness = useBrokerPackReadiness()
   const [data, setData] = useState<PortfolioData>(EMPTY)
   const [loading, setLoading] = useState(true)
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
   const [curvePoints, setCurvePoints] = useState<EquityCurvePoint[]>([])
   const [curveAccountId, setCurveAccountId] = useState<string | 'all'>('') // '' = not yet initialized
   const [selectedTimestamp, setSelectedTimestamp] = useState<string | null>(null)
@@ -128,6 +134,17 @@ export function PortfolioPage() {
   // hero today-PnL delta and per-account sparklines. Distinct from
   // curvePoints which follows the user's chart-account selection.
   const [aggregateCurve, setAggregateCurve] = useState<CurveSummary | null>(null)
+  const portfolioConfigs = useMemo(() => tradingConfig.utas.filter((uta) => uta.keyless !== true), [tradingConfig.utas])
+
+  const accountReadiness = useMemo(() => new Map(
+    portfolioConfigs.map((uta) => [uta.id, brokerReadiness.forAccount(uta)]),
+  ), [portfolioConfigs, brokerReadiness.forAccount])
+  const operationalAccounts = useMemo(() => portfolioConfigs.filter((uta) => (
+    uta.enabled !== false && accountReadiness.get(uta.id)?.operational
+  )), [accountReadiness, portfolioConfigs])
+  const blockedAccounts = useMemo(() => portfolioConfigs.filter((uta) => (
+    uta.enabled !== false && !accountReadiness.get(uta.id)?.operational
+  )), [accountReadiness, portfolioConfigs])
 
   const snapshotConfig = useMemo(() => ({ enabled: snapshotEnabled, every: snapshotEvery }), [snapshotEnabled, snapshotEvery])
   const saveSnapshotConfig = useCallback(async (d: Record<string, unknown>) => {
@@ -160,7 +177,7 @@ export function PortfolioPage() {
   }, [])
 
   const refresh = useCallback(async () => {
-    if (tradingModeLoading) return
+    if (tradingModeLoading || tradingConfig.loading || brokerReadiness.loading) return
     if (tradingMode === 'lite') {
       setData(EMPTY)
       setAggregateCurve(null)
@@ -168,16 +185,19 @@ export function PortfolioPage() {
       setSelectedSnapshot(null)
       setSelectedTimestamp(null)
       setLoading(false)
-      setLastRefresh(new Date())
+      setLastRefresh(null)
+      setRefreshError(null)
       return
     }
     setLoading(true)
-    const [result, configResult, aggregateResult] = await Promise.all([
-      fetchPortfolioData(),
+    const [portfolioResult, configResult, aggregateResult] = await Promise.all([
+      fetchPortfolioData(operationalAccounts),
       api.config.load().catch(() => null),
-      api.trading.equityCurve({ limit: 1500 }).catch(() => ({ points: [] as EquityCurvePoint[] })),
+      operationalAccounts.length > 0
+        ? api.trading.equityCurve({ limit: 1500 }).catch(() => ({ points: [] as EquityCurvePoint[] }))
+        : Promise.resolve({ points: [] as EquityCurvePoint[] }),
     ])
-    setData(result)
+    setData(portfolioResult.data)
     setAggregateCurve(summarizeAggregateCurve(aggregateResult.points))
     if (configResult?.snapshot) {
       setSnapshotEnabled(configResult.snapshot.enabled)
@@ -186,14 +206,15 @@ export function PortfolioPage() {
     setSnapshotConfigLoaded(true)
 
     // Default to first account on initial load
-    const effectiveId = curveAccountId || result.accounts[0]?.id || 'all'
+    const effectiveId = curveAccountId || portfolioConfigs[0]?.id || 'all'
     if (!curveAccountId && effectiveId) setCurveAccountId(effectiveId)
     const points = await fetchCurveData(effectiveId)
     setCurvePoints(points)
 
-    setLastRefresh(new Date())
+    setLastRefresh(portfolioResult.liveSucceeded ? new Date() : null)
+    setRefreshError(portfolioResult.error)
     setLoading(false)
-  }, [curveAccountId, fetchCurveData, tradingMode, tradingModeLoading])
+  }, [brokerReadiness.loading, curveAccountId, fetchCurveData, operationalAccounts, portfolioConfigs, tradingConfig.loading, tradingMode, tradingModeLoading])
 
   useEffect(() => { ensureTradingModePolling() }, [])
   useEffect(() => { refresh() }, [refresh])
@@ -212,7 +233,7 @@ export function PortfolioPage() {
   )
 
   // Account list for the chart switcher
-  const chartAccounts = data.accounts.map(a => ({ id: a.id, label: a.label }))
+  const chartAccounts = portfolioConfigs.map(a => ({ id: a.id, label: a.label ?? a.id }))
 
   const handleAccountChange = useCallback(async (id: string | 'all') => {
     setCurveAccountId(id)
@@ -247,7 +268,7 @@ export function PortfolioPage() {
       <PageHeader
         title="Portfolio"
         description="Live portfolio overview across all trading accounts."
-        live={{ lastUpdated: lastRefresh }}
+        live={lastRefresh ? { lastUpdated: lastRefresh } : undefined}
         right={
           <button
             onClick={refresh}
@@ -264,24 +285,56 @@ export function PortfolioPage() {
         <div className="flex gap-6 items-start">
           {/* Main column */}
           <div className="flex-1 min-w-0 space-y-5">
-            {!lastRefresh ? <PortfolioSkeleton /> : <>
+            {loading && data === EMPTY ? <PortfolioSkeleton /> : <>
             {!tradingModeLoading && tradingMode === 'lite' ? (
               <TradingModeGate
                 title="Portfolio is unavailable in Lite mode."
                 description="Lite mode keeps UTA disconnected, so there are no broker accounts, positions, or equity snapshots to show. Change the trading mode in Agent Permissions to connect UTA."
               />
             ) : <>
-            <HeroMetrics equity={data.equity} curve={aggregateCurve?.total ?? null} />
+            {refreshError && (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-[12px] text-destructive" role="alert">
+                Live portfolio data is unavailable: {refreshError}
+              </div>
+            )}
+
+            {blockedAccounts.map((uta) => {
+              const readiness = accountReadiness.get(uta.id)!
+              return (
+                <div key={uta.id} className="space-y-2">
+                  <div className="flex items-center justify-between gap-3 px-1">
+                    <span className="text-[12px] font-medium text-foreground">{uta.label ?? uta.id}</span>
+                    <AccountReadinessBadge readiness={readiness} health={healthMap[uta.id]} />
+                  </div>
+                  <BrokerSupportGate
+                    readiness={readiness}
+                    installingEngine={brokerReadiness.installingEngine}
+                    onInstall={brokerReadiness.install}
+                    onRetry={brokerReadiness.refresh}
+                  />
+                </div>
+              )
+            })}
+            {operationalAccounts.length > 0 && (
+              <HeroMetrics equity={data.equity} curve={aggregateCurve?.total ?? null} />
+            )}
 
             {curvePoints.length > 0 && (
-              <EquityCurve
-                points={curvePoints}
-                accounts={chartAccounts}
-                selectedAccountId={curveAccountId}
-                onAccountChange={handleAccountChange}
-                onPointClick={handlePointClick}
-                selectedTimestamp={selectedTimestamp}
-              />
+              <div className="space-y-2">
+                {curveAccountId !== 'all' && !accountReadiness.get(curveAccountId)?.operational && (
+                  <p className="text-[11px] text-warning" role="status">
+                    Historical snapshot · broker support is unavailable on this Runtime, so this chart is not live.
+                  </p>
+                )}
+                <EquityCurve
+                  points={curvePoints}
+                  accounts={chartAccounts}
+                  selectedAccountId={curveAccountId}
+                  onAccountChange={handleAccountChange}
+                  onPointClick={handlePointClick}
+                  selectedTimestamp={selectedTimestamp}
+                />
+              </div>
             )}
 
             <SnapshotSettings
@@ -311,7 +364,7 @@ export function PortfolioPage() {
             )}
 
             {/* Empty states */}
-            {data.accounts.length === 0 && !loading && (
+            {portfolioConfigs.length === 0 && !loading && (
               <NoAccountsEmpty />
             )}
             {data.accounts.length > 0 && allPositions.length === 0 && !loading && (
@@ -339,35 +392,49 @@ export function PortfolioPage() {
 
 // ==================== Data Fetching ====================
 
-async function fetchPortfolioData(): Promise<PortfolioData> {
-  try {
-    const [equityResult, utasResult, fxResult] = await Promise.allSettled([
-      api.trading.equity(),
-      api.trading.listUTASummaries(),
-      api.trading.fxRates(),
-    ])
+async function fetchPortfolioData(configuredAccounts: Array<{ id: string; label?: string }>): Promise<{
+  data: PortfolioData
+  liveSucceeded: boolean
+  error: string | null
+}> {
+  if (configuredAccounts.length === 0) return { data: EMPTY, liveSucceeded: false, error: null }
 
-    const equity = equityResult.status === 'fulfilled' ? equityResult.value : null
-    const utasList = utasResult.status === 'fulfilled' ? filterAccountTierUTAs(utasResult.value.utas) : []
-    const fxRates = fxResult.status === 'fulfilled' ? fxResult.value.rates : []
+  const [equityResult, fxResult, accountResults] = await Promise.all([
+    api.trading.equity().then((value) => ({ value })).catch((error: unknown) => ({ error })),
+    api.trading.fxRates().then((value) => ({ value })).catch(() => ({ value: { rates: [] as FxRateInfo[] } })),
+    Promise.all(configuredAccounts.map(async (configured): Promise<{ account: AccountData; live: boolean }> => {
+      const [accountResult, positionResult, logResult] = await Promise.allSettled([
+        api.trading.utaAccount(configured.id),
+        api.trading.utaPositions(configured.id),
+        api.trading.walletLog(configured.id, 10),
+      ])
+      const live = accountResult.status === 'fulfilled'
+      return {
+        live,
+        account: {
+          id: configured.id,
+          label: configured.label ?? configured.id,
+          provider: displayProviderForUTA(configured),
+          positions: positionResult.status === 'fulfilled' ? positionResult.value.positions : [],
+          walletLog: logResult.status === 'fulfilled' ? logResult.value.commits : [],
+          ...(!live ? { error: 'Live account data is unavailable' } : {}),
+        },
+      }
+    })),
+  ])
 
-    const accounts = await Promise.all(
-      utasList.map(async (acct): Promise<AccountData> => {
-        try {
-          const [posResp, logResp] = await Promise.all([
-            api.trading.utaPositions(acct.id),
-            api.trading.walletLog(acct.id, 10),
-          ])
-          return { ...acct, provider: displayProviderForUTA(acct), positions: posResp.positions, walletLog: logResp.commits }
-        } catch {
-          return { ...acct, provider: displayProviderForUTA(acct), positions: [], walletLog: [], error: 'Not connected' }
-        }
-      }),
-    )
-
-    return { equity, accounts, fxRates }
-  } catch {
-    return EMPTY
+  const equity = 'value' in equityResult ? equityResult.value : null
+  const fxRates = fxResult.value.rates
+  const liveSucceeded = equity !== null || accountResults.some((result) => result.live)
+  const error = liveSucceeded
+    ? null
+    : ('error' in equityResult && equityResult.error instanceof Error
+        ? equityResult.error.message
+        : 'No configured account returned live data.')
+  return {
+    data: { equity, accounts: accountResults.map((result) => result.account), fxRates },
+    liveSucceeded,
+    error,
   }
 }
 

@@ -486,8 +486,14 @@ containing only the validated SSH destination, SSH port, and remote loopback
 Runtime port. The Web UI consumes that fragment into tab-scoped session storage
 before rendering and immediately removes it from the address bar. Fragments are
 not sent in HTTP requests, so this context never becomes remote Runtime state or
-server log data. The global offline screen may use it to distinguish a broken
-SSH route from a local Runtime outage and show the exact endpoints to retry.
+server log data. The full client URL emitted by the CLI is the bootstrap
+authority; a same-tab reload retains that client-owned identity. A copied bare
+origin or unrelated tab has no authority to acquire it, and cross-tab
+persistence is not part of this phase. Both the healthy Settings/About surface
+and the global offline screen use the retained identity to show the SSH target,
+local tunnel endpoint, and remote Runtime endpoint. A remote/service-owned data
+home is described as belonging to that Runtime; the browser must not suggest
+local `openalice` or `pnpm` launch commands for it.
 
 ## Server Lifecycle
 
@@ -680,6 +686,19 @@ remote PTY and Agent TUI remain authoritative; the local xterm-compatible
 surface renders received terminal bytes. Shell, Claude Code, Codex, opencode,
 and Pi retain the same terminal semantics. WebPi remains an optional structured
 Pi surface, not a prerequisite or replacement for shell/TUI workflows.
+
+The browser's core health probe publishes a monotonic recovery generation only
+when Alice transitions from unavailable back to available. PTY views use that
+signal to re-attach the same Session after a recoverable tunnel/backend outage,
+including after their bounded exponential retry budget has expired. A stopped
+retry loop remains visibly closed with an explicit **Retry** action.
+Runtime-identity reads such as the running version/update authority and current
+AliceProject also invalidate outage-era requests and refetch on that recovery
+generation, so a replacement owner cannot leave Settings describing the old
+Runtime after the global overlay disappears.
+Authentication failures, another controller's ownership, and a missing Session
+remain fatal to that attachment: recovery never implies takeover, Session
+recreation, or a new Agent Runtime.
 
 This path should be measured before adding a second terminal protocol. Relevant
 tests use controlled network conditions such as 20 ms, 80 ms, and 150 ms RTT,

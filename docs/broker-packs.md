@@ -166,6 +166,27 @@ release matrix as appropriate.
 
 ## UI Contract
 
+Alice is the readiness authority for every UI surface. `GET
+/api/trading/config/broker-packs` joins the persisted UTA configuration with
+the Broker Packs installed on the current Runtime and returns both engine-level
+`packs` and one exact `accounts` readiness row per configured UTA. A configured
+account and a loadable account are deliberately different states:
+
+- `ready` means the account's engine can be loaded on this Runtime;
+- `needs-install` and `needs-repair` keep the account visible but non-operational;
+- `unsupported-preset` preserves a legacy configuration without guessing an
+  engine;
+- a frontend that cannot read this contract fails closed as status unavailable
+  and offers Retry.
+
+This join is machine-local. AliceProject transfer preserves account
+configuration and historical snapshots, but it does not transfer replaceable
+`runtime/broker-packs/` payloads. A transferred account is therefore shown as
+"configured, support needed" until the destination Runtime installs or repairs
+its Pack. Discovery on mount, focus, visibility, or explicit Retry is cheap and
+read-only; it must never install a Pack, contact a broker, reconnect an account,
+or submit a trade.
+
 The Trading page owns three installation entry points:
 
 - broker creation stops before credentials and offers Install/Repair when the
@@ -177,6 +198,20 @@ The Trading page owns three installation entry points:
 
 Pack errors must be explicit and recoverable. Alice/Chat remains usable, UTA
 continues starting, and other installed broker engines remain independent.
+
+Trading, Portfolio, and UTA Detail consume the same account-readiness selector
+and interaction policy. When support is missing or broken they must not show a
+Live indicator, wait forever in a loading skeleton, poll account/sub-account/
+position/order/market-clock endpoints, or present Reconnect, Place Order, Close,
+or order deep links as usable actions. They instead offer Install, Repair, or
+Retry against the current Runtime. Installed Packs with an available update
+remain operational while Update is offered non-blockingly.
+
+`canTrade` is stricter than Pack readiness: the account must also be configured
+on, writable, running under `pro` trading mode, and report healthy, readable,
+trading-tier UTA health. A missing health row is not permission to trade.
+Historical snapshots may remain visible while live support is unavailable, but
+the UI must label them explicitly as stale/non-live.
 
 The v0.85.0-beta regression that established this contract is recorded in
 [[docs/incidents/2026-07-28-broker-pack-upgrade-gap.md]].
@@ -195,12 +230,15 @@ npx tsc --noEmit
 cd ui && npx tsc -b
 ```
 
-The Bun CLI lane additionally runs `pnpm build:bun-runtime:feasibility`. Its
-isolated fixture uses the production active-release layout, imports a private
-SDK from Pack-local `node_modules`, requires a real platform N-API binary, and
-proves the compiled UTA role loads it again after a forced UTA restart. This is
-the external-loading gate; it does not replace building and verifying the real
-release Packs above.
+The Bun CLI PR and release lanes additionally run
+`pnpm build:bun-runtime:feasibility` on their native hosts. Rolling `dev`
+publication samples this heavier multiprocess recovery on Linux x64 once per
+commit, while every platform still runs the packaged native-candidate smoke.
+The isolated feasibility fixture uses the production active-release layout,
+imports a private SDK from Pack-local `node_modules`, requires a real platform
+N-API binary, and proves the compiled UTA role loads it again after a forced UTA
+restart. This is the external-loading gate; it does not replace building and
+verifying the real release Packs above.
 
 For desktop changes, follow [[docs/managed-workspace-runtime.md]] and require
 `pnpm electron:assert-package` plus the packaged Workspace smoke. For a broker

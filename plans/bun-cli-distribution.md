@@ -1,13 +1,14 @@
 # Bun-native CLI Distribution
 
 Status: Active — macOS/Linux native CLI is public in v0.90.2 and the separately
-dispatched v0.91.0-beta.1 is externally verified; stable remains v0.90.2 while
+dispatched v0.91.0-beta.3 is externally verified; stable remains v0.90.2 while
 stable/beta discovery authority is converged on the OpenAlice CDN;
 the Railway native CLI SSH host passes local empty-Volume, normal replacement,
 hard-kill recovery, real retained-Volume transfer, hosted Agent turns, and live
-v2 normal-restart/hard-kill reacceptance; the disposable hosted empty-Volume
-and forced installer-failure fallback journeys remain open; native PowerShell
-and external package-manager activation remain deferred
+v2 normal-restart/hard-kill reacceptance, plus a non-destructive switch from a
+rolling dev Runtime to pinned beta3; the disposable hosted empty-Volume and
+forced installer-failure fallback journeys remain open; native PowerShell and
+external package-manager activation remain deferred
 
 Delivery mode: Serial / interactive from current `dev`. The accepted native CLI
 increments have already reached `dev`; the old `codex/usability-improvements`
@@ -578,6 +579,15 @@ artifacts.
   mutable surface stayed byte-for-byte unchanged.
 - [x] Leave later fixes on `dev`. A `beta.2` checkpoint is optional; stable is
   a separate later decision after beta testing and maintainer acceptance.
+- [x] After later `dev` fixes and the beta fast-lane redesign, publish only
+  `v0.91.0-beta.2`, independently verify its public surface and stable-channel
+  isolation, then replace the retained Railway dev Runtime through the
+  service-owned selector rather than an SSH-owned install.
+- [x] After the remote-readiness increment, publish only `v0.91.0-beta.3`,
+  independently verify all accepted assets and stable-channel isolation, then
+  replace the retained Railway beta2 Runtime through its service-owned selector
+  and pass the retained core Runtime/PTY long-outage journey. Record the
+  resulting Settings identity-refresh fix as the following `dev` increment.
 
 ### 11. Converge channel discovery authority
 
@@ -737,6 +747,29 @@ source-built Docker image.
   empty-Volume install-failure/fail-closed journey isolated to the disposable
   service above.
 
+### 13. Make local acceptance primary for dev and beta
+
+- [x] Fix the confidence boundary: surface-appropriate local tests, browser,
+  OrbStack, and unsigned Electron/package smokes are the primary development
+  evidence. Hosted CI is a cheap integration/build backstop for routine PRs,
+  not a second full test environment.
+- [x] Reduce routine integration PRs to one clean Ubuntu workflow-contract,
+  root-typecheck, and complete-build lane. Do not allocate the full Vitest
+  suite, macOS/Windows matrix, dev-smoke, Docker image, desktop packages, or
+  managed-SSH fixture.
+- [x] Retain only the cheap checkout HTTP installer on relevant dev PRs. Keep
+  the four native dev candidates, packaged-runtime acceptance, atomic alias
+  publication, and live raw-dev install on the post-merge `dev` push.
+- [x] Reduce exact beta version preparation to the trusted base classifier,
+  workflow contracts, root typecheck, and stable aggregate check name. Let the
+  manually dispatched Release build and accept the final version-bearing
+  artifacts once; the post-merge full `master` run is an asynchronous backstop.
+- [x] Keep `master` promotion, stable preparation/release, `master` push,
+  nightly, and manual full validation on the complete cross-platform lanes.
+- [x] Verify the lightweight lane on its own `dev` PR and record the measured
+  before/after wall and runner time. Local workflow contracts, root typecheck,
+  full tests, and full build must already be green before opening that PR.
+
 ## Verification Matrix
 
 Every code increment runs:
@@ -779,7 +812,8 @@ credentials or broker state. OrbStack validates Linux behavior efficiently,
 including native Bun release and multiprocess Runtime acceptance on Linux
 arm64 and x64, but it does not replace native macOS acceptance. Prefer this
 local native-macOS plus OrbStack matrix during serial development instead of
-waiting on hosted runners; hosted jobs remain publication and release gates.
+waiting on hosted runners; hosted jobs remain final publication and stable
+release gates rather than a duplicate routine-development test harness.
 Windows PowerShell,
 filesystem-locking, PATH, and executable-signing checks belong to the deferred
 Windows lane.
@@ -1283,3 +1317,70 @@ This plan is complete only when:
   The disposable hosted empty-Volume/bootstrap-failure drill and retained
   valid-release forced-refresh fallback remain pending. No stable/beta release,
   tag, or channel promotion was performed.
+- 2026-09-01: Published only
+  [`v0.91.0-beta.2`](https://github.com/TraderAlice/OpenAlice/releases/tag/v0.91.0-beta.2)
+  from `87b5a81aa608c6c687c21d24259ea78054a632ac` in
+  [release run 33475817953](https://github.com/TraderAlice/OpenAlice/actions/runs/33475817953).
+  The beta fast lane completed in 17:53 wall time and 64:04 aggregate runner
+  time across 16 jobs, versus 35:03 and 110:09 across 21 jobs for beta1: 49.0%
+  less wall time and 41.8% less runner time. The signed/notarized Intel macOS
+  current candidate remained the 14:44 critical path. Independent verification
+  accepted all 49 GitHub assets, versioned desktop downloads, four native CLI
+  archives and sidecars, shared/versioned installers, updater feeds, Broker
+  Packs, and the beta CDN manifest. The default installer and GitHub latest
+  release still resolve stable `v0.90.2`; the captured stable manifest, feeds,
+  aliases, ETags, and sizes remained unchanged.
+- 2026-09-01: The retained no-domain Railway service then changed explicitly
+  from rolling `dev` to pinned `beta` `0.91.0-beta.2` through service variables
+  and one platform-owned redeploy (`0b8b36f9-3400-401d-965b-88c38ba42247`).
+  The entrypoint installed the accepted Linux x64 archive with SHA-256
+  `aae9e485e48e3ec56a108d64471c6b7e1c80da5f35408d236fbeb5f2d36582f7`
+  and content identity `02fb66323ca9fbf9`; the running provider is Bun and
+  advertises both Railway Runtime capabilities with no pending activation or
+  fallback. Alice, UTA, and Connector returned ready on the same
+  `/data/projects/main-cloud` Project id, whose 10,763 files and six Workspace
+  directories remained present. User-owned Pi 0.84.4 and OpenCode 1.18.25
+  remained executable under `/data/home`, and a fresh inspection-only SSH
+  tunnel served the beta2 UI on local loopback. No installer or release-pointer
+  mutation ran through Railway SSH.
+- 2026-09-01: Published only
+  [`v0.91.0-beta.3`](https://github.com/TraderAlice/OpenAlice/releases/tag/v0.91.0-beta.3)
+  from `3af7b0b3df46b829c40e6fab6698044dc60e07c7` in
+  [release run 33498423338](https://github.com/TraderAlice/OpenAlice/actions/runs/33498423338).
+  Independent acceptance matched all 49 GitHub assets and their CDN mirrors,
+  including four native CLI archives, updater feeds, installers, Broker Packs,
+  and sidecars. The beta manifest resolved beta3 while GitHub latest, the
+  stable manifest, stable feeds, and stable aliases remained v0.90.2. The
+  retained Railway service then moved from pinned beta2 to pinned beta3 through
+  service variables and deployment `745fbb1f-ed13-4df0-ab20-4d03d6e35ec0`.
+  It accepted Linux x64 SHA-256
+  `9d421eb08e58472509c053aa550db464b2f40c28e51e09da94daadf0fcbd499c`,
+  preserved `/data/projects/main-cloud`, the same AliceProject identity and six
+  Workspace directories, Pi 0.84.4, and OpenCode 1.18.25, and returned Alice,
+  UTA, and Connector ready. A shell PTY retained PID 893 and printed both sides
+  of a 120-second command while its local tunnel stayed absent beyond the
+  terminal retry budget; replacing only the tunnel restored the existing page
+  and reattached the same PTY without a manual retry or page reload. The beta3
+  UI still retained its pre-outage version/Project identity after replacement;
+  the following `dev` increment makes those domain reads recovery-aware.
+- 2026-09-01: Reframed development confidence around local acceptance instead
+  of constrained hosted runners. Routine `dev` PRs now retain one clean Ubuntu
+  workflow-contract, root-typecheck, and complete-build lane; relevant CLI
+  changes additionally retain only the clean checkout HTTP installer. Exact
+  beta preparation retains the trusted base classifier plus contracts and
+  typecheck, while the Release workflow owns the final candidate build and
+  artifact acceptance. Full tests, macOS/Windows, dev-smoke, Docker, desktop,
+  Broker Pack, and managed-SSH lanes remain on `master`, stable, nightly, or
+  manual authority rather than synchronously blocking routine development.
+  Before opening the proving PR, local workflow contracts passed 47/47, the
+  root suite passed 5,431 tests with 13 expected skips, root typecheck passed,
+  and the complete workspace build passed. The prior remote baseline was a
+  15:31 desktop critical path for the preceding product PR and a 5:15
+  redundant Ubuntu root-test lane for the version-only beta3 PR. On the
+  workflow's own [PR #1298](https://github.com/TraderAlice/OpenAlice/pull/1298),
+  central feedback completed in 2:50 wall and 2:37 runner time; the relevant
+  clean checkout installer completed in 0:31 wall and 0:25 runner time in
+  parallel. All full-test, macOS/Windows, dev-smoke, Bun-feasibility, and
+  managed-SSH jobs were explicitly skipped. The combined critical path fell
+  81.7% from 15:31 to 2:50 and aggregate hosted allocation fell from roughly 70
+  minutes to 3:02 (about 95.7%).

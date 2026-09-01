@@ -34,16 +34,26 @@ the durable truth after it changes. Git history is the archive.
   npm/Bun, Homebrew, and AUR channels consume one accepted artifact set. The
   CLI package owns OpenAlice only: Agent Runtime installation and Electron
   packaging stay outside this plan. The native CLI is public through the
-  separately dispatched `v0.91.0-beta.1`; stable/beta discovery now uses the
+  separately dispatched `v0.91.0-beta.3`; stable/beta discovery now uses the
   OpenAlice CDN manifests. The retained no-domain Railway profile has passed
-  real migration, OpenCode resume, normal restart, and hard-kill recovery;
-  disposable empty-Volume/failure fallback, native PowerShell, and external
-  package-manager activation remain open on focused branches from current
-  `dev`.
+  real migration, OpenCode resume, normal restart, hard-kill recovery, and a
+  non-destructive dev-to-pinned-beta3 replacement. Beta3 core Runtime/PTY state
+  survives a long tunnel outage, and the following `dev` increment refreshes
+  Settings identity after recovery; disposable empty-Volume and
+  failure-fallback journeys, native PowerShell, and external package-manager
+  activation remain open on focused branches from current `dev`. Routine dev
+  and exact-beta source feedback is reduced to local-first, lightweight
+  hosted lanes while `master` promotion, stable, and final artifact acceptance
+  retain the complete gates.
 - [[plans/remote-project-fleet.md]] — Adds a machine-aware Supervisor fleet,
   remote AliceProject inventory/connection, and safe local-to-SSH project
   transfer for portable configuration and Workspaces while deliberately
-  excluding native/OpenAlice Session continuation state.
+  excluding native/OpenAlice Session continuation state. The completed
+  remote-readiness increment makes the attached browser truthful about remote
+  identity, Agent and Broker Pack capability, scheduled-work blockers,
+  reconnect recovery, and public Session titles. Controller/remote release
+  negotiation and a consented Railway redeploy adapter remain a separate
+  authority increment without background polling or SSH-owned installation.
 - [[plans/auto-prediction-harness.md]] — Auto Prediction Beta conversation
   Harness is in `dev`; managed AP/AQ Studio supervision, opaque routing, and
   embedded product surfaces are implemented. Shared verified/unverified source
@@ -78,9 +88,6 @@ the durable truth after it changes. Git history is the archive.
   (`active` / `archived` / `deleted`) separate from workspace `retired`, uncap
   the Ask Alice roster, and make Archive the floor action instead of deleting
   a coworker. Increment 1 landed in PR #1069; persisted presence remains open.
-- [[plans/release-feedback-reliability.md]] — Batch 1 (deterministic/early
-  release feedback) landed in PR #1061. Batch 2 still needs per-platform N-1
-  fan-in and accepted-tree provenance without weakening release gates.
 - [[plans/shell-first-cli-supervisor.md]] — Delivers a first-class Shell
   Supervisor TUI, persistent Guardian-owned Runtime lifecycle, standalone
   headless release bundle, atomic update/rollback, and real N-1 plus PTY

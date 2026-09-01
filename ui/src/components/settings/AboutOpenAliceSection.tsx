@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, Download, ExternalLink, FolderKanban, LoaderCircle, RefreshCw, Server } from 'lucide-react'
+import { Cable, CheckCircle2, Download, ExternalLink, FolderKanban, LoaderCircle, RefreshCw, Server } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import { api } from '../../api'
-import type { VersionInfo } from '../../api/types'
+import { getBackendConnection } from '../../auth/backendConnection'
 import { useAliceProject } from '../../hooks/useAliceProject'
+import { useVersionInfo } from '../../hooks/useVersionInfo'
 import { Button } from '../ui/button'
 import { ConfigSection } from '../form'
 
@@ -24,12 +24,23 @@ const RELEASES_URL = 'https://github.com/TraderAlice/OpenAlice/releases'
 
 export function AboutOpenAliceSection() {
   const { t } = useTranslation()
-  const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null)
+  const backendConnection = getBackendConnection()
+  const remoteConnection = backendConnection.kind === 'remote' ? backendConnection : null
+  const remoteTarget = remoteConnection
+    ? remoteConnection.sshPort === 22
+      ? remoteConnection.target
+      : `${remoteConnection.target}:${remoteConnection.sshPort}`
+    : null
   const [runtimeMode, setRuntimeMode] = useState<RuntimeMode>('browser')
   const [nativeStatus, setNativeStatus] = useState<NativeUpdaterStatus | null>(null)
   const [checking, setChecking] = useState(false)
   const [installing, setInstalling] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const {
+    info: versionInfo,
+    error: versionError,
+    check: checkVersion,
+  } = useVersionInfo()
   const {
     project,
     loading: projectLoading,
@@ -39,14 +50,6 @@ export function AboutOpenAliceSection() {
 
   useEffect(() => {
     let active = true
-    void api.version.get()
-      .then((next) => {
-        if (active) setVersionInfo(next)
-      })
-      .catch(() => {
-        if (active) setError(t('settings.about.checkError'))
-      })
-
     const runtime = window.openAlice?.runtime
     if (runtime) {
       void runtime.info()
@@ -70,7 +73,7 @@ export function AboutOpenAliceSection() {
       active = false
       unsubscribe()
     }
-  }, [t])
+  }, [])
 
   const currentVersion = versionInfo?.current ?? t('settings.about.versionLoading')
   const updateVersion = nativeStatus && 'version' in nativeStatus && nativeStatus.version
@@ -120,7 +123,7 @@ export function AboutOpenAliceSection() {
           : t('settings.about.status.availableUnknown'),
       }
     }
-    if (nativeStatus?.phase === 'error' || versionInfo?.error || error) {
+    if (nativeStatus?.phase === 'error' || versionInfo?.error || versionError || error) {
       return { kind: 'error' as const, text: t('settings.about.status.error') }
     }
     if (versionInfo?.updateAuthority === 'service') {
@@ -136,7 +139,7 @@ export function AboutOpenAliceSection() {
       return { kind: 'current' as const, text: t('settings.about.status.current') }
     }
     return { kind: 'checking' as const, text: t('settings.about.status.loading') }
-  }, [checking, error, nativeStatus, t, updateVersion, versionInfo])
+  }, [checking, error, nativeStatus, t, updateVersion, versionError, versionInfo])
 
   const checkForUpdates = async () => {
     setChecking(true)
@@ -145,10 +148,9 @@ export function AboutOpenAliceSection() {
       const nativeCheck = window.openAlice?.updater?.checkForUpdates().catch(() => null)
       const [, next] = await Promise.all([
         nativeCheck ?? Promise.resolve(null),
-        api.version.check(),
+        checkVersion(),
       ])
-      setVersionInfo(next)
-      if (next.error) setError(t('settings.about.checkError'))
+      if (next?.error) setError(t('settings.about.checkError'))
     } catch {
       setError(t('settings.about.checkError'))
     } finally {
@@ -291,6 +293,39 @@ export function AboutOpenAliceSection() {
           </button>
           </div>
         </div>
+
+        {remoteConnection && remoteTarget && (
+          <section className="overflow-hidden rounded-xl border border-border/70 bg-secondary/35" aria-labelledby="backend-connection-title">
+            <div className="flex flex-col gap-3 border-b border-border/70 px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground shadow-sm">
+                  <Cable size={18} aria-hidden />
+                </div>
+                <div className="min-w-0">
+                  <h4 id="backend-connection-title" className="text-[13px] font-semibold text-foreground">
+                    {t('settings.about.connection.title')}
+                  </h4>
+                  <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+                    {t('settings.about.connection.description')}
+                  </p>
+                </div>
+              </div>
+              <span className="inline-flex w-fit shrink-0 items-center gap-1.5 rounded-full border border-success/25 bg-success/10 px-2 py-1 text-[10px] font-medium text-success">
+                <span className="size-1.5 rounded-full bg-success" aria-hidden />
+                {t('settings.about.connection.connected')}
+              </span>
+            </div>
+            <dl className="grid min-w-0 gap-2 px-4 py-4 sm:grid-cols-2">
+              <ProjectField label={t('auth.remoteTarget')} value={remoteTarget} />
+              <ProjectField label={t('auth.localTunnelEndpoint')} value={remoteConnection.localEndpoint} />
+              <ProjectField
+                className="sm:col-span-2"
+                label={t('auth.remoteRuntimeEndpoint')}
+                value={`127.0.0.1:${remoteConnection.runtimePort}`}
+              />
+            </dl>
+          </section>
+        )}
 
         <section className="overflow-hidden rounded-xl border border-border/70 bg-secondary/35" aria-labelledby="current-alice-project-title">
         <div className="flex flex-col gap-3 border-b border-border/70 px-4 py-4 sm:flex-row sm:items-start sm:justify-between">

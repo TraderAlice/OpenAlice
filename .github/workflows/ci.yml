@@ -2,11 +2,11 @@ name: CI
 
 on:
   push:
-    branches: [master, dev]
+    branches: [master]
   pull_request:
     branches: [dev, master, codex/usability-improvements]
   # Keep a full cross-platform safety net for lightweight PRs that intentionally
-  # skip the expensive host matrix. Scheduled workflows run from the default
+  # skip the focused host matrix. Scheduled workflows run from the default
   # branch, while checkout below points the jobs at the current dev branch.
   schedule:
     - cron: "0 19 * * *"
@@ -14,68 +14,48 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
 
 # Agent-driven iterations often supersede an earlier commit before its Windows
-# job finishes. Keep only the latest PR/dev run while never cancelling a master
-# or scheduled validation.
+# job finishes. Keep only the latest PR run while never cancelling a master or
+# scheduled validation.
 concurrency:
   group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.ref == 'refs/heads/dev' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # UI and prose changes are built and tested on Ubuntu, but do not need to
-  # repeat the host-sensitive runtime suite on macOS and Windows. This is a
-  # deliberately narrow allowlist: every other path keeps the full matrix.
+  # Every PR keeps a small, deterministic contract/type gate. The beta
+  # classifier is loaded from the trusted base revision so a candidate cannot
+  # weaken its own release-preparation lane. Any classifier failure produces
+  # `false`, which fails beta preparation closed; routine integration still
+  # stays on its intentionally light branch lane.
   change-scope:
     if: github.event_name != 'push' || github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     outputs:
-      cross_platform: ${{ steps.changes.outputs.cross_platform }}
+      beta_release_prep: ${{ steps.beta-release-prep.outcome == 'success' && steps.beta-release-prep.outputs.beta_release_prep || 'false' }}
 
     steps:
-      - name: Classify changed paths
-        id: changes
-        uses: actions/github-script@v9
+      - uses: actions/checkout@v7
         with:
-          script: |
-            if (context.eventName !== "pull_request") {
-              core.info("Non-PR validation keeps the full platform matrix.");
-              core.setOutput("cross_platform", "true");
-              return;
-            }
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'schedule' && 'dev' || '' }}
 
-            const files = await github.paginate(github.rest.pulls.listFiles, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number,
-              per_page: 100,
-            });
-            const paths = files.flatMap((file) =>
-              file.previous_filename
-                ? [file.filename, file.previous_filename]
-                : [file.filename],
-            );
-            const isLightweight = (path) =>
-              path.startsWith("ui/") ||
-              path.startsWith("docs/") ||
-              /^[^/]+\.md$/i.test(path) ||
-              path === "LICENSE";
-            const platformSensitive = paths.filter((path) => !isLightweight(path));
-            const runCrossPlatform = paths.length === 0 || platformSensitive.length > 0;
-
-            core.info(`Changed paths: ${paths.join(", ") || "none reported"}`);
-            if (platformSensitive.length > 0) {
-              core.info(`Full matrix required by: ${platformSensitive.join(", ")}`);
-            } else {
-              core.info("Only UI/docs paths changed; Ubuntu remains the PR gate.");
-            }
-            core.setOutput("cross_platform", String(runCrossPlatform));
+      - name: Detect exact beta release preparation
+        id: beta-release-prep
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git show "${BASE_SHA}:scripts/classify-beta-release-prep.mjs" > "$RUNNER_TEMP/classify-beta-release-prep.mjs"
+          node "$RUNNER_TEMP/classify-beta-release-prep.mjs" --github-output "$GITHUB_OUTPUT"
 
   build:
-    # A dev push is the already-tested result of merging a PR. It gets the
-    # focused post-merge smoke below instead of repeating the whole PR suite.
-    if: github.event_name != 'push' || github.ref == 'refs/heads/master'
+    needs: change-scope
+    # Keep contracts and typecheck inside the stable aggregate gate for every
+    # PR. Exact beta preparation skips only the complete source build;
+    # classifier failures fall back to it.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
 
     steps:
@@ -92,12 +72,32 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm build
+      - name: Verify CI workflow contracts
+        run: pnpm test:workflow-contracts
+
+      - name: Typecheck root workspace
+        run: npx tsc --noEmit
+        timeout-minutes: 5
+
+      - name: Build complete workspace
+        if: >-
+          needs.change-scope.result != 'success' ||
+          needs.change-scope.outputs.beta_release_prep != 'true'
+        run: pnpm build
 
   test:
-    # Build and Vitest do not consume each other's output. Keep them on
-    # separate runners so either failure becomes actionable immediately.
-    if: github.event_name != 'push' || github.ref == 'refs/heads/master'
+    needs: change-scope
+    # Local verification plus build/type/contracts are the routine dev gate.
+    # Keep the full suite for master, scheduled, and manually requested runs.
+    # A classifier/preflight failure falls back to the full suite only where
+    # full validation already belongs: master, scheduled, and manual lanes.
+    if: >-
+      !cancelled() &&
+      (github.event_name != 'pull_request' || github.base_ref == 'master') &&
+      (
+        needs.change-scope.result != 'success' ||
+        needs.change-scope.outputs.beta_release_prep != 'true'
+      )
     runs-on: ubuntu-latest
 
     steps:
@@ -120,28 +120,55 @@ jobs:
   # consumers while the two independent validations report failures earlier.
   build-and-test:
     if: always() && (github.event_name != 'push' || github.ref == 'refs/heads/master')
-    needs: [build, test]
+    needs: [change-scope, build, test]
     runs-on: ubuntu-latest
 
     steps:
       - name: Require successful build and test lanes
         env:
+          PREFLIGHT_RESULT: ${{ needs.change-scope.result }}
+          BETA_RELEASE_PREP: ${{ needs.change-scope.outputs.beta_release_prep }}
           BUILD_RESULT: ${{ needs.build.result }}
           TEST_RESULT: ${{ needs.test.result }}
+          FULL_VALIDATION: ${{ github.event_name != 'pull_request' || github.base_ref == 'master' }}
         run: |
-          if [[ "$BUILD_RESULT" != "success" || "$TEST_RESULT" != "success" ]]; then
-            echo "Build result: $BUILD_RESULT"
-            echo "Test result: $TEST_RESULT"
+          echo "Preflight result: $PREFLIGHT_RESULT"
+          echo "Beta release preparation: $BETA_RELEASE_PREP"
+          echo "Build result: $BUILD_RESULT"
+          echo "Test result: $TEST_RESULT"
+
+          if [[ "$PREFLIGHT_RESULT" != "success" ]]; then
             exit 1
           fi
 
-  # The full Vitest suite includes path, port-binding, process-launch, and
-  # packaged-toolchain behavior whose semantics differ materially by host OS.
-  # Ubuntu remains the build gate above; this matrix prevents a Linux-only
-  # green check from shipping regressions to macOS or Windows users.
+          if [[ "$BETA_RELEASE_PREP" == "true" ]]; then
+            [[ "$BUILD_RESULT" == "success" ]] || exit 1
+            [[ "$TEST_RESULT" == "skipped" ]] || exit 1
+            exit 0
+          fi
+
+          if [[ "$BUILD_RESULT" != "success" ]]; then
+            exit 1
+          fi
+
+          if [[ "$FULL_VALIDATION" == "true" ]]; then
+            [[ "$TEST_RESULT" == "success" ]] || exit 1
+          else
+            [[ "$TEST_RESULT" == "skipped" ]] || exit 1
+          fi
+
+  # Cross-platform hosted runners are a master/scheduled/manual safety net.
+  # Routine dev PRs rely on local multi-platform acceptance plus the focused
+  # contracts, typecheck, and complete Ubuntu build above.
   cross-platform-test:
     needs: change-scope
-    if: needs.change-scope.outputs.cross_platform == 'true'
+    if: >-
+      !cancelled() &&
+      (github.event_name != 'pull_request' || github.base_ref == 'master') &&
+      (
+        needs.change-scope.result != 'success' ||
+        needs.change-scope.outputs.beta_release_prep != 'true'
+      )
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -163,10 +190,12 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm build
+      - name: Build complete workspace for stable and scheduled validation
+        run: pnpm build
         timeout-minutes: 15
 
-      - run: pnpm test
+      - name: Run complete suite for stable and scheduled validation
+        run: pnpm test
         timeout-minutes: 15
 
   # Boots the real `pnpm dev` stack and asserts UTA/Alice/Vite all spawn.
@@ -177,7 +206,13 @@ jobs:
   # diff, not a harness bug. See scripts/guardian/smoke.ts.
   dev-smoke:
     needs: change-scope
-    if: needs.change-scope.outputs.cross_platform == 'true'
+    if: >-
+      !cancelled() &&
+      (github.event_name != 'pull_request' || github.base_ref == 'master') &&
+      (
+        needs.change-scope.result != 'success' ||
+        needs.change-scope.outputs.beta_release_prep != 'true'
+      )
     strategy:
       fail-fast: false
       matrix:
@@ -203,31 +238,6 @@ jobs:
       # Exercises duplicate-start rejection, graceful takeover, crash-stale
       # reclamation, heartbeat renewal, and forced recovery with real child
       # processes before the heavier full-stack boot smoke.
-      - run: pnpm test:guardian-recovery
-        timeout-minutes: 3
-
-      - run: pnpm test:smoke
-        timeout-minutes: 8
-
-  # Merging a green PR changes the commit SHA but normally not its tested tree.
-  # Keep a cheap real-process integration check on dev without paying for a
-  # second complete Linux/macOS/Windows pass.
-  post-merge-dev-smoke:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: pnpm/action-setup@v6
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
-
       - run: pnpm test:guardian-recovery
         timeout-minutes: 3
 

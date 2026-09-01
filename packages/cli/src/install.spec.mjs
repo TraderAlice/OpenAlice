@@ -245,24 +245,35 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
 
   it('checks locking and release-comparison prerequisites before requesting consent', async () => {
     const fixture = await makeReleaseArchive('0.91.0', '5'.repeat(16))
-    const lockCommand = platform === 'darwin' ? 'lockf' : 'flock'
+    const lockCommands = platform === 'darwin' ? ['lockf', 'shlock'] : ['flock']
     const cases = [
       {
-        missing: lockCommand,
+        missing: lockCommands,
         message: platform === 'darwin'
-          ? 'macOS lockf is required for safe concurrent installation'
+          ? 'macOS lockf or shlock is required for safe concurrent installation'
           : 'Linux flock is required for safe concurrent installation',
       },
-      { missing: 'diff', message: 'diff is required to verify the existing OpenAlice release' },
+      { missing: ['diff'], message: 'diff is required to verify the existing OpenAlice release' },
     ]
 
     for (const testCase of cases) {
-      const installRoot = join(fixture.root, `missing-${testCase.missing}`)
+      const installRoot = join(fixture.root, `missing-${testCase.missing.join('-')}`)
       const path = await makeInstallerPathWithout(testCase.missing)
       await expect(runInstaller(fixture, installRoot, [], { PATH: path }))
         .rejects.toMatchObject({ stderr: expect.stringContaining(testCase.message) })
       await expect(access(installRoot)).rejects.toMatchObject({ code: 'ENOENT' })
     }
+  })
+
+  it.skipIf(platform !== 'darwin')('falls back to shlock on macOS versions without lockf', async () => {
+    const fixture = await makeReleaseArchive('0.91.0', 'e'.repeat(16))
+    const installRoot = join(fixture.root, 'shlock-fallback')
+    const path = await makeInstallerPathWithout(['lockf'])
+
+    await expect(runInstaller(fixture, installRoot, ['--yes'], { PATH: path }))
+      .resolves.toMatchObject({ stdout: expect.stringContaining('OpenAlice 0.91.0 is ready') })
+    await expect(access(join(installRoot, '.cli-install.lock.guard')))
+      .rejects.toMatchObject({ code: 'ENOENT' })
   })
 
   it('recovers a stale lock and refuses to race a live installer', async () => {
@@ -324,7 +335,6 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
     const fixture = await makeReleaseArchive('0.91.0', '6'.repeat(16), { versionDelaySeconds: 2 })
     const installRoot = join(fixture.root, 'installed')
     const lockDir = join(installRoot, '.cli-install.lock')
-    const guard = join(installRoot, '.cli-install.lock.guard')
     const first = runInstaller(fixture, installRoot, ['--yes'])
     await waitForPath(lockDir)
 
@@ -332,7 +342,13 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
       .rejects.toMatchObject({ stderr: expect.stringContaining('Another OpenAlice CLI installer is running') })
     await expect(first).resolves.toMatchObject({ stdout: expect.stringContaining('OpenAlice 0.91.0 is ready') })
     await expect(access(lockDir)).rejects.toMatchObject({ code: 'ENOENT' })
-    await expect(access(guard)).resolves.toBeUndefined()
+
+    // lockf/flock keep a harmless inode after releasing their advisory lock;
+    // shlock represents the lock by the file itself and removes it. A third
+    // successful install is the backend-independent proof that no live guard
+    // remains after the first owner exits.
+    await expect(runInstaller(fixture, installRoot, ['--yes']))
+      .resolves.toMatchObject({ stdout: expect.stringContaining('OpenAlice 0.91.0 is ready') })
   })
 
   it('uses the fixed dev-channel archive and records dev provenance', async () => {
@@ -819,23 +835,45 @@ async function waitForPath(path, timeoutMs = 5_000) {
   throw new Error(`Timed out waiting for ${path}`)
 }
 
-async function makeInstallerPathWithout(missingCommand) {
+async function makeInstallerPathWithout(missingCommands) {
   const bin = await mkdtemp(join(tmpdir(), 'openalice-installer-path-'))
   temporaryPaths.push(bin)
+  const missing = new Set(missingCommands)
   const commands = [
+    'awk',
+    'basename',
     'bash',
     'cat',
+    'chmod',
+    'cp',
+    'date',
     'diff',
+    'dirname',
+    'find',
     'flock',
+    'head',
+    'ln',
     'lockf',
+    'mkdir',
+    'mktemp',
+    'mv',
+    'ps',
+    'readlink',
+    'rm',
+    'sed',
+    'shlock',
     'sha256sum',
     'shasum',
+    'sort',
+    'stat',
     'sysctl',
     'tar',
+    'tr',
     'uname',
+    'wc',
   ]
   for (const command of commands) {
-    if (command === missingCommand) continue
+    if (missing.has(command)) continue
     const executable = await resolveExecutable(command)
     if (executable) await symlink(executable, join(bin, command))
   }

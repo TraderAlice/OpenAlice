@@ -20,6 +20,7 @@ import { useWorkspace } from '../tabs/store'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { PageLoading, RecoverySurface, RefreshNotice } from '../components/StateViews'
 import { OverviewCard } from '../components/workspace/OverviewCard'
+import { workspaceActivityMs } from '../components/workspace/sidebar-order'
 import {
   getGitLog,
   listDepartedWorkspaces,
@@ -30,14 +31,6 @@ import {
   type TemplateInfo,
   type Workspace,
 } from '../components/workspace/api'
-
-function lastActivityMs(w: Workspace): number {
-  const sessionTs = w.sessions
-    .map((s) => new Date(s.lastActiveAt).getTime())
-    .filter((n) => Number.isFinite(n))
-  if (sessionTs.length === 0) return new Date(w.createdAt).getTime()
-  return Math.max(...sessionTs)
-}
 
 /** Best-effort humanization for templates that don't declare a `displayName`. */
 function humanize(name: string): string {
@@ -87,7 +80,7 @@ function buildSections(
   for (const t of orderedTemplates) {
     const ws = buckets.get(t.name)
     if (!ws || ws.length === 0) continue
-    const sorted = [...ws].sort((a, b) => lastActivityMs(b) - lastActivityMs(a))
+    const sorted = [...ws].sort((a, b) => workspaceActivityMs(b) - workspaceActivityMs(a))
     sections.push({
       key: t.name,
       title: t.displayName ?? humanize(t.name),
@@ -96,7 +89,7 @@ function buildSections(
   }
   const others = buckets.get(UNKNOWN_KEY)
   if (others && others.length > 0) {
-    const sorted = [...others].sort((a, b) => lastActivityMs(b) - lastActivityMs(a))
+    const sorted = [...others].sort((a, b) => workspaceActivityMs(b) - workspaceActivityMs(a))
     sections.push({ key: UNKNOWN_KEY, title: otherTitle, workspaces: sorted })
   }
   return sections

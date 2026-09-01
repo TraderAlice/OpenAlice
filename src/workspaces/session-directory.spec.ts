@@ -59,6 +59,11 @@ describe('buildWorkspaceSessionDirectory', () => {
         output: { hasAssistantReply: true, assistantPreview: 'done', blockCount: 1, toolCalls: 0, toolFailures: 0 },
       }),
       isActive: () => false,
+      issueTitleFor: (workspaceId, issueId) => (
+        workspaceId === 'ws-1' && issueId === 'daily-market-close'
+          ? 'Daily market close review'
+          : undefined
+      ),
     })
 
     expect(result.sessions[0]).toMatchObject({
@@ -74,6 +79,7 @@ describe('buildWorkspaceSessionDirectory', () => {
       },
       displayName: 'AAPL desk',
       runtime: { credentialSource: 'vault', credentialSlug: 'secret-slug', model: 'gpt-5.6-terra', reasoningEffort: 'high' },
+      presentationTitle: 'Daily market close review',
       interactive: { name: 'c1', title: 'Investigate provenance' },
       latestExecution: { taskId: 'task-1', assistantPreview: 'done' },
     })
