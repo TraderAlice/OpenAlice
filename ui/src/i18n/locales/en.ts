@@ -425,11 +425,17 @@ export const en = {
       channel: {
         stable: 'Stable channel',
         beta: 'Beta channel',
+        dev: 'Development channel',
+        pinned: 'Pinned version',
+        custom: 'Custom source',
       },
       status: {
         loading: 'Reading version information…',
         checking: 'Checking for updates…',
         current: 'You’re up to date.',
+        serviceManaged: 'Updates are managed by this deployment service.',
+        cliManaged: 'Use the OpenAlice CLI to check this development build for updates.',
+        noUpdater: 'This installation does not follow an automatic update channel.',
         available: 'OpenAlice v{{version}} is available.',
         availableUnknown: 'A new OpenAlice version is available.',
         downloading: 'Downloading the update…',

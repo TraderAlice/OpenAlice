@@ -6,8 +6,8 @@ const SKIP_STORAGE_KEY = 'openalice.update.skipVersion'
 type RuntimeMode = 'browser' | 'electron-dev' | 'electron-packaged'
 
 /**
- * Top-of-app banner shown when GitHub Releases reports a version newer
- * than the running app's package.json.
+ * Top-of-app banner shown when the Runtime's update owner reports a newer
+ * version than the running app.
  *
  * Three actions for the user:
  *  - "Release notes" — opens the GitHub release page (changelog)
@@ -16,8 +16,9 @@ type RuntimeMode = 'browser' | 'electron-dev' | 'electron-packaged'
  *    when a newer version is released.
  *  - "×" close — session-only dismiss (until next page load).
  *
- * The action text is runtime-aware: source/Docker installs update from git,
- * while packaged Electron is handled by the native auto-updater.
+ * The action text follows the backend's update authority: source checkouts use
+ * Git, installed CLI releases use the CLI, and packaged Electron uses its
+ * native updater. Service-managed and non-updating installs do not render.
  */
 export function UpdateBanner() {
   const [info, setInfo] = useState<VersionInfo | null>(null)
@@ -31,7 +32,12 @@ export function UpdateBanner() {
       .catch(() => setRuntimeMode('browser'))
   }, [])
 
-  if (!info || !info.hasUpdate || !info.latest) return null
+  if (
+    !info
+    || !['source', 'desktop', 'cli'].includes(info.updateAuthority)
+    || !info.hasUpdate
+    || !info.latest
+  ) return null
   if (sessionDismissed) return null
 
   const skippedVersion = (() => {
@@ -63,9 +69,13 @@ export function UpdateBanner() {
           <span className="text-muted-foreground hidden lg:inline"> · released {info.publishedAt.slice(0, 10)}</span>
         )}
       </span>
-      {runtimeMode === 'electron-packaged' ? (
+      {runtimeMode === 'electron-packaged' || info.updateAuthority === 'desktop' ? (
         <span className="text-muted-foreground shrink-0 hidden md:inline">
           Desktop updater will prompt when the download is ready
+        </span>
+      ) : info.updateAuthority === 'cli' ? (
+        <span className="text-muted-foreground shrink-0 hidden md:inline">
+          Run <code className="text-primary bg-muted px-1 rounded">openalice update</code> to continue
         </span>
       ) : (
         <span className="text-muted-foreground shrink-0 hidden md:inline">

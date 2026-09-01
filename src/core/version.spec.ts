@@ -24,6 +24,30 @@ function releaseManifest(
   }
 }
 
+function installSource(
+  updateChannel: 'stable' | 'beta' | 'pinned' | 'development' | 'custom',
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    schemaVersion: 3,
+    repository: 'TraderAlice/OpenAlice',
+    cliVersion: '0.90.1',
+    selector: updateChannel === 'pinned'
+      ? { kind: 'version', value: 'v0.90.1' }
+      : { kind: 'branch', value: updateChannel === 'development' ? 'dev' : 'master' },
+    installerUrl: 'https://openalice.ai/install',
+    updateChannel,
+    method: 'direct',
+    artifact: {
+      platform: 'linux',
+      arch: 'x64',
+      sha256: 'a'.repeat(64),
+    },
+    installedAt: '2026-08-31T23:11:19Z',
+    ...overrides,
+  }
+}
+
 function mockJsonResponse(value: unknown, response?: { status?: number; statusText?: string }) {
   const status = response?.status ?? 200
   const fetchMock = vi.fn().mockResolvedValue({
@@ -289,5 +313,131 @@ describe('getVersionInfo', () => {
     expect(info.latest).toBeNull()
     expect(info.hasUpdate).toBe(false)
     expect(info.error).toContain('boom')
+  })
+
+  it('keeps Railway release selection service-owned and does not fetch a manifest', async () => {
+    const fetchMock = vi.fn()
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+
+    const info = await getVersionInfo({
+      env: {
+        OPENALICE_SERVICE_MANAGER: 'railway',
+        OPENALICE_INSTALL_SOURCE: '/runtime/install-source.json',
+      },
+      readTextFile: () => JSON.stringify(installSource('development')),
+    })
+
+    expect(info).toMatchObject({
+      channel: 'dev',
+      updateAuthority: 'service',
+      latest: null,
+      hasUpdate: false,
+      error: null,
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps Docker release selection service-owned through the legacy launcher env', async () => {
+    const fetchMock = vi.fn()
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+
+    const info = await getVersionInfo({
+      env: { OPENALICE_LAUNCHER: 'docker' },
+    })
+
+    expect(info).toMatchObject({
+      updateAuthority: 'service',
+      latest: null,
+      hasUpdate: false,
+      error: null,
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('normalizes legacy non-master branch provenance to the development channel', async () => {
+    const fetchMock = vi.fn()
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+
+    const info = await getVersionInfo({
+      env: { OPENALICE_INSTALL_SOURCE: '/runtime/install-source.json' },
+      readTextFile: () => JSON.stringify({
+        ...installSource('development'),
+        schemaVersion: 1,
+        selector: { kind: 'branch', value: 'feature/runtime' },
+        updateChannel: undefined,
+      }),
+    })
+
+    expect(info).toMatchObject({
+      channel: 'dev',
+      updateAuthority: 'cli',
+      latest: null,
+      hasUpdate: false,
+      error: null,
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['development', 'dev', 'cli'],
+    ['pinned', 'pinned', 'none'],
+    ['custom', 'custom', 'none'],
+  ] as const)('does not duplicate %s update discovery in the web service', async (installed, channel, authority) => {
+    const fetchMock = vi.fn()
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+
+    const info = await getVersionInfo({
+      env: { OPENALICE_INSTALL_SOURCE: '/runtime/install-source.json' },
+      readTextFile: () => JSON.stringify(installSource(installed)),
+    })
+
+    expect(info).toMatchObject({
+      channel,
+      updateAuthority: authority,
+      latest: null,
+      hasUpdate: false,
+      error: null,
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('uses installed beta provenance instead of inferring stable from the package version', async () => {
+    const fetchMock = mockJsonResponse(releaseManifest('beta', '999.999.999-beta.1'))
+
+    const info = await getVersionInfo({
+      env: { OPENALICE_INSTALL_SOURCE: '/runtime/install-source.json' },
+      readTextFile: () => JSON.stringify(installSource('beta')),
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith(BETA_MANIFEST_URL, expect.any(Object))
+    expect(info).toMatchObject({
+      channel: 'beta',
+      updateAuthority: 'cli',
+      latest: '999.999.999-beta.1',
+      hasUpdate: true,
+      error: null,
+    })
+  })
+
+  it('fails closed when installed provenance is malformed', async () => {
+    const fetchMock = vi.fn()
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+
+    const info = await getVersionInfo({
+      env: { OPENALICE_INSTALL_SOURCE: '/runtime/install-source.json' },
+      readTextFile: () => JSON.stringify({
+        ...installSource('stable'),
+        selector: null,
+      }),
+    })
+
+    expect(info).toMatchObject({
+      channel: 'custom',
+      updateAuthority: 'none',
+      latest: null,
+      hasUpdate: false,
+      error: 'Installed OpenAlice update metadata is invalid',
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })

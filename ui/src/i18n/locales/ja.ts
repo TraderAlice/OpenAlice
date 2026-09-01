@@ -414,11 +414,17 @@ export const ja: Resources = {
       channel: {
         stable: '安定版チャンネル',
         beta: 'ベータチャンネル',
+        dev: '開発チャンネル',
+        pinned: '固定バージョン',
+        custom: 'カスタムソース',
       },
       status: {
         loading: 'バージョン情報を読み込み中…',
         checking: '更新を確認中…',
         current: '最新バージョンです。',
+        serviceManaged: '更新はこのデプロイサービスによって管理されています。',
+        cliManaged: 'この開発ビルドの更新確認には OpenAlice CLI を使用してください。',
+        noUpdater: 'このインストールは自動更新チャンネルを使用していません。',
         available: 'OpenAlice v{{version}} を利用できます。',
         availableUnknown: '新しい OpenAlice バージョンを利用できます。',
         downloading: '更新をダウンロード中…',

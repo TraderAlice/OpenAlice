@@ -110,7 +110,10 @@ the persistent `PATH` only after it has verified the native CLI.
 `OPENALICE_HOME` is the only layout selector and must resolve beneath `/data`;
 `AQ_LAUNCHER_ROOT` is always canonicalized from that selected Project as
 `<OPENALICE_HOME>/workspaces`. The reserved `/data/quarantine` tree can never be
-selected as a Project Home. The entrypoint rejects a different Volume mount,
+selected as a Project Home. That reserved path is lexical and must be absent or
+an actual directory directly under the Volume; a file, dangling link, or
+symlink to another Project fails startup instead of hiding its target from the
+Volume scan. The entrypoint rejects a different Volume mount,
 ephemeral `HOME`, alternate install/npm/Bun root, or normalized/symlink escape;
 it does not honor an independent Workspace-root override. The image filesystem
 is replaceable; no install release, credential, Workspace, Agent login, or
@@ -131,12 +134,29 @@ previous release still validates, the host starts the previous release. An
 empty or damaged install with a failed bootstrap stops instead of running an
 unverified fallback.
 
+The Railway profile currently requires `railway-runtime-lock-v2`. Public
+stable `v0.90.2` and beta `v0.91.0-beta.1` predate that capability, so they are
+not eligible Railway fallbacks. A completed dev artifact that explicitly
+advertises both Railway capabilities has passed retained-Volume acceptance; a
+stable or beta host still requires a later explicit release that carries the
+same capabilities. Do not infer eligibility from package version or branch
+name, and do not treat this guide as authority to publish or promote a channel.
+
 After selection, the image atomically replaces the persistent `openalice`,
 `alice`, `alice-workspace`, `alice-uta`, and `traderhub` shims with its Railway
 wrapper. The wrapper resolves the active immutable release directly, rebuilds
 its provenance environment, and rejects update/rollback/uninstall mutations;
 this keeps older published CLIs from bypassing Railway's release authority via
 the persistent command path.
+
+Railway and the source-built Docker image are service-managed update surfaces.
+Their Web version route reports the normalized installed channel and
+`updateAuthority: service`, but does not fetch a stable/beta manifest or offer
+`git pull`, `openalice update`, rollback, or uninstall guidance. The deployment
+configuration selects and replaces the runtime; for dev that decision is bound
+to the completed artifact checksum and content identity rather than the reused
+package version. Missing or invalid installed provenance fails closed instead
+of handing update authority to the browser.
 
 Before installer, current-pointer, or Project selection mutation, the
 entrypoint opens the mounted Railway Volume root itself read-only, takes an
@@ -146,10 +166,22 @@ replaceable Project-owned lock file and serializes every Runtime using that
 Volume. While holding that fence and before touching the install pointer,
 shims, or Project layout, the image discovers every Project Home on the Volume
 and inspects its four known Runtime lock directories, including nested legacy
-homes. It skips only the documented quarantine. Missing locks and
-same-service `railway-flock-v1` records may proceed; an initializing, malformed,
-foreign, or pre-fence owner anywhere on the Volume stops the deployment at this
-read-only boundary. The CLI independently checks that the actual canonical Project Home
+homes and the historical Volume-root Project layout. It skips only the
+documented quarantine. Missing locks and
+same-service `railway-flock-v1` records may proceed; an initializing shape
+outside the bounded v2 intermediates, a malformed lock, foreign owner, or
+pre-fence owner anywhere on the Volume stops
+the deployment before release mutation. Recoverable v2 intermediate states are
+strictly shaped: an ownerless empty lock after the initialization grace, a
+single UUID-named mutation marker whose JSON token matches its filename, or the
+corresponding single write temp. A fully published fenced owner may retain the
+same validated claim or write temp after a hard kill. Cleanup begins only after
+the complete Volume scan has no blocker, reopens every path relative to the
+Volume descriptor without following symlinks, rechecks inode/mtime and owner
+evidence, and removes only those exact entries. Unknown entries, duplicate
+claim markers or write temps, symlinked/malformed nodes, and incomplete Volume
+traversal fail closed.
+The CLI independently checks that the actual canonical Project Home
 and install root are children of that real mount, that the inherited descriptor
 names its directory inode, and that Linux `/proc/self/fdinfo` reports an
 exclusive kernel lock; an environment flag or arbitrary locked directory is
@@ -163,6 +195,13 @@ adapters, broker helpers, Workspace Agents, or PTYs can start. Ordinary Node
 child-process and node-pty launch boundaries omit extra descriptors, which is
 verified with a positive-control Linux inheritance test. Consequently a Guardian
 crash cannot release the Volume fence while any old Project writer is still alive.
+Each fenced service start also creates a fresh opaque instance identity.
+Guardian and its trusted children record that identity in lock owners, while
+Agent and PTY environments omit it. This distinguishes replacement containers
+even when Railway reuses the same hostname and child PID layout.
+The installed Runtime must advertise both the retained-owner
+`railway-flock-v1` capability and `railway-runtime-lock-v2`; a fence-only older
+binary is not an eligible bootstrap fallback.
 This also makes a direct Railway `--internal-role connector` invocation without
 Guardian authority fail before it can open Project-backed queues. Agent and PTY environments also strip
 the descriptor number and entrypoint marker as defense in depth. Every Railway
@@ -184,18 +223,26 @@ Alice stays on loopback port `47331` (or the explicit
 
 Every Railway shell and service process derives one exact machine identity
 from `RAILWAY_SERVICE_ID`; a conflicting configured identity fails startup.
-Within one container, Runtime ownership still uses PID and process-start-time
-identity. Across replacement-container PID namespaces on the same service
-Volume, it never probes or signals the recorded PID. A Railway shell without
-the inherited locked descriptor is an observer: even a very old heartbeat is
-not reclaim authority. A fenced replacement may reclaim only an owner written
-under `fencingProtocol: railway-flock-v1`; the owner directory identity and
-complete owner evidence are checked again immediately before quarantine.
-Heartbeats remain diagnostic only. Missing or foreign identity, a forged or
-unlocked descriptor, and pre-fence legacy owners all fail closed. A retained
-legacy owner therefore requires a one-time operator cutover: first prove the
-old deployment has stopped, inspect the owner records, then move only these
-exact directories when present:
+Within one fenced service start, Runtime ownership first matches the opaque
+fencing-instance identity, then PID and process-start-time identity. Across
+replacement containers on the same service Volume, it never probes or signals
+the recorded PID, even when Railway reuses the hostname and PID layout. A
+Railway shell without the inherited locked descriptor is an observer: even a
+very old heartbeat is not reclaim authority. A fenced replacement may reclaim
+only an owner written under `fencingProtocol: railway-flock-v1`; the owner
+directory identity and complete owner evidence are checked again while holding
+one recoverable mutation claim shared by owner publication, release, and stale
+reaping. The claim owner uses a UUID-bearing filename; release or recovery can
+atomically move only the exact generation it inspected, verifies the moved
+record, and rechecks that same marker immediately before canonical mutation.
+Release and stale reaping then rename the complete canonical lock before
+best-effort tombstone cleanup, so a hard kill leaves either the full owner, a
+strictly recoverable publication/claim intermediate, or no canonical lock. Heartbeats remain
+diagnostic only. Missing or foreign identity, a forged or unlocked descriptor,
+non-empty malformed locks, and pre-fence legacy owners all fail closed. A
+retained legacy owner therefore requires a one-time operator cutover: first
+prove the old deployment has stopped, inspect the owner records, then move only
+these exact directories when present:
 
 ```text
 <OPENALICE_HOME>/state/guardian.lock
@@ -268,10 +315,11 @@ must still block a contender. Linux acceptance must suspend the old holder beyon
 show that a replacement still cannot acquire the fence; only process/container
 death may release it, and simultaneous replacements must produce one winner.
 
-A real Railway acceptance is still required before treating the profile as a
-usable hosted product. Keep the clean-bootstrap and retained-data journeys
-separate; never relabel or clear an existing user Volume merely to obtain an
-empty-host result:
+The retained-data Railway journey has passed through migration, a real Agent
+turn, normal restart, and hard-kill replacement. The disposable clean-bootstrap
+and forced installer-failure journeys remain separate required acceptance;
+never relabel or clear an existing user Volume merely to obtain an empty-host
+result:
 
 1. on a disposable service and empty `/data` Volume, bootstrap the image and
    prove that a failed initial install stops without an unverified fallback;

@@ -83,7 +83,11 @@ for persistent_path in "$HOME" "$OPENALICE_HOME" "$AQ_LAUNCHER_ROOT" "$OPENALICE
     *) fail "$persistent_path must stay beneath the persistent volume root $volume_root" ;;
   esac
 done
-quarantine_root="$(canonical_path "$volume_root/quarantine")"
+quarantine_root="$volume_root/quarantine"
+if [[ -e "$quarantine_root" || -L "$quarantine_root" ]]; then
+  [[ -d "$quarantine_root" && ! -L "$quarantine_root" ]] \
+    || fail 'the reserved Railway quarantine path must be an actual directory, not a symlink or file'
+fi
 case "$OPENALICE_HOME" in
   "$quarantine_root"|"$quarantine_root/"*)
     fail 'OPENALICE_HOME cannot select the reserved Railway quarantine tree'
@@ -141,6 +145,10 @@ if [[ -n "${RAILWAY_ENVIRONMENT_ID:-}" ]]; then
     || fail 'the inherited Railway lifecycle fence names the wrong inode'
   grep -Eq '^lock:[[:space:]]+[0-9]+:[[:space:]]+FLOCK[[:space:]]+ADVISORY[[:space:]]+WRITE' /proc/self/fdinfo/9 \
     || fail 'the inherited Railway lifecycle fence is not exclusively locked'
+  OPENALICE_RAILWAY_INSTANCE_ID="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+  [[ "$OPENALICE_RAILWAY_INSTANCE_ID" =~ ^[A-Za-z0-9-]{16,128}$ ]] \
+    || fail 'could not create the Railway fencing instance identity'
+  export OPENALICE_RAILWAY_INSTANCE_ID
   export OPENALICE_RAILWAY_FENCE_FD=9
   export OPENALICE_RAILWAY_ENTRYPOINT_OWNER=1
   [[ -f "$retained_lock_preflight" && ! -L "$retained_lock_preflight" ]] \
@@ -197,6 +205,7 @@ if not (
     and isinstance(runtime, dict)
     and isinstance(capabilities, list)
     and "railway-flock-v1" in capabilities
+    and "railway-runtime-lock-v2" in capabilities
     and runtime.get("productVersion") == version
     and runtime.get("contentIdentity") == identity
     and runtime.get("platform") == artifact.get("platform")
