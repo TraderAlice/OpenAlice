@@ -149,7 +149,7 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
       </Button>
     )
     const runtimeBadge = (
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background px-2 py-1 text-[10px] font-medium text-muted-foreground">
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background px-2 py-1 text-[10px] leading-[14px] font-medium text-muted-foreground">
         <AgentRuntimeIcon agentId={session.agent} className="h-[11px] w-[11px]" />
         {runtimeLabel(session.agent, agents)} {session.surface === 'webpi' ? 'WebPi' : 'TUI'}
       </span>
@@ -255,7 +255,7 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
         {(error ?? workspaceManagerError) && (
           <div
             role="alert"
-            className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-[12px] text-destructive"
+            className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-[12px] leading-[18px] text-destructive"
           >
             <span>{error ?? workspaceManagerError}</span>
             {!error && workspaceManagerError && (
@@ -273,7 +273,7 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
         )}
 
         <section className="workspace-manager-suggestions-section mt-7 min-w-0">
-          <h2 className="mb-2 text-[12px] font-medium text-muted-foreground">
+          <h2 className="mb-2 text-[12px] leading-[18px] font-medium text-muted-foreground">
             {t('workspaceManager.suggestions')}
           </h2>
           <div className="workspace-manager-suggestions grid min-w-0 gap-2">

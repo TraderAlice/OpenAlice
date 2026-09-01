@@ -130,7 +130,7 @@ function AgentLaunchModelEditor({
     : undefined
 
   return (
-    <label className={`relative inline-flex min-w-0 items-center rounded-md bg-muted text-[11px] text-muted-foreground focus-within:ring-1 focus-within:ring-primary/50 ${labeled ? 'min-h-12 w-full max-w-none sm:w-auto sm:max-w-[220px]' : 'min-h-8 max-w-[220px]'}`}>
+    <label className={`relative inline-flex min-w-0 items-center rounded-md bg-muted text-[11px] leading-[15px] text-muted-foreground focus-within:ring-1 focus-within:ring-primary/50 ${labeled ? 'min-h-12 w-full max-w-none sm:w-auto sm:max-w-[220px]' : 'min-h-8 max-w-[220px]'}`}>
       <Cpu className={`pointer-events-none absolute left-2.5 h-3 w-3 shrink-0 ${labeled ? 'top-6' : ''}`} />
       {labeled && (
         <span className="pointer-events-none absolute left-2.5 top-1.5 text-[9.5px] font-medium text-muted-foreground">
@@ -177,7 +177,7 @@ function AgentLaunchEffortEditor({
     : config.effortOptions
   const defaultLabel = t('chatLanding.effortNotSpecified')
   return (
-    <label className={`relative inline-flex min-w-0 items-center rounded-md bg-muted text-[11px] text-muted-foreground focus-within:ring-1 focus-within:ring-primary/50 ${labeled ? 'min-h-12 w-full max-w-none sm:w-auto sm:max-w-[190px]' : 'min-h-8 max-w-[190px]'}`}>
+    <label className={`relative inline-flex min-w-0 items-center rounded-md bg-muted text-[11px] leading-[15px] text-muted-foreground focus-within:ring-1 focus-within:ring-primary/50 ${labeled ? 'min-h-12 w-full max-w-none sm:w-auto sm:max-w-[190px]' : 'min-h-8 max-w-[190px]'}`}>
       <BrainCircuit className={`pointer-events-none absolute left-2.5 h-3 w-3 shrink-0 ${labeled ? 'top-6' : ''}`} />
       {labeled && (
         <span className="pointer-events-none absolute left-2.5 top-1.5 text-[9.5px] font-medium text-muted-foreground">
@@ -271,7 +271,7 @@ function AgentLaunchInferenceMenu({
             aria-label={t('chatLanding.selectModelAndEffort')}
             className={settings
               ? 'oa-pressable flex min-h-14 w-full min-w-0 items-center gap-3 rounded-lg border border-border/70 bg-muted/25 px-3 py-2 text-left transition-colors hover:bg-muted/45'
-              : 'oa-pressable inline-flex min-h-7 min-w-0 max-w-[340px] items-center gap-1 rounded-lg bg-transparent px-1.5 py-1 text-[12px] font-medium text-foreground transition-colors hover:bg-muted'}
+              : 'oa-pressable inline-flex min-h-7 min-w-0 max-w-[340px] items-center gap-1 rounded-lg bg-transparent px-1.5 py-1 text-[12px] leading-[18px] font-medium text-foreground transition-colors hover:bg-muted'}
           />}
         >
           <Cpu className={settings ? 'h-4 w-4 shrink-0 text-muted-foreground' : 'h-3 w-3 shrink-0 text-muted-foreground'} />
@@ -396,7 +396,7 @@ function AgentLaunchInferenceMenu({
             aria-label={t('chatLanding.customModelId')}
             placeholder={t('chatLanding.customModelId')}
             autoFocus
-            className={`${inputClass} min-h-9 text-[12px]`}
+            className={`${inputClass} min-h-9 text-[12px] leading-[18px]`}
           />
           <DialogFooter>
             <DialogClose render={<Button variant="outline" />}>

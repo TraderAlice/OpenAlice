@@ -252,7 +252,7 @@ export function ActivityBar({
                           {badge !== null && (
                             <span
                               aria-label={badge.label}
-                              className={`flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tabular-nums ${badge.tone} ${
+                              className={`flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] leading-[14px] font-semibold tabular-nums ${badge.tone} ${
                                 compactRail ? 'md:absolute md:-right-1 md:-top-1 md:h-4 md:min-w-4 md:px-1 md:text-[9px]' : ''
                               }`}
                             >

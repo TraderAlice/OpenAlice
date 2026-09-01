@@ -192,7 +192,7 @@ function HarnessWorkspacePicker({
 
   if (locked || options.length === 0) {
     return (
-      <div className="flex min-h-7 min-w-0 max-w-[17rem] items-center gap-1.5 rounded-md px-2 text-[12px] font-medium text-foreground">
+      <div className="flex min-h-7 min-w-0 max-w-[17rem] items-center gap-1.5 rounded-md px-2 text-[12px] leading-[18px] font-medium text-foreground">
         {triggerContents}
         {onClear && (
           <Tooltip>
@@ -633,7 +633,7 @@ function HarnessLandingPage({
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <span>{t('chatLanding.agentMissing', { name: selectedInfo.displayName })}</span>
                 {installHint?.cmd && (
-                  <code className="select-all rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground">
+                  <code className="select-all rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] leading-[15px] text-foreground">
                     {installHint.cmd}
                   </code>
                 )}

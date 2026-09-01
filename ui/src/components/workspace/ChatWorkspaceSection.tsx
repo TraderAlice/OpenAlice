@@ -455,7 +455,7 @@ export function ChatWorkspaceSection({
       )}
 
       <div className="px-3 pb-1 pt-1.5">
-        <h3 className="min-w-0 truncate text-[12px] font-medium text-muted-foreground/70">
+        <h3 className="min-w-0 truncate text-[12px] leading-[18px] font-medium text-muted-foreground/70">
           {t('nav.item.workspaces')}
         </h3>
       </div>
@@ -792,7 +792,7 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
             >
               <Layers3 size={14} strokeWidth={2} aria-hidden />
               <span className="min-w-0 flex-1 truncate">{t('chat.reviewWorkspaceUpdate')}</span>
-              <span className="shrink-0 tabular-nums text-[10px] text-muted-foreground">v{upgradeVersion}</span>
+              <span className="shrink-0 tabular-nums text-[10px] leading-[14px] text-muted-foreground">v{upgradeVersion}</span>
             </DropdownMenuItem>
           )}
           <DropdownMenuItem
@@ -911,7 +911,7 @@ function HarnessSessionRoster(props: HarnessSessionRosterProps): ReactElement {
         <section className="border-b border-border/55 pb-1" aria-label={t('chat.runningInBackground')}>
           <button
             type="button"
-            className="oa-nav-row flex min-h-8 w-full items-center gap-2 px-3 text-left text-[11px] font-medium text-muted-foreground hover:text-foreground"
+            className="oa-nav-row flex min-h-8 w-full items-center gap-2 px-3 text-left text-[11px] leading-[15px] font-medium text-muted-foreground hover:text-foreground"
             onClick={() => setRunningExpanded((expanded) => !expanded)}
             aria-expanded={runningExpanded}
           >
@@ -1168,7 +1168,7 @@ function ManagerWorkspaceRow(props: ManagerWorkspaceRowProps): ReactElement {
           {!props.loaded ? (
             <span aria-hidden className="h-2.5 w-4 animate-pulse rounded bg-muted-foreground/15" />
           ) : sessions.length > 0 ? (
-            <span className="inline-flex shrink-0 items-center gap-1.5 text-[10px] tabular-nums text-muted-foreground/55">
+            <span className="inline-flex shrink-0 items-center gap-1.5 text-[10px] leading-[14px] tabular-nums text-muted-foreground/55">
               <span className={`h-1.5 w-1.5 rounded-full ${hasRunning ? 'bg-success' : 'bg-muted-foreground/35'}`} />
               {sessions.length}
             </span>
@@ -1370,7 +1370,7 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
             )}
           </span>
           {orderedSessions.length > 0 && (
-            <span className="text-[11px] text-muted-foreground/45 tabular-nums shrink-0">
+            <span className="text-[11px] leading-[15px] text-muted-foreground/45 tabular-nums shrink-0">
               {orderedSessions.length}
             </span>
           )}
