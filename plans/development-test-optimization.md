@@ -1,12 +1,12 @@
 # Development and Test Feedback Optimization
 
-Status: Active — dedicated feature-branch iteration on
-`codex/dev-test-optimization`; baseline audit is complete and no integration PR
-should be opened or merged until the maintainer accepts the initiative.
+Status: Active — the feedback-ladder and `AGENTS.md` checkpoint on
+`codex/dev-test-optimization` is accepted for integration; rolling native-CLI
+build reuse and retryable channel activation remain follow-up work.
 
-Delivery mode: Serial / interactive from current `dev`, with an explicit
-feature-branch hold. Related increments stay on this branch and remain
-independently reviewable.
+Delivery mode: Serial / interactive from current `dev`. The maintainer lifted
+the initial feature-branch hold for this checkpoint; later increments use
+focused branches from the updated integration lane.
 
 Owner guides:
 
@@ -194,10 +194,14 @@ make development metrics look better.
   repeated platform-neutral build plus candidate/activation coupling.
 - [ ] Remove only duplicate rolling-publication work that does not contribute
   to an accepted platform artifact, and make activation safely retryable.
-- [ ] Run proportional local acceptance for each increment, then run the full
-  hermetic and workflow backstops once for the completed initiative.
-- [ ] Present the final branch, measurements, and residual platform/release
-  risks for maintainer acceptance before opening an integration PR.
+- [x] Run proportional local acceptance for the feedback-ladder increment and
+  the full hermetic and workflow backstops before its integration checkpoint.
+- [x] Present the feedback-ladder checkpoint and receive maintainer acceptance
+  to integrate it into `dev`.
+- [ ] Run proportional local acceptance for each later increment, then run the
+  full hermetic and workflow backstops once for the completed initiative.
+- [ ] Present final measurements and residual platform/release risks for
+  initiative completion.
 
 ## Verification
 
@@ -233,4 +237,5 @@ At initiative acceptance:
   hosted workflow behavior describe one coherent lane model.
 - Full-suite and release gates remain directly runnable and are still required
   at their documented boundaries.
-- The maintainer accepts the dedicated branch before it is proposed for `dev`.
+- Each integration checkpoint has explicit maintainer acceptance or follows the
+  repository's normal serial delivery authority.
