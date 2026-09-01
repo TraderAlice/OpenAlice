@@ -84,10 +84,10 @@ export function OverviewCard({
             aria-hidden="true"
           />
           <div className="flex-1 min-w-0">
-            <h3 className="text-[14px] font-semibold text-foreground truncate" title={workspaceDisplayTitle(w)}>
+            <h3 className="text-[14px] leading-[19px] font-semibold text-foreground truncate" title={workspaceDisplayTitle(w)}>
               {label}
             </h3>
-            <p className="text-[11px] text-muted-foreground truncate" title={w.description}>
+            <p className="text-[11px] leading-[15px] text-muted-foreground truncate" title={w.description}>
               {w.description?.trim() || t('workspace.activeAgo', { time: formatRelativeTime(lastActivityMs) })}
             </p>
           </div>
@@ -100,7 +100,7 @@ export function OverviewCard({
                 from: w.upgradeAvailable.from,
                 to: upgradeVersion,
               })}
-              className={`oa-pressable pointer-events-auto flex min-h-10 shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors sm:min-h-0 ${w.upgradeAvailable.verified === false ? 'border border-warning/50 text-warning hover:bg-warning/10' : 'border border-primary/40 text-primary hover:border-primary/80 hover:bg-primary/10'}`}
+              className={`oa-pressable pointer-events-auto flex min-h-10 shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] leading-[14px] font-medium transition-colors sm:min-h-0 ${w.upgradeAvailable.verified === false ? 'border border-warning/50 text-warning hover:bg-warning/10' : 'border border-primary/40 text-primary hover:border-primary/80 hover:bg-primary/10'}`}
             >
               <ArrowUpCircle size={10} strokeWidth={2.25} />
               <span>v{upgradeVersion}</span>
@@ -110,12 +110,12 @@ export function OverviewCard({
 
         {/* Sessions */}
         <div className="border-t border-border/60 pt-2.5">
-          <div className="mb-1 flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+          <div className="mb-1 flex items-center gap-1.5 text-[11px] leading-[15px] font-medium text-muted-foreground">
             <span>{t('workspace.sessions')}</span>
             <span className="tabular-nums text-muted-foreground/45">{w.sessions.length}</span>
           </div>
           {w.sessions.length === 0 ? (
-            <p className="text-[12px] text-muted-foreground/80 italic">{t('workspace.noSessions')}</p>
+            <p className="text-[12px] leading-[18px] text-muted-foreground/80 italic">{t('workspace.noSessions')}</p>
           ) : (
             <ul className="space-y-0.5 -mx-2">
               {previewSessions.map((s, index) => (
@@ -127,14 +127,14 @@ export function OverviewCard({
                     type="button"
                     aria-label={`${sessionCoworkerLabel(s)} ${t(s.state === 'running' ? 'workspace.running' : 'workspace.paused')}`}
                     onClick={() => onOpenSession(s.id)}
-                    className="oa-nav-row pointer-events-auto flex min-h-10 w-full items-center gap-2 rounded px-2 py-1 text-left text-[12px] text-foreground hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:min-h-0"
+                    className="oa-nav-row pointer-events-auto flex min-h-10 w-full items-center gap-2 rounded px-2 py-1 text-left text-[12px] leading-[18px] text-foreground hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:min-h-0"
                   >
                     <span className="w-3 flex justify-center text-muted-foreground">
                       <AgentGlyph agent={s.agent} />
                     </span>
-                    <span className="truncate text-[12px]">{sessionCoworkerLabel(s)}</span>
+                    <span className="truncate text-[12px] leading-[18px]">{sessionCoworkerLabel(s)}</span>
                     <span
-                      className={`text-[11px] ${
+                      className={`text-[11px] leading-[15px] ${
                         s.state === 'running' ? 'text-success' : 'text-muted-foreground'
                       }`}
                     >
@@ -153,7 +153,7 @@ export function OverviewCard({
                     type="button"
                     onClick={onOpen}
                     aria-label={t('workspace.viewAllSessions', { count: w.sessions.length })}
-                    className="oa-nav-row pointer-events-auto flex min-h-10 w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[11px] font-medium text-primary hover:bg-primary/8 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:min-h-0"
+                    className="oa-nav-row pointer-events-auto flex min-h-10 w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[11px] leading-[15px] font-medium text-primary hover:bg-primary/8 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:min-h-0"
                   >
                     <span>{t('workspace.viewAllSessions', { count: w.sessions.length })}</span>
                     <span className="ml-auto tabular-nums text-muted-foreground/55 sm:hidden">
@@ -174,7 +174,7 @@ export function OverviewCard({
         {(lastCommit || w.harnessSource || (w.template && w.spawnedFromVersion)) && (
           <div className="flex flex-wrap gap-x-4 gap-y-1.5 border-t border-border/60 pt-2.5">
             {w.harnessSource && (
-              <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+              <div className="flex items-center gap-2 text-[11px] leading-[15px] text-muted-foreground">
                 <GitBranch size={11} strokeWidth={2.25} className="shrink-0" />
                 <span
                   className="truncate"
@@ -188,7 +188,7 @@ export function OverviewCard({
               </div>
             )}
             {w.template && w.spawnedFromVersion && (
-              <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+              <div className="flex items-center gap-2 text-[11px] leading-[15px] text-muted-foreground">
                 <GitBranch size={11} strokeWidth={2.25} className="shrink-0" />
                 <span className="truncate">
                   {t('workspace.fromTemplate', {
@@ -199,7 +199,7 @@ export function OverviewCard({
               </div>
             )}
             {lastCommit && (
-              <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+              <div className="flex items-center gap-2 text-[11px] leading-[15px] text-muted-foreground">
                 <ScrollText size={11} strokeWidth={2.25} className="shrink-0" />
                 <span className="truncate" title={lastCommit.subject}>
                   {lastCommit.subject}

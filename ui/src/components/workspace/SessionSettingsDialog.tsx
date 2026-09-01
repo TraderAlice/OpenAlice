@@ -143,7 +143,7 @@ export function SessionSettingsDialog({
               className={inputClass}
               disabled={saving}
             />
-            <div className="mt-1 flex items-center justify-between gap-3 text-[11px] text-muted-foreground/70">
+            <div className="mt-1 flex items-center justify-between gap-3 text-[11px] leading-[15px] text-muted-foreground/70">
               <span>{t('workspace.sessionSettings.displayNameHelp')}</span>
               <span className="tabular-nums">{displayName.trim().length}/{DISPLAY_NAME_MAX}</span>
             </div>

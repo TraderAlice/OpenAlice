@@ -48,6 +48,7 @@ import { WorkspaceAbsorbPanel } from './WorkspaceAbsorbPanel'
 import { WorkspaceLaunchConfigurationPanel } from './WorkspaceLaunchConfigurationPanel'
 import { WorkspaceAIPreferencesPanel } from './WorkspaceAIPreferencesPanel'
 import { Button } from '@/components/ui/button'
+import { inputClass as sharedInputClass } from '@/components/form'
 
 // The agent tab implies a default vendor when the baseUrl alone can't say:
 // claude → Anthropic, codex → OpenAI; opencode/pi run anything so they have no
@@ -77,8 +78,7 @@ export interface WorkspaceAiSaveResult {
   readonly workspaceLabel: string
 }
 
-const inputClass =
-  'h-8 w-full rounded-md border border-border bg-secondary px-2.5 py-1 text-[13px] text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary'
+const inputClass = `${sharedInputClass} bg-secondary`
 
 const TAB_LABEL: Record<Tab, string> = { claude: 'Claude Code', codex: 'Codex', opencode: 'opencode', pi: 'Pi' }
 const CONTEXT_WINDOW_OPTIONS = [
@@ -707,7 +707,7 @@ export function WorkspaceAIConfigModal({
               type="button"
               onClick={() => setSection('general')}
               aria-current={section === 'general' ? 'page' : undefined}
-              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-0 sm:h-8 sm:min-h-8 sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] leading-[18px] font-medium transition-colors sm:mt-0 sm:h-8 sm:min-h-8 sm:w-full ${
                 section === 'general'
                   ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -720,7 +720,7 @@ export function WorkspaceAIConfigModal({
               type="button"
               onClick={() => setSection('launch')}
               aria-current={section === 'launch' ? 'page' : undefined}
-              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] leading-[18px] font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
                 section === 'launch'
                   ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -733,7 +733,7 @@ export function WorkspaceAIConfigModal({
               type="button"
               onClick={() => setSection('preferences')}
               aria-current={section === 'preferences' ? 'page' : undefined}
-              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] leading-[18px] font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
                 section === 'preferences'
                   ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -746,7 +746,7 @@ export function WorkspaceAIConfigModal({
               type="button"
               onClick={() => setSection('template')}
               aria-current={section === 'template' ? 'page' : undefined}
-              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] leading-[18px] font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
                 section === 'template'
                   ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -762,7 +762,7 @@ export function WorkspaceAIConfigModal({
               type="button"
               onClick={() => setSection('absorb')}
               aria-current={section === 'absorb' ? 'page' : undefined}
-              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] leading-[18px] font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
                 section === 'absorb'
                   ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -787,7 +787,7 @@ export function WorkspaceAIConfigModal({
                       placeholder={stableTag}
                       className={inputClass}
                     />
-                    <div className="mt-1 flex items-center justify-between gap-3 text-[11px] text-muted-foreground/70">
+                    <div className="mt-1 flex items-center justify-between gap-3 text-[11px] leading-[15px] text-muted-foreground/70">
                       <span>{t('workspaceSettings.general.displayNameHelp')}</span>
                       <span>{displayName.length}/80</span>
                     </div>
@@ -803,7 +803,7 @@ export function WorkspaceAIConfigModal({
                       placeholder={t('workspaceSettings.general.descriptionPlaceholder')}
                       className={`${inputClass} min-h-28 resize-y leading-relaxed`}
                     />
-                    <div className="mt-1 flex items-center justify-between gap-3 text-[11px] text-muted-foreground/70">
+                    <div className="mt-1 flex items-center justify-between gap-3 text-[11px] leading-[15px] text-muted-foreground/70">
                       <span>{t('workspaceSettings.general.descriptionHelp')}</span>
                       <span>{description.length}/240</span>
                     </div>
@@ -814,7 +814,7 @@ export function WorkspaceAIConfigModal({
                       <Info size={14} className="mt-0.5 shrink-0 text-muted-foreground" />
                       <div className="min-w-0">
                         <div className="text-[11px] font-medium text-muted-foreground">{t('workspaceSettings.general.stableTag')}</div>
-                        <div className="mt-1 truncate font-mono text-[12px] text-foreground">{stableTag}</div>
+                        <div className="mt-1 truncate font-mono text-[12px] leading-[18px] text-foreground">{stableTag}</div>
                         <p className="mt-1 text-[11px] leading-snug text-muted-foreground/75">
                           {t('workspaceSettings.general.stableTagHelp')}
                         </p>
@@ -823,12 +823,12 @@ export function WorkspaceAIConfigModal({
                   </div>
 
                   {error && (
-                    <div className="rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-[12px] px-3 py-2">
+                    <div className="rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-[12px] leading-[18px] px-3 py-2">
                       {error}
                     </div>
                   )}
                   {metadataSavedFlash && (
-                    <div className="rounded-md border border-success/40 bg-success/10 text-success text-[12px] px-3 py-2">
+                    <div className="rounded-md border border-success/40 bg-success/10 text-success text-[12px] leading-[18px] px-3 py-2">
                       {t('workspaceSettings.general.saved')}
                     </div>
                   )}
@@ -881,7 +881,7 @@ export function WorkspaceAIConfigModal({
                 setPickedCredential('')
                 setPickedWireShape('')
               }}
-              className={`flex min-h-11 flex-none items-center justify-center gap-2 whitespace-nowrap px-3 py-2 text-[13px] font-medium transition-colors sm:h-9 sm:min-h-9 sm:flex-1 sm:px-4 ${
+              className={`flex min-h-11 flex-none items-center justify-center gap-2 whitespace-nowrap px-3 py-2 text-[13px] leading-[18px] font-medium transition-colors sm:h-9 sm:min-h-9 sm:flex-1 sm:px-4 ${
                 tab === id
                   ? 'text-primary border-b-2 border-primary -mb-px'
                   : 'text-muted-foreground hover:text-foreground'
@@ -1246,17 +1246,17 @@ export function WorkspaceAIConfigModal({
           )}
 
           {error && (
-            <div className="rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-[12px] px-3 py-2">
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-[12px] leading-[18px] px-3 py-2">
               {error}
             </div>
           )}
           {savedFlash && (
-            <div className="rounded-md border border-success/40 bg-success/10 text-success text-[12px] px-3 py-2">
+            <div className="rounded-md border border-success/40 bg-success/10 text-success text-[12px] leading-[18px] px-3 py-2">
               {t('workspaceSettings.ai.saved')}
             </div>
           )}
           {offerSaveCred && (
-            <div className="rounded-md border border-primary/40 bg-primary/10 text-foreground text-[12px] px-3 py-2.5 flex items-center justify-between gap-3">
+            <div className="rounded-md border border-primary/40 bg-primary/10 text-foreground text-[12px] leading-[18px] px-3 py-2.5 flex items-center justify-between gap-3">
               <span className="leading-snug">
                 {t('workspaceSettings.ai.saveCredentialPrompt')}
               </span>
@@ -1282,17 +1282,17 @@ export function WorkspaceAIConfigModal({
             </div>
           )}
           {credFlash && (
-            <div className="rounded-md border border-success/40 bg-success/10 text-success text-[12px] px-3 py-2">
+            <div className="rounded-md border border-success/40 bg-success/10 text-success text-[12px] leading-[18px] px-3 py-2">
               {credFlash}
             </div>
           )}
           {testing && (
-            <div className="rounded-md border border-border bg-secondary text-muted-foreground text-[12px] px-3 py-2">
+            <div className="rounded-md border border-border bg-secondary text-muted-foreground text-[12px] leading-[18px] px-3 py-2">
               {t('workspaceSettings.ai.testingConnection')}
             </div>
           )}
           {!testing && result?.ok && resultMatchesCurrent && (
-            <div className="rounded-md border border-success/40 bg-success/10 text-success text-[12px] px-3 py-2">
+            <div className="rounded-md border border-success/40 bg-success/10 text-success text-[12px] leading-[18px] px-3 py-2">
               {result.response?.trim() ? (
                 <>
                   <div className="font-medium mb-0.5">
@@ -1314,7 +1314,7 @@ export function WorkspaceAIConfigModal({
             </div>
           )}
           {!testing && result && !result.ok && resultMatchesCurrent && (
-            <div className="rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-[12px] px-3 py-2">
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-[12px] leading-[18px] px-3 py-2">
               <div className="font-medium mb-0.5">{t('workspaceSettings.ai.testFailed')}</div>
               <div className="whitespace-pre-wrap break-words font-mono text-[11.5px]">
                 {result.error}
@@ -1322,7 +1322,7 @@ export function WorkspaceAIConfigModal({
             </div>
           )}
           {!testing && result && !resultMatchesCurrent && (
-            <div className="rounded-md border border-warning/30 bg-warning/5 text-warning/90 text-[12px] px-3 py-2">
+            <div className="rounded-md border border-warning/30 bg-warning/5 text-warning/90 text-[12px] leading-[18px] px-3 py-2">
               {t('workspaceSettings.ai.formChanged')}
             </div>
           )}

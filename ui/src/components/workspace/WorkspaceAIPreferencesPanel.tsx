@@ -342,7 +342,7 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
             return (
               <section key={mode} className="overflow-hidden rounded-lg border border-border bg-card">
                 <div className="border-b border-border bg-muted/25 px-4 py-3">
-                  <h4 className="text-[13px] font-semibold text-foreground">{title}</h4>
+                  <h4 className="text-[13px] leading-[18px] font-semibold text-foreground">{title}</h4>
                   <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
                     {t(`workspaceSettings.preferences.${mode}Help`)}
                   </p>
@@ -378,7 +378,7 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
                   </label>
 
                   {recentAgentName && recentSummary && (
-                    <div className="flex flex-wrap items-center gap-x-1 gap-y-1 text-[11px] text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-x-1 gap-y-1 text-[11px] leading-[15px] text-muted-foreground">
                       <span>
                         {drafts[mode].defaultAgent
                           ? t('workspaceSettings.preferences.recentRuntime')
@@ -393,7 +393,7 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
                   {saveState?.mode === mode && (
                     <div
                       role={saveState.status === 'error' ? 'alert' : 'status'}
-                      className={`flex min-h-5 flex-wrap items-center gap-2 text-[11px] ${saveState.status === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}
+                      className={`flex min-h-5 flex-wrap items-center gap-2 text-[11px] leading-[15px] ${saveState.status === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}
                     >
                       {saveState.status === 'saving' && t('common.saving')}
                       {saveState.status === 'saved' && t('common.saved')}

@@ -84,7 +84,7 @@ export function WorkspaceOffboardingDialog({
         {assessment && (
           <>
             {assessment.blockers.length > 0 && (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-[12px] text-destructive">
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-[12px] leading-[18px] text-destructive">
                 <div className="font-semibold">{t('workspace.offboardBlocked')}</div>
                 {assessment.blockers.map((blocker) => <div key={blocker} className="mt-1">{blocker}</div>)}
               </div>

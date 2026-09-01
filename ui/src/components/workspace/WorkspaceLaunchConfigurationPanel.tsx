@@ -175,12 +175,12 @@ export function WorkspaceLaunchConfigurationPanel({
           )}
 
           {error && !loading && (
-            <div className="oa-status-surface rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-[12px] text-destructive">
+            <div className="oa-status-surface rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-[12px] leading-[18px] text-destructive">
               <div className="flex items-start gap-2">
                 <AlertTriangle size={15} className="mt-0.5 shrink-0" />
                 <div className="min-w-0">
                   <div className="font-medium">{t('workspaceSettings.launch.loadError')}</div>
-                  <div className="mt-1 break-words font-mono text-[11px]">{error}</div>
+                  <div className="mt-1 break-words font-mono text-[11px] leading-[15px]">{error}</div>
                 </div>
               </div>
             </div>
@@ -194,16 +194,16 @@ export function WorkspaceLaunchConfigurationPanel({
                     <AgentRuntimeIcon agentId={selectedAgent} className="mt-0.5 h-[17px] w-[17px] shrink-0 text-muted-foreground" />
                     <div className="min-w-0">
                       <div className="font-medium text-foreground">{plan.agent.displayName}</div>
-                      <div className="mt-0.5 break-all font-mono text-[11px] text-muted-foreground">
+                      <div className="mt-0.5 break-all font-mono text-[11px] leading-[15px] text-muted-foreground">
                         {plan.agent.binPath ?? plan.launch.composedCommand[0]}
                       </div>
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    <span className="rounded-full border border-border bg-background/60 px-2 py-1 text-[10px] font-medium text-muted-foreground">
+                    <span className="rounded-full border border-border bg-background/60 px-2 py-1 text-[10px] leading-[14px] font-medium text-muted-foreground">
                       {t(`workspaceSettings.launch.mode.${plan.launch.mode}`)}
                     </span>
-                    <span className={`rounded-full border px-2 py-1 text-[10px] font-medium ${
+                    <span className={`rounded-full border px-2 py-1 text-[10px] leading-[14px] font-medium ${
                       plan.agent.installed
                         ? 'border-success/30 bg-success/10 text-success'
                         : 'border-warning/30 bg-warning/10 text-warning'
@@ -225,7 +225,7 @@ export function WorkspaceLaunchConfigurationPanel({
               <section className="rounded-lg border border-border p-3">
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <div>
-                    <h4 className="text-[12px] font-medium text-foreground">
+                    <h4 className="text-[12px] leading-[18px] font-medium text-foreground">
                       {t('workspaceSettings.launch.command')}
                     </h4>
                     <p className="mt-0.5 text-[10px] text-muted-foreground">
@@ -258,7 +258,7 @@ export function WorkspaceLaunchConfigurationPanel({
                   <div className="text-[11px] font-medium text-muted-foreground">
                     {t('workspaceSettings.launch.cwd')}
                   </div>
-                  <div className="mt-1 break-all font-mono text-[11px] text-foreground">
+                  <div className="mt-1 break-all font-mono text-[11px] leading-[15px] text-foreground">
                     {plan.launch.cwd}
                   </div>
                 </div>
@@ -266,14 +266,14 @@ export function WorkspaceLaunchConfigurationPanel({
                   <div className="text-[11px] font-medium text-muted-foreground">
                     {t('workspaceSettings.launch.transcript')}
                   </div>
-                  <div className="mt-1 break-all font-mono text-[11px] text-foreground">
+                  <div className="mt-1 break-all font-mono text-[11px] leading-[15px] text-foreground">
                     {plan.launch.transcriptDir ?? t('workspaceSettings.launch.noTranscript')}
                   </div>
                 </div>
               </section>
 
               <section className="rounded-lg border border-border p-3">
-                <h4 className="text-[12px] font-medium text-foreground">
+                <h4 className="text-[12px] leading-[18px] font-medium text-foreground">
                   {t('workspaceSettings.launch.environment')}
                 </h4>
                 <p className="mt-0.5 text-[10px] text-muted-foreground">
@@ -283,12 +283,12 @@ export function WorkspaceLaunchConfigurationPanel({
                   {plan.launch.environment.map((entry) => (
                     <div key={`${entry.source}:${entry.key}`} className="flex items-start justify-between gap-3 py-2 first:pt-0 last:pb-0">
                       <div className="min-w-0">
-                        <div className="break-all font-mono text-[11px] text-foreground">{entry.key}</div>
+                        <div className="break-all font-mono text-[11px] leading-[15px] text-foreground">{entry.key}</div>
                         <div className="mt-0.5 text-[10px] text-muted-foreground">
                           {t(`workspaceSettings.launch.source.${entry.source}`)}
                         </div>
                       </div>
-                      <div className="max-w-[55%] break-all text-right font-mono text-[10px] text-muted-foreground">
+                      <div className="max-w-[55%] break-all text-right font-mono text-[10px] leading-[14px] text-muted-foreground">
                         {environmentValue(entry, environmentLabels)}
                       </div>
                     </div>
@@ -301,7 +301,7 @@ export function WorkspaceLaunchConfigurationPanel({
                   <div className="flex items-start gap-2">
                     <ShieldCheck size={15} className="mt-0.5 shrink-0 text-muted-foreground" />
                     <div className="min-w-0">
-                      <h4 className="text-[12px] font-medium text-foreground">
+                      <h4 className="text-[12px] leading-[18px] font-medium text-foreground">
                         {t('workspaceSettings.launch.capabilities')}
                       </h4>
                       <div className="mt-2 flex flex-wrap gap-1.5">
@@ -324,7 +324,7 @@ export function WorkspaceLaunchConfigurationPanel({
                 <div className="flex items-start gap-2.5">
                   <AlertTriangle size={16} className="mt-0.5 shrink-0 text-warning" />
                   <div className="min-w-0 flex-1">
-                    <h3 className="text-[12px] font-semibold text-foreground">
+                    <h3 className="text-[12px] leading-[18px] font-semibold text-foreground">
                       {t('workspaceSettings.launch.compatibilityTitle')}
                     </h3>
                     <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
@@ -368,7 +368,7 @@ export function WorkspaceLaunchConfigurationPanel({
 
 function Capability({ label }: { readonly label: string }) {
   return (
-    <span className="rounded-full border border-border bg-secondary/50 px-2 py-1 text-[10px] text-muted-foreground">
+    <span className="rounded-full border border-border bg-secondary/50 px-2 py-1 text-[10px] leading-[14px] text-muted-foreground">
       {label}
     </span>
   )
