@@ -35,6 +35,7 @@ import {
   type AdapterRegistry,
   type CliAdapter,
 } from '../../workspaces/cli-adapter.js'
+import { TushareClient } from '../../domain/market-data/tushare/client.js'
 
 interface ConfigRouteOpts {
   ctx?: EngineContext
@@ -476,7 +477,35 @@ export function createMarketDataRoutes(ctx: EngineContext) {
 
   app.post('/test-provider', async (c) => {
     try {
-      const { provider, key } = await c.req.json<{ provider: string; key: string }>()
+      const { provider, key, baseUrl } = await c.req.json<{ provider: string; key: string; baseUrl?: string }>()
+      if (provider === 'tushare') {
+        if (!key) return c.json({ ok: false, error: 'No API token provided' }, 400)
+        const client = new TushareClient({
+          getConfig: () => ({ enabled: true, token: key, baseUrl: baseUrl || 'https://api.tushare.pro' }),
+          retries: 0,
+          timeoutMs: 8_000,
+        })
+        const probes = await Promise.allSettled([
+          client.query('trade_cal', { exchange: 'SSE', limit: 1 }, undefined, 0),
+          client.query('stock_basic', { list_status: 'L', limit: 1 }, ['ts_code', 'name'], 0),
+          client.query(
+            'daily_basic',
+            { ts_code: '000001.SZ', start_date: '20200101', end_date: '20301231', limit: 1 },
+            ['ts_code', 'trade_date'],
+            0,
+          ),
+        ])
+        const capabilities = ['calendar', 'securities', 'fundamentals'].map((name, index) => ({
+          name,
+          ok: probes[index]?.status === 'fulfilled',
+          error: probes[index]?.status === 'rejected'
+            ? (probes[index] as PromiseRejectedResult).reason instanceof Error
+              ? (probes[index] as PromiseRejectedResult).reason.message
+              : 'Probe failed'
+            : undefined,
+        }))
+        return c.json({ ok: capabilities.every((item) => item.ok), capabilities })
+      }
       const endpoint = TEST_ENDPOINTS[provider]
       if (!endpoint) return c.json({ ok: false, error: `Unknown provider: ${provider}` }, 400)
       if (!key) return c.json({ ok: false, error: 'No API key provided' }, 400)

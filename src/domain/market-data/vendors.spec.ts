@@ -9,10 +9,11 @@ import type { QueryExecutor } from '@traderalice/opentypebb'
 vi.mock('@/core/config.js', () => ({
   readMarketDataConfig: vi.fn(),
   updateExtraVendors: vi.fn(),
+  updateTushareEnabled: vi.fn(),
 }))
 
-import { readMarketDataConfig, updateExtraVendors } from '@/core/config.js'
-import { listMarketVendors, setMarketVendor } from './vendors.js'
+import { readMarketDataConfig, updateExtraVendors, updateTushareEnabled } from '@/core/config.js'
+import { listMarketVendors, setMarketVendor, TUSHARE_VENDOR } from './vendors.js'
 
 const META = { coverage: 'cov', howToUse: 'how' }
 
@@ -38,9 +39,12 @@ beforeEach(() => {
   vi.mocked(readMarketDataConfig).mockResolvedValue({
     providers: { equity: 'yfinance' },
     extraVendors: ['eastmoney'],
+    tushare: { enabled: false, baseUrl: 'https://api.tushare.pro' },
   } as unknown as Awaited<ReturnType<typeof readMarketDataConfig>>)
   vi.mocked(updateExtraVendors).mockReset()
   vi.mocked(updateExtraVendors).mockImplementation(async (mutate) => mutate([]))
+  vi.mocked(updateTushareEnabled).mockReset()
+  vi.mocked(updateTushareEnabled).mockImplementation(async (enabled) => enabled)
 })
 
 describe('listMarketVendors', () => {
@@ -60,6 +64,11 @@ describe('listMarketVendors', () => {
     expect(v.find((x) => x.id === 'eastmoney')).toMatchObject({ alwaysOn: false, enabled: true })
     expect(v.find((x) => x.id === 'twse')).toMatchObject({ alwaysOn: false, enabled: false, coverage: 'cov' })
     expect(v.some((x) => x.id === 'fmp')).toBe(false)
+  })
+
+  it('joins native Tushare state without pretending it is keyless', async () => {
+    const v = await listMarketVendors(fakeExecutor([]), [TUSHARE_VENDOR])
+    expect(v).toEqual([expect.objectContaining({ id: 'tushare', enabled: false, keyless: false })])
   })
 })
 
@@ -91,5 +100,11 @@ describe('setMarketVendor', () => {
   it('rejects an unknown vendor id', async () => {
     await expect(setMarketVendor(exec, 'nope', true)).rejects.toThrow(/Unknown market vendor/)
     expect(updateExtraVendors).not.toHaveBeenCalled()
+  })
+
+  it('toggles native Tushare through its dedicated config field', async () => {
+    const result = await setMarketVendor(exec, 'tushare', true, [TUSHARE_VENDOR])
+    expect(updateTushareEnabled).toHaveBeenCalledWith(true)
+    expect(result).toMatchObject({ id: 'tushare', enabled: true })
   })
 })

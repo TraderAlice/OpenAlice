@@ -122,6 +122,27 @@ describe('getBars — barId forms', () => {
     expect(deps.equityClient.getHistorical).toHaveBeenCalled()
   })
 
+  it('routes native provider barIds before the compatibility clients', async () => {
+    const getBars = vi.fn(async () => ({
+      bars: [{ date: '2026-08-31', open: 1, high: 2, low: 1, close: 2, volume: 100 }],
+      meta: {
+        symbol: '600519.SH', from: '2026-08-31', to: '2026-08-31', bars: 1,
+        adjustment: 'qfq' as const, adjustmentAnchor: '2026-08-31',
+      },
+    }))
+    const deps = makeDeps({ nativeVendors: { tushare: { getBars, barCapability: 'delayed' } } })
+    const svc = createBarService(deps)
+    const { meta } = await svc.getBars(
+      { barId: 'tushare|600519.SH', assetClass: 'equity' },
+      { interval: '1d', asOf: '2026-08-31' },
+    )
+    expect(getBars).toHaveBeenCalledWith('600519.SH', { interval: '1d', asOf: '2026-08-31' })
+    expect(deps.equityClient.getHistorical).not.toHaveBeenCalled()
+    expect(meta).toMatchObject({
+      barId: 'tushare|600519.SH', provider: 'tushare', adjustment: 'qfq', adjustmentAnchor: '2026-08-31',
+    })
+  })
+
   it('vendor barId without assetClass throws a clear error', async () => {
     const svc = createBarService(makeDeps())
     await expect(svc.getBars({ barId: 'yfinance|AAPL' }, { interval: '1d' })).rejects.toThrow(/needs an assetClass/)

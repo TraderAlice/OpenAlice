@@ -342,7 +342,17 @@ const marketDataSchema = z.object({
     benzinga: z.string().optional(),
     tiingo: z.string().optional(),
     biztoc: z.string().optional(),
+    /** Tushare Pro token. Stored in the user-global provider-key file and
+     *  hot-read by the native China-market adapter on every request. */
+    tushare: z.string().optional(),
   }).default({}),
+  /** Native Tushare HTTP adapter. Disabled by default because it is a
+   *  credentialed, user-selected source. Custom proxy endpoints are validated
+   *  again at the network boundary before any request is made. */
+  tushare: z.object({
+    enabled: z.boolean().default(false),
+    baseUrl: z.string().default('https://api.tushare.pro'),
+  }).default({ enabled: false, baseUrl: 'https://api.tushare.pro' }),
   /** Hosted reference-data hub (TraderHub). Enabled by default: anonymous
    *  GETs of public boards, no user data attached; one switch to opt out.
    *  Self-hosters point baseUrl at their own instance. */
@@ -879,6 +889,20 @@ export async function updateExtraVendors(
   await mkdir(CONFIG_DIR, { recursive: true })
   await writeFile(resolve(CONFIG_DIR, 'market-data.json'), JSON.stringify(updated, null, 2) + '\n')
   return next
+}
+
+/** Toggle the native Tushare source without snapshotting globally merged keys
+ * into the workspace config. Effective on the next request. */
+export async function updateTushareEnabled(enabled: boolean): Promise<boolean> {
+  const raw = (await loadJsonFile('market-data.json')) ?? {}
+  const parsed = marketDataSchema.parse(raw)
+  const updated = marketDataSchema.parse({
+    ...parsed,
+    tushare: { ...parsed.tushare, enabled },
+  })
+  await mkdir(CONFIG_DIR, { recursive: true })
+  await writeFile(resolve(CONFIG_DIR, 'market-data.json'), JSON.stringify(updated, null, 2) + '\n')
+  return updated.tushare.enabled
 }
 
 /** Read tools config from disk (called per-request for hot-reload). */

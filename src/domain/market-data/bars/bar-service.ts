@@ -198,6 +198,27 @@ export function createBarService(deps: BarServiceDeps): BarService {
     symbol: string,
     opts: GetBarsOpts,
   ): Promise<BarsResult> {
+    const native = deps.nativeVendors?.[provider]
+    if (native) {
+      const result = await native.getBars(symbol, opts)
+      const bars = finalize(result.bars, opts.count)
+      return {
+        bars,
+        meta: {
+          ...result.meta,
+          symbol,
+          from: bars[0]?.date ?? '',
+          to: bars[bars.length - 1]?.date ?? '',
+          bars: bars.length,
+          source: 'vendor',
+          sourceId: provider,
+          barId: formatBarId(provider, symbol),
+          provider,
+          barCapability: native.barCapability ?? result.meta.barCapability,
+          ...computeFreshness(bars[bars.length - 1]?.date ?? '', opts, () => new Date()),
+        },
+      }
+    }
     const start_date = startDateFor(opts)
     // Upper bound: the provider compatibility models apply end_date;
     // we also post-filter defensively in case a provider ignores it.
@@ -302,7 +323,7 @@ export function createBarService(deps: BarServiceDeps): BarService {
           // Per-result vendor attribution (multi-vendor equity); falls back to
           // the configured per-asset provider for crypto/currency/commodity.
           const provider = r.sourceId ?? deps.vendorProviders[r.assetClass]
-          const cap = VENDOR_CAPABILITY[provider]
+          const cap = deps.nativeVendors?.[provider]?.barCapability ?? VENDOR_CAPABILITY[provider]
           const base = r.name ? `${symbol} · ${r.name} (${provider})` : `${symbol} (${provider})`
           append({
             barId: formatBarId(provider, symbol),

@@ -10,8 +10,11 @@ import { tool } from 'ai'
 import { z } from 'zod'
 import type { EquityClientLike } from '@/domain/market-data/client/types'
 import type { EquityDiscoveryData } from '@traderalice/opentypebb'
+import type { TushareService } from '@/domain/market-data/tushare/service.js'
 
-export function createEquityTools(equityClient: EquityClientLike) {
+const isChinaEquity = (symbol: string) => /\.(SH|SZ|BJ)$/i.test(symbol)
+
+export function createEquityTools(equityClient: EquityClientLike, tushare?: TushareService) {
   return {
     equityGetProfile: tool({
       description: `Get company profile and key valuation metrics for a stock.
@@ -24,6 +27,17 @@ If unsure about the symbol, use marketSearchForResearch to find it.`,
         symbol: z.string().describe('Ticker symbol, e.g. "AAPL", "MSFT"'),
       }).meta({ examples: [{ symbol: 'AAPL' }] }),
       execute: async ({ symbol }) => {
+        if (tushare && isChinaEquity(symbol)) {
+          const [{ profile, company }, valuation] = await Promise.all([
+            tushare.getProfile(symbol.toUpperCase()),
+            tushare.dailyBasic({ ts_code: symbol.toUpperCase(), limit: 1 }),
+          ])
+          return {
+            profile: profile || company ? { ...profile, ...company } : null,
+            metrics: valuation.data[0] ?? null,
+            meta: valuation.meta,
+          }
+        }
         // For Taiwan tickers (2330.TW / 6488.TWO), metrics route to the official
         // twse vendor first (official P/E·殖利率·股價淨值比), then yfinance.
         // Profile stays yfinance-first (richer description/sector), with twse as a
@@ -59,8 +73,12 @@ If unsure about the symbol, use marketSearchForResearch to find it.`,
         type: z.enum(['income', 'balance', 'cash']).describe('Statement type: "income" for income statement, "balance" for balance sheet, "cash" for cash flow'),
         period: z.enum(['annual', 'quarter']).optional().describe('Fiscal period (default: annual)'),
         limit: z.number().int().positive().optional().describe('Number of periods to return (default: 5)'),
+        asOf: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe('Point-in-time cutoff; filings announced later are excluded'),
       }).meta({ examples: [{ symbol: 'AAPL', type: 'income', period: 'annual', limit: 5 }] }),
-      execute: async ({ symbol, type, period, limit }) => {
+      execute: async ({ symbol, type, period, limit, asOf }) => {
+        if (tushare && isChinaEquity(symbol)) {
+          return tushare.getFinancials(symbol.toUpperCase(), type, { period, limit, asOf })
+        }
         const params: Record<string, unknown> = { symbol, provider: 'yfinance' }
         if (period) params.period = period
         if (limit) params.limit = limit
@@ -96,8 +114,12 @@ If unsure about the symbol, use marketSearchForResearch to find it.`,
         period: z.enum(['annual', 'quarter']).optional().describe('Fiscal period for the historical series (default: annual)'),
         limit: z.number().int().positive().optional().describe('Number of historical periods to return (default: 5; ignored when ttm="only")'),
         ttm: z.enum(['include', 'exclude', 'only']).optional().describe('TTM handling: "include" (default — TTM + history), "exclude" (history only), "only" (TTM snapshot only)'),
+        asOf: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe('Point-in-time cutoff; filings announced later are excluded'),
       }).meta({ examples: [{ symbol: 'AAPL', period: 'annual', limit: 5 }] }),
-      execute: async ({ symbol, period, limit, ttm }) => {
+      execute: async ({ symbol, period, limit, ttm, asOf }) => {
+        if (tushare && isChinaEquity(symbol)) {
+          return tushare.getRatios(symbol.toUpperCase(), { period, limit, asOf })
+        }
         // The FMP fetcher defaults ttm to "only" (a single TTM row, with
         // period/limit dead). Default to "include" here so the historical
         // series — and therefore period/limit — actually come through.

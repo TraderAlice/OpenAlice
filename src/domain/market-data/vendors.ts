@@ -18,7 +18,7 @@
  */
 
 import type { QueryExecutor } from '@traderalice/opentypebb'
-import { readMarketDataConfig, updateExtraVendors } from '@/core/config.js'
+import { readMarketDataConfig, updateExtraVendors, updateTushareEnabled } from '@/core/config.js'
 
 export interface MarketVendorInfo {
   /** Vendor id used everywhere (search sourceId, setMarketVendor arg). */
@@ -38,14 +38,28 @@ export interface MarketVendorInfo {
   website?: string
 }
 
+export interface NativeMarketVendor {
+  id: string
+  name: string
+  keyless: boolean
+  coverage: string
+  howToUse: string
+  website?: string
+  enabled(config: Awaited<ReturnType<typeof readMarketDataConfig>>): boolean
+  setEnabled?(enabled: boolean): Promise<void>
+}
+
 /** Every provider that has opted into the vendor picker (declared `vendorMeta`),
  *  joined to current on/off state. Always-on first, then enabled, then the rest. */
-export async function listMarketVendors(executor: QueryExecutor): Promise<MarketVendorInfo[]> {
+export async function listMarketVendors(
+  executor: QueryExecutor,
+  nativeVendors: NativeMarketVendor[] = [],
+): Promise<MarketVendorInfo[]> {
   const md = await readMarketDataConfig()
   const primary = md.providers.equity
   const extra = new Set(md.extraVendors)
 
-  return executor
+  const embedded = executor
     .listProviders()
     .filter((p) => p.vendorMeta)
     .map((p): MarketVendorInfo => {
@@ -61,7 +75,17 @@ export async function listMarketVendors(executor: QueryExecutor): Promise<Market
         website: p.website,
       }
     })
-    .sort(
+  const native = nativeVendors.map((vendor): MarketVendorInfo => ({
+    id: vendor.id,
+    name: vendor.name,
+    enabled: vendor.enabled(md),
+    alwaysOn: false,
+    keyless: vendor.keyless,
+    coverage: vendor.coverage,
+    howToUse: vendor.howToUse,
+    website: vendor.website,
+  }))
+  return [...embedded, ...native].sort(
       (a, b) =>
         Number(b.alwaysOn) - Number(a.alwaysOn) ||
         Number(b.enabled) - Number(a.enabled) ||
@@ -84,11 +108,18 @@ export async function setMarketVendor(
   executor: QueryExecutor,
   id: string,
   enabled: boolean,
+  nativeVendors: NativeMarketVendor[] = [],
 ): Promise<SetVendorResult> {
+  const native = nativeVendors.find((vendor) => vendor.id.toLowerCase() === id.trim().toLowerCase())
+  if (native) {
+    if (!native.setEnabled) throw new Error(`Vendor "${native.id}" cannot be toggled.`)
+    await native.setEnabled(enabled)
+    return { id: native.id, enabled, vendors: await listMarketVendors(executor, nativeVendors) }
+  }
   const known = executor.listProviders().filter((p) => p.vendorMeta)
   const target = known.find((p) => p.name.toLowerCase() === id.trim().toLowerCase())
   if (!target) {
-    const names = known.map((p) => p.name).join(', ')
+    const names = [...known.map((p) => p.name), ...nativeVendors.map((vendor) => vendor.id)].join(', ')
     throw new Error(`Unknown market vendor "${id}". Available vendors: ${names}.`)
   }
 
@@ -103,5 +134,16 @@ export async function setMarketVendor(
     enabled ? [...current, target.name] : current.filter((v) => v !== target.name),
   )
 
-  return { id: target.name, enabled, vendors: await listMarketVendors(executor) }
+  return { id: target.name, enabled, vendors: await listMarketVendors(executor, nativeVendors) }
+}
+
+export const TUSHARE_VENDOR: NativeMarketVendor = {
+  id: 'tushare',
+  name: 'Tushare Pro',
+  keyless: false,
+  coverage: 'China A-shares, indices, fundamentals, calendars, classifications and daily qfq bars',
+  howToUse: 'Enable it and configure a token, then search by ts_code (600519.SH), ticker, Chinese name, or pinyin.',
+  website: 'https://tushare.pro',
+  enabled: (config) => config.tushare.enabled,
+  setEnabled: async (enabled) => { await updateTushareEnabled(enabled) },
 }

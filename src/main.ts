@@ -39,6 +39,7 @@ import type { EquityClientLike, CryptoClientLike, CurrencyClientLike, EtfClientL
 import { buildSDKCredentials } from './domain/market-data/credential-map.js'
 import { createMarketSearchTools } from './tool/market.js'
 import { createVendorTools } from './tool/market-vendors.js'
+import { createChinaTools } from './tool/china.js'
 import { createQuantTools } from './tool/quant.js'
 import { createSnapshotTools } from './tool/snapshot.js'
 import { createSimulateTools } from './tool/simulate.js'
@@ -49,6 +50,9 @@ import { createReferenceBoardTools } from './tool/reference-board.js'
 import { createDerivativesTools } from './tool/derivatives.js'
 import { createIndexTools } from './tool/indices.js'
 import { createEconomyTools } from './tool/economy.js'
+import { TushareClient } from './domain/market-data/tushare/client.js'
+import { TushareService } from './domain/market-data/tushare/service.js'
+import { TUSHARE_VENDOR } from './domain/market-data/vendors.js'
 import { SessionStore } from './core/session.js'
 import { createInboxStore } from './core/inbox-store.js'
 import { startInboxConnectorBridge } from './services/connector-client/index.js'
@@ -205,6 +209,19 @@ async function main() {
   const commodityCatalog = new CommodityCatalog()
   commodityCatalog.load()
 
+  // Native China-market provider. Credentials, enabled state and endpoint are
+  // deliberately read per request so scheduled token rotation is immediate.
+  const tushare = new TushareService(new TushareClient({
+    getConfig: async () => {
+      const md = await readMarketDataConfig()
+      return {
+        enabled: md.tushare.enabled,
+        baseUrl: md.tushare.baseUrl,
+        token: md.providerKeys.tushare,
+      }
+    },
+  }))
+
   // Default equity vendor + user-opted incremental vendors (eastmoney, …),
   // de-duped, fanned out in searchBars; yfinance stays the always-on default.
   // Resolved PER search (not a boot snapshot) so a vendor the agent enables at
@@ -215,7 +232,18 @@ async function main() {
     return [...new Set([md.providers.equity, ...md.extraVendors])]
   }
 
-  const marketSearch = { symbolIndex, equityVendors: getEquityVendors, equityClient, cryptoClient, currencyClient, commodityCatalog }
+  const marketSearch = {
+    symbolIndex,
+    equityVendors: getEquityVendors,
+    equityClient,
+    cryptoClient,
+    currencyClient,
+    commodityCatalog,
+    nativeEquitySources: [{
+      sourceId: 'tushare',
+      search: (query: string, limit: number) => tushare.searchStocks(query, limit),
+    }],
+  }
 
   // Federated bar layer — embedded vendor adapters + broker (UTA) OHLCV behind one
   // barId-keyed interface. Vendor branch live now; UTA branch lands with Phase 1.
@@ -227,6 +255,7 @@ async function main() {
     commodityClient,
     utaManager,
     vendorProviders: config.marketData.providers,
+    nativeVendors: { tushare: { getBars: (symbol, opts) => tushare.getBars(symbol, opts), barCapability: 'delayed' } },
   })
 
   // Hub-first calendars: tools, CLI and boards all inherit through the
@@ -258,9 +287,10 @@ async function main() {
   )
 
   toolCenter.register(createMarketSearchTools(marketSearch), 'market-search')
-  toolCenter.register(createVendorTools(getSDKExecutor()), 'market-vendors')
+  toolCenter.register(createVendorTools(getSDKExecutor(), [TUSHARE_VENDOR]), 'market-vendors')
   toolCenter.register(createReferenceBoardTools(reference), 'market-board')
-  toolCenter.register(createEquityTools(equityClient), 'equity')
+  toolCenter.register(createEquityTools(equityClient, tushare), 'equity')
+  toolCenter.register(createChinaTools(tushare), 'china')
   if (etfClient) {
     toolCenter.register(createEtfTools(etfClient), 'etf')
   }
