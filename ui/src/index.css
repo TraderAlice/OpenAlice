@@ -651,19 +651,19 @@ body {
    - .text-micro    badges, timestamps, table metadata */
 
 .text-display {
-  @apply text-[28px] md:text-[36px] font-bold leading-tight tabular-nums;
+  @apply text-[28px] leading-[34px] font-bold tabular-nums md:text-[36px] md:leading-[42px];
 }
 .text-title {
-  @apply text-[16px] font-semibold leading-snug;
+  @apply text-[16px] leading-[22px] font-semibold;
 }
 .text-body {
-  @apply text-[13px] leading-relaxed;
+  @apply text-[13px] leading-5;
 }
 .text-caption {
-  @apply text-[12px] leading-relaxed;
+  @apply text-[12px] leading-[18px];
 }
 .text-micro {
-  @apply text-[11px] tracking-wide;
+  @apply text-[11px] leading-[15px] tracking-wide;
 }
 
 /* Page headers normally keep compact actions inline. Dense operational
