@@ -138,6 +138,12 @@ mouse reporting. Its ordinary path is intentionally parameter-free:
   exposes the current primary action and a few adjacent actions as keycaps;
   `?` keeps the complete keyboard reference available without crowding every
   operational page;
+- Help is a grouped keyboard map rather than another prose screen. Update,
+  Setup, AliceProject selection, Runtime Source, and Remote Transfer use the
+  same bordered overlay shell and semantic selected/description states.
+  Lifecycle, managed-source, and update confirmations use matching framed cards
+  with explicit confirm/cancel keycaps. Existing Esc, validation, confirmation,
+  and hardware-cursor contracts remain unchanged;
 - registered Machines refresh in the background with one bounded,
   non-interactive (`BatchMode=yes`) SSH inventory request each. Registered,
   checking, online, unauthorized, offline, and incompatible remain distinct

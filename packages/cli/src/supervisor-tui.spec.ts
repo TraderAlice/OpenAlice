@@ -1002,7 +1002,7 @@ describe('Supervisor TUI screen', () => {
 
     expect(screen.handleKey('?', matchesKey)).toBe(true)
     expect(screen.snapshot.panel).toBe('help')
-    expect(screen.render(100).join('\n')).toContain('Supervisor controls')
+    expect(screen.render(100).join('\n')).toContain('Help · Keyboard map')
   })
 
   it('renders a machine-level recovery shell and gates project actions', () => {
@@ -1062,7 +1062,7 @@ describe('Supervisor TUI screen', () => {
 
     expect(screen.handleKey('tab', matchesKey)).toBe(true)
     expect(screen.snapshot.panel).toBe('help')
-    expect(screen.render(100).join('\n')).toContain('Supervisor recovery controls')
+    expect(screen.render(100).join('\n')).toContain('Help · Recovery mode')
     expect(screen.render(100).join('\n')).not.toContain('i  Select or create')
 
     expect(screen.handleKey('u', matchesKey)).toBe(true)

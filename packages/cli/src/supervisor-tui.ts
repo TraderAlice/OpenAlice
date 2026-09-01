@@ -416,6 +416,7 @@ export async function runSupervisorTui(
     join(supervisorRoot, 'logs'),
   )
   const canvas = createSupervisorTerminalCanvas(stdout, dependencies.env ?? process.env)
+  const tuiTheme = createSupervisorTuiTheme(dependencies.env ?? process.env)
   let active = true
   let actionRunning = false
   let sourcePromptActive = false
@@ -475,7 +476,7 @@ export async function runSupervisorTui(
       void prepareManagedSourceAndStart()
     },
     requestRender: () => ui.requestRender(),
-    theme: createSupervisorTuiTheme(dependencies.env ?? process.env),
+    theme: tuiTheme,
   })
   ui.addChild(screen)
 
@@ -812,11 +813,11 @@ export async function runSupervisorTui(
       },
     ]
     const theme: SelectListTheme = {
-      selectedPrefix: (text) => text,
-      selectedText: (text) => text,
-      description: (text) => text,
-      scrollInfo: (text) => text,
-      noMatch: (text) => text,
+      selectedPrefix: (text) => tuiTheme.accentStrong(text),
+      selectedText: (text) => tuiTheme.selected(text),
+      description: (text) => tuiTheme.muted(text),
+      scrollInfo: (text) => tuiTheme.muted(text),
+      noMatch: (text) => tuiTheme.warning(text),
     }
     const list = new piTui.SelectList(items, items.length, theme)
     list.setSelectedIndex(Math.max(
@@ -844,14 +845,14 @@ export async function runSupervisorTui(
     }
     const panel = new (class implements Component {
       render(width: number): string[] {
-        return [
-          'OpenAlice update channel',
-          '─'.repeat(Math.max(1, width)),
+        return renderSupervisorPanel('Update Channel', 'Choose release lane', [
+          ...list.render(Math.max(1, width - 4)),
           '',
-          ...list.render(width),
-          '',
-          'Enter  Check selected channel · Esc  Cancel',
-        ]
+          ...renderSupervisorCommandBar([
+            { key: 'Enter', label: 'Check channel', primary: true },
+            { key: 'Esc', label: 'Cancel' },
+          ], Math.max(1, width - 4)),
+        ], width)
       }
 
       handleInput(data: string): void {
@@ -1128,16 +1129,16 @@ export async function runSupervisorTui(
       }
 
       override render(width: number): string[] {
-        return [
-          'Configure Runtime source',
-          '',
+        return renderSupervisorPanel('Runtime Source', 'AliceProject setting', [
           sanitize(this.detail),
           '',
-          ...super.render(width),
+          ...super.render(Math.max(1, width - 4)),
           '',
-          'Enter  Save for this AliceProject and start',
-          'Esc    Cancel',
-        ]
+          ...renderSupervisorCommandBar([
+            { key: 'Enter', label: 'Save & start', primary: true },
+            { key: 'Esc', label: 'Cancel' },
+          ], Math.max(1, width - 4)),
+        ], width)
       }
     })()
     input.setValue(sourceContext.appDir ?? process.cwd())
@@ -1530,11 +1531,11 @@ export async function runSupervisorTui(
     }
 
     const theme: SettingsListTheme = {
-      label: (text) => text,
-      value: (text) => text,
-      description: (text) => text,
-      cursor: '> ',
-      hint: (text) => text,
+      label: (text) => tuiTheme.accentStrong(text),
+      value: (text) => tuiTheme.accent(text),
+      description: (text) => tuiTheme.muted(text),
+      cursor: tuiTheme.accentStrong('› '),
+      hint: (text) => tuiTheme.muted(text),
     }
     settings = new piTui.SettingsList(
       items,
@@ -1547,14 +1548,11 @@ export async function runSupervisorTui(
     )
     const panel = new (class implements Component {
       render(width: number): string[] {
-        return [
-          `OpenAlice setup · ${settingsContext.aliceProject.displayName}`,
-          '─'.repeat(Math.max(1, width)),
-          '',
-          ...settings.render(width),
+        return renderSupervisorPanel('Setup', settingsContext.aliceProject.displayName, [
+          ...settings.render(Math.max(1, width - 4)),
           '',
           sanitize(message),
-        ]
+        ], width)
       }
 
       handleInput(data: string): void {
@@ -1649,11 +1647,11 @@ export async function runSupervisorTui(
     }
 
     const theme: SelectListTheme = {
-      selectedPrefix: (text) => text,
-      selectedText: (text) => text,
-      description: (text) => text,
-      scrollInfo: (text) => text,
-      noMatch: (text) => text,
+      selectedPrefix: (text) => tuiTheme.accentStrong(text),
+      selectedText: (text) => tuiTheme.selected(text),
+      description: (text) => tuiTheme.muted(text),
+      scrollInfo: (text) => tuiTheme.muted(text),
+      noMatch: (text) => tuiTheme.warning(text),
     }
     const list = new piTui.SelectList(items, 8, theme, {
       minPrimaryColumnWidth: 20,
@@ -1832,14 +1830,11 @@ export async function runSupervisorTui(
 
     const panel = new (class implements Component {
       render(width: number): string[] {
-        return [
-          'OpenAlice AliceProjects',
-          '─'.repeat(Math.max(1, width)),
-          '',
-          ...component.render(width),
+        return renderSupervisorPanel('AliceProjects', projectContext.aliceProject.displayName, [
+          ...component.render(Math.max(1, width - 4)),
           '',
           sanitize(message),
-        ]
+        ], width)
       }
 
       handleInput(data: string): void {
@@ -1890,11 +1885,11 @@ export async function runSupervisorTui(
     let message = 'Choose the SSH Machine that will own the new AliceProject.'
     let transferController: AbortController | null = null
     const theme: SelectListTheme = {
-      selectedPrefix: (text) => text,
-      selectedText: (text) => text,
-      description: (text) => text,
-      scrollInfo: (text) => text,
-      noMatch: (text) => text,
+      selectedPrefix: (text) => tuiTheme.accentStrong(text),
+      selectedText: (text) => tuiTheme.selected(text),
+      description: (text) => tuiTheme.muted(text),
+      scrollInfo: (text) => tuiTheme.muted(text),
+      noMatch: (text) => tuiTheme.warning(text),
     }
     const setMessage = (next: string) => { message = next; ui.requestRender() }
     const close = (notice = 'Transfer cancelled. Nothing changed.') => {
@@ -2128,7 +2123,13 @@ export async function runSupervisorTui(
     })
     showDestination()
     const panel = new (class implements Component {
-      render(width: number): string[] { return ['AliceProject Remote Transfer', '─'.repeat(Math.max(1, width)), '', ...component.render(width), '', sanitize(message)] }
+      render(width: number): string[] {
+        return renderSupervisorPanel('Remote Transfer', source.displayName, [
+          ...component.render(Math.max(1, width - 4)),
+          '',
+          sanitize(message),
+        ], width)
+      }
       handleInput(data: string): void { component.handleInput?.(data) }
       invalidate(): void { component.invalidate() }
     })()
@@ -2648,7 +2649,7 @@ export class SupervisorScreen implements Component {
     } else if (this.snapshot.panel === 'doctor') {
       lines.push(...renderDoctor(this.snapshot.doctor, width, this.doctorOffset))
     } else if (this.snapshot.panel === 'help') {
-      lines.push(...renderHelp(isConfigRecovery(this.snapshot)))
+      lines.push(...renderHelp(isConfigRecovery(this.snapshot), width))
     } else if (isConfigRecovery(this.snapshot)) {
       lines.push(...renderConfigRecovery(this.snapshot))
     } else {
@@ -2682,6 +2683,7 @@ export class SupervisorScreen implements Component {
         runtime,
         this.snapshot.managedSource,
         this.snapshot.update,
+        width,
       ))
     }
     if (this.snapshot.busy) lines.push('', `Working: ${this.snapshot.busy}…`)
@@ -2712,7 +2714,13 @@ export class SupervisorScreen implements Component {
                 { key: 'Home', label: 'Top' },
                 { key: '?', label: 'More' },
               ], width)
-            : actionBar(runtime, this.snapshot.context, width, isConfigRecovery(this.snapshot))),
+            : this.snapshot.panel === 'help'
+              ? renderSupervisorCommandBar([
+                  { key: '?', label: 'Close help', primary: true },
+                  { key: 'Tab', label: 'Next view' },
+                  { key: 'q', label: 'Detach' },
+                ], width)
+              : actionBar(runtime, this.snapshot.context, width, isConfigRecovery(this.snapshot))),
       'q / Esc / Ctrl+C  Detach without stopping',
     )
     return decorateSupervisorFrame(
@@ -3002,38 +3010,36 @@ function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(Math.max(value, minimum), maximum)
 }
 
-function renderHelp(recovery = false): string[] {
+function renderHelp(recovery: boolean, width: number): string[] {
   if (recovery) {
-    return [
-      'Supervisor recovery controls',
-      '',
+    return renderSupervisorPanel('Help', 'Recovery mode', [
       'AliceProject configuration cannot be read by this OpenAlice.',
       'This shell will not inspect, start, stop, open, or configure a project.',
       '',
-      'u  Choose stable, beta, or dev; then check and install',
-      '?  Toggle this help',
-      'q / Esc  Detach only',
+      'RECOVERY',
+      '[ u ]       Choose a channel, then check and install',
+      '[ ? ]       Close this help',
+      '[ q / Esc ] Detach only',
       '',
       'After a successful update, exit and run openalice again. This process does not reload.',
-    ]
+    ], width)
   }
-  return [
-    'Supervisor controls',
+  return renderSupervisorPanel('Help', 'Keyboard map', [
+    'NAVIGATION',
+    '[ Tab / → ] Next view          [ Shift+Tab / ← ] Previous view',
+    '[ ↑ / ↓ ]   Move or scroll     [ PgUp / PgDn ]  Page content',
     '',
-    'Enter  Start and open / open Web UI',
-    's  Start in background            o  Open verified Web UI',
-    'x  Stop (confirmation required)   r  Restart (confirmation required)',
-    'l  Bounded redacted logs          d  Read-only Doctor',
-    'u  Choose stable, beta, or dev; then check and install',
-    '?  Toggle this help',
-    'i  Select or create an AliceProject',
-    'p  Review setup for this AliceProject',
-    'm  Fleet: transfer local project · Overview: prepare managed source',
-    'c  Advanced: choose and remember a source checkout',
-    'Tab / arrows  Change panel        q / Esc  Detach only',
+    'RUNTIME',
+    '[ Enter ] Primary action       [ s ] Start quietly   [ o ] Open',
+    '[ r ] Restart with confirm     [ x ] Stop with confirm',
+    '[ l ] Logs                     [ d ] Doctor           [ u ] Update',
     '',
-    'The Supervisor manages Runtime state. Workspaces, trading, and chat stay in the Web UI.',
-  ]
+    'PROJECT',
+    '[ i ] AliceProjects            [ p ] Setup             [ m ] Transfer / managed source',
+    '[ c ] Source checkout          [ ? ] Close help        [ q / Esc ] Detach',
+    '',
+    'Runtime control stays here; Workspaces, trading, and chat stay in the Web UI.',
+  ], width)
 }
 
 function renderConfigRecovery(snapshot: SupervisorSnapshot): string[] {
@@ -3052,40 +3058,53 @@ function renderConfirmation(
   runtime: RuntimeSummary | null,
   managedSource?: ManagedSourcePlan | null,
   update?: UpdateResult | null,
+  width = 80,
 ): string[] {
   if (action === 'update') {
     const target = formatUpdateCandidate(update)
     const sourceChannel = update?.sourceChannel ?? 'current'
     const targetChannel = update?.channel ?? 'selected'
-    return [
+    return renderSupervisorPanel('Confirm Update', target, [
       sourceChannel === targetChannel
         ? `Install OpenAlice ${target} from ${targetChannel} now?`
         : `Switch ${sourceChannel} → ${targetChannel} and install OpenAlice ${target}?`,
       `Current CLI: ${update?.currentVersion ?? 'this running process'}.`,
       'This downloads the release installer, verifies its SHA-256, and atomically replaces the installed command.',
       'This running Supervisor will not reload. After success, exit and run openalice again.',
-      'Press y / Enter to install, n / Esc to cancel.',
-    ]
+      '',
+      ...renderSupervisorCommandBar([
+        { key: 'y / Enter', label: 'Install', primary: true },
+        { key: 'n / Esc', label: 'Cancel' },
+      ], Math.max(1, width - 4)),
+    ], width)
   }
   if (action === 'managed-source') {
     const selector = managedSource
       ? `${managedSource.selector.kind} ${managedSource.selector.value}`
       : 'the branch/version paired with this CLI'
-    return [
+    return renderSupervisorPanel('Confirm Managed Source', managedSource?.state ?? 'prepare', [
       `Prepare and use installer-managed OpenAlice source ${selector}?`,
       `Destination: ${managedSource?.appDir ?? 'the OpenAlice install root'}`,
       'First start may install dependencies and build the Runtime.',
-      'Press y / Enter to continue, n / Esc to cancel.',
-    ]
+      '',
+      ...renderSupervisorCommandBar([
+        { key: 'y / Enter', label: 'Continue', primary: true },
+        { key: 'n / Esc', label: 'Cancel' },
+      ], Math.max(1, width - 4)),
+    ], width)
   }
   const effect = action === 'stop'
     ? 'This stops the Guardian-owned Runtime and disconnects active Web/agent sessions.'
     : 'This stops and starts the Guardian-owned Runtime; active Web/agent sessions reconnect or end.'
-  return [
+  return renderSupervisorPanel(`Confirm ${action === 'stop' ? 'Stop' : 'Restart'}`, formatOwner(runtime), [
     `${action === 'stop' ? 'Stop' : 'Restart'} Runtime owned by ${formatOwner(runtime)}?`,
     effect,
-    'Press y / Enter to continue, n / Esc to cancel.',
-  ]
+    '',
+    ...renderSupervisorCommandBar([
+      { key: 'y / Enter', label: action === 'stop' ? 'Stop Runtime' : 'Restart Runtime', primary: true },
+      { key: 'n / Esc', label: 'Cancel' },
+    ], Math.max(1, width - 4)),
+  ], width)
 }
 
 function actionBar(

@@ -53,6 +53,9 @@ export function decorateSupervisorFrame(
     if (line.includes('│ × ')) return theme.danger(line)
     if (line.includes('│ ! ')) return theme.warning(line)
     if (line.includes('│ ✓ ')) return theme.success(line)
+    if (line.includes('│ NAVIGATION') || line.includes('│ RUNTIME') || line.includes('│ PROJECT') || line.includes('│ RECOVERY')) {
+      return theme.accentStrong(line)
+    }
     if (line.startsWith('╭')) return theme.accent(line)
     if (line.startsWith('╰')) return theme.muted(line)
     if (line.includes('[ Enter ]') || line.startsWith('◆ [')) return theme.accentStrong(line)

@@ -172,7 +172,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         if (!openedHelp && output.includes('q / Esc / Ctrl+C  Detach without stopping')) {
           openedHelp = true
           child.write('?')
-        } else if (!detached && output.includes('Supervisor controls')) {
+        } else if (!detached && output.includes('Help · Keyboard map')) {
           detached = true
           child.write('q')
         }
@@ -187,7 +187,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('OpenAlice Supervisor')
     expect(transcript).toContain(`v${cliVersion} · DEV`)
     expect(transcript).toContain('○ STOPPED')
-    expect(transcript).toContain('Supervisor controls')
+    expect(transcript).toContain('Help · Keyboard map')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   })
@@ -347,7 +347,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         if (!requestedStart && output.includes('Start OpenAlice & open Workspace')) {
           requestedStart = true
           child.write('s')
-        } else if (!submittedInvalidPath && output.includes('Configure Runtime source')) {
+        } else if (!submittedInvalidPath && output.includes('Runtime Source · AliceProject setting')) {
           submittedInvalidPath = true
           child.write('\u0005\u0015/definitely/not/openalice\r')
         } else if (!cancelledPrompt && output.includes('Could not use that checkout')) {
@@ -365,7 +365,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       })
     })
 
-    expect(transcript).toContain('Configure Runtime source')
+    expect(transcript).toContain('Runtime Source · AliceProject setting')
     expect(transcript).toContain('Could not use that checkout')
     expect(transcript).toContain('Source configuration cancelled.')
     expect(transcript).toContain('\u001b[?25h')
@@ -446,7 +446,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('OpenAlice Supervisor')
     expect(transcript).toContain(`v${cliVersion} · DEV`)
     expect(transcript).toContain('installer-managed OpenAlice source branch dev')
-    expect(transcript).not.toContain('Configure Runtime source')
+    expect(transcript).not.toContain('Runtime Source · AliceProject setting')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   })
@@ -487,7 +487,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         if (!openedSettings && output.includes('[ p ] Setup')) {
           openedSettings = true
           child.write('p')
-        } else if (!selectedPort && output.includes('OpenAlice setup · Default AliceProject')) {
+        } else if (!selectedPort && output.includes('Setup · Default AliceProject')) {
           selectedPort = true
           child.write('\u001b[B\u001b[B\r')
         } else if (!submittedPort && output.includes('Set AliceProject browser port')) {
@@ -518,7 +518,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       await readFile(join(supervisorHome, 'config.json'), 'utf8'),
     )
     expect(config.projects.default.port).toBe(49_001)
-    expect(transcript).toContain('OpenAlice setup · Default AliceProject')
+    expect(transcript).toContain('Setup · Default AliceProject')
     expect(transcript).toContain('Set AliceProject browser port')
     expect(transcript).toContain('Saved browser port for AliceProject "Default AliceProject".')
     expect(transcript).toContain('Notice: Setup closed.')
@@ -703,7 +703,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       name: 'research',
       home: await realpath(join(isolatedHome, '.openalice-research')),
     })
-    expect(transcript).toContain('OpenAlice AliceProjects')
+    expect(transcript).toContain('AliceProjects · Default AliceProject')
     expect(transcript).toContain('Created and selected AliceProject Research.')
     expect(transcript).toContain('Selected AliceProject Default AliceProject; future bare starts use it.')
     expect(transcript).toContain('\u001b[?25h')

@@ -103,7 +103,7 @@ already large `supervisor-tui.ts` application controller.
   than a flat field dump.
 - [x] Upgrade Logs and Doctor with scroll/follow/filter or actionable diagnostic
   presentation inside the existing read-only contracts.
-- [ ] Upgrade Help, Setup, Project selection, Update, source, and transfer flows
+- [x] Upgrade Help, Setup, Project selection, Update, source, and transfer flows
   to consistent overlays and dialogs.
 - [ ] Dogfood the real `pnpm cli` surface across wide, 80x24, and narrow sizes;
   inspect mouse, resize, copy/selection, signal exit, and failure recovery.
@@ -138,6 +138,12 @@ already large `supervisor-tui.ts` application controller.
   live-tail state, keyboard paging, End-to-latest, mouse-wheel navigation, and a
   contextual reload bar. Doctor renders its summary and checks as semantic
   pass/warn/fail rows with the same keyboard and pointer scroll model.
+- Help is now a grouped keyboard map with its own contextual footer. Update,
+  Setup, AliceProject selection, and Remote Transfer share the bordered panel
+  primitive plus OMP-style selected rows, muted descriptions, and warning
+  states. Runtime Source and lifecycle/update confirmations now use the same
+  framed cards and contextual keycaps. Their existing PTY-driven input,
+  validation, and recovery state machines remain intact.
 
 ## Completion Criteria
 
