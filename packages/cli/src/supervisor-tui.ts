@@ -88,6 +88,11 @@ import {
   type SupervisorTuiTheme,
 } from './supervisor-tui-theme.ts'
 import {
+  decorateSupervisorSetupStudio,
+  renderSupervisorSetupStudio,
+  type SupervisorSetupItem,
+} from './supervisor-setup-view.ts'
+import {
   createSupervisorHelpState,
   moveSupervisorHelpSelection,
   normalizeSupervisorHelpState,
@@ -1466,6 +1471,7 @@ export async function runSupervisorTui(
     let saving = false
     let settingsSelectedIndex = 0
     let settingsSubmenuOpen = false
+    let settingsHoveredCommand: string | undefined
     let scope: typeof PROJECT_SCOPE | typeof MACHINE_SCOPE = PROJECT_SCOPE
     let message = 'Changes apply to this AliceProject. Environment and command-line overrides remain locked.'
     const items: SettingItem[] = []
@@ -1480,6 +1486,7 @@ export async function runSupervisorTui(
       settingsActive = false
       closeSettings = null
       overlayPointer.clear()
+      settingsHoveredCommand = undefined
       overlay.hide()
       ui.setShowHardwareCursor(false)
       screen.update({ notice })
@@ -1784,6 +1791,7 @@ export async function runSupervisorTui(
       () => close(),
     )
     const moveSettings = (delta: -1 | 1) => {
+      settingsHoveredCommand = undefined
       settingsSelectedIndex = delta < 0
         ? settingsSelectedIndex === 0 ? items.length - 1 : settingsSelectedIndex - 1
         : settingsSelectedIndex === items.length - 1 ? 0 : settingsSelectedIndex + 1
@@ -1815,29 +1823,60 @@ export async function runSupervisorTui(
     } as const
     const panel = new (class implements Component {
       render(width: number): string[] {
-        const settingsLines = settings.render(Math.max(1, width - 4))
-        const lines = renderSupervisorPanel('Setup', settingsContext.aliceProject.displayName, [
-          ...settingsLines,
-          '',
-          sanitize(message),
-        ], width)
-        const list = settingsSubmenuOpen
-          ? undefined
-          : {
-              firstRow: 2,
-              indexes: supervisorVisibleListIndexes(settingsSelectedIndex, items.length, 6),
-              select: (index: number) => {
-                while (settingsSelectedIndex !== index) moveSettings(1)
-                ui.requestRender()
-              },
-              activate: () => handleSettingsInput('\r'),
-              move: (delta: -1 | 1) => {
-                moveSettings(delta)
-                ui.requestRender()
-              },
-            }
-        captureOverlayPointer(lines, width, overlayOptions, (data) => this.handleInput(data), list)
-        return lines
+        if (settingsSubmenuOpen) {
+          const lines = renderSupervisorPanel('Setup Editor', settingsContext.aliceProject.displayName, [
+            ...settings.render(Math.max(1, width - 4)),
+            '',
+            sanitize(message),
+          ], width)
+          captureOverlayPointer(lines, width, overlayOptions, (data) => this.handleInput(data))
+          return lines
+        }
+        const studioItems: SupervisorSetupItem[] = items.map((item) => ({
+          id: item.id,
+          label: item.label,
+          value: sanitize(item.currentValue),
+          description: sanitize(item.description ?? 'No additional setup guidance is available.'),
+          kind: item.submenu ? 'editor' : item.values?.length ? 'choice' : 'readonly',
+        }))
+        const studio = renderSupervisorSetupStudio({
+          projectName: settingsContext.aliceProject.displayName,
+          scope: scope === MACHINE_SCOPE ? 'Machine defaults' : 'AliceProject',
+          runtimeClass: screen.snapshot.runtime?.class,
+          message: sanitize(message),
+          items: studioItems,
+          selected: settingsSelectedIndex,
+        }, width)
+        const firstTarget = studio.targets[0]
+        const list = {
+          firstRow: firstTarget?.row ?? 2,
+          indexes: studio.targets.map((target) => target.index),
+          startColumn: firstTarget?.startColumn ?? 2,
+          endColumn: firstTarget?.endColumn ?? Math.max(2, width - 1),
+          select: (index: number) => {
+            while (settingsSelectedIndex !== index) moveSettings(1)
+            settingsHoveredCommand = undefined
+            ui.requestRender()
+          },
+          activate: () => handleSettingsInput('\r'),
+          move: (delta: -1 | 1) => {
+            moveSettings(delta)
+            ui.requestRender()
+          },
+        }
+        captureOverlayPointer(
+          studio.lines,
+          width,
+          overlayOptions,
+          (data) => this.handleInput(data),
+          list,
+          (label) => {
+            if (settingsHoveredCommand === label) return
+            settingsHoveredCommand = label
+            ui.requestRender()
+          },
+        )
+        return decorateSupervisorSetupStudio(studio.lines, tuiTheme, settingsHoveredCommand)
       }
 
       handleInput(data: string): void {

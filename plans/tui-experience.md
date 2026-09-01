@@ -259,6 +259,21 @@ not imply maintainer approval of the finished interaction.
   and adapts hover, wheel, and click into each existing component’s keyboard
   state machine. No lifecycle or configuration action gains a second path.
 
+### Setup Studio decision
+
+- Recoloring the existing single-column `SettingsList` would retain its proven
+  mutation semantics, but selected value, precedence explanation, and next
+  action would continue competing in one dense text stack.
+- Copying OMP's four-step onboarding literally would look polished but falsely
+  imply that OpenAlice's independent setup fields must be completed in order.
+- The selected model keeps the existing non-linear settings state machine and
+  replaces only its presentation with an OMP-inspired Setup Studio. Wide
+  overlays pair a compact setting map with a selected-item Inspector; the
+  80-column baseline stacks the same regions. Current value, layer, Runtime
+  state, impact copy, and the one valid action stay visible together. Split-pane
+  pointer columns prevent Inspector actions from activating the adjacent list,
+  and complete action labels still emit only Enter/Esc.
+
 ### Persistent context-ribbon decision
 
 - Expanding the animated brand header would make version/update presentation
@@ -383,6 +398,8 @@ already large `supervisor-tui.ts` application controller.
   overlay cards and confirmation modals without new action paths.
 - [x] Add a shared proportional scroll rail to overflowing Event Lens, Doctor,
   Machine, and AliceProject windows without changing selection or pointer state.
+- [x] Replace the legacy Setup settings stack with a responsive Setup Studio
+  map/Inspector while preserving the existing configuration mutation path.
 
 ## Progress
 
@@ -714,6 +731,22 @@ already large `supervisor-tui.ts` application controller.
   skipped; 6108 tests passed, 10 skipped). Docker installer smoke passes, and
   package dry-run includes both `src/supervisor-display.ts` and
   `src/supervisor-scroll-rail.ts`.
+- Setup is now a responsive Setup Studio rather than a legacy settings stack.
+  An actual isolated OMP 17.3.4 session informed the map/Inspector hierarchy,
+  explicit step identity, selected-row treatment, action shelf, and scroll
+  affordance without copying its sequential onboarding model. Wide layouts keep
+  the six-field map beside current value, Runtime state, guidance, and action;
+  the 80-column baseline stacks the same complete model. Split-pane pointer
+  bounds prevent Inspector actions from selecting adjacent rows, while the
+  existing `SettingsList` remains the sole keyboard and mutation authority.
+- Setup-Studio acceptance passes with 75 focused view, pointer, screen, and
+  real-PTY tests. A real 110×30 session hovered and clicked `Cycle value`
+  outside its keycap, changed the editing layer, and restored cursor, mouse,
+  and bracketed-paste modes. The narrow render also exposed and fixed a shared
+  panel-title overflow. Root TypeScript, CLI build/typecheck, and the 694-file
+  suite pass (693 passed, 1 skipped; 6113 tests passed, 10 skipped). Docker
+  installer smoke passes, and package dry-run includes
+  `src/supervisor-setup-view.ts`.
 
 ## Completion Criteria
 

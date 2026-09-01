@@ -19,6 +19,8 @@ export interface SupervisorOverlayOptions {
 export interface SupervisorOverlayListTarget {
   firstRow: number
   indexes: number[]
+  startColumn?: number
+  endColumn?: number
   select(index: number): void
   activate(): void
   move(delta: -1 | 1): void
@@ -179,12 +181,15 @@ export class SupervisorOverlayPointerRouter {
     if (event.motion) frame.hoverCommand?.(command?.label)
 
     const list = frame.list
-    if (event.wheel && list) {
+    const inListColumns = Boolean(list)
+      && localColumn >= (list?.startColumn ?? 1)
+      && localColumn <= (list?.endColumn ?? frame.width)
+    if (event.wheel && list && inListColumns) {
       list.move(event.wheel)
       return true
     }
 
-    if (list) {
+    if (list && inListColumns) {
       const offset = localRow - list.firstRow
       const index = list.indexes[offset]
       if (index !== undefined && (event.motion || event.leftClick)) {

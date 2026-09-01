@@ -238,6 +238,11 @@ export function supervisorCommandTargets(lines: string[]): SupervisorCommandTarg
       targets.push(...shelf)
       continue
     }
+    const embeddedShelf = embeddedSupervisorActionShelfTargets(line, rowIndex + 1)
+    if (embeddedShelf.length > 0) {
+      targets.push(...embeddedShelf)
+      continue
+    }
     for (const match of line.matchAll(/\[ ([^\]]+) \]/gu)) {
       if (match.index === undefined || !match[1]) continue
       const startColumn = displayWidth(line.slice(0, match.index)) + 1
@@ -250,6 +255,23 @@ export function supervisorCommandTargets(lines: string[]): SupervisorCommandTarg
     }
   }
   return targets
+}
+
+function embeddedSupervisorActionShelfTargets(
+  line: string,
+  row: number,
+): SupervisorCommandTarget[] {
+  const match = /[◆·] \[ [^\]]+ \] /u.exec(line)
+  if (match?.index === undefined) return []
+  const panelEnd = line.lastIndexOf('│')
+  if (panelEnd <= match.index) return []
+  const content = line.slice(match.index, panelEnd).trimEnd()
+  const offset = displayWidth(line.slice(0, match.index))
+  return supervisorActionShelfTargets(content, row).map((target) => ({
+    ...target,
+    startColumn: target.startColumn + offset,
+    endColumn: target.endColumn + offset,
+  }))
 }
 
 function supervisorActionShelfTargets(
@@ -286,7 +308,7 @@ function supervisorActionShelfTargets(
 function renderCard(title: string, body: string[], width: number): string[] {
   const safeWidth = Math.max(12, width)
   const innerWidth = safeWidth - 4
-  const titleText = ` ${title} `
+  const titleText = ` ${truncateDisplayWidth(title, Math.max(1, safeWidth - 4))} `
   const topFill = Math.max(0, safeWidth - displayWidth(titleText) - 2)
   return [
     `╭${titleText}${'─'.repeat(topFill)}╮`,

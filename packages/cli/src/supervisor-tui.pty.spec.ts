@@ -78,7 +78,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         } else if (!clicked && output.includes('│ › [ p ] Setup')) {
           clicked = true
           child.write('\u001b[<0;62;21M')
-        } else if (!closed && clicked && output.includes('╭ Setup · Default AliceProject')) {
+        } else if (!closed && clicked && output.includes('╭ Setup Studio · Default AliceProject')) {
           closed = true
           child.write('\u001b')
         } else if (!detached && closed && output.includes('Setup closed.')) {
@@ -94,7 +94,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     })
 
     expect(transcript).toContain('│ › [ p ] Setup')
-    expect(transcript).toContain('╭ Setup · Default AliceProject')
+    expect(transcript).toContain('╭ Setup Studio · Default AliceProject')
     expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=0')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
@@ -441,11 +441,11 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         if (!setupOpened && output.includes('[ / ] Commands') && output.includes('[ q ] Detach')) {
           setupOpened = true
           child.write('p')
-        } else if (!clickedScope && output.includes('Setup · Default AliceProject') && output.includes('Editing')) {
+        } else if (!clickedScope && output.includes('Setup Studio · Default AliceProject') && output.includes('Editing')) {
           clickedScope = true
-          child.write('\u001b[<32;10;6M')
-          child.write('\u001b[<0;10;6M')
-        } else if (!closed && output.includes('› Editing          Machine defaults')) {
+          child.write('\u001b[<32;10;3M')
+          child.write('\u001b[<0;10;3M')
+        } else if (!closed && output.includes('› Editing') && output.includes('Current · Machine defaults')) {
           closed = true
           child.write('\u001b')
           setTimeout(() => child.write('q'), 50)
@@ -458,7 +458,62 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       })
     })
 
-    expect(transcript).toContain('› Editing          Machine defaults')
+    expect(transcript).toContain('Current · Machine defaults')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it('clicks the wide Setup Studio Inspector action outside its keycap', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-setup-studio-action-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [cliEntry], {
+      cols: 110,
+      rows: 30,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let hovered = false
+      let clicked = false
+      let closed = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Setup Studio action timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!opened && output.includes('[ p ] Setup')) {
+          opened = true
+          child.write('p')
+        } else if (!hovered && output.includes('Setup Studio · Default AliceProject') && output.includes('Cycle value')) {
+          hovered = true
+          child.write('\u001b[<35;75;15M')
+        } else if (!clicked && output.includes('› [ Enter ] Cycle value')) {
+          clicked = true
+          child.write('\u001b[<0;75;15M')
+        } else if (!closed && clicked && output.includes('Current · Machine defaults')) {
+          closed = true
+          child.write('\u001b')
+          setTimeout(() => child.write('q'), 50)
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && closed) resolve(output)
+        else reject(new Error(`Supervisor Setup Studio action exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('› [ Enter ] Cycle value')
+    expect(transcript).toContain('Current · Machine defaults')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
@@ -556,7 +611,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           clickedSetup = true
           child.write('\u001b[<32;6;12M')
           child.write('\u001b[<0;6;12M')
-        } else if (!setupOpened && output.includes('Setup · Default AliceProject')) {
+        } else if (!setupOpened && output.includes('Setup Studio · Default AliceProject')) {
           setupOpened = true
           child.write('\u001b')
           setTimeout(() => child.write('q'), 50)
@@ -571,7 +626,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
 
     expect(transcript).toContain('Command Palette')
     expect(transcript).toContain('╭ Launchpad · AliceProject')
-    expect(transcript).toContain('Setup · Default AliceProject')
+    expect(transcript).toContain('Setup Studio · Default AliceProject')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
@@ -938,7 +993,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         if (!openedSettings && output.includes('[ p ] Setup')) {
           openedSettings = true
           child.write('p')
-        } else if (!selectedPort && output.includes('Setup · Default AliceProject')) {
+        } else if (!selectedPort && output.includes('Setup Studio · Default AliceProject')) {
           selectedPort = true
           child.write('\u001b[B\u001b[B\r')
         } else if (!submittedPort && output.includes('Set AliceProject browser port')) {
@@ -969,7 +1024,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       await readFile(join(supervisorHome, 'config.json'), 'utf8'),
     )
     expect(config.projects.default.port).toBe(49_001)
-    expect(transcript).toContain('Setup · Default AliceProject')
+    expect(transcript).toContain('Setup Studio · Default AliceProject')
     expect(transcript).toContain('Set AliceProject browser port')
     expect(transcript).toContain('Saved browser port for AliceProject "Default AliceProject".')
     expect(transcript).toContain('STATUS   Setup closed.')
@@ -1277,10 +1332,14 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         if (!openedSettings && output.includes('[ p ] Setup')) {
           openedSettings = true
           child.write('p')
-        } else if (!selectedPort && output.includes('44000 · locked')) {
+        } else if (!selectedPort && output.includes('Setup Studio · Default AliceProject')) {
           selectedPort = true
           child.write('\u001b[B\u001b[B')
-        } else if (!testedLockedPort && output.includes('Locked by --port.')) {
+        } else if (
+          !testedLockedPort
+          && output.includes('Current · 44000 · locked')
+          && output.includes('Locked by --port.')
+        ) {
           testedLockedPort = true
           child.write('\r')
           setTimeout(() => child.write('\u001b'), 50)

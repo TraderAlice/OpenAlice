@@ -447,6 +447,12 @@ describe('Supervisor TUI screen', () => {
         primary: false,
       },
     ])
+    expect(supervisorCommandTargets([
+      '│ left pane │   │ ◆ [ Enter ] Edit value  │  [ Esc ] Done │',
+    ])).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: 'Enter', surface: '◆ [ Enter ] Edit value', primary: true }),
+      expect.objectContaining({ label: 'Esc', surface: '[ Esc ] Done', primary: false }),
+    ]))
     const actions: SupervisorAction[] = []
     const settings = vi.fn()
     const detach = vi.fn()

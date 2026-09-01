@@ -271,7 +271,9 @@ path is intentionally parameter-free:
   AI vault copy is a separate command: `openalice project copy-ai-creds`;
 - `p` opens Setup for data home, browser port, update checks, and resolved
   Runtime/config provenance. Setup can edit either the selected AliceProject or
-  machine defaults inherited by projects;
+  machine defaults inherited by projects. Wide terminals present a Setup map
+  beside the selected field's Inspector; narrower terminals stack the same
+  complete regions;
 - `m` on Overview is an advanced control that confirms, prepares, remembers, and starts an installer-managed source
   aligned to the installed CLI branch/version;
 - `c` is an advanced control that chooses and remembers the selected AliceProject's source checkout;
@@ -360,6 +362,15 @@ only the implicit `default` may inherit its Home. Home and port remain
 read-only while the selected Runtime is active when the edited layer affects
 that Runtime. A machine default may still be changed while a higher project,
 environment, or flag layer shields the running AliceProject.
+
+Setup renders as a responsive Setup Studio rather than exposing the underlying
+settings widget directly. The map keeps all six fields and their EDIT/CYCLE/READ
+capability visible; the Inspector keeps the selected field's current resolved
+value, precedence or safety explanation, Runtime state, and complete Enter/Esc
+Action Shelf together. At wide sizes the regions are adjacent and pointer input
+is column-bounded, so clicking an Inspector action cannot select the row beside
+it. At the 80-column baseline they stack without changing keyboard order or the
+atomic configuration write path.
 
 Any selected-project value supplied by an environment variable or explicit
 CLI flag is shown with its resolved value and a locked provenance message; the

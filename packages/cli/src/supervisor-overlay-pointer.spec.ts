@@ -86,4 +86,37 @@ describe('Supervisor overlay pointer routing', () => {
     expect(router.route(pointer(37, 6))).toBe(true)
     expect(input).toHaveBeenCalledWith('\u001b')
   })
+
+  it('keeps split-pane list routing inside its declared columns', () => {
+    const select = vi.fn()
+    const activate = vi.fn()
+    const input = vi.fn()
+    const router = new SupervisorOverlayPointerRouter()
+    router.capture({
+      lines: [
+        '╭ List ─────╮   ╭ Inspection ─────────────────────╮',
+        '│ › Scope   │   │ ◆ [ Enter ] Cycle value         │',
+        '╰───────────╯   ╰──────────────────────────────────╯',
+      ],
+      width: 52,
+      terminalWidth: 60,
+      terminalHeight: 9,
+      options: { width: 52, anchor: 'center' },
+      list: {
+        firstRow: 2,
+        indexes: [0],
+        startColumn: 2,
+        endColumn: 13,
+        select,
+        activate,
+        move: vi.fn(),
+      },
+      input,
+    })
+
+    expect(router.route(pointer(35, 5))).toBe(true)
+    expect(input).toHaveBeenCalledWith('\r')
+    expect(select).not.toHaveBeenCalled()
+    expect(activate).not.toHaveBeenCalled()
+  })
 })
