@@ -14,7 +14,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
 
 # Agent-driven iterations often supersede an earlier commit before its Windows
 # job finishes. Keep only the latest PR run while never cancelling a master or
@@ -24,14 +23,15 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # UI and prose changes are built and tested on Ubuntu, but do not need to
-  # repeat the host-sensitive runtime suite on macOS and Windows. This is a
-  # deliberately narrow allowlist: every other path keeps the full matrix.
+  # Every PR keeps a small, deterministic contract/type gate. The beta
+  # classifier is loaded from the trusted base revision so a candidate cannot
+  # weaken its own release-preparation lane. Any classifier failure produces
+  # `false`, which fails beta preparation closed; routine integration still
+  # stays on its intentionally light branch lane.
   change-scope:
     if: github.event_name != 'push' || github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     outputs:
-      cross_platform: ${{ steps.changes.outputs.cross_platform }}
       beta_release_prep: ${{ steps.beta-release-prep.outcome == 'success' && steps.beta-release-prep.outputs.beta_release_prep || 'false' }}
 
     steps:
@@ -50,47 +50,12 @@ jobs:
           git show "${BASE_SHA}:scripts/classify-beta-release-prep.mjs" > "$RUNNER_TEMP/classify-beta-release-prep.mjs"
           node "$RUNNER_TEMP/classify-beta-release-prep.mjs" --github-output "$GITHUB_OUTPUT"
 
-      - name: Classify changed paths
-        id: changes
-        uses: actions/github-script@v9
-        with:
-          script: |
-            if (context.eventName !== "pull_request") {
-              core.info("Non-PR validation keeps the full platform matrix.");
-              core.setOutput("cross_platform", "true");
-              return;
-            }
-
-            const files = await github.paginate(github.rest.pulls.listFiles, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number,
-              per_page: 100,
-            });
-            const paths = files.flatMap((file) =>
-              file.previous_filename
-                ? [file.filename, file.previous_filename]
-                : [file.filename],
-            );
-            const isLightweight = (path) =>
-              path.startsWith("ui/") ||
-              path.startsWith("docs/") ||
-              /^[^/]+\.md$/i.test(path) ||
-              path === "LICENSE";
-            const platformSensitive = paths.filter((path) => !isLightweight(path));
-            const runCrossPlatform = paths.length === 0 || platformSensitive.length > 0;
-
-            core.info(`Changed paths: ${paths.join(", ") || "none reported"}`);
-            if (platformSensitive.length > 0) {
-              core.info(`Native host contracts required by: ${platformSensitive.join(", ")}`);
-            } else {
-              core.info("Only UI/docs paths changed; Ubuntu remains the PR gate.");
-            }
-            core.setOutput("cross_platform", String(runCrossPlatform));
-
   build:
-    # Dev pushes belong exclusively to the rolling CLI publication workflow.
-    if: github.event_name != 'push' || github.ref == 'refs/heads/master'
+    needs: change-scope
+    # Keep contracts and typecheck inside the stable aggregate gate for every
+    # PR. Exact beta preparation skips only the complete source build;
+    # classifier failures fall back to it.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
 
     steps:
@@ -107,12 +72,32 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm build
+      - name: Verify CI workflow contracts
+        run: pnpm test:workflow-contracts
+
+      - name: Typecheck root workspace
+        run: npx tsc --noEmit
+        timeout-minutes: 5
+
+      - name: Build complete workspace
+        if: >-
+          needs.change-scope.result != 'success' ||
+          needs.change-scope.outputs.beta_release_prep != 'true'
+        run: pnpm build
 
   test:
-    # Build and Vitest do not consume each other's output. Keep them on
-    # separate runners so either failure becomes actionable immediately.
-    if: github.event_name != 'push' || github.ref == 'refs/heads/master'
+    needs: change-scope
+    # Local verification plus build/type/contracts are the routine dev gate.
+    # Keep the full suite for master, scheduled, and manually requested runs.
+    # A classifier/preflight failure falls back to the full suite only where
+    # full validation already belongs: master, scheduled, and manual lanes.
+    if: >-
+      !cancelled() &&
+      (github.event_name != 'pull_request' || github.base_ref == 'master') &&
+      (
+        needs.change-scope.result != 'success' ||
+        needs.change-scope.outputs.beta_release_prep != 'true'
+      )
     runs-on: ubuntu-latest
 
     steps:
@@ -135,38 +120,54 @@ jobs:
   # consumers while the two independent validations report failures earlier.
   build-and-test:
     if: always() && (github.event_name != 'push' || github.ref == 'refs/heads/master')
-    needs: [build, test]
+    needs: [change-scope, build, test]
     runs-on: ubuntu-latest
 
     steps:
       - name: Require successful build and test lanes
         env:
+          PREFLIGHT_RESULT: ${{ needs.change-scope.result }}
+          BETA_RELEASE_PREP: ${{ needs.change-scope.outputs.beta_release_prep }}
           BUILD_RESULT: ${{ needs.build.result }}
           TEST_RESULT: ${{ needs.test.result }}
+          FULL_VALIDATION: ${{ github.event_name != 'pull_request' || github.base_ref == 'master' }}
         run: |
-          if [[ "$BUILD_RESULT" != "success" || "$TEST_RESULT" != "success" ]]; then
-            echo "Build result: $BUILD_RESULT"
-            echo "Test result: $TEST_RESULT"
+          echo "Preflight result: $PREFLIGHT_RESULT"
+          echo "Beta release preparation: $BETA_RELEASE_PREP"
+          echo "Build result: $BUILD_RESULT"
+          echo "Test result: $TEST_RESULT"
+
+          if [[ "$PREFLIGHT_RESULT" != "success" ]]; then
             exit 1
           fi
 
-  # Routine dev PRs run the complete build and test suite once on Ubuntu, then
-  # exercise only native CLI/Guardian/path/process contracts on macOS and
-  # Windows. Repeating all 5,000+ platform-neutral tests on constrained hosted
-  # runners amplified resource starvation into false serial blockers. Stable
-  # promotion, master, scheduled, and manual validation still run the complete
-  # build and test suite on both hosts.
+          if [[ "$BETA_RELEASE_PREP" == "true" ]]; then
+            [[ "$BUILD_RESULT" == "success" ]] || exit 1
+            [[ "$TEST_RESULT" == "skipped" ]] || exit 1
+            exit 0
+          fi
+
+          if [[ "$BUILD_RESULT" != "success" ]]; then
+            exit 1
+          fi
+
+          if [[ "$FULL_VALIDATION" == "true" ]]; then
+            [[ "$TEST_RESULT" == "success" ]] || exit 1
+          else
+            [[ "$TEST_RESULT" == "skipped" ]] || exit 1
+          fi
+
+  # Cross-platform hosted runners are a master/scheduled/manual safety net.
+  # Routine dev PRs rely on local multi-platform acceptance plus the focused
+  # contracts, typecheck, and complete Ubuntu build above.
   cross-platform-test:
     needs: change-scope
     if: >-
       !cancelled() &&
-      (github.event_name != 'push' || github.ref == 'refs/heads/master') &&
+      (github.event_name != 'pull_request' || github.base_ref == 'master') &&
       (
         needs.change-scope.result != 'success' ||
-        (
-          needs.change-scope.outputs.cross_platform == 'true' &&
-          needs.change-scope.outputs.beta_release_prep != 'true'
-        )
+        needs.change-scope.outputs.beta_release_prep != 'true'
       )
     timeout-minutes: 30
     strategy:
@@ -190,17 +191,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Build complete workspace for stable and scheduled validation
-        if: github.event_name != 'pull_request' || github.base_ref == 'master'
         run: pnpm build
         timeout-minutes: 15
 
-      - name: Run native platform contracts for routine integration PRs
-        if: github.event_name == 'pull_request' && github.base_ref != 'master'
-        run: pnpm test:platform-contracts
-        timeout-minutes: 8
-
       - name: Run complete suite for stable and scheduled validation
-        if: github.event_name != 'pull_request' || github.base_ref == 'master'
         run: pnpm test
         timeout-minutes: 15
 
@@ -214,13 +208,10 @@ jobs:
     needs: change-scope
     if: >-
       !cancelled() &&
-      (github.event_name != 'push' || github.ref == 'refs/heads/master') &&
+      (github.event_name != 'pull_request' || github.base_ref == 'master') &&
       (
         needs.change-scope.result != 'success' ||
-        (
-          needs.change-scope.outputs.cross_platform == 'true' &&
-          needs.change-scope.outputs.beta_release_prep != 'true'
-        )
+        needs.change-scope.outputs.beta_release_prep != 'true'
       )
     strategy:
       fail-fast: false

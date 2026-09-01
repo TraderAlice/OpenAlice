@@ -742,6 +742,29 @@ source-built Docker image.
   empty-Volume install-failure/fail-closed journey isolated to the disposable
   service above.
 
+### 13. Make local acceptance primary for dev and beta
+
+- [x] Fix the confidence boundary: surface-appropriate local tests, browser,
+  OrbStack, and unsigned Electron/package smokes are the primary development
+  evidence. Hosted CI is a cheap integration/build backstop for routine PRs,
+  not a second full test environment.
+- [x] Reduce routine integration PRs to one clean Ubuntu workflow-contract,
+  root-typecheck, and complete-build lane. Do not allocate the full Vitest
+  suite, macOS/Windows matrix, dev-smoke, Docker image, desktop packages, or
+  managed-SSH fixture.
+- [x] Retain only the cheap checkout HTTP installer on relevant dev PRs. Keep
+  the four native dev candidates, packaged-runtime acceptance, atomic alias
+  publication, and live raw-dev install on the post-merge `dev` push.
+- [x] Reduce exact beta version preparation to the trusted base classifier,
+  workflow contracts, root typecheck, and stable aggregate check name. Let the
+  manually dispatched Release build and accept the final version-bearing
+  artifacts once; the post-merge full `master` run is an asynchronous backstop.
+- [x] Keep `master` promotion, stable preparation/release, `master` push,
+  nightly, and manual full validation on the complete cross-platform lanes.
+- [ ] Verify the lightweight lane on its own `dev` PR and record the measured
+  before/after wall and runner time. Local workflow contracts, root typecheck,
+  full tests, and full build must already be green before opening that PR.
+
 ## Verification Matrix
 
 Every code increment runs:
@@ -784,7 +807,8 @@ credentials or broker state. OrbStack validates Linux behavior efficiently,
 including native Bun release and multiprocess Runtime acceptance on Linux
 arm64 and x64, but it does not replace native macOS acceptance. Prefer this
 local native-macOS plus OrbStack matrix during serial development instead of
-waiting on hosted runners; hosted jobs remain publication and release gates.
+waiting on hosted runners; hosted jobs remain final publication and stable
+release gates rather than a duplicate routine-development test harness.
 Windows PowerShell,
 filesystem-locking, PATH, and executable-signing checks belong to the deferred
 Windows lane.
@@ -1314,3 +1338,18 @@ This plan is complete only when:
   remained executable under `/data/home`, and a fresh inspection-only SSH
   tunnel served the beta2 UI on local loopback. No installer or release-pointer
   mutation ran through Railway SSH.
+- 2026-09-01: Reframed development confidence around local acceptance instead
+  of constrained hosted runners. Routine `dev` PRs now retain one clean Ubuntu
+  workflow-contract, root-typecheck, and complete-build lane; relevant CLI
+  changes additionally retain only the clean checkout HTTP installer. Exact
+  beta preparation retains the trusted base classifier plus contracts and
+  typecheck, while the Release workflow owns the final candidate build and
+  artifact acceptance. Full tests, macOS/Windows, dev-smoke, Docker, desktop,
+  Broker Pack, and managed-SSH lanes remain on `master`, stable, nightly, or
+  manual authority rather than synchronously blocking routine development.
+  Before opening the proving PR, local workflow contracts passed 47/47, the
+  root suite passed 5,431 tests with 13 expected skips, root typecheck passed,
+  and the complete workspace build passed. The prior remote baseline was a
+  15:31 desktop critical path for the preceding product PR and a 5:15
+  redundant Ubuntu root-test lane for the version-only beta3 PR; measured
+  post-change timing remains pending on the workflow's own `dev` PR.

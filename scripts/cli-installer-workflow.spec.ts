@@ -45,6 +45,21 @@ describe('CLI installer dev publication workflow', () => {
     expect(workflow.on?.pull_request?.branches).toEqual(expect.arrayContaining(['dev', 'master']))
   })
 
+  it('keeps dev PR acceptance to the current checkout installer', () => {
+    const feasibility = workflow.jobs['bun-cli-feasibility']
+    const checkoutInstall = workflow.jobs['checkout-install']
+    const checkoutRemote = workflow.jobs['checkout-remote']
+
+    for (const job of [feasibility, checkoutRemote]) {
+      expect(job.if).toContain("github.event_name != 'pull_request' || github.base_ref == 'master'")
+      expect(job.if).toContain("needs.release-prep-scope.result != 'success'")
+      expect(job.if).toContain("beta_release_prep != 'true'")
+    }
+    expect(checkoutInstall.if).not.toContain("github.base_ref == 'master'")
+    expect(checkoutInstall.if).toContain("needs.release-prep-scope.result != 'success'")
+    expect(checkoutInstall.if).toContain("beta_release_prep != 'true'")
+  })
+
   it('builds all four supported native targets with the pinned Bun version', () => {
     const build = workflow.jobs['build-dev-cli']
     expect(build.strategy?.matrix?.include).toEqual([

@@ -229,20 +229,23 @@ Pull-request CI and the rolling dev CLI publication provide change-level and
 post-merge integration feedback. Their blocking authority depends on the
 delivery lane:
 
-- Every PR to `dev` or `master` runs independent Ubuntu build and unit-test
-  lanes so either failure is visible without waiting for the other. The stable
-  `build-and-test` aggregate check requires both lanes to pass.
-- PRs whose complete diff is limited to `ui/`, `docs/`, or root documentation
-  skip the macOS/Windows runtime matrix. Other routine PRs to `dev` run the
-  focused native CLI, Guardian, filesystem, shell, and process contract suite
-  on macOS and Windows instead of repeating every platform-neutral Vitest file
-  already accepted on Ubuntu. PRs to `master`, `master` pushes, scheduled runs,
-  and manual full validation still build and test the complete tree on both
-  hosts.
+- A routine integration PR whose base is not `master` runs one clean Ubuntu
+  lane: workflow contracts, root typecheck, and the complete workspace build.
+  The stable `build-and-test` check name remains successful by requiring that
+  build and intentionally accepting the skipped full-test lane. The PR must
+  record the applicable local `npx tsc --noEmit`, `pnpm test`, browser,
+  Electron, Docker, installer, or native-runtime evidence; hosted CI is not a
+  second purchase of the same confidence.
+- PRs to `master`, `master` pushes, scheduled runs, and manual validation retain
+  the full Ubuntu test lane, macOS/Windows build-and-test matrix, and native
+  dev-smoke. Routine integration PRs do not allocate those runners. There is no
+  changed-test or actor/label router: the branch boundary is intentionally
+  simple, and current `dev` receives a daily full cross-platform backstop.
 - A `master`-targeted PR whose complete diff is exactly the synchronized,
   forward beta `version` value in `package.json` and
   `packages/cli/package.json` takes the release-preparation fast lane. It keeps
-  Ubuntu build/test, workflow contracts, and root typecheck, while skipping the
+  the trusted classifier, workflow contracts, root typecheck, and the stable
+  aggregate check name, while skipping the source build/full-test lane and the
   Docker, CLI installer, Broker Pack, and desktop/cross-platform PR matrices
   because no runtime implementation changed. The beta Release workflow then
   rebuilds and accepts every final version-bearing candidate from the exact
@@ -252,9 +255,12 @@ delivery lane:
   errors all retain the full PR suite.
 - Superseded runs for the same PR are cancelled. Only the latest-head result is
   actionable evidence.
-- Desktop Package Smoke runs its workflow-contract and root-typecheck preflight
-  before allocating the expensive host package matrix and Windows Broker Pack
-  lane. The native package lanes still start together after that fast gate.
+- The central CI aggregate owns workflow contracts and root typecheck for an
+  exact beta version PR. Desktop Package Smoke keeps only its trusted
+  classifier before skipping the expensive host package matrix and Windows
+  Broker Pack lane. Those package lanes are reserved for `master`-targeted
+  implementation PRs and manual validation; routine integration uses the
+  matching local unsigned package smoke.
 - In serial mode, a `dev` PR may merge after proportional local verification
   while its remote checks are pending. Before the next serial PR is published,
   inspect both that PR's checks and the resulting `dev` push run. A completed
@@ -272,30 +278,34 @@ delivery lane:
   CLI candidates are assembled and each candidate runs its packaged
   Guardian/Alice, Web, Workspace, PTY, and release-owned Git acceptance before
   one atomic dev manifest is activated. The heavier UTA/Connector recovery and
-  external Broker Pack fixture run once on Linux x64; PR and release lanes keep
-  their broader native-host coverage. The scheduled CI run remains the daily
-  full cross-platform backstop for current `dev`.
-- Installer or distributed-CLI PRs run deterministic clean-container install
-  and managed-SSH acceptance against the checked-out tree. After merge, the
-  `dev` push separately downloads `raw/.../dev/install` into a clean container,
-  installs `--channel dev`, and verifies the live preview channel's provenance,
-  commands, server control surface, and idempotent reuse.
+  external Broker Pack fixture run once on Linux x64; `master`, scheduled, and
+  final Release lanes keep the broader native-host coverage. The scheduled CI
+  run remains the daily full cross-platform backstop for current `dev`.
+- Installer or distributed-CLI PRs to a routine integration base retain only
+  the cheap deterministic clean-container HTTP install against the checked-out
+  tree. Bun host feasibility, package-manager, and managed-SSH acceptance run
+  locally during development and in the `master`/manual lanes. After merge,
+  the `dev` push separately downloads `raw/.../dev/install` into a clean
+  container, installs `--channel dev`, and verifies the live preview channel's
+  provenance, commands, server control surface, and idempotent reuse.
 - A push to `master` always runs the complete matrix. Reusing PR evidence after
-  merge remains a separate accepted-tree provenance problem; the semantic beta
-  PR fast lane does not silently solve it by trusting a commit message or diff.
+  merge remains a useful accepted-tree provenance backstop. For stable it is a
+  synchronous release gate. For an exact beta, it may finish after dispatch and
+  is not a second source-test gate: the trusted version PR plus the Release
+  workflow's final artifact acceptance own publication. A real product failure
+  still stops or withdraws a candidate; hosted-runner starvation and a known
+  non-product fixture timeout do not become product risk through repetition.
 - Once this workflow version reaches the default `master` branch, the scheduled
   validation checks out current `dev` and runs the complete matrix, providing a
   daily cross-platform backstop for lightweight PRs.
 
-Keep the lightweight-path allowlist narrow. Changes to dependencies, runtime,
-Guardian, Electron, packaging, scripts, workflows, or any unclassified path
-must still produce Windows and macOS evidence, but routine PR evidence is the
-focused native contract suite plus the relevant real-runtime/package smoke, not
-three copies of all platform-neutral tests. Serial development uses the local
-Mac for the complete `npx tsc --noEmit` and `pnpm test` contract, adding the
-unsigned Electron/package smoke when that surface changes. A product failure
-must be green before promotion to `master` or release; stable keeps the full
-remote matrix even when routine integration used focused host checks.
+Routine integration has no hosted changed-path allowlist. Serial development
+uses the local Mac for the complete `npx tsc --noEmit` and `pnpm test` contract,
+adding real browser, OrbStack, installer, unsigned Electron/package, and native
+runtime acceptance when those surfaces change. Record those commands and
+results in the PR. A promotion to `master` re-establishes full remote evidence;
+stable keeps the complete matrix even when routine integration and beta used
+lighter hosted feedback.
 
 ### Package signing boundary
 
@@ -324,15 +334,17 @@ and resource-layout coverage.
 
 Optimize measured waiting time without collapsing the confidence lanes:
 
-1. cancel superseded work and avoid repeating the PR matrix on `dev` push;
-2. use narrow path classification to skip irrelevant host/package jobs;
-3. cache dependency, build, and safe unsigned-package inputs across jobs;
-4. split fast contract/type gates from slower host/runtime acceptance so the
-   first actionable failure arrives early;
+1. keep routine integration to one clean build/type/contract lane and run
+   surface-specific acceptance on the development machine;
+2. avoid repeating PR acceptance on `dev` push, which owns publication only;
+3. keep exact-beta preparation to trusted version/contracts/type checks and let
+   Release accept the final artifacts once;
+4. cancel superseded work and cache dependency, build, and safe unsigned-package
+   inputs across the remaining jobs;
 5. measure queue time versus install/build/test time before buying larger
    runners;
-6. keep complete promotion/release acceptance, signing, and publication gated
-   even when routine `dev` feedback is deliberately asynchronous.
+6. keep complete `master` promotion and stable acceptance, signing, and
+   publication gated even when routine `dev` and beta feedback are light.
 
 Any CI optimization PR should include before/after timing evidence and name the
 confidence gate it preserves, moves, or removes.
@@ -405,9 +417,11 @@ the accepted candidates and eventual tag to the dispatch commit SHA.
 
 An exact forward beta version-only PR uses the bounded CI fast lane described
 above. Stable version preparation deliberately does not: it retains the full
-PR matrix. The subsequent `master` push also remains complete for both
-channels, and the manually dispatched Release always rebuilds and accepts its
-own final candidates; the fast lane never supplies release artifacts.
+PR matrix. The subsequent `master` push remains a complete asynchronous
+backstop for both channels, but only stable waits for it as a synchronous
+publication gate. The manually dispatched beta Release rebuilds and accepts
+its own final candidates from the exact dispatch SHA; the fast lane never
+supplies release artifacts.
 
 Beta and stable are serial public checkpoints, not paired outputs from one
 release run. After a beta, fixes may continue on `dev`, pass the ordinary
@@ -522,7 +536,11 @@ Keep `AGENTS.md` and `CONTRIBUTING.md` consistent with this guide and with
 For a serial PR to `dev`, satisfy the locally runnable, surface-specific gate
 before merging and report any platform-only residual risk. Remote platform
 evidence may trail that merge under the feedback rule above. Before promotion
-to `master` or release, every applicable gate must be complete and green.
+to `master` or a stable release, every applicable full gate must be complete
+and green. An exact beta requires the bounded version-prep gate, previously
+accepted promotion evidence for its product tree, and a fully green final
+Release artifact workflow; it does not reopen the development source-test
+matrix.
 
 | Boundary | Required evidence |
 |---|---|
