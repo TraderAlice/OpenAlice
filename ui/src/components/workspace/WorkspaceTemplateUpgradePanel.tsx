@@ -13,6 +13,9 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { CenteredLoading, EmptyState } from '../StateViews'
+import { Button } from '../ui/button'
+import { SelectionCheckIcon } from '../ui/selection-check-icon'
 import {
   applyTemplateUpgrade,
   getTemplateUpgradePlan,
@@ -97,20 +100,17 @@ export function WorkspaceTemplateUpgradePanel({
   }
 
   if (loading && !plan) {
-    return (
-      <div className="flex min-h-[360px] items-center justify-center gap-2 text-[13px] text-muted-foreground">
-        <LoaderCircle size={16} className="animate-spin" />
-        {t('workspace.upgradeLoading')}
-      </div>
-    )
+    return <CenteredLoading label={t('workspace.upgradeLoading')} />
   }
 
   if (unsupported) {
     return (
-      <div className="flex min-h-[360px] flex-col items-center justify-center px-6 text-center">
-        <ShieldCheck size={28} className="mb-3 text-muted-foreground/60" />
-        <h3 className="text-[14px] font-semibold text-foreground">{t('workspace.upgradeUnavailableTitle')}</h3>
-        <p className="mt-1 max-w-md text-[12px] leading-relaxed text-muted-foreground">{error}</p>
+      <div className="flex min-h-[360px] items-center justify-center px-6">
+        <EmptyState
+          icon={<ShieldCheck />}
+          title={t('workspace.upgradeUnavailableTitle')}
+          description={error ?? undefined}
+        />
       </div>
     )
   }
@@ -120,10 +120,10 @@ export function WorkspaceTemplateUpgradePanel({
       <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
         {plan && (
           <>
-            <section className="oa-status-surface overflow-hidden rounded-xl border border-border bg-secondary/35">
+            <section className="oa-status-surface overflow-hidden rounded-lg border border-border bg-secondary/35">
               <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/75">
+                  <div className="flex items-center gap-2 text-[12px] font-semibold text-muted-foreground">
                     <FileDiff size={14} />
                     {t('workspace.upgradeManagedAssets')}
                   </div>
@@ -138,15 +138,16 @@ export function WorkspaceTemplateUpgradePanel({
                       : t('workspace.upgradeDescription')}
                   </p>
                 </div>
-                <button
+                <Button
                   type="button"
                   onClick={() => void load()}
                   disabled={loading || applying}
-                  className="oa-pressable inline-flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 text-[12px] text-muted-foreground hover:border-primary/40 hover:text-foreground disabled:opacity-50"
+                  variant="outline"
+                  className="shrink-0"
                 >
                   <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
                   {t('workspace.upgradeRefresh')}
-                </button>
+                </Button>
               </div>
               {!current && (
                 <div className="grid grid-cols-3 border-t border-border bg-background/45">
@@ -198,7 +199,6 @@ export function WorkspaceTemplateUpgradePanel({
             {!current && plan.summary.ready > 0 && (
               <FileGroup
                 title={t('workspace.upgradeReadyTitle')}
-                description={t('workspace.upgradeReadyDescription')}
                 files={plan.files.filter((file) => file.status === 'ready')}
                 defaultOpen
                 tone="accent"
@@ -208,14 +208,13 @@ export function WorkspaceTemplateUpgradePanel({
             {!current && plan.summary.preserved > 0 && (
               <FileGroup
                 title={t('workspace.upgradePreservedTitle')}
-                description={t('workspace.upgradePreservedDescription')}
                 files={plan.files.filter((file) => file.status === 'preserved')}
                 tone="neutral"
               />
             )}
 
             {!current && conflicts.length > 0 && (
-              <section className="rounded-xl border border-warning/35 bg-secondary/20">
+              <section className="rounded-lg border border-warning/35 bg-secondary/20">
                 <div className="border-b border-border px-4 py-3">
                   <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
                     <AlertTriangle size={15} className="text-warning" />
@@ -245,7 +244,7 @@ export function WorkspaceTemplateUpgradePanel({
             )}
 
             {result && current && (
-              <div className="oa-disclosure-enter rounded-xl border border-success/35 bg-success/8 px-4 py-3">
+              <div className="rounded-lg border border-success/35 bg-success/8 px-4 py-3">
                 <div className="flex items-center gap-2 text-[13px] font-semibold text-success">
                   <Check size={16} />
                   {t('workspace.upgradeCompleteTitle')}
@@ -278,19 +277,18 @@ export function WorkspaceTemplateUpgradePanel({
           {plan && !current && conflicts.length === 0 && t('workspace.upgradeNoConflicts')}
         </div>
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} disabled={applying} className="btn-secondary">
+          <Button type="button" variant="outline" onClick={onClose} disabled={applying}>
             {current ? t('common.close') : t('createWorkspace.cancel')}
-          </button>
+          </Button>
           {!current && (
-            <button
+            <Button
               type="button"
               onClick={() => void apply()}
               disabled={!canApply}
-              className="oa-pressable inline-flex min-h-9 items-center gap-2 rounded-lg bg-primary px-4 text-[12px] font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {applying ? <LoaderCircle size={14} className="animate-spin" /> : <GitCommitHorizontal size={14} />}
               {applying ? t('workspace.upgradeApplying') : t('workspace.upgradeApply')}
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -315,21 +313,21 @@ function Metric({ value, label, tone }: {
   )
 }
 
-function FileGroup({ title, description, files, defaultOpen = false, tone }: {
+function FileGroup({ title, files, defaultOpen = false, tone }: {
   title: string
-  description: string
   files: readonly TemplateUpgradeFilePlan[]
   defaultOpen?: boolean
   tone: 'accent' | 'neutral'
 }): ReactElement {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <section className="rounded-xl border border-border bg-secondary/20">
-      <button
+    <section className="rounded-lg border border-border bg-secondary/20">
+      <Button
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        className="oa-pressable flex w-full items-start gap-3 rounded-xl px-4 py-3 text-left"
+        variant="ghost"
+        className="h-auto w-full justify-start gap-3 whitespace-normal rounded-lg px-4 py-3 text-left"
       >
         {open ? <ChevronDown size={15} className="mt-0.5 text-muted-foreground" /> : <ChevronRight size={15} className="mt-0.5 text-muted-foreground" />}
         <div className="min-w-0 flex-1">
@@ -339,11 +337,10 @@ function FileGroup({ title, description, files, defaultOpen = false, tone }: {
               {files.length}
             </span>
           </div>
-          <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{description}</p>
         </div>
-      </button>
+      </Button>
       {open && (
-        <div className="oa-disclosure-enter border-t border-border px-4 py-2">
+        <div className="border-t border-border px-4 py-2">
           {files.map((file) => (
             <div key={file.path} className="flex items-center gap-2 border-b border-border/60 py-2 last:border-b-0">
               {file.status === 'ready'
@@ -386,17 +383,19 @@ function ConflictFile({ file, value, onChange }: {
           </Choice>
         </div>
       </div>
-      <button
+      <Button
         type="button"
         onClick={() => setPreviewOpen((open) => !open)}
-        className="oa-pressable mt-2 inline-flex items-center gap-1.5 rounded-md px-1 py-1 text-[11px] text-muted-foreground hover:text-foreground"
+        variant="ghost"
+        size="sm"
+        className="mt-2 px-1 text-[11px] text-muted-foreground"
         aria-expanded={previewOpen}
       >
         {previewOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         {t('workspace.upgradeCompare')}
-      </button>
+      </Button>
       {previewOpen && (
-        <div className="oa-disclosure-enter mt-2 grid gap-2 lg:grid-cols-2">
+        <div className="mt-2 grid gap-2 lg:grid-cols-2">
           <Preview title={t('workspace.upgradeWorkspaceCopy')} value={file.currentPreview} truncated={file.currentTruncated} />
           <Preview title={t('workspace.upgradeTemplateCopy')} value={file.templatePreview} truncated={file.templateTruncated} />
         </div>
@@ -412,18 +411,19 @@ function Choice({ active, disabled = false, onClick, children }: {
   children: React.ReactNode
 }): ReactElement {
   return (
-    <button
+    <Button
       type="button"
       role="radio"
       aria-checked={active}
       disabled={disabled}
       onClick={onClick}
-      className={`oa-pressable rounded-md px-2.5 py-1.5 text-[10px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-35 ${
-        active ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-      }`}
+      variant="ghost"
+      size="xs"
+      className={active ? 'bg-muted text-foreground' : 'text-muted-foreground'}
     >
+      {active && <SelectionCheckIcon />}
       {children}
-    </button>
+    </Button>
   )
 }
 

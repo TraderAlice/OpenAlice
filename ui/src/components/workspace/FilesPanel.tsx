@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { formatRelativeTime } from '../../lib/intl';
 import type { ReactElement } from 'react';
+import { File, FileQuestion, Folder, Link } from 'lucide-react';
 
 import { listFiles, type DirListing, type FileEntry } from './api';
 import { Skeleton } from '../StateViews';
@@ -148,16 +149,16 @@ export function FilesPanel(props: FilesPanelProps): ReactElement {
   );
 }
 
-function iconFor(e: FileEntry): string {
-  if (e.kind === 'dir') return '📁';
-  if (e.kind === 'symlink') return '🔗';
-  if (e.kind === 'other') return '◦';
-  return '·';
+function iconFor(e: FileEntry): ReactElement {
+  if (e.kind === 'dir') return <Folder size={13} aria-hidden />;
+  if (e.kind === 'symlink') return <Link size={13} aria-hidden />;
+  if (e.kind === 'other') return <FileQuestion size={13} aria-hidden />;
+  return <File size={13} aria-hidden />;
 }
 
 function formatMeta(e: FileEntry): string {
   if (e.kind !== 'file' || e.sizeBytes === null) return formatRelativeTime(e.mtime);
-  return `${formatSize(e.sizeBytes)} · ${formatRelativeTime(e.mtime)}`;
+  return `${formatSize(e.sizeBytes)}, ${formatRelativeTime(e.mtime)}`;
 }
 
 function formatSize(n: number): string {

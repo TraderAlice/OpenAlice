@@ -9,7 +9,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, BrainCircuit, GitMerge, Info, Layers3, Rocket, RotateCcw, Settings, X } from 'lucide-react'
+import { AlertTriangle, ArrowUpCircle, BrainCircuit, GitMerge, Info, Layers3, Rocket, RotateCcw, Settings, X } from 'lucide-react'
 import {
   getAgentConfig,
   listCredentials,
@@ -41,11 +41,13 @@ import { ModelCombobox } from '../credentials/PresetFields'
 import { useTestGate } from '../../lib/useTestGate'
 import { useWorkspaces } from '../../contexts/workspaces-context'
 import { notifyWorkspaceAgentConfigChanged } from '../../lib/workspaceAiEvents'
+import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon'
 import { WorkspaceTemplateUpgradePanel } from './WorkspaceTemplateUpgradePanel'
 import { WorkspaceSourceUpgradePanel } from './WorkspaceSourceUpgradePanel'
 import { WorkspaceAbsorbPanel } from './WorkspaceAbsorbPanel'
 import { WorkspaceLaunchConfigurationPanel } from './WorkspaceLaunchConfigurationPanel'
 import { WorkspaceAIPreferencesPanel } from './WorkspaceAIPreferencesPanel'
+import { Button } from '@/components/ui/button'
 
 // The agent tab implies a default vendor when the baseUrl alone can't say:
 // claude → Anthropic, codex → OpenAI; opencode/pi run anything so they have no
@@ -76,7 +78,7 @@ export interface WorkspaceAiSaveResult {
 }
 
 const inputClass =
-  'w-full bg-secondary border border-border rounded-md px-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary'
+  'h-8 w-full rounded-md border border-border bg-secondary px-2.5 py-1 text-[13px] text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary'
 
 const TAB_LABEL: Record<Tab, string> = { claude: 'Claude Code', codex: 'Codex', opencode: 'opencode', pi: 'Pi' }
 const CONTEXT_WINDOW_OPTIONS = [
@@ -676,7 +678,7 @@ export function WorkspaceAIConfigModal({
         aria-labelledby={dialogTitleId}
         aria-describedby={dialogDescriptionId}
         tabIndex={-1}
-        className="flex h-full w-full flex-col overflow-hidden border-y border-border bg-background shadow-2xl sm:h-auto sm:w-[calc(100vw-24px)] sm:max-w-3xl sm:max-h-[85dvh] sm:rounded-xl sm:border"
+        className="flex h-full w-full flex-col overflow-hidden border-y border-border bg-background shadow-2xl sm:h-auto sm:w-[calc(100vw-24px)] sm:max-w-3xl sm:max-h-[85dvh] sm:rounded-lg sm:border"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -685,15 +687,15 @@ export function WorkspaceAIConfigModal({
             <h2 id={dialogTitleId} className="text-[15px] font-semibold text-foreground">{t('workspaceSettings.title')}</h2>
             <p id={dialogDescriptionId} className="mt-0.5 truncate text-[11px] text-muted-foreground">{workspaceLabel}</p>
           </div>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon-sm"
             onClick={onClose}
-            className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             aria-label={t('workspaceSettings.close')}
-            title={t('common.close')}
           >
             <X size={18} />
-          </button>
+          </Button>
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden sm:flex-row">
@@ -705,9 +707,9 @@ export function WorkspaceAIConfigModal({
               type="button"
               onClick={() => setSection('general')}
               aria-current={section === 'general' ? 'page' : undefined}
-              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:min-h-0 sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-0 sm:h-8 sm:min-h-8 sm:w-full ${
                 section === 'general'
-                  ? 'bg-primary/10 text-primary'
+                  ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
             >
@@ -718,9 +720,9 @@ export function WorkspaceAIConfigModal({
               type="button"
               onClick={() => setSection('launch')}
               aria-current={section === 'launch' ? 'page' : undefined}
-              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:min-h-0 sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
                 section === 'launch'
-                  ? 'bg-primary/10 text-primary'
+                  ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
             >
@@ -731,9 +733,9 @@ export function WorkspaceAIConfigModal({
               type="button"
               onClick={() => setSection('preferences')}
               aria-current={section === 'preferences' ? 'page' : undefined}
-              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:min-h-0 sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
                 section === 'preferences'
-                  ? 'bg-primary/10 text-primary'
+                  ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
             >
@@ -744,25 +746,25 @@ export function WorkspaceAIConfigModal({
               type="button"
               onClick={() => setSection('template')}
               aria-current={section === 'template' ? 'page' : undefined}
-              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:min-h-0 sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
                 section === 'template'
-                  ? 'bg-primary/10 text-primary'
+                  ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
             >
               <Layers3 size={15} />
               <span>{t('workspaceSettings.section.template')}</span>
               {workspace?.upgradeAvailable && (
-                <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" aria-label="Update available" />
+                <ArrowUpCircle className="ml-auto size-3.5 shrink-0 text-primary" aria-label="Update available" />
               )}
             </button>
             <button
               type="button"
               onClick={() => setSection('absorb')}
               aria-current={section === 'absorb' ? 'page' : undefined}
-              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:min-h-0 sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:h-8 sm:min-h-8 sm:w-full ${
                 section === 'absorb'
-                  ? 'bg-primary/10 text-primary'
+                  ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
             >
@@ -811,7 +813,7 @@ export function WorkspaceAIConfigModal({
                     <div className="flex items-start gap-2">
                       <Info size={14} className="mt-0.5 shrink-0 text-muted-foreground" />
                       <div className="min-w-0">
-                        <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{t('workspaceSettings.general.stableTag')}</div>
+                        <div className="text-[11px] font-medium text-muted-foreground">{t('workspaceSettings.general.stableTag')}</div>
                         <div className="mt-1 truncate font-mono text-[12px] text-foreground">{stableTag}</div>
                         <p className="mt-1 text-[11px] leading-snug text-muted-foreground/75">
                           {t('workspaceSettings.general.stableTagHelp')}
@@ -837,22 +839,21 @@ export function WorkspaceAIConfigModal({
                     {t('workspaceSettings.general.storedIn')}
                   </p>
                   <div className="flex justify-end gap-2">
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
                       onClick={onClose}
                       disabled={metadataSaving}
-                      className="whitespace-nowrap px-3 py-2 rounded-md text-muted-foreground hover:text-foreground text-[13px] disabled:opacity-40"
                     >
                       {t('common.cancel')}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
                       onClick={handleSaveMetadata}
                       disabled={metadataSaving || !metadataDirty}
-                      className="whitespace-nowrap px-4 py-2 rounded-md bg-primary text-primary-foreground text-[13px] font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
                     >
                       {metadataSaving ? t('common.saving') : t('common.save')}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -880,12 +881,13 @@ export function WorkspaceAIConfigModal({
                 setPickedCredential('')
                 setPickedWireShape('')
               }}
-              className={`min-h-11 flex-none whitespace-nowrap px-3 py-2 text-[13px] font-medium transition-colors sm:flex-1 sm:px-4 sm:py-2.5 ${
+              className={`flex min-h-11 flex-none items-center justify-center gap-2 whitespace-nowrap px-3 py-2 text-[13px] font-medium transition-colors sm:h-9 sm:min-h-9 sm:flex-1 sm:px-4 ${
                 tab === id
                   ? 'text-primary border-b-2 border-primary -mb-px'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
+              <AgentRuntimeIcon agentId={id} className="size-[18px] shrink-0" />
               <span className="sm:hidden">{id === 'claude' ? 'Claude' : TAB_LABEL[id]}</span>
               <span className="hidden sm:inline">{TAB_LABEL[id]}</span>
             </button>
@@ -943,7 +945,7 @@ export function WorkspaceAIConfigModal({
                         const shapes = agentWireShapes(cred.wires, agents, tab, cred.vendor)
                         return (
                           <option key={cred.slug} value={cred.slug}>
-                            {(cred.label?.trim() || cred.slug)}{shapes.length > 1 ? ` · ${t('workspaceSettings.ai.protocolCount', { count: shapes.length })}` : ''}
+                            {(cred.label?.trim() || cred.slug)}{shapes.length > 1 ? `, ${t('workspaceSettings.ai.protocolCount', { count: shapes.length })}` : ''}
                           </option>
                         )
                       })}
@@ -960,13 +962,13 @@ export function WorkspaceAIConfigModal({
                         ))}
                       </select>
                     )}
-                    <button
+                    <Button
                       onClick={applyCredential}
                       disabled={!pickedCredential}
-                      className="px-3 py-2 rounded-md bg-primary text-primary-foreground text-[13px] font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
+                      size="sm"
                     >
                       {t('workspaceSettings.ai.load')}
-                    </button>
+                    </Button>
                   </div>
                   <p className="text-[11px] text-muted-foreground/80 leading-snug mt-1.5">
                     {compatible.length === 0 && credentials.length > 0
@@ -1051,13 +1053,13 @@ export function WorkspaceAIConfigModal({
                 autoCapitalize="off"
                 autoCorrect="off"
               />
-              <button
-                onClick={() => setShowKey(!showKey)}
-                className="px-3 rounded-md border border-border text-muted-foreground hover:text-foreground text-[12px]"
+              <Button
                 type="button"
+                variant="outline"
+                onClick={() => setShowKey(!showKey)}
               >
                 {showKey ? t('common.hide') : t('common.show')}
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -1259,20 +1261,23 @@ export function WorkspaceAIConfigModal({
                 {t('workspaceSettings.ai.saveCredentialPrompt')}
               </span>
               <div className="flex gap-2 shrink-0">
-                <button
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => setDismissedCredentialKey(enteredApiKey)}
                   disabled={savingCred}
-                  className="px-2.5 py-1 rounded-md border border-border text-muted-foreground hover:text-foreground text-[12px] disabled:opacity-40"
                 >
                   {t('workspaceSettings.ai.notNow')}
-                </button>
-                <button
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
                   onClick={handleSaveCredential}
                   disabled={savingCred}
-                  className="px-2.5 py-1 rounded-md bg-primary text-primary-foreground text-[12px] font-medium disabled:opacity-40 hover:bg-primary/90"
                 >
                   {savingCred ? t('common.saving') : t('workspaceSettings.ai.saveToAlice')}
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -1333,45 +1338,46 @@ export function WorkspaceAIConfigModal({
           className="flex shrink-0 items-center justify-between gap-2 border-t border-border bg-secondary/30 px-3 py-2.5"
         >
           <div className="flex gap-2">
-            <button
+            <Button
               type="button"
+              variant="outline"
               aria-label={t('workspaceSettings.ai.reset')}
               onClick={handleReset}
               disabled={saving}
-              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-2.5 text-[12px] text-muted-foreground hover:text-foreground disabled:opacity-40"
             >
               <RotateCcw size={14} />
               <span className="hidden sm:inline">{t('workspaceSettings.ai.reset')}</span>
-            </button>
+            </Button>
           </div>
           <div className="flex justify-end gap-2">
-            <button
+            <Button
+              type="button"
+              variant="ghost"
               onClick={onClose}
               disabled={saving}
-              className="whitespace-nowrap px-3 py-2 rounded-md text-muted-foreground hover:text-foreground text-[13px]"
             >
               {t('common.cancel')}
-            </button>
+            </Button>
             {/* Single primary CTA that walks the connection gate. Managed
                 transport/auth/model changes show Test first; native-login
                 model/effort and local runtime metadata save directly. */}
             {needsTest ? (
-              <button
+              <Button
+                type="button"
                 onClick={handleTest}
                 disabled={!canTest || testing || saving}
-                title={!canTest ? t('workspaceSettings.ai.fillRequired') : undefined}
-                className="whitespace-nowrap px-4 py-2 rounded-md bg-primary text-primary-foreground text-[13px] font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
+                aria-description={!canTest ? t('workspaceSettings.ai.fillRequired') : undefined}
               >
                 {testing ? t('common.testing') : t('common.test')}
-              </button>
+              </Button>
             ) : (
-              <button
+              <Button
+                type="button"
                 onClick={handleSave}
                 disabled={saving || !dirty}
-                className="whitespace-nowrap px-4 py-2 rounded-md bg-primary text-primary-foreground text-[13px] font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
               >
                 {saving ? t('common.saving') : t('common.save')}
-              </button>
+              </Button>
             )}
           </div>
         </div>

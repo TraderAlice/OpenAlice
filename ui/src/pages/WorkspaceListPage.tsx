@@ -18,7 +18,8 @@ import { ArchiveRestore, GitMerge, Trash2 } from 'lucide-react'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { useWorkspace } from '../tabs/store'
 import { ConfirmDialog } from '../components/ConfirmDialog'
-import { PageLoading, RecoverySurface, RefreshNotice } from '../components/StateViews'
+import { EmptyState, PageLoading, RecoverySurface, RefreshNotice } from '../components/StateViews'
+import { Button } from '../components/ui/button'
 import { OverviewCard } from '../components/workspace/OverviewCard'
 import { workspaceActivityMs } from '../components/workspace/sidebar-order'
 import {
@@ -173,7 +174,6 @@ export function WorkspaceListPage() {
   if (!hasLoaded && listError !== null && departed.length === 0) {
     return (
       <RecoverySurface
-        eyebrow={t('workspace.dataUnavailableEyebrow')}
         title={t('workspace.dataUnavailableTitle')}
         description={t('workspace.dataUnavailableDescription')}
         actionLabel={t('common.retry')}
@@ -184,18 +184,15 @@ export function WorkspaceListPage() {
 
   if (hasLoaded && workspaces.length === 0 && departed.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-muted-foreground px-6">
-        <h2 className="text-lg font-medium text-foreground mb-2">{t('workspace.emptyTitle')}</h2>
-        <p className="text-sm max-w-md text-center">
-          {t('workspace.emptyBody')}
-        </p>
-        <button
+      <div className="flex h-full flex-col items-center justify-center px-6">
+        <EmptyState title={t('workspace.emptyTitle')} description={t('workspace.emptyBody')} />
+        <Button
           type="button"
           onClick={() => openOrFocus({ kind: 'template-catalog', params: {} })}
-          className="btn-primary oa-pressable mt-5 inline-flex min-h-10 items-center justify-center px-4"
+          className="mt-1 min-h-10"
         >
           {t('workspace.createFromTemplates')}
-        </button>
+        </Button>
       </div>
     )
   }
@@ -215,8 +212,8 @@ export function WorkspaceListPage() {
             className="mb-4 sm:mb-5"
           />
         )}
-        <div className="mb-4 flex items-baseline justify-between gap-4 sm:mb-6">
-          <h2 className="text-[18px] font-semibold text-foreground">{t('workspace.overviewTitle')}</h2>
+        <div className="mb-4 flex items-baseline justify-between gap-4 sm:mb-5">
+          <h2 className="text-[18px] font-semibold tracking-[-0.012em] text-foreground">{t('workspace.overviewTitle')}</h2>
           <span className="text-[12px] text-muted-foreground">
             {hasLoaded
               ? t(workspaces.length === 1 ? 'workspace.workspaceSingular' : 'workspace.workspacePlural', {
@@ -226,14 +223,14 @@ export function WorkspaceListPage() {
           </span>
         </div>
 
-        <div className="space-y-5 sm:space-y-7">
+        <div className="space-y-5 sm:space-y-6">
           {sections.map((sec) => (
             <section key={sec.key}>
-              <div className="mb-3 flex items-baseline gap-2">
-                <h3 className="text-[12px] font-semibold text-foreground/85 uppercase tracking-wider">
+              <div className="mb-2.5 flex items-baseline gap-2">
+                <h3 className="text-[12px] font-semibold text-foreground/85">
                   {sec.title}
                 </h3>
-                <span className="text-[11px] text-muted-foreground">· {sec.workspaces.length}</span>
+                <span className="text-[11px] tabular-nums text-muted-foreground">{sec.workspaces.length}</span>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2">
                 {sec.workspaces.map((w) => (
@@ -260,10 +257,10 @@ export function WorkspaceListPage() {
           {(departed.length > 0 || departedError) && (
             <section className="border-t border-border pt-6">
               <div className="mb-3 flex items-baseline gap-2">
-                <h3 className="text-[12px] font-semibold uppercase tracking-wider text-foreground/85">
+                <h3 className="text-[12px] font-semibold text-foreground/85">
                   {t('workspace.departedTitle')}
                 </h3>
-                <span className="text-[11px] text-muted-foreground">· {departed.length}</span>
+                <span className="text-[11px] tabular-nums text-muted-foreground">{departed.length}</span>
               </div>
               <p className="mb-3 max-w-2xl text-[12px] leading-relaxed text-muted-foreground">
                 {t('workspace.departedDescription')}
@@ -293,7 +290,7 @@ export function WorkspaceListPage() {
                           <div className="truncate text-[14px] font-medium text-foreground">{workspace.tag}</div>
                           <div className="mt-0.5 font-mono text-[10px] text-muted-foreground">{workspace.id}</div>
                         </div>
-                        <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                        <span className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[10px] text-muted-foreground">
                           {lifecycleLabel}
                         </span>
                       </div>
@@ -310,7 +307,7 @@ export function WorkspaceListPage() {
                                 ?? workspaces.find((candidate) => candidate.id === workspace.absorbedIntoWorkspaceId)?.tag
                                 ?? workspace.absorbedIntoWorkspaceId}
                             </strong>
-                            {workspace.absorbCommit ? ` · ${workspace.absorbCommit.slice(0, 8)}` : ''}
+                            {workspace.absorbCommit ? `, ${workspace.absorbCommit.slice(0, 8)}` : ''}
                           </span>
                         </div>
                       )}
@@ -335,9 +332,10 @@ export function WorkspaceListPage() {
                       </div>
                       <div className="mt-4 flex justify-end gap-2">
                         {!purged && workspace.lifecycle === 'departed' && (
-                          <button
+                          <Button
                             type="button"
-                            className="btn-secondary inline-flex min-h-10 items-center gap-1.5 sm:min-h-0"
+                            variant="outline"
+                            className="min-h-10 sm:min-h-8"
                             aria-label={t('workspace.restoreWorkspaceAria', { workspace: workspace.tag })}
                             disabled={lifecycleBusy !== null}
                             onClick={() => {
@@ -350,18 +348,19 @@ export function WorkspaceListPage() {
                           >
                             <ArchiveRestore size={13} />
                             {restoring ? t('workspace.restoringWorkspace') : t('workspace.restoreWorkspace')}
-                          </button>
+                          </Button>
                         )}
                         {!purged && workspace.lifecycle === 'departed' && (
-                          <button
+                          <Button
                             type="button"
-                            className="btn-danger inline-flex min-h-10 items-center gap-1.5 sm:min-h-0"
+                            variant="destructive"
+                            className="min-h-10 sm:min-h-8"
                             aria-label={t('workspace.purgeFilesAria', { workspace: workspace.tag })}
                             disabled={lifecycleBusy !== null}
                             onClick={() => setPendingPurge(workspace)}
                           >
                             <Trash2 size={13} /> {t('workspace.purgeFiles')}
-                          </button>
+                          </Button>
                         )}
                       </div>
                     </article>

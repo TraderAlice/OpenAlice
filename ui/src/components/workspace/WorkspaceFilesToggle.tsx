@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 
 import { useIsDesktop } from '../../live/use-is-desktop'
 import { useWorkspaceSidePanels } from '../../live/workspace-side-panels'
+import { Button } from '../ui/button'
 
 /**
  * Top-bar toggle for the workspace right pane (the Files panel). One click
@@ -23,19 +24,19 @@ export function WorkspaceFilesToggle(): ReactElement {
   const usesMobileOverlay = !isDesktop && autoHideMobile
   const filesVisible = usesMobileOverlay ? mobileFilesOpen : files
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
+      size="sm"
       onClick={usesMobileOverlay ? toggleMobileFiles : toggleFiles}
       aria-pressed={filesVisible}
-      title={filesVisible ? t('workspace.hideFilesTitle') : t('workspace.showFilesTitle')}
-      className={`workspace-files-toggle flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] transition-colors ${
+      className={`workspace-files-toggle text-[11px] ${
         filesVisible
           ? 'text-foreground bg-muted'
-          : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+          : 'text-muted-foreground'
       }`}
     >
       <PanelRight size={13} strokeWidth={1.8} aria-hidden />
       {t('workspace.files')}
-    </button>
+    </Button>
   )
 }

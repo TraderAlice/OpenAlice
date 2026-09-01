@@ -22,6 +22,9 @@ import { useWorkspaces } from '../contexts/workspaces-context'
 import { useWorkspace } from '../tabs/store'
 import { fetchTemplateReadme } from '../components/workspace/api'
 import { CreateWorkspaceDialog } from '../components/workspace/CreateWorkspaceDialog'
+import { EmptyState } from '../components/StateViews'
+import { Button } from '../components/ui/button'
+import { AgentRuntimeIcon } from '../lib/agentRuntimeIcon'
 
 interface Props {
   spec: { kind: 'template-detail'; params: { name: string } }
@@ -77,9 +80,11 @@ export function TemplateDetailPage({ spec }: Props) {
 
   if (!template) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-muted-foreground px-6">
-        <h2 className="text-lg font-medium text-foreground mb-2">{t('templates.notFoundTitle')}</h2>
-        <p className="text-sm">{t('templates.notFoundBody', { name: templateName })}</p>
+      <div className="flex h-full items-center justify-center px-6">
+        <EmptyState
+          title={t('templates.notFoundTitle')}
+          description={t('templates.notFoundBody', { name: templateName })}
+        />
       </div>
     )
   }
@@ -103,7 +108,7 @@ export function TemplateDetailPage({ spec }: Props) {
                 v{template.version}
               </span>
               {template.community && (
-                <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border border-border text-muted-foreground shrink-0">
+                <span className="shrink-0 rounded-md border border-border px-2 py-0.5 text-[10px] text-muted-foreground">
                   {t('templates.communityBadge')}
                 </span>
               )}
@@ -114,15 +119,16 @@ export function TemplateDetailPage({ spec }: Props) {
               </p>
             )}
             <div className="flex items-center gap-3 mt-2.5 flex-wrap">
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground/70">
+              <span className="text-[11px] font-medium text-muted-foreground">
                 {t('templates.agentsLabel')}
               </span>
               <div className="flex items-center gap-2 flex-wrap">
                 {agents.map((a) => (
                   <span
                     key={a.id}
-                    className="text-[11px] font-mono text-muted-foreground px-1.5 py-0.5 rounded bg-muted"
+                    className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground"
                   >
+                    <AgentRuntimeIcon agentId={a.id} className="size-3.5 shrink-0" />
                     {a.id}
                   </span>
                 ))}
@@ -132,17 +138,17 @@ export function TemplateDetailPage({ spec }: Props) {
               </span>
             </div>
           </div>
-          <button
+          <Button
             type="button"
             onClick={() => setShowCreate(true)}
-            className="btn-primary shrink-0"
+            className="shrink-0"
           >
             {t('createWorkspace.create')}
-          </button>
+          </Button>
         </div>
 
         {/* README body — the template's starting-shape doc */}
-        <div className="text-[10px] uppercase tracking-wider text-muted-foreground/70 mb-2">
+        <div className="mb-2 text-[11px] font-medium text-muted-foreground">
           {t('templates.readmeLabel')}
         </div>
         <div className="rounded-lg border border-border bg-secondary px-6 py-5">
@@ -158,13 +164,15 @@ export function TemplateDetailPage({ spec }: Props) {
               className="flex items-center justify-between gap-3 text-[12px] text-destructive"
             >
               <span className="min-w-0 break-words">{readmeError}</span>
-              <button
+              <Button
                 type="button"
-                className="shrink-0 rounded-md border border-destructive/30 px-2.5 py-1 font-medium hover:bg-destructive/10"
+                variant="outline"
+                size="sm"
+                className="shrink-0"
                 onClick={() => setReadmeAttempt((attempt) => attempt + 1)}
               >
                 {t('common.retry')}
-              </button>
+              </Button>
             </div>
           )}
           {readmeBody && (

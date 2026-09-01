@@ -41,6 +41,7 @@ describe('ResumeCta runtime facts', () => {
     expect(screen.getByText('deepseek-1')).toBeTruthy()
     expect(screen.getByText('deepseek-v4-flash')).toBeTruthy()
     expect(screen.getByText('high reasoning')).toBeTruthy()
+    expect(document.querySelector('[data-agent-runtime-icon="claude"]')).toBeTruthy()
   })
 
   it('shows an explicit model with omitted effort as not specified', () => {
