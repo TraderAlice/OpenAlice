@@ -238,7 +238,7 @@ function contextRail(label: string, value: string, width: number): string[] {
   ))
 }
 
-function wrapDisplayText(value: string, width: number): string[] {
+export function wrapDisplayText(value: string, width: number): string[] {
   const lines: string[] = []
   let line = ''
   for (const word of value.split(/\s+/u).filter(Boolean)) {

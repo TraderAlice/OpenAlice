@@ -66,6 +66,12 @@ import {
   type SupervisorOverlayOptions,
 } from './supervisor-overlay-pointer.ts'
 import {
+  renderSupervisorConfirmation,
+  SUPERVISOR_CONFIRMATION_OVERLAY_OPTIONS,
+  type SupervisorConfirmation,
+  type SupervisorConfirmationView,
+} from './supervisor-confirmation.ts'
+import {
   createSupervisorCommandDeckState,
   moveSupervisorCommandDeckSelection,
   normalizeSupervisorCommandDeckState,
@@ -230,11 +236,7 @@ export type SupervisorAction =
   | 'doctor'
   | 'update'
   | 'apply-update'
-export type SupervisorConfirmation =
-  | 'stop'
-  | 'restart'
-  | 'managed-source'
-  | 'update'
+export type { SupervisorConfirmation } from './supervisor-confirmation.ts'
 
 export interface SupervisorSnapshot {
   version: string
@@ -441,6 +443,7 @@ export async function runSupervisorTui(
   const canvas = createSupervisorTerminalCanvas(stdout, dependencies.env ?? process.env)
   const overlayPointer = new SupervisorOverlayPointerRouter()
   const tuiTheme = createSupervisorTuiTheme(dependencies.env ?? process.env)
+  const plainTuiTheme = createSupervisorTuiTheme({ NO_COLOR: '1' })
   const motionEnabled = supervisorMotionEnabled(dependencies.env ?? process.env)
   let active = true
   let actionRunning = false
@@ -449,6 +452,7 @@ export async function runSupervisorTui(
   let projectsActive = false
   let transferActive = false
   let updateChannelActive = false
+  let confirmationActive = false
   let fleetRefreshing = false
   const tunnelControllers = new Map<string, AbortController>()
   let managedStartAction: 'start' | 'start-open' = 'start'
@@ -457,6 +461,7 @@ export async function runSupervisorTui(
   let closeProjects: (() => void) | null = null
   let closeTransfer: (() => void) | null = null
   let closeUpdateChannel: (() => void) | null = null
+  let closeConfirmation: (() => void) | null = null
   let motionTimer: NodeJS.Timeout | undefined
   let screen: SupervisorScreen
   const terminalSize = () => ({
@@ -469,6 +474,7 @@ export async function runSupervisorTui(
     options: SupervisorOverlayOptions,
     input: (data: string) => void,
     list?: SupervisorOverlayListTarget,
+    hoverCommand?: (label?: string) => void,
   ) => {
     const terminal = terminalSize()
     overlayPointer.capture({
@@ -479,6 +485,7 @@ export async function runSupervisorTui(
       options,
       input,
       list,
+      hoverCommand,
     })
   }
   const selectListPointerTarget = (
@@ -525,6 +532,63 @@ export async function runSupervisorTui(
     }, 80)
     motionTimer.unref()
   }
+
+  function syncConfirmationOverlay(action?: SupervisorConfirmation): void {
+    closeConfirmation?.()
+    if (!action) return
+
+    confirmationActive = true
+    let hoveredCommand: string | undefined
+    const view = confirmationView(
+      action,
+      screen.snapshot.runtime,
+      screen.snapshot.managedSource,
+      screen.snapshot.update,
+    )
+    const panel = new (class implements Component {
+      render(width: number): string[] {
+        const plainLines = renderSupervisorConfirmation(
+          view,
+          width,
+          plainTuiTheme,
+        )
+        captureOverlayPointer(
+          plainLines,
+          width,
+          SUPERVISOR_CONFIRMATION_OVERLAY_OPTIONS,
+          (data) => this.handleInput(data),
+          undefined,
+          (label) => {
+            if (hoveredCommand === label) return
+            hoveredCommand = label
+            ui.requestRender()
+          },
+        )
+        return renderSupervisorConfirmation(view, width, tuiTheme, hoveredCommand)
+      }
+
+      handleInput(data: string): void {
+        if (piTui.matchesKey(data, 'escape')) {
+          screen.cancelConfirmation()
+          return
+        }
+        screen.handleKey(data, piTui.matchesKey)
+      }
+
+      invalidate(): void {}
+    })()
+    const overlay = ui.showOverlay(panel, SUPERVISOR_CONFIRMATION_OVERLAY_OPTIONS)
+    closeConfirmation = () => {
+      if (!confirmationActive) return
+      confirmationActive = false
+      closeConfirmation = null
+      hoveredCommand = undefined
+      overlayPointer.clear()
+      overlay.hide()
+    }
+    overlay.focus()
+  }
+
   screen = new SupervisorScreen({
     version: dependencies.version ?? readCliVersion(),
     channel,
@@ -568,6 +632,7 @@ export async function runSupervisorTui(
     onPrepareManagedSource: () => {
       void prepareManagedSourceAndStart()
     },
+    onConfirmationChange: syncConfirmationOverlay,
     requestRender: () => ui.requestRender(),
     theme: tuiTheme,
     motionEnabled,
@@ -2373,6 +2438,7 @@ export async function runSupervisorTui(
       closeProjects?.()
       closeTransfer?.()
       closeUpdateChannel?.()
+      closeConfirmation?.()
       removeInputListener()
       process.off('SIGTERM', onTerminate)
       process.off('SIGINT', onTerminate)
@@ -2385,11 +2451,20 @@ export async function runSupervisorTui(
     const removeInputListener = ui.addInputListener((data) => {
       const pointer = parseSupervisorPointer(data)
       if (pointer) {
-        if (sourcePromptActive || settingsActive || projectsActive || transferActive || updateChannelActive) {
+        if (sourcePromptActive || settingsActive || projectsActive || transferActive || updateChannelActive || confirmationActive) {
           overlayPointer.route(pointer)
         } else {
           screen.handlePointer(pointer)
         }
+        return { consume: true }
+      }
+      if (confirmationActive) {
+        if (piTui.matchesKey(data, 'ctrl+c')) {
+          finish()
+          return { consume: true }
+        }
+        if (piTui.matchesKey(data, 'escape')) screen.cancelConfirmation()
+        else screen.handleKey(data, piTui.matchesKey)
         return { consume: true }
       }
       if (sourcePromptActive || settingsActive || projectsActive || transferActive || updateChannelActive) {
@@ -2398,10 +2473,6 @@ export async function runSupervisorTui(
           return { consume: true }
         }
         return undefined
-      }
-      if (screen.snapshot.confirmation && piTui.matchesKey(data, 'escape')) {
-        screen.cancelConfirmation()
-        return { consume: true }
       }
       if (
         piTui.matchesKey(data, 'q')
@@ -2485,6 +2556,7 @@ export class SupervisorScreen implements Component {
   private readonly onTransferFleet?: (source: MachineProjectInventory) => void
   private readonly onRequestManagedSource?: () => void
   private readonly onPrepareManagedSource?: () => void
+  private readonly onConfirmationChange?: (action?: SupervisorConfirmation) => void
   private readonly requestRender?: () => void
   private readonly theme: SupervisorTuiTheme
   private readonly motionEnabled: boolean
@@ -2525,6 +2597,7 @@ export class SupervisorScreen implements Component {
       onTransferFleet?: (source: MachineProjectInventory) => void
       onRequestManagedSource?: () => void
       onPrepareManagedSource?: () => void
+      onConfirmationChange?: (action?: SupervisorConfirmation) => void
       requestRender?: () => void
       theme?: SupervisorTuiTheme
       motionEnabled?: boolean
@@ -2547,6 +2620,7 @@ export class SupervisorScreen implements Component {
     this.onTransferFleet = callbacks.onTransferFleet
     this.onRequestManagedSource = callbacks.onRequestManagedSource
     this.onPrepareManagedSource = callbacks.onPrepareManagedSource
+    this.onConfirmationChange = callbacks.onConfirmationChange
     this.requestRender = callbacks.requestRender
     this.theme = callbacks.theme ?? createSupervisorTuiTheme({ NO_COLOR: '1' })
     this.motionEnabled = callbacks.motionEnabled ?? true
@@ -2561,6 +2635,7 @@ export class SupervisorScreen implements Component {
 
   update(patch: Partial<SupervisorSnapshot>): void {
     const wasBusy = Boolean(this.snapshot.busy)
+    const previousConfirmation = this.snapshot.confirmation
     if (patch.logs !== undefined && patch.logs !== this.snapshot.logs) this.logsFromEnd = 0
     if (patch.doctor !== undefined && patch.doctor !== this.snapshot.doctor) {
       this.doctorState = createSupervisorDoctorState(patch.doctor)
@@ -2581,6 +2656,9 @@ export class SupervisorScreen implements Component {
         : false
     }
     this.snapshot = { ...this.snapshot, ...patch }
+    if (this.snapshot.confirmation !== previousConfirmation) {
+      this.onConfirmationChange?.(this.snapshot.confirmation)
+    }
     const isBusy = Boolean(this.snapshot.busy)
     if (isBusy !== wasBusy) this.onMotionDemandChange?.()
     this.requestRender?.()
@@ -2633,12 +2711,14 @@ export class SupervisorScreen implements Component {
     if (this.snapshot.busy) return false
     if (this.snapshot.confirmation) {
       if (matchesKey(data, 'y') || matchesKey(data, 'enter')) {
-        if (this.snapshot.confirmation === 'managed-source') {
+        const confirmation = this.snapshot.confirmation
+        this.update({ confirmation: undefined })
+        if (confirmation === 'managed-source') {
           this.onPrepareManagedSource?.()
-        } else if (this.snapshot.confirmation === 'update') {
+        } else if (confirmation === 'update') {
           this.onAction?.('apply-update')
         } else {
-          this.onAction?.(this.snapshot.confirmation)
+          this.onAction?.(confirmation)
         }
         return true
       }
@@ -3093,15 +3173,6 @@ export class SupervisorScreen implements Component {
       }, width))
     }
 
-    if (this.snapshot.confirmation) {
-      lines.push('', ...renderConfirmation(
-        this.snapshot.confirmation,
-        runtime,
-        this.snapshot.managedSource,
-        this.snapshot.update,
-        width,
-      ))
-    }
     const activity = renderSupervisorActivitySlot({
       ...(this.snapshot.busy ? { busy: sanitize(this.snapshot.busy) } : {}),
       ...(this.snapshot.notice ? { notice: sanitize(this.snapshot.notice) } : {}),
@@ -3545,58 +3616,61 @@ function renderConfigRecovery(snapshot: SupervisorSnapshot): string[] {
   ]
 }
 
-function renderConfirmation(
+function confirmationView(
   action: SupervisorConfirmation,
   runtime: RuntimeSummary | null,
   managedSource?: ManagedSourcePlan | null,
   update?: UpdateResult | null,
-  width = 80,
-): string[] {
+): SupervisorConfirmationView {
   if (action === 'update') {
     const target = formatUpdateCandidate(update)
     const sourceChannel = update?.sourceChannel ?? 'current'
     const targetChannel = update?.channel ?? 'selected'
-    return renderSupervisorPanel('Confirm Update', target, [
-      sourceChannel === targetChannel
+    return {
+      action,
+      title: 'Confirm Update',
+      meta: target,
+      prompt: sourceChannel === targetChannel
         ? `Install OpenAlice ${target} from ${targetChannel} now?`
         : `Switch ${sourceChannel} → ${targetChannel} and install OpenAlice ${target}?`,
-      `Current CLI: ${update?.currentVersion ?? 'this running process'}.`,
-      'This downloads the release installer, verifies its SHA-256, and atomically replaces the installed command.',
-      'This running Supervisor will not reload. After success, exit and run openalice again.',
-      '',
-      ...renderSupervisorCommandBar([
-        { key: 'y / Enter', label: 'Install', primary: true },
-        { key: 'n / Esc', label: 'Cancel' },
-      ], Math.max(1, width - 4)),
-    ], width)
+      impact: [
+        `Current CLI: ${update?.currentVersion ?? 'this running process'}.`,
+        'The release installer is downloaded, SHA-256 verified, then the installed command is atomically replaced.',
+        'This Supervisor will not reload. After success, exit and run openalice again.',
+      ],
+      confirmLabel: 'Install update',
+      cancelLabel: 'Not now',
+    }
   }
   if (action === 'managed-source') {
     const selector = managedSource
       ? `${managedSource.selector.kind} ${managedSource.selector.value}`
       : 'the branch/version paired with this CLI'
-    return renderSupervisorPanel('Confirm Managed Source', managedSource?.state ?? 'prepare', [
-      `Prepare and use installer-managed OpenAlice source ${selector}?`,
-      `Destination: ${managedSource?.appDir ?? 'the OpenAlice install root'}`,
-      'First start may install dependencies and build the Runtime.',
-      '',
-      ...renderSupervisorCommandBar([
-        { key: 'y / Enter', label: 'Continue', primary: true },
-        { key: 'n / Esc', label: 'Cancel' },
-      ], Math.max(1, width - 4)),
-    ], width)
+    return {
+      action,
+      title: 'Confirm Managed Source',
+      meta: managedSource?.state ?? 'prepare',
+      prompt: `Prepare and use installer-managed OpenAlice source ${selector}?`,
+      impact: [
+        `Destination: ${managedSource?.appDir ?? 'the OpenAlice install root'}`,
+        'First start may install dependencies and build the Runtime.',
+      ],
+      confirmLabel: 'Prepare source',
+      cancelLabel: 'Not now',
+    }
   }
-  const effect = action === 'stop'
-    ? 'This stops the Guardian-owned Runtime and disconnects active Web/agent sessions.'
-    : 'This stops and starts the Guardian-owned Runtime; active Web/agent sessions reconnect or end.'
-  return renderSupervisorPanel(`Confirm ${action === 'stop' ? 'Stop' : 'Restart'}`, formatOwner(runtime), [
-    `${action === 'stop' ? 'Stop' : 'Restart'} Runtime owned by ${formatOwner(runtime)}?`,
-    effect,
-    '',
-    ...renderSupervisorCommandBar([
-      { key: 'y / Enter', label: action === 'stop' ? 'Stop Runtime' : 'Restart Runtime', primary: true },
-      { key: 'n / Esc', label: 'Cancel' },
-    ], Math.max(1, width - 4)),
-  ], width)
+  const stopping = action === 'stop'
+  return {
+    action,
+    title: `Confirm ${stopping ? 'Stop' : 'Restart'}`,
+    meta: formatOwner(runtime),
+    prompt: `${stopping ? 'Stop' : 'Restart'} Runtime owned by ${formatOwner(runtime)}?`,
+    impact: [stopping
+      ? 'The Guardian-owned Runtime stops and active Web and agent sessions disconnect.'
+      : 'The Guardian-owned Runtime stops and starts; active Web and agent sessions reconnect or end.'],
+    confirmLabel: stopping ? 'Stop Runtime' : 'Restart Runtime',
+    cancelLabel: 'Keep running',
+  }
 }
 
 function actionBar(

@@ -61,4 +61,23 @@ describe('Supervisor overlay pointer routing', () => {
     expect(supervisorVisibleListIndexes(5, 10, 5)).toEqual([3, 4, 5, 6, 7])
     expect(supervisorVisibleListIndexes(9, 10, 5)).toEqual([5, 6, 7, 8, 9])
   })
+
+  it('reports command hover without inventing an action', () => {
+    const hoverCommand = vi.fn()
+    const input = vi.fn()
+    const router = new SupervisorOverlayPointerRouter()
+    router.capture({
+      lines: ['╭──────────────╮', '│ [ Enter ] Go │', '╰──────────────╯'],
+      width: 16,
+      terminalWidth: 40,
+      terminalHeight: 11,
+      options: { width: 16, anchor: 'center' },
+      input,
+      hoverCommand,
+    })
+
+    expect(router.route(pointer(17, 6, 'motion'))).toBe(true)
+    expect(hoverCommand).toHaveBeenLastCalledWith('Enter')
+    expect(input).not.toHaveBeenCalled()
+  })
 })

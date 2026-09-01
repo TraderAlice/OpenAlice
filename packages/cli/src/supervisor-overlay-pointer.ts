@@ -31,6 +31,7 @@ export interface SupervisorOverlayPointerFrame {
   terminalHeight: number
   options: SupervisorOverlayOptions
   list?: SupervisorOverlayListTarget
+  hoverCommand?(label?: string): void
   input(data: string): void
 }
 
@@ -165,7 +166,17 @@ export class SupervisorOverlayPointerRouter {
       || localRow > frame.height
       || localColumn < 1
       || localColumn > frame.width
-    ) return false
+    ) {
+      if (event.motion) frame.hoverCommand?.()
+      return false
+    }
+
+    const command = supervisorCommandTargets(frame.lines).find((target) => (
+      target.row === localRow
+      && localColumn >= target.startColumn
+      && localColumn <= target.endColumn
+    ))
+    if (event.motion) frame.hoverCommand?.(command?.label)
 
     const list = frame.list
     if (event.wheel && list) {
@@ -184,11 +195,6 @@ export class SupervisorOverlayPointerRouter {
     }
 
     if (event.leftClick) {
-      const command = supervisorCommandTargets(frame.lines).find((target) => (
-        target.row === localRow
-        && localColumn >= target.startColumn
-        && localColumn <= target.endColumn
-      ))
       const data = command ? commandInput(command.label) : undefined
       if (data) {
         frame.input(data)

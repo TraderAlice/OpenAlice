@@ -184,6 +184,22 @@ not imply maintainer approval of the finished interaction.
   tone still come from the existing snapshot, but action bar and context ribbon
   never change rows merely because feedback appears.
 
+### Confirmation-modal decision
+
+- Keeping confirmation cards inline preserves the original implementation but
+  changes the main frame height, moves controls, and makes impact copy compete
+  with the operational page it is protecting.
+- Replacing confirmation with a transient toast would keep layout stable but
+  weaken explicit consent and make keyboard focus ambiguous for destructive
+  Runtime actions.
+- The selected model follows OMP's stable dialog composition: lifecycle,
+  managed-source, and update confirmation is a centered compositor overlay over
+  an unchanged application frame. The modal owns a bounded width, explicit
+  Impact section, primary Enter action, secondary Esc action, pointer hover and
+  click, while forwarding acceptance into the existing confirmation state
+  machine. Acceptance closes the modal before the fixed activity slot reports
+  work; cancellation changes no Runtime or configuration state.
+
 ## Responsive and Accessibility Contract
 
 - `80x24` remains the minimum full experience. Wide terminals show the
@@ -250,6 +266,7 @@ already large `supervisor-tui.ts` application controller.
 - [x] Turn the bottom command dock into a persistent, pointer-aware
   AliceProject/Runtime/view context ribbon.
 - [x] Replace expanding feedback rows with a stable single-line activity slot.
+- [x] Replace inline confirmation cards with stable, focused compositor modals.
 
 ## Progress
 
@@ -449,6 +466,21 @@ already large `supervisor-tui.ts` application controller.
   the ribbon's unchanged row and opened the Command Palette. CLI
   build/typecheck, root TypeScript, and the 689-file suite pass (688 passed, 1
   skipped; 6082 tests passed, 10 skipped). Docker installer smoke also passes.
+- Lifecycle, managed-source, and update consent no longer appends content to
+  the operational page. A focused centered modal now separates the question
+  from its impact, exposes distinct Enter/Esc keycaps, traps keyboard input,
+  and uses the shared overlay pointer router for hover/click. Acceptance first
+  removes the modal, then lets the existing lifecycle action surface progress
+  in the fixed activity slot; refusal remains state-only and non-mutating.
+- Confirmation-modal acceptance passes with 106 focused Supervisor screen,
+  modal, pointer, Fleet, Doctor, Palette, transfer, and real-PTY tests. A real
+  80x24 color session opened Managed Source over the unchanged application
+  frame, clicked `[ Esc ]` with raw SGR pointer input, rendered the fixed
+  `STATUS Action cancelled.` slot, detached, and restored terminal modes. The
+  46-column render keeps both actions visible. CLI build/typecheck, root
+  TypeScript, and the 690-file suite pass (689 passed, 1 skipped; 6087 tests
+  passed, 10 skipped). Docker installer smoke passes, and the package dry-run
+  includes `src/supervisor-confirmation.ts`.
 
 ## Completion Criteria
 

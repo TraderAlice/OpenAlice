@@ -193,9 +193,13 @@ path is intentionally parameter-free:
   review, failure, and completion phases; the pointer router derives the
   overlay origin from the same terminal dimensions, anchor, margin, and
   rendered height used by the TUI compositor.
-  Lifecycle, managed-source, and update confirmations use matching framed cards
-  with explicit confirm/cancel keycaps. Existing Esc, validation, confirmation,
-  and hardware-cursor contracts remain unchanged;
+  Lifecycle, managed-source, and update confirmations are focused centered
+  compositor modals over an unchanged application frame. Each modal separates
+  the question from an explicit Impact section, exposes distinct Enter/Esc
+  keycaps, and routes pointer hover/click through the same confirmation state
+  machine. Acceptance closes the modal before work appears in the fixed
+  activity slot; cancellation changes no Runtime or configuration state.
+  Existing validation and hardware-cursor contracts remain unchanged;
 - registered Machines refresh in the background with one bounded,
   non-interactive (`BatchMode=yes`) SSH inventory request each. Registered,
   checking, online, unauthorized, offline, and incompatible remain distinct

@@ -20,6 +20,10 @@ const transferFixtureEntry = join(
   dirname(fileURLToPath(import.meta.url)),
   '__fixtures__/supervisor-transfer-tui-fixture.ts',
 )
+const confirmationFixtureEntry = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '__fixtures__/supervisor-confirmation-tui-fixture.ts',
+)
 const cliPackageRoot = dirname(dirname(cliEntry))
 const cliVersion = JSON.parse(
   await readFile(join(cliPackageRoot, 'package.json'), 'utf8'),
@@ -239,6 +243,62 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     })
 
     expect(transcript).toContain('› Editing          Machine defaults')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it('keeps the application frame stable behind a focused confirmation modal', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-confirmation-modal-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [confirmationFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let requested = false
+      let clickedCancel = false
+      let cancelled = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor confirmation modal timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!requested && output.includes('[ / ] Commands') && output.includes('○ COLD')) {
+          requested = true
+          child.write('m')
+        } else if (!clickedCancel && output.includes('Confirm Managed Source') && output.includes('[ Esc ] Not now')) {
+          clickedCancel = true
+          child.write('\u001b[<32;38;16M')
+          child.write('\u001b[<0;38;16M')
+        } else if (!cancelled && output.includes('STATUS   Action cancelled.')) {
+          cancelled = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && cancelled) resolve(output)
+        else reject(new Error(`Supervisor confirmation modal exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('Confirm Managed Source')
+    expect(transcript).toContain('◆  CONFIRMATION REQUIRED')
+    expect(transcript).toContain('IMPACT')
+    expect(transcript).toContain('[ Enter ] Prepare source')
+    expect(transcript).toContain('[ Esc ] Not now')
+    expect(transcript).toContain('[ / ] Commands')
+    expect(transcript).toContain('STATUS   Action cancelled.')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)

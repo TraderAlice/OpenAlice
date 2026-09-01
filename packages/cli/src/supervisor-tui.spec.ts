@@ -456,14 +456,11 @@ describe('Supervisor TUI screen', () => {
         endpoints: { web: 'http://127.0.0.1:47331' },
       },
     })
+    const frameBeforeConfirmation = screen.render(80)
     screen.handleKey('x', matchesKey)
-    lines = screen.render(80)
-    plainLines = lines.map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
-    row = plainLines.findIndex((line) => line.includes('[ y / Enter ] Stop Runtime')) + 1
-    col = plainLines[row - 1]!.indexOf('[ y / Enter ]') + 2
-    screen.handlePointer({
-      button: 0, col, row, release: false, wheel: null, motion: false, leftClick: true,
-    })
+    expect(screen.render(80)).toHaveLength(frameBeforeConfirmation.length)
+    expect(screen.render(80).join('\n')).not.toContain('Confirm Stop')
+    screen.handleKey('enter', matchesKey)
     expect(actions).toContain('stop')
 
     screen.update({ panel: 'help' })
@@ -640,6 +637,7 @@ describe('Supervisor TUI screen', () => {
 
   it('dispatches available actions and confirms Runtime mutations', () => {
     const actions: SupervisorAction[] = []
+    const confirmations: Array<string | undefined> = []
     const screen = new SupervisorScreen({
       version: 'dev',
       channel: 'development',
@@ -652,6 +650,7 @@ describe('Supervisor TUI screen', () => {
       },
     }, {
       onAction: (action) => actions.push(action),
+      onConfirmationChange: (action) => confirmations.push(action),
     })
 
     expect(screen.handleKey('o', matchesKey)).toBe(true)
@@ -659,10 +658,13 @@ describe('Supervisor TUI screen', () => {
 
     expect(screen.handleKey('r', matchesKey)).toBe(true)
     expect(screen.snapshot.confirmation).toBe('restart')
-    expect(screen.render(100).join('\n')).toContain('active Web/agent sessions reconnect or end')
+    expect(confirmations).toEqual(['restart'])
+    expect(screen.render(100).join('\n')).not.toContain('Confirm Restart')
 
     expect(screen.handleKey('enter', matchesKey)).toBe(true)
     expect(actions).toEqual(['open', 'restart'])
+    expect(screen.snapshot.confirmation).toBeUndefined()
+    expect(confirmations).toEqual(['restart', undefined])
   })
 
   it('uses Enter as the human-first start-and-open or open action', () => {
@@ -1179,6 +1181,9 @@ describe('Supervisor TUI screen', () => {
       }
       requestRender(): void {}
       setShowHardwareCursor(): void {}
+      showOverlay() {
+        return { hide: () => undefined, focus: () => undefined }
+      }
       start(): void {
         queueMicrotask(() => inputListener?.('enter'))
       }
@@ -1354,6 +1359,7 @@ describe('Supervisor TUI screen', () => {
 
   it('confirms managed source preparation before dispatch', () => {
     let prepareRequests = 0
+    const confirmations: Array<string | undefined> = []
     const screen = new SupervisorScreen({
       version: 'dev',
       channel: 'development',
@@ -1365,16 +1371,17 @@ describe('Supervisor TUI screen', () => {
       onPrepareManagedSource: () => {
         prepareRequests += 1
       },
+      onConfirmationChange: (action) => confirmations.push(action),
     })
 
     expect(screen.handleKey('m', matchesKey)).toBe(true)
     expect(screen.snapshot.confirmation).toBe('managed-source')
-    expect(screen.render(100).join('\n')).toContain(
-      'branch/version paired with this CLI',
-    )
+    expect(confirmations).toEqual(['managed-source'])
+    expect(screen.render(100).join('\n')).not.toContain('Confirm Managed Source')
 
     expect(screen.handleKey('enter', matchesKey)).toBe(true)
     expect(prepareRequests).toBe(1)
+    expect(confirmations).toEqual(['managed-source', undefined])
   })
 
   it('navigates detail panels and requests their read-only data', () => {
@@ -1466,12 +1473,14 @@ describe('Supervisor TUI screen', () => {
 
   it('confirms an available update before dispatching the installer', () => {
     const actions: SupervisorAction[] = []
+    const confirmations: Array<string | undefined> = []
     const screen = new SupervisorScreen({
       version: '0.89.4-beta',
       channel: 'stable',
       runtime: { class: 'absent' },
     }, {
       onAction: (action) => actions.push(action),
+      onConfirmationChange: (action) => confirmations.push(action),
     })
 
     expect(screen.handleKey('u', matchesKey)).toBe(true)
@@ -1487,10 +1496,8 @@ describe('Supervisor TUI screen', () => {
       },
       confirmation: 'update',
     })
-    const confirmation = screen.render(100).join('\n')
-    expect(confirmation).toContain('Install OpenAlice 0.90.0 from stable now?')
-    expect(confirmation).toContain('will not reload')
-    expect(confirmation).toContain('run openalice again')
+    expect(confirmations).toEqual(['update'])
+    expect(screen.render(100).join('\n')).not.toContain('Confirm Update')
 
     expect(screen.handleKey('n', matchesKey)).toBe(true)
     expect(actions).toEqual(['update'])
