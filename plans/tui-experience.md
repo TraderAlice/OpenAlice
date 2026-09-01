@@ -101,7 +101,7 @@ already large `supervisor-tui.ts` application controller.
   and stable selection/scroll behavior.
 - [x] Rebuild Overview as the selected AliceProject's operational home rather
   than a flat field dump.
-- [ ] Upgrade Logs and Doctor with scroll/follow/filter or actionable diagnostic
+- [x] Upgrade Logs and Doctor with scroll/follow/filter or actionable diagnostic
   presentation inside the existing read-only contracts.
 - [ ] Upgrade Help, Setup, Project selection, Update, source, and transfer flows
   to consistent overlays and dialogs.
@@ -131,9 +131,13 @@ already large `supervisor-tui.ts` application controller.
   selected the Railway Machine, and detach restored cursor, mouse, bracketed
   paste, and alternate-screen modes.
 - Focused screen/pointer specs, all 18 real-PTY workflows, CLI build/typecheck,
-  and the repository suite pass for the current increment. Logs,
-  diagnostics, and overlays still retain old presentation and remain active
-  work rather than accepted completion.
+  and the repository suite pass for the current increment. Help and modal
+  workflows still retain old presentation and remain active work rather than
+  accepted completion.
+- Runtime Logs now render as a numbered bounded snapshot with range position,
+  live-tail state, keyboard paging, End-to-latest, mouse-wheel navigation, and a
+  contextual reload bar. Doctor renders its summary and checks as semantic
+  pass/warn/fail rows with the same keyboard and pointer scroll model.
 
 ## Completion Criteria
 

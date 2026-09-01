@@ -76,6 +76,15 @@ export function renderSupervisorCommandBar(
   return lines.length > 0 ? lines : ['No actions available']
 }
 
+export function renderSupervisorPanel(
+  title: string,
+  meta: string,
+  rows: string[],
+  width: number,
+): string[] {
+  return renderCard(`${title}${meta ? ` · ${meta}` : ''}`, rows, Math.max(24, width))
+}
+
 function renderCard(title: string, body: string[], width: number): string[] {
   const safeWidth = Math.max(12, width)
   const innerWidth = safeWidth - 4

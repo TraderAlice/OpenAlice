@@ -174,6 +174,46 @@ describe('Supervisor TUI screen', () => {
     expect(actions).toContain('logs')
   })
 
+  it('scrolls Logs and Doctor with keyboard and pointer while keeping contextual controls', () => {
+    const requestRender = vi.fn()
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'logs',
+      runtime: { class: 'running', endpoints: {} },
+      logs: {
+        entries: Array.from({ length: 20 }, (_, index) => ({ text: `log line ${index + 1}` })),
+      },
+      doctor: {
+        overall: 'warning',
+        summary: { passed: 1, warnings: 1, failures: 1 },
+        checks: [
+          { status: 'pass', summary: 'Runtime reachable' },
+          { status: 'warning', summary: 'Update available', detail: 'Install when convenient.' },
+          { status: 'fail', summary: 'Port collision' },
+        ],
+      },
+    }, { requestRender })
+
+    expect(screen.render(80).join('\n')).toContain('9–20/20 · LIVE TAIL')
+    expect(screen.render(80).join('\n')).toContain('[ l ] Reload')
+    expect(screen.handleKey('up', matchesKey)).toBe(true)
+    expect(screen.render(80).join('\n')).toContain('8–19/20')
+    expect(screen.handleKey('end', matchesKey)).toBe(true)
+    expect(screen.render(80).join('\n')).toContain('9–20/20 · LIVE TAIL')
+
+    screen.update({ panel: 'doctor' })
+    expect(screen.render(80).join('\n')).toContain('✓ Runtime reachable')
+    expect(screen.render(80).join('\n')).toContain('! Update available')
+    expect(screen.render(80).join('\n')).toContain('× Port collision')
+    expect(screen.render(80).join('\n')).toContain('[ d ] Rerun')
+    expect(screen.handlePointer({
+      button: 65, col: 10, row: 8, release: false, wheel: 1, motion: false, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(80).join('\n')).not.toContain('✓ Runtime reachable')
+    expect(requestRender).toHaveBeenCalled()
+  })
+
   it('offers Start for a stopped compatible remote AliceProject', () => {
     const machines = fleetMachines()
     machines[1]!.projects[0]!.runtime = {

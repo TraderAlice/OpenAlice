@@ -492,8 +492,11 @@ openalice logs --lines 200
 openalice logs --lines 200 --json
 ```
 
-Follow, pause, component filtering, and TUI log navigation belong to the later
-Logs/TUI increment and must reuse this bounded reader.
+The TUI projects that same bounded snapshot into a numbered Runtime Logs panel.
+Up/Down, Page Up/Page Down, Home/End, and the mouse wheel navigate the snapshot;
+End returns to the live tail and `l` reloads it. This is navigation over a
+redacted snapshot, not an unbounded file follower. Follow, pause, and component
+filtering remain later work and must reuse this bounded reader.
 
 ## Doctor
 

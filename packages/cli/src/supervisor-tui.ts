@@ -68,6 +68,7 @@ import {
   renderSupervisorCommandBar,
   renderSupervisorHeader,
   renderSupervisorHome,
+  renderSupervisorPanel,
 } from './supervisor-tui-view.ts'
 import { connectSsh } from './ssh-connect.mjs'
 import { buildRemoteSshArgs } from './remote.mjs'
@@ -2287,6 +2288,8 @@ export class SupervisorScreen implements Component {
   private readonly theme: SupervisorTuiTheme
   private hoveredPanel?: SupervisorPanel
   private hoveredFleetTarget?: SupervisorFleetPointerTarget
+  private logsFromEnd = 0
+  private doctorOffset = 0
   private renderWidth = 80
 
   constructor(
@@ -2331,6 +2334,8 @@ export class SupervisorScreen implements Component {
   }
 
   update(patch: Partial<SupervisorSnapshot>): void {
+    if (patch.logs !== undefined && patch.logs !== this.snapshot.logs) this.logsFromEnd = 0
+    if (patch.doctor !== undefined && patch.doctor !== this.snapshot.doctor) this.doctorOffset = 0
     this.snapshot = { ...this.snapshot, ...patch }
     this.requestRender?.()
   }
@@ -2437,6 +2442,20 @@ export class SupervisorScreen implements Component {
         this.update({
           notice: 'That mutation is not available for a remote selection. Use r to refresh or Enter/o to connect a running AliceProject.',
         })
+        return true
+      }
+    }
+    if (this.snapshot.panel === 'logs' || this.snapshot.panel === 'doctor') {
+      const direction = matchesKey(data, 'up') || matchesKey(data, 'pageUp')
+        ? -1
+        : matchesKey(data, 'down') || matchesKey(data, 'pageDown') ? 1 : 0
+      if (direction !== 0) {
+        const amount = matchesKey(data, 'pageUp') || matchesKey(data, 'pageDown') ? 8 : 1
+        this.scrollOperationalPanel(direction * amount)
+        return true
+      }
+      if (matchesKey(data, 'home') || matchesKey(data, 'end')) {
+        this.jumpOperationalPanel(matchesKey(data, 'end'))
         return true
       }
     }
@@ -2596,6 +2615,10 @@ export class SupervisorScreen implements Component {
       })
       return true
     }
+    if (event.wheel !== null && (this.snapshot.panel === 'logs' || this.snapshot.panel === 'doctor')) {
+      this.scrollOperationalPanel(event.wheel)
+      return true
+    }
     return event.release
   }
 
@@ -2621,9 +2644,9 @@ export class SupervisorScreen implements Component {
         this.hoveredFleetTarget,
       ))
     } else if (this.snapshot.panel === 'logs') {
-      lines.push(...renderLogs(this.snapshot.logs))
+      lines.push(...renderLogs(this.snapshot.logs, width, this.logsFromEnd))
     } else if (this.snapshot.panel === 'doctor') {
-      lines.push(...renderDoctor(this.snapshot.doctor))
+      lines.push(...renderDoctor(this.snapshot.doctor, width, this.doctorOffset))
     } else if (this.snapshot.panel === 'help') {
       lines.push(...renderHelp(isConfigRecovery(this.snapshot)))
     } else if (isConfigRecovery(this.snapshot)) {
@@ -2675,7 +2698,21 @@ export class SupervisorScreen implements Component {
             this.snapshot.context,
             width,
           )
-        : actionBar(runtime, this.snapshot.context, width, isConfigRecovery(this.snapshot))),
+        : this.snapshot.panel === 'logs'
+          ? renderSupervisorCommandBar([
+              { key: '↑↓', label: 'Scroll' },
+              { key: 'l', label: 'Reload' },
+              { key: 'End', label: 'Latest' },
+              { key: '?', label: 'More' },
+            ], width)
+          : this.snapshot.panel === 'doctor'
+            ? renderSupervisorCommandBar([
+                { key: '↑↓', label: 'Scroll' },
+                { key: 'd', label: 'Rerun' },
+                { key: 'Home', label: 'Top' },
+                { key: '?', label: 'More' },
+              ], width)
+            : actionBar(runtime, this.snapshot.context, width, isConfigRecovery(this.snapshot))),
       'q / Esc / Ctrl+C  Detach without stopping',
     )
     return decorateSupervisorFrame(
@@ -2690,6 +2727,26 @@ export class SupervisorScreen implements Component {
   }
 
   invalidate(): void {}
+
+  private scrollOperationalPanel(direction: number): void {
+    if (this.snapshot.panel === 'logs') {
+      const length = this.snapshot.logs?.entries?.length ?? 0
+      this.logsFromEnd = clamp(this.logsFromEnd - direction, 0, Math.max(0, length - 1))
+    } else if (this.snapshot.panel === 'doctor') {
+      const length = doctorLines(this.snapshot.doctor).length
+      this.doctorOffset = clamp(this.doctorOffset + direction, 0, Math.max(0, length - 1))
+    }
+    this.requestRender?.()
+  }
+
+  private jumpOperationalPanel(end: boolean): void {
+    if (this.snapshot.panel === 'logs') {
+      this.logsFromEnd = end ? 0 : Math.max(0, (this.snapshot.logs?.entries?.length ?? 0) - 1)
+    } else if (this.snapshot.panel === 'doctor') {
+      this.doctorOffset = end ? Math.max(0, doctorLines(this.snapshot.doctor).length - 1) : 0
+    }
+    this.requestRender?.()
+  }
 
   private actionAvailable(action: SupervisorAction): boolean {
     if (isConfigRecovery(this.snapshot)) {
@@ -2887,30 +2944,62 @@ function renderGuidance(
   return [`Runtime is ${runtime.class ?? runtime.state ?? 'unknown'}; status will refresh automatically.`]
 }
 
-function renderLogs(logs: RuntimeLogs | null | undefined): string[] {
+function renderLogs(
+  logs: RuntimeLogs | null | undefined,
+  width: number,
+  fromEnd: number,
+): string[] {
   if (!logs) return ['Press l to load the bounded, redacted Runtime log tail.']
   const entries = logs.entries ?? []
   if (entries.length === 0) return ['No Runtime log entries were found.']
-  const lines = ['Runtime logs (bounded and redacted):', '']
-  lines.push(...entries.slice(-16).map((entry) => sanitize(entry.text ?? '')))
-  if (logs.truncated || entries.length > 16) {
-    lines.push('[showing the most recent visible lines]')
-  }
-  return lines
+  const visible = 12
+  const safeFromEnd = clamp(fromEnd, 0, Math.max(0, entries.length - 1))
+  const end = Math.max(1, entries.length - safeFromEnd)
+  const start = Math.max(0, end - visible)
+  const position = `${start + 1}–${end}/${entries.length}${safeFromEnd === 0 ? ' · LIVE TAIL' : ''}`
+  const rows = entries.slice(start, end).map((entry, index) => {
+    const number = String(start + index + 1).padStart(String(entries.length).length, ' ')
+    return `${number}  ${sanitize(entry.text ?? '')}`
+  })
+  if (logs.truncated && start === 0) rows.unshift('… earlier lines were omitted by the bounded reader')
+  return renderSupervisorPanel('Runtime Logs', position, rows, width)
 }
 
-function renderDoctor(doctor: DoctorReport | null | undefined): string[] {
+function renderDoctor(
+  doctor: DoctorReport | null | undefined,
+  width: number,
+  offset: number,
+): string[] {
   if (!doctor) return ['Press d to run read-only Runtime diagnostics.']
   const summary = doctor.summary
-  const lines = [
-    `Doctor: ${doctor.overall ?? 'unknown'} · ${summary?.passed ?? 0} pass · ${summary?.warnings ?? 0} warn · ${summary?.failures ?? 0} fail`,
-    '',
-  ]
-  for (const check of (doctor.checks ?? []).slice(0, 12)) {
-    lines.push(`[${(check.status ?? 'unknown').toUpperCase()}] ${sanitize(check.summary ?? '')}`)
+  const rows = doctorLines(doctor)
+  const visible = 12
+  const start = clamp(offset, 0, Math.max(0, rows.length - 1))
+  const end = Math.min(rows.length, start + visible)
+  const meta = [
+    (doctor.overall ?? 'unknown').toUpperCase(),
+    `${summary?.passed ?? 0} pass`,
+    `${summary?.warnings ?? 0} warn`,
+    `${summary?.failures ?? 0} fail`,
+    rows.length > visible ? `${start + 1}–${end}/${rows.length}` : '',
+  ].filter(Boolean).join(' · ')
+  return renderSupervisorPanel('Doctor', meta, rows.slice(start, end), width)
+}
+
+function doctorLines(doctor: DoctorReport | null | undefined): string[] {
+  return (doctor?.checks ?? []).flatMap((check) => {
+    const status = (check.status ?? 'unknown').toLowerCase()
+    const glyph = status === 'pass' || status === 'passed'
+      ? '✓'
+      : status === 'warn' || status === 'warning' ? '!' : status === 'fail' || status === 'failed' ? '×' : '·'
+    const lines = [`${glyph} ${sanitize(check.summary ?? 'Unnamed check')}`]
     if (check.detail) lines.push(`  ${sanitize(check.detail)}`)
-  }
-  return lines
+    return lines
+  })
+}
+
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.min(Math.max(value, minimum), maximum)
 }
 
 function renderHelp(recovery = false): string[] {
