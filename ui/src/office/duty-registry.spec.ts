@@ -7,6 +7,7 @@ import type {
 } from '../api/issues'
 import {
   coreOfficeDutyRegistrations,
+  officeDutyKey,
   officeScheduledIssueFingerprint,
   projectOfficeDutyQueue,
   resolveOfficeDutyTarget,
@@ -170,6 +171,29 @@ describe('Office duty registry', () => {
       .not.toBe(officeScheduledIssueFingerprint(NOW, 'ws-a', retired))
     expect(officeScheduledIssueFingerprint(NOW, 'ws-a', missing))
       .toBe(officeScheduledIssueFingerprint(NOW, 'ws-a', renamed))
+  })
+
+  it('keys frozen duties by exact evidence while ignoring presentation-only edits', () => {
+    const project = (issue: IssueListItem) => scheduledIssueHealthDutyRegistration(
+      NOW,
+      snapshot(issue),
+      'ready',
+    ).candidates[0]!
+    const first = project(scheduledIssue('failed', {
+      automationHealth: { state: 'failed', message: 'Run failed.', latestTaskId: 'run-a' },
+    }))
+    const changed = project(scheduledIssue('failed', {
+      automationHealth: { state: 'failed', message: 'Run failed.', latestTaskId: 'run-b' },
+    }))
+    const renamed = project(scheduledIssue('failed', {
+      title: 'Presentation-only rename',
+      priority: 'low',
+      automationHealth: { state: 'failed', message: 'Run failed.', latestTaskId: 'run-a' },
+    }))
+
+    expect(first.id).toBe(changed.id)
+    expect(officeDutyKey(first)).not.toBe(officeDutyKey(changed))
+    expect(officeDutyKey(first)).toBe(officeDutyKey(renamed))
   })
 
   it('keeps unknown blocker wording inside the evidence identity', () => {

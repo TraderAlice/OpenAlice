@@ -174,6 +174,7 @@ describe('useOfficeInboxDuties', () => {
     const hook = renderHook(() => useOfficeInboxDuties())
 
     expect(hook.result.current.status).toBe('loading')
+    expect(hook.result.current).toMatchObject({ requestEpoch: 1, successEpoch: 0 })
     expect(hook.result.current.deliveries).toEqual([])
 
     await act(async () => {
@@ -181,7 +182,39 @@ describe('useOfficeInboxDuties', () => {
       await first.promise.catch(() => undefined)
     })
     await waitFor(() => expect(hook.result.current.status).toBe('error'))
+    expect(hook.result.current).toMatchObject({ requestEpoch: 1, successEpoch: 0 })
     expect(hook.result.current.deliveries).toEqual([])
+  })
+
+  it('exposes request-start provenance across deferred authoritative responses', async () => {
+    const beforeBaseline = deferred<InboxHistoryResponse>()
+    historyMock.mockReturnValueOnce(beforeBaseline.promise)
+    const hook = renderHook(
+      ({ activitySeq }) => useOfficeInboxDuties(activitySeq),
+      { initialProps: { activitySeq: 1 } },
+    )
+    await waitFor(() => expect(hook.result.current.requestEpoch).toBe(1))
+    expect(hook.result.current.successEpoch).toBe(0)
+
+    await act(async () => {
+      beforeBaseline.resolve(page([]))
+      await beforeBaseline.promise
+    })
+    expect(hook.result.current).toMatchObject({ requestEpoch: 1, successEpoch: 1 })
+
+    const afterBaseline = deferred<InboxHistoryResponse>()
+    historyMock.mockReturnValueOnce(afterBaseline.promise)
+    hook.rerender({ activitySeq: 2 })
+    await waitFor(() => expect(hook.result.current).toMatchObject({
+      requestEpoch: 2,
+      successEpoch: 1,
+    }))
+
+    await act(async () => {
+      afterBaseline.resolve(page([]))
+      await afterBaseline.promise
+    })
+    expect(hook.result.current).toMatchObject({ requestEpoch: 2, successEpoch: 2 })
   })
 
   it('keeps A after a failed receipt and removes only A after server confirmation', async () => {

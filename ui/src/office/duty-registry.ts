@@ -114,7 +114,7 @@ export type OfficeCadenceDutyCandidate = OfficeDutyCandidateBase & {
     readonly kind: 'evidence'
     readonly subjectKey: string
     readonly fingerprint: string
-    readonly scope: 'session'
+    readonly scope: 'office-day'
   }
   readonly cadence: OfficeCadenceDutyEvidence
 }
@@ -123,6 +123,67 @@ export type OfficeDutyCandidate =
   | OfficeEventDutyCandidate
   | OfficeInboxDutyCandidate
   | OfficeCadenceDutyCandidate
+
+export type OfficeDutyProvider = 'inbox' | 'issues'
+
+export interface OfficeDutyProviderEpoch {
+  /** Latest authoritative request started by this tab. */
+  readonly requested: number
+  /** Request-start epoch of the latest authoritative response accepted by this tab. */
+  readonly successful: number
+}
+
+export interface OfficeDutySourceEpochs {
+  readonly inbox: OfficeDutyProviderEpoch
+  readonly issues: OfficeDutyProviderEpoch
+}
+
+/**
+ * Exact frozen identity for one reviewable fact. Candidate ids intentionally
+ * remain stable across evidence versions; a finite Office shift must not let a
+ * newer fingerprint silently replace the version that was admitted.
+ */
+export function officeDutyKey(duty: OfficeDutyCandidate): string {
+  const receipt = duty.receipt
+  if (receipt.kind === 'evidence') {
+    return JSON.stringify([
+      'office-duty-v1',
+      duty.kind,
+      duty.id,
+      receipt.subjectKey,
+      receipt.fingerprint,
+    ])
+  }
+  if (receipt.kind === 'inbox-read') {
+    return JSON.stringify([
+      'office-duty-v1',
+      duty.kind,
+      duty.id,
+      receipt.inboxEntryId,
+      receipt.fingerprint,
+    ])
+  }
+  return JSON.stringify([
+    'office-duty-v1',
+    duty.kind,
+    duty.id,
+    receipt.family,
+    receipt.throughSeq,
+  ])
+}
+
+/** Provider ownership encoded into one exact frozen Office Day duty key. */
+export function officeDutyProviderFromKey(dutyKey: string): OfficeDutyProvider | null {
+  try {
+    const parsed: unknown = JSON.parse(dutyKey)
+    if (!Array.isArray(parsed) || parsed[0] !== 'office-duty-v1') return null
+    if (parsed[1] === 'inbox') return 'inbox'
+    if (parsed[1] === 'cadence') return 'issues'
+    return null
+  } catch {
+    return null
+  }
+}
 
 /** Normalized registration boundary consumed by the Office queue resolver. */
 export interface OfficeDutyRegistration {
@@ -196,7 +257,7 @@ function nextDueEvidenceKey(now: number, nextDueAtMs: number | null | undefined)
 }
 
 /**
- * Session receipt identity for a Scheduled Issue exception. Overdue snapshots
+ * Exact Office Day evidence identity for a Scheduled Issue exception. Overdue snapshots
  * deliberately collapse to `due`: the backend clamps an overdue next fire to
  * each scanner read's `now`, so storing that raw value would resurrect the same
  * reviewed exception on every poll.
@@ -419,7 +480,7 @@ export function scheduledIssueHealthDutyRegistration(
           issueId: issue.id,
           targetId: 'operations',
         },
-        receipt: { kind: 'evidence', subjectKey, fingerprint, scope: 'session' },
+        receipt: { kind: 'evidence', subjectKey, fingerprint, scope: 'office-day' },
         cadence,
       })
     }

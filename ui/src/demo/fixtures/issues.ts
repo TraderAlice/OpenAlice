@@ -7,6 +7,7 @@ import type {
 } from '../../api/issues'
 import { demoInboxEntries } from './inbox'
 import { demoTurnProgress } from './turn-progress'
+import { demoLocalDayAnchor } from './time'
 
 // GET /api/issues aggregates every workspace's declared issues by SCANNING
 // each workspace's `.alice/issues/<id>.md` dir (one markdown file per issue) —
@@ -31,7 +32,7 @@ import { demoTurnProgress } from './turn-progress'
 
 const HOUR = 60 * 60 * 1000
 const DAY = 24 * HOUR
-const now = Date.now()
+const now = demoLocalDayAnchor()
 
 export const demoIssuesSnapshot: IssueSnapshot = {
   workspaces: [

@@ -1,4 +1,4 @@
-import { fetchJson } from './client'
+import { fetchJson, headers } from './client'
 import type { AgentRuntimeSurface } from './agentRuntimeLog'
 
 export type OfficeEmployeeMood =
@@ -95,6 +95,90 @@ export interface OfficeRoutineFollowUpDeleteResponse {
   removed: boolean
 }
 
+export interface OfficeDayEvidenceReceipt {
+  subjectKey: string
+  fingerprint: string
+  reviewedAt: number
+}
+
+export interface OfficeDayShiftSnapshot {
+  id: number
+  openedAt: number
+  /** Exact duty keys frozen into this finite shift. */
+  slots: string[]
+  /** Pending exact duty keys. Later only rotates this list. */
+  order: string[]
+  cleared: boolean
+}
+
+export interface OfficeDayRecord {
+  dayKey: string
+  timeZone: string
+  openedAt: number
+  updatedAt: number
+  shift: OfficeDayShiftSnapshot
+  /** Exact duty keys admitted by any shift during this day; server-owned and append-only. */
+  seenDutyIds: string[]
+  evidenceReceipts: OfficeDayEvidenceReceipt[]
+}
+
+/** Server-clock envelope shared by every renderer of one AliceProject. */
+export interface OfficeDayEnvelope {
+  serverNow: number
+  dayKey: string
+  timeZone: string
+  nextRolloverAt: number
+  revision: number
+  day: OfficeDayRecord | null
+}
+
+export type OfficeDayMutationReason =
+  | 'stale-day'
+  | 'stale-shift'
+  | 'no-change'
+  | 'duty-not-pending'
+  | 'shift-not-complete'
+
+export interface OfficeDayMutationResponse extends OfficeDayEnvelope {
+  applied: boolean
+  reason?: OfficeDayMutationReason
+}
+
+export type OfficeDayCommand =
+  | {
+      type: 'reconcile-shift'
+      dayKey: string
+      shiftId: number
+      presentSlotIds: string[]
+      proposedSlots: string[]
+      unresolvedCount: number
+    }
+  | {
+      type: 'defer-duty'
+      dayKey: string
+      shiftId: number
+      dutyId: string
+    }
+  | {
+      type: 'start-next-shift'
+      dayKey: string
+      shiftId: number
+      slots: string[]
+    }
+  | {
+      type: 'review-evidence'
+      dayKey: string
+      shiftId: number
+      dutyId: string
+      subjectKey: string
+      fingerprint: string
+    }
+  | {
+      type: 'forget-evidence'
+      dayKey: string
+      subjectKey: string
+    }
+
 export const officeApi = {
   async floor(opts?: { workspaceId?: string; asOfSeq?: number }): Promise<OfficeBuildingSnapshot> {
     const params = new URLSearchParams()
@@ -121,6 +205,29 @@ export const officeApi = {
   ): Promise<OfficeRoutineFollowUpDeleteResponse> {
     return fetchJson(`/api/office/routine-follow-ups/${encodeURIComponent(inboxEntryId)}`, {
       method: 'DELETE',
+    })
+  },
+
+  async day(): Promise<OfficeDayEnvelope> {
+    return fetchJson('/api/office/day')
+  },
+
+  async openDay(input: {
+    dayKey: string
+    slots: string[]
+  }): Promise<OfficeDayMutationResponse> {
+    return fetchJson('/api/office/day/open', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(input),
+    })
+  },
+
+  async commandDay(command: OfficeDayCommand): Promise<OfficeDayMutationResponse> {
+    return fetchJson('/api/office/day/commands', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(command),
     })
   },
 }

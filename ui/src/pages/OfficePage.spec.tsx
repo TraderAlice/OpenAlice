@@ -1,12 +1,21 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { useSyncExternalStore } from 'react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../i18n'
+import type {
+  OfficeDayMutationResponse,
+  OfficeDayRecord,
+} from '../api/office'
 import type { OfficeInboxDutyEvidence } from '../office/duty-registry'
-import { inboxUnreadDutyRegistration, type OfficeInboxDutyCandidate } from '../office/duty-registry'
+import {
+  inboxUnreadDutyRegistration,
+  officeDutyKey,
+  type OfficeInboxDutyCandidate,
+} from '../office/duty-registry'
 import { useInboxSelection } from '../live/inbox-selection'
 import { OFFICE_COWORKER_CAST_STORAGE_KEY } from '../office/coworker-cast-storage'
 import {
@@ -15,6 +24,7 @@ import {
   rememberOfficeInboxDutyExcursion,
 } from '../office/inbox-duty-excursion'
 import { clearOfficePlayerState } from '../office/office-excursion'
+import type { OfficeDayController } from '../office/useOfficeDay'
 import { OfficePage } from './OfficePage'
 
 const {
@@ -31,6 +41,8 @@ const {
   routineCarryMock,
   routineFollowUpsMock,
   routineResolveMock,
+  sourceEpochState,
+  useOfficeDayMock,
 } = vi.hoisted(() => ({
   acknowledgeMock: vi.fn(),
   navigateMock: vi.fn(),
@@ -45,6 +57,15 @@ const {
   routineCarryMock: vi.fn(async () => undefined),
   routineFollowUpsMock: vi.fn(),
   routineResolveMock: vi.fn(async () => undefined),
+  sourceEpochState: {
+    inboxRequested: 1,
+    inboxSuccessful: 1,
+    issuesRequested: 1,
+    issuesSuccessful: 1,
+    routineRequested: 1,
+    routineSuccessful: 1,
+  },
+  useOfficeDayMock: vi.fn(),
 }))
 
 vi.mock('react-router-dom', async (importOriginal) => ({
@@ -130,7 +151,11 @@ vi.mock('../hooks/useOfficeFloor', () => ({
 }))
 
 vi.mock('../hooks/useIssues', () => ({
-  useIssues: issuesMock,
+  useIssues: () => ({
+    ...issuesMock(),
+    requestEpoch: sourceEpochState.issuesRequested,
+    successEpoch: sourceEpochState.issuesSuccessful,
+  }),
 }))
 
 vi.mock('../hooks/useIssueDetail', () => ({
@@ -142,11 +167,34 @@ vi.mock('../office/useOfficeProductActivity', () => ({
 }))
 
 vi.mock('../office/useOfficeInboxDuties', () => ({
-  useOfficeInboxDuties: inboxDutiesMock,
+  useOfficeInboxDuties: () => ({
+    ...inboxDutiesMock(),
+    requestEpoch: sourceEpochState.inboxRequested,
+    successEpoch: sourceEpochState.inboxSuccessful,
+  }),
 }))
 
 vi.mock('../office/useOfficeRoutineFollowUps', () => ({
-  useOfficeRoutineFollowUps: routineFollowUpsMock,
+  useOfficeRoutineFollowUps: () => {
+    const source = routineFollowUpsMock()
+    return {
+      ...source,
+      requestEpoch: sourceEpochState.routineRequested,
+      successEpoch: sourceEpochState.routineSuccessful,
+      refresh: async () => {
+        const requestEpoch = sourceEpochState.routineRequested + 1
+        sourceEpochState.routineRequested = requestEpoch
+        publishTestOfficeDay()
+        await source.refresh()
+        sourceEpochState.routineSuccessful = requestEpoch
+        publishTestOfficeDay()
+      },
+    }
+  },
+}))
+
+vi.mock('../office/useOfficeDay', () => ({
+  useOfficeDay: useOfficeDayMock,
 }))
 
 const defaultOfficeFloor = () => ({
@@ -242,6 +290,16 @@ function inboxCandidate(evidence: OfficeInboxDutyEvidence): OfficeInboxDutyCandi
   return inboxUnreadDutyRegistration([evidence], 'ready').candidates[0] as OfficeInboxDutyCandidate
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (error: unknown) => void
+  const promise = new Promise<T>((done, fail) => {
+    resolve = done
+    reject = fail
+  })
+  return { promise, resolve, reject }
+}
+
 function routineInboxEvidence(input: {
   id: string
   title: string
@@ -284,6 +342,268 @@ function healthyRoutineIssue(id: string, title: string) {
   }
 }
 
+const TEST_OFFICE_DAY_KEY = '2026-09-01'
+const TEST_OFFICE_TIME_ZONE = 'Asia/Shanghai'
+const TEST_OFFICE_ROLLOVER_AT = Date.UTC(2026, 8, 2)
+let testOfficeDayNow = Date.UTC(2026, 8, 1)
+let testOfficeDayRevision = 0
+let testOfficeDayVersion = 0
+let testOfficeDayRecord: OfficeDayRecord | null = null
+const testOfficeDayListeners = new Set<() => void>()
+const testOfficeDayRefreshMock = vi.fn(async () => undefined)
+let testReconcileOverride: OfficeDayController['reconcileShift'] | null = null
+let testDeferOverride: OfficeDayController['deferDuty'] | null = null
+let testStartNextOverride: OfficeDayController['startNextShift'] | null = null
+
+function cloneTestOfficeDay(): OfficeDayRecord | null {
+  return testOfficeDayRecord ? JSON.parse(JSON.stringify(testOfficeDayRecord)) as OfficeDayRecord : null
+}
+
+function testOfficeDayResponse(
+  applied: boolean,
+  reason?: OfficeDayMutationResponse['reason'],
+): OfficeDayMutationResponse {
+  testOfficeDayNow += 1
+  return {
+    serverNow: testOfficeDayNow,
+    dayKey: TEST_OFFICE_DAY_KEY,
+    timeZone: TEST_OFFICE_TIME_ZONE,
+    nextRolloverAt: TEST_OFFICE_ROLLOVER_AT,
+    revision: testOfficeDayRevision,
+    day: cloneTestOfficeDay(),
+    applied,
+    ...(reason ? { reason } : {}),
+  }
+}
+
+function publishTestOfficeDay(): void {
+  testOfficeDayVersion += 1
+  for (const listener of testOfficeDayListeners) listener()
+}
+
+function resetTestOfficeDay(): void {
+  testOfficeDayNow = Date.UTC(2026, 8, 1)
+  testOfficeDayRevision = 0
+  testOfficeDayVersion = 0
+  testOfficeDayRecord = null
+  testOfficeDayListeners.clear()
+  testOfficeDayRefreshMock.mockReset()
+  testOfficeDayRefreshMock.mockResolvedValue(undefined)
+  testReconcileOverride = null
+  testDeferOverride = null
+  testStartNextOverride = null
+}
+
+function acceptTestInboxSnapshot(): void {
+  sourceEpochState.inboxRequested += 1
+  sourceEpochState.inboxSuccessful = sourceEpochState.inboxRequested
+}
+
+function acceptTestIssueSnapshot(): void {
+  sourceEpochState.issuesRequested += 1
+  sourceEpochState.issuesSuccessful = sourceEpochState.issuesRequested
+}
+
+function commitTestOfficeDay(
+  day: OfficeDayRecord,
+  at = testOfficeDayNow + 1,
+): OfficeDayMutationResponse {
+  testOfficeDayRevision += 1
+  testOfficeDayRecord = { ...day, updatedAt: at }
+  const response = testOfficeDayResponse(true)
+  publishTestOfficeDay()
+  return response
+}
+
+const openTestOfficeDay: OfficeDayController['open'] = async (slots) => {
+  if (testOfficeDayRecord) return testOfficeDayResponse(false, 'no-change')
+  const at = testOfficeDayNow + 1
+  testOfficeDayRevision += 1
+  testOfficeDayRecord = {
+    dayKey: TEST_OFFICE_DAY_KEY,
+    timeZone: TEST_OFFICE_TIME_ZONE,
+    openedAt: at,
+    updatedAt: at,
+    seenDutyIds: [...slots],
+    shift: {
+      id: testOfficeDayRevision,
+      openedAt: at,
+      slots: [...slots],
+      order: [...slots],
+      cleared: false,
+    },
+    evidenceReceipts: [],
+  }
+  const response = testOfficeDayResponse(true)
+  publishTestOfficeDay()
+  return response
+}
+
+const reconcileTestOfficeShift: OfficeDayController['reconcileShift'] = async (input) => {
+  const day = testOfficeDayRecord
+  if (!day || input.dayKey !== TEST_OFFICE_DAY_KEY) {
+    return testOfficeDayResponse(false, 'stale-day')
+  }
+  if (day.shift.id !== input.shiftId) return testOfficeDayResponse(false, 'stale-shift')
+  if ((day.shift.cleared || day.shift.slots.length === 0) && input.proposedSlots.length > 0) {
+    const slots = input.proposedSlots.filter((dutyId) => !day.seenDutyIds.includes(dutyId))
+    if (slots.length === 0) return testOfficeDayResponse(false, 'no-change')
+    const at = testOfficeDayNow + 1
+    const nextRevision = testOfficeDayRevision + 1
+    return commitTestOfficeDay({
+      ...day,
+      shift: {
+        id: nextRevision,
+        openedAt: at,
+        slots: [...slots],
+        order: [...slots],
+        cleared: false,
+      },
+      seenDutyIds: [...day.seenDutyIds, ...slots],
+    }, at)
+  }
+  const present = new Set(input.presentSlotIds)
+  const order = day.shift.order.filter((dutyId) => present.has(dutyId))
+  const cleared = day.shift.slots.length > 0 && order.length === 0 && input.unresolvedCount === 0
+  if (order.length === day.shift.order.length
+    && order.every((dutyId, index) => dutyId === day.shift.order[index])
+    && cleared === day.shift.cleared) {
+    return testOfficeDayResponse(false, 'no-change')
+  }
+  return commitTestOfficeDay({
+    ...day,
+    shift: { ...day.shift, order, cleared },
+  })
+}
+
+const deferTestOfficeDuty: OfficeDayController['deferDuty'] = async (input) => {
+  const day = testOfficeDayRecord
+  if (!day || input.dayKey !== TEST_OFFICE_DAY_KEY) {
+    return testOfficeDayResponse(false, 'stale-day')
+  }
+  if (day.shift.id !== input.shiftId) return testOfficeDayResponse(false, 'stale-shift')
+  const index = day.shift.order.indexOf(input.dutyId)
+  if (index < 0) return testOfficeDayResponse(false, 'duty-not-pending')
+  if (day.shift.order.length < 2 || index === day.shift.order.length - 1) {
+    return testOfficeDayResponse(false, 'no-change')
+  }
+  const order = [...day.shift.order]
+  order.splice(index, 1)
+  order.push(input.dutyId)
+  return commitTestOfficeDay({ ...day, shift: { ...day.shift, order } })
+}
+
+const reconcileTestOfficeShiftDispatch: OfficeDayController['reconcileShift'] = (input) => (
+  testReconcileOverride?.(input) ?? reconcileTestOfficeShift(input)
+)
+
+const deferTestOfficeDutyDispatch: OfficeDayController['deferDuty'] = (input) => (
+  testDeferOverride?.(input) ?? deferTestOfficeDuty(input)
+)
+
+const startNextTestOfficeShift: OfficeDayController['startNextShift'] = async (input) => {
+  const day = testOfficeDayRecord
+  if (!day || input.dayKey !== TEST_OFFICE_DAY_KEY) {
+    return testOfficeDayResponse(false, 'stale-day')
+  }
+  if (day.shift.id !== input.shiftId) return testOfficeDayResponse(false, 'stale-shift')
+  if (day.shift.order.length > 0) return testOfficeDayResponse(false, 'shift-not-complete')
+  const slots = input.slots.filter((dutyId) => !day.seenDutyIds.includes(dutyId))
+  if (slots.length === 0) return testOfficeDayResponse(false, 'no-change')
+  const at = testOfficeDayNow + 1
+  const nextRevision = testOfficeDayRevision + 1
+  return commitTestOfficeDay({
+    ...day,
+    shift: {
+      id: nextRevision,
+      openedAt: at,
+      slots: [...slots],
+      order: [...slots],
+      cleared: false,
+    },
+    seenDutyIds: [...day.seenDutyIds, ...slots],
+  }, at)
+}
+
+const startNextTestOfficeShiftDispatch: OfficeDayController['startNextShift'] = (input) => (
+  testStartNextOverride?.(input) ?? startNextTestOfficeShift(input)
+)
+
+const reviewTestOfficeEvidence: OfficeDayController['reviewEvidence'] = async (duty) => {
+  const day = testOfficeDayRecord
+  if (!day) throw new Error('Office Day is unavailable.')
+  const dutyId = officeDutyKey(duty)
+  const receiptExists = day.evidenceReceipts.some((receipt) => (
+    receipt.subjectKey === duty.receipt.subjectKey
+    && receipt.fingerprint === duty.receipt.fingerprint
+  ))
+  if (!day.shift.order.includes(dutyId)) {
+    if (receiptExists) return 'already-resolved'
+    throw new Error('Duty is not pending in this Office Day.')
+  }
+  commitTestOfficeDay({
+    ...day,
+    shift: {
+      ...day.shift,
+      order: day.shift.order.filter((pending) => pending !== dutyId),
+      cleared: false,
+    },
+    evidenceReceipts: receiptExists ? day.evidenceReceipts : [...day.evidenceReceipts, {
+      subjectKey: duty.receipt.subjectKey,
+      fingerprint: duty.receipt.fingerprint,
+      reviewedAt: testOfficeDayNow + 1,
+    }],
+  })
+  return 'acknowledged'
+}
+
+const forgetTestOfficeEvidence: OfficeDayController['forgetEvidence'] = async (subjectKey) => {
+  const day = testOfficeDayRecord
+  if (!day) return
+  const evidenceReceipts = day.evidenceReceipts.filter((receipt) => receipt.subjectKey !== subjectKey)
+  if (evidenceReceipts.length === day.evidenceReceipts.length) return
+  commitTestOfficeDay({ ...day, evidenceReceipts })
+}
+
+function hasTestOfficeEvidence(subjectKey: string, fingerprint: string): boolean {
+  return testOfficeDayRecord?.evidenceReceipts.some((receipt) => (
+    receipt.subjectKey === subjectKey && receipt.fingerprint === fingerprint
+  )) ?? false
+}
+
+function useTestOfficeDay(): OfficeDayController {
+  useSyncExternalStore(
+    (listener) => {
+      testOfficeDayListeners.add(listener)
+      return () => testOfficeDayListeners.delete(listener)
+    },
+    () => testOfficeDayVersion,
+    () => testOfficeDayVersion,
+  )
+  const day = cloneTestOfficeDay()
+  return {
+    status: 'ready',
+    dayKey: TEST_OFFICE_DAY_KEY,
+    timeZone: TEST_OFFICE_TIME_ZONE,
+    nextRolloverAt: TEST_OFFICE_ROLLOVER_AT,
+    revision: testOfficeDayRevision,
+    day,
+    evidenceReceipts: day?.evidenceReceipts ?? [],
+    // Mirror the real controller: the predicate identity changes with each
+    // authoritative snapshot so duty projections recompute exact receipts.
+    hasEvidenceReceipt: (subjectKey, fingerprint) => (
+      hasTestOfficeEvidence(subjectKey, fingerprint)
+    ),
+    refresh: testOfficeDayRefreshMock,
+    open: openTestOfficeDay,
+    reconcileShift: reconcileTestOfficeShiftDispatch,
+    deferDuty: deferTestOfficeDutyDispatch,
+    startNextShift: startNextTestOfficeShiftDispatch,
+    reviewEvidence: reviewTestOfficeEvidence,
+    forgetEvidence: forgetTestOfficeEvidence,
+  }
+}
+
 async function leaveCadenceDossierForFullIssue() {
   const view = render(<OfficePage />)
   await userEvent.click(screen.getByRole('button', {
@@ -302,6 +622,15 @@ vi.mock('../tabs/store', () => ({
 
 beforeEach(async () => {
   await i18n.changeLanguage('zh')
+  resetTestOfficeDay()
+  sourceEpochState.inboxRequested = 1
+  sourceEpochState.inboxSuccessful = 1
+  sourceEpochState.issuesRequested = 1
+  sourceEpochState.issuesSuccessful = 1
+  sourceEpochState.routineRequested = 1
+  sourceEpochState.routineSuccessful = 1
+  useOfficeDayMock.mockReset()
+  useOfficeDayMock.mockImplementation(useTestOfficeDay)
   officeFloorMock.mockReturnValue(defaultOfficeFloor())
   navigateMock.mockClear()
   openOrFocusMock.mockClear()
@@ -767,6 +1096,7 @@ describe('OfficePage localization', () => {
     expect(readOfficeInboxDutyExcursion()?.phase).toBe('returned')
 
     markInboxReadMock.mockImplementationOnce(async () => {
+      acceptTestInboxSnapshot()
       inboxDutiesMock.mockReturnValue({
         status: 'ready',
         deliveries: [deliveryB],
@@ -920,6 +1250,7 @@ describe('OfficePage localization', () => {
       markReadConfirmed: markInboxReadMock,
     })
     markInboxReadMock.mockImplementationOnce(async () => {
+      acceptTestInboxSnapshot()
       inboxDutiesMock.mockReturnValue({
         status: 'ready',
         deliveries: [],
@@ -1084,6 +1415,7 @@ describe('OfficePage localization', () => {
     markInboxReadMock
       .mockRejectedValueOnce(new Error('receipt temporarily unavailable'))
       .mockImplementationOnce(async () => {
+        acceptTestInboxSnapshot()
         inboxDutiesMock.mockReturnValue({
           status: 'ready',
           deliveries: [],
@@ -1128,6 +1460,7 @@ describe('OfficePage localization', () => {
       markReadConfirmed: markInboxReadMock,
     })
     markInboxReadMock.mockImplementationOnce(async () => {
+      acceptTestInboxSnapshot()
       inboxDutiesMock.mockReturnValue({
         status: 'ready',
         deliveries: [],
@@ -1148,6 +1481,203 @@ describe('OfficePage localization', () => {
     expect(document.querySelector('.oa-office-page > p[role="status"]')).toBeNull()
     expect(screen.getByText('值班已清')).toBeTruthy()
     await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('office-floor')))
+  })
+
+  it('waits for a post-Inbox routine read to reveal another tab\'s carry before settling', async () => {
+    const delivery = inboxEvidence('causal-clear', 'Causal clear report', 5_100)
+    const postInboxRoutineRead = deferred<void>()
+    let carriedVisible = false
+    const routineRefresh = vi.fn()
+      .mockResolvedValueOnce(undefined)
+      .mockImplementationOnce(() => postInboxRoutineRead.promise)
+    routineFollowUpsMock.mockImplementation(() => ({
+      status: 'ready',
+      // The server already has this row from tab A. Tab B keeps its stale
+      // ready+empty snapshot until the causal refresh completes.
+      followUps: carriedVisible ? [{
+        inboxEntryId: 'causal-clear',
+        reportTs: 5_100,
+        issueWorkspaceId: 'chat-1',
+        issueId: 'causal-clear-issue',
+        createdAt: 5_150,
+      }] : [],
+      carry: routineCarryMock,
+      resolve: routineResolveMock,
+      refresh: routineRefresh,
+    }))
+    rememberOfficeInboxDutyExcursion({
+      duty: inboxCandidate(delivery),
+      purpose: 'review',
+      phase: 'presented',
+    })
+    inboxDutiesMock.mockReturnValue({
+      status: 'ready',
+      deliveries: [delivery],
+      markReadConfirmed: markInboxReadMock,
+    })
+    markInboxReadMock.mockImplementationOnce(async () => {
+      acceptTestInboxSnapshot()
+      inboxDutiesMock.mockReturnValue({
+        status: 'ready',
+        deliveries: [],
+        markReadConfirmed: markInboxReadMock,
+      })
+      return 'acknowledged'
+    })
+    render(<OfficePage />)
+
+    expect(await screen.findByRole('dialog', { name: 'Causal clear report' })).toBeTruthy()
+    await waitFor(() => expect(routineRefresh).toHaveBeenCalledTimes(1))
+    await userEvent.click(screen.getByRole('button', { name: '盖章：已复核' }))
+
+    await waitFor(() => expect(routineRefresh).toHaveBeenCalledTimes(2))
+    expect(screen.queryByText('值班已清')).toBeNull()
+    expect(screen.getByTestId('office-shift-harvest-hud').dataset.state).toBe('planning')
+
+    await act(async () => {
+      carriedVisible = true
+      postInboxRoutineRead.resolve()
+      await postInboxRoutineRead.promise
+    })
+    expect(await screen.findByRole('button', { name: '决策台 · 1 项待处理' })).toBeTruthy()
+    expect(screen.queryByText('值班已清')).toBeNull()
+    expect(screen.getByTestId('office-shift-harvest-hud').dataset.state).toBe('complete')
+  })
+
+  it('waits for server-confirmed shift reconciliation before announcing Inbox clear', async () => {
+    const delivery = inboxEvidence('pending-clear', 'Pending clear report', 5_100)
+    rememberOfficeInboxDutyExcursion({
+      duty: inboxCandidate(delivery),
+      purpose: 'review',
+      phase: 'presented',
+    })
+    inboxDutiesMock.mockReturnValue({
+      status: 'ready',
+      deliveries: [delivery],
+      markReadConfirmed: markInboxReadMock,
+    })
+    const pendingReconcile = deferred<OfficeDayMutationResponse>()
+    render(<OfficePage />)
+    expect(await screen.findByRole('dialog', { name: 'Pending clear report' })).toBeTruthy()
+    await waitFor(() => expect(testOfficeDayRecord?.shift.order).toEqual([
+      officeDutyKey(inboxCandidate(delivery)),
+    ]))
+    testReconcileOverride = vi.fn(() => pendingReconcile.promise)
+    markInboxReadMock.mockImplementationOnce(async () => {
+      acceptTestInboxSnapshot()
+      inboxDutiesMock.mockReturnValue({
+        status: 'ready',
+        deliveries: [],
+        markReadConfirmed: markInboxReadMock,
+      })
+      return 'acknowledged'
+    })
+
+    await userEvent.click(screen.getByRole('button', { name: '盖章：已复核' }))
+    await waitFor(() => expect(testReconcileOverride).toHaveBeenCalled())
+    expect(screen.queryByText('值班已清')).toBeNull()
+    expect(document.querySelector('.oa-office-page > p[role="status"]')).toBeNull()
+    expect(screen.getByTestId('office-shift-harvest-hud').dataset.state).toBe('planning')
+
+    await act(async () => {
+      pendingReconcile.reject(new Error('reconcile rejected'))
+      await pendingReconcile.promise.catch(() => undefined)
+    })
+    await waitFor(() => expect(screen.getByTestId('office-shift-harvest-hud').dataset.state)
+      .toBe('degraded'))
+    expect(screen.queryByText('值班已清')).toBeNull()
+    expect(document.querySelector('.oa-office-page > p[role="status"]')).toBeNull()
+    expect(testOfficeDayRefreshMock).toHaveBeenCalled()
+  })
+
+  it('keeps a dossier open when the server rejects Later as a stale shift', async () => {
+    const deliveryA = inboxEvidence('stale-later-a', 'Stale Later A', 5_100)
+    const deliveryB = inboxEvidence('stale-later-b', 'Stale Later B', 5_200)
+    rememberOfficeInboxDutyExcursion({
+      duty: inboxCandidate(deliveryA),
+      purpose: 'review',
+      phase: 'presented',
+    })
+    inboxDutiesMock.mockReturnValue({
+      status: 'ready',
+      deliveries: [deliveryA, deliveryB],
+      markReadConfirmed: markInboxReadMock,
+    })
+    render(<OfficePage />)
+    expect(await screen.findByRole('dialog', { name: 'Stale Later A' })).toBeTruthy()
+    const originalOrder = [...(testOfficeDayRecord?.shift.order ?? [])]
+    testDeferOverride = vi.fn(async () => testOfficeDayResponse(false, 'stale-shift'))
+
+    await userEvent.click(screen.getByRole('button', { name: '稍后处理' }))
+
+    expect(await screen.findByRole('dialog', { name: 'Stale Later A' })).toBeTruthy()
+    expect((await screen.findByRole('alert')).textContent).toContain('保存失败')
+    expect(testOfficeDayRecord?.shift.order).toEqual(originalOrder)
+    expect(screen.queryByText(/已将“Stale Later A”排到本班稍后/)).toBeNull()
+    expect(testOfficeDayRefreshMock).toHaveBeenCalled()
+  })
+
+  it('locks Start next shift while pending and leaves a retryable complete-state error', async () => {
+    const reviewed = ['reviewed-a', 'reviewed-b', 'reviewed-c', 'reviewed-d']
+      .map((id) => inboxCandidate(inboxEvidence(id, `Reviewed ${id}`, 4_000)))
+    const waitingEvidence = inboxEvidence('next-shift', '下一班报告', 5_200)
+    const waitingDuty = inboxCandidate(waitingEvidence)
+    const openedAt = Date.UTC(2026, 8, 1, 9)
+    commitTestOfficeDay({
+      dayKey: TEST_OFFICE_DAY_KEY,
+      timeZone: TEST_OFFICE_TIME_ZONE,
+      openedAt,
+      updatedAt: openedAt,
+      seenDutyIds: reviewed.map(officeDutyKey),
+      shift: {
+        id: 1,
+        openedAt,
+        slots: reviewed.map(officeDutyKey),
+        order: [],
+        cleared: false,
+      },
+      evidenceReceipts: [],
+    }, openedAt)
+    inboxDutiesMock.mockReturnValue({
+      status: 'ready',
+      deliveries: [waitingEvidence],
+      evidenceByEntryId: new Map([['next-shift', waitingEvidence]]),
+      markReadConfirmed: markInboxReadMock,
+    })
+    const pendingStart = deferred<OfficeDayMutationResponse>()
+    const startNext = vi.fn((input: Parameters<OfficeDayController['startNextShift']>[0]) => (
+      startNextTestOfficeShift(input)
+    ))
+    startNext.mockImplementationOnce(() => pendingStart.promise)
+    testStartNextOverride = startNext
+    render(<OfficePage />)
+
+    const start = await screen.findByRole('button', {
+      name: '本班已完成，另有 1 项待排。开始下一班',
+    })
+    fireEvent.click(start)
+    fireEvent.click(start)
+
+    await waitFor(() => expect(startNext).toHaveBeenCalledTimes(1))
+    expect(start.hasAttribute('disabled')).toBe(true)
+    expect(start.getAttribute('aria-busy')).toBe('true')
+    expect(within(start).getByRole('status').textContent).toBe('正在开始下一班…')
+
+    await act(async () => {
+      pendingStart.resolve(testOfficeDayResponse(false, 'stale-shift'))
+      await pendingStart.promise
+    })
+    const retry = await screen.findByRole('button', { name: '下一班未开始 · 重试' })
+    expect(retry.hasAttribute('disabled')).toBe(false)
+    expect(within(retry).getByRole('status').textContent).toBe('下一班未开始 · 重试')
+    expect(screen.getByTestId('office-shift-harvest-hud').dataset.state).toBe('complete')
+
+    await userEvent.click(retry)
+    await waitFor(() => expect(startNext).toHaveBeenCalledTimes(2))
+    expect(await screen.findByRole('button', {
+      name: /本班第 1\/1 项：.*下一班报告/,
+    })).toBeTruthy()
+    expect(testOfficeDayRecord?.shift.order).toEqual([officeDutyKey(waitingDuty)])
   })
 
   it('dismisses a returned durable Inbox duty on Escape without changing its order or read state', async () => {
@@ -1204,6 +1734,40 @@ describe('OfficePage localization', () => {
       name: /本班第 1\/2 项：.*Risk desk follow-up/,
     })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Inbox 收件台 · 待处理 2 条' })).toBeTruthy()
+  })
+
+  it('restores the exact Project Day shift order after an OfficePage remount', async () => {
+    const deliveryA = inboxEvidence('persist-a', 'Persistent report A', 5_100)
+    const deliveryB = inboxEvidence('persist-b', 'Persistent report B', 5_200)
+    rememberOfficeInboxDutyExcursion({
+      duty: inboxCandidate(deliveryA),
+      purpose: 'review',
+      phase: 'presented',
+    })
+    inboxDutiesMock.mockReturnValue({
+      status: 'ready',
+      deliveries: [deliveryA, deliveryB],
+      markReadConfirmed: markInboxReadMock,
+    })
+
+    const firstVisit = render(<OfficePage />)
+    expect(await screen.findByRole('dialog', { name: 'Persistent report A' })).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: '稍后处理' }))
+    expect(screen.getByRole('button', {
+      name: /本班第 1\/2 项：.*Persistent report B/,
+    })).toBeTruthy()
+    expect(testOfficeDayRecord?.shift.order).toEqual([
+      officeDutyKey(inboxCandidate(deliveryB)),
+      officeDutyKey(inboxCandidate(deliveryA)),
+    ])
+    firstVisit.unmount()
+
+    render(<OfficePage />)
+    expect(screen.getByRole('button', {
+      name: /本班第 1\/2 项：.*Persistent report B/,
+    })).toBeTruthy()
+    expect(window.sessionStorage.getItem('openalice:office-shift:v1')).toBeNull()
+    expect(markInboxReadMock).not.toHaveBeenCalled()
   })
 
   it('guides a scheduled Issue exception through evidence and an explicit Office receipt', async () => {
@@ -1274,8 +1838,10 @@ describe('OfficePage localization', () => {
       '已复核“检查周报排期”。本班完成；仍有 1 项定时 Issue 待跟进。',
     )).toBeTruthy()
     expect(acknowledgeMock).not.toHaveBeenCalled()
-    expect(window.sessionStorage.getItem('openalice:office-duty:evidence-receipts:v2'))
-      .toContain('weekly-review')
+    expect(testOfficeDayRecord?.evidenceReceipts.some((receipt) => (
+      receipt.subjectKey.includes('weekly-review')
+    ))).toBe(true)
+    expect(window.sessionStorage.getItem('openalice:office-duty:evidence-receipts:v2')).toBeNull()
   })
 
   it('keeps a reviewed cadence exception as an exact follow-up without stealing the active Inbox duty', async () => {
@@ -1301,9 +1867,7 @@ describe('OfficePage localization', () => {
       name: /本班第 2\/2 项：.*NVDA weekly evidence brief/,
     })).toBeTruthy()
     expect(markInboxReadMock).not.toHaveBeenCalled()
-    const receiptAfterReview = window.sessionStorage.getItem(
-      'openalice:office-duty:evidence-receipts:v2',
-    )
+    const receiptAfterReview = JSON.stringify(testOfficeDayRecord?.evidenceReceipts ?? [])
     expect(receiptAfterReview).toContain('weekly-review')
 
     openOrFocusMock.mockClear()
@@ -1314,14 +1878,14 @@ describe('OfficePage localization', () => {
     }))
     expect(screen.queryByRole('dialog', { name: '活动日志' })).toBeNull()
     expect(screen.queryByRole('dialog', { name: '检查周报排期' })).toBeNull()
-    expect(window.sessionStorage.getItem('openalice:office-duty:evidence-receipts:v2'))
-      .toBe(receiptAfterReview)
+    expect(JSON.stringify(testOfficeDayRecord?.evidenceReceipts ?? [])).toBe(receiptAfterReview)
     expect(markInboxReadMock).not.toHaveBeenCalled()
     expect(screen.getByRole('button', {
       name: /本班第 2\/2 项：.*NVDA weekly evidence brief/,
     })).toBeTruthy()
 
     const healthy = { state: 'healthy', message: 'Schedule healthy.' } as const
+    acceptTestIssueSnapshot()
     issuesMock.mockReturnValue(cadenceIssues(healthy))
     issueDetailMock.mockReturnValue(cadenceIssueDetail(healthy))
     openOrFocusMock.mockClear()
@@ -1401,13 +1965,16 @@ describe('OfficePage localization', () => {
     await leaveCadenceDossierForFullIssue()
 
     const healthy = { state: 'healthy', message: 'Schedule healthy.' } as const
+    acceptTestIssueSnapshot()
     issuesMock.mockReturnValue(cadenceIssues(healthy))
     issueDetailMock.mockReturnValue(cadenceIssueDetail(healthy))
-    render(<OfficePage />)
+    const returned = render(<OfficePage />)
 
     expect(await screen.findByRole('heading', { name: '第 2 步 · 证据' })).toBeTruthy()
     expect(screen.getByText('这个 Issue 已不再是定时异常。')).toBeTruthy()
     expect(screen.queryByRole('button', { name: '盖章：本次值班已复核' })).toBeNull()
+    acceptTestIssueSnapshot()
+    returned.rerender(<OfficePage />)
     await userEvent.click(screen.getByRole('button', { name: '返回下一值班项' }))
     expect(screen.queryByRole('dialog', { name: '检查周报排期' })).toBeNull()
     expect(screen.getByText('值班已清')).toBeTruthy()
@@ -1471,7 +2038,7 @@ describe('OfficePage localization', () => {
     })
     render(<OfficePage />)
 
-    expect(screen.getByText('本班暂无到期功课')).toBeTruthy()
+    expect(await screen.findByText('本班暂无到期功课')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /本班第 .* 项/ })).toBeNull()
 
     await userEvent.click(screen.getByTestId('office-desk-resume-grok-duty'))

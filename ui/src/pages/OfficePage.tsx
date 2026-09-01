@@ -43,19 +43,21 @@ import { OfficeReplayBar } from '../office/OfficeReplayBar'
 import type { OfficeReplayFocus } from '../office/replay-focus'
 import { OfficeRosterWindow } from '../office/OfficeRosterWindow'
 import { useOfficeDuties } from '../office/useOfficeDuties'
+import { useOfficeDay } from '../office/useOfficeDay'
 import { useOfficeRoutineFollowUps } from '../office/useOfficeRoutineFollowUps'
 import { useOfficeShift } from '../office/useOfficeShift'
 import {
   useOfficeProductActivity,
 } from '../office/useOfficeProductActivity'
-import type {
-  OfficeCadenceDutyCandidate,
-  OfficeDutyAcknowledgementResult,
-  OfficeDutySourceStatus,
-  OfficeDutyCandidate,
-  OfficeInboxDutyCandidate,
-  OfficeDutyTargetId,
-  OfficeResolvedDuty,
+import {
+  officeDutyKey,
+  type OfficeCadenceDutyCandidate,
+  type OfficeDutyAcknowledgementResult,
+  type OfficeDutySourceStatus,
+  type OfficeDutyCandidate,
+  type OfficeInboxDutyCandidate,
+  type OfficeDutyTargetId,
+  type OfficeResolvedDuty,
 } from '../office/duty-registry'
 import { useIssues } from '../hooks/useIssues'
 import '../office/office.css'
@@ -133,11 +135,22 @@ export function OfficePage() {
   const { building, error, refresh } = useOfficeFloor(asOfSeq)
   const productActivity = useOfficeProductActivity()
   const issues = useIssues()
-  const officeDuties = useOfficeDuties(productActivity, issues)
+  const officeDay = useOfficeDay()
+  const officeDuties = useOfficeDuties(productActivity, issues, officeDay)
   const routineFollowUps = useOfficeRoutineFollowUps()
+  const routineSettlementSource = useMemo(() => ({
+    requestEpoch: routineFollowUps.requestEpoch,
+    successEpoch: routineFollowUps.successEpoch,
+    refresh: routineFollowUps.refresh,
+  }), [
+    routineFollowUps.refresh,
+    routineFollowUps.requestEpoch,
+    routineFollowUps.successEpoch,
+  ])
   const dutyGuidanceStatus = combineOfficeSourceStatus(
     officeDuties.status,
     routineFollowUps.status,
+    officeDay.status,
   )
   const totalUnresolvedCount = officeDuties.unresolvedCount
     + routineFollowUps.followUps.length
@@ -146,7 +159,42 @@ export function OfficePage() {
     status: officeDuties.status,
     settlementStatus: dutyGuidanceStatus,
     unresolvedCount: totalUnresolvedCount,
+    sourceEpochs: officeDuties.sourceEpochs,
+    settlementSource: routineSettlementSource,
+    officeDay,
   })
+  const [startNextShiftStatus, setStartNextShiftStatus] = useState<
+    'idle' | 'pending' | 'error'
+  >('idle')
+  const startNextShiftAttemptRef = useRef({ token: 0, pending: false })
+  const officeShiftIdentity = officeDay.day
+    ? `${officeDay.day.dayKey}:${officeDay.day.shift.id}`
+    : null
+  useEffect(() => {
+    startNextShiftAttemptRef.current.token += 1
+    startNextShiftAttemptRef.current.pending = false
+    setStartNextShiftStatus('idle')
+  }, [officeShift.canStartNext, officeShiftIdentity])
+  const startNextOfficeShift = async () => {
+    if (startNextShiftAttemptRef.current.pending) return
+    const token = startNextShiftAttemptRef.current.token + 1
+    startNextShiftAttemptRef.current = { token, pending: true }
+    setStartNextShiftStatus('pending')
+    try {
+      await officeShift.startNext()
+      if (startNextShiftAttemptRef.current.token === token) {
+        setStartNextShiftStatus('idle')
+      }
+    } catch {
+      if (startNextShiftAttemptRef.current.token === token) {
+        setStartNextShiftStatus('error')
+      }
+    } finally {
+      if (startNextShiftAttemptRef.current.token === token) {
+        startNextShiftAttemptRef.current.pending = false
+      }
+    }
+  }
   const [cadenceDuty, setCadenceDuty] = useState<OfficeCadenceDutyCandidate | null>(null)
   const [cadenceInitialStep, setCadenceInitialStep] = useState<'exception' | 'evidence'>('exception')
   const [inboxDuty, setInboxDuty] = useState<OfficeInboxDutyCandidate | null>(null)
@@ -423,18 +471,18 @@ export function OfficePage() {
     }))
   }
 
-  const deferInboxDuty = () => {
+  const deferInboxDuty = async () => {
     if (inboxDuty) {
+      await officeShift.defer(inboxDuty)
       announceDutyHandoff(inboxDuty)
-      officeShift.defer(inboxDuty)
     }
     closeInboxDuty('floor')
   }
 
-  const deferCadenceDuty = () => {
+  const deferCadenceDuty = async () => {
     if (cadenceDuty) {
+      await officeShift.defer(cadenceDuty)
       announceDutyHandoff(cadenceDuty)
-      officeShift.defer(cadenceDuty)
     }
     closeCadenceDuty('floor')
   }
@@ -448,7 +496,7 @@ export function OfficePage() {
       targetId: 'inbox-service',
       label: t('office.cadenceReviewedShort'),
       reviewed: duty.delivery.title,
-      dutyKey: `${duty.id}:${duty.receipt.fingerprint}`,
+      dutyKey: officeDutyKey(duty),
       announcement: null,
     }))
     requestAnimationFrame(() => {
@@ -465,7 +513,7 @@ export function OfficePage() {
       targetId: 'operations',
       label: t('office.routineCarriedShort'),
       reviewed: duty.delivery.title,
-      dutyKey: `${duty.id}:${duty.receipt.fingerprint}`,
+      dutyKey: officeDutyKey(duty),
       announcement: t('office.routineCarriedAnnouncement', {
         name: duty.delivery.title,
       }),
@@ -665,13 +713,7 @@ export function OfficePage() {
     workspaces,
   ])
   const nextDutyCandidate = officeShift.candidates[0]
-  const nextDutyKey = nextDutyCandidate
-    ? nextDutyCandidate.receipt.kind === 'evidence'
-      ? `${nextDutyCandidate.id}:${nextDutyCandidate.receipt.fingerprint}`
-      : nextDutyCandidate.receipt.kind === 'inbox-read'
-        ? `${nextDutyCandidate.id}:${nextDutyCandidate.receipt.fingerprint}`
-        : `${nextDutyCandidate.id}:${nextDutyCandidate.receipt.throughSeq}`
-    : null
+  const nextDutyKey = nextDutyCandidate ? officeDutyKey(nextDutyCandidate) : null
   const nextDutyAnnouncementName = (() => {
     const next = nextDutyCandidate
     if (!next) return null
@@ -681,14 +723,28 @@ export function OfficePage() {
   })()
   const reviewedFollowUpAfterAcknowledgement = dutyAcknowledgement
     ? officeDuties.reviewedCadenceFollowUps.find((duty) => (
-        `${duty.id}:${duty.receipt.fingerprint}` === dutyAcknowledgement.dutyKey
+        officeDutyKey(duty) === dutyAcknowledgement.dutyKey
       )) ?? null
     : null
+  const acknowledgedDutyPending = dutyAcknowledgement
+    ? officeDay.day?.shift.order.includes(dutyAcknowledgement.dutyKey) ?? true
+    : false
+  const dutyAcknowledgementSettled = Boolean(
+    dutyAcknowledgement
+    && officeDay.status === 'ready'
+    && officeDay.day
+    && !acknowledgedDutyPending
+    && officeShift.sourceStatus === 'ready'
+    && (nextDutyCandidate
+      ? officeShift.state === 'active'
+      : officeShift.state === 'clear'
+        || (officeShift.state === 'complete' && totalUnresolvedCount > 0)),
+  )
   useEffect(() => {
     if (!dutyAcknowledgement
       || dutyAcknowledgement.announcement
-      || dutyAcknowledgement.dutyKey === nextDutyKey) return
-    if (!nextDutyAnnouncementName && officeDuties.status === 'loading') return
+      || dutyAcknowledgement.dutyKey === nextDutyKey
+      || !dutyAcknowledgementSettled) return
     const announcement = nextDutyAnnouncementName
       ? t(reviewedFollowUpAfterAcknowledgement
           ? 'office.cadenceReviewedNextFollowUp'
@@ -696,27 +752,26 @@ export function OfficePage() {
           reviewed: dutyAcknowledgement.reviewed,
           name: nextDutyAnnouncementName,
         })
-      : officeDuties.status === 'ready'
-        ? totalUnresolvedCount === 0
-          ? t('office.cadenceReviewedClear', { reviewed: dutyAcknowledgement.reviewed })
-          : t(reviewedFollowUpAfterAcknowledgement
-              ? 'office.cadenceReviewedCompleteFollowUp'
-              : 'office.cadenceReviewedComplete', {
-              reviewed: dutyAcknowledgement.reviewed,
-              count: reviewedFollowUpAfterAcknowledgement
-                ? officeDuties.reviewedCadenceFollowUps.length
-                : totalUnresolvedCount,
-            })
-        : t('office.cadenceReviewedUnknown', { reviewed: dutyAcknowledgement.reviewed })
+      : officeShift.state === 'clear'
+        ? t('office.cadenceReviewedClear', { reviewed: dutyAcknowledgement.reviewed })
+        : t(reviewedFollowUpAfterAcknowledgement
+            ? 'office.cadenceReviewedCompleteFollowUp'
+            : 'office.cadenceReviewedComplete', {
+            reviewed: dutyAcknowledgement.reviewed,
+            count: reviewedFollowUpAfterAcknowledgement
+              ? officeDuties.reviewedCadenceFollowUps.length
+              : totalUnresolvedCount,
+          })
     setDutyAcknowledgement((current) => current?.token === dutyAcknowledgement.token
       ? { ...current, announcement }
       : current)
   }, [
     dutyAcknowledgement,
+    dutyAcknowledgementSettled,
     nextDutyAnnouncementName,
     nextDutyKey,
-    officeDuties.status,
     officeDuties.reviewedCadenceFollowUps,
+    officeShift.state,
     reviewedFollowUpAfterAcknowledgement,
     t,
     totalUnresolvedCount,
@@ -792,7 +847,7 @@ export function OfficePage() {
         <h2>{t('nav.item.office')}</h2>
         <p>{t('office.description')}</p>
       </div>
-      {dutyAcknowledgement?.announcement && (
+      {dutyAcknowledgement?.announcement && dutyAcknowledgementSettled && (
         <p className="sr-only" role="status" aria-live="polite">
           {dutyAcknowledgement.announcement}
         </p>
@@ -926,7 +981,8 @@ export function OfficePage() {
                 }}
                 reviewedCadenceFollowUps={officeDuties.reviewedCadenceFollowUps}
                 onOpenCadenceFollowUp={openReviewedCadenceFollowUp}
-                onStartNextShift={officeShift.startNext}
+                onStartNextShift={() => { void startNextOfficeShift() }}
+                startNextShiftStatus={startNextShiftStatus}
                 onOpenService={(kind, seq) => {
                   setLogView({
                     origin: `${kind}-service`,
@@ -1055,10 +1111,10 @@ export function OfficePage() {
                     },
                   })
                 }}
-                onConfirm={() => {
+                onConfirm={async () => {
+                  const result = await officeDuties.acknowledge(cadenceDuty)
                   clearOfficeCadenceExcursion()
                   cadenceExcursionRef.current = null
-                  officeDuties.acknowledge(cadenceDuty)
                   setCadenceDuty(null)
                   setCadenceInitialStep('exception')
                   setDutyAcknowledgement((current) => ({
@@ -1066,12 +1122,13 @@ export function OfficePage() {
                     targetId: 'operations',
                     label: t('office.cadenceReviewedShort'),
                     reviewed: cadenceDuty.cadence.title,
-                    dutyKey: `${cadenceDuty.id}:${cadenceDuty.receipt.fingerprint}`,
+                    dutyKey: officeDutyKey(cadenceDuty),
                     announcement: null,
                   }))
                   requestAnimationFrame(() => {
                     document.querySelector<HTMLElement>('[data-testid="office-floor"]')?.focus()
                   })
+                  return result
                 }}
                 onReviewLatest={(next) => {
                   setCadenceInitialStep('evidence')

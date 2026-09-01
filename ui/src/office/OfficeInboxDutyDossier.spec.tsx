@@ -882,6 +882,59 @@ describe('OfficeInboxDutyDossier', () => {
     expect(onConfirmed).not.toHaveBeenCalled()
   })
 
+  it('keeps the dossier locked while Later persists and restores retry after failure', async () => {
+    let rejectLater!: (reason?: unknown) => void
+    const onLater = vi.fn()
+      .mockImplementationOnce(() => new Promise<void>((_resolve, reject) => {
+        rejectLater = reject
+      }))
+      .mockResolvedValueOnce(undefined)
+    const onClose = vi.fn()
+
+    render(
+      <OfficeInboxDutyDossier
+        duty={duty()}
+        latestDuty={duty()}
+        currentBacklogCount={3}
+        sourceStatus="ready"
+        onOpenInbox={vi.fn()}
+        onCarry={vi.fn().mockResolvedValue('acknowledged')}
+        onCarried={vi.fn()}
+        onConfirm={vi.fn().mockResolvedValue('acknowledged')}
+        onConfirmed={vi.fn()}
+        onContinue={vi.fn()}
+        onLater={onLater}
+        onClose={onClose}
+      />,
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: 'Later' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'NVDA weekly evidence brief' })
+    expect(dialog.getAttribute('aria-busy')).toBe('true')
+    expect((screen.getByRole('button', { name: 'Close' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: 'Later' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: 'Open again' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: 'Stamp reviewed' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.keyDown(dialog, { key: 'Escape' })
+    expect(onClose).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: 'Later' }))
+    expect(onLater).toHaveBeenCalledTimes(1)
+
+    rejectLater(new Error('disk unavailable'))
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain(
+      'The receipt could not be saved. This delivery remains in your shift.',
+    ))
+    expect(dialog.hasAttribute('aria-busy')).toBe(false)
+    expect((screen.getByRole('button', { name: 'Close' }) as HTMLButtonElement).disabled).toBe(false)
+    expect((screen.getByRole('button', { name: 'Later' }) as HTMLButtonElement).disabled).toBe(false)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Later' }))
+    await waitFor(() => expect(onLater).toHaveBeenCalledTimes(2))
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(dialog.hasAttribute('aria-busy')).toBe(false)
+  })
+
   it('traps Tab focus between the first and last available controls', async () => {
     render(
       <OfficeInboxDutyDossier

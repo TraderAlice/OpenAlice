@@ -35,6 +35,7 @@ import { OfficeMapPod } from './OfficeMapPod'
 import { OfficeRouteTrail } from './OfficeRouteTrail'
 import { OfficeRouteTargetPointer } from './OfficeRouteTargetPointer'
 import { OfficeReplayBeacon } from './OfficeReplayBeacon'
+import { OfficeShiftHarvestMeter } from './OfficeShiftHarvestMeter'
 import type { OfficeReplayFocus } from './replay-focus'
 import {
   clampOfficeCamera,
@@ -82,7 +83,7 @@ import {
 import { layoutOfficeMap } from './map-layout'
 import { officeDepthAt } from './scene-depth'
 import { useReducedMotion } from './use-reduced-motion'
-import type { OfficeShift } from './useOfficeShift'
+import type { OfficeShift, OfficeShiftState } from './useOfficeShift'
 import type { OfficeActivityKind, OfficeProductActivityState } from './useOfficeProductActivity'
 
 const OFFICE_MOVEMENTS = {
@@ -191,6 +192,7 @@ export function OfficeBuilding({
   reviewedCadenceFollowUps = [],
   onOpenCadenceFollowUp,
   onStartNextShift,
+  startNextShiftStatus = 'idle',
   onOpenService,
   onReturnLive,
   coworkerAssets: retainedCoworkerAssets,
@@ -227,6 +229,7 @@ export function OfficeBuilding({
   reviewedCadenceFollowUps?: readonly OfficeCadenceDutyCandidate[]
   onOpenCadenceFollowUp?: (duty: OfficeCadenceDutyCandidate) => void
   onStartNextShift?: () => void
+  startNextShiftStatus?: 'idle' | 'pending' | 'error'
   onOpenService?: (kind: 'inbox' | 'news', seq?: number) => void
   onReturnLive?: () => void
   coworkerAssets?: ReadonlyMap<string, OfficeCoworkerSpriteAsset>
@@ -260,6 +263,7 @@ export function OfficeBuilding({
   const [controlsLearned, setControlsLearned] = useState(false)
   const [interactionAnchorTargetId, setInteractionAnchorTargetId] = useState<string | null>(null)
   const [acknowledgedTargetId, setAcknowledgedTargetId] = useState<OfficeAcknowledgementTarget | null>(null)
+  const [acknowledgedDutyToken, setAcknowledgedDutyToken] = useState<number | null>(null)
   const [acknowledgementLabel, setAcknowledgementLabel] = useState('OK')
   const previousAttentionRef = useRef(productActivity.attention)
   const pendingAcknowledgementRef = useRef<OfficeAcknowledgementTarget | null>(null)
@@ -487,11 +491,18 @@ export function OfficeBuilding({
   })).candidates, [productActivity])
   const currentDutyCandidates = dutyCandidates ?? legacyDutyCandidates
   const currentDutyStatus = dutyCandidates ? dutyStatus : 'ready'
-  const currentShiftState = dutyShift?.state
+  const currentShiftState: OfficeShiftState = dutyShift?.state
     ?? (currentDutyCandidates.length > 0
       ? 'active'
       : currentDutyStatus === 'ready' ? 'quiet'
         : currentDutyStatus === 'loading' ? 'planning' : 'degraded')
+  const shiftHarvestProps = {
+    total: dutyShift?.total ?? 0,
+    completed: dutyShift?.completed ?? 0,
+    state: currentShiftState,
+    acknowledgementToken: acknowledgedDutyToken ?? undefined,
+    reducedMotion,
+  }
   const currentDutyCandidate = currentDutyCandidates[0] ?? null
   const activeRoutineFollowUpCount = replaySeq == null
     && Number.isSafeInteger(routineFollowUpCount)
@@ -626,10 +637,12 @@ export function OfficeBuilding({
       window.clearTimeout(acknowledgementTimerRef.current)
     }
     setAcknowledgedTargetId(targetId)
+    setAcknowledgedDutyToken(null)
     setAcknowledgementLabel('OK')
     acknowledgementTimerRef.current = window.setTimeout(() => {
       acknowledgementTimerRef.current = null
       setAcknowledgedTargetId(null)
+      setAcknowledgedDutyToken(null)
     }, 900)
   }, [interactionSuspended, productActivity.attention])
   useEffect(() => {
@@ -641,10 +654,12 @@ export function OfficeBuilding({
       window.clearTimeout(acknowledgementTimerRef.current)
     }
     setAcknowledgedTargetId(dutyAcknowledgement.targetId)
+    setAcknowledgedDutyToken(dutyAcknowledgement.token)
     setAcknowledgementLabel(dutyAcknowledgement.label ?? 'OK')
     acknowledgementTimerRef.current = window.setTimeout(() => {
       acknowledgementTimerRef.current = null
       setAcknowledgedTargetId(null)
+      setAcknowledgedDutyToken(null)
     }, 900)
   }, [dutyAcknowledgement, interactionSuspended])
   const nearbyTarget = useMemo(
@@ -1743,7 +1758,10 @@ export function OfficeBuilding({
                 )}
               </span>
               <strong title={nextDutyName}>{nextDutyName}</strong>
-              <em>{dutyShift?.position ?? 1}/{dutyShift?.total ?? currentDutyCandidates.length}</em>
+              <em>
+                <OfficeShiftHarvestMeter {...shiftHarvestProps} variant="hud" />
+                <span>{dutyShift?.position ?? 1}/{dutyShift?.total ?? currentDutyCandidates.length}</span>
+              </em>
             </button>
           ) : routineDecisionPrimary && onOpenRoutineFollowUps ? (
             <button
@@ -1762,18 +1780,42 @@ export function OfficeBuilding({
                 <span>{t('office.decisionDeskAction')}</span>
               </span>
               <strong>{t('office.decisionDeskTitle')}</strong>
-              <em>{activeRoutineFollowUpCount}</em>
+              <em>
+                <OfficeShiftHarvestMeter {...shiftHarvestProps} variant="hud" />
+                <span>{activeRoutineFollowUpCount}</span>
+              </em>
             </button>
           ) : currentShiftState === 'complete' && dutyShift?.canStartNext && onStartNextShift ? (
             <button
               type="button"
               className="oa-office-hud__duty oa-office-hud__duty--complete"
-              aria-label={t('office.startNextShift', { count: dutyShift.backlogCount ?? 0 })}
+              data-action-state={startNextShiftStatus}
+              aria-label={t(startNextShiftStatus === 'pending'
+                ? 'office.startingNextShift'
+                : startNextShiftStatus === 'error'
+                  ? 'office.startNextShiftFailed'
+                  : 'office.startNextShift', { count: dutyShift.backlogCount ?? 0 })}
+              aria-busy={startNextShiftStatus === 'pending' || undefined}
+              disabled={startNextShiftStatus === 'pending'}
               onClick={onStartNextShift}
             >
-              <span className="oa-office-hud__duty-meta">{t('office.startNextShiftShort')}</span>
+              <span
+                className="oa-office-hud__duty-meta"
+                role={startNextShiftStatus === 'idle' ? undefined : 'status'}
+                aria-live={startNextShiftStatus === 'idle' ? undefined : 'polite'}
+                aria-atomic={startNextShiftStatus === 'idle' ? undefined : 'true'}
+              >
+                {t(startNextShiftStatus === 'pending'
+                  ? 'office.startingNextShift'
+                  : startNextShiftStatus === 'error'
+                    ? 'office.startNextShiftFailed'
+                    : 'office.startNextShiftShort')}
+              </span>
               <strong>{t('office.shiftComplete')}</strong>
-              <em>+{dutyShift.backlogCount ?? 0}</em>
+              <em>
+                <OfficeShiftHarvestMeter {...shiftHarvestProps} variant="hud" />
+                <span>+{dutyShift.backlogCount ?? 0}</span>
+              </em>
             </button>
           ) : reviewedCadenceFollowUp && onOpenCadenceFollowUp ? (
             <button
@@ -1801,24 +1843,30 @@ export function OfficeBuilding({
               <strong title={reviewedCadenceFollowUp.cadence.title}>
                 {reviewedCadenceFollowUp.cadence.title}
               </strong>
-              <em>{reviewedCadenceFollowUpCount > 1
-                ? `+${reviewedCadenceFollowUpCount - 1}`
-                : '!'}</em>
+              <em>
+                <OfficeShiftHarvestMeter {...shiftHarvestProps} variant="hud" />
+                <span>{reviewedCadenceFollowUpCount > 1
+                  ? `+${reviewedCadenceFollowUpCount - 1}`
+                  : '!'}</span>
+              </em>
             </button>
           ) : currentShiftState === 'complete' ? (
             <div className="oa-office-hud__duty oa-office-hud__duty--complete" role="status">
               <span className="oa-office-hud__duty-meta">{t('office.shiftLabel')}</span>
               <strong>{t('office.shiftCarryover', { count: dutyShift?.backlogCount ?? 0 })}</strong>
+              <OfficeShiftHarvestMeter {...shiftHarvestProps} variant="hud" />
             </div>
           ) : currentShiftState === 'quiet' ? (
             <div className="oa-office-hud__duty oa-office-hud__duty--clear">
               <span className="oa-office-hud__duty-meta">{t('office.shiftLabel')}</span>
               <strong>{t('office.shiftQuiet')}</strong>
+              <OfficeShiftHarvestMeter {...shiftHarvestProps} variant="hud" />
             </div>
           ) : currentShiftState === 'clear' ? (
             <div className="oa-office-hud__duty oa-office-hud__duty--clear">
               <span className="oa-office-hud__duty-meta">{t('office.shiftLabel')}</span>
               <strong>{t('office.shiftClear')}</strong>
+              <OfficeShiftHarvestMeter {...shiftHarvestProps} variant="hud" />
             </div>
           ) : (
             <div
@@ -1830,6 +1878,7 @@ export function OfficeBuilding({
               <strong>{t(currentShiftState === 'planning'
                 ? 'office.dutySyncing'
                 : 'office.dutySignalInterrupted')}</strong>
+              <OfficeShiftHarvestMeter {...shiftHarvestProps} variant="hud" />
             </div>
           )
         )}
@@ -2359,6 +2408,9 @@ export function OfficeBuilding({
                 aria-hidden
                 style={officePixelImg}
               />
+              {replaySeq == null && (
+                <OfficeShiftHarvestMeter {...shiftHarvestProps} variant="board" />
+              )}
               {operationsNeedsAttention && (
                 <span className="oa-office-operations-board__signal" aria-hidden>
                   {operationsPending >= 9 ? '9+' : operationsPending || '!'}

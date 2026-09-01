@@ -68,7 +68,7 @@ function cadenceDuty(
       kind: 'evidence',
       subjectKey: `chat-1:${id}`,
       fingerprint: `evidence-${id}`,
-      scope: 'session',
+      scope: 'office-day',
     },
     cadence: {
       workspaceId: 'chat-1',
@@ -475,6 +475,11 @@ describe('OfficeBuilding', () => {
           }],
         }}
         replaySeq={2}
+        dutyShift={activeShift({
+          total: 4,
+          completed: 2,
+          position: 3,
+        })}
         replayFocus={{
           seq: 2,
           workspaceId: 'chat-replay',
@@ -500,6 +505,8 @@ describe('OfficeBuilding', () => {
 
     expect(screen.getByTestId('office-building').getAttribute('data-replay')).toBe('true')
     expect(screen.getByText('Replay · Seq 2')).toBeTruthy()
+    expect(screen.queryByTestId('office-shift-harvest-hud')).toBeNull()
+    expect(screen.queryByTestId('office-shift-harvest-board')).toBeNull()
     const replayVisitor = screen.getByTestId('office-replay-visitor')
     const replayAlice = screen.getByRole('img', { name: 'Alice on the office map' })
     expect(replayVisitor.querySelector('img')?.getAttribute('src'))
@@ -2222,6 +2229,15 @@ describe('OfficeBuilding', () => {
     expect(activeDuty.textContent).toContain('This shift')
     expect(activeDuty.textContent).toContain('≈ 9 min')
     expect(activeDuty.textContent).toContain('2/4')
+    for (const meter of [
+      screen.getByTestId('office-shift-harvest-hud'),
+      screen.getByTestId('office-shift-harvest-board'),
+    ]) {
+      expect(meter.dataset.state).toBe('active')
+      expect(meter.dataset.total).toBe('4')
+      expect(meter.dataset.completed).toBe('1')
+      expect(meter.querySelectorAll('.oa-office-shift-harvest__slot')).toHaveLength(4)
+    }
     const beacon = screen.getByTestId('office-duty-target-beacon')
     expect(beacon.classList.contains('oa-office-duty-target-beacon')).toBe(true)
     expect(beacon.dataset.kind).toBe('inbox-service')
@@ -2249,6 +2265,13 @@ describe('OfficeBuilding', () => {
     })
     expect(nextShift.textContent).toContain('Shift complete')
     expect(nextShift.textContent).toContain('+3')
+    for (const meter of [
+      screen.getByTestId('office-shift-harvest-hud'),
+      screen.getByTestId('office-shift-harvest-board'),
+    ]) {
+      expect(meter.dataset.state).toBe('complete')
+      expect(meter.dataset.completed).toBe('4')
+    }
     await userEvent.click(nextShift)
     expect(onStartNextShift).toHaveBeenCalledTimes(1)
 
@@ -2269,6 +2292,8 @@ describe('OfficeBuilding', () => {
       />,
     )
     expect(screen.getByText('Shift reviewed · 2 still unresolved')).toBeTruthy()
+    expect(screen.getByTestId('office-shift-harvest-hud').dataset.state).toBe('complete')
+    expect(screen.getByTestId('office-shift-harvest-board').dataset.state).toBe('complete')
 
     view.rerender(
       <OfficeBuilding
@@ -2287,7 +2312,58 @@ describe('OfficeBuilding', () => {
       />,
     )
     expect(screen.getByText('Shift clear')).toBeTruthy()
+    expect(screen.getByTestId('office-shift-harvest-hud').dataset.state).toBe('clear')
+    expect(screen.getByTestId('office-shift-harvest-board').dataset.state).toBe('clear')
     expect(screen.queryByTestId('office-duty-target-beacon')).toBeNull()
+  })
+
+  it('locks the next-shift action while pending and exposes a live retryable error', async () => {
+    const onStartNextShift = vi.fn()
+    const props = {
+      building: emptyBuilding(),
+      dutyCandidates: [],
+      dutyShift: {
+        state: 'complete' as const,
+        total: 4,
+        completed: 4,
+        position: null,
+        remainingMinutes: 0,
+        backlogCount: 3,
+        canStartNext: true,
+      },
+      onSelectEmployee: vi.fn(),
+      onOpenEmployee: vi.fn(),
+      onOpenWorkspace: vi.fn(),
+      onOpenFiles: vi.fn(),
+      onOpenRoster: vi.fn(),
+      onOpenLog: vi.fn(),
+      onStartNextShift,
+    }
+    const view = render(
+      <OfficeBuilding {...props} startNextShiftStatus="pending" />,
+    )
+
+    const pending = screen.getByRole('button', { name: 'Starting next shift…' })
+    expect(pending.dataset.actionState).toBe('pending')
+    expect(pending.hasAttribute('disabled')).toBe(true)
+    expect(pending.getAttribute('aria-busy')).toBe('true')
+    expect(within(pending).getByRole('status').textContent).toBe('Starting next shift…')
+    await userEvent.click(pending)
+    expect(onStartNextShift).not.toHaveBeenCalled()
+
+    view.rerender(
+      <OfficeBuilding {...props} startNextShiftStatus="error" />,
+    )
+    const retry = screen.getByRole('button', {
+      name: 'Next shift did not start · Try again',
+    })
+    expect(retry.dataset.actionState).toBe('error')
+    expect(retry.hasAttribute('disabled')).toBe(false)
+    expect(retry.hasAttribute('aria-busy')).toBe(false)
+    expect(within(retry).getByRole('status').textContent)
+      .toBe('Next shift did not start · Try again')
+    await userEvent.click(retry)
+    expect(onStartNextShift).toHaveBeenCalledTimes(1)
   })
 
   it('names a safely joined Inbox duty as the exact routine while ordinary Inbox stays unchanged', () => {
@@ -3039,6 +3115,17 @@ describe('OfficeBuilding', () => {
     )
     await waitFor(() => expect(inbox.dataset.acknowledged).toBe('true'))
     expect(inbox.querySelector('.oa-office-landmark-ack')?.textContent).toBe('OK')
+    for (const meter of [
+      screen.getByTestId('office-shift-harvest-hud'),
+      screen.getByTestId('office-shift-harvest-board'),
+    ]) {
+      expect(meter.querySelectorAll(
+        '.oa-office-shift-harvest__slot[data-acknowledged="true"]',
+      )).toHaveLength(1)
+    }
     await waitFor(() => expect(inbox.dataset.acknowledged).toBeUndefined(), { timeout: 1_500 })
+    expect(document.querySelector(
+      '.oa-office-shift-harvest__slot[data-acknowledged="true"]',
+    )).toBeNull()
   })
 })

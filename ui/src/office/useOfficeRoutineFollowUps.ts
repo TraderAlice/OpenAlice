@@ -5,9 +5,16 @@ import type { OfficeRoutineFollowUp } from '../api/office'
 
 export type OfficeRoutineFollowUpStatus = 'loading' | 'ready' | 'error'
 
+const OFFICE_ROUTINE_FOLLOW_UP_POLL_MS = 15_000
+const OFFICE_ROUTINE_FOLLOW_UP_CHANNEL = 'openalice:office-routine-follow-ups'
+
 export interface OfficeRoutineFollowUpsState {
   readonly status: OfficeRoutineFollowUpStatus
   readonly followUps: readonly OfficeRoutineFollowUp[]
+  /** Latest authoritative list request started by this hook. */
+  readonly requestEpoch: number
+  /** Request-start epoch of the latest validated list accepted by this hook. */
+  readonly successEpoch: number
   carry(inboxEntryId: string): Promise<void>
   resolve(inboxEntryId: string): Promise<void>
   refresh(): Promise<void>
@@ -82,7 +89,10 @@ function upsertFollowUp(
 export function useOfficeRoutineFollowUps(): OfficeRoutineFollowUpsState {
   const [status, setStatus] = useState<OfficeRoutineFollowUpStatus>('loading')
   const [followUps, setFollowUps] = useState<OfficeRoutineFollowUp[]>([])
+  const [requestEpoch, setRequestEpoch] = useState(0)
+  const [successEpoch, setSuccessEpoch] = useState(0)
   const mountedRef = useRef(true)
+  const listRequestEpochRef = useRef(0)
   const requestTokenRef = useRef(0)
   const pendingRequestTokensRef = useRef(new Set<number>())
   const errorVersionRef = useRef(0)
@@ -94,6 +104,7 @@ export function useOfficeRoutineFollowUps(): OfficeRoutineFollowUpsState {
   const entryIntentGenerationRef = useRef(new Map<string, number>())
   const entryMutationTailsRef = useRef(new Map<string, Promise<void>>())
   const inflightMutationsRef = useRef(new Map<string, InflightMutation>())
+  const channelRef = useRef<BroadcastChannel | null>(null)
 
   const beginRequest = useCallback((): number => {
     const token = requestTokenRef.current + 1
@@ -111,6 +122,9 @@ export function useOfficeRoutineFollowUps(): OfficeRoutineFollowUpsState {
   }, [])
 
   const refresh = useCallback(async (): Promise<void> => {
+    const listRequestEpoch = listRequestEpochRef.current + 1
+    listRequestEpochRef.current = listRequestEpoch
+    if (mountedRef.current) setRequestEpoch(listRequestEpoch)
     const generation = refreshGenerationRef.current + 1
     refreshGenerationRef.current = generation
     const startedAtMutationVersion = mutationCommitVersionRef.current
@@ -142,6 +156,7 @@ export function useOfficeRoutineFollowUps(): OfficeRoutineFollowUpsState {
       for (const [token, failedAt] of errorTokensRef.current) {
         if (failedAt <= startedAtErrorVersion) errorTokensRef.current.delete(token)
       }
+      setSuccessEpoch((current) => Math.max(current, listRequestEpoch))
     } catch {
       if (!mountedRef.current
         || refreshGenerationRef.current !== generation) return
@@ -210,6 +225,7 @@ export function useOfficeRoutineFollowUps(): OfficeRoutineFollowUpsState {
           ))
         }
         errorTokensRef.current.delete(`entry:${inboxEntryId}`)
+        channelRef.current?.postMessage({ mutation, inboxEntryId })
       } catch (cause) {
         if (mountedRef.current
           && entryIntentGenerationRef.current.get(inboxEntryId) === generation) {
@@ -249,9 +265,29 @@ export function useOfficeRoutineFollowUps(): OfficeRoutineFollowUpsState {
   useEffect(() => {
     mountedRef.current = true
     void refresh()
+    const intervalId = window.setInterval(
+      () => void refresh(),
+      OFFICE_ROUTINE_FOLLOW_UP_POLL_MS,
+    )
+    const refreshVisible = () => {
+      if (document.visibilityState === 'visible') void refresh()
+    }
+    const refreshFocused = () => void refresh()
+    document.addEventListener('visibilitychange', refreshVisible)
+    window.addEventListener('focus', refreshFocused)
+    if (typeof BroadcastChannel !== 'undefined') {
+      const channel = new BroadcastChannel(OFFICE_ROUTINE_FOLLOW_UP_CHANNEL)
+      channel.onmessage = () => void refresh()
+      channelRef.current = channel
+    }
     return () => {
       mountedRef.current = false
       refreshGenerationRef.current += 1
+      window.clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', refreshVisible)
+      window.removeEventListener('focus', refreshFocused)
+      channelRef.current?.close()
+      channelRef.current = null
       pendingRequestTokensRef.current.clear()
       errorTokensRef.current.clear()
       entryIntentGenerationRef.current.clear()
@@ -260,5 +296,13 @@ export function useOfficeRoutineFollowUps(): OfficeRoutineFollowUpsState {
     }
   }, [refresh])
 
-  return { status, followUps, carry, resolve, refresh }
+  return {
+    status,
+    followUps,
+    requestEpoch,
+    successEpoch,
+    carry,
+    resolve,
+    refresh,
+  }
 }

@@ -65,6 +65,22 @@ surfaces, while the Office decision-queue API fails closed until the sidecar is
 repaired. The file moves with the complete AliceProject so browser and Electron
 views share one durable diligence workflow.
 
+`<OPENALICE_HOME>/data/office/day.json` is the AliceProject-wide Office Day
+sidecar. It stores one server-local IANA calendar day, the current finite shift
+of up to four exact duty keys, their pending order, a same-day ledger of every
+exact duty key already admitted, and exact evidence receipts. The admission
+ledger is append-only within the day and capped at 1,024 exact keys. The
+ledger prevents a stale renderer from reopening an older evidence version as a
+new shift while still allowing a genuinely new fingerprint.
+It is presentation/workflow state only: Inbox, Issues, schedules, and Decision
+Desk records remain the completion authorities. The backend supplies the day
+key and next local-midnight rollover; browser tabs mutate it through commands
+guarded by that day key and the current monotonic shift id. Missing means no day
+has been opened. Malformed state is never replaced: Alice keeps serving other
+surfaces while every Office Day API fails closed until the sidecar is repaired.
+Atomic replacement and process-local command serialization make every browser
+and Electron view of one AliceProject converge on the same day.
+
 Each product Session created in that Workspace owns a secret-free dossier
 at `.alice/sessions/<resumeId>.json`. The `ai` object records the Agent
 runtime plus the credential reference, model, and effort frozen for that

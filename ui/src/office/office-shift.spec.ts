@@ -1,16 +1,13 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
-import type { OfficeDutyCandidate } from './duty-registry'
+import { officeDutyKey, type OfficeDutyCandidate } from './duty-registry'
 import {
   OFFICE_SHIFT_LIMIT,
-  OFFICE_SHIFT_STORAGE_KEY,
   createOfficeShiftSnapshot,
   deferOfficeShiftDuty,
-  readOfficeShiftSnapshot,
   reconcileOfficeShiftSnapshot,
-  writeOfficeShiftSnapshot,
 } from './office-shift'
 
 function inboxDuty(id: string): OfficeDutyCandidate {
@@ -69,7 +66,7 @@ function routineInboxDuty(
   }
 }
 
-function cadenceDuty(workspaceId: string, issueId: string): OfficeDutyCandidate {
+function cadenceDuty(workspaceId: string, issueId: string, fingerprint = `fingerprint-${workspaceId}-${issueId}`): OfficeDutyCandidate {
   return {
     id: `scheduled-issue-health:${workspaceId}:${issueId}`,
     registrationId: 'scheduled-issue-health',
@@ -84,8 +81,8 @@ function cadenceDuty(workspaceId: string, issueId: string): OfficeDutyCandidate 
     receipt: {
       kind: 'evidence',
       subjectKey: JSON.stringify(['scheduled-issue', workspaceId, issueId]),
-      fingerprint: `fingerprint-${workspaceId}-${issueId}`,
-      scope: 'session',
+      fingerprint,
+      scope: 'office-day',
     },
     cadence: {
       workspaceId,
@@ -101,10 +98,6 @@ function cadenceDuty(workspaceId: string, issueId: string): OfficeDutyCandidate 
   }
 }
 
-beforeEach(() => {
-  window.sessionStorage.clear()
-})
-
 describe('Office shift snapshot', () => {
   it('freezes at four unique duties without padding or admitting the fifth', () => {
     const duties = ['a', 'b', 'c', 'd', 'e'].map(inboxDuty)
@@ -115,10 +108,9 @@ describe('Office shift snapshot', () => {
 
     expect(OFFICE_SHIFT_LIMIT).toBe(4)
     expect(snapshot).toEqual({
-      version: 1,
       createdAt: 1_234,
-      slots: duties.slice(0, 4).map((duty) => duty.id),
-      order: duties.slice(0, 4).map((duty) => duty.id),
+      slots: duties.slice(0, 4).map(officeDutyKey),
+      order: duties.slice(0, 4).map(officeDutyKey),
       cleared: false,
     })
   })
@@ -139,12 +131,12 @@ describe('Office shift snapshot', () => {
     ], 1_500)
 
     expect(snapshot.slots).toEqual([
-      cadence.id,
-      otherRoutine.id,
-      ordinary.id,
-      sameRoutineNewest.id,
+      officeDutyKey(cadence),
+      officeDutyKey(otherRoutine),
+      officeDutyKey(ordinary),
+      officeDutyKey(sameRoutineNewest),
     ])
-    expect(snapshot.slots).not.toContain(sameRoutineOlder.id)
+    expect(snapshot.slots).not.toContain(officeDutyKey(sameRoutineOlder))
   })
 
   it('does not group ambiguous or unlinked Inbox rows without a declared Issue join', () => {
@@ -152,7 +144,7 @@ describe('Office shift snapshot', () => {
       .map(inboxDuty)
 
     expect(createOfficeShiftSnapshot(ungrouped, 1_600).slots)
-      .toEqual(ungrouped.slice(0, OFFICE_SHIFT_LIMIT).map((duty) => duty.id))
+      .toEqual(ungrouped.slice(0, OFFICE_SHIFT_LIMIT).map(officeDutyKey))
   })
 
   it('fills the finite batch with separate versions when only one routine exists', () => {
@@ -161,20 +153,20 @@ describe('Office shift snapshot', () => {
 
     const snapshot = createOfficeShiftSnapshot(versions, 1_700)
 
-    expect(snapshot.slots).toEqual(versions.slice(0, OFFICE_SHIFT_LIMIT).map((duty) => duty.id))
+    expect(snapshot.slots).toEqual(versions.slice(0, OFFICE_SHIFT_LIMIT).map(officeDutyKey))
     expect(snapshot.order).toEqual(snapshot.slots)
   })
 
   it('rotates Later to the tail without completing or changing membership', () => {
     const snapshot = createOfficeShiftSnapshot(['a', 'b', 'c'].map(inboxDuty), 2_000)
-    const deferred = deferOfficeShiftDuty(snapshot, inboxDuty('a').id)
+    const deferred = deferOfficeShiftDuty(snapshot, officeDutyKey(inboxDuty('a')))
 
     expect(deferred).not.toBe(snapshot)
     expect(deferred.slots).toEqual(snapshot.slots)
     expect(deferred.order).toEqual([
-      inboxDuty('b').id,
-      inboxDuty('c').id,
-      inboxDuty('a').id,
+      officeDutyKey(inboxDuty('b')),
+      officeDutyKey(inboxDuty('c')),
+      officeDutyKey(inboxDuty('a')),
     ])
     expect(deferred.order).toHaveLength(snapshot.order.length)
     expect(deferred.cleared).toBe(false)
@@ -191,7 +183,7 @@ describe('Office shift snapshot', () => {
     const ready = reconcileOfficeShiftSnapshot(snapshot, [duties[1]!], 'ready', 1)
     expect(ready).toEqual({
       ...snapshot,
-      order: [duties[1]!.id],
+      order: [officeDutyKey(duties[1]!)],
       cleared: false,
     })
   })
@@ -209,19 +201,19 @@ describe('Office shift snapshot', () => {
     )
 
     expect(reconciled).toBe(snapshot)
-    expect(reconciled?.order).toEqual(duties.map((duty) => duty.id))
-    expect(reconciled?.slots).not.toContain(arrival.id)
+    expect(reconciled?.order).toEqual(duties.map(officeDutyKey))
+    expect(reconciled?.slots).not.toContain(officeDutyKey(arrival))
   })
 
-  it('round-trips the frozen order through sessionStorage', () => {
-    const snapshot = deferOfficeShiftDuty(
-      createOfficeShiftSnapshot(['a', 'b', 'c'].map(inboxDuty), 5_000),
-      inboxDuty('a').id,
-    )
+  it('freezes exact evidence versions even when their presentation id is stable', () => {
+    const first = cadenceDuty('macro', 'asia-close', 'failed-run-a')
+    const changed = cadenceDuty('macro', 'asia-close', 'failed-run-b')
 
-    writeOfficeShiftSnapshot(snapshot)
-
-    expect(JSON.parse(window.sessionStorage.getItem(OFFICE_SHIFT_STORAGE_KEY)!)).toEqual(snapshot)
-    expect(readOfficeShiftSnapshot()).toEqual(snapshot)
+    expect(first.id).toBe(changed.id)
+    expect(officeDutyKey(first)).not.toBe(officeDutyKey(changed))
+    expect(createOfficeShiftSnapshot([first, changed], 5_000).slots).toEqual([
+      officeDutyKey(first),
+      officeDutyKey(changed),
+    ])
   })
 })

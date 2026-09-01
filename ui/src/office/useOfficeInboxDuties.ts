@@ -86,6 +86,10 @@ export function projectOfficeInboxEvidence(
 
 interface OfficeInboxDutySource {
   readonly status: OfficeDutySourceStatus
+  /** Latest authoritative history request started by this tab. */
+  readonly requestEpoch: number
+  /** Request-start epoch of the latest history snapshot accepted by this tab. */
+  readonly successEpoch: number
   readonly deliveries: readonly OfficeInboxDutyEvidence[]
   /** Exact report presentation, including already-read history rows. */
   readonly evidenceByEntryId: ReadonlyMap<string, OfficeInboxDutyEvidence>
@@ -112,18 +116,24 @@ export function useOfficeInboxDuties(activitySeq?: number): OfficeInboxDutySourc
   const { t } = useTranslation()
   const [entries, setEntries] = useState<InboxEntry[]>([])
   const [status, setStatus] = useState<OfficeDutySourceStatus>('loading')
+  const [requestEpoch, setRequestEpoch] = useState(0)
+  const [successEpoch, setSuccessEpoch] = useState(0)
   const generationRef = useRef(0)
+  const requestEpochRef = useRef(0)
   const mountedRef = useRef(false)
   const activitySeqRef = useRef(activitySeq)
   const markingRef = useRef(new Set<string>())
 
   const refresh = useCallback(async () => {
+    const request = ++requestEpochRef.current
+    if (mountedRef.current) setRequestEpoch(request)
     const generation = ++generationRef.current
     try {
       const next = await readOfficeInboxHistory((opts) => api.inbox.history(opts))
       if (!mountedRef.current || generation !== generationRef.current) return
       setEntries(next)
       setStatus('ready')
+      setSuccessEpoch((current) => Math.max(current, request))
     } catch {
       if (!mountedRef.current || generation !== generationRef.current) return
       setStatus('error')
@@ -166,6 +176,8 @@ export function useOfficeInboxDuties(activitySeq?: number): OfficeInboxDutySourc
     markingRef.current.add(inboxEntryId)
     try {
       return await withOfficeInboxReceiptLock(inboxEntryId, async () => {
+        const request = ++requestEpochRef.current
+        if (mountedRef.current) setRequestEpoch(request)
         generationRef.current += 1
         if (mountedRef.current) setStatus('loading')
 
@@ -184,6 +196,7 @@ export function useOfficeInboxDuties(activitySeq?: number): OfficeInboxDutySourc
           if (mountedRef.current) {
             setEntries(authoritativeEntries)
             setStatus('ready')
+            setSuccessEpoch((current) => Math.max(current, request))
           }
           if (exactEntry?.readAt) {
             setInboxReadAtOptimistically(inboxEntryId, exactEntry.readAt)
@@ -200,6 +213,7 @@ export function useOfficeInboxDuties(activitySeq?: number): OfficeInboxDutySourc
           if (mountedRef.current) {
             setEntries(authoritativeEntries)
             setStatus('ready')
+            setSuccessEpoch((current) => Math.max(current, request))
           }
           throw error
         }
@@ -210,6 +224,7 @@ export function useOfficeInboxDuties(activitySeq?: number): OfficeInboxDutySourc
           if (mountedRef.current) {
             setEntries(authoritativeEntries)
             setStatus('ready')
+            setSuccessEpoch((current) => Math.max(current, request))
           }
           throw new Error('Inbox read receipt did not match the duty.')
         }
@@ -222,6 +237,7 @@ export function useOfficeInboxDuties(activitySeq?: number): OfficeInboxDutySourc
           setEntries(authoritativeEntries.map((entry) => entry.id === inboxEntryId
             ? { ...entry, readAt: result.readAt }
             : entry))
+          setSuccessEpoch((current) => Math.max(current, request))
         }
         setInboxReadAtOptimistically(inboxEntryId, result.readAt)
         refreshInbox()
@@ -233,5 +249,12 @@ export function useOfficeInboxDuties(activitySeq?: number): OfficeInboxDutySourc
     }
   }, [refresh])
 
-  return { status, deliveries, evidenceByEntryId, markReadConfirmed }
+  return {
+    status,
+    requestEpoch,
+    successEpoch,
+    deliveries,
+    evidenceByEntryId,
+    markReadConfirmed,
+  }
 }

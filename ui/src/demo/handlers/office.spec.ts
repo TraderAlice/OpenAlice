@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { setupServer } from 'msw/node'
 
 import { officeApi } from '../../api/office'
@@ -15,16 +15,464 @@ import {
 import { demoMoversReport, demoWorkspaceFiles } from '../fixtures/inbox'
 import { demoIssuesSnapshot } from '../fixtures/issues'
 import { inboxHandlers } from './inbox'
-import { officeHandlers } from './office'
+import {
+  DEMO_OFFICE_DAY_STORAGE_KEY,
+  officeHandlers,
+  resetDemoOfficeDay,
+} from './office'
 
 const server = setupServer(...inboxHandlers, ...officeHandlers)
 const baseUrl = window.location.origin
 
+function cadenceDutyId(candidateId: string, subjectKey: string, fingerprint: string): string {
+  return JSON.stringify(['office-duty-v1', 'cadence', candidateId, subjectKey, fingerprint])
+}
+
+class SerialDemoLockManager {
+  readonly requestedNames: string[] = []
+  private tail: Promise<void> = Promise.resolve()
+
+  request<T>(name: string, callback: (lock: Lock) => T | PromiseLike<T>): Promise<T> {
+    this.requestedNames.push(name)
+    const run = this.tail.then(() => callback({ name, mode: 'exclusive' } as Lock))
+    this.tail = run.then(() => undefined, () => undefined)
+    return run
+  }
+}
+
+function installNavigatorLocks(locks: LockManager | undefined): () => void {
+  const descriptor = Object.getOwnPropertyDescriptor(navigator, 'locks')
+  Object.defineProperty(navigator, 'locks', { configurable: true, value: locks })
+  return () => {
+    if (descriptor) Object.defineProperty(navigator, 'locks', descriptor)
+    else delete (navigator as unknown as { locks?: LockManager }).locks
+  }
+}
+
+async function reviewTwoDemoDutiesConcurrently(prefix: string) {
+  const subjectA = `subject-${prefix}-a`
+  const subjectB = `subject-${prefix}-b`
+  const fingerprintA = `fingerprint-${prefix}-a`
+  const fingerprintB = `fingerprint-${prefix}-b`
+  const dutyA = cadenceDutyId(`scheduled-issue-health:${prefix}:a`, subjectA, fingerprintA)
+  const dutyB = cadenceDutyId(`scheduled-issue-health:${prefix}:b`, subjectB, fingerprintB)
+  const initial = await officeApi.day()
+  const opened = await officeApi.openDay({
+    dayKey: initial.dayKey,
+    slots: [dutyA, dutyB],
+  })
+
+  const results = await Promise.all([
+    officeApi.commandDay({
+      type: 'review-evidence',
+      dayKey: opened.dayKey,
+      shiftId: opened.day!.shift.id,
+      dutyId: dutyA,
+      subjectKey: subjectA,
+      fingerprint: fingerprintA,
+    }),
+    officeApi.commandDay({
+      type: 'review-evidence',
+      dayKey: opened.dayKey,
+      shiftId: opened.day!.shift.id,
+      dutyId: dutyB,
+      subjectKey: subjectB,
+      fingerprint: fingerprintB,
+    }),
+  ])
+
+  return {
+    opened,
+    results,
+    observed: await officeApi.day(),
+    receipts: [
+      { subjectKey: subjectA, fingerprint: fingerprintA },
+      { subjectKey: subjectB, fingerprint: fingerprintB },
+    ],
+  }
+}
+
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
-afterEach(() => server.resetHandlers())
+afterEach(() => {
+  server.resetHandlers()
+  resetDemoOfficeDay()
+  vi.restoreAllMocks()
+})
 afterAll(() => server.close())
 
 describe('demo Office handlers', () => {
+  it('rehydrates the shared revision, day, and admission ledger from same-origin storage', async () => {
+    const calendar = await officeApi.day()
+    const persistedDay = {
+      dayKey: calendar.dayKey,
+      timeZone: calendar.timeZone,
+      openedAt: calendar.serverNow,
+      updatedAt: calendar.serverNow,
+      shift: {
+        id: 7,
+        openedAt: calendar.serverNow,
+        slots: ['duty-a', 'duty-b'],
+        order: ['duty-a', 'duty-b'],
+        cleared: false,
+      },
+      seenDutyIds: ['duty-from-earlier-shift', 'duty-a', 'duty-b'],
+      evidenceReceipts: [],
+    }
+    localStorage.setItem(DEMO_OFFICE_DAY_STORAGE_KEY, JSON.stringify({
+      version: 1,
+      revision: 7,
+      day: persistedDay,
+    }))
+
+    const firstClient = await officeApi.day()
+    expect(firstClient).toMatchObject({
+      revision: 7,
+      day: {
+        shift: { id: 7, order: ['duty-a', 'duty-b'] },
+        seenDutyIds: ['duty-from-earlier-shift', 'duty-a', 'duty-b'],
+      },
+    })
+
+    const mutated = await officeApi.commandDay({
+      type: 'defer-duty',
+      dayKey: firstClient.dayKey,
+      shiftId: 7,
+      dutyId: 'duty-a',
+    })
+    expect(mutated).toMatchObject({
+      applied: true,
+      revision: 8,
+      day: {
+        shift: { order: ['duty-b', 'duty-a'] },
+        seenDutyIds: ['duty-from-earlier-shift', 'duty-a', 'duty-b'],
+      },
+    })
+
+    const secondClient = await officeApi.day()
+    expect(secondClient).toMatchObject({
+      revision: 8,
+      day: {
+        shift: { order: ['duty-b', 'duty-a'] },
+        seenDutyIds: ['duty-from-earlier-shift', 'duty-a', 'duty-b'],
+      },
+    })
+    expect(JSON.parse(localStorage.getItem(DEMO_OFFICE_DAY_STORAGE_KEY)!)).toMatchObject({
+      revision: 8,
+      day: { seenDutyIds: ['duty-from-earlier-shift', 'duty-a', 'duty-b'] },
+    })
+  })
+
+  it('serializes same-revision Demo mutations with the same-realm fallback', async () => {
+    const restoreLocks = installNavigatorLocks(undefined)
+    try {
+      const { opened, results, observed, receipts } = await reviewTwoDemoDutiesConcurrently(
+        'fallback',
+      )
+
+      expect(results.every((result) => result.applied)).toBe(true)
+      expect(results.map((result) => result.revision).sort((left, right) => left - right)).toEqual([
+        opened.revision + 1,
+        opened.revision + 2,
+      ])
+      expect(observed).toMatchObject({
+        revision: opened.revision + 2,
+        day: { shift: { order: [] } },
+      })
+      expect(observed.day?.evidenceReceipts).toEqual(expect.arrayContaining(
+        receipts.map((receipt) => expect.objectContaining(receipt)),
+      ))
+    } finally {
+      restoreLocks()
+    }
+  })
+
+  it('serializes same-revision Demo mutations across tabs with Web Locks', async () => {
+    const lockManager = new SerialDemoLockManager()
+    const restoreLocks = installNavigatorLocks(lockManager as unknown as LockManager)
+    try {
+      const { opened, results, observed, receipts } = await reviewTwoDemoDutiesConcurrently(
+        'web-locks',
+      )
+
+      expect(results.every((result) => result.applied)).toBe(true)
+      expect(observed).toMatchObject({
+        revision: opened.revision + 2,
+        day: { shift: { order: [] } },
+      })
+      expect(observed.day?.evidenceReceipts).toEqual(expect.arrayContaining(
+        receipts.map((receipt) => expect.objectContaining(receipt)),
+      ))
+      expect(lockManager.requestedNames).toEqual([
+        'openalice:demo:office-day:mutation',
+        'openalice:demo:office-day:mutation',
+        'openalice:demo:office-day:mutation',
+      ])
+    } finally {
+      restoreLocks()
+    }
+  })
+
+  it('uses one calendar snapshot for open and command responses across a rollover', async () => {
+    const firstDay = new Date(2026, 8, 1, 10, 0, 0, 0).getTime()
+    const nextDay = new Date(2026, 8, 2, 10, 0, 0, 0).getTime()
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(firstDay)
+    const initial = await officeApi.day()
+
+    let calendarReads = 0
+    clock.mockImplementation(() => {
+      if (new Error().stack?.includes('demoOfficeCalendar')) {
+        calendarReads += 1
+        return calendarReads === 1 ? firstDay : nextDay
+      }
+      return firstDay
+    })
+    const opened = await officeApi.openDay({
+      dayKey: initial.dayKey,
+      slots: ['duty-a', 'duty-b'],
+    })
+    expect(opened).toMatchObject({
+      applied: true,
+      serverNow: firstDay,
+      dayKey: initial.dayKey,
+      day: { dayKey: initial.dayKey, shift: { order: ['duty-a', 'duty-b'] } },
+    })
+    expect(calendarReads).toBe(1)
+
+    calendarReads = 0
+    clock.mockImplementation(() => {
+      if (new Error().stack?.includes('demoOfficeCalendar')) {
+        calendarReads += 1
+        return calendarReads === 1 ? firstDay + 1 : nextDay
+      }
+      return firstDay + 1
+    })
+    const deferred = await officeApi.commandDay({
+      type: 'defer-duty',
+      dayKey: opened.dayKey,
+      shiftId: opened.day!.shift.id,
+      dutyId: 'duty-a',
+    })
+    expect(deferred).toMatchObject({
+      applied: true,
+      serverNow: firstDay + 1,
+      dayKey: initial.dayKey,
+      day: { dayKey: initial.dayKey, shift: { order: ['duty-b', 'duty-a'] } },
+    })
+    expect(calendarReads).toBe(1)
+  })
+
+  it('shares one command-shaped Office Day and rejects stale shift mutations', async () => {
+    const subjectKey = '["scheduled-issue","macro","weekly"]'
+    const fingerprint = 'fingerprint-v1'
+    const cadenceA = cadenceDutyId('scheduled-issue-health:macro:weekly', subjectKey, fingerprint)
+    const initial = await officeApi.day()
+    const opened = await officeApi.openDay({
+      dayKey: initial.dayKey,
+      slots: [cadenceA, 'inbox-b@v1'],
+    })
+    expect(opened.applied).toBe(true)
+    expect(opened.day?.shift.order).toEqual([cadenceA, 'inbox-b@v1'])
+    const firstShiftId = opened.day!.shift.id
+
+    const deferred = await officeApi.commandDay({
+      type: 'defer-duty',
+      dayKey: opened.dayKey,
+      shiftId: firstShiftId,
+      dutyId: cadenceA,
+    })
+    expect(deferred.day?.shift.order).toEqual(['inbox-b@v1', cadenceA])
+
+    const reviewed = await officeApi.commandDay({
+      type: 'review-evidence',
+      dayKey: opened.dayKey,
+      shiftId: firstShiftId,
+      dutyId: cadenceA,
+      subjectKey,
+      fingerprint,
+    })
+    expect(reviewed.day?.evidenceReceipts).toMatchObject([{
+      subjectKey,
+      fingerprint,
+    }])
+    expect(reviewed.day?.shift.order).toEqual(['inbox-b@v1'])
+
+    const settled = await officeApi.commandDay({
+      type: 'reconcile-shift',
+      dayKey: opened.dayKey,
+      shiftId: firstShiftId,
+      presentSlotIds: [],
+      proposedSlots: [],
+      unresolvedCount: 1,
+    })
+    expect(settled.day?.shift.order).toEqual([])
+    const next = await officeApi.commandDay({
+      type: 'start-next-shift',
+      dayKey: opened.dayKey,
+      shiftId: firstShiftId,
+      slots: ['inbox-c@v1'],
+    })
+    expect(next.applied).toBe(true)
+    expect(next.day?.shift.id).not.toBe(firstShiftId)
+
+    const stale = await officeApi.commandDay({
+      type: 'defer-duty',
+      dayKey: opened.dayKey,
+      shiftId: firstShiftId,
+      dutyId: 'inbox-b@v1',
+    })
+    expect(stale).toMatchObject({ applied: false, reason: 'stale-shift' })
+    expect(stale.day?.shift.order).toEqual(['inbox-c@v1'])
+  })
+
+  it('does not re-admit exact keys from stale controllers but accepts a new fingerprint', async () => {
+    const exactA = 'inbox-report@fingerprint-a'
+    const exactB = 'inbox-report@fingerprint-b'
+    const exactC = 'inbox-report@fingerprint-c'
+    const initial = await officeApi.day()
+    const openedA = await officeApi.openDay({ dayKey: initial.dayKey, slots: [exactA] })
+    const shiftA = openedA.day!.shift.id
+    await officeApi.commandDay({
+      type: 'reconcile-shift',
+      dayKey: openedA.dayKey,
+      shiftId: shiftA,
+      presentSlotIds: [],
+      proposedSlots: [],
+      unresolvedCount: 0,
+    })
+
+    const staleA = await officeApi.commandDay({
+      type: 'reconcile-shift',
+      dayKey: openedA.dayKey,
+      shiftId: shiftA,
+      presentSlotIds: [exactA],
+      proposedSlots: [exactA],
+      unresolvedCount: 1,
+    })
+    expect(staleA).toMatchObject({
+      applied: false,
+      reason: 'no-change',
+      day: { shift: { id: shiftA, slots: [exactA], order: [], cleared: true } },
+    })
+
+    const openedB = await officeApi.commandDay({
+      type: 'reconcile-shift',
+      dayKey: openedA.dayKey,
+      shiftId: shiftA,
+      presentSlotIds: [],
+      proposedSlots: [exactA, exactB],
+      unresolvedCount: 1,
+    })
+    expect(openedB).toMatchObject({
+      applied: true,
+      day: {
+        shift: { slots: [exactB], order: [exactB] },
+        seenDutyIds: [exactA, exactB],
+      },
+    })
+    const shiftB = openedB.day!.shift.id
+    await officeApi.commandDay({
+      type: 'reconcile-shift',
+      dayKey: openedA.dayKey,
+      shiftId: shiftB,
+      presentSlotIds: [],
+      proposedSlots: [],
+      unresolvedCount: 0,
+    })
+
+    const twoShiftsOldA = await officeApi.commandDay({
+      type: 'reconcile-shift',
+      dayKey: openedA.dayKey,
+      shiftId: shiftB,
+      presentSlotIds: [exactA],
+      proposedSlots: [exactA],
+      unresolvedCount: 1,
+    })
+    expect(twoShiftsOldA).toMatchObject({
+      applied: false,
+      reason: 'no-change',
+      day: { shift: { id: shiftB, slots: [exactB], order: [], cleared: true } },
+    })
+    await expect(officeApi.commandDay({
+      type: 'start-next-shift',
+      dayKey: openedA.dayKey,
+      shiftId: shiftB,
+      slots: [exactA],
+    })).resolves.toMatchObject({ applied: false, reason: 'no-change' })
+
+    const openedC = await officeApi.commandDay({
+      type: 'start-next-shift',
+      dayKey: openedA.dayKey,
+      shiftId: shiftB,
+      slots: [exactA, exactC],
+    })
+    expect(openedC).toMatchObject({
+      applied: true,
+      day: {
+        shift: { slots: [exactC], order: [exactC] },
+        seenDutyIds: [exactA, exactB, exactC],
+      },
+    })
+  })
+
+  it('rejects review evidence when its receipt does not match the pending exact duty key', async () => {
+    const exactA = cadenceDutyId(
+      'scheduled-issue-health:a',
+      'subject-a',
+      'fingerprint-a',
+    )
+    const initial = await officeApi.day()
+    const opened = await officeApi.openDay({ dayKey: initial.dayKey, slots: [exactA] })
+
+    const response = await fetch(`${baseUrl}/api/office/day/commands`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        type: 'review-evidence',
+        dayKey: opened.dayKey,
+        shiftId: opened.day!.shift.id,
+        dutyId: exactA,
+        subjectKey: 'subject-b',
+        fingerprint: 'fingerprint-b',
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    expect(await officeApi.day()).toMatchObject({
+      revision: 1,
+      day: { shift: { order: [exactA] }, evidenceReceipts: [] },
+    })
+  })
+
+  it('rolls the Office Day at the server-local boundary without copying receipts', async () => {
+    const firstDay = new Date(2026, 8, 1, 10, 0, 0, 0).getTime()
+    const nextDay = new Date(2026, 8, 2, 10, 0, 0, 0).getTime()
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(firstDay)
+    const subjectKey = '["scheduled-issue","macro","weekly"]'
+    const fingerprint = 'fingerprint-v1'
+    const dutyId = cadenceDutyId('scheduled-issue-health:macro:weekly', subjectKey, fingerprint)
+    const initial = await officeApi.day()
+    const opened = await officeApi.openDay({ dayKey: initial.dayKey, slots: [dutyId] })
+    await officeApi.commandDay({
+      type: 'review-evidence',
+      dayKey: opened.dayKey,
+      shiftId: opened.day!.shift.id,
+      dutyId,
+      subjectKey,
+      fingerprint,
+    })
+
+    clock.mockReturnValue(nextDay)
+    const rolled = await officeApi.day()
+    expect(rolled.dayKey).not.toBe(opened.dayKey)
+    expect(rolled.day).toBeNull()
+    const stale = await officeApi.commandDay({
+      type: 'forget-evidence',
+      dayKey: opened.dayKey,
+      subjectKey: '["scheduled-issue","macro","weekly"]',
+    })
+    expect(stale).toMatchObject({ applied: false, reason: 'stale-day', day: null })
+  })
+
   it('projects Workspaces and Sessions that exist in the shared demo roster', async () => {
     const response = await fetch(`${baseUrl}/api/office/floor`)
     const body = await response.json() as {

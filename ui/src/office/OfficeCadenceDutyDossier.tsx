@@ -7,6 +7,7 @@ import { useIssueDetail } from '../hooks/useIssueDetail'
 import { formatRelativeTime, getIntlLocale } from '../lib/intl'
 import type {
   OfficeCadenceDutyCandidate,
+  OfficeDutyAcknowledgementResult,
   OfficeDutySourceStatus,
 } from './duty-registry'
 import { officeScheduledIssueFingerprint } from './duty-registry'
@@ -81,6 +82,8 @@ function OfficeCadenceEvidence({
   onConfirm,
   onReviewLatest,
   onContinue,
+  submitting,
+  submitError,
 }: {
   duty: OfficeCadenceDutyCandidate
   changed: boolean
@@ -91,6 +94,8 @@ function OfficeCadenceEvidence({
   onConfirm: () => void
   onReviewLatest?: () => void
   onContinue: () => void
+  submitting: boolean
+  submitError: string | null
 }) {
   const { t } = useTranslation()
   const evidenceHeadingRef = useRef<HTMLHeadingElement>(null)
@@ -128,6 +133,7 @@ function OfficeCadenceEvidence({
     && !stale
     && !evidenceChanged
     && !evidenceResolved
+    && !submitting
   const evidenceMessage = localizedHealthMessage(duty.cadence.health.state === 'blocked'
     ? duty.cadence.health.message
     : latestRun?.failure?.message
@@ -173,6 +179,11 @@ function OfficeCadenceEvidence({
       )}
       {error && (
         <p className="oa-office-cadence__notice" data-tone="warning" role="alert">{error}</p>
+      )}
+      {submitError && (
+        <p className="oa-office-cadence__notice" data-tone="warning" role="alert">
+          {submitError}
+        </p>
       )}
 
       {data && (
@@ -238,19 +249,19 @@ function OfficeCadenceEvidence({
       )}
 
       <div className="oa-office-cadence__actions">
-        <button type="button" className="oa-office-cadence__back" onClick={onBack}>
+        <button type="button" className="oa-office-cadence__back" disabled={submitting} onClick={onBack}>
           {t('office.cadenceBack')}
         </button>
-        <button type="button" className="oa-office-cadence__open" onClick={onOpenIssue}>
+        <button type="button" className="oa-office-cadence__open" disabled={submitting} onClick={onOpenIssue}>
           <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" aria-hidden style={officePixelImg} />
           {t('office.cadenceOpenIssue')}
         </button>
         {evidenceResolved ? (
-          <button type="button" className="oa-office-cadence__stamp" onClick={onContinue}>
+          <button type="button" className="oa-office-cadence__stamp" disabled={submitting} onClick={onContinue}>
             {t('office.cadenceContinue')}
           </button>
         ) : evidenceChanged && onReviewLatest ? (
-          <button type="button" className="oa-office-cadence__stamp" onClick={onReviewLatest}>
+          <button type="button" className="oa-office-cadence__stamp" disabled={submitting} onClick={onReviewLatest}>
             {t('office.cadenceReviewLatest')}
           </button>
         ) : (
@@ -260,7 +271,7 @@ function OfficeCadenceEvidence({
             disabled={!canStamp}
             onClick={onConfirm}
           >
-            {t('office.cadenceStamp')}
+            {t(submitting ? 'office.cadenceSaving' : 'office.cadenceStamp')}
           </button>
         )}
       </div>
@@ -284,13 +295,15 @@ export function OfficeCadenceDutyDossier({
   sourceStatus: OfficeDutySourceStatus
   initialStep?: 'exception' | 'evidence'
   onOpenIssue: () => void
-  onConfirm: () => void
+  onConfirm: () => Promise<OfficeDutyAcknowledgementResult>
   onReviewLatest: (duty: OfficeCadenceDutyCandidate) => void
-  onLater?: () => void
+  onLater?: () => void | Promise<void>
   onClose: () => void
 }) {
   const { t } = useTranslation()
   const [step, setStep] = useState<'exception' | 'evidence'>(initialStep)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const exceptionHeadingRef = useRef<HTMLHeadingElement>(null)
   const changed = Boolean(latestDuty
     && latestDuty.receipt.fingerprint !== duty.receipt.fingerprint)
@@ -299,6 +312,29 @@ export function OfficeCadenceDutyDossier({
   useEffect(() => {
     if (step === 'exception') exceptionHeadingRef.current?.focus({ preventScroll: true })
   }, [step])
+  const confirm = async () => {
+    if (submitting) return
+    setSubmitting(true)
+    setSubmitError(null)
+    try {
+      await onConfirm()
+    } catch {
+      setSubmitting(false)
+      setSubmitError(t('office.cadenceSaveFailed'))
+    }
+  }
+  const later = async () => {
+    if (submitting) return
+    setSubmitting(true)
+    setSubmitError(null)
+    try {
+      await onLater()
+      setSubmitting(false)
+    } catch {
+      setSubmitting(false)
+      setSubmitError(t('office.cadenceSaveFailed'))
+    }
+  }
 
   return (
     <section
@@ -307,10 +343,12 @@ export function OfficeCadenceDutyDossier({
       aria-labelledby="office-cadence-title"
       aria-describedby="office-cadence-description"
       data-testid="office-cadence-duty"
+      aria-busy={submitting || undefined}
       className="oa-office-window oa-office-cadence"
       onKeyDown={(event) => {
         if (event.key === 'Escape') {
           event.preventDefault()
+          if (submitting) return
           if (step === 'evidence') setStep('exception')
           else onClose()
           return
@@ -327,7 +365,7 @@ export function OfficeCadenceDutyDossier({
             <span className="oa-office-window__title-kind">{step === 'exception' ? '01' : '02'}</span>
           </span>
         </div>
-        <button type="button" aria-label={t('common.close')} onClick={onClose}>
+        <button type="button" aria-label={t('common.close')} disabled={submitting} onClick={onClose}>
           <OfficeWindowControlGlyph kind="close" />
         </button>
       </header>
@@ -383,13 +421,24 @@ export function OfficeCadenceDutyDossier({
               {t('office.cadenceSignalStale')}
             </p>
           )}
+          {submitError && (
+            <p className="oa-office-cadence__notice" data-tone="warning" role="alert">
+              {submitError}
+            </p>
+          )}
           <div className="oa-office-cadence__actions oa-office-cadence__actions--entry">
-            <button type="button" className="oa-office-cadence__back" onClick={onLater}>
+            <button
+              type="button"
+              className="oa-office-cadence__back"
+              disabled={submitting}
+              onClick={() => void later()}
+            >
               {t('office.inboxBacklogLater')}
             </button>
             <button
               type="button"
               className="oa-office-cadence__review"
+              disabled={submitting}
               onClick={() => setStep('evidence')}
             >
               <img src={OFFICE_HUD_ASSETS.occupancyLog} alt="" aria-hidden style={officePixelImg} />
@@ -405,11 +454,13 @@ export function OfficeCadenceDutyDossier({
           stale={stale}
           onBack={() => setStep('exception')}
           onOpenIssue={onOpenIssue}
-          onConfirm={onConfirm}
+          onConfirm={() => void confirm()}
           onReviewLatest={changed && latestDuty
             ? () => onReviewLatest(latestDuty)
             : undefined}
           onContinue={onClose}
+          submitting={submitting}
+          submitError={submitError}
         />
       )}
     </section>

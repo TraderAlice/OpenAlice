@@ -103,6 +103,38 @@ describe('Office responsive style contract', () => {
     )
   })
 
+  it('shares a compact shift harvest meter between the HUD and Operations board', () => {
+    const shortLandscapeStart = css.indexOf(
+      '@container (max-width: 760px) and (max-height: 420px)',
+      narrowLiveStart,
+    )
+    const shortLandscapeEnd = css.indexOf('@container (max-width: 520px)', shortLandscapeStart)
+    const shortLandscapeCss = css.slice(shortLandscapeStart, shortLandscapeEnd)
+
+    expect(css).toMatch(
+      /\.oa-office-shift-harvest\s*\{[^}]*display:\s*inline-grid;[^}]*grid-auto-flow:\s*column;/s,
+    )
+    expect(css).toMatch(
+      /\.oa-office-shift-harvest--hud\s*\{[^}]*--office-shift-harvest-slot-size:\s*7px;/s,
+    )
+    expect(css).toMatch(
+      /\.oa-office-shift-harvest--board\s*\{[^}]*position:\s*absolute;[^}]*bottom:\s*18px;[^}]*transform:\s*translateX\(-50%\);/s,
+    )
+    expect(css).toMatch(
+      /\.oa-office-shift-harvest__slot\[data-acknowledged="true"\]\s*\{[^}]*oa-office-shift-harvest-collect 480ms steps\(4, end\) both;/s,
+    )
+    expect(css).toMatch(
+      /\.oa-office-shift-harvest\[data-reduced-motion="true"\] \.oa-office-shift-harvest__slot\s*\{\s*animation:\s*none;/,
+    )
+    expect(css).toMatch(
+      /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.oa-office-shift-harvest__slot,[\s\S]*?animation:\s*none;/,
+    )
+    expect(narrowLiveCss).toContain('min-height: 68px')
+    expect(shortLandscapeCss).toMatch(
+      /\.oa-office-hud__duty\s*\{[^}]*min-height:\s*34px;[^}]*grid-template-rows:\s*1fr;/s,
+    )
+  })
+
   it('keeps the cadence review readable and actionable on phone and short landscape stages', () => {
     expect(css).toMatch(
       /\.oa-office-cadence__review,[\s\S]*?\.oa-office-cadence__actions button\s*\{[^}]*min-height:\s*44px;/,

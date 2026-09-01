@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -52,7 +52,7 @@ function duty(
         lastFiredAtMs,
         nextDueAtMs,
       }),
-      scope: 'session',
+      scope: 'office-day',
     },
     cadence: {
       workspaceId: 'ws-a',
@@ -151,6 +151,42 @@ describe('OfficeCadenceDutyDossier', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Stamp reviewed for this shift' }))
     expect(onConfirm).toHaveBeenCalledTimes(1)
+  })
+
+  it('locks dismissal while the durable Office-Day receipt saves and recovers after failure', async () => {
+    let rejectReceipt!: (reason?: unknown) => void
+    const onConfirm = vi.fn(() => new Promise<'acknowledged'>((_resolve, reject) => {
+      rejectReceipt = reject
+    }))
+    const onClose = vi.fn()
+    render(
+      <OfficeCadenceDutyDossier
+        duty={duty()}
+        latestDuty={duty()}
+        sourceStatus="ready"
+        onOpenIssue={vi.fn()}
+        onConfirm={onConfirm}
+        onReviewLatest={vi.fn()}
+        onClose={onClose}
+      />,
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: 'Review evidence' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Stamp reviewed for this shift' }))
+
+    expect((screen.getByRole('button', { name: 'Saving shift receipt…' }) as HTMLButtonElement).disabled)
+      .toBe(true)
+    expect((screen.getByRole('button', { name: 'Close' }) as HTMLButtonElement).disabled)
+      .toBe(true)
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
+    expect(onClose).not.toHaveBeenCalled()
+
+    rejectReceipt(new Error('disk unavailable'))
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain(
+      'The shift receipt could not be saved. This evidence remains in the shift.',
+    ))
+    expect((screen.getByRole('button', { name: 'Close' }) as HTMLButtonElement).disabled)
+      .toBe(false)
   })
 
   it('keeps keyboard focus inside both dossier steps', async () => {
@@ -330,6 +366,54 @@ describe('OfficeCadenceDutyDossier', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(onClose).toHaveBeenCalledTimes(2)
     expect(onLater).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the dossier locked while Later persists and restores retry after failure', async () => {
+    let rejectLater!: (reason?: unknown) => void
+    const onLater = vi.fn()
+      .mockImplementationOnce(() => new Promise<void>((_resolve, reject) => {
+        rejectLater = reject
+      }))
+      .mockResolvedValueOnce(undefined)
+    const onClose = vi.fn()
+    render(
+      <OfficeCadenceDutyDossier
+        duty={duty()}
+        latestDuty={duty()}
+        sourceStatus="ready"
+        onOpenIssue={vi.fn()}
+        onConfirm={vi.fn().mockResolvedValue('acknowledged')}
+        onReviewLatest={vi.fn()}
+        onLater={onLater}
+        onClose={onClose}
+      />,
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: 'Later' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Review the weekly report cadence' })
+    expect(dialog.getAttribute('aria-busy')).toBe('true')
+    expect((screen.getByRole('button', { name: 'Close' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: 'Later' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: 'Review evidence' }) as HTMLButtonElement).disabled)
+      .toBe(true)
+    fireEvent.keyDown(dialog, { key: 'Escape' })
+    expect(onClose).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: 'Later' }))
+    expect(onLater).toHaveBeenCalledTimes(1)
+
+    rejectLater(new Error('disk unavailable'))
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain(
+      'The shift receipt could not be saved. This evidence remains in the shift.',
+    ))
+    expect(dialog.hasAttribute('aria-busy')).toBe(false)
+    expect((screen.getByRole('button', { name: 'Close' }) as HTMLButtonElement).disabled).toBe(false)
+    expect((screen.getByRole('button', { name: 'Later' }) as HTMLButtonElement).disabled).toBe(false)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Later' }))
+    await waitFor(() => expect(onLater).toHaveBeenCalledTimes(2))
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(dialog.hasAttribute('aria-busy')).toBe(false)
   })
 
   it('pins captured evidence and refuses to stamp after the live fingerprint changes', async () => {

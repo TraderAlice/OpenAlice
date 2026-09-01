@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { OfficeCadenceDutyCandidate } from './duty-registry'
 import {
@@ -25,7 +25,7 @@ function duty(): OfficeCadenceDutyCandidate {
       kind: 'evidence',
       subjectKey: '["scheduled-issue","ws-a","weekly-review"]',
       fingerprint: 'captured-a',
-      scope: 'session',
+      scope: 'office-day',
     },
     cadence: {
       workspaceId: 'ws-a',
@@ -44,28 +44,36 @@ function duty(): OfficeCadenceDutyCandidate {
   }
 }
 
-beforeEach(() => window.sessionStorage.clear())
-afterEach(() => window.sessionStorage.clear())
+beforeEach(clearOfficeCadenceExcursion)
+afterEach(() => {
+  clearOfficeCadenceExcursion()
+  vi.restoreAllMocks()
+})
 
 describe('Office cadence excursion', () => {
-  it('round-trips the captured evidence instead of only its subject identity', () => {
+  it('keeps captured evidence in renderer memory without creating another persistence owner', () => {
+    const writeStorage = vi.spyOn(Storage.prototype, 'setItem')
     const captured = duty()
     rememberOfficeCadenceExcursion({ duty: captured })
 
     expect(readOfficeCadenceExcursion()).toEqual({ duty: captured })
+    expect(writeStorage).not.toHaveBeenCalled()
     clearOfficeCadenceExcursion()
     expect(readOfficeCadenceExcursion()).toBeNull()
   })
 
-  it('fails closed when the stored candidate cannot render a complete dossier', () => {
-    window.sessionStorage.setItem('openalice:office-cadence-excursion:v2', JSON.stringify({
-      duty: {
-        kind: 'cadence',
-        id: 'broken',
-        receipt: { kind: 'evidence', subjectKey: 'subject', fingerprint: 'fingerprint' },
-      },
-    }))
+  it('replaces the navigation capture without reading a legacy session value', () => {
+    const readStorage = vi.spyOn(Storage.prototype, 'getItem')
+    const first = duty()
+    const second = {
+      ...first,
+      receipt: { ...first.receipt, fingerprint: 'captured-b' },
+    }
 
-    expect(readOfficeCadenceExcursion()).toBeNull()
+    rememberOfficeCadenceExcursion({ duty: first })
+    rememberOfficeCadenceExcursion({ duty: second })
+
+    expect(readOfficeCadenceExcursion()).toEqual({ duty: second })
+    expect(readStorage).not.toHaveBeenCalled()
   })
 })

@@ -4,13 +4,15 @@ import {
   DEMO_SESSION_ID,
   DEMO_WORKSPACE_ID,
 } from './workspaces'
+import { demoLocalDayAnchor } from './time'
 
 export const DEMO_REPORT_PATH = 'research-AAPL-q1.md'
 
-const FIVE_MIN_AGO = Date.now() - 5 * 60 * 1000
+const demoDayAnchor = demoLocalDayAnchor()
+const FIVE_MIN_AGO = demoDayAnchor - 5 * 60 * 1000
 const HOUR = 60 * 60 * 1000
 const DAY = 24 * HOUR
-const nowMs = Date.now()
+const nowMs = demoDayAnchor
 
 export const demoInboxEntry: InboxEntry = {
   id: 'demo-inbox-aapl-q1',

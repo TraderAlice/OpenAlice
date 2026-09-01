@@ -1,8 +1,8 @@
-/**
- * Read-only Office building. Each Workspace is one room. Never a spawn surface.
- */
+/** Office building plus Project-owned Day state. Never a spawn surface. */
 import { Hono } from 'hono'
+import { ZodError } from 'zod'
 
+import { OfficeDayUnavailableError } from '../../core/office-day-store.js'
 import {
   RoutineFollowUpConflictError,
   RoutineFollowUpCreateDisallowedError,
@@ -100,6 +100,62 @@ async function projectRoom(
 export function createOfficeRoutes(svc: WorkspaceService): Hono {
   const app = new Hono()
   const activityJournal = svc.activityJournal ?? svc.agentRuntimeLog
+
+  app.get('/day', (c) => {
+    try {
+      return c.json(svc.officeDayStore.observe())
+    } catch (error) {
+      if (error instanceof OfficeDayUnavailableError) {
+        return c.json({ error: error.code, message: error.message }, 503)
+      }
+      return c.json({
+        error: 'office_day_read_failed',
+        message: error instanceof Error ? error.message : String(error),
+      }, 500)
+    }
+  })
+
+  app.post('/day/open', async (c) => {
+    try {
+      const input: unknown = await c.req.json()
+      return c.json(await svc.officeDayStore.open(input))
+    } catch (error) {
+      if (error instanceof ZodError || error instanceof SyntaxError) {
+        return c.json({
+          error: 'invalid_office_day_request',
+          message: 'The Office Day request body is invalid.',
+        }, 400)
+      }
+      if (error instanceof OfficeDayUnavailableError) {
+        return c.json({ error: error.code, message: error.message }, 503)
+      }
+      return c.json({
+        error: 'office_day_write_failed',
+        message: error instanceof Error ? error.message : String(error),
+      }, 500)
+    }
+  })
+
+  app.post('/day/commands', async (c) => {
+    try {
+      const input: unknown = await c.req.json()
+      return c.json(await svc.officeDayStore.execute(input))
+    } catch (error) {
+      if (error instanceof ZodError || error instanceof SyntaxError) {
+        return c.json({
+          error: 'invalid_office_day_request',
+          message: 'The Office Day request body is invalid.',
+        }, 400)
+      }
+      if (error instanceof OfficeDayUnavailableError) {
+        return c.json({ error: error.code, message: error.message }, 503)
+      }
+      return c.json({
+        error: 'office_day_write_failed',
+        message: error instanceof Error ? error.message : String(error),
+      }, 500)
+    }
+  })
 
   app.get('/routine-follow-ups', (c) => {
     try {

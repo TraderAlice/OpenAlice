@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { Hono } from 'hono'
 import { describe, expect, it, vi } from 'vitest'
 
+import { OfficeDayStore } from '../../core/office-day-store.js'
 import {
   RoutineFollowUpConflictError,
   RoutineFollowUpCreateDisallowedError,
@@ -250,6 +251,183 @@ describe('GET /api/office/floor', () => {
     })
     expect(replay.offices[0]?.employees[0]?.latestResult).toBeUndefined()
     expect(read).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('Office Day', () => {
+  const now = Date.parse('2026-09-01T12:00:00.000Z')
+  const dayKey = '2026-09-01'
+
+  async function build() {
+    const dir = await mkdtemp(join(tmpdir(), 'openalice-office-day-route-'))
+    const officeDayStore = await OfficeDayStore.load({
+      path: join(dir, 'office', 'day.json'),
+      timeZone: 'UTC',
+      now: () => now,
+    })
+    return {
+      dir,
+      officeDayStore,
+      app: new Hono().route('/', createOfficeRoutes({ officeDayStore } as never)),
+    }
+  }
+
+  it('serves the shared envelope and command-shaped mutations', async () => {
+    const { app, dir } = await build()
+    try {
+      const observed = await app.request('/day')
+      expect(observed.status).toBe(200)
+      expect(await observed.json()).toEqual({
+        serverNow: now,
+        dayKey,
+        timeZone: 'UTC',
+        nextRolloverAt: Date.parse('2026-09-02T00:00:00.000Z'),
+        revision: 0,
+        day: null,
+      })
+
+      const opened = await app.request('/day/open', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ dayKey, slots: ['duty-a', 'duty-b'] }),
+      })
+      expect(opened.status).toBe(200)
+      expect(await opened.json()).toMatchObject({
+        applied: true,
+        revision: 1,
+        day: {
+          shift: { id: 1, slots: ['duty-a', 'duty-b'], order: ['duty-a', 'duty-b'] },
+          seenDutyIds: ['duty-a', 'duty-b'],
+        },
+      })
+
+      const deferred = await app.request('/day/commands', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          type: 'defer-duty',
+          dayKey,
+          shiftId: 1,
+          dutyId: 'duty-a',
+        }),
+      })
+      expect(deferred.status).toBe(200)
+      expect(await deferred.json()).toMatchObject({
+        applied: true,
+        revision: 2,
+        day: { shift: { order: ['duty-b', 'duty-a'] } },
+      })
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('returns the live snapshot instead of writing when a tab has a stale shift id', async () => {
+    const { app, dir, officeDayStore } = await build()
+    try {
+      await officeDayStore.open({ dayKey, slots: ['old-duty'] })
+      await officeDayStore.execute({
+        type: 'reconcile-shift',
+        dayKey,
+        shiftId: 1,
+        presentSlotIds: [],
+        proposedSlots: [],
+        unresolvedCount: 0,
+      })
+      await officeDayStore.execute({
+        type: 'start-next-shift',
+        dayKey,
+        shiftId: 1,
+        slots: ['new-duty'],
+      })
+
+      const response = await app.request('/day/commands', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          type: 'defer-duty',
+          dayKey,
+          shiftId: 1,
+          dutyId: 'old-duty',
+        }),
+      })
+      expect(response.status).toBe(200)
+      expect(await response.json()).toMatchObject({
+        applied: false,
+        reason: 'stale-shift',
+        revision: 3,
+        day: { shift: { id: 3, slots: ['new-duty'] } },
+      })
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it.each([
+    ['/day/open', JSON.stringify({ dayKey, slots: ['duplicate', 'duplicate'] })],
+    ['/day/commands', JSON.stringify({
+      kind: 'defer-duty',
+      dayKey,
+      shiftId: 1,
+      dutyId: 'duty-a',
+    })],
+    ['/day/commands', JSON.stringify({
+      type: 'review-evidence',
+      dayKey,
+      shiftId: 1,
+      dutyId: JSON.stringify([
+        'office-duty-v1',
+        'cadence',
+        'scheduled-issue-health:a',
+        'subject-a',
+        'fingerprint-a',
+      ]),
+      subjectKey: 'subject-b',
+      fingerprint: 'fingerprint-b',
+    })],
+    ['/day/commands', '{'],
+  ])('rejects an invalid command body at %s without mutating the day', async (path, body) => {
+    const { app, dir } = await build()
+    try {
+      const response = await app.request(path, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body,
+      })
+      expect(response.status).toBe(400)
+      expect(await response.json()).toMatchObject({ error: 'invalid_office_day_request' })
+      expect(await (await app.request('/day')).json()).toMatchObject({ revision: 0, day: null })
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('fails every Office Day API closed when the durable sidecar is unavailable', async () => {
+    const officeDayStore = OfficeDayStore.unavailable(new Error('malformed sidecar'), {
+      timeZone: 'UTC',
+      now: () => now,
+    })
+    const app = new Hono().route('/', createOfficeRoutes({ officeDayStore } as never))
+
+    const observed = await app.request('/day')
+    expect(observed.status).toBe(503)
+    expect(await observed.json()).toMatchObject({ error: 'office_day_unavailable' })
+
+    const opened = await app.request('/day/open', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ dayKey, slots: [] }),
+    })
+    expect(opened.status).toBe(503)
+    expect(await opened.json()).toMatchObject({ error: 'office_day_unavailable' })
+
+    const commanded = await app.request('/day/commands', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'forget-evidence', dayKey, subjectKey: 'subject-a' }),
+    })
+    expect(commanded.status).toBe(503)
+    expect(await commanded.json()).toMatchObject({ error: 'office_day_unavailable' })
   })
 })
 

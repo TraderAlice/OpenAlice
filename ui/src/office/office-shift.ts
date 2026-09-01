@@ -1,14 +1,16 @@
-import type { OfficeDutyCandidate, OfficeDutySourceStatus } from './duty-registry'
+import {
+  officeDutyKey,
+  type OfficeDutyCandidate,
+  type OfficeDutySourceStatus,
+} from './duty-registry'
 
 export const OFFICE_SHIFT_LIMIT = 4
-export const OFFICE_SHIFT_STORAGE_KEY = 'openalice:office-shift:v1'
 
 export interface OfficeShiftSnapshot {
-  readonly version: 1
   readonly createdAt: number
-  /** Frozen membership. Missing candidates count as completed only after every source is ready. */
+  /** Frozen exact-duty membership. */
   readonly slots: readonly string[]
-  /** Pending slot order. Later rotates this list without changing membership or progress. */
+  /** Pending exact-duty order. Later rotates this list without changing progress. */
   readonly order: readonly string[]
   /** True only when the frozen shift settled with no remaining mandatory domain facts. */
   readonly cleared: boolean
@@ -33,10 +35,11 @@ export function createOfficeShiftSnapshot(
   candidates: readonly OfficeDutyCandidate[],
   now = Date.now(),
 ): OfficeShiftSnapshot {
-  const candidateIds = new Set<string>()
+  const candidateKeys = new Set<string>()
   const canonical = candidates.filter((candidate) => {
-    if (!candidate.id.trim() || candidateIds.has(candidate.id)) return false
-    candidateIds.add(candidate.id)
+    const key = officeDutyKey(candidate)
+    if (!candidate.id.trim() || candidateKeys.has(key)) return false
+    candidateKeys.add(key)
     return true
   })
   const coveredRoutines = new Set<string>()
@@ -56,8 +59,8 @@ export function createOfficeShiftSnapshot(
   // in their original canonical order; no row or receipt is coalesced.
   const slots = uniqueIds([...firstCoverage, ...repeatedVersions]
     .slice(0, OFFICE_SHIFT_LIMIT)
-    .map((candidate) => candidate.id))
-  return { version: 1, createdAt: now, slots, order: slots, cleared: false }
+    .map(officeDutyKey))
+  return { createdAt: now, slots, order: slots, cleared: false }
 }
 
 export function reconcileOfficeShiftSnapshot(
@@ -75,8 +78,8 @@ export function reconcileOfficeShiftSnapshot(
     return createOfficeShiftSnapshot(candidates, now)
   }
 
-  const candidateIds = new Set(candidates.map((candidate) => candidate.id))
-  const order = snapshot.order.filter((id) => candidateIds.has(id))
+  const candidateKeys = new Set(candidates.map(officeDutyKey))
+  const order = snapshot.order.filter((key) => candidateKeys.has(key))
   const cleared = snapshot.slots.length > 0 && order.length === 0 && unresolvedCount === 0
   if (cleared === snapshot.cleared
     && order.length === snapshot.order.length
@@ -88,50 +91,12 @@ export function reconcileOfficeShiftSnapshot(
 
 export function deferOfficeShiftDuty(
   snapshot: OfficeShiftSnapshot,
-  dutyId: string,
+  dutyKey: string,
 ): OfficeShiftSnapshot {
-  const index = snapshot.order.indexOf(dutyId)
+  const index = snapshot.order.indexOf(dutyKey)
   if (index < 0 || snapshot.order.length < 2) return snapshot
   const order = [...snapshot.order]
   order.splice(index, 1)
-  order.push(dutyId)
+  order.push(dutyKey)
   return { ...snapshot, order }
-}
-
-export function readOfficeShiftSnapshot(): OfficeShiftSnapshot | null {
-  if (typeof window === 'undefined') return null
-  try {
-    const parsed: unknown = JSON.parse(window.sessionStorage.getItem(OFFICE_SHIFT_STORAGE_KEY) ?? 'null')
-    if (!parsed || typeof parsed !== 'object') return null
-    const candidate = parsed as Record<string, unknown>
-    if (candidate.version !== 1
-      || !Number.isFinite(candidate.createdAt)
-      || !Array.isArray(candidate.slots)
-      || !candidate.slots.every((value) => typeof value === 'string')
-      || !Array.isArray(candidate.order)
-      || !candidate.order.every((value) => typeof value === 'string')
-      || typeof candidate.cleared !== 'boolean') {
-      return null
-    }
-    const slots = uniqueIds(candidate.slots as string[])
-    const slotIds = new Set(slots)
-    const order = uniqueIds(candidate.order as string[]).filter((id) => slotIds.has(id))
-    return {
-      version: 1,
-      createdAt: candidate.createdAt as number,
-      slots,
-      order,
-      cleared: candidate.cleared,
-    }
-  } catch {
-    return null
-  }
-}
-
-export function writeOfficeShiftSnapshot(snapshot: OfficeShiftSnapshot): void {
-  try {
-    window.sessionStorage.setItem(OFFICE_SHIFT_STORAGE_KEY, JSON.stringify(snapshot))
-  } catch {
-    // Same-tab storage is continuity only; domain completion remains authoritative.
-  }
 }

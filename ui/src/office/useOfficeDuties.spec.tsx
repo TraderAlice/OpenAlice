@@ -1,10 +1,13 @@
 // @vitest-environment jsdom
 
+import { useCallback, useMemo, useState } from 'react'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { IssueListItem, IssueSnapshot } from '../api/issues'
+import type { OfficeDayEvidenceReceipt } from '../api/office'
 import type { UseIssues } from '../hooks/useIssues'
+import type { OfficeDayController } from './useOfficeDay'
 import { useOfficeDuties } from './useOfficeDuties'
 import type { OfficeProductActivity } from './useOfficeProductActivity'
 
@@ -37,11 +40,16 @@ function exception(latestTaskId = 'run-a'): IssueListItem {
   }
 }
 
-function issues(issue: IssueListItem | null, error: string | null = null): UseIssues {
+function issues(
+  issue: IssueListItem | null,
+  error: string | null = null,
+  requestEpoch = 1,
+  successEpoch = requestEpoch,
+): UseIssues {
   const data: IssueSnapshot = {
     workspaces: [{ wsId: 'ws-a', tag: 'weekly', status: 'ok', issues: issue ? [issue] : [] }],
   }
-  return { data, error, loading: false }
+  return { data, error, loading: false, requestEpoch, successEpoch }
 }
 
 function activity(): OfficeProductActivity {
@@ -79,14 +87,56 @@ function inboxDelivery(id = 'inbox-a') {
   }
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (error: unknown) => void
+  const promise = new Promise<T>((done, fail) => {
+    resolve = done
+    reject = fail
+  })
+  return { promise, resolve, reject }
+}
+
+function useTestOfficeDay(
+  initialReceipts: readonly OfficeDayEvidenceReceipt[] = [],
+): Pick<
+  OfficeDayController,
+  'evidenceReceipts' | 'hasEvidenceReceipt' | 'reviewEvidence' | 'forgetEvidence'
+> {
+  const [evidenceReceipts, setEvidenceReceipts] = useState<readonly OfficeDayEvidenceReceipt[]>(
+    initialReceipts,
+  )
+  const hasEvidenceReceipt = useCallback((subjectKey: string, fingerprint: string) => (
+    evidenceReceipts.some((receipt) => (
+      receipt.subjectKey === subjectKey && receipt.fingerprint === fingerprint
+    ))
+  ), [evidenceReceipts])
+  const reviewEvidence = useCallback<OfficeDayController['reviewEvidence']>(async (duty) => {
+    const { subjectKey, fingerprint } = duty.receipt
+    if (hasEvidenceReceipt(subjectKey, fingerprint)) return 'already-resolved'
+    setEvidenceReceipts((current) => [...current, { subjectKey, fingerprint, reviewedAt: NOW }])
+    return 'acknowledged'
+  }, [hasEvidenceReceipt])
+  const forgetEvidence = useCallback<OfficeDayController['forgetEvidence']>(async (subjectKey) => {
+    setEvidenceReceipts((current) => current.filter((receipt) => receipt.subjectKey !== subjectKey))
+  }, [])
+  return useMemo(() => ({
+    evidenceReceipts,
+    hasEvidenceReceipt,
+    reviewEvidence,
+    forgetEvidence,
+  }), [evidenceReceipts, forgetEvidence, hasEvidenceReceipt, reviewEvidence])
+}
+
 beforeEach(() => {
-  window.sessionStorage.clear()
   vi.spyOn(Date, 'now').mockReturnValue(NOW)
   markReadConfirmedMock.mockReset()
   markReadConfirmedMock.mockResolvedValue('acknowledged')
   inboxDutiesMock.mockReset()
   inboxDutiesMock.mockReturnValue({
     status: 'ready',
+    requestEpoch: 1,
+    successEpoch: 1,
     deliveries: [],
     markReadConfirmed: markReadConfirmedMock,
   })
@@ -95,9 +145,12 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks())
 
 describe('useOfficeDuties', () => {
-  it('persists a cadence receipt for this browser session and restores it on remount', async () => {
+  it('restores an exact cadence receipt from the Project Office Day after remount', async () => {
     const productActivity = activity()
-    const first = renderHook(() => useOfficeDuties(productActivity, issues(exception())))
+    const first = renderHook(() => {
+      const officeDay = useTestOfficeDay()
+      return useOfficeDuties(productActivity, issues(exception()), officeDay)
+    })
     const duty = first.result.current.candidates[0]!
     expect(duty.kind).toBe('cadence')
     expect(first.result.current.unresolvedCount).toBe(1)
@@ -109,7 +162,14 @@ describe('useOfficeDuties', () => {
     expect(first.result.current.unresolvedCount).toBe(1)
     first.unmount()
 
-    const second = renderHook(() => useOfficeDuties(productActivity, issues(exception())))
+    const second = renderHook(() => {
+      const officeDay = useTestOfficeDay([{
+        subjectKey: duty.receipt.kind === 'evidence' ? duty.receipt.subjectKey : 'unexpected',
+        fingerprint: duty.receipt.kind === 'evidence' ? duty.receipt.fingerprint : 'unexpected',
+        reviewedAt: NOW,
+      }])
+      return useOfficeDuties(productActivity, issues(exception()), officeDay)
+    })
     expect(second.result.current.candidates).toEqual([])
     expect(second.result.current.reviewedCadenceFollowUps).toMatchObject([
       { id: duty.id, receipt: duty.receipt },
@@ -122,7 +182,10 @@ describe('useOfficeDuties', () => {
   it('keeps new evidence pending when an older captured dossier is stamped', async () => {
     const productActivity = activity()
     const { result, rerender } = renderHook(
-      ({ issue }) => useOfficeDuties(productActivity, issues(issue)),
+      ({ issue }) => {
+        const officeDay = useTestOfficeDay()
+        return useOfficeDuties(productActivity, issues(issue), officeDay)
+      },
       { initialProps: { issue: exception('run-a') } },
     )
     const captured = result.current.candidates[0]!
@@ -141,7 +204,10 @@ describe('useOfficeDuties', () => {
   it('returns changed evidence to the actionable queue instead of treating it as reviewed', async () => {
     const productActivity = activity()
     const { result, rerender } = renderHook(
-      ({ issue }) => useOfficeDuties(productActivity, issues(issue)),
+      ({ issue }) => {
+        const officeDay = useTestOfficeDay()
+        return useOfficeDuties(productActivity, issues(issue), officeDay)
+      },
       { initialProps: { issue: exception('run-a') } },
     )
     const reviewed = result.current.candidates[0]!
@@ -162,8 +228,11 @@ describe('useOfficeDuties', () => {
   it('clears a recovered subject receipt so the same exception can recur later', async () => {
     const productActivity = activity()
     const { result, rerender } = renderHook(
-      ({ issue }) => useOfficeDuties(productActivity, issues(issue)),
-      { initialProps: { issue: exception() as IssueListItem | null } },
+      ({ issue, epoch }) => {
+        const officeDay = useTestOfficeDay()
+        return useOfficeDuties(productActivity, issues(issue, null, epoch), officeDay)
+      },
+      { initialProps: { issue: exception() as IssueListItem | null, epoch: 1 } },
     )
     const first = result.current.candidates[0]!
     await act(async () => {
@@ -172,12 +241,15 @@ describe('useOfficeDuties', () => {
     expect(result.current.candidates).toEqual([])
     expect(result.current.reviewedCadenceFollowUps).toEqual([first])
 
-    rerender({ issue: { ...exception(), automationHealth: { state: 'healthy', message: 'Recovered.' } } })
+    rerender({
+      issue: { ...exception(), automationHealth: { state: 'healthy', message: 'Recovered.' } },
+      epoch: 2,
+    })
     await waitFor(() => {
       expect(result.current.candidates).toEqual([])
       expect(result.current.reviewedCadenceFollowUps).toEqual([])
     })
-    rerender({ issue: exception() })
+    rerender({ issue: exception(), epoch: 2 })
     await waitFor(() => {
       expect(result.current.candidates[0]?.kind).toBe('cadence')
       expect(result.current.reviewedCadenceFollowUps).toEqual([])
@@ -186,10 +258,14 @@ describe('useOfficeDuties', () => {
 
   it('keeps a stale exception actionable but refuses to call the shift clear after stamping', async () => {
     const productActivity = activity()
-    const hook = renderHook(() => useOfficeDuties(
-      productActivity,
-      issues(exception(), 'scanner unavailable'),
-    ))
+    const hook = renderHook(() => {
+      const officeDay = useTestOfficeDay()
+      return useOfficeDuties(
+        productActivity,
+        issues(exception(), 'scanner unavailable'),
+        officeDay,
+      )
+    })
     const duty = hook.result.current.candidates[0]!
     expect(hook.result.current.status).toBe('error')
     await act(async () => {
@@ -206,6 +282,8 @@ describe('useOfficeDuties', () => {
       data: { workspaces: [{ wsId: 'ws-b', tag: 'broken', status: 'invalid', error: 'bad data', issues: [] }] },
       error: null,
       loading: false,
+      requestEpoch: 1,
+      successEpoch: 1,
     }
     const hook = renderHook(() => useOfficeDuties(activity(), invalid))
     expect(hook.result.current.candidates).toEqual([])
@@ -213,7 +291,7 @@ describe('useOfficeDuties', () => {
   })
 
   it('reconciles a healthy workspace receipt while preserving another invalid workspace boundary', async () => {
-    const mixed = (issue: IssueListItem): UseIssues => ({
+    const mixed = (issue: IssueListItem, epoch: number): UseIssues => ({
       data: {
         workspaces: [
           { wsId: 'ws-a', tag: 'weekly', status: 'ok', issues: [issue] },
@@ -222,10 +300,15 @@ describe('useOfficeDuties', () => {
       },
       error: null,
       loading: false,
+      requestEpoch: epoch,
+      successEpoch: epoch,
     })
     const hook = renderHook(
-      ({ issue }) => useOfficeDuties(activity(), mixed(issue)),
-      { initialProps: { issue: exception() } },
+      ({ issue, epoch }) => {
+        const officeDay = useTestOfficeDay()
+        return useOfficeDuties(activity(), mixed(issue, epoch), officeDay)
+      },
+      { initialProps: { issue: exception(), epoch: 1 } },
     )
     expect(hook.result.current.candidates[0]?.kind).toBe('cadence')
     expect(hook.result.current.cadenceStatus).toBe('ready')
@@ -240,10 +323,11 @@ describe('useOfficeDuties', () => {
 
     hook.rerender({
       issue: { ...exception(), automationHealth: { state: 'healthy', message: 'Recovered.' } },
+      epoch: 2,
     })
     await waitFor(() => expect(hook.result.current.reviewedCadenceFollowUps).toEqual([]))
 
-    hook.rerender({ issue: exception() })
+    hook.rerender({ issue: exception(), epoch: 2 })
     await waitFor(() => expect(hook.result.current.candidates[0]?.kind).toBe('cadence'))
   })
 
@@ -252,6 +336,8 @@ describe('useOfficeDuties', () => {
       data: { workspaces: [{ wsId: 'ws-a', tag: 'weekly', status: 'ok', issues: [] }] },
       error: null,
       loading: true,
+      requestEpoch: 1,
+      successEpoch: 1,
     }
     const productActivity: OfficeProductActivity = {
       ...activity(),
@@ -269,6 +355,8 @@ describe('useOfficeDuties', () => {
     (status) => {
       inboxDutiesMock.mockReturnValue({
         status,
+        requestEpoch: 1,
+        successEpoch: 1,
         deliveries: [],
         markReadConfirmed: markReadConfirmedMock,
       })
@@ -293,15 +381,29 @@ describe('useOfficeDuties', () => {
   it.each([
     {
       status: 'loading' as const,
-      issueSource: { data: null, error: null, loading: true } satisfies UseIssues,
+      issueSource: {
+        data: null,
+        error: null,
+        loading: true,
+        requestEpoch: 0,
+        successEpoch: 0,
+      } satisfies UseIssues,
     },
     {
       status: 'error' as const,
-      issueSource: { data: null, error: 'scanner unavailable', loading: false } satisfies UseIssues,
+      issueSource: {
+        data: null,
+        error: 'scanner unavailable',
+        loading: false,
+        requestEpoch: 0,
+        successEpoch: 0,
+      } satisfies UseIssues,
     },
   ])('keeps a known Inbox duty visible while cadence is $status', ({ status, issueSource }) => {
     inboxDutiesMock.mockReturnValue({
       status: 'ready',
+      requestEpoch: 1,
+      successEpoch: 1,
       deliveries: [inboxDelivery('known-inbox')],
       markReadConfirmed: markReadConfirmedMock,
     })
@@ -380,10 +482,14 @@ describe('useOfficeDuties', () => {
       },
       error: null,
       loading: false,
+      requestEpoch: 1,
+      successEpoch: 1,
     }
     const priorityInbox = inboxDelivery('priority-inbox')
     inboxDutiesMock.mockReturnValue({
       status: 'ready',
+      requestEpoch: 1,
+      successEpoch: 1,
       deliveries: [
         inboxDelivery('ordinary-inbox'),
         {
@@ -418,6 +524,8 @@ describe('useOfficeDuties', () => {
   it('awaits the exact Inbox server receipt without acknowledging a journal watermark', async () => {
     inboxDutiesMock.mockReturnValue({
       status: 'ready',
+      requestEpoch: 1,
+      successEpoch: 1,
       deliveries: [inboxDelivery()],
       markReadConfirmed: markReadConfirmedMock,
     })
@@ -461,6 +569,8 @@ describe('useOfficeDuties', () => {
     const readReport = inboxDelivery('read-report')
     inboxDutiesMock.mockReturnValue({
       status: 'ready',
+      requestEpoch: 1,
+      successEpoch: 1,
       deliveries: [],
       evidenceByEntryId: new Map([['read-report', readReport]]),
       markReadConfirmed: markReadConfirmedMock,
@@ -471,5 +581,98 @@ describe('useOfficeDuties', () => {
     expect(hook.result.current.candidates).toEqual([])
     expect(hook.result.current.inboxByEntryId.has('read-report')).toBe(false)
     expect(hook.result.current.inboxEvidenceByEntryId.get('read-report')).toBe(readReport)
+  })
+
+  it('treats a process-warm Issue snapshot as loading until this hook accepts a fresh response', () => {
+    const hook = renderHook(
+      ({ successEpoch }) => useOfficeDuties(
+        activity(),
+        issues(exception(), null, 1, successEpoch),
+      ),
+      { initialProps: { successEpoch: 0 } },
+    )
+
+    expect(hook.result.current.candidates).toHaveLength(1)
+    expect(hook.result.current.cadenceStatus).toBe('loading')
+    expect(hook.result.current.issueStatus).toBe('loading')
+    expect(hook.result.current.status).toBe('loading')
+
+    hook.rerender({ successEpoch: 1 })
+    expect(hook.result.current.cadenceStatus).toBe('ready')
+    expect(hook.result.current.issueStatus).toBe('ready')
+    expect(hook.result.current.status).toBe('ready')
+  })
+
+  it('waits for a post-receipt Issue request and deduplicates delayed forgets by subject', async () => {
+    const subjectA = JSON.stringify(['scheduled-issue', 'ws-a', 'recovered-a'])
+    const subjectB = JSON.stringify(['scheduled-issue', 'ws-a', 'recovered-b'])
+    const receipts: readonly OfficeDayEvidenceReceipt[] = [
+      { subjectKey: subjectA, fingerprint: 'fingerprint-a', reviewedAt: NOW },
+      { subjectKey: subjectB, fingerprint: 'fingerprint-b', reviewedAt: NOW },
+    ]
+    const attempts = new Map<string, ReturnType<typeof deferred<void>>[]>()
+    const forgetEvidence = vi.fn((subjectKey: string) => {
+      const attempt = deferred<void>()
+      const current = attempts.get(subjectKey) ?? []
+      current.push(attempt)
+      attempts.set(subjectKey, current)
+      return attempt.promise
+    })
+    const controller = (evidenceReceipts: readonly OfficeDayEvidenceReceipt[]) => ({
+      evidenceReceipts,
+      hasEvidenceReceipt: (subjectKey: string, fingerprint: string) => evidenceReceipts.some(
+        (receipt) => receipt.subjectKey === subjectKey && receipt.fingerprint === fingerprint,
+      ),
+      reviewEvidence: vi.fn(async () => 'acknowledged' as const),
+      forgetEvidence,
+    })
+    const hook = renderHook(
+      ({ evidenceReceipts, requested, successful }) => useOfficeDuties(
+        activity(),
+        issues(null, null, requested, successful),
+        controller(evidenceReceipts),
+      ),
+      {
+        initialProps: {
+          evidenceReceipts: receipts,
+          requested: 5,
+          successful: 4,
+        },
+      },
+    )
+
+    hook.rerender({ evidenceReceipts: receipts, requested: 5, successful: 5 })
+    expect(forgetEvidence).not.toHaveBeenCalled()
+    hook.rerender({ evidenceReceipts: receipts, requested: 6, successful: 5 })
+    expect(forgetEvidence).not.toHaveBeenCalled()
+    hook.rerender({ evidenceReceipts: receipts, requested: 6, successful: 6 })
+    await waitFor(() => expect(forgetEvidence).toHaveBeenCalledTimes(2))
+    expect(forgetEvidence).toHaveBeenCalledWith(subjectA)
+    expect(forgetEvidence).toHaveBeenCalledWith(subjectB)
+
+    await act(async () => {
+      attempts.get(subjectA)![0]!.reject(new Error('temporary failure'))
+      await attempts.get(subjectA)![0]!.promise.catch(() => undefined)
+    })
+    hook.rerender({ evidenceReceipts: receipts, requested: 7, successful: 7 })
+    await waitFor(() => expect(forgetEvidence.mock.calls.filter(
+      ([subjectKey]) => subjectKey === subjectA,
+    )).toHaveLength(2))
+    expect(forgetEvidence.mock.calls.filter(([subjectKey]) => subjectKey === subjectB)).toHaveLength(1)
+
+    await act(async () => {
+      attempts.get(subjectA)![1]!.resolve()
+      await attempts.get(subjectA)![1]!.promise
+    })
+    hook.rerender({
+      evidenceReceipts: receipts.filter((receipt) => receipt.subjectKey === subjectB),
+      requested: 7,
+      successful: 7,
+    })
+    expect(forgetEvidence.mock.calls.filter(([subjectKey]) => subjectKey === subjectB)).toHaveLength(1)
+    await act(async () => {
+      attempts.get(subjectB)![0]!.resolve()
+      await attempts.get(subjectB)![0]!.promise
+    })
   })
 })

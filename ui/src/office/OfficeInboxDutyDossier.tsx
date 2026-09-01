@@ -49,13 +49,13 @@ export function OfficeInboxDutyDossier({
   onConfirm: () => Promise<OfficeDutyAcknowledgementResult>
   onConfirmed: () => void
   onContinue: () => void
-  onLater?: () => void
+  onLater?: () => void | Promise<void>
   onClose: () => void
 }) {
   const { t } = useTranslation()
   const headingRef = useRef<HTMLHeadingElement>(null)
   const carryRef = useRef<HTMLButtonElement>(null)
-  const [submittingAction, setSubmittingAction] = useState<'carry' | 'confirm' | null>(null)
+  const [submittingAction, setSubmittingAction] = useState<'carry' | 'confirm' | 'later' | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const submitting = submittingAction !== null
   const changed = Boolean(latestDuty
@@ -135,6 +135,19 @@ export function OfficeInboxDutyDossier({
     }
   }
 
+  const later = async () => {
+    if (submitting) return
+    setSubmittingAction('later')
+    setSubmitError(null)
+    try {
+      await onLater()
+      setSubmittingAction(null)
+    } catch {
+      setSubmittingAction(null)
+      setSubmitError(t('office.inboxBacklogSaveFailed'))
+    }
+  }
+
   return (
     <section
       role="dialog"
@@ -143,6 +156,7 @@ export function OfficeInboxDutyDossier({
       aria-describedby="office-inbox-duty-description"
       data-testid="office-inbox-duty"
       data-source-status={sourceStatus}
+      aria-busy={submitting || undefined}
       className="oa-office-window oa-office-cadence oa-office-inbox-duty"
       onKeyDown={(event) => {
         if (event.key === 'Escape') {
@@ -363,7 +377,12 @@ export function OfficeInboxDutyDossier({
             </>
           ) : (
             <>
-              <button type="button" className="oa-office-cadence__back" disabled={submitting} onClick={onLater}>
+              <button
+                type="button"
+                className="oa-office-cadence__back"
+                disabled={submitting}
+                onClick={() => void later()}
+              >
                 {t('office.inboxBacklogLater')}
               </button>
               <button
@@ -380,13 +399,19 @@ export function OfficeInboxDutyDossier({
                     : 'office.inboxBacklogOpenAgain')}
               </button>
               {resolved ? (
-                <button type="button" className="oa-office-cadence__stamp" onClick={onContinue}>
+                <button
+                  type="button"
+                  className="oa-office-cadence__stamp"
+                  disabled={submitting}
+                  onClick={onContinue}
+                >
                   {t('office.cadenceContinue')}
                 </button>
               ) : changed ? (
                 <button
                   type="button"
                   className="oa-office-cadence__stamp"
+                  disabled={submitting}
                   onClick={() => latestDuty && onOpenInbox(latestDuty)}
                 >
                   {t('office.inboxBacklogOpenLatest')}
@@ -409,7 +434,9 @@ export function OfficeInboxDutyDossier({
                   disabled={!sourceReady || submitting}
                   onClick={() => void confirm()}
                 >
-                  {submitting ? t('office.inboxBacklogSaving') : t('office.inboxBacklogStamp')}
+                  {submittingAction === 'confirm'
+                    ? t('office.inboxBacklogSaving')
+                    : t('office.inboxBacklogStamp')}
                 </button>
               )}
             </>

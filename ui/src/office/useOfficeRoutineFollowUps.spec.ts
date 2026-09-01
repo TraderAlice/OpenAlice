@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { act, renderHook, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { api } from '../api'
 import type { OfficeRoutineFollowUp } from '../api/office'
@@ -40,10 +40,39 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 
+class TestBroadcastChannel {
+  static readonly peers = new Set<TestBroadcastChannel>()
+
+  onmessage: ((event: MessageEvent) => void) | null = null
+
+  constructor(readonly name: string) {
+    TestBroadcastChannel.peers.add(this)
+  }
+
+  postMessage(data: unknown): void {
+    for (const peer of TestBroadcastChannel.peers) {
+      if (peer !== this && peer.name === this.name) {
+        queueMicrotask(() => peer.onmessage?.(new MessageEvent('message', { data })))
+      }
+    }
+  }
+
+  close(): void {
+    TestBroadcastChannel.peers.delete(this)
+  }
+}
+
 beforeEach(() => {
   vi.mocked(api.office.listRoutineFollowUps).mockReset()
   vi.mocked(api.office.carryRoutineFollowUp).mockReset()
   vi.mocked(api.office.resolveRoutineFollowUp).mockReset()
+})
+
+afterEach(() => {
+  cleanup()
+  TestBroadcastChannel.peers.clear()
+  vi.unstubAllGlobals()
+  vi.useRealTimers()
 })
 
 describe('useOfficeRoutineFollowUps', () => {
@@ -54,12 +83,14 @@ describe('useOfficeRoutineFollowUps', () => {
     const { result } = renderHook(() => useOfficeRoutineFollowUps())
     expect(result.current.status).toBe('loading')
     expect(result.current.followUps).toEqual([])
+    expect(result.current).toMatchObject({ requestEpoch: 1, successEpoch: 0 })
 
     await act(async () => {
       request.resolve({ followUps: [followUp('later', 2_000), followUp('first', 1_000)] })
       await request.promise
     })
     expect(result.current.status).toBe('ready')
+    expect(result.current).toMatchObject({ requestEpoch: 1, successEpoch: 1 })
     expect(result.current.followUps.map((item) => item.inboxEntryId)).toEqual(['first', 'later'])
   })
 
@@ -69,6 +100,7 @@ describe('useOfficeRoutineFollowUps', () => {
     const { result } = renderHook(() => useOfficeRoutineFollowUps())
     await waitFor(() => expect(result.current.status).toBe('error'))
     expect(result.current.followUps).toEqual([])
+    expect(result.current).toMatchObject({ requestEpoch: 1, successEpoch: 0 })
   })
 
   it('fails closed for a malformed successful list response', async () => {
@@ -79,6 +111,7 @@ describe('useOfficeRoutineFollowUps', () => {
     const { result } = renderHook(() => useOfficeRoutineFollowUps())
     await waitFor(() => expect(result.current.status).toBe('error'))
     expect(result.current.followUps).toEqual([])
+    expect(result.current).toMatchObject({ requestEpoch: 1, successEpoch: 0 })
   })
 
   it('preserves the last confirmed list when refresh transiently fails', async () => {
@@ -95,6 +128,123 @@ describe('useOfficeRoutineFollowUps', () => {
     })
     expect(result.current.status).toBe('error')
     expect(result.current.followUps).toEqual([known])
+    expect(result.current).toMatchObject({ requestEpoch: 2, successEpoch: 1 })
+  })
+
+  it('starts a causal refresh after an older read and advances success only for the accepted read', async () => {
+    const older = deferred<{ followUps: OfficeRoutineFollowUp[] }>()
+    const causal = deferred<{ followUps: OfficeRoutineFollowUp[] }>()
+    const current = followUp('current')
+    vi.mocked(api.office.listRoutineFollowUps)
+      .mockResolvedValueOnce({ followUps: [] })
+      .mockReturnValueOnce(older.promise)
+      .mockReturnValueOnce(causal.promise)
+
+    const { result } = renderHook(() => useOfficeRoutineFollowUps())
+    await waitFor(() => expect(result.current).toMatchObject({
+      status: 'ready',
+      requestEpoch: 1,
+      successEpoch: 1,
+    }))
+
+    let olderPromise!: Promise<void>
+    let causalPromise!: Promise<void>
+    act(() => {
+      olderPromise = result.current.refresh()
+      causalPromise = result.current.refresh()
+    })
+    expect(result.current).toMatchObject({ requestEpoch: 3, successEpoch: 1 })
+
+    await act(async () => {
+      older.resolve({ followUps: [] })
+      await olderPromise
+    })
+    expect(result.current.successEpoch).toBe(1)
+
+    await act(async () => {
+      causal.resolve({ followUps: [current] })
+      await causalPromise
+    })
+    expect(result.current).toMatchObject({
+      status: 'ready',
+      followUps: [current],
+      requestEpoch: 3,
+      successEpoch: 3,
+    })
+  })
+
+  it('invalidates another tab after carry so its stale ready-empty snapshot refreshes', async () => {
+    vi.stubGlobal('BroadcastChannel', TestBroadcastChannel)
+    const carried = followUp('report-a')
+    let serverFollowUps: OfficeRoutineFollowUp[] = []
+    vi.mocked(api.office.listRoutineFollowUps).mockImplementation(async () => ({
+      followUps: [...serverFollowUps],
+    }))
+    vi.mocked(api.office.carryRoutineFollowUp).mockImplementation(async () => {
+      serverFollowUps = [carried]
+      return { followUp: carried, created: true }
+    })
+    vi.mocked(api.office.resolveRoutineFollowUp).mockImplementation(async () => {
+      serverFollowUps = []
+      return { ok: true, removed: true }
+    })
+
+    const tabA = renderHook(() => useOfficeRoutineFollowUps())
+    const tabB = renderHook(() => useOfficeRoutineFollowUps())
+    await waitFor(() => {
+      expect(tabA.result.current.status).toBe('ready')
+      expect(tabB.result.current.status).toBe('ready')
+    })
+    expect(tabB.result.current).toMatchObject({
+      followUps: [],
+      requestEpoch: 1,
+      successEpoch: 1,
+    })
+
+    await act(async () => {
+      await tabA.result.current.carry('report-a')
+    })
+
+    await waitFor(() => expect(tabB.result.current.followUps).toEqual([carried]))
+    expect(tabB.result.current.requestEpoch).toBeGreaterThan(1)
+    expect(tabB.result.current.successEpoch).toBe(tabB.result.current.requestEpoch)
+
+    const afterCarryEpoch = tabB.result.current.successEpoch
+    await act(async () => {
+      await tabA.result.current.resolve('report-a')
+    })
+    await waitFor(() => expect(tabB.result.current.followUps).toEqual([]))
+    expect(tabB.result.current.successEpoch).toBeGreaterThan(afterCarryEpoch)
+    tabA.unmount()
+    tabB.unmount()
+  })
+
+  it('refreshes authoritative follow-ups on focus, visible return, and polling', async () => {
+    vi.useFakeTimers()
+    vi.mocked(api.office.listRoutineFollowUps).mockResolvedValue({ followUps: [] })
+    const visibility = Object.getOwnPropertyDescriptor(document, 'visibilityState')
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+    const hook = renderHook(() => useOfficeRoutineFollowUps())
+
+    await act(async () => { await Promise.resolve() })
+    expect(api.office.listRoutineFollowUps).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'))
+      await Promise.resolve()
+    })
+    expect(api.office.listRoutineFollowUps).toHaveBeenCalledTimes(2)
+
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'))
+      await Promise.resolve()
+    })
+    expect(api.office.listRoutineFollowUps).toHaveBeenCalledTimes(3)
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(15_000) })
+    expect(api.office.listRoutineFollowUps).toHaveBeenCalledTimes(4)
+    hook.unmount()
+    if (visibility) Object.defineProperty(document, 'visibilityState', visibility)
   })
 
   it('publishes a confirmed carry once and coalesces an identical inflight retry', async () => {

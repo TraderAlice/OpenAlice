@@ -147,6 +147,7 @@ import {
 import { sessionSignature } from './session-signature.js';
 import { issueRunFailure } from './issues/run-failure.js';
 import type { IInboxStore } from '@/core/inbox-store.js';
+import { OfficeDayStore } from '@/core/office-day-store.js';
 import { RoutineFollowUpStore } from '@/core/routine-follow-up-store.js';
 import { toSafeInboxOrigin } from '@/core/workspace-tool-center.js';
 import {
@@ -622,6 +623,8 @@ export interface WorkspaceService {
   provenanceStore: ArtifactProvenanceStore;
   /** Global Inbox delivery source used to prove Office routine-report identity. */
   inboxStore?: IInboxStore;
+  /** AliceProject-owned daily Office patrol and exact evidence receipts. */
+  officeDayStore: OfficeDayStore;
   /** Durable human-carried queue for scheduled reports that need a decision. */
   routineFollowUpStore: RoutineFollowUpStore;
   /** Append-only analysis/audit projection of cross-Agent messages. */
@@ -687,6 +690,12 @@ export function resumeFromRecord(
 export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions): Promise<WorkspaceService> {
   const config = loadConfig({ webPort: opts.webPort });
   const inboxStore = opts.inboxStore;
+  const officeDayStore = await OfficeDayStore.loadOrUnavailable();
+  if (!officeDayStore.available) {
+    launcherLogger.error('office_day_store.load_failed', {
+      error: officeDayStore.loadError,
+    });
+  }
   const routineFollowUpStore = await RoutineFollowUpStore.loadOrUnavailable();
   if (!routineFollowUpStore.available) {
     launcherLogger.error('routine_follow_up_store.load_failed', {
@@ -3207,6 +3216,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     resumeRegistry,
     provenanceStore,
     inboxStore,
+    officeDayStore,
     routineFollowUpStore,
     agentConversationLog,
     activityJournal: agentRuntimeLog,

@@ -18,6 +18,12 @@ Office 奖励的是流程勤勉，而不是交易频率或盈亏。它像农场�
 并把下一项交给用户。未来 Trading、NanoAlice 或其他领域通过主动注册各自可确认的值班
 事项接入同一投影，不在 `src/` 里生长第二套工作流引擎。
 
+每天的核心动线固定为四拍：**开门看班次 → 广度巡检证据 → 集中处理带回的判断 → 诚实收班**。
+环境里的 Agent 与 News 负责让后台劳动可见，班次只收纳有人类确认语义的功课；“看过”与
+“判断完成”分开计账。世界可以提醒、排序和庆祝，但不能用打开页面、停留时间、下单、盈亏
+或供应侧吞吐量替用户伪造进度。这样 Office 才是把用户引导得更勤快的日常营业循环，而不是
+给传统金融页面再套一层像素皮肤。
+
 产品层级固定为：
 
 - **一张连续楼层地图**：OpenAlice 当前运行现场
@@ -90,12 +96,14 @@ Office 原生复核，明确确认后才切换下一项；来源均 ready、冻�
   backlog；用户完成本班后可以明确开始下一班。
 - `Later` 只把当前项轮转到队尾；Escape / 关闭只收起 dossier。两者都不调用领域回执，
   不增加 `n`。
-- 只有 Inbox 服务端 `readAt` 确认、cadence session evidence receipt，或 ready 来源证明事项
+- 只有 Inbox 服务端 `readAt` 确认、cadence Office-Day evidence receipt，或 ready 来源证明事项
   已在别处解决，才能推进冻结班次。
 - `本班完成` 只表示有限冻结槽位已复核；只要仍有未读 Inbox、仍存在 cadence 异常或任一
   来源未知，就不能称为 `值班已清`。cadence 的“已复核”也不等于异常已修复。
-- 冻结顺序和 Later 轮转只保存到当前 tab 的 `sessionStorage`；它不是跨设备日计划，也不
-  改写 Inbox、Issue 或活动日志的领域所有权。
+- 冻结顺序、Later 轮转和 cadence 复核写入 AliceProject 自己的 `data/office/day.json`；服务端
+  本地日是唯一日界并返回下一次 rollover。浏览器、Electron、刷新和多标签页读取同一班次，
+  但它仍不改写 Inbox、Issue 或活动日志的领域所有权。Inbox `readAt` 和 Decision Desk 保持
+  各自独立的持久真相；跨日只清空 Office-Day 班表与 cadence 回执，不复制旧日完成状态。
 
 ### 证据巡检与决策台合同（2026-09-01）
 
@@ -6288,6 +6296,50 @@ Routine-report decision desk acceptance (2026-09-01):
   final check.
 - Focused backend/UI suites pass 169 tests; the complete suite passes 656 files / 5,749 tests (two files and thirteen tests
   skipped). Root and UI TypeScript pass, and the production UI build remains part of the final branch gate.
+
+Office-Day persistence and harvest meter (2026-09-01, implementation complete; real-project QA pending):
+
+- The corrected product mission is a repeatable diligence ritual, not an activity aquarium. A shift that survives only
+  for one browser tab cannot truthfully model a daily chore: a new tab resurrects an unchanged cadence exception
+  immediately, while a tab left open can suppress it across several days. Compared keeping `sessionStorage`, moving the
+  same shape to `localStorage`, and making AliceProject the authority. `sessionStorage` is visibly inconsistent;
+  `localStorage` still forks browser, Electron, origin, and concurrent tabs. Chose one strict Project-owned Office-Day
+  sidecar so every renderer observes the same finite patrol and calendar boundary.
+- The server's local calendar day owns `dayKey` and `nextRolloverAt`; clients never compete with different browser
+  time zones. The current finite shift, Later order, and exact cadence evidence receipts live together. A changed
+  cadence fingerprint can recur immediately; an unchanged unresolved exception recurs on the next Office day. Inbox
+  completion remains the Inbox store's exact `readAt`, and carried decisions remain the independent Decision Desk
+  sidecar. A damaged Office-Day file disables only this guidance source and can never manufacture `Shift clear`.
+- Cross-tab mutations are command-shaped and serialized rather than whole-file last-write-wins. Every shift receives
+  a monotonically increasing identity; stale reconcile, Later, or Start-next commands for an older shift return the
+  live snapshot without rewriting it. Evidence receipts are idempotent by exact subject + fingerprint. The frontend
+  deletes the superseded session-storage paths instead of carrying a compatibility reader for an unreleased shape.
+- Compared HUD-only progress, Board-only progress, and one shared meter rendered in both places. HUD-only preserves the
+  Dashboard bias; Board-only can leave the next action off-camera. Chose one prop-driven four-slot harvest meter: HUD
+  keeps the compact always-visible progress, while Operations Board makes confirmed work persist in the world. It
+  renders only the real `N` slots, fills only from `completed`, distinguishes `complete` carryover from honest `clear`,
+  never treats Later as progress, and stays hidden in Replay.
+- Desktop gives the Board the physical meter and the HUD its compact echo. At 390×844 and 844×390 the meter shares the
+  existing progress region and never adds a third HUD row. Both renderings are `aria-hidden`; the existing duty label
+  and live handoff remain the single spoken contract. A one-shot stepped fill may accompany a real receipt, while
+  reduced motion switches immediately to the same static filled/current/empty shapes. No new portal, focus owner,
+  checklist, task API, or visual dialect is introduced.
+- Implemented one strict `data/office/day.json` store plus observe/open/command routes, atomic persistence, local-day
+  rollover, monotonic shift identities, exact evidence receipts, and same-day `seenDutyIds`. The UI now reads that
+  Project authority through a domain hook and serializes mutations; BroadcastChannel, focus/visibility refresh and a
+  bounded poll converge tabs without letting an older renderer overwrite a newer shift.
+- Negative evidence is causal rather than optimistic. A frozen Inbox or cadence slot disappears only after its owning
+  provider has completed a newer authoritative request, and patrol completion waits for a post-Inbox Decision Desk
+  read. Failed reconciliation remains visibly degraded and retries with bounded exponential cooldown. Same-day seen
+  keys are excluded only from the next-batch projection, so a stale-positive tab cannot offer a false next shift while
+  a genuinely new fingerprint still recurs immediately.
+- Demo browser acceptance opened a real four-item patrol, advanced `1/4 → 2/4` only after the exact cadence evidence
+  stamp, survived a full reload at `2/4`, and projected the same duty in a second tab. `Later` rotated the duty in both
+  tabs without changing `2/4`; console warnings/errors remained empty. Demo fixture identity is now stable for one
+  local calendar day, so reload cannot manufacture a resolved shift or a new backlog from the same recording.
+- Focused Office verification passes 19 files / 337 tests. Root and UI TypeScript, the complete monorepo suite and the
+  production build pass; real Default AliceProject desktop/narrow/short-landscape play remains pending only because
+  another migration task still owns the shared Guardian process.
 
 ## Completion
 
