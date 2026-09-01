@@ -9,7 +9,10 @@ import { useInboxSelection } from '../live/inbox-selection'
 import { useInboxViewMode } from '../live/inbox-view-mode'
 import { presentInboxEntry } from '../lib/inbox-presentation'
 import { groupThreads } from '../live/inbox-threads'
-import { isActiveOfficeInboxDutyReviewTarget } from '../office/inbox-duty-excursion'
+import {
+  isActiveOfficeInboxDutyReviewTarget,
+  readOfficeInboxDutyExcursion,
+} from '../office/inbox-duty-excursion'
 import { workspaceDisplayName } from './workspace/display'
 import { Skeleton } from './StateViews'
 import type { InboxEntry } from '../api/inbox'
@@ -38,6 +41,7 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const mode = useInboxViewMode((s) => s.mode)
   const { workspaces } = useWorkspaces()
   const [query, setQuery] = useState('')
+  const officeReviewTargetId = readOfficeInboxDutyExcursion()?.duty.destination.inboxEntryId ?? null
 
   const workspaceLabels = useMemo(
     () => new Map(workspaces.map((workspace) => [workspace.id, workspaceDisplayName(workspace)])),
@@ -88,11 +92,16 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const everSelectedRef = useRef(false)
   useEffect(() => {
     if (everSelectedRef.current) return
+    if (!selectedId && officeReviewTargetId) {
+      select(officeReviewTargetId)
+      everSelectedRef.current = true
+      return
+    }
     if (ordered.length === 0) return
     if (!selectedId) selectAndRead(ordered[0]!.id)
     everSelectedRef.current = true
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ordered, selectedId])
+  }, [officeReviewTargetId, ordered, selectedId])
 
   // Keyboard nav — j/k move within the currently-displayed order.
   useEffect(() => {

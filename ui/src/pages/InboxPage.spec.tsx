@@ -19,6 +19,7 @@ const workspaceMocks = vi.hoisted(() => ({
   openHeadlessRun: vi.fn(),
   resumeSession: vi.fn(),
 }))
+const officeReturnMock = vi.hoisted(() => vi.fn())
 
 function officeInboxDuty(entry: InboxEntry): OfficeInboxDutyCandidate {
   return inboxUnreadDutyRegistration([{
@@ -45,6 +46,10 @@ vi.mock('../hooks/useIssues', () => ({
 
 vi.mock('../components/InboxReplyThread', () => ({
   InboxReplyThread: () => null,
+}))
+
+vi.mock('../office/useOfficeInboxDutyReturn', () => ({
+  useOfficeInboxDutyReturn: () => officeReturnMock,
 }))
 
 vi.mock('../components/workspace/api', async (importOriginal) => {
@@ -234,12 +239,14 @@ describe('InboxPage deletion', () => {
           duty: officeInboxDuty(successor),
           purpose: 'review',
           phase: 'presented',
+          shift: { position: 1, total: 2 },
         })
       } else {
         rememberOfficeInboxDutyExcursion({
           duty: officeInboxDuty({ ...successor, id: 'different-entry' }),
           purpose: 'review',
           phase: 'presented',
+          shift: { position: 1, total: 2 },
         })
       }
       useInboxSelection.getState().select(current.id)
@@ -272,6 +279,7 @@ describe('InboxPage Office presentation handshake', () => {
       duty: officeInboxDuty(entry),
       purpose: 'review',
       phase: 'away',
+      shift: { position: 1, total: 2 },
     })
     useInboxSelection.getState().select(entry.id)
 
@@ -281,6 +289,12 @@ describe('InboxPage Office presentation handshake', () => {
 
     view.rerender(<InboxPage visible />)
     await waitFor(() => expect(readOfficeInboxDutyExcursion()?.phase).toBe('presented'))
+    expect(await screen.findByRole('region', {
+      name: /Office shift 1 of 2.*Inbox evidence.*Exact Office delivery/,
+    })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Return to Office' }))
+    expect(officeReturnMock).toHaveBeenCalledTimes(1)
+    expect(readOfficeInboxDutyExcursion()?.phase).toBe('presented')
   })
 
   it('does not present captured delivery A when Inbox renders delivery B', async () => {
@@ -303,6 +317,7 @@ describe('InboxPage Office presentation handshake', () => {
       }),
       purpose: 'review',
       phase: 'away',
+      shift: { position: 1, total: 2 },
     })
     useInboxSelection.getState().select(entry.id)
 
@@ -311,7 +326,7 @@ describe('InboxPage Office presentation handshake', () => {
     expect(readOfficeInboxDutyExcursion()?.phase).toBe('away')
   })
 
-  it('renders an exact captured duty older than the live feed without exposing Delete', async () => {
+  it('restores an exact captured duty after reload even when it is older than the live feed', async () => {
     const captured = {
       id: 'inbox-office-older-than-feed',
       ts: Date.now() - 10_000,
@@ -332,11 +347,13 @@ describe('InboxPage Office presentation handshake', () => {
       duty: officeInboxDuty(captured),
       purpose: 'review',
       phase: 'away',
+      shift: { position: 1, total: 2 },
     })
-    useInboxSelection.getState().select(captured.id)
+    expect(useInboxSelection.getState().selectedEntryId).toBeNull()
 
     render(<InboxPage visible />)
 
+    await waitFor(() => expect(useInboxSelection.getState().selectedEntryId).toBe(captured.id))
     expect(await screen.findAllByRole('heading', { level: 1, name: 'Older weekly report' }))
       .toHaveLength(2)
     expect(screen.getByText('This exact report still needs review.')).toBeTruthy()

@@ -1,6 +1,13 @@
 import type { OfficeInboxDutyCandidate } from './duty-registry'
+import { reloadOnHotUpdate } from '../lib/hmr'
 
-const INBOX_DUTY_EXCURSION_KEY = 'openalice:office-inbox-duty-excursion:v3'
+reloadOnHotUpdate('office/inbox-duty-excursion')
+
+const INBOX_DUTY_EXCURSION_KEY = 'openalice:office-inbox-duty-excursion:v4'
+
+type OfficeInboxDutyExcursionListener = () => void
+
+const excursionListeners = new Set<OfficeInboxDutyExcursionListener>()
 
 export type OfficeInboxDutyExcursionPhase = 'away' | 'presented' | 'returned'
 
@@ -8,6 +15,10 @@ export interface OfficeInboxDutyExcursion {
   readonly duty: OfficeInboxDutyCandidate
   readonly purpose: 'review'
   readonly phase: OfficeInboxDutyExcursionPhase
+  readonly shift: {
+    readonly position: number
+    readonly total: number
+  }
 }
 
 function isNonEmptyString(value: unknown): value is string {
@@ -18,6 +29,10 @@ const ISSUE_PRIORITIES = new Set(['urgent', 'high', 'medium', 'low', 'none'])
 
 function isNonNegativeSafeInteger(value: unknown): value is number {
   return Number.isSafeInteger(value) && (value as number) >= 0
+}
+
+function isPositiveSafeInteger(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) > 0
 }
 
 function isSafeDeclaredIssue(
@@ -84,10 +99,33 @@ function isOfficeInboxDutyExcursion(value: unknown): value is OfficeInboxDutyExc
   if (!value || typeof value !== 'object') return false
   const candidate = value as Record<string, unknown>
   if (!isInboxDuty(candidate.duty)) return false
+  if (!candidate.shift || typeof candidate.shift !== 'object' || Array.isArray(candidate.shift)) {
+    return false
+  }
+  const shift = candidate.shift as Record<string, unknown>
+  if (Object.keys(shift).length !== 2
+    || !Object.hasOwn(shift, 'position')
+    || !Object.hasOwn(shift, 'total')
+    || !isPositiveSafeInteger(shift.position)
+    || !isPositiveSafeInteger(shift.total)
+    || shift.position > shift.total) {
+    return false
+  }
   return candidate.purpose === 'review'
     && (candidate.phase === 'away'
       || candidate.phase === 'presented'
       || candidate.phase === 'returned')
+}
+
+function notifyOfficeInboxDutyExcursionListeners(): void {
+  for (const listener of [...excursionListeners]) listener()
+}
+
+export function subscribeOfficeInboxDutyExcursion(
+  listener: OfficeInboxDutyExcursionListener,
+): () => void {
+  excursionListeners.add(listener)
+  return () => excursionListeners.delete(listener)
 }
 
 export function readOfficeInboxDutyExcursion(): OfficeInboxDutyExcursion | null {
@@ -107,7 +145,9 @@ export function rememberOfficeInboxDutyExcursion(excursion: OfficeInboxDutyExcur
     window.sessionStorage.setItem(INBOX_DUTY_EXCURSION_KEY, JSON.stringify(excursion))
   } catch {
     // The unread duty remains available when same-tab storage is blocked.
+    return
   }
+  notifyOfficeInboxDutyExcursionListeners()
 }
 
 export function clearOfficeInboxDutyExcursion(): void {
@@ -115,7 +155,9 @@ export function clearOfficeInboxDutyExcursion(): void {
     window.sessionStorage.removeItem(INBOX_DUTY_EXCURSION_KEY)
   } catch {
     // No-op: this state is only a same-tab return checkpoint.
+    return
   }
+  notifyOfficeInboxDutyExcursionListeners()
 }
 
 /**

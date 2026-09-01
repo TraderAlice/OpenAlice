@@ -1071,6 +1071,7 @@ describe('OfficePage localization', () => {
       duty: { id: 'inbox-unread:inbox-a' },
       purpose: 'review',
       phase: 'away',
+      shift: { position: 1, total: 2 },
     })
     expect(useInboxSelection.getState().selectedEntryId).toBe('inbox-a')
     expect(navigateMock).toHaveBeenLastCalledWith('/office/return', {
@@ -1200,6 +1201,7 @@ describe('OfficePage localization', () => {
       },
       purpose: 'review',
       phase: 'away',
+      shift: { position: 1, total: 4 },
     })
     expect(markInboxReadMock).not.toHaveBeenCalled()
   })
@@ -1376,6 +1378,7 @@ describe('OfficePage localization', () => {
       duty: dutyWithRoutine,
       purpose: 'review',
       phase: 'presented',
+      shift: { position: 1, total: 1 },
     })
     issuesMock.mockReturnValue({
       data: {
@@ -1453,6 +1456,7 @@ describe('OfficePage localization', () => {
       duty: inboxCandidate(delivery),
       purpose: 'review',
       phase: 'presented',
+      shift: { position: 1, total: 1 },
     })
     inboxDutiesMock.mockReturnValue({
       status: 'ready',
@@ -1509,6 +1513,7 @@ describe('OfficePage localization', () => {
       duty: inboxCandidate(delivery),
       purpose: 'review',
       phase: 'presented',
+      shift: { position: 1, total: 1 },
     })
     inboxDutiesMock.mockReturnValue({
       status: 'ready',
@@ -1550,6 +1555,7 @@ describe('OfficePage localization', () => {
       duty: inboxCandidate(delivery),
       purpose: 'review',
       phase: 'presented',
+      shift: { position: 1, total: 1 },
     })
     inboxDutiesMock.mockReturnValue({
       status: 'ready',
@@ -1597,6 +1603,7 @@ describe('OfficePage localization', () => {
       duty: inboxCandidate(deliveryA),
       purpose: 'review',
       phase: 'presented',
+      shift: { position: 1, total: 2 },
     })
     inboxDutiesMock.mockReturnValue({
       status: 'ready',
@@ -1686,6 +1693,7 @@ describe('OfficePage localization', () => {
       duty: inboxCandidate(delivery),
       purpose: 'review',
       phase: 'presented',
+      shift: { position: 1, total: 1 },
     })
     inboxDutiesMock.mockReturnValue({
       status: 'ready',
@@ -1717,6 +1725,7 @@ describe('OfficePage localization', () => {
       duty: inboxCandidate(deliveryA),
       purpose: 'review',
       phase: 'presented',
+      shift: { position: 1, total: 2 },
     })
     inboxDutiesMock.mockReturnValue({
       status: 'ready',
@@ -1743,6 +1752,7 @@ describe('OfficePage localization', () => {
       duty: inboxCandidate(deliveryA),
       purpose: 'review',
       phase: 'presented',
+      shift: { position: 1, total: 2 },
     })
     inboxDutiesMock.mockReturnValue({
       status: 'ready',

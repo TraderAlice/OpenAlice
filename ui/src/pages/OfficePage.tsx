@@ -533,8 +533,18 @@ export function OfficePage() {
   }
 
   const openInboxDuty = (duty: OfficeInboxDutyCandidate) => {
-    const excursion: OfficeInboxDutyExcursion = { duty, purpose: 'review', phase: 'away' }
-    rememberOfficeInboxDutyExcursion(excursion)
+    const excursion: OfficeInboxDutyExcursion | null = officeShift.position !== null
+      && officeShift.position > 0
+      && officeShift.position <= officeShift.total
+      ? {
+          duty,
+          purpose: 'review',
+          phase: 'away',
+          shift: { position: officeShift.position, total: officeShift.total },
+        }
+      : null
+    if (excursion) rememberOfficeInboxDutyExcursion(excursion)
+    else clearOfficeInboxDutyExcursion()
     inboxExcursionRef.current = excursion
     setInboxDuty(null)
     setSelected(null)

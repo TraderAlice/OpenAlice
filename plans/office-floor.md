@@ -6343,6 +6343,45 @@ Office-Day persistence and harvest meter (2026-09-01, implementation complete; n
   closing the dossier left progress unchanged and the browser reported no warnings or errors. The 390×844 and 844×390
   real-Project passes remain pending because the current browser-control surface cannot resize this tab.
 
+External evidence escort (2026-09-01, implementation complete):
+
+- Real Default AliceProject play opened the current `2/4` routine report in an Inbox with 100 historical entries. The
+  exact report was selected and remained honestly unread, but the Office shift, position, and return action disappeared
+  from the reading surface. The player had to remember that Inbox was a temporary evidence stop and find Office again in
+  the Activity Bar. This is a guidance break: the product exposed the evidence but abandoned the daily ritual around it.
+- Compared relying on the existing Activity Bar, automatically returning as soon as the report is presented, and an
+  Office-owned escort ribbon across external review surfaces. The rail adds no context in a crowded Inbox; auto-return
+  interrupts attachment reading and removes agency. This autonomous increment chooses the escort ribbon because it
+  preserves the task's why, finite-shift position, and explicit return without duplicating Inbox or claiming completion.
+- The excursion checkpoint freezes the exact duty plus its `n/N` shift context. Only an Office-launched Inbox review may
+  create it; ordinary Inbox and Decision Desk visits remain untouched. The ribbon is visible outside Office while that
+  checkpoint exists on the exact Inbox item or a captured document, and returns by explicitly focusing the existing
+  Office tab. URL sync replaces the external route; no browser-history guess or duplicate Office tab is required.
+  It never marks an Inbox row read, advances the Office Day, opens an Issue, auto-navigates, or infers diligence from
+  route, selection, dwell time, scrolling, or attachment access. Returning before presentation remains a safe cancel.
+- Presentation owns a shared Office primitive rather than a second Inbox component: compact 16-bit mission-strip chrome,
+  exact title clamped to two lines, one native 44px return button, and no looping motion. Desktop uses one horizontal row;
+  phone and short-landscape modes keep a single ellipsized row without horizontal overflow. A stable live region politely
+  announces its context, does not steal focus or intercept Escape, and reduced motion removes its finite arrival transition.
+  Office itself hides the ribbon,
+  leaving the dossier and floor as the only in-world focus owners.
+- State ownership stays ephemeral and same-tab. The unreleased excursion shape advances directly to a strict new version;
+  same-tab change events make presentation/clear updates reactive, while the Project-owned Office Day remains the sole
+  durable progress authority. Inbox replaces its generic header only for the exact Office excursion; File Viewer mounts
+  the same primitive beneath its path header. State, styling, navigation behavior, and surface matching remain owned under
+  `ui/src/office/`; the singleton module opts into the existing full-reload HMR guard so listeners cannot split in dev.
+- Real Default AliceProject acceptance walked Alice to the current `2/4` Asia rotation report inside an Inbox with 100
+  historical entries. The ribbon showed the exact title and Routine report context in a 62px strip; its action measured
+  44px high, document and body scroll widths matched the 1280px viewport, and the long title stayed clipped inside its
+  reading column. A full Inbox reload restored that same older report instead of selecting the newest row; its explicit
+  exit then restored the exact Step 2 dossier. The Inbox badge remained 10 unread and the shift remained `2/4`; closing
+  the dossier still made no receipt or progress mutation.
+- Focused excursion, Inbox, File Viewer, Office Page, sidebar, and responsive-style verification passes 8 files / 144
+  tests. Root and UI TypeScript pass; the complete monorepo suite passes 664 files / 5,896 tests (two files and thirteen
+  tests skipped); the production build passes with only the existing local-ports fallback, direct-eval, and large-chunk
+  advisories. Responsive CSS contracts cover 390px and short landscape; a real viewport resize remains unavailable in
+  the current in-app browser-control surface.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、Overview groups、employee dialog 和 pause/log

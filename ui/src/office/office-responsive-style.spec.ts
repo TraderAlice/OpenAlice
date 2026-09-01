@@ -135,6 +135,22 @@ describe('Office responsive style contract', () => {
     )
   })
 
+  it('keeps the external duty escort compact, touch-safe, and finite', () => {
+    expect(css).toMatch(
+      /\.oa-office-excursion-return__cta\s*\{[^}]*min-height:\s*44px;[^}]*white-space:\s*nowrap;/s,
+    )
+    expect(css).toMatch(
+      /@media \(max-width: 520px\) \{[\s\S]*?\.oa-office-excursion-return__title\s*\{[^}]*text-overflow:\s*ellipsis;[^}]*white-space:\s*nowrap;/s,
+    )
+    expect(css).toMatch(
+      /@media \(max-height: 480px\) and \(orientation: landscape\) \{[\s\S]*?\.oa-office-excursion-return\s*\{[^}]*min-height:\s*52px;/s,
+    )
+    expect(css).toMatch(
+      /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.oa-office-excursion-return,[\s\S]*?animation:\s*none;/s,
+    )
+    expect(css).not.toMatch(/oa-office-excursion-return[^}]*animation-iteration-count:\s*infinite/s)
+  })
+
   it('keeps the cadence review readable and actionable on phone and short landscape stages', () => {
     expect(css).toMatch(
       /\.oa-office-cadence__review,[\s\S]*?\.oa-office-cadence__actions button\s*\{[^}]*min-height:\s*44px;/,

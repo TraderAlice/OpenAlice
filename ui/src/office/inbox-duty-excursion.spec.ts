@@ -8,6 +8,7 @@ import {
   markOfficeInboxDutyPresented,
   readOfficeInboxDutyExcursion,
   rememberOfficeInboxDutyExcursion,
+  subscribeOfficeInboxDutyExcursion,
 } from './inbox-duty-excursion'
 import { inboxUnreadDutyRegistration, type OfficeInboxDutyCandidate } from './duty-registry'
 
@@ -57,7 +58,12 @@ afterEach(() => window.sessionStorage.clear())
 
 describe('Office Inbox duty excursion', () => {
   it('round-trips one exact captured delivery and its return phase', () => {
-    const excursion = { duty: duty(), purpose: 'review' as const, phase: 'away' as const }
+    const excursion = {
+      duty: duty(),
+      purpose: 'review' as const,
+      phase: 'away' as const,
+      shift: { position: 1, total: 2 },
+    }
     rememberOfficeInboxDutyExcursion(excursion)
     expect(readOfficeInboxDutyExcursion()).toEqual(excursion)
 
@@ -74,7 +80,12 @@ describe('Office Inbox duty excursion', () => {
   })
 
   it('does not accept a different or background-defaulted Inbox entry', () => {
-    rememberOfficeInboxDutyExcursion({ duty: duty('inbox-a'), purpose: 'review', phase: 'away' })
+    rememberOfficeInboxDutyExcursion({
+      duty: duty('inbox-a'),
+      purpose: 'review',
+      phase: 'away',
+      shift: { position: 1, total: 2 },
+    })
 
     expect(markOfficeInboxDutyPresented({
       workspaceId: 'chat-1',
@@ -86,7 +97,12 @@ describe('Office Inbox duty excursion', () => {
   it.each(['away', 'presented', 'returned'] as const)(
     'reserves only the exact review target while the %s checkpoint exists',
     (phase) => {
-      rememberOfficeInboxDutyExcursion({ duty: duty('inbox-a'), purpose: 'review', phase })
+      rememberOfficeInboxDutyExcursion({
+        duty: duty('inbox-a'),
+        purpose: 'review',
+        phase,
+        shift: { position: 1, total: 2 },
+      })
 
       expect(isActiveOfficeInboxDutyReviewTarget({
         workspaceId: 'chat-1',
@@ -108,6 +124,37 @@ describe('Office Inbox duty excursion', () => {
       })).toBe(false)
     },
   )
+
+  it('notifies same-tab subscribers after set, presentation, and clear', () => {
+    const snapshots: Array<ReturnType<typeof readOfficeInboxDutyExcursion>> = []
+    const unsubscribe = subscribeOfficeInboxDutyExcursion(() => {
+      snapshots.push(readOfficeInboxDutyExcursion())
+    })
+    const excursion = {
+      duty: duty(),
+      purpose: 'review' as const,
+      phase: 'away' as const,
+      shift: { position: 1, total: 2 },
+    }
+
+    rememberOfficeInboxDutyExcursion(excursion)
+    expect(markOfficeInboxDutyPresented({
+      workspaceId: 'chat-1',
+      inboxEntryId: 'inbox-42',
+    })).toBe(true)
+    clearOfficeInboxDutyExcursion()
+
+    expect(snapshots.map((snapshot) => snapshot?.phase ?? null)).toEqual([
+      'away',
+      'presented',
+      null,
+    ])
+    expect(snapshots[0]?.shift).toEqual({ position: 1, total: 2 })
+
+    unsubscribe()
+    rememberOfficeInboxDutyExcursion(excursion)
+    expect(snapshots).toHaveLength(3)
+  })
 
   it.each([
     (value: Record<string, unknown>) => ({ ...value, purpose: 'unknown' }),
@@ -239,15 +286,45 @@ describe('Office Inbox duty excursion', () => {
       },
     }),
   ])('fails closed for an invalid captured delivery', (mutate) => {
-    const value = mutate({ duty: duty(), purpose: 'review', phase: 'away' })
-    window.sessionStorage.setItem('openalice:office-inbox-duty-excursion:v3', JSON.stringify(value))
+    const value = mutate({
+      duty: duty(),
+      purpose: 'review',
+      phase: 'away',
+      shift: { position: 1, total: 2 },
+    })
+    window.sessionStorage.setItem('openalice:office-inbox-duty-excursion:v4', JSON.stringify(value))
     expect(readOfficeInboxDutyExcursion()).toBeNull()
   })
 
-  it('ignores the retired v2 checkpoint instead of migrating it', () => {
-    window.sessionStorage.setItem('openalice:office-inbox-duty-excursion:v2', JSON.stringify({
+  it.each([
+    undefined,
+    null,
+    {},
+    { position: 0, total: 1 },
+    { position: -1, total: 1 },
+    { position: 1.5, total: 2 },
+    { position: 1, total: 0 },
+    { position: 2, total: 1 },
+    { position: Number.MAX_SAFE_INTEGER + 1, total: Number.MAX_SAFE_INTEGER + 1 },
+    { position: '1', total: 2 },
+    { position: 1, total: 2, unexpected: true },
+  ])('fails closed for an invalid shift checkpoint: %j', (shift) => {
+    window.sessionStorage.setItem('openalice:office-inbox-duty-excursion:v4', JSON.stringify({
       duty: duty(),
+      purpose: 'review',
+      phase: 'away',
+      ...(shift === undefined ? {} : { shift }),
+    }))
+
+    expect(readOfficeInboxDutyExcursion()).toBeNull()
+  })
+
+  it('ignores the retired v3 checkpoint instead of migrating it', () => {
+    window.sessionStorage.setItem('openalice:office-inbox-duty-excursion:v3', JSON.stringify({
+      duty: duty(),
+      purpose: 'review',
       phase: 'presented',
+      shift: { position: 1, total: 2 },
     }))
 
     expect(readOfficeInboxDutyExcursion()).toBeNull()

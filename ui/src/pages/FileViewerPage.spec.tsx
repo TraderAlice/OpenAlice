@@ -4,6 +4,11 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import '../i18n'
+import {
+  readOfficeInboxDutyExcursion,
+  rememberOfficeInboxDutyExcursion,
+} from '../office/inbox-duty-excursion'
+import { inboxUnreadDutyRegistration, type OfficeInboxDutyCandidate } from '../office/duty-registry'
 import { FileViewerPage } from './FileViewerPage'
 
 const mocks = vi.hoisted(() => ({
@@ -12,6 +17,11 @@ const mocks = vi.hoisted(() => ({
   selectTracked: vi.fn(),
   readWorkspaceFile: vi.fn(),
   workspaces: [] as Array<{ id: string; tag: string; displayName?: string }>,
+  returnToOffice: vi.fn(),
+}))
+
+vi.mock('../office/useOfficeInboxDutyReturn', () => ({
+  useOfficeInboxDutyReturn: () => mocks.returnToOffice,
 }))
 
 vi.mock('../contexts/workspaces-context', () => ({
@@ -44,6 +54,7 @@ vi.mock('../components/FileContentView', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
+  window.sessionStorage.clear()
   mocks.readWorkspaceFile.mockResolvedValue({ kind: 'ok', content: 'hello' })
   mocks.workspaces = [{
     id: 'chat-1',
@@ -52,7 +63,10 @@ beforeEach(() => {
   }]
 })
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  window.sessionStorage.clear()
+})
 
 describe('FileViewerPage back navigation', () => {
   it('returns an Ask Alice artifact to the exact Session', () => {
@@ -132,5 +146,40 @@ describe('FileViewerPage back navigation', () => {
       kind: 'tracked',
       params: { entity: 'stock-vst' },
     })
+  })
+
+  it('keeps the exact presented Office report escorted through its file viewer', () => {
+    const duty = inboxUnreadDutyRegistration([{
+      title: 'Weekly evidence report',
+      entry: {
+        id: 'inbox-weekly',
+        ts: 42,
+        workspaceId: 'chat-1',
+        workspaceLabel: 'chat-jul20',
+        docs: [{ path: 'research/note.md' }],
+      },
+    }], 'ready').candidates[0] as OfficeInboxDutyCandidate
+    rememberOfficeInboxDutyExcursion({
+      duty,
+      purpose: 'review',
+      phase: 'presented',
+      shift: { position: 2, total: 4 },
+    })
+
+    render(
+      <FileViewerPage
+        spec={{
+          kind: 'file-viewer',
+          params: { wsId: 'chat-1', path: 'research/note.md', source: 'chat' },
+        }}
+      />,
+    )
+
+    expect(screen.getByRole('region', {
+      name: /Office shift 2 of 4.*Weekly evidence report/,
+    })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Return to Office' }))
+    expect(mocks.returnToOffice).toHaveBeenCalledTimes(1)
+    expect(readOfficeInboxDutyExcursion()?.phase).toBe('presented')
   })
 })

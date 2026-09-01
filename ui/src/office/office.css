@@ -8163,3 +8163,200 @@ button.oa-office-hud__duty:active {
     animation: none;
   }
 }
+
+/*
+ * Office excursion context travels with an exact Inbox report without turning
+ * the reading surface into a second Office dashboard. The component can replace
+ * a page header or sit under a file header, so it owns its GBA palette outside
+ * `.oa-office-page` and keeps one compact, bounded row at every breakpoint.
+ */
+.oa-office-excursion-return {
+  --gba-ink: var(--office-gba-ink-seed, var(--foreground));
+  --gba-ink-soft: var(--office-gba-ink-soft-seed, var(--muted-foreground));
+  --gba-cream: var(--office-gba-cream-seed, var(--card));
+  --gba-paper: var(--office-gba-paper-seed, var(--foreground));
+  --gba-moss-dark: var(--office-gba-moss-dark-seed, var(--primary));
+  --gba-water: var(--office-gba-water-seed, var(--primary));
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  min-height: 60px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 10px;
+  box-sizing: border-box;
+  padding: 6px 8px 6px 10px;
+  border: 3px solid var(--gba-ink);
+  color: var(--gba-ink);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--gba-water) 10%, transparent), transparent 42%),
+    var(--gba-cream);
+  box-shadow:
+    inset 0 0 0 2px color-mix(in srgb, var(--gba-moss-dark) 18%, transparent),
+    0 3px 0 color-mix(in srgb, var(--gba-ink) 28%, transparent);
+  font-family: var(--font-mono);
+  animation: oa-office-excursion-return-in 160ms steps(3, end) both;
+}
+
+.oa-office-excursion-return__copy {
+  display: grid;
+  min-width: 0;
+  align-content: center;
+  gap: 3px;
+}
+
+.oa-office-excursion-return__meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  color: var(--gba-ink-soft);
+  font-size: var(--text-xs);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.oa-office-excursion-return__eyebrow,
+.oa-office-excursion-return__type {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oa-office-excursion-return__eyebrow {
+  flex: none;
+  color: var(--gba-moss-dark);
+}
+
+.oa-office-excursion-return__type {
+  min-width: 0;
+}
+
+.oa-office-excursion-return__type::before {
+  margin-right: 7px;
+  content: "·";
+}
+
+.oa-office-excursion-return__title {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--gba-ink);
+  font-size: var(--text-sm);
+  font-weight: 950;
+  letter-spacing: 0.01em;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.oa-office-excursion-return__cta {
+  display: inline-flex;
+  min-width: 132px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  gap: 7px;
+  padding: 5px 12px;
+  border: 3px solid var(--gba-ink);
+  border-radius: 2px;
+  color: var(--gba-paper);
+  background: var(--gba-moss-dark);
+  box-shadow: 2px 2px 0 color-mix(in srgb, var(--gba-ink) 32%, transparent);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 950;
+  line-height: 1.1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.oa-office-excursion-return__cta > span {
+  font-size: var(--text-base);
+  line-height: 1;
+}
+
+.oa-office-excursion-return__cta:is(:hover, :focus-visible) {
+  color: var(--gba-ink);
+  background: var(--gba-water);
+  outline: 2px solid var(--gba-paper);
+  outline-offset: -5px;
+}
+
+.oa-office-excursion-return__cta:active {
+  box-shadow: none;
+  transform: translate(2px, 2px);
+}
+
+@keyframes oa-office-excursion-return-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 520px) {
+  .oa-office-excursion-return {
+    min-height: 56px;
+    gap: 6px;
+    padding: 5px 6px 5px 8px;
+  }
+
+  .oa-office-excursion-return__meta {
+    gap: 4px;
+  }
+
+  .oa-office-excursion-return__type::before {
+    margin-right: 4px;
+  }
+
+  .oa-office-excursion-return__title {
+    display: block;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .oa-office-excursion-return__cta {
+    min-width: 44px;
+    padding-inline: 9px;
+  }
+}
+
+@media (max-height: 480px) and (orientation: landscape) {
+  .oa-office-excursion-return {
+    min-height: 52px;
+    gap: 6px;
+    padding-block: 4px;
+  }
+
+  .oa-office-excursion-return__title {
+    display: block;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .oa-office-excursion-return__cta {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oa-office-excursion-return,
+  .oa-office-excursion-return__cta {
+    animation: none;
+    transition: none;
+  }
+
+  .oa-office-excursion-return__cta:active {
+    transform: none;
+  }
+}

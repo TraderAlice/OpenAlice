@@ -34,9 +34,10 @@ import { workspaceDisplayName, workspaceDisplayTitle } from '../components/works
 import { presentInboxEntry } from '../lib/inbox-presentation'
 import {
   isActiveOfficeInboxDutyReviewTarget,
-  markOfficeInboxDutyPresented,
   readOfficeInboxDutyExcursion,
 } from '../office/inbox-duty-excursion'
+import { OfficeInboxDutyReturnBar } from '../office/OfficeInboxDutyReturnBar'
+import { useOfficeInboxDutyReturn } from '../office/useOfficeInboxDutyReturn'
 import type { InboxEntry, InboxDoc } from '../api/inbox'
 
 interface InboxPageProps {
@@ -69,20 +70,22 @@ export function InboxPage({ visible }: InboxPageProps) {
   const markRead = useInboxRead((s) => s.markRead)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const returnToOffice = useOfficeInboxDutyReturn()
 
   const capturedOfficeEntry = readOfficeInboxDutyExcursion()?.duty.delivery.entry ?? null
+  const capturedOfficeEntryId = capturedOfficeEntry?.id ?? null
   const selectedFromLive = entries.find((e) => e.id === selectedId) ?? null
   const selected = selectedFromLive
     ?? (capturedOfficeEntry?.id === selectedId ? capturedOfficeEntry : null)
   const pendingDelete = entries.find((e) => e.id === pendingDeleteId) ?? null
 
+  // Selection is normally disposable UI state. An Office field trip is the
+  // exception: after reload, restore its exact captured delivery before an
+  // ordinary Inbox default can sever the route and select a newer row.
   useEffect(() => {
-    if (!visible || !selected) return
-    markOfficeInboxDutyPresented({
-      workspaceId: selected.workspaceId,
-      inboxEntryId: selected.id,
-    })
-  }, [selected, visible])
+    if (!visible || selectedId !== null || !capturedOfficeEntryId) return
+    select(capturedOfficeEntryId)
+  }, [capturedOfficeEntryId, select, selectedId, visible])
 
   /** Hard-delete an entry. The durable DELETE must succeed before the UI
    *  removes anything: a failed destructive action should keep both the
@@ -148,10 +151,28 @@ export function InboxPage({ visible }: InboxPageProps) {
   return (
     <>
       <div className="flex flex-col flex-1 min-h-0">
-        <PageHeader
-          title={t('nav.item.inbox')}
-          description={t('inbox.pageDescription', { count: entries.length })}
-        />
+        {selected ? (
+          <OfficeInboxDutyReturnBar
+            surface={{
+              kind: 'inbox',
+              visible,
+              workspaceId: selected.workspaceId,
+              inboxEntryId: selected.id,
+            }}
+            onReturn={returnToOffice}
+            fallback={(
+              <PageHeader
+                title={t('nav.item.inbox')}
+                description={t('inbox.pageDescription', { count: entries.length })}
+              />
+            )}
+          />
+        ) : (
+          <PageHeader
+            title={t('nav.item.inbox')}
+            description={t('inbox.pageDescription', { count: entries.length })}
+          />
+        )}
         <div className="flex-1 overflow-y-auto min-h-0">
           {loading && entries.length === 0 && !selected ? (
             <InboxLoadingSkeleton />

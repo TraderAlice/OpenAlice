@@ -232,6 +232,30 @@ describe('InboxSidebar search', () => {
 })
 
 describe('InboxSidebar Office review selection', () => {
+  it('restores the captured Office target before the ordinary newest-row default', async () => {
+    const newest = mocks.entries[0]!
+    const captured: InboxEntry = {
+      ...newest,
+      id: 'inbox-office-older-than-feed',
+      ts: newest.ts - 10_000,
+      comments: 'Exact older Office report.',
+    }
+    mocks.mode = 'time'
+    mocks.selectedEntryId = null
+    rememberOfficeInboxDutyExcursion({
+      duty: officeInboxDuty(captured),
+      purpose: 'review',
+      phase: 'presented',
+      shift: { position: 2, total: 4 },
+    })
+
+    render(<InboxSidebar />)
+
+    await vi.waitFor(() => expect(mocks.select).toHaveBeenCalledWith(captured.id))
+    expect(mocks.select).not.toHaveBeenCalledWith(newest.id)
+    expect(mocks.markRead).not.toHaveBeenCalled()
+  })
+
   it.each(['away', 'presented', 'returned'] as const)(
     'does not auto-read the exact Office target while its %s checkpoint is active',
     async (phase) => {
@@ -243,6 +267,7 @@ describe('InboxSidebar Office review selection', () => {
         duty: officeInboxDuty(target),
         purpose: 'review',
         phase,
+        shift: { position: 1, total: 2 },
       })
 
       render(<InboxSidebar />)
@@ -270,6 +295,7 @@ describe('InboxSidebar Office review selection', () => {
       duty: officeInboxDuty(target),
       purpose: 'review',
       phase: 'presented',
+      shift: { position: 1, total: 2 },
     })
 
     render(<InboxSidebar />)
