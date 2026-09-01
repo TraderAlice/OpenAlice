@@ -440,6 +440,18 @@ observable CLI round trip rather than only asserting that files exist. Docker
 build cache is shared infrastructure and is retained; only resources owned by
 the smoke are deleted. Use `--keep` or `--keep-image` for investigation.
 
+`pnpm test:remote:docker` is the corresponding disposable existing-host SSH
+journey. In addition to install, Server lifecycle, tunnel, TUI, and Project
+transfer acceptance, it exercises the layered-readiness contract without
+starting an Agent or contacting a broker: a temporary inert CLI shim must
+appear and disappear through cheap discovery while cached readiness follows
+the exact executable identity, and a transferred configured account whose
+machine-local Broker Pack is absent must remain visible as `needs-install` and
+non-operational. The fixture asserts that the shim was never executed and that
+no Pack installation or trading path ran. `--keep-container` preserves only
+the disposable fixture and prints its scratch SSH credentials for explicit
+investigation; the default path removes the container, owned image, and keys.
+
 Before a release, an operator can add a real multi-turn agent check with a
 credential already stored in the local Alice vault:
 

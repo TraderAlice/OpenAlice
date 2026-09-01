@@ -6,6 +6,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Terminal as Xterm } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
 
+import { useAuth } from '../../auth/AuthContext';
 import {
   parseServerControl,
   type ClientControlMessage,
@@ -206,13 +207,17 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
     );
   }
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const { backendRecoveryGeneration } = useAuth();
   const [status, setStatus] = useState<Status>('connecting');
+  const [closedRecoverable, setClosedRecoverable] = useState(false);
   const [pid, setPid] = useState<number | null>(null);
   const [scrollbackTruncated, setScrollbackTruncated] = useState(false);
   const [exitInfo, setExitInfo] = useState<ExitInfo | null>(null);
   const [childExited, setChildExited] = useState(false);
   const takeoverNextAttachRef = useRef(false);
   const connectRef = useRef<(() => void) | null>(null);
+  const retryRecoverableRef = useRef<(() => void) | null>(null);
+  const observedBackendRecoveryGenerationRef = useRef(backendRecoveryGeneration);
 
   const wsId = props.wsId;
   const wsUrl = props.wsUrl;
@@ -239,6 +244,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
     if (!container) return undefined;
 
     setStatus('connecting');
+    setClosedRecoverable(false);
     setPid(null);
     setScrollbackTruncated(false);
     setExitInfo(null);
@@ -308,6 +314,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
     let activeWs: SocketLike | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
     let attempts = 0;
+    let recoverableTransportFailure = false;
     let hasConnectedOnce = false;
     let teardown = false;
     let resizeObserver: ResizeObserver | null = null;
@@ -467,7 +474,9 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
 
     const scheduleReconnect = (): void => {
       if (teardown) return;
+      recoverableTransportFailure = true;
       if (attempts >= RECONNECT_MAX_ATTEMPTS) {
+        setClosedRecoverable(true);
         setStatus('closed');
         return;
       }
@@ -511,7 +520,8 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
       setStatus(hasConnectedOnce ? 'reconnecting' : 'connecting');
 
       ws.addEventListener('open', () => {
-        attempts = 0;
+        recoverableTransportFailure = false;
+        setClosedRecoverable(false);
         takeoverNextAttachRef.current = false;
         // A reconnect re-attaches to a live xterm that already shows the
         // pre-drop screen, but the server restores its current snapshot on
@@ -536,6 +546,11 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
           if (!msg) return;
           switch (msg.type) {
             case 'attached':
+              // A transport-level open is not proof that the backend accepted
+              // this Session. Only the authoritative attached frame retires
+              // the reconnect history; open-then-close loops must still
+              // exhaust the bounded retry budget.
+              attempts = 0;
               setPid(msg.pid);
               setScrollbackTruncated(msg.scrollbackTruncated);
               kittyKeyboardMode.scan(`\x1b[=${msg.kittyKeyboardFlags};1u`);
@@ -573,16 +588,28 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
         // or removed). Neither should reconnect: 4001 means another client owns
         // the session, 4404 means it's gone.
         if (ev.code === 4001) {
+          recoverableTransportFailure = false;
+          setClosedRecoverable(false);
           setStatus('kicked');
           return;
         }
         if (ev.code === 4409) {
+          recoverableTransportFailure = false;
+          setClosedRecoverable(false);
           setStatus('locked');
           return;
         }
         if (ev.code === 4404) {
+          recoverableTransportFailure = false;
+          setClosedRecoverable(false);
           onSessionLostRef.current?.();
           setStatus('closed');
+          return;
+        }
+        if (ev.code === 4401 || ev.code === 4403) {
+          recoverableTransportFailure = false;
+          setClosedRecoverable(false);
+          setStatus('error');
           return;
         }
         if (teardown) return;
@@ -594,6 +621,16 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
       ws.addEventListener('error', () => {});
     }
     connectRef.current = connect;
+    const retryRecoverableConnection = (): void => {
+      if (teardown || !recoverableTransportFailure) return;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      reconnectTimer = undefined;
+      attempts = 0;
+      recoverableTransportFailure = false;
+      setClosedRecoverable(false);
+      connect();
+    };
+    retryRecoverableRef.current = retryRecoverableConnection;
 
     const stdinSub = term.onData(sendStdin);
     const binarySub = term.onBinary((d) => {
@@ -648,11 +685,18 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
         // ignore
       }
       if (connectRef.current === connect) connectRef.current = null;
+      if (retryRecoverableRef.current === retryRecoverableConnection) retryRecoverableRef.current = null;
       if (applyAppearanceRef.current === applyAppearance) applyAppearanceRef.current = null;
       webgl?.dispose();
       term.dispose();
     };
   }, [wsId, sessionId, wsUrl, props.renderer]);
+
+  useEffect(() => {
+    if (observedBackendRecoveryGenerationRef.current === backendRecoveryGeneration) return;
+    observedBackendRecoveryGenerationRef.current = backendRecoveryGeneration;
+    retryRecoverableRef.current?.();
+  }, [backendRecoveryGeneration]);
 
   return (
     <div className={`terminal-shell${props.chrome === 'canvas' ? ' is-canvas' : ''}`}>
@@ -687,6 +731,17 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
             title="take over this session"
           >
             take over
+          </button>
+        )}
+        {status === 'closed' && closedRecoverable && (
+          <button
+            type="button"
+            className="terminal-header-action"
+            onClick={() => retryRecoverableRef.current?.()}
+            aria-label="retry this terminal connection"
+            title="retry this terminal connection"
+          >
+            retry
           </button>
         )}
         {props.headerActions && (

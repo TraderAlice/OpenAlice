@@ -570,6 +570,8 @@ export interface AgentInfo {
   readonly installed?: boolean;
   /** Absolute path the CLI resolved to, when installed. */
   readonly binPath?: string | null;
+  /** Opaque identity for the currently resolved executable. */
+  readonly fingerprint?: string | null;
 }
 
 export type AgentRuntimeReadinessStatus =
@@ -602,6 +604,7 @@ export interface AgentRuntimeReadinessRow {
   readonly displayName: string;
   readonly installed: boolean;
   readonly binPath: string | null;
+  readonly fingerprint?: string | null;
   readonly status: AgentRuntimeReadinessStatus;
   readonly ready: boolean;
   readonly source: AgentRuntimeReadinessSource;
@@ -877,6 +880,8 @@ export interface WorkspaceSessionDirectoryEntry {
     readonly model?: string;
     readonly reasoningEffort?: ModelReasoningEffort;
   };
+  /** Backend-authoritative title with internal launch wrappers projected away. */
+  readonly presentationTitle?: string;
   readonly latestExecution?: {
     readonly taskId: string;
     readonly status: 'running' | 'done' | 'failed' | 'interrupted';

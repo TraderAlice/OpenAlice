@@ -204,6 +204,7 @@ export const zh: Resources = {
         due: '已到运行时间，正在等待派发。',
         running: '计划任务正在运行。',
         healthy: '最近一次计划任务已完成。',
+        runtimeMissing: '这台主机尚未安装 {{agent}}。请在下次计划运行前完成安装。',
         missingSession: '指定的会话不存在。请选择活跃会话或“每次运行都新建会话”。',
         retiredSession: '指定的会话已归档。请在下次运行前重新分配议题。',
         unboundSession: '指定的会话还没有可恢复的运行时对话。',
@@ -391,6 +392,11 @@ export const zh: Resources = {
     about: {
       title: '关于 OpenAlice',
       description: '查看当前安装、运行环境、更新状态，以及此处打开的 AliceProject。',
+      connection: {
+        title: '后端连接',
+        description: '此浏览器正通过 SSH 隧道连接远端 OpenAlice Runtime。',
+        connected: '已连接',
+      },
       aliceProject: {
         title: '当前 AliceProject',
         description: '拥有此数据目录、Guardian、后端与前端入口的顶层项目。',
@@ -474,6 +480,7 @@ export const zh: Resources = {
       recent: '最近使用的位置',
       useAndRestart: '使用并重启',
       browserOnly: '桌面端可以直接选择文件夹；浏览器和开发模式可用以下命令选择同一套边界：',
+      remoteManaged: '此数据目录属于当前连接的远端 Runtime。请在远端主机或其部署服务中管理该位置。',
       lockedByHome: '本次启动被 OPENALICE_HOME 锁定。请先移除该环境变量，再从桌面 UI 切换。',
       lockedByWorkspace: '本次启动固定了 AQ_LAUNCHER_ROOT。请先移除该环境变量，再从桌面 UI 切换完整主目录。',
       loadError: '无法读取桌面端的资料位置设置。',

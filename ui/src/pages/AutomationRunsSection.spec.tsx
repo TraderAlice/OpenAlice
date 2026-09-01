@@ -161,7 +161,7 @@ describe('AutomationRunsSection workspace identity', () => {
 
     const issueTitle = await screen.findByText('Daily portfolio risk scan')
     expect(screen.getByText('Issue')).toBeTruthy()
-    expect(screen.getByText('Inspect every live position and report only material changes.')).toBeTruthy()
+    expect(screen.queryByText('Inspect every live position and report only material changes.')).toBeNull()
     expect(screen.getByRole('button', {
       name: 'Run details, running: Daily portfolio risk scan. codex in quant-desk.',
     })).toBeTruthy()
@@ -169,6 +169,12 @@ describe('AutomationRunsSection workspace identity', () => {
     const article = issueTitle.closest('article')
     expect(article).toBeTruthy()
     fireEvent.click(within(article as HTMLElement).getAllByRole('button')[0]!)
+    const instructions = within(article as HTMLElement)
+      .getByText('Inspect every live position and report only material changes.')
+      .closest('details')
+    expect(instructions?.hasAttribute('open')).toBe(false)
+    fireEvent.click(within(article as HTMLElement).getByText('Task instructions'))
+    expect(instructions?.hasAttribute('open')).toBe(true)
     fireEvent.click(within(article as HTMLElement).getByRole('button', { name: 'Open Issue' }))
 
     expect(mocks.openOrFocus).toHaveBeenCalledWith({
@@ -192,7 +198,8 @@ describe('AutomationRunsSection workspace identity', () => {
 
     render(<AutomationRunsSection />)
 
-    expect((await screen.findByText('departed-daily-scan')).className).toContain('font-mono')
+    expect(await screen.findByText('Departed Daily Scan')).toBeTruthy()
+    expect(screen.getByTitle(`Issue: departed-daily-scan · ${liveWorkspace.id}`)).toBeTruthy()
   })
 
   it('identifies an Issue comment follow-up as a reply to its owning Issue', async () => {
@@ -232,6 +239,8 @@ describe('AutomationRunsSection workspace identity', () => {
 
     expect(await screen.findByText('Daily portfolio risk scan')).toBeTruthy()
     expect(screen.getByText('Reply')).toBeTruthy()
+    expect(screen.getByText('What changed?')).toBeTruthy()
+    expect(screen.queryByText('Reconstruct the Issue context and answer the new comment.')).toBeNull()
   })
 })
 
@@ -274,7 +283,7 @@ describe('AutomationRunsSection run controls', () => {
     render(<AutomationRunsSection />)
 
     fireEvent.click(await screen.findByRole('button', {
-      name: 'Run details, done: daily-risk-scan. codex in quant-desk.',
+      name: 'Run details, done: Daily Risk Scan. codex in quant-desk.',
     }))
 
     expect(screen.getByText('Task instructions').className).toContain('min-h-10')
@@ -284,7 +293,7 @@ describe('AutomationRunsSection run controls', () => {
     expect(screen.getByTestId('runs-load-more').className).toContain('min-h-10')
   })
 
-  it('gives long task instructions a concise accessible name without hiding the visible prompt', async () => {
+  it('gives long task instructions a concise roster identity and keeps the full prompt in details', async () => {
     const omittedTail = 'TAIL_MARKER_THAT_MUST_NOT_BE_READ_FOR_EVERY_RUN'
     const prompt = `Review the latest market snapshot and summarize material changes. ${'Include supporting detail. '.repeat(12)}${omittedTail}`
     mocks.snapshot.mockResolvedValue(snapshot([task({ prompt })]))
@@ -297,12 +306,13 @@ describe('AutomationRunsSection run controls', () => {
     expect(accessibleName).toContain('codex in quant-desk')
     expect(accessibleName).not.toContain(omittedTail)
     expect(accessibleName?.length).toBeLessThan(160)
-    expect(screen.getByText(prompt)).toBeTruthy()
+    expect(screen.queryByText(prompt)).toBeNull()
 
     control.focus()
     await userEvent.keyboard('{Enter}')
     expect(control.getAttribute('aria-expanded')).toBe('true')
     expect(screen.getByText('Task instructions')).toBeTruthy()
+    expect(screen.getByText(prompt)).toBeTruthy()
   })
 
   it('labels an empty stored prompt without exposing a blank control', async () => {
@@ -337,6 +347,12 @@ describe('AutomationRunsSection run controls', () => {
       taskId: 'run-open',
       status: 'done',
       resumable: true,
+      prompt: 'Reconstruct the Issue context, inject target JSON, and continue.',
+      trigger: {
+        kind: 'issue',
+        workspaceId: liveWorkspace.id,
+        issueId: 'daily-risk-scan',
+      },
     })
     let rejectOpen: ((reason?: unknown) => void) | undefined
     mocks.snapshot.mockResolvedValue(snapshot([resumable]))
@@ -353,6 +369,11 @@ describe('AutomationRunsSection run controls', () => {
     fireEvent.click(openButton)
 
     expect(mocks.openHeadlessRun).toHaveBeenCalledTimes(1)
+    expect(mocks.openHeadlessRun).toHaveBeenCalledWith(
+      liveWorkspace.id,
+      resumable.resumeId,
+      { title: 'Daily Risk Scan' },
+    )
     expect((screen.getByRole('button', { name: 'Opening…' }) as HTMLButtonElement).disabled).toBe(true)
 
     await act(async () => rejectOpen?.(new Error('Session service is unavailable')))

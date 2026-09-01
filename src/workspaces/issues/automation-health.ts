@@ -1,5 +1,5 @@
 import type { HeadlessTaskStatus } from '../headless-task-registry.js'
-import type { IssueStatus } from './declaration.js'
+import { issueAssigneeResumeId, type IssueStatus } from './declaration.js'
 import type { IssueRunFailure } from './run-failure.js'
 
 /** Operational state of a scheduled Issue. This is a live projection, never a
@@ -19,19 +19,67 @@ export type IssueAutomationHealthState =
 export interface IssueAutomationHealth {
   state: IssueAutomationHealthState
   message: string
+  /** Machine-readable reason for a blocked schedule. */
+  blocker?: {
+    kind: 'agent_runtime_missing'
+    agent: string
+    displayName: string
+  }
   /** Latest scheduled execution, when one exists. Useful to jump from a health
    * warning to the authoritative run log without guessing from timestamps. */
   latestTaskId?: string
 }
 
-export type IssueAutomationOwnerState = 'workspace' | 'ready' | 'missing' | 'retired' | 'deleted' | 'unbound'
+export type IssueAutomationOwnerState =
+  | 'workspace'
+  | 'ready'
+  | 'missing'
+  | 'retired'
+  | 'deleted'
+  | 'unbound'
+  | 'workspace_missing'
+
+type ExactIssueAutomationOwnerState = Exclude<IssueAutomationOwnerState, 'workspace'>
+
+/** Map the authoritative exact-Session projection onto scheduler health. The
+ * projection already owns Workspace presence, lifecycle, deletion, and native
+ * resume availability, so health must not re-derive a weaker answer from only
+ * the resume registry. */
+export function issueAutomationOwnerState(
+  assignee: string,
+  assigneeSession?: { state: ExactIssueAutomationOwnerState },
+): IssueAutomationOwnerState {
+  if (!issueAssigneeResumeId(assignee)) return 'workspace'
+  return assigneeSession?.state ?? 'missing'
+}
 
 export interface IssueAutomationHealthInput {
   status: IssueStatus
   nowMs: number
   nextDueAtMs: number | null
   ownerState: IssueAutomationOwnerState
+  /** Effective runtime after resolving exact Session, Issue override, then Workspace default. */
+  runtime?: { agent: string; displayName: string; installed: boolean }
   latestRun?: { taskId: string; status: HeadlessTaskStatus; failure?: IssueRunFailure }
+}
+
+/** Resolve the Agent whose executable will service the next scheduled fire.
+ * The caller supplies the exact Session Agent when applicable; otherwise the
+ * Issue override and Workspace/default chain apply in order. */
+export function issueAutomationRuntime(input: {
+  sessionAgent?: string
+  issueAgent?: string
+  defaultAgent?: string
+  availability: Readonly<Record<string, { installed: boolean } | undefined>>
+  displayNameFor(agent: string): string | undefined
+}): { agent: string; displayName: string; installed: boolean } | undefined {
+  const agent = input.sessionAgent ?? input.issueAgent ?? input.defaultAgent
+  if (!agent) return undefined
+  return {
+    agent,
+    displayName: input.displayNameFor(agent) ?? agent,
+    installed: input.availability[agent]?.installed ?? false,
+  }
 }
 
 /** Derive one scheduler-health answer from authoritative stores. Ordering is
@@ -60,6 +108,20 @@ export function issueAutomationHealth(input: IssueAutomationHealthInput): IssueA
   }
   if (input.ownerState === 'unbound') {
     return withLatest({ state: 'blocked', message: 'Assigned Session has no resumable runtime conversation yet.' })
+  }
+  if (input.ownerState === 'workspace_missing') {
+    return withLatest({ state: 'blocked', message: 'Assigned Session Workspace is unavailable. Restore it or reassign the Issue before its next run.' })
+  }
+  if (input.runtime && !input.runtime.installed) {
+    return withLatest({
+      state: 'blocked',
+      message: `${input.runtime.displayName} is not installed or not on PATH. Install it before the next scheduled run.`,
+      blocker: {
+        kind: 'agent_runtime_missing',
+        agent: input.runtime.agent,
+        displayName: input.runtime.displayName,
+      },
+    })
   }
   if (latest?.status === 'interrupted' || latest?.failure?.kind === 'system_paused') {
     return {
