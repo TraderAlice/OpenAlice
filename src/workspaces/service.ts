@@ -101,6 +101,7 @@ import {
   type IssuesSnapshotWorkspace,
   type WikilinkIssueRef,
 } from './issues/board.js';
+import { projectIssueAssigneeSession } from './issues/assignee-session.js';
 import {
   buildWorkspaceSessionDirectory,
   connectorDeskRosterExclusions,
@@ -361,7 +362,7 @@ import {
   type SessionRecord,
 } from './session-registry.js';
 import { ProductSessionCoordinator } from './product-session-coordinator.js';
-import { projectPublicSession, projectPublicSessionRuntime } from './public-session.js';
+import { projectPublicSession } from './public-session.js';
 import { NativeSessionTitleResolver } from './session-title-resolver.js';
 import { buildCliPath, buildSpawnEnv } from './spawn-env.js';
 import { TemplateRegistry } from './template-registry.js';
@@ -1123,35 +1124,20 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       await resolveDefaultAgentId(wsMeta);
   };
 
-  const projectIssueAssigneeSession = (assignee: string): IssueAssigneeSession | undefined => {
+  const resolveIssueAssigneeSession = (assignee: string): IssueAssigneeSession | undefined => {
     const resumeId = issueAssigneeResumeId(assignee);
     if (!resumeId) return undefined;
     const identity = resumeRegistry.get(resumeId);
-    if (!identity) return { resumeId, state: 'missing', active: false };
-    const workspace = registry.get(identity.wsId);
-    const presence = sessionPresence(identity);
-    const state: IssueAssigneeSession['state'] = identity.lifecycle === 'retired'
-      ? 'retired'
-      : presence === 'deleted'
-        ? 'deleted'
-        : !workspace
-          ? 'workspace_missing'
-          : identity.agentSessionId
-            ? 'ready'
-            : 'unbound';
-    return {
-      resumeId,
-      state,
+    const workspace = identity ? registry.get(identity.wsId) : undefined;
+    return projectIssueAssigneeSession({
+      assignee,
+      ...(identity ? { identity } : {}),
       ...(workspace ? { workspace: { id: workspace.id, tag: workspace.tag } } : {}),
-      agent: identity.agent,
-      ...(identity.displayName ? { displayName: identity.displayName } : {}),
-      createdAt: identity.createdAt,
-      updatedAt: identity.updatedAt,
-      active: state === 'ready' && activeResumeIds.has(resumeId),
-      ...(identity.runtimeBinding
-        ? { runtime: projectPublicSessionRuntime(identity.runtimeBinding) }
+      ...(identity
+        ? { interactive: sessionRegistry.findByResumeId(identity.wsId, resumeId) }
         : {}),
-    };
+      headlessActive: activeResumeIds.has(resumeId),
+    });
   };
 
   const issueRuntimeAvailability = (
@@ -2399,6 +2385,13 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           }
           return { wsId: ws.id, tag: ws.tag, status: 'invalid', error: res.error, issues: [] };
         }
+        const ownerWorkspaceIds = new Set(
+          res.issues
+            .map((issue) => issueAssigneeResumeId(issue.assignee))
+            .map((resumeId) => resumeId ? resumeRegistry.get(resumeId)?.wsId : undefined)
+            .filter((wsId): wsId is string => Boolean(wsId)),
+        );
+        await Promise.all([...ownerWorkspaceIds].map((wsId) => sessionRegistry.ensureLoaded(wsId)));
         await observeIssueRecords(ws, res.issues);
         const needsDefaultAgent = res.issues.some((issue) =>
           Boolean(issue.when) && !issueAssigneeResumeId(issue.assignee) && !issue.agent,
@@ -2420,7 +2413,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
             scheduleMarkers.getHeld(ws.id, issue.id) ?? null,
           );
           const latestRun = headlessTasks.list({ issue: { workspaceId: ws.id, issueId: issue.id } })[0];
-          const assigneeSession = projectIssueAssigneeSession(issue.assignee);
+          const assigneeSession = resolveIssueAssigneeSession(issue.assignee);
           return snapshotBoardIssue(
             issue,
             {
@@ -2460,7 +2453,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     await observeIssueRecords(ws, res.issues);
     const issue = res.issues.find((i) => i.id === id);
     if (!issue) return null;
-    const assigneeSession = projectIssueAssigneeSession(issue.assignee);
+    const ownerResumeId = issueAssigneeResumeId(issue.assignee);
+    const ownerIdentity = ownerResumeId ? resumeRegistry.get(ownerResumeId) : undefined;
+    if (ownerIdentity) await sessionRegistry.ensureLoaded(ownerIdentity.wsId);
+    const assigneeSession = resolveIssueAssigneeSession(issue.assignee);
     const defaultIssueAgent = issue.when && !issueAssigneeResumeId(issue.assignee) && !issue.agent
       ? await resolveIssueDefaultAgentId(ws)
       : undefined;

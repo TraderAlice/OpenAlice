@@ -13,6 +13,7 @@ import { sessionPreferredTitle, type SessionRecord } from './session-registry.js
 import type { SessionCreatedBy } from './session-metadata.js'
 import { projectSessionPresentationTitle } from './session-presentation.js'
 import {
+  isInteractiveSessionActive,
   projectPublicSessionRuntime,
   type PublicSessionRuntime,
 } from './public-session.js'
@@ -114,8 +115,7 @@ export function buildWorkspaceSessionDirectory(input: {
     sessions: input.identities.map((identity) => {
       const execution = input.latestExecutionFor(identity.resumeId)
       const interactive = input.interactiveFor(identity.resumeId)
-      const interactiveActive = interactive?.surface !== 'headless'
-        && interactive?.state === 'running'
+      const interactiveActive = isInteractiveSessionActive(interactive)
       const interactiveTitle = interactive ? sessionPreferredTitle(interactive) : undefined
       const presentationTitle = interactive
         ? projectSessionPresentationTitle({
