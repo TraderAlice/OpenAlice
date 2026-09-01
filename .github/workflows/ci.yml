@@ -32,8 +32,24 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       cross_platform: ${{ steps.changes.outputs.cross_platform }}
+      beta_release_prep: ${{ steps.beta-release-prep.outcome == 'success' && steps.beta-release-prep.outputs.beta_release_prep || 'false' }}
 
     steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'schedule' && 'dev' || '' }}
+
+      - name: Detect exact beta release preparation
+        id: beta-release-prep
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git show "${BASE_SHA}:scripts/classify-beta-release-prep.mjs" > "$RUNNER_TEMP/classify-beta-release-prep.mjs"
+          node "$RUNNER_TEMP/classify-beta-release-prep.mjs" --github-output "$GITHUB_OUTPUT"
+
       - name: Classify changed paths
         id: changes
         uses: actions/github-script@v9
@@ -141,7 +157,16 @@ jobs:
   # green check from shipping regressions to macOS or Windows users.
   cross-platform-test:
     needs: change-scope
-    if: needs.change-scope.outputs.cross_platform == 'true'
+    if: >-
+      !cancelled() &&
+      (github.event_name != 'push' || github.ref == 'refs/heads/master') &&
+      (
+        needs.change-scope.result != 'success' ||
+        (
+          needs.change-scope.outputs.cross_platform == 'true' &&
+          needs.change-scope.outputs.beta_release_prep != 'true'
+        )
+      )
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -177,7 +202,16 @@ jobs:
   # diff, not a harness bug. See scripts/guardian/smoke.ts.
   dev-smoke:
     needs: change-scope
-    if: needs.change-scope.outputs.cross_platform == 'true'
+    if: >-
+      !cancelled() &&
+      (github.event_name != 'push' || github.ref == 'refs/heads/master') &&
+      (
+        needs.change-scope.result != 'success' ||
+        (
+          needs.change-scope.outputs.cross_platform == 'true' &&
+          needs.change-scope.outputs.beta_release_prep != 'true'
+        )
+      )
     strategy:
       fail-fast: false
       matrix:

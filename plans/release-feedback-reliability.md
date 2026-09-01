@@ -105,7 +105,7 @@ versioned release lane.
 - [ ] Release status presents one coherent view of publication and CI evidence,
   so a green release beside an unrelated red duplicate workflow is no longer
   the normal successful path.
-- [ ] An exact two-manifest release-preparation PR takes the bounded semantic
+- [x] An exact two-manifest release-preparation PR takes the bounded semantic
   fast lane, while near misses demonstrably fall back to the ordinary full PR
   matrix.
 - [ ] Successful beta timing is measured before and after the channel split;
@@ -129,7 +129,7 @@ versioned release lane.
   compatibility contract.
 - [x] Implement and validate the beta/stable release split while retaining
   downloadable desktop candidates for three days.
-- [ ] Add the exact release-preparation semantic classifier and use it to skip
+- [x] Add the exact release-preparation semantic classifier and use it to skip
   only redundant host/package PR jobs, never the final Release gates.
 - [ ] Define the signed accepted-tree receipt, trust boundary, invalidation
   rules, and hotfix fallback.
@@ -179,6 +179,17 @@ Docker, unsigned desktop, and CLI host matrices; its independent Linux
 build/test completed in under four minutes. That evidence motivates the strict
 semantic release-preparation fast lane above rather than a title-, label-, or
 commit-message bypass.
+
+PR #1271's exact two-manifest bump consumed about 72 runner-minutes across 18
+Actions checks, with the Windows desktop package lane setting a roughly
+15-minute wall-clock path. The semantic fast lane keeps Linux build/test plus
+the desktop workflow-contract/typecheck preflight and removes roughly 65 of
+those runner-minutes; its expected PR wall time is about four minutes. The
+classifier executes from the trusted base commit and accepts only a byte-exact,
+synchronized, forward beta version change. Stable bumps, near misses, and
+classifier failures run the complete suite. `master` push reuse remains out of
+scope until the accepted-tree receipt can prove the associated PR, tree, and
+successful checks without adding an ad hoc trust tower.
 
 ## Completion
 
