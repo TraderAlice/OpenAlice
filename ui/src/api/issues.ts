@@ -49,6 +49,11 @@ export type IssueAutomationHealthState =
 export interface IssueAutomationHealth {
   state: IssueAutomationHealthState
   message: string
+  blocker?: {
+    kind: 'agent_runtime_missing'
+    agent: string
+    displayName: string
+  }
   latestTaskId?: string
 }
 export type IssueProvenanceAction = 'created' | 'updated' | 'commented' | 'sent' | 'decided' | 'reconstructed'
@@ -276,9 +281,28 @@ export interface IssueDetailIssue {
   telegramConnector?: true
 }
 
+export interface IssueAssigneeSession {
+  resumeId: string
+  state: 'ready' | 'missing' | 'retired' | 'deleted' | 'unbound' | 'workspace_missing'
+  workspace?: { id: string; tag: string }
+  agent?: string
+  displayName?: string
+  createdAt?: number
+  updatedAt?: number
+  active: boolean
+  runtime?: {
+    credentialSource: 'native' | 'vault' | 'workspace'
+    credentialSlug?: string
+    model?: string
+    reasoningEffort?: ModelReasoningEffort
+  }
+}
+
 /** GET /api/issues/:wsId/:id — one issue + Activity, Runs, and reports. */
 export interface IssueDetail {
   issue: IssueDetailIssue
+  /** Authoritative global lookup for an exact @resume assignee. */
+  assigneeSession?: IssueAssigneeSession
   /** Structured markdown comments from `<id>.comments.json`. */
   comments?: IssueComment[]
   /** This issue's headless runs (wsId + issueId match), newest first. */

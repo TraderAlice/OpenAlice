@@ -62,9 +62,12 @@ import {
   notInstalledRuntimeReadinessRow,
   readyRuntimeReadinessRow,
   runtimeProbeSucceeded,
+  shareRuntimeReadinessProbe,
   snapshotRuntimeReadiness,
   RUNTIME_READINESS_PROMPT,
   RUNTIME_READINESS_TIMEOUT_MS,
+  type AgentRuntimeReadinessProbeAuthority,
+  type AgentRuntimeReadinessProbeInFlight,
   type AgentRuntimeReadinessRow,
   type AgentRuntimeReadinessSnapshot,
   type AgentRuntimeReadinessSource,
@@ -90,6 +93,7 @@ import {
   issueProvenanceRecords,
   snapshotBoardIssue,
   type IssueDetail,
+  type IssueAssigneeSession,
   issueRunRecord,
   type IssueFiringMarkers,
   type IssuesSnapshot,
@@ -123,7 +127,8 @@ import {
 import { updateIssueFields } from './issues/mutate.js';
 import {
   issueAutomationHealth,
-  type IssueAutomationOwnerState,
+  issueAutomationOwnerState,
+  issueAutomationRuntime,
 } from './issues/automation-health.js';
 import {
   issueAssigneeClaimsFirstSession,
@@ -188,18 +193,6 @@ import {
   type ChatWorkspaceResolution,
   type TemplateWorkspaceResolution,
 } from './chat-workspace-resolver.js';
-
-/** Resolve only the operational facts automation health needs. Product APIs do
- * not expose the runtime-native session id itself. */
-function automationOwnerState(assignee: string, resumes: ResumeRegistry): IssueAutomationOwnerState {
-  const resumeId = issueAssigneeResumeId(assignee);
-  if (!resumeId) return 'workspace';
-  const identity = resumes.get(resumeId);
-  if (!identity) return 'missing';
-  if (identity.lifecycle === 'retired') return 'retired';
-  if (identity.presence === 'deleted') return 'deleted';
-  return identity.agentSessionId ? 'ready' : 'unbound';
-}
 
 function automationLatestRun(task: HeadlessTaskRecord) {
   const failure = issueRunFailure(task);
@@ -366,7 +359,7 @@ import {
   type SessionRecord,
 } from './session-registry.js';
 import { ProductSessionCoordinator } from './product-session-coordinator.js';
-import { projectPublicSession } from './public-session.js';
+import { projectPublicSession, projectPublicSessionRuntime } from './public-session.js';
 import { NativeSessionTitleResolver } from './session-title-resolver.js';
 import { buildCliPath, buildSpawnEnv } from './spawn-env.js';
 import { TemplateRegistry } from './template-registry.js';
@@ -997,6 +990,8 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   const resolveRuntimeWorkspace = (workspaceId: string): WorkspaceMeta | undefined =>
     workspaceId === managerWorkspace.id ? managerWorkspace : registry.get(workspaceId);
   const runtimeReadinessCache = new Map<string, AgentRuntimeReadinessRow>();
+  const runtimeReadinessProbeInFlight = new Map<string, AgentRuntimeReadinessProbeInFlight>();
+  const runtimeReadinessProbeAuthority = new Map<string, AgentRuntimeReadinessProbeAuthority>();
 
   const creator = new WorkspaceCreator({
     workspacesRoot: `${config.launcherRoot}/workspaces`,
@@ -1085,6 +1080,53 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         : null) ??
       validRegisteredRuntime(await readIssueDefaultAgent().catch(() => null)) ??
       await resolveDefaultAgentId(wsMeta);
+  };
+
+  const projectIssueAssigneeSession = (assignee: string): IssueAssigneeSession | undefined => {
+    const resumeId = issueAssigneeResumeId(assignee);
+    if (!resumeId) return undefined;
+    const identity = resumeRegistry.get(resumeId);
+    if (!identity) return { resumeId, state: 'missing', active: false };
+    const workspace = registry.get(identity.wsId);
+    const presence = sessionPresence(identity);
+    const state: IssueAssigneeSession['state'] = identity.lifecycle === 'retired'
+      ? 'retired'
+      : presence === 'deleted'
+        ? 'deleted'
+        : !workspace
+          ? 'workspace_missing'
+          : identity.agentSessionId
+            ? 'ready'
+            : 'unbound';
+    return {
+      resumeId,
+      state,
+      ...(workspace ? { workspace: { id: workspace.id, tag: workspace.tag } } : {}),
+      agent: identity.agent,
+      ...(identity.displayName ? { displayName: identity.displayName } : {}),
+      createdAt: identity.createdAt,
+      updatedAt: identity.updatedAt,
+      active: state === 'ready' && activeResumeIds.has(resumeId),
+      ...(identity.runtimeBinding
+        ? { runtime: projectPublicSessionRuntime(identity.runtimeBinding) }
+        : {}),
+    };
+  };
+
+  const issueRuntimeAvailability = (
+    issue: IssueRecord,
+    defaultAgent: string | undefined,
+    availability: Record<string, AgentAvailability>,
+  ): { agent: string; displayName: string; installed: boolean } | undefined => {
+    const resumeId = issueAssigneeResumeId(issue.assignee);
+    const sessionAgent = resumeId ? resumeRegistry.get(resumeId)?.agent : undefined;
+    return issueAutomationRuntime({
+      ...(sessionAgent ? { sessionAgent } : {}),
+      ...(issue.agent ? { issueAgent: issue.agent } : {}),
+      ...(defaultAgent ? { defaultAgent } : {}),
+      availability,
+      displayNameFor: (agent) => adapters.get(agent)?.displayName,
+    });
   };
 
   /**
@@ -1215,7 +1257,12 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   const getRuntimeAdapters = () => adapters.list().filter(isAgentRuntime);
 
   const getAgentRuntimeReadinessMethod = (): AgentRuntimeReadinessSnapshot =>
-    snapshotRuntimeReadiness(getRuntimeAdapters(), detectAgents(), runtimeReadinessCache);
+    snapshotRuntimeReadiness(
+      getRuntimeAdapters(),
+      detectAgents(),
+      runtimeReadinessCache,
+      runtimeReadinessProbeAuthority,
+    );
 
   const runtimeReadinessSourceFor = (
     adapter: CliAdapter,
@@ -1374,16 +1421,18 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     },
   });
 
-  const runtimeReadinessProbeInFlight = new Map<string, Promise<AgentRuntimeReadinessRow>>();
-
   const executeSingleAgentRuntimeReadinessProbe = async (
     adapter: CliAdapter,
-    availability?: AgentAvailability,
+    availability: AgentAvailability | undefined,
+    mayPublish: () => boolean,
   ): Promise<AgentRuntimeReadinessRow> => {
+    const publish = (row: AgentRuntimeReadinessRow): AgentRuntimeReadinessRow => {
+      if (mayPublish()) runtimeReadinessCache.set(adapter.id, row);
+      return row;
+    };
     if (!availability?.installed) {
       const row = notInstalledRuntimeReadinessRow(adapter, availability);
-      runtimeReadinessCache.set(adapter.id, row);
-      return row;
+      return publish(row);
     }
     if (!adapter.capabilities.headless || !adapter.composeHeadlessCommand) {
       const row = failedRuntimeReadinessRow({
@@ -1391,13 +1440,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         availability,
         result: syntheticRuntimeReadinessFailure('Agent does not support headless probes.'),
       });
-      runtimeReadinessCache.set(adapter.id, row);
-      return row;
+      return publish(row);
     }
 
-    const existing =
-      runtimeReadinessCache.get(adapter.id) ?? initialRuntimeReadinessRow(adapter, availability);
-    runtimeReadinessCache.set(adapter.id, checkingRuntimeReadinessRow(existing));
+    publish(checkingRuntimeReadinessRow(initialRuntimeReadinessRow(adapter, availability)));
 
     const globalSource = runtimeReadinessSourceFor(adapter, availability);
     let lastAttempt: Awaited<ReturnType<typeof runRuntimeReadinessProbeAttempt>> | null = null;
@@ -1411,8 +1457,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           source: lastAttempt.source,
           durationMs: lastAttempt.result.durationMs,
         });
-        runtimeReadinessCache.set(adapter.id, row);
-        return row;
+        return publish(row);
       }
 
       const row = failedRuntimeReadinessRow({
@@ -1423,8 +1468,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           syntheticRuntimeReadinessFailure('The native runtime login or Workspace provider config is not ready.'),
         source: lastAttempt?.source ?? globalSource,
       });
-      runtimeReadinessCache.set(adapter.id, row);
-      return row;
+      return publish(row);
     } catch (err) {
       const row = failedRuntimeReadinessRow({
         adapter,
@@ -1432,26 +1476,21 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         result: syntheticRuntimeReadinessFailure(err instanceof Error ? err.message : String(err)),
         source: lastAttempt?.source ?? globalSource,
       });
-      runtimeReadinessCache.set(adapter.id, row);
-      return row;
+      return publish(row);
     }
   };
 
   const probeSingleAgentRuntimeReadiness = (
     adapter: CliAdapter,
     availability?: AgentAvailability,
-  ): Promise<AgentRuntimeReadinessRow> => {
-    const existing = runtimeReadinessProbeInFlight.get(adapter.id);
-    if (existing) return existing;
-    const probe = executeSingleAgentRuntimeReadinessProbe(adapter, availability);
-    runtimeReadinessProbeInFlight.set(adapter.id, probe);
-    void probe.finally(() => {
-      if (runtimeReadinessProbeInFlight.get(adapter.id) === probe) {
-        runtimeReadinessProbeInFlight.delete(adapter.id);
-      }
-    });
-    return probe;
-  };
+  ): Promise<AgentRuntimeReadinessRow> =>
+    shareRuntimeReadinessProbe(
+      runtimeReadinessProbeInFlight,
+      runtimeReadinessProbeAuthority,
+      adapter.id,
+      availability,
+      (mayPublish) => executeSingleAgentRuntimeReadinessProbe(adapter, availability, mayPublish),
+    );
 
   const readinessTargets = (agentId?: string): CliAdapter[] => {
     const runtimeAdapters = getRuntimeAdapters();
@@ -1485,7 +1524,12 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     await Promise.all(
       targets.map((adapter) => probeSingleAgentRuntimeReadiness(adapter, availability[adapter.id])),
     );
-    return snapshotRuntimeReadiness(getRuntimeAdapters(), detectAgents(), runtimeReadinessCache);
+    return snapshotRuntimeReadiness(
+      getRuntimeAdapters(),
+      detectAgents(),
+      runtimeReadinessCache,
+      runtimeReadinessProbeAuthority,
+    );
   };
 
   const computeSpawnPlan = (
@@ -2301,6 +2345,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   // board's unscheduled work items — and the board is a low-frequency poll.
   const issuesSnapshot = async (): Promise<IssuesSnapshot> => {
     const nowMs = Date.now();
+    const availability = detectAgents();
     const workspaces = await Promise.all(
       registry.list().map(async (ws): Promise<IssuesSnapshotWorkspace> => {
         const res = await readWorkspaceIssues(ws.dir);
@@ -2314,6 +2359,12 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           return { wsId: ws.id, tag: ws.tag, status: 'invalid', error: res.error, issues: [] };
         }
         await observeIssueRecords(ws, res.issues);
+        const needsDefaultAgent = res.issues.some((issue) =>
+          Boolean(issue.when) && !issueAssigneeResumeId(issue.assignee) && !issue.agent,
+        );
+        const defaultIssueAgent = needsDefaultAgent
+          ? await resolveIssueDefaultAgentId(ws)
+          : undefined;
         const issues: IssuesSnapshotIssue[] = res.issues.filter((issue) => !isConnectorDeskIssue(issue)).map((issue) => {
           // Unscheduled ⇒ pure board work item, no firing markers.
           if (!issue.when) return snapshotBoardIssue(issue, null);
@@ -2328,6 +2379,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
             scheduleMarkers.getHeld(ws.id, issue.id) ?? null,
           );
           const latestRun = headlessTasks.list({ issue: { workspaceId: ws.id, issueId: issue.id } })[0];
+          const assigneeSession = projectIssueAssigneeSession(issue.assignee);
           return snapshotBoardIssue(
             issue,
             {
@@ -2337,7 +2389,8 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
                 status: issue.status,
                 nowMs,
                 nextDueAtMs: fired.nextDueAtMs,
-                ownerState: automationOwnerState(issue.assignee, resumeRegistry),
+                ownerState: issueAutomationOwnerState(issue.assignee, assigneeSession),
+                runtime: issueRuntimeAvailability(issue, defaultIssueAgent, availability),
                 ...(latestRun ? { latestRun: automationLatestRun(latestRun) } : {}),
               }),
             },
@@ -2366,6 +2419,13 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     await observeIssueRecords(ws, res.issues);
     const issue = res.issues.find((i) => i.id === id);
     if (!issue) return null;
+    const assigneeSession = projectIssueAssigneeSession(issue.assignee);
+    const defaultIssueAgent = issue.when && !issueAssigneeResumeId(issue.assignee) && !issue.agent
+      ? await resolveIssueDefaultAgentId(ws)
+      : undefined;
+    const runtimeAvailability = issue.when
+      ? issueRuntimeAvailability(issue, defaultIssueAgent, detectAgents())
+      : undefined;
     const commentsResult = await readIssueComments(ws.dir, issue.id);
     const comments = commentsResult.ok ? commentsResult.comments : [];
     if (!commentsResult.ok) {
@@ -2395,7 +2455,8 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         status: issue.status,
         nowMs: Date.now(),
         nextDueAtMs: scheduledSnapshot.nextDueAtMs,
-        ownerState: automationOwnerState(issue.assignee, resumeRegistry),
+        ownerState: issueAutomationOwnerState(issue.assignee, assigneeSession),
+        runtime: runtimeAvailability,
         ...(runs[0] ? {
           latestRun: {
             taskId: runs[0].taskId,
@@ -2428,7 +2489,15 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       artifact: { kind: 'issue', workspaceId: ws.id, issueId: issue.id },
     }));
     const activity = issueActivityRecords(provenance, comments);
-    return { issue: detailIssue(issue, markers), comments, runs, inboxReports, provenance, activity };
+    return {
+      issue: detailIssue(issue, markers),
+      ...(assigneeSession ? { assigneeSession } : {}),
+      comments,
+      runs,
+      inboxReports,
+      provenance,
+      activity,
+    };
   };
 
   const retryingIssueKeys = new Set<string>();
@@ -2599,6 +2668,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           }),
         })
       : new Set<string>();
+    const issueTitles = issueRead.ok
+      ? new Map(issueRead.issues.map((issue) => [issue.id, issue.title] as const))
+      : new Map<string, string>();
     return buildWorkspaceSessionDirectory({
       workspace: { id: ws.id, tag: ws.tag },
       identities: resumeRegistry.list({ wsId, limit }),
@@ -2607,6 +2679,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       isActive: (resumeId) => activeResumeIds.has(resumeId),
       rosterVisibilityFor: (resumeId) => rosterExclusions.has(resumeId) ? 'hidden' : undefined,
       issueAttachedFor: (resumeId) => issueAttachments.has(resumeId) ? true : undefined,
+      issueTitleFor: (workspaceId, issueId) => workspaceId === wsId
+        ? issueTitles.get(issueId)
+        : undefined,
     });
   };
 
@@ -2952,6 +3027,8 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         runtimeBinding: identity.runtimeBinding,
         displayName: identity.displayName,
         presence: sessionPresence(identity),
+        ...(identity.metadata?.createdBy ? { createdBy: identity.metadata.createdBy } : {}),
+        latestExecution: headlessTasks.latestForResumeId(record.resumeId),
       })];
     });
     // Deprecated native-project compatibility-export signals. Retained in the

@@ -27,6 +27,7 @@ import {
 } from '../theme/styleProfiles'
 import { useEffectivePreferenceSlot } from '../theme/useEffectiveTheme'
 import { AboutOpenAliceSection } from '../components/settings/AboutOpenAliceSection'
+import { getBackendConnection } from '../auth/backendConnection'
 
 // ==================== Appearance ====================
 
@@ -562,6 +563,7 @@ export function LanguageSection() {
 export function DataHomeSection() {
   const { t } = useTranslation()
   const bridge = window.openAlice?.dataHome
+  const backendConnection = getBackendConnection()
   const [status, setStatus] = useState<OpenAliceDataHomeStatus | null>(null)
   const [busy, setBusy] = useState(false)
   const [restarting, setRestarting] = useState(false)
@@ -581,13 +583,21 @@ export function DataHomeSection() {
         description={t('settings.dataHome.description')}
       >
         <div className="rounded-lg border border-border/60 bg-secondary/50 px-3 py-3">
-          <p className="text-[13px] text-foreground">{t('settings.dataHome.browserOnly')}</p>
-          <p className="mt-2 break-all font-mono text-[12px] text-muted-foreground">
-            openalice start --home &lt;path&gt;
-          </p>
-          <p className="mt-1 break-all font-mono text-[12px] text-muted-foreground">
-            pnpm dev -- --home &lt;path&gt;
-          </p>
+          {backendConnection.kind === 'remote' ? (
+            <p className="text-[13px] leading-relaxed text-foreground">
+              {t('settings.dataHome.remoteManaged')}
+            </p>
+          ) : (
+            <>
+              <p className="text-[13px] text-foreground">{t('settings.dataHome.browserOnly')}</p>
+              <p className="mt-2 break-all font-mono text-[12px] text-muted-foreground">
+                openalice start --home &lt;path&gt;
+              </p>
+              <p className="mt-1 break-all font-mono text-[12px] text-muted-foreground">
+                pnpm dev -- --home &lt;path&gt;
+              </p>
+            </>
+          )}
         </div>
       </ConfigSection>
     )

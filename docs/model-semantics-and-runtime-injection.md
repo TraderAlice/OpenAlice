@@ -441,6 +441,14 @@ Manager, Session spawn, and Session resume proceed through the selected native
 runtime without waiting for a probe. Onboarding, explicit Retry, and background
 health surfaces may probe and cache the result without becoming a launch gate.
 
+Readiness results are scoped to the executable identity that was probed. Every
+cheap runtime discovery compares installed state, resolved path, and a file
+fingerprint with that cached identity. Installing, removing, replacing, or
+rerouting a CLI invalidates the old probe result back to `unknown` (or
+`not_installed`). Returning focus to the UI refreshes inventory and the cached
+readiness snapshot with GET requests only; an explicit user action remains the
+only path that starts a headless readiness probe.
+
 Choosing an OpenAlice credential is an explicit override. A fresh Session may
 bind that vault reference without writing it into the Workspace or changing the
 runtime's global state. An absent choice means

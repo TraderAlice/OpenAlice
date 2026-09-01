@@ -1187,7 +1187,10 @@ describe('POST /:id/headless/:taskId/session', () => {
     };
     const svc = {
       registry: { get: (id: string) => id === 'ws-1' ? { id, dir: '/w' } : undefined },
-      headlessTasks: { get: (id: string) => id === task.taskId ? task : null },
+      headlessTasks: {
+        get: (id: string) => id === task.taskId ? task : null,
+        latestForResumeId: (resumeId: string) => resumeId === task.resumeId ? task : null,
+      },
       sessionRegistry,
       sessionCoordinator,
       resumeRegistry: {
@@ -1242,7 +1245,7 @@ describe('POST /:id/headless/:taskId/session', () => {
   });
 
   it('opens the same conversation directly by resumeId without a native id in the request', async () => {
-    const { app } = buildHeadlessSession();
+    const { app, records } = buildHeadlessSession();
     const opened = await post(app, '/ws-1/resumes/resume-run-1/session', {
       title: 'Durable Inbox report',
     });
@@ -1252,6 +1255,9 @@ describe('POST /:id/headless/:taskId/session', () => {
       sourceRunId: 'run-1',
       resumeId: 'resume-run-1',
       runtime: { credentialSource: 'native' },
+    });
+    expect(Array.from(records.values())[0]).toMatchObject({
+      fallbackTitle: 'Durable Inbox report',
     });
   });
 

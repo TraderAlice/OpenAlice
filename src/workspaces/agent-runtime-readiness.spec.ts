@@ -1,10 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   classifyRuntimeReadinessFailure,
   failedRuntimeReadinessRow,
+  initialRuntimeReadinessRow,
   runtimeProbeSucceeded,
+  shareRuntimeReadinessProbe,
   snapshotRuntimeReadiness,
+  type AgentRuntimeReadinessProbeAuthority,
+  type AgentRuntimeReadinessProbeInFlight,
   type AgentRuntimeReadinessRow,
 } from './agent-runtime-readiness.js';
 import { emptyAgentSessionRuntime, type CliAdapter } from './cli-adapter.js';
@@ -55,6 +59,157 @@ function result(overrides: Partial<HeadlessTaskResult>): HeadlessTaskResult {
 }
 
 describe('agent runtime readiness helpers', () => {
+  it('shares an in-flight probe only while executable path and fingerprint match', async () => {
+    const inFlight = new Map<string, AgentRuntimeReadinessProbeInFlight>();
+    const authority = new Map<string, AgentRuntimeReadinessProbeAuthority>();
+    const probes = [
+      deferred<AgentRuntimeReadinessRow>(),
+      deferred<AgentRuntimeReadinessRow>(),
+      deferred<AgentRuntimeReadinessRow>(),
+    ];
+    let probeIndex = 0;
+    const start = vi.fn(() => probes[probeIndex++]!.promise);
+    const v1 = { installed: true, path: '/usr/bin/pi', fingerprint: 'pi-v1' };
+    const v2 = { installed: true, path: '/usr/bin/pi', fingerprint: 'pi-v2' };
+    const rerouted = { installed: true, path: '/opt/bin/pi', fingerprint: 'pi-v2' };
+
+    const first = shareRuntimeReadinessProbe(inFlight, authority, 'pi', v1, start);
+    expect(shareRuntimeReadinessProbe(inFlight, authority, 'pi', v1, start)).toBe(first);
+    expect(start).toHaveBeenCalledTimes(1);
+
+    const replacement = shareRuntimeReadinessProbe(inFlight, authority, 'pi', v2, start);
+    expect(replacement).not.toBe(first);
+    expect(start).toHaveBeenCalledTimes(2);
+
+    probes[0]!.resolve(initialRuntimeReadinessRow(piAdapter, v1));
+    await first;
+    await Promise.resolve();
+    expect(shareRuntimeReadinessProbe(inFlight, authority, 'pi', v2, start)).toBe(replacement);
+
+    const reroutedProbe = shareRuntimeReadinessProbe(inFlight, authority, 'pi', rerouted, start);
+    expect(reroutedProbe).not.toBe(replacement);
+    expect(start).toHaveBeenCalledTimes(3);
+
+    probes[1]!.resolve(initialRuntimeReadinessRow(piAdapter, v2));
+    probes[2]!.resolve(initialRuntimeReadinessRow(piAdapter, rerouted));
+    await Promise.all([replacement, reroutedProbe]);
+  });
+
+  it('does not let a retired executable probe overwrite its replacement after v2 finishes first', async () => {
+    const inFlight = new Map<string, AgentRuntimeReadinessProbeInFlight>();
+    const authority = new Map<string, AgentRuntimeReadinessProbeAuthority>();
+    const cache = new Map<string, AgentRuntimeReadinessRow>();
+    const probes = [deferred<AgentRuntimeReadinessRow>(), deferred<AgentRuntimeReadinessRow>()];
+    let probeIndex = 0;
+    const start = vi.fn((mayPublish: () => boolean) => {
+      const probe = probes[probeIndex++]!;
+      return probe.promise.then((row) => {
+        if (mayPublish()) cache.set('pi', row);
+        return row;
+      });
+    });
+    const v1 = { installed: true, path: '/usr/bin/pi', fingerprint: 'pi-v1' };
+    const v2 = { installed: true, path: '/usr/bin/pi', fingerprint: 'pi-v2' };
+
+    const retired = shareRuntimeReadinessProbe(
+      inFlight,
+      authority,
+      'pi',
+      v1,
+      start,
+    );
+    const replacement = shareRuntimeReadinessProbe(
+      inFlight,
+      authority,
+      'pi',
+      v2,
+      start,
+    );
+
+    probes[1]!.resolve(initialRuntimeReadinessRow(piAdapter, v2));
+    await replacement;
+    await Promise.resolve();
+    expect(cache.get('pi')?.fingerprint).toBe('pi-v2');
+    expect(inFlight.has('pi')).toBe(false);
+
+    probes[0]!.resolve(initialRuntimeReadinessRow(piAdapter, v1));
+    await retired;
+    expect(cache.get('pi')?.fingerprint).toBe('pi-v2');
+  });
+
+  it('keeps A1 retired when executable identity cycles from A to B to A2', async () => {
+    const inFlight = new Map<string, AgentRuntimeReadinessProbeInFlight>();
+    const authority = new Map<string, AgentRuntimeReadinessProbeAuthority>();
+    const cache = new Map<string, AgentRuntimeReadinessRow>();
+    const probes = [
+      deferred<AgentRuntimeReadinessRow>(),
+      deferred<AgentRuntimeReadinessRow>(),
+      deferred<AgentRuntimeReadinessRow>(),
+    ];
+    let probeIndex = 0;
+    const start = vi.fn((mayPublish: () => boolean) => {
+      const probe = probes[probeIndex++]!;
+      return probe.promise.then((row) => {
+        if (mayPublish()) cache.set('pi', row);
+        return row;
+      });
+    });
+    const v1 = { installed: true, path: '/usr/bin/pi', fingerprint: 'pi-v1' };
+    const v2 = { installed: true, path: '/usr/bin/pi', fingerprint: 'pi-v2' };
+
+    const a1 = shareRuntimeReadinessProbe(inFlight, authority, 'pi', v1, start);
+    const b = shareRuntimeReadinessProbe(inFlight, authority, 'pi', v2, start);
+    const a2 = shareRuntimeReadinessProbe(inFlight, authority, 'pi', v1, start);
+
+    expect(a2).not.toBe(a1);
+    expect(start).toHaveBeenCalledTimes(3);
+    probes[2]!.resolve({ ...initialRuntimeReadinessRow(piAdapter, v1), message: 'A2' });
+    await a2;
+    expect(cache.get('pi')?.message).toBe('A2');
+
+    probes[0]!.resolve({ ...initialRuntimeReadinessRow(piAdapter, v1), message: 'A1' });
+    probes[1]!.resolve({ ...initialRuntimeReadinessRow(piAdapter, v2), message: 'B' });
+    await Promise.all([a1, b]);
+    expect(cache.get('pi')?.message).toBe('A2');
+  });
+
+  it.each([
+    {
+      change: 'an in-place replacement',
+      fresh: { installed: true, path: '/usr/bin/pi', fingerprint: 'pi-v2' },
+      expectedStatus: 'unknown',
+    },
+    {
+      change: 'an uninstall',
+      fresh: { installed: false, path: null, fingerprint: null },
+      expectedStatus: 'not_installed',
+    },
+  ] as const)('retires an old probe when GET discovers $change', async ({ fresh, expectedStatus }) => {
+    const inFlight = new Map<string, AgentRuntimeReadinessProbeInFlight>();
+    const authority = new Map<string, AgentRuntimeReadinessProbeAuthority>();
+    const cache = new Map<string, AgentRuntimeReadinessRow>();
+    const late = deferred<AgentRuntimeReadinessRow>();
+    const v1 = { installed: true, path: '/usr/bin/pi', fingerprint: 'pi-v1' };
+    const oldProbe = shareRuntimeReadinessProbe(
+      inFlight,
+      authority,
+      'pi',
+      v1,
+      (mayPublish) => late.promise.then((row) => {
+        if (mayPublish()) cache.set('pi', row);
+        return row;
+      }),
+    );
+
+    const snapshot = snapshotRuntimeReadiness([piAdapter], { pi: fresh }, cache, authority);
+    expect(snapshot.agents.pi?.status).toBe(expectedStatus);
+    expect(authority.has('pi')).toBe(false);
+
+    late.resolve({ ...initialRuntimeReadinessRow(piAdapter, v1), message: 'late old probe' });
+    await oldProbe;
+    expect(cache.get('pi')).toEqual(snapshot.agents.pi);
+  });
+
   it('classifies timeout, auth, provider, and generic failures', () => {
     expect(classifyRuntimeReadinessFailure(result({ killed: true }))).toBe('timeout');
     expect(
@@ -142,6 +297,7 @@ describe('agent runtime readiness helpers', () => {
       displayName: 'Pi',
       installed: true,
       binPath: '/usr/bin/pi',
+      fingerprint: 'pi-v1',
       status: 'ready',
       ready: true,
       source: 'global-config',
@@ -151,7 +307,7 @@ describe('agent runtime readiness helpers', () => {
 
     const ready = snapshotRuntimeReadiness(
       [piAdapter],
-      { pi: { installed: true, path: '/usr/bin/pi' } },
+      { pi: { installed: true, path: '/usr/bin/pi', fingerprint: 'pi-v1' } },
       cache,
     );
 
@@ -159,4 +315,56 @@ describe('agent runtime readiness helpers', () => {
     expect(ready.checkedAt).toBe('2026-07-08T00:00:00.000Z');
     expect(ready.agents.pi?.source).toBe('global-config');
   });
+
+  it('invalidates a cached probe when fresh install identity changes', () => {
+    const cache = new Map<string, AgentRuntimeReadinessRow>([['pi', {
+      agent: 'pi',
+      displayName: 'Pi',
+      installed: true,
+      binPath: '/usr/bin/pi',
+      fingerprint: 'pi-v1',
+      status: 'ready',
+      ready: true,
+      source: 'global-config',
+      checkedAt: '2026-07-08T00:00:00.000Z',
+      durationMs: 25,
+    }]]);
+
+    const replaced = snapshotRuntimeReadiness(
+      [piAdapter],
+      { pi: { installed: true, path: '/usr/bin/pi', fingerprint: 'pi-v2' } },
+      cache,
+    );
+
+    expect(replaced.agents.pi).toMatchObject({
+      installed: true,
+      fingerprint: 'pi-v2',
+      status: 'unknown',
+      ready: false,
+      checkedAt: null,
+    });
+    expect(cache.get('pi')).toEqual(replaced.agents.pi);
+
+    const uninstalled = snapshotRuntimeReadiness(
+      [piAdapter],
+      { pi: { installed: false, path: null, fingerprint: null } },
+      cache,
+    );
+    expect(uninstalled.agents.pi).toMatchObject({
+      installed: false,
+      status: 'not_installed',
+      ready: false,
+    });
+  });
 });
+
+function deferred<T>(): {
+  promise: Promise<T>
+  resolve(value: T): void
+} {
+  let resolvePromise!: (value: T) => void
+  const promise = new Promise<T>((resolve) => {
+    resolvePromise = resolve
+  })
+  return { promise, resolve: resolvePromise }
+}

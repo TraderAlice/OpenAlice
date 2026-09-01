@@ -10,6 +10,10 @@ const mocks = vi.hoisted(() => ({
   updateSection: vi.fn(),
   openOrFocus: vi.fn(),
   setSidebar: vi.fn(),
+  emptyUtas: [] as never[],
+  brokerRefresh: vi.fn().mockResolvedValue(undefined),
+  brokerInstall: vi.fn().mockResolvedValue(undefined),
+  brokerForAccount: vi.fn(),
 }))
 
 vi.mock('../api', async (importOriginal) => {
@@ -36,6 +40,18 @@ vi.mock('../api', async (importOriginal) => {
 
 vi.mock('../hooks/useAccountHealth', () => ({
   useAccountHealth: () => ({}),
+}))
+
+vi.mock('../hooks/useTradingConfig', () => ({
+  useTradingConfig: () => ({ utas: mocks.emptyUtas, loading: false, error: null }),
+}))
+
+vi.mock('../hooks/useBrokerPackReadiness', () => ({
+  useBrokerPackReadiness: () => ({
+    data: { packs: [], accounts: [] }, loading: false, error: null, installingEngine: null,
+    refresh: mocks.brokerRefresh, install: mocks.brokerInstall,
+    forAccount: mocks.brokerForAccount,
+  }),
 }))
 
 vi.mock('../live/trading-mode', () => ({

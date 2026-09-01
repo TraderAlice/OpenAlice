@@ -7,11 +7,12 @@ import { getIntlLocale } from '../lib/intl'
 import type { UTAConfig, BrokerPreset, AccountInfo, SubAccountRef, Position, BrokerHealthInfo, UTASnapshotSummary, EquityCurvePoint, OrderHistoryEntry, OrderHistoryStatus, TradeHistoryEntry } from '../api/types'
 import { useTradingConfig } from '../hooks/useTradingConfig'
 import { useAccountHealth } from '../hooks/useAccountHealth'
+import { deriveAccountInteractionPolicy, useBrokerPackReadiness } from '../hooks/useBrokerPackReadiness'
 import { PageHeader } from '../components/PageHeader'
 import { EmptyState, Skeleton } from '../components/StateViews'
 import { ReconnectButton } from '../components/ReconnectButton'
 import { Toggle } from '../components/Toggle'
-import { HealthBadge } from '../components/uta/HealthBadge'
+import { AccountReadinessBadge, BrokerSupportGate } from '../components/uta/BrokerPackGate'
 import { EditUTADialog } from '../components/uta/EditUTADialog'
 import { OrderEntryDialog, type OrderEntryMode } from '../components/uta/OrderEntryDialog'
 import { EquityCurve } from '../components/EquityCurve'
@@ -20,6 +21,7 @@ import { fmt, fmtPnl, fmtNum, fmtPctSigned, isUnsetDecimal } from '../lib/format
 import { secTypeToClass, assetClassLabel, ASSET_CLASS_ORDER, type AssetClass } from '../lib/asset-class'
 import { ContractCell, contractPrimary } from '../lib/contract-display'
 import { displayNameForUTA } from '../lib/uta-account-filter'
+import { ensureTradingModePolling, useTradingMode } from '../live/trading-mode'
 
 // ==================== Page ====================
 
@@ -33,6 +35,9 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
   const navigate = useNavigate()
   const tc = useTradingConfig()
   const healthMap = useAccountHealth()
+  const brokerReadiness = useBrokerPackReadiness()
+  const tradingMode = useTradingMode((state) => state.status.mode)
+  const tradingModeLoading = useTradingMode((state) => state.loading)
   const [presets, setPresets] = useState<BrokerPreset[]>([])
   const [account, setAccount] = useState<AccountInfo | null>(null)
   const [positions, setPositions] = useState<Position[]>([])
@@ -48,6 +53,7 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
   const [dataError, setDataError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [clock, setClock] = useState<MarketClockState>(null)
+  const [interactionNotice, setInteractionNotice] = useState<string | null>(null)
 
   useEffect(() => {
     api.trading.getBrokerPresets().then(r => setPresets(r.presets)).catch(() => {})
@@ -56,18 +62,26 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
   const uta = useMemo<UTAConfig | undefined>(() => tc.utas.find(u => u.id === id), [tc.utas, id])
   const preset = useMemo<BrokerPreset | undefined>(() => presets.find(p => p.id === uta?.presetId), [presets, uta])
   const health: BrokerHealthInfo | undefined = id ? healthMap[id] : undefined
+  const readiness = uta ? brokerReadiness.forAccount(uta) : null
+  const policy = uta && readiness ? deriveAccountInteractionPolicy({ account: uta, readiness, health, tradingMode }) : null
+
+  useEffect(() => { ensureTradingModePolling() }, [])
 
   // Sub-account discovery — once per UTA. A failure (or a single-wallet
   // broker) leaves the list empty, so the selector simply never renders.
   useEffect(() => {
-    if (!id) return
+    if (!id || !policy?.canRead) {
+      setSubAccounts([])
+      setSelectedSub(undefined)
+      return
+    }
     let cancelled = false
     api.trading.utaSubAccounts(id)
       .then(r => { if (!cancelled) setSubAccounts(r.subAccounts ?? []) })
       .catch(() => { if (!cancelled) setSubAccounts([]) })
     setSelectedSub(undefined)  // reset to aggregate when switching UTAs
     return () => { cancelled = true }
-  }, [id])
+  }, [id, policy?.canRead])
 
   // Live polling — account/positions/orders refresh every 15s. Account +
   // positions scope to the selected wallet (undefined ⇒ aggregate); orders
@@ -81,25 +95,43 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
   // the newest in flight.
   const reqSeq = useRef(0)
   const refreshLive = useCallback(async () => {
-    if (!id) return
+    if (!id || !policy?.canRead) {
+      setAccount(null)
+      setPositions([])
+      setOrders([])
+      setLastUpdated(null)
+      setDataError(null)
+      return
+    }
     const seq = ++reqSeq.current
     setDataError(null)
     try {
-      const [acct, pos, ord] = await Promise.all([
-        api.trading.utaAccount(id, selectedSub).catch(() => null),
-        api.trading.utaPositions(id, selectedSub).catch(() => ({ positions: [] as Position[] })),
-        api.trading.utaOrders(id).catch(() => ({ orders: [] as unknown[] })),
+      const [acct, pos, ord] = await Promise.allSettled([
+        api.trading.utaAccount(id, selectedSub),
+        api.trading.utaPositions(id, selectedSub),
+        api.trading.utaOrders(id),
       ])
       if (seq !== reqSeq.current) return  // superseded by a newer refresh — discard
-      setAccount(acct)
-      setPositions(pos.positions)
-      setOrders(ord.orders)
+      if (acct.status === 'rejected') {
+        setAccount(null)
+        setPositions([])
+        setOrders([])
+        setLastUpdated(null)
+        setDataError(acct.reason instanceof Error ? acct.reason.message : String(acct.reason))
+        return
+      }
+      setAccount(acct.value)
+      setPositions(pos.status === 'fulfilled' ? pos.value.positions : [])
+      setOrders(ord.status === 'fulfilled' ? ord.value.orders : [])
+      setDataError(pos.status === 'rejected' || ord.status === 'rejected'
+        ? 'Some live account details could not be loaded.'
+        : null)
       setLastUpdated(new Date())
     } catch (err) {
       if (seq !== reqSeq.current) return
       setDataError(err instanceof Error ? err.message : String(err))
     }
-  }, [id, selectedSub])
+  }, [id, policy?.canRead, selectedSub])
 
   // Snapshots refresh more slowly (60s); same data feeds the NAV chart and
   // the 24h-delta anchor — no extra fetches needed.
@@ -124,7 +156,10 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
   // Market clock — mount + every 60s. The poll itself re-renders the
   // "opens in Xh Ym" countdown, so no separate ticker is needed.
   useEffect(() => {
-    if (!id) return
+    if (!id || !policy?.canRead) {
+      setClock(null)
+      return
+    }
     let cancelled = false
     const load = () => api.trading.marketClock(id)
       .then(c => { if (!cancelled) setClock(c) })
@@ -132,19 +167,20 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
     load()
     const t = setInterval(load, 60_000)
     return () => { cancelled = true; clearInterval(t) }
-  }, [id])
+  }, [id, policy?.canRead])
 
   // ?aliceId=... auto-opens the place-order form prefilled (e.g. clicked
   // from TradeableContractsPanel on the market workbench).
   useEffect(() => {
     const queryAlice = searchParams.get('aliceId')
-    if (queryAlice && !orderMode) {
-      setOrderMode({ kind: 'place', aliceId: queryAlice })
+    if (queryAlice && !orderMode && policy && readiness?.state !== 'checking' && !tradingModeLoading) {
+      if (policy.canTrade) setOrderMode({ kind: 'place', aliceId: queryAlice })
+      else setInteractionNotice(policy.reason ?? 'Trading is unavailable for this account.')
       const next = new URLSearchParams(searchParams)
       next.delete('aliceId')
       setSearchParams(next, { replace: true })
     }
-  }, [searchParams, setSearchParams, orderMode])
+  }, [searchParams, setSearchParams, orderMode, policy, readiness?.state, tradingModeLoading])
 
   // 24h delta = current NLV − the oldest snapshot still within the trailing
   // 24h window. Labeled "24h" in the UI — it IS a trailing-24h diff, not a
@@ -200,12 +236,13 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
 
   const isDisabled = uta.enabled === false
   const displayName = displayNameForUTA(uta, preset)
+  if (!readiness || !policy) return <Shell title={displayName}><UTADetailMainSkeleton /></Shell>
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
         title={displayName}
-        live={{ lastUpdated }}
+        live={lastUpdated && policy.canRead ? { lastUpdated } : undefined}
         stackActionsOnNarrow
         description={
           <>
@@ -213,7 +250,7 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
             <span className="mx-2 text-muted-foreground/40">·</span>
             <span className="font-mono text-muted-foreground">{uta.id}</span>
             <span className="mx-2 text-muted-foreground/40">·</span>
-            <HealthBadge health={health} size="sm" />
+            <AccountReadinessBadge readiness={readiness} health={health} size="sm" />
           </>
         }
         right={
@@ -228,21 +265,24 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
                 ariaLabel={`${preset?.label ?? uta.id} enabled`}
                 size="sm"
                 checked={!isDisabled}
+                disabled={isDisabled && !readiness.operational}
+                title={isDisabled && !readiness.operational ? policy.reason : undefined}
                 onChange={async (v) => { await tc.saveUTA({ ...uta, enabled: v }) }}
               />
               <span className="text-[11px] text-muted-foreground">
-                {isDisabled ? 'Account disabled' : 'Account enabled'}
+                {isDisabled ? 'Configured off' : 'Configured on'}
               </span>
             </div>
             <div className="oa-uta-header-divider h-5 w-px bg-border" />
             <div className="flex flex-wrap items-center gap-2">
-              <ReconnectButton accountId={uta.id} />
+              <ReconnectButton accountId={uta.id} disabled={!policy.canReconnect} disabledReason={policy.reason} />
               <button onClick={() => setEditing(true)} className="btn-secondary-sm">
                 Edit
               </button>
               <button
-                onClick={() => setOrderMode({ kind: 'place' })}
-                disabled={isDisabled}
+                onClick={() => { if (policy.canTrade) setOrderMode({ kind: 'place' }) }}
+                disabled={!policy.canTrade}
+                title={!policy.canTrade ? policy.reason : undefined}
                 className="btn-primary-sm"
               >
                 + Place Order
@@ -260,7 +300,37 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
             </div>
           )}
 
-          {!lastUpdated ? <UTADetailMainSkeleton /> : (
+          {interactionNotice && (
+            <div className="mb-4 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-[12px] text-warning" role="status">
+              {interactionNotice}
+            </div>
+          )}
+
+          {!policy.canRead ? (
+            <div className="space-y-4">
+              <BrokerSupportGate
+                readiness={readiness}
+                installingEngine={brokerReadiness.installingEngine}
+                onInstall={brokerReadiness.install}
+                onRetry={brokerReadiness.refresh}
+              />
+              {curvePoints.length >= 2 && (
+                <div className="space-y-2">
+                  <p className="text-[11px] text-warning" role="status">
+                    Historical snapshot · broker support is unavailable on this Runtime, so these values are stale and not live.
+                  </p>
+                  <EquityCurve
+                    points={curvePoints}
+                    accounts={[{ id, label: displayName }]}
+                    selectedAccountId={id}
+                    onAccountChange={() => {}}
+                  />
+                </div>
+              )}
+            </div>
+          ) : !lastUpdated && !dataError ? <UTADetailMainSkeleton /> : !lastUpdated ? (
+            <EmptyState title="Live account data is unavailable." description="Retry after checking the broker connection and account health." />
+          ) : (
             <div className="space-y-5">
               {/* Keep the visual overview together, then give the operational
                   tables the full content width. The auto-fit grid responds to
@@ -302,6 +372,8 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
 
               <PositionsSection
                 positions={positions}
+                canClose={policy.canTrade}
+                closeDisabledReason={policy.reason}
                 onCloseClick={(p) => setOrderMode({
                   kind: 'close',
                   aliceId: p.contract.aliceId ?? p.contract.localSymbol ?? p.contract.symbol ?? '',
@@ -321,6 +393,11 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
           uta={uta}
           preset={preset}
           health={health}
+          readiness={readiness}
+          policy={policy}
+          installingEngine={brokerReadiness.installingEngine}
+          onInstallBrokerPack={brokerReadiness.install}
+          onRetryBrokerPack={brokerReadiness.refresh}
           onSave={async (next) => { await tc.saveUTA(next) }}
           onDelete={async () => {
             await tc.deleteUTA(uta.id)
@@ -331,7 +408,7 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
         />
       )}
 
-      {orderMode && (
+      {orderMode && policy.canTrade && (
         <OrderEntryDialog
           utaId={uta.id}
           mode={orderMode}
@@ -590,9 +667,11 @@ function Section({ title, action, children }: { title: string; action?: React.Re
 
 interface PositionGroup { class: AssetClass; positions: Position[] }
 
-export function PositionsSection({ positions, onCloseClick }: {
+export function PositionsSection({ positions, onCloseClick, canClose = true, closeDisabledReason }: {
   positions: Position[]
   onCloseClick: (p: Position) => void
+  canClose?: boolean
+  closeDisabledReason?: string
 }) {
   const groups = useMemo<PositionGroup[]>(() => {
     const buckets = new Map<AssetClass, Position[]>()
@@ -653,6 +732,8 @@ export function PositionsSection({ positions, onCloseClick }: {
                   key={`${g.class}-${index}`}
                   position={position}
                   onClose={() => onCloseClick(position)}
+                  canClose={canClose}
+                  closeDisabledReason={closeDisabledReason}
                 />
               ))}
             </div>
@@ -708,7 +789,7 @@ export function PositionsSection({ positions, onCloseClick }: {
                     </td>
                   </tr>
                   {g.positions.map((p, i) => (
-                    <PositionRow key={`${g.class}-${i}`} position={p} onClose={() => onCloseClick(p)} />
+                    <PositionRow key={`${g.class}-${i}`} position={p} onClose={() => onCloseClick(p)} canClose={canClose} closeDisabledReason={closeDisabledReason} />
                   ))}
                 </Fragment>
               )
@@ -737,7 +818,7 @@ function PositionMetric({
   )
 }
 
-function PositionMobileRow({ position: p, onClose }: { position: Position; onClose: () => void }) {
+function PositionMobileRow({ position: p, onClose, canClose, closeDisabledReason }: { position: Position; onClose: () => void; canClose: boolean; closeDisabledReason?: string }) {
   const ccy = p.currency ?? 'USD'
   const cost = Number(p.avgCost) * Number(p.quantity)
   const pnl = Number(p.unrealizedPnL)
@@ -786,6 +867,8 @@ function PositionMobileRow({ position: p, onClose }: { position: Position; onClo
         <button
           type="button"
           onClick={onClose}
+          disabled={!canClose}
+          title={!canClose ? closeDisabledReason : undefined}
           aria-label={`Close ${name} position`}
           className="oa-pressable inline-flex min-h-10 items-center justify-center rounded-md border border-destructive/30 px-3 text-[12px] font-medium text-destructive transition-colors hover:bg-destructive/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/40"
         >
@@ -796,7 +879,7 @@ function PositionMobileRow({ position: p, onClose }: { position: Position; onClo
   )
 }
 
-function PositionRow({ position: p, onClose }: { position: Position; onClose: () => void }) {
+function PositionRow({ position: p, onClose, canClose, closeDisabledReason }: { position: Position; onClose: () => void; canClose: boolean; closeDisabledReason?: string }) {
   const ccy = p.currency ?? 'USD'
   const cost = Number(p.avgCost) * Number(p.quantity)
   const pnl = Number(p.unrealizedPnL)
@@ -825,6 +908,8 @@ function PositionRow({ position: p, onClose }: { position: Position; onClose: ()
         <button
           type="button"
           onClick={onClose}
+          disabled={!canClose}
+          title={!canClose ? closeDisabledReason : undefined}
           aria-label={`Close ${contractPrimary(p.contract)} position`}
           className="text-[11px] text-muted-foreground hover:text-destructive transition-colors"
         >
