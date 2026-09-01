@@ -46,6 +46,10 @@ machines:
   loopback transport;
 - copy a local AliceProject's portable configuration and Workspace estate to a
   new remote complete home through a reviewable, resumable transaction;
+- negotiate one OpenAlice release graph across independently activated local
+  and remote Runtimes, so a current controller may deliberately advance an
+  older remote while an older controller can never downgrade or mutate a newer
+  remote;
 - deliberately exclude native Agent conversations and OpenAlice Session
   continuation state, so the remote AliceProject starts with zero resumable
   Sessions while retaining its Workspace repositories and Workspace ids.
@@ -419,6 +423,61 @@ The remote importer is the only writer for a transfer staging home. Guardian
 remains the only Runtime writer. Transfer never invents another Runtime lock,
 signals a guessed PID, exposes the Guardian socket, or performs trading writes.
 
+## Remote Release Negotiation
+
+The controller and remote Runtime activate versions independently but consume
+the same release authority. Opening a tunnel must not silently align them, and
+the remote must not run a background updater merely because it is registered
+in the fleet. The controller owns comparison, plan presentation, and consent;
+the destination's deployment owner verifies, installs, atomically activates,
+and falls back.
+
+Release comparison uses logical and artifact identities rather than a displayed
+version string alone:
+
+- stable and beta use channel plus exact release version, then validate the
+  destination platform's archive checksum and content identity;
+- dev uses the latest completed dev manifest commit plus the local and remote
+  platform targets from that one manifest. The reused package version does not
+  order dev builds;
+- control protocol range and capabilities are negotiated separately from
+  release order. A newer release is not assumed compatible merely because its
+  version sorts higher.
+
+The plan classifies every connection before proposing a mutation:
+
+| Relation | Required behavior |
+|---|---|
+| `aligned` | Reuse the compatible Runtime and open the loopback tunnel without mutation. |
+| `remote-behind` | Show the exact release/artifact target and Runtime interruption; after explicit consent, ask the destination deployment owner to upgrade, then re-probe before tunneling. |
+| `controller-behind` | Never downgrade the remote. Permit compatible read-only status/tunneling, but block install, start, stop, restart, takeover, or update until the controller upgrades. |
+| `channel-conflict` | Do not infer ordering across stable, beta, and dev. Require an explicit channel-switch intent before any release mutation. |
+| `incompatible` | Fail closed with the required controller or remote upgrade; do not guess a PID, selector, or fallback. |
+
+Ordinary SSH and Railway share this relation model but keep distinct apply
+authorities:
+
+- an ordinary SSH host continues to use the normal installer with the
+  controller's verified logical release and the destination-specific artifact;
+- a Railway host remains service-managed. The controller never runs an
+  installer through Railway SSH or changes the live release pointer. A Railway
+  adapter uses locally held deployment authority to request restart/redeploy;
+  the image entrypoint resolves and validates the selected release, owns the
+  lifecycle fence, and retains the previous verified release on failure;
+- Railway credentials and project/environment/service identifiers stay on the
+  controller. They are not discovered from remote secrets or copied into an
+  AliceProject;
+- rolling dev is checked when the service starts; no polling or hot-update loop
+  is added. A controller-triggered redeploy is the normal deliberate refresh
+  path.
+
+A real regression fixture comes from the retained Railway host: the installed
+0.90.2 stable controller treated a newer dev Railway release as an ordinary SSH
+target and proposed replacing it with stable, while the current dev controller
+correctly recognized `Lifecycle: Railway (dev channel)` and planned a tunnel
+only. The unified relation must make the former `controller-behind` or
+`channel-conflict`, never an update plan.
+
 ## Ordered Delivery
 
 ### Increment 0 — contract and plan
@@ -555,6 +614,34 @@ signals a guessed PID, exposes the Guardian socket, or performs trading writes.
 - [x] Apply the reviewed transfer to the retained Railway Volume, select the
   imported Project, and verify portable Workspace/configuration state plus a
   new user-owned Agent Runtime turn without importing native Session state.
+
+### Increment 7 — controller-driven remote release convergence
+
+- [x] Audit ordinary SSH and Railway release authority, dev-manifest selection,
+  target-specific artifact identity, and the retained-host stale-controller
+  failure described above; record the chosen relation model in this plan.
+- [ ] Add one typed release-relation result shared by raw-target Remote, fleet
+  inventory/detail, CLI plans, and Supervisor TUI presentation.
+- [ ] Preserve the existing latest-dev-controller gate and add directional
+  stable/beta comparison so an older controller cannot downgrade a newer
+  remote. Cross-channel changes remain an explicit separate intent.
+- [ ] Keep compatible read-only status/tunnel access available when the
+  controller is behind, while blocking every remote lifecycle or release
+  mutation with actionable local-upgrade guidance.
+- [ ] Add a Railway deployment adapter that validates locally configured
+  project/environment/service identity, shows the exact restart/PTY impact,
+  requires consent, requests a service-owned redeploy, and waits for a bounded
+  target-identity/readiness re-probe. It must not inherit write authority from
+  Railway SSH or run the installer inside the foreground container.
+- [ ] Treat transport loss, owner replacement, configured-selector fallback,
+  deployment failure, and readiness timeout as non-convergence. Report the
+  verified running release and never claim that the remote upgraded.
+- [ ] Add focused ordinary-SSH, dev-manifest, stale-controller, cross-channel,
+  Railway-adapter, consent/default-No, and post-redeploy identity tests. Extend
+  the disposable Docker SSH journey and run one retained Railway convergence
+  acceptance without exposing a public Web port.
+- [ ] Update `docs/remote-access.md`, `docs/docker-deployment.md`, CLI help, and
+  Supervisor wording with the shipped apply authority and downgrade rules.
 
 ## Verification Matrix
 
