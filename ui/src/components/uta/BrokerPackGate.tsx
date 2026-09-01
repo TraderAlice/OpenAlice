@@ -26,7 +26,7 @@ export function AccountReadinessBadge({ readiness, health, size = 'sm' }: {
           : 'Support status unavailable'
   return (
     <span
-      className="inline-flex items-center gap-1.5 text-[11px] text-warning"
+      className="inline-flex items-center gap-1.5 text-[11px] leading-[15px] text-warning"
       title={readiness.reason}
       data-testid="account-readiness-badge"
     >

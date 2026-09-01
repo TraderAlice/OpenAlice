@@ -290,13 +290,13 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
       <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
         <div className="max-w-[1240px] mx-auto">
           {dataError && (
-            <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] text-destructive">
+            <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] leading-[18px] text-destructive">
               Failed to load live data: {dataError}
             </div>
           )}
 
           {interactionNotice && (
-            <div className="mb-4 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[12px] text-warning" role="status">
+            <div className="mb-4 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[12px] leading-[18px] text-warning" role="status">
               {interactionNotice}
             </div>
           )}
@@ -584,7 +584,7 @@ function AccountPanel({ account, positions, delta24h, clock, connecting }: {
           <div className="py-2">
             <div className="flex items-baseline justify-between gap-3">
               <span className="text-[11px] font-medium text-muted-foreground">Utilization</span>
-              <span className="text-[13px] font-medium tabular-nums text-foreground">{utilizationPct.toFixed(1)}%</span>
+              <span className="text-[13px] leading-[18px] font-medium tabular-nums text-foreground">{utilizationPct.toFixed(1)}%</span>
             </div>
             <div className="mt-1.5 h-[2px] rounded-full bg-muted overflow-hidden">
               <div
@@ -636,7 +636,7 @@ function AccountRow({ label, value, sign }: {
   return (
     <div className="flex items-baseline justify-between gap-3 py-2">
       <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
-      <span className={`text-[13px] font-medium tabular-nums text-right ${valueColor}`}>{value}</span>
+      <span className={`text-[13px] leading-[18px] font-medium tabular-nums text-right ${valueColor}`}>{value}</span>
     </div>
   )
 }
@@ -647,7 +647,7 @@ function Section({ title, action, children }: { title: string; action?: React.Re
   return (
     <section>
       <div className="flex items-center justify-between mb-2.5">
-        <h3 className="text-[13px] font-semibold text-foreground">{title}</h3>
+        <h3 className="text-[13px] leading-[18px] font-semibold text-foreground">{title}</h3>
         {action}
       </div>
       {children}
@@ -700,7 +700,7 @@ export function PositionsSection({ positions, onCloseClick, canClose = true, clo
           const groupCcy = currencies.size === 1 ? [...currencies][0] : undefined
           return (
             <div key={g.class} className="border-t border-border first:border-t-0">
-              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 bg-muted/40 px-3 py-2 text-[11px]">
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 bg-muted/40 px-3 py-2 text-[11px] leading-[15px]">
                 <div className="flex items-center gap-1.5">
                   <span className="font-semibold text-foreground">{assetClassLabel(g.class)}</span>
                   <span className="text-muted-foreground">
@@ -759,7 +759,7 @@ export function PositionsSection({ positions, onCloseClick, canClose = true, clo
                 <Fragment key={g.class}>
                   <tr className="bg-muted/40 border-t border-border">
                     <td colSpan={cols} className="px-3 py-1.5">
-                      <div className="flex items-center justify-between text-[12px]">
+                      <div className="flex items-center justify-between text-[12px] leading-[18px]">
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-foreground">{assetClassLabel(g.class)}</span>
                           <span className="text-muted-foreground">{g.positions.length} position{g.positions.length > 1 ? 's' : ''}</span>
@@ -823,13 +823,13 @@ function PositionMobileRow({ position: p, onClose, canClose, closeDisabledReason
         <div className="grid grid-cols-[minmax(0,1fr)_auto_16px] items-start gap-2">
           <div className="min-w-0">
             <ContractCell contract={p.contract} />
-            <span className={`mt-1 inline-flex rounded-sm px-1.5 py-0.5 text-[10px] font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
+            <span className={`mt-1 inline-flex rounded-sm px-1.5 py-0.5 text-[10px] leading-[14px] font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
               {p.side}
             </span>
           </div>
           <div className="shrink-0 text-right">
-            <div className="text-[13px] font-semibold tabular-nums text-foreground">{fmt(p.marketValue, ccy)}</div>
-            <div className={`mt-1 flex justify-end gap-2 text-[11px] tabular-nums ${pnlTone}`}>
+            <div className="text-[13px] leading-[18px] font-semibold tabular-nums text-foreground">{fmt(p.marketValue, ccy)}</div>
+            <div className={`mt-1 flex justify-end gap-2 text-[11px] leading-[15px] tabular-nums ${pnlTone}`}>
               <span>{fmtPnl(pnl, ccy)}</span>
               <span>{fmtPctSigned(pct)}</span>
             </div>
@@ -882,7 +882,7 @@ function PositionRow({ position: p, onClose, canClose, closeDisabledReason }: { 
         <ContractCell contract={p.contract} />
       </td>
       <td className="px-3 py-2">
-        <span className={`rounded-sm px-1.5 py-0.5 text-[10px] font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
+        <span className={`rounded-sm px-1.5 py-0.5 text-[10px] leading-[14px] font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
           {p.side}
         </span>
       </td>
@@ -1061,7 +1061,7 @@ function OpenOrdersTable({ orders }: { orders: unknown[] }) {
         <tbody>
           {rows.map((o, i) => (
             <tr key={i} className="border-t border-border">
-              <td className="px-3 py-2 font-mono text-muted-foreground text-[11px]">{String(o.orderId ?? '—')}</td>
+              <td className="px-3 py-2 font-mono text-muted-foreground text-[11px] leading-[15px]">{String(o.orderId ?? '—')}</td>
               <td className="px-3 py-2 font-mono text-foreground" title={o.contract?.aliceId}>
                 {o.contract?.symbol ?? o.contract?.localSymbol ?? o.contract?.aliceId ?? '?'}
               </td>
@@ -1094,7 +1094,7 @@ const ORDER_HISTORY_COMPACT_WIDTH = 760
 
 function OrderStatusBadge({ status }: { status: OrderHistoryStatus }) {
   return (
-    <span className={`rounded-sm px-1.5 py-0.5 text-[10px] font-medium ${ORDER_STATUS_STYLES[status] ?? 'bg-muted text-muted-foreground'}`}>
+    <span className={`rounded-sm px-1.5 py-0.5 text-[10px] leading-[14px] font-medium ${ORDER_STATUS_STYLES[status] ?? 'bg-muted text-muted-foreground'}`}>
       {status}
     </span>
   )
@@ -1102,7 +1102,7 @@ function OrderStatusBadge({ status }: { status: OrderHistoryStatus }) {
 
 function SideBadge({ side }: { side: 'BUY' | 'SELL' }) {
   return (
-    <span className={`rounded-sm px-1.5 py-0.5 text-[10px] font-medium ${side === 'BUY' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
+    <span className={`rounded-sm px-1.5 py-0.5 text-[10px] leading-[14px] font-medium ${side === 'BUY' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
       {side}
     </span>
   )
@@ -1110,7 +1110,7 @@ function SideBadge({ side }: { side: 'BUY' | 'SELL' }) {
 
 function SourceChip({ label }: { label: string }) {
   return (
-    <span className="rounded-sm bg-muted px-1.5 text-[10px] text-muted-foreground">
+    <span className="rounded-sm bg-muted px-1.5 text-[10px] leading-[14px] text-muted-foreground">
       {label}
     </span>
   )
@@ -1159,7 +1159,7 @@ export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | nu
                     </span>
                   </div>
 
-                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-[15px] text-muted-foreground">
                     <span className="tabular-nums">{formatHistoryTime(o.timestamp)}</span>
                     <SideBadge side={o.side} />
                     <span>{o.orderType ?? '—'}</span>
@@ -1168,17 +1168,17 @@ export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | nu
                   <dl className="mt-3 grid grid-cols-3 gap-2">
                     <div className="min-w-0 border-l border-border pl-2.5">
                       <dt className="text-[11px] font-medium text-muted-foreground">Qty</dt>
-                      <dd className="mt-0.5 truncate text-[12px] text-foreground tabular-nums">
+                      <dd className="mt-0.5 truncate text-[12px] leading-[18px] text-foreground tabular-nums">
                         {o.quantity != null ? fmtNum(o.quantity) : '—'}
                       </dd>
                     </div>
                     <div className="min-w-0 border-l border-border pl-2.5">
                       <dt className="text-[11px] font-medium text-muted-foreground">Limit</dt>
-                      <dd className="mt-0.5 truncate text-[12px] text-foreground tabular-nums">{o.limitPrice ?? '—'}</dd>
+                      <dd className="mt-0.5 truncate text-[12px] leading-[18px] text-foreground tabular-nums">{o.limitPrice ?? '—'}</dd>
                     </div>
                     <div className="min-w-0 border-l border-border pl-2.5">
                       <dt className="text-[11px] font-medium text-muted-foreground">Fill</dt>
-                      <dd className="mt-0.5 truncate text-[12px] text-foreground tabular-nums">
+                      <dd className="mt-0.5 truncate text-[12px] leading-[18px] text-foreground tabular-nums">
                         {o.avgFillPrice ? `${o.avgFillPrice}${o.filledQty ? ` × ${o.filledQty}` : ''}` : '—'}
                       </dd>
                     </div>

@@ -561,7 +561,7 @@ export function PushApprovalPanel() {
           className={`${mobileDetailOpen ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col bg-secondary md:flex md:border-r`}
         >
           <div className="shrink-0 border-b border-border/70 px-4 py-3">
-            <div className="flex items-center gap-2 text-[12px] font-medium text-foreground">
+            <div className="flex items-center gap-2 text-[12px] leading-[18px] font-medium text-foreground">
               {verificationIncomplete || waitingCount > 0 ? (
                 <AlertTriangle size={15} className="text-warning" aria-hidden />
               ) : (
@@ -585,7 +585,7 @@ export function PushApprovalPanel() {
                 <button
                   type="button"
                   onClick={() => setHistoryFilter(null)}
-                  className={`rounded-full border px-2 py-0.5 text-[10px] transition-colors ${
+                  className={`rounded-full border px-2 py-0.5 text-[10px] leading-[14px] transition-colors ${
                     effectiveFilter === null
                       ? 'border-border bg-muted text-foreground'
                       : 'border-border/50 text-muted-foreground hover:border-border hover:text-foreground'
@@ -599,7 +599,7 @@ export function PushApprovalPanel() {
                     type="button"
                     onClick={() => setHistoryFilter(account.id)}
                     title={account.label}
-                    className={`max-w-[120px] truncate rounded-full border px-2 py-0.5 text-[10px] transition-colors ${
+                    className={`max-w-[120px] truncate rounded-full border px-2 py-0.5 text-[10px] leading-[14px] transition-colors ${
                       effectiveFilter === account.id
                         ? 'border-border bg-muted text-foreground'
                         : 'border-border/50 text-muted-foreground hover:border-border hover:text-foreground'
@@ -790,11 +790,11 @@ function QueueRow({
         <span className="text-muted-foreground/70">{icon}</span>
         <span className="min-w-0 flex-1 truncate text-[12px] font-medium">{itemTitle(item, t)}</span>
       </div>
-      <div className="mt-1 flex min-w-0 items-center gap-2 text-[10px] text-muted-foreground/65">
+      <div className="mt-1 flex min-w-0 items-center gap-2 text-[10px] leading-[14px] text-muted-foreground/65">
         <span className="truncate">{itemAccountLabel(item)}</span>
         <span className="text-muted-foreground/35">/</span>
         <span>{t('tradingReview.queue.operationCount', { count: ops.length })}</span>
-        <span className="ml-auto rounded border border-border/60 px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground/60">{badge}</span>
+        <span className="ml-auto rounded border border-border/60 px-1.5 py-0.5 font-mono text-[10px] leading-[14px] text-muted-foreground/60">{badge}</span>
       </div>
       {timestamp && (
         <div className="mt-1 text-[10px] text-muted-foreground/45">{formatRelativeTime(timestamp)}</div>
@@ -888,7 +888,7 @@ function ReviewDetail({
           <ResultBanner result={lastResult.data} onDismiss={onDismissResult} />
         )}
         {error && (
-          <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] text-destructive">
+          <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] leading-[18px] text-destructive">
             <XCircle size={15} className="mt-0.5 shrink-0" aria-hidden />
             <span className="min-w-0 flex-1">{error}</span>
             <Button variant="ghost" size="xs" onClick={onDismissError} className="text-muted-foreground">
@@ -905,7 +905,7 @@ function ReviewDetail({
                   <StatusPill item={item} />
                   <span className="text-[11px] text-muted-foreground">{itemAccountLabel(item)}</span>
                   {item.kind === 'history' && (
-                    <span className="font-mono text-[11px] text-muted-foreground/60">{shortHash(item.commit.hash)}</span>
+                    <span className="font-mono text-[11px] leading-[15px] text-muted-foreground/60">{shortHash(item.commit.hash)}</span>
                   )}
                 </div>
                 <h3 className="text-lg font-semibold text-foreground">{title}</h3>
@@ -969,7 +969,7 @@ function ReviewDetail({
 
           <div className="grid gap-4 p-4 xl:grid-cols-[minmax(0,1fr)_260px]">
             <section className="min-w-0 space-y-3">
-              <div className="flex items-center gap-2 text-[12px] font-medium text-muted-foreground/70">
+              <div className="flex items-center gap-2 text-[12px] leading-[18px] font-medium text-muted-foreground/70">
                 <GitCommitHorizontal size={14} aria-hidden />
                 {t('tradingReview.operationDiff')}
               </div>
@@ -1004,7 +1004,7 @@ function StatusPill({ item }: { item: ReviewItem }) {
   const { t } = useTranslation()
   if (item.kind === 'pending') {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-[11px] font-medium text-warning">
+      <span className="inline-flex items-center gap-1 rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-[11px] leading-[15px] font-medium text-warning">
         <AlertTriangle size={12} aria-hidden />
         {t('tradingReview.status.needsApproval')}
       </span>
@@ -1012,14 +1012,14 @@ function StatusPill({ item }: { item: ReviewItem }) {
   }
   if (item.kind === 'staged') {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-info/25 bg-info/10 px-2 py-0.5 text-[11px] font-medium text-info">
+      <span className="inline-flex items-center gap-1 rounded-full border border-info/25 bg-info/10 px-2 py-0.5 text-[11px] leading-[15px] font-medium text-info">
         <Clock3 size={12} aria-hidden />
         {t('tradingReview.status.staged')}
       </span>
     )
   }
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-success/25 bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success">
+    <span className="inline-flex items-center gap-1 rounded-full border border-success/25 bg-success/10 px-2 py-0.5 text-[11px] leading-[15px] font-medium text-success">
       <CheckCircle2 size={12} aria-hidden />
       {t('tradingReview.status.pushed')}
     </span>
@@ -1035,7 +1035,7 @@ function OperationRow({ op }: { op: OperationDisplay }) {
       </div>
       <div className="min-w-0 px-3 py-2">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="min-w-0 break-all font-mono text-[13px] font-medium text-foreground">{op.title}</span>
+          <span className="min-w-0 break-all font-mono text-[13px] leading-[18px] font-medium text-foreground">{op.title}</span>
           {op.status && (
             <span className={`text-[11px] ${statusClass(op.status)}`}>{statusLabel(op.status, t)}</span>
           )}
@@ -1089,7 +1089,7 @@ function ResultBanner({ result, onDismiss }: { result: WalletPushResult; onDismi
   const { t } = useTranslation()
   const hasRejected = result.rejected.length > 0
   return (
-    <div className={`flex items-start gap-2 rounded-md border px-3 py-2 text-[12px] ${
+    <div className={`flex items-start gap-2 rounded-md border px-3 py-2 text-[12px] leading-[18px] ${
       hasRejected ? 'border-destructive/30 bg-destructive/5 text-destructive' : 'border-success/25 bg-success/5 text-success'
     }`}>
       {hasRejected ? <AlertTriangle size={15} className="mt-0.5 shrink-0" aria-hidden /> : <CheckCircle2 size={15} className="mt-0.5 shrink-0" aria-hidden />}

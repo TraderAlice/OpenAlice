@@ -210,8 +210,8 @@ export function CreateUTADialog({
     <Dialog ariaLabel={headerLabel} onClose={onClose}>
       <div className="shrink-0 px-6 py-4 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0">
-          <h3 className="text-[14px] font-semibold text-foreground truncate">{headerLabel}</h3>
-          <span className="text-[11px] tabular-nums text-muted-foreground">
+          <h3 className="text-[14px] leading-[19px] font-semibold text-foreground truncate">{headerLabel}</h3>
+          <span className="text-[11px] leading-[15px] tabular-nums text-muted-foreground">
             Step {WIZARD_STEPS.indexOf(step) + 1} of {WIZARD_STEPS.length}
           </span>
         </div>

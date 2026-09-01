@@ -83,7 +83,7 @@ export function OrderEntryDialog({ utaId, mode, onClose, subAccounts, defaultSub
 function Header({ title, onClose }: { title: string; onClose: () => void }) {
   return (
     <div className="shrink-0 px-6 py-4 border-b border-border flex items-center justify-between">
-      <h3 className="text-[14px] font-semibold text-foreground">{title}</h3>
+      <h3 className="text-[14px] leading-[19px] font-semibold text-foreground">{title}</h3>
       <Button
         variant="ghost"
         size="icon-sm"
@@ -462,7 +462,7 @@ function ContractPicker({
         <div className="mt-2 flex min-w-0 items-start gap-2 rounded-lg border border-border bg-muted/35 px-3 py-2">
           <span className="mt-0.5"><SelectionCheckIcon /></span>
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-1.5 text-[12px] font-medium text-foreground">
+            <div className="flex flex-wrap items-center gap-1.5 text-[12px] leading-[18px] font-medium text-foreground">
               <span>{contractLabel(selected)}</span>
               {selected.contract.secType && (
                 <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
@@ -470,7 +470,7 @@ function ContractPicker({
                 </span>
               )}
             </div>
-            <div className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground" title={value}>
+            <div className="mt-0.5 truncate font-mono text-[10px] leading-[14px] text-muted-foreground" title={value}>
               {value}
             </div>
           </div>
@@ -504,7 +504,7 @@ function ContractPicker({
               >
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-center gap-1.5">
-                    <span className="font-mono text-[13px] font-semibold text-foreground">
+                    <span className="font-mono text-[13px] leading-[18px] font-semibold text-foreground">
                       {contractLabel(hit)}
                     </span>
                     {hit.contract.secType && (
@@ -526,13 +526,13 @@ function ContractPicker({
       )}
 
       {showNoMatches && (
-        <div id={resultsId} role="status" className="mt-2 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-[12px] text-muted-foreground">
+        <div id={resultsId} role="status" className="mt-2 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-[12px] leading-[18px] text-muted-foreground">
           No matching tradeable contract on this account.
         </div>
       )}
 
       {hasExactAliceId && selected === null && value && (
-        <div id={resultsId} role="status" className="mt-2 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-[11px] text-muted-foreground">
+        <div id={resultsId} role="status" className="mt-2 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-[11px] leading-[15px] text-muted-foreground">
           Exact aliceId entered. It will still be validated by the account before the order is staged.
         </div>
       )}
@@ -600,7 +600,7 @@ function CloseForm({ aliceId, initialQty, symbol, ...p }: SharedFormProps & { al
     <div className="space-y-4">
       <div className="rounded-md border border-border bg-secondary/50 px-3 py-2.5 space-y-1">
         <div className="text-[11px] font-medium text-muted-foreground">Closing</div>
-        <div className="font-mono text-[13px] text-foreground">{aliceId}</div>
+        <div className="font-mono text-[13px] leading-[18px] text-foreground">{aliceId}</div>
       </div>
 
       <WalletPicker subAccounts={p.subAccounts} value={subAccountId} onChange={setSubAccountId} />
@@ -731,7 +731,7 @@ function OpTable({ title, rows, kind }: { title: string; rows: OpRow[]; kind: 's
             {rows.map((r, i) => (
               <tr key={i} className="border-t border-border">
                 <td className="px-2.5 py-1.5 text-foreground">{r.action}</td>
-                <td className="px-2.5 py-1.5 font-mono text-muted-foreground text-[11px]">{r.orderId ?? '—'}</td>
+                <td className="px-2.5 py-1.5 font-mono text-muted-foreground text-[11px] leading-[15px]">{r.orderId ?? '—'}</td>
                 <td className={`px-2.5 py-1.5 ${kind === 'rejected' ? 'text-destructive' : 'text-foreground'}`}>
                   {kind === 'rejected' ? (r.error ?? r.status) : r.status}
                 </td>

@@ -88,9 +88,9 @@ export function EditUTADialog({ uta, preset, health, readiness, policy, installi
       <div className="relative shrink-0 border-b border-border px-4 py-3 sm:flex sm:items-center sm:justify-between sm:px-6 sm:py-4">
         <div className="flex min-w-0 items-center gap-2 pr-8 sm:gap-3 sm:pr-0">
           <div className="min-w-0 flex-1">
-            <h3 className="text-[14px] font-semibold text-foreground truncate">{displayName}</h3>
+            <h3 className="text-[14px] leading-[19px] font-semibold text-foreground truncate">{displayName}</h3>
             {displayName !== uta.id && (
-              <div className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">{uta.id}</div>
+              <div className="mt-0.5 truncate font-mono text-[10px] leading-[14px] text-muted-foreground">{uta.id}</div>
             )}
           </div>
           <AccountReadinessBadge readiness={readiness} health={health} size="md" />
