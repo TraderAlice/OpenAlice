@@ -318,18 +318,18 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
   }, 12_000)
 
   it.each([
-    ['default-no', 50, 'sends=0 aborted=false'],
-    ['success', 100, 'sends=1 aborted=false'],
-    ['auth-loss', 100, 'sends=0 aborted=false'],
-    ['occupied', 100, 'sends=0 aborted=false'],
-    ['checksum-retry', 100, 'sends=2 aborted=false'],
-    ['cancel-retry', 100, 'sends=2 aborted=true'],
+    ['default-no', 80, 24, 'sends=0 aborted=false'],
+    ['success', 110, 30, 'sends=1 aborted=false'],
+    ['auth-loss', 100, 30, 'sends=0 aborted=false'],
+    ['occupied', 100, 30, 'sends=0 aborted=false'],
+    ['checksum-retry', 100, 30, 'sends=2 aborted=false'],
+    ['cancel-retry', 100, 30, 'sends=2 aborted=true'],
   ] as const)(
     'drives the remote transfer %s recovery path through a real PTY',
-    async (scenario, cols, expectedResult) => {
+    async (scenario, cols, rows, expectedResult) => {
       const child = pty.spawn(process.execPath, [transferFixtureEntry], {
         cols,
-        rows: 30,
+        rows,
         cwd: dirname(cliEntry),
         env: {
           ...process.env,
@@ -360,7 +360,12 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
             child.write('m')
           } else if (stage === 1 && output.includes('destination Machine')) {
             stage = 2
-            child.write('\r')
+            if (scenario === 'success') {
+              child.write('\u001b[<35;50;12M')
+              child.write('\u001b[<0;50;12M')
+            } else {
+              child.write('\r')
+            }
           } else if (stage === 2 && output.includes('Destination AliceProject key')) {
             stage = 3
             child.write('\r')
@@ -415,6 +420,15 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       })
 
       expect(transcript).toContain(`FIXTURE_RESULT scenario=${scenario} ${expectedResult}`)
+      if (scenario === 'success') {
+        expect(transcript).toContain('Flight Deck · 1/8 · DESTINATION')
+        expect(transcript).toContain('Mission Brief · Source → Cloud fixture')
+      } else {
+        expect(transcript).toContain('Transfer Flight Deck')
+      }
+      if (scenario === 'checksum-retry' || scenario === 'cancel-retry') {
+        expect(transcript).toContain('Transfer Flight Deck · 7/8 · STREAM')
+      }
       if (scenario === 'auth-loss') {
         expect(transcript).toContain('SSH authentication required after destination selection.')
       } else if (scenario === 'occupied') {

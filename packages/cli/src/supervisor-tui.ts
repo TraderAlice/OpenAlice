@@ -177,6 +177,10 @@ import {
   selectedTransferDestination,
 } from './supervisor-transfer.ts'
 import {
+  decorateSupervisorTransferFlightDeck,
+  renderSupervisorTransferFlightDeck,
+} from './supervisor-transfer-view.ts'
+import {
   createSupervisorAliceProject,
   persistAliceProjectLaunchConfig,
   persistMachineLaunchConfig,
@@ -2345,6 +2349,7 @@ export async function runSupervisorTui(
       transferActive = false
       closeTransfer = null
       overlayPointer.clear()
+      overlay.unfocus?.({ target: screen })
       overlay.hide()
       ui.setShowHardwareCursor(false)
       screen.update({ notice })
@@ -2582,22 +2587,36 @@ export async function runSupervisorTui(
     } as const
     const panel = new (class implements Component {
       render(width: number): string[] {
-        const lines = renderSupervisorPanel('Remote Transfer', source.displayName, [
-          ...component.render(Math.max(1, width - 4)),
-          '',
-          sanitize(message),
-        ], width)
+        const flightDeck = renderSupervisorTransferFlightDeck({
+          phase: state.phase === 'failed' && state.plan ? 'transferring' : state.phase,
+          sourceName: source.displayName,
+          destinationName: selectedTransferDestination(state)?.displayName,
+          content: component.render(Math.max(1, width >= 96 ? width - 43 : width - 4)),
+          message: sanitize(message),
+        }, width)
         const choice = activeChoice
+        const choiceTarget = choice
+          ? selectListPointerTarget(
+              choice.items,
+              choice.list,
+              choice.maxVisible,
+              flightDeck.contentFirstRow + 2,
+            )
+          : undefined
         captureOverlayPointer(
-          lines,
+          flightDeck.lines,
           width,
           overlayOptions,
           (data) => this.handleInput(data),
-          choice
-            ? selectListPointerTarget(choice.items, choice.list, choice.maxVisible, 4)
+          choiceTarget
+            ? {
+                ...choiceTarget,
+                startColumn: flightDeck.contentStartColumn,
+                endColumn: flightDeck.contentEndColumn,
+              }
             : undefined,
         )
-        return lines
+        return decorateSupervisorTransferFlightDeck(flightDeck.lines, tuiTheme)
       }
       handleInput(data: string): void { component.handleInput?.(data) }
       invalidate(): void { component.invalidate() }

@@ -232,10 +232,14 @@ path is intentionally parameter-free:
   checking, online, unauthorized, offline, and incompatible remain distinct
   from per-project Runtime state;
 - `m` on a selected local Fleet AliceProject opens the remote-transfer wizard.
-  It selects an online compatible SSH Machine, destination key/Home, credential
-  handling, and exact-Session Issue policy; then renders the same checksum and
-  exclusion plan as the explicit command. Default No changes nothing. Success
-  offers separate Start, Connect/Open, and Done actions and never auto-starts;
+  Its Transfer Flight Deck keeps an eight-stage route, the current Mission
+  Brief, and a stable Safety Rail visible across destination Machine,
+  key/Home, credential handling, exact-Session Issue policy, checksum review,
+  streaming, and arrival. Wide terminals pair route and Brief; the 80-column
+  baseline compresses completed/current/next stages above the complete Brief.
+  It renders the same checksum and exclusion plan as the explicit command.
+  Default No changes nothing. Success offers separate Start, Connect/Open, and
+  Done actions and never auto-starts;
 - Enter or `o` on a running compatible remote AliceProject opens a TUI-owned
   loopback tunnel and browser. Detaching aborts only those tunnel processes;
   it never stops the local or remote Runtime. `s` on a stopped compatible

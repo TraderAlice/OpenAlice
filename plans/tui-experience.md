@@ -308,6 +308,23 @@ not imply maintainer approval of the finished interaction.
   overlay and invokes the existing one-channel `checkUpdate` path. The selected
   lane remains session-local until an already-confirmed installer succeeds.
 
+### Transfer Flight Deck decision
+
+- Merely recoloring the existing `Remote Transfer` card would leave destination,
+  identity, secrets, review, and streaming phases looking unrelated, so users
+  would still have to remember where they are in a safety-sensitive workflow.
+- Replacing the wizard with a new full-screen transfer application could expose
+  every field at once, but would duplicate its validation, re-probe, retry,
+  cancellation, and atomic-publish state machine inside presentation code.
+- The selected model is a phase-aware Transfer Flight Deck. Wide terminals pair
+  an eight-stage flight path with the current Mission Brief; narrower terminals
+  compress the same completed/current/next state into a one-line route above
+  the Brief. A persistent Safety Rail carries the phase message without moving
+  the content. Existing inputs, `SelectList` instances, plan review, retries,
+  sender, and success actions remain authoritative. Pointer row origins derive
+  from the rendered Flight Deck so both responsive forms keep the existing
+  keyboard and mutation paths.
+
 ### Persistent context-ribbon decision
 
 - Expanding the animated brand header would make version/update presentation
@@ -438,6 +455,8 @@ already large `supervisor-tui.ts` application controller.
   map/Inspector while preserving its selection and creation state machine.
 - [x] Replace the legacy update-channel picker with a responsive Release
   Observatory while preserving one-channel, explicit-Enter network behavior.
+- [x] Replace the legacy Remote Transfer shell with a responsive Transfer
+  Flight Deck while preserving its planner, sender, and recovery state machine.
 
 ## Progress
 
@@ -820,6 +839,18 @@ already large `supervisor-tui.ts` application controller.
   suite passes (695 passed, 1 skipped; 6123 tests passed, 10 skipped). Docker
   installer smoke passes, and package dry-run includes
   `src/supervisor-release-view.ts`.
+- Remote migration now runs inside a responsive Transfer Flight Deck. Its
+  eight-stage route distinguishes completed, current, and next boundaries while
+  the Mission Brief keeps the existing input, choice, review, progress,
+  recovery, and completion components in one stable region. Wide terminals use
+  adjacent route/Brief panels; narrow terminals compress the route and Safety
+  Rail so the complete default-No review fits the 80×24 baseline.
+- Flight-Deck acceptance passes with 82 focused view, transfer, pointer, screen,
+  and real-PTY tests. The six PTY recovery scenarios include a 110×30 raw-mouse
+  destination selection and an 80×24 default cancellation. Root TypeScript and
+  CLI build/typecheck pass; the 697-file suite passes (696 passed, 1 skipped;
+  6126 tests passed, 10 skipped). Docker installer smoke passes, and package
+  dry-run includes `src/supervisor-transfer-view.ts`.
 
 ## Completion Criteria
 
