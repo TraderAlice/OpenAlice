@@ -3298,6 +3298,24 @@ already large `supervisor-tui.ts` application controller.
   and real-PTY tests (including all 54 PTY cases), and the complete CLI suite
   (63 files, 637 tests). CLI typecheck and build also pass.
 
+### Inbox identity decision
+
+- A fresh three-message 120x32/80x24 Inbox capture confirmed that Message
+  Stream, Selected, unread state, Mark read, and the contextual Tip already form
+  one coherent reading loop. The remaining visual seam was the Command Spine:
+  every other primary view had a semantic glyph and purple identity treatment,
+  while Inbox fell through as an unstyled bare implementation label.
+- The Spine now projects `● INBOX` as the full view identity and `● BOX` at the
+  narrow intermediate tier before dropping the view badge. Both forms use the
+  same view treatment as Overview, Connections, Runtime, Doctor, and Help;
+  unread attention remains independently yellow in the Inbox Desk and header.
+- Real 120x32 and 80x24 captures verify the selected message, read action,
+  target identity, live signal, and themed Inbox view remain coherent without
+  changing history polling, read-state mutation, selection, or navigation.
+- Inbox-identity acceptance passes through 139 focused Inbox, screen, and
+  real-PTY tests (including all 54 PTY cases), and the complete CLI suite (63
+  files, 637 tests). CLI typecheck and build also pass.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

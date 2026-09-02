@@ -764,6 +764,33 @@ describe('Supervisor TUI screen', () => {
       runtimeClass: 'running',
     })[3]).toContain('\u001b[1;38;2;213;179;255;48;2;10;34;39m≋ RUN')
 
+    const compactInbox = renderSupervisorDock({
+      panel: 'inbox',
+      projectName: 'Default AliceProject',
+      machineName: 'This computer',
+      targetKind: 'local',
+      runtimeState: 'running',
+      connectionHealth: 'connected',
+    }, 113)
+    expect(compactInbox).toContain('● LIVE  ›  ● BOX ─╯')
+    expect(renderSupervisorDock({
+      panel: 'inbox',
+      projectName: 'Default AliceProject',
+      machineName: 'This computer',
+      targetKind: 'local',
+      runtimeState: 'running',
+      connectionHealth: 'connected',
+    }, 115)).toContain('● LIVE  ›  ● INBOX ─╯')
+    expect(decorateSupervisorFrame([
+      'header',
+      'divider',
+      'tabs',
+      compactInbox,
+    ], createSupervisorTuiTheme({ TERM: 'xterm-256color' }), {
+      panel: 'inbox',
+      runtimeClass: 'running',
+    })[3]).toContain('\u001b[1;38;2;213;179;255;48;2;10;34;39m● BOX')
+
     const unreachableRemote = renderSupervisorDock({
       panel: 'overview',
       projectName: 'Research',

@@ -505,6 +505,9 @@ intentionally parameter-free:
   open columns on wide terminals and stacks the same reading order at compact
   widths. The selected message owns Enter's Mark read/unread action; arrows or
   the wheel move selection, and the contextual Tip teaches that exact loop.
+  The Command Spine uses the themed `● INBOX` view identity, contracts it to
+  `● BOX` only at the intermediate responsive tier, and removes the badge
+  before sacrificing target or Runtime truth.
   Help remains available through `?`; Doctor remains a Runtime tool rather
   than a top-level product destination;
 - Runtime is a layered status-manager surface rather than a renamed log tail.

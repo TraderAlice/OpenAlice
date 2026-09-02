@@ -957,6 +957,7 @@ function commandSpine(left: string, right: string, width: number): string {
 
 function panelBadge(panel: string): string {
   if (panel === 'OVERVIEW') return '◆ OVERVIEW'
+  if (panel === 'INBOX') return '● INBOX'
   if (panel === 'FLEET') return '◇ CONNECTIONS'
   if (panel === 'LOGS') return '≋ RUNTIME'
   if (panel === 'DOCTOR') return '✦ DOCTOR'
@@ -971,6 +972,7 @@ function panelBadge(panel: string): string {
 }
 
 function compactPanelBadge(panel: string): string {
+  if (panel === 'INBOX') return '● BOX'
   if (panel === 'FLEET') return '◇ CONN'
   if (panel === 'LOGS') return '≋ RUN'
   return panelBadge(panel)
