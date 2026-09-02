@@ -1107,7 +1107,7 @@ function ConnectorCredentialsEditor({
       ? t('connectorSettings.enterCredentialToSave')
       : t('connectorSettings.saveConnectionHint')
   return (
-    <section className="overflow-hidden rounded-lg border border-border/70 bg-background">
+    <section className="overflow-hidden rounded-xl border border-border/60 bg-background">
       <Button
         type="button"
         variant="ghost"
@@ -1118,32 +1118,33 @@ function ConnectorCredentialsEditor({
         aria-expanded={open}
         aria-controls={credentialsId}
         onClick={onToggle}
-        className="h-auto min-h-11 w-full justify-between gap-3 rounded-none px-3.5 py-2.5 text-left hover:bg-secondary/30"
+        className="h-auto min-h-12 w-full justify-between gap-3 rounded-none px-4 py-3 text-left hover:bg-secondary/25 aria-expanded:bg-secondary/20"
       >
-        <span className="flex min-w-0 items-center gap-2.5">
-          <span className="flex size-5 shrink-0 items-center justify-center text-muted-foreground">
+        <span className="flex min-w-0 items-center gap-3">
+          <span className="flex size-6 shrink-0 items-center justify-center text-muted-foreground">
             <KeyRound size={14} aria-hidden />
           </span>
-          <span className="text-[12.5px] font-medium leading-[18px] text-foreground">{t('connectorSettings.connectionDetails')}</span>
-          <span className={`rounded-sm border px-1.5 py-px text-[9.5px] font-medium leading-[14px] ${
-            ready ? 'border-success/20 text-success' : 'border-warning/20 text-warning'
+          <span className="truncate text-[13px] font-medium leading-[18px] text-foreground">{t('connectorSettings.connectionDetails')}</span>
+        </span>
+        <span className="flex shrink-0 items-center gap-2" aria-hidden>
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium leading-4 ${
+            ready ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'
           }`}>
             {ready ? t('connectorSettings.saved') : t('connectorSettings.required')}
           </span>
-        </span>
-        <span className="flex shrink-0 items-center gap-1.5 text-[11px] leading-[15px] text-muted-foreground" aria-hidden>
-          {open ? t('connectorSettings.hide') : t('connectorSettings.manage')}
-          <ChevronDown
-            size={14}
-            className={`transition-transform duration-[var(--motion-fast)] ${open ? 'rotate-180' : ''}`}
-          />
+          <span className="flex size-7 items-center justify-center rounded-md text-muted-foreground">
+            <ChevronDown
+              size={15}
+              className={`transition-transform duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] motion-reduce:transition-none ${open ? 'rotate-180' : ''}`}
+            />
+          </span>
         </span>
       </Button>
       <div
         id={credentialsId}
         hidden={!open}
         inert={!open ? true : undefined}
-        className={`border-t border-border/60 px-3.5 pb-4 ${open ? 'oa-disclosure-enter' : ''}`}
+        className={`border-t border-border/45 px-4 pb-5 ${open ? 'oa-disclosure-enter' : ''}`}
       >
         {!ready && <ConnectorSetupGuide definition={definition} t={t} />}
         <p className="mb-4 pt-3 text-[11.5px] leading-5 text-muted-foreground">

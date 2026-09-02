@@ -80,14 +80,14 @@
   --font-mono: "SF Mono", "Fira Code", "Cascadia Code", Menlo, Consolas,
     monospace;
 
-  /* Compact workbench geometry. Composer and drawer silhouettes keep their
+  /* Shared workbench geometry. Composer and drawer silhouettes keep their
      dedicated larger radii at the component boundary. */
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 10px;
-  --radius-2xl: 12px;
-  --radius-3xl: 16px;
+  --radius-sm: 5px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-3xl: 20px;
 }
 
 /* Base resolution (no attribute / explicit light). */
