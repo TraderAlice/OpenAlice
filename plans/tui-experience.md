@@ -442,6 +442,20 @@ not imply maintainer approval of the finished interaction.
   tone still come from the existing snapshot, but action bar and context ribbon
   never change rows merely because feedback appears.
 
+### Launchpad brand-beacon decision
+
+- Copying OMP's full-screen welcome composition would create a memorable first
+  frame, but delay operational truth and crowd the required 80×24 experience.
+- Translating the official Alice pixel portrait into terminal blocks would be
+  closer to the raster asset, but recognition would depend on a large canvas
+  and color fidelity that `NO_COLOR` and narrow terminals cannot promise.
+- The selected model is a wide-only, three-row `ALICE` pixel wordmark Beacon
+  above the existing Overview cockpit. It pairs the mark with the selected
+  AliceProject and truthful Runtime state, reuses the bounded brand entrance
+  sweep, remains meaningful without color, and appears only from 116 columns.
+  The action-first Launchpad, 80×24 geometry, and lifecycle callbacks remain
+  unchanged.
+
 ### Confirmation-modal decision
 
 - Keeping confirmation cards inline preserves the original implementation but
@@ -505,6 +519,8 @@ already large `supervisor-tui.ts` application controller.
   full-width activity rail and purposeful OMP-inspired busy animation.
 - [x] Add a bounded one-shot entrance treatment and subtle Runtime heartbeat;
   preserve the static reduced-motion frame as the complete experience.
+- [x] Add an OMP-inspired wide Launchpad brand Beacon without displacing the
+  complete 80×24 operational frame.
 - [x] Turn Overview into a responsive AliceProject/Runtime cockpit without
   changing lifecycle action semantics or sacrificing the 80x24 baseline.
 - [x] Promote Overview into an action-first Launchpad with a semantic intent
@@ -1033,6 +1049,22 @@ already large `supervisor-tui.ts` application controller.
   1 skipped; 6142 tests passed, 10 skipped). Docker installer smoke passes, and
   package dry-run retains both `src/supervisor-transfer-view.ts` and
   `src/supervisor-tui.ts`.
+- A live 120-column comparison against the locally installed OMP home screen
+  showed that OpenAlice had reached operational clarity but still lacked a
+  memorable first-frame brand composition. Overview now adds a wide Launch
+  System Beacon: a terminal-native `ALICE` pixel wordmark and selected
+  AliceProject/Runtime signal share an internal split frame, and the existing
+  bounded brand sweep crosses the wordmark before settling.
+- Beacon acceptance passes with 73 focused screen and real-PTY tests. A real
+  120×30 color session hovered and clicked the shifted Launchpad primary row
+  outside its keycap and reached the existing start/open callbacks. `NO_COLOR`
+  retains the complete wordmark and state, while 115 columns and below keep the
+  prior operational geometry. Testing initially exposed a reproducible 110×32
+  compositor focus regression; raising the decorative boundary to 116 restored
+  the complete AliceProject create/switch flow. CLI build/typecheck and root
+  TypeScript pass; the 699-file suite passes (698 passed, 1 skipped; 6,145 tests
+  passed, 10 skipped). Docker installer smoke passes, and package dry-run
+  retains the theme, view, and Supervisor sources.
 
 ## Completion Criteria
 

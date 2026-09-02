@@ -266,6 +266,64 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
 
+  it('renders the wide Alice Beacon without breaking Launchpad pointer geometry', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-wide-beacon-pointer-'))
+    temporaryPaths.push(isolatedHome)
+    const childEnv = { ...process.env }
+    delete childEnv.NO_COLOR
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 120,
+      rows: 30,
+      cwd: dirname(cliEntry),
+      env: {
+        ...childEnv,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let hovered = false
+      let clicked = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor wide Beacon pointer timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (
+          !hovered
+          && output.includes('OpenAlice · launch system')
+          && output.includes('◆ ALICEPROJECT')
+          && output.includes('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+        ) {
+          hovered = true
+          child.write('\u001b[<35;50;17M')
+        } else if (!clicked && output.includes('│ › [ Enter ]')) {
+          clicked = true
+          child.write('\u001b[<0;50;17M')
+        } else if (clicked && output.includes('OpenAlice started and opened in your browser.')) {
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor wide Beacon pointer exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('OpenAlice · launch system')
+    expect(transcript).toContain('◆ ALICEPROJECT')
+    expect(transcript).toContain('\u001b[1;38;2;')
+    expect(transcript).toContain('│ › [ Enter ]')
+    expect(transcript).toContain('FIXTURE_RESULT starts=1 opens=1')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
   it('clicks the navigation rail and explores Help with raw pointer input', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-navigation-pointer-'))
     temporaryPaths.push(isolatedHome)

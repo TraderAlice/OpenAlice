@@ -1,4 +1,7 @@
 import { displayWidth, truncateDisplayWidth } from './supervisor-display.ts'
+import { SUPERVISOR_BRAND_MARK_ROWS } from './supervisor-tui-theme.ts'
+
+const SUPERVISOR_BRAND_BEACON_MIN_WIDTH = 116
 
 export interface SupervisorHomeView {
   projectName: string
@@ -132,11 +135,37 @@ function renderWideCockpit(
     gap,
     width,
   ))
-  const lines = [...cards, ...contextRail('⌂  Home', view.home, width)]
+  const beacon = width >= SUPERVISOR_BRAND_BEACON_MIN_WIDTH
+    ? [...renderLaunchpadBeacon(view, state, width), '']
+    : []
+  const lines = [...beacon, ...cards, ...contextRail('⌂  Home', view.home, width)]
   return {
     lines,
     primaryTarget: targetForLine(lines, '[ Enter ]', leftWidth),
   }
+}
+
+function renderLaunchpadBeacon(
+  view: SupervisorHomeView,
+  state: string,
+  width: number,
+): string[] {
+  const innerWidth = Math.max(1, width - 4)
+  const divider = ' │ '
+  const leftWidth = Math.min(
+    48,
+    Math.max(displayWidth(SUPERVISOR_BRAND_MARK_ROWS[0]) + 2, Math.floor(innerWidth * 0.44)),
+  )
+  const rightWidth = Math.max(1, innerWidth - leftWidth - displayWidth(divider))
+  const signals = [
+    '◆ ALICEPROJECT',
+    truncateDisplayWidth(view.projectName, Math.max(1, Math.floor(innerWidth * 0.42))),
+    state,
+  ]
+  const rows = SUPERVISOR_BRAND_MARK_ROWS.map((mark, index) => (
+    `${fillLine(`  ${mark}`, leftWidth)}${divider}${truncateDisplayWidth(signals[index] ?? '', rightWidth)}`
+  ))
+  return renderCard('OpenAlice · launch system', rows, width)
 }
 
 function launchIntent(state: string): string {

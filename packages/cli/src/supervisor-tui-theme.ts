@@ -38,6 +38,12 @@ const BRAND_SWEEP = [
   '255;164;210',
 ] as const
 
+export const SUPERVISOR_BRAND_MARK_ROWS = [
+  '▄▀▄ █   ▀█▀ ▄▀▀ █▀▀',
+  '█▀█ █    █  █   █▀ ',
+  '▀ ▀ ▀▀▀ ▄█▄ ▀▄▄ ▀▀▀',
+] as const
+
 export function createSupervisorTuiTheme(
   env: NodeJS.ProcessEnv = process.env,
 ): SupervisorTuiTheme {
@@ -97,6 +103,8 @@ export function decorateSupervisorFrame(
     ))
   }
   return lines.map((line, index) => {
+    const brandMark = decorateBrandMarkLine(line, theme, options.introFrame)
+    if (brandMark) return brandMark
     if (isSupervisorActionShelf(line)) {
       return decorateSupervisorActionShelf(
         line,
@@ -168,6 +176,17 @@ export function decorateSupervisorFrame(
     ) return theme.accentStrong(line)
     return line
   })
+}
+
+function decorateBrandMarkLine(
+  line: string,
+  theme: SupervisorTuiTheme,
+  introFrame?: number,
+): string | null {
+  const mark = SUPERVISOR_BRAND_MARK_ROWS.find((row) => line.includes(row))
+  if (!mark) return null
+  const offset = line.indexOf(mark)
+  return `${line.slice(0, offset)}${theme.brand(mark, introFrame)}${line.slice(offset + mark.length)}`
 }
 
 export function decorateSupervisorActionShelf(

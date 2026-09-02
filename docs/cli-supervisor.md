@@ -128,7 +128,12 @@ path is intentionally parameter-free:
   owner, provider identity, services, and uptime available without returning
   to the historical flat field dump. At 100 columns and wider those surfaces
   become a two-column cockpit, with the Launchpad on the left and Runtime
-  Signal on the right. Narrower terminals fold the same fields
+  Signal on the right. From 116 columns, an OMP-inspired Launch System Beacon
+  adds a terminal-native `ALICE` pixel wordmark beside the selected
+  AliceProject and truthful Runtime state. It is decorative enhancement rather
+  than another control: the same bounded entrance sweep styles it, `NO_COLOR`
+  keeps the wordmark and state legible, and narrower terminals omit it entirely.
+  Narrower terminals fold the operational fields
   into the complete vertical flow instead of hiding them. The application
   divider follows the full terminal width, and an available-update notice is
   composed inside the responsive header instead of being appended beyond its
@@ -204,7 +209,8 @@ path is intentionally parameter-free:
   color; only the busy glyph animates. The slot is a presentation of existing
   Supervisor state and does not introduce a second lifecycle or error path;
 - color-capable motion-enabled sessions play one bounded brand-color sweep on
-  entry, then settle to the static OpenAlice header. A successfully refreshed
+  entry across the OpenAlice header and any visible wide Beacon, then settle to
+  the static brand frame. A successfully refreshed
   running Runtime alternates `●`/`◉` as a low-frequency heartbeat in Overview
   and Fleet; the adjacent `RUNNING`/`running` text never changes, and failed
   probes still surface through the diagnostic rail rather than animation;

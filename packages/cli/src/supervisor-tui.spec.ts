@@ -80,14 +80,20 @@ describe('Supervisor TUI screen', () => {
 
     const wideLines = screen.render(120)
     expect(wideLines[1]).toHaveLength(120)
-    expect(wideLines[4]).toContain('AliceProject')
-    expect(wideLines[4]).toContain('Runtime signal')
+    expect(wideLines.join('\n')).toContain('OpenAlice · launch system')
+    expect(wideLines.join('\n')).toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+    expect(wideLines.join('\n')).toContain('ALICEPROJECT')
+    const wideCockpitHeader = wideLines.find((line) => (
+      line.includes('Launchpad · AliceProject') && line.includes('Runtime signal')
+    ))
+    expect(wideCockpitHeader).toBeDefined()
     expect(wideLines.join('\n')).toContain('○ COLD')
     expect(wideLines.every((line) => displayWidth(line) <= 120)).toBe(true)
 
     const foldedLines = screen.render(99)
     expect(foldedLines.findIndex((line) => line.includes('╭ Launchpad · AliceProject')))
       .toBeLessThan(foldedLines.findIndex((line) => line.includes('╭ Runtime signal')))
+    expect(foldedLines.join('\n')).not.toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
     expect(foldedLines.every((line) => displayWidth(line) <= 99)).toBe(true)
 
     expect(screen.handlePointer({
@@ -290,9 +296,13 @@ describe('Supervisor TUI screen', () => {
 
     expect(screen.hasActiveMotion()).toBe(true)
     const intro = screen.render(80)[0]
+    const beaconIntro = screen.render(120).find((line) => line.includes('ALICEPROJECT'))
+    expect(beaconIntro).toContain('\u001b[1;38;2;')
     expect(intro).toContain('\u001b[1;38;2;116;235;226m◆')
     screen.advanceMotion()
     expect(screen.render(80)[0]).not.toBe(intro)
+    expect(screen.render(120).find((line) => line.includes('ALICEPROJECT')))
+      .not.toBe(beaconIntro)
     for (let frame = 0; frame < 8; frame += 1) screen.advanceMotion()
     expect(screen.hasActiveMotion()).toBe(false)
     expect(screen.render(80)[0]).toContain('\u001b[1;38;2;116;235;226m◆  OpenAlice Supervisor')
@@ -315,6 +325,20 @@ describe('Supervisor TUI screen', () => {
     }, { motionEnabled: true })
     fleetScreen.update({ runtime: { class: 'absent', endpoints: {} } })
     expect(fleetScreen.render(100).join('\n')).toContain('◉ running')
+
+    const reduced = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'absent', endpoints: {} },
+    }, {
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color', NO_COLOR: '1' }),
+      motionEnabled: false,
+    })
+    const plainBeacon = reduced.render(120).join('\n')
+    expect(plainBeacon).toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+    expect(plainBeacon).toContain('Default AliceProject')
+    expect(plainBeacon).not.toContain('\u001b[')
+    expect(reduced.render(115).join('\n')).not.toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
   })
 
   it('describes an externally owned Runtime without offering refused mutations', () => {
