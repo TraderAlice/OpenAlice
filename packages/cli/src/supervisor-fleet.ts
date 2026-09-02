@@ -447,11 +447,11 @@ function launchRuntimeStep(
 ): string {
   if (!projectReady || !machine || !project) return '○ WAITING FOR SELECTION'
   if (project.runtime.class === 'absent') {
-    return '○ READY · ENTER TO START'
+    return '○ READY TO START'
   }
   if ((project.runtime.class === 'running' || project.runtime.class === 'owned_elsewhere')
     && project.runtime.webEndpoint) {
-    return machine.key === 'local' ? '● READY · ENTER TO USE' : '● READY · ENTER TO CONNECT'
+    return machine.key === 'local' ? '● READY TO USE' : '● READY TO CONNECT'
   }
   return `◆ ${project.runtime.class.toUpperCase()} · OPEN RUNTIME TOOLS`
 }
@@ -466,10 +466,10 @@ function compactLaunchSteps(
   const projectStep = `2 ${projectReady ? '✓' : '○'} ${project?.displayName ?? 'Choose Project'}`
   let runtimeStep = '3 ○ SELECT TARGET'
   if (projectReady && machine && project) {
-    if (project.runtime.class === 'absent') runtimeStep = '3 ○ [Enter] START'
+    if (project.runtime.class === 'absent') runtimeStep = '3 ○ READY TO START'
     else if ((project.runtime.class === 'running' || project.runtime.class === 'owned_elsewhere')
       && project.runtime.webEndpoint) {
-      runtimeStep = machine.key === 'local' ? '3 ● [Enter] USE' : '3 ● [Enter] CONNECT'
+      runtimeStep = machine.key === 'local' ? '3 ● READY TO USE' : '3 ● READY TO CONNECT'
     } else {
       runtimeStep = '3 ◆ CHECK RUNTIME'
     }
@@ -808,12 +808,15 @@ function renderLaunchBriefing(
         ? '× LAUNCH BLOCKED'
         : '◇ LAUNCH SELECT'
   const keycap = `[ ${intent.action.key} ]`
+  const briefingStatus = intent.state === 'ready'
+    ? `${signal} · ${route}`
+    : `${signal} · ${intent.headline} · ${route}`
   if (rowCount <= 2) {
     return renderPane(
       `Launch Briefing · ${state.focus === 'machines' ? 'Machine' : 'AliceProject'}`,
       [
-        `${signal} · ${intent.headline} · ${route}`,
-        `NEXT  ${keycap} ${intent.action.label} · ${compactLaunchConsequence(intent)}`,
+        briefingStatus,
+        `◆ ${keycap} ${intent.action.label} · ${compactLaunchConsequence(intent)}`,
       ],
       width,
       undefined,
@@ -831,7 +834,7 @@ function renderLaunchBriefing(
   return renderPane(
     `Launch Briefing · ${state.focus === 'machines' ? 'Machine' : 'AliceProject'}`,
     [
-      `${signal} · ${intent.headline} · ${route}`,
+      briefingStatus,
       intent.summary,
       '',
       '◇ HANDOFF · THIS TUI STAYS IN CONTROL',
@@ -839,7 +842,7 @@ function renderLaunchBriefing(
       '',
       `TARGET   ${target}`,
       `CONTEXT  ${context}`,
-      `NEXT     Use ${keycap} ${intent.action.label} from this Briefing.`,
+      `◆ ${keycap} ${intent.action.label}`,
     ],
     width,
     undefined,

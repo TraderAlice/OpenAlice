@@ -135,15 +135,18 @@ intentionally parameter-free:
 
 - before connection, the default Connect page is an OpenAlice Launcher. Its
   explicit Machine → AliceProject → Runtime rail names all three selected
-  values and whether Enter will browse, start, connect, or use the target.
+  values and whether the Runtime is ready to browse, start, connect, or use.
   Machine and AliceProject panes remain keyboard- and pointer-selectable; the
   passive detail surface is a Launch Briefing rather than a pre-connection
   telemetry dump. It names the selected route, explains the human outcome, and
   previews the three-stage handoff into connected Home; wide terminals add
   target context in a content-sized nine-row stage while ordinary and narrow
-  terminals retain the outcome and next command. Surplus viewport height stays
-  outside the Briefing so its final Next instruction remains visually adjacent
-  to the contextual Tip. The Briefing and its content-owned action share one
+  terminals retain the outcome and next command. The final command is a
+  full-row primary Action Shelf such as `◆ [ Enter ] Start OpenAlice`, not a
+  keycap buried in a prose Next sentence; its complete painted row is also its
+  pointer target. Surplus viewport height stays outside the Briefing so this
+  action remains visually adjacent to the contextual Tip. The Briefing and its
+  content-owned action share one
   resolved intent,
   so an offline, unavailable, capability-blocked, or endpoint-less target
   promotes Refresh instead of advertising a stale Start or Connect. An offline
@@ -172,12 +175,12 @@ intentionally parameter-free:
   state and does not own
   Runtime readiness, lifecycle, SSH cancellation, or persistence;
   At 72–95 columns the launch path uses compact stage vocabulary that spends
-  width on the selected target names plus an explicit `[Enter] START`, `USE`,
-  or `CONNECT`, instead of independently truncating three equal-width technical
-  labels. The compact Briefing then
-  states only the resolved Next action and its immediate consequence; it does
-  not repeat the same three-stage handoff. Its Tip names Enter, selection,
-  pane movement, and repeated-click activation without requiring Help;
+  width on the selected target names and readiness state instead of repeating
+  the same Enter command or independently truncating three equal-width
+  technical labels. The compact Briefing then owns the resolved full-row action
+  and its immediate consequence; it does not repeat the same three-stage
+  handoff. Its Tip names selection, pane movement, and repeated-click
+  activation without repeating the visible primary action;
 - the connected workbench has exactly one active target. Its persistent command
   spine names the Machine, AliceProject, loopback or SSH transport, and live
   Runtime signal on every page. Connections marks the active Machine and

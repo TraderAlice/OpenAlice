@@ -681,7 +681,7 @@ export function renderSupervisorContextTip(
       ? 'Enter retries; Esc returns to targets; q detaches this TUI.'
     : view.panel === 'fleet'
       ? view.launcher
-        ? 'Enter runs Next; ↑↓ selects; Tab/←→ changes pane; click again activates.'
+        ? '↑↓ selects; Tab/←→ changes pane; click selection again to activate.'
         : view.activeSelection
           ? '←→ changes pane; ↑↓ chooses; Enter returns Home from the active target.'
           : view.switchSelection
@@ -839,6 +839,9 @@ function supervisorActionShelfTargets(
   if (!/^[◆·] \[ [^\]]+ \] /u.test(body)) return []
   const parts = body.split('  │  ')
   if (!parts.every((part) => /^(?:[◆·] )?\[ [^\]]+ \] \S/u.test(part))) return []
+  const singleActionEnd = parts.length === 1 && (framed || capped)
+    ? displayWidth(trimmed) - 1
+    : null
 
   const targets: SupervisorCommandTarget[] = []
   let codeUnitOffset = 0
@@ -849,7 +852,7 @@ function supervisorActionShelfTargets(
     targets.push({
       row,
       startColumn,
-      endColumn: startColumn + displayWidth(part) - 1,
+      endColumn: singleActionEnd ?? startColumn + displayWidth(part) - 1,
       label: match[2],
       surface: part,
       primary: match[1] === '◆ ',

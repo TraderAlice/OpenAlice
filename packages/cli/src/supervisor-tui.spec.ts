@@ -83,10 +83,10 @@ describe('Supervisor TUI screen', () => {
     expect(frame).toContain('OPENALICE LAUNCH · SELECT → START → CONNECT')
     expect(frame).toContain('1 MACHINE ✓ This computer')
     expect(frame).toContain('2 ALICEPROJECT ✓ Default AliceProject')
-    expect(frame).toContain('3 RUNTIME ○ READY · ENTER TO START')
+    expect(frame).toContain('3 RUNTIME ○ READY TO START')
     expect(frame).toContain('Launch Briefing · AliceProject')
-    expect(frame).toContain('◆ LAUNCH READY · READY TO START')
-    expect(frame).toContain('NEXT  [ Enter ] Start OpenAlice')
+    expect(frame).toContain('◆ LAUNCH READY · This computer → Default AliceProject')
+    expect(frame).toContain('◆ [ Enter ] Start OpenAlice')
     expect(frame).toContain('[ Enter ] Start OpenAlice')
     expect(frame).not.toContain('Inbox')
 
@@ -99,7 +99,8 @@ describe('Supervisor TUI screen', () => {
     expect(themed.join('\n')).toContain('[ Enter ]')
     expect(themed.map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))).toEqual(plainLines)
 
-    expect(screen.handleKey('enter', matchesKey)).toBe(true)
+    const actionRow = plainLines.findIndex((line) => line.includes('◆ [ Enter ] Start OpenAlice')) + 1
+    expect(screen.handlePointer(pointerClick(130, actionRow))).toBe(true)
     expect(activated).toEqual(['local/default'])
   })
 
@@ -129,7 +130,7 @@ describe('Supervisor TUI screen', () => {
 
     const frame = screen.render(100).join('\n')
     expect(frame).toContain('× LAUNCH BLOCKED · SSH FORWARD UNAVAILABLE')
-    expect(frame).toContain('NEXT  [ r ] Refresh')
+    expect(frame).toContain('◆ [ r ] Refresh')
     expect(frame).not.toContain('╭─ ◆ [ r ] Refresh')
     expect(frame).not.toContain('[ Enter ] Connect')
     expect(screen.handleKey('r', matchesKey)).toBe(true)
@@ -985,7 +986,8 @@ describe('Supervisor TUI screen', () => {
     expect(activeFleet).toContain('Enter returns Home')
     expect(activeFleet).toContain('active target')
     expect(switchFleet).toContain('current target stays live until ready')
-    expect(launcher).toContain('Enter runs Next')
+    expect(launcher).toContain('↑↓ selects')
+    expect(launcher).not.toContain('Enter runs Next')
     expect(launcher).toContain('Tab/←→ changes pane')
     expect(logs).toContain('f filters; y copies')
     expect(emptyLogs).toContain('No Runtime events in this lens')
@@ -2087,6 +2089,17 @@ describe('Supervisor TUI screen', () => {
         surface: '[ p ] Setup',
         primary: false,
       },
+    ])
+    const singleAction = '│ ◆ [ Enter ] Start OpenAlice'.padEnd(39, ' ') + '│'
+    expect(supervisorCommandTargets([singleAction])).toEqual([
+      expect.objectContaining({
+        row: 1,
+        startColumn: 3,
+        endColumn: 39,
+        label: 'Enter',
+        surface: '◆ [ Enter ] Start OpenAlice',
+        primary: true,
+      }),
     ])
     expect(supervisorCommandTargets([
       '│ left pane │   │ ◆ [ Enter ] Edit value  │  [ Esc ] Done │',

@@ -276,17 +276,17 @@ describe('Supervisor fleet state and presentation', () => {
       action: { key: 'Enter', label: 'Start OpenAlice' },
     })
     expect(output).toContain('Launch Briefing · AliceProject')
-    expect(output).toContain('◆ LAUNCH READY · READY TO START · This Mac → Default AliceProject')
+    expect(output).toContain('◆ LAUNCH READY · This Mac → Default AliceProject')
     expect(output).toContain('Start OpenAlice locally, verify readiness, and stay inside this terminal.')
     expect(output).toContain('1 Start Runtime')
     expect(output).toContain('2 Verify Web endpoint')
     expect(output).toContain('3 Enter connected Home')
-    expect(output).toContain('NEXT     Use [ Enter ] Start OpenAlice from this Briefing.')
+    expect(output).toContain('◆ [ Enter ] Start OpenAlice')
     expect(output).not.toContain('Selection Constellation')
     expect(output).not.toContain('OWNER    ')
     expect(output).not.toContain('PORT  ')
     expect(launcher).toHaveLength(23)
-    expect(launcher.at(-2)).toContain('NEXT     Use [ Enter ] Start OpenAlice')
+    expect(launcher.at(-2)).toContain('◆ [ Enter ] Start OpenAlice')
     expect(launcher.every((line) => displayWidth(line) <= 120)).toBe(true)
 
     const compactLauncher = renderSupervisorFleet(
@@ -300,8 +300,8 @@ describe('Supervisor fleet state and presentation', () => {
     ).join('\n')
     expect(compactLauncher).toContain('1 ✓ This Mac')
     expect(compactLauncher).toContain('2 ✓ Default AliceProject')
-    expect(compactLauncher).toContain('3 ○ [Enter] START')
-    expect(compactLauncher).toContain('NEXT  [ Enter ] Start OpenAlice · stay here through readiness')
+    expect(compactLauncher).toContain('3 ○ READY TO START')
+    expect(compactLauncher).toContain('◆ [ Enter ] Start OpenAlice · stay here through readiness')
     expect(compactLauncher).not.toContain('Start Runtime → Verify Web endpoint')
 
     const connectedManager = renderSupervisorFleet(state, 120, undefined, false, 15)
@@ -336,7 +336,7 @@ describe('Supervisor fleet state and presentation', () => {
       action: { key: 'r', label: 'Refresh' },
     })
     expect(compact).toContain('× LAUNCH BLOCKED · SSH FORWARD UNAVAILABLE')
-    expect(compact).toContain('NEXT  [ r ] Refresh')
+    expect(compact).toContain('◆ [ r ] Refresh')
   })
 
   it('names compact local-use and remote-connect consequences explicitly', () => {
@@ -347,8 +347,8 @@ describe('Supervisor fleet state and presentation', () => {
     const localOutput = renderSupervisorFleet(
       local, 80, undefined, false, 5, undefined, true,
     ).join('\n')
-    expect(localOutput).toContain('3 ● [Enter] USE')
-    expect(localOutput).toContain('NEXT  [ Enter ] Use AliceProject · enter connected Home')
+    expect(localOutput).toContain('3 ● READY TO USE')
+    expect(localOutput).toContain('◆ [ Enter ] Use AliceProject · enter connected Home')
 
     let remote = createSupervisorFleetState('2026-08-23T00:00:00Z', machines())
     remote = selectFleetIndex(remote, 'machines', 1)
@@ -356,8 +356,8 @@ describe('Supervisor fleet state and presentation', () => {
     const remoteOutput = renderSupervisorFleet(
       remote, 80, undefined, false, 5, undefined, true,
     ).join('\n')
-    expect(remoteOutput).toContain('3 ● [Enter] CONNECT')
-    expect(remoteOutput).toContain('NEXT  [ Enter ] Connect · open its SSH forward into Home')
+    expect(remoteOutput).toContain('3 ● READY TO CONNECT')
+    expect(remoteOutput).toContain('◆ [ Enter ] Connect · open its SSH forward into Home')
   })
 
   it('maps pointer rows to visible Machine and AliceProject selections', () => {

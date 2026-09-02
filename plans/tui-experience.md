@@ -3254,6 +3254,31 @@ already large `supervisor-tui.ts` application controller.
   and real-PTY tests (including all 54 PTY cases), and the complete CLI suite
   (63 files, 637 tests). CLI typecheck and build also pass.
 
+### Launcher primary-action decision
+
+- Fresh 120x32 and 80x24 Launcher captures showed the same Start instruction in
+  five visual layers: Runtime stage, Briefing status, prose Next row,
+  contextual Tip, and Command Spine. The repetition made the only actionable
+  control look like another sentence instead of the page's primary button.
+- The Machine → AliceProject → Runtime rail now reports readiness only. The
+  Briefing status names state plus selected route, while its last row becomes a
+  high-contrast `◆ [ key ] action` shelf. Compact Briefing retains the immediate
+  consequence on that same shelf; wide Briefing already explains it in the
+  outcome sentence and keeps the three-stage handoff above.
+- Launcher Tips now teach selection, pane movement, and repeated-click
+  activation only. Start, Connect, Use, Browse, and Refresh remain derived from
+  the existing shared launch intent, but each appears as one visually dominant
+  command instead of a prose `NEXT Use ... from this Briefing` instruction.
+- A single framed Action Shelf now extends its pointer target through the whole
+  painted row. Real screen acceptance clicks the far-right quiet area of the
+  Start shelf and reaches the same local/default activation path as Enter.
+- Real 120x32 and 80x24 captures verify the complete target route, readiness,
+  outcome, handoff, primary action, navigation Tip, and Command Spine remain
+  visible with no duplicate Enter instruction.
+- Launcher-primary-action acceptance passes through 149 focused Fleet, screen,
+  and real-PTY tests (including all 54 PTY cases), and the complete CLI suite
+  (63 files, 637 tests). CLI typecheck and build also pass.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and
