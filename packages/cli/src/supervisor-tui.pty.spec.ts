@@ -961,7 +961,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         if (!hovered && output.includes('Start OpenAlice for this AliceProject') && output.includes('[ Enter ]')) {
           hovered = true
           child.write('\u001b[<35;60;13M')
-        } else if (!clicked && output.includes('│ › [ Enter ]')) {
+        } else if (!clicked && stripSgr(output).includes('│ › [ Enter ]')) {
           clicked = true
           child.write('\u001b[<0;60;13M')
         } else if (clicked && output.includes('OpenAlice started')) {
@@ -975,7 +975,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       })
     })
 
-    expect(transcript).toContain('│ › [ Enter ]')
+    expect(stripSgr(transcript)).toContain('│ › [ Enter ]')
     expect(transcript).toContain('FIXTURE_RESULT starts=1 opens=1')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
@@ -1014,7 +1014,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         if (!hovered && output.includes('Runtime is live; AliceProject home is missing') && output.includes('[ Enter ]')) {
           hovered = true
           child.write('\u001b[<35;70;13M')
-        } else if (!clicked && output.includes('│ › [ Enter ]')) {
+        } else if (!clicked && stripSgr(output).includes('│ › [ Enter ]')) {
           clicked = true
           child.write('\u001b[<0;70;13M')
         } else if (!detached && clicked && output.includes('FIXTURE_RESULT') === false && output.includes('Opened the verified Web')) {
@@ -1029,7 +1029,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       })
     })
 
-    expect(transcript).toContain('│ › [ Enter ]')
+    expect(stripSgr(transcript)).toContain('│ › [ Enter ]')
     expect(stripSgr(transcript)).toContain('HOME MISSING')
     expect(transcript).toContain('Opened the verified Web')
     expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=1')

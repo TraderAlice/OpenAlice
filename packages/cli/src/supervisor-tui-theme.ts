@@ -129,6 +129,20 @@ export function decorateSupervisorFrame(
         options.introFrame ?? options.ambientBrandFrame,
       ) ?? highlighted
     }
+    if (isSupervisorActionShelf(line)) {
+      const actionShelf = decorateSupervisorActionShelf(
+        line,
+        theme,
+        options.hoveredCommand?.row === index + 1
+          ? options.hoveredCommand.label
+          : undefined,
+      )
+      return decorateBrandMarkLine(
+        actionShelf,
+        theme,
+        options.introFrame ?? options.ambientBrandFrame,
+      ) ?? actionShelf
+    }
     const brandMark = decorateBrandMarkLine(
       line,
       theme,
@@ -145,15 +159,6 @@ export function decorateSupervisorFrame(
     if (line.startsWith('╭─ ×  ERROR')) return theme.dangerRail(line)
     if (line.startsWith('╭─ ◆  STATUS')) return theme.infoRail(line)
     if (line.startsWith('╭─ ◇  PREVIEW')) return theme.navigationHover(line)
-    if (isSupervisorActionShelf(line)) {
-      return decorateSupervisorActionShelf(
-        line,
-        theme,
-        options.hoveredCommand?.row === index + 1
-          ? options.hoveredCommand.label
-          : undefined,
-      )
-    }
     if (line.startsWith('[ / ]')
       || line.startsWith('╰─ [ / ]')
       || line.startsWith('╰─ ◆ OPERATION ACTIVE')) {
@@ -400,6 +405,8 @@ export function decorateSupervisorActionShelf(
   theme: SupervisorTuiTheme,
   hoveredCommand?: string,
 ): string {
+  const embedded = decorateEmbeddedSupervisorActionShelf(line, theme, hoveredCommand)
+  if (embedded) return embedded
   const columns = splitFramedColumns(line)
   if (columns.length > 1) {
     return columns.map((column) => (
@@ -409,6 +416,32 @@ export function decorateSupervisorActionShelf(
     )).join('   ')
   }
   return decorateSingleSupervisorActionShelf(line, theme, hoveredCommand)
+}
+
+function decorateEmbeddedSupervisorActionShelf(
+  line: string,
+  theme: SupervisorTuiTheme,
+  hoveredCommand?: string,
+): string | null {
+  const trimmed = line.trimEnd()
+  if (!trimmed.startsWith('│ ') || !trimmed.endsWith(' │')) return null
+  const content = trimmed.slice(2, -2)
+  const action = /[◆·›] \[ ([^\]]+) \] /u.exec(content)
+  if (!action || action.index === undefined) return null
+  const leading = content.slice(0, action.index)
+  if (leading.length < 4 || !leading.endsWith('    ')) return null
+
+  const actionStart = 2 + action.index
+  const actionEnd = trimmed.length - 2
+  const rawAction = line.slice(actionStart, actionEnd)
+  const hovered = action[0].startsWith('›') || action[1] === hoveredCommand
+  const semantic = hovered ? `›${rawAction.slice(1)}` : rawAction
+  const decorated = hovered
+    ? theme.selected(semantic)
+    : semantic.startsWith('◆ ')
+      ? theme.actionPrimary(semantic)
+      : theme.actionRail(semantic)
+  return `${line.slice(0, actionStart)}${decorated}${theme.actionRail(line.slice(actionEnd))}`
 }
 
 function decorateSingleSupervisorActionShelf(
@@ -431,8 +464,8 @@ function decorateSingleSupervisorActionShelf(
     : line.slice(trimmed.length)
   const parts = content.split(separator)
   const decorated = parts.map((part, index) => {
-    const key = /^(?:[◆·] )?\[ ([^\]]+) \]/u.exec(part)?.[1]
-    const hovered = Boolean(key && key === hoveredCommand)
+    const key = /^(?:[◆·›] )?\[ ([^\]]+) \]/u.exec(part)?.[1]
+    const hovered = part.startsWith('› ') || Boolean(key && key === hoveredCommand)
     const semantic = hovered && index === 0
       ? `›${part.slice(1)}`
       : part
@@ -442,8 +475,11 @@ function decorateSingleSupervisorActionShelf(
       : theme.actionRail(semantic)
   }).reduce((result, part, index) => {
     if (index === 0) return part
-    const key = /^(?:[◆·] )?\[ ([^\]]+) \]/u.exec(parts[index] ?? '')?.[1]
-    const joiner = key && key === hoveredCommand ? ' │ › ' : separator
+    const rawPart = parts[index] ?? ''
+    const key = /^(?:[◆·›] )?\[ ([^\]]+) \]/u.exec(rawPart)?.[1]
+    const joiner = rawPart.startsWith('› ') || (key && key === hoveredCommand)
+      ? ' │ › '
+      : separator
     return `${result}${theme.actionRail(joiner)}${part}`
   }, '')
   const framedPrefix = framed || capped ? theme.actionRail(prefix) : prefix
@@ -452,7 +488,18 @@ function decorateSingleSupervisorActionShelf(
 }
 
 function isSupervisorActionShelf(line: string): boolean {
-  return splitFramedColumns(line).some(isSingleSupervisorActionShelf)
+  return embeddedSupervisorActionShelfOffset(line) >= 0
+    || splitFramedColumns(line).some(isSingleSupervisorActionShelf)
+}
+
+function embeddedSupervisorActionShelfOffset(line: string): number {
+  const trimmed = line.trimEnd()
+  if (!trimmed.startsWith('│ ') || !trimmed.endsWith(' │')) return -1
+  const content = trimmed.slice(2, -2)
+  const action = /[◆·›] \[ [^\]]+ \] /u.exec(content)
+  if (!action || action.index === undefined) return -1
+  const leading = content.slice(0, action.index)
+  return leading.length >= 4 && leading.endsWith('    ') ? action.index : -1
 }
 
 function isSingleSupervisorActionShelf(line: string): boolean {
@@ -462,7 +509,7 @@ function isSingleSupervisorActionShelf(line: string): boolean {
     : trimmed.startsWith('╭─ ') && trimmed.endsWith('╮')
       ? trimmed.slice(3, -1).trimEnd()
       : trimmed
-  return /^[◆·] \[ [^\]]+ \] /u.test(content)
+  return /^[◆·›] \[ [^\]]+ \] /u.test(content)
 }
 
 function splitFramedColumns(line: string): string[] {

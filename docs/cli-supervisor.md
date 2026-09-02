@@ -219,7 +219,10 @@ intentionally parameter-free:
   preserve the same task order in one column, add bounded whitespace between
   each decision layer, and omit illustration before task truth. Home
   intentionally does not repeat PID, provider, endpoint, uptime, or component
-  telemetry; Runtime owns those diagnostic facts.
+  telemetry; Runtime owns those diagnostic facts. The primary action paints
+  the complete task-column width on the wide canvas and the complete content
+  width when compact; its glyph and keycap retain the same hierarchy with
+  color disabled, and the existing whole-row pointer target is unchanged.
   Before connection, Enter starts or connects the selected target. A degraded
   or unreachable endpoint always promotes Retry. After a healthy connection,
   unread Inbox reports promote Enter to Review Inbox and keep `o` as the

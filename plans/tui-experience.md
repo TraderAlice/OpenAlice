@@ -3333,6 +3333,25 @@ already large `supervisor-tui.ts` application controller.
   tests (including all 54 PTY cases), and the complete CLI suite (63 files,
   637 tests). CLI typecheck and build also pass.
 
+### Home primary-action parity decision
+
+- Corrected cell-accurate 120x32 and 80x24 captures exposed a responsive
+  inversion: compact Home painted Enter as a full-width Action Shelf, while
+  wide Home left the same primary route as ordinary text beside the ALICE
+  mark. More room therefore produced a weaker launcher hierarchy.
+- Wide Home now paints the complete right task column from `◆ [ Enter ]`
+  through its trailing field. The existing open gutter keeps identity and task
+  ownership distinct; compact Home retains its complete-content shelf.
+- The action and animated brand mark deliberately compose on the same physical
+  row instead of either theme pass short-circuiting the other. Hover changes
+  the action marker to `›` and uses the selected treatment; `NO_COLOR` keeps
+  the same glyph, keycap, copy, full-row pointer target, and keyboard route.
+- Real 120x32 and 80x24 captures verify equal visual priority without changing
+  Home content, responsive structure, action consequence, or lifecycle state.
+- Home-primary-parity acceptance passes through all 133 focused screen and
+  real-PTY tests (including all 54 PTY cases), and the complete CLI suite (63
+  files, 638 tests). CLI typecheck and build also pass.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

@@ -2313,6 +2313,45 @@ describe('Supervisor TUI screen', () => {
     )).toBe(line)
   })
 
+  it('promotes an Action Shelf embedded in the wide Home task column', () => {
+    const line = '│      ▄▀▄ █   ▀█▀ ▄▀▀ █▀▀         ◆ [ Enter ]  Open Workspace                         │'
+    const colorTheme = createSupervisorTuiTheme({ TERM: 'xterm-256color' })
+    const decorated = decorateSupervisorFrame(
+      ['header', line],
+      colorTheme,
+      { panel: 'overview', runtimeClass: 'running' },
+    )[1]!
+
+    expect(decorated).toContain('\u001b[1;38;2;116;235;226m▄')
+    expect(decorated).toContain(
+      '\u001b[1;38;2;183;255;248;48;2;18;54;59m◆ [ Enter ]  Open Workspace',
+    )
+    expect(decorated.replace(/\u001b\[[0-9;]*m/gu, '')).toBe(line)
+    expect(decorateSupervisorFrame(
+      ['header', line],
+      colorTheme,
+      {
+        panel: 'overview',
+        runtimeClass: 'running',
+        hoveredCommand: { row: 2, label: 'Enter' },
+      },
+    )[1]).toContain(
+      '\u001b[1;38;2;230;255;252;48;2;24;64;69m› [ Enter ]  Open Workspace',
+    )
+    expect(decorateSupervisorFrame(
+      ['header', line.replace('◆ [ Enter ]', '› [ Enter ]')],
+      colorTheme,
+      { panel: 'overview', runtimeClass: 'running' },
+    )[1]).toContain(
+      '\u001b[1;38;2;230;255;252;48;2;24;64;69m› [ Enter ]  Open Workspace',
+    )
+    expect(decorateSupervisorFrame(
+      ['header', line],
+      createSupervisorTuiTheme({ TERM: 'xterm-256color', NO_COLOR: '1' }),
+      { panel: 'overview', runtimeClass: 'running' },
+    )[1]).toBe(line)
+  })
+
   it('contains split-pane semantic focus inside each framed column', () => {
     const theme = createSupervisorTuiTheme({ TERM: 'xterm-256color' })
     const selected = '│ › ! Runtime ownership needs review   │   │ Evidence remains neutral           │'
