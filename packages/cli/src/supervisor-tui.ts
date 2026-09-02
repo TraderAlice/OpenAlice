@@ -2938,6 +2938,7 @@ export class SupervisorScreen implements Component {
   private commandDeckOpen = false
   private commandDeckState: SupervisorCommandDeckState = createSupervisorCommandDeckState()
   private commandDeckQuery = ''
+  private commandDeckCursorFrame = 0
   private motionFrame = 0
   private introFrame?: number
   private navigationTransition?: SupervisorNavigationTransition
@@ -3065,6 +3066,11 @@ export class SupervisorScreen implements Component {
           }
       changed = true
     }
+    if (this.commandDeckOpen) {
+      const wasVisible = this.commandDeckCursorFrame < 6
+      this.commandDeckCursorFrame = (this.commandDeckCursorFrame + 1) % 12
+      if (wasVisible !== (this.commandDeckCursorFrame < 6)) changed = true
+    }
     return changed
   }
 
@@ -3074,6 +3080,7 @@ export class SupervisorScreen implements Component {
         this.introFrame !== undefined
         || Boolean(this.snapshot.busy)
         || Boolean(this.navigationTransition)
+        || this.commandDeckOpen
       )
   }
 
@@ -3095,6 +3102,7 @@ export class SupervisorScreen implements Component {
         : this.snapshot.runtime?.class ?? 'unavailable',
       width,
       this.commandDeckQuery,
+      !this.motionEnabled || this.commandDeckCursorFrame < 6,
     )
   }
 
@@ -3188,15 +3196,16 @@ export class SupervisorScreen implements Component {
         return this.activateCommandDeckItem(items[this.commandDeckState.selected])
       }
       if (data === '\x7f' || data === '\b') {
-        this.setCommandDeckQuery(this.commandDeckQuery.slice(0, -1))
+        this.setCommandDeckQuery(dropLastCommandQueryCodePoint(this.commandDeckQuery))
         return true
       }
       if (data === '\x15') {
         this.setCommandDeckQuery('')
         return true
       }
-      if (/^[\x20-\x7e]$/u.test(data) && this.commandDeckQuery.length < 48) {
-        this.setCommandDeckQuery(`${this.commandDeckQuery}${data}`)
+      const query = appendCommandQueryInput(this.commandDeckQuery, data, 48)
+      if (query !== null) {
+        this.setCommandDeckQuery(query)
         return true
       }
       return true
@@ -3832,10 +3841,12 @@ export class SupervisorScreen implements Component {
     if (this.commandDeckOpen === open) return
     this.commandDeckOpen = open
     this.commandDeckQuery = ''
+    this.commandDeckCursorFrame = 0
     this.commandDeckState = open
       ? createSupervisorCommandDeckState()
       : { ...this.commandDeckState, hovered: null }
     this.onCommandPaletteChange?.(open)
+    this.onMotionDemandChange?.()
     this.requestRender?.()
   }
 
@@ -3912,6 +3923,20 @@ export class SupervisorScreen implements Component {
     if (panel === 'logs') this.onAction?.('logs')
     if (panel === 'doctor') this.onAction?.('doctor')
   }
+}
+
+function appendCommandQueryInput(
+  current: string,
+  input: string,
+  maxCodePoints: number,
+): string | null {
+  if (!input || /[\u0000-\u001f\u007f-\u009f]/u.test(input)) return null
+  const remaining = Math.max(0, maxCodePoints - [...current].length)
+  return `${current}${[...input].slice(0, remaining).join('')}`
+}
+
+function dropLastCommandQueryCodePoint(query: string): string {
+  return [...query].slice(0, -1).join('')
 }
 
 function renderNavigationBeaconRail(

@@ -451,6 +451,29 @@ describe('Supervisor TUI screen', () => {
     expect(reduced.hasActiveMotion()).toBe(false)
   })
 
+  it('accepts Unicode Command Palette queries and edits them by code point', () => {
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'running', endpoints: {} },
+    }, { motionEnabled: false })
+    expect(screen.handleKey('/', matchesKey)).toBe(true)
+    expect(screen.renderCommandPalette(76).lines.join('\n')).toContain('⌕  ▌ Type to filter commands')
+    expect(screen.handleKey('日志', matchesKey)).toBe(true)
+    expect(screen.renderCommandPalette(76).lines.join('\n')).toContain('MATCH “日志”')
+    expect(screen.renderCommandPalette(76).lines.join('\n')).toContain('›   Runtime logs')
+    expect(screen.handleKey('\x7f', matchesKey)).toBe(true)
+    expect(screen.renderCommandPalette(76).lines.join('\n')).toContain('MATCH “日”')
+    expect(screen.handleKey('\x15', matchesKey)).toBe(true)
+    expect(screen.renderCommandPalette(76).lines.join('\n')).toContain('⌕  ▌ Type to filter commands')
+    expect(screen.handleKey('🧭', matchesKey)).toBe(true)
+    expect(screen.renderCommandPalette(76).lines.join('\n')).toContain('MATCH “🧭”')
+    expect(screen.handleKey('\x7f', matchesKey)).toBe(true)
+    expect(screen.renderCommandPalette(76).lines.join('\n')).toContain('⌕  ▌ Type to filter commands')
+    expect(screen.handleEscape()).toBe(true)
+    expect(screen.hasActiveMotion()).toBe(false)
+  })
+
   it('describes an externally owned Runtime without offering refused mutations', () => {
     const screen = new SupervisorScreen({
       version: 'dev',

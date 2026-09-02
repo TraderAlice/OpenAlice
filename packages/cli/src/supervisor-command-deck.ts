@@ -37,6 +37,7 @@ export interface SupervisorCommandDeckItem {
   input: SupervisorCommandDeckInput
   label: string
   description: string
+  aliases: string[]
   group: 'Primary' | 'Observe' | 'Manage' | 'Navigate'
   primary?: boolean
 }
@@ -68,8 +69,14 @@ export function supervisorCommandDeckItems(
 ): SupervisorCommandDeckItem[] {
   if (context.recovery) {
     return [
-      command('u', 'Check for update', 'Choose a release channel and inspect it', 'Primary', true),
-      command('?', 'Recovery help', 'Review safe recovery controls', 'Navigate'),
+      command(
+        'u', 'Check for update', 'Choose a release channel and inspect it',
+        'Primary', true, ['更新', '升级'],
+      ),
+      command(
+        '?', 'Recovery help', 'Review safe recovery controls',
+        'Navigate', false, ['帮助', '恢复'],
+      ),
     ]
   }
 
@@ -83,25 +90,56 @@ export function supervisorCommandDeckItems(
         : 'Open the selected AliceProject Workspace',
       'Primary',
       true,
+      ['start', 'open', '启动', '打开'],
     ))
   }
   if (context.startAvailable) {
-    items.push(command('s', 'Start quietly', 'Start without opening a browser', 'Primary'))
+    items.push(command(
+      's', 'Start quietly', 'Start without opening a browser',
+      'Primary', false, ['启动', '静默启动'],
+    ))
   }
   if (context.restartAvailable) {
-    items.push(command('r', 'Restart Runtime', 'Confirm before reconnecting active sessions', 'Primary'))
+    items.push(command(
+      'r', 'Restart Runtime', 'Confirm before reconnecting active sessions',
+      'Primary', false, ['重启'],
+    ))
   }
   if (context.stopAvailable) {
-    items.push(command('x', 'Stop Runtime', 'Confirm before disconnecting active sessions', 'Primary'))
+    items.push(command(
+      'x', 'Stop Runtime', 'Confirm before disconnecting active sessions',
+      'Primary', false, ['停止'],
+    ))
   }
   items.push(
-    command('l', 'Runtime logs', 'Inspect the bounded, redacted snapshot', 'Observe'),
-    command('d', 'Runtime Doctor', 'Run read-only ownership and readiness checks', 'Observe'),
-    command('i', 'AliceProjects', 'Select or create a complete local home', 'Manage'),
-    command('p', 'Setup', 'Review project and Machine defaults', 'Manage'),
-    command('u', 'Update', 'Choose and inspect a release channel', 'Manage'),
-    command('tab', 'Next view', 'Move through the Supervisor navigation rail', 'Navigate'),
-    command('?', 'Help', 'Open the complete keyboard reference', 'Navigate'),
+    command(
+      'l', 'Runtime logs', 'Inspect the bounded, redacted snapshot',
+      'Observe', false, ['日志'],
+    ),
+    command(
+      'd', 'Runtime Doctor', 'Run read-only ownership and readiness checks',
+      'Observe', false, ['诊断', '检查'],
+    ),
+    command(
+      'i', 'AliceProjects', 'Select or create a complete local home',
+      'Manage', false, ['项目', '工作区'],
+    ),
+    command(
+      'p', 'Setup', 'Review project and Machine defaults',
+      'Manage', false, ['设置', '配置'],
+    ),
+    command(
+      'u', 'Update', 'Choose and inspect a release channel',
+      'Manage', false, ['更新', '升级'],
+    ),
+    command(
+      'tab', 'Next view', 'Move through the Supervisor navigation rail',
+      'Navigate', false, ['下一页', '切换'],
+    ),
+    command(
+      '?', 'Help', 'Open the complete keyboard reference',
+      'Navigate', false, ['帮助'],
+    ),
   )
   return items
 }
@@ -150,6 +188,7 @@ export function renderSupervisorCommandDeck(
   runtimeState: string,
   width: number,
   query = '',
+  cursorVisible = true,
 ): SupervisorCommandDeckRender {
   const normalized = normalizeSupervisorCommandDeckState(state, items.length)
   const innerWidth = Math.max(1, width - 4)
@@ -166,7 +205,7 @@ export function renderSupervisorCommandDeck(
     innerWidth,
     labelColumnWidth,
   ))
-  rows.unshift(renderSearchRail(query, innerWidth))
+  rows.unshift(renderSearchRail(query, innerWidth, cursorVisible))
   if (items.length === 0) rows.push(renderEmptyState(query, innerWidth))
   rows.push('', renderCommandFooter(query, innerWidth))
   const queryMeta = query.trim()
@@ -213,7 +252,7 @@ function commandSearchScore(
 ): number | null {
   const label = normalizeSearchText(item.label)
   const searchable = normalizeSearchText(
-    `${item.label} ${item.group} ${commandShortcut(item.input)}`,
+    `${item.label} ${item.group} ${commandShortcut(item.input)} ${item.aliases.join(' ')}`,
   )
   let score = 0
   for (const token of tokens) {
@@ -258,11 +297,11 @@ function subsequenceSpan(value: string, query: string): number | null {
   return queryIndex === query.length ? last - first : null
 }
 
-function renderSearchRail(query: string, width: number): string {
-  const value = query || 'Type to filter commands'
-  const cursor = query ? '▌' : ''
+function renderSearchRail(query: string, width: number, cursorVisible: boolean): string {
+  const cursor = cursorVisible ? '▌' : ' '
+  const value = query ? `${query}${cursor}` : `${cursor} Type to filter commands`
   const prefix = '⌕  '
-  return `${prefix}${truncateDisplayWidth(`${value}${cursor}`, Math.max(1, width - displayWidth(prefix)))}`
+  return `${prefix}${truncateDisplayWidth(value, Math.max(1, width - displayWidth(prefix)))}`
 }
 
 function renderEmptyState(query: string, width: number): string {
@@ -283,8 +322,9 @@ function command(
   description: string,
   group: SupervisorCommandDeckItem['group'],
   primary = false,
+  aliases: string[] = [],
 ): SupervisorCommandDeckItem {
-  return { input, label, description, group, primary }
+  return { input, label, description, aliases, group, primary }
 }
 
 function renderCommandRow(

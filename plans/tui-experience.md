@@ -163,6 +163,21 @@ not imply maintainer approval of the finished interaction.
   the same existing Supervisor action, and `/` or Esc closes. No command or
   backend action is added by search.
 
+### Command palette live-input decision
+
+- Keeping the empty search rail as placeholder prose makes the focused overlay
+  look static, and the prior single-ASCII-character gate silently rejects CJK
+  and other printable Unicode input even though ranking already normalizes it.
+- Replacing the search rail with a generic text-input dependency would split
+  query, overlay, pointer, and activation ownership again.
+- The selected model keeps the owned Palette renderer and turns its search rail
+  into a live input surface: an always-present caret pulses at a bounded cadence
+  when motion is enabled and remains solid under reduced motion; printable
+  Unicode appends up to the existing bound; Backspace removes one code point;
+  and compact Chinese intent aliases route to the same English command items.
+  Search still cannot create or bypass an action. This is an autonomous topic
+  decision, not a recorded maintainer approval.
+
 ### Runtime log presentation decision
 
 - Coloring raw JSON would leave the event message behind long metadata and
@@ -632,6 +647,8 @@ already large `supervisor-tui.ts` application controller.
   mouse-capable Command Palette.
 - [x] Upgrade the Command Palette with OMP-inspired in-place fuzzy search,
   ranked results, and a corrective empty state without adding action paths.
+- [x] Turn the Palette search rail into a live Unicode input with a bounded
+  caret pulse and English/Chinese intent aliases over the same command model.
 - [x] Replace Doctor's flat line scroller with a responsive, selectable
   checklist and detail Inspector.
 - [x] Replace Help's static shortcut wall with a responsive, pointer-aware
@@ -1246,6 +1263,19 @@ already large `supervisor-tui.ts` application controller.
   699-file suite passes (698 passed, 1 skipped; 6,149 tests passed, 10 skipped).
   Docker installer smoke passes, and package dry-run includes the changed
   Supervisor view, controller, and theme sources.
+- The Command Palette search rail is now a live Unicode input surface. Its
+  caret pulses without moving geometry and remains solid under reduced motion;
+  printable Unicode, code-point-safe Backspace, and English/Chinese intent
+  aliases let operators search the existing command set naturally without
+  introducing another command or backend path.
+- Live-input acceptance passes with 84 focused screen and real-PTY tests. Real
+  sessions confirmed `日志` opens Runtime logs at 100 columns, the caret pulses
+  in truecolor at 80×24, and `设置` resolves to Setup at 46×30 with `NO_COLOR`
+  and motion disabled; every path restored terminal modes after closing. CLI
+  build/typecheck and root TypeScript pass; the 699-file suite passes (698
+  passed, 1 skipped; 6,150 tests passed, 10 skipped). Docker installer smoke
+  passes, and package dry-run includes the changed command-deck and Supervisor
+  controller sources.
 
 ## Completion Criteria
 

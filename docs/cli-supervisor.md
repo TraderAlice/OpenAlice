@@ -208,8 +208,12 @@ path is intentionally parameter-free:
   Detach likewise expose their complete labels as pointer targets. `/`
   opens a compact centered Command Palette overlay over the unchanged current
   page and changes the Spine action to `Close`. The Palette exposes
-  only commands valid for the current Runtime/recovery context. Typing filters and ranks
-  command names, groups, and shortcuts in place; Backspace edits, Ctrl+U clears,
+  only commands valid for the current Runtime/recovery context. Typing filters
+  and ranks command names, groups, shortcuts, and compact English/Chinese
+  intent aliases in place. The focused search rail always exposes a caret;
+  color terminals pulse it at a bounded cadence while reduced motion keeps the
+  same solid affordance. Unicode input is preserved, Backspace removes one code
+  point, Ctrl+U clears,
   and an explicit empty state keeps the query available for correction. Up/Down
   wraps selection, the mouse wheel moves within the visible result set, pointer
   hover highlights a complete row, and clicking a row selects and runs it.

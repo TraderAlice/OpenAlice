@@ -54,6 +54,12 @@ describe('Supervisor Command Palette', () => {
     expect(filterSupervisorCommandDeckItems(items, 'rtr doc').map((item) => item.label)).toEqual([
       'Runtime Doctor',
     ])
+    expect(filterSupervisorCommandDeckItems(items, '日志').map((item) => item.label)).toEqual([
+      'Runtime logs',
+    ])
+    expect(filterSupervisorCommandDeckItems(items, '设置').map((item) => item.label)).toEqual([
+      'Setup',
+    ])
     expect(filterSupervisorCommandDeckItems(items, 'no such command')).toEqual([])
   })
 
@@ -64,7 +70,7 @@ describe('Supervisor Command Palette', () => {
     expect(wide.lines.join('\n')).toContain('›   Restart Runtime')
     expect(wide.lines.join('\n')).toContain('»   Stop Runtime')
     expect(wide.lines.join('\n')).toContain('Confirm before reconnecting active sessions')
-    expect(wide.lines.join('\n')).toContain('⌕  Type to filter commands')
+    expect(wide.lines.join('\n')).toContain('⌕  ▌ Type to filter commands')
     expect(wide.targets[1]).toEqual({ row: 4, startColumn: 2, endColumn: 99, index: 1 })
 
     const narrow = renderSupervisorCommandDeck(items, createSupervisorCommandDeckState(), 'running', 52)
@@ -85,6 +91,17 @@ describe('Supervisor Command Palette', () => {
     expect(match.lines.join('\n')).toContain('Command Palette · 1/1 · MATCH “setup” · RUNNING')
     expect(match.lines.join('\n')).toContain('⌕  setup▌')
     expect(match.targets).toEqual([{ row: 3, startColumn: 2, endColumn: 75, index: 0 }])
+
+    const cursorOff = renderSupervisorCommandDeck(
+      items,
+      createSupervisorCommandDeckState(),
+      'running',
+      76,
+      'setup',
+      false,
+    )
+    expect(cursorOff.lines.join('\n')).toContain('⌕  setup ')
+    expect(cursorOff.lines.join('\n')).not.toContain('setup▌')
 
     const empty = renderSupervisorCommandDeck([], createSupervisorCommandDeckState(), 'running', 76, 'xyz')
     expect(empty.lines.join('\n')).toContain('Command Palette · 0/0 · MATCH “xyz” · RUNNING')

@@ -826,6 +826,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     const transcript = await new Promise<string>((resolve, reject) => {
       let output = ''
       let opened = false
+      let typedUnicode = false
       let typedSearch = false
       let clickedSetup = false
       let setupOpened = false
@@ -839,8 +840,15 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           opened = true
           child.write('/')
         } else if (!typedSearch && output.includes('Command Palette') && output.includes('› ◆ Start OpenAlice')) {
+          if (!typedUnicode) {
+            typedUnicode = true
+            child.write('日志')
+            return
+          }
+          if (!output.includes('MATCH “日志”') || !output.includes('⌕  日志')) return
           typedSearch = true
-          child.write('setup')
+          child.write('\x15')
+          setTimeout(() => child.write('setup'), 50)
         } else if (
           !clickedSetup
           && output.includes('MATCH “setup”')
@@ -864,6 +872,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     })
 
     expect(transcript).toContain('Command Palette')
+    expect(transcript).toContain('MATCH “日志”')
+    expect(transcript).toContain('⌕  日志')
     expect(transcript).toContain('MATCH “setup”')
     expect(transcript).toContain('⌕  setup▌')
     expect(transcript).toContain('╭ Launchpad · AliceProject')
