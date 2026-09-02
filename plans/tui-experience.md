@@ -3681,6 +3681,27 @@ already large `supervisor-tui.ts` application controller.
   exits with terminal modes restored. The focused TUI closure passes 155 tests,
   the complete CLI suite passes 645 tests, and CLI typecheck/build passes.
 
+### Content-sized Home Board correction
+
+- Comparing fresh 120x48 captures against OMP 17.3.4 showed that making Alice
+  Session consume the entire Operational Canvas did not create useful ownership.
+  It split Now, identity, Signals, and Recent with large internal voids, weakening
+  their visual relationship. OMP instead keeps its welcome workbench bounded and
+  lets the terminal below it stay deliberately quiet.
+- Wide Home now caps its two-column body at 16 rows (18 including borders). A
+  120x32 terminal retains the accepted complete Session Board; a taller terminal
+  keeps that same board geometry and gives surplus height to the quiet field
+  below it. Contextual Tip and Command Spine remain bottom-anchored, so the empty
+  space reads as canvas rather than a gap between content and controls.
+- This corrects the earlier full-height policy without changing Home intent,
+  responsive compact or emergency folds, keyboard order, pointer targets,
+  lifecycle behavior, or Runtime/Inbox/Connection ownership. This is an
+  autonomous visual decision pending maintainer review on the retained branch.
+- Real 120x48 and 120x32 PTY captures verify identical bounded Board geometry
+  with surplus confined below the card. The focused Fleet/screen/PTY closure
+  passes 155 tests, the complete CLI suite passes 645 tests, and CLI
+  typecheck/build passes.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

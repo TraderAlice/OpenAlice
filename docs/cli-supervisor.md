@@ -357,15 +357,16 @@ intentionally parameter-free:
   Signal Scope with Run/Rerun and Help. Scroll, copy, Inspect, Latest, First,
   and Last return only when a filtered event or diagnostic check exists. Their
   contextual Tips state the same empty contract;
-- at 100 columns and wider, Home's single Alice Session stage owns the full
-  available Operational Canvas. The identity column centers the selected
-  AliceProject while the task column spreads one ordered path across the field:
-  Now and its primary action remain at the top, Signals occupy the middle, and
-  Recent anchors the lower region. Compact layouts keep the same hierarchy with
-  bounded vertical rhythm, and no other panel inherits this Home-only height
-  policy. Inbox and Connection signals are whole-row pointer targets backed by
-  the same panel-selection path as Mission Navigation; hover previews their
-  destination in the stable Activity Slot;
+- at 100 columns and wider, Home's single Alice Session Board uses a bounded
+  OMP-style two-column composition instead of stretching with every surplus
+  terminal row. The identity column centers the selected AliceProject while the
+  task column keeps one ordered path together: Now and its primary action,
+  Signals, then Recent. On tall terminals, extra height becomes a quiet field
+  below the complete board while the contextual Tip and Command Spine remain
+  anchored at the bottom. Compact layouts keep the same hierarchy with bounded
+  vertical rhythm. Inbox and Connection signals are whole-row pointer targets
+  backed by the same panel-selection path as Mission Navigation; hover previews
+  their destination in the stable Activity Slot;
 - the connected Home page keeps one product name from Mission Header through
   Command Spine: the footer projects `◆ HOME`, never the internal `overview`
   panel key. At compact widths the view badge is removed before selected

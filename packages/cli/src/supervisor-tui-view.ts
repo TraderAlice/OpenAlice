@@ -44,6 +44,8 @@ export interface SupervisorHomeRender {
   hotspotTargets: SupervisorHomeHotspotTarget[]
 }
 
+const WIDE_HOME_MAX_BODY_HEIGHT = 16
+
 export interface SupervisorCommand {
   key: string
   label: string
@@ -228,7 +230,10 @@ function renderWideSessionStage(
   const task = sessionTaskRows(view, taskWidth)
   const naturalBodyHeight = Math.max(identity.length, task.length)
   const requestedBodyHeight = Number.isFinite(targetHeight)
-    ? Math.max(naturalBodyHeight, Math.floor(targetHeight ?? 0) - 2)
+    ? Math.max(
+        naturalBodyHeight,
+        Math.min(WIDE_HOME_MAX_BODY_HEIGHT, Math.floor(targetHeight ?? 0) - 2),
+      )
     : naturalBodyHeight
   const bodyHeight = requestedBodyHeight
   const left = centerSessionRows(identity, bodyHeight)

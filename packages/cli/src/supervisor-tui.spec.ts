@@ -651,7 +651,7 @@ describe('Supervisor TUI screen', () => {
     expect(screen.render(120)[0]).toContain('v0.87.0-beta · DEV · update 0.90.0')
   })
 
-  it('uses wide surplus height for one full-height OMP-style Session Stage', () => {
+  it('keeps wide Home as a content-sized OMP-style Session Board', () => {
     let viewportHeight = 32
     const screen = new SupervisorScreen({
       version: 'dev',
@@ -682,7 +682,8 @@ describe('Supervisor TUI screen', () => {
     expect(recentRow).toBeGreaterThan(signalsRow)
     expect(cardBottomRow).toBeGreaterThan(recentRow)
     expect(tipRow).toBeGreaterThan(cardBottomRow)
-    expect(cardBottomRow).toBeGreaterThanOrEqual(25)
+    expect(cardBottomRow).toBeGreaterThanOrEqual(20)
+    expect(cardBottomRow).toBeLessThanOrEqual(22)
     expect(tall.join('\n')).toContain('NOW')
     expect(tall.join('\n')).toContain('SIGNALS')
     expect(tall.join('\n')).toContain('RECENT')
@@ -697,9 +698,11 @@ describe('Supervisor TUI screen', () => {
     expect(expanded).toHaveLength(48)
     const expandedBottom = expanded.findIndex((line, index) => index > stageRow && line.startsWith('╰'))
     const expandedRecent = expanded.findIndex((line) => line.includes('RECENT'))
-    expect(expandedBottom).toBeGreaterThan(cardBottomRow)
-    expect(expandedRecent).toBeGreaterThan(recentRow)
+    expect(expandedBottom).toBe(cardBottomRow)
+    expect(expandedRecent).toBe(recentRow)
     expect(expanded.findIndex((line) => line.includes('[ Enter ]'))).toBe(actionRow)
+    expect(expanded.slice(expandedBottom + 1, -2).filter((line) => line === '').length)
+      .toBeGreaterThan(10)
 
     const folded = screen.render(99).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
     expect(folded.findIndex((line) => line.includes('Alice Session'))).toBeLessThan(20)
