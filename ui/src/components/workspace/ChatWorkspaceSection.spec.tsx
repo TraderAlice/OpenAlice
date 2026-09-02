@@ -344,7 +344,7 @@ describe('ChatWorkspaceSection actions', () => {
 
     expect(newChat.className).toContain('w-full')
     expect(newChat.className).toContain('h-9')
-    expect(newChat.className).toContain('text-[13px]')
+    expect(screen.getByText('New chat').className).toContain('text-body')
     expect(newChat.textContent).toBe('New chat')
     expect(newChat.querySelector('.lucide-message-square-plus')).toBeTruthy()
     expect(workspaceHeading.parentElement?.nextElementSibling?.tagName).toBe('UL')

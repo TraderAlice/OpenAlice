@@ -352,10 +352,10 @@ export function ChatWorkspaceSection({
               : {},
           })}
           variant="secondary"
-          className="oa-chat-new-action h-9 w-full justify-start px-2.5 text-[13px] text-sidebar-accent-foreground"
+          className="oa-chat-new-action h-9 w-full justify-start px-2.5 text-sidebar-accent-foreground"
         >
           <MessageSquarePlus size={15} strokeWidth={2} className="shrink-0 text-primary" />
-          <span>{mode === 'auto-quant'
+          <span className="text-body">{mode === 'auto-quant'
             ? t('autoQuant.newResearch')
             : mode === 'prediction' ? t('autoPrediction.newResearch') : t('chat.newChat')}</span>
         </Button>
@@ -368,10 +368,10 @@ export function ChatWorkspaceSection({
             })}
             variant="ghost"
             size="lg"
-            className="w-full justify-start px-2.5 text-sm text-muted-foreground"
+            className="w-full justify-start px-2.5 text-muted-foreground"
           >
             <AppWindow size={15} strokeWidth={2.05} className="shrink-0 text-primary" />
-            <span>{t('harnessSurface.studio')}</span>
+            <span className="text-body">{t('harnessSurface.studio')}</span>
           </Button>
         )}
       </div>
@@ -455,7 +455,7 @@ export function ChatWorkspaceSection({
       )}
 
       <div className="px-3 pb-1 pt-1.5">
-        <h3 className="min-w-0 truncate text-[12px] leading-[18px] font-medium text-muted-foreground/70">
+        <h3 className="text-caption min-w-0 truncate font-medium text-muted-foreground/70">
           {t('nav.item.workspaces')}
         </h3>
       </div>
@@ -481,7 +481,7 @@ export function ChatWorkspaceSection({
         )}
         {ctx.hasLoaded && chatWorkspaces.length === 0 && !showListError && (
           <li className="px-3 py-2.5">
-            <p className="text-[12px] text-muted-foreground/60">
+            <p className="text-caption text-muted-foreground/60">
               {mode === 'auto-quant'
                 ? t('autoQuant.noWorkspacesYet')
                 : mode === 'prediction' ? t('autoPrediction.noWorkspacesYet') : t('chat.noChatWorkspacesYet')}
@@ -690,7 +690,7 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
     pendingActionRef.current = action
   }
 
-  const menuItemClass = 'oa-workspace-context-item min-h-7 gap-2 rounded-md px-2 py-1 text-xs text-muted-foreground focus:bg-muted focus:text-foreground'
+  const menuItemClass = 'oa-workspace-context-item text-caption min-h-7 gap-2 rounded-md px-2 py-1 text-muted-foreground focus:bg-muted focus:text-foreground'
   const modeItemClass = `${menuItemClass} pr-7 text-foreground`
 
   return (
@@ -714,7 +714,7 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
             aria-label={upgrade
               ? t('chat.workspaceContextUpdateLabel', { name: title, version: upgradeVersion })
               : contextLabel}
-            className="oa-pressable flex min-h-8 w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="oa-pressable text-caption flex min-h-8 w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-muted-foreground hover:bg-muted hover:text-foreground"
           />}
         >
           <TriggerIcon className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -742,7 +742,7 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
               queueAction(() => props.onRequestDisplayMode(value as ChatDisplayMode))
             }}
           >
-            <DropdownMenuLabel className="px-2 py-1 text-[11px] font-medium text-muted-foreground/70">
+            <DropdownMenuLabel className="text-micro px-2 py-1 font-medium text-muted-foreground/70">
               {t('chat.view')}
             </DropdownMenuLabel>
             <DropdownMenuRadioItem
@@ -792,7 +792,7 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
             >
               <Layers3 size={14} strokeWidth={2} aria-hidden />
               <span className="min-w-0 flex-1 truncate">{t('chat.reviewWorkspaceUpdate')}</span>
-              <span className="shrink-0 tabular-nums text-[10px] leading-[14px] text-muted-foreground">v{upgradeVersion}</span>
+              <span className="text-micro shrink-0 tabular-nums text-muted-foreground">v{upgradeVersion}</span>
             </DropdownMenuItem>
           )}
           <DropdownMenuItem
@@ -911,7 +911,7 @@ function HarnessSessionRoster(props: HarnessSessionRosterProps): ReactElement {
         <section className="border-b border-border/55 pb-1" aria-label={t('chat.runningInBackground')}>
           <button
             type="button"
-            className="oa-nav-row flex min-h-8 w-full items-center gap-2 px-3 text-left text-[11px] leading-[15px] font-medium text-muted-foreground hover:text-foreground"
+            className="oa-nav-row text-micro flex min-h-8 w-full items-center gap-2 px-3 text-left font-medium text-muted-foreground hover:text-foreground"
             onClick={() => setRunningExpanded((expanded) => !expanded)}
             aria-expanded={runningExpanded}
           >
@@ -936,7 +936,7 @@ function HarnessSessionRoster(props: HarnessSessionRosterProps): ReactElement {
       )}
 
       <div className="flex min-h-8 items-center gap-2 px-3.5 pb-1 pt-2">
-        <span data-testid="harness-recent-heading" className="min-w-0 flex-1 truncate text-[12px] font-medium leading-4 text-muted-foreground/70">
+        <span data-testid="harness-recent-heading" className="text-caption min-w-0 flex-1 truncate font-medium text-muted-foreground/70">
           {props.harness === 'auto-quant'
             ? t('autoQuant.recentResearch')
             : props.harness === 'prediction'
@@ -944,17 +944,17 @@ function HarnessSessionRoster(props: HarnessSessionRosterProps): ReactElement {
               : t('chat.recentConversations')}
         </span>
         {recent.length > 0 && (
-          <span className="text-[11px] leading-[15px] tabular-nums text-muted-foreground/50">{recent.length}</span>
+          <span className="text-micro tabular-nums text-muted-foreground/50">{recent.length}</span>
         )}
       </div>
 
       <div ref={recentRef}>
         {props.sessions.length === 0 ? (
-          <p className="px-3 py-3 text-[12px] leading-[18px] text-muted-foreground/60">
+          <p className="text-caption px-3 py-3 text-muted-foreground/60">
             {props.emptyCopy}
           </p>
         ) : recent.length === 0 ? (
-          <p className="px-3 py-2 text-[12px] leading-[18px] text-muted-foreground/55">
+          <p className="text-caption px-3 py-2 text-muted-foreground/55">
             {t('chat.allConversationsRunning')}
           </p>
         ) : visibleRecent.map(renderRow)}
@@ -963,7 +963,7 @@ function HarnessSessionRoster(props: HarnessSessionRosterProps): ReactElement {
       {recent.length > visibleRecent.length && (
         <button
           type="button"
-          className="oa-nav-row group mx-1.5 flex min-h-8 w-[calc(100%-0.75rem)] items-center gap-2 rounded-md px-2 py-1 text-left text-[13px] leading-[18px] font-medium text-foreground hover:bg-sidebar-accent"
+          className="oa-nav-row text-body group mx-1.5 flex min-h-8 w-[calc(100%-0.75rem)] items-center gap-2 rounded-md px-2 py-1 text-left font-medium text-foreground hover:bg-sidebar-accent"
           onClick={(event) => props.onBrowseSessions(event.currentTarget)}
         >
           <span className="min-w-0 flex-1 truncate">
@@ -1073,7 +1073,7 @@ function FocusedChatWorkspace(props: FocusedChatWorkspaceProps): ReactElement {
   if (!props.workspace) {
     return (
       <div className="flex min-h-0 flex-1 flex-col px-3 py-3">
-        <p className="text-xs leading-relaxed text-muted-foreground">
+        <p className="text-caption leading-relaxed text-muted-foreground">
           {t('chat.focusedEmpty')}
         </p>
         <Button
@@ -1164,11 +1164,11 @@ function ManagerWorkspaceRow(props: ManagerWorkspaceRowProps): ReactElement {
           className="oa-pressable relative flex min-w-0 flex-1 items-center gap-2 py-2 pl-1 pr-3 text-left"
         >
           <Network size={14} strokeWidth={2.1} className="shrink-0 text-muted-foreground" />
-          <span className="min-w-0 flex-1 truncate text-[12px] font-medium">{t('workspaceManager.title')}</span>
+          <span className="text-caption min-w-0 flex-1 truncate font-medium">{t('workspaceManager.title')}</span>
           {!props.loaded ? (
             <span aria-hidden className="h-2.5 w-4 animate-pulse rounded bg-muted-foreground/15" />
           ) : sessions.length > 0 ? (
-            <span className="inline-flex shrink-0 items-center gap-1.5 text-[10px] leading-[14px] tabular-nums text-muted-foreground/55">
+            <span className="text-micro inline-flex shrink-0 items-center gap-1.5 tabular-nums text-muted-foreground/55">
               <span className={`h-1.5 w-1.5 rounded-full ${hasRunning ? 'bg-success' : 'bg-muted-foreground/35'}`} />
               {sessions.length}
             </span>
@@ -1288,7 +1288,7 @@ function HeadlessSessionBusyDialog(props: {
             >
               {props.row.title}
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="text-caption mt-1 text-muted-foreground">
               {issueId
                 ? t('chat.headlessBusyIssue', { issue: issueId })
                 : t('chat.headlessBusyAgent', { agent: props.row.agent })}
@@ -1329,7 +1329,7 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
   return (
     <li className="group relative" data-reorder-id={w.id}>
       <div
-        className={`relative flex items-center gap-1 py-1 pl-2 pr-2 text-[13px] leading-[18px] transition-colors ${
+        className={`text-body relative flex items-center gap-1 py-1 pl-2 pr-2 transition-colors ${
           isSelected ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-foreground hover:bg-sidebar-accent/65'
         }`}
       >
@@ -1364,13 +1364,13 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
           <span className="min-w-0 flex-1">
             <span className="block truncate font-medium" title={props.label}>{props.label}</span>
             {subtitle && (
-              <span className="block truncate text-[11px] leading-3 text-muted-foreground/65" title={subtitle}>
+              <span className="text-micro block truncate text-muted-foreground/65" title={subtitle}>
                 {subtitle}
               </span>
             )}
           </span>
           {orderedSessions.length > 0 && (
-            <span className="text-[11px] leading-[15px] text-muted-foreground/45 tabular-nums shrink-0">
+            <span className="text-micro shrink-0 tabular-nums text-muted-foreground/45">
               {orderedSessions.length}
             </span>
           )}

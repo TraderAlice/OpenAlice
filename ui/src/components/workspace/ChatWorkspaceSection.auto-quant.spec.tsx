@@ -146,6 +146,8 @@ describe('Ask Alice sidebar in AutoQuant mode', () => {
     const studio = screen.getByRole('button', { name: 'Studio' })
     expect(newResearch.parentElement).toBe(studio.parentElement)
     expect(newResearch.parentElement?.className).toContain('grid-cols-1')
+    expect(screen.getByText('New research').className).toContain('text-body')
+    expect(screen.getByText('Studio').className).toContain('text-body')
   })
 
   it('keeps the active research current and routes destructive actions through the More menu', async () => {
