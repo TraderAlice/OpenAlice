@@ -128,7 +128,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(plain).toContain('1 Start Runtime')
     expect(plain).toContain('2 Verify Web endpoint')
     expect(plain).toContain('3 Enter connected Home')
-    expect(plain).toContain('NEXT     Use [ Enter ] Start OpenAlice in the Action Shelf.')
+    expect(plain).toContain('NEXT     Use [ Enter ] Start OpenAlice from this Briefing.')
     expect(plain).toContain('FIXTURE_RESULT starts=1 opens=0 loads=0 diagnoses=0')
     expect(transcript).toContain('\u001b[?25h')
   }, 12_000)
@@ -181,7 +181,9 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(plain).toContain('[ Enter ] Start OpenAlice')
     expect(plain).toContain('Launch Briefing · AliceProject')
     expect(plain).toContain('◆ LAUNCH READY · READY TO START')
-    expect(plain).toContain('Start Runtime → Verify Web endpoint → Enter connected Home')
+    expect(plain).toContain('1 Start Runtime')
+    expect(plain).toContain('2 Verify Web endpoint')
+    expect(plain).toContain('3 Enter connected Home')
     expect(plain).not.toContain('OWNER    none')
     expect(plain).not.toContain('Inbox')
     expect(transcript).toContain('\u001b[?25h')
@@ -241,7 +243,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
 
     const plain = stripSgr(transcript)
     expect(plain).toContain('⌁ Cloud Lab · SSH')
-    expect(plain).toContain('[ x ] Disconnect')
+    expect(plain).toContain('⌁ Cloud Lab · SSH')
     expect(plain).toContain('Disconnected from Cloud Lab / Research')
     expect(plain).toContain('FIXTURE_RESULT starts=0 opens=0 loads=0 diagnoses=0 disconnects=1 probes=0')
     expect(transcript).toContain('\u001b[?25h')
@@ -311,7 +313,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     const plain = stripSgr(transcript)
     expect(plain).toContain('! DEGRADED')
     expect(plain).toContain('× UNREACHABLE')
-    expect(plain).toContain('[ r ] Retry connection')
+    expect(plain).toContain('Press Enter or r to retry')
     expect(plain).toContain('Connection to Cloud Lab / Research is healthy.')
     expect(plain).toContain('Runtime Observatory · CONNECTED · REMOTE')
     expect(plain).toContain('RUNTIME')
@@ -482,7 +484,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
 
-  it('hovers and clicks an Action Shelf label outside its keycap', async () => {
+  it('opens Setup from the single-spine Command Dock', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-action-shelf-pointer-'))
     temporaryPaths.push(isolatedHome)
     const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
@@ -500,26 +502,26 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     let overlayIdleOutput = ''
     const transcript = await new Promise<string>((resolve, reject) => {
       let output = ''
-      let hovered = false
+      let dockOpened = false
+      let queried = false
       let clicked = false
       let closed = false
       let detached = false
       const timeout = setTimeout(() => {
         child.kill()
-        reject(new Error(`Supervisor Action Shelf pointer timed out:\n${output}`))
+        reject(new Error(`Supervisor Command Dock pointer timed out:\n${output}`))
       }, 8_000)
       child.onData((data) => {
         output += data
-        if (!hovered && output.includes('[ p ] Setup')) {
-          hovered = true
-          child.write('\u001b[<35;34;23M')
-        } else if (
-          !clicked
-          && output.includes('│ › [ p ] Setup')
-          && output.includes('◇  PREVIEW  Setup Studio · review')
-        ) {
+        if (!dockOpened && output.includes('Alice Session · OpenAlice')) {
+          dockOpened = true
+          child.write('/')
+        } else if (!queried && output.includes('Command Dock')) {
+          queried = true
+          child.write('setup')
+        } else if (!clicked && output.includes('›   Setup')) {
           clicked = true
-          child.write('\u001b[<0;34;23M')
+          child.write('\r')
         } else if (!closed && clicked && output.includes('╭ Setup Studio · Default AliceProject')) {
           closed = true
           const pausedAt = output.length
@@ -535,7 +537,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       child.onExit(({ exitCode }) => {
         clearTimeout(timeout)
         if (exitCode === 0) resolve(output)
-        else reject(new Error(`Supervisor Action Shelf pointer exited ${exitCode}:\n${output}`))
+        else reject(new Error(`Supervisor Command Dock pointer exited ${exitCode}:\n${output}`))
       })
     })
 
@@ -543,9 +545,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(stripSgr(transcript)).not.toContain('Runtime Signal Deck')
     expect(stripSgr(overlayIdleOutput)).not.toContain('OpenAlice Supervisor')
     expect(transcript).not.toContain('CONTROL CONSOLE')
-    expect(transcript).toContain('╭─ · [ s ] Start quietly')
-    expect(transcript).toContain('│ › [ p ] Setup')
-    expect(transcript).toContain('◇  PREVIEW  Setup Studio · review')
+    expect(transcript).toContain('MATCH “setup”')
+    expect(transcript).toContain('›   Setup')
     expect(transcript).toContain('╭ Setup Studio · Default AliceProject')
     expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=0')
     expect(transcript).toContain('\u001b[?25h')
@@ -606,7 +607,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(stripSgr(transcript)).toContain(
       '◇  Tip: No Runtime events in this lens; l reloads the bounded snapshot.',
     )
-    expect(stripSgr(transcript)).toContain('◆ [ l ] Reload snapshot')
+    expect(stripSgr(transcript)).toContain('◆ [ l ] Reload Runtime snapshot')
     expect(stripSgr(transcript)).not.toContain('[ ↑↓ ] Scroll')
     expect(stripSgr(transcript)).not.toContain('[ End ] Latest')
     expect(transcript).toContain('› [ l ] Reload Runtime snapshot')
@@ -668,7 +669,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('Diagnostic Radar · NO CHECKS · 0F/0W/0P')
     expect(transcript).toContain('○  NO CHECKS')
     expect(transcript).toContain('› [ d ] Rerun Runtime Doctor')
-    expect(stripSgr(transcript)).toContain('◆ [ d ] Rerun Doctor')
+    expect(stripSgr(transcript)).toContain('◆ [ d ] Rerun Runtime Doctor')
     expect(stripSgr(transcript)).not.toContain('[ ↑↓ ] Inspect')
     expect(stripSgr(transcript)).not.toContain('[ Home ] First')
     expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=0 loads=0 diagnoses=2')
@@ -697,7 +698,6 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       let opened = false
       let hovered = false
       let clicked = false
-      let copyHovered = false
       let copyClicked = false
       const timeout = setTimeout(() => {
         child.kill()
@@ -705,7 +705,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 8_000)
       child.onData((data) => {
         output += data
-        if (!opened && output.includes('[ l ] Logs')) {
+        if (!opened && output.includes('Alice Session · OpenAlice')) {
           opened = true
           child.write('l')
         } else if (!hovered && output.includes('Event Lens · LINE 10 · INFO · TEXT')) {
@@ -714,12 +714,9 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         } else if (!clicked && output.includes('│ » !  9  03:04:09Z Fixture event 9')) {
           clicked = true
           child.write('\u001b[<0;20;11M')
-        } else if (!copyHovered && clicked && output.includes('Event Lens · LINE 9 · WARNING · JSON')) {
-          copyHovered = true
-          child.write('\u001b[<35;52;22M')
-        } else if (!copyClicked && output.includes('› [ y ] Copy event')) {
+        } else if (!copyClicked && clicked && output.includes('Event Lens · LINE 9 · WARNING · JSON')) {
           copyClicked = true
-          child.write('\u001b[<0;52;22M')
+          child.write('y')
         } else if (copyClicked && output.includes('Sent Runtime event 9')) {
           child.write('q')
         }
@@ -733,7 +730,6 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
 
     expect(transcript).toContain('│ » !  9  03:04:09Z Fixture event 9')
     expect(transcript).toContain('Event Lens · LINE 9 · WARNING · JSON')
-    expect(transcript).toContain('› [ y ] Copy event')
     expect(transcript).toContain('Sent Runtime event 9')
     expect(transcript).toContain(
       `\u001b]52;c;${Buffer.from('{"ts":"2026-09-02T03:04:09Z","level":"warn","msg":"Fixture event 9","scope":"pty"}').toString('base64')}\u0007`,
@@ -773,7 +769,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 8_000)
       child.onData((data) => {
         output += data
-        if (!opened && output.includes('[ l ] Logs')) {
+        if (!opened && output.includes('Alice Session · OpenAlice')) {
           opened = true
           child.write('l')
         } else if (!hovered && output.includes('4–10/10 · ALL · LATEST')) {
@@ -835,7 +831,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 8_000)
       child.onData((data) => {
         output += data
-        if (!opened && output.includes('[ l ] Logs')) {
+        if (!opened && output.includes('Alice Session · OpenAlice')) {
           opened = true
           child.write('l')
         } else if (!hovered && output.includes('1–20/20 · ALL · LATEST')) {
@@ -861,7 +857,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('» · 19  fixture event 19')
     expect(transcript).toContain('› · 19  fixture event 19')
     expect(transcript).toContain('Event Lens · LINE 19 · INFO · TEXT')
-    expect(transcript).toContain('╭─ · [ ↑↓ ] Scroll')
+    expect(transcript).toContain('╰─ [ / ] Commands')
     expect(transcript).not.toContain('CONTROL CONSOLE')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
@@ -1115,8 +1111,6 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         if (
           !invoked
           && output.includes('[ Enter ]  Run Runtime Doctor')
-          && output.includes('· [ l ] Logs')
-          && output.includes('[ u ] Update')
         ) {
           invoked = true
           child.write('\r')
@@ -1271,6 +1265,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         let output = ''
         let stage = 0
         let openedFleet = false
+        let movedToProjects = false
         const timeout = setTimeout(() => {
           child.kill()
           reject(new Error(`Supervisor transfer ${scenario} timed out at stage ${stage}:\n${output}`))
@@ -1284,6 +1279,9 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           ) {
             openedFleet = true
             child.write('\t\t')
+          } else if (stage === 0 && !movedToProjects && output.includes('[ Enter ] Browse projects')) {
+            movedToProjects = true
+            child.write('\t')
           } else if (stage === 0 && output.includes('[ m ] Transfer')) {
             stage = 1
             child.write('m')
@@ -1545,7 +1543,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 8_000)
       child.onData((data) => {
         output += data
-        if (!opened && output.includes('[ p ] Setup')) {
+        if (!opened && output.includes('Alice Session · OpenAlice')) {
           opened = true
           child.write('p')
         } else if (!hovered && output.includes('Setup Studio · Default AliceProject') && output.includes('Cycle value')) {
@@ -2367,7 +2365,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 10_000)
       child.onData((data) => {
         output += data
-        if (!openedSettings && output.includes('[ p ] Setup')) {
+        if (!openedSettings && output.includes('Alice Session · OpenAlice')) {
           openedSettings = true
           child.write('p')
         } else if (!selectedPort && output.includes('Setup Studio · Default AliceProject')) {
@@ -2461,7 +2459,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 10_000)
       child.onData((data) => {
         output += data
-        if (!openedSetup && output.includes('[ p ] Setup')) {
+        if (!openedSetup && output.includes('Alice Session · OpenAlice')) {
           openedSetup = true
           child.write('p')
         } else if (
@@ -2953,7 +2951,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 10_000)
       child.onData((data) => {
         output += data
-        if (!openedSettings && output.includes('[ p ] Setup')) {
+        if (!openedSettings && output.includes('Alice Session · OpenAlice')) {
           openedSettings = true
           child.write('p')
         } else if (!selectedPort && output.includes('Setup Studio · Default AliceProject')) {

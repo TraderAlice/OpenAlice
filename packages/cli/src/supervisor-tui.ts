@@ -293,9 +293,9 @@ const DISABLED_SETTING = 'Disabled'
 const PROJECT_SCOPE = 'This AliceProject'
 const MACHINE_SCOPE = 'Machine defaults'
 const WIDE_OVERVIEW_MAX_HEIGHT = 17
-const WIDE_OVERVIEW_RESERVED_CHROME_HEIGHT = 6
-const FLEET_VIEWPORT_RESERVED_HEIGHT = 13
-const WIDE_OPERATIONAL_CANVAS_RESERVED_CHROME_HEIGHT = 6
+const WIDE_OVERVIEW_RESERVED_CHROME_HEIGHT = 5
+const FLEET_VIEWPORT_RESERVED_HEIGHT = 12
+const WIDE_OPERATIONAL_CANVAS_RESERVED_CHROME_HEIGHT = 5
 
 type SupervisorRailSurface = 'logs' | 'doctor' | 'fleet-machines' | 'fleet-projects'
 
@@ -5001,86 +5001,9 @@ export class SupervisorScreen implements Component {
       ...(this.snapshot.diagnostic ? { diagnostic: sanitize(this.snapshot.diagnostic) } : {}),
       ...(hoverPreview ? { preview: sanitize(hoverPreview) } : {}),
     }, width, this.motionFrame, this.motionEnabled)
-    const actionWidth = Math.max(1, width - 4)
     const actionShelf = focusTask
-      ? this.renderFocusActionBar(actionWidth)
-      : this.snapshot.panel === 'fleet'
-        && this.snapshot.launchFlight
-        ? this.snapshot.launchFlight.status === 'running'
-          ? renderSupervisorCommandBar([
-              { key: 'q', label: 'Detach TUI', primary: true },
-            ], actionWidth)
-          : renderSupervisorCommandBar([
-              { key: 'Enter', label: 'Retry selected target', primary: true },
-              { key: 'Esc', label: 'Back to targets' },
-              { key: '?', label: 'More' },
-            ], actionWidth)
-      : this.snapshot.panel === 'fleet' && this.snapshot.fleet
-        ? fleetActionBar(
-          this.snapshot.fleet,
-          runtime,
-          this.snapshot.context,
-          actionWidth,
-          this.snapshot.activeTarget === null,
-        )
-        : this.snapshot.panel === 'inbox'
-          ? renderSupervisorCommandBar([
-              ...(selectedSupervisorInboxEntry(this.snapshot.inbox, this.inboxState)
-                ? [{ key: 'Enter' as const, label: selectedSupervisorInboxEntry(this.snapshot.inbox, this.inboxState)?.readAt ? 'Mark unread' : 'Mark read', primary: true }]
-                : []),
-              { key: '↑↓', label: 'Select' },
-              { key: 'r', label: 'Reload' },
-              { key: 'o', label: 'Open Web' },
-              { key: '?', label: 'More' },
-            ], actionWidth)
-        : this.snapshot.panel === 'logs'
-        ? this.snapshot.activeTarget?.kind === 'ssh'
-          ? remoteRuntimeActionBar(this.snapshot.activeTarget, actionWidth)
-          : this.snapshot.activeTarget && !activeTargetIsReachable(this.snapshot.activeTarget)
-            ? renderSupervisorCommandBar([
-                { key: 'r', label: 'Retry connection', primary: true },
-                { key: 'c', label: 'Connections' },
-                { key: '?', label: 'More' },
-              ], actionWidth)
-          : logsActionBar(
-              this.snapshot.logs,
-              this.logFilter,
-              this.logsFromEnd,
-              actionWidth,
-            )
-        : this.snapshot.panel === 'doctor'
-          ? doctorActionBar(this.snapshot.doctor, actionWidth)
-          : this.snapshot.panel === 'help'
-            ? renderSupervisorCommandBar([
-                { key: '↑↓', label: 'Explore', primary: true },
-                { key: '?', label: 'Close help' },
-                { key: 'q', label: 'Detach' },
-              ], actionWidth)
-            : this.snapshot.activeTarget && !activeTargetIsReachable(this.snapshot.activeTarget)
-              ? renderSupervisorCommandBar([
-                  { key: 'r', label: 'Retry connection', primary: true },
-                  { key: 'c', label: 'Connections' },
-                  ...(this.snapshot.activeTarget.kind === 'ssh'
-                    ? [{ key: 'x' as const, label: 'Disconnect' }]
-                    : []),
-                  { key: '?', label: 'More' },
-                ], actionWidth)
-            : this.snapshot.activeTarget?.kind === 'ssh'
-              ? renderSupervisorCommandBar([
-                  activeTargetIsReachable(this.snapshot.activeTarget)
-                    ? { key: 'o', label: 'Open Web', primary: homePrimaryIntent.kind !== 'inbox' }
-                    : { key: 'r', label: 'Retry connection', primary: true },
-                  { key: 'c', label: 'Connections' },
-                  { key: 'x', label: 'Disconnect' },
-                  { key: '?', label: 'More' },
-                ], actionWidth)
-              : actionBar(
-                  runtime,
-                  this.snapshot.context,
-                  actionWidth,
-                  isConfigRecovery(this.snapshot),
-                  homePrimaryIntent.kind === 'inbox',
-                )
+      ? this.renderFocusActionBar(Math.max(1, width - 4))
+      : []
     const controlConsole = renderSupervisorControlConsole(
       activity,
       actionShelf,
@@ -5524,85 +5447,6 @@ function pointerCommandInput(label: string): KeyId | undefined {
   return inputs[label]
 }
 
-function fleetActionBar(
-  fleet: SupervisorFleetState,
-  runtime: RuntimeSummary | null,
-  _context: ResolvedLaunchContext | undefined,
-  width: number,
-  launcher: boolean,
-): string[] {
-  const machine = selectedFleetMachine(fleet)
-  const project = selectedFleetProject(fleet)
-  if (!launcher) {
-    if (machine?.key === 'local') {
-      return renderSupervisorCommandBar(fleet.focus === 'machines'
-        ? [
-            { key: 'Enter', label: 'Browse projects', primary: true },
-            ...(project?.available ? [{ key: 'm' as const, label: 'Transfer' }] : []),
-            { key: '↑↓', label: 'Select' },
-            { key: '?', label: 'More' },
-          ]
-        : [
-            { key: 'Enter', label: runtime?.class === 'absent' ? 'Start OpenAlice' : 'Use AliceProject', primary: true },
-            ...(project?.available ? [{ key: 'm' as const, label: 'Transfer' }] : []),
-            { key: '←', label: 'Machines' },
-            { key: '?', label: 'More' },
-          ], width)
-    }
-    if (fleet.focus === 'machines') {
-      return renderSupervisorCommandBar([
-        { key: 'Enter', label: 'Browse projects', primary: true },
-        { key: '↑↓', label: 'Select' },
-        { key: 'r', label: 'Refresh' },
-        { key: '?', label: 'More' },
-      ], width)
-    }
-    return renderSupervisorCommandBar([
-      project?.runtime.class === 'absent'
-        ? { key: 'Enter', label: 'Start OpenAlice', primary: true }
-        : { key: 'Enter', label: 'Connect', primary: true },
-      { key: '←', label: 'Machines' },
-      { key: 'r', label: 'Refresh' },
-      { key: '?', label: 'More' },
-    ], width)
-  }
-  const intent = supervisorFleetLaunchIntent(fleet)
-  const primary = {
-    key: intent.action.key,
-    label: intent.action.label,
-    primary: true,
-  } as const
-  if (machine?.key === 'local') {
-    return renderSupervisorCommandBar(fleet.focus === 'machines'
-      ? [
-          primary,
-          ...(project?.available ? [{ key: 'm' as const, label: 'Transfer' }] : []),
-          { key: '↑↓', label: 'Select' },
-          { key: '?', label: 'More' },
-        ]
-      : [
-          primary,
-          ...(project?.available ? [{ key: 'm' as const, label: 'Transfer' }] : []),
-          { key: '←', label: 'Machines' },
-          { key: '?', label: 'More' },
-        ], width)
-  }
-  if (fleet.focus === 'machines') {
-    return renderSupervisorCommandBar([
-      primary,
-      { key: '↑↓', label: 'Select' },
-      ...(intent.action.key === 'r' ? [] : [{ key: 'r' as const, label: 'Refresh' }]),
-      { key: '?', label: 'More' },
-    ], width)
-  }
-  return renderSupervisorCommandBar([
-    primary,
-    { key: '←', label: 'Machines' },
-    ...(intent.action.key === 'r' ? [] : [{ key: 'r' as const, label: 'Refresh' }]),
-    { key: '?', label: 'More' },
-  ], width)
-}
-
 function currentFleetProjectAvailable(
   fleet: SupervisorFleetState | null | undefined,
   context: ResolvedLaunchContext | undefined,
@@ -5819,73 +5663,6 @@ function confirmationView(
   }
 }
 
-function remoteRuntimeActionBar(
-  target: SupervisorActiveTarget,
-  width: number,
-): string[] {
-  const healthy = activeTargetIsReachable(target)
-  return renderSupervisorCommandBar([
-    healthy
-      ? { key: 'o', label: 'Open Web', primary: true }
-      : { key: 'r', label: 'Retry connection', primary: true },
-    ...(healthy ? [{ key: 'r' as const, label: 'Check now' }] : []),
-    { key: 'c', label: 'Connections' },
-    { key: 'x', label: 'Disconnect' },
-    { key: '?', label: 'More' },
-  ], width)
-}
-
-function actionBar(
-  runtime: RuntimeSummary | null,
-  _context: ResolvedLaunchContext | undefined,
-  width: number,
-  recovery = false,
-  inboxPrimary = false,
-): string[] {
-  if (recovery) {
-    return renderSupervisorCommandBar([
-      { key: 'u', label: 'Update', primary: true },
-      { key: '?', label: 'Help' },
-    ], width)
-  }
-  if (runtime?.class === 'absent') {
-    return renderSupervisorCommandBar([
-      { key: 's', label: 'Start quietly' },
-      { key: 'p', label: 'Setup' },
-      { key: 'c', label: 'Source' },
-      { key: '?', label: 'More' },
-    ], width)
-  }
-  if (runtime?.endpoints?.web) {
-    if (inboxPrimary && width < 96 && runtime.owner?.surface === 'cli-server') {
-      return renderSupervisorCommandBar([
-        { key: 'o', label: 'Open Web' },
-        { key: 'l', label: 'Logs' },
-        { key: '?', label: 'More' },
-      ], width)
-    }
-    return renderSupervisorCommandBar(runtime.owner?.surface === 'cli-server'
-      ? [
-          ...(inboxPrimary ? [{ key: 'o' as const, label: 'Open Web' }] : []),
-          { key: 'r', label: 'Restart' },
-          { key: 'x', label: 'Stop' },
-          { key: 'l', label: 'Logs' },
-          { key: '?', label: 'More' },
-        ]
-      : [
-          ...(inboxPrimary ? [{ key: 'o' as const, label: 'Open Web' }] : []),
-          { key: 'd', label: 'Doctor' },
-          { key: 'l', label: 'Logs' },
-          { key: '?', label: 'More' },
-        ], width)
-  }
-  return renderSupervisorCommandBar([
-    { key: 'l', label: 'Logs' },
-    { key: 'u', label: 'Update' },
-    { key: '?', label: 'More' },
-  ], width)
-}
-
 function supervisorHomePrimaryIntent(
   snapshot: SupervisorSnapshot,
 ): SupervisorHomePrimaryIntent {
@@ -5945,49 +5722,6 @@ function homeConnectionOrigin(origin: SupervisorConnectionEventOrigin): string {
   if (origin === 'target-switch') return 'target switch'
   if (origin === 'user-disconnect') return 'user disconnect'
   return 'tunnel exit'
-}
-
-function logsActionBar(
-  logs: RuntimeLogs | null | undefined,
-  filter: SupervisorLogFilter,
-  fromEnd: number,
-  width: number,
-): string[] {
-  const nextFilter = supervisorLogFilterLabel(nextSupervisorLogFilter(filter))
-  if (supervisorFilteredLogCount(logs, filter) === 0) {
-    return renderSupervisorCommandBar([
-      { key: 'l', label: 'Reload snapshot', primary: true },
-      { key: 'f', label: `Show ${nextFilter}` },
-      { key: '?', label: 'More' },
-    ], width)
-  }
-  return renderSupervisorCommandBar([
-    { key: '↑↓', label: 'Scroll' },
-    { key: 'f', label: `Show ${nextFilter}` },
-    ...(supervisorSelectedLogEntry(logs, filter, fromEnd)
-      ? [{ key: 'y', label: 'Copy event' }]
-      : []),
-    { key: 'l', label: 'Reload' },
-    { key: 'End', label: 'Latest' },
-  ], width)
-}
-
-function doctorActionBar(
-  report: DoctorReport | null | undefined,
-  width: number,
-): string[] {
-  if ((report?.checks?.length ?? 0) === 0) {
-    return renderSupervisorCommandBar([
-      { key: 'd', label: report ? 'Rerun Doctor' : 'Run Doctor', primary: true },
-      { key: '?', label: 'More' },
-    ], width)
-  }
-  return renderSupervisorCommandBar([
-    { key: '↑↓', label: 'Inspect' },
-    { key: 'd', label: 'Rerun' },
-    { key: 'Home', label: 'First' },
-    { key: 'End', label: 'Last' },
-  ], width)
 }
 
 function unavailableActionMessage(

@@ -2921,6 +2921,36 @@ already large `supervisor-tui.ts` application controller.
   Acceptance passes through 86 focused renderer/screen tests, the raw-PTY
   pointer reload case, and the complete CLI suite (63 files, 629 tests).
 
+### Single-spine workbench decision
+
+- A live OMP 17.3.4 capture at 120×32 and 80×24 confirmed that its default
+  workbench is grounded by one identity/status rail rather than a persistent
+  wall of shortcut chips. OpenAlice's contextual Action Shelf repeated actions
+  already present in page content or `/` Commands, competed with the Command
+  Spine, and made sparse pages feel like stacked chrome instead of one stage.
+- Ordinary Home, Inbox, Connections, Runtime, Logs, and Doctor pages now use
+  the Command Spine as their sole footer. Actions move to the object they
+  affect: Alice Session, Launch Briefing, Launch Flight Recorder, Fleet
+  Selection, Inbox Inspector, Runtime Observatory/Lens, and Doctor Signal
+  Scope. Direct shortcuts and their safety state machines are unchanged, and
+  `/` Commands remains the discoverable long-tail surface. Focus Workspaces and
+  confirmation/refusal overlays retain their task-owned Action Shelf because
+  those bounded surfaces temporarily replace the ordinary workbench.
+- Removing duplicate chrome exposed useful discoverability gaps instead of
+  hiding them. Failed launch flights now show both Enter Retry and Esc Back;
+  Fleet Selection shows Enter's resolved Start, Connect, Browse, or Use action
+  and local Transfer when available; Inbox Inspector shows Enter's read-state
+  mutation; Home unread guidance names `o` Open Web; populated Logs guidance
+  names filter, copy, and latest navigation.
+- Real 120×32 and 80×24 captures of Home, Runtime, and Inbox prove that page
+  content, contextual guidance, and the single Command Spine remain visible
+  while the large terminal stage gains the same deliberate breathing room seen
+  in OMP. Keyboard and pointer acceptance continue to cover the visible
+  content actions and Command Spine independently.
+- Single-spine acceptance passes through 101 focused screen and renderer tests,
+  all 51 real-PTY cases, and the complete CLI suite (63 files, 629 tests). CLI
+  typecheck and build also pass.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

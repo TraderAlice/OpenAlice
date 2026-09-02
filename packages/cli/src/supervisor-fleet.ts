@@ -685,18 +685,27 @@ function fleetSelectionDetail(
   if (!machine) return ['No Machine selected.']
   if (state.focus === 'machines' || !project) {
     const target = machine.sshTarget ? ` · ${machine.sshTarget}` : ''
-    const rows = [
-      `${machine.key === activeTarget?.machineKey ? '● ACTIVE MACHINE · ' : ''}${machineGlyph(machine)} ${machine.displayName} · ${machineStatus(machine)}${target}`,
-      `${machine.platform ?? 'unknown'} / ${machine.arch ?? 'unknown'} · ${machine.projects.length} AliceProjects · checked ${formatChecked(state.generatedAt)}`,
-    ]
+    const identity = `${machine.key === activeTarget?.machineKey ? '● ACTIVE MACHINE · ' : ''}${machineGlyph(machine)} ${machine.displayName} · ${machineStatus(machine)}${target}`
+    const facts = `${machine.platform ?? 'unknown'} / ${machine.arch ?? 'unknown'} · ${machine.projects.length} AliceProjects · checked ${formatChecked(state.generatedAt)}`
+    const rows = expanded
+      ? [identity, facts, '◆ [ Enter ] Browse projects']
+      : [identity, '◆ [ Enter ] Browse projects']
     return expanded ? [...rows, ...expandedMachineDetail(machine, state, width)] : rows
   }
   const tunnel = state.tunnels[fleetTunnelKey(machine.key, project.key)]
   const active = activeTarget?.machineKey === machine.key && activeTarget.projectKey === project.key
-  const rows = [
-    `${active ? '● ACTIVE TARGET · ' : ''}${projectStatus(project, pulse)} ${project.displayName} · ${project.product === 'nano' ? 'NanoAlice' : 'TraderAlice'} · ${project.runtime.ownerSurface ?? 'no owner'}`,
-    [project.home, tunnel ? `tunnel ${tunnel}` : ''].filter(Boolean).join(' · '),
-  ]
+  const identity = `${active ? '● ACTIVE TARGET · ' : ''}${projectStatus(project, pulse)} ${project.displayName} · ${project.product === 'nano' ? 'NanoAlice' : 'TraderAlice'} · ${project.runtime.ownerSurface ?? 'no owner'}`
+  const path = [project.home, tunnel ? `tunnel ${tunnel}` : ''].filter(Boolean).join(' · ')
+  const primary = project.runtime.class === 'absent'
+    ? 'Start OpenAlice'
+    : machine.key === 'local'
+      ? 'Use AliceProject'
+      : 'Connect'
+  const action = [
+    `◆ [ Enter ] ${primary}`,
+    ...(machine.key === 'local' && project.available ? ['[ m ] Transfer'] : []),
+  ].join('  │  ')
+  const rows = expanded ? [identity, path, action] : [identity, action]
   return expanded
     ? [...rows, ...expandedProjectDetail(machine, project, state, width, pulse)]
     : rows
@@ -775,7 +784,7 @@ function renderLaunchBriefing(
       '',
       `TARGET   ${target}`,
       `CONTEXT  ${context}`,
-      `NEXT     Use ${keycap} ${intent.action.label} in the Action Shelf.`,
+      `NEXT     Use ${keycap} ${intent.action.label} from this Briefing.`,
     ],
     width,
     undefined,

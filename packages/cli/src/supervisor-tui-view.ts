@@ -424,7 +424,10 @@ function homeStateBadge(view: SupervisorHomeView): string {
 function homeGuidance(view: SupervisorHomeView): string[] {
   if (view.inboxPrimary) {
     const count = view.inboxUnread ?? 0
-    return [`${count} unread ${count === 1 ? 'report is' : 'reports are'} waiting in this AliceProject.`]
+    return [
+      `${count} unread ${count === 1 ? 'report is' : 'reports are'} waiting in this AliceProject.`,
+      'Enter reviews Inbox; o opens the Web UI.',
+    ]
   }
   if (
     view.projectAvailable === false
@@ -652,7 +655,7 @@ export function renderSupervisorContextTip(
           ? 'The Chronicle keeps the SSH forward while r checks endpoint health now.'
           : view.itemCount === 0
           ? 'No Runtime events in this lens; l reloads the bounded snapshot.'
-          : 'y copies the focused safe event; End returns to the latest.'
+          : '↑↓ explores; f filters; y copies; End returns to the latest.'
         : view.panel === 'doctor'
           ? view.itemCount === 0
             ? 'No diagnostic checks in this report; d reruns read-only Doctor.'

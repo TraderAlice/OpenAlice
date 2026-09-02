@@ -115,7 +115,7 @@ export function renderSupervisorLaunchFlight(
       ? `${activeStage.state === 'failed' ? '×' : '◆'} NOW  ${activeStage.label} · ${activeStage.detail}`
       : '✓ NOW  Launch handoff complete',
     flight.status === 'failed'
-      ? '◆ [ Enter ] Retry selected target'
+      ? '◆ [ Enter ] Retry selected target  │  [ Esc ] Back to targets'
       : '◇ CONTROL  Keep this terminal open while the selected launch completes.',
   ]
   const naturalHeight = rows.length + 2

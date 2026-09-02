@@ -141,7 +141,8 @@ intentionally parameter-free:
   telemetry dump. It names the selected route, explains the human outcome, and
   previews the three-stage handoff into connected Home; wide terminals add
   target context while ordinary and narrow terminals retain the outcome and
-  next command. The Briefing and bottom Action Shelf share one resolved intent,
+  next command. The Briefing and its content-owned action share one resolved
+  intent,
   so an offline, unavailable, capability-blocked, or endpoint-less target
   promotes Refresh instead of advertising a stale Start or Connect. An offline
   Machine can still expose its last known AliceProjects for inspection before
@@ -197,8 +198,8 @@ intentionally parameter-free:
   or unreachable endpoint always promotes Retry. After a healthy connection,
   unread Inbox reports promote Enter to Review Inbox and keep `o` as the
   explicit Open Web route; when attention clears, Enter returns to Open
-  Workspace. The rendered label, whole-row pointer target, Enter handler, and
-  supporting Action Shelf resolve from the same intent. `⌂` AliceProject remains
+  Workspace. The rendered label, whole-row pointer target, and Enter handler
+  resolve from the same intent. `⌂` AliceProject remains
   a direct route into the Switchboard, while passive identity and status rows
   do not pretend to be controls. Color strengthens identity, focus, healthy
   state, and actionable attention, but glyphs and text keep the complete
@@ -264,27 +265,28 @@ intentionally parameter-free:
   of leaving that surplus unowned. It visualizes the selected
   Machine → AliceProject → Runtime/Web route and expands only reported product,
   port, owner, uptime, service, capability, and refresh facts. The Constellation
-  has no pointer target or lifecycle action; compact Selection remains two rows.
+  has no pointer target or lifecycle action. The Selection surface owns the
+  current Enter action in both forms and exposes Transfer only for an available
+  local AliceProject; compact Selection remains two rows plus that content-
+  owned action.
   With only the local Machine, Fleet focus starts on its current AliceProject;
-- the footer is a contextual Action Shelf, not a complete shortcut legend. It
-  exposes a few relevant actions as chips on one full-width surface. On
-  Home these are supporting commands only because the Alice Session stage owns
-  the sole primary action. At the 80-column baseline, Inbox likewise keeps its
-  Review/Open report action in content and moves lower-priority Runtime
-  mutations behind `/` Commands. Other surfaces can expose their current
-  primary action as a high-priority `◆` segment. Segments wrap atomically
-  instead of clipping labels;
-  `?` keeps the complete keyboard reference available without crowding every
-  operational page. Each complete action segment derives a display-width-aware
-  pointer target from the final responsive layout, so hover and click survive
-  reflow and invoke the same input state machine as the corresponding key.
-  Hover changes the leading `◆`/`·` or divider to `›`, preserving a visible
-  focus signal even under `NO_COLOR`. Confirmation and refusal semantics
-  therefore do not have a separate mouse-only path. The same parser recognizes
-  Action Shelves framed inside overlays and confirmation modals: their complete
-  Enter/Esc labels share hover/click semantics with the application footer,
-  while activation still emits only the existing keyboard input. When a wide
-  layout composes adjacent framed cards, theme decoration classifies each card
+- ordinary workbench pages have one bottom surface: the Command Spine. Primary
+  and contextual actions live with the object they affect: Alice Session,
+  Launch Briefing, Launch Flight Recorder, Fleet Selection, Inbox Inspector,
+  Runtime Observatory or Lens, and Doctor Signal Scope. `/` Commands owns the
+  long tail while direct shortcuts remain active; `?` retains the complete
+  keyboard reference. Inbox Inspector exposes Enter's read-state mutation, and
+  a failed Flight Recorder keeps both Enter Retry and Esc Back visible in its
+  content. This avoids a second footer that competes with page truth or repeats
+  the Spine. Focus Workspaces and confirmation/refusal overlays still own a
+  local Action Shelf because that bounded task temporarily replaces ordinary
+  workbench navigation. Each complete local action segment derives a display-
+  width-aware pointer target from the final responsive layout, so hover and
+  click survive reflow and invoke the same input state machine as the
+  corresponding key. Hover changes the leading `◆`/`·` or divider to `›`,
+  preserving a visible focus signal even under `NO_COLOR`. Confirmation and
+  refusal semantics therefore do not have a separate mouse-only path. When a
+  wide layout composes adjacent framed cards, theme decoration classifies each card
   column independently at the rendered gutter; a primary action in one card
   must not color fields, borders, or whitespace in its neighbor;
 - wide split-pane content follows the same containment contract. Selection,
@@ -304,7 +306,8 @@ intentionally parameter-free:
   quiet while the task sequence and primary action settle against the stage's
   lower edge. Compact layouts keep their natural density, and no other panel
   inherits this Home-only height policy;
-- a persistent full-width Command Spine closes the application with `╰─`/`─╯`
+- a persistent full-width Command Spine is the sole default footer and closes
+  the application with `╰─`/`─╯`
   while keeping `[ / ] Commands` and `[ q ] Detach` visible on every Supervisor
   page. A flexible track joins those controls to an OMP-style breadcrumb of the
   selected AliceProject, compact Runtime signal, and active-view badge. The
@@ -350,10 +353,10 @@ intentionally parameter-free:
   breadcrumb. Busy, informational, successful, actionable-warning, failed, and
   preview states retain distinct glyph and text labels without depending on
   color; only the busy glyph animates. Feedback is object-first and bounded to
-  the available rail width, so it never moves Action Shelf or Command Spine
-  pointer targets and does not introduce a second lifecycle or error path.
+  the available rail width, so it never moves Command Spine pointer targets
+  and does not introduce a second lifecycle or error path.
   When the terminal is taller than the current page, one elastic blank stage
-  grounds the Action Shelf and Command Spine at the terminal edge; short
+  grounds the Command Spine at the terminal edge; short
   terminals retain their natural complete flow without clipping. Resize changes
   only that elastic stage and does not reset selection, focus, or action state.
   When the stage has at least two spare rows, one contextual `Tip:` Beacon

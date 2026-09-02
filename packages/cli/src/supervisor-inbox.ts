@@ -311,6 +311,8 @@ function inboxDetailRows(entry: SupervisorInboxEntry, width: number): string[] {
     rows.push(...docs.slice(0, 5).map((doc) => `◇ ${doc.path}`))
     if (docs.length > 5) rows.push(`… ${docs.length - 5} more`)
   }
+  if (rows.at(-1) !== '') rows.push('')
+  rows.push(`◆ [ Enter ] ${entry.readAt ? 'Mark unread' : 'Mark read'}`)
   return rows.map((row) => truncateDisplayWidth(row, width))
 }
 

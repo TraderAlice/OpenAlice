@@ -103,7 +103,7 @@ describe('Supervisor TUI screen', () => {
     expect(activated).toEqual(['local/default'])
   })
 
-  it('makes blocked Launch Briefings and the Action Shelf share Refresh', () => {
+  it('makes a blocked Launch Briefing own its visible Refresh action', () => {
     const refreshed: string[] = []
     const activated: string[] = []
     const remote = {
@@ -129,7 +129,8 @@ describe('Supervisor TUI screen', () => {
 
     const frame = screen.render(100).join('\n')
     expect(frame).toContain('× LAUNCH BLOCKED · SSH FORWARD UNAVAILABLE')
-    expect(frame).toContain('◆ [ r ] Refresh')
+    expect(frame).toContain('NEXT  [ r ] Refresh')
+    expect(frame).not.toContain('╭─ ◆ [ r ] Refresh')
     expect(frame).not.toContain('[ Enter ] Connect')
     expect(screen.handleKey('r', matchesKey)).toBe(true)
     screen.activateFleetPrimary(fleet)
@@ -176,7 +177,7 @@ describe('Supervisor TUI screen', () => {
     const activeFrame = screen.render(100).join('\n')
     expect(activeFrame).toContain('Launch Flight Recorder · LOCAL START · IN FLIGHT · T+00:04')
     expect(activeFrame).toContain('◆ 02 START')
-    expect(activeFrame).toContain('[ q ] Detach TUI')
+    expect(activeFrame).toContain('[ q ] Detach')
     expect(activeFrame).not.toContain('Machines · 1/1')
 
     screen.update({
@@ -229,7 +230,8 @@ describe('Supervisor TUI screen', () => {
     expect(home).toContain('1 unread report needs your attention')
     expect(home).toContain('1 unread report is waiting in this AliceProject.')
     expect(home).toContain('[ Enter ]  Review 1 unread report')
-    expect(home).toContain('[ o ] Open Web')
+    expect(home).toContain('Enter reviews Inbox;')
+    expect(home).toContain('o opens the Web UI.')
     expect(screen.handleKey('enter', matchesKey)).toBe(true)
     expect(screen.snapshot.panel).toBe('inbox')
     expect(opens).toBe(0)
@@ -286,7 +288,7 @@ describe('Supervisor TUI screen', () => {
 
     const frame = screen.render(100).join('\n')
     expect(frame).toContain('⌁ Cloud Lab / Research · SSH')
-    expect(frame).toContain('[ x ] Disconnect')
+    expect(frame).not.toContain('╭─ ◆ [ x ] Disconnect')
     expect(frame).not.toContain('[ i ] Research')
     expect(screen.renderCommandPalette(100).lines.join('\n')).toContain('Disconnect remote target')
     expect(screen.renderCommandPalette(100).lines.join('\n')).not.toContain('Runtime Source')
@@ -345,7 +347,7 @@ describe('Supervisor TUI screen', () => {
     expect(frame).not.toContain('● LIVE SESSION · OPEN THE WORKSPACE')
     expect(frame).not.toContain('INBOX ATTENTION')
     expect(frame).toContain('currently unreachable')
-    expect(frame).toContain('[ r ] Retry connection')
+    expect(frame).toContain('[ Enter ]  Retry active connection')
     expect(frame).not.toContain('[ o ] Open Web')
     expect(screen.renderCommandPalette(100).lines.join('\n')).toContain('Retry connection')
 
@@ -394,7 +396,7 @@ describe('Supervisor TUI screen', () => {
     expect(frame).toContain('Connection needs a retry')
     expect(frame).toContain('! Connection  degraded')
     expect(frame).toContain('endpoint missed a Runtime')
-    expect(frame).toContain('[ r ] Retry connection')
+    expect(frame).toContain('[ Enter ]  Retry active connection')
     expect(screen.handleKey('r', matchesKey)).toBe(true)
     expect(retries).toBe(1)
 
@@ -402,7 +404,7 @@ describe('Supervisor TUI screen', () => {
     const runtimeFrame = screen.render(100).join('\n')
     expect(runtimeFrame).toContain('Runtime Observatory · CONNECTION DEGRADED · LOCAL')
     expect(runtimeFrame).toContain('1 failed inspections')
-    expect(runtimeFrame).toContain('◆ [ r ] Retry connection')
+    expect(runtimeFrame).toContain('◆ [ r ] Retry active connection')
     expect(runtimeFrame).not.toContain('[ l ] Reload snapshot')
   })
 
@@ -461,9 +463,8 @@ describe('Supervisor TUI screen', () => {
     expect(lines.length).toBeLessThanOrEqual(24)
     expect(lines.join('\n')).toContain('[ Enter ]  Start OpenAlice & open Workspace')
     expect(lines.join('\n')).not.toContain('◆ [ Enter ] Start & open')
-    expect(lines.join('\n')).toContain('[ s ] Start quietly')
-    expect(lines.join('\n')).toContain('[ c ] Source')
-    expect(lines.join('\n')).toContain('[ ? ] More')
+    expect(lines.join('\n')).not.toContain('╭─ · [ s ] Start quietly')
+    expect(screen.renderCommandPalette(80).lines.join('\n')).toContain('Start quietly')
     expect(lines.at(-1)).toContain('╰─ [ / ] Commands  ›  [ q ] Detach')
     expect(lines.at(-1)).toContain('[ i ] AliceProject  ›  ○ COLD')
     expect(lines.at(-1)).toMatch(/─╯$/u)
@@ -564,7 +565,7 @@ describe('Supervisor TUI screen', () => {
     expect(tall.join('\n')).toContain('RECENT')
     expect(tall.join('\n')).not.toContain('CONTROL PATH')
     expect(tall.join('\n')).not.toContain('Runtime Telemetry')
-    expect(tall.at(-2)).toMatch(/^╭─ · \[ s \] Start quietly/u)
+    expect(tall.at(-2)).toBe('')
     expect(tall.join('\n')).not.toContain('CONTROL CONSOLE')
     expect(tall.at(-1)).toContain('[ / ] Commands')
 
@@ -822,7 +823,7 @@ describe('Supervisor TUI screen', () => {
     expect(recovery).toContain('! RECOVERY  ›  ◆ OVERVIEW')
   })
 
-  it('anchors the two-line action rail to the live viewport without clipping content', () => {
+  it('anchors one Command Spine to the live viewport without clipping content', () => {
     let viewportHeight = 32
     const paletteChanges: boolean[] = []
     const screen = new SupervisorScreen({
@@ -837,7 +838,7 @@ describe('Supervisor TUI screen', () => {
 
     const tall = screen.render(80)
     expect(tall).toHaveLength(32)
-    expect(tall.at(-2)).toContain('[ l ] Logs')
+    expect(tall.at(-2)).toBe('')
     expect(tall.join('\n')).not.toContain('CONTROL CONSOLE')
     expect(tall.at(-1)).toContain('╰─ [ / ] Commands')
     expect(tall.join('\n')).toContain(
@@ -851,7 +852,7 @@ describe('Supervisor TUI screen', () => {
     viewportHeight = 24
     const resized = screen.render(80)
     expect(resized).toHaveLength(24)
-    expect(resized.at(-2)).toContain('[ l ] Logs')
+    expect(resized.at(-2)).toBe('')
     expect(resized.at(-1)).toContain('[ / ] Close')
     expect(resized.join('\n')).toContain('◇  Tip: Enter follows Now; o opens Web; Runtime keeps the diagnostic detail.')
     expect(screen.handlePointer(pointerClick(6, 24))).toBe(true)
@@ -883,7 +884,7 @@ describe('Supervisor TUI screen', () => {
     const recovery = renderSupervisorContextTip({ panel: 'overview', recovery: true }, 100)
 
     expect(fleet).toContain('First click focuses a pane')
-    expect(logs).toContain('y copies the focused safe event')
+    expect(logs).toContain('f filters; y copies')
     expect(emptyLogs).toContain('No Runtime events in this lens')
     expect(doctor).toContain('Doctor is read-only')
     expect(emptyDoctor).toContain('No diagnostic checks in this report')
@@ -919,7 +920,7 @@ describe('Supervisor TUI screen', () => {
     )[3]).toBe(fleet)
   })
 
-  it('exposes only recovery actions when Logs or Doctor have no objects', () => {
+  it('keeps empty recovery actions in content and long-tail controls in Commands', () => {
     const screen = new SupervisorScreen({
       version: 'dev',
       channel: 'dev',
@@ -933,31 +934,24 @@ describe('Supervisor TUI screen', () => {
     })
 
     const emptyLogs = screen.render(120)
-    expect(emptyLogs.at(-2)).toContain('◆ [ l ] Reload snapshot')
-    expect(emptyLogs.at(-2)).toContain('[ f ] Show alerts')
-    expect(emptyLogs.at(-2)).toContain('[ ? ] More')
-    expect(emptyLogs.at(-2)).not.toContain('[ ↑↓ ] Scroll')
-    expect(emptyLogs.at(-2)).not.toContain('[ y ] Copy event')
-    expect(emptyLogs.at(-2)).not.toContain('[ End ] Latest')
+    expect(emptyLogs.join('\n')).toContain('◆ [ l ] Reload Runtime snapshot')
+    expect(emptyLogs.at(-1)).toContain('[ / ] Commands')
+    expect(emptyLogs.at(-2)).toBe('')
+    expect(emptyLogs.join('\n')).not.toContain('[ y ] Copy event')
     expect(emptyLogs.join('\n')).toContain('No Runtime events in this lens')
 
     screen.update({ logs: { entries: [{ text: 'Runtime ready' }] } })
-    expect(screen.render(120).at(-2)).toContain('[ ↑↓ ] Scroll')
-    expect(screen.render(120).at(-2)).toContain('[ y ] Copy event')
-    expect(screen.render(120).at(-2)).toContain('[ End ] Latest')
+    expect(screen.render(120).join('\n')).toContain('Event Lens · LINE 1')
 
     screen.update({ panel: 'doctor' })
     const emptyDoctor = screen.render(120)
-    expect(emptyDoctor.at(-2)).toContain('◆ [ d ] Rerun Doctor')
-    expect(emptyDoctor.at(-2)).toContain('[ ? ] More')
-    expect(emptyDoctor.at(-2)).not.toContain('[ ↑↓ ] Inspect')
-    expect(emptyDoctor.at(-2)).not.toContain('[ Home ] First')
-    expect(emptyDoctor.at(-2)).not.toContain('[ End ] Last')
+    expect(emptyDoctor.join('\n')).toContain('◆ [ d ] Rerun Runtime Doctor')
+    expect(emptyDoctor.at(-1)).toContain('[ / ] Commands')
     expect(emptyDoctor.join('\n')).toContain('No diagnostic checks in this report')
     expect(emptyDoctor[1]).not.toContain('Doctor✓')
 
     screen.update({ doctor: null })
-    expect(screen.render(120).at(-2)).toContain('◆ [ d ] Run Doctor')
+    expect(screen.render(120).join('\n')).toContain('◆ [ d ] Run Runtime Doctor')
 
     screen.update({
       doctor: {
@@ -965,9 +959,7 @@ describe('Supervisor TUI screen', () => {
         checks: [{ status: 'pass', summary: 'Runtime reachable' }],
       },
     })
-    expect(screen.render(120).at(-2)).toContain('[ ↑↓ ] Inspect')
-    expect(screen.render(120).at(-2)).toContain('[ Home ] First')
-    expect(screen.render(120).at(-2)).toContain('[ End ] Last')
+    expect(screen.render(120).join('\n')).toContain('Doctor checks')
     expect(screen.render(120)[1]).not.toContain('Doctor')
   })
 
@@ -1026,9 +1018,9 @@ describe('Supervisor TUI screen', () => {
     expect(screen.handlePointer(pointerClick(6, spineRow))).toBe(true)
     lines = screen.render(80)
 
-    const actionRow = lines.findIndex((line) => line.includes('[ s ] Start quietly')) + 1
+    const actionRow = lines.findIndex((line) => line.includes('[ Enter ]  Start OpenAlice')) + 1
     const actionLine = lines[actionRow - 1]?.replace(/\u001b\[[0-9;]*m/gu, '') ?? ''
-    const actionCol = actionLine.indexOf('[ s ]') + 3
+    const actionCol = actionLine.indexOf('[ Enter ]') + 3
     expect(actionRow).toBeGreaterThan(0)
     expect(actionCol).toBeGreaterThan(2)
     expect(screen.handleCommandSpinePointer(pointerClick(actionCol, actionRow))).toBe(false)
@@ -1488,7 +1480,7 @@ describe('Supervisor TUI screen', () => {
     expect(output).toContain('● RUNNING ELSEWHERE')
     expect(output).toContain('[ Enter ]  Open Workspace')
     expect(output).not.toContain('[ Enter ] Open workspace')
-    expect(output).toContain('[ d ] Doctor')
+    expect(screen.renderCommandPalette(80).lines.join('\n')).toContain('Runtime Doctor')
     expect(output).not.toContain('[ r ] Restart')
     expect(output).not.toContain('[ x ] Stop')
   })
@@ -1514,10 +1506,13 @@ describe('Supervisor TUI screen', () => {
 
     const localFleet = screen.render(100).join('\n')
     expect(localFleet).toContain('AliceProjects · This computer')
-    expect(localFleet.match(/\[ m \] Transfer/gu)).toHaveLength(1)
+    expect(localFleet).not.toContain('[ m ] Transfer')
     expect(localFleet).not.toContain('m Managed')
+    expect(screen.handleKey('tab', matchesKey)).toBe(true)
+    expect(screen.render(100).join('\n').match(/\[ m \] Transfer/gu)).toHaveLength(1)
     expect(screen.handleKey('m', matchesKey)).toBe(true)
     expect(transfers).toEqual(['default'])
+    expect(screen.handleKey('shift+tab', matchesKey)).toBe(true)
     expect(screen.handleKey('down', matchesKey)).toBe(true)
     expect(screen.handleKey('tab', matchesKey)).toBe(true)
     expect(screen.render(100).join('\n')).toContain('AliceProjects · Cloud')
@@ -1531,7 +1526,7 @@ describe('Supervisor TUI screen', () => {
     expect(screen.snapshot.fleet?.focus).toBe('machines')
   })
 
-  it('keeps Transfer out of the action shelf when the local Project home is missing', () => {
+  it('keeps Transfer out of Commands when the local Project home is missing', () => {
     const transfers: string[] = []
     const local = fleetMachines()[0]!
     const screen = new SupervisorScreen({
@@ -1559,8 +1554,9 @@ describe('Supervisor TUI screen', () => {
     const output = screen.render(120).join('\n')
     expect(output).toContain('◆ running · home missing')
     expect(output).toContain('◆ LIVE · HOME MISSING')
-    expect(output).toContain('[ Enter ] Use AliceProject')
+    expect(output).toContain('Selection')
     expect(output).not.toContain('[ m ] Transfer')
+    expect(screen.renderCommandPalette(120).lines.join('\n')).not.toContain('Transfer AliceProject')
     expect(screen.handleKey('m', matchesKey)).toBe(true)
     expect(transfers).toEqual([])
     expect(screen.snapshot.notice).toBe('Transfer requires an available AliceProject home.')
@@ -1610,7 +1606,8 @@ describe('Supervisor TUI screen', () => {
     expect(expanded).toHaveLength(32)
     expect(expanded.join('\n')).toContain('Local Project 6')
     expect(expanded.join('\n')).not.toContain('█')
-    expect(expanded.at(-2)).toContain('[ Enter ] Browse projects')
+    expect(expanded.at(-2)).toBe('')
+    expect(expanded.at(-1)).toContain('[ / ] Commands')
 
     viewportHeight = 20
     const constrained = screen.render(120).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
@@ -1637,7 +1634,8 @@ describe('Supervisor TUI screen', () => {
     expect(expandedLogs).toHaveLength(32)
     expect(expandedLogs.join('\n')).toContain('1–20/20 · ALL · LATEST')
     expect(expandedLogs.join('\n')).not.toContain('█')
-    expect(expandedLogs.at(-2)).toContain('[ ↑↓ ] Scroll')
+    expect(expandedLogs.at(-2)).toBe('')
+    expect(expandedLogs.at(-1)).toContain('[ / ] Commands')
 
     viewportHeight = 20
     const constrainedLogs = logsScreen.render(120).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
@@ -1658,9 +1656,9 @@ describe('Supervisor TUI screen', () => {
     })
     const standbyDoctor = doctorScreen.render(120).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
     expect(standbyDoctor).toHaveLength(32)
-    expect(standbyDoctor[24]).toContain('◆ [ d ] Run Runtime Doctor')
-    expect(standbyDoctor[25]).toContain('╰')
-    expect(standbyDoctor.at(-2)).toContain('[ d ] Run Doctor')
+    expect(standbyDoctor.join('\n')).toContain('◆ [ d ] Run Runtime Doctor')
+    expect(standbyDoctor.at(-2)).toBe('')
+    expect(standbyDoctor.at(-1)).toContain('[ / ] Commands')
   })
 
   it('scrubs Logs, Doctor, and Fleet rails without activating operations', () => {
@@ -1971,9 +1969,7 @@ describe('Supervisor TUI screen', () => {
       expect.objectContaining({ label: 'Esc', surface: '[ Esc ] Done', primary: false }),
     ]))
     const actions: SupervisorAction[] = []
-    const settings = vi.fn()
     const detach = vi.fn()
-    const requestRender = vi.fn()
     const screen = new SupervisorScreen({
       version: 'dev',
       channel: 'dev',
@@ -1981,40 +1977,14 @@ describe('Supervisor TUI screen', () => {
       runtime: { class: 'absent', endpoints: {} },
     }, {
       onAction: (action) => actions.push(action),
-      onSettings: settings,
       onDetach: detach,
-      requestRender,
       theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
     })
 
     let lines = screen.render(80)
     let plainLines = lines.map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
-    let row = plainLines.findIndex((line) => line.includes('[ p ] Setup')) + 1
-    let col = plainLines[row - 1]!.indexOf('Setup') + 2
-    expect(screen.handlePointer({
-      button: 35, col, row, release: false, wheel: null, motion: true, leftClick: false,
-    })).toBe(true)
-    expect(requestRender).toHaveBeenCalled()
-    expect(screen.render(80)[row - 1]).toContain('\u001b[1;38;2;230;255;252;48;2;24;64;69m[ p ] Setup')
-    expect(screen.render(80)[row - 1]!.replace(/\u001b\[[0-9;]*m/gu, '')).toContain('│ › [ p ] Setup')
-    expect(screen.render(80).join('\n').replace(/\u001b\[[0-9;]*m/gu, ''))
-      .toContain('◇  PREVIEW  Setup Studio · review')
-    expect(screen.handlePointer({
-      button: 35, col: 40, row: row - 1, release: false, wheel: null, motion: true, leftClick: false,
-    })).toBe(true)
-    expect(screen.render(80).join('\n')).not.toContain('PREVIEW')
-    expect(screen.handlePointer({
-      button: 35, col, row, release: false, wheel: null, motion: true, leftClick: false,
-    })).toBe(true)
-    expect(screen.handlePointer({
-      button: 0, col, row, release: false, wheel: null, motion: false, leftClick: true,
-    })).toBe(true)
-    expect(settings).toHaveBeenCalledOnce()
-
-    lines = screen.render(80)
-    plainLines = lines.map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
-    row = plainLines.findIndex((line) => line.includes('[ Enter ]  Start')) + 1
-    col = plainLines[row - 1]!.indexOf('[ Enter ]') + 2
+    let row = plainLines.findIndex((line) => line.includes('[ Enter ]  Start')) + 1
+    let col = plainLines[row - 1]!.indexOf('[ Enter ]') + 2
     screen.handlePointer({
       button: 0, col, row, release: false, wheel: null, motion: false, leftClick: true,
     })
@@ -2290,7 +2260,7 @@ describe('Supervisor TUI screen', () => {
 
     expect(screen.render(80).join('\n')).toContain('14–20/20 · ALL · LATEST')
     expect(screen.render(80).join('\n')).toContain('Event Lens · LINE 20 · INFO · TEXT')
-    expect(screen.render(80).join('\n')).toContain('[ l ] Reload')
+    expect(screen.render(80).at(-1)).toContain('[ / ] Commands')
     expect(screen.handleKey('up', matchesKey)).toBe(true)
     expect(screen.render(80).join('\n')).toContain('Event Lens · LINE 19 · INFO · TEXT')
     expect(screen.handleKey('end', matchesKey)).toBe(true)
@@ -2303,10 +2273,7 @@ describe('Supervisor TUI screen', () => {
     expect(screen.render(80)[previousEventRow - 1]).toContain('» · 19  log line 19')
     expect(screen.handlePointer(pointerClick(8, previousEventRow))).toBe(true)
     expect(screen.render(80).join('\n')).toContain('Event Lens · LINE 19 · INFO · TEXT')
-    const copyLines = screen.render(80)
-    const copyRow = copyLines.findIndex((line) => line.includes('[ y ] Copy event')) + 1
-    const copyColumn = copyLines[copyRow - 1]!.indexOf('Copy event') + 2
-    expect(screen.handlePointer(pointerClick(copyColumn, copyRow))).toBe(true)
+    expect(screen.handleKey('y', matchesKey)).toBe(true)
     expect(copied).toEqual([{ number: 19, text: 'log line 19' }])
     expect(screen.snapshot.notice).toBe('Sent Runtime event 19 to the terminal clipboard.')
 
@@ -2324,15 +2291,13 @@ describe('Supervisor TUI screen', () => {
     expect(semanticLogs).toContain('! 1  03:04:05Z Runtime probe slowed · scope=guardian waitMs=120')
     expect(semanticLogs).toContain('· 2  plain adapter output')
     expect(semanticLogs).not.toContain('"msg"')
-    expect(semanticLogs).toContain('[ f ] Show alerts')
-    expect(semanticLogs).toContain('[ y ] Copy event')
+    expect(semanticLogs).not.toContain('╭─ [ f ] Show alerts')
     expect(screen.handleKey('f', matchesKey)).toBe(true)
     const attentionLogs = screen.render(80).join('\n')
     expect(attentionLogs).toContain('ATTENTION · 1/2 · LATEST')
     expect(attentionLogs).toContain('Event Lens · LINE 1 · WARNING · JSON')
     expect(attentionLogs).toContain('! 1  03:04:05Z Runtime probe slowed')
     expect(attentionLogs).not.toContain('plain adapter output')
-    expect(attentionLogs).toContain('[ f ] Show errors')
     expect(screen.handleKey('f', matchesKey)).toBe(true)
     expect(screen.render(80).join('\n')).toContain('0/2 · ERRORS')
     expect(screen.handleKey('f', matchesKey)).toBe(true)
@@ -2344,7 +2309,6 @@ describe('Supervisor TUI screen', () => {
     expect(screen.render(80).join('\n')).toContain('! Update available')
     expect(screen.render(80).join('\n')).toContain('× Port collision')
     expect(screen.render(80).join('\n')).toContain('Inspection · 3/3 · FAIL')
-    expect(screen.render(80).join('\n')).toContain('[ d ] Rerun')
     expect(screen.handleKey('up', matchesKey)).toBe(true)
     expect(screen.render(80).join('\n')).toContain('Inspection · 2/3 · WARNING')
     expect(screen.render(80).join('\n')).toContain('Install when convenient.')
@@ -2510,8 +2474,8 @@ describe('Supervisor TUI screen', () => {
     screen.handleKey('down', matchesKey)
     screen.handleKey('tab', matchesKey)
 
-    expect(screen.render(100).join('\n')).toContain('[ Enter ] Start OpenAlice')
-    expect(screen.render(50).join('\n')).toContain('[ Enter ] Start OpenAlice')
+    expect(screen.render(100).join('\n')).toContain('○ stopped Research')
+    expect(screen.render(50).join('\n')).toContain('○ stopped')
     expect(screen.handleKey('enter', matchesKey)).toBe(true)
     expect(starts).toEqual(['cloud/research'])
   })
@@ -2621,7 +2585,8 @@ describe('Supervisor TUI screen', () => {
 
     let lines = screen.render(80)
     expect(lines.join('\n')).toContain('◆ [ Enter ]  Run Runtime Doctor')
-    expect(lines.join('\n')).toContain('· [ l ] Logs  │  [ u ] Update  │  [ ? ] More')
+    expect(lines.at(-1)).toContain('[ / ] Commands')
+    expect(screen.renderCommandPalette(80).lines.join('\n')).toContain('Runtime logs')
     expect(lines.join('\n')).not.toContain('[ d ] Review Doctor')
     const row = lines.findIndex((line) => line.includes('[ Enter ]  Run Runtime Doctor')) + 1
     expect(screen.handlePointer(pointerClick(60, row))).toBe(true)
@@ -3736,8 +3701,9 @@ describe('Supervisor TUI screen', () => {
     expect(output).toContain('AliceProject configuration cannot be read.')
     expect(output).toContain('requires a newer OpenAlice')
     expect(output).toContain('will not inspect, start, open, stop, restart, or configure a project')
-    expect(output).toContain('[ u ] Update')
-    expect(output).toContain('[ ? ] Help')
+    expect(output).toContain('Press u to choose a channel')
+    expect(screen.renderCommandPalette(100).lines.join('\n')).toContain('Check for update')
+    expect(screen.renderCommandPalette(100).lines.join('\n')).toContain('Recovery help')
     expect(output).not.toContain('Enter Start & open')
     expect(output).not.toContain('i AliceProjects')
     expect(output).not.toContain('Default AliceProject')

@@ -234,7 +234,7 @@ describe('Supervisor fleet state and presentation', () => {
     expect(output).toContain('1 Start Runtime')
     expect(output).toContain('2 Verify Web endpoint')
     expect(output).toContain('3 Enter connected Home')
-    expect(output).toContain('NEXT     Use [ Enter ] Start OpenAlice in the Action Shelf.')
+    expect(output).toContain('NEXT     Use [ Enter ] Start OpenAlice from this Briefing.')
     expect(output).not.toContain('Selection Constellation')
     expect(output).not.toContain('OWNER    ')
     expect(output).not.toContain('PORT  ')
