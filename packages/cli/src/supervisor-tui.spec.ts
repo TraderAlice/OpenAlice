@@ -235,12 +235,67 @@ describe('Supervisor TUI screen', () => {
     expect(narrow).toHaveLength(52)
     expect(narrow).toContain('[ q ] Detach')
     expect(narrow).not.toContain('[ i ]')
+    expect(narrow).toMatch(/\[ q \] Detach ─+╯$/u)
+    expect(narrow).not.toContain('  ─╯')
+    expect(displayWidth(narrow)).toBe(52)
+    expect(supervisorCommandTargets([narrow])).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: '/', surface: '[ / ] Commands' }),
+      expect.objectContaining({ label: 'q', surface: '[ q ] Detach' }),
+    ]))
+    expect(decorateSupervisorFrame([
+      'header',
+      'divider',
+      'tabs',
+      narrow,
+    ], createSupervisorTuiTheme({ TERM: 'xterm-256color', NO_COLOR: '1' }), {
+      panel: 'overview',
+      runtimeClass: 'absent',
+    })[3]).toBe(narrow)
+
+    const narrowPalette = renderSupervisorDock({
+      panel: 'overview',
+      commandPaletteOpen: true,
+    }, 46)
+    expect(narrowPalette).toMatch(/\[ \/ \] Close  ›  \[ q \] Detach ─+╯$/u)
+    expect(narrowPalette).not.toContain('  ─╯')
+    expect(displayWidth(narrowPalette)).toBe(46)
 
     const recovery = renderSupervisorDock({
       panel: 'overview',
       recovery: true,
     }, 80)
     expect(recovery).toContain('! RECOVERY  ›  ◆ OVERVIEW')
+  })
+
+  it('keeps the narrow Command Spine closed while Commands and Close remain clickable', () => {
+    const paletteChanges: boolean[] = []
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'overview',
+      runtime: { class: 'absent', endpoints: {} },
+    }, {
+      onCommandPaletteChange: (open) => paletteChanges.push(open),
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+      motionEnabled: false,
+    })
+
+    let lines = screen.render(46)
+    let spineRow = lines.findIndex((line) => line.includes('[ / ] Commands')) + 1
+    expect(spineRow).toBeGreaterThan(0)
+    let plainSpine = lines[spineRow - 1]?.replace(/\u001b\[[0-9;]*m/gu, '') ?? ''
+    expect(plainSpine).toMatch(/^╰─ \[ \/ \] Commands  ›  \[ q \] Detach ─+╯$/u)
+    expect(displayWidth(plainSpine)).toBe(46)
+    expect(screen.handlePointer(pointerClick(6, spineRow))).toBe(true)
+    expect(paletteChanges).toEqual([true])
+
+    lines = screen.render(46)
+    spineRow = lines.findIndex((line) => line.includes('[ / ] Close')) + 1
+    plainSpine = lines[spineRow - 1]?.replace(/\u001b\[[0-9;]*m/gu, '') ?? ''
+    expect(plainSpine).toMatch(/^╰─ \[ \/ \] Close  ›  \[ q \] Detach ─+╯$/u)
+    expect(displayWidth(plainSpine)).toBe(46)
+    expect(screen.handlePointer(pointerClick(6, spineRow))).toBe(true)
+    expect(paletteChanges).toEqual([true, false])
   })
 
   it('turns Overview identity and actionable telemetry into direct pointer hotspots', () => {

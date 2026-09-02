@@ -575,6 +575,19 @@ not imply maintainer approval of the finished interaction.
   continuous rail; `NO_COLOR` keeps the same glyph hierarchy. Existing keycaps,
   pointer targets, overlay routing, and one-row geometry remain authoritative.
 
+### Narrow Command Spine closure decision
+
+- Keeping the wide Spine compositor unchanged below 60 columns leaves an empty
+  right-context separator after responsive removal, producing a visible double
+  gap and a detached one-character rail before `╯`.
+- Hiding the track entirely would remove the artifact but weaken the visual
+  closure that makes the Spine part of the application frame.
+- The selected model gives the no-context state its own continuous closure:
+  Commands and Detach keep identical text and pointer targets, then one elastic
+  track runs directly into `─╯`. Context-bearing widths retain the existing
+  breadcrumb separator and suffix. This is an autonomous topic decision, not a
+  recorded maintainer approval.
+
 ### Mission Header decision
 
 - Recoloring the existing title, divider, and tabs would be the least invasive
@@ -854,6 +867,8 @@ already large `supervisor-tui.ts` application controller.
   AliceProject/Runtime/view context ribbon.
 - [x] Evolve the flat context ribbon into an OMP-style one-row Command Spine
   with a closing frame, semantic breadcrumbs, and whole-segment pointer targets.
+- [x] Close the context-free narrow Command Spine with one continuous track
+  while preserving Commands/Close and Detach pointer geometry.
 - [x] Replace the disconnected title/divider/tabs stack with a same-height
   Mission Header that frames brand, release provenance, and clickable navigation.
 - [x] Anchor the active view with a reduced-motion-safe beacon that travels
@@ -1632,6 +1647,20 @@ already large `supervisor-tui.ts` application controller.
   passed, 10 skipped). Docker installer smoke passes without Node, npm, pnpm,
   Bun, or an Agent Runtime, and package dry-run contains the shared view,
   Doctor, Logs, and theme sources.
+- The context-free Command Spine no longer carries a ghost breadcrumb slot at
+  narrow widths. Once project, Runtime, and view context are intentionally
+  removed below 60 columns, one elastic track now runs from Detach directly
+  into `─╯`; context-bearing layouts retain their existing separated suffix.
+- Narrow-Spine acceptance passes with 94 focused screen, pointer, and real-PTY
+  tests. A real truecolor 46×30 session rendered the continuous closure, hovered
+  and clicked Commands, opened the bottom Command Dock, closed it with `/`, and
+  restored the identical Spine plus cursor, bracketed-paste, and mouse modes on
+  detach. Screen tests preserve Commands/Close and Detach targets at 46 and 52
+  columns, while `NO_COLOR` is byte-identical. CLI build/typecheck and root
+  TypeScript pass; the 699-file suite passes (698 passed, 1 skipped; 6,168 tests
+  passed, 10 skipped). Docker installer smoke passes without Node, npm, pnpm,
+  Bun, or an Agent Runtime, and package dry-run contains the changed shared TUI
+  view source.
 
 ## Completion Criteria
 

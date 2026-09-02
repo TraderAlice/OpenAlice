@@ -229,6 +229,9 @@ path is intentionally parameter-free:
   while wider terminals retain all four segments. Controls, project identity,
   Runtime health, and view use distinct semantic tones on one continuous rail;
   `NO_COLOR` preserves the border, track, glyphs, and breadcrumb hierarchy.
+  Below 60 columns, where all right-side context is intentionally removed, the
+  flexible track closes continuously from Detach into `─╯`; it does not retain
+  an empty breadcrumb gap or a detached final rail.
   `[ i ]` and its complete visible project-name segment are one direct
   pointer/keyboard route into the existing AliceProjects overlay. Commands and
   Detach likewise expose their complete labels as pointer targets. `/`

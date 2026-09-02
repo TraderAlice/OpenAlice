@@ -673,13 +673,21 @@ function labelAndTail(label: string, tail: string, width: number): string {
 
 function commandSpine(left: string, right: string, width: number): string {
   const prefix = '╰─ '
+  if (!right) {
+    const suffix = '─╯'
+    const innerWidth = Math.max(1, width - displayWidth(prefix) - displayWidth(suffix))
+    const safeLeft = truncateDisplayWidth(left, innerWidth)
+    const trackWidth = Math.max(0, innerWidth - displayWidth(safeLeft))
+    const track = trackWidth >= 2
+      ? ` ${'─'.repeat(trackWidth - 1)}`
+      : ' '.repeat(trackWidth)
+    return truncateDisplayWidth(`${prefix}${safeLeft}${track}${suffix}`, width)
+  }
   const suffix = ' ─╯'
   const innerWidth = Math.max(1, width - displayWidth(prefix) - displayWidth(suffix))
   const safeLeft = truncateDisplayWidth(left, innerWidth)
   const remaining = Math.max(0, innerWidth - displayWidth(safeLeft))
-  const safeRight = right
-    ? truncateDisplayWidth(right, Math.max(0, remaining - 1))
-    : ''
+  const safeRight = truncateDisplayWidth(right, Math.max(0, remaining - 1))
   const trackWidth = Math.max(0, innerWidth - displayWidth(safeLeft) - displayWidth(safeRight))
   const track = trackWidth >= 3
     ? ` ${'─'.repeat(trackWidth - 2)} `

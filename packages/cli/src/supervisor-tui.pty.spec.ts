@@ -1144,6 +1144,58 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
 
+  it('keeps the 46-column Command Spine continuously closed around the Command Dock', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-narrow-command-spine-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 46,
+      rows: 30,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+        OPENALICE_TUI_MOTION: '0',
+      },
+    })
+
+    const closedSpine = '╰─ [ / ] Commands  ›  [ q ] Detach ──────────╯'
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let closingAt = -1
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Narrow Supervisor Command Spine timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!opened && output.includes(closedSpine)) {
+          opened = true
+          child.write('\u001b[<0;6;23M')
+        } else if (opened && closingAt < 0 && output.includes('Command Dock · 1/10 · ABSENT')) {
+          closingAt = output.length
+          child.write('/')
+        } else if (closingAt >= 0 && output.slice(closingAt).includes(closedSpine)) {
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && closingAt >= 0) resolve(output)
+        else reject(new Error(`Narrow Supervisor Command Spine exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain(closedSpine)
+    expect(transcript).not.toContain('[ q ] Detach ───────  ─╯')
+    expect(transcript).toContain('Command Dock · 1/10 · ABSENT')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+    expect(transcript).toContain('\u001b[?1006l')
+  }, 12_000)
+
   it('renders an offline registered Machine and preserves drill-down across resize', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-fleet-offline-'))
     temporaryPaths.push(isolatedHome)
