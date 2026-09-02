@@ -297,7 +297,7 @@ describe('Supervisor TUI screen', () => {
     expect(stable.render(80).join('\n')).toContain('◆  WORKING  Refreshing Runtime…')
   })
 
-  it('opens a selectable command palette without creating a second action path', () => {
+  it('opens a selectable bottom command dock without creating a second action path', () => {
     let settingsOpened = 0
     let projectsOpened = 0
     let detached = 0
@@ -315,9 +315,10 @@ describe('Supervisor TUI screen', () => {
 
     expect(screen.handleKey('/', matchesKey)).toBe(true)
     expect(paletteChanges).toEqual([true])
-    expect(screen.render(80).join('\n')).not.toContain('Command Palette')
+    expect(screen.render(80).join('\n')).not.toContain('Command Dock')
     let lines = screen.renderCommandPalette(80).lines
-    expect(lines.join('\n')).toContain('Command Palette · 1/9 · ABSENT')
+    expect(lines.join('\n')).toContain('Command Dock · 1/9 · ABSENT')
+    expect(lines).toHaveLength(9)
     expect(lines.join('\n')).toContain('› ◆ Start OpenAlice & open Workspace')
     expect(screen.render(80).join('\n')).toContain('[ / ] Close  ›  [ q ] Detach')
     screen.moveCommandPaletteSelection(1)
@@ -329,7 +330,7 @@ describe('Supervisor TUI screen', () => {
     }
     const searched = screen.renderCommandPalette(80).lines.join('\n')
     expect(searched).toContain('⌕  setup▌')
-    expect(searched).toContain('Command Palette · 1/1 · MATCH “setup” · ABSENT')
+    expect(searched).toContain('Command Dock · 1/1 · MATCH “setup” · ABSENT')
     expect(searched).toContain('›   Setup')
     expect(searched).not.toContain('Runtime logs')
     expect(screen.commandPaletteItemCount()).toBe(1)
@@ -355,7 +356,8 @@ describe('Supervisor TUI screen', () => {
     const compactDeck = screen.renderCommandPalette(52).lines
     expect(compactDeck.length).toBeLessThanOrEqual(20)
     expect(compactDeck.every((line) => displayWidth(line) <= 52)).toBe(true)
-    expect(compactDeck.join('\n')).toContain('Update')
+    expect(compactDeck.join('\n')).not.toContain('Update')
+    expect(compactDeck).toHaveLength(9)
     expect(screen.handleEscape()).toBe(true)
     expect(paletteChanges.at(-1)).toBe(false)
 

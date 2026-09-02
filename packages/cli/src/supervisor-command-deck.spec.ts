@@ -6,12 +6,12 @@ import {
   filterSupervisorCommandDeckItems,
   moveSupervisorCommandDeckSelection,
   renderSupervisorCommandDeck,
-  SUPERVISOR_COMMAND_PALETTE_OVERLAY_OPTIONS,
+  SUPERVISOR_COMMAND_DOCK_OVERLAY_OPTIONS,
   supervisorCommandDeckItems,
 } from './supervisor-command-deck.ts'
 import { createSupervisorTuiTheme } from './supervisor-tui-theme.ts'
 
-describe('Supervisor Command Palette', () => {
+describe('Supervisor Command Dock', () => {
   const context = {
     recovery: false,
     runtimeState: 'running',
@@ -66,12 +66,20 @@ describe('Supervisor Command Palette', () => {
   it('renders selected and hovered full-row targets responsively', () => {
     const items = supervisorCommandDeckItems(context)
     const wide = renderSupervisorCommandDeck(items, { selected: 1, hovered: 2 }, 'running', 100)
-    expect(wide.lines.join('\n')).toContain('Command Palette · 2/10 · RUNNING')
+    expect(wide.lines.join('\n')).toContain('Command Dock · 2/10 · RUNNING')
     expect(wide.lines.join('\n')).toContain('›   Restart Runtime')
     expect(wide.lines.join('\n')).toContain('»   Stop Runtime')
     expect(wide.lines.join('\n')).toContain('Confirm before reconnecting active sessions')
     expect(wide.lines.join('\n')).toContain('⌕  ▌ Type to filter commands')
     expect(wide.targets[1]).toEqual({ row: 4, startColumn: 2, endColumn: 99, index: 1 })
+    expect(wide.lines).toHaveLength(9)
+    expect(wide.lines.join('\n')).not.toContain('AliceProjects')
+
+    const scrolled = renderSupervisorCommandDeck(items, { selected: 8, hovered: null }, 'running', 100)
+    expect(scrolled.lines.join('\n')).toContain('Command Dock · 9/10 · RUNNING')
+    expect(scrolled.lines.join('\n')).toContain('›   Next view')
+    expect(scrolled.lines.join('\n')).not.toContain('Open Workspace')
+    expect(scrolled.targets.map((target) => target.index)).toEqual([6, 7, 8, 9])
 
     const narrow = renderSupervisorCommandDeck(items, createSupervisorCommandDeckState(), 'running', 52)
     expect(narrow.lines.every((line) => displayWidthWithoutAnsi(line) <= 52)).toBe(true)
@@ -88,7 +96,7 @@ describe('Supervisor Command Palette', () => {
       76,
       'setup',
     )
-    expect(match.lines.join('\n')).toContain('Command Palette · 1/1 · MATCH “setup” · RUNNING')
+    expect(match.lines.join('\n')).toContain('Command Dock · 1/1 · MATCH “setup” · RUNNING')
     expect(match.lines.join('\n')).toContain('⌕  setup▌')
     expect(match.targets).toEqual([{ row: 3, startColumn: 2, endColumn: 75, index: 0 }])
 
@@ -104,7 +112,7 @@ describe('Supervisor Command Palette', () => {
     expect(cursorOff.lines.join('\n')).not.toContain('setup▌')
 
     const empty = renderSupervisorCommandDeck([], createSupervisorCommandDeckState(), 'running', 76, 'xyz')
-    expect(empty.lines.join('\n')).toContain('Command Palette · 0/0 · MATCH “xyz” · RUNNING')
+    expect(empty.lines.join('\n')).toContain('Command Dock · 0/0 · MATCH “xyz” · RUNNING')
     expect(empty.lines.join('\n')).toContain('No commands match “xyz”')
     expect(empty.targets).toEqual([])
   })
@@ -128,10 +136,11 @@ describe('Supervisor Command Palette', () => {
     expect(plain).toEqual(deck.lines)
     expect(colored.join('\n')).toContain('\u001b[')
     expect(colored.join('\n')).toContain('› ◆ Open Workspace')
-    expect(SUPERVISOR_COMMAND_PALETTE_OVERLAY_OPTIONS).toMatchObject({
-      width: 76,
-      anchor: 'center',
-      maxHeight: '90%',
+    expect(SUPERVISOR_COMMAND_DOCK_OVERLAY_OPTIONS).toMatchObject({
+      width: '100%',
+      anchor: 'bottom-center',
+      maxHeight: 9,
+      margin: { bottom: 2 },
     })
   })
 })

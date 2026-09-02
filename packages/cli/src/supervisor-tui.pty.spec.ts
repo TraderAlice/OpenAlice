@@ -820,8 +820,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
 
-  it('opens Setup by clicking a command-palette overlay row', async () => {
-    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-command-palette-overlay-'))
+  it('opens Setup by clicking a bottom Command Dock result', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-command-dock-'))
     temporaryPaths.push(isolatedHome)
     const child = pty.spawn(process.execPath, [cliEntry], {
       cols: 80,
@@ -844,14 +844,14 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       let setupOpened = false
       const timeout = setTimeout(() => {
         child.kill()
-        reject(new Error(`Supervisor command palette overlay timed out:\n${output}`))
+        reject(new Error(`Supervisor Command Dock timed out:\n${output}`))
       }, 8_000)
       child.onData((data) => {
         output += data
         if (!opened && output.includes('[ / ] Commands') && output.includes('○ COLD')) {
           opened = true
           child.write('/')
-        } else if (!typedSearch && output.includes('Command Palette') && output.includes('› ◆ Start OpenAlice')) {
+        } else if (!typedSearch && output.includes('Command Dock') && output.includes('› ◆ Start OpenAlice')) {
           if (!typedUnicode) {
             typedUnicode = true
             child.write('日志')
@@ -868,8 +868,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           && output.includes('›   Setup')
         ) {
           clickedSetup = true
-          child.write('\u001b[<32;32;12M')
-          child.write('\u001b[<0;32;12M')
+          child.write('\u001b[<32;32;19M')
+          child.write('\u001b[<0;32;19M')
         } else if (!setupOpened && output.includes('Setup Studio · Default AliceProject')) {
           setupOpened = true
           child.write('\u001b')
@@ -879,11 +879,11 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       child.onExit(({ exitCode }) => {
         clearTimeout(timeout)
         if (exitCode === 0 && setupOpened) resolve(output)
-        else reject(new Error(`Supervisor command palette overlay exited ${exitCode}:\n${output}`))
+        else reject(new Error(`Supervisor Command Dock exited ${exitCode}:\n${output}`))
       })
     })
 
-    expect(transcript).toContain('Command Palette')
+    expect(transcript).toContain('Command Dock')
     expect(transcript).toContain('MATCH “日志”')
     expect(transcript).toContain('⌕  日志')
     expect(transcript).toContain('MATCH “setup”')
@@ -941,7 +941,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         ) {
           clickedAfterNotice = true
           child.write('\u001b[<0;6;22M')
-        } else if (!openedPalette && output.includes('Command Palette')) {
+        } else if (!openedPalette && output.includes('Command Dock')) {
           openedPalette = true
           child.write('q')
         }
@@ -955,7 +955,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
 
     expect(transcript).toContain('AliceProject Switchboard · 1 PROJECT')
     expect(transcript).toContain('STATUS   AliceProject selection closed.')
-    expect(transcript).toContain('Command Palette')
+    expect(transcript).toContain('Command Dock')
     expect(transcript).toContain('╰─ ')
     expect(transcript).toContain('  ›  ')
     expect(transcript).toContain(' ─╯')

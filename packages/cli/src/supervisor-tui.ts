@@ -78,7 +78,7 @@ import {
   moveSupervisorCommandDeckSelection,
   normalizeSupervisorCommandDeckState,
   renderSupervisorCommandDeck,
-  SUPERVISOR_COMMAND_PALETTE_OVERLAY_OPTIONS,
+  SUPERVISOR_COMMAND_DOCK_OVERLAY_OPTIONS,
   supervisorCommandDeckItems,
   type SupervisorCommandDeckItem,
   type SupervisorCommandDeckState,
@@ -678,7 +678,7 @@ export async function runSupervisorTui(
         captureOverlayPointer(
           deck.lines,
           width,
-          SUPERVISOR_COMMAND_PALETTE_OVERLAY_OPTIONS,
+          SUPERVISOR_COMMAND_DOCK_OVERLAY_OPTIONS,
           (data) => this.handleInput(data),
           {
             firstRow: deck.targets[0]?.row ?? 3,
@@ -698,7 +698,7 @@ export async function runSupervisorTui(
 
       invalidate(): void {}
     })()
-    const overlay = ui.showOverlay(panel, SUPERVISOR_COMMAND_PALETTE_OVERLAY_OPTIONS)
+    const overlay = ui.showOverlay(panel, SUPERVISOR_COMMAND_DOCK_OVERLAY_OPTIONS)
     closeCommandPalette = () => {
       if (!commandPaletteActive) return
       commandPaletteActive = false

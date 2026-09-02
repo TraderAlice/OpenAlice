@@ -233,7 +233,7 @@ function helpGroups(recovery: boolean): HelpGroup[] {
         { key: 'p', label: 'Review layered setup' },
         { key: 'c', label: 'Choose the source checkout' },
         { key: 'm', label: 'Transfer or prepare managed source' },
-        { key: '/', label: 'Open the Command Palette' },
+        { key: '/', label: 'Open the Command Dock' },
       ],
     },
   ]

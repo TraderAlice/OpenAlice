@@ -592,6 +592,23 @@ not imply maintainer approval of the finished interaction.
   timer. This is an autonomous topic decision, not a recorded maintainer
   approval.
 
+### Bottom Command Dock decision
+
+- Keeping the centered Command Palette preserves the existing overlay shell,
+  but the unfiltered nine-command list occupies roughly half of an 80x24
+  terminal and turns the still-useful Launchpad and Signal Deck into backdrop.
+- Replacing it with an unframed autocomplete list would copy OMP most literally,
+  but would discard OpenAlice's established panel identity and make the focused
+  input boundary weaker in no-color terminals.
+- The selected model keeps the searchable command contract inside a shallow
+  bottom-anchored Command Dock. It spans the available width above the Command
+  Spine, shows at most four results around the current selection, and exposes
+  the complete result position so keyboard and wheel movement can reach every
+  command without growing the overlay. Filtered and empty states contract to
+  their content. The existing activation, confirmation, refusal, and detach
+  paths remain the only action owners. This is an autonomous topic decision,
+  not a recorded maintainer approval.
+
 ### Confirmation-modal decision
 
 - Keeping confirmation cards inline preserves the original implementation but
@@ -661,6 +678,8 @@ already large `supervisor-tui.ts` application controller.
   and promote the complete Beacon to the 100-column wide cockpit.
 - [x] Give the responsive brand mark an overlay-aware ambient prism while
   keeping operational content and reduced-motion frames static.
+- [x] Replace the centered Command Palette with a shallow bottom Command Dock
+  that keeps every command reachable without obscuring the operational frame.
 - [x] Turn Overview into a responsive AliceProject/Runtime cockpit without
   changing lifecycle action semantics or sacrificing the 80x24 baseline.
 - [x] Promote Overview into an action-first Launchpad with a semantic intent
@@ -1342,6 +1361,21 @@ already large `supervisor-tui.ts` application controller.
   699-file suite passes (698 passed, 1 skipped; 6,150 tests passed, 10 skipped).
   Docker installer smoke passes, and package dry-run contains the changed TUI
   theme and Supervisor controller sources.
+- A live OMP v17.3.4 comparison showed that its command suggestions stay next
+  to the composer while OpenAlice's centered nine-row Palette covered roughly
+  half of the operational frame. `/` now opens a full-width, bottom-anchored
+  Command Dock with a four-result sliding window; filtering and empty results
+  contract naturally while the existing command and safety owners remain
+  unchanged.
+- Command-Dock acceptance passes with 88 focused screen and real-PTY tests. A
+  real truecolor 80×24 Default AliceProject session reached result 8/9 while
+  showing only Setup, Update, Next view, and Help, restored the complete
+  Overview on Escape, and restored cursor, bracketed-paste, mouse, and
+  alternate-screen modes on detach. The filtered Setup row also activates by
+  real pointer coordinates in PTY. CLI build/typecheck and root TypeScript
+  pass; the 699-file suite passes (698 passed, 1 skipped; 6,150 tests passed,
+  10 skipped). Docker installer smoke passes, and package dry-run contains the
+  changed Command Dock and Help sources.
 
 ## Completion Criteria
 

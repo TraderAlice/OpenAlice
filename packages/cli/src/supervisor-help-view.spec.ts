@@ -33,7 +33,7 @@ describe('Supervisor Help control atlas', () => {
     expect(output).toContain('Control atlas · 3/3 · AliceProject')
     expect(output).toContain('› ◇ AliceProject')
     expect(output).toContain('[ i ] Choose or create an AliceProject')
-    expect(output).toContain('[ / ] Open the Command Palette')
+    expect(output).toContain('[ / ] Open the Command Dock')
     expect(rendered.targets).toHaveLength(3)
     expect(rendered.lines.every((line) => displayWidth(line) <= 46)).toBe(true)
     expect(rendered.lines.length).toBeLessThanOrEqual(16)

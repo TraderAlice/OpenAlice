@@ -208,8 +208,10 @@ path is intentionally parameter-free:
   `[ i ]` and its complete visible project-name segment are one direct
   pointer/keyboard route into the existing AliceProjects overlay. Commands and
   Detach likewise expose their complete labels as pointer targets. `/`
-  opens a compact centered Command Palette overlay over the unchanged current
-  page and changes the Spine action to `Close`. The Palette exposes
+  opens a shallow bottom-anchored Command Dock over the unchanged current page
+  and changes the Spine action to `Close`. The Dock spans the available width
+  above the Spine, shows at most four results around the current selection, and
+  contracts for filtered or empty states. It exposes
   only commands valid for the current Runtime/recovery context. Typing filters
   and ranks command names, groups, shortcuts, and compact English/Chinese
   intent aliases in place. The focused search rail always exposes a caret;
@@ -220,11 +222,11 @@ path is intentionally parameter-free:
   wraps selection, the mouse wheel moves within the visible result set, pointer
   hover highlights a complete row, and clicking a row selects and runs it.
   Enter runs the selected command, while direct shortcuts remain available from
-  the Supervisor outside the Palette. All routes feed the existing keyboard
+  the Supervisor outside the Dock. All routes feed the existing keyboard
   action, confirmation, refusal, or detach state machine.
-  Activation closes the Palette before Setup, Update, project selection, or a
+  Activation closes the Dock before Setup, Update, project selection, or a
   confirmation modal takes focus; only one overlay owns input at a time.
-  `/` or `Esc` closes the Palette without exiting, while `q` and `Ctrl+C` retain
+  `/` or `Esc` closes the Dock without exiting, while `q` and `Ctrl+C` retain
   their global detach behavior;
 - asynchronous work and its result occupy one fixed full-width activity slot
   above the command bar. Idle uses that same row as the content/control
@@ -249,7 +251,7 @@ path is intentionally parameter-free:
   keycaps; narrower terminals stack the same focus model. Arrow/Home/End keys,
   wheel movement, and whole-row pointer hover/click share one selection.
   Recovery mode projects only safe update and detach groups. Help remains the
-  place to understand controls, while `/` remains the faster Command Palette.
+  place to understand controls, while `/` remains the faster Command Dock.
   Update, Setup, AliceProject selection, Runtime Source, and Remote Transfer
   use the same bordered overlay shell and semantic selected/description states.
   Runtime Source is a responsive Launch Bay: its Select, Validate, Save, and

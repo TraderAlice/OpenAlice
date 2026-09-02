@@ -1,14 +1,19 @@
 import { displayWidth, truncateDisplayWidth } from './supervisor-display.ts'
-import type { SupervisorOverlayOptions } from './supervisor-overlay-pointer.ts'
+import {
+  supervisorVisibleListIndexes,
+  type SupervisorOverlayOptions,
+} from './supervisor-overlay-pointer.ts'
 import type { SupervisorTuiTheme } from './supervisor-tui-theme.ts'
 import { renderSupervisorPanel } from './supervisor-tui-view.ts'
 
-export const SUPERVISOR_COMMAND_PALETTE_OVERLAY_OPTIONS = {
-  width: 76,
-  maxHeight: '90%',
-  anchor: 'center',
-  margin: 1,
+export const SUPERVISOR_COMMAND_DOCK_OVERLAY_OPTIONS = {
+  width: '100%',
+  maxHeight: 9,
+  anchor: 'bottom-center',
+  margin: { bottom: 2 },
 } as const satisfies SupervisorOverlayOptions
+
+export const SUPERVISOR_COMMAND_DOCK_VISIBLE_RESULTS = 4
 
 export type SupervisorCommandDeckInput =
   | 'enter'
@@ -191,6 +196,12 @@ export function renderSupervisorCommandDeck(
   cursorVisible = true,
 ): SupervisorCommandDeckRender {
   const normalized = normalizeSupervisorCommandDeckState(state, items.length)
+  const visibleIndexes = supervisorVisibleListIndexes(
+    normalized.selected,
+    items.length,
+    SUPERVISOR_COMMAND_DOCK_VISIBLE_RESULTS,
+  )
+  const visibleItems = visibleIndexes.map((index) => items[index]!)
   const innerWidth = Math.max(1, width - 4)
   const labelColumnWidth = items.length === 0
     ? 16
@@ -198,13 +209,16 @@ export function renderSupervisorCommandDeck(
         Math.max(...items.map((item) => displayWidth(commandLabel(item, false, false))), 16),
         Math.max(16, Math.floor(innerWidth * 0.52)),
       )
-  const rows = items.map((item, index) => renderCommandRow(
-    item,
-    index === normalized.selected,
-    index === normalized.hovered,
-    innerWidth,
-    labelColumnWidth,
-  ))
+  const rows = visibleItems.map((item, visibleIndex) => {
+    const index = visibleIndexes[visibleIndex]!
+    return renderCommandRow(
+      item,
+      index === normalized.selected,
+      index === normalized.hovered,
+      innerWidth,
+      labelColumnWidth,
+    )
+  })
   rows.unshift(renderSearchRail(query, innerWidth, cursorVisible))
   if (items.length === 0) rows.push(renderEmptyState(query, innerWidth))
   rows.push('', renderCommandFooter(query, innerWidth))
@@ -213,15 +227,15 @@ export function renderSupervisorCommandDeck(
     : ''
   const position = items.length === 0 ? '0/0' : `${normalized.selected + 1}/${items.length}`
   const lines = renderSupervisorPanel(
-    'Command Palette',
+    'Command Dock',
     `${position}${queryMeta} · ${runtimeState.toUpperCase()}`,
     rows,
     width,
   )
   return {
     lines,
-    targets: items.map((_, index) => ({
-      row: index + 3,
+    targets: visibleIndexes.map((index, visibleIndex) => ({
+      row: visibleIndex + 3,
       startColumn: 2,
       endColumn: Math.max(2, width - 1),
       index,
