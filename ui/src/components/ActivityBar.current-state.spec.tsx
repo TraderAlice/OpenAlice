@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   setSidebar: vi.fn(),
   openOrFocus: vi.fn(),
   setCollapsed: vi.fn(),
+  railCollapsed: false,
   setRailCollapsed: vi.fn(),
   connectorWarnings: 0,
 }))
@@ -39,7 +40,7 @@ vi.mock('../live/activity-bar-collapse', () => ({
   useActivityBarCollapse: (selector: (state: Record<string, unknown>) => unknown) => selector({
     collapsedSections: {},
     setCollapsed: mocks.setCollapsed,
-    railCollapsed: false,
+    railCollapsed: mocks.railCollapsed,
     setRailCollapsed: mocks.setRailCollapsed,
   }),
 }))
@@ -64,8 +65,9 @@ vi.mock('./ThemeToggle', () => ({
 }))
 
 beforeEach(() => {
-    mocks.selectedSidebar = 'settings'
-    mocks.connectorWarnings = 0
+  mocks.selectedSidebar = 'settings'
+  mocks.connectorWarnings = 0
+  mocks.railCollapsed = false
   vi.stubGlobal('matchMedia', vi.fn(() => ({
     matches: false,
     addEventListener: vi.fn(),
@@ -118,8 +120,27 @@ describe('ActivityBar current destination', () => {
 
     await user.click(expand)
 
-    expect(mocks.setRailCollapsed).toHaveBeenCalledWith(false)
+    expect(mocks.setRailCollapsed).not.toHaveBeenCalled()
     expect(rail.getAttribute('data-rail-layout')).toBe('full')
     expect(screen.getByRole('button', { name: 'Collapse navigation' })).toBeTruthy()
+  })
+
+  it('preserves the saved compact preference across temporary workbench expansion', async () => {
+    const user = userEvent.setup()
+    mocks.selectedSidebar = 'chat'
+    mocks.railCollapsed = true
+    const { rerender } = render(<ActivityBar open onClose={vi.fn()} railMode="full" />)
+
+    const rail = screen.getByTestId('activity-bar')
+    await user.click(screen.getByRole('button', { name: 'Expand navigation' }))
+    expect(rail.getAttribute('data-rail-layout')).toBe('full')
+
+    await user.click(screen.getByRole('button', { name: 'Collapse navigation' }))
+    expect(rail.getAttribute('data-rail-layout')).toBe('compact')
+
+    mocks.selectedSidebar = 'settings'
+    rerender(<ActivityBar open onClose={vi.fn()} railMode="full" />)
+    expect(rail.getAttribute('data-rail-layout')).toBe('compact')
+    expect(mocks.setRailCollapsed).not.toHaveBeenCalled()
   })
 })

@@ -126,7 +126,9 @@ export function ActivityBar({
   const forcedCompactRail = desktopStatic && (
     constrainedCompactRail || (workbenchRail && !workbenchRailExpanded)
   )
-  const compactRail = desktopStatic && (forcedCompactRail || railCollapsed)
+  const compactRail = desktopStatic && (
+    forcedCompactRail || (railCollapsed && !(workbenchRail && workbenchRailExpanded))
+  )
   const canExpandCompactRail = compactRail && !constrainedCompactRail
   const narrowRail = desktopStatic && railMode === 'narrow' && !compactRail
   const denseRail = desktopStatic && shortRailHeight
@@ -137,8 +139,11 @@ export function ActivityBar({
   }, [workbenchRail])
 
   const expandCompactRail = () => {
+    if (workbenchRail) {
+      setWorkbenchRailExpanded(true)
+      return
+    }
     setRailCollapsed(false)
-    if (workbenchRail) setWorkbenchRailExpanded(true)
   }
 
   const collapseExpandedRail = () => {
