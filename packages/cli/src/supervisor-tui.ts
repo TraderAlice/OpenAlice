@@ -5028,8 +5028,16 @@ export class SupervisorScreen implements Component {
           launcher: this.snapshot.panel === 'fleet' && this.snapshot.activeTarget === null,
           activeSelection: this.snapshot.panel === 'fleet'
             && this.snapshot.activeTarget != null
+            && this.snapshot.fleet?.focus === 'projects'
             && selectedFleetMachine(this.snapshot.fleet)?.key === this.snapshot.activeTarget.machineKey
             && selectedFleetProject(this.snapshot.fleet)?.key === this.snapshot.activeTarget.projectKey,
+          switchSelection: this.snapshot.panel === 'fleet'
+            && this.snapshot.activeTarget != null
+            && this.snapshot.fleet?.focus === 'projects'
+            && selectedFleetMachine(this.snapshot.fleet) != null
+            && selectedFleetProject(this.snapshot.fleet) != null
+            && (selectedFleetMachine(this.snapshot.fleet)?.key !== this.snapshot.activeTarget.machineKey
+              || selectedFleetProject(this.snapshot.fleet)?.key !== this.snapshot.activeTarget.projectKey),
           recovery: isConfigRecovery(this.snapshot),
           itemCount: this.snapshot.panel === 'logs'
             ? supervisorFilteredLogCount(this.snapshot.logs, this.logFilter)

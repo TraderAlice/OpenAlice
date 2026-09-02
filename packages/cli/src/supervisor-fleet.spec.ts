@@ -86,6 +86,27 @@ describe('Supervisor fleet state and presentation', () => {
     expect(output).not.toContain('[ Enter ] Use AliceProject')
   })
 
+  it('frames a different connected target as a switch before activation', () => {
+    let state = createSupervisorFleetState('2026-08-23T00:00:00Z', machines())
+    state = selectFleetIndex(state, 'machines', 1)
+    state = setFleetFocus(state, 'projects')
+    const output = renderSupervisorFleet(
+      state,
+      80,
+      undefined,
+      false,
+      5,
+      undefined,
+      false,
+      { machineKey: 'local', projectKey: 'default', transport: 'loopback' },
+    ).join('\n')
+
+    expect(output).toContain('Switch Target')
+    expect(output).toContain('◇ SWITCH CANDIDATE')
+    expect(output).toContain('[ Enter ] Connect & Switch')
+    expect(output).not.toContain('[ Enter ] Return Home')
+  })
+
   it('distinguishes active focus from the related inactive selection', () => {
     let state = createSupervisorFleetState('2026-08-23T00:00:00Z', machines())
     const machinesFocused = renderSupervisorFleet(state, 100).join('\n')

@@ -280,8 +280,10 @@ intentionally parameter-free:
   local AliceProject; compact Selection remains two rows plus that content-
   owned action. When the exact connected AliceProject is selected, that surface
   is titled Active Connection and Enter returns Home; choosing any other target
-  restores the Start, Connect, or Use AliceProject action. The contextual Tip
-  teaches that switch explicitly.
+  turns it into a Switch Target surface with an explicit Switch Candidate
+  identity and Switch AliceProject or Connect & Switch action. Its contextual
+  Tip explains that the current target remains live until the new route is
+  ready. Machine focus retains Browse projects and its generic focus guidance.
   With only the local Machine, Fleet focus starts on its current AliceProject;
 - ordinary workbench pages have one bottom surface: the Command Spine. Primary
   and contextual actions live with the object they affect: Alice Session,

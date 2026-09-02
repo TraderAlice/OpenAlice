@@ -2102,6 +2102,71 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
 
+  it('previews a compact remote switch without dropping the active target', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-switch-target-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_BOOT: '0',
+        OPENALICE_TUI_MOTION: '0',
+        OPENALICE_TUI_START_VIEW: 'connect',
+        OPENALICE_TUI_FIXTURE_RUNTIME: 'running',
+        OPENALICE_TUI_FIXTURE_FLEET_ROWS: '1',
+        OPENALICE_TUI_FIXTURE_REMOTE: '1',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let stage = 0
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor switch target timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        const plain = stripSgr(output)
+        if (stage === 0 && plain.includes('Alice Session · OpenAlice')) {
+          stage = 1
+          child.write(']]')
+        } else if (stage === 1 && plain.includes('Machines · 1/2')) {
+          stage = 2
+          child.write('\u001b[B')
+        } else if (stage === 2 && plain.includes('▶ Cloud Lab')) {
+          stage = 3
+          child.write('\t')
+        } else if (stage === 3 && plain.includes('[ Enter ] Connect & Switch')) {
+          stage = 4
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && stage === 4) resolve(output)
+        else reject(new Error(`Supervisor switch target exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    const plain = stripSgr(transcript)
+    expect(plain).toContain('AliceProjects · Cloud Lab · 1/1')
+    expect(plain).toContain('Switch Target')
+    expect(plain).toContain('◇ SWITCH CANDIDATE')
+    expect(plain).toContain('[ Enter ] Connect & Switch')
+    expect(plain).toContain('current target stays live until the new route is ready')
+    expect(plain).toMatch(/This computer\s+● ACTIVE · 1/u)
+    expect(plain).toContain('⌂ This comp… · LOCAL  ›  ● LIVE')
+    expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=0 loads=0 diagnoses=0')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
   it('renders an explicitly selected launch context before detach', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-context-'))
     temporaryPaths.push(isolatedHome)

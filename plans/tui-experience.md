@@ -3113,8 +3113,15 @@ already large `supervisor-tui.ts` application controller.
 - The contextual Tip explains that Enter returns Home and another selection
   switches target. Real 120x32 and 80x24 captures verify the active identity,
   action consequence, target detail, Tip, and Command Spine remain legible.
-- Active-Connection acceptance passes through 94 focused Fleet and screen
-  tests, all 51 real-PTY cases, and the complete CLI suite (63 files, 632
+- A second real capture with local still LIVE and Cloud Lab / Research selected
+  exposed `Selection` plus `Connect` as too weak: neither named the replacement
+  operation nor promised what happened to the current target. Candidate
+  projects now render as Switch Target / Switch Candidate, distinguish local
+  Switch AliceProject from remote Connect & Switch, and state that the current
+  target stays live until the new route is ready. Returning to Machine focus
+  restores Browse projects guidance instead of falsely advertising Return Home.
+- Active-and-switch acceptance passes through 95 focused Fleet and screen
+  tests, all 52 real-PTY cases, and the complete CLI suite (63 files, 634
   tests). CLI typecheck and build also pass.
 
 ## Completion Criteria

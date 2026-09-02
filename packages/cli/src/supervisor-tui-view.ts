@@ -104,6 +104,7 @@ export interface SupervisorContextTipView {
   targetKind?: 'local' | 'ssh'
   launcher?: boolean
   activeSelection?: boolean
+  switchSelection?: boolean
   recovery?: boolean
   itemCount?: number
 }
@@ -667,6 +668,8 @@ export function renderSupervisorContextTip(
         ? 'Enter runs Next; ↑↓ selects; Tab/←→ changes pane; click again activates.'
         : view.activeSelection
           ? 'Enter returns Home; choose another Machine or AliceProject to switch.'
+          : view.switchSelection
+            ? 'Enter switches; current target stays live until the new route is ready.'
           : 'First click focuses a pane; click its selection again to activate it.'
       : view.panel === 'logs'
         ? view.targetKind === 'ssh'

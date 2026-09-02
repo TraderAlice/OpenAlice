@@ -917,6 +917,7 @@ describe('Supervisor TUI screen', () => {
   it('renders contextual OMP-style Tips without creating an action target', () => {
     const fleet = renderSupervisorContextTip({ panel: 'fleet' }, 100)
     const activeFleet = renderSupervisorContextTip({ panel: 'fleet', activeSelection: true }, 100)
+    const switchFleet = renderSupervisorContextTip({ panel: 'fleet', switchSelection: true }, 100)
     const launcher = renderSupervisorContextTip({ panel: 'fleet', launcher: true }, 100)
     const logs = renderSupervisorContextTip({ panel: 'logs' }, 100)
     const emptyLogs = renderSupervisorContextTip({ panel: 'logs', itemCount: 0 }, 100)
@@ -929,6 +930,7 @@ describe('Supervisor TUI screen', () => {
     expect(fleet).toContain('First click focuses a pane')
     expect(activeFleet).toContain('Enter returns Home')
     expect(activeFleet).toContain('switch')
+    expect(switchFleet).toContain('current target stays live until the new route is ready')
     expect(launcher).toContain('Enter runs Next')
     expect(launcher).toContain('Tab/←→ changes pane')
     expect(logs).toContain('f filters; y copies')
@@ -941,6 +943,7 @@ describe('Supervisor TUI screen', () => {
     expect(supervisorCommandTargets([
       fleet,
       activeFleet,
+      switchFleet,
       launcher,
       logs,
       emptyLogs,
@@ -1907,11 +1910,23 @@ describe('Supervisor TUI screen', () => {
 
   it('focuses an inactive Fleet pane before activating its selected row', () => {
     const activated: string[] = []
+    const runtime = { class: 'running' as const, endpoints: { web: 'http://127.0.0.1:2024' } }
     const screen = new SupervisorScreen({
       version: 'dev',
       channel: 'dev',
       panel: 'fleet',
-      runtime: { class: 'absent', endpoints: {} },
+      runtime,
+      activeTarget: {
+        kind: 'local',
+        machineKey: 'local',
+        machineName: 'This computer',
+        projectKey: 'default',
+        projectName: 'Default AliceProject',
+        home: '/fixture/default',
+        transport: 'loopback',
+        endpoint: 'http://127.0.0.1:2024',
+        runtime,
+      },
       fleet: createSupervisorFleetState(
         '2026-09-02T00:00:00Z',
         fleetMachines(),
@@ -1920,15 +1935,19 @@ describe('Supervisor TUI screen', () => {
     }, {
       onActivateFleet: (machine, project) => activated.push(`${machine.key}/${project.key}`),
       theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+      getViewportHeight: () => 32,
     })
 
     screen.render(100)
     expect(screen.snapshot.fleet?.focus).toBe('machines')
+    expect(screen.render(100).join('\n')).toContain('First click focuses a pane')
+    expect(screen.render(100).join('\n')).not.toContain('Enter returns Home')
 
     expect(screen.handlePointer(pointerClick(50, 6))).toBe(true)
     expect(screen.snapshot.fleet?.focus).toBe('projects')
     expect(activated).toEqual([])
     expect(screen.render(100).join('\n')).toContain('▶ Default AliceProject')
+    expect(screen.render(100).join('\n')).toContain('Enter returns Home')
 
     expect(screen.handlePointer(pointerClick(8, 6))).toBe(true)
     expect(screen.snapshot.fleet?.focus).toBe('machines')

@@ -727,10 +727,13 @@ function fleetSelectionDetail(
   }
   const tunnel = state.tunnels[fleetTunnelKey(machine.key, project.key)]
   const active = activeTarget?.machineKey === machine.key && activeTarget.projectKey === project.key
-  const identity = `${active ? '● ACTIVE TARGET · ' : ''}${projectStatus(project, pulse)} ${project.displayName} · ${project.product === 'nano' ? 'NanoAlice' : 'TraderAlice'} · ${project.runtime.ownerSurface ?? 'no owner'}`
+  const switching = Boolean(activeTarget) && !active
+  const identity = `${active ? '● ACTIVE TARGET · ' : switching ? '◇ SWITCH CANDIDATE · ' : ''}${projectStatus(project, pulse)} ${project.displayName} · ${project.product === 'nano' ? 'NanoAlice' : 'TraderAlice'} · ${project.runtime.ownerSurface ?? 'no owner'}`
   const path = [project.home, tunnel ? `tunnel ${tunnel}` : ''].filter(Boolean).join(' · ')
   const primary = active
     ? 'Return Home'
+    : switching
+      ? machine.key === 'local' ? 'Switch AliceProject' : 'Connect & Switch'
     : project.runtime.class === 'absent'
       ? 'Start OpenAlice'
       : machine.key === 'local'
@@ -761,8 +764,15 @@ function renderDetailCard(
   const activeSelection = state.focus === 'projects'
     && machine?.key === activeTarget?.machineKey
     && project?.key === activeTarget?.projectKey
+  const switchSelection = state.focus === 'projects'
+    && activeTarget != null
+    && machine != null
+    && project != null
+    && !activeSelection
   const title = activeSelection
     ? expanded ? 'Active Connection · AliceProject' : 'Active Connection'
+    : switchSelection
+      ? expanded ? 'Switch Target · AliceProject' : 'Switch Target'
     : expanded
       ? `Selection Constellation · ${state.focus === 'machines' ? 'Machine' : 'AliceProject'}`
       : 'Selection'
