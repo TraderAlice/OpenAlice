@@ -158,6 +158,7 @@ import {
 import {
   anchorSupervisorControlConsole,
   renderSupervisorCommandBar,
+  renderSupervisorControlConsole,
   renderSupervisorContextTip,
   renderSupervisorDock,
   renderSupervisorHeaderLayout,
@@ -3853,40 +3854,42 @@ export class SupervisorScreen implements Component {
       ...(this.snapshot.diagnostic ? { diagnostic: sanitize(this.snapshot.diagnostic) } : {}),
       ...(hoverPreview ? { preview: sanitize(hoverPreview) } : {}),
     }, width, this.motionFrame, this.motionEnabled)
-    const controlConsole = [
-      activity,
-      ...(this.snapshot.panel === 'fleet' && this.snapshot.fleet
-        ? fleetActionBar(
-            this.snapshot.fleet,
-            runtime,
-            this.snapshot.context,
-            width,
-          )
-        : this.snapshot.panel === 'logs'
+    const actionWidth = Math.max(1, width - 4)
+    const actionShelf = this.snapshot.panel === 'fleet' && this.snapshot.fleet
+      ? fleetActionBar(
+          this.snapshot.fleet,
+          runtime,
+          this.snapshot.context,
+          actionWidth,
+        )
+      : this.snapshot.panel === 'logs'
+        ? renderSupervisorCommandBar([
+            { key: '↑↓', label: 'Scroll' },
+            {
+              key: 'f',
+              label: `Show ${supervisorLogFilterLabel(nextSupervisorLogFilter(this.logFilter))}`,
+            },
+            { key: 'l', label: 'Reload' },
+            { key: 'End', label: 'Latest' },
+            { key: '?', label: 'More' },
+          ], actionWidth)
+        : this.snapshot.panel === 'doctor'
           ? renderSupervisorCommandBar([
-              { key: '↑↓', label: 'Scroll' },
-              {
-                key: 'f',
-                label: `Show ${supervisorLogFilterLabel(nextSupervisorLogFilter(this.logFilter))}`,
-              },
-              { key: 'l', label: 'Reload' },
-              { key: 'End', label: 'Latest' },
-              { key: '?', label: 'More' },
-            ], width)
-          : this.snapshot.panel === 'doctor'
+              { key: '↑↓', label: 'Inspect' },
+              { key: 'd', label: 'Rerun' },
+              { key: 'Home', label: 'First' },
+              { key: 'End', label: 'Last' },
+            ], actionWidth)
+          : this.snapshot.panel === 'help'
             ? renderSupervisorCommandBar([
-                { key: '↑↓', label: 'Inspect' },
-                { key: 'd', label: 'Rerun' },
-                { key: 'Home', label: 'First' },
-                { key: 'End', label: 'Last' },
-              ], width)
-            : this.snapshot.panel === 'help'
-              ? renderSupervisorCommandBar([
-                  { key: '↑↓', label: 'Explore', primary: true },
-                  { key: '?', label: 'Close help' },
-                  { key: 'q', label: 'Detach' },
-                ], width)
-          : actionBar(runtime, this.snapshot.context, width, isConfigRecovery(this.snapshot))),
+                { key: '↑↓', label: 'Explore', primary: true },
+                { key: '?', label: 'Close help' },
+                { key: 'q', label: 'Detach' },
+              ], actionWidth)
+            : actionBar(runtime, this.snapshot.context, actionWidth, isConfigRecovery(this.snapshot))
+    const controlConsole = renderSupervisorControlConsole(
+      activity,
+      actionShelf,
       renderSupervisorDock({
         panel: this.snapshot.panel ?? 'overview',
         projectName: this.snapshot.context?.aliceProject.displayName,
@@ -3895,7 +3898,8 @@ export class SupervisorScreen implements Component {
         commandPaletteOpen: this.commandDeckOpen,
         recovery: isConfigRecovery(this.snapshot),
       }, width),
-    ]
+      width,
+    )
     const visibleLines = anchorSupervisorControlConsole(
       lines,
       controlConsole,

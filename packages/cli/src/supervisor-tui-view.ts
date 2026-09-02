@@ -416,6 +416,41 @@ export function renderSupervisorCommandBar(
   return lines.length > 0 ? lines : ['No actions available']
 }
 
+export function renderSupervisorControlConsole(
+  activity: string,
+  actionLines: string[],
+  dock: string,
+  width: number,
+): string[] {
+  const safeWidth = Math.max(1, width)
+  const bodyWidth = Math.max(1, safeWidth - 4)
+  return [
+    controlConsoleCap(activity, safeWidth),
+    ...actionLines.map((line) => (
+      safeWidth < 4
+        ? truncateDisplayWidth(line, safeWidth)
+        : `│ ${fillLine(truncateDisplayWidth(line, bodyWidth), bodyWidth)} │`
+    )),
+    truncateDisplayWidth(dock, safeWidth),
+  ]
+}
+
+function controlConsoleCap(activity: string, width: number): string {
+  if (width < 8) {
+    return width === 1
+      ? '╭'
+      : `╭${'─'.repeat(Math.max(0, width - 2))}╮`
+  }
+  const contentWidth = width - 4
+  const rawContent = activity.trimEnd() || '◇  CONTROL CONSOLE'
+  const content = truncateDisplayWidth(rawContent, Math.max(1, contentWidth - 4))
+  const trackWidth = Math.max(0, contentWidth - displayWidth(content))
+  const track = trackWidth > 0
+    ? ` ${'─'.repeat(Math.max(0, trackWidth - 1))}`
+    : ''
+  return `╭─ ${content}${track}╮`
+}
+
 export function renderSupervisorDock(
   view: SupervisorDockView,
   width: number,

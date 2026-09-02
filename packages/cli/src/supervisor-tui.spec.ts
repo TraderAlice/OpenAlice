@@ -13,6 +13,7 @@ import {
 import {
   anchorSupervisorControlConsole,
   renderSupervisorCommandBar,
+  renderSupervisorControlConsole,
   renderSupervisorContextTip,
   renderSupervisorDock,
   supervisorCommandTargets,
@@ -193,7 +194,7 @@ describe('Supervisor TUI screen', () => {
     expect(tall.slice(cockpitRow + 1, actionRow).some((line) => (
       /^│\s+│ {3}│\s+│$/u.test(line)
     ))).toBe(true)
-    expect(tall.at(-3)?.trim()).toBe('')
+    expect(tall.at(-3)).toContain('CONTROL CONSOLE')
     expect(tall.at(-2)).toContain('[ s ] Start quietly')
     expect(tall.at(-1)).toContain('[ / ] Commands')
 
@@ -343,7 +344,7 @@ describe('Supervisor TUI screen', () => {
 
     const tall = screen.render(80)
     expect(tall).toHaveLength(32)
-    expect(tall.at(-3)?.trim()).toBe('')
+    expect(tall.at(-3)).toContain('CONTROL CONSOLE')
     expect(tall.at(-2)).toContain('[ l ] Logs')
     expect(tall.at(-1)).toContain('╰─ [ / ] Commands')
     expect(tall.join('\n')).toContain(
@@ -357,7 +358,7 @@ describe('Supervisor TUI screen', () => {
     viewportHeight = 24
     const resized = screen.render(80)
     expect(resized).toHaveLength(24)
-    expect(resized.at(-3)?.trim()).toBe('')
+    expect(resized.at(-3)).toContain('CONTROL CONSOLE')
     expect(resized.at(-2)).toContain('[ l ] Logs')
     expect(resized.at(-1)).toContain('[ / ] Close')
     expect(resized.at(-6)?.trim()).toBe('')
@@ -1192,6 +1193,45 @@ describe('Supervisor TUI screen', () => {
     expect(supervisorCommandTargets(lines).map((target) => target.label)).toEqual([
       'Enter', 's', 'p', '?',
     ])
+  })
+
+  it('frames feedback, actions, and Command Spine as one same-height Control Console', () => {
+    const actionLines = renderSupervisorCommandBar([
+      { key: 's', label: 'Start quietly' },
+      { key: 'p', label: 'Setup' },
+    ], 76)
+    const dock = renderSupervisorDock({
+      panel: 'overview',
+      projectName: 'Default AliceProject',
+      runtimeState: 'absent',
+    }, 80)
+    const idle = renderSupervisorControlConsole(' '.repeat(80), actionLines, dock, 80)
+
+    expect(idle).toHaveLength(3)
+    expect(idle.every((line) => displayWidth(line) === 80)).toBe(true)
+    expect(idle[0]).toMatch(/^╭─ ◇  CONTROL CONSOLE ─+╮$/u)
+    expect(idle[1]).toMatch(/^│ · \[ s \] Start quietly  │  \[ p \] Setup +│$/u)
+    expect(idle[2]).toBe(dock)
+    const targets = supervisorCommandTargets(idle)
+    expect(targets.map((target) => target.label)).toEqual(['s', 'p', '/', 'q', 'i'])
+    expect(targets.find((target) => target.label === 's')?.startColumn).toBe(3)
+
+    const ready = renderSupervisorControlConsole(
+      '✓  READY    Runtime started in the background.',
+      actionLines,
+      dock,
+      80,
+    )
+    expect(ready[0]).toMatch(/^╭─ ✓  READY +Runtime started in the background\. ─+╮$/u)
+    const colorTheme = createSupervisorTuiTheme({ TERM: 'xterm-256color' })
+    const decorated = decorateSupervisorFrame(ready, colorTheme, { panel: 'overview' })
+    expect(decorated[0]).toContain('\u001b[1;38;2;170;255;207;48;2;13;45;31m')
+    expect(decorated.map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))).toEqual(ready)
+    expect(decorateSupervisorFrame(
+      ready,
+      createSupervisorTuiTheme({ TERM: 'xterm-256color', NO_COLOR: '1' }),
+      { panel: 'overview' },
+    )).toEqual(ready)
   })
 
   it('contains Action Shelf color inside its framed column', () => {

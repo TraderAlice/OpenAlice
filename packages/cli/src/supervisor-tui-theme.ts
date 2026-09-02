@@ -139,6 +139,13 @@ export function decorateSupervisorFrame(
       const label = '◇  Tip:'
       return `${theme.accentStrong(label)}${theme.muted(line.slice(label.length))}`
     }
+    if (line.startsWith('╭─ ') && line.includes('  WORKING ')) return theme.busyRail(line)
+    if (line.startsWith('╭─ ✓  READY')) return theme.successRail(line)
+    if (line.startsWith('╭─ !  NOTICE')) return theme.warningRail(line)
+    if (line.startsWith('╭─ ×  ERROR')) return theme.dangerRail(line)
+    if (line.startsWith('╭─ ◆  STATUS')) return theme.infoRail(line)
+    if (line.startsWith('╭─ ◇  PREVIEW')) return theme.navigationHover(line)
+    if (line.startsWith('╭─ ◇  CONTROL CONSOLE')) return theme.accent(line)
     if (isSupervisorActionShelf(line)) {
       return decorateSupervisorActionShelf(
         line,
@@ -336,7 +343,9 @@ function decorateSingleSupervisorActionShelf(
     const joiner = key && key === hoveredCommand ? ' │ › ' : separator
     return `${result}${theme.actionRail(joiner)}${part}`
   }, '')
-  return `${prefix}${decorated}${theme.actionRail(trailing)}${suffix}`
+  const framedPrefix = framed ? theme.actionRail(prefix) : prefix
+  const framedSuffix = framed ? theme.actionRail(suffix) : suffix
+  return `${framedPrefix}${decorated}${theme.actionRail(trailing)}${framedSuffix}`
 }
 
 function isSupervisorActionShelf(line: string): boolean {

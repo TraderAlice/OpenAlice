@@ -620,6 +620,23 @@ not imply maintainer approval of the finished interaction.
   17 rows and widths below 100 keep their existing dense layouts. This is an
   autonomous topic decision, not recorded maintainer approval.
 
+### Framed Control Console decision
+
+- Styling the existing Activity Slot and Action Shelf more aggressively would
+  preserve every byte of layout, but would leave three visually disconnected
+  rows pretending to be one console.
+- Adding a separate frame above and below the existing rows would create a
+  convincing panel at the cost of two more terminal rows and would move every
+  bottom pointer target on constrained screens.
+- The selected model recomposes the existing rows without increasing height.
+  The Activity Slot becomes an OMP-composer-style top rail whose label changes
+  with Working, Ready, Notice, Error, Status, or Preview state; its idle label is
+  `CONTROL CONSOLE`. Every responsive Action Shelf row becomes framed body
+  content, and the existing Command Spine remains the closing border. Commands
+  still derive pointer geometry from their final framed layout, feedback keeps
+  its priority and fixed slot, and `NO_COLOR` retains the same structural box.
+  This is an autonomous topic decision, not recorded maintainer approval.
+
 ### Bottom Control Console decision
 
 - Leaving the footer directly after page content preserves the current natural
@@ -966,6 +983,8 @@ already large `supervisor-tui.ts` application controller.
   overlay input, without enabling click-through for any other modal surface.
 - [x] Let the wide Overview absorb a bounded share of surplus terminal height
   instead of dumping the entire remainder into an unowned blank stage.
+- [x] Recompose Activity, actions, and Command Spine into one same-height framed
+  Control Console with stateful OMP-style top-rail feedback.
 - [x] Replace the disconnected title/divider/tabs stack with a same-height
   Mission Header that frames brand, release provenance, and clickable navigation.
 - [x] Anchor the active view with a reduced-motion-safe beacon that travels
@@ -1838,6 +1857,23 @@ already large `supervisor-tui.ts` application controller.
   pass; the 699-file suite passes (698 passed, 1 skipped; 6,172 tests passed, 10
   skipped). Docker installer smoke passes without Node, npm, pnpm, Bun, or an
   Agent Runtime, and package dry-run contains both changed Supervisor sources.
+- The bottom controls no longer read as a loose blank row, shortcut line, and
+  unrelated closing rail. They now form one OMP-composer-style Control Console:
+  the top border carries idle or live feedback state, every responsive Action
+  Shelf row is framed inside it, and the existing context-rich Command Spine
+  closes the surface without adding terminal height.
+- Framed-Console acceptance passes with 101 focused feedback, screen, and
+  real-PTY tests. Real truecolor Default AliceProject sessions at 120x32 and
+  46x30 preserve the grounded bottom edge, full-width borders, and wrapped
+  narrow actions. Hovering Setup in the 80x24 PTY moves the existing Preview
+  into the top rail, highlights the framed whole-row segment, opens Setup once,
+  and restores terminal modes after detach. Unit coverage verifies final
+  framed pointer geometry, stable display widths, semantic state color, and
+  byte-identical `NO_COLOR` structure. CLI build/typecheck and root TypeScript
+  pass; the 699-file suite passes (698 passed, 1 skipped; 6,173 tests passed, 10
+  skipped). Docker installer smoke passes without Node, npm, pnpm, Bun, or an
+  Agent Runtime, and package dry-run contains the changed view, theme, and
+  Supervisor sources.
 
 ## Completion Criteria
 

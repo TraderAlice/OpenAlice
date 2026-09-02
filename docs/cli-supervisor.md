@@ -269,15 +269,19 @@ path is intentionally parameter-free:
 - asynchronous work and its result occupy one fixed full-width activity slot
   above the command bar. When no operation or persisted feedback owns it,
   hovering a Navigation, Action Shelf, or Command Spine target projects its
-  consequence there as a `PREVIEW`; moving away restores the blank separator.
+  consequence there as a `PREVIEW`; moving away restores the idle
+  `CONTROL CONSOLE` label.
   Feedback therefore never inserts rows or moves action/ribbon pointer targets.
   Working wins over Error, which wins over Notice/Ready/Status, which wins over
   Preview. Busy, informational, successful, actionable-warning, failed, and
   preview states retain distinct glyph and text labels without depending on
   color; only the busy glyph animates. The slot is a presentation of existing
   Supervisor and pointer state and does not introduce a second lifecycle or
-  error path. The Activity Slot, contextual Action Shelf, and Command Spine form
-  one bottom Control Console. When the terminal is taller than the current page,
+  error path. The Activity Slot is the Console's stateful top border, each
+  responsive Action Shelf row is framed body content, and the Command Spine is
+  its closing border. This OMP-composer-style Control Console uses the same
+  number of rows as the former loose stack. When the terminal is taller than
+  the current page,
   a single elastic blank stage appears above that console so its controls remain
   anchored to the terminal edge; short terminals retain the natural complete
   flow without clipping. Resize changes only that elastic stage and does not
