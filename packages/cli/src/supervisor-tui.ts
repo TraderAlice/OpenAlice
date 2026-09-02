@@ -137,6 +137,11 @@ import {
   supervisorMotionEnabled,
 } from './supervisor-tui-feedback.ts'
 import {
+  renderSupervisorBootSequence,
+  supervisorBootSequenceEnabled,
+  SUPERVISOR_BOOT_LAST_FRAME,
+} from './supervisor-boot-sequence.ts'
+import {
   nextSupervisorLogFilter,
   renderSupervisorLogs,
   supervisorFilteredLogCount,
@@ -532,6 +537,11 @@ export async function runSupervisorTui(
   const tuiTheme = createSupervisorTuiTheme(dependencies.env ?? process.env)
   const plainTuiTheme = createSupervisorTuiTheme({ NO_COLOR: '1' })
   const motionEnabled = supervisorMotionEnabled(dependencies.env ?? process.env)
+  const bootSequenceEnabled = supervisorBootSequenceEnabled(
+    dependencies.env ?? process.env,
+    motionEnabled,
+    tuiTheme.enabled,
+  )
   let active = true
   let actionRunning = false
   let sourcePromptActive = false
@@ -779,6 +789,7 @@ export async function runSupervisorTui(
     requestRender: () => ui.requestRender(),
     theme: tuiTheme,
     motionEnabled,
+    bootSequence: bootSequenceEnabled,
     onMotionDemandChange: syncMotionTimer,
     getViewportHeight: () => terminalSize().height,
   })
@@ -2887,6 +2898,10 @@ export async function runSupervisorTui(
         finish()
         return { consume: true }
       }
+      if (screen.bootSequenceOwnsInput()) {
+        screen.skipBootSequence()
+        return { consume: true }
+      }
       if (piTui.matchesKey(data, 'escape')) {
         if (!screen.handleEscape()) finish()
         return { consume: true }
@@ -2987,6 +3002,8 @@ export class SupervisorScreen implements Component {
   private commandDeckQuery = ''
   private commandDeckCursorFrame = 0
   private motionFrame = 0
+  private bootFrame?: number
+  private bootInputShield = false
   private introFrame?: number
   private ambientBrandFrame = 0
   private ambientBrandTick = 0
@@ -3032,6 +3049,7 @@ export class SupervisorScreen implements Component {
       requestRender?: () => void
       theme?: SupervisorTuiTheme
       motionEnabled?: boolean
+      bootSequence?: boolean
       onMotionDemandChange?: () => void
       getViewportHeight?: () => number
       onDetach?: () => void
@@ -3057,6 +3075,9 @@ export class SupervisorScreen implements Component {
     this.requestRender = callbacks.requestRender
     this.theme = callbacks.theme ?? createSupervisorTuiTheme({ NO_COLOR: '1' })
     this.motionEnabled = callbacks.motionEnabled ?? true
+    this.bootFrame = callbacks.bootSequence && this.motionEnabled && this.theme.enabled
+      ? 0
+      : undefined
     this.onMotionDemandChange = callbacks.onMotionDemandChange
     this.getViewportHeight = callbacks.getViewportHeight
     this.introFrame = this.motionEnabled && this.theme.enabled ? 0 : undefined
@@ -3065,6 +3086,23 @@ export class SupervisorScreen implements Component {
 
   setDetachHandler(handler: () => void): void {
     this.onDetach = handler
+  }
+
+  bootSequenceActive(): boolean {
+    return this.bootFrame !== undefined
+  }
+
+  bootSequenceOwnsInput(): boolean {
+    return this.bootFrame !== undefined || this.bootInputShield
+  }
+
+  skipBootSequence(): boolean {
+    if (this.bootFrame === undefined) return false
+    this.bootFrame = undefined
+    this.bootInputShield = false
+    this.requestRender?.()
+    this.onMotionDemandChange?.()
+    return true
   }
 
   update(patch: Partial<SupervisorSnapshot>): void {
@@ -3106,6 +3144,19 @@ export class SupervisorScreen implements Component {
   advanceMotion(ambientMotionAllowed = true): boolean {
     if (!this.motionEnabled) return false
     let changed = false
+    if (this.bootFrame !== undefined) {
+      if (this.bootFrame >= SUPERVISOR_BOOT_LAST_FRAME) {
+        this.bootFrame = undefined
+        this.bootInputShield = true
+      } else {
+        this.bootFrame += 1
+      }
+      return true
+    }
+    if (this.bootInputShield) {
+      this.bootInputShield = false
+      return false
+    }
     const brandMotionAllowed = ambientMotionAllowed && !this.snapshot.busy
     if (this.introFrame !== undefined && brandMotionAllowed) {
       this.introFrame = this.introFrame >= 8 ? undefined : this.introFrame + 1
@@ -3143,7 +3194,9 @@ export class SupervisorScreen implements Component {
     const brandMotionAllowed = ambientMotionAllowed && !this.snapshot.busy
     return this.motionEnabled
       && (
-        (brandMotionAllowed && this.introFrame !== undefined)
+        this.bootFrame !== undefined
+        || this.bootInputShield
+        || (brandMotionAllowed && this.introFrame !== undefined)
         || this.ambientBrandMotionActive(brandMotionAllowed)
         || Boolean(this.snapshot.busy)
         || Boolean(this.navigationTransition)
@@ -3227,6 +3280,8 @@ export class SupervisorScreen implements Component {
     data: string,
     matchesKey: (data: string, key: KeyId) => boolean,
   ): boolean {
+    if (this.skipBootSequence()) return true
+    if (this.bootInputShield) return true
     if (this.snapshot.busy) return false
     if (this.snapshot.confirmation) {
       if (matchesKey(data, 'y') || matchesKey(data, 'enter')) {
@@ -3515,6 +3570,10 @@ export class SupervisorScreen implements Component {
   }
 
   handlePointer(event: SupervisorPointerEvent): boolean {
+    if (this.bootSequenceOwnsInput()) {
+      if (event.leftClick) this.skipBootSequence()
+      return true
+    }
     const headerRelease = !this.commandDeckOpen
       && event.row === 1
       && this.headerReleaseTarget
@@ -3784,6 +3843,24 @@ export class SupervisorScreen implements Component {
   render(width: number): string[] {
     this.renderWidth = width
     const viewportHeight = this.getViewportHeight?.()
+    if (this.bootFrame !== undefined) {
+      this.navigationTargets = []
+      this.commandTargets = []
+      this.commandSpineTargets = []
+      this.doctorTargets = []
+      this.doctorRailTargets = []
+      this.logTargets = []
+      this.logRailTargets = []
+      this.helpTargets = []
+      this.homePrimaryTarget = undefined
+      this.homeHotspotTargets = []
+      return renderSupervisorBootSequence(
+        width,
+        Number.isFinite(viewportHeight) ? Math.floor(viewportHeight ?? 24) : 24,
+        this.bootFrame,
+        this.theme,
+      )
+    }
     const runtime = this.snapshot.runtime
     const state = runtime?.class ?? 'unavailable'
     const updateBadge = this.snapshot.update?.status === 'available'

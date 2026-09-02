@@ -853,6 +853,25 @@ not imply maintainer approval of the finished interaction.
   timer. This is an autonomous topic decision, not a recorded maintainer
   approval.
 
+### Startup Boot Sequence decision
+
+- Keeping the current immediate first frame is fastest, but a live 120x32 OMP
+  v17.3.4 comparison shows the missing transition clearly: the shell becomes a
+  framed status page without first becoming an owned OpenAlice surface.
+- Copying OMP's 2.6-second animated setup splash literally would maximize
+  spectacle, but it would delay a lifecycle console on every ordinary launch
+  and import Pi-specific water/logo imagery that does not belong to OpenAlice.
+- The selected model creates an original OpenAlice Boot Sequence from the
+  existing `ALICE` mark, brand prism, deterministic signal field, and truthful
+  AliceProject/Machine/Runtime stages. It owns the complete terminal for at most
+  sixteen existing 80ms motion ticks, then hands off to the normal Mission
+  Header without mutating or rereading Runtime state. Any ordinary key or left
+  click skips and is consumed instead of activating the surface underneath;
+  `q` and Ctrl-C still detach immediately. Reduced motion, `NO_COLOR`, test
+  processes, or `OPENALICE_TUI_BOOT=0` bypass the sequence; tests may opt in
+  explicitly with `OPENALICE_TUI_BOOT=1`. This is an autonomous topic decision,
+  not recorded maintainer approval.
+
 ### Bottom Command Dock decision
 
 - Keeping the centered Command Palette preserves the existing overlay shell,
@@ -1035,6 +1054,8 @@ already large `supervisor-tui.ts` application controller.
   consuming a required row or adding an action path.
 - [x] Fold the standalone wide Beacon into the action-first Launchpad without
   duplicating identity or losing guidance, motion, or pointer geometry.
+- [x] Turn the first terminal frame into a skippable OpenAlice Boot Sequence
+  without delaying reduced-motion startup or allowing input click-through.
 - [x] Keep the visible Command Spine mouse-capable while the Command Dock owns
   overlay input, without enabling click-through for any other modal surface.
 - [x] Let the wide Overview absorb a bounded share of surplus terminal height
@@ -1984,6 +2005,24 @@ already large `supervisor-tui.ts` application controller.
   1 skipped; 6,185 tests passed, 10 skipped). Docker installer smoke passes
   without Node, npm, pnpm, Bun, or an Agent Runtime, and package dry-run
   contains the shared rail plus every changed Supervisor owner.
+- A live 120x32 OMP v17.3.4 launch made the remaining first-frame gap explicit,
+  so OpenAlice now owns the shell-to-product transition with an original Boot
+  Sequence. The full viewport composes a doubled `ALICE` prism, sparse
+  deterministic signal field, responsive horizon, and an
+  `AliceProject → Machine → Runtime → Control` rail before handing off to the
+  unchanged Mission Header. Compact terminals keep a centered complete mark;
+  reduced-motion, no-color, dumb-terminal, and explicit opt-out launches remain
+  immediate.
+- Boot-Sequence acceptance passes with 108 focused renderer, screen, and
+  real-PTY tests. The truecolor 120x32 fixture filled all 32 rows and handed off
+  automatically in sixteen 80ms ticks. An 80x24 raw SGR click at the ready
+  Launchpad action's future coordinates skipped without click-through
+  (`starts=0 opens=0 loads=0 diagnoses=0`); a second PTY detached directly with
+  `q` before the Mission Header appeared and restored every terminal mode. CLI
+  build and root TypeScript pass; the 700-file suite passes (699 passed, 1
+  skipped; 6,191 tests passed, 10 skipped). Docker installer smoke passes
+  without Node, npm, pnpm, Bun, or an Agent Runtime, and package dry-run contains
+  the new Boot Sequence owner.
 
 ## Completion Criteria
 

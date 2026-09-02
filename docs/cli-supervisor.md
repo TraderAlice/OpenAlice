@@ -116,8 +116,16 @@ the screen, cursor, and mouse modes on detach or signal exit. `NO_COLOR` and
 `TERM=dumb` remove decorative color without removing state text;
 `OPENALICE_TUI_MOUSE=0` keeps the full keyboard surface while disabling terminal
 mouse reporting, and `OPENALICE_TUI_MOTION=0` replaces purposeful activity
-animation with a stable glyph without changing its text or layout. Its ordinary
-path is intentionally parameter-free:
+animation with a stable glyph without changing its text or layout. A normal
+animated color launch begins with a full-viewport OpenAlice Boot Sequence: the
+existing `ALICE` prism, deterministic signal field, and
+`AliceProject → Machine → Runtime → Control` rail hand the shell into the
+Mission Header in at most sixteen 80ms ticks. Any ordinary key or left click
+skips and is consumed so it cannot activate the surface underneath; `q` and
+Ctrl-C still detach immediately. Reduced motion, `NO_COLOR`, `TERM=dumb`, and
+`OPENALICE_TUI_BOOT=0` enter the ready surface directly. The sequence performs
+no Runtime read, write, discovery, or lifecycle action. Its ordinary path is
+intentionally parameter-free:
 
 - the default Overview page is an AliceProject Launchpad rather than a status
   report. Its hero presents the selected project, a semantic launch/live/

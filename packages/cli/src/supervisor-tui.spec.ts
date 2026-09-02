@@ -806,6 +806,80 @@ describe('Supervisor TUI screen', () => {
     expect(reduced.hasActiveMotion()).toBe(false)
   })
 
+  it('owns startup input with a skippable full-viewport Boot Sequence', () => {
+    const actions: SupervisorAction[] = []
+    const motionDemand = vi.fn()
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'running', endpoints: {} },
+    }, {
+      onAction: (action) => actions.push(action),
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+      motionEnabled: true,
+      bootSequence: true,
+      getViewportHeight: () => 32,
+      onMotionDemandChange: motionDemand,
+    })
+
+    expect(screen.bootSequenceActive()).toBe(true)
+    const splash = screen.render(120)
+    expect(splash).toHaveLength(32)
+    expect(splash.join('\n')).toContain('O P E N A L I C E')
+    expect(splash.join('\n')).not.toContain('OpenAlice Supervisor')
+    expect(screen.handlePointer({
+      button: 35,
+      col: 60,
+      row: 16,
+      release: false,
+      wheel: null,
+      motion: true,
+      leftClick: false,
+    })).toBe(true)
+    expect(screen.bootSequenceActive()).toBe(true)
+
+    expect(screen.handleKey('o', matchesKey)).toBe(true)
+    expect(screen.bootSequenceActive()).toBe(false)
+    expect(actions).toEqual([])
+    expect(screen.render(120).join('\n').replace(/\u001b\[[0-9;]*m/gu, ''))
+      .toContain('OpenAlice Supervisor')
+    expect(motionDemand).toHaveBeenCalledTimes(1)
+
+    const clicked = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'running', endpoints: {} },
+    }, {
+      onAction: (action) => actions.push(action),
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+      bootSequence: true,
+    })
+    expect(clicked.handlePointer(pointerClick(40, 12))).toBe(true)
+    expect(clicked.bootSequenceActive()).toBe(false)
+    expect(actions).toEqual([])
+
+    const automatic = new SupervisorScreen({ version: 'dev', channel: 'dev', runtime: null }, {
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+      bootSequence: true,
+    })
+    for (let frame = 0; frame <= 15; frame += 1) {
+      expect(automatic.advanceMotion()).toBe(true)
+    }
+    expect(automatic.bootSequenceActive()).toBe(false)
+    expect(automatic.bootSequenceOwnsInput()).toBe(true)
+    expect(automatic.handleKey('o', matchesKey)).toBe(true)
+    expect(automatic.advanceMotion()).toBe(false)
+    expect(automatic.bootSequenceOwnsInput()).toBe(false)
+
+    const reduced = new SupervisorScreen({ version: 'dev', channel: 'dev', runtime: null }, {
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+      motionEnabled: false,
+      bootSequence: true,
+    })
+    expect(reduced.bootSequenceActive()).toBe(false)
+    expect(reduced.render(80)[0]).toContain('OpenAlice Supervisor')
+  })
+
   it('slides the Mission Header view beacon while reduced motion lands immediately', () => {
     const animated = new SupervisorScreen({
       version: 'dev',

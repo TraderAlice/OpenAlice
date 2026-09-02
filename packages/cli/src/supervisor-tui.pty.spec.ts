@@ -57,6 +57,105 @@ afterEach(async () => {
 })
 
 describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
+  it('skips the Boot Sequence with raw pointer input without click-through', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-boot-pointer-'))
+    temporaryPaths.push(isolatedHome)
+    const childEnv = { ...process.env }
+    delete childEnv.NO_COLOR
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...childEnv,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_BOOT: '1',
+        OPENALICE_TUI_FIXTURE_RUNTIME: 'running',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let skipped = false
+      let entered = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Boot Sequence pointer timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!skipped && output.includes('O P E N A L I C E')) {
+          skipped = true
+          child.write('\u001b[<35;20;9M')
+          child.write('\u001b[<0;20;9M')
+        } else if (skipped && !entered && output.includes('OpenAlice Supervisor')) {
+          entered = true
+          setTimeout(() => child.write('q'), 100)
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && skipped && entered) resolve(output)
+        else reject(new Error(`Supervisor Boot Sequence pointer exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('O P E N A L I C E')
+    expect(transcript).toContain('◆ ALICEPROJECT')
+    expect(transcript).toContain('OpenAlice Supervisor')
+    expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=0 loads=0 diagnoses=0')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it('detaches directly from the Boot Sequence with q', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-boot-detach-'))
+    temporaryPaths.push(isolatedHome)
+    const childEnv = { ...process.env }
+    delete childEnv.NO_COLOR
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...childEnv,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_BOOT: '1',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let detached = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Boot Sequence detach timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!detached && output.includes('O P E N A L I C E')) {
+          detached = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && detached) resolve(output)
+        else reject(new Error(`Supervisor Boot Sequence detach exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('O P E N A L I C E')
+    expect(transcript).not.toContain('OpenAlice Supervisor')
+    expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=0 loads=0 diagnoses=0')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
   it('selects a release lane and clicks the Channel Brief action with raw pointer input', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-release-pointer-'))
     temporaryPaths.push(isolatedHome)
