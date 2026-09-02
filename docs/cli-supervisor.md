@@ -352,6 +352,12 @@ intentionally parameter-free:
   input handlers. No other overlay permits pointer click-through. `/`, `Esc`, or
   the visible Close segment closes the Dock without exiting, while `q`, its
   visible Detach segment, and `Ctrl+C` retain global detach behavior;
+  Before connection, the Spine describes the selected Launcher target instead
+  of the local process context: Machine/AliceProject, LOCAL or SSH transport,
+  selected Runtime signal, and a wide `LAUNCH` badge. This route is passive and
+  deliberately has no `[ i ]` keycap because that key edits the local registry,
+  not the selected remote target. Compact projection drops Machine before the
+  AliceProject identity so the actionable target survives at 80 columns;
 - asynchronous work, results, and pointer previews replace the Command Spine's
   right-side context instead of inserting a separate activity row. Working wins
   over Error, which wins over Notice/Ready/Status, which wins over Preview;

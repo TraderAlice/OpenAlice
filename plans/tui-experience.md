@@ -3003,6 +3003,28 @@ already large `supervisor-tui.ts` application controller.
   tests, all 51 real-PTY cases, and the complete CLI suite (63 files, 630
   tests). CLI typecheck and build also pass.
 
+### Launcher Spine coherence decision
+
+- The remote-target screenshot exposed two simultaneous truths: the Launchpad
+  selected `Cloud Lab → Research`, while the Command Spine still advertised
+  `[i] Default AliceProject · COLD` from the local launch context. Apart from
+  being visually contradictory, replacing that text with the remote name while
+  retaining `[i]` would falsely imply that the local Switchboard controls the
+  remote AliceProject.
+- While the Launcher owns the session, the Spine now consumes its selected
+  Machine, AliceProject, transport, availability, and Runtime class. It renders
+  a passive route such as `Cloud Lab / Research · SSH › LIVE › LAUNCH`; it has
+  no `[i]` pointer target. Connected workbench pages retain their active-target
+  route and the existing local `[i]` Switchboard control.
+- At constrained widths the launcher route first removes the `LAUNCH` badge and
+  then Machine identity, preserving the selected AliceProject, transport, and
+  Runtime signal. Real 120×32 and 80×24 captures prove remote selection stays
+  coherent across the Launch path, Briefing, and Spine; the local 80×24 capture
+  likewise retains `Default AliceProject · LOCAL › COLD` in full.
+- Launcher-Spine acceptance passes through 93 focused screen and Fleet tests,
+  all 51 real-PTY cases, and the complete CLI suite (63 files, 630 tests). CLI
+  typecheck and build also pass.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

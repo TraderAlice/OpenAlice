@@ -83,6 +83,7 @@ export interface SupervisorSignalScopeView {
 
 export interface SupervisorDockView {
   panel: string
+  launcher?: boolean
   focusTask?: string
   focusLabel?: string
   projectName?: string
@@ -559,7 +560,9 @@ export function renderSupervisorDock(
   if (width < 60) return commandSpine(controls, '', width)
 
   const panel = (view.focusLabel ?? view.focusTask ?? view.panel).toUpperCase()
-  const panelIdentity = view.focusLabel ? `◆ ${panel}` : panelBadge(panel)
+  const panelIdentity = view.launcher
+    ? '◆ LAUNCH'
+    : view.focusLabel ? `◆ ${panel}` : panelBadge(panel)
   if (view.recovery) {
     return commandSpine(controls, `! RECOVERY${breadcrumb}${panelIdentity}`, width)
   }
@@ -577,23 +580,30 @@ export function renderSupervisorDock(
           )
   const fullProjectName = view.projectName ?? 'AliceProject'
   const contextBudget = Math.max(1, width - 6 - displayWidth(controls) - 3)
-  const panelSuffix = `${breadcrumb}${panelIdentity}`
+  const contextBreadcrumb = view.launcher ? ' › ' : breadcrumb
+  const panelSuffix = `${contextBreadcrumb}${panelIdentity}`
   const projectPrefix = view.focusTask ? '⌂ ' : '[ i ] '
-  const targetIdentity = view.targetKind === 'ssh'
+  const targetIdentity = view.launcher
+    ? `⌁ ${view.machineName ?? 'Machine'} / ${fullProjectName} · ${view.targetKind === 'ssh' ? 'SSH' : 'LOCAL'}`
+    : view.targetKind === 'ssh'
     ? `⌁ ${view.machineName ?? 'Remote'} / ${fullProjectName} · SSH`
     : view.targetKind === 'local'
       ? `⌂ ${view.machineName ?? 'This computer'} / ${view.focusTask ? '' : '[ i ] '}${fullProjectName} · LOCAL`
       : `${projectPrefix}${fullProjectName}`
-  const signalSuffix = `${breadcrumb}${signal}`
+  const signalSuffix = `${contextBreadcrumb}${signal}`
   const fullContext = `${targetIdentity}${signalSuffix}${panelSuffix}`
   const projectSignal = `${targetIdentity}${signalSuffix}`
   const projectNameBudget = contextBudget
-    - displayWidth(view.targetKind === 'ssh'
+    - displayWidth(view.launcher
+      ? '⌁  · LOCAL'
+      : view.targetKind === 'ssh'
       ? '⌁  /  · SSH'
       : view.targetKind === 'local' ? '⌂  / [ i ]  · LOCAL' : projectPrefix)
     - displayWidth(signalSuffix)
   const compactProjectSignal = projectNameBudget >= 6
-    ? view.targetKind === 'ssh'
+    ? view.launcher
+      ? `⌁ ${truncateDisplayWidth(fullProjectName, projectNameBudget)} · ${view.targetKind === 'ssh' ? 'SSH' : 'LOCAL'}${signalSuffix}`
+      : view.targetKind === 'ssh'
       ? `⌁ ${truncateDisplayWidth(`${view.machineName ?? 'Remote'} / ${fullProjectName}`, projectNameBudget)} · SSH${signalSuffix}`
       : view.targetKind === 'local'
         ? `⌂ ${truncateDisplayWidth(`${view.machineName ?? 'This computer'} / ${fullProjectName}`, projectNameBudget)} · LOCAL${signalSuffix}`

@@ -4977,21 +4977,36 @@ export class SupervisorScreen implements Component {
     const actionShelf = focusTask
       ? this.renderFocusActionBar(Math.max(1, width - 4))
       : []
+    const launcherTarget = this.snapshot.panel === 'fleet' && this.snapshot.activeTarget === null
+    const launcherMachine = launcherTarget
+      ? selectedFleetMachine(this.snapshot.fleet)
+      : undefined
+    const launcherProject = launcherTarget
+      ? selectedFleetProject(this.snapshot.fleet)
+      : undefined
+    const launcherTargetKind = launcherMachine
+      ? launcherMachine.key === 'local' ? 'local' : 'ssh'
+      : undefined
+    const launcherTransport = launcherMachine
+      ? launcherMachine.key === 'local' ? 'loopback' : 'ssh-forward'
+      : undefined
     const controlConsole = renderSupervisorControlConsole(
       activity,
       actionShelf,
       renderSupervisorDock({
         panel: this.snapshot.panel ?? 'overview',
+        launcher: launcherTarget,
         focusTask,
         focusLabel: confirmation?.confirmLabel,
         projectName: this.snapshot.activeTarget?.projectName
+          ?? launcherProject?.displayName
           ?? this.snapshot.context?.aliceProject.displayName,
-        machineName: this.snapshot.activeTarget?.machineName,
-        targetKind: this.snapshot.activeTarget?.kind,
-        transport: this.snapshot.activeTarget?.transport,
+        machineName: this.snapshot.activeTarget?.machineName ?? launcherMachine?.displayName,
+        targetKind: this.snapshot.activeTarget?.kind ?? launcherTargetKind,
+        transport: this.snapshot.activeTarget?.transport ?? launcherTransport,
         connectionHealth: this.snapshot.activeTarget?.health?.phase,
-        runtimeState: state,
-        projectAvailable: activeTargetProjectAvailable(this.snapshot),
+        runtimeState: launcherProject?.runtime.class ?? state,
+        projectAvailable: launcherProject?.available ?? activeTargetProjectAvailable(this.snapshot),
         pulse: this.runtimePulse,
         commandPaletteOpen: this.commandDeckOpen,
         recovery: isConfigRecovery(this.snapshot),

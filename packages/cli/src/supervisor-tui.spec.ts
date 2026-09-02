@@ -715,6 +715,33 @@ describe('Supervisor TUI screen', () => {
     expect(themedUnreachable).toContain('\u001b[')
     expect(themedUnreachable.replace(/\u001b\[[0-9;]*m/gu, '')).toBe(unreachableRemote)
 
+    const remoteLauncher = renderSupervisorDock({
+      panel: 'fleet',
+      launcher: true,
+      projectName: 'Research',
+      machineName: 'Cloud Lab',
+      targetKind: 'ssh',
+      transport: 'ssh-forward',
+      runtimeState: 'running',
+    }, 110)
+    expect(remoteLauncher).toContain('⌁ Cloud Lab / Research · SSH')
+    expect(remoteLauncher).toContain('● LIVE › ◆ LAUNCH')
+    expect(remoteLauncher).not.toContain('[ i ]')
+    expect(supervisorCommandTargets([remoteLauncher]).map((target) => target.label))
+      .toEqual(['/', 'q'])
+
+    const localLauncher = renderSupervisorDock({
+      panel: 'fleet',
+      launcher: true,
+      projectName: 'Default AliceProject',
+      machineName: 'This computer',
+      targetKind: 'local',
+      transport: 'loopback',
+      runtimeState: 'absent',
+    }, 80)
+    expect(localLauncher).toContain('⌁ Default AliceProject · LOCAL › ○ COLD')
+    expect(localLauncher).not.toContain('[ i ]')
+
     const focus = renderSupervisorDock({
       panel: 'overview',
       focusTask: 'setup',
