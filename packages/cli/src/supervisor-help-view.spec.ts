@@ -26,6 +26,33 @@ describe('Supervisor Help control atlas', () => {
     ])
   })
 
+  it('uses a tall wide viewport for an all-system Control Atlas Board', () => {
+    const rendered = renderSupervisorHelp({ selected: 1, hovered: 2 }, false, 120, 22)
+    const output = rendered.lines.join('\n')
+
+    expect(rendered.lines).toHaveLength(22)
+    expect(output).toContain('Control Atlas Board · 3 SYSTEMS · POINTER + KEYBOARD')
+    expect(output).toContain('· ◆ NAVIGATION  //  MOVE WITH INTENT')
+    expect(output).toContain('› ● RUNTIME  //  OPERATE LOCALLY')
+    expect(output).toContain('» ◇ ALICEPROJECT  //  SHAPE THE WORKSPACE')
+    expect(output).toContain('[ Shift+Tab / ← ] Previous view')
+    expect(output).toContain('[ x ] Stop with confirmation')
+    expect(output).toContain('[ / ] Open the Command Dock')
+    expect(rendered.targets.filter((target) => target.index === 0)).toHaveLength(4)
+    expect(rendered.targets.filter((target) => target.index === 1)).toHaveLength(6)
+    expect(rendered.targets.filter((target) => target.index === 2)).toHaveLength(5)
+    expect(rendered.targets.every((target) => (
+      target.startColumn === 2 && target.endColumn === 119
+    ))).toBe(true)
+    expect(rendered.lines.every((line) => displayWidth(line) === 120)).toBe(true)
+
+    const boundary = renderSupervisorHelp({ selected: 0, hovered: null }, false, 100, 21)
+    expect(boundary.lines).toHaveLength(21)
+    expect(boundary.lines.join('\n')).toContain('Control Atlas Board')
+    expect(renderSupervisorHelp({ selected: 0, hovered: null }, false, 100, 20)
+      .lines.join('\n')).not.toContain('Control Atlas Board')
+  })
+
   it('folds the same selected group into a narrow card', () => {
     const rendered = renderSupervisorHelp({ selected: 2, hovered: null }, false, 46)
     const output = rendered.lines.join('\n')
@@ -58,5 +85,7 @@ describe('Supervisor Help control atlas', () => {
     const exit = renderSupervisorHelp({ selected: 1, hovered: null }, true, 80)
       .lines.join('\n')
     expect(exit).toContain('[ q / Esc ] Detach only')
+    expect(renderSupervisorHelp({ selected: 0, hovered: null }, true, 120, 22)
+      .lines.join('\n')).not.toContain('Control Atlas Board')
   })
 })

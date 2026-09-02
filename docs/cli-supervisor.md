@@ -324,10 +324,13 @@ intentionally parameter-free:
   and Fleet; the adjacent `RUNNING`/`running` text never changes, and failed
   probes still surface through the diagnostic rail rather than animation;
 - Help is a responsive Control Atlas rather than a prose screen or static
-  shortcut wall. Ordinary terminals split Navigation, Runtime, and
-  AliceProject groups from the selected group's explanation and executable
-  keycaps; narrower terminals stack the same focus model. Arrow/Home/End keys,
-  wheel movement, and whole-row pointer hover/click share one selection.
+  shortcut wall. Wide tall terminals become an all-system Control Atlas Board:
+  Navigation, Runtime, and AliceProject remain simultaneously expanded in
+  full-width sections with bounded two-column command grids, and every row in
+  a section shares its pointer focus. Ordinary terminals split those groups
+  from the selected group's explanation and visible keycaps; narrower
+  terminals stack the same focus model. Arrow/Home/End keys, wheel movement,
+  and whole-row pointer hover/click share one selection.
   Recovery mode projects only safe update and detach groups. Help remains the
   place to understand controls, while `/` remains the faster Command Dock.
   Update, Setup, AliceProject selection, Runtime Source, and Remote Transfer

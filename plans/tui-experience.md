@@ -888,6 +888,22 @@ not imply maintainer approval of the finished interaction.
   80x24 surface, and keeps reduced-motion output structurally identical. This
   is an autonomous topic decision, not recorded maintainer approval.
 
+### Wide Help Control Atlas Board decision
+
+- Stretching the existing selector/detail pair would retain its one-category-at
+  a-time hierarchy and merely move the unused space inside larger borders.
+- Three equal horizontal cards would expose every category, but Runtime's eight
+  commands would either wrap unpredictably or make that card much taller than
+  Navigation and AliceProject.
+- The selected model replaces only the wide, tall ordinary Help surface with a
+  vertical Control Atlas Board. Navigation, Runtime, and AliceProject stay
+  simultaneously visible as full-width sections whose commands form a bounded
+  two-column grid; hovering or clicking any row focuses its owning section.
+  Short terminals retain the existing responsive selector/detail inspector,
+  and configuration Recovery retains its deliberately narrow safe-control
+  vocabulary. The board adds no operational action or mutation. This is an
+  autonomous topic decision, not recorded maintainer approval.
+
 ### Bottom Command Dock decision
 
 - Keeping the centered Command Palette preserves the existing overlay shell,
@@ -1074,6 +1090,8 @@ already large `supervisor-tui.ts` application controller.
   without delaying reduced-motion startup or allowing input click-through.
 - [x] Replace mechanical wide-Overview filler with a truthful animated Control
   Path and passive Service Array without changing compact terminal behavior.
+- [x] Replace wide Help's one-category inspector with an all-system Control
+  Atlas Board while preserving compact and Recovery behavior.
 - [x] Keep the visible Command Spine mouse-capable while the Command Dock owns
   overlay input, without enabling click-through for any other modal surface.
 - [x] Let the wide Overview absorb a bounded share of surplus terminal height
@@ -2060,6 +2078,28 @@ already large `supervisor-tui.ts` application controller.
   passes (699 passed, 1 skipped; 6,192 tests passed, 10 skipped). Docker
   installer smoke passes without Node, npm, pnpm, Bun, or an Agent Runtime, and
   package dry-run contains the changed Supervisor view source.
+- A fresh OMP v17.3.4 no-session run exposed the next old-menu seam: OMP's
+  welcome surface keeps Tips, LSP, sessions, composer context, and command
+  suggestions simultaneously visible, while OpenAlice's 120x32 Help showed one
+  category beside its detail and then abandoned thirteen viewport rows. Wide
+  tall Help is now a Control Atlas Board that expands Navigation, Runtime, and
+  AliceProject together. Each section keeps its description and a two-column
+  command grid; pointer focus spans every command row instead of only the
+  heading. The board activates only with at least 21 available content rows,
+  while 20-row, sub-100-column, and Recovery surfaces retain the prior compact
+  inspector.
+- Control-Atlas-Board acceptance passes with 112 focused Help, screen, and
+  real-PTY tests. A truecolor 120x32 fixture filled the operational stage with
+  all three complete sections and kept the Context Tip plus Control Console at
+  the bottom. Raw SGR hover on an ordinary Runtime command row changed the
+  section from idle to hover; clicking the same row selected Runtime without
+  invoking a lifecycle action, and detach restored cursor, mouse, bracketed
+  paste, and alternate-screen modes. Renderer coverage proves exact 21/22-row
+  boundaries, 120-column display widths, complete commands, whole-section
+  targets, and the Recovery exclusion. CLI build and root TypeScript pass; the
+  700-file suite passes (699 passed, 1 skipped; 6,194 tests passed, 10 skipped).
+  Docker installer smoke passes without Node, npm, pnpm, Bun, or an Agent
+  Runtime, and package dry-run contains both changed Supervisor sources.
 
 ## Completion Criteria
 

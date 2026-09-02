@@ -3984,7 +3984,12 @@ export class SupervisorScreen implements Component {
     } else if (this.snapshot.panel === 'help') {
       const recovery = isConfigRecovery(this.snapshot)
       this.helpState = normalizeSupervisorHelpState(this.helpState, recovery)
-      const help = renderSupervisorHelp(this.helpState, recovery, width)
+      const help = renderSupervisorHelp(
+        this.helpState,
+        recovery,
+        width,
+        operationalCanvasHeight,
+      )
       const rowOffset = lines.length
       this.helpTargets = help.targets.map((target) => ({
         ...target,

@@ -71,13 +71,86 @@ export function renderSupervisorHelp(
   state: SupervisorHelpState,
   recovery: boolean,
   width: number,
+  targetHeight?: number,
 ): SupervisorHelpRender {
   const groups = helpGroups(recovery)
   const normalized = normalizeSupervisorHelpState(state, recovery)
   const selected = groups[normalized.selected] ?? groups[0]!
-  return width >= 96
-    ? renderWideHelp(groups, selected, normalized, recovery, width)
-    : renderStackedHelp(groups, selected, normalized, recovery, width)
+  const boardAvailable = !recovery
+    && width >= 100
+    && Number.isFinite(targetHeight)
+    && (targetHeight ?? 0) >= 21
+  return boardAvailable
+    ? renderHelpAtlasBoard(groups, normalized, width, Math.floor(targetHeight ?? 21))
+    : width >= 96
+      ? renderWideHelp(groups, selected, normalized, recovery, width)
+      : renderStackedHelp(groups, selected, normalized, recovery, width)
+}
+
+function renderHelpAtlasBoard(
+  groups: HelpGroup[],
+  state: SupervisorHelpState,
+  width: number,
+  targetHeight: number,
+): SupervisorHelpRender {
+  const innerWidth = Math.max(1, width - 4)
+  const body = [
+    '◇ ALL SYSTEMS · Scan every control route without leaving this view.',
+    '',
+  ]
+  const targetRows: Array<{ index: number; row: number }> = []
+
+  groups.forEach((group, index) => {
+    const start = body.length
+    const marker = index === state.selected ? '›' : index === state.hovered ? '»' : '·'
+    body.push(
+      `${marker} ${group.glyph} ${group.title.toUpperCase()}  //  ${group.summary.toUpperCase()}`,
+      group.description,
+      ...helpCommandGrid(group.commands, innerWidth),
+    )
+    for (let row = start; row < body.length; row += 1) targetRows.push({ index, row })
+    if (index < groups.length - 1) body.push('')
+  })
+
+  const desiredBodyHeight = Math.max(body.length, targetHeight - 2)
+  while (body.length < desiredBodyHeight) body.push('')
+  const lines = renderSupervisorPanel(
+    'Control Atlas Board',
+    `${groups.length} SYSTEMS · POINTER + KEYBOARD`,
+    body,
+    width,
+  )
+  return {
+    lines,
+    targets: targetRows.map(({ index, row }) => ({
+      index,
+      row: row + 2,
+      startColumn: 2,
+      endColumn: Math.max(2, width - 1),
+    })),
+  }
+}
+
+function helpCommandGrid(
+  commands: HelpGroup['commands'],
+  width: number,
+): string[] {
+  const gap = 3
+  const columnWidth = Math.max(1, Math.floor((width - gap) / 2))
+  const rowCount = Math.ceil(commands.length / 2)
+  return Array.from({ length: rowCount }, (_, row) => {
+    const left = helpCommand(commands[row], columnWidth)
+    const right = helpCommand(commands[row + rowCount], columnWidth)
+    return `${left}${' '.repeat(Math.max(gap, columnWidth - displayWidth(left) + gap))}${right}`.trimEnd()
+  })
+}
+
+function helpCommand(
+  command: HelpGroup['commands'][number] | undefined,
+  width: number,
+): string {
+  if (!command) return ''
+  return truncateDisplayWidth(`[ ${command.key} ] ${command.label}`, width)
 }
 
 function renderWideHelp(

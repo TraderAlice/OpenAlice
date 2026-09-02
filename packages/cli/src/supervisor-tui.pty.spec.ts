@@ -857,6 +857,63 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
 
+  it('focuses a complete wide Help section from any command row', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-help-board-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 120,
+      rows: 32,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_BOOT: '0',
+        OPENALICE_TUI_MOTION: '0',
+        OPENALICE_TUI_FIXTURE_RUNTIME: 'running',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let hovered = false
+      let selected = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Help Board pointer timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        const plain = stripSgr(output)
+        if (!opened && plain.includes('[ / ] Commands') && plain.includes('◆ OVERVIEW')) {
+          opened = true
+          child.write('?')
+        } else if (!hovered && plain.includes('Control Atlas Board · 3 SYSTEMS')) {
+          hovered = true
+          child.write('\u001b[<35;70;16M')
+        } else if (!selected && plain.includes('» ● RUNTIME  //  OPERATE LOCALLY')) {
+          selected = true
+          child.write('\u001b[<0;70;16M')
+        } else if (selected && plain.includes('› ● RUNTIME  //  OPERATE LOCALLY')) {
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && selected) resolve(output)
+        else reject(new Error(`Supervisor Help Board pointer exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(stripSgr(transcript)).toContain('» ● RUNTIME  //  OPERATE LOCALLY')
+    expect(stripSgr(transcript)).toContain('› ● RUNTIME  //  OPERATE LOCALLY')
+    expect(stripSgr(transcript)).toContain('[ / ] Open the Command Dock')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
   it.each([
     ['default-no', 80, 24, 'sends=0 aborted=false'],
     ['success', 110, 30, 'sends=1 aborted=false'],
