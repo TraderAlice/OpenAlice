@@ -8,7 +8,7 @@ import { usePendingPushCount } from '../live/trading-push'
 import { useConnectorWarningCount } from '../live/connector-health'
 import { useActivityBarCollapse } from '../live/activity-bar-collapse'
 import { useTranslation } from 'react-i18next'
-import { ThemeToggle } from './ThemeToggle'
+import { ActivityBarUtilityMenu } from './ActivityBarUtilityMenu'
 import { useAliceProject } from '../hooks/useAliceProject'
 import { useBetaFeatures } from '../live/beta-features'
 import { joinNavLayout, NAV_SECTIONS } from './activity-navigation'
@@ -302,9 +302,19 @@ export function ActivityBar({
           })}
         </nav>
 
-        {/* Footer — global icon controls pinned to the bottom of the rail. */}
-        <div className={`flex shrink-0 items-center ${compactRail ? `${denseRail ? 'py-2 md:py-0.5 md:gap-px' : 'py-2 md:gap-1'} px-4 md:flex-col md:items-center md:px-2` : 'justify-between gap-2 border-t border-border/55 px-2 py-1'}`}>
-          <ThemeToggle compact={denseRail} />
+        {/* Project-scoped application controls pinned to the bottom of the rail. */}
+        <div className={`shrink-0 border-t border-border/55 ${compactRail ? `flex justify-center ${denseRail ? 'py-0.5' : 'py-2'}` : 'p-1.5'}`}>
+          <ActivityBarUtilityMenu
+            projectName={project?.displayName ?? 'OpenAlice'}
+            compactRail={compactRail}
+            denseRail={denseRail}
+            active={selectedSidebar === 'settings'}
+            onOpenSettings={() => {
+              setSidebar('settings')
+              openOrFocus({ kind: 'settings', params: { category: 'general' } })
+              onClose()
+            }}
+          />
         </div>
     </>
   )

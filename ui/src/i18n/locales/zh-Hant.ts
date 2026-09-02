@@ -40,6 +40,7 @@ export const zhHant: Resources = {
     connectorNeedsAttention: '{{count}} 個連接器需要處理',
     about: '關於{{label}}',
     primaryNavigation: '主要導覽',
+    applicationMenu: '{{name}} 應用選單',
     collapseRail: '收合活動列',
     expandRail: '展開活動列',
   },

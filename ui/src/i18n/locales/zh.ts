@@ -32,6 +32,7 @@ export const zh: Resources = {
     connectorNeedsAttention: '{{count}} 个连接器需要处理',
     about: '关于{{label}}',
     primaryNavigation: '主导航',
+    applicationMenu: '{{name}} 应用菜单',
     collapseRail: '折叠活动栏',
     expandRail: '展开活动栏',
   },

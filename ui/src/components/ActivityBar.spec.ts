@@ -40,17 +40,16 @@ describe('ActivityBar navigation hierarchy', () => {
       'connectors',
       'workspaces',
       'automation',
-      'settings',
     ])
     expect(pages).not.toContain('market')
     expect(pages).not.toContain('portfolio')
   })
 
-  it('keeps Settings on the default joined rail without a Dev activity item', () => {
+  it('keeps Settings and Dev out of the default joined rail', () => {
     const pages = joinNavLayout(NAV_SECTIONS, defaultUiLayout(), { office: false })
       .flatMap((section) => section.items.map((item) => item.page))
     expect(pages).not.toContain('dev')
-    expect(pages).toContain('settings')
+    expect(pages).not.toContain('settings')
     expect(pages).not.toContain('office')
   })
 

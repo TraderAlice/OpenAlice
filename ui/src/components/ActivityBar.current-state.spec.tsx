@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ActivityBar } from './ActivityBar'
 
 const mocks = vi.hoisted(() => ({
-  selectedSidebar: 'settings',
+  selectedSidebar: 'issue',
   setSidebar: vi.fn(),
   openOrFocus: vi.fn(),
   setCollapsed: vi.fn(),
@@ -48,7 +48,7 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => ({
       'nav.item.chat': 'Ask Alice',
-      'nav.item.settings': 'Settings',
+      'nav.item.issue': 'Issues',
       'nav.item.connectors': 'Connectors',
       'nav.connectorNeedsAttention': '1 connector needs attention',
       'nav.collapseRail': 'Collapse activity bar',
@@ -59,12 +59,14 @@ vi.mock('react-i18next', () => ({
   }),
 }))
 
-vi.mock('./ThemeToggle', () => ({
-  ThemeToggle: () => null,
+vi.mock('./ActivityBarUtilityMenu', () => ({
+  ActivityBarUtilityMenu: ({ onOpenSettings }: { onOpenSettings: () => void }) => (
+    <button type="button" data-testid="activity-bar-utility" onClick={onOpenSettings}>Utilities</button>
+  ),
 }))
 
 beforeEach(() => {
-  mocks.selectedSidebar = 'settings'
+  mocks.selectedSidebar = 'issue'
   mocks.connectorWarnings = 0
   mocks.railCollapsed = false
   vi.stubGlobal('matchMedia', vi.fn(() => ({
@@ -84,7 +86,7 @@ describe('ActivityBar current destination', () => {
   it('exposes the visually active product area as the current page', () => {
     const { rerender } = render(<ActivityBar open onClose={vi.fn()} />)
 
-    expect(screen.getByRole('button', { name: 'Settings' }).getAttribute('aria-current')).toBe('page')
+    expect(screen.getByRole('button', { name: 'Issues' }).getAttribute('aria-current')).toBe('page')
     expect(screen.getByRole('button', { name: 'Ask Alice' }).getAttribute('aria-current')).toBeNull()
     expect(document.querySelectorAll('nav [aria-current="page"]')).toHaveLength(1)
     expect(screen.getByTestId('activity-bar').getAttribute('data-rail-layout')).toBe('full')
@@ -94,7 +96,7 @@ describe('ActivityBar current destination', () => {
 
     expect(screen.getByRole('button', { name: 'Ask Alice' }).getAttribute('aria-current')).toBe('page')
     expect(screen.getByRole('button', { name: 'Ask Alice' }).getAttribute('aria-label')).toBe('Ask Alice')
-    expect(screen.getByRole('button', { name: 'Settings' }).getAttribute('aria-current')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Issues' }).getAttribute('aria-current')).toBeNull()
     expect(document.querySelectorAll('nav [aria-current="page"]')).toHaveLength(1)
     expect(screen.getByTestId('activity-bar').getAttribute('data-rail-layout')).toBe('compact')
     expect(screen.getByTestId('activity-bar').className).toContain('md:w-[50px]')
@@ -107,6 +109,17 @@ describe('ActivityBar current destination', () => {
     render(<ActivityBar open onClose={vi.fn()} />)
 
     expect(screen.getByLabelText('1 connector needs attention').textContent).toBe('1')
+  })
+
+  it('opens Settings from the application utility menu', () => {
+    render(<ActivityBar open onClose={vi.fn()} />)
+
+    screen.getByTestId('activity-bar-utility').click()
+    expect(mocks.setSidebar).toHaveBeenCalledWith('settings')
+    expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'settings',
+      params: { category: 'general' },
+    })
   })
 
   it('keeps the rail toggle in the header and turns that slot into expand when collapsed', () => {
