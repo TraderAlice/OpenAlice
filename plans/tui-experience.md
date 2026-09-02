@@ -3598,6 +3598,27 @@ already large `supervisor-tui.ts` application controller.
   (including all 56 PTY cases), plus the complete CLI suite (63 files, 642
   tests). CLI typecheck and build also pass.
 
+### Full-height Home stage decision
+
+- Fresh real 120x32 and 80x24 captures confirmed that the revised Home hierarchy
+  was clearer than the legacy dashboard, but the wide stage still stopped early.
+  Tip and Command Spine remained anchored below it, leaving a large unowned field
+  between the page's status content and its persistent controls.
+- At 100 columns and wider, Alice Session now owns all height available between
+  Mission Navigation and the contextual Tip. The identity rail centers in that
+  field; the task rail keeps Now and the primary action high, distributes Signals
+  through the middle, and anchors Recent low. Subtle internal rails make the
+  three regions legible without restoring a telemetry dashboard.
+- Compact Home remains content-height and retains the same linear
+  identity-to-action-to-signals-to-recent order. Existing keyboard, pointer,
+  hotspot, Runtime, Inbox, project-selection, and Command Spine contracts remain
+  unchanged. Maintainer acceptance remains pending on the retained feature
+  branch.
+- Real 120x48, 120x32, and 80x24 PTY captures verify the expanded, normal-wide,
+  and compact compositions. Acceptance passes through all 135 screen and
+  real-PTY tests (including all 56 PTY cases), plus the complete CLI suite (63
+  files, 642 tests). CLI typecheck and build also pass.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

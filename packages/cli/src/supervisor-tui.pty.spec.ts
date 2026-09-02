@@ -1145,10 +1145,10 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           && plainOutput.includes('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
         ) {
           hovered = true
-          child.write('\u001b[<35;70;12M')
+          child.write('\u001b[<35;70;11M')
         } else if (!clicked && plainOutput.includes('› [ Enter ]')) {
           clicked = true
-          child.write('\u001b[<0;70;12M')
+          child.write('\u001b[<0;70;11M')
         } else if (clicked && plainOutput.includes('OpenAlice started')) {
           child.write('q')
         }

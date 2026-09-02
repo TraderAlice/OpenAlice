@@ -206,9 +206,9 @@ function renderWideSessionStage(
   const requestedBodyHeight = Number.isFinite(targetHeight)
     ? Math.max(naturalBodyHeight, Math.floor(targetHeight ?? 0) - 2)
     : naturalBodyHeight
-  const bodyHeight = Math.min(17, requestedBodyHeight)
+  const bodyHeight = requestedBodyHeight
   const left = centerSessionRows(identity, bodyHeight)
-  const right = centerSessionRows(task, bodyHeight)
+  const right = spreadSessionTaskRows(view, taskWidth, bodyHeight)
   const body = Array.from({ length: bodyHeight }, (_, index) => (
     `${fillLine(left[index] ?? '', identityWidth)}${gutter}${truncateDisplayWidth(right[index] ?? '', taskWidth)}`
   ))
@@ -274,6 +274,44 @@ function sessionTaskRows(view: SupervisorHomeView, width: number): string[] {
     'RECENT',
     ...recent,
   ]
+}
+
+function spreadSessionTaskRows(
+  view: SupervisorHomeView,
+  width: number,
+  height: number,
+): string[] {
+  const guidance = wrapDisplayText(homeGuidance(view).join(' '), width).slice(0, 2)
+  const recent = homeRecentRows(view, width).slice(0, 2)
+  const sections = [
+    [homeSectionRail('NOW', width), homeNowHeadline(view), ...guidance, primaryLaunchRow(view)],
+    [homeSectionRail('SIGNALS', width), homeAttentionRow(view), homeConnectionRow(view)],
+    [homeSectionRail('RECENT', width), ...recent],
+  ]
+  const contentHeight = sections.reduce((total, section) => total + section.length, 0)
+  const minimumHeight = contentHeight + sections.length - 1
+  if (height <= minimumHeight) return sessionTaskRows(view, width).slice(0, height)
+
+  const surplus = height - minimumHeight
+  const topPadding = surplus > 2 ? 1 : 0
+  const bottomPadding = surplus > 3 ? 1 : 0
+  const distributed = Math.max(0, surplus - topPadding - bottomPadding)
+  const firstGap = 1 + Math.ceil(distributed / 2)
+  const secondGap = 1 + Math.floor(distributed / 2)
+  return [
+    ...Array.from({ length: topPadding }, () => ''),
+    ...sections[0]!,
+    ...Array.from({ length: firstGap }, () => ''),
+    ...sections[1]!,
+    ...Array.from({ length: secondGap }, () => ''),
+    ...sections[2]!,
+    ...Array.from({ length: bottomPadding }, () => ''),
+  ]
+}
+
+function homeSectionRail(label: string, width: number): string {
+  const trackWidth = Math.max(0, width - displayWidth(label) - 2)
+  return `${label}${trackWidth > 0 ? `  ${'─'.repeat(trackWidth)}` : ''}`
 }
 
 function homeNowHeadline(view: SupervisorHomeView): string {

@@ -295,7 +295,6 @@ const ENABLED_SETTING = 'Enabled'
 const DISABLED_SETTING = 'Disabled'
 const PROJECT_SCOPE = 'This AliceProject'
 const MACHINE_SCOPE = 'Machine defaults'
-const WIDE_OVERVIEW_MAX_HEIGHT = 17
 const WIDE_OVERVIEW_RESERVED_CHROME_HEIGHT = 5
 const FLEET_VIEWPORT_RESERVED_HEIGHT = 12
 const WIDE_OPERATIONAL_CANVAS_RESERVED_CHROME_HEIGHT = 5
@@ -4968,14 +4967,11 @@ export class SupervisorScreen implements Component {
         hoveredHotspot: this.hoveredHomeHotspot,
         pulse: this.runtimePulse,
       }, width, width >= 100 && Number.isFinite(viewportHeight)
-        ? Math.min(
-            WIDE_OVERVIEW_MAX_HEIGHT,
-            Math.max(
-              0,
-              Math.floor(viewportHeight ?? 0)
-                - lines.length
-                - WIDE_OVERVIEW_RESERVED_CHROME_HEIGHT,
-            ),
+        ? Math.max(
+            0,
+            Math.floor(viewportHeight ?? 0)
+              - lines.length
+              - WIDE_OVERVIEW_RESERVED_CHROME_HEIGHT,
           )
         : undefined)
       const rowOffset = lines.length
