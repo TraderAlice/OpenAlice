@@ -5,6 +5,8 @@ import {
   renderSupervisorLogs,
   supervisorFilteredLogCount,
 } from './supervisor-tui-logs.ts'
+import { displayWidth } from './supervisor-display.ts'
+import { supervisorCommandTargets } from './supervisor-tui-view.ts'
 
 describe('Supervisor Runtime log presentation', () => {
   const logs = {
@@ -51,10 +53,46 @@ describe('Supervisor Runtime log presentation', () => {
     expect(errors).toContain('× 3  03:04:07Z Probe failed')
   })
 
-  it('renders an explicit empty filtered state', () => {
-    const output = renderSupervisorLogs({ entries: [{ text: 'all good' }] }, 80, 0, 'errors').lines.join('\n')
-    expect(output).toContain('0/1 · ERRORS')
-    expect(output).toContain('✓ No error log entries in this snapshot.')
+  it('turns unloaded, quiet, and filtered-empty snapshots into truthful Signal Scopes', () => {
+    const unloaded = renderSupervisorLogs(null, 80, 0, 'attention')
+    expect(unloaded.lines).toHaveLength(7)
+    expect(unloaded.lines.join('\n')).toContain('Event Signal Scope · STANDBY')
+    expect(unloaded.lines.join('\n')).toContain('◇  SIGNAL STANDBY')
+    expect(unloaded.lines.join('\n')).toContain('LENS       warnings + errors · awaiting capture')
+    expect(supervisorCommandTargets(unloaded.lines)).toEqual([
+      expect.objectContaining({
+        label: 'l',
+        surface: '◆ [ l ] Load bounded Runtime tail',
+        primary: true,
+      }),
+    ])
+
+    const quiet = renderSupervisorLogs({ entries: [] }, 80, 0, 'all')
+    expect(quiet.lines.join('\n')).toContain('Event Signal Scope · QUIET · 0 EVENTS')
+    expect(quiet.lines.join('\n')).toContain('○  SIGNAL QUIET')
+    expect(quiet.lines.join('\n')).toContain('SNAPSHOT   Loaded · 0 Runtime events')
+    expect(quiet.lines.join('\n')).toContain('◆ [ l ] Reload Runtime snapshot')
+
+    const clear = renderSupervisorLogs({ entries: [{ text: 'all good' }] }, 80, 0, 'errors')
+    expect(clear.lines.join('\n')).toContain('CLEAR · 0/1 · ERRORS')
+    expect(clear.lines.join('\n')).toContain('✓  LENS CLEAR')
+    expect(clear.lines.join('\n')).toContain('LENS       errors · 0 matches')
+    expect(supervisorCommandTargets(clear.lines)).toEqual([
+      expect.objectContaining({
+        label: 'f',
+        surface: '◆ [ f ] Change severity lens',
+        primary: true,
+      }),
+    ])
+  })
+
+  it('keeps the Signal Scope complete at narrow widths', () => {
+    const rendered = renderSupervisorLogs(null, 46, 0, 'attention')
+    expect(rendered.lines).toHaveLength(7)
+    expect(rendered.lines.every((line) => displayWidth(line) === 46)).toBe(true)
+    expect(rendered.lines.join('\n')).toContain('◇  SIGNAL STANDBY')
+    expect(rendered.lines.join('\n')).toContain('Lens      warnings + errors · awaiting ca…')
+    expect(rendered.lines.join('\n')).toContain('◆ [ l ] Load Runtime tail')
   })
 
   it('keeps pointer targets aligned with a centered event window and inspector focus', () => {

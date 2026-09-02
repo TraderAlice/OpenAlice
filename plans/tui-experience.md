@@ -273,6 +273,22 @@ not imply maintainer approval of the finished interaction.
   Wide terminals use a stream/Inspector split and 80-column terminals stack the
   same model without another read or lifecycle path.
 
+### Runtime zero-event Signal Scope decision
+
+- Keeping the old one-sentence cards preserves minimal height, but at the
+  ordinary 80×24 canvas it leaves most of the operational surface blank and
+  makes Logs look like an unfinished legacy command after the composed Overview.
+- Inventing activity, a fake waveform, or an automatic live follower would add
+  visual energy by lying about the snapshot and widening the bounded Logs
+  contract.
+- The selected model borrows OMP's composed idle-state discipline without
+  copying its agent loop: unloaded, loaded-but-quiet, and filtered-empty states
+  become one responsive Event Signal Scope with explicit `STANDBY`, `QUIET`, or
+  `LENS CLEAR` status, truthful snapshot/lens/safety rows, and one whole-segment
+  `l` or `f` action. That action emits the existing keyboard input, so mouse and
+  keyboard still share the same reader and filter owners. This is an autonomous
+  topic decision, not a recorded maintainer approval.
+
 ### Visible scroll rail decision
 
 - Keeping only numeric ranges in pane titles is compact, but position remains
@@ -804,6 +820,8 @@ already large `supervisor-tui.ts` application controller.
   reader or changing the snapshot contract.
 - [x] Replace the passive Runtime Logs tail with a selectable Event Lens and
   responsive Inspector while preserving the same bounded snapshot.
+- [x] Replace collapsed Runtime zero-event cards with a responsive Signal Scope
+  that preserves truthful snapshot state and existing `l`/`f` actions.
 - [x] Replace the static Command Deck with a contextual, selectable, whole-row
   mouse-capable Command Palette.
 - [x] Upgrade the Command Palette with OMP-inspired in-place fuzzy search,
@@ -1568,6 +1586,21 @@ already large `supervisor-tui.ts` application controller.
   tests passed, 10 skipped). Docker installer smoke passes without Node, npm,
   pnpm, Bun, or an Agent Runtime, and package dry-run contains the changed Fleet
   geometry and Supervisor pointer-controller sources.
+- Runtime Logs no longer collapse to a one-line legacy card when the bounded
+  snapshot is unloaded, quiet, or empty under the selected severity lens. A
+  shared Event Signal Scope distinguishes `STANDBY`, `QUIET`, and `LENS CLEAR`,
+  keeps snapshot/lens/safety truth visible, and promotes the existing `l` or `f`
+  input into a themed pointer-capable action segment without adding a read path.
+- Signal-Scope acceptance passes with 92 focused screen and real-PTY tests. A
+  real truecolor 80×24 Default AliceProject session loaded its 200-event stream,
+  traversed severity lenses, and preserved the populated Event Lens; an isolated
+  quiet session hovered and clicked Reload through raw pointer input. A real
+  46×30 `NO_COLOR` session retained all five Scope rows, showed the hover Preview,
+  reloaded twice, and restored cursor, bracketed-paste, and mouse modes after
+  detach. CLI build/typecheck and root TypeScript pass; the
+  699-file suite passes (698 passed, 1 skipped; 6,163 tests passed, 10 skipped).
+  Docker installer smoke passes without Node, npm, pnpm, Bun, or an Agent
+  Runtime, and package dry-run contains the changed Logs and theme sources.
 
 ## Completion Criteria
 

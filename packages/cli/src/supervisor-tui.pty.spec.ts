@@ -187,6 +187,64 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
 
+  it('hovers and clicks the quiet Event Signal Scope reload segment', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-signal-scope-pointer-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+        OPENALICE_TUI_MOTION: '0',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let hovered = false
+      let clicked = false
+      let detached = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Signal Scope pointer timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!opened && output.includes('◆ [ Enter ]  Start OpenAlice')) {
+          opened = true
+          child.write('l')
+        } else if (!hovered && output.includes('Event Signal Scope · QUIET · 0 EVENTS')) {
+          hovered = true
+          child.write('\u001b[<35;30;10M')
+        } else if (!clicked && output.includes('› [ l ] Reload Runtime snapshot')) {
+          clicked = true
+          child.write('\u001b[<0;30;10M')
+        } else if (!detached && clicked) {
+          detached = true
+          setTimeout(() => child.write('q'), 250)
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor Signal Scope pointer exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('Event Signal Scope · QUIET · 0 EVENTS')
+    expect(transcript).toContain('○  SIGNAL QUIET')
+    expect(transcript).toContain('› [ l ] Reload Runtime snapshot')
+    expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=0 loads=2')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+    expect(transcript).toContain('\u001b[?1006l')
+  }, 12_000)
+
   it('hovers and selects an Event Lens row with raw pointer input', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-event-lens-pointer-'))
     temporaryPaths.push(isolatedHome)

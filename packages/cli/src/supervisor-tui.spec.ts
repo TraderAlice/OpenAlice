@@ -1159,6 +1159,54 @@ describe('Supervisor TUI screen', () => {
     expect(requestRender).toHaveBeenCalled()
   })
 
+  it('routes Signal Scope action segments through the existing Logs keys', () => {
+    const onAction = vi.fn()
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'logs',
+      runtime: { class: 'absent', endpoints: {} },
+      logs: null,
+    }, {
+      onAction,
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+      motionEnabled: false,
+    })
+
+    let lines = screen.render(80)
+    let actionRow = lines.findIndex((line) => line.includes('[ l ] Load bounded Runtime tail')) + 1
+    expect(actionRow).toBeGreaterThan(0)
+    expect(screen.handlePointer({
+      button: 35, col: 30, row: actionRow, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(80)[actionRow - 1]).toContain('› [ l ] Load bounded Runtime tail')
+    expect(screen.handlePointer(pointerClick(30, actionRow))).toBe(true)
+    expect(onAction).toHaveBeenCalledWith('logs')
+
+    screen.update({ logs: { entries: [{ text: 'all good' }] } })
+    expect(screen.handleKey('f', matchesKey)).toBe(true)
+    expect(screen.handleKey('f', matchesKey)).toBe(true)
+    lines = screen.render(80)
+    actionRow = lines.findIndex((line) => line.includes('[ f ] Change severity lens')) + 1
+    expect(actionRow).toBeGreaterThan(0)
+    expect(screen.handlePointer(pointerClick(28, actionRow))).toBe(true)
+    expect(screen.render(80).join('\n')).toContain('Event Lens · LINE 1 · INFO · TEXT')
+
+    const noColor = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'logs',
+      runtime: { class: 'absent', endpoints: {} },
+      logs: null,
+    }, {
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color', NO_COLOR: '1' }),
+      motionEnabled: false,
+    }).render(46)
+    expect(noColor.join('\n')).toContain('◇  SIGNAL STANDBY')
+    expect(noColor.join('\n')).toContain('◆ [ l ] Load Runtime tail')
+    expect(noColor.join('\n')).not.toContain('\u001b[')
+  })
+
   it('treats keycap-like log text as an Event Lens row instead of a command', () => {
     const detach = vi.fn()
     const requestRender = vi.fn()

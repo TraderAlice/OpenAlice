@@ -719,9 +719,14 @@ sanitized raw content. Wide terminals split stream and Lens while 80-column and
 narrow terminals stack the same information. End returns to the `LATEST` edge
 and `l` reloads it. `f`, or its clickable footer keycap, cycles
 All, Attention (warning plus error), and Errors views locally over that loaded
-snapshot. Filtering retains the source line numbers, resets navigation to the
-latest matching entry, and shows an explicit healthy empty state; it performs
-no extra read and does not change the Logs command contract. This is navigation
+snapshot. Filtering retains the source line numbers and resets navigation to
+the latest matching entry. Unloaded, loaded-but-quiet, and filtered-empty
+snapshots share a responsive Event Signal Scope instead of collapsing to a
+one-line message. Its `STANDBY`, `QUIET`, or `LENS CLEAR` rail states the exact
+condition, then exposes snapshot, lens, and bounded/redacted safety context.
+The final whole-segment `l` or `f` action is pointer-capable and emits the same
+existing key as the footer; it performs no extra read and does not change the
+Logs command contract. This is navigation
 over a redacted snapshot, not an unbounded file follower. Follow, pause, and
 component filtering remain later work and must reuse this bounded reader.
 When the stream exceeds its responsive window, its final content column renders

@@ -22,6 +22,17 @@ export interface SupervisorLogRender {
   targets: SupervisorLogTarget[]
 }
 
+interface EmptyLogScope {
+  glyph: '◇' | '○' | '✓'
+  state: string
+  meta: string
+  snapshot: string
+  lens: string
+  actionKey: 'l' | 'f'
+  action: string
+  compactAction: string
+}
+
 interface FormattedLogEntry {
   glyph: '·' | '!' | '×'
   severity: 'INFO' | 'WARNING' | 'ERROR'
@@ -66,30 +77,48 @@ export function renderSupervisorLogs(
 ): SupervisorLogRender {
   if (!logs) {
     return {
-      lines: renderSupervisorPanel('Event stream', 'NOT LOADED', [
-        'Press l to load the bounded, redacted Runtime log tail.',
-      ], width),
+      lines: renderEmptyLogScope({
+        glyph: '◇',
+        state: 'SIGNAL STANDBY',
+        meta: 'STANDBY',
+        snapshot: 'Not loaded',
+        lens: `${logLensDescription(filter)} · awaiting capture`,
+        actionKey: 'l',
+        action: 'Load bounded Runtime tail',
+        compactAction: 'Load Runtime tail',
+      }, width),
       targets: [],
     }
   }
   const sourceEntries = logs.entries ?? []
   if (sourceEntries.length === 0) {
     return {
-      lines: renderSupervisorPanel('Event stream', 'EMPTY', [
-        'No Runtime log entries were found.',
-      ], width),
+      lines: renderEmptyLogScope({
+        glyph: '○',
+        state: 'SIGNAL QUIET',
+        meta: 'QUIET · 0 EVENTS',
+        snapshot: 'Loaded · 0 Runtime events',
+        lens: `${logLensDescription(filter)} · source is quiet`,
+        actionKey: 'l',
+        action: 'Reload Runtime snapshot',
+        compactAction: 'Reload snapshot',
+      }, width),
       targets: [],
     }
   }
   const entries = filterLogEntries(logs, filter)
   if (entries.length === 0) {
     return {
-      lines: renderSupervisorPanel('Event stream', `0/${sourceEntries.length} · ${filter.toUpperCase()}`, [
-        filter === 'errors'
-          ? '✓ No error log entries in this snapshot.'
-          : '✓ No warning or error log entries in this snapshot.',
-        'Press f to return to another severity view.',
-      ], width),
+      lines: renderEmptyLogScope({
+        glyph: '✓',
+        state: 'LENS CLEAR',
+        meta: `CLEAR · 0/${sourceEntries.length} · ${filter.toUpperCase()}`,
+        snapshot: `Loaded · ${sourceEntries.length} Runtime ${pluralize(sourceEntries.length, 'event')}`,
+        lens: `${supervisorLogFilterLabel(filter)} · 0 matches`,
+        actionKey: 'f',
+        action: 'Change severity lens',
+        compactAction: 'Change lens',
+      }, width),
       targets: [],
     }
   }
@@ -176,6 +205,45 @@ export function renderSupervisorLogs(
       fromEnd: entries.length - 1 - (start + relativeIndex),
     })),
   }
+}
+
+function renderEmptyLogScope(scope: EmptyLogScope, width: number): string[] {
+  const compact = width < 60
+  const rows = compact
+    ? [
+        `${scope.glyph}  ${scope.state}`,
+        `Snapshot  ${scope.snapshot}`,
+        `Lens      ${scope.lens}`,
+        'Safety    bounded · redacted',
+        `◆ [ ${scope.actionKey} ] ${scope.compactAction}`,
+      ]
+    : [
+        signalScopeRail(scope.glyph, scope.state, Math.max(1, width - 4)),
+        `SNAPSHOT   ${scope.snapshot}`,
+        `LENS       ${scope.lens}`,
+        'SAFETY     Bounded · redacted · terminal-safe',
+        `◆ [ ${scope.actionKey} ] ${scope.action}`,
+      ]
+  return renderSupervisorPanel('Event Signal Scope', scope.meta, rows, width)
+}
+
+function signalScopeRail(glyph: EmptyLogScope['glyph'], state: string, width: number): string {
+  const prefix = `${glyph}  ${state}`
+  const remaining = Math.max(0, width - displayWidth(prefix) - 2)
+  if (remaining < 7) return prefix
+  const left = Math.max(1, Math.floor((remaining - 3) / 2))
+  const right = Math.max(1, remaining - left - 3)
+  return `${prefix}  ·${'─'.repeat(left)}◇${'─'.repeat(right)}·`
+}
+
+function pluralize(count: number, singular: string): string {
+  return count === 1 ? singular : `${singular}s`
+}
+
+function logLensDescription(filter: SupervisorLogFilter): string {
+  if (filter === 'attention') return 'warnings + errors'
+  if (filter === 'errors') return 'errors only'
+  return 'all events'
 }
 
 function filterLogEntries(
