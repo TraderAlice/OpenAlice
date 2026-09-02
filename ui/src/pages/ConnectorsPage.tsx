@@ -1077,6 +1077,7 @@ function ConnectorCredentialsEditor({
   t: TFunction
 }) {
   const credentialsId = `connector-${definition.id}-credentials`
+  const credentialsStatusId = `${credentialsId}-status`
   const [maskedSecrets, setMaskedSecrets] = useState<Record<string, boolean>>({})
   const credentialFields = definition.fields.filter((field) => !field.learnedBy && field.group !== 'preferences')
   const missingSecretFields = credentialFields.filter(
@@ -1117,6 +1118,7 @@ function ConnectorCredentialsEditor({
           : 'connectorSettings.manageConnectionDetailsAria', { name: definition.label })}
         aria-expanded={open}
         aria-controls={credentialsId}
+        aria-describedby={credentialsStatusId}
         onClick={onToggle}
         className="h-auto min-h-12 w-full justify-between gap-3 rounded-none px-4 py-3 text-left hover:bg-secondary/25 aria-expanded:bg-secondary/20"
       >
@@ -1126,8 +1128,8 @@ function ConnectorCredentialsEditor({
           </span>
           <span className="truncate text-[13px] font-medium leading-[18px] text-foreground">{t('connectorSettings.connectionDetails')}</span>
         </span>
-        <span className="flex shrink-0 items-center gap-2" aria-hidden>
-          <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium leading-4 ${
+        <span className="flex shrink-0 items-center gap-2">
+          <span id={credentialsStatusId} className={`rounded-full px-2 py-0.5 text-[10px] font-medium leading-4 ${
             ready ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'
           }`}>
             {ready ? t('connectorSettings.saved') : t('connectorSettings.required')}
@@ -1135,6 +1137,7 @@ function ConnectorCredentialsEditor({
           <span className="flex size-7 items-center justify-center rounded-md text-muted-foreground">
             <ChevronDown
               size={15}
+              aria-hidden
               className={`transition-transform duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] motion-reduce:transition-none ${open ? 'rotate-180' : ''}`}
             />
           </span>
