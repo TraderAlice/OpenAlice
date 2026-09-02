@@ -3490,8 +3490,9 @@ already large `supervisor-tui.ts` application controller.
   Inspector, and Status sheets. AliceProject selection now joins the same
   compact stage; its status is folded into at most two rows so five visible
   projects plus the complete Inspector still fit the 18-row canvas.
-- The lower stage threshold remains task-specific. Transfer and its existing
-  centered-sheet threshold do not change.
+- The lower stage threshold remains task-specific. At this point Remote Transfer
+  still retained its independent centered-sheet threshold; the later compact
+  Transfer decision below closes that remaining overlap.
   Selection, editing, validation, save callbacks, inheritance rules, Runtime
   ownership, keyboard routes, and pointer activation remain unchanged.
 - The first compact Source stage then exposed the Launcher's selection Tip in
@@ -3522,13 +3523,38 @@ already large `supervisor-tui.ts` application controller.
   or action was removed.
 - Channel selection, update probing, install confirmation, version/channel
   provenance, pointer and keyboard routes, and update authority are unchanged.
-  Transfer retains its independent Flight Deck and centered-sheet threshold.
+  Transfer retains its independent eight-stage Flight Deck rather than sharing
+  Release's four-step trajectory.
 - Real 120x32 and 80x24 captures verify one owned Release canvas at both
   baselines. Maintainer acceptance remains pending on the retained feature
   branch.
 - Acceptance passes through all 143 Task Surface, Release, screen, and real-PTY
   tests (including all 55 PTY cases), plus the complete CLI suite (63 files,
   640 tests). CLI typecheck and build also pass.
+
+### Compact Remote Transfer Focus Workspace decision
+
+- Real 120x32 and 80x24 captures showed a deliberate responsive split: the wide
+  two-column Flight Deck was coherent, while the compact centered sheet exposed
+  the underlying AliceProject panel and crossed its borders through the Mission
+  Brief and Safety Rail.
+- Remote Transfer now joins the 72x24 Focus Workspace boundary. It keeps its own
+  compact eight-stage route, Mission Brief, current-stage Safety message, and
+  action vocabulary; the generic four-step Focus Trajectory stays disabled so
+  the migration path is not duplicated.
+- A real 80x24 capture verifies one clean Header-to-Console Transfer canvas. A
+  new compact PTY journey drives Destination, Project ID, Remote Home,
+  Credentials, Issue Owners, Review, Stream, and Arrival through a successful
+  transfer rather than proving only the first frame.
+- Confirmation intentionally remains a centered Decision Gate at both 120x32
+  and 80x24: its short irreversible-choice content benefits from spatial
+  isolation and neither capture leaks underlying page content.
+- Transfer planning, validation, credential policy, cancellation, retry,
+  checksums, publication, Runtime ownership, and SSH authority are unchanged.
+  Maintainer acceptance remains pending on the retained feature branch.
+- Acceptance passes through all 149 Task Surface, Transfer, screen, and real-PTY
+  tests (including all 56 PTY cases), plus the complete CLI suite (63 files,
+  641 tests). CLI typecheck and build also pass.
 
 ## Completion Criteria
 

@@ -2,8 +2,9 @@ import { truncateDisplayWidth } from './supervisor-display.ts'
 import type { SupervisorOverlayOptions } from './supervisor-overlay-pointer.ts'
 import type { SupervisorTuiTheme } from './supervisor-tui-theme.ts'
 
-export type SupervisorTaskSurfaceTask = 'setup' | 'source' | 'projects' | 'release'
-export type SupervisorFocusTask = SupervisorTaskSurfaceTask | 'transfer' | 'confirmation'
+export type SupervisorTaskSurfaceTask = 'setup' | 'source' | 'projects' | 'release' | 'transfer'
+export type SupervisorFocusTask = SupervisorTaskSurfaceTask | 'confirmation'
+type SupervisorTrajectoryTask = Exclude<SupervisorTaskSurfaceTask, 'transfer'>
 
 export interface SupervisorTaskSurfaceSize {
   width: number
@@ -25,6 +26,7 @@ export function supervisorUsesTaskStage(
     || task === 'source'
     || task === 'projects'
     || task === 'release'
+    || task === 'transfer'
   return compactFocusTask
     ? size.width >= SUPERVISOR_COMPACT_TASK_STAGE_MIN_WIDTH
       && size.height >= SUPERVISOR_COMPACT_TASK_STAGE_MIN_HEIGHT
@@ -90,6 +92,7 @@ export function decorateSupervisorTaskSurface(
 }
 
 function renderFocusTrajectory(task: SupervisorTaskSurfaceTask, width: number): string[] {
+  if (task === 'transfer') return []
   const definition = TASK_TRAJECTORIES[task]
   const rail = definition.steps
     .map((step, index) => `${String(index + 1).padStart(2, '0')} ${step.toUpperCase()}`)
@@ -106,7 +109,7 @@ function blankRows(count: number): string[] {
   return Array.from({ length: Math.max(0, count) }, () => '')
 }
 
-const TASK_TRAJECTORIES: Record<SupervisorTaskSurfaceTask, {
+const TASK_TRAJECTORIES: Record<SupervisorTrajectoryTask, {
   steps: readonly string[]
   boundary: string
 }> = {

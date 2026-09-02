@@ -3387,7 +3387,7 @@ export async function runSupervisorTui(
       maxHeight: '92%',
       anchor: 'center',
       margin: 1,
-    } as const)
+    } as const, 'transfer')
     const panel = new (class implements Component {
       render(width: number): string[] {
         const flightDeck = renderSupervisorTransferFlightDeck({
@@ -3406,7 +3406,7 @@ export async function runSupervisorTui(
               flightDeck.contentFirstRow + 2,
             )
           : undefined
-        const lines = renderSupervisorTaskSurface(flightDeck.lines, terminalSize())
+        const lines = renderSupervisorTaskSurface(flightDeck.lines, terminalSize(), 'transfer')
         captureOverlayPointer(
           lines,
           width,

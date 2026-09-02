@@ -615,8 +615,8 @@ publishes no page targets. The Context Ribbon uses the same task identity. The
 task renderer, pointer targets, and mutation
 callbacks remain unchanged inside that stage. Smaller terminals retain the
 bounded centered sheet because their stacked responsive content takes priority
-over clearing the whole viewport, except Setup, Source, AliceProject, and
-Release: from 72x24 they use the complete header-to-console Focus
+over clearing the whole viewport, except Setup, Source, AliceProject, Release,
+and Remote Transfer: from 72x24 they use the complete header-to-console Focus
 Workspace so their content never overlaps the Focus Header or reveals unrelated
 Home or Launcher content behind the task. Compact Setup and AliceProject status
 become bounded two-line signals rather than third framed sheets, keeping each

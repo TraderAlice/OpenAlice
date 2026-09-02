@@ -52,6 +52,7 @@ describe('Supervisor secondary-task surface', () => {
     expect(supervisorUsesTaskStage(size, 'source')).toBe(true)
     expect(supervisorUsesTaskStage(size, 'projects')).toBe(true)
     expect(supervisorUsesTaskStage(size, 'release')).toBe(true)
+    expect(supervisorUsesTaskStage(size, 'transfer')).toBe(true)
     expect(supervisorUsesTaskStage({ width: 71, height: 24 }, 'setup')).toBe(false)
     expect(supervisorUsesTaskStage({ width: 80, height: 23 }, 'setup')).toBe(false)
     expect(supervisorTaskSurfaceOptions(size, sheet, 'setup')).toEqual({
@@ -64,6 +65,7 @@ describe('Supervisor secondary-task surface', () => {
     expect(renderSupervisorTaskSurface(['work'], size, 'source')).toHaveLength(18)
     expect(renderSupervisorTaskSurface(['work'], size, 'projects')).toHaveLength(18)
     expect(renderSupervisorTaskSurface(['work'], size, 'release')).toHaveLength(18)
+    expect(renderSupervisorTaskSurface(['work'], size, 'transfer')).toHaveLength(18)
     expect(renderSupervisorTaskSurface(['work'], size)).toEqual(['work'])
   })
 

@@ -1346,15 +1346,16 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
   }, 12_000)
 
   it.each([
-    ['default-no', 80, 24, 'sends=0 aborted=false'],
-    ['success', 110, 30, 'sends=1 aborted=false'],
-    ['auth-loss', 100, 30, 'sends=0 aborted=false'],
-    ['occupied', 100, 30, 'sends=0 aborted=false'],
-    ['checksum-retry', 100, 30, 'sends=2 aborted=false'],
-    ['cancel-retry', 100, 30, 'sends=2 aborted=true'],
+    ['default-no compact', 'default-no', 80, 24, 'sends=0 aborted=false', true],
+    ['success wide', 'success', 110, 30, 'sends=1 aborted=false', false],
+    ['success compact', 'success', 80, 24, 'sends=1 aborted=false', true],
+    ['auth-loss', 'auth-loss', 100, 30, 'sends=0 aborted=false', false],
+    ['occupied', 'occupied', 100, 30, 'sends=0 aborted=false', false],
+    ['checksum-retry', 'checksum-retry', 100, 30, 'sends=2 aborted=false', false],
+    ['cancel-retry', 'cancel-retry', 100, 30, 'sends=2 aborted=true', false],
   ] as const)(
     'drives the remote transfer %s recovery path through a real PTY',
-    async (scenario, cols, rows, expectedResult) => {
+    async (_caseName, scenario, cols, rows, expectedResult, compact) => {
       const child = pty.spawn(process.execPath, [transferFixtureEntry], {
         cols,
         rows,
@@ -1392,14 +1393,14 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
             child.write('m')
           } else if (stage === 1 && output.includes('destination Machine')) {
             stage = 2
-            if (scenario === 'success') {
+            if (scenario === 'success' && !compact) {
               child.write('\u001b[<35;50;7M')
               child.write('\u001b[<0;50;7M')
             } else {
               child.write('\r')
             }
           } else if (stage === 2 && output.includes('Destination AliceProject key')) {
-            if (scenario === 'success') {
+            if (scenario === 'success' && !compact) {
               stage = 22
               child.write('\u0005\u0015Bad Key')
               setTimeout(() => {
@@ -1481,8 +1482,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       if (scenario === 'success') {
         expect(transcript).toContain('Flight Deck · 1/8 · DESTINATION')
         expect(transcript).toContain('Mission Brief · Source → Cloud fixture')
-        expect(transcript).toContain('! Destination AliceProject key · FIX')
-        expect(transcript).toContain('› [ Enter ] Continue')
+        if (!compact) expect(transcript).toContain('! Destination AliceProject key · FIX')
+        if (!compact) expect(transcript).toContain('› [ Enter ] Continue')
       } else if (scenario === 'default-no') {
         expect(transcript).toContain('Transfer Flight Deck')
       }
