@@ -70,13 +70,15 @@ describe('Supervisor Inbox', () => {
     const rendered = renderSupervisorInbox(snapshot, createSupervisorInboxState(), 120, 16)
     const frame = rendered.lines.join('\n')
 
-    expect(frame).toContain('Message stream')
+    expect(frame).toContain('Inbox Desk')
+    expect(frame).toContain('MESSAGE STREAM')
     expect(frame).toContain('1 UNREAD')
     expect(frame).toContain('● Morning brief')
-    expect(frame).toContain('Message Inspector')
+    expect(frame).toContain('SELECTED · UNREAD')
     expect(frame).toContain('Risk is concentrated in semiconductors.')
     expect(frame).toContain('reports/morning.md')
-    expect(rendered.targets[0]).toMatchObject({ index: 0, startColumn: 2 })
+    expect(rendered.lines.filter((line) => line.startsWith('╭'))).toHaveLength(1)
+    expect(rendered.targets[0]).toMatchObject({ index: 0, row: 3, startColumn: 2 })
     expect(rendered.lines.every((line) => line.length <= 120)).toBe(true)
   })
 
@@ -89,8 +91,26 @@ describe('Supervisor Inbox', () => {
     expect(selected?.id).toBe('two')
     expect(supervisorInboxUnreadCount(snapshot)).toBe(1)
     expect(supervisorInboxUnreadCount(updated)).toBe(0)
-    expect(frame).toContain('Selected message')
+    expect(frame).toContain('SELECTED · READ · ws-two')
     expect(frame).toContain('notes/follow-up.md')
+  })
+
+  it('caps a tall Inbox Desk to rendered message targets', () => {
+    const entries = Array.from({ length: 30 }, (_, index) => ({
+      ...snapshot.entries[0]!,
+      id: `message-${index + 1}`,
+      comments: `Message ${index + 1}`,
+    }))
+    const rendered = renderSupervisorInbox(
+      { ...snapshot, entries },
+      createSupervisorInboxState(),
+      120,
+      40,
+    )
+
+    expect(rendered.lines).toHaveLength(23)
+    expect(rendered.targets).toHaveLength(20)
+    expect(rendered.targets.at(-1)?.row).toBe(22)
   })
 
   it('makes disconnected and empty states explain the next action', () => {

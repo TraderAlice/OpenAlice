@@ -3069,6 +3069,30 @@ already large `supervisor-tui.ts` application controller.
   all 51 real-PTY cases, and the complete CLI suite (63 files, 630 tests). CLI
   typecheck and build also pass.
 
+### Unified Inbox Desk decision
+
+- The first post-Home Inbox capture exposed the same obsolete dashboard shape:
+  a short Message Stream card and a short Inspector card occupied the top
+  quarter of a 120x32 terminal, while the contextual Tip incorrectly repeated
+  Home's `Enter follows Now` guidance.
+- Populated Inbox is now one responsive Inbox Desk. Wide terminals keep the
+  necessary stream-to-reader relationship as two open regions inside one
+  bounded canvas; compact terminals stack `Message Stream -> Selected` inside
+  the same frame. Empty and disconnected Inbox Relay states remain concise
+  signal scopes because they have no message work to fill a desk.
+- The selected message continues to own the only mutation, Mark read/unread,
+  and no delete route is introduced. The Inbox Tip now names arrow/wheel
+  selection, Enter's read-state toggle, and the way unread work is promoted on
+  Home. Existing server-owned history, polling, and read-state contracts are
+  unchanged.
+- Real 120x32 and 80x24 captures prove the stream, selection, workspace and
+  agent provenance, message body, read action, Tip, and Command Spine remain
+  simultaneously visible without two competing panel headers.
+- Inbox-Desk acceptance passes through 85 focused Inbox and screen tests, all
+  51 real-PTY cases including Home -> Inbox -> Mark read attention closure, and
+  the complete CLI suite (63 files, 631 tests). CLI typecheck and build also
+  pass.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

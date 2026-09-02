@@ -191,7 +191,7 @@ export function renderSupervisorInbox(
   const entries = snapshot.entries
   const wide = width >= 100
   const visible = wide && Number.isFinite(targetHeight)
-    ? Math.max(7, Math.floor(targetHeight ?? 0) - 2)
+    ? Math.min(20, Math.max(7, Math.floor(targetHeight ?? 0) - 4))
     : width < 60 ? 4 : 7
   const start = windowStart(normalized.selected, entries.length, visible)
   const end = Math.min(entries.length, start + visible)
@@ -206,40 +206,48 @@ export function renderSupervisorInbox(
   const meta = `${unread} UNREAD · ${start + 1}–${end}/${entries.length}${snapshot.hasMore ? ' · MORE' : ''}`
 
   if (wide) {
-    const gap = 3
-    const listWidth = Math.max(46, Math.floor(width * 0.47))
-    const detailWidth = Math.max(30, width - listWidth - gap)
-    const details = inboxDetailRows(selected, detailWidth - 4)
-    const bodyHeight = Math.max(listRows.length, details.length)
-    const left = renderSupervisorPanel('Message stream', meta, padRows(listRows, bodyHeight), listWidth)
-    const right = renderSupervisorPanel(
-      'Message Inspector',
-      `${selected.readAt ? 'READ' : 'UNREAD'} · ${formatTimestamp(selected.ts)}`,
-      padRows(details, bodyHeight),
-      detailWidth,
-    )
+    const innerWidth = width - 4
+    const gutter = '    '
+    const listWidth = Math.max(40, Math.floor(innerWidth * 0.42))
+    const detailWidth = Math.max(24, innerWidth - listWidth - displayWidth(gutter))
+    const stream = [`MESSAGE STREAM · ${start + 1}–${end}/${entries.length}`, ...listRows]
+    const details = [
+      `SELECTED · ${selected.readAt ? 'READ' : 'UNREAD'} · ${formatTimestamp(selected.ts)}`,
+      '',
+      ...inboxDetailRows(selected, detailWidth),
+    ]
+    const naturalBodyHeight = Math.max(stream.length, details.length)
+    const requestedBodyHeight = Number.isFinite(targetHeight)
+      ? Math.max(naturalBodyHeight, Math.floor(targetHeight ?? 0) - 2)
+      : naturalBodyHeight
+    const bodyHeight = Math.min(21, requestedBodyHeight)
+    const left = padRows(stream, bodyHeight)
+    const right = padRows(details, bodyHeight)
+    const body = Array.from({ length: bodyHeight }, (_, index) => (
+      `${fillRow(left[index] ?? '', listWidth)}${gutter}${truncateDisplayWidth(right[index] ?? '', detailWidth)}`
+    ))
     return {
-      lines: left.map((line, index) => joinColumns(line, right[index] ?? '', listWidth, gap, width)),
+      lines: renderSupervisorPanel('Inbox Desk', meta, body, width),
       targets: entries.slice(start, end).map((_, offset) => ({
-        row: offset + 2,
+        row: offset + 3,
         startColumn: 2,
-        endColumn: listWidth - 1,
+        endColumn: listWidth + 1,
         index: start + offset,
       })),
     }
   }
 
-  const list = renderSupervisorPanel('Message stream', meta, listRows, width)
-  const details = renderSupervisorPanel(
-    'Selected message',
-    `${selected.readAt ? 'READ' : 'UNREAD'} · ${workspaceLabel(selected)}`,
-    inboxDetailRows(selected, Math.max(20, width - 4)),
-    width,
-  )
+  const body = [
+    `MESSAGE STREAM · ${start + 1}–${end}/${entries.length}`,
+    ...listRows,
+    '',
+    `SELECTED · ${selected.readAt ? 'READ' : 'UNREAD'} · ${workspaceLabel(selected)}`,
+    ...inboxDetailRows(selected, Math.max(20, width - 4)),
+  ]
   return {
-    lines: [...list, '', ...details],
+    lines: renderSupervisorPanel('Inbox Desk', meta, body, width),
     targets: entries.slice(start, end).map((_, offset) => ({
-      row: offset + 2,
+      row: offset + 3,
       startColumn: 2,
       endColumn: Math.max(2, width - 1),
       index: start + offset,
@@ -378,9 +386,9 @@ function padRows(rows: string[], height: number): string[] {
   return [...rows, ...Array.from({ length: Math.max(0, height - rows.length) }, () => '')]
 }
 
-function joinColumns(left: string, right: string, leftWidth: number, gap: number, width: number): string {
-  const padded = `${left}${' '.repeat(Math.max(0, leftWidth - displayWidth(left) + gap))}${right}`
-  return truncateDisplayWidth(padded, width)
+function fillRow(value: string, width: number): string {
+  const safe = truncateDisplayWidth(value, width)
+  return `${safe}${' '.repeat(Math.max(0, width - displayWidth(safe)))}`
 }
 
 function windowStart(selected: number, count: number, visible: number): number {

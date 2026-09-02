@@ -988,6 +988,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     const transcript = await new Promise<string>((resolve, reject) => {
       let output = ''
       let openedInbox = false
+      let toggledRead = false
       let detached = false
       const timeout = setTimeout(() => {
         child.kill()
@@ -998,22 +999,27 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         if (!openedInbox && output.includes('[ Enter ]  Review 2 unread reports')) {
           openedInbox = true
           child.write('\r')
-        } else if (!detached && openedInbox && output.includes('Message stream') && output.includes('2 UNREAD')) {
+        } else if (!toggledRead && openedInbox && output.includes('Inbox Desk') && output.includes('2 UNREAD')) {
+          toggledRead = true
+          child.write('\r')
+        } else if (!detached && toggledRead && output.includes('Inbox Desk · 1 UNREAD') && output.includes('Mark unread')) {
           detached = true
           child.write('q')
         }
       })
       child.onExit(({ exitCode }) => {
         clearTimeout(timeout)
-        if (exitCode === 0 && openedInbox) resolve(output)
+        if (exitCode === 0 && openedInbox && toggledRead) resolve(output)
         else reject(new Error(`Supervisor Home Inbox route exited ${exitCode}:\n${output}`))
       })
     })
 
     expect(transcript).toContain('◆ Inbox  2 unread reports')
     expect(transcript).toContain('[ Enter ]  Review 2 unread reports')
-    expect(transcript).toContain('Message stream')
+    expect(transcript).toContain('Inbox Desk')
     expect(transcript).toContain('2 UNREAD')
+    expect(transcript).toContain('1 UNREAD')
+    expect(transcript).toContain('Mark unread')
     expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=0')
     expect(transcript).toContain('\u001b[?25h')
   }, 12_000)

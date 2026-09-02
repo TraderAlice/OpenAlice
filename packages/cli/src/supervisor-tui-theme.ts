@@ -187,6 +187,13 @@ export function decorateSupervisorFrame(
       return decorateFocusHeader(line, theme, options.hoveredCommand?.label)
     }
     if (index === 1) return decorateTabs(line, theme, options.panel, options.hoveredPanel)
+    if (options.panel === 'inbox' && line.length >= 100 && /^│ [›»] /u.test(line)) {
+      const match = /^(│ )([›»] .+?)(\s{4,})(.*)$/u.exec(line)
+      if (match) {
+        const style = match[2]?.startsWith('›') ? theme.selected : theme.accent
+        return `${match[1]}${style(match[2] ?? '')}${match[3]}${match[4]}`
+      }
+    }
     if (line.startsWith('› ') || line.startsWith('▶ ') || line.includes('│ › ')) return theme.selected(line)
     if (line.includes('│ » ')) return theme.accent(line)
     if (line.includes('│ × ')) return theme.danger(line)
@@ -212,6 +219,13 @@ export function decorateSupervisorFrame(
     if (line.includes('│ ○  NO CHECKS')) return theme.infoRail(line)
     if (line.includes('│ × ATTENTION')) return theme.dangerRail(line)
     if (line.includes('│ ◇ CHECKING')) return theme.warningRail(line)
+    if (options.panel === 'inbox' && line.startsWith('│ ')
+      && /\b(?:MESSAGE STREAM|SELECTED)\b/u.test(line)) {
+      return line
+        .replace(/\b(?:MESSAGE STREAM|SELECTED)\b/gu, (label) => theme.accentStrong(label))
+        .replace(/\bUNREAD\b/gu, (label) => theme.warning(label))
+        .replace(/\bREAD\b/gu, (label) => theme.muted(label))
+    }
     if (line.startsWith('│ ') && /\b(?:NOW|SIGNALS|RECENT)\b/u.test(line)) {
       return line.replace(/\b(?:NOW|SIGNALS|RECENT)\b/u, (label) => theme.accentStrong(label))
     }

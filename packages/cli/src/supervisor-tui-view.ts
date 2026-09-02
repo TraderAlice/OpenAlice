@@ -677,11 +677,13 @@ export function renderSupervisorContextTip(
             : 'Doctor is read-only; d refreshes checks without changing Runtime.'
           : view.panel === 'help'
             ? '/ searches every available command without leaving this view.'
-            : view.runtimeState === 'absent'
-              ? 'Enter starts and opens; s starts quietly inside this terminal.'
-            : view.runtimeState === 'running' || view.runtimeState === 'owned_elsewhere'
-                ? 'Enter follows Now; o opens Web; Runtime keeps the diagnostic detail.'
-                : 'Run Doctor before acting on an uncertain Runtime signal.'
+            : view.panel === 'inbox'
+              ? '↑↓ or wheel selects; Enter toggles read state; Home follows unread work.'
+              : view.runtimeState === 'absent'
+                ? 'Enter starts and opens; s starts quietly inside this terminal.'
+                : view.runtimeState === 'running' || view.runtimeState === 'owned_elsewhere'
+                  ? 'Enter follows Now; o opens Web; Runtime keeps the diagnostic detail.'
+                  : 'Run Doctor before acting on an uncertain Runtime signal.'
   return truncateDisplayWidth(`◇  Tip: ${message}`, Math.max(1, width))
 }
 

@@ -280,15 +280,17 @@ intentionally parameter-free:
   With only the local Machine, Fleet focus starts on its current AliceProject;
 - ordinary workbench pages have one bottom surface: the Command Spine. Primary
   and contextual actions live with the object they affect: Alice Session,
-  Launch Briefing, Launch Flight Recorder, Fleet Selection, Inbox Inspector,
-  Runtime Observatory or Lens, and Doctor Signal Scope. `/` Commands owns the
+  Launch Briefing, Launch Flight Recorder, Fleet Selection, the selected
+  message inside Inbox Desk, Runtime Observatory or Lens, and Doctor Signal
+  Scope. `/` Commands owns the
   long tail while direct shortcuts remain active; `?` retains the complete
-  keyboard reference. Inbox Inspector exposes Enter's read-state mutation, and
-  a failed Flight Recorder keeps both Enter Retry and Esc Back visible in its
-  content. This avoids a second footer that competes with page truth or repeats
-  the Spine. Focus Workspaces and confirmation/refusal overlays still own a
-  local Action Shelf because that bounded task temporarily replaces ordinary
-  workbench navigation. Each complete local action segment derives a display-
+  keyboard reference. The Inbox Desk's selected message exposes Enter's
+  read-state mutation, and a failed Flight Recorder keeps both Enter Retry and
+  Esc Back visible in its content. This avoids a second footer that competes
+  with page truth or repeats the Spine. Focus Workspaces and
+  confirmation/refusal overlays still own a local Action Shelf because that
+  bounded task temporarily replaces ordinary workbench navigation. Each
+  complete local action segment derives a display-
   width-aware pointer target from the final responsive layout, so hover and
   click survive reflow and invoke the same input state machine as the
   corresponding key. Hover changes the leading `◆`/`·` or divider to `›`,
@@ -468,9 +470,13 @@ intentionally parameter-free:
 - `o` opens an advertised, verified Web endpoint;
 - connected navigation is Home, Inbox, Connections, and Runtime. Inbox reads
   the active target's bounded `/api/inbox/history` surface, shares server-owned
-  read/unread state, polls every 20 seconds, and offers no delete action. Help
-  remains available through `?`; Doctor remains a Runtime tool rather than a
-  top-level product destination;
+  read/unread state, polls every 20 seconds, and offers no delete action. Its
+  single responsive Inbox Desk keeps Message Stream and Selected Message in
+  open columns on wide terminals and stacks the same reading order at compact
+  widths. The selected message owns Enter's Mark read/unread action; arrows or
+  the wheel move selection, and the contextual Tip teaches that exact loop.
+  Help remains available through `?`; Doctor remains a Runtime tool rather
+  than a top-level product destination;
 - Runtime is a layered status-manager surface rather than a renamed log tail.
   Its responsive Runtime Observatory leads with three wide columns—Runtime,
   Route, and Services—or the same facts in one compact stack. It owns process

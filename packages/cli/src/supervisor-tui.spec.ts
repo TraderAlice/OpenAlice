@@ -239,6 +239,8 @@ describe('Supervisor TUI screen', () => {
     const inbox = screen.render(100).join('\n')
     expect(inbox).toContain('Agent report ready.')
     expect(inbox).toContain('[ Enter ] Mark read')
+    expect(renderSupervisorContextTip({ panel: 'inbox' }, 80))
+      .toContain('Enter toggles read state')
     expect(screen.handleKey('enter', matchesKey)).toBe(true)
     expect(toggled).toEqual(['hello'])
 
