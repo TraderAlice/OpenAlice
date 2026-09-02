@@ -1103,6 +1103,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('◆ Inbox  2 unread reports')
     expect(transcript).toContain('[ Enter ]  Review 2 unread reports')
     expect(transcript).toContain('Inbox Desk')
+    expect(transcript).toContain('[ o ] Open Workspace')
     expect(transcript).toContain('2 UNREAD')
     expect(transcript).toContain('1 UNREAD')
     expect(transcript).toContain('Mark unread')

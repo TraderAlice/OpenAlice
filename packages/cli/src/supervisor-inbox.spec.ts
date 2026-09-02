@@ -7,6 +7,7 @@ import {
   selectedSupervisorInboxEntry,
   setSupervisorInboxRead,
   supervisorInboxUnreadCount,
+  supervisorInboxWorkspaceUrl,
   updateSupervisorInboxEntryRead,
   type SupervisorInboxSnapshot,
 } from './supervisor-inbox.ts'
@@ -77,9 +78,20 @@ describe('Supervisor Inbox', () => {
     expect(frame).toContain('SELECTED · UNREAD')
     expect(frame).toContain('Risk is concentrated in semiconductors.')
     expect(frame).toContain('reports/morning.md')
+    expect(frame).toContain('[ o ] Open Workspace')
+    expect(frame).toContain('[ Enter ] Mark read')
     expect(rendered.lines.filter((line) => line.startsWith('╭'))).toHaveLength(1)
     expect(rendered.targets[0]).toMatchObject({ index: 0, row: 3, startColumn: 2 })
     expect(rendered.lines.every((line) => line.length <= 120)).toBe(true)
+  })
+
+  it('builds an encoded Workspace route on the active AliceProject endpoint', () => {
+    expect(supervisorInboxWorkspaceUrl(
+      'http://127.0.0.1:2026/#openalice-remote=1&target=alice%40cloud',
+      'desk/a',
+    )).toBe(
+      'http://127.0.0.1:2026/workspaces/desk%2Fa#openalice-remote=1&target=alice%40cloud',
+    )
   })
 
   it('keeps selection, unread state, and compact details coherent', () => {

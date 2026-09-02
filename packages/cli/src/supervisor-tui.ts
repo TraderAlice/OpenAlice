@@ -187,6 +187,7 @@ import {
   renderSupervisorInbox,
   selectedSupervisorInboxEntry,
   setSupervisorInboxRead,
+  supervisorInboxWorkspaceUrl,
   supervisorInboxUnreadCount,
   updateSupervisorInboxEntryRead,
   type SupervisorInboxSnapshot,
@@ -938,6 +939,15 @@ export async function runSupervisorTui(
     },
     onToggleInboxRead: (entry) => {
       void toggleInboxRead(entry.id)
+    },
+    onOpenInboxEntry: (entry) => {
+      const base = activeTarget?.clientUrl ?? activeTarget?.endpoint
+      if (!base) return
+      const url = supervisorInboxWorkspaceUrl(base, entry.workspaceId)
+      void openBrowser(url).then(
+        () => screen.update({ notice: `Opened Workspace ${entry.workspaceLabel ?? entry.workspaceId}.` }),
+        (error: unknown) => screen.update({ diagnostic: safeError(error) }),
+      )
     },
     onOpenActiveTarget: () => {
       const url = activeTarget?.clientUrl ?? activeTarget?.endpoint
@@ -3633,6 +3643,7 @@ export class SupervisorScreen implements Component {
   ) => { emitted: boolean; truncated: boolean }
   private readonly onRefreshInbox?: () => void
   private readonly onToggleInboxRead?: (entry: NonNullable<SupervisorInboxSnapshot['entries'][number]>) => void
+  private readonly onOpenInboxEntry?: (entry: NonNullable<SupervisorInboxSnapshot['entries'][number]>) => void
   private readonly onOpenActiveTarget?: () => void
   private readonly onDisconnectActiveTarget?: () => void
   private readonly onRefreshActiveTarget?: () => void
@@ -3710,6 +3721,7 @@ export class SupervisorScreen implements Component {
       ) => { emitted: boolean; truncated: boolean }
       onRefreshInbox?: () => void
       onToggleInboxRead?: (entry: NonNullable<SupervisorInboxSnapshot['entries'][number]>) => void
+      onOpenInboxEntry?: (entry: NonNullable<SupervisorInboxSnapshot['entries'][number]>) => void
       onOpenActiveTarget?: () => void
       onDisconnectActiveTarget?: () => void
       onRefreshActiveTarget?: () => void
@@ -3743,6 +3755,7 @@ export class SupervisorScreen implements Component {
     this.onCopyLog = callbacks.onCopyLog
     this.onRefreshInbox = callbacks.onRefreshInbox
     this.onToggleInboxRead = callbacks.onToggleInboxRead
+    this.onOpenInboxEntry = callbacks.onOpenInboxEntry
     this.onOpenActiveTarget = callbacks.onOpenActiveTarget
     this.onDisconnectActiveTarget = callbacks.onDisconnectActiveTarget
     this.onRefreshActiveTarget = callbacks.onRefreshActiveTarget
@@ -4155,6 +4168,12 @@ export class SupervisorScreen implements Component {
         const entry = selectedSupervisorInboxEntry(this.snapshot.inbox, this.inboxState)
         if (entry) this.onToggleInboxRead?.(entry)
         else this.update({ notice: 'Inbox has no selected message.' })
+        return true
+      }
+      if (matchesKey(data, 'o')) {
+        const entry = selectedSupervisorInboxEntry(this.snapshot.inbox, this.inboxState)
+        if (entry) this.onOpenInboxEntry?.(entry)
+        else this.update({ notice: 'Inbox has no selected Workspace.' })
         return true
       }
       if (matchesKey(data, 'r')) {
@@ -5108,7 +5127,7 @@ export class SupervisorScreen implements Component {
     if (this.hoveredPanel) {
       return {
         overview: 'Return to the selected AliceProject launch and Runtime overview.',
-        inbox: 'Read messages delivered by the active AliceProject.',
+        inbox: 'Review reports and open their Workspace in the active AliceProject.',
         fleet: 'Browse local and remote Machines and their AliceProjects.',
         logs: 'Inspect the bounded, redacted Runtime event lens.',
         doctor: 'Inspect read-only Runtime ownership and readiness checks.',

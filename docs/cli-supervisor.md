@@ -318,10 +318,11 @@ intentionally parameter-free:
   message inside Inbox Desk, Runtime Observatory or Lens, and Doctor Signal
   Scope. `/` Commands owns the
   long tail while direct shortcuts remain active; `?` retains the complete
-  keyboard reference. The Inbox Desk's selected message exposes Enter's
-  read-state mutation, and a failed Flight Recorder keeps both Enter Retry and
-  Esc Back visible in its content. This avoids a second footer that competes
-  with page truth or repeats the Spine. Focus Workspaces and
+  keyboard reference. The Inbox Desk's selected message exposes `o` Open
+  Workspace as its primary follow-through and Enter's read-state mutation as
+  the secondary organization action. A failed Flight Recorder keeps both Enter
+  Retry and Esc Back visible in its content. This avoids a second footer that
+  competes with page truth or repeats the Spine. Focus Workspaces and
   confirmation/refusal overlays still own a local Action Shelf because that
   bounded task temporarily replaces ordinary workbench navigation. Each
   complete local action segment derives a display-
@@ -529,8 +530,9 @@ intentionally parameter-free:
   widths. Stream rows lead with Workspace and agent provenance before their
   bounded summary and relative time, so truncation cannot hide the identity
   users need to choose a message; Selected Message owns the complete body and
-  documents. The selected message owns Enter's Mark read/unread action; arrows
-  or the wheel move selection, and the contextual Tip teaches that exact loop.
+  documents. The selected message opens its encoded `/workspaces/:workspaceId`
+  Web route with `o` and owns Enter's Mark read/unread action; arrows or the
+  wheel move selection, and the contextual Tip teaches that exact loop.
   The Command Spine uses the themed `● INBOX` view identity, contracts it to
   `● BOX` only at the intermediate responsive tier, and removes the badge
   before sacrificing target or Runtime truth.

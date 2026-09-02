@@ -3081,9 +3081,9 @@ already large `supervisor-tui.ts` application controller.
   the same frame. Empty and disconnected Inbox Relay states remain concise
   signal scopes because they have no message work to fill a desk.
 - The selected message continues to own the only mutation, Mark read/unread,
-  and no delete route is introduced. The Inbox Tip now names arrow/wheel
-  selection, Enter's read-state toggle, and the way unread work is promoted on
-  Home. Existing server-owned history, polling, and read-state contracts are
+  and no delete route is introduced. The later action-hierarchy decision adds
+  a non-mutating Workspace follow-through while preserving this boundary.
+  Existing server-owned history, polling, and read-state contracts are
   unchanged.
 - Real 120x32 and 80x24 captures prove the stream, selection, workspace and
   agent provenance, message body, read action, Tip, and Command Spine remain
@@ -3400,7 +3400,7 @@ already large `supervisor-tui.ts` application controller.
 - Stream rows now lead with `Workspace / agent`, followed by summary and
   relative time. If no agent is reported they retain the Workspace alone. The
   Selected inspector remains the owner of the complete title, Workspace, From,
-  body, documents, timestamp, and Mark read/unread action.
+  body, documents, timestamp, and its message actions.
 - Real 120x32 and 80x24 captures verify source identities survive truncation
   while summaries remain scannable, with no change to selection, pointer rows,
   history polling, read-state mutation, ordering, or persistence.
@@ -3555,6 +3555,28 @@ already large `supervisor-tui.ts` application controller.
 - Acceptance passes through all 149 Task Surface, Transfer, screen, and real-PTY
   tests (including all 56 PTY cases), plus the complete CLI suite (63 files,
   641 tests). CLI typecheck and build also pass.
+
+### Inbox action hierarchy decision
+
+- Fresh 120x32 and 80x24 captures showed a coherent Message Stream and Selected
+  reader, but its only visible action was Mark read. A report that was ready for
+  review therefore ended in inbox administration rather than the work it named.
+- Selected now leads with `[ o ] Open Workspace` and keeps Enter's Mark
+  read/unread beside it as the secondary action. The route uses the entry's
+  existing `workspaceId` under the active AliceProject's verified client URL;
+  IDs are encoded before opening `/workspaces/:workspaceId`, while remote
+  tunnel identity in the client URL query or fragment remains intact.
+- Opening never marks a report read automatically. History polling, server-owned
+  read state, selection, ordering, and the no-delete boundary remain unchanged.
+  The Action Shelf uses the existing command-target parser, so keyboard and
+  mouse activate the same `o` route and expose the same hover treatment.
+- Real 120x32 and 80x24 captures verify both actions remain visible in one row,
+  with the Workspace action visually primary and the read-state action
+  secondary. Maintainer acceptance remains pending on the retained feature
+  branch.
+- Acceptance passes through all 143 Inbox, screen, and real-PTY tests
+  (including all 56 PTY cases), plus the complete CLI suite (63 files, 642
+  tests). CLI typecheck and build also pass.
 
 ## Completion Criteria
 

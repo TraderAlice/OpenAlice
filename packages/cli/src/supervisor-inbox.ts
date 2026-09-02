@@ -133,6 +133,15 @@ export function selectedSupervisorInboxEntry(
   return snapshot.entries[normalizeSupervisorInboxState(state, snapshot).selected] ?? null
 }
 
+export function supervisorInboxWorkspaceUrl(endpoint: string, workspaceId: string): string {
+  const url = new URL(endpoint)
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error('Inbox Workspace URL must use HTTP or HTTPS.')
+  }
+  url.pathname = `/workspaces/${encodeURIComponent(workspaceId)}`
+  return url.toString()
+}
+
 export function updateSupervisorInboxEntryRead(
   snapshot: SupervisorInboxSnapshot,
   id: string,
@@ -320,7 +329,7 @@ function inboxDetailRows(entry: SupervisorInboxEntry, width: number): string[] {
     if (docs.length > 5) rows.push(`… ${docs.length - 5} more`)
   }
   if (rows.at(-1) !== '') rows.push('')
-  rows.push(`◆ [ Enter ] ${entry.readAt ? 'Mark unread' : 'Mark read'}`)
+  rows.push(`◆ [ o ] Open Workspace  │  [ Enter ] ${entry.readAt ? 'Mark unread' : 'Mark read'}`)
   return rows.map((row) => truncateDisplayWidth(row, width))
 }
 

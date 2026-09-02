@@ -204,6 +204,7 @@ describe('Supervisor TUI screen', () => {
 
   it('turns a connected target into a bounded workbench with Inbox attention', () => {
     const toggled: string[] = []
+    const openedInbox: string[] = []
     let opens = 0
     const runtime = { class: 'running', endpoints: { web: 'http://127.0.0.1:2026' } }
     const screen = new SupervisorScreen({
@@ -231,6 +232,7 @@ describe('Supervisor TUI screen', () => {
     }, {
       motionEnabled: false,
       onToggleInboxRead: (entry) => toggled.push(entry.id),
+      onOpenInboxEntry: (entry) => openedInbox.push(entry.id),
       onOpenActiveTarget: () => { opens += 1 },
     })
 
@@ -245,11 +247,22 @@ describe('Supervisor TUI screen', () => {
     expect(screen.snapshot.panel).toBe('inbox')
     expect(opens).toBe(0)
 
-    const inbox = screen.render(100).join('\n')
+    const inboxLines = screen.render(100)
+    const inbox = inboxLines.join('\n')
     expect(inbox).toContain('Agent report ready.')
+    expect(inbox).toContain('[ o ] Open Workspace')
     expect(inbox).toContain('[ Enter ] Mark read')
     expect(renderSupervisorContextTip({ panel: 'inbox' }, 80))
+      .toContain('o opens its Workspace')
+    expect(renderSupervisorContextTip({ panel: 'inbox' }, 80))
       .toContain('Enter toggles read state')
+    expect(screen.handleKey('o', matchesKey)).toBe(true)
+    expect(openedInbox).toEqual(['hello'])
+    expect(opens).toBe(0)
+    const openRow = inboxLines.findIndex((line) => line.includes('[ o ] Open Workspace')) + 1
+    const openColumn = inboxLines[openRow - 1]!.indexOf('[ o ]') + 3
+    expect(screen.handlePointer(pointerClick(openColumn, openRow))).toBe(true)
+    expect(openedInbox).toEqual(['hello', 'hello'])
     expect(screen.handleKey('enter', matchesKey)).toBe(true)
     expect(toggled).toEqual(['hello'])
 

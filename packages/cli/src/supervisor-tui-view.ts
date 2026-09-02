@@ -700,7 +700,7 @@ export function renderSupervisorContextTip(
           : view.panel === 'help'
             ? '/ searches every available command without leaving this view.'
             : view.panel === 'inbox'
-              ? '↑↓ or wheel selects; Enter toggles read state; Home follows unread work.'
+              ? '↑↓ or wheel selects; o opens its Workspace; Enter toggles read state.'
               : view.runtimeState === 'absent'
                 ? 'Alternate route: s starts without opening Web; / reveals every command.'
                 : view.runtimeState === 'running' || view.runtimeState === 'owned_elsewhere'
