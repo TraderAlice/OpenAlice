@@ -80,14 +80,17 @@ describe('Supervisor TUI screen', () => {
     const plainLines = screen.render(140)
     const frame = plainLines.join('\n')
     expect(frame).toContain('◆ [Connect]·1')
-    expect(frame).toContain('OPENALICE LAUNCH · SELECT → START → CONNECT')
+    expect(frame).toContain('OPENALICE LAUNCH · READY → START → CONNECT')
     expect(frame).toContain('1 MACHINE ✓ This computer')
     expect(frame).toContain('2 ALICEPROJECT ✓ Default AliceProject')
     expect(frame).toContain('3 RUNTIME ○ READY TO START')
-    expect(frame).toContain('Launch Briefing · AliceProject')
-    expect(frame).toContain('◆ LAUNCH READY · This computer → Default AliceProject')
+    expect(frame).toContain('Launchpad · Default AliceProject')
+    expect(frame).toContain('◆ READY TO LAUNCH · READY TO START')
+    expect(frame).toContain('This computer → Default AliceProject')
     expect(frame).toContain('◆ [ Enter ] Start OpenAlice')
     expect(frame).toContain('[ Enter ] Start OpenAlice')
+    expect(frame).not.toContain('Machines · 1/1')
+    expect(frame).not.toContain('AliceProjects · This computer · 1/1')
     expect(frame).not.toContain('Inbox')
 
     const themed = decorateSupervisorFrame(
@@ -1206,6 +1209,11 @@ describe('Supervisor TUI screen', () => {
     const activeFleet = renderSupervisorContextTip({ panel: 'fleet', activeSelection: true }, 100)
     const switchFleet = renderSupervisorContextTip({ panel: 'fleet', switchSelection: true }, 100)
     const launcher = renderSupervisorContextTip({ panel: 'fleet', launcher: true }, 100)
+    const directLauncher = renderSupervisorContextTip({
+      panel: 'fleet',
+      launcher: true,
+      directLauncher: true,
+    }, 100)
     const logs = renderSupervisorContextTip({ panel: 'logs' }, 100)
     const emptyLogs = renderSupervisorContextTip({ panel: 'logs', itemCount: 0 }, 100)
     const doctor = renderSupervisorContextTip({ panel: 'doctor' }, 100)
@@ -1223,6 +1231,9 @@ describe('Supervisor TUI screen', () => {
     expect(launcher).toContain('↑↓ selects')
     expect(launcher).not.toContain('Enter runs Next')
     expect(launcher).toContain('Tab/←→ changes pane')
+    expect(directLauncher).toContain('Enter starts OpenAlice')
+    expect(directLauncher).toContain('brings you Home')
+    expect(directLauncher).not.toContain('changes pane')
     expect(logs).toContain('f filters; y copies')
     expect(emptyLogs).toContain('No Runtime events in this lens')
     expect(doctor).toContain('Doctor is read-only')

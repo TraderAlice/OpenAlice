@@ -7,6 +7,7 @@ import {
   supervisorScrollRailIndexAt,
   withSupervisorScrollRail,
 } from './supervisor-scroll-rail.ts'
+import { SUPERVISOR_BRAND_MARK_ROWS } from './supervisor-tui-theme.ts'
 
 export { displayWidth, truncateDisplayWidth } from './supervisor-display.ts'
 
@@ -349,6 +350,12 @@ export function renderSupervisorFleet(
     return renderEmergencyLaunchCard(state, width)
   }
   const launchRail = launcher ? [...renderLaunchSequence(state, width), ''] : []
+  if (launcher && supervisorFleetHasSingleLaunchTarget(state)) {
+    return [
+      ...launchRail,
+      ...renderDirectLaunchBoard(state, width, pulse),
+    ].map((line) => truncateDisplayWidth(line, width))
+  }
   if (fleetUsesNarrowLayout(width, launcher)) {
     return [...launchRail, ...renderNarrowFleet(
       state,
@@ -420,6 +427,110 @@ export function renderSupervisorFleet(
   return [...launchRail, ...lines].map((line) => truncateDisplayWidth(line, width))
 }
 
+export function supervisorFleetHasSingleLaunchTarget(state: SupervisorFleetState): boolean {
+  return state.machines.length === 1 && state.machines[0]?.projects.length === 1
+}
+
+function renderDirectLaunchBoard(
+  state: SupervisorFleetState,
+  width: number,
+  pulse: boolean,
+): string[] {
+  const machine = selectedFleetMachine(state)
+  const project = selectedFleetProject(state)
+  const intent = supervisorFleetLaunchIntent(state)
+  const route = `${machine?.displayName ?? 'No Machine'} → ${project?.displayName ?? 'No AliceProject'}`
+  const signal = intent.state === 'ready'
+    ? '◆ READY TO LAUNCH'
+    : intent.state === 'attention'
+      ? '! NEEDS ATTENTION'
+      : intent.state === 'blocked'
+        ? '× LAUNCH BLOCKED'
+        : '◇ CHOOSE A TARGET'
+  const action = `◆ [ ${intent.action.key} ] ${intent.action.label}`
+
+  if (width < 96) {
+    return renderPane(
+      `Launchpad · ${project?.displayName ?? 'AliceProject'}`,
+      [
+        `${signal} · ${route}`,
+        intent.summary,
+        `NEXT  ${compactLaunchConsequence(intent)}`,
+        action,
+      ],
+      width,
+      undefined,
+      false,
+      4,
+    )
+  }
+
+  const innerWidth = width - 4
+  const identityWidth = 28
+  const gap = 4
+  const taskWidth = Math.max(1, innerWidth - identityWidth - gap)
+  const markWidth = displayWidth(SUPERVISOR_BRAND_MARK_ROWS[0])
+  const markInset = ' '.repeat(Math.max(0, Math.floor((identityWidth - markWidth) / 2)))
+  const handoff = directLaunchHandoffRows(intent, taskWidth)
+  const identity = [
+    labelAndTail('ALICEPROJECT', project ? projectStatus(project, pulse) : '◇ missing', identityWidth),
+    '',
+    ...SUPERVISOR_BRAND_MARK_ROWS.map((row) => `${markInset}${row}`),
+    '',
+    `⌂ ${project?.displayName ?? 'No AliceProject'}`,
+    `⌁ ${machine?.displayName ?? 'No Machine'} · ${machine?.key === 'local' ? 'LOCAL' : 'SSH'}`,
+    launchRuntimeStep(
+      machine,
+      project,
+      Boolean(
+        machine
+        && (machine.connection === 'local' || machine.connection === 'online')
+        && project?.available,
+      ),
+    ),
+  ]
+  const task = [
+    `${signal} · ${intent.headline}`,
+    route,
+    intent.summary,
+    '',
+    'NEXT',
+    ...handoff,
+    '',
+    '',
+    action,
+  ]
+  const rowCount = Math.max(identity.length, task.length)
+  const body = Array.from({ length: rowCount }, (_, index) => joinColumns(
+    identity[index] ?? '',
+    task[index] ?? '',
+    identityWidth,
+    taskWidth,
+    gap,
+  ))
+  return renderPane(
+    `Launchpad · ${project?.displayName ?? 'AliceProject'}`,
+    body,
+    width,
+    undefined,
+    false,
+    rowCount,
+  )
+}
+
+function directLaunchHandoffRows(
+  intent: SupervisorFleetLaunchIntent,
+  width: number,
+): string[] {
+  const steps = intent.handoff.map((stage, index) => `${index + 1} ${stage}`)
+  const single = steps.join('  ━━━  ')
+  if (displayWidth(single) <= width) return [single]
+  return [
+    `${steps[0]}  ━━━  ${steps[1]}`,
+    steps[2] ?? '',
+  ].map((row) => truncateDisplayWidth(row, width))
+}
+
 function renderEmergencyLaunchCard(
   state: SupervisorFleetState,
   width: number,
@@ -464,7 +575,10 @@ function renderLaunchSequence(state: SupervisorFleetState, width: number): strin
       ? [machineStep, projectStep, runtimeStep]
       : compactLaunchSteps(machine, project, machineReady, projectReady), inner)]
     : [machineStep, projectStep, runtimeStep]
-  return renderPane('OPENALICE LAUNCH · SELECT → START → CONNECT', rows, width, undefined, false, rows.length)
+  const title = supervisorFleetHasSingleLaunchTarget(state)
+    ? 'OPENALICE LAUNCH · READY → START → CONNECT'
+    : 'OPENALICE LAUNCH · SELECT → START → CONNECT'
+  return renderPane(title, rows, width, undefined, false, rows.length)
 }
 
 function launchRuntimeStep(
@@ -578,6 +692,7 @@ export function supervisorFleetTargetAt(
   launcher = false,
 ): SupervisorFleetPointerTarget | undefined {
   if (launcher && visibleRows <= 0) return undefined
+  if (launcher && supervisorFleetHasSingleLaunchTarget(state)) return undefined
   const narrow = fleetUsesNarrowLayout(width, launcher)
   const rowCount = narrow
     ? SUPERVISOR_FLEET_MIN_VISIBLE_ROWS
@@ -637,6 +752,7 @@ export function supervisorFleetRailTargetAt(
   launcher = false,
 ): SupervisorFleetRailTarget | undefined {
   if (launcher && visibleRows <= 0) return undefined
+  if (launcher && supervisorFleetHasSingleLaunchTarget(state)) return undefined
   const narrow = fleetUsesNarrowLayout(width, launcher)
   const rowCount = narrow
     ? SUPERVISOR_FLEET_MIN_VISIBLE_ROWS

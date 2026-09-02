@@ -240,7 +240,7 @@ describe('Supervisor fleet state and presentation', () => {
       .not.toContain('Selection Constellation')
   })
 
-  it('turns disconnected detail into a task-first Launch Briefing', () => {
+  it('turns one disconnected target into a direct Launchpad', () => {
     const stoppedLocal = {
       ...machines()[0]!,
       projects: machines()[0]!.projects.map((entry) => ({
@@ -275,8 +275,10 @@ describe('Supervisor fleet state and presentation', () => {
       headline: 'READY TO START',
       action: { key: 'Enter', label: 'Start OpenAlice' },
     })
-    expect(output).toContain('Launch Briefing · AliceProject')
-    expect(output).toContain('◆ LAUNCH READY · This Mac → Default AliceProject')
+    expect(output).toContain('OPENALICE LAUNCH · READY → START → CONNECT')
+    expect(output).toContain('Launchpad · Default AliceProject')
+    expect(output).toContain('◆ READY TO LAUNCH · READY TO START')
+    expect(output).toContain('This Mac → Default AliceProject')
     expect(output).toContain('Start OpenAlice locally, verify readiness, and stay inside this terminal.')
     expect(output).toContain('1 Start Runtime')
     expect(output).toContain('2 Verify Web endpoint')
@@ -285,9 +287,13 @@ describe('Supervisor fleet state and presentation', () => {
     expect(output).not.toContain('Selection Constellation')
     expect(output).not.toContain('OWNER    ')
     expect(output).not.toContain('PORT  ')
-    expect(launcher).toHaveLength(23)
+    expect(output).not.toContain('Machines · 1/1')
+    expect(output).not.toContain('AliceProjects · This Mac · 1/1')
+    expect(launcher).toHaveLength(15)
     expect(launcher.at(-2)).toContain('◆ [ Enter ] Start OpenAlice')
     expect(launcher.every((line) => displayWidth(line) <= 120)).toBe(true)
+    expect(supervisorFleetTargetAt(state, 120, 10, 2, 15, true)).toBeUndefined()
+    expect(supervisorFleetRailTargetAt(state, 120, 118, 2, 15, true)).toBeUndefined()
 
     const compactLauncher = renderSupervisorFleet(
       state,
@@ -301,7 +307,8 @@ describe('Supervisor fleet state and presentation', () => {
     expect(compactLauncher).toContain('1 ✓ This Mac')
     expect(compactLauncher).toContain('2 ✓ Default AliceProject')
     expect(compactLauncher).toContain('3 ○ READY TO START')
-    expect(compactLauncher).toContain('◆ [ Enter ] Start OpenAlice · stay here through readiness')
+    expect(compactLauncher).toContain('NEXT  stay here through readiness')
+    expect(compactLauncher).toContain('◆ [ Enter ] Start OpenAlice')
     expect(compactLauncher).not.toContain('Start Runtime → Verify Web endpoint')
 
     const connectedManager = renderSupervisorFleet(state, 120, undefined, false, 15)
@@ -348,7 +355,8 @@ describe('Supervisor fleet state and presentation', () => {
       local, 80, undefined, false, 5, undefined, true,
     ).join('\n')
     expect(localOutput).toContain('3 ● READY TO USE')
-    expect(localOutput).toContain('◆ [ Enter ] Use AliceProject · enter connected Home')
+    expect(localOutput).toContain('NEXT  enter connected Home')
+    expect(localOutput).toContain('◆ [ Enter ] Use AliceProject')
 
     let remote = createSupervisorFleetState('2026-08-23T00:00:00Z', machines())
     remote = selectFleetIndex(remote, 'machines', 1)

@@ -89,6 +89,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
 
     const transcript = await new Promise<string>((resolve, reject) => {
       let output = ''
+      let hovered = false
       let started = false
       let sawFlight = false
       let reachedHome = false
@@ -99,9 +100,16 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       child.onData((data) => {
         output += data
         const plain = stripSgr(output)
-        if (!started && plain.includes('OPENALICE LAUNCH · SELECT → START → CONNECT')) {
+        if (
+          !hovered
+          && plain.includes('OPENALICE LAUNCH · READY → START → CONNECT')
+          && plain.includes('◆ [ Enter ] Start OpenAlice')
+        ) {
+          hovered = true
+          child.write('\u001b[<35;100;18M')
+        } else if (!started && plain.includes('› [ Enter ] Start OpenAlice')) {
           started = true
-          child.write('\r')
+          child.write('\u001b[<0;100;18M')
         }
         if (!sawFlight && plain.includes('Launch Flight Recorder · LOCAL START · IN FLIGHT')) {
           sawFlight = true
@@ -127,7 +135,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(plain).toContain('◆ 02  Prepare and start Runtime · IN FLIGHT')
     expect(plain).toContain('◇ 03  Bind local target · WAITING')
     expect(plain).toContain('◇ CONTROL  Keep this terminal open')
-    expect(plain).toContain('◇ HANDOFF · THIS TUI STAYS IN CONTROL')
+    expect(plain).toContain('NEXT')
+    expect(plain).toContain('› [ Enter ] Start OpenAlice')
     expect(plain).toContain('1 Start Runtime')
     expect(plain).toContain('2 Verify Web endpoint')
     expect(plain).toContain('3 Enter connected Home')
@@ -171,7 +180,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       child.onData((data) => {
         output += data
         const plain = stripSgr(output)
-        if (stage === 0 && plain.includes('OPENALICE LAUNCH · SELECT → START → CONNECT')) {
+        if (stage === 0 && plain.includes('OPENALICE LAUNCH · READY → START → CONNECT')) {
           stage = 1
           child.write('\r')
         } else if (stage === 1 && plain.includes('RECOVERABLE FAILURE')) {
@@ -179,7 +188,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           failureOffset = plain.lastIndexOf('Launch Flight Recorder')
           child.write('\u001b')
         } else if (stage === 2
-          && plain.slice(failureOffset).includes('OPENALICE LAUNCH · SELECT → START → CONNECT')) {
+          && plain.slice(failureOffset).includes('OPENALICE LAUNCH · READY → START → CONNECT')) {
           stage = 3
           child.write('q')
         }
@@ -246,12 +255,12 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
 
     const plain = stripSgr(transcript)
     expect(plain).toContain('◆ [Connect]·1')
-    expect(plain).toContain('OPENALICE LAUNCH · SELECT → START → CONNECT')
+    expect(plain).toContain('OPENALICE LAUNCH · READY → START → CONNECT')
     expect(plain).toContain('1 MACHINE ✓ This computer')
     expect(plain).toContain('2 ALICEPROJECT ✓ Default')
     expect(plain).toContain('[ Enter ] Start OpenAlice')
-    expect(plain).toContain('Launch Briefing · AliceProject')
-    expect(plain).toContain('◆ LAUNCH READY · This computer → Default')
+    expect(plain).toContain('Launchpad · Default')
+    expect(plain).toContain('◆ READY TO LAUNCH · READY TO START')
     expect(plain).toContain('1 Start Runtime')
     expect(plain).toContain('2 Verify Web endpoint')
     expect(plain).toContain('3 Enter connected Home')

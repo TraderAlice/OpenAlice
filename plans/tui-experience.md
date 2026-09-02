@@ -3651,8 +3651,9 @@ already large `supervisor-tui.ts` application controller.
   size; Up/Down, Tab/arrows, Enter, and the existing Fleet selection/launch
   state remain authoritative.
 - The fold is TUI-only and does not change inventory, discovery, Runtime,
-  lifecycle, SSH, or AliceProject contracts. At 60x20 and above the full Launch
-  Sequence, focused list, and Launch Briefing return unchanged.
+  lifecycle, SSH, or AliceProject contracts. At 60x20 the later single-target
+  Launchpad keeps Mission Header, Launch Sequence, direct action, Tip, and
+  Command Spine complete; multi-target inventory restores the full chooser.
 - Real 46x16 and 60x20 PTY captures verify both sides of the fold. A dedicated
   46x16 PTY journey hovers and clicks Start, reaches connected Home, and restores
   terminal modes. All 154 Fleet, screen, and PTY tests (including all 57 PTY
@@ -3680,6 +3681,35 @@ already large `supervisor-tui.ts` application controller.
   Mission Navigation, Now, the reset Home action, and Connection signal, then
   exits with terminal modes restored. The focused TUI closure passes 155 tests,
   the complete CLI suite passes 645 tests, and CLI typecheck/build passes.
+
+### Direct-target Launchpad decision
+
+- Fresh 120x48, 120x32, 80x24, and 60x20 Launcher captures showed the common
+  one-Machine/one-AliceProject state pretending to require selection. The ready
+  route appeared in the Launch Sequence, two mostly empty 1/1 inventory panes,
+  and Launch Briefing target/context rows before the primary action. At 60x20,
+  that redundant stack also displaced Mission Header, Navigation, and Tip.
+- When inventory has exactly one Machine with one AliceProject, Launcher now
+  progressively discloses a direct Launchpad instead of the chooser. Its rail
+  reads `READY → START → CONNECT`; wide terminals pair the ALICE identity with
+  route, human outcome, complete handoff, and action, while widths below 96 use
+  a four-row action card. Multiple Machines or Projects automatically restore
+  the existing two-pane selector and `SELECT` rail without new toggle state.
+- The direct card has no ghost Fleet pointer or scroll targets. Its sole action
+  remains owned by the shared launch intent and the complete painted row is
+  mouse-active, including the quiet region to the right of its label. The Tip
+  teaches Enter, readiness continuity, Home arrival, and command discovery;
+  selector movement guidance appears only when a selector exists.
+- This changes presentation only. Inventory, keyboard activation, local/remote
+  lifecycle, tunnel, readiness, Launch Flight Recorder, failure recovery, and
+  connected Connections management retain their existing owners. Real captures
+  verify the wide, ordinary, and 60x20 compositions; maintainer acceptance
+  remains pending on the retained feature branch.
+- A real 110x30 PTY journey now hovers the far-right quiet region of the wide
+  Start shelf, observes its hover state, clicks there, follows Launch Flight
+  Recorder into connected Home, and verifies terminal restoration. The focused
+  Fleet/screen/PTY closure passes 155 tests, the complete CLI suite passes 645
+  tests, and CLI typecheck/build passes.
 
 ### Content-sized Home Board correction
 

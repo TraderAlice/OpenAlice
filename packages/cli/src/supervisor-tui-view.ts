@@ -107,6 +107,7 @@ export interface SupervisorContextTipView {
   runtimeState?: string
   targetKind?: 'local' | 'ssh'
   launcher?: boolean
+  directLauncher?: boolean
   activeSelection?: boolean
   switchSelection?: boolean
   inputLocked?: boolean
@@ -789,7 +790,9 @@ export function renderSupervisorContextTip(
       ? 'Enter retries; Esc returns to targets; q detaches this TUI.'
     : view.panel === 'fleet'
       ? view.launcher
-        ? '↑↓ selects; Tab/←→ changes pane; click selection again to activate.'
+        ? view.directLauncher
+          ? 'Enter starts OpenAlice; this TUI verifies readiness and brings you Home. / shows commands.'
+          : '↑↓ selects; Tab/←→ changes pane; click selection again to activate.'
         : view.activeSelection
           ? '←→ changes pane; ↑↓ chooses; Enter returns Home from the active target.'
           : view.switchSelection
@@ -926,11 +929,18 @@ function embeddedSupervisorActionShelfTargets(
   if (panelEnd <= match.index) return []
   const content = line.slice(match.index, panelEnd).trimEnd()
   const offset = displayWidth(line.slice(0, match.index))
-  return supervisorActionShelfTargets(content, row).map((target) => ({
+  const targets = supervisorActionShelfTargets(content, row).map((target) => ({
     ...target,
     startColumn: target.startColumn + offset,
     endColumn: target.endColumn + offset,
   }))
+  if (targets.length === 1) {
+    targets[0] = {
+      ...targets[0]!,
+      endColumn: displayWidth(line.slice(0, panelEnd)),
+    }
+  }
+  return targets
 }
 
 function supervisorActionShelfTargets(

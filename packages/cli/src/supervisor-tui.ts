@@ -240,6 +240,7 @@ import {
   SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
   supervisorFleetLaunchIntent,
   supervisorFleetRailTargetAt,
+  supervisorFleetHasSingleLaunchTarget,
   supervisorFleetLauncherRows,
   supervisorFleetTargetAt,
   type SupervisorFleetRailTarget,
@@ -5082,6 +5083,10 @@ export class SupervisorScreen implements Component {
           runtimeState: state,
           targetKind: this.snapshot.activeTarget?.kind,
           launcher: this.snapshot.panel === 'fleet' && this.snapshot.activeTarget === null,
+          directLauncher: this.snapshot.panel === 'fleet'
+            && this.snapshot.activeTarget === null
+            && this.snapshot.fleet != null
+            && supervisorFleetHasSingleLaunchTarget(this.snapshot.fleet),
           activeSelection: this.snapshot.panel === 'fleet'
             && this.snapshot.activeTarget != null
             && this.snapshot.fleet?.focus === 'projects'

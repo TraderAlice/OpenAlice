@@ -135,21 +135,24 @@ intentionally parameter-free:
 
 - before connection, the default Connect page is an OpenAlice Launcher. Its
   explicit Machine → AliceProject → Runtime rail names all three selected
-  values and whether the Runtime is ready to browse, start, connect, or use.
-  Machine and AliceProject panes remain keyboard- and pointer-selectable; the
-  passive detail surface is a Launch Briefing rather than a pre-connection
-  telemetry dump. It names the selected route, explains the human outcome, and
-  previews the three-stage handoff into connected Home; wide terminals add
-  target context in a content-sized nine-row stage while ordinary and narrow
-  terminals retain the outcome and next command. Below 60 columns and 18 rows,
-  the Launcher uses one emergency target card rather than letting bottom
-  anchoring crop Machine context. It keeps the selected Machine, AliceProject,
-  Runtime readiness, and current Launch intent visible together; keyboard
-  selection still uses the existing Fleet state and the action remains
+  values and whether the Runtime is ready to browse, start, connect, or use. If
+  inventory resolves to exactly one Machine and one AliceProject, the Launcher
+  omits false 1/1 selection panes and becomes a direct Launchpad. Wide terminals
+  pair its Alice identity with route, outcome, three-stage handoff, and primary
+  action; ordinary and narrow terminals fold the same truth into a four-row
+  card. Its rail reads `READY → START → CONNECT`, and its Tip teaches Enter and
+  command discovery rather than pane movement. Multiple Machines or Projects
+  restore the keyboard- and pointer-selectable panes and `SELECT` rail, with a
+  Launch Briefing instead of a pre-connection telemetry dump. Below 60 columns
+  and 18 rows, the Launcher uses one emergency target card rather than letting
+  bottom anchoring crop Machine context. It keeps the selected Machine,
+  AliceProject, Runtime readiness, and current Launch intent visible together;
+  keyboard selection still uses the existing Fleet state and the action remains
   mouse-capable. The final command is a
   full-row primary Action Shelf such as `◆ [ Enter ] Start OpenAlice`, not a
   keycap buried in a prose Next sentence; its complete painted row is also its
-  pointer target. Surplus viewport height stays outside the Briefing so this
+  pointer target, including when embedded in the wide Launchpad's task column.
+  Surplus viewport height stays outside the launch board so this
   action remains visually adjacent to the contextual Tip. The Briefing and its
   content-owned action share one
   resolved intent,
