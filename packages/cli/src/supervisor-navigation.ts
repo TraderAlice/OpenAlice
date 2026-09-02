@@ -105,9 +105,14 @@ function renderFocusHeader(
       compact: 'TRANSFER',
       contract: '8-STAGE GUARDED MIGRATION',
     },
+    confirmation: {
+      title: 'DECISION GATE',
+      compact: 'CONFIRM',
+      contract: 'REVIEW IMPACT · CONFIRM OR CANCEL',
+    },
   }
   const current = definition[task]
-  const back = '[ Esc ] Back'
+  const back = task === 'confirmation' ? '[ Esc ] Cancel' : '[ Esc ] Back'
   const candidates = [
     `◆ FOCUS · ${task.toUpperCase()}  │  ${current.title}  │  ${current.contract}`,
     `◆ FOCUS · ${task.toUpperCase()}  │  ${current.title}`,

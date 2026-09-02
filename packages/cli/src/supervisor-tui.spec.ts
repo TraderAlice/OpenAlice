@@ -316,6 +316,17 @@ describe('Supervisor TUI screen', () => {
     expect(transferFocus).toContain('⌂ Default AliceProject  ›  ○ COLD  ›  ◆ TRANSFER')
     expect(transferFocus).not.toContain('◇ FLEET')
 
+    const confirmationFocus = renderSupervisorDock({
+      panel: 'overview',
+      focusTask: 'confirmation',
+      projectName: 'Default AliceProject',
+      runtimeState: 'absent',
+    }, 100)
+    expect(confirmationFocus).toContain('◆ DECISION GATE')
+    expect(confirmationFocus).toContain('◆ CONFIRMATION')
+    expect(confirmationFocus).not.toContain('[ Esc ] Cancel')
+    expect(confirmationFocus).not.toContain('[ / ] Commands')
+
     const compact = renderSupervisorDock({
       panel: 'logs',
       projectName: '研究 AliceProject with a very long name',
@@ -1512,10 +1523,18 @@ describe('Supervisor TUI screen', () => {
         endpoints: { web: 'http://127.0.0.1:47331' },
       },
     })
-    const frameBeforeConfirmation = screen.render(80)
     screen.handleKey('x', matchesKey)
-    expect(screen.render(80)).toHaveLength(frameBeforeConfirmation.length)
-    expect(screen.render(80).join('\n')).not.toContain('Confirm Stop')
+    const decisionFrame = screen.render(80)
+    const plainDecisionFrame = decisionFrame.join('\n').replace(/\u001b\[[0-9;]*m/gu, '')
+    expect(plainDecisionFrame).toContain('◆ FOCUS · CONFIRMATION')
+    expect(plainDecisionFrame).toContain('DECISION GATE')
+    expect(plainDecisionFrame).toContain('◇ BUILD vdev · DEV')
+    expect(plainDecisionFrame).toContain('◆ [ Enter ] Confirm')
+    expect(plainDecisionFrame).toContain('[ Esc ] Cancel')
+    expect(plainDecisionFrame).not.toContain('Launchpad')
+    expect(plainDecisionFrame).not.toContain('[ / ] Commands')
+    expect(plainDecisionFrame).not.toContain('[ p ] Setup')
+    expect(plainDecisionFrame).not.toContain('Confirm Stop')
     screen.handleKey('enter', matchesKey)
     expect(actions).toContain('stop')
 
@@ -1562,6 +1581,9 @@ describe('Supervisor TUI screen', () => {
     )
     expect(renderSupervisorFocusActionBar('transfer', 96)[0]).toContain(
       '◆ [ Enter ] Continue  │  [ ↑↓ ] Move choice',
+    )
+    expect(renderSupervisorFocusActionBar('confirmation', 96)[0]).toContain(
+      '◆ [ Enter ] Confirm  │  [ Esc ] Cancel',
     )
   })
 
@@ -2065,6 +2087,10 @@ describe('Supervisor TUI screen', () => {
     expect(actions).toEqual(['open', 'restart'])
     expect(screen.snapshot.confirmation).toBeUndefined()
     expect(confirmations).toEqual(['restart', undefined])
+
+    screen.update({ focusTask: 'release', confirmation: 'update' })
+    expect(screen.activeFocusTask()).toBe('confirmation')
+    expect(screen.render(100).join('\n')).toContain('DECISION GATE')
   })
 
   it('turns the degraded Launchpad promise into the existing Doctor action', () => {

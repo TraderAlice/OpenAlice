@@ -243,7 +243,7 @@ function decorateFocusHeader(
   theme: SupervisorTuiTheme,
   hoveredCommand?: string,
 ): string {
-  const pattern = /◆ FOCUS · [A-Z]+|\[ Esc \] Back|(?:SETUP STUDIO|SOURCE LAUNCH BAY|ALICEPROJECT SWITCHBOARD|RELEASE OBSERVATORY|TRANSFER FLIGHT DECK)|(?:INSPECT · EDIT · VALIDATE · SAVE|SELECT · VALIDATE · SAVE · LAUNCH|INSPECT · SELECT OR CREATE · REMEMBER|CHOOSE · PROBE · CONFIRM · INSTALL|8-STAGE GUARDED MIGRATION)/gu
+  const pattern = /◆ FOCUS · [A-Z]+|\[ Esc \] (?:Back|Cancel)|(?:SETUP STUDIO|SOURCE LAUNCH BAY|ALICEPROJECT SWITCHBOARD|RELEASE OBSERVATORY|TRANSFER FLIGHT DECK|DECISION GATE)|(?:INSPECT · EDIT · VALIDATE · SAVE|SELECT · VALIDATE · SAVE · LAUNCH|INSPECT · SELECT OR CREATE · REMEMBER|CHOOSE · PROBE · CONFIRM · INSTALL|8-STAGE GUARDED MIGRATION|REVIEW IMPACT · CONFIRM OR CANCEL)/gu
   let output = ''
   let cursor = 0
   for (const match of line.matchAll(pattern)) {
@@ -251,7 +251,7 @@ function decorateFocusHeader(
     const token = match[0]
     output += theme.navigationRail(line.slice(cursor, offset))
     if (token.startsWith('◆ FOCUS')) output += theme.selected(token)
-    else if (token === '[ Esc ] Back') {
+    else if (token === '[ Esc ] Back' || token === '[ Esc ] Cancel') {
       output += decorateDockKeyedToken(token, theme, theme.dockControl, hoveredCommand)
     } else if (token.includes(' · ') || token.startsWith('8-STAGE')) {
       output += theme.muted(token)
@@ -402,7 +402,7 @@ function decorateDock(
   theme: SupervisorTuiTheme,
   hoveredCommand?: string,
 ): string {
-  const tokenPattern = /\[ \/ \] (?:Commands|Close)|\[ q \] Detach|\[ Esc \] Back|\[ i \] .*?(?=  ›  )|⌂ .*?(?=  ›  )|◆ FOCUS WORKSPACE|! RECOVERY|(?:◉|●) (?:LIVE|EXTERNAL)|○ COLD|◆ (?:BLOCKED|DEGRADED)|◇ OFFLINE|◌ [A-Z][A-Z ]*?(?=  ›  | ─╯)|[◆◇≋✦?] (?:OVERVIEW|FLEET|LOGS|DOCTOR|HELP|SETUP|SOURCE|PROJECTS|RELEASE|TRANSFER)/gu
+  const tokenPattern = /\[ \/ \] (?:Commands|Close)|\[ q \] Detach|\[ Esc \] (?:Back|Cancel)|\[ i \] .*?(?=  ›  )|⌂ .*?(?=  ›  )|◆ (?:FOCUS WORKSPACE|DECISION GATE)|! RECOVERY|(?:◉|●) (?:LIVE|EXTERNAL)|○ COLD|◆ (?:BLOCKED|DEGRADED)|◇ OFFLINE|◌ [A-Z][A-Z ]*?(?=  ›  | ─╯)|[◆◇≋✦?] (?:OVERVIEW|FLEET|LOGS|DOCTOR|HELP|SETUP|SOURCE|PROJECTS|RELEASE|TRANSFER|CONFIRMATION)/gu
   let output = ''
   let cursor = 0
   for (const match of line.matchAll(tokenPattern)) {
@@ -427,7 +427,7 @@ function decorateDockToken(
   if (token.startsWith('[ i ]') || token.startsWith('⌂ ')) {
     return decorateDockKeyedToken(token, theme, theme.dockIdentity, hoveredCommand)
   }
-  if (token === '◆ FOCUS WORKSPACE' || /^[◆◇≋✦?] (?:OVERVIEW|FLEET|LOGS|DOCTOR|HELP|SETUP|SOURCE|PROJECTS|RELEASE|TRANSFER)$/u.test(token)) {
+  if (token === '◆ FOCUS WORKSPACE' || token === '◆ DECISION GATE' || /^[◆◇≋✦?] (?:OVERVIEW|FLEET|LOGS|DOCTOR|HELP|SETUP|SOURCE|PROJECTS|RELEASE|TRANSFER|CONFIRMATION)$/u.test(token)) {
     return theme.dockPanel(token)
   }
   if (token.startsWith('● ') || token.startsWith('◉ ')) return theme.dockSuccess(token)

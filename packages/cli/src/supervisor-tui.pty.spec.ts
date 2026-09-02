@@ -1254,7 +1254,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
 
-  it('keeps the application frame stable behind a focused confirmation modal', async () => {
+  it('gives a focused confirmation modal an isolated Decision Gate', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-confirmation-modal-'))
     temporaryPaths.push(isolatedHome)
     const child = pty.spawn(process.execPath, [confirmationFixtureEntry], {
@@ -1284,12 +1284,12 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         if (!requested && output.includes('[ / ] Commands') && output.includes('○ COLD')) {
           requested = true
           child.write('m')
-        } else if (!hoveredCancel && output.includes('Confirm Managed Source') && output.includes('[ Esc ] Not now')) {
+        } else if (!hoveredCancel && output.includes('Confirm Managed Source') && output.includes('◆ [ Enter ] Confirm')) {
           hoveredCancel = true
-          child.write('\u001b[<32;49;16M')
-        } else if (!clickedCancel && output.includes('│ › [ Esc ] Not now')) {
+          child.write('\u001b[<35;31;23M')
+        } else if (!clickedCancel && output.includes('│ › [ Esc ] Cancel')) {
           clickedCancel = true
-          child.write('\u001b[<0;49;16M')
+          child.write('\u001b[<0;31;23M')
         } else if (!cancelled && output.includes('STATUS   Action cancelled.')) {
           cancelled = true
           child.write('q')
@@ -1307,8 +1307,12 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('IMPACT')
     expect(transcript).toContain('[ Enter ] Prepare source')
     expect(transcript).toContain('[ Esc ] Not now')
-    expect(transcript).toContain('│ › [ Esc ] Not now')
-    expect(transcript).toContain('[ / ] Commands')
+    expect(transcript).toContain('│ › [ Esc ] Cancel')
+    expect(transcript).toContain('◆ FOCUS · CONFIRMATION')
+    expect(transcript).toContain('DECISION GATE')
+    expect(transcript).toContain('◇ BUILD')
+    expect(transcript).toContain('◆ [ Enter ] Confirm')
+    expect(transcript).toContain('[ Esc ] Cancel')
     expect(transcript).toContain('STATUS   Action cancelled.')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')

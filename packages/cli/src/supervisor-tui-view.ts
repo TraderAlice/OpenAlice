@@ -502,7 +502,13 @@ export function renderSupervisorFocusActionBar(
   task: SupervisorFocusTask,
   width: number,
 ): string[] {
-  const labels: Record<SupervisorFocusTask, readonly [string, string, string]> = {
+  if (task === 'confirmation') {
+    return renderSupervisorCommandBar([
+      { key: 'Enter', label: 'Confirm', primary: true },
+      { key: 'Esc', label: 'Cancel' },
+    ], width)
+  }
+  const labels: Record<Exclude<SupervisorFocusTask, 'confirmation'>, readonly [string, string, string]> = {
     setup: ['Edit / apply', 'Move field', 'Step back'],
     source: ['Validate / continue', 'Move cursor', 'Step back'],
     projects: ['Choose', 'Move project', 'Step back'],
@@ -558,7 +564,9 @@ export function renderSupervisorDock(
 ): string {
   const breadcrumb = '  ›  '
   const controls = view.focusTask
-    ? `◆ FOCUS WORKSPACE${breadcrumb}[ Esc ] Back`
+    ? view.focusTask === 'confirmation'
+      ? '◆ DECISION GATE'
+      : `◆ FOCUS WORKSPACE${breadcrumb}[ Esc ] Back`
     : view.commandPaletteOpen
       ? `[ / ] Close${breadcrumb}[ q ] Detach`
       : `[ / ] Commands${breadcrumb}[ q ] Detach`
@@ -930,6 +938,7 @@ function panelBadge(panel: string): string {
   if (panel === 'PROJECTS') return '◆ PROJECTS'
   if (panel === 'RELEASE') return '◆ RELEASE'
   if (panel === 'TRANSFER') return '◆ TRANSFER'
+  if (panel === 'CONFIRMATION') return '◆ CONFIRMATION'
   return panel
 }
 

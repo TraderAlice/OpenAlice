@@ -587,7 +587,7 @@ export async function runSupervisorTui(
     hoverCommand?: (label?: string) => void,
   ) => {
     const terminal = terminalSize()
-    const focusTask = screen.snapshot.focusTask
+    const focusTask = screen.activeFocusTask()
     const focusConsole = focusTask
       ? renderSupervisorControlConsole(
           '',
@@ -608,7 +608,7 @@ export async function runSupervisorTui(
           focusTask,
         }, Math.max(1, terminal.width - 4)).line
       : ''
-    const focusBack = '[ Esc ] Back'
+    const focusBack = focusTask === 'confirmation' ? '[ Esc ] Cancel' : '[ Esc ] Back'
     const focusBackOffset = focusHeader.indexOf(focusBack)
     const headerCommands: SupervisorCommandTarget[] = focusBackOffset >= 0
       ? [{
@@ -3166,6 +3166,10 @@ export class SupervisorScreen implements Component {
     this.onDetach = handler
   }
 
+  activeFocusTask(): SupervisorFocusTask | undefined {
+    return this.snapshot.confirmation ? 'confirmation' : this.snapshot.focusTask
+  }
+
   bootSequenceActive(): boolean {
     return this.bootFrame !== undefined
   }
@@ -3970,12 +3974,13 @@ export class SupervisorScreen implements Component {
     }
     const runtime = this.snapshot.runtime
     const state = runtime?.class ?? 'unavailable'
+    const focusTask = this.activeFocusTask()
     const updateBadge = this.snapshot.update?.status === 'available'
       ? ` · update ${formatUpdateCandidate(this.snapshot.update)}`
       : ''
     const navigation = renderSupervisorNavigation({
       selected: this.snapshot.panel ?? 'overview',
-      focusTask: this.snapshot.focusTask,
+      focusTask,
       recovery: isConfigRecovery(this.snapshot),
       machineCount: this.snapshot.fleet?.machines.length,
       logCount: this.snapshot.logs?.entries?.length,
@@ -4006,7 +4011,7 @@ export class SupervisorScreen implements Component {
       this.snapshot.channel,
       width,
       updateBadge,
-      !this.snapshot.focusTask,
+      !focusTask,
     )
     this.headerReleaseTarget = header.releaseTarget
     const lines = [
@@ -4031,7 +4036,10 @@ export class SupervisorScreen implements Component {
             - WIDE_OPERATIONAL_CANVAS_RESERVED_CHROME_HEIGHT,
         )
       : undefined
-    if (this.snapshot.panel === 'fleet' && this.snapshot.fleet) {
+    if (focusTask === 'confirmation') {
+      // The centered Decision Gate owns this field. Leaving it empty prevents
+      // clipped page copy and inactive controls from reading as modal context.
+    } else if (this.snapshot.panel === 'fleet' && this.snapshot.fleet) {
       this.fleetVisibleRows = width >= 72 && Number.isFinite(viewportHeight)
         ? Math.max(
             SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
@@ -4166,8 +4174,8 @@ export class SupervisorScreen implements Component {
       ...(hoverPreview ? { preview: sanitize(hoverPreview) } : {}),
     }, width, this.motionFrame, this.motionEnabled)
     const actionWidth = Math.max(1, width - 4)
-    const actionShelf = this.snapshot.focusTask
-      ? renderSupervisorFocusActionBar(this.snapshot.focusTask, actionWidth)
+    const actionShelf = focusTask
+      ? renderSupervisorFocusActionBar(focusTask, actionWidth)
       : this.snapshot.panel === 'fleet' && this.snapshot.fleet
         ? fleetActionBar(
           this.snapshot.fleet,
@@ -4207,7 +4215,7 @@ export class SupervisorScreen implements Component {
       actionShelf,
       renderSupervisorDock({
         panel: this.snapshot.panel ?? 'overview',
-        focusTask: this.snapshot.focusTask,
+        focusTask,
         projectName: this.snapshot.context?.aliceProject.displayName,
         runtimeState: state,
         pulse: this.runtimePulse,
@@ -4220,11 +4228,13 @@ export class SupervisorScreen implements Component {
       lines,
       controlConsole,
       viewportHeight ?? lines.length + controlConsole.length,
-      [renderSupervisorContextTip({
-        panel: this.snapshot.panel ?? 'overview',
-        runtimeState: state,
-        recovery: isConfigRecovery(this.snapshot),
-      }, width)],
+      focusTask === 'confirmation'
+        ? []
+        : [renderSupervisorContextTip({
+            panel: this.snapshot.panel ?? 'overview',
+            runtimeState: state,
+            recovery: isConfigRecovery(this.snapshot),
+          }, width)],
     ).map((line) => truncate(line, width))
     this.commandTargets = supervisorCommandTargets(visibleLines)
     if (this.focusConsoleHoveredCommand) {

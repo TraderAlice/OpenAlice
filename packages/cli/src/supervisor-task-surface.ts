@@ -3,7 +3,7 @@ import type { SupervisorOverlayOptions } from './supervisor-overlay-pointer.ts'
 import type { SupervisorTuiTheme } from './supervisor-tui-theme.ts'
 
 export type SupervisorTaskSurfaceTask = 'setup' | 'source' | 'projects' | 'release'
-export type SupervisorFocusTask = SupervisorTaskSurfaceTask | 'transfer'
+export type SupervisorFocusTask = SupervisorTaskSurfaceTask | 'transfer' | 'confirmation'
 
 export interface SupervisorTaskSurfaceSize {
   width: number

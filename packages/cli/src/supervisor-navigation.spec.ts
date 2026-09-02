@@ -63,6 +63,16 @@ describe('Supervisor navigation rail', () => {
     expect(compact.line).not.toContain('Fleet')
     expect(compact.targets).toEqual([])
     expect(displayWidth(compact.line)).toBe(46)
+
+    const confirmation = renderSupervisorNavigation({
+      selected: 'overview',
+      focusTask: 'confirmation',
+    }, 96)
+    expect(confirmation.line).toContain('◆ FOCUS · CONFIRMATION')
+    expect(confirmation.line).toContain('DECISION GATE')
+    expect(confirmation.line).toContain('REVIEW IMPACT · CONFIRM OR CANCEL')
+    expect(confirmation.line).toContain('[ Esc ] Cancel')
+    expect(confirmation.targets).toEqual([])
   })
 
   it('derives badge-edge pointer hits from the rendered layout', () => {

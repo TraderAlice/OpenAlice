@@ -351,12 +351,17 @@ intentionally parameter-free:
   review, failure, and completion phases; the pointer router derives the
   overlay origin from the same terminal dimensions, anchor, margin, and
   rendered height used by the TUI compositor.
-  Lifecycle, managed-source, and update confirmations are focused centered
-  compositor modals over an unchanged application frame. Each modal separates
-  the question from an explicit Impact section, exposes distinct Enter/Esc
-  Action Shelf segments, and routes complete-segment pointer hover/click through
-  the same confirmation state machine. Acceptance closes the modal before work appears in the fixed
-  activity slot; cancellation changes no Runtime or configuration state.
+  Lifecycle, managed-source, and update confirmations enter a focused Decision
+  Gate. The bounded card remains centered, but the operational field behind it
+  is cleared so clipped page copy and inactive controls cannot read as modal
+  context. Mission Header navigation becomes
+  `FOCUS · CONFIRMATION / DECISION GATE`, release provenance becomes read-only
+  `BUILD`, and the bottom Console exposes only Confirm and Cancel. Each modal
+  separates the question from an explicit Impact section and routes its own plus
+  the Console's complete-segment pointer hover/click through the same
+  confirmation state machine. Acceptance closes the gate before work appears in
+  the fixed activity slot; cancellation restores the exact previous page and
+  changes no Runtime or configuration state.
   Existing validation and hardware-cursor contracts remain unchanged;
 - registered Machines refresh in the background with one bounded,
   non-interactive (`BatchMode=yes`) SSH inventory request each. Registered,

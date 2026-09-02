@@ -1091,19 +1091,21 @@ not imply maintainer approval of the finished interaction.
 
 ### Confirmation-modal decision
 
-- Keeping confirmation cards inline preserves the original implementation but
-  changes the main frame height, moves controls, and makes impact copy compete
-  with the operational page it is protecting.
-- Replacing confirmation with a transient toast would keep layout stable but
-  weaken explicit consent and make keyboard focus ambiguous for destructive
-  Runtime actions.
-- The selected model follows OMP's stable dialog composition: lifecycle,
-  managed-source, and update confirmation is a centered compositor overlay over
-  an unchanged application frame. The modal owns a bounded width, explicit
-  Impact section, primary Enter action, secondary Esc action, pointer hover and
-  click, while forwarding acceptance into the existing confirmation state
-  machine. Acceptance closes the modal before the fixed activity slot reports
-  work; cancellation changes no Runtime or configuration state.
+- Keeping the centered card over an unchanged application frame preserves
+  geometry, but a live 120x32 capture showed chopped Launchpad text beside the
+  card and still-bright Commands, Setup, and Source controls that no longer own
+  input.
+- Dimming that frame would reduce contrast but preserve both the fragmented
+  background copy and the false control inventory.
+- The selected model follows the focus ownership observed in OMP v17.3.4's live
+  Models surface: the bounded confirmation card remains centered, while a
+  `DECISION GATE` clears the operational field and replaces navigation and the
+  bottom console with confirmation-specific identity, Confirm, and Cancel.
+  Version/update provenance stays visible but read-only. Enter/Esc and complete
+  pointer segments still feed the one existing confirmation state machine;
+  acceptance closes the gate before work feedback appears, and cancellation
+  restores the exact previous page without mutation. This is an autonomous
+  topic refinement, not a recorded maintainer approval.
 
 ## Responsive and Accessibility Contract
 
@@ -2371,6 +2373,24 @@ already large `supervisor-tui.ts` application controller.
   passed, 10 skipped). Docker installer smoke passes without Node, npm, pnpm,
   Bun, or an Agent Runtime, and package dry-run now proves the new clipboard
   owner is present in the published CLI tarball.
+- A live OMP v17.3.4 Models surface and OpenAlice 120x32 confirmation comparison
+  exposed the next modal seam: OMP lets its focused surface own the operational
+  field, while OpenAlice left chopped Launchpad copy and bright but inert page
+  controls around the centered card. Confirmation now enters a Decision Gate:
+  the card stays bounded and centered, the field clears, Header navigation and
+  release affordances become confirmation identity plus read-only BUILD, and
+  the grounded Console advertises only Confirm and Cancel. Confirmation takes
+  priority over any existing Focus task and cancellation restores that task or
+  page unchanged.
+- Decision-Gate acceptance passes with 125 focused navigation, task-surface,
+  overlay-pointer, screen, and real-PTY tests. Truecolor 120x32 and 80x24 frames
+  contain no underlying Launchpad/Fleet copy or page commands; the 80x24 PTY
+  hovered and clicked the complete bottom Cancel segment, closed the managed-
+  source card through the existing confirmation state machine, restored the
+  prior Overview, and restored terminal modes on detach. Root TypeScript and
+  CLI build pass; the 702-file suite passes (701 passed, 1 skipped; 6,207 tests
+  passed, 10 skipped). Docker installer smoke passes without Node, npm, pnpm,
+  Bun, or an Agent Runtime, and package dry-run retains every changed TUI owner.
 
 ## Completion Criteria
 
