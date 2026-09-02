@@ -139,6 +139,40 @@ describe('Supervisor fleet state and presentation', () => {
     expect(supervisorFleetTargetAt(state, 46, 8, 7, 8)).toBeUndefined()
   })
 
+  it('turns sparse wide surplus into a passive Selection Constellation', () => {
+    const state = createSupervisorFleetState(
+      '2026-08-23T00:00:00Z',
+      [machines()[0]!],
+      'default',
+    )
+    const expanded = renderSupervisorFleet(state, 120, undefined, false, 15)
+    const output = expanded.join('\n')
+
+    expect(expanded).toHaveLength(22)
+    expect(output).toContain('Selection Constellation · AliceProject')
+    expect(output).toContain('◇ CONTROL ROUTE')
+    expect(output).toContain('● This Mac')
+    expect(output).toContain('● running Default AliceProject')
+    expect(output).toContain('↗ WEB  http://127.0.0.1:47331')
+    expect(output).toContain('PRODUCT  TraderAlice')
+    expect(output).toContain('PORT  47331 · AUTO')
+    expect(output).toContain('OWNER    cli-server')
+    expect(output).toContain('UPTIME  12s')
+    expect(output).toContain('SERVICES Alice ready')
+    expect(output).toContain('CAPS     inspect · lifecycle · tunnel')
+    expect(expanded.every((line) => displayWidth(line) <= 120)).toBe(true)
+    expect(supervisorFleetTargetAt(state, 120, 40, 14, 15)).toBeUndefined()
+
+    expect(renderSupervisorFleet(state, 120, undefined, false, 11).join('\n'))
+      .not.toContain('Selection Constellation')
+    expect(renderSupervisorFleet(state, 120, undefined, false, 12).join('\n'))
+      .toContain('Selection Constellation')
+    expect(renderSupervisorFleet(state, 100, undefined, false, 12).join('\n'))
+      .toContain('Selection Constellation')
+    expect(renderSupervisorFleet(state, 99, undefined, false, 15).join('\n'))
+      .not.toContain('Selection Constellation')
+  })
+
   it('maps pointer rows to visible Machine and AliceProject selections', () => {
     let state = createSupervisorFleetState('2026-08-23T00:00:00Z', machines())
     expect(supervisorFleetTargetAt(state, 80, 4, 3)).toEqual({

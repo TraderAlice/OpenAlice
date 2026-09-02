@@ -653,6 +653,23 @@ not imply maintainer approval of the finished interaction.
   in the elastic stage. This is an autonomous topic decision, not recorded
   maintainer approval.
 
+### Sparse Fleet Selection Constellation decision
+
+- Extending the Machine and AliceProject panes to the bottom would create
+  blank focus-only rows that look selectable but contain no additional
+  inventory.
+- An ambient constellation could own the empty viewport visually, but would
+  imply Fleet telemetry without helping the user understand the selected
+  Machine or AliceProject.
+- The selected model spends wide-screen surplus on a passive Selection
+  Constellation only when at least nine complete detail rows fit. It visualizes
+  the real Machine to AliceProject to Runtime/Web route and expands the existing
+  product, port, owner, uptime, services, capability, and refresh facts. Dense
+  inventory still receives rows before detail, detail never publishes a
+  pointer target, and ordinary 80x24, narrow, or constrained terminals retain
+  the two-row Selection inspector. This is an autonomous topic decision, not
+  recorded maintainer approval.
+
 ### Operational Canvas decision
 
 - Stretching every Supervisor page to the viewport would produce one uniform
@@ -1092,6 +1109,8 @@ already large `supervisor-tui.ts` application controller.
   Path and passive Service Array without changing compact terminal behavior.
 - [x] Replace wide Help's one-category inspector with an all-system Control
   Atlas Board while preserving compact and Recovery behavior.
+- [x] Turn sparse wide Fleet surplus into a truthful passive Selection
+  Constellation without creating fake inventory or action targets.
 - [x] Keep the visible Command Spine mouse-capable while the Command Dock owns
   overlay input, without enabling click-through for any other modal surface.
 - [x] Let the wide Overview absorb a bounded share of surplus terminal height
@@ -2100,6 +2119,27 @@ already large `supervisor-tui.ts` application controller.
   700-file suite passes (699 passed, 1 skipped; 6,194 tests passed, 10 skipped).
   Docker installer smoke passes without Node, npm, pnpm, Bun, or an Agent
   Runtime, and package dry-run contains both changed Supervisor sources.
+- A live 120x32 comparison confirmed that the Command Dock already carries the
+  useful OMP composer properties—inline query, immediate suggestions, status
+  metadata, and preserved page context—while sparse Fleet remained the larger
+  old-dashboard break. With one Machine and one AliceProject, its two five-row
+  panes plus two-line Selection abandoned ten usable rows. Wide Fleet now
+  spends that remaining budget on a Selection Constellation after real
+  inventory receives priority. The Constellation renders the selected
+  Machine → AliceProject → Runtime/Web signal path and reported product, port,
+  owner, uptime, services, capabilities, default, and refresh facts; compact
+  Selection remains unchanged below the complete nine-detail-row threshold.
+- Selection-Constellation acceptance passes with 118 focused Fleet, screen,
+  and real-PTY tests. The truecolor 120x32 running fixture filled the former
+  gap while preserving both inventory panes, Context Tip, and bottom Control
+  Console. A raw SGR hover/click inside the Constellation invoked no start,
+  open, log, or Doctor action and detach restored terminal modes. Unit coverage
+  proves the 11/12 requested-row and 99/100-column boundaries, exact reported
+  facts, display-width containment, and absence of Fleet pointer geometry in
+  the detail region. CLI build and root TypeScript pass; the 700-file suite
+  passes (699 passed, 1 skipped; 6,196 tests passed, 10 skipped). Docker
+  installer smoke passes without Node, npm, pnpm, Bun, or an Agent Runtime, and
+  package dry-run contains the changed Fleet renderer.
 
 ## Completion Criteria
 

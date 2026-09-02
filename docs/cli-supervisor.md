@@ -218,6 +218,12 @@ intentionally parameter-free:
   scroll rails, and pointer row mapping consume the same final count, so a tall
   terminal reveals more real rows before it asks the user to scroll; narrow
   drill-down and constrained terminals keep the five-row contract.
+  When wide Fleet still has at least nine complete detail rows after revealing
+  all available inventory, Selection becomes a passive Constellation instead
+  of leaving that surplus unowned. It visualizes the selected
+  Machine → AliceProject → Runtime/Web route and expands only reported product,
+  port, owner, uptime, service, capability, and refresh facts. The Constellation
+  has no pointer target or lifecycle action; compact Selection remains two rows.
   With only the local Machine, Fleet focus starts on its current AliceProject;
 - the footer is a contextual Action Shelf, not a complete shortcut legend. It
   exposes a few relevant actions as chips on one full-width surface. On

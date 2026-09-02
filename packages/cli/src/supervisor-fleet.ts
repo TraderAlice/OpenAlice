@@ -251,7 +251,8 @@ export function renderSupervisorFleet(
       gap,
     ))
   }
-  lines.push('', ...renderDetailCard(state, width, pulse))
+  const detailRows = fleetDetailRows(width, visibleRows, rowCount)
+  lines.push('', ...renderDetailCard(state, width, pulse, detailRows))
   return lines.map((line) => truncateDisplayWidth(line, width))
 }
 
@@ -461,26 +462,192 @@ function renderProjectRows(
   })
 }
 
-function fleetSelectionDetail(state: SupervisorFleetState, pulse = false): string[] {
+function fleetSelectionDetail(
+  state: SupervisorFleetState,
+  pulse = false,
+  width = 76,
+  expanded = false,
+): string[] {
   const machine = selectedFleetMachine(state)
   const project = selectedFleetProject(state)
   if (!machine) return ['No Machine selected.']
   if (state.focus === 'machines' || !project) {
     const target = machine.sshTarget ? ` · ${machine.sshTarget}` : ''
-    return [
+    const rows = [
       `${machineGlyph(machine)} ${machine.displayName} · ${machineStatus(machine)}${target}`,
       `${machine.platform ?? 'unknown'} / ${machine.arch ?? 'unknown'} · ${machine.projects.length} AliceProjects · checked ${formatChecked(state.generatedAt)}`,
     ]
+    return expanded ? [...rows, ...expandedMachineDetail(machine, state, width)] : rows
   }
   const tunnel = state.tunnels[fleetTunnelKey(machine.key, project.key)]
-  return [
+  const rows = [
     `${projectStatus(project, pulse)} ${project.displayName} · ${project.product === 'nano' ? 'NanoAlice' : 'TraderAlice'} · ${project.runtime.ownerSurface ?? 'no owner'}`,
     [project.home, tunnel ? `tunnel ${tunnel}` : ''].filter(Boolean).join(' · '),
   ]
+  return expanded
+    ? [...rows, ...expandedProjectDetail(machine, project, state, width, pulse)]
+    : rows
 }
 
-function renderDetailCard(state: SupervisorFleetState, width: number, pulse = false): string[] {
-  return renderPane('Selection', fleetSelectionDetail(state, pulse), width, undefined, false, 2)
+function renderDetailCard(
+  state: SupervisorFleetState,
+  width: number,
+  pulse = false,
+  rowCount = 2,
+): string[] {
+  const expanded = rowCount > 2
+  const title = expanded
+    ? `Selection Constellation · ${state.focus === 'machines' ? 'Machine' : 'AliceProject'}`
+    : 'Selection'
+  return renderPane(
+    title,
+    fleetSelectionDetail(state, pulse, width - 4, expanded),
+    width,
+    undefined,
+    false,
+    rowCount,
+  )
+}
+
+function expandedProjectDetail(
+  machine: MachineInventory,
+  project: MachineProjectInventory,
+  state: SupervisorFleetState,
+  width: number,
+  pulse: boolean,
+): string[] {
+  const runtimeActive = project.runtime.class === 'running'
+    || project.runtime.class === 'owned_elsewhere'
+  const web = project.runtime.webEndpoint
+    ? `↗ WEB  ${project.runtime.webEndpoint}`
+    : '◇ WEB  Not advertised by Runtime'
+  return [
+    '',
+    '◇ CONTROL ROUTE',
+    fleetRoute(
+      `${machineGlyph(machine)} ${machine.displayName}`,
+      `${projectStatus(project, pulse)} ${project.displayName}`,
+      width,
+      runtimeActive,
+      pulse,
+    ),
+    `  ╰━━${fleetSignalTrack(7, runtimeActive, !pulse)} ${truncateDisplayWidth(web, Math.max(1, width - 8))}`,
+    '',
+    labelAndTail(
+      `PRODUCT  ${project.product === 'nano' ? 'NanoAlice' : 'TraderAlice'}`,
+      `PORT  ${project.port}${project.portAutomatic ? ' · AUTO' : ' · FIXED'}`,
+      width,
+    ),
+    labelAndTail(
+      `OWNER    ${project.runtime.ownerSurface ?? 'none'}`,
+      `UPTIME  ${formatFleetDuration(project.runtime.uptimeSeconds)}`,
+      width,
+    ),
+    labelAndTail(
+      `SERVICES ${formatProjectComponents(project)}`,
+      project.isDefault ? 'DEFAULT  YES' : 'DEFAULT  NO',
+      width,
+    ),
+    labelAndTail(
+      `CAPS     ${formatMachineCapabilities(machine)}`,
+      `CHECKED  ${formatChecked(state.generatedAt)}`,
+      width,
+    ),
+  ]
+}
+
+function expandedMachineDetail(
+  machine: MachineInventory,
+  state: SupervisorFleetState,
+  width: number,
+): string[] {
+  const target = machine.connection === 'local'
+    ? 'local control plane'
+    : machine.sshTarget ?? 'SSH target unavailable'
+  return [
+    '',
+    '◇ MACHINE ROUTE',
+    fleetRoute(
+      `${machineGlyph(machine)} ${machine.displayName}`,
+      `${machine.projects.length} ALICEPROJECT${machine.projects.length === 1 ? '' : 'S'}`,
+      width,
+      machine.connection === 'local' || machine.connection === 'online',
+      false,
+    ),
+    `  TARGET   ${truncateDisplayWidth(target, Math.max(1, width - 11))}`,
+    '',
+    labelAndTail(
+      `HOST     ${machine.hostname ?? 'unknown'}`,
+      `CLI  ${machine.cliVersion ?? 'unknown'}`,
+      width,
+    ),
+    labelAndTail(
+      `PLATFORM ${machine.platform ?? 'unknown'} / ${machine.arch ?? 'unknown'}`,
+      `DEFAULT  ${machine.defaultProject ?? 'none'}`,
+      width,
+    ),
+    labelAndTail(
+      `CAPS     ${formatMachineCapabilities(machine)}`,
+      `CHECKED  ${formatChecked(state.generatedAt)}`,
+      width,
+    ),
+  ]
+}
+
+function fleetRoute(
+  from: string,
+  to: string,
+  width: number,
+  active: boolean,
+  pulse: boolean,
+): string {
+  const safeFrom = truncateDisplayWidth(from, Math.max(1, Math.floor(width * 0.3)))
+  const safeTo = truncateDisplayWidth(to, Math.max(1, Math.floor(width * 0.4)))
+  const trackWidth = Math.max(5, width - displayWidth(safeFrom) - displayWidth(safeTo) - 2)
+  return truncateDisplayWidth(
+    `${safeFrom} ${fleetSignalTrack(trackWidth, active, pulse)} ${safeTo}`,
+    width,
+  )
+}
+
+function fleetSignalTrack(width: number, active: boolean, pulse: boolean): string {
+  const track = Array.from({ length: Math.max(3, width) }, () => '━')
+  const packet = Math.floor(track.length * (pulse ? 0.7 : 0.3))
+  track[Math.min(track.length - 2, Math.max(1, packet))] = active ? '◆' : '·'
+  return track.join('')
+}
+
+function formatProjectComponents(project: MachineProjectInventory): string {
+  const components = Object.entries(project.runtime.components)
+  if (components.length === 0) return 'not reported'
+  return components.map(([name, status]) => (
+    `${name.charAt(0).toUpperCase()}${name.slice(1)} ${status}`
+  )).join(' · ')
+}
+
+function formatMachineCapabilities(machine: MachineInventory): string {
+  const labels: Array<[keyof MachineInventory['capabilities'], string]> = [
+    ['inspect', 'inspect'],
+    ['lifecycle', 'lifecycle'],
+    ['openTunnel', 'tunnel'],
+    ['transferReceive', 'receive'],
+    ['credentialReseal', 'reseal'],
+  ]
+  const enabled = labels.filter(([key]) => machine.capabilities[key]).map(([, label]) => label)
+  return enabled.length > 0 ? enabled.join(' · ') : 'none reported'
+}
+
+function formatFleetDuration(seconds: number | null): string {
+  if (seconds === null || !Number.isFinite(seconds)) return 'not reported'
+  if (seconds < 60) return `${Math.max(0, Math.floor(seconds))}s`
+  if (seconds < 3_600) return `${Math.floor(seconds / 60)}m`
+  return `${Math.floor(seconds / 3_600)}h ${Math.floor((seconds % 3_600) / 60)}m`
+}
+
+function fleetDetailRows(width: number, requestedRows: number, inventoryRows: number): number {
+  if (width < 100 || !Number.isFinite(requestedRows)) return 2
+  const available = 2 + Math.max(0, Math.floor(requestedRows) - inventoryRows)
+  return available >= 9 ? Math.min(12, available) : 2
 }
 
 function renderPane(

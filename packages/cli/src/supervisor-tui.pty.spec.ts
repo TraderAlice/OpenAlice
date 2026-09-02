@@ -1621,6 +1621,60 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
 
+  it('keeps the wide Fleet Selection Constellation pointer-passive', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-fleet-constellation-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 120,
+      rows: 32,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_BOOT: '0',
+        OPENALICE_TUI_MOTION: '0',
+        OPENALICE_TUI_FIXTURE_RUNTIME: 'running',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let clicked = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Fleet Constellation timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        const plain = stripSgr(output)
+        if (!opened && plain.includes('◆ OVERVIEW')) {
+          opened = true
+          child.write(']')
+        } else if (!clicked && plain.includes('Selection Constellation · AliceProject')) {
+          clicked = true
+          child.write('\u001b[<35;70;18M')
+          child.write('\u001b[<0;70;18M')
+          setTimeout(() => child.write('q'), 150)
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && clicked) resolve(output)
+        else reject(new Error(`Supervisor Fleet Constellation exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(stripSgr(transcript)).toContain('◇ CONTROL ROUTE')
+    expect(stripSgr(transcript)).toContain('↗ WEB  http://127.0.0.1:47331')
+    expect(stripSgr(transcript)).toContain('CAPS     inspect · lifecycle · tunnel')
+    expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=0 loads=0 diagnoses=0')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
   it('renders an explicitly selected launch context before detach', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-context-'))
     temporaryPaths.push(isolatedHome)
