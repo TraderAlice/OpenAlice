@@ -3,7 +3,10 @@ import { describe, expect, it, vi } from 'vitest'
 import { resolveLaunchContext } from './launch-context.ts'
 import type { MachineFleetEnvelope, MachineInventory } from './machine-inventory.ts'
 import { createSupervisorFleetState, displayWidth, selectedFleetProject } from './supervisor-fleet.ts'
-import { createSupervisorTuiTheme } from './supervisor-tui-theme.ts'
+import {
+  createSupervisorTuiTheme,
+  decorateSupervisorActionShelf,
+} from './supervisor-tui-theme.ts'
 import {
   renderSupervisorCommandBar,
   renderSupervisorDock,
@@ -574,6 +577,20 @@ describe('Supervisor TUI screen', () => {
     expect(supervisorCommandTargets(lines).map((target) => target.label)).toEqual([
       'Enter', 's', 'p', '?',
     ])
+  })
+
+  it('contains Action Shelf color inside its framed column', () => {
+    const line = '│ ◆ [ Enter ]  Start OpenAlice & open Workspace │   │ Uptime      Waiting for Runtime │'
+    const colorTheme = createSupervisorTuiTheme({ TERM: 'xterm-256color' })
+    const decorated = decorateSupervisorActionShelf(line, colorTheme)
+    const rightColumn = decorated.slice(decorated.indexOf('   │ Uptime'))
+
+    expect(decorated).toContain('\u001b[1;38;2;183;255;248;48;2;18;54;59m')
+    expect(rightColumn).toBe('   │ Uptime      Waiting for Runtime │')
+    expect(decorateSupervisorActionShelf(
+      line,
+      createSupervisorTuiTheme({ TERM: 'xterm-256color', NO_COLOR: '1' }),
+    )).toBe(line)
   })
 
   it('scrolls Logs and Doctor with keyboard and pointer while keeping contextual controls', () => {

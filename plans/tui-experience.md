@@ -105,6 +105,20 @@ not imply maintainer approval of the finished interaction.
   Source, Restart, Stop, Logs, and Update. All keys and callbacks already exist;
   this change removes duplication rather than adding an execution path.
 
+### Wide framed-column theme decision
+
+- Removing the Launchpad primary background at wide widths would hide the
+  symptom, but weaken the action hierarchy precisely where the visual system
+  has the most room to express it.
+- Styling a fully composed terminal row is simple, but a row containing two
+  adjacent cards is not one semantic surface: the left `[ Enter ]` currently
+  causes the right Runtime field to inherit Action Shelf colors.
+- The selected model keeps the existing cards, dimensions, and pointer
+  geometry while splitting theme decoration at the rendered `│   │` card
+  gutter. Each framed column is classified and decorated independently, then
+  recomposed with an unstyled gutter. `NO_COLOR` remains byte-for-byte plain,
+  and the fix becomes shared protection for every future wide TUI surface.
+
 ### Global command discovery decision
 
 - Restyling the legacy detach hint would improve finish but not discoverability.
@@ -540,6 +554,8 @@ already large `supervisor-tui.ts` application controller.
   strip and whole-row primary-action pointer target.
 - [x] Make the Overview Launchpad the single truthful primary surface and keep
   its Action Shelf focused on supporting commands.
+- [x] Contain semantic Action Shelf color inside its framed column when wide
+  layouts compose adjacent cards.
 - [x] Replace the legacy global shortcut hint with a clickable command dock and
   contextual `/` Command Deck.
 - [x] Project structured Runtime logs into semantic event rows while preserving
@@ -1093,6 +1109,19 @@ already large `supervisor-tui.ts` application controller.
   the 699-file suite passes (698 passed, 1 skipped; 6,147 tests passed, 10
   skipped). Docker installer smoke passes, and package dry-run retains the
   Supervisor source without publishing test fixtures.
+- A fresh 120×30 color comparison against OMP 17.3.4 exposed a theme-compositor
+  defect rather than a layout problem: the Launchpad primary background crossed
+  the three-column card gutter and painted Runtime Uptime as part of Enter.
+  Framed columns are now classified and decorated independently, so semantic
+  color cannot escape its card while geometry and pointer targets stay intact.
+- Framed-column acceptance passes with 76 focused screen and real-PTY tests.
+  The regression covers exact color containment, byte-identical `NO_COLOR`,
+  wide Beacon hover/click behavior, and terminal-mode restoration; a real
+  Default AliceProject session confirmed the left primary surface resets before
+  the unstyled gutter and right Runtime card. CLI build/typecheck and root
+  TypeScript pass; the 699-file suite passes (698 passed, 1 skipped; 6,148 tests
+  passed, 10 skipped). Docker installer smoke passes, and package dry-run
+  retains the shared Supervisor theme source.
 
 ## Completion Criteria
 

@@ -322,6 +322,9 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('OpenAlice · launch system')
     expect(transcript).toContain('◆ ALICEPROJECT')
     expect(transcript).toContain('\u001b[1;38;2;')
+    expect(transcript).not.toMatch(
+      /\u001b\[1;38;2;183;255;248;48;2;18;54;59m[^\u001b\r\n]*Uptime/u,
+    )
     expect(transcript).toContain('│ › [ Enter ]')
     expect(transcript).toContain('FIXTURE_RESULT starts=1 opens=1')
     expect(transcript).toContain('\u001b[?25h')

@@ -194,6 +194,22 @@ export function decorateSupervisorActionShelf(
   theme: SupervisorTuiTheme,
   hoveredCommand?: string,
 ): string {
+  const columns = splitFramedColumns(line)
+  if (columns.length > 1) {
+    return columns.map((column) => (
+      isSingleSupervisorActionShelf(column)
+        ? decorateSingleSupervisorActionShelf(column, theme, hoveredCommand)
+        : column
+    )).join('   ')
+  }
+  return decorateSingleSupervisorActionShelf(line, theme, hoveredCommand)
+}
+
+function decorateSingleSupervisorActionShelf(
+  line: string,
+  theme: SupervisorTuiTheme,
+  hoveredCommand?: string,
+): string {
   const separator = '  │  '
   const trimmed = line.trimEnd()
   const framed = trimmed.startsWith('│ ') && trimmed.endsWith(' │')
@@ -225,11 +241,19 @@ export function decorateSupervisorActionShelf(
 }
 
 function isSupervisorActionShelf(line: string): boolean {
+  return splitFramedColumns(line).some(isSingleSupervisorActionShelf)
+}
+
+function isSingleSupervisorActionShelf(line: string): boolean {
   const trimmed = line.trimEnd()
   const content = trimmed.startsWith('│ ') && trimmed.endsWith(' │')
     ? trimmed.slice(2, -2).trimEnd()
     : trimmed
   return /^[◆·] \[ [^\]]+ \] /u.test(content)
+}
+
+function splitFramedColumns(line: string): string[] {
+  return line.split(/(?<=│) {3}(?=│)/u)
 }
 
 function decorateDock(

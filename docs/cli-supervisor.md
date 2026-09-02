@@ -184,7 +184,10 @@ path is intentionally parameter-free:
   therefore do not have a separate mouse-only path. The same parser recognizes
   Action Shelves framed inside overlays and confirmation modals: their complete
   Enter/Esc labels share hover/click semantics with the application footer,
-  while activation still emits only the existing keyboard input;
+  while activation still emits only the existing keyboard input. When a wide
+  layout composes adjacent framed cards, theme decoration classifies each card
+  column independently at the rendered gutter; a primary action in one card
+  must not color fields, borders, or whitespace in its neighbor;
 - a persistent full-width context ribbon keeps `[ / ] Commands` and
   `[ q ] Detach` visible on every Supervisor page. At 60 columns and wider it
   also retains the selected AliceProject and compact Runtime signal; when space
