@@ -3757,6 +3757,29 @@ already large `supervisor-tui.ts` application controller.
   passes 155 tests, the complete CLI suite passes 645 tests, and CLI
   typecheck/build passes.
 
+### Adaptive Inbox work-surface decision
+
+- Fresh 120x32 Inbox capture showed three messages stretched across the full
+  Operational Canvas. The excess rows lived inside Inbox Desk rather than in
+  the quiet application field, weakening the relationship between Message
+  Stream, Selected Message, and their actions. At the other extreme, 46x16
+  cropped application chrome and the secondary Mark read action.
+- Wide Inbox now sizes to its natural stream/detail content plus two breathing
+  rows, while longer histories retain the existing expansion and 20-message
+  bound. Ordinary compact terminals keep the accepted stacked reading order.
+  Below 60 columns and 18 rows, Inbox progressively discloses one selected-work
+  summary: Workspace and read state, title, provenance, Open Workspace, and
+  Mark read/unread.
+- The emergency fold retains Mission Header, all adaptive navigation targets,
+  contextual Tip, and Command Spine at 46x16. It reuses the same Inbox
+  selection, open, read-state, polling, and pointer contracts; no history,
+  Runtime, Workspace, API, or persistence behavior changes.
+- Real 120x32, 80x24, and 46x16 PTY captures verify the bounded wide Desk,
+  ordinary stacked Desk, and complete tiny selected-work path. This is a
+  TUI-only visual decision pending maintainer review on the retained branch.
+  The focused Inbox/Fleet/screen/PTY closure passes 166 tests, the complete CLI
+  suite passes 648 tests, and CLI typecheck/build passes.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

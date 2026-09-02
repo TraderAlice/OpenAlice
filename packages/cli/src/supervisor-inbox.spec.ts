@@ -125,6 +125,35 @@ describe('Supervisor Inbox', () => {
     expect(rendered.targets.at(-1)?.row).toBe(22)
   })
 
+  it('keeps a short wide Inbox content-sized and folds tiny Inbox to selected work', () => {
+    const wide = renderSupervisorInbox(
+      snapshot,
+      createSupervisorInboxState(),
+      120,
+      40,
+    )
+    expect(wide.lines.length).toBeLessThan(20)
+    expect(wide.lines.join('\n')).toContain('MESSAGE STREAM')
+    expect(wide.lines.join('\n')).toContain('SELECTED · UNREAD')
+
+    const tiny = renderSupervisorInbox(
+      snapshot,
+      createSupervisorInboxState(),
+      46,
+      7,
+    )
+    const frame = tiny.lines.join('\n')
+    expect(tiny.lines).toHaveLength(7)
+    expect(frame).toContain('Inbox · 1 UNREAD · 1/2')
+    expect(frame).toContain('SELECTED · UNREAD · Macro desk')
+    expect(frame).toContain('◆ Morning brief')
+    expect(frame).toContain('From  codex')
+    expect(frame).toContain('◆ [ o ] Open Workspace')
+    expect(frame).toContain('· [ Enter ] Mark read')
+    expect(frame).not.toContain('MESSAGE STREAM')
+    expect(tiny.targets).toEqual([{ row: 2, startColumn: 2, endColumn: 45, index: 0 }])
+  })
+
   it('makes disconnected and empty states explain the next action', () => {
     expect(renderSupervisorInbox(null, createSupervisorInboxState(), 80).lines.join('\n'))
       .toContain('Choose a connection')

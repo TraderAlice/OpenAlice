@@ -549,7 +549,13 @@ intentionally parameter-free:
   read/unread state, polls every 20 seconds, and offers no delete action. Its
   single responsive Inbox Desk keeps Message Stream and Selected Message in
   open columns on wide terminals and stacks the same reading order at compact
-  widths. Stream rows lead with Workspace and agent provenance before their
+  widths. A short wide stream owns only its natural content plus two breathing
+  rows instead of stretching to fill the Operational Canvas; longer streams
+  still expand within the existing 20-message history bound. Below 60 columns
+  and 18 rows, the Desk folds to the selected message's Workspace, read state,
+  title, provenance, Open Workspace action, and Mark read/unread action so the
+  Mission Header, navigation, contextual Tip, and Command Spine all remain in
+  the viewport. Stream rows lead with Workspace and agent provenance before their
   bounded summary and relative time, so truncation cannot hide the identity
   users need to choose a message; Selected Message owns the complete body and
   documents. The selected message opens its encoded `/workspaces/:workspaceId`

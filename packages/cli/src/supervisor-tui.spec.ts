@@ -393,6 +393,57 @@ describe('Supervisor TUI screen', () => {
     expect(screen.snapshot.panel).toBe('fleet')
   })
 
+  it('keeps selected Inbox work and application chrome visible at 46x16', () => {
+    const runtime = { class: 'running', endpoints: { web: 'http://127.0.0.1:2026' } }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'inbox',
+      runtime,
+      activeTarget: {
+        kind: 'local',
+        machineKey: 'local',
+        machineName: 'This computer',
+        projectKey: 'default',
+        projectName: 'Default AliceProject',
+        home: '/tmp/openalice',
+        transport: 'loopback',
+        endpoint: 'http://127.0.0.1:2026',
+        runtime,
+      },
+      inbox: {
+        endpoint: 'http://127.0.0.1:2026/',
+        refreshedAt: Date.now(),
+        hasMore: false,
+        entries: [{
+          id: 'hello',
+          ts: Date.now(),
+          workspaceId: 'morning',
+          workspaceLabel: 'Morning research',
+          comments: 'Agent report ready.',
+          origin: { kind: 'headless', agent: 'fixture-agent' },
+        }],
+      },
+    }, {
+      getViewportHeight: () => 16,
+      motionEnabled: false,
+    })
+
+    const lines = screen.render(46)
+    const frame = lines.join('\n')
+    expect(lines).toHaveLength(16)
+    expect(frame).toContain('◆ OpenAlice')
+    expect(frame).toContain('[Inbox]·1')
+    expect(frame).toContain('Inbox · 1 UNREAD · 1/1')
+    expect(frame).toContain('SELECTED · UNREAD · Morning research')
+    expect(frame).toContain('◆ Agent report ready.')
+    expect(frame).toContain('From  fixture-agent')
+    expect(frame).toContain('◆ [ o ] Open Workspace')
+    expect(frame).toContain('· [ Enter ] Mark read')
+    expect(frame).toContain('◇  Tip:')
+    expect(frame).toContain('[ / ] Commands')
+  })
+
   it('keeps remote controls target-scoped and exposes an explicit disconnect', () => {
     let disconnected = 0
     let sourceRequests = 0

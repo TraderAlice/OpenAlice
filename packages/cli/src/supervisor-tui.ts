@@ -4885,11 +4885,23 @@ export class SupervisorScreen implements Component {
       ))
     } else if (this.snapshot.panel === 'inbox') {
       this.inboxState = normalizeSupervisorInboxState(this.inboxState, this.snapshot.inbox)
+      const inboxCanvasHeight = Number.isFinite(operationalCanvasHeight)
+        ? operationalCanvasHeight
+        : width < 60
+          && Number.isFinite(viewportHeight)
+          && Math.floor(viewportHeight ?? 0) < 18
+          ? Math.max(
+              0,
+              Math.floor(viewportHeight ?? 0)
+                - lines.length
+                - WIDE_OPERATIONAL_CANVAS_RESERVED_CHROME_HEIGHT,
+            )
+          : undefined
       const inboxView = renderSupervisorInbox(
         this.snapshot.inbox,
         this.inboxState,
         width,
-        operationalCanvasHeight,
+        inboxCanvasHeight,
       )
       const rowOffset = lines.length
       this.inboxTargets = inboxView.targets.map((target) => ({

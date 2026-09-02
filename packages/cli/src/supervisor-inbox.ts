@@ -198,6 +198,31 @@ export function renderSupervisorInbox(
 
   const normalized = normalizeSupervisorInboxState(state, snapshot)
   const entries = snapshot.entries
+  const selected = entries[normalized.selected]!
+  const unread = supervisorInboxUnreadCount(snapshot)
+  if (width < 60 && Number.isFinite(targetHeight)) {
+    const identity = selected.origin?.agent ?? selected.origin?.kind ?? 'manual'
+    return {
+      lines: renderSupervisorPanel(
+        'Inbox',
+        `${unread} UNREAD · ${normalized.selected + 1}/${entries.length}`,
+        [
+          `SELECTED · ${selected.readAt ? 'READ' : 'UNREAD'} · ${workspaceLabel(selected)}`,
+          `◆ ${entryTitle(selected)}`,
+          `From  ${identity}`,
+          `◆ [ o ] Open Workspace`,
+          `· [ Enter ] ${selected.readAt ? 'Mark unread' : 'Mark read'}`,
+        ],
+        width,
+      ),
+      targets: [{
+        row: 2,
+        startColumn: 2,
+        endColumn: Math.max(2, width - 1),
+        index: normalized.selected,
+      }],
+    }
+  }
   const wide = width >= 100
   const visible = wide && Number.isFinite(targetHeight)
     ? Math.min(20, Math.max(7, Math.floor(targetHeight ?? 0) - 4))
@@ -210,8 +235,6 @@ export function renderSupervisorInbox(
     const attention = entry.readAt ? '○' : '●'
     return `${marker} ${attention} ${streamSourceLabel(entry)}  ·  ${entryTitle(entry)}  ·  ${relativeTime(entry.ts)}`
   })
-  const selected = entries[normalized.selected]!
-  const unread = supervisorInboxUnreadCount(snapshot)
   const meta = `${unread} UNREAD · ${start + 1}–${end}/${entries.length}${snapshot.hasMore ? ' · MORE' : ''}`
 
   if (wide) {
@@ -227,7 +250,10 @@ export function renderSupervisorInbox(
     ]
     const naturalBodyHeight = Math.max(stream.length, details.length)
     const requestedBodyHeight = Number.isFinite(targetHeight)
-      ? Math.max(naturalBodyHeight, Math.floor(targetHeight ?? 0) - 2)
+      ? Math.max(
+          naturalBodyHeight,
+          Math.min(naturalBodyHeight + 2, Math.floor(targetHeight ?? 0) - 2),
+        )
       : naturalBodyHeight
     const bodyHeight = Math.min(21, requestedBodyHeight)
     const left = padRows(stream, bodyHeight)
