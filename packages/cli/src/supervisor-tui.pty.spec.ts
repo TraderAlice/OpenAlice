@@ -1925,8 +1925,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           && output.includes('○ COLD')
         ) {
           clickedProject = true
-          child.write('\u001b[<32;56;24M')
-          child.write('\u001b[<0;56;24M')
+          child.write('\u001b[<32;56;23M')
+          child.write('\u001b[<0;56;23M')
         } else if (!closedOverlay && output.includes('AliceProject Switchboard · 1 PROJECT')) {
           closedOverlay = true
           child.write('\u001b')
@@ -1936,7 +1936,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           && output.includes('STATUS   AliceProject selection')
         ) {
           clickedAfterNotice = true
-          child.write('\u001b[<0;6;24M')
+          child.write('\u001b[<0;6;23M')
         } else if (!openedPalette && output.includes('Command Dock')) {
           openedPalette = true
           child.write('q')
@@ -1990,7 +1990,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         output += data
         if (!opened && output.includes(closedSpine)) {
           opened = true
-          child.write('\u001b[<0;6;30M')
+          child.write('\u001b[<0;6;23M')
         } else if (opened && closingAt < 0 && output.includes('Command Dock · 1/10 · ABSENT')) {
           closingAt = output.length
           child.write('\u001b[<35;6;30M')

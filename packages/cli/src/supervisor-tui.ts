@@ -5152,6 +5152,10 @@ export class SupervisorScreen implements Component {
       }, width),
       width,
     )
+    const flowHomeConsole = this.snapshot.panel === 'overview'
+      && !focusTask
+      && !this.commandDeckOpen
+      && !isConfigRecovery(this.snapshot)
     const visibleLines = anchorSupervisorControlConsole(
       lines,
       controlConsole,
@@ -5192,6 +5196,7 @@ export class SupervisorScreen implements Component {
               ? this.snapshot.doctor?.checks?.length ?? 0
               : undefined,
         }, width)],
+      flowHomeConsole ? 'flow' : 'bottom',
     ).map((line) => truncate(line, width))
     this.commandTargets = supervisorCommandTargets(visibleLines)
     if (this.focusConsoleHoveredCommand) {
@@ -5199,8 +5204,8 @@ export class SupervisorScreen implements Component {
         target.label === this.focusConsoleHoveredCommand
       ))
     }
-    const commandSpineRow = visibleLines.length
-    this.commandSpineTargets = visibleLines.at(-1)?.startsWith('╰─ ')
+    const commandSpineRow = visibleLines.findLastIndex((line) => line.startsWith('╰─ ')) + 1
+    this.commandSpineTargets = commandSpineRow > 0
       ? this.commandTargets.filter((target) => target.row === commandSpineRow)
       : []
     return decorateSupervisorFrame(

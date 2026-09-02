@@ -338,7 +338,8 @@ intentionally parameter-free:
   Tip explains that the current target remains live until the new route is
   ready. Machine focus retains Browse projects and its generic focus guidance.
   With only the local Machine, Fleet focus starts on its current AliceProject;
-- ordinary workbench pages have one bottom surface: the Command Spine. Primary
+- ordinary workbench pages have one persistent control surface: the Command
+  Spine. Primary
   and contextual actions live with the object they affect: Alice Session,
   Launch Briefing, Launch Flight Recorder, Fleet Selection, the selected
   message inside Inbox Desk, Runtime Observatory or Lens, and Doctor Signal
@@ -381,17 +382,18 @@ intentionally parameter-free:
   OMP-style two-column composition instead of stretching with every surplus
   terminal row. The identity column centers the selected AliceProject while the
   task column keeps one ordered path together: Now and its primary action,
-  Signals, then Recent. On tall terminals, extra height becomes a quiet field
-  below the complete board while the contextual Tip and Command Spine remain
-  anchored at the bottom. Compact layouts keep the same hierarchy with bounded
-  vertical rhythm. Inbox and Connection signals are whole-row pointer targets
+  Signals, then Recent. Home keeps the board, contextual Tip, and Command Spine
+  in one continuous interaction cluster; surplus terminal height follows that
+  cluster instead of separating its guidance from its controls. Compact layouts
+  keep the same hierarchy and flow with bounded vertical rhythm. Inbox and
+  Connection signals are whole-row pointer targets
   backed by the same panel-selection path as Mission Navigation; hover previews
   their destination in the stable Activity Slot;
 - the connected Home page keeps one product name from Mission Header through
   Command Spine: the footer projects `◆ HOME`, never the internal `overview`
   panel key. At compact widths the view badge is removed before selected
   AliceProject or Runtime truth, matching the Spine's existing priority order;
-- a persistent full-width Command Spine is the sole default footer and closes
+- a persistent full-width Command Spine is the sole default control rail and closes
   the application with `╰─`/`─╯`
   while keeping `[ / ] Commands` and `[ q ] Detach` visible on every Supervisor
   page. A flexible track joins those controls to an OMP-style breadcrumb of the
@@ -454,10 +456,12 @@ intentionally parameter-free:
   color; only the busy glyph animates. Feedback is object-first and bounded to
   the available rail width, so it never moves Command Spine pointer targets
   and does not introduce a second lifecycle or error path.
-  When the terminal is taller than the current page, one elastic blank stage
-  grounds the Command Spine at the terminal edge; short
-  terminals retain their natural complete flow without clipping. Resize changes
-  only that elastic stage and does not reset selection, focus, or action state.
+  On operational pages, an elastic blank stage grounds the Command Spine at the
+  terminal edge. Home instead keeps it immediately after the Session Board and
+  Tip so the launcher reads as one task; surplus height follows the complete
+  cluster. Short terminals retain their natural complete flow without clipping.
+  Resize changes only elastic whitespace and does not reset selection, focus,
+  or action state.
   When the stage has at least two spare rows, one contextual `Tip:` Beacon
   teaches a useful interaction for the active view or Runtime state while
   preserving a blank row after page content. It disappears rather than consume

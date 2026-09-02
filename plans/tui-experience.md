@@ -3880,6 +3880,29 @@ already large `supervisor-tui.ts` application controller.
   CLI suite passes 657 tests, and CLI typecheck/build passes. Maintainer
   acceptance remains pending on this branch.
 
+### Home interaction-cluster decision
+
+- Fresh 120x32 and 120x48 captures confirmed that the replacement Alice Session
+  Board had removed the old Launchpad/Telemetry split, but its contextual Tip
+  remained near the board while Command Spine stayed pinned to the terminal
+  edge. The resulting blank stage split one launcher into two visual systems,
+  reproducing the hierarchy problem visible in the maintainer's real screenshot.
+- Home now follows Oh My Pi's content-flow principle: Session Board, one blank
+  beat, contextual Tip, one blank beat, then Command Spine form one continuous
+  interaction cluster. Any surplus viewport height follows that complete cluster
+  rather than occupying the space between guidance and controls. Operational
+  pages, Focus Workspaces, Recovery, and the open Command Dock retain their
+  bottom-anchored control behavior.
+- Command Spine pointer targets now resolve from its final rendered row instead
+  of assuming the last viewport row. Keyboard routes, hover states, full-row Home
+  actions, AliceProject shortcut, Runtime state, lifecycle behavior, and terminal
+  cleanup are unchanged. Real 120x48, 120x32, 80x24, and 46x16 PTY captures
+  verify the new rhythm; real-PTY coverage clicks the relocated project and
+  Commands segments and confirms the open Dock remains bottom-anchored. The
+  focused screen/PTY closure passes 146 tests, the complete CLI suite passes 657
+  tests, and CLI typecheck/build passes. Maintainer acceptance remains pending
+  on this branch.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

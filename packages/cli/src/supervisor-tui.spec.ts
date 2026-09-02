@@ -991,7 +991,7 @@ describe('Supervisor TUI screen', () => {
     expect(screen.render(120)[0]).toContain('v0.87.0-beta · DEV · update 0.90.0')
   })
 
-  it('keeps wide Home as a content-sized OMP-style Session Board', () => {
+  it('keeps wide Home as one content-sized OMP-style interaction cluster', () => {
     let viewportHeight = 32
     const screen = new SupervisorScreen({
       version: 'dev',
@@ -1012,6 +1012,7 @@ describe('Supervisor TUI screen', () => {
     const actionRow = tall.findIndex((line) => line.includes('[ Enter ]'))
     const cardBottomRow = tall.findIndex((line, index) => index > stageRow && line.startsWith('╰'))
     const tipRow = tall.findIndex((line) => line.startsWith('◇  Tip:'))
+    const spineRow = tall.findIndex((line) => line.includes('[ / ] Commands'))
 
     expect(tall).toHaveLength(32)
     expect(stageRow).toBe(4)
@@ -1031,17 +1032,21 @@ describe('Supervisor TUI screen', () => {
     expect(tall.join('\n')).not.toContain('Runtime Telemetry')
     expect(tall.at(-2)).toBe('')
     expect(tall.join('\n')).not.toContain('CONTROL CONSOLE')
-    expect(tall.at(-1)).toContain('[ / ] Commands')
+    expect(spineRow).toBe(tipRow + 2)
+    expect(spineRow).toBeLessThan(tall.length - 1)
+    expect(tall.slice(spineRow + 1).every((line) => line === '')).toBe(true)
 
     viewportHeight = 48
     const expanded = screen.render(120).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
     expect(expanded).toHaveLength(48)
     const expandedBottom = expanded.findIndex((line, index) => index > stageRow && line.startsWith('╰'))
     const expandedRecent = expanded.findIndex((line) => line.includes('RECENT'))
+    const expandedSpine = expanded.findIndex((line) => line.includes('[ / ] Commands'))
     expect(expandedBottom).toBe(cardBottomRow)
     expect(expandedRecent).toBe(recentRow)
+    expect(expandedSpine).toBe(spineRow)
     expect(expanded.findIndex((line) => line.includes('[ Enter ]'))).toBe(actionRow)
-    expect(expanded.slice(expandedBottom + 1, -2).filter((line) => line === '').length)
+    expect(expanded.slice(expandedSpine + 1).filter((line) => line === '').length)
       .toBeGreaterThan(10)
 
     const folded = screen.render(99).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
@@ -1491,7 +1496,7 @@ describe('Supervisor TUI screen', () => {
     expect(themedLocked).toContain('\u001b[1;38;2;183;255;248;48;2;10;34;39m[ q ] Detach')
   })
 
-  it('anchors one Command Spine to the live viewport without clipping content', () => {
+  it('flows Home controls with its task while operational controls stay viewport-anchored', () => {
     let viewportHeight = 32
     const paletteChanges: boolean[] = []
     const screen = new SupervisorScreen({
@@ -1508,12 +1513,16 @@ describe('Supervisor TUI screen', () => {
     expect(tall).toHaveLength(32)
     expect(tall.at(-2)).toBe('')
     expect(tall.join('\n')).not.toContain('CONTROL CONSOLE')
-    expect(tall.at(-1)).toContain('╰─ [ / ] Commands')
+    const tallSpineRow = tall.findIndex((line) => line.includes('[ / ] Commands')) + 1
+    const tallTipRow = tall.findIndex((line) => line.startsWith('◇  Tip:')) + 1
+    expect(tallSpineRow).toBe(tallTipRow + 2)
+    expect(tallSpineRow).toBeLessThan(tall.length)
+    expect(tall.slice(tallSpineRow).every((line) => line === '')).toBe(true)
     expect(tall.join('\n')).toContain(
       '◇  Tip: Enter follows Now; o opens Web; Runtime keeps the diagnostic detail.',
     )
     expect(tall.findIndex((line) => line.includes('Runtime Signal Deck'))).toBeLessThan(20)
-    expect(screen.handlePointer(pointerClick(6, 32))).toBe(true)
+    expect(screen.handlePointer(pointerClick(6, tallSpineRow))).toBe(true)
     expect(paletteChanges).toEqual([true])
     expect(screen.render(80).at(-1)).toContain('[ / ] Close')
 
@@ -1539,6 +1548,13 @@ describe('Supervisor TUI screen', () => {
       7,
       ['tip'],
     )).toEqual(['content', '', 'tip', '', 'activity', 'actions', 'spine'])
+    expect(anchorSupervisorControlConsole(
+      ['content'],
+      ['spine'],
+      7,
+      ['tip'],
+      'flow',
+    )).toEqual(['content', '', 'tip', '', 'spine', '', ''])
   })
 
   it('renders contextual OMP-style Tips without creating an action target', () => {

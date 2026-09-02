@@ -762,12 +762,26 @@ export function anchorSupervisorControlConsole(
   consoleLines: string[],
   viewportHeight: number,
   stageContent: string[] = [],
+  placement: 'bottom' | 'flow' = 'bottom',
 ): string[] {
   const naturalHeight = content.length + consoleLines.length
   const safeViewportHeight = Number.isFinite(viewportHeight)
     ? Math.max(0, Math.floor(viewportHeight))
     : naturalHeight
   const stageHeight = Math.max(0, safeViewportHeight - naturalHeight)
+  if (placement === 'flow') {
+    const leadHeight = Math.min(stageHeight, Math.max(0, stageContent.length + 2))
+    const lead = Array.from({ length: leadHeight }, () => '')
+    for (const [index, line] of stageContent.slice(0, Math.max(0, leadHeight - 1)).entries()) {
+      lead[index + 1] = line
+    }
+    return [
+      ...content,
+      ...lead,
+      ...consoleLines,
+      ...Array.from({ length: Math.max(0, stageHeight - leadHeight) }, () => ''),
+    ]
+  }
   const stage = Array.from({ length: stageHeight }, () => '')
   for (const [index, line] of stageContent.slice(0, Math.max(0, stageHeight - 1)).entries()) {
     stage[index + 1] = line
