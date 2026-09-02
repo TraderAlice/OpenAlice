@@ -247,9 +247,14 @@ function renderWideCockpit(
     ? Math.max(0, Math.floor(targetHeight ?? naturalHeight) - naturalHeight)
     : 0
   if (extraRows > 0) {
-    const quietRows = Array.from({ length: extraRows }, () => '')
-    projectBody.splice(-1, 0, ...quietRows)
-    runtimeBody.splice(-1, 0, ...quietRows)
+    const stage = renderWideControlPath(
+      view,
+      extraRows,
+      leftInnerWidth,
+      rightInnerWidth,
+    )
+    projectBody.splice(-1, 0, ...stage.project)
+    runtimeBody.splice(-1, 0, ...stage.runtime)
   }
   const project = renderCard('Launchpad · AliceProject', projectBody, leftWidth)
   const runtime = renderCard('Runtime signal', runtimeBody, rightWidth)
@@ -267,6 +272,74 @@ function renderWideCockpit(
     primaryTarget: targetForLine(lines, '[ Enter ]', leftWidth),
     hotspotTargets: homeHotspotTargets(lines, view),
   }
+}
+
+function renderWideControlPath(
+  view: SupervisorHomeView,
+  height: number,
+  projectWidth: number,
+  runtimeWidth: number,
+): { project: string[]; runtime: string[] } {
+  const project = Array.from({ length: height }, () => '')
+  const runtime = Array.from({ length: height }, () => '')
+  if (height < 5) return { project, runtime }
+
+  const start = Math.max(0, Math.floor((height - 5) / 2))
+  const activeRuntime = view.state === 'running' || view.state === 'owned_elsewhere'
+  const routeTrack = renderRouteTrack(
+    Math.max(5, Math.min(13, projectWidth - 23)),
+    activeRuntime,
+    view.pulse ?? false,
+  )
+  const workspaceTrack = renderRouteTrack(5, activeRuntime, !(view.pulse ?? false))
+  const workspace = view.webHotspot ? '↗ WORKSPACE READY' : '◇ WORKSPACE WAITING'
+  const projectIdentity = truncateDisplayWidth(view.projectName, Math.max(1, projectWidth - 17))
+
+  project[start] = '◇ CONTROL PATH'
+  project[start + 1] = truncateDisplayWidth(`◆ ALICEPROJECT  ${projectIdentity}`, projectWidth)
+  project[start + 2] = truncateDisplayWidth(
+    `╰${routeTrack} ${runtimeSignal(view.state, view.pulse ?? false)}`,
+    projectWidth,
+  )
+  project[start + 3] = truncateDisplayWidth(
+    ` ${' '.repeat(Math.max(2, Math.min(8, projectWidth - 24)))}╰${workspaceTrack} ${workspace}`,
+    projectWidth,
+  )
+  project[start + 4] = truncateDisplayWidth(
+    `  PROVIDER  ${view.provider}`,
+    projectWidth,
+  )
+
+  runtime[start] = '◇ SERVICE ARRAY'
+  for (const [index, service] of serviceArray(view.components).entries()) {
+    runtime[start + index + 1] = truncateDisplayWidth(service, runtimeWidth)
+  }
+  runtime[start + 4] = activeRuntime
+    ? '  SIGNAL  Runtime report is live'
+    : '  SIGNAL  Waiting for Runtime ownership'
+  return { project, runtime }
+}
+
+function renderRouteTrack(width: number, active: boolean, pulse: boolean): string {
+  const track = Array.from({ length: Math.max(3, width) }, () => '━')
+  const packet = pulse
+    ? Math.max(1, Math.floor(track.length * 0.7))
+    : Math.max(1, Math.floor(track.length * 0.3))
+  track[Math.min(track.length - 2, packet)] = active ? '◆' : '·'
+  return track.join('')
+}
+
+function serviceArray(components: string): [string, string, string] {
+  const reported = components === 'not reported'
+    ? ['Alice not reported', 'UTA not reported', 'Connector not reported']
+    : components.split(/\s+·\s+/u)
+  return (['Alice', 'UTA', 'Connector'] as const).map((name, index) => {
+    const value = reported[index] ?? `${name} not reported`
+    const normalized = value.toLowerCase()
+    const active = /\b(?:ready|running|connected|healthy)\b/u.test(normalized)
+    const unavailable = /\b(?:disabled|unavailable|failed|error)\b/u.test(normalized)
+    return `${active ? '◆' : unavailable ? '×' : '◇'} ${value}`
+  }) as [string, string, string]
 }
 
 function renderIntegratedWideLaunchpad(

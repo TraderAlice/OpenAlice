@@ -872,6 +872,22 @@ not imply maintainer approval of the finished interaction.
   explicitly with `OPENALICE_TUI_BOOT=1`. This is an autonomous topic decision,
   not recorded maintainer approval.
 
+### Wide Overview control-path decision
+
+- Returning the 120-column Overview to natural-height cards would remove the
+  mechanical empty rows, but it would reopen the unowned center interval that
+  the adaptive stage was introduced to solve.
+- Filling the stage with an abstract waveform or star field would be visually
+  louder, but it would imply telemetry that the Supervisor does not own and add
+  no operational understanding after the new Boot Sequence hands off.
+- The selected model spends only real wide-screen surplus on a passive Control
+  Path and Service Array inside the existing paired stage. The path visualizes
+  the already-known AliceProject, Runtime, and Web readiness; the service array
+  decomposes the already-reported Alice, UTA, and Connector states. It adds no
+  read, mutation, focus target, or lifecycle route, preserves the compact
+  80x24 surface, and keeps reduced-motion output structurally identical. This
+  is an autonomous topic decision, not recorded maintainer approval.
+
 ### Bottom Command Dock decision
 
 - Keeping the centered Command Palette preserves the existing overlay shell,
@@ -1056,6 +1072,8 @@ already large `supervisor-tui.ts` application controller.
   duplicating identity or losing guidance, motion, or pointer geometry.
 - [x] Turn the first terminal frame into a skippable OpenAlice Boot Sequence
   without delaying reduced-motion startup or allowing input click-through.
+- [x] Replace mechanical wide-Overview filler with a truthful animated Control
+  Path and passive Service Array without changing compact terminal behavior.
 - [x] Keep the visible Command Spine mouse-capable while the Command Dock owns
   overlay input, without enabling click-through for any other modal surface.
 - [x] Let the wide Overview absorb a bounded share of surplus terminal height
@@ -2023,6 +2041,25 @@ already large `supervisor-tui.ts` application controller.
   skipped; 6,191 tests passed, 10 skipped). Docker installer smoke passes
   without Node, npm, pnpm, Bun, or an Agent Runtime, and package dry-run contains
   the new Boot Sequence owner.
+- The wide Overview's adaptive stage no longer stretches seven empty paired
+  rows between identity and action. Its real surplus now centers a Control Path
+  for AliceProject, Runtime, Workspace, and provider beside a Service Array
+  derived from the existing Alice, UTA, and Connector report. Live route
+  packets follow the existing Runtime pulse; stopped and unreported states stay
+  explicit, and neither surface publishes a pointer or keyboard target. The
+  80x24 and 99-column layouts remain unchanged.
+- Control-Path acceptance passes with 106 focused screen and real-PTY tests. A
+  truecolor 120x32 running fixture showed the route and array inside the paired
+  stage while keeping the primary action and Uptime on their shared lower edge;
+  the existing 120x30 raw-pointer PTY saw the new stage, hovered and clicked the
+  relocated primary surface, invoked start/open exactly once, and restored all
+  terminal modes. Component coverage distinguishes ready/connected, disabled,
+  and unreported service truth, while the wide-stage test forbids three
+  consecutive mechanical filler rows and proves the 99-column boundary omits
+  the new composition. CLI build and root TypeScript pass; the 700-file suite
+  passes (699 passed, 1 skipped; 6,192 tests passed, 10 skipped). Docker
+  installer smoke passes without Node, npm, pnpm, Bun, or an Agent Runtime, and
+  package dry-run contains the changed Supervisor view source.
 
 ## Completion Criteria
 

@@ -191,9 +191,18 @@ describe('Supervisor TUI screen', () => {
     expect(cardBottomRow).toBe(actionRow + 1)
     expect(homeRow).toBe(cardBottomRow + 1)
     expect(tipRow).toBeGreaterThan(homeRow)
-    expect(tall.slice(cockpitRow + 1, actionRow).some((line) => (
+    expect(tall.join('\n')).toContain('◇ CONTROL PATH')
+    expect(tall.join('\n')).toContain('◆ ALICEPROJECT')
+    expect(tall.join('\n')).toContain('◇ WORKSPACE WAITING')
+    expect(tall.join('\n')).toContain('◇ SERVICE ARRAY')
+    expect(tall.join('\n')).toContain('◇ Alice not reported')
+    const quietStageRows = tall.slice(cockpitRow + 1, actionRow).map((line) => (
       /^│\s+│ {3}│\s+│$/u.test(line)
-    ))).toBe(true)
+    ))
+    expect(quietStageRows.filter(Boolean).length).toBeLessThanOrEqual(3)
+    expect(quietStageRows.some((quiet, index) => (
+      quiet && quietStageRows[index + 1] && quietStageRows[index + 2]
+    ))).toBe(false)
     expect(tall.at(-3)).toContain('CONTROL CONSOLE')
     expect(tall.at(-2)).toContain('[ s ] Start quietly')
     expect(tall.at(-1)).toContain('[ / ] Commands')
@@ -205,9 +214,33 @@ describe('Supervisor TUI screen', () => {
 
     const folded = screen.render(99).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
     expect(folded.findIndex((line) => line.includes('Runtime Signal Deck'))).toBeLessThan(20)
+    expect(folded.join('\n')).not.toContain('CONTROL PATH')
     expect(folded.join('\n')).not.toContain(
       `│${' '.repeat(97)}│\n│${' '.repeat(97)}│`,
     )
+  })
+
+  it('maps reported component truth into the wide Service Array', () => {
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: {
+        class: 'running',
+        owner: null,
+        endpoints: { web: 'http://127.0.0.1:47331' },
+        components: { alice: 'ready', uta: 'disabled', connector: 'connected' },
+      },
+    }, {
+      getViewportHeight: () => 32,
+      motionEnabled: false,
+    })
+
+    const wide = screen.render(120).join('\n')
+    expect(wide).toContain('↗ WORKSPACE READY')
+    expect(wide).toContain('◆ Alice ready')
+    expect(wide).toContain('× UTA disabled')
+    expect(wide).toContain('◆ Connector connected')
+    expect(screen.render(99).join('\n')).not.toContain('SERVICE ARRAY')
   })
 
   it('renders a responsive OMP-style Command Spine without adding a row', () => {

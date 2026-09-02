@@ -152,8 +152,14 @@ intentionally parameter-free:
   complete wrapped guidance instead of repeating AliceProject identity and
   Runtime state in a standalone hero card. Runtime telemetry remains an
   independent right-hand pane, while the bounded entrance/prism sweep styles
-  the integrated mark. `NO_COLOR` keeps the wordmark and state legible, and
-  terminals below 72 columns omit it entirely. Those narrow terminals fold the
+  the integrated mark. When a wide terminal gives the paired stage surplus
+  height, its center becomes a passive Control Path and Service Array instead
+  of mechanical blank filler. The path visualizes the already-selected
+  AliceProject, Runtime readiness, Workspace availability, and provider; the
+  array decomposes only the already-reported Alice, UTA, and Connector states.
+  Neither surface adds a read, action target, or lifecycle route. `NO_COLOR`
+  keeps the wordmark and state legible, and terminals below 72 columns omit it
+  entirely. Those narrow terminals fold the
   operational fields into the complete vertical flow instead of hiding them.
   The application divider follows the full terminal width, and an
   available-update notice is composed inside the responsive header instead of
