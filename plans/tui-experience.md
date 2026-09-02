@@ -170,6 +170,23 @@ not imply maintainer approval of the finished interaction.
   lifecycle or tunnel ownership. This is an autonomous topic decision, not
   recorded maintainer approval.
 
+### Launch-flight recorder decision
+
+- Keeping the Launcher inventory visible while one generic Busy rail says
+  `Starting` or `Connecting` makes selection look actionable even though input
+  is owned by an opaque operation. Adding a larger spinner would make the wait
+  louder without answering which target, transport, or boundary is active.
+- The selected model temporarily replaces the Launcher inventory with a Launch
+  Flight Recorder for local start, remote start, and SSH connect. It preserves
+  the selected Machine and AliceProject as mission identity, projects only
+  stages the existing orchestration can truthfully observe, distinguishes
+  complete, active, waiting, and recoverable-failure states without color, and
+  keeps the persistent Detach route. Success hands directly into the connected
+  Home surface; failure stays on the selected target and makes Enter the retry
+  path. This is presentation state only and does not add cancellation,
+  lifecycle, readiness, or tunnel authority. This is an autonomous topic
+  decision, not recorded maintainer approval.
+
 ### Launchpad action-surface decision
 
 - Keeping the current cockpit and merely recoloring its cards would improve a
@@ -2758,6 +2775,21 @@ already large `supervisor-tui.ts` application controller.
   tests passed, 10 skipped). CLI build, the 70-file package dry-run, and Docker
   installer smoke all pass; the packaged installer remains independent of
   Node, npm, pnpm, Bun, and an Agent Runtime.
+- Launcher waits now become a Launch Flight Recorder for local start, remote
+  start, and SSH connect instead of leaving apparently selectable inventory
+  behind one generic Busy label. The selected Machine/AliceProject route,
+  transport, elapsed time, and only the orchestration stages the TUI can
+  observe remain visible; complete, active, waiting, and failure states have
+  explicit glyph/text semantics. Success hands to connected Home, while a
+  failure keeps Enter retry and Esc return paths on the same selected target.
+- Flight-recorder acceptance passes through 130 focused renderer, theme,
+  orchestration, screen, and real-PTY tests. The real terminal visibly traverses
+  local validate → start → bind → connected Home; remote integration covers
+  start → refreshed endpoint → SSH forward → bound target. The complete CLI
+  suite passes (63 files, 625 tests), and `test:affected` passes across 705 files
+  (704 passed, 1 skipped; 6,244 tests passed, 10 skipped). CLI typecheck/build,
+  the 71-file package dry-run, and Docker installer smoke all pass; the packaged
+  installer remains independent of Node, npm, pnpm, Bun, and an Agent Runtime.
 
 ## Completion Criteria
 

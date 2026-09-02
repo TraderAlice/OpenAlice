@@ -140,7 +140,17 @@ intentionally parameter-free:
   bottom Action Shelf repeats the one current primary action. Starting locally
   stays in the TUI and transitions to the connected workbench after readiness.
   A stopped remote target starts on Enter and automatically continues into its
-  SSH connection when the refreshed inventory advertises a Web endpoint;
+  SSH connection when the refreshed inventory advertises a Web endpoint.
+  While local start, remote start, or SSH connection owns input, the target
+  inventory becomes a Launch Flight Recorder instead of remaining deceptively
+  selectable behind a generic busy label. It keeps the selected Machine and
+  AliceProject visible, names only observable validation, lifecycle, inventory,
+  forwarding, and binding stages, and distinguishes complete, active, waiting,
+  and failed stages in text and glyphs without relying on color. Success hands
+  directly to connected Home. A failure remains on the selected target with
+  Enter to retry or Esc to return to target selection; `q` can still detach at
+  any time. The recorder is session-local presentation state and does not own
+  Runtime readiness, lifecycle, SSH cancellation, or persistence;
 - the connected workbench has exactly one active target. Its persistent command
   spine names the Machine, AliceProject, loopback or SSH transport, and live
   Runtime signal on every page. Connections marks the active Machine and

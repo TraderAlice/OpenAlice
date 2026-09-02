@@ -67,6 +67,67 @@ afterEach(async () => {
 })
 
 describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
+  it('shows a truthful Launch Flight Recorder while starting a local Runtime', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-launch-flight-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 110,
+      rows: 30,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_START_VIEW: 'connect',
+        OPENALICE_TUI_BOOT: '0',
+        OPENALICE_TUI_MOTION: '0',
+        OPENALICE_TUI_FIXTURE_FLEET_ROWS: '1',
+        OPENALICE_TUI_FIXTURE_START_DELAY_MS: '250',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let started = false
+      let sawFlight = false
+      let reachedHome = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor launch flight timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        const plain = stripSgr(output)
+        if (!started && plain.includes('OPENALICE LAUNCH · SELECT → START → CONNECT')) {
+          started = true
+          child.write('\r')
+        }
+        if (!sawFlight && plain.includes('Launch Flight Recorder · LOCAL START · IN FLIGHT')) {
+          sawFlight = true
+        }
+        if (sawFlight && !reachedHome && plain.includes('◆ [Home] │ ● Inbox')) {
+          reachedHome = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && sawFlight && reachedHome) resolve(output)
+        else reject(new Error(`Supervisor launch flight exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    const plain = stripSgr(transcript)
+    expect(plain).toContain('◆ IN FLIGHT · This computer → Default AliceProject')
+    expect(plain).toContain('✓ 01  Validate local target · DONE')
+    expect(plain).toContain('◆ 02  Prepare and start Runtime · IN FLIGHT')
+    expect(plain).toContain('◇ 03  Bind local target · WAITING')
+    expect(plain).toContain('◇ CONTROL  Keep this terminal open')
+    expect(plain).toContain('FIXTURE_RESULT starts=1 opens=0 loads=0 diagnoses=0')
+    expect(transcript).toContain('\u001b[?25h')
+  }, 12_000)
+
   it('opens a stopped AliceProject in the connection-first Launcher by default', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-launcher-'))
     temporaryPaths.push(isolatedHome)

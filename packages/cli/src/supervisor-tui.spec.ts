@@ -31,6 +31,11 @@ import {
   SupervisorScreen,
 } from './supervisor-tui.ts'
 import { renderSupervisorConfirmationActionBar } from './supervisor-confirmation.ts'
+import {
+  advanceSupervisorLaunchFlight,
+  createSupervisorLaunchFlight,
+  failSupervisorLaunchFlight,
+} from './supervisor-launch-flight.ts'
 
 const matchesKey = (data: string, key: string) => data === key
 const pointerClick = (col: number, row: number) => ({
@@ -83,6 +88,61 @@ describe('Supervisor TUI screen', () => {
 
     expect(screen.handleKey('enter', matchesKey)).toBe(true)
     expect(activated).toEqual(['local/default'])
+  })
+
+  it('lets the Launch Flight Recorder own busy and recoverable-failure states', () => {
+    const originalLocal = fleetMachines()[0]!
+    const local = {
+      ...originalLocal,
+      projects: originalLocal.projects.map((project) => ({
+        ...project,
+        runtime: { ...project.runtime, class: 'absent', state: 'absent', webEndpoint: null },
+      })),
+    }
+    const startedAt = new Date(2026, 8, 3, 0, 0, 0).getTime()
+    const target = {
+      machineKey: 'local',
+      machineName: 'This computer',
+      projectKey: 'default',
+      projectName: 'Default AliceProject',
+      transport: 'loopback' as const,
+    }
+    const running = advanceSupervisorLaunchFlight(
+      createSupervisorLaunchFlight('local-start', target, startedAt),
+      'start-runtime',
+    )
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'fleet',
+      runtime: { class: 'absent', endpoints: {} },
+      activeTarget: null,
+      fleet: createSupervisorFleetState('2026-09-02T00:00:00Z', [local], 'default'),
+      launchFlight: running,
+      busy: 'Preparing and starting local Runtime',
+    }, {
+      motionEnabled: false,
+      now: () => startedAt + 4_000,
+      getViewportHeight: () => 28,
+    })
+
+    const activeFrame = screen.render(100).join('\n')
+    expect(activeFrame).toContain('Launch Flight Recorder · LOCAL START · IN FLIGHT · T+00:04')
+    expect(activeFrame).toContain('◆ 02 START')
+    expect(activeFrame).toContain('[ q ] Detach TUI')
+    expect(activeFrame).not.toContain('Machines · 1/1')
+
+    screen.update({
+      busy: undefined,
+      launchFlight: failSupervisorLaunchFlight(running, 'Runtime readiness timed out'),
+    })
+    const failedFrame = screen.render(100).join('\n')
+    expect(failedFrame).toContain('RECOVERABLE FAILURE')
+    expect(failedFrame).toContain('[ Enter ] Retry selected target')
+    expect(failedFrame).toContain('[ Esc ] Back to targets')
+    expect(screen.handleEscape()).toBe(true)
+    expect(screen.snapshot.launchFlight).toBeNull()
+    expect(screen.render(100).join('\n')).toContain('OPENALICE LAUNCH')
   })
 
   it('turns a connected target into a bounded workbench with Inbox attention', () => {
@@ -2571,6 +2631,7 @@ describe('Supervisor TUI screen', () => {
 
   it('starts the Runtime from the Launcher and stays in the TUI', async () => {
     const calls: string[] = []
+    let screen: SupervisorScreen | undefined
     let runtime: {
       class: string
       owner: { surface: string; pid: number } | null
@@ -2582,7 +2643,7 @@ describe('Supervisor TUI screen', () => {
     }
     let inputListener: ((data: string) => unknown) | undefined
     class FakeTui {
-      addChild(): void {}
+      addChild(component: SupervisorScreen): void { screen = component }
       addInputListener(listener: (data: string) => unknown): () => void {
         inputListener = listener
         return () => undefined
@@ -2615,12 +2676,16 @@ describe('Supervisor TUI screen', () => {
       inspect: async () => runtime,
       start: async () => {
         calls.push('start')
+        expect(screen?.snapshot.launchFlight?.kind).toBe('local-start')
+        expect(screen?.snapshot.launchFlight?.stages.map((stage) => stage.state)).toEqual([
+          'complete', 'active', 'waiting',
+        ])
         runtime = {
           class: 'running',
           owner: { surface: 'cli-server', pid: 42 },
           endpoints: { web: 'http://127.0.0.1:47331' },
         }
-        queueMicrotask(() => inputListener?.('q'))
+        setTimeout(() => inputListener?.('q'), 0)
       },
       open: async () => {
         calls.push('open')
@@ -2632,6 +2697,7 @@ describe('Supervisor TUI screen', () => {
     })).resolves.toBe(0)
 
     expect(calls).toEqual(['start'])
+    expect(screen?.snapshot.launchFlight).toBeNull()
   })
 
   it('returns to the Launcher when the active local Runtime disappears', async () => {
@@ -3009,6 +3075,8 @@ describe('Supervisor TUI screen', () => {
 
   it('re-probes and starts a selected stopped remote AliceProject', async () => {
     let inputListener: ((data: string) => unknown) | undefined
+    let screen: SupervisorScreen | undefined
+    const observedStages: string[] = []
     const machines = fleetMachines()
     machines[1]!.projects[0]!.runtime = {
       ...machines[1]!.projects[0]!.runtime,
@@ -3023,11 +3091,20 @@ describe('Supervisor TUI screen', () => {
       machines,
     }
     const startRemoteProject = vi.fn(async () => {
-      setTimeout(() => inputListener?.('q'), 0)
+      observedStages.push(screen?.snapshot.launchFlight?.stages.find((stage) => (
+        stage.state === 'active'
+      ))?.id ?? 'missing')
+      machines[1]!.projects[0]!.runtime = {
+        ...machines[1]!.projects[0]!.runtime,
+        class: 'running',
+        state: 'ready',
+        ownerSurface: 'cli-server',
+        webEndpoint: 'http://127.0.0.1:47331',
+      }
     })
     const inspectFleet = vi.fn(async () => fleet)
     class FakeTui {
-      addChild(): void {}
+      addChild(component: SupervisorScreen): void { screen = component }
       addInputListener(listener: (data: string) => unknown): () => void { inputListener = listener; return () => undefined }
       requestRender(): void {}
       setShowHardwareCursor(): void {}
@@ -3053,6 +3130,20 @@ describe('Supervisor TUI screen', () => {
         machines: [{ key: 'cloud', displayName: 'Cloud', sshTarget: 'cloud.example.com', isDefault: false }],
       }),
       startRemoteProject,
+      connectRemoteProject: async ({ signal, onReady }) => {
+        observedStages.push(screen?.snapshot.launchFlight?.stages.find((stage) => (
+          stage.state === 'active'
+        ))?.id ?? 'missing')
+        onReady({
+          localPort: 45454,
+          localUrl: 'http://127.0.0.1:45454',
+          clientUrl: 'http://127.0.0.1:45454',
+        })
+        queueMicrotask(() => inputListener?.('q'))
+        return new Promise<number>((resolve) => {
+          signal.addEventListener('abort', () => resolve(0), { once: true })
+        })
+      },
       discoverUpdate: async () => null,
       loadTui: async () => ({ ProcessTerminal: class {}, TUI: FakeTui, matchesKey }) as never,
     })).resolves.toBe(0)
@@ -3062,6 +3153,13 @@ describe('Supervisor TUI screen', () => {
       expect.objectContaining({ key: 'cloud', sshTarget: 'cloud.example.com' }),
       'research',
     )
+    expect(observedStages).toEqual(['start-runtime', 'open-forward'])
+    expect(screen?.snapshot.launchFlight).toBeNull()
+    expect(screen?.snapshot.activeTarget).toMatchObject({
+      kind: 'ssh',
+      machineKey: 'cloud',
+      projectKey: 'research',
+    })
   })
 
   it('keeps the transfer wizard default-no and never invokes the sender', async () => {

@@ -8,7 +8,8 @@ let loads = 0
 let diagnoses = 0
 let disconnects = 0
 let probes = 0
-const running = process.env['OPENALICE_TUI_FIXTURE_RUNTIME'] === 'running'
+let running = process.env['OPENALICE_TUI_FIXTURE_RUNTIME'] === 'running'
+const startDelayMs = Number(process.env['OPENALICE_TUI_FIXTURE_START_DELAY_MS'] ?? 0)
 const remote = process.env['OPENALICE_TUI_FIXTURE_REMOTE'] === '1'
 const healthFlap = process.env['OPENALICE_TUI_FIXTURE_HEALTH'] === 'flap'
 const fleetRows = Number(process.env['OPENALICE_TUI_FIXTURE_FLEET_ROWS'] ?? 0)
@@ -29,7 +30,13 @@ const exitCode = await runSupervisorTui({}, {
         endpoints: { web: 'http://127.0.0.1:47331' },
       }
     : { class: 'absent', state: 'absent', owner: null, endpoints: {} },
-  start: async () => { starts += 1 },
+  start: async () => {
+    starts += 1
+    if (startDelayMs > 0) {
+      await new Promise<void>((resolve) => setTimeout(resolve, startDelayMs))
+    }
+    running = true
+  },
   open: async () => { opens += 1 },
   readLogs: async () => {
     loads += 1

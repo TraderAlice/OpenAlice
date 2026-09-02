@@ -176,6 +176,7 @@ export function decorateSupervisorFrame(
     if (splitFramedHeaderColumns(line).length > 1) {
       return decorateSupervisorFramedHeaders(line, theme)
     }
+    if (/[✓◆◇×] \d{2} [A-Z]+/u.test(line)) return decorateLaunchFlightRail(line, theme)
     if (/^[⠀-⣿◆]  WORKING /u.test(line)) return theme.busyRail(line)
     if (line.startsWith('✓  READY')) return theme.successRail(line)
     if (line.startsWith('!  NOTICE')) return theme.warningRail(line)
@@ -195,6 +196,8 @@ export function decorateSupervisorFrame(
     if (line.includes('│ ✓ ')) return theme.success(line)
     if (line.includes('│ ● ')) return theme.success(line)
     if (line.includes('│ ○ ')) return theme.muted(line)
+    if (/│ ◆ (?:IN FLIGHT|NOW|\d{2})/u.test(line)) return theme.accentStrong(line)
+    if (/│ ◇ \d{2}/u.test(line)) return theme.muted(line)
     if (line.includes('│ ● LIVE SESSION')) return theme.successRail(line)
     if (line.includes('│ ◆ LIVE RUNTIME · PROJECT HOME MISSING')) return theme.warningRail(line)
     if (line.includes('│ ◆ CONNECTION DEGRADED')) return theme.warningRail(line)
@@ -244,6 +247,18 @@ export function decorateSupervisorFrame(
       || line.startsWith('Supervisor recovery controls')
     ) return theme.accentStrong(line)
     return line
+  })
+}
+
+function decorateLaunchFlightRail(
+  line: string,
+  theme: SupervisorTuiTheme,
+): string {
+  return line.replace(/[✓◆◇×] \d{2} [A-Z]+/gu, (token) => {
+    if (token.startsWith('✓')) return theme.success(token)
+    if (token.startsWith('◆')) return theme.accentStrong(token)
+    if (token.startsWith('×')) return theme.danger(token)
+    return theme.muted(token)
   })
 }
 

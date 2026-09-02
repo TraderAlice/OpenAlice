@@ -168,6 +168,15 @@ import {
   type SupervisorConnectionEventOrigin,
   type SupervisorConnectionPhase,
 } from './supervisor-connection-chronicle.ts'
+import {
+  advanceSupervisorLaunchFlight,
+  createSupervisorLaunchFlight,
+  failSupervisorLaunchFlight,
+  renderSupervisorLaunchFlight,
+  type SupervisorLaunchFlight,
+  type SupervisorLaunchFlightKind,
+  type SupervisorLaunchStageId,
+} from './supervisor-launch-flight.ts'
 import { supervisorClipboardPayload } from './supervisor-terminal-clipboard.ts'
 import {
   createSupervisorInboxState,
@@ -406,6 +415,7 @@ export interface SupervisorSnapshot {
   fleet?: SupervisorFleetState | null
   activeTarget?: SupervisorActiveTarget | null
   connectionEvents?: SupervisorConnectionEvent[]
+  launchFlight?: SupervisorLaunchFlight | null
   inbox?: SupervisorInboxSnapshot | null
 }
 
@@ -945,6 +955,7 @@ export async function runSupervisorTui(
     bootSequence: bootSequenceEnabled,
     onMotionDemandChange: syncMotionTimer,
     getViewportHeight: () => terminalSize().height,
+    now,
   })
   ui.addChild(screen)
 
@@ -1051,6 +1062,46 @@ export async function runSupervisorTui(
       createSupervisorConnectionEvent(kind, target, now(), origin),
     )
     return connectionEvents
+  }
+
+  function beginLaunchFlight(
+    kind: SupervisorLaunchFlightKind,
+    target: {
+      machineKey: string
+      machineName: string
+      projectKey: string
+      projectName: string
+      transport: 'loopback' | 'ssh-forward'
+    },
+    stage: SupervisorLaunchStageId,
+    busy: string,
+  ): SupervisorLaunchFlight {
+    const launchFlight = advanceSupervisorLaunchFlight(
+      createSupervisorLaunchFlight(kind, target, now()),
+      stage,
+    )
+    screen.update({ launchFlight, busy, notice: undefined, diagnostic: undefined })
+    return launchFlight
+  }
+
+  function advanceLaunchFlight(
+    stage: SupervisorLaunchStageId,
+    busy: string,
+    detail?: string,
+  ): SupervisorLaunchFlight | null {
+    const current = screen.snapshot.launchFlight
+    if (!current) return null
+    const launchFlight = advanceSupervisorLaunchFlight(current, stage, detail)
+    screen.update({ launchFlight, busy })
+    return launchFlight
+  }
+
+  function failLaunchFlight(failure: string): SupervisorLaunchFlight | null {
+    const current = screen.snapshot.launchFlight
+    if (!current) return null
+    const launchFlight = failSupervisorLaunchFlight(current, failure)
+    screen.update({ launchFlight, busy: undefined })
+    return launchFlight
   }
 
   function abortRemoteTunnels(exceptKey?: string): void {
@@ -1456,13 +1507,34 @@ export async function runSupervisorTui(
     const controller = new AbortController()
     tunnelControllers.set(key, controller)
     updateTunnelState(key, 'connecting')
-    screen.update({ notice: `Connecting to ${machine.displayName} / ${project.displayName}…` })
+    const currentFlight = screen.snapshot.launchFlight
+    if (currentFlight?.kind === 'remote-start'
+      && currentFlight.target.machineKey === machine.key
+      && currentFlight.target.projectKey === project.key) {
+      advanceLaunchFlight(
+        'open-forward',
+        `Opening SSH forward to ${machine.key}/${project.key}`,
+      )
+    } else {
+      beginLaunchFlight('remote-connect', {
+        machineKey: machine.key,
+        machineName: machine.displayName,
+        projectKey: project.key,
+        projectName: project.displayName,
+        transport: 'ssh-forward',
+      }, 'open-forward', `Opening SSH forward to ${machine.key}/${project.key}`)
+    }
     try {
       await connectRemoteProject({
         machine,
         project,
         signal: controller.signal,
         onReady: ({ localUrl, clientUrl }) => {
+          advanceLaunchFlight(
+            'bind-target',
+            `Binding ${machine.key}/${project.key}`,
+            'SSH forward is ready; promoting the endpoint into the workbench',
+          )
           const previousTarget = activeTarget
           if (previousTarget && (previousTarget.machineKey !== machine.key
             || previousTarget.projectKey !== project.key
@@ -1477,6 +1549,8 @@ export async function runSupervisorTui(
           screen.update({
             activeTarget,
             connectionEvents,
+            launchFlight: null,
+            busy: undefined,
             inbox,
             panel: 'overview',
             notice: `Connected to ${machine.displayName} / ${project.displayName}.`,
@@ -1485,12 +1559,20 @@ export async function runSupervisorTui(
         },
       })
       if (active && !controller.signal.aborted) {
-        screen.update({ notice: `Tunnel to ${machine.key}/${project.key} closed.` })
+        if (screen.snapshot.launchFlight?.status === 'running') {
+          const failure = `SSH forward to ${machine.key}/${project.key} closed before the target was ready.`
+          failLaunchFlight(failure)
+          screen.update({ diagnostic: failure })
+        } else {
+          screen.update({ notice: `Tunnel to ${machine.key}/${project.key} closed.` })
+        }
       }
     } catch (error: unknown) {
       if (active && !controller.signal.aborted) {
         updateTunnelState(key, 'failed')
-        screen.update({ diagnostic: safeError(error) })
+        const failure = safeError(error)
+        failLaunchFlight(failure)
+        screen.update({ diagnostic: failure })
       }
     } finally {
       tunnelControllers.delete(key)
@@ -1525,7 +1607,13 @@ export async function runSupervisorTui(
     if (machine.key === 'local' || actionRunning) return
     let started = false
     actionRunning = true
-    screen.update({ busy: `Checking ${machine.key}/${project.key}`, diagnostic: undefined })
+    beginLaunchFlight('remote-start', {
+      machineKey: machine.key,
+      machineName: machine.displayName,
+      projectKey: project.key,
+      projectName: project.displayName,
+      transport: 'ssh-forward',
+    }, 'validate-target', `Checking ${machine.key}/${project.key}`)
     try {
       const latest = await inspectFleet()
       const remote = latest.machines.find((entry) => entry.key === machine.key)
@@ -1537,15 +1625,25 @@ export async function runSupervisorTui(
       const registry = await loadMachines()
       const registered = registry.machines.find((entry) => entry.key === machine.key)
       if (!registered) throw new Error(`Machine "${machine.key}" is no longer registered.`)
-      screen.update({ busy: `Starting ${machine.key}/${project.key}` })
+      advanceLaunchFlight(
+        'start-runtime',
+        `Starting ${machine.key}/${project.key}`,
+        'Remote selection and lifecycle capability confirmed',
+      )
       await startRemoteProject(registered, project.key)
       started = true
-      screen.update({ notice: `Started ${machine.displayName} / ${project.displayName}.` })
+      advanceLaunchFlight(
+        'refresh-inventory',
+        `Refreshing ${machine.key}/${project.key}`,
+        'Remote start returned; waiting for the advertised endpoint',
+      )
     } catch (error: unknown) {
-      screen.update({ diagnostic: safeError(error) })
+      const failure = safeError(error)
+      failLaunchFlight(failure)
+      screen.update({ diagnostic: failure })
     } finally {
       actionRunning = false
-      screen.update({ busy: undefined })
+      if (!started) screen.update({ busy: undefined })
     }
     if (started) {
       await refreshFleet({ quiet: true })
@@ -1556,8 +1654,16 @@ export async function runSupervisorTui(
       if (refreshedMachine && refreshedProject
         && refreshedProject.runtime.webEndpoint
         && runtimeIsConnected(refreshedProject.runtime)) {
-        screen.update({ notice: `Started ${machine.displayName} / ${project.displayName}. Connecting…` })
+        advanceLaunchFlight(
+          'open-forward',
+          `Opening SSH forward to ${machine.key}/${project.key}`,
+          'Remote inventory advertises a ready Web endpoint',
+        )
         void activateFleetProject(refreshedMachine, refreshedProject)
+      } else {
+        const failure = 'Remote Runtime started, but no reachable Web endpoint was advertised.'
+        failLaunchFlight(failure)
+        screen.update({ diagnostic: failure })
       }
     }
   }
@@ -1750,6 +1856,16 @@ export async function runSupervisorTui(
     let actionFailure: string | undefined
     const homeRoot = context?.home
     const actionLabel = actionName(action)
+    const launchAction = action === 'start' || action === 'start-open'
+    if (launchAction && context) {
+      beginLaunchFlight('local-start', {
+        machineKey: 'local',
+        machineName: 'This computer',
+        projectKey: context.project,
+        projectName: context.aliceProject.displayName,
+        transport: 'loopback',
+      }, 'start-runtime', 'Preparing and starting local Runtime')
+    }
     screen.update({
       busy: actionLabel,
       notice: undefined,
@@ -1792,6 +1908,11 @@ export async function runSupervisorTui(
           waitMs: 120_000,
           takeover: false,
         })
+        advanceLaunchFlight(
+          'bind-target',
+          'Binding ready local target',
+          'Runtime readiness confirmed; promoting the loopback endpoint',
+        )
         if (action === 'start-open') {
           screen.update({ notice: 'Runtime started.' })
           try {
@@ -1837,12 +1958,23 @@ export async function runSupervisorTui(
       }
     } catch (error: unknown) {
       actionFailure = `${actionLabel} failed: ${safeError(error)}`
+      if (launchAction) failLaunchFlight(actionFailure)
       screen.update({ confirmation: undefined })
     } finally {
       actionRunning = false
       if (active) {
-        screen.update({ busy: undefined })
+        screen.update({
+          busy: launchAction && !actionFailure ? 'Binding ready local target' : undefined,
+        })
         await refreshRuntime()
+        if (launchAction && activeTarget) {
+          screen.update({ launchFlight: null, busy: undefined })
+        } else if (launchAction && !actionFailure) {
+          actionFailure = 'Runtime start returned without a reachable local endpoint.'
+          failLaunchFlight(actionFailure)
+        } else {
+          screen.update({ busy: undefined })
+        }
         if (actionFailure) screen.update({ diagnostic: actionFailure })
       }
     }
@@ -3504,6 +3636,7 @@ export class SupervisorScreen implements Component {
   private readonly motionEnabled: boolean
   private readonly onMotionDemandChange?: () => void
   private readonly getViewportHeight?: () => number
+  private readonly now: () => number
   private onDetach?: () => void
   private hoveredPanel?: SupervisorPanel
   private headerReleaseHovered = false
@@ -3583,6 +3716,7 @@ export class SupervisorScreen implements Component {
       bootSequence?: boolean
       onMotionDemandChange?: () => void
       getViewportHeight?: () => number
+      now?: () => number
       onDetach?: () => void
     } = {},
   ) {
@@ -3617,6 +3751,7 @@ export class SupervisorScreen implements Component {
       : undefined
     this.onMotionDemandChange = callbacks.onMotionDemandChange
     this.getViewportHeight = callbacks.getViewportHeight
+    this.now = callbacks.now ?? (() => Date.now())
     this.introFrame = this.motionEnabled && this.theme.enabled ? 0 : undefined
     this.onDetach = callbacks.onDetach
   }
@@ -3839,6 +3974,10 @@ export class SupervisorScreen implements Component {
   handleEscape(): boolean {
     if (this.commandDeckOpen) {
       this.setCommandPaletteOpen(false)
+      return true
+    }
+    if (this.snapshot.launchFlight?.status === 'failed') {
+      this.update({ launchFlight: null, diagnostic: undefined, notice: 'Returned to launch targets.' })
       return true
     }
     if (
@@ -4658,6 +4797,13 @@ export class SupervisorScreen implements Component {
     if (focusTask === 'confirmation') {
       // The centered Decision Gate owns this field. Leaving it empty prevents
       // clipped page copy and inactive controls from reading as modal context.
+    } else if (this.snapshot.panel === 'fleet' && this.snapshot.launchFlight) {
+      lines.push(...renderSupervisorLaunchFlight(
+        this.snapshot.launchFlight,
+        width,
+        this.now(),
+        operationalCanvasHeight,
+      ))
     } else if (this.snapshot.panel === 'fleet' && this.snapshot.fleet) {
       this.fleetVisibleRows = width >= 72 && Number.isFinite(viewportHeight)
         ? Math.max(
@@ -4844,6 +4990,17 @@ export class SupervisorScreen implements Component {
     const actionWidth = Math.max(1, width - 4)
     const actionShelf = focusTask
       ? this.renderFocusActionBar(actionWidth)
+      : this.snapshot.panel === 'fleet'
+        && this.snapshot.launchFlight
+        ? this.snapshot.launchFlight.status === 'running'
+          ? renderSupervisorCommandBar([
+              { key: 'q', label: 'Detach TUI', primary: true },
+            ], actionWidth)
+          : renderSupervisorCommandBar([
+              { key: 'Enter', label: 'Retry selected target', primary: true },
+              { key: 'Esc', label: 'Back to targets' },
+              { key: '?', label: 'More' },
+            ], actionWidth)
       : this.snapshot.panel === 'fleet' && this.snapshot.fleet
         ? fleetActionBar(
           this.snapshot.fleet,
@@ -5318,6 +5475,7 @@ function pointerCommandInput(label: string): KeyId | undefined {
     Enter: 'enter',
     'y / Enter': 'enter',
     'n / Esc': 'n',
+    Esc: 'escape',
     'Tab / →': 'tab',
     'Shift+Tab / ←': 'shift+tab',
     Tab: 'tab',
