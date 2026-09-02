@@ -51,6 +51,7 @@ const pointerClick = (col: number, row: number) => ({
 describe('Supervisor TUI screen', () => {
   it('makes the disconnected surface a three-step OpenAlice Launcher', () => {
     const activated: string[] = []
+    let viewportHeight = 32
     const originalLocal = fleetMachines()[0]!
     const local = {
       ...originalLocal,
@@ -73,6 +74,7 @@ describe('Supervisor TUI screen', () => {
       activeTarget: null,
       fleet: createSupervisorFleetState('2026-09-02T00:00:00Z', [local], 'default'),
     }, {
+      getViewportHeight: () => viewportHeight,
       motionEnabled: false,
       onActivateFleet: (machine, project) => activated.push(`${machine.key}/${project.key}`),
     })
@@ -92,6 +94,11 @@ describe('Supervisor TUI screen', () => {
     expect(frame).not.toContain('Machines · 1/1')
     expect(frame).not.toContain('AliceProjects · This computer · 1/1')
     expect(frame).not.toContain('Inbox')
+    const tipRow = plainLines.findIndex((line) => line.startsWith('◇  Tip:'))
+    const spineRow = plainLines.findIndex((line) => line.includes('[ / ] Commands'))
+    expect(plainLines).toHaveLength(32)
+    expect(spineRow).toBe(tipRow + 2)
+    expect(plainLines.slice(spineRow + 1).every((line) => line === '')).toBe(true)
 
     const themed = decorateSupervisorFrame(
       plainLines,
@@ -105,6 +112,11 @@ describe('Supervisor TUI screen', () => {
     const actionRow = plainLines.findIndex((line) => line.includes('◆ [ Enter ] Start OpenAlice')) + 1
     expect(screen.handlePointer(pointerClick(130, actionRow))).toBe(true)
     expect(activated).toEqual(['local/default'])
+
+    viewportHeight = 48
+    const expanded = screen.render(140)
+    expect(expanded).toHaveLength(48)
+    expect(expanded.findIndex((line) => line.includes('[ / ] Commands'))).toBe(spineRow)
   })
 
   it('folds an extremely short Launcher into one complete target card', () => {

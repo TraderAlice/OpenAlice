@@ -156,8 +156,10 @@ intentionally parameter-free:
   full-row primary Action Shelf such as `◆ [ Enter ] Start OpenAlice`, not a
   keycap buried in a prose Next sentence; its complete painted row is also its
   pointer target, including when embedded in the wide Launchpad's task column.
-  Surplus viewport height stays outside the launch board so this
-  action remains visually adjacent to the contextual Tip. The Briefing and its
+  Direct Launchpad, contextual Tip, and Command Spine form one continuous entry
+  cluster, with surplus viewport height following the complete cluster. This
+  keeps the primary action, guidance, and global controls visually adjacent.
+  Multi-target selectors retain their viewport-anchored Spine. The Briefing and its
   content-owned action share one
   resolved intent,
   so an offline, unavailable, capability-blocked, or endpoint-less target

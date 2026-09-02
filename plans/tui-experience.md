@@ -3903,6 +3903,26 @@ already large `supervisor-tui.ts` application controller.
   tests, and CLI typecheck/build passes. Maintainer acceptance remains pending
   on this branch.
 
+### Direct Launcher interaction-cluster decision
+
+- The post-Home visual audit found the same detached-control failure on the
+  highest-value cold-start path: the direct Launchpad and Tip ended near the top
+  of a 120x32 terminal while Command Spine remained at row 32. That made the one
+  screen whose job is to start OpenAlice read as two unrelated interfaces.
+- A single resolved Machine/AliceProject Launcher now uses the same entry-flow
+  rhythm as connected Home: Launchpad, Tip, and Command Spine stay together and
+  surplus height follows them. The multi-target Fleet selector keeps its
+  bottom-anchored Spine because its candidate canvas can consume and scroll the
+  available viewport; Launch Flight, Recovery, Focus, and Command Dock behavior
+  are unchanged.
+- Real 120x32, 80x24, and 46x16 PTY captures verify that target, three-stage
+  readiness, primary Start action, guidance, and Commands read as one bounded
+  launch sequence. Screen coverage locks the Spine directly after the Tip at
+  32 rows and confirms its row is stable when the viewport grows to 48. The
+  focused screen/PTY closure passes 146 tests, the complete CLI suite passes 657
+  tests, and CLI typecheck/build passes. Maintainer acceptance remains pending
+  on this branch.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

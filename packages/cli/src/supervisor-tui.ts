@@ -5116,6 +5116,9 @@ export class SupervisorScreen implements Component {
       ? this.renderFocusActionBar(Math.max(1, width - 4))
       : []
     const launcherTarget = this.snapshot.panel === 'fleet' && this.snapshot.activeTarget === null
+    const directLauncherTarget = launcherTarget
+      && this.snapshot.fleet != null
+      && supervisorFleetHasSingleLaunchTarget(this.snapshot.fleet)
     const launcherMachine = launcherTarget
       ? selectedFleetMachine(this.snapshot.fleet)
       : undefined
@@ -5152,7 +5155,7 @@ export class SupervisorScreen implements Component {
       }, width),
       width,
     )
-    const flowHomeConsole = this.snapshot.panel === 'overview'
+    const flowEntryConsole = (this.snapshot.panel === 'overview' || directLauncherTarget)
       && !focusTask
       && !this.commandDeckOpen
       && !isConfigRecovery(this.snapshot)
@@ -5196,7 +5199,7 @@ export class SupervisorScreen implements Component {
               ? this.snapshot.doctor?.checks?.length ?? 0
               : undefined,
         }, width)],
-      flowHomeConsole ? 'flow' : 'bottom',
+      flowEntryConsole ? 'flow' : 'bottom',
     ).map((line) => truncate(line, width))
     this.commandTargets = supervisorCommandTargets(visibleLines)
     if (this.focusConsoleHoveredCommand) {
