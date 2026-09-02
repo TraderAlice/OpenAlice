@@ -151,8 +151,11 @@ path is intentionally parameter-free:
   window position without changing keyboard or pointer selection.
   Background refresh of the selected local Runtime updates its inventory row
   without moving a user who is inspecting another Machine or AliceProject;
-- the Overview/Fleet/Logs/Doctor/Help navigation accepts Tab, left/right, and
-  `[`/`]`; the visible tabs are composed as a full-width segmented rail with a
+- the top-level chrome is a three-row Mission Header: a framed brand/release
+  masthead, the Overview/Fleet/Logs/Doctor/Help navigation, and a closing rail.
+  It replaces the disconnected legacy title/divider/tab stack without taking
+  another terminal row. The navigation accepts Tab, left/right, and `[`/`]`;
+  its visible tabs are composed as a full-width segmented rail with a
   stable glyph, label, and optional status badge. Color terminals render the
   rail, selected chip, and hover chip as distinct surfaces; `NO_COLOR` keeps
   the selected label in brackets. Wide labels collapse through compact and

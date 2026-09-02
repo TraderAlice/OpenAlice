@@ -72,8 +72,12 @@ describe('Supervisor TUI screen', () => {
 
     const lines = screen.render(80)
 
+    expect(lines[0]).toMatch(/^╭─ /u)
     expect(lines[0]).toContain('OpenAlice Supervisor')
     expect(lines[0]).toContain('v0.87.0-beta · DEV')
+    expect(lines[1]).toMatch(/^│ .+ │$/u)
+    expect(lines[2]).toMatch(/^╰─+╯$/u)
+    expect(lines.slice(0, 3).every((line) => displayWidth(line) === 80)).toBe(true)
     expect(lines.join('\n')).toContain('○ STOPPED')
     expect(lines.join('\n')).toContain('[ Enter ]  Start OpenAlice & open Workspace')
     expect(lines.join('\n')).not.toContain('◆ [ Enter ] Start & open')
@@ -370,7 +374,7 @@ describe('Supervisor TUI screen', () => {
       .not.toBe(beaconIntro)
     for (let frame = 0; frame < 8; frame += 1) screen.advanceMotion()
     expect(screen.hasActiveMotion()).toBe(false)
-    expect(screen.render(80)[0]).toContain('\u001b[1;38;2;116;235;226m◆  OpenAlice Supervisor')
+    expect(screen.render(80)[0]).toContain('\u001b[1;38;2;116;235;226m◆ OpenAlice Supervisor')
 
     screen.update({ runtime: { class: 'running', endpoints: {} } })
     expect(screen.render(80).join('\n')).toContain('◉ RUNNING')
@@ -486,7 +490,7 @@ describe('Supervisor TUI screen', () => {
     })
 
     expect(screen.render(100).join('\n')).toContain('\u001b[38;2;')
-    expect(screen.render(100)[2]!.replace(/\u001b\[[0-9;]*m/gu, '')).toContain('[Machines]·2')
+    expect(screen.render(100)[1]!.replace(/\u001b\[[0-9;]*m/gu, '')).toContain('[Machines]·2')
     expect(screen.snapshot.fleet?.selectedMachine).toBe(0)
     expect(screen.handlePointer({
       button: 65, col: 2, row: 7, release: false, wheel: 1, motion: false, leftClick: false,
@@ -512,15 +516,15 @@ describe('Supervisor TUI screen', () => {
       button: 0, col: 50, row: 6, release: false, wheel: null, motion: false, leftClick: true,
     })).toBe(true)
     expect(activated).toEqual(['cloud/research'])
-    const logsColumn = screen.render(100)[2]!
+    const logsColumn = screen.render(100)[1]!
       .replace(/\u001b\[[0-9;]*m/gu, '')
       .indexOf('Logs') + 1
     expect(screen.handlePointer({
-      button: 35, col: logsColumn, row: 3, release: false, wheel: null, motion: true, leftClick: false,
+      button: 35, col: logsColumn, row: 2, release: false, wheel: null, motion: true, leftClick: false,
     })).toBe(true)
-    expect(screen.render(100)[2]).toContain('\u001b[1;38;2;203;250;246;48;2;19;49;55m≋ Logs')
+    expect(screen.render(100)[1]).toContain('\u001b[1;38;2;203;250;246;48;2;19;49;55m≋ Logs')
     expect(screen.handlePointer({
-      button: 0, col: logsColumn, row: 3, release: false, wheel: null, motion: false, leftClick: true,
+      button: 0, col: logsColumn, row: 2, release: false, wheel: null, motion: false, leftClick: true,
     })).toBe(true)
     expect(screen.snapshot.panel).toBe('logs')
     expect(actions).toContain('logs')
@@ -701,7 +705,7 @@ describe('Supervisor TUI screen', () => {
       },
     })
     const semanticLogs = screen.render(80).join('\n')
-    expect(screen.render(80)[2]).toContain('[Logs]·2')
+    expect(screen.render(80)[1]).toContain('[Logs]·2')
     expect(semanticLogs).toContain('! 1  03:04:05Z Runtime probe slowed · scope=guardian waitMs=120')
     expect(semanticLogs).toContain('· 2  plain adapter output')
     expect(semanticLogs).not.toContain('"msg"')
@@ -719,7 +723,7 @@ describe('Supervisor TUI screen', () => {
     expect(screen.render(80).join('\n')).toContain('· 2  plain adapter output')
 
     screen.update({ panel: 'doctor' })
-    expect(screen.render(80)[2]).toContain('[Doctor]×1')
+    expect(screen.render(80)[1]).toContain('[Doctor]×1')
     expect(screen.render(80).join('\n')).toContain('✓ Runtime reachable')
     expect(screen.render(80).join('\n')).toContain('! Update available')
     expect(screen.render(80).join('\n')).toContain('× Port collision')
@@ -733,9 +737,9 @@ describe('Supervisor TUI screen', () => {
     expect(screen.handleKey('end', matchesKey)).toBe(true)
     expect(screen.render(80).join('\n')).toContain('Inspection · 3/3 · FAIL')
     screen.update({ panel: 'overview' })
-    const navigation = screen.render(80)[2]!
+    const navigation = screen.render(80)[1]!
     const doctorBadgeColumn = navigation.indexOf('×1') + 2
-    expect(screen.handlePointer(pointerClick(doctorBadgeColumn, 3))).toBe(true)
+    expect(screen.handlePointer(pointerClick(doctorBadgeColumn, 2))).toBe(true)
     expect(screen.snapshot.panel).toBe('doctor')
     const doctorLines = screen.render(80)
     const reachableRow = doctorLines.findIndex((line) => line.includes('Runtime reachable')) + 1

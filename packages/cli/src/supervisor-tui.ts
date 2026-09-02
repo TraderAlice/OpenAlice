@@ -3408,7 +3408,7 @@ export class SupervisorScreen implements Component {
   }
 
   handlePointer(event: SupervisorPointerEvent): boolean {
-    const hovered = !this.commandDeckOpen && event.row === 3
+    const hovered = !this.commandDeckOpen && event.row === 2
       ? supervisorNavigationPanelAt(this.navigationTargets, event.col)
       : undefined
     const fleet = !this.commandDeckOpen && this.snapshot.panel === 'fleet'
@@ -3566,12 +3566,16 @@ export class SupervisorScreen implements Component {
             warnings: this.snapshot.doctor.summary?.warnings ?? 0,
           }
         : undefined,
-    }, width)
-    this.navigationTargets = navigation.targets
+    }, Math.max(1, width - 4))
+    this.navigationTargets = navigation.targets.map((target) => ({
+      ...target,
+      startColumn: target.startColumn + 2,
+      endColumn: target.endColumn + 2,
+    }))
     const lines = [
       renderSupervisorHeader(this.snapshot.version, this.snapshot.channel, width, updateBadge),
-      '─'.repeat(Math.max(1, width)),
-      navigation.line,
+      `│ ${navigation.line} │`,
+      `╰${'─'.repeat(Math.max(1, width - 2))}╯`,
       '',
     ]
 

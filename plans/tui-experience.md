@@ -472,6 +472,22 @@ not imply maintainer approval of the finished interaction.
   continuous rail; `NO_COLOR` keeps the same glyph hierarchy. Existing keycaps,
   pointer targets, overlay routing, and one-row geometry remain authoritative.
 
+### Mission Header decision
+
+- Recoloring the existing title, divider, and tabs would be the least invasive
+  change, but preserve three unrelated horizontal strips and leave the global
+  shell visually unfinished above the framed Launchpad.
+- Wrapping the whole application in an additional multi-row outer frame would
+  create the strongest container, but take content rows and columns away from
+  the supported 80×24 surface.
+- The selected model recomposes the same three rows as a Mission Header: the
+  first row frames brand and release provenance, the second frames the complete
+  segmented navigation, and the third closes the rail. Navigation renders
+  against the true inner width and offsets its published pointer geometry into
+  the frame, so compact/minimal labels, mouse hit regions, and `NO_COLOR`
+  structure remain authoritative. This is an autonomous topic decision, not a
+  recorded maintainer approval.
+
 ### Fixed activity-slot decision
 
 - Keeping the existing append-only feedback stack makes Working, Notice, and
@@ -598,6 +614,8 @@ already large `supervisor-tui.ts` application controller.
   AliceProject/Runtime/view context ribbon.
 - [x] Evolve the flat context ribbon into an OMP-style one-row Command Spine
   with a closing frame, semantic breadcrumbs, and whole-segment pointer targets.
+- [x] Replace the disconnected title/divider/tabs stack with a same-height
+  Mission Header that frames brand, release provenance, and clickable navigation.
 - [x] Replace expanding feedback rows with a stable single-line activity slot.
 - [x] Replace inline confirmation cards with stable, focused compositor modals.
 - [x] Promote the Command Palette from page replacement to a focused overlay.
@@ -1155,6 +1173,20 @@ already large `supervisor-tui.ts` application controller.
   TypeScript pass; the 699-file suite passes (698 passed, 1 skipped; 6,148 tests
   passed, 10 skipped). Docker installer smoke passes, and package dry-run
   retains the shared theme and view sources.
+- The disconnected title, divider, and tab rows are now a same-height Mission
+  Header. Its masthead joins OpenAlice identity to version/channel provenance,
+  its framed navigation preserves complete segmented targets, and its closing
+  rail pairs with the bottom Command Spine without taking another content row.
+  The navigation renderer owns the true inner width and its targets are offset
+  into the frame, so hover and click follow the rendered segments exactly.
+- Mission-Header acceptance passes with 76 focused screen and real-PTY tests.
+  Real Default AliceProject runs at 120×30, 80×24, and 46×30 confirmed the
+  complete masthead, the compact `Home / Fleet / Logs / Doc / Help` fallback,
+  stable content geometry, and terminal-mode restoration after detach. CLI
+  build/typecheck and root TypeScript pass; the 699-file suite passes (698
+  passed, 1 skipped; 6,148 tests passed, 10 skipped). Docker installer smoke
+  passes, and package dry-run includes the changed Supervisor theme, view, and
+  renderer sources.
 
 ## Completion Criteria
 

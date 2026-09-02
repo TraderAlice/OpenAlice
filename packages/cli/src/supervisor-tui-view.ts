@@ -59,10 +59,24 @@ export function renderSupervisorHeader(
   width: number,
   notice = '',
 ): string {
-  const left = '◆  OpenAlice Supervisor'
+  const prefix = '╭─ '
+  const suffix = ' ─╮'
+  const innerWidth = Math.max(1, width - displayWidth(prefix) - displayWidth(suffix))
+  const left = width < 54 ? '◆ OpenAlice' : '◆ OpenAlice Supervisor'
   const right = `v${version} · ${channel.toUpperCase()}${notice}`
-  if (width < 54) return truncateDisplayWidth(`◆ OpenAlice · ${right}`, width)
-  return labelAndTail(left, right, width)
+  const safeRight = truncateDisplayWidth(right, Math.max(1, Math.floor(innerWidth / 2)))
+  const safeLeft = truncateDisplayWidth(
+    left,
+    Math.max(1, innerWidth - displayWidth(safeRight) - 1),
+  )
+  const trackWidth = Math.max(
+    0,
+    innerWidth - displayWidth(safeLeft) - displayWidth(safeRight),
+  )
+  const track = trackWidth >= 3
+    ? ` ${'─'.repeat(trackWidth - 2)} `
+    : ' '.repeat(trackWidth)
+  return truncateDisplayWidth(`${prefix}${safeLeft}${track}${safeRight}${suffix}`, width)
 }
 
 export function renderSupervisorHome(

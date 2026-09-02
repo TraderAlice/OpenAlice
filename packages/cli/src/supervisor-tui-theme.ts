@@ -141,8 +141,8 @@ export function decorateSupervisorFrame(
     if (line.startsWith('×  ERROR')) return theme.dangerRail(line)
     if (line.startsWith('◆  STATUS')) return theme.infoRail(line)
     if (index === 0) return decorateHeader(line, theme, options.introFrame)
-    if (index === 1) return theme.accent(line)
-    if (index === 2) return decorateTabs(line, theme, options.panel, options.hoveredPanel)
+    if (index === 1) return decorateTabs(line, theme, options.panel, options.hoveredPanel)
+    if (index === 2) return theme.muted(line)
     if (line.startsWith('› ') || line.startsWith('▶ ') || line.includes('│ › ')) return theme.selected(line)
     if (line.includes('│ » ')) return theme.accent(line)
     if (line.includes('│ × ')) return theme.danger(line)
@@ -326,13 +326,15 @@ function decorateHeader(
   theme: SupervisorTuiTheme,
   introFrame?: number,
 ): string {
-  const brand = line.startsWith('◆  OpenAlice Supervisor')
-    ? '◆  OpenAlice Supervisor'
-    : line.startsWith('◆ OpenAlice')
-      ? '◆ OpenAlice'
-      : line
-  if (brand === line) return theme.brand(line, introFrame)
-  return `${theme.brand(brand, introFrame)}${theme.muted(line.slice(brand.length))}`
+  const brands = ['◆ OpenAlice Supervisor', '◆  OpenAlice Supervisor', '◆ OpenAlice']
+  const brand = brands.find((candidate) => line.includes(candidate))
+  if (!brand) return theme.brand(line, introFrame)
+  const offset = line.indexOf(brand)
+  return [
+    theme.accent(line.slice(0, offset)),
+    theme.brand(brand, introFrame),
+    theme.muted(line.slice(offset + brand.length)),
+  ].join('')
 }
 
 function decorateTabs(
@@ -348,8 +350,10 @@ function decorateTabs(
     doctor: ['Doctor', 'Doc'],
     help: ['Help'],
   }
-  const parts = line.split(' │ ')
-  return parts.map((part, index) => {
+  const framed = line.startsWith('│ ') && line.endsWith(' │')
+  const contentLine = framed ? line.slice(2, -2) : line
+  const parts = contentLine.split(' │ ')
+  const decorated = parts.map((part, index) => {
     const content = part.trimEnd()
     const padding = part.slice(content.length)
     const panel = Object.entries(labels).find(([, candidates]) => (
@@ -367,4 +371,7 @@ function decorateTabs(
       suffix ? theme.navigationRail(suffix) : '',
     ].join('')
   }).join('')
+  return framed
+    ? `${theme.navigationRail('│ ')}${decorated}${theme.navigationRail(' │')}`
+    : decorated
 }

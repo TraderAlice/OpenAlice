@@ -410,8 +410,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         output += data
         if (!clicked && output.includes('◆ [Overview]') && output.includes('? Help')) {
           clicked = true
-          child.write('\u001b[<35;52;3M')
-          child.write('\u001b[<0;52;3M')
+          child.write('\u001b[<35;54;2M')
+          child.write('\u001b[<0;54;2M')
         } else if (!inspected && clicked && output.includes('Control atlas · 1/3 · Navigation')) {
           inspected = true
           child.write('\u001b[<35;10;7M')
