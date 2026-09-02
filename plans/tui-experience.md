@@ -3316,6 +3316,23 @@ already large `supervisor-tui.ts` application controller.
   real-PTY tests (including all 54 PTY cases), and the complete CLI suite (63
   files, 637 tests). CLI typecheck and build also pass.
 
+### Home identity decision
+
+- Fresh 120x32 and 80x24 captures showed the Mission Header, selected tab, and
+  session stage all naming Home while the persistent Command Spine still
+  exposed the internal `OVERVIEW` panel key. That semantic contradiction
+  revived the dashboard premise the single-session canvas had removed.
+- The Spine now projects `◆ HOME`; recovery therefore reads
+  `! RECOVERY  ›  ◆ HOME`. The internal `overview` key remains an
+  implementation detail, while view treatment, `NO_COLOR`, pointer ownership,
+  and responsive priority remain unchanged.
+- Real 120x32 and 80x24 captures verify that the wide surface closes with one
+  coherent Home identity and the compact surface drops that low-priority view
+  badge before selected target or `LIVE` truth.
+- Home-identity acceptance passes through all 132 focused screen and real-PTY
+  tests (including all 54 PTY cases), and the complete CLI suite (63 files,
+  637 tests). CLI typecheck and build also pass.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

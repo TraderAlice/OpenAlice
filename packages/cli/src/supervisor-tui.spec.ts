@@ -850,7 +850,7 @@ describe('Supervisor TUI screen', () => {
     expect(focus).toContain('◆ FOCUS WORKSPACE  ›  [ Esc ] Back')
     expect(focus).toContain('⌂ Default AliceProject  ›  ○ COLD  ›  ◆ SETUP')
     expect(focus).not.toContain('[ / ] Commands')
-    expect(focus).not.toContain('◆ OVERVIEW')
+    expect(focus).not.toContain('◆ HOME')
     expect(supervisorCommandTargets([focus]).map((target) => target.label)).toEqual(['Esc'])
 
     const transferFocus = renderSupervisorDock({
@@ -891,7 +891,7 @@ describe('Supervisor TUI screen', () => {
     }, 80)
     expect(palette).toContain('[ / ] Close  ›  [ q ] Detach')
     expect(palette).toContain('[ i ] Default AliceProject  ›  ○ COLD')
-    expect(palette).not.toContain('◆ OVERVIEW')
+    expect(palette).not.toContain('◆ HOME')
     const overview = renderSupervisorDock({
       panel: 'overview',
       projectName: 'Default AliceProject',
@@ -907,7 +907,7 @@ describe('Supervisor TUI screen', () => {
       runtimeClass: 'absent',
     })[3]!
     expect(themedOverview).toContain(
-      '\u001b[1;38;2;213;179;255;48;2;10;34;39m◆ OVERVIEW',
+      '\u001b[1;38;2;213;179;255;48;2;10;34;39m◆ HOME',
     )
 
     const narrow = renderSupervisorDock({
@@ -947,7 +947,7 @@ describe('Supervisor TUI screen', () => {
       panel: 'overview',
       recovery: true,
     }, 80)
-    expect(recovery).toContain('! RECOVERY  ›  ◆ OVERVIEW')
+    expect(recovery).toContain('! RECOVERY  ›  ◆ HOME')
 
     const locked = renderSupervisorDock({
       panel: 'fleet',

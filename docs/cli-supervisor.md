@@ -341,6 +341,10 @@ intentionally parameter-free:
   primary action follows Now instead of settling against the stage's lower
   edge. Compact layouts use the same hierarchy with bounded vertical rhythm,
   and no other panel inherits this Home-only height policy;
+- the connected Home page keeps one product name from Mission Header through
+  Command Spine: the footer projects `◆ HOME`, never the internal `overview`
+  panel key. At compact widths the view badge is removed before selected
+  AliceProject or Runtime truth, matching the Spine's existing priority order;
 - a persistent full-width Command Spine is the sole default footer and closes
   the application with `╰─`/`─╯`
   while keeping `[ / ] Commands` and `[ q ] Detach` visible on every Supervisor

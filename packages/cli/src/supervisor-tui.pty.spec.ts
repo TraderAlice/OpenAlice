@@ -1299,7 +1299,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       child.onData((data) => {
         output += data
         const plain = stripSgr(output)
-        if (!opened && plain.includes('[ / ] Commands') && plain.includes('◆ OVERVIEW')) {
+        if (!opened && plain.includes('[ / ] Commands') && plain.includes('◆ HOME')) {
           opened = true
           child.write('?')
         } else if (!hovered && plain.includes('Help · START · SEARCH · SWITCH')) {
