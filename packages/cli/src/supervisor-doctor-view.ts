@@ -1,6 +1,6 @@
 import { displayWidth, truncateDisplayWidth } from './supervisor-display.ts'
 import { withSupervisorScrollRail } from './supervisor-scroll-rail.ts'
-import { renderSupervisorPanel } from './supervisor-tui-view.ts'
+import { renderSupervisorPanel, renderSupervisorSignalScope } from './supervisor-tui-view.ts'
 
 export interface SupervisorDoctorCheck {
   status?: string
@@ -89,17 +89,56 @@ export function renderSupervisorDoctor(
 ): SupervisorDoctorRender {
   if (!report) {
     return {
-      lines: ['Press d to run read-only Runtime diagnostics.'],
+      lines: renderSupervisorSignalScope({
+        title: 'Diagnostic Radar',
+        meta: 'STANDBY',
+        glyph: '◇',
+        state: 'DOCTOR STANDBY',
+        facts: [
+          {
+            label: 'Mode',
+            value: 'Read-only Runtime diagnostics',
+            compactValue: 'Read-only diagnostics',
+          },
+          {
+            label: 'Scope',
+            value: 'Lifecycle · ownership · paths · dependencies',
+            compactValue: 'Runtime · ownership · paths',
+          },
+          {
+            label: 'Writes',
+            value: 'None · no repair or state mutation',
+            compactValue: 'None',
+          },
+        ],
+        action: { key: 'd', label: 'Run Runtime Doctor', compactLabel: 'Run Doctor' },
+      }, width),
       targets: [],
     }
   }
   const checks = report.checks ?? []
   if (checks.length === 0) {
     return {
-      lines: renderSupervisorPanel('Doctor', width < 60 ? doctorCompactMeta(report) : doctorMeta(report), [
-        'No diagnostic checks were returned.',
-        'Press d to rerun Doctor.',
-      ], width),
+      lines: renderSupervisorSignalScope({
+        title: 'Diagnostic Radar',
+        meta: `NO CHECKS · ${doctorCompactMeta(report)}`,
+        glyph: '○',
+        state: 'NO CHECKS',
+        facts: [
+          {
+            label: 'Report',
+            value: `Loaded · ${doctorMeta(report)}`,
+            compactValue: `Loaded · ${doctorCompactMeta(report)}`,
+          },
+          { label: 'Result', value: 'No diagnostic checks returned' },
+          {
+            label: 'Writes',
+            value: 'None · report remains read-only',
+            compactValue: 'None',
+          },
+        ],
+        action: { key: 'd', label: 'Rerun Runtime Doctor', compactLabel: 'Rerun Doctor' },
+      }, width),
       targets: [],
     }
   }

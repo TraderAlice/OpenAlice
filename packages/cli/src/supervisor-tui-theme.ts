@@ -182,6 +182,8 @@ export function decorateSupervisorFrame(
     if (line.includes('│ ◆ LAUNCH READY')) return theme.infoRail(line)
     if (line.includes('│ ◇  SIGNAL STANDBY')) return theme.warningRail(line)
     if (line.includes('│ ○  SIGNAL QUIET')) return theme.infoRail(line)
+    if (line.includes('│ ◇  DOCTOR STANDBY')) return theme.warningRail(line)
+    if (line.includes('│ ○  NO CHECKS')) return theme.infoRail(line)
     if (line.includes('│ × ATTENTION')) return theme.dangerRail(line)
     if (line.includes('│ ◇ CHECKING')) return theme.warningRail(line)
     if (line.includes('│ NAVIGATION') || line.includes('│ RUNTIME') || line.includes('│ PROJECT') || line.includes('│ RECOVERY') || line.includes('│ PRIMARY') || line.includes('│ OBSERVE') || line.includes('│ MANAGE')) {

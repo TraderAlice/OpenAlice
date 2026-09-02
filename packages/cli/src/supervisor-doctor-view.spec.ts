@@ -5,6 +5,8 @@ import {
   moveSupervisorDoctorSelection,
   renderSupervisorDoctor,
 } from './supervisor-doctor-view.ts'
+import { displayWidth } from './supervisor-display.ts'
+import { supervisorCommandTargets } from './supervisor-tui-view.ts'
 
 describe('Supervisor Doctor inspector', () => {
   const report = {
@@ -29,6 +31,39 @@ describe('Supervisor Doctor inspector', () => {
     const state = createSupervisorDoctorState(report)
     expect(moveSupervisorDoctorSelection(state, 1, report)).toEqual({ selected: 0, hovered: null })
     expect(moveSupervisorDoctorSelection(state, 1, report, false)).toEqual({ selected: 2, hovered: null })
+  })
+
+  it('composes standby and no-check reports as actionable Diagnostic Radars', () => {
+    const standby = renderSupervisorDoctor(null, createSupervisorDoctorState(), 80)
+    expect(standby.lines).toHaveLength(7)
+    expect(standby.lines.join('\n')).toContain('Diagnostic Radar · STANDBY')
+    expect(standby.lines.join('\n')).toContain('◇  DOCTOR STANDBY')
+    expect(standby.lines.join('\n')).toContain('MODE       Read-only Runtime diagnostics')
+    expect(standby.lines.join('\n')).toContain('WRITES     None · no repair or state mutation')
+    expect(supervisorCommandTargets(standby.lines)).toEqual([
+      expect.objectContaining({
+        label: 'd',
+        surface: '◆ [ d ] Run Runtime Doctor',
+        primary: true,
+      }),
+    ])
+
+    const emptyReport = {
+      overall: 'unknown',
+      summary: { passed: 0, warnings: 0, failures: 0 },
+      checks: [],
+    }
+    const empty = renderSupervisorDoctor(emptyReport, createSupervisorDoctorState(emptyReport), 80)
+    expect(empty.lines.join('\n')).toContain('Diagnostic Radar · NO CHECKS · 0F/0W/0P')
+    expect(empty.lines.join('\n')).toContain('○  NO CHECKS')
+    expect(empty.lines.join('\n')).toContain('REPORT     Loaded · UNKNOWN · 0 pass · 0 warn · 0 fail')
+    expect(empty.lines.join('\n')).toContain('◆ [ d ] Rerun Runtime Doctor')
+
+    const narrow = renderSupervisorDoctor(null, createSupervisorDoctorState(), 46)
+    expect(narrow.lines.every((line) => displayWidth(line) === 46)).toBe(true)
+    expect(narrow.lines.join('\n')).toContain('Mode      Read-only diagnostics')
+    expect(narrow.lines.join('\n')).toContain('Writes    None')
+    expect(narrow.lines.join('\n')).toContain('◆ [ d ] Run Doctor')
   })
 
   it('renders responsive list-detail views with full-row targets', () => {

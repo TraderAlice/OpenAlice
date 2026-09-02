@@ -4,6 +4,7 @@ import { runSupervisorTui } from '../supervisor-tui.ts'
 let starts = 0
 let opens = 0
 let loads = 0
+let diagnoses = 0
 const running = process.env['OPENALICE_TUI_FIXTURE_RUNTIME'] === 'running'
 
 const exitCode = await runSupervisorTui({}, {
@@ -27,9 +28,17 @@ const exitCode = await runSupervisorTui({}, {
     loads += 1
     return { entries: [] }
   },
+  diagnose: async () => {
+    diagnoses += 1
+    return {
+      overall: 'unknown',
+      summary: { passed: 0, warnings: 0, failures: 0 },
+      checks: [],
+    }
+  },
   discoverUpdate: async () => null,
   pollIntervalMs: 60_000,
 })
 
-process.stdout.write(`\nFIXTURE_RESULT starts=${starts} opens=${opens} loads=${loads}\n`)
+process.stdout.write(`\nFIXTURE_RESULT starts=${starts} opens=${opens} loads=${loads} diagnoses=${diagnoses}\n`)
 process.exitCode = exitCode

@@ -58,6 +58,29 @@ export interface SupervisorCommandTarget {
   primary?: boolean
 }
 
+export interface SupervisorSignalScopeFact {
+  label: string
+  value: string
+  compactValue?: string
+}
+
+export interface SupervisorSignalScopeView {
+  title: string
+  meta: string
+  glyph: string
+  state: string
+  facts: readonly [
+    SupervisorSignalScopeFact,
+    SupervisorSignalScopeFact,
+    SupervisorSignalScopeFact,
+  ]
+  action: {
+    key: string
+    label: string
+    compactLabel?: string
+  }
+}
+
 export interface SupervisorDockView {
   panel: string
   projectName?: string
@@ -429,6 +452,23 @@ export function renderSupervisorPanel(
   return renderCard(`${title}${meta ? ` · ${meta}` : ''}`, rows, Math.max(24, width))
 }
 
+export function renderSupervisorSignalScope(
+  view: SupervisorSignalScopeView,
+  width: number,
+): string[] {
+  const compact = width < 60
+  const rows = [
+    compact
+      ? `${view.glyph}  ${view.state}`
+      : signalScopeRail(view.glyph, view.state, Math.max(1, width - 4)),
+    ...view.facts.map((fact) => signalScopeFact(fact, compact)),
+    `◆ [ ${view.action.key} ] ${compact
+      ? view.action.compactLabel ?? view.action.label
+      : view.action.label}`,
+  ]
+  return renderSupervisorPanel(view.title, view.meta, rows, width)
+}
+
 export function supervisorCommandTargets(lines: string[]): SupervisorCommandTarget[] {
   const targets: SupervisorCommandTarget[] = []
   for (const [rowIndex, line] of lines.entries()) {
@@ -545,6 +585,27 @@ function renderCard(title: string, body: string[], width: number): string[] {
     }),
     `╰${'─'.repeat(Math.max(0, safeWidth - 2))}╯`,
   ]
+}
+
+function signalScopeRail(glyph: string, state: string, width: number): string {
+  const prefix = `${glyph}  ${state}`
+  const remaining = Math.max(0, width - displayWidth(prefix) - 2)
+  if (remaining < 7) return prefix
+  const left = Math.max(1, Math.floor((remaining - 3) / 2))
+  const right = Math.max(1, remaining - left - 3)
+  return `${prefix}  ·${'─'.repeat(left)}◇${'─'.repeat(right)}·`
+}
+
+function signalScopeFact(
+  fact: SupervisorSignalScopeView['facts'][number],
+  compact: boolean,
+): string {
+  const labelWidth = compact ? 10 : 11
+  const label = compact ? fact.label : fact.label.toUpperCase()
+  const safeLabel = truncateDisplayWidth(label, Math.max(1, labelWidth - 1))
+  return `${safeLabel}${' '.repeat(Math.max(1, labelWidth - displayWidth(safeLabel)))}${
+    compact ? fact.compactValue ?? fact.value : fact.value
+  }`
 }
 
 function detailRow(label: string, value: string, width: number): string {

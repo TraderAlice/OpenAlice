@@ -1,6 +1,6 @@
 import { displayWidth, truncateDisplayWidth } from './supervisor-display.ts'
 import { withSupervisorScrollRail } from './supervisor-scroll-rail.ts'
-import { renderSupervisorPanel } from './supervisor-tui-view.ts'
+import { renderSupervisorPanel, renderSupervisorSignalScope } from './supervisor-tui-view.ts'
 
 export type SupervisorLogFilter = 'all' | 'attention' | 'errors'
 
@@ -20,17 +20,6 @@ export interface SupervisorLogTarget {
 export interface SupervisorLogRender {
   lines: string[]
   targets: SupervisorLogTarget[]
-}
-
-interface EmptyLogScope {
-  glyph: '◇' | '○' | '✓'
-  state: string
-  meta: string
-  snapshot: string
-  lens: string
-  actionKey: 'l' | 'f'
-  action: string
-  compactAction: string
 }
 
 interface FormattedLogEntry {
@@ -77,15 +66,17 @@ export function renderSupervisorLogs(
 ): SupervisorLogRender {
   if (!logs) {
     return {
-      lines: renderEmptyLogScope({
+      lines: renderSupervisorSignalScope({
+        title: 'Event Signal Scope',
         glyph: '◇',
         state: 'SIGNAL STANDBY',
         meta: 'STANDBY',
-        snapshot: 'Not loaded',
-        lens: `${logLensDescription(filter)} · awaiting capture`,
-        actionKey: 'l',
-        action: 'Load bounded Runtime tail',
-        compactAction: 'Load Runtime tail',
+        facts: [
+          { label: 'Snapshot', value: 'Not loaded' },
+          { label: 'Lens', value: `${logLensDescription(filter)} · awaiting capture` },
+          { label: 'Safety', value: 'Bounded · redacted · terminal-safe', compactValue: 'bounded · redacted' },
+        ],
+        action: { key: 'l', label: 'Load bounded Runtime tail', compactLabel: 'Load Runtime tail' },
       }, width),
       targets: [],
     }
@@ -93,15 +84,17 @@ export function renderSupervisorLogs(
   const sourceEntries = logs.entries ?? []
   if (sourceEntries.length === 0) {
     return {
-      lines: renderEmptyLogScope({
+      lines: renderSupervisorSignalScope({
+        title: 'Event Signal Scope',
         glyph: '○',
         state: 'SIGNAL QUIET',
         meta: 'QUIET · 0 EVENTS',
-        snapshot: 'Loaded · 0 Runtime events',
-        lens: `${logLensDescription(filter)} · source is quiet`,
-        actionKey: 'l',
-        action: 'Reload Runtime snapshot',
-        compactAction: 'Reload snapshot',
+        facts: [
+          { label: 'Snapshot', value: 'Loaded · 0 Runtime events' },
+          { label: 'Lens', value: `${logLensDescription(filter)} · source is quiet` },
+          { label: 'Safety', value: 'Bounded · redacted · terminal-safe', compactValue: 'bounded · redacted' },
+        ],
+        action: { key: 'l', label: 'Reload Runtime snapshot', compactLabel: 'Reload snapshot' },
       }, width),
       targets: [],
     }
@@ -109,15 +102,20 @@ export function renderSupervisorLogs(
   const entries = filterLogEntries(logs, filter)
   if (entries.length === 0) {
     return {
-      lines: renderEmptyLogScope({
+      lines: renderSupervisorSignalScope({
+        title: 'Event Signal Scope',
         glyph: '✓',
         state: 'LENS CLEAR',
         meta: `CLEAR · 0/${sourceEntries.length} · ${filter.toUpperCase()}`,
-        snapshot: `Loaded · ${sourceEntries.length} Runtime ${pluralize(sourceEntries.length, 'event')}`,
-        lens: `${supervisorLogFilterLabel(filter)} · 0 matches`,
-        actionKey: 'f',
-        action: 'Change severity lens',
-        compactAction: 'Change lens',
+        facts: [
+          {
+            label: 'Snapshot',
+            value: `Loaded · ${sourceEntries.length} Runtime ${pluralize(sourceEntries.length, 'event')}`,
+          },
+          { label: 'Lens', value: `${supervisorLogFilterLabel(filter)} · 0 matches` },
+          { label: 'Safety', value: 'Bounded · redacted · terminal-safe', compactValue: 'bounded · redacted' },
+        ],
+        action: { key: 'f', label: 'Change severity lens', compactLabel: 'Change lens' },
       }, width),
       targets: [],
     }
@@ -205,35 +203,6 @@ export function renderSupervisorLogs(
       fromEnd: entries.length - 1 - (start + relativeIndex),
     })),
   }
-}
-
-function renderEmptyLogScope(scope: EmptyLogScope, width: number): string[] {
-  const compact = width < 60
-  const rows = compact
-    ? [
-        `${scope.glyph}  ${scope.state}`,
-        `Snapshot  ${scope.snapshot}`,
-        `Lens      ${scope.lens}`,
-        'Safety    bounded · redacted',
-        `◆ [ ${scope.actionKey} ] ${scope.compactAction}`,
-      ]
-    : [
-        signalScopeRail(scope.glyph, scope.state, Math.max(1, width - 4)),
-        `SNAPSHOT   ${scope.snapshot}`,
-        `LENS       ${scope.lens}`,
-        'SAFETY     Bounded · redacted · terminal-safe',
-        `◆ [ ${scope.actionKey} ] ${scope.action}`,
-      ]
-  return renderSupervisorPanel('Event Signal Scope', scope.meta, rows, width)
-}
-
-function signalScopeRail(glyph: EmptyLogScope['glyph'], state: string, width: number): string {
-  const prefix = `${glyph}  ${state}`
-  const remaining = Math.max(0, width - displayWidth(prefix) - 2)
-  if (remaining < 7) return prefix
-  const left = Math.max(1, Math.floor((remaining - 3) / 2))
-  const right = Math.max(1, remaining - left - 3)
-  return `${prefix}  ·${'─'.repeat(left)}◇${'─'.repeat(right)}·`
 }
 
 function pluralize(count: number, singular: string): string {

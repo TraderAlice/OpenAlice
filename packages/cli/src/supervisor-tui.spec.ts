@@ -1207,6 +1207,58 @@ describe('Supervisor TUI screen', () => {
     expect(noColor.join('\n')).not.toContain('\u001b[')
   })
 
+  it('routes Diagnostic Radar action segments through the existing Doctor key', () => {
+    const onAction = vi.fn()
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'doctor',
+      runtime: { class: 'absent', endpoints: {} },
+      doctor: null,
+    }, {
+      onAction,
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+      motionEnabled: false,
+    })
+
+    let lines = screen.render(80)
+    let actionRow = lines.findIndex((line) => line.includes('[ d ] Run Runtime Doctor')) + 1
+    expect(actionRow).toBeGreaterThan(0)
+    expect(screen.handlePointer({
+      button: 35, col: 24, row: actionRow, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(80)[actionRow - 1]).toContain('› [ d ] Run Runtime Doctor')
+    expect(screen.handlePointer(pointerClick(24, actionRow))).toBe(true)
+    expect(onAction).toHaveBeenLastCalledWith('doctor')
+
+    screen.update({
+      doctor: {
+        overall: 'unknown',
+        summary: { passed: 0, warnings: 0, failures: 0 },
+        checks: [],
+      },
+    })
+    lines = screen.render(80)
+    actionRow = lines.findIndex((line) => line.includes('[ d ] Rerun Runtime Doctor')) + 1
+    expect(actionRow).toBeGreaterThan(0)
+    expect(screen.handlePointer(pointerClick(24, actionRow))).toBe(true)
+    expect(onAction).toHaveBeenCalledTimes(2)
+
+    const noColor = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'doctor',
+      runtime: { class: 'absent', endpoints: {} },
+      doctor: null,
+    }, {
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color', NO_COLOR: '1' }),
+      motionEnabled: false,
+    }).render(46)
+    expect(noColor.join('\n')).toContain('◇  DOCTOR STANDBY')
+    expect(noColor.join('\n')).toContain('◆ [ d ] Run Doctor')
+    expect(noColor.join('\n')).not.toContain('\u001b[')
+  })
+
   it('treats keycap-like log text as an Event Lens row instead of a command', () => {
     const detach = vi.fn()
     const requestRender = vi.fn()

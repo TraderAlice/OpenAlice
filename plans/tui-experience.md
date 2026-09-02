@@ -363,6 +363,20 @@ not imply maintainer approval of the finished interaction.
   checklist/Inspector cards; 80-column and narrow terminals stack the same two
   regions. All evidence remains the existing read-only Doctor snapshot.
 
+### Doctor Diagnostic Radar decision
+
+- Keeping the unrun Doctor as a loose `Press d` line and the zero-check report
+  as a two-line card preserves minimal code, but both states collapse the
+  composed application into a sparse legacy command surface.
+- Animating invented probes or treating zero returned checks as healthy would
+  look active while misrepresenting the read-only report contract.
+- The selected model reuses the shared Signal Scope primitive as a Diagnostic
+  Radar. `DOCTOR STANDBY` exposes read-only mode, intended scope, and zero writes;
+  `NO CHECKS` truthfully names an empty completed report. Each ends in one
+  pointer-capable `d` action segment routed through the existing Doctor input.
+  Populated reports retain the checklist/Inspector model. This is an autonomous
+  topic decision, not a recorded maintainer approval.
+
 ### Help Control Atlas decision
 
 - Restyling the grouped keyboard map would make the shortcut wall prettier but
@@ -830,6 +844,8 @@ already large `supervisor-tui.ts` application controller.
   caret pulse and English/Chinese intent aliases over the same command model.
 - [x] Replace Doctor's flat line scroller with a responsive, selectable
   checklist and detail Inspector.
+- [x] Replace Doctor's loose unrun/zero-check messages with a shared responsive
+  Diagnostic Radar that preserves its read-only `d` action.
 - [x] Replace Help's static shortcut wall with a responsive, pointer-aware
   Control Atlas while keeping the Command Palette as the fast execution path.
 - [x] Give every Supervisor overlay list, input, and visible command keycap the
@@ -1601,6 +1617,21 @@ already large `supervisor-tui.ts` application controller.
   699-file suite passes (698 passed, 1 skipped; 6,163 tests passed, 10 skipped).
   Docker installer smoke passes without Node, npm, pnpm, Bun, or an Agent
   Runtime, and package dry-run contains the changed Logs and theme sources.
+- Doctor's unrun and zero-check paths now share the same responsive status-scope
+  primitive as Logs without sharing domain claims. `DOCTOR STANDBY` exposes
+  read-only mode, diagnostic scope, and zero writes; `NO CHECKS` distinguishes
+  an empty completed report from a healthy one. Both promote only the existing
+  `d` input, while populated reports keep their checklist/Inspector geometry.
+- Diagnostic-Radar acceptance passes with 99 focused Doctor, Logs, screen, and
+  real-PTY tests. A real truecolor 80×24 Default AliceProject run produced its
+  seven-check degraded report and preserved selection/detail rendering. A real
+  46×30 `NO_COLOR` zero-check session retained all Radar facts, hovered the
+  complete Rerun segment, invoked Doctor twice by pointer, and restored cursor,
+  bracketed-paste, and mouse modes after detach. CLI build/typecheck and root
+  TypeScript pass; the 699-file suite passes (698 passed, 1 skipped; 6,166 tests
+  passed, 10 skipped). Docker installer smoke passes without Node, npm, pnpm,
+  Bun, or an Agent Runtime, and package dry-run contains the shared view,
+  Doctor, Logs, and theme sources.
 
 ## Completion Criteria
 

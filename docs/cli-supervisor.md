@@ -764,6 +764,13 @@ narrower terminals stack the same complete regions. The Inspector separates the
 check summary, existing Doctor evidence, and conservative status guidance. It
 does not run a repair, invent a command, or issue another diagnostic request;
 `d` remains the explicit read-only rerun action.
+Before a report exists, the same page renders a responsive Diagnostic Radar
+instead of a loose instruction line. `DOCTOR STANDBY` names the unrun state and
+keeps read-only mode, inspection scope, and the zero-write guarantee visible.
+A completed report with no checks uses the distinct `NO CHECKS` state rather
+than claiming health. Both states expose a pointer-capable `d` action segment
+that emits the existing Doctor key; neither performs a repair or introduces a
+second diagnostic path.
 An overflowing checklist uses the same proportional `│`/`█` rail as Event Lens
 and Fleet; the rail is positional evidence rather than another control.
 
