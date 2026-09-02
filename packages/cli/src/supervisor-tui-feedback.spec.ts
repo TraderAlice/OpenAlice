@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   classifySupervisorNotice,
   renderSupervisorActivitySlot,
+  supervisorCommandHoverPreview,
   supervisorMotionEnabled,
 } from './supervisor-tui-feedback.ts'
 
@@ -31,15 +32,34 @@ describe('Supervisor TUI feedback rail', () => {
 
   it('keeps one fixed activity slot and applies deterministic priority', () => {
     expect(renderSupervisorActivitySlot({}, 32)).toBe(' '.repeat(32))
+    expect(renderSupervisorActivitySlot({ preview: 'Inspect Setup.' }, 32))
+      .toContain('◇  PREVIEW  Inspect Setup.')
+    expect(renderSupervisorActivitySlot({
+      preview: 'Inspect Setup.',
+      notice: 'Runtime started.',
+    }, 50)).toContain('✓  READY')
     expect(renderSupervisorActivitySlot({
       notice: 'Runtime started.',
       diagnostic: 'Previous probe failed.',
+      preview: 'Inspect Setup.',
     }, 50)).toContain('×  ERROR')
     expect(renderSupervisorActivitySlot({
       busy: 'Refreshing Runtime',
       notice: 'Runtime started.',
       diagnostic: 'Previous probe failed.',
+      preview: 'Inspect Setup.',
     }, 50, 0, false)).toContain('◆  WORKING')
+  })
+
+  it('describes existing pointer actions without inventing another route', () => {
+    expect(supervisorCommandHoverPreview('p', 'overview'))
+      .toContain('Setup Studio')
+    expect(supervisorCommandHoverPreview('q', 'overview'))
+      .toContain('Runtime keeps its current ownership')
+    expect(supervisorCommandHoverPreview('r', 'fleet'))
+      .toContain('Refresh the selected Machine inventory')
+    expect(supervisorCommandHoverPreview('Enter', 'fleet', 'running', '◆ [ Enter ] Connect'))
+      .toBe('Connect; activation follows the existing Enter path.')
   })
 
   it('classifies successful and actionable notices conservatively', () => {

@@ -229,13 +229,16 @@ path is intentionally parameter-free:
   `/` or `Esc` closes the Dock without exiting, while `q` and `Ctrl+C` retain
   their global detach behavior;
 - asynchronous work and its result occupy one fixed full-width activity slot
-  above the command bar. Idle uses that same row as the content/control
-  separator; feedback therefore never inserts rows or moves action/ribbon
-  pointer targets. Working wins while an operation is active, otherwise Error
-  wins over Notice. Busy, informational, successful, actionable-warning, and
-  failed states retain distinct glyph and text labels without depending on
+  above the command bar. When no operation or persisted feedback owns it,
+  hovering a Navigation, Action Shelf, or Command Spine target projects its
+  consequence there as a `PREVIEW`; moving away restores the blank separator.
+  Feedback therefore never inserts rows or moves action/ribbon pointer targets.
+  Working wins over Error, which wins over Notice/Ready/Status, which wins over
+  Preview. Busy, informational, successful, actionable-warning, failed, and
+  preview states retain distinct glyph and text labels without depending on
   color; only the busy glyph animates. The slot is a presentation of existing
-  Supervisor state and does not introduce a second lifecycle or error path;
+  Supervisor and pointer state and does not introduce a second lifecycle or
+  error path;
 - color-capable motion-enabled sessions play one bounded brand-color sweep on
   entry across the OpenAlice header and any visible brand mark. The header then
   settles while a visible Overview `ALICE` mark continues a slow six-phase

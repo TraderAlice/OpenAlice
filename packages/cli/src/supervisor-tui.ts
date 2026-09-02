@@ -133,6 +133,7 @@ import {
 } from './supervisor-navigation.ts'
 import {
   renderSupervisorActivitySlot,
+  supervisorCommandHoverPreview,
   supervisorMotionEnabled,
 } from './supervisor-tui-feedback.ts'
 import {
@@ -3761,10 +3762,12 @@ export class SupervisorScreen implements Component {
       lines.push(...home.lines)
     }
 
+    const hoverPreview = this.hoverPreview(runtime?.class)
     const activity = renderSupervisorActivitySlot({
       ...(this.snapshot.busy ? { busy: sanitize(this.snapshot.busy) } : {}),
       ...(this.snapshot.notice ? { notice: sanitize(this.snapshot.notice) } : {}),
       ...(this.snapshot.diagnostic ? { diagnostic: sanitize(this.snapshot.diagnostic) } : {}),
+      ...(hoverPreview ? { preview: sanitize(hoverPreview) } : {}),
     }, width, this.motionFrame, this.motionEnabled)
     lines.push(
       activity,
@@ -3827,6 +3830,31 @@ export class SupervisorScreen implements Component {
   }
 
   invalidate(): void {}
+
+  private hoverPreview(runtimeClass = 'unavailable'): string | undefined {
+    if (this.commandDeckOpen) return undefined
+    if (this.headerReleaseHovered) {
+      return `Inspect the ${this.snapshot.channel} release lane and available update.`
+    }
+    if (this.hoveredPanel) {
+      return {
+        overview: 'Return to the selected AliceProject launch and Runtime overview.',
+        fleet: 'Browse local and remote Machines and their AliceProjects.',
+        logs: 'Inspect the bounded, redacted Runtime event lens.',
+        doctor: 'Inspect read-only Runtime ownership and readiness checks.',
+        help: 'Explore contextual controls and keyboard routes.',
+      }[this.hoveredPanel]
+    }
+    const target = this.hoveredCommandTarget
+    return target
+      ? supervisorCommandHoverPreview(
+          target.label,
+          this.snapshot.panel ?? 'overview',
+          runtimeClass,
+          target.surface,
+        )
+      : undefined
+  }
 
   private activatePointerCommand(label: string): boolean {
     if (label === 'q' || label === 'q / Esc') {

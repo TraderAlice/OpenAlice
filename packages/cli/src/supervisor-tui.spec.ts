@@ -317,7 +317,7 @@ describe('Supervisor TUI screen', () => {
     expect(paletteChanges).toEqual([true])
     expect(screen.render(80).join('\n')).not.toContain('Command Dock')
     let lines = screen.renderCommandPalette(80).lines
-    expect(lines.join('\n')).toContain('Command Dock · 1/9 · ABSENT')
+    expect(lines.join('\n')).toContain('Command Dock · 1/10 · ABSENT')
     expect(lines).toHaveLength(9)
     expect(lines.join('\n')).toContain('› ◆ Start OpenAlice & open Workspace')
     expect(screen.render(80).join('\n')).toContain('[ / ] Close  ›  [ q ] Detach')
@@ -339,7 +339,7 @@ describe('Supervisor TUI screen', () => {
     expect(paletteChanges).toEqual([true, false])
 
     screen.handleKey('/', matchesKey)
-    for (let index = 0; index < 5; index += 1) {
+    for (let index = 0; index < 6; index += 1) {
       expect(screen.handleKey('down', matchesKey)).toBe(true)
     }
     expect(screen.renderCommandPalette(80).lines.join('\n')).toContain('›   Setup')
@@ -592,6 +592,7 @@ describe('Supervisor TUI screen', () => {
       button: 35, col: releaseColumn, row: 1, release: false, wheel: null, motion: true, leftClick: false,
     })).toBe(true)
     expect(screen.render(100)[0]).toContain('\u001b[1;38;2;203;250;246;48;2;19;49;55m[ u ] vdev · DEV')
+    expect(screen.render(100).join('\n')).toContain('◇  PREVIEW  Inspect the dev release lane and available update.')
     expect(screen.handlePointer(pointerClick(releaseColumn, 1))).toBe(true)
     expect(actions).toContain('update')
     expect(screen.snapshot.fleet?.selectedMachine).toBe(0)
@@ -626,6 +627,7 @@ describe('Supervisor TUI screen', () => {
       button: 35, col: logsColumn, row: 2, release: false, wheel: null, motion: true, leftClick: false,
     })).toBe(true)
     expect(screen.render(100)[1]).toContain('\u001b[1;38;2;203;250;246;48;2;19;49;55m≋ Logs')
+    expect(screen.render(100).join('\n')).toContain('◇  PREVIEW  Inspect the bounded, redacted Runtime event lens.')
     expect(screen.handlePointer({
       button: 0, col: logsColumn, row: 2, release: false, wheel: null, motion: false, leftClick: true,
     })).toBe(true)
@@ -691,6 +693,15 @@ describe('Supervisor TUI screen', () => {
     expect(requestRender).toHaveBeenCalled()
     expect(screen.render(80)[row - 1]).toContain('\u001b[1;38;2;230;255;252;48;2;24;64;69m[ p ] Setup')
     expect(screen.render(80)[row - 1]!.replace(/\u001b\[[0-9;]*m/gu, '')).toContain('│ › [ p ] Setup')
+    expect(screen.render(80).join('\n').replace(/\u001b\[[0-9;]*m/gu, ''))
+      .toContain('◇  PREVIEW  Review AliceProject and Machine defaults in Setup Studio.')
+    expect(screen.handlePointer({
+      button: 35, col: 40, row: row - 1, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(80).join('\n')).not.toContain('PREVIEW')
+    expect(screen.handlePointer({
+      button: 35, col, row, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
     expect(screen.handlePointer({
       button: 0, col, row, release: false, wheel: null, motion: false, leftClick: true,
     })).toBe(true)

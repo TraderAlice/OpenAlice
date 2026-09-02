@@ -152,6 +152,7 @@ export function decorateSupervisorFrame(
     if (line.startsWith('!  NOTICE')) return theme.warningRail(line)
     if (line.startsWith('×  ERROR')) return theme.dangerRail(line)
     if (line.startsWith('◆  STATUS')) return theme.infoRail(line)
+    if (line.startsWith('◇  PREVIEW')) return theme.navigationHover(line)
     if (index === 1) return decorateTabs(line, theme, options.panel, options.hoveredPanel)
     if (index === 2) return decorateNavigationBeaconRail(line, theme)
     if (line.startsWith('› ') || line.startsWith('▶ ') || line.includes('│ › ')) return theme.selected(line)

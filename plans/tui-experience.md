@@ -609,6 +609,23 @@ not imply maintainer approval of the finished interaction.
   paths remain the only action owners. This is an autonomous topic decision,
   not a recorded maintainer approval.
 
+### Hover Preview Rail decision
+
+- Keeping hover as color-only feedback preserves the current geometry, but a
+  pointer user still has to click before learning whether a short label opens,
+  mutates, confirms, or merely changes focus.
+- Adding tooltips beside every control would provide local explanations, but
+  introduces transient geometry, collision, and dismissal behavior throughout
+  the terminal frame.
+- The selected model projects the hovered control's consequence into the
+  existing fixed Activity Slot. Working, Error, Notice/Ready/Status, Preview,
+  and blank form a strict priority order, so operational feedback can never be
+  displaced by hover. Moving off the target restores the previous rail without
+  changing layout. Navigation, Action Shelf, and Command Spine targets share
+  the same preview language; activation remains owned by their existing key
+  paths. This is an autonomous topic decision, not a recorded maintainer
+  approval.
+
 ### Confirmation-modal decision
 
 - Keeping confirmation cards inline preserves the original implementation but
@@ -680,6 +697,8 @@ already large `supervisor-tui.ts` application controller.
   keeping operational content and reduced-motion frames static.
 - [x] Replace the centered Command Palette with a shallow bottom Command Dock
   that keeps every command reachable without obscuring the operational frame.
+- [x] Project hovered control consequences into the fixed Activity Slot without
+  displacing operational feedback or creating another action path.
 - [x] Turn Overview into a responsive AliceProject/Runtime cockpit without
   changing lifecycle action semantics or sacrificing the 80x24 baseline.
 - [x] Promote Overview into an action-first Launchpad with a semantic intent
@@ -1376,6 +1395,22 @@ already large `supervisor-tui.ts` application controller.
   pass; the 699-file suite passes (698 passed, 1 skipped; 6,150 tests passed,
   10 skipped). Docker installer smoke passes, and package dry-run contains the
   changed Command Dock and Help sources.
+- Pointer hover now has explanatory depth instead of color alone. Navigation,
+  Action Shelf, and Command Spine targets project their consequence into the
+  fixed Activity Slot as `PREVIEW`; moving away restores the blank rail, while
+  Working, Error, and persisted feedback retain strict priority. The existing
+  `c` Runtime Source action is also discoverable through the same Command Dock
+  search model without gaining a second handler.
+- Hover-Preview acceptance passes with 93 focused feedback, Command Dock,
+  screen, and real-PTY tests. A real truecolor 80×24 Default AliceProject
+  session hovered Setup and updated only the Preview and Action Shelf rows,
+  moved into blank space and cleared the Preview, then hovered Logs and exposed
+  its Event Lens consequence. Raw PTY input confirms preview-before-click and
+  the existing Setup overlay path; detach restored cursor, bracketed-paste,
+  mouse, and alternate-screen modes. CLI build/typecheck and root TypeScript
+  pass; the 699-file suite passes (698 passed, 1 skipped; 6,151 tests passed,
+  10 skipped). Docker installer smoke passes, and package dry-run contains the
+  changed feedback, theme, Command Dock, and Supervisor sources.
 
 ## Completion Criteria
 

@@ -25,7 +25,7 @@ describe('Supervisor Command Dock', () => {
   it('builds contextual commands without inventing another action contract', () => {
     const items = supervisorCommandDeckItems(context)
     expect(items.map((item) => item.input)).toEqual([
-      'enter', 'r', 'x', 'l', 'd', 'i', 'p', 'u', 'tab', '?',
+      'enter', 'r', 'x', 'l', 'd', 'c', 'i', 'p', 'u', 'tab', '?',
     ])
     expect(items[0]).toMatchObject({ label: 'Open Workspace', primary: true })
 
@@ -60,13 +60,16 @@ describe('Supervisor Command Dock', () => {
     expect(filterSupervisorCommandDeckItems(items, '设置').map((item) => item.label)).toEqual([
       'Setup',
     ])
+    expect(filterSupervisorCommandDeckItems(items, '源码').map((item) => item.label)).toEqual([
+      'Runtime Source',
+    ])
     expect(filterSupervisorCommandDeckItems(items, 'no such command')).toEqual([])
   })
 
   it('renders selected and hovered full-row targets responsively', () => {
     const items = supervisorCommandDeckItems(context)
     const wide = renderSupervisorCommandDeck(items, { selected: 1, hovered: 2 }, 'running', 100)
-    expect(wide.lines.join('\n')).toContain('Command Dock · 2/10 · RUNNING')
+    expect(wide.lines.join('\n')).toContain('Command Dock · 2/11 · RUNNING')
     expect(wide.lines.join('\n')).toContain('›   Restart Runtime')
     expect(wide.lines.join('\n')).toContain('»   Stop Runtime')
     expect(wide.lines.join('\n')).toContain('Confirm before reconnecting active sessions')
@@ -75,11 +78,11 @@ describe('Supervisor Command Dock', () => {
     expect(wide.lines).toHaveLength(9)
     expect(wide.lines.join('\n')).not.toContain('AliceProjects')
 
-    const scrolled = renderSupervisorCommandDeck(items, { selected: 8, hovered: null }, 'running', 100)
-    expect(scrolled.lines.join('\n')).toContain('Command Dock · 9/10 · RUNNING')
+    const scrolled = renderSupervisorCommandDeck(items, { selected: 9, hovered: null }, 'running', 100)
+    expect(scrolled.lines.join('\n')).toContain('Command Dock · 10/11 · RUNNING')
     expect(scrolled.lines.join('\n')).toContain('›   Next view')
     expect(scrolled.lines.join('\n')).not.toContain('Open Workspace')
-    expect(scrolled.targets.map((target) => target.index)).toEqual([6, 7, 8, 9])
+    expect(scrolled.targets.map((target) => target.index)).toEqual([7, 8, 9, 10])
 
     const narrow = renderSupervisorCommandDeck(items, createSupervisorCommandDeckState(), 'running', 52)
     expect(narrow.lines.every((line) => displayWidthWithoutAnsi(line) <= 52)).toBe(true)

@@ -26,6 +26,7 @@ export type SupervisorCommandDeckInput =
   | 'u'
   | 'i'
   | 'p'
+  | 'c'
   | '?'
 
 export interface SupervisorCommandDeckContext {
@@ -124,6 +125,10 @@ export function supervisorCommandDeckItems(
     command(
       'd', 'Runtime Doctor', 'Run read-only ownership and readiness checks',
       'Observe', false, ['诊断', '检查'],
+    ),
+    command(
+      'c', 'Runtime Source', 'Choose, validate, save, and launch a source checkout',
+      'Manage', false, ['source', 'checkout', '源码', '检出'],
     ),
     command(
       'i', 'AliceProjects', 'Select or create a complete local home',

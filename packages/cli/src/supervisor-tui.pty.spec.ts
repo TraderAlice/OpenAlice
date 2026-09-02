@@ -149,7 +149,11 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         if (!hovered && output.includes('[ p ] Setup')) {
           hovered = true
           child.write('\u001b[<35;34;21M')
-        } else if (!clicked && output.includes('│ › [ p ] Setup')) {
+        } else if (
+          !clicked
+          && output.includes('│ › [ p ] Setup')
+          && output.includes('◇  PREVIEW  Review AliceProject and Machine defaults in Setup Studio.')
+        ) {
           clicked = true
           child.write('\u001b[<0;34;21M')
         } else if (!closed && clicked && output.includes('╭ Setup Studio · Default AliceProject')) {
@@ -176,6 +180,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('◆ LOCAL CONTROL')
     expect(stripSgr(overlayIdleOutput)).not.toContain('OpenAlice Supervisor')
     expect(transcript).toContain('│ › [ p ] Setup')
+    expect(transcript).toContain('◇  PREVIEW  Review AliceProject and Machine defaults in Setup Studio.')
     expect(transcript).toContain('╭ Setup Studio · Default AliceProject')
     expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=0')
     expect(transcript).toContain('\u001b[?25h')
