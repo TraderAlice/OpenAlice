@@ -388,8 +388,62 @@ describe('Supervisor TUI screen', () => {
     plainSpine = lines[spineRow - 1]?.replace(/\u001b\[[0-9;]*m/gu, '') ?? ''
     expect(plainSpine).toMatch(/^╰─ \[ \/ \] Close  ›  \[ q \] Detach ─+╯$/u)
     expect(displayWidth(plainSpine)).toBe(46)
-    expect(screen.handlePointer(pointerClick(6, spineRow))).toBe(true)
+    expect(screen.handleCommandSpinePointer(pointerClick(6, spineRow))).toBe(true)
     expect(paletteChanges).toEqual([true, false])
+  })
+
+  it('routes only persistent Command Spine targets while the Command Dock is open', () => {
+    const paletteChanges: boolean[] = []
+    const actions: SupervisorAction[] = []
+    const onProjects = vi.fn()
+    const onDetach = vi.fn()
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'overview',
+      runtime: { class: 'absent', endpoints: {} },
+    }, {
+      onAction: (action) => actions.push(action),
+      onCommandPaletteChange: (open) => paletteChanges.push(open),
+      onProjects,
+      onDetach,
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+      motionEnabled: false,
+    })
+
+    let lines = screen.render(80)
+    let spineRow = lines.findIndex((line) => line.includes('[ / ] Commands')) + 1
+    expect(screen.handlePointer(pointerClick(6, spineRow))).toBe(true)
+    lines = screen.render(80)
+
+    const actionRow = lines.findIndex((line) => line.includes('[ s ] Start quietly')) + 1
+    const actionLine = lines[actionRow - 1]?.replace(/\u001b\[[0-9;]*m/gu, '') ?? ''
+    const actionCol = actionLine.indexOf('[ s ]') + 3
+    expect(actionRow).toBeGreaterThan(0)
+    expect(actionCol).toBeGreaterThan(2)
+    expect(screen.handleCommandSpinePointer(pointerClick(actionCol, actionRow))).toBe(false)
+    expect(actions).toEqual([])
+    expect(paletteChanges).toEqual([true])
+
+    const projectRow = lines.findIndex((line) => line.includes('[ i ]')) + 1
+    const projectLine = lines[projectRow - 1]?.replace(/\u001b\[[0-9;]*m/gu, '') ?? ''
+    const projectCol = projectLine.indexOf('[ i ]') + 3
+    expect(projectRow).toBe(lines.length)
+    expect(projectCol).toBeGreaterThan(2)
+    expect(screen.handleCommandSpinePointer(pointerClick(projectCol, projectRow))).toBe(true)
+    expect(paletteChanges).toEqual([true, false])
+    expect(onProjects).toHaveBeenCalledTimes(1)
+
+    lines = screen.render(80)
+    spineRow = lines.findIndex((line) => line.includes('[ / ] Commands')) + 1
+    expect(screen.handlePointer(pointerClick(6, spineRow))).toBe(true)
+    lines = screen.render(80)
+    const detachRow = lines.findIndex((line) => line.includes('[ q ] Detach')) + 1
+    const detachLine = lines[detachRow - 1]?.replace(/\u001b\[[0-9;]*m/gu, '') ?? ''
+    const detachCol = detachLine.indexOf('[ q ]') + 3
+    expect(detachRow).toBe(lines.length)
+    expect(screen.handleCommandSpinePointer(pointerClick(detachCol, detachRow))).toBe(true)
+    expect(onDetach).toHaveBeenCalledTimes(1)
   })
 
   it('turns Overview identity and actionable telemetry into direct pointer hotspots', () => {

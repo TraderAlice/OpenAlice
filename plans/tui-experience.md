@@ -588,6 +588,21 @@ not imply maintainer approval of the finished interaction.
   breadcrumb separator and suffix. This is an autonomous topic decision, not a
   recorded maintainer approval.
 
+### Command Dock persistent-Spine routing decision
+
+- Letting every pointer event outside any overlay fall through to the
+  application would make the visible Spine work, but could activate obscured
+  controls behind confirmation, Setup, transfer, and other focused overlays.
+- Teaching the overlay router a duplicate bottom-margin Close target would fix
+  one label while creating a second source of Command Spine geometry.
+- The selected model grants only the Command Dock one persistent-chrome route.
+  While it is active, the Supervisor first hit-tests the final rendered Spine
+  targets; Close, Detach, and visible AliceProject therefore keep their exact
+  Screen-owned geometry and existing input handlers. A miss routes normally to
+  the Dock overlay, while every other overlay remains strictly modal. Hover
+  also clears when the pointer returns to Dock content. This is an autonomous
+  topic decision, not recorded maintainer approval.
+
 ### Bottom Control Console decision
 
 - Leaving the footer directly after page content preserves the current natural
@@ -930,6 +945,8 @@ already large `supervisor-tui.ts` application controller.
   consuming a required row or adding an action path.
 - [x] Fold the standalone wide Beacon into the action-first Launchpad without
   duplicating identity or losing guidance, motion, or pointer geometry.
+- [x] Keep the visible Command Spine mouse-capable while the Command Dock owns
+  overlay input, without enabling click-through for any other modal surface.
 - [x] Replace the disconnected title/divider/tabs stack with a same-height
   Mission Header that frames brand, release provenance, and clickable navigation.
 - [x] Anchor the active view with a reduced-motion-safe beacon that travels
@@ -1772,6 +1789,20 @@ already large `supervisor-tui.ts` application controller.
   699-file suite passes (698 passed, 1 skipped; 6,170 tests passed, 10 skipped).
   Docker installer smoke passes without Node, npm, pnpm, Bun, or an Agent
   Runtime, and package dry-run contains the changed Supervisor view source.
+- The Command Dock no longer strands its still-visible Command Spine behind the
+  overlay pointer router. Its final rendered Close, Detach, and AliceProject
+  targets retain Screen-owned geometry and handlers; every miss stays with the
+  Dock, so Action Shelf and content controls cannot activate through it. Other
+  overlays remain fully modal.
+- Persistent-Spine routing acceptance passes with 94 focused screen and
+  real-PTY tests. The 46x30 truecolor PTY now opens and closes the Dock through
+  raw SGR mouse input on the same bottom-row segment, rather than using `/` for
+  the close half. Unit coverage proves covered Action Shelf geometry is inert
+  while visible AliceProject and Detach segments still route correctly. CLI
+  build/typecheck and root TypeScript pass; the 699-file suite passes (698
+  passed, 1 skipped; 6,171 tests passed, 10 skipped). Docker installer smoke
+  passes without Node, npm, pnpm, Bun, or an Agent Runtime, and package dry-run
+  contains the changed Supervisor input controller.
 
 ## Completion Criteria
 

@@ -253,8 +253,12 @@ path is intentionally parameter-free:
   action, confirmation, refusal, or detach state machine.
   Activation closes the Dock before Setup, Update, project selection, or a
   confirmation modal takes focus; only one overlay owns input at a time.
-  `/` or `Esc` closes the Dock without exiting, while `q` and `Ctrl+C` retain
-  their global detach behavior;
+  The persistent Command Spine is the sole exception to overlay pointer
+  isolation: its final rendered Close, Detach, and visible AliceProject segments
+  remain mouse-capable while the Dock is open and still feed the same Screen
+  input handlers. No other overlay permits pointer click-through. `/`, `Esc`, or
+  the visible Close segment closes the Dock without exiting, while `q`, its
+  visible Detach segment, and `Ctrl+C` retain global detach behavior;
 - asynchronous work and its result occupy one fixed full-width activity slot
   above the command bar. When no operation or persisted feedback owns it,
   hovering a Navigation, Action Shelf, or Command Spine target projects its

@@ -2828,7 +2828,10 @@ export async function runSupervisorTui(
     const removeInputListener = ui.addInputListener((data) => {
       const pointer = parseSupervisorPointer(data)
       if (pointer) {
-        if (sourcePromptActive || settingsActive || projectsActive || transferActive || updateChannelActive || confirmationActive || commandPaletteActive) {
+        if (commandPaletteActive) {
+          const spineHandled = screen.handleCommandSpinePointer(pointer)
+          if (pointer.motion || !spineHandled) overlayPointer.route(pointer)
+        } else if (sourcePromptActive || settingsActive || projectsActive || transferActive || updateChannelActive || confirmationActive) {
           overlayPointer.route(pointer)
         } else {
           screen.handlePointer(pointer)
@@ -2958,6 +2961,7 @@ export class SupervisorScreen implements Component {
   private hoveredFleetTarget?: SupervisorFleetPointerTarget
   private hoveredCommandTarget?: SupervisorCommandTarget
   private commandTargets: SupervisorCommandTarget[] = []
+  private commandSpineTargets: SupervisorCommandTarget[] = []
   private commandDeckOpen = false
   private commandDeckState: SupervisorCommandDeckState = createSupervisorCommandDeckState()
   private commandDeckQuery = ''
@@ -3662,6 +3666,34 @@ export class SupervisorScreen implements Component {
     return event.release
   }
 
+  handleCommandSpinePointer(event: SupervisorPointerEvent): boolean {
+    const commandTarget = commandAtPosition(
+      this.commandSpineTargets,
+      event.col,
+      event.row,
+    )
+    if (event.motion) {
+      const changed = commandTarget?.row !== this.hoveredCommandTarget?.row
+        || commandTarget?.label !== this.hoveredCommandTarget?.label
+      if (changed) {
+        this.hoveredCommandTarget = commandTarget
+        this.requestRender?.()
+      }
+      return Boolean(commandTarget)
+    }
+    if (event.leftClick && commandTarget) {
+      if (
+        this.commandDeckOpen
+        && commandTarget.label !== '/'
+        && commandTarget.label !== 'q'
+      ) {
+        this.setCommandPaletteOpen(false)
+      }
+      return this.activatePointerCommand(commandTarget.label)
+    }
+    return Boolean(commandTarget) && (event.release || event.wheel !== null)
+  }
+
   render(width: number): string[] {
     this.renderWidth = width
     const runtime = this.snapshot.runtime
@@ -3862,6 +3894,10 @@ export class SupervisorScreen implements Component {
       }, width)],
     ).map((line) => truncate(line, width))
     this.commandTargets = supervisorCommandTargets(visibleLines)
+    const commandSpineRow = visibleLines.length
+    this.commandSpineTargets = visibleLines.at(-1)?.startsWith('╰─ ')
+      ? this.commandTargets.filter((target) => target.row === commandSpineRow)
+      : []
     return decorateSupervisorFrame(
       visibleLines,
       this.theme,
