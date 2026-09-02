@@ -3639,6 +3639,26 @@ already large `supervisor-tui.ts` application controller.
   tests, the complete CLI suite (63 files, 642 tests), and CLI typecheck/build
   pass.
 
+### Extreme-compact Launcher decision
+
+- Real 60x20 and 46x16 PTY captures exposed a threshold failure hidden by the
+  normal 80x24 acceptance: 60 columns retained the complete Launcher, while
+  46x16 bottom anchoring cropped the Machine pane and the first two launch-step
+  rows. The action survived, but its target context did not.
+- Below 60 columns and 18 rows, the disconnected Launcher now folds into one
+  six-row target card: selected Machine, AliceProject, Runtime readiness, and
+  the one current Launch intent. It removes list chrome only at this emergency
+  size; Up/Down, Tab/arrows, Enter, and the existing Fleet selection/launch
+  state remain authoritative.
+- The fold is TUI-only and does not change inventory, discovery, Runtime,
+  lifecycle, SSH, or AliceProject contracts. At 60x20 and above the full Launch
+  Sequence, focused list, and Launch Briefing return unchanged.
+- Real 46x16 and 60x20 PTY captures verify both sides of the fold. A dedicated
+  46x16 PTY journey hovers and clicks Start, reaches connected Home, and restores
+  terminal modes. All 154 Fleet, screen, and PTY tests (including all 57 PTY
+  cases), the complete CLI suite (63 files, 644 tests), and CLI typecheck/build
+  pass.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

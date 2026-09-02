@@ -345,6 +345,9 @@ export function renderSupervisorFleet(
   launcher = false,
   activeTarget?: SupervisorFleetActiveTarget,
 ): string[] {
+  if (launcher && visibleRows <= 0) {
+    return renderEmergencyLaunchCard(state, width)
+  }
   const launchRail = launcher ? [...renderLaunchSequence(state, width), ''] : []
   if (fleetUsesNarrowLayout(width, launcher)) {
     return [...launchRail, ...renderNarrowFleet(
@@ -415,6 +418,30 @@ export function renderSupervisorFleet(
     : availableDetailRows
   lines.push('', ...renderDetailCard(state, width, pulse, detailRows, activeTarget, launcher))
   return [...launchRail, ...lines].map((line) => truncateDisplayWidth(line, width))
+}
+
+function renderEmergencyLaunchCard(
+  state: SupervisorFleetState,
+  width: number,
+): string[] {
+  const machine = selectedFleetMachine(state)
+  const project = selectedFleetProject(state)
+  const machineReady = machine?.connection === 'local' || machine?.connection === 'online'
+  const projectReady = Boolean(machineReady && project?.available)
+  const intent = supervisorFleetLaunchIntent(state)
+  return renderPane(
+    `OPENALICE LAUNCH · ${state.focus === 'machines' ? 'MACHINE' : 'ALICEPROJECT'}`,
+    [
+      `1 MACHINE ${machineReady ? '✓' : '○'} ${machine?.displayName ?? 'Choose a Machine'}`,
+      `2 ALICEPROJECT ${projectReady ? '✓' : '○'} ${project?.displayName ?? 'Choose an AliceProject'}`,
+      `3 RUNTIME ${launchRuntimeStep(machine, project, projectReady)}`,
+      `◆ [ ${intent.action.key} ] ${intent.action.label}`,
+    ],
+    width,
+    undefined,
+    false,
+    4,
+  )
 }
 
 export function supervisorFleetLauncherRows(width: number, launcher: boolean): number {
@@ -550,6 +577,7 @@ export function supervisorFleetTargetAt(
   visibleRows = SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
   launcher = false,
 ): SupervisorFleetPointerTarget | undefined {
+  if (launcher && visibleRows <= 0) return undefined
   const narrow = fleetUsesNarrowLayout(width, launcher)
   const rowCount = narrow
     ? SUPERVISOR_FLEET_MIN_VISIBLE_ROWS
@@ -608,6 +636,7 @@ export function supervisorFleetRailTargetAt(
   visibleRows = SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
   launcher = false,
 ): SupervisorFleetRailTarget | undefined {
+  if (launcher && visibleRows <= 0) return undefined
   const narrow = fleetUsesNarrowLayout(width, launcher)
   const rowCount = narrow
     ? SUPERVISOR_FLEET_MIN_VISIBLE_ROWS

@@ -2006,6 +2006,64 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?1006l')
   }, 12_000)
 
+  it('keeps the complete Launcher target and action visible at 46x16', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-emergency-launcher-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 46,
+      rows: 16,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+        OPENALICE_TUI_BOOT: '0',
+        OPENALICE_TUI_MOTION: '0',
+        OPENALICE_TUI_START_VIEW: 'connect',
+        OPENALICE_TUI_FIXTURE_FLEET_ROWS: '1',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let hovered = false
+      let clicked = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Emergency Supervisor Launcher timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        const plain = stripSgr(output)
+        if (!hovered && plain.includes('◆ [ Enter ] Start OpenAlice')) {
+          hovered = true
+          child.write('\u001b[<35;22;9M')
+        } else if (!clicked && plain.includes('› [ Enter ] Start OpenAlice')) {
+          clicked = true
+          child.write('\u001b[<0;22;9M')
+        } else if (clicked && plain.includes('Alice Session · OpenAlice') && plain.includes('● RUNNING')) {
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && clicked) resolve(output)
+        else reject(new Error(`Emergency Supervisor Launcher exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    const plain = stripSgr(transcript)
+    expect(plain).toContain('OPENALICE LAUNCH · ALICEPROJECT')
+    expect(plain).toContain('1 MACHINE ✓ This computer')
+    expect(plain).toContain('2 ALICEPROJECT ✓ Default AliceProject')
+    expect(plain).toContain('3 RUNTIME ○ READY TO START')
+    expect(plain).toContain('› [ Enter ] Start OpenAlice')
+    expect(transcript).toContain('FIXTURE_RESULT starts=1 opens=0')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
   it('renders an offline registered Machine and preserves drill-down across resize', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-fleet-offline-'))
     temporaryPaths.push(isolatedHome)

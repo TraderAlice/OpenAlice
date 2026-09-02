@@ -104,6 +104,51 @@ describe('Supervisor TUI screen', () => {
     expect(activated).toEqual(['local/default'])
   })
 
+  it('folds an extremely short Launcher into one complete target card', () => {
+    const activated: string[] = []
+    const originalLocal = fleetMachines()[0]!
+    const local = {
+      ...originalLocal,
+      projects: originalLocal.projects.map((project) => ({
+        ...project,
+        runtime: {
+          ...project.runtime,
+          class: 'absent',
+          state: 'absent',
+          ownerSurface: null,
+          webEndpoint: null,
+        },
+      })),
+    }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'fleet',
+      runtime: { class: 'absent', endpoints: {} },
+      activeTarget: null,
+      fleet: createSupervisorFleetState('2026-09-02T00:00:00Z', [local], 'default'),
+    }, {
+      getViewportHeight: () => 16,
+      motionEnabled: false,
+      onActivateFleet: (machine, project) => activated.push(`${machine.key}/${project.key}`),
+    })
+
+    const lines = screen.render(46)
+    const frame = lines.join('\n')
+    expect(lines).toHaveLength(16)
+    expect(frame).toContain('◆ OpenAlice')
+    expect(frame).toContain('[Connect]·1')
+    expect(frame).toContain('OPENALICE LAUNCH · ALICEPROJECT')
+    expect(frame).toContain('1 MACHINE ✓ This computer')
+    expect(frame).toContain('2 ALICEPROJECT ✓ Default AliceProject')
+    expect(frame).toContain('3 RUNTIME ○ READY TO START')
+    expect(frame).toContain('◆ [ Enter ] Start OpenAlice')
+    expect(frame).not.toContain('AliceProjects · This computer')
+    const actionRow = lines.findIndex((line) => line.includes('[ Enter ] Start OpenAlice')) + 1
+    expect(screen.handlePointer(pointerClick(22, actionRow))).toBe(true)
+    expect(activated).toEqual(['local/default'])
+  })
+
   it('makes a blocked Launch Briefing own its visible Refresh action', () => {
     const refreshed: string[] = []
     const activated: string[] = []

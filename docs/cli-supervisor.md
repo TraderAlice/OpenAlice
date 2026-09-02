@@ -141,7 +141,12 @@ intentionally parameter-free:
   telemetry dump. It names the selected route, explains the human outcome, and
   previews the three-stage handoff into connected Home; wide terminals add
   target context in a content-sized nine-row stage while ordinary and narrow
-  terminals retain the outcome and next command. The final command is a
+  terminals retain the outcome and next command. Below 60 columns and 18 rows,
+  the Launcher uses one emergency target card rather than letting bottom
+  anchoring crop Machine context. It keeps the selected Machine, AliceProject,
+  Runtime readiness, and current Launch intent visible together; keyboard
+  selection still uses the existing Fleet state and the action remains
+  mouse-capable. The final command is a
   full-row primary Action Shelf such as `◆ [ Enter ] Start OpenAlice`, not a
   keycap buried in a prose Next sentence; its complete painted row is also its
   pointer target. Surplus viewport height stays outside the Briefing so this
