@@ -534,8 +534,10 @@ intentionally parameter-free:
   and missing telemetry says `not reported` instead of inventing state. A
   bounded recent-event region records only meaningful acquire, release,
   degraded, unreachable, recovered, and stopped transitions, keeps at most
-  twelve newest events, sanitizes target identity, and is never persisted.
-  Local Runtime log evidence remains directly below the Observatory; remote
+  twelve newest events, sanitizes target identity, and is never persisted. Its
+  retained count stays inside the wide `History` field rather than competing
+  in the Observatory title with Runtime Lens event counts. Local Runtime log
+  evidence remains directly below the Observatory; remote
   targets give surplus height to recent transitions and expose only remote-safe
   Open, Check, Disconnect, Connections, and Help actions;
 - `x` stops and `r` restarts only a `cli-server` owner, after an impact

@@ -23,7 +23,8 @@ describe('Supervisor connection chronicle', () => {
     const lines = renderSupervisorConnectionChronicle({ target, events }, 80)
     const text = lines.join('\n')
 
-    expect(text).toContain('Runtime Observatory · ENDPOINT UNREACHABLE · REMOTE · 3/12 EVENTS')
+    expect(text).toContain('Runtime Observatory · ENDPOINT UNREACHABLE · REMOTE')
+    expect(text).not.toMatch(/Runtime Observatory[^\n]*EVENTS/u)
     expect(text).toContain('× OPENALICE READY · ENDPOINT UNREACHABLE')
     expect(text).toContain('⌁ Cloud Lab → Research · SSH FORWARD')
     expect(text).toContain('Owner  cli-server · pid 4242 · Uptime  2h 3m')
@@ -47,7 +48,8 @@ describe('Supervisor connection chronicle', () => {
     const text = lines.join('\n')
 
     expect(lines).toHaveLength(14)
-    expect(text).toContain('Runtime Observatory · CONNECTED · REMOTE · 3/12 EVENTS')
+    expect(text).toContain('Runtime Observatory · CONNECTED · REMOTE')
+    expect(text).not.toMatch(/Runtime Observatory[^\n]*EVENTS/u)
     expect(text).toContain('RUNTIME')
     expect(text).toContain('ROUTE')
     expect(text).toContain('SERVICES')

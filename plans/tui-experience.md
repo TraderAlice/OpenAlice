@@ -3372,6 +3372,25 @@ already large `supervisor-tui.ts` application controller.
   real-PTY tests (including all 54 PTY cases), and the complete CLI suite (63
   files, 638 tests). CLI typecheck and build also pass.
 
+### Runtime evidence-domain decision
+
+- Cell-accurate 120x32 and 80x24 Runtime captures exposed `1/12 EVENTS` in the
+  Runtime Observatory title directly above `0 EVENTS` in Runtime Lens. Both
+  numbers were truthful, but the first counted ephemeral connection history
+  while the second counted bounded Runtime logs, so the status manager appeared
+  internally contradictory.
+- Runtime Observatory titles now own only connection state and LOCAL/REMOTE
+  scope. Wide Observatory content retains its explicit `History n/12` field
+  and both layouts retain a concrete Recent transition; Runtime Lens alone
+  uses EVENTS for the log evidence it can filter, inspect, reload, and copy.
+- Real 120x32 and 80x24 captures verify the two evidence domains read clearly
+  without changing collection, retention, log filtering, action routing,
+  responsive structure, or Runtime state.
+- Runtime-evidence-domain acceptance passes through all 12 Chronicle/Lens
+  tests, all 133 focused screen and real-PTY tests (including all 54 PTY cases),
+  and the complete CLI suite (63 files, 638 tests). CLI typecheck and build also
+  pass.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

@@ -121,7 +121,7 @@ export function renderSupervisorConnectionChronicle(
   const rows = padActionRows(naturalRows, bodyHeight)
   return renderSupervisorPanel(
     'Runtime Observatory',
-    `${state.label} · ${view.target.kind === 'ssh' ? 'REMOTE' : 'LOCAL'} · ${view.events.length}/${MAX_CONNECTION_EVENTS} EVENTS`,
+    `${state.label} · ${view.target.kind === 'ssh' ? 'REMOTE' : 'LOCAL'}`,
     rows,
     safeWidth,
   )
