@@ -292,7 +292,10 @@ path is intentionally parameter-free:
   Runtime/config provenance. Setup can edit either the selected AliceProject or
   machine defaults inherited by projects. Wide terminals present a Setup map
   beside the selected field's Inspector; narrower terminals stack the same
-  complete regions;
+  complete regions. Editable fields stay in that model through a responsive
+  Setup Workbench: the active layer and Edit/Validate/Save route remain visible
+  beside the focused input, while invalid values block Save and keep the field
+  available for correction;
 - `m` on Overview is an advanced control that confirms, prepares, remembers, and starts an installer-managed source
   aligned to the installed CLI branch/version;
 - `c` opens the Source Launch Bay to choose, validate, remember, and then start

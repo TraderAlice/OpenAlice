@@ -355,6 +355,22 @@ not imply maintainer approval of the finished interaction.
   `findSource` -> `configureProject` -> `performAction('start')` chain remains
   the only validation, persistence, and launch path.
 
+### Setup Workbench decision
+
+- Keeping the raw Setup Editor inside a generic panel would preserve its small
+  footprint, but entering it from Setup Studio would continue to erase the
+  selected field's position, active configuration layer, inheritance contract,
+  and validation boundary.
+- Editing values inline in the Studio map would retain context, but long paths
+  and validation failures would collide with navigation rows and make pointer
+  selection ambiguous.
+- The selected model is a Setup Workbench. A Layer Context panel keeps the
+  AliceProject or Machine layer, selected field, and Edit/Validate/Save route
+  visible while a Field Inspector owns the existing focused input and validator.
+  Wide terminals pair the regions; the 80-column baseline stacks the complete
+  route. Existing `SettingsList` callbacks and `applySetting` remain the only
+  persistence path.
+
 ### Persistent context-ribbon decision
 
 - Expanding the animated brand header would make version/update presentation
@@ -491,6 +507,8 @@ already large `supervisor-tui.ts` application controller.
   while preserving its ordered key/Home validation and creation boundary.
 - [x] Replace the legacy Runtime Source input card with a responsive Launch Bay
   while preserving its validate-save-start execution boundary.
+- [x] Replace the legacy Setup Editor fallback with a responsive Workbench
+  while preserving the SettingsList validation and applySetting boundary.
 
 ## Progress
 
@@ -911,6 +929,19 @@ already large `supervisor-tui.ts` application controller.
   pass; the 699-file suite passes (698 passed, 1 skipped; 6134 tests passed, 10
   skipped). Docker installer smoke passes, and package dry-run includes
   `src/supervisor-source-view.ts`.
+- Setup value editing now stays inside a responsive Workbench instead of
+  dropping from Setup Studio into the legacy Editor card. The active Project or
+  Machine layer, field position, Edit/Validate/Save route, focused input, and
+  inheritance contract remain visible; rejected values switch to a complete
+  `FIX` route without losing the user's entry.
+- Setup-Workbench acceptance passes with 83 focused view, pointer, screen, and
+  real-PTY tests. A 110×30 run used the full action segment to submit an invalid
+  project port, corrected it, clicked again, and persisted the valid value; a
+  separate 80×24 run switched to Machine defaults and persisted its port through
+  the stacked Workbench. Root TypeScript and CLI build/typecheck pass; the
+  699-file suite passes (698 passed, 1 skipped; 6137 tests passed, 10 skipped).
+  Docker installer smoke passes, and package dry-run retains
+  `src/supervisor-setup-view.ts`.
 
 ## Completion Criteria
 

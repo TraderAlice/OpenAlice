@@ -1122,6 +1122,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       let output = ''
       let openedSettings = false
       let selectedPort = false
+      let submittedInvalidPort = false
       let submittedPort = false
       let closedSettings = false
       let detached = false
@@ -1137,9 +1138,24 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         } else if (!selectedPort && output.includes('Setup Studio · Default AliceProject')) {
           selectedPort = true
           child.write('\u001b[B\u001b[B\r')
-        } else if (!submittedPort && output.includes('Set AliceProject browser port')) {
+        } else if (!submittedInvalidPort && output.includes('Set AliceProject browser port')) {
+          submittedInvalidPort = true
+          child.write('99999')
+          setTimeout(() => {
+            child.write('\u001b[<35;65;15M')
+            setTimeout(() => child.write('\u001b[<0;65;15M'), 300)
+          }, 100)
+        } else if (
+          !submittedPort
+          && output.includes('Layer Context · PROJECT · FIX')
+          && output.includes('Browser port must be a whole number')
+        ) {
           submittedPort = true
-          child.write('49001\r')
+          child.write('\u0005\u001549001')
+          setTimeout(() => {
+            child.write('\u001b[<35;65;15M')
+            setTimeout(() => child.write('\u001b[<0;65;15M'), 300)
+          }, 100)
         } else if (
           !closedSettings
           && output.includes('Saved browser port for AliceProject "Default AliceProject".')
@@ -1166,7 +1182,11 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     )
     expect(config.projects.default.port).toBe(49_001)
     expect(transcript).toContain('Setup Studio · Default AliceProject')
+    expect(transcript).toContain('Layer Context · PROJECT · EDIT')
     expect(transcript).toContain('Set AliceProject browser port')
+    expect(transcript).toContain('› [ Enter ] Validate & save')
+    expect(transcript).toContain('Layer Context · PROJECT · FIX')
+    expect(transcript).toContain('Browser port must be a whole number')
     expect(transcript).toContain('Saved browser port for AliceProject "Default AliceProject".')
     expect(transcript).toContain('STATUS   Setup closed.')
     expect(transcript).toContain('\u001b[?25h')
@@ -1181,8 +1201,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     delete childEnv.OPENALICE_HOME
     delete childEnv.OPENALICE_INSTANCE
     const child = pty.spawn(process.execPath, [cliEntry], {
-      cols: 110,
-      rows: 30,
+      cols: 80,
+      rows: 24,
       cwd: dirname(cliEntry),
       env: {
         ...childEnv,
@@ -1254,6 +1274,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     )
     expect(config.defaults.port).toBe(49_002)
     expect(transcript).toContain('Editing machine defaults.')
+    expect(transcript).toContain('Setup Workbench · MACHINE · EDIT')
+    expect(transcript).toContain('◆ Edit  → Validate  → Save')
     expect(transcript).toContain('Set machine-default browser port')
     expect(transcript).toContain('Saved browser port for machine default.')
     expect(transcript).toContain('STATUS   Setup closed.')

@@ -89,7 +89,10 @@ import {
 } from './supervisor-tui-theme.ts'
 import {
   decorateSupervisorSetupStudio,
+  decorateSupervisorSetupWorkbench,
   renderSupervisorSetupStudio,
+  renderSupervisorSetupWorkbench,
+  supervisorSetupWorkbenchFieldWidth,
   type SupervisorSetupItem,
 } from './supervisor-setup-view.ts'
 import {
@@ -1555,6 +1558,7 @@ export async function runSupervisorTui(
     let saving = false
     let settingsSelectedIndex = 0
     let settingsSubmenuOpen = false
+    let activeSettingsInput: Component | null = null
     let settingsHoveredCommand: string | undefined
     let scope: typeof PROJECT_SCOPE | typeof MACHINE_SCOPE = PROJECT_SCOPE
     let message = 'Changes apply to this AliceProject. Environment and command-line overrides remain locked.'
@@ -1570,7 +1574,10 @@ export async function runSupervisorTui(
       settingsActive = false
       closeSettings = null
       overlayPointer.clear()
+      settingsSubmenuOpen = false
+      activeSettingsInput = null
       settingsHoveredCommand = undefined
+      overlay.unfocus?.({ target: screen })
       overlay.hide()
       ui.setShowHardwareCursor(false)
       screen.update({ notice })
@@ -1584,30 +1591,38 @@ export async function runSupervisorTui(
     ): Component => {
       const input = new (class extends piTui.Input {
         detail = initialDetail
+        phase: 'edit' | 'error' = 'edit'
 
         setDetail(next: string): void {
           this.detail = next
+          this.phase = 'error'
           this.invalidate()
           ui.requestRender()
         }
 
         override render(width: number): string[] {
-          return [
-            title,
-            '',
-            ...super.render(width),
-            '',
-            sanitize(this.detail),
-            '',
-            '[ Enter ] Save · [ Esc ] Cancel',
-          ]
+          return renderSupervisorSetupWorkbench({
+            phase: this.phase,
+            projectName: settingsContext.aliceProject.displayName,
+            scope,
+            fieldTitle: title,
+            fieldPosition: `${settingsSelectedIndex + 1}/${items.length}`,
+            runtimeClass: screen.snapshot.runtime?.class,
+            fieldLines: super.render(supervisorSetupWorkbenchFieldWidth(width)),
+            detail: sanitize(this.detail),
+            message: scope === MACHINE_SCOPE
+              ? 'Blank values fall through to OpenAlice defaults; AliceProject overrides remain above.'
+              : 'Blank values inherit from Machine defaults; environment and command-line overrides remain above.',
+          }, width)
         }
       })()
       input.setValue(initialValue)
       input.focused = true
+      activeSettingsInput = input
       ui.setShowHardwareCursor(true)
       input.onEscape = () => {
         input.focused = false
+        activeSettingsInput = null
         ui.setShowHardwareCursor(false)
         settingsSubmenuOpen = false
         done()
@@ -1619,6 +1634,7 @@ export async function runSupervisorTui(
           return
         }
         input.focused = false
+        activeSettingsInput = null
         ui.setShowHardwareCursor(false)
         settingsSubmenuOpen = false
         done(value.trim() || INHERIT_SETTING)
@@ -1883,6 +1899,11 @@ export async function runSupervisorTui(
     }
     const handleSettingsInput = (data: string) => {
       if (saving) return
+      settingsHoveredCommand = undefined
+      if (settingsSubmenuOpen && activeSettingsInput) {
+        activeSettingsInput.handleInput?.(data)
+        return
+      }
       if (!settingsSubmenuOpen) {
         if (piTui.matchesKey(data, 'up')) {
           moveSettings(-1)
@@ -1908,13 +1929,24 @@ export async function runSupervisorTui(
     const panel = new (class implements Component {
       render(width: number): string[] {
         if (settingsSubmenuOpen) {
-          const lines = renderSupervisorPanel('Setup Editor', settingsContext.aliceProject.displayName, [
-            ...settings.render(Math.max(1, width - 4)),
-            '',
-            sanitize(message),
-          ], width)
-          captureOverlayPointer(lines, width, overlayOptions, (data) => this.handleInput(data))
-          return lines
+          const lines = settings.render(width)
+          captureOverlayPointer(
+            lines,
+            width,
+            overlayOptions,
+            (data) => this.handleInput(data),
+            undefined,
+            (label) => {
+              if (settingsHoveredCommand === label) return
+              settingsHoveredCommand = label
+              ui.requestRender()
+            },
+          )
+          return decorateSupervisorSetupWorkbench(
+            lines,
+            tuiTheme,
+            settingsHoveredCommand,
+          )
         }
         const studioItems: SupervisorSetupItem[] = items.map((item) => ({
           id: item.id,
