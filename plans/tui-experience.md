@@ -3619,6 +3619,26 @@ already large `supervisor-tui.ts` application controller.
   real-PTY tests (including all 56 PTY cases), plus the complete CLI suite (63
   files, 642 tests). CLI typecheck and build also pass.
 
+### Home signal-entry decision
+
+- A pointer audit found that Home's `SIGNALS` rows looked like navigation but
+  were inert. This weakened the state-manager half of the product: users could
+  see Inbox and connection state, yet still had to rediscover the matching
+  Mission Navigation tab.
+- Inbox and Connection are now whole-row Home hotspots. Hover changes the
+  leading signal and uses the stable Activity Slot to explain the destination;
+  click enters the existing Inbox or Connections panel-selection path. No new
+  Runtime, Inbox, lifecycle, or navigation state machine is introduced.
+- The signal rows remain passive status text for keyboard traversal: existing
+  Mission Navigation, Tab/arrow cycling, and Command Dock routes remain the
+  keyboard-complete paths. Compact and wide Home share the same target contract.
+- Real 80x24 PTY coverage hovers and clicks the unread Inbox signal before
+  toggling the selected report. Wide screen coverage verifies that AliceProject
+  and Inbox targets sharing one rendered row stop at the next target boundary
+  instead of stealing each other's pointer field. All 135 screen and real-PTY
+  tests, the complete CLI suite (63 files, 642 tests), and CLI typecheck/build
+  pass.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

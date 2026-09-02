@@ -352,7 +352,9 @@ intentionally parameter-free:
   Now and its primary action remain at the top, Signals occupy the middle, and
   Recent anchors the lower region. Compact layouts keep the same hierarchy with
   bounded vertical rhythm, and no other panel inherits this Home-only height
-  policy;
+  policy. Inbox and Connection signals are whole-row pointer targets backed by
+  the same panel-selection path as Mission Navigation; hover previews their
+  destination in the stable Activity Slot;
 - the connected Home page keeps one product name from Mission Header through
   Command Spine: the footer projects `◆ HOME`, never the internal `overview`
   panel key. At compact widths the view badge is removed before selected

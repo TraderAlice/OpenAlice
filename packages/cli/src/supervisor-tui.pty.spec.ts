@@ -1053,7 +1053,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
 
-  it('routes Home Enter to unread Inbox work before opening the Workspace', async () => {
+  it('routes the Home Inbox signal to unread work before opening the Workspace', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-home-inbox-'))
     temporaryPaths.push(isolatedHome)
     const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
@@ -1073,6 +1073,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
 
     const transcript = await new Promise<string>((resolve, reject) => {
       let output = ''
+      let hoveredInbox = false
       let openedInbox = false
       let toggledRead = false
       let detached = false
@@ -1082,9 +1083,13 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 8_000)
       child.onData((data) => {
         output += data
-        if (!openedInbox && output.includes('[ Enter ]  Review 2 unread reports')) {
+        const plain = stripSgr(output)
+        if (!hoveredInbox && plain.includes('◆ Inbox  2 unread reports')) {
+          hoveredInbox = true
+          child.write('\u001b[<35;20;15M')
+        } else if (!openedInbox && plain.includes('› Inbox  2 unread reports')) {
           openedInbox = true
-          child.write('\r')
+          child.write('\u001b[<0;20;15M')
         } else if (!toggledRead && openedInbox && output.includes('Inbox Desk') && output.includes('2 UNREAD')) {
           toggledRead = true
           child.write('\r')
@@ -1101,6 +1106,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     })
 
     expect(transcript).toContain('◆ Inbox  2 unread reports')
+    expect(stripSgr(transcript)).toContain('› Inbox  2 unread reports')
     expect(transcript).toContain('[ Enter ]  Review 2 unread reports')
     expect(transcript).toContain('Inbox Desk')
     expect(transcript).toContain('[ o ] Open Workspace')

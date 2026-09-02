@@ -24,6 +24,7 @@ export interface SupervisorHomeView {
 }
 
 export type SupervisorHomeHotspotKind = 'project' | 'web' | 'provider'
+  | 'inbox' | 'connection'
 
 export interface SupervisorHomeTarget {
   row: number
@@ -33,7 +34,7 @@ export interface SupervisorHomeTarget {
 
 export interface SupervisorHomeHotspotTarget extends SupervisorHomeTarget {
   kind: SupervisorHomeHotspotKind
-  input: 'i' | 'o' | 'c'
+  input: 'i' | 'o' | 'c' | 'inbox' | 'connections'
   surface: string
 }
 
@@ -333,6 +334,11 @@ function homeNowHeadline(view: SupervisorHomeView): string {
 }
 
 function homeAttentionRow(view: SupervisorHomeView): string {
+  const row = homeAttentionText(view)
+  return view.hoveredHotspot === 'inbox' ? replaceLeadingSignal(row) : row
+}
+
+function homeAttentionText(view: SupervisorHomeView): string {
   const count = view.inboxUnread ?? 0
   if (count > 0) return `◆ Inbox  ${count} unread ${count === 1 ? 'report' : 'reports'}`
   if (view.state === 'absent') return '◇ Runtime  stopped · ready to launch'
@@ -341,6 +347,11 @@ function homeAttentionRow(view: SupervisorHomeView): string {
 }
 
 function homeConnectionRow(view: SupervisorHomeView): string {
+  const row = homeConnectionText(view)
+  return view.hoveredHotspot === 'connection' ? replaceLeadingSignal(row) : row
+}
+
+function homeConnectionText(view: SupervisorHomeView): string {
   if (view.connectionHealth === 'checking') return '◌ Connection  checking endpoint'
   if (view.connectionHealth === 'degraded') return '! Connection  degraded'
   if (view.connectionHealth === 'unreachable') return '× Connection  unreachable'
@@ -348,6 +359,10 @@ function homeConnectionRow(view: SupervisorHomeView): string {
     return '● Connection  healthy'
   }
   return '◇ Connection  waiting for Runtime'
+}
+
+function replaceLeadingSignal(row: string): string {
+  return row.replace(/^\S+\s/u, '› ')
 }
 
 function homeRecentRows(view: SupervisorHomeView, width: number): string[] {
@@ -432,8 +447,22 @@ function homeHotspotTargets(
       idleMarker: '⑂ Provider',
       hoveredMarker: '› Provider',
     },
+    {
+      kind: 'inbox',
+      input: 'inbox',
+      enabled: homeAttentionText(view).includes('Inbox'),
+      idleMarker: homeAttentionText(view),
+      hoveredMarker: homeAttentionRow(view),
+    },
+    {
+      kind: 'connection',
+      input: 'connections',
+      enabled: true,
+      idleMarker: homeConnectionText(view),
+      hoveredMarker: homeConnectionRow(view),
+    },
   ]
-  return specs.flatMap((spec) => {
+  const visible = specs.flatMap((spec) => {
     if (!spec.enabled) return []
     const marker = view.hoveredHotspot === spec.kind
       ? spec.hoveredMarker
@@ -443,18 +472,28 @@ function homeHotspotTargets(
     const line = lines[rowIndex]!
     const markerIndex = line.indexOf(marker)
       + (spec.kind === 'project' && marker.startsWith('│ ') ? 2 : 0)
+    return [{ spec, marker, rowIndex, markerIndex }]
+  })
+  return visible.map(({ spec, marker, rowIndex, markerIndex }) => {
+    const line = lines[rowIndex]!
+    const nextHotspot = visible
+      .filter((candidate) => (
+        candidate.rowIndex === rowIndex && candidate.markerIndex > markerIndex
+      ))
+      .sort((left, right) => left.markerIndex - right.markerIndex)[0]
     const boundary = line.indexOf('│', markerIndex)
-    const surfaceEnd = boundary >= 0 ? boundary : line.length
+    const surfaceEnd = nextHotspot?.markerIndex
+      ?? (boundary >= 0 ? boundary : line.length)
     const surface = line.slice(markerIndex, surfaceEnd)
     const startColumn = displayWidth(line.slice(0, markerIndex)) + 1
-    return [{
+    return {
       kind: spec.kind,
       input: spec.input,
       row: rowIndex + 1,
       startColumn,
       endColumn: startColumn + displayWidth(surface) - 1,
       surface,
-    }]
+    }
   })
 }
 

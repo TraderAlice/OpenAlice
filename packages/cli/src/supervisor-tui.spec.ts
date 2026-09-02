@@ -236,13 +236,30 @@ describe('Supervisor TUI screen', () => {
       onOpenActiveTarget: () => { opens += 1 },
     })
 
-    const home = screen.render(100).join('\n')
+    const homeLines = screen.render(100)
+    const home = homeLines.join('\n')
     expect(home).toContain('● Inbox·1')
     expect(home).toContain('1 unread report needs your attention')
     expect(home).toContain('1 unread report is waiting in this AliceProject.')
     expect(home).toContain('[ Enter ]  Review 1 unread report')
     expect(home).toContain('Enter reviews')
     expect(home).toContain('Inbox; o opens the Web UI.')
+    const inboxSignalRow = homeLines.findIndex((line) => line.includes('◆ Inbox  1 unread report')) + 1
+    const inboxSignalColumn = homeLines[inboxSignalRow - 1]!.indexOf('◆ Inbox') + 1
+    expect(screen.handlePointer({
+      button: 35,
+      col: inboxSignalColumn,
+      row: inboxSignalRow,
+      release: false,
+      wheel: null,
+      motion: true,
+      leftClick: false,
+    })).toBe(true)
+    expect(screen.render(100).join('\n')).toContain('› Inbox  1 unread report')
+    expect(screen.render(100).join('\n')).toContain('Open Inbox reports for')
+    expect(screen.handlePointer(pointerClick(inboxSignalColumn, inboxSignalRow))).toBe(true)
+    expect(screen.snapshot.panel).toBe('inbox')
+    screen.update({ panel: 'overview' })
     expect(screen.handleKey('enter', matchesKey)).toBe(true)
     expect(screen.snapshot.panel).toBe('inbox')
     expect(opens).toBe(0)
@@ -273,11 +290,27 @@ describe('Supervisor TUI screen', () => {
         entries: [{ ...screen.snapshot.inbox!.entries[0]!, readAt: Date.now() }],
       },
     })
-    const settledHome = screen.render(100).join('\n')
+    const settledHomeLines = screen.render(100)
+    const settledHome = settledHomeLines.join('\n')
     expect(settledHome).not.toContain('INBOX ATTENTION')
     expect(settledHome).toContain('[ Enter ]  Open Workspace')
     expect(screen.handleKey('enter', matchesKey)).toBe(true)
     expect(opens).toBe(1)
+    const connectionRow = settledHomeLines.findIndex((line) => line.includes('● Connection')) + 1
+    const connectionColumn = settledHomeLines[connectionRow - 1]!.indexOf('● Connection') + 1
+    expect(screen.handlePointer({
+      button: 35,
+      col: connectionColumn,
+      row: connectionRow,
+      release: false,
+      wheel: null,
+      motion: true,
+      leftClick: false,
+    })).toBe(true)
+    expect(screen.render(100).join('\n')).toContain('› Connection  healthy')
+    expect(screen.render(100).join('\n')).toContain('Open Connections to inspect')
+    expect(screen.handlePointer(pointerClick(connectionColumn, connectionRow))).toBe(true)
+    expect(screen.snapshot.panel).toBe('fleet')
   })
 
   it('keeps remote controls target-scoped and exposes an explicit disconnect', () => {

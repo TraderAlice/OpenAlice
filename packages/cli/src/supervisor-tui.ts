@@ -4624,6 +4624,14 @@ export class SupervisorScreen implements Component {
     }
     if (event.leftClick && homeHotspot) {
       this.hoveredHomeHotspot = homeHotspot.kind
+      if (homeHotspot.input === 'inbox') {
+        this.selectPanel('inbox')
+        return true
+      }
+      if (homeHotspot.input === 'connections') {
+        this.selectPanel('fleet')
+        return true
+      }
       return this.handleKey(homeHotspot.input, (data, key) => data === key)
     }
     if (event.leftClick && homePrimaryTarget) {
@@ -5138,6 +5146,12 @@ export class SupervisorScreen implements Component {
     }
     if (this.hoveredHomeHotspot === 'provider') {
       return 'Choose and validate the source checkout used by this stopped Runtime.'
+    }
+    if (this.hoveredHomeHotspot === 'inbox') {
+      return 'Open Inbox reports for the selected AliceProject.'
+    }
+    if (this.hoveredHomeHotspot === 'connection') {
+      return 'Open Connections to inspect or switch the active target.'
     }
     if (this.homePrimaryHovered) {
       if (this.snapshot.activeTarget && !activeTargetIsReachable(this.snapshot.activeTarget)) {
