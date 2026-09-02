@@ -356,19 +356,22 @@ export function renderSupervisorFleet(
       ...renderDirectLaunchBoard(state, width, pulse),
     ].map((line) => truncateDisplayWidth(line, width))
   }
+  const inventoryRows = launcher
+    ? fleetLauncherInventoryRows(state, visibleRows)
+    : fleetVisibleRows(state, visibleRows)
   if (fleetUsesNarrowLayout(width, launcher)) {
     return [...launchRail, ...renderNarrowFleet(
       state,
       width,
       hovered,
       pulse,
-      SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
+      launcher ? inventoryRows : SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
       hoveredRail,
       activeTarget,
       launcher,
     )]
   }
-  const rowCount = fleetVisibleRows(state, visibleRows)
+  const rowCount = inventoryRows
   const leftWidth = Math.max(28, Math.min(36, Math.floor(width * 0.38)))
   const gap = 3
   const rightWidth = Math.max(1, width - leftWidth - gap)
@@ -421,7 +424,7 @@ export function renderSupervisorFleet(
   }
   const availableDetailRows = fleetDetailRows(width, visibleRows, rowCount)
   const detailRows = launcher && availableDetailRows > 2
-    ? 9
+    ? 6
     : availableDetailRows
   lines.push('', ...renderDetailCard(state, width, pulse, detailRows, activeTarget, launcher))
   return [...launchRail, ...lines].map((line) => truncateDisplayWidth(line, width))
@@ -557,7 +560,7 @@ function renderEmergencyLaunchCard(
 
 export function supervisorFleetLauncherRows(width: number, launcher: boolean): number {
   if (!launcher) return 0
-  return width >= 72 ? 4 : 6
+  return width >= 72 ? 4 : width >= 54 ? 5 : 6
 }
 
 function renderLaunchSequence(state: SupervisorFleetState, width: number): string[] {
@@ -570,11 +573,14 @@ function renderLaunchSequence(state: SupervisorFleetState, width: number): strin
   const projectStep = `2 ALICEPROJECT ${projectReady ? '✓' : '○'} ${project?.displayName ?? 'Choose an AliceProject'}`
   const runtimeStep = `3 RUNTIME ${runtime}`
   const inner = Math.max(12, width - 4)
+  const compactSteps = compactLaunchSteps(machine, project, machineReady, projectReady)
   const rows = width >= 72
     ? [joinLaunchSteps(width >= 96
       ? [machineStep, projectStep, runtimeStep]
-      : compactLaunchSteps(machine, project, machineReady, projectReady), inner)]
-    : [machineStep, projectStep, runtimeStep]
+      : compactSteps, inner)]
+    : width >= 54
+      ? [joinLaunchSteps(compactSteps.slice(0, 2), inner), compactSteps[2]!]
+      : [machineStep, projectStep, runtimeStep]
   const title = supervisorFleetHasSingleLaunchTarget(state)
     ? 'OPENALICE LAUNCH · READY → START → CONNECT'
     : 'OPENALICE LAUNCH · SELECT → START → CONNECT'
@@ -656,7 +662,7 @@ function renderNarrowFleet(
         hovered?.surface === 'pane',
         rowCount,
       ),
-      '',
+      ...(launcher ? [] : ['']),
       ...renderDetailCard(state, width, pulse, 2, activeTarget, launcher),
     ].map((line) => truncateDisplayWidth(line, width))
   }
@@ -678,7 +684,7 @@ function renderNarrowFleet(
       hovered?.surface === 'pane',
       rowCount,
     ),
-    '',
+    ...(launcher ? [] : ['']),
     ...renderDetailCard(state, width, pulse, 2, activeTarget, launcher),
   ].map((line) => truncateDisplayWidth(line, width))
 }
@@ -694,9 +700,11 @@ export function supervisorFleetTargetAt(
   if (launcher && visibleRows <= 0) return undefined
   if (launcher && supervisorFleetHasSingleLaunchTarget(state)) return undefined
   const narrow = fleetUsesNarrowLayout(width, launcher)
-  const rowCount = narrow
-    ? SUPERVISOR_FLEET_MIN_VISIBLE_ROWS
-    : fleetVisibleRows(state, visibleRows)
+  const rowCount = launcher
+    ? fleetLauncherInventoryRows(state, visibleRows)
+    : narrow
+      ? SUPERVISOR_FLEET_MIN_VISIBLE_ROWS
+      : fleetVisibleRows(state, visibleRows)
   if (row < 1 || row > rowCount + 1) return undefined
   if (narrow) {
     const items = state.focus === 'machines'
@@ -754,9 +762,11 @@ export function supervisorFleetRailTargetAt(
   if (launcher && visibleRows <= 0) return undefined
   if (launcher && supervisorFleetHasSingleLaunchTarget(state)) return undefined
   const narrow = fleetUsesNarrowLayout(width, launcher)
-  const rowCount = narrow
-    ? SUPERVISOR_FLEET_MIN_VISIBLE_ROWS
-    : fleetVisibleRows(state, visibleRows)
+  const rowCount = launcher
+    ? fleetLauncherInventoryRows(state, visibleRows)
+    : narrow
+      ? SUPERVISOR_FLEET_MIN_VISIBLE_ROWS
+      : fleetVisibleRows(state, visibleRows)
   if (row < 2 || row > rowCount + 1) return undefined
   const trackRow = row - 2
   let focus: FleetFocus
@@ -970,23 +980,17 @@ function renderLaunchBriefing(
     )
   }
 
-  const context = project && state.focus === 'projects'
-    ? `${machine?.key === 'local' ? 'LOCAL LOOPBACK' : 'SSH FORWARD'} · ${projectStatus(project)}`
-    : `${machine?.connection === 'local' ? 'LOCAL CONTROL PLANE' : 'SSH MACHINE'} · ${machine?.projects.length ?? 0} ALICEPROJECTS`
-  const target = project && state.focus === 'projects'
-    ? `${machine?.key ?? 'unknown'}/${project.key} · ${project.product === 'nano' ? 'NanoAlice' : 'TraderAlice'}`
-    : `${machine?.key ?? 'unknown'} · ${machine?.hostname ?? 'host not reported'}`
   return renderPane(
     `Launch Briefing · ${state.focus === 'machines' ? 'Machine' : 'AliceProject'}`,
     [
       briefingStatus,
       intent.summary,
       '',
-      '◇ HANDOFF · THIS TUI STAYS IN CONTROL',
-      joinLaunchSteps(intent.handoff.map((stage, index) => `${index + 1} ${stage}`), Math.max(1, width - 4)),
+      `NEXT  ${joinLaunchSteps(
+        intent.handoff.map((stage, index) => `${index + 1} ${stage}`),
+        Math.max(1, width - 10),
+      )}`,
       '',
-      `TARGET   ${target}`,
-      `CONTEXT  ${context}`,
       `◆ ${keycap} ${intent.action.label}`,
     ],
     width,
@@ -994,6 +998,15 @@ function renderLaunchBriefing(
     false,
     rowCount,
   )
+}
+
+function fleetLauncherInventoryRows(
+  state: SupervisorFleetState,
+  visibleRows: number,
+): number {
+  const machine = selectedFleetMachine(state)
+  const candidates = Math.max(state.machines.length, machine?.projects.length ?? 0)
+  return Math.max(1, Math.min(Math.max(1, Math.floor(visibleRows)), candidates))
 }
 
 function compactLaunchConsequence(intent: SupervisorFleetLaunchIntent): string {

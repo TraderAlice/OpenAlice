@@ -152,6 +152,38 @@ describe('Supervisor TUI screen', () => {
     expect(activated).toEqual(['local/default'])
   })
 
+  it('keeps multi-target Launcher guidance complete at 60x20', () => {
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'fleet',
+      runtime: { class: 'absent', endpoints: {} },
+      activeTarget: null,
+      fleet: createSupervisorFleetState(
+        '2026-09-03T00:00:00Z',
+        fleetMachines(),
+        'default',
+      ),
+    }, {
+      getViewportHeight: () => 20,
+      motionEnabled: false,
+    })
+
+    const lines = screen.render(60)
+    const frame = lines.join('\n')
+    expect(lines).toHaveLength(20)
+    expect(frame).toContain('◆ OpenAlice Supervisor')
+    expect(frame).toContain('[Connect]·2')
+    expect(frame).toContain('OPENALICE LAUNCH · SELECT → START → CONNECT')
+    expect(frame).toContain('1 ✓ This computer')
+    expect(frame).toContain('2 ✓ Default AliceProject')
+    expect(frame).toContain('3 ● READY TO USE')
+    expect(frame).toContain('Machines · 1/2')
+    expect(frame).toContain('Launch Briefing · Machine')
+    expect(frame).toContain('◇  Tip:')
+    expect(frame).toContain('[ / ] Commands')
+  })
+
   it('makes a blocked Launch Briefing own its visible Refresh action', () => {
     const refreshed: string[] = []
     const activated: string[] = []

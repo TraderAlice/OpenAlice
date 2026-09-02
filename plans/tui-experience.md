@@ -3711,6 +3711,31 @@ already large `supervisor-tui.ts` application controller.
   Fleet/screen/PTY closure passes 155 tests, the complete CLI suite passes 645
   tests, and CLI typecheck/build passes.
 
+### Candidate-sized multi-target Launcher decision
+
+- After the direct-target split, fresh local-plus-remote captures showed the
+  real chooser still reserving five rows for two Machines and one AliceProject,
+  then repeating route, TARGET, and CONTEXT in a nine-row Briefing. The result
+  remained taller than its choice set and displaced guidance at 60x20.
+- Multi-target Launcher panes now size to the larger real candidate count within
+  the existing viewport window. Wide Launch Briefing owns six rows containing
+  only launch state, human outcome, complete three-stage Next, and the resolved
+  action; ordinary widths retain their two-row result. Connected Connections
+  keeps its existing minimum-height inspection canvas.
+- From 54 through 71 columns, Machine and AliceProject readiness share the first
+  Launch Sequence row and Runtime owns the second. The narrow selected-list and
+  Briefing cards are adjacent because they are one choice/result unit. This
+  recovers the contextual selector Tip at 60x20 while preserving Mission Header,
+  Navigation, complete action, and Command Spine.
+- Pointer row and scroll-rail calculations use the same candidate-sized window
+  as rendering. Fleet selection, launch intent, local/remote activation, SSH,
+  lifecycle, Launch Flight, and failure recovery are unchanged. Maintainer
+  acceptance remains pending on the retained feature branch.
+- Real 120x48, 80x24, and 60x20 local-plus-remote PTY captures verify candidate
+  sizing, the bounded Briefing, and restored narrow Tip. The focused
+  Fleet/screen/PTY closure passes 156 tests, the complete CLI suite passes 646
+  tests, and CLI typecheck/build passes.
+
 ### Content-sized Home Board correction
 
 - Comparing fresh 120x48 captures against OMP 17.3.4 showed that making Alice

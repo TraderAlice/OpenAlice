@@ -143,9 +143,13 @@ intentionally parameter-free:
   card. Its rail reads `READY → START → CONNECT`, and its Tip teaches Enter and
   command discovery rather than pane movement. Multiple Machines or Projects
   restore the keyboard- and pointer-selectable panes and `SELECT` rail, with a
-  Launch Briefing instead of a pre-connection telemetry dump. Below 60 columns
-  and 18 rows, the Launcher uses one emergency target card rather than letting
-  bottom anchoring crop Machine context. It keeps the selected Machine,
+  Launch Briefing instead of a pre-connection telemetry dump. Launcher panes
+  size to real visible candidates rather than reserving five empty rows. Wide
+  Briefing keeps only state, human outcome, three-stage Next, and the primary
+  action; widths from 54 through 71 combine Machine and AliceProject readiness
+  on one Launch Sequence row so the selector Tip remains visible. Below 60
+  columns and 18 rows, the Launcher uses one emergency target card rather than
+  letting bottom anchoring crop Machine context. It keeps the selected Machine,
   AliceProject, Runtime readiness, and current Launch intent visible together;
   keyboard selection still uses the existing Fleet state and the action remains
   mouse-capable. The final command is a
