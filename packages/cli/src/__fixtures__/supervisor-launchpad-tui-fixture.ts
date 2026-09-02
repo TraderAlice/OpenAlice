@@ -11,6 +11,7 @@ let probes = 0
 let running = process.env['OPENALICE_TUI_FIXTURE_RUNTIME'] === 'running'
 const startDelayMs = Number(process.env['OPENALICE_TUI_FIXTURE_START_DELAY_MS'] ?? 0)
 const startFailure = process.env['OPENALICE_TUI_FIXTURE_START_FAILURE'] === '1'
+const remoteReadyDelayMs = Number(process.env['OPENALICE_TUI_FIXTURE_REMOTE_READY_DELAY_MS'] ?? 0)
 const remote = process.env['OPENALICE_TUI_FIXTURE_REMOTE'] === '1'
 const healthFlap = process.env['OPENALICE_TUI_FIXTURE_HEALTH'] === 'flap'
 const fleetRows = Number(process.env['OPENALICE_TUI_FIXTURE_FLEET_ROWS'] ?? 0)
@@ -65,6 +66,19 @@ const exitCode = await runSupervisorTui({}, {
   ...(remote
     ? {
         connectRemoteProject: async ({ signal, onReady }) => {
+          if (remoteReadyDelayMs > 0) {
+            await new Promise<void>((resolve) => {
+              const timer = setTimeout(resolve, remoteReadyDelayMs)
+              signal.addEventListener('abort', () => {
+                clearTimeout(timer)
+                resolve()
+              }, { once: true })
+            })
+          }
+          if (signal.aborted) {
+            disconnects += 1
+            return 0
+          }
           onReady({
             localPort: 45_454,
             localUrl: 'http://127.0.0.1:45454',

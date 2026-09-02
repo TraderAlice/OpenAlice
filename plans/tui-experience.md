@@ -3168,6 +3168,24 @@ already large `supervisor-tui.ts` application controller.
   tests, all 53 real-PTY cases including failure -> Back -> Launcher, and the
   complete CLI suite (63 files, 635 tests). CLI typecheck and build also pass.
 
+### Remote switch continuity decision
+
+- The delayed remote-connect capture showed a truthful candidate route and
+  forward stage, but the local target promised to remain live disappeared as
+  soon as Flight Recorder took over. The controller had not disconnected it;
+  this was a presentation loss that made a safe handoff look destructive.
+- A replacement flight now renders `FROM` as the current live target and `TO`
+  as the candidate transport being prepared. Local cold starts and remote
+  starts without an existing target retain their concise single-route identity.
+  Source and destination use text plus distinct success/accent glyphs, so the
+  relationship remains complete under `NO_COLOR`.
+- Real 120x32 and 80x24 captures verify local/default remains visibly LIVE while
+  Cloud Lab / Research opens its SSH forward. A real compact PTY detaches during
+  the delay and verifies the forward is aborted without promoting the candidate.
+- Remote-continuity acceptance passes through 99 focused launch, Fleet, and
+  screen tests, all 54 real-PTY cases, and the complete CLI suite (63 files, 637
+  tests). CLI typecheck and build also pass.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

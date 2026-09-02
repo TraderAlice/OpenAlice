@@ -99,4 +99,25 @@ describe('Supervisor launch flight recorder', () => {
     expect(text).not.toContain('\nretry safely')
     expect(lines.every((line) => displayWidth(line) <= 80)).toBe(true)
   })
+
+  it('keeps the live source visible while a remote replacement is in flight', () => {
+    const current = {
+      machineKey: 'local',
+      machineName: 'This computer',
+      projectKey: 'default',
+      projectName: 'Default AliceProject',
+      transport: 'loopback' as const,
+    }
+    const flight = advanceSupervisorLaunchFlight(
+      createSupervisorLaunchFlight('remote-connect', target, startedAt),
+      'open-forward',
+    )
+    const lines = renderSupervisorLaunchFlight(flight, 80, startedAt, undefined, current)
+    const text = lines.join('\n')
+
+    expect(text).toContain('● FROM  This computer / Default AliceProject · LOCAL · LIVE')
+    expect(text).toContain('◆ TO    Cloud Lab / Research · SSH FORWARD')
+    expect(text).not.toContain('⌁ cloud/research · SSH FORWARD')
+    expect(lines.every((line) => displayWidth(line) <= 80)).toBe(true)
+  })
 })

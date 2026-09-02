@@ -94,6 +94,7 @@ export function renderSupervisorLaunchFlight(
   width: number,
   now: number,
   targetHeight?: number,
+  currentTarget?: SupervisorLaunchFlightTarget,
 ): string[] {
   const safeWidth = Math.max(24, width)
   const compact = safeWidth < 72
@@ -103,11 +104,21 @@ export function renderSupervisorLaunchFlight(
   ))
   const status = flight.status === 'failed' ? 'RECOVERABLE FAILURE' : 'IN FLIGHT'
   const route = `${flight.target.machineName} → ${flight.target.projectName}`
+  const switchingFrom = currentTarget
+    && (currentTarget.machineKey !== flight.target.machineKey
+      || currentTarget.projectKey !== flight.target.projectKey)
+    ? currentTarget
+    : undefined
   const rows = [
     flight.status === 'failed'
       ? `× ${status} · ${route}`
       : `◆ ${status} · ${route}`,
-    `⌁ ${flight.target.machineKey}/${flight.target.projectKey} · ${flight.target.transport === 'ssh-forward' ? 'SSH FORWARD' : 'LOCAL LOOPBACK'} · T+${elapsed}`,
+    ...(switchingFrom
+      ? [
+          `● FROM  ${switchingFrom.machineName} / ${switchingFrom.projectName} · ${switchingFrom.transport === 'ssh-forward' ? 'SSH' : 'LOCAL'} · LIVE`,
+          `◆ TO    ${flight.target.machineName} / ${flight.target.projectName} · ${flight.target.transport === 'ssh-forward' ? 'SSH FORWARD' : 'LOCAL LOOPBACK'}`,
+        ]
+      : [`⌁ ${flight.target.machineKey}/${flight.target.projectKey} · ${flight.target.transport === 'ssh-forward' ? 'SSH FORWARD' : 'LOCAL LOOPBACK'} · T+${elapsed}`]),
     ...(compact ? [] : ['', renderStageRail(flight.stages, Math.max(1, safeWidth - 4)), '']),
     ...flight.stages.map((stage, index) => renderStageRow(stage, index)),
     '',

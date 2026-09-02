@@ -4805,6 +4805,7 @@ export class SupervisorScreen implements Component {
         width,
         this.now(),
         operationalCanvasHeight,
+        this.snapshot.activeTarget ?? undefined,
       ))
     } else if (this.snapshot.panel === 'fleet' && this.snapshot.fleet) {
       this.fleetVisibleRows = width >= 72 && Number.isFinite(viewportHeight)

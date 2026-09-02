@@ -2237,6 +2237,73 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
 
+  it('keeps the live source visible during a remote switch flight', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-switch-flight-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_BOOT: '0',
+        OPENALICE_TUI_MOTION: '0',
+        OPENALICE_TUI_START_VIEW: 'connect',
+        OPENALICE_TUI_FIXTURE_RUNTIME: 'running',
+        OPENALICE_TUI_FIXTURE_FLEET_ROWS: '1',
+        OPENALICE_TUI_FIXTURE_REMOTE: '1',
+        OPENALICE_TUI_FIXTURE_REMOTE_READY_DELAY_MS: '500',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let stage = 0
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor switch flight timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        const plain = stripSgr(output)
+        if (stage === 0 && plain.includes('Alice Session · OpenAlice')) {
+          stage = 1
+          child.write(']]')
+        } else if (stage === 1 && plain.includes('Machines · 1/2')) {
+          stage = 2
+          child.write('\u001b[B')
+        } else if (stage === 2 && plain.includes('▶ Cloud Lab')) {
+          stage = 3
+          child.write('\t')
+        } else if (stage === 3 && plain.includes('[ Enter ] Connect & Switch')) {
+          stage = 4
+          child.write('\r')
+        } else if (stage === 4 && plain.includes('◆ TO    Cloud Lab / Research · SSH FORWARD')) {
+          stage = 5
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && stage === 5) resolve(output)
+        else reject(new Error(`Supervisor switch flight exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    const plain = stripSgr(transcript)
+    expect(plain).toContain('Launch Flight Recorder · REMOTE CONNECT · IN FLIGHT')
+    expect(plain).toContain('● FROM  This computer / Default AliceProject · LOCAL · LIVE')
+    expect(plain).toContain('◆ TO    Cloud Lab / Research · SSH FORWARD')
+    expect(plain).toContain('◆ 02  Open SSH forward · IN FLIGHT')
+    expect(plain).toContain('◆ OPERATION ACTIVE')
+    expect(plain).toContain('FIXTURE_RESULT starts=0 opens=0 loads=0 diagnoses=0 disconnects=1')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
   it('renders an explicitly selected launch context before detach', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-context-'))
     temporaryPaths.push(isolatedHome)

@@ -159,7 +159,9 @@ intentionally parameter-free:
   selectable behind a generic busy label. It keeps the selected Machine and
   AliceProject visible, names only observable validation, lifecycle, inventory,
   forwarding, and binding stages, and distinguishes complete, active, waiting,
-  and failed stages in text and glyphs without relying on color. Success hands
+  and failed stages in text and glyphs without relying on color. When replacing
+  an active target, the Recorder keeps the still-live source visible as From
+  and the in-flight candidate as To until readiness promotes it. Success hands
   directly to connected Home. A failure remains on the selected target with
   Enter to retry or Esc to return to target selection; its contextual Tip names
   Retry, Back, and Detach rather than teaching the hidden inventory controls.
