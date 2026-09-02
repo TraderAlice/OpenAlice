@@ -1121,6 +1121,22 @@ not imply maintainer approval of the finished interaction.
   confirmation state machine. This is an autonomous topic decision, not a
   recorded maintainer approval.
 
+### Decision mission-header decision
+
+- Keeping `CONFIRMATION / CONFIRM OR CANCEL / Cancel` in the Mission Header
+  preserves a stable generic title, but leaves the most prominent task boundary
+  contradicting the precise action language now shared by the card and Console.
+- Mapping confirmation kinds to a second set of Header labels would make the
+  chrome specific while recreating the wording-drift risk removed from the
+  Action Shelf.
+- The selected model projects the same resolved confirmation view into all
+  Decision Gate boundaries. The Header uses the positive action as its
+  task identity, retains the review contract, and uses the refusal label for
+  its Esc target; the centered card and grounded Console keep using the same
+  labels. Responsive fallback drops contract detail before it drops the exact
+  task or refusal.
+  This is an autonomous topic refinement, not a recorded maintainer approval.
+
 ## Responsive and Accessibility Contract
 
 - `80x24` remains the minimum full experience. Wide terminals show the
@@ -2420,6 +2436,21 @@ already large `supervisor-tui.ts` application controller.
   passes (701 passed, 1 skipped; 6,207 tests passed, 10 skipped). Docker
   installer smoke passes without Node, npm, pnpm, Bun, or an Agent Runtime, and
   package dry-run retains the shared confirmation projection in the CLI.
+- A live OMP v17.3.4 home-composer comparison reinforced that the strongest
+  chrome boundary should name the current concrete context, not merely its UI
+  category. Decision Gate Mission Headers now use the resolved positive action
+  as identity, the resolved refusal as their complete pointer-capable Esc
+  target, and `REVIEW IMPACT` as the stable contract. The Control Console's
+  right task badge carries that same action instead of generic `CONFIRMATION`.
+- Action-Mission acceptance passes with 124 focused confirmation, navigation,
+  overlay-pointer, screen, and real-PTY tests. A settled truecolor 120x32 Stop
+  frame carries `STOP RUNTIME` through Header, centered card, Action Shelf, and
+  Dock while every refusal edge says `Keep running`; an 80x24 managed-Source
+  PTY hovers and clicks the complete top `[ Esc ] Not now` target and restores
+  Overview. Root TypeScript and CLI build pass; the 702-file suite passes (701
+  passed, 1 skipped; 6,208 tests passed, 10 skipped). Docker installer smoke
+  passes without Node, npm, pnpm, Bun, or an Agent Runtime, and package dry-run
+  retains the updated navigation, Dock, and Supervisor owners.
 
 ## Completion Criteria
 

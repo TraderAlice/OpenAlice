@@ -355,11 +355,12 @@ intentionally parameter-free:
   Gate. The bounded card remains centered, but the operational field behind it
   is cleared so clipped page copy and inactive controls cannot read as modal
   context. Mission Header navigation becomes
-  `FOCUS · CONFIRMATION / DECISION GATE`, release provenance becomes read-only
-  `BUILD`, and the bottom Console repeats only the exact action/refusal pair
-  (for example, Stop Runtime and Keep running). Each modal
-  separates the question from an explicit Impact section and routes its own plus
-  the Console's complete-segment pointer hover/click through the same
+  an action-specific identity such as `FOCUS · STOP RUNTIME / DECISION GATE`,
+  its Esc target repeats the exact refusal such as `Keep running`, release
+  provenance becomes read-only `BUILD`, and the bottom Console repeats the same
+  exact action/refusal pair plus the positive action as its task badge. Each
+  modal separates the question from an explicit Impact section and routes its
+  own plus the Console's complete-segment pointer hover/click through the same
   confirmation state machine. Acceptance closes the gate before work appears in
   the fixed activity slot; cancellation restores the exact previous page and
   changes no Runtime or configuration state.

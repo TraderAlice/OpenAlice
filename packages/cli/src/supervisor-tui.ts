@@ -589,6 +589,7 @@ export async function runSupervisorTui(
   ) => {
     const terminal = terminalSize()
     const focusTask = screen.activeFocusTask()
+    const confirmation = screen.activeConfirmationView()
     const focusConsole = focusTask
       ? renderSupervisorControlConsole(
           '',
@@ -596,6 +597,7 @@ export async function runSupervisorTui(
           renderSupervisorDock({
             panel: screen.snapshot.panel ?? 'overview',
             focusTask,
+            focusLabel: confirmation?.confirmLabel,
             projectName: screen.snapshot.context?.aliceProject.displayName,
             runtimeState: screen.snapshot.runtime?.class,
           }, terminal.width),
@@ -607,9 +609,12 @@ export async function runSupervisorTui(
       ? renderSupervisorNavigation({
           selected: screen.snapshot.panel ?? 'overview',
           focusTask,
+          confirmation,
         }, Math.max(1, terminal.width - 4)).line
       : ''
-    const focusBack = focusTask === 'confirmation' ? '[ Esc ] Cancel' : '[ Esc ] Back'
+    const focusBack = focusTask === 'confirmation'
+      ? `[ Esc ] ${confirmation?.cancelLabel ?? 'Cancel'}`
+      : '[ Esc ] Back'
     const focusBackOffset = focusHeader.indexOf(focusBack)
     const headerCommands: SupervisorCommandTarget[] = focusBackOffset >= 0
       ? [{
@@ -3171,14 +3176,20 @@ export class SupervisorScreen implements Component {
     return this.snapshot.confirmation ? 'confirmation' : this.snapshot.focusTask
   }
 
+  activeConfirmationView(): SupervisorConfirmationView | undefined {
+    if (!this.snapshot.confirmation) return undefined
+    return confirmationView(
+      this.snapshot.confirmation,
+      this.snapshot.runtime,
+      this.snapshot.managedSource,
+      this.snapshot.update,
+    )
+  }
+
   renderFocusActionBar(width: number): string[] {
-    if (this.snapshot.confirmation) {
-      return renderSupervisorConfirmationActionBar(confirmationView(
-        this.snapshot.confirmation,
-        this.snapshot.runtime,
-        this.snapshot.managedSource,
-        this.snapshot.update,
-      ), width)
+    const confirmation = this.activeConfirmationView()
+    if (confirmation) {
+      return renderSupervisorConfirmationActionBar(confirmation, width)
     }
     if (!this.snapshot.focusTask || this.snapshot.focusTask === 'confirmation') return []
     return renderSupervisorFocusActionBar(this.snapshot.focusTask, width)
@@ -3989,12 +4000,14 @@ export class SupervisorScreen implements Component {
     const runtime = this.snapshot.runtime
     const state = runtime?.class ?? 'unavailable'
     const focusTask = this.activeFocusTask()
+    const confirmation = this.activeConfirmationView()
     const updateBadge = this.snapshot.update?.status === 'available'
       ? ` · update ${formatUpdateCandidate(this.snapshot.update)}`
       : ''
     const navigation = renderSupervisorNavigation({
       selected: this.snapshot.panel ?? 'overview',
       focusTask,
+      confirmation,
       recovery: isConfigRecovery(this.snapshot),
       machineCount: this.snapshot.fleet?.machines.length,
       logCount: this.snapshot.logs?.entries?.length,
@@ -4230,6 +4243,7 @@ export class SupervisorScreen implements Component {
       renderSupervisorDock({
         panel: this.snapshot.panel ?? 'overview',
         focusTask,
+        focusLabel: confirmation?.confirmLabel,
         projectName: this.snapshot.context?.aliceProject.displayName,
         runtimeState: state,
         pulse: this.runtimePulse,

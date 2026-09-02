@@ -1308,11 +1308,68 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('[ Enter ] Prepare source')
     expect(transcript).toContain('[ Esc ] Not now')
     expect(transcript).toContain('│ › [ Esc ] Not now')
-    expect(transcript).toContain('◆ FOCUS · CONFIRMATION')
+    expect(transcript).toContain('◆ FOCUS · PREPARE SOURCE')
     expect(transcript).toContain('DECISION GATE')
+    expect(transcript).toContain('[ Esc ] Not now')
     expect(transcript).toContain('◇ BUILD')
     expect(transcript).toContain('◆ [ Enter ] Prepare source')
     expect(transcript).toContain('[ Esc ] Not now')
+    expect(transcript).toContain('STATUS   Action cancelled.')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it('cancels a Decision Gate from its action-specific Mission Header', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-confirmation-header-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [confirmationFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let requested = false
+      let hovered = false
+      let clicked = false
+      let cancelled = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor confirmation Header timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!requested && output.includes('[ / ] Commands') && output.includes('○ COLD')) {
+          requested = true
+          child.write('m')
+        } else if (!hovered && output.includes('◆ FOCUS · PREPARE SOURCE') && output.includes('[ Esc ] Not now')) {
+          hovered = true
+          child.write('\u001b[<35;70;2M')
+        } else if (!clicked && output.includes('› [ Esc ] Not now')) {
+          clicked = true
+          child.write('\u001b[<0;70;2M')
+        } else if (!cancelled && output.includes('STATUS   Action cancelled.')) {
+          cancelled = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && cancelled) resolve(output)
+        else reject(new Error(`Supervisor confirmation Header exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('◆ FOCUS · PREPARE SOURCE')
+    expect(transcript).toContain('DECISION GATE')
+    expect(transcript).toContain('› [ Esc ] Not now')
     expect(transcript).toContain('STATUS   Action cancelled.')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')

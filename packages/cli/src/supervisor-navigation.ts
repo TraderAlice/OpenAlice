@@ -6,6 +6,10 @@ export type SupervisorNavigationPanel = 'fleet' | 'overview' | 'logs' | 'doctor'
 export interface SupervisorNavigationView {
   selected: SupervisorNavigationPanel
   focusTask?: SupervisorFocusTask
+  confirmation?: {
+    confirmLabel: string
+    cancelLabel: string
+  }
   recovery?: boolean
   machineCount?: number
   logCount?: number
@@ -41,7 +45,7 @@ export function renderSupervisorNavigation(
   view: SupervisorNavigationView,
   width: number,
 ): SupervisorNavigationLayout {
-  if (view.focusTask) return renderFocusHeader(view.focusTask, width)
+  if (view.focusTask) return renderFocusHeader(view.focusTask, width, view.confirmation)
   const items = navigationItems(view)
   const variants = ['wide', 'compact', 'minimal'] as const
   const selected = view.selected
@@ -74,6 +78,7 @@ export function renderSupervisorNavigation(
 function renderFocusHeader(
   task: SupervisorFocusTask,
   width: number,
+  confirmation?: SupervisorNavigationView['confirmation'],
 ): SupervisorNavigationLayout {
   const definition: Record<SupervisorFocusTask, {
     title: string
@@ -111,11 +116,22 @@ function renderFocusHeader(
       contract: 'REVIEW IMPACT · CONFIRM OR CANCEL',
     },
   }
-  const current = definition[task]
-  const back = task === 'confirmation' ? '[ Esc ] Cancel' : '[ Esc ] Back'
+  const current = task === 'confirmation' && confirmation
+    ? {
+        title: 'DECISION GATE',
+        compact: confirmation.confirmLabel.toUpperCase(),
+        contract: 'REVIEW IMPACT',
+      }
+    : definition[task]
+  const identity = task === 'confirmation' && confirmation
+    ? confirmation.confirmLabel.toUpperCase()
+    : task.toUpperCase()
+  const back = task === 'confirmation'
+    ? `[ Esc ] ${confirmation?.cancelLabel ?? 'Cancel'}`
+    : '[ Esc ] Back'
   const candidates = [
-    `◆ FOCUS · ${task.toUpperCase()}  │  ${current.title}  │  ${current.contract}`,
-    `◆ FOCUS · ${task.toUpperCase()}  │  ${current.title}`,
+    `◆ FOCUS · ${identity}  │  ${current.title}  │  ${current.contract}`,
+    `◆ FOCUS · ${identity}  │  ${current.title}`,
     `◆ ${current.compact}`,
   ]
   const available = Math.max(1, width - displayWidth(back) - 2)

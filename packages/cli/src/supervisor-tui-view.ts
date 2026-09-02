@@ -84,6 +84,7 @@ export interface SupervisorSignalScopeView {
 export interface SupervisorDockView {
   panel: string
   focusTask?: string
+  focusLabel?: string
   projectName?: string
   runtimeState?: string
   pulse?: boolean
@@ -566,15 +567,16 @@ export function renderSupervisorDock(
       : `[ / ] Commands${breadcrumb}[ q ] Detach`
   if (width < 60) return commandSpine(controls, '', width)
 
-  const panel = (view.focusTask ?? view.panel).toUpperCase()
+  const panel = (view.focusLabel ?? view.focusTask ?? view.panel).toUpperCase()
+  const panelIdentity = view.focusLabel ? `◆ ${panel}` : panelBadge(panel)
   if (view.recovery) {
-    return commandSpine(controls, `! RECOVERY${breadcrumb}${panelBadge(panel)}`, width)
+    return commandSpine(controls, `! RECOVERY${breadcrumb}${panelIdentity}`, width)
   }
 
   const signal = runtimeSignal(view.runtimeState ?? 'unavailable', view.pulse ?? false)
   const fullProjectName = view.projectName ?? 'AliceProject'
   const contextBudget = Math.max(1, width - 6 - displayWidth(controls) - 3)
-  const panelSuffix = `${breadcrumb}${panelBadge(panel)}`
+  const panelSuffix = `${breadcrumb}${panelIdentity}`
   const projectPrefix = view.focusTask ? '⌂ ' : '[ i ] '
   const signalSuffix = `${breadcrumb}${signal}`
   const fullContext = `${projectPrefix}${fullProjectName}${signalSuffix}${panelSuffix}`

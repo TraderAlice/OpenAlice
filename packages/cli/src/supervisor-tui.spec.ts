@@ -320,11 +320,12 @@ describe('Supervisor TUI screen', () => {
     const confirmationFocus = renderSupervisorDock({
       panel: 'overview',
       focusTask: 'confirmation',
+      focusLabel: 'Stop Runtime',
       projectName: 'Default AliceProject',
       runtimeState: 'absent',
     }, 100)
     expect(confirmationFocus).toContain('◆ DECISION GATE')
-    expect(confirmationFocus).toContain('◆ CONFIRMATION')
+    expect(confirmationFocus).toContain('◆ STOP RUNTIME')
     expect(confirmationFocus).not.toContain('[ Esc ] Cancel')
     expect(confirmationFocus).not.toContain('[ / ] Commands')
 
@@ -1527,8 +1528,9 @@ describe('Supervisor TUI screen', () => {
     screen.handleKey('x', matchesKey)
     const decisionFrame = screen.render(80)
     const plainDecisionFrame = decisionFrame.join('\n').replace(/\u001b\[[0-9;]*m/gu, '')
-    expect(plainDecisionFrame).toContain('◆ FOCUS · CONFIRMATION')
+    expect(plainDecisionFrame).toContain('◆ FOCUS · STOP RUNTIME')
     expect(plainDecisionFrame).toContain('DECISION GATE')
+    expect(plainDecisionFrame).toContain('[ Esc ] Keep running')
     expect(plainDecisionFrame).toContain('◇ BUILD vdev · DEV')
     expect(plainDecisionFrame).toContain('◆ [ Enter ] Stop Runtime')
     expect(plainDecisionFrame).toContain('[ Esc ] Keep running')
@@ -2085,7 +2087,11 @@ describe('Supervisor TUI screen', () => {
     expect(screen.handleKey('r', matchesKey)).toBe(true)
     expect(screen.snapshot.confirmation).toBe('restart')
     expect(confirmations).toEqual(['restart'])
-    expect(screen.render(100).join('\n')).not.toContain('Confirm Restart')
+    const restartFrame = screen.render(100).join('\n')
+    expect(restartFrame).not.toContain('Confirm Restart')
+    expect(restartFrame).toContain('FOCUS · RESTART RUNTIME')
+    expect(restartFrame).toContain('◆ RESTART RUNTIME')
+    expect(restartFrame).toContain('[ Esc ] Keep running')
 
     expect(screen.handleKey('enter', matchesKey)).toBe(true)
     expect(actions).toEqual(['open', 'restart'])
@@ -2094,7 +2100,11 @@ describe('Supervisor TUI screen', () => {
 
     screen.update({ focusTask: 'release', confirmation: 'update' })
     expect(screen.activeFocusTask()).toBe('confirmation')
-    expect(screen.render(100).join('\n')).toContain('DECISION GATE')
+    const updateFrame = screen.render(100).join('\n')
+    expect(updateFrame).toContain('DECISION GATE')
+    expect(updateFrame).toContain('FOCUS · INSTALL UPDATE')
+    expect(updateFrame).toContain('◆ INSTALL UPDATE')
+    expect(updateFrame).toContain('[ Esc ] Not now')
   })
 
   it('turns the degraded Launchpad promise into the existing Doctor action', () => {

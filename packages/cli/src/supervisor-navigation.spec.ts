@@ -67,12 +67,28 @@ describe('Supervisor navigation rail', () => {
     const confirmation = renderSupervisorNavigation({
       selected: 'overview',
       focusTask: 'confirmation',
+      confirmation: {
+        confirmLabel: 'Stop Runtime',
+        cancelLabel: 'Keep running',
+      },
     }, 96)
-    expect(confirmation.line).toContain('◆ FOCUS · CONFIRMATION')
+    expect(confirmation.line).toContain('◆ FOCUS · STOP RUNTIME')
     expect(confirmation.line).toContain('DECISION GATE')
-    expect(confirmation.line).toContain('REVIEW IMPACT · CONFIRM OR CANCEL')
-    expect(confirmation.line).toContain('[ Esc ] Cancel')
+    expect(confirmation.line).toContain('REVIEW IMPACT')
+    expect(confirmation.line).toContain('[ Esc ] Keep running')
     expect(confirmation.targets).toEqual([])
+
+    const compactConfirmation = renderSupervisorNavigation({
+      selected: 'overview',
+      focusTask: 'confirmation',
+      confirmation: {
+        confirmLabel: 'Prepare source',
+        cancelLabel: 'Not now',
+      },
+    }, 46)
+    expect(compactConfirmation.line).toContain('◆ PREPARE SOURCE')
+    expect(compactConfirmation.line).toContain('[ Esc ] Not now')
+    expect(displayWidth(compactConfirmation.line)).toBe(46)
   })
 
   it('derives badge-edge pointer hits from the rendered layout', () => {
