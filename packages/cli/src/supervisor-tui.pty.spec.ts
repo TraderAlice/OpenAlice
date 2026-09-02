@@ -552,7 +552,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
 
-  it('hovers and clicks the quiet Event Signal Scope reload segment', async () => {
+  it('hovers and clicks the quiet compact Runtime Lens reload segment', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-signal-scope-pointer-'))
     temporaryPaths.push(isolatedHome)
     const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
@@ -583,12 +583,12 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         if (!opened && output.includes('◆ [ Enter ]  Start OpenAlice')) {
           opened = true
           child.write('l')
-        } else if (!hovered && output.includes('Event Signal Scope · QUIET · 0 EVENTS')) {
+        } else if (!hovered && output.includes('Runtime Lens · QUIET · 0 EVENTS')) {
           hovered = true
-          child.write('\u001b[<35;30;10M')
+          child.write('\u001b[<35;30;7M')
         } else if (!clicked && output.includes('› [ l ] Reload Runtime snapshot')) {
           clicked = true
-          child.write('\u001b[<0;30;10M')
+          child.write('\u001b[<0;30;7M')
         } else if (!detached && clicked) {
           detached = true
           setTimeout(() => child.write('q'), 250)
@@ -601,8 +601,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       })
     })
 
-    expect(transcript).toContain('Event Signal Scope · QUIET · 0 EVENTS')
-    expect(transcript).toContain('○  SIGNAL QUIET')
+    expect(transcript).toContain('Runtime Lens · QUIET · 0 EVENTS')
+    expect(transcript).toContain('○ QUIET · No Runtime events · all events · bounded/redacted')
     expect(stripSgr(transcript)).toContain(
       '◇  Tip: No Runtime events in this lens; l reloads the bounded snapshot.',
     )

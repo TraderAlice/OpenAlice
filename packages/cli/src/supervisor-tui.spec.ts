@@ -2411,7 +2411,7 @@ describe('Supervisor TUI screen', () => {
       theme: createSupervisorTuiTheme({ TERM: 'xterm-256color', NO_COLOR: '1' }),
       motionEnabled: false,
     }).render(46)
-    expect(noColor.join('\n')).toContain('◇  SIGNAL STANDBY')
+    expect(noColor.join('\n')).toContain('◇ STANDBY · Snapshot not loaded')
     expect(noColor.join('\n')).toContain('◆ [ l ] Load Runtime tail')
     expect(noColor.join('\n')).not.toContain('\u001b[')
   })

@@ -67,12 +67,11 @@ describe('Supervisor Runtime log presentation', () => {
     expect(supervisorSelectedLogEntry({ entries: [] }, 'all', 0)).toBeNull()
   })
 
-  it('turns unloaded, quiet, and filtered-empty snapshots into truthful Signal Scopes', () => {
+  it('turns unloaded, quiet, and filtered-empty snapshots into compact Runtime lenses', () => {
     const unloaded = renderSupervisorLogs(null, 80, 0, 'attention')
-    expect(unloaded.lines).toHaveLength(7)
-    expect(unloaded.lines.join('\n')).toContain('Event Signal Scope · STANDBY')
-    expect(unloaded.lines.join('\n')).toContain('◇  SIGNAL STANDBY')
-    expect(unloaded.lines.join('\n')).toContain('LENS       warnings + errors · awaiting capture')
+    expect(unloaded.lines).toHaveLength(4)
+    expect(unloaded.lines.join('\n')).toContain('Runtime Lens · STANDBY')
+    expect(unloaded.lines.join('\n')).toContain('◇ STANDBY · Snapshot not loaded · warnings + errors · bounded/redacted')
     expect(supervisorCommandTargets(unloaded.lines)).toEqual([
       expect.objectContaining({
         label: 'l',
@@ -82,15 +81,13 @@ describe('Supervisor Runtime log presentation', () => {
     ])
 
     const quiet = renderSupervisorLogs({ entries: [] }, 80, 0, 'all')
-    expect(quiet.lines.join('\n')).toContain('Event Signal Scope · QUIET · 0 EVENTS')
-    expect(quiet.lines.join('\n')).toContain('○  SIGNAL QUIET')
-    expect(quiet.lines.join('\n')).toContain('SNAPSHOT   Loaded · 0 Runtime events')
+    expect(quiet.lines.join('\n')).toContain('Runtime Lens · QUIET · 0 EVENTS')
+    expect(quiet.lines.join('\n')).toContain('○ QUIET · No Runtime events · all events · bounded/redacted')
     expect(quiet.lines.join('\n')).toContain('◆ [ l ] Reload Runtime snapshot')
 
     const clear = renderSupervisorLogs({ entries: [{ text: 'all good' }] }, 80, 0, 'errors')
     expect(clear.lines.join('\n')).toContain('CLEAR · 0/1 · ERRORS')
-    expect(clear.lines.join('\n')).toContain('✓  LENS CLEAR')
-    expect(clear.lines.join('\n')).toContain('LENS       errors · 0 matches')
+    expect(clear.lines.join('\n')).toContain('✓ CLEAR · 0/1 errors · source loaded · bounded/redacted')
     expect(supervisorCommandTargets(clear.lines)).toEqual([
       expect.objectContaining({
         label: 'f',
@@ -100,12 +97,11 @@ describe('Supervisor Runtime log presentation', () => {
     ])
   })
 
-  it('keeps the Signal Scope complete at narrow widths', () => {
+  it('keeps the compact Runtime lens complete at narrow widths', () => {
     const rendered = renderSupervisorLogs(null, 46, 0, 'attention')
-    expect(rendered.lines).toHaveLength(7)
+    expect(rendered.lines).toHaveLength(4)
     expect(rendered.lines.every((line) => displayWidth(line) === 46)).toBe(true)
-    expect(rendered.lines.join('\n')).toContain('◇  SIGNAL STANDBY')
-    expect(rendered.lines.join('\n')).toContain('Lens      warnings + errors · awaiting ca…')
+    expect(rendered.lines.join('\n')).toContain('◇ STANDBY · Snapshot not loaded · warning…')
     expect(rendered.lines.join('\n')).toContain('◆ [ l ] Load Runtime tail')
   })
 
@@ -158,19 +154,18 @@ describe('Supervisor Runtime log presentation', () => {
     expect(compact.lines.join('\n')).toContain('█')
   })
 
-  it('anchors a truthful Signal Scope action at the bottom of a wide canvas', () => {
+  it('does not spend a wide canvas on a zero-event Runtime lens', () => {
     const expanded = renderSupervisorLogs({ entries: [] }, 120, 0, 'all', null, 22)
     const compact = renderSupervisorLogs({ entries: [] }, 80, 0, 'all', null, 22)
     const targets = supervisorCommandTargets(expanded.lines)
 
-    expect(expanded.lines).toHaveLength(22)
-    expect(expanded.lines[1]).toContain('○  SIGNAL QUIET')
-    expect(expanded.lines[4]).toContain('SAFETY')
-    expect(expanded.lines.join('\n')).toContain('· ───── ○ ───── ·')
-    expect(expanded.lines[20]).toContain('◆ [ l ] Reload Runtime snapshot')
+    expect(expanded.lines).toHaveLength(4)
+    expect(expanded.lines[1]).toContain('○ QUIET · No Runtime events')
+    expect(expanded.lines[2]).toContain('◆ [ l ] Reload Runtime snapshot')
+    expect(expanded.lines.join('\n')).not.toContain('· ───── ○ ───── ·')
     expect(targets).toEqual([
-      expect.objectContaining({ row: 21, label: 'l', primary: true }),
+      expect.objectContaining({ row: 3, label: 'l', primary: true }),
     ])
-    expect(compact.lines).toHaveLength(7)
+    expect(compact.lines).toHaveLength(4)
   })
 })

@@ -293,11 +293,12 @@ intentionally parameter-free:
   gutter, borders, and semantically neutral neighboring pane remain unchanged;
   independent semantic rows in both panes may still style themselves. Single-
   pane and `NO_COLOR` output retain their existing plain-text structure;
-- empty Logs and Doctor Signal Scopes own contextual Action Shelves instead of
-  advertising object-dependent commands. Empty Logs retain snapshot reload,
-  filter cycling, and Help; empty Doctor retains Run/Rerun and Help. Scroll,
-  copy, Inspect, Latest, First, and Last return only when a filtered event or
-  diagnostic check exists. Their contextual Tips state the same empty contract;
+- an empty Runtime log lens stays compact instead of claiming the Operational
+  Canvas. Its four-line panel states Standby, Quiet, or Clear and retains only
+  snapshot reload or filter cycling plus Help. Empty Doctor keeps its truthful
+  Signal Scope with Run/Rerun and Help. Scroll, copy, Inspect, Latest, First,
+  and Last return only when a filtered event or diagnostic check exists. Their
+  contextual Tips state the same empty contract;
 - at 100 columns and wider, Home's single Alice Session stage may absorb
   available terminal height up to a bounded 17 rows. The identity column stays
   quiet while the task sequence and primary action settle against the stage's
@@ -886,13 +887,12 @@ capped at 24 KiB, never reads clipboard contents, and reports that it was sent
 rather than claiming the terminal accepted it; terminal policy may disable OSC
 52. Empty and filtered-empty lenses expose no Copy segment. Runtime events may
 still contain private product or trading context, so the action is always
-explicit. Unloaded, loaded-but-quiet, and filtered-empty
-snapshots share a responsive Event Signal Scope instead of collapsing to a
-one-line message. Its `STANDBY`, `QUIET`, or `LENS CLEAR` rail states the exact
-condition, then exposes snapshot, lens, and bounded/redacted safety context.
-The final whole-segment `l` or `f` action is pointer-capable and emits the same
-existing key as the footer; it performs no extra read and does not change the
-Logs command contract. This is navigation
+explicit. Unloaded, loaded-but-quiet, and filtered-empty snapshots share a
+compact Runtime Lens. Its `STANDBY`, `QUIET`, or `CLEAR` state names the exact
+condition alongside snapshot/lens and bounded/redacted context. The final
+whole-segment `l` or `f` action is pointer-capable and emits the same existing
+key as the footer; it performs no extra read and does not change the Logs
+command contract. This is navigation
 over a redacted snapshot, not an unbounded file follower. Follow, pause, and
 component filtering remain later work and must reuse this bounded reader.
 When the stream exceeds its responsive window, its final content column renders
@@ -904,12 +904,11 @@ It never reloads Logs or invokes the selected event as an action.
 At 100 columns and wider, a known terminal height turns Logs into an Operational
 Canvas: the compact ten-event baseline expands only as far as the loaded,
 filtered snapshot and available viewport permit. The Event stream, Lens height,
-scroll rail, and pointer rows consume that same final window. A Signal Scope has
-no events to invent, so it instead keeps its truthful rail and facts at the top
-and anchors the existing `l` or `f` action at the bottom of the owned frame.
-A centered, non-interactive state-glyph echo gives that quiet region a visual
-focus without claiming an event, count, progress value, or additional control.
-Constrained and narrower terminals retain the compact layout.
+scroll rail, and pointer rows consume that same final window. A zero-event lens
+has no evidence to expand, so it never inherits canvas height: its four-line
+panel stays next to the Observatory and leaves honest breathing room above the
+grounded action rails. Constrained and narrower terminals retain the same
+compact layout.
 
 ## Doctor
 

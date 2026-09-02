@@ -4,7 +4,7 @@ import {
   withSupervisorScrollRail,
   type SupervisorScrollRailTarget,
 } from './supervisor-scroll-rail.ts'
-import { renderSupervisorPanel, renderSupervisorSignalScope } from './supervisor-tui-view.ts'
+import { renderSupervisorPanel } from './supervisor-tui-view.ts'
 
 export type SupervisorLogFilter = 'all' | 'attention' | 'errors'
 
@@ -93,18 +93,13 @@ export function renderSupervisorLogs(
 ): SupervisorLogRender {
   if (!logs) {
     return {
-      lines: renderSupervisorSignalScope({
-        title: 'Event Signal Scope',
+      lines: renderRuntimeLensState({
         glyph: '◇',
-        state: 'SIGNAL STANDBY',
+        state: 'STANDBY',
         meta: 'STANDBY',
-        facts: [
-          { label: 'Snapshot', value: 'Not loaded' },
-          { label: 'Lens', value: `${logLensDescription(filter)} · awaiting capture` },
-          { label: 'Safety', value: 'Bounded · redacted · terminal-safe', compactValue: 'bounded · redacted' },
-        ],
+        summary: `Snapshot not loaded · ${logLensDescription(filter)} · bounded/redacted`,
         action: { key: 'l', label: 'Load bounded Runtime tail', compactLabel: 'Load Runtime tail' },
-      }, width, targetHeight),
+      }, width),
       targets: [],
       railTargets: [],
     }
@@ -112,18 +107,13 @@ export function renderSupervisorLogs(
   const sourceEntries = logs.entries ?? []
   if (sourceEntries.length === 0) {
     return {
-      lines: renderSupervisorSignalScope({
-        title: 'Event Signal Scope',
+      lines: renderRuntimeLensState({
         glyph: '○',
-        state: 'SIGNAL QUIET',
+        state: 'QUIET',
         meta: 'QUIET · 0 EVENTS',
-        facts: [
-          { label: 'Snapshot', value: 'Loaded · 0 Runtime events' },
-          { label: 'Lens', value: `${logLensDescription(filter)} · source is quiet` },
-          { label: 'Safety', value: 'Bounded · redacted · terminal-safe', compactValue: 'bounded · redacted' },
-        ],
+        summary: `No Runtime events · ${logLensDescription(filter)} · bounded/redacted`,
         action: { key: 'l', label: 'Reload Runtime snapshot', compactLabel: 'Reload snapshot' },
-      }, width, targetHeight),
+      }, width),
       targets: [],
       railTargets: [],
     }
@@ -131,21 +121,13 @@ export function renderSupervisorLogs(
   const entries = filterLogEntries(logs, filter)
   if (entries.length === 0) {
     return {
-      lines: renderSupervisorSignalScope({
-        title: 'Event Signal Scope',
+      lines: renderRuntimeLensState({
         glyph: '✓',
-        state: 'LENS CLEAR',
+        state: 'CLEAR',
         meta: `CLEAR · 0/${sourceEntries.length} · ${filter.toUpperCase()}`,
-        facts: [
-          {
-            label: 'Snapshot',
-            value: `Loaded · ${sourceEntries.length} Runtime ${pluralize(sourceEntries.length, 'event')}`,
-          },
-          { label: 'Lens', value: `${supervisorLogFilterLabel(filter)} · 0 matches` },
-          { label: 'Safety', value: 'Bounded · redacted · terminal-safe', compactValue: 'bounded · redacted' },
-        ],
+        summary: `0/${sourceEntries.length} ${supervisorLogFilterLabel(filter)} · source loaded · bounded/redacted`,
         action: { key: 'f', label: 'Change severity lens', compactLabel: 'Change lens' },
-      }, width, targetHeight),
+      }, width),
       targets: [],
       railTargets: [],
     }
@@ -251,6 +233,25 @@ export function renderSupervisorLogs(
   }
 }
 
+function renderRuntimeLensState(
+  view: {
+    glyph: '◇' | '○' | '✓'
+    state: 'STANDBY' | 'QUIET' | 'CLEAR'
+    meta: string
+    summary: string
+    action: { key: string; label: string; compactLabel?: string }
+  },
+  width: number,
+): string[] {
+  const compact = width < 60
+  return renderSupervisorPanel('Runtime Lens', view.meta, [
+    `${view.glyph} ${view.state} · ${view.summary}`,
+    `◆ [ ${view.action.key} ] ${compact
+      ? view.action.compactLabel ?? view.action.label
+      : view.action.label}`,
+  ], width)
+}
+
 function logRailTargets(
   viewportRows: number,
   total: number,
@@ -266,10 +267,6 @@ function logRailTargets(
     const index = Math.min(Math.max(0, total - 1), mapped)
     return { row: firstRow + trackRow, column, trackRow, index }
   })
-}
-
-function pluralize(count: number, singular: string): string {
-  return count === 1 ? singular : `${singular}s`
 }
 
 function logLensDescription(filter: SupervisorLogFilter): string {

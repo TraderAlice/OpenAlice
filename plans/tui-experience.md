@@ -478,21 +478,22 @@ not imply maintainer approval of the finished interaction.
   input path; empty or filtered-empty lenses expose no false Copy control. This
   is an autonomous topic decision, not a recorded maintainer approval.
 
-### Runtime zero-event Signal Scope decision
+### Runtime quiet-lens decision
 
-- Keeping the old one-sentence cards preserves minimal height, but at the
-  ordinary 80×24 canvas it leaves most of the operational surface blank and
-  makes Logs look like an unfinished legacy command after the composed Overview.
+- A wide, height-filling idle scope initially made Logs look intentionally
+  composed, but the real 120×32 Runtime capture showed that its empty border
+  claimed more visual weight than the Observatory while presenting no events.
 - Inventing activity, a fake waveform, or an automatic live follower would add
   visual energy by lying about the snapshot and widening the bounded Logs
   contract.
-- The selected model borrows OMP's composed idle-state discipline without
-  copying its agent loop: unloaded, loaded-but-quiet, and filtered-empty states
-  become one responsive Event Signal Scope with explicit `STANDBY`, `QUIET`, or
-  `LENS CLEAR` status, truthful snapshot/lens/safety rows, and one whole-segment
-  `l` or `f` action. That action emits the existing keyboard input, so mouse and
-  keyboard still share the same reader and filter owners. This is an autonomous
-  topic decision, not a recorded maintainer approval.
+- The corrected model spends height only on real evidence. Unloaded,
+  loaded-but-quiet, and filtered-empty states become one four-line Runtime Lens
+  with explicit `STANDBY`, `QUIET`, or `CLEAR` status, concise
+  snapshot/lens/safety context, and one whole-segment `l` or `f` action. The
+  remainder becomes honest breathing room above the grounded command rails.
+  That action emits the existing keyboard input, so mouse and keyboard still
+  share the same reader and filter owners. This is an autonomous topic
+  decision, not a recorded maintainer approval.
 
 ### Visible scroll rail decision
 
@@ -1490,8 +1491,9 @@ already large `supervisor-tui.ts` application controller.
   reader or changing the snapshot contract.
 - [x] Replace the passive Runtime Logs tail with a selectable Event Lens and
   responsive Inspector while preserving the same bounded snapshot.
-- [x] Replace collapsed Runtime zero-event cards with a responsive Signal Scope
-  that preserves truthful snapshot state and existing `l`/`f` actions.
+- [x] Keep zero-event Runtime Logs in a compact Runtime Lens that preserves
+  truthful snapshot state and existing `l`/`f` actions without claiming canvas
+  height.
 - [x] Replace the static Command Deck with a contextual, selectable, whole-row
   mouse-capable Command Palette.
 - [x] Upgrade the Command Palette with OMP-inspired in-place fuzzy search,
@@ -2912,6 +2914,12 @@ already large `supervisor-tui.ts` application controller.
   120×32 and 80×24 captures prove the three-column and compact-stack forms keep
   their route, owner, provider, uptime, services, recent event, and valid action
   visible without relying on the local log lens.
+- A follow-up screenshot audit removed the height-filling zero-event Signal
+  Scope beneath the Observatory. The compact Runtime Lens now occupies four
+  lines at both 120×32 and 80×24, retains whole-row pointer reload/filter
+  actions, and lets only real event streams expand into the Operational Canvas.
+  Acceptance passes through 86 focused renderer/screen tests, the raw-PTY
+  pointer reload case, and the complete CLI suite (63 files, 629 tests).
 
 ## Completion Criteria
 
