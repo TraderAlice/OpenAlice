@@ -1153,6 +1153,9 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       let output = ''
       let clicked = false
       let inspected = false
+      let closing = false
+      let closed = false
+      let closeOffset = 0
       const timeout = setTimeout(() => {
         child.kill()
         reject(new Error(`Supervisor navigation pointer timed out:\n${output}`))
@@ -1166,19 +1169,26 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           inspected = true
           child.write('\u001b[<35;10;7M')
           child.write('\u001b[<0;10;7M')
-        } else if (inspected && output.includes('Control atlas · 2/3 · Runtime')) {
+        } else if (!closing && inspected && output.includes('Control atlas · 2/3 · Runtime')) {
+          closing = true
+          closeOffset = output.length
+          child.write('\u001b[<35;10;21M')
+          child.write('\u001b[<0;10;21M')
+        } else if (closing && !closed && output.slice(closeOffset).includes('Alice Session · OpenAlice')) {
+          closed = true
           child.write('q')
         }
       })
       child.onExit(({ exitCode }) => {
         clearTimeout(timeout)
-        if (exitCode === 0) resolve(output)
+        if (exitCode === 0 && closed) resolve(output)
         else reject(new Error(`Supervisor navigation pointer exited ${exitCode}:\n${output}`))
       })
     })
 
     expect(transcript).toContain('Control atlas · 1/3 · Navigation')
     expect(transcript).toContain('Control atlas · 2/3 · Runtime')
+    expect(transcript).toContain('[ ? ] Close Help')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)

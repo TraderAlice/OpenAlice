@@ -3025,6 +3025,25 @@ already large `supervisor-tui.ts` application controller.
   all 51 real-PTY cases, and the complete CLI suite (63 files, 630 tests). CLI
   typecheck and build also pass.
 
+### Content-owned Help exit decision
+
+- The first Help screenshots after the single-spine change exposed a concrete
+  discoverability regression: `?` still closed Help, but neither the wide
+  Control Atlas Board nor the 80-column stacked Atlas visibly taught that exit
+  after the ordinary Action Shelf was removed.
+- Ordinary Help now ends with one content-owned `◆ [ ? ] Close Help` action in
+  Board, wide list-detail, and compact stacked layouts. The row participates in
+  existing action geometry, so keyboard `?`, pointer hover, and pointer click
+  all use the same Help toggle without restoring a second footer spine.
+- Recovery remains deliberately different: its safe Update and Exit groups
+  already contain `? Close safe controls`, so it does not duplicate a generic
+  close row or weaken the recovery-specific language.
+- Real 120x32 and 80x24 captures prove the exit stays visible beneath the
+  Control Atlas while preserving the contextual Tip and sole Command Spine.
+- Content-owned-exit acceptance passes through 83 focused Help and screen
+  tests, all 51 real-PTY cases including an 80x24 pointer close, and the
+  complete CLI suite (63 files, 630 tests). CLI typecheck and build also pass.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

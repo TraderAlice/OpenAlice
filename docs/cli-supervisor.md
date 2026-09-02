@@ -392,7 +392,12 @@ intentionally parameter-free:
   a section shares its pointer focus. Ordinary terminals split those groups
   from the selected group's explanation and visible keycaps; narrower
   terminals stack the same focus model. Arrow/Home/End keys, wheel movement,
-  and whole-row pointer hover/click share one selection.
+  and whole-row pointer hover/click share one selection. Ordinary Help owns a
+  final `◆ [ ? ] Close Help` content action in Board, wide list-detail, and
+  compact stacked layouts; its visible row is pointer-active and invokes the
+  same `?` toggle as the keyboard. It does not restore the ordinary footer
+  Action Shelf. Recovery keeps its explicit `? Close safe controls` action
+  inside the safe update/detach groups instead of duplicating a generic exit.
   Recovery mode projects only safe update and detach groups. Help remains the
   place to understand controls, while `/` remains the faster Command Dock.
   Update, Setup, AliceProject selection, Runtime Source, and Remote Transfer

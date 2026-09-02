@@ -26,6 +26,8 @@ interface HelpGroup {
   commands: Array<{ key: string; label: string }>
 }
 
+const CLOSE_HELP_ACTION = '◆ [ ? ] Close Help'
+
 export function createSupervisorHelpState(): SupervisorHelpState {
   return { selected: 0, hovered: null }
 }
@@ -79,7 +81,7 @@ export function renderSupervisorHelp(
   const boardAvailable = !recovery
     && width >= 100
     && Number.isFinite(targetHeight)
-    && (targetHeight ?? 0) >= 21
+    && (targetHeight ?? 0) >= 22
   return boardAvailable
     ? renderHelpAtlasBoard(groups, normalized, width, Math.floor(targetHeight ?? 21))
     : width >= 96
@@ -112,8 +114,9 @@ function renderHelpAtlasBoard(
     if (index < groups.length - 1) body.push('')
   })
 
-  const desiredBodyHeight = Math.max(body.length, targetHeight - 2)
-  while (body.length < desiredBodyHeight) body.push('')
+  const desiredBodyHeight = Math.max(body.length + 1, targetHeight - 2)
+  while (body.length < desiredBodyHeight - 1) body.push('')
+  body.push(CLOSE_HELP_ACTION)
   const lines = renderSupervisorPanel(
     'Control Atlas Board',
     `${groups.length} SYSTEMS · POINTER + KEYBOARD`,
@@ -163,7 +166,10 @@ function renderWideHelp(
   const gap = 3
   const leftWidth = 32
   const rightWidth = width - leftWidth - gap
-  const detailRows = detailBody(selected)
+  const detailRows = [
+    ...detailBody(selected),
+    ...(!recovery ? ['', CLOSE_HELP_ACTION] : []),
+  ]
   const listRows = groupRows(groups, state)
   while (listRows.length < detailRows.length) listRows.push('')
   const left = renderSupervisorPanel(
@@ -213,6 +219,7 @@ function renderStackedHelp(
       `${selected.glyph} ${selected.title.toUpperCase()} · ${selected.summary}`,
       selected.description,
       ...selected.commands.map((command) => `[ ${command.key} ] ${command.label}`),
+      ...(!recovery ? ['', CLOSE_HELP_ACTION] : []),
     ],
     width,
   )

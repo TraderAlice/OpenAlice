@@ -19,6 +19,7 @@ describe('Supervisor Help control atlas', () => {
     expect(output).toContain('Runtime · Read state, then act')
     expect(output).toContain('[ r ] Restart local / check remote target')
     expect(output).toContain('[ x ] Stop local / disconnect remote target')
+    expect(output).toContain('◆ [ ? ] Close Help')
     expect(rendered.targets).toEqual([
       { index: 0, row: 2, startColumn: 2, endColumn: 31 },
       { index: 1, row: 3, startColumn: 2, endColumn: 31 },
@@ -38,6 +39,7 @@ describe('Supervisor Help control atlas', () => {
     expect(output).toContain('[ Shift+Tab / ← ] Previous view')
     expect(output).toContain('[ x ] Stop local / disconnect remote target')
     expect(output).toContain('[ / ] Open the Command Dock')
+    expect(output).toContain('◆ [ ? ] Close Help')
     expect(rendered.targets.filter((target) => target.index === 0)).toHaveLength(4)
     expect(rendered.targets.filter((target) => target.index === 1)).toHaveLength(6)
     expect(rendered.targets.filter((target) => target.index === 2)).toHaveLength(5)
@@ -46,10 +48,10 @@ describe('Supervisor Help control atlas', () => {
     ))).toBe(true)
     expect(rendered.lines.every((line) => displayWidth(line) === 120)).toBe(true)
 
-    const boundary = renderSupervisorHelp({ selected: 0, hovered: null }, false, 100, 21)
-    expect(boundary.lines).toHaveLength(21)
+    const boundary = renderSupervisorHelp({ selected: 0, hovered: null }, false, 100, 22)
+    expect(boundary.lines).toHaveLength(22)
     expect(boundary.lines.join('\n')).toContain('Control Atlas Board')
-    expect(renderSupervisorHelp({ selected: 0, hovered: null }, false, 100, 20)
+    expect(renderSupervisorHelp({ selected: 0, hovered: null }, false, 100, 21)
       .lines.join('\n')).not.toContain('Control Atlas Board')
   })
 
@@ -61,6 +63,7 @@ describe('Supervisor Help control atlas', () => {
     expect(output).toContain('› ◇ AliceProject')
     expect(output).toContain('[ i ] Choose or create an AliceProject')
     expect(output).toContain('[ / ] Open the Command Dock')
+    expect(output).toContain('◆ [ ? ] Close Help')
     expect(rendered.targets).toHaveLength(3)
     expect(rendered.lines.every((line) => displayWidth(line) <= 46)).toBe(true)
     expect(rendered.lines.length).toBeLessThanOrEqual(16)
@@ -81,6 +84,7 @@ describe('Supervisor Help control atlas', () => {
     expect(output).toContain('[ u ] Choose a channel, then check and install')
     expect(output).toContain('◇ Exit  Leave unchanged')
     expect(output).not.toContain('Start quietly')
+    expect(output).not.toContain('◆ [ ? ] Close Help')
 
     const exit = renderSupervisorHelp({ selected: 1, hovered: null }, true, 80)
       .lines.join('\n')
