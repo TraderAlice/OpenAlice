@@ -223,7 +223,7 @@ function runtimeDetailRows(view: SupervisorHomeView, width: number): string[] {
     detailRow(homeHotspotLabel('Web', 'web', view), view.web, width),
     detailRow('Owner', view.owner, width),
     detailRow(homeHotspotLabel('Provider', 'provider', view), view.provider, width),
-    detailRow('Services', view.components, width),
+    detailRow('Telemetry', componentTelemetrySummary(view), width),
   ]
   if (view.uptime) details.push(detailRow('Uptime', view.uptime, width))
   return details
@@ -245,8 +245,8 @@ function renderWideCockpit(
     detailRow(homeHotspotLabel('Web', 'web', view), view.web, rightInnerWidth),
     detailRow('Owner', view.owner, rightInnerWidth),
     ...wrappedDetailRows(homeHotspotLabel('Provider', 'provider', view), view.provider, rightInnerWidth),
-    detailRow('Services', view.components, rightInnerWidth),
-    detailRow('Uptime', view.uptime ?? 'Waiting for Runtime', rightInnerWidth),
+    detailRow('Telemetry', componentTelemetrySummary(view), rightInnerWidth),
+    detailRow('Uptime', runtimeUptime(view), rightInnerWidth),
   ]
   const projectBody = renderIntegratedWideLaunchpad(view, state, leftInnerWidth)
   while (projectBody.length < runtimeBody.length) projectBody.splice(-1, 0, '')
@@ -267,7 +267,7 @@ function renderWideCockpit(
     runtimeBody.splice(-1, 0, ...stage.runtime)
   }
   const project = renderCard('Launchpad · AliceProject', projectBody, leftWidth)
-  const runtime = renderCard('Runtime signal', runtimeBody, rightWidth)
+  const runtime = renderCard('Runtime Telemetry · OpenAlice', runtimeBody, rightWidth)
 
   const cards = project.map((line, index) => joinColumns(
     line,
@@ -320,14 +320,46 @@ function renderWideControlPath(
     projectWidth,
   )
 
-  runtime[start] = '◇ SERVICE ARRAY'
-  for (const [index, service] of serviceArray(view.components).entries()) {
-    runtime[start + index + 1] = truncateDisplayWidth(service, runtimeWidth)
+  if (view.components === 'not reported') {
+    runtime[start] = '◇ COMPONENT TELEMETRY'
+    runtime[start + 1] = activeRuntime
+      ? '· SNAPSHOT PENDING'
+      : '· AVAILABLE AFTER LAUNCH'
+    runtime[start + 2] = '  Alice · UTA · Connector'
+    runtime[start + 3] = activeRuntime
+      ? '  Runtime live · states unavailable'
+      : '  Starts reporting with Runtime'
+    runtime[start + 4] = activeRuntime
+      ? '◆ CONTROL  Runtime ownership confirmed'
+      : '◇ CONTROL  Waiting for Runtime ownership'
+  } else {
+    runtime[start] = '◇ SERVICE ARRAY'
+    for (const [index, service] of serviceArray(view.components).entries()) {
+      runtime[start + index + 1] = truncateDisplayWidth(service, runtimeWidth)
+    }
+    runtime[start + 4] = activeRuntime
+      ? '  SIGNAL  Runtime report is live'
+      : '  SIGNAL  Waiting for Runtime ownership'
   }
-  runtime[start + 4] = activeRuntime
-    ? '  SIGNAL  Runtime report is live'
-    : '  SIGNAL  Waiting for Runtime ownership'
   return { project, runtime }
+}
+
+function componentTelemetrySummary(view: SupervisorHomeView): string {
+  if (view.components !== 'not reported') return view.components
+  if (view.state === 'running' || view.state === 'owned_elsewhere') {
+    return 'Component snapshot pending'
+  }
+  if (view.state === 'absent') return 'Available after launch'
+  return 'Component snapshot unavailable'
+}
+
+function runtimeUptime(view: SupervisorHomeView): string {
+  if (view.uptime) return view.uptime
+  if (view.state === 'running' || view.state === 'owned_elsewhere') {
+    return 'Live · not reported'
+  }
+  if (view.state === 'absent') return 'Waiting for Runtime'
+  return 'Unavailable'
 }
 
 function renderRouteTrack(width: number, active: boolean, pulse: boolean): string {

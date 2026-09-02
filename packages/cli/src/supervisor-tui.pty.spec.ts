@@ -756,8 +756,10 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(stripSgr(transcript)).toContain('OpenAlice is ready to start.')
     expect(stripSgr(transcript)).toContain('◇ CONTROL PATH')
     expect(stripSgr(transcript)).toContain('◆ ALICEPROJECT')
-    expect(stripSgr(transcript)).toContain('◇ SERVICE ARRAY')
-    expect(stripSgr(transcript)).toContain('◇ Alice not reported')
+    expect(stripSgr(transcript)).toContain('◇ COMPONENT TELEMETRY')
+    expect(stripSgr(transcript)).toContain('· AVAILABLE AFTER LAUNCH')
+    expect(stripSgr(transcript)).toContain('Alice · UTA · Connector')
+    expect(stripSgr(transcript)).not.toContain('Alice not reported')
     expect(transcript).toContain('\u001b[1;38;2;')
     expect(transcript).not.toMatch(
       /\u001b\[1;38;2;183;255;248;48;2;18;54;59m[^\u001b\r\n]*Uptime/u,

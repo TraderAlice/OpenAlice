@@ -119,7 +119,7 @@ describe('Supervisor TUI screen', () => {
     expect(wideLines.join('\n')).toContain('prepares anything missing and opens')
     expect(wideLines.join('\n')).toContain('the browser; c chooses a checkout.')
     const wideCockpitHeader = wideLines.find((line) => (
-      line.includes('Launchpad · AliceProject') && line.includes('Runtime signal')
+      line.includes('Launchpad · AliceProject') && line.includes('Runtime Telemetry · OpenAlice')
     ))
     expect(wideCockpitHeader).toBeDefined()
     expect(wideLines.find((line) => line.includes('[ Enter ]'))).toContain('Uptime')
@@ -184,7 +184,7 @@ describe('Supervisor TUI screen', () => {
 
     const tall = screen.render(120).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
     const cockpitRow = tall.findIndex((line) => (
-      line.includes('Launchpad · AliceProject') && line.includes('Runtime signal')
+      line.includes('Launchpad · AliceProject') && line.includes('Runtime Telemetry · OpenAlice')
     ))
     const actionRow = tall.findIndex((line) => line.includes('[ Enter ]'))
     const uptimeRow = tall.findIndex((line) => line.includes('Uptime'))
@@ -204,8 +204,10 @@ describe('Supervisor TUI screen', () => {
     expect(tall.join('\n')).toContain('◇ CONTROL PATH')
     expect(tall.join('\n')).toContain('◆ ALICEPROJECT')
     expect(tall.join('\n')).toContain('◇ WORKSPACE WAITING')
-    expect(tall.join('\n')).toContain('◇ SERVICE ARRAY')
-    expect(tall.join('\n')).toContain('◇ Alice not reported')
+    expect(tall.join('\n')).toContain('◇ COMPONENT TELEMETRY')
+    expect(tall.join('\n')).toContain('· AVAILABLE AFTER LAUNCH')
+    expect(tall.join('\n')).toContain('Alice · UTA · Connector')
+    expect(tall.join('\n')).not.toContain('Alice not reported')
     const quietStageRows = tall.slice(cockpitRow + 1, actionRow).map((line) => (
       /^│\s+│ {3}│\s+│$/u.test(line)
     ))
@@ -247,10 +249,36 @@ describe('Supervisor TUI screen', () => {
 
     const wide = screen.render(120).join('\n')
     expect(wide).toContain('↗ WORKSPACE READY')
+    expect(wide).toContain('◇ SERVICE ARRAY')
     expect(wide).toContain('◆ Alice ready')
     expect(wide).toContain('× UTA disabled')
     expect(wide).toContain('◆ Connector connected')
     expect(screen.render(99).join('\n')).not.toContain('SERVICE ARRAY')
+  })
+
+  it('renders one honest pending cluster for a live Runtime without telemetry', () => {
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: {
+        class: 'running',
+        owner: { surface: 'cli-server', pid: 42 },
+        endpoints: { web: 'http://127.0.0.1:47331' },
+      },
+    }, {
+      getViewportHeight: () => 32,
+      motionEnabled: false,
+    })
+
+    const wide = screen.render(120).join('\n')
+    expect(wide).toContain('Runtime Telemetry · OpenAlice')
+    expect(wide).toContain('Telemetry   Component snapshot pending')
+    expect(wide).toContain('Uptime      Live · not reported')
+    expect(wide).toContain('◇ COMPONENT TELEMETRY')
+    expect(wide).toContain('· SNAPSHOT PENDING')
+    expect(wide).toContain('Runtime live · states unavailable')
+    expect(wide).not.toContain('Alice not reported')
+    expect(wide).not.toContain('Waiting for Runtime')
   })
 
   it('renders a responsive OMP-style Command Spine without adding a row', () => {

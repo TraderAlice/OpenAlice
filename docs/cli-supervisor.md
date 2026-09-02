@@ -135,28 +135,32 @@ intentionally parameter-free:
   Launchpad is the sole primary-action surface on Overview: Enter starts and
   opens a stopped Runtime, opens a verified Web endpoint, or runs Runtime
   Doctor when neither action is truthfully available. Its
-  Runtime Signal card keeps Home, Web endpoint, owner, provider identity,
-  services, and uptime available without returning to the historical flat
-  field dump. Overview promotes only fields with a truthful existing action:
+  Runtime Telemetry card keeps Home, Web endpoint, owner, provider identity,
+  component telemetry, and uptime available without returning to the
+  historical flat field dump. Overview promotes only fields with a truthful
+  existing action:
   `⌂` AliceProject opens the Switchboard, `↗` Web opens an advertised verified
   endpoint, and `⑂` Provider opens Source while the Runtime is stopped. Hover
   changes the marker to `›`, highlights the complete responsive field, and
   previews its consequence in the fixed activity slot; click emits the same
-  `i`, `o`, or `c` input as keyboard use. Owner, services, uptime, and unavailable
-  Web/source states remain passive telemetry. From 72 through 99 columns it
+  `i`, `o`, or `c` input as keyboard use. Owner, telemetry, uptime, and
+  unavailable Web/source states remain passive telemetry. From 72 through 99 columns it
   becomes a Signal Deck: the existing
   card composes a terminal-native `ALICE` mark and truthful Runtime state beside
   the complete telemetry without consuming another row. At 100 columns and
-  wider the Launchpad and Runtime Signal become a two-column cockpit. The
+  wider the Launchpad and Runtime Telemetry become a two-column cockpit. The
   action-first Launchpad integrates the terminal-native `ALICE` mark beside its
   complete wrapped guidance instead of repeating AliceProject identity and
   Runtime state in a standalone hero card. Runtime telemetry remains an
   independent right-hand pane, while the bounded entrance/prism sweep styles
   the integrated mark. When a wide terminal gives the paired stage surplus
-  height, its center becomes a passive Control Path and Service Array instead
-  of mechanical blank filler. The path visualizes the already-selected
-  AliceProject, Runtime readiness, Workspace availability, and provider; the
-  array decomposes only the already-reported Alice, UTA, and Connector states.
+  height, its center becomes a passive Control Path and adaptive component deck
+  instead of mechanical blank filler. The path visualizes the already-selected
+  AliceProject, Runtime readiness, Workspace availability, and provider.
+  Reported snapshots decompose Alice, UTA, and Connector as a Service Array;
+  a missing snapshot becomes one bounded pending cluster that names the expected
+  components and distinguishes a stopped Runtime from a live Runtime whose
+  component states or uptime were not reported.
   Neither surface adds a read, action target, or lifecycle route. `NO_COLOR`
   keeps the wordmark and state legible, and terminals below 72 columns omit it
   entirely. Those narrow terminals fold the

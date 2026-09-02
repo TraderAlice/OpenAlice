@@ -1137,6 +1137,22 @@ not imply maintainer approval of the finished interaction.
   task or refusal.
   This is an autonomous topic refinement, not a recorded maintainer approval.
 
+### Adaptive Runtime telemetry decision
+
+- Keeping three fixed `Alice/UTA/Connector not reported` rows preserves the
+  reported-service geometry, but presents one missing snapshot as three
+  negative-looking component states and wastes the most valuable wide pane.
+- Hiding component rows and uptime whenever they are absent would make the pane
+  quieter, but unexplained whitespace would leave users unable to distinguish
+  unsupported telemetry from a delayed or stopped Runtime.
+- The selected model gives the Runtime pane an explicit Telemetry identity and
+  adapts its content contract. Reported component snapshots retain the
+  three-service array; an absent snapshot becomes one bounded pending cluster
+  that names the expected components and explains whether launch or reporting
+  is pending. Wide uptime remains anchored but distinguishes a stopped Runtime
+  from a live Runtime whose uptime was not reported. This is an autonomous topic
+  refinement, not a recorded maintainer approval.
+
 ## Responsive and Accessibility Contract
 
 - `80x24` remains the minimum full experience. Wide terminals show the
@@ -2451,6 +2467,21 @@ already large `supervisor-tui.ts` application controller.
   passed, 1 skipped; 6,208 tests passed, 10 skipped). Docker installer smoke
   passes without Node, npm, pnpm, Bun, or an Agent Runtime, and package dry-run
   retains the updated navigation, Dock, and Supervisor owners.
+- A settled 120x32 Overview audit exposed a data-trust seam in the visual
+  hierarchy: one missing component snapshot expanded into three negative-looking
+  `not reported` rows, while a live Runtime without uptime still claimed it was
+  waiting for a Runtime. The wide right pane is now
+  `Runtime Telemetry · OpenAlice` and adapts missing data into one explicit pending cluster instead
+  of imitating three component failures.
+- Adaptive-Telemetry acceptance passes with 111 focused screen and real-PTY
+  tests. Settled truecolor 120x32 running and stopped frames prove the two
+  distinct contracts: live ownership shows `SNAPSHOT PENDING`, expected
+  components, and `Uptime · Live · not reported`; stopped ownership shows
+  `AVAILABLE AFTER LAUNCH` and keeps `Waiting for Runtime`. A reported snapshot
+  still expands into the three-service array. Root TypeScript and CLI build
+  pass; the 702-file suite passes (701 passed, 1 skipped; 6,209 tests passed, 10
+  skipped). Docker installer smoke passes without Node, npm, pnpm, Bun, or an
+  Agent Runtime, and package dry-run retains the changed TUI view owner.
 
 ## Completion Criteria
 
