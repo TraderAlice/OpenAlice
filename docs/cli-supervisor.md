@@ -452,6 +452,12 @@ callbacks remain unchanged inside that stage. Smaller terminals retain the
 bounded centered sheet because their stacked responsive content takes priority
 over clearing the whole viewport. Closing the task restores the prior
 top-level panel identity without changing Runtime or selection state.
+When the wide stage has enough surplus rows, a read-only Focus Trajectory
+centers the task's existing workflow and mutation boundary in that quiet field.
+It does not claim completion state, expose a hit target, or add another action
+path: Setup projects Inspect/Edit/Validate/Save, Source projects
+Select/Validate/Save/Launch, AliceProjects project Inspect/Select or
+Create/Remember, and Release projects Choose/Probe/Confirm/Install.
 
 The TUI refuses to stop or restart Electron, development, incompatible, or
 otherwise foreign owners. Its stop/restart confirmation states that active Web

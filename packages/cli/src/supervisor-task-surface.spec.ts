@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
+import { displayWidth } from './supervisor-display.ts'
 import {
+  decorateSupervisorTaskSurface,
   renderSupervisorTaskSurface,
   supervisorTaskSurfaceOptions,
   supervisorUsesTaskStage,
 } from './supervisor-task-surface.ts'
+import { createSupervisorTuiTheme } from './supervisor-tui-theme.ts'
+import { supervisorCommandTargets } from './supervisor-tui-view.ts'
 
 describe('Supervisor secondary-task surface', () => {
   const sheet = {
@@ -39,5 +43,57 @@ describe('Supervisor secondary-task surface', () => {
       expect(supervisorTaskSurfaceOptions(size, sheet)).toBe(sheet)
       expect(renderSupervisorTaskSurface(['work'], size)).toEqual(['work'])
     }
+  })
+
+  it('centers a truthful task trajectory inside genuine surplus rows', () => {
+    const lines = renderSupervisorTaskSurface(
+      Array.from({ length: 12 }, (_, index) => `content ${index + 1}`),
+      { width: 120, height: 32 },
+      'source',
+    )
+    const output = lines.join('\n')
+
+    expect(lines).toHaveLength(26)
+    expect(output).toContain('◇  FOCUS TRAJECTORY · SOURCE')
+    expect(output).toContain('01 SELECT  ━━━  02 VALIDATE  ━━━  03 SAVE  ━━━  04 LAUNCH')
+    expect(output).toContain('One verified checkout; launch follows a successful save.')
+    expect(output).toContain('Esc returns to the previous Supervisor view.')
+    expect(lines.every((line) => displayWidth(line) <= 120)).toBe(true)
+    expect(supervisorCommandTargets(lines)).toEqual([])
+  })
+
+  it('projects each existing task contract without inventing progress', () => {
+    const expected = {
+      setup: '01 INSPECT  ━━━  02 EDIT  ━━━  03 VALIDATE  ━━━  04 SAVE',
+      projects: '01 INSPECT  ━━━  02 SELECT OR CREATE  ━━━  03 REMEMBER',
+      release: '01 CHOOSE  ━━━  02 PROBE  ━━━  03 CONFIRM  ━━━  04 INSTALL',
+    } as const
+    for (const [task, route] of Object.entries(expected)) {
+      const output = renderSupervisorTaskSurface(
+        ['content'],
+        { width: 120, height: 32 },
+        task as keyof typeof expected,
+      ).join('\n')
+      expect(output).toContain(route)
+      expect(output).not.toMatch(/CURRENT|DONE|READY/u)
+    }
+  })
+
+  it('colors only the quiet-field hierarchy and preserves no-color output', () => {
+    const lines = renderSupervisorTaskSurface(
+      ['content'],
+      { width: 120, height: 32 },
+      'setup',
+    )
+    const color = decorateSupervisorTaskSurface(
+      lines,
+      createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+    )
+    const plain = decorateSupervisorTaskSurface(
+      lines,
+      createSupervisorTuiTheme({ TERM: 'xterm-256color', NO_COLOR: '1' }),
+    )
+    expect(color.join('\n')).toContain('\u001b[')
+    expect(plain).toEqual(lines)
   })
 })

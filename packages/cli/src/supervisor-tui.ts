@@ -118,8 +118,10 @@ import {
   renderSupervisorReleaseObservatory,
 } from './supervisor-release-view.ts'
 import {
+  decorateSupervisorTaskSurface,
   renderSupervisorTaskSurface,
   supervisorTaskSurfaceOptions,
+  type SupervisorTaskSurfaceTask,
 } from './supervisor-task-surface.ts'
 import {
   createSupervisorHelpState,
@@ -313,7 +315,7 @@ interface UpdateResult {
 export type SupervisorUpdateChannel = 'stable' | 'beta' | 'dev'
 
 export type SupervisorPanel = 'fleet' | 'overview' | 'logs' | 'doctor' | 'help'
-export type SupervisorFocusTask = 'setup' | 'source' | 'projects' | 'release'
+export type SupervisorFocusTask = SupervisorTaskSurfaceTask
 
 interface SupervisorNavigationTransition {
   from: SupervisorPanel
@@ -1205,7 +1207,7 @@ export async function runSupervisorTui(
           },
           activate: () => undefined,
         }
-        const lines = renderSupervisorTaskSurface(observatory.lines, terminalSize())
+        const lines = renderSupervisorTaskSurface(observatory.lines, terminalSize(), 'release')
         captureOverlayPointer(
           lines,
           width,
@@ -1218,11 +1220,11 @@ export async function runSupervisorTui(
             ui.requestRender()
           },
         )
-        return decorateSupervisorReleaseObservatory(
+        return decorateSupervisorTaskSurface(decorateSupervisorReleaseObservatory(
           lines,
           tuiTheme,
           updateChannelHoveredCommand,
-        )
+        ), tuiTheme)
       }
 
       handleInput(data: string): void {
@@ -1513,7 +1515,7 @@ export async function runSupervisorTui(
           detail: sanitize(this.detail),
           contract: 'Validate the checkout before saving; launch only follows a saved source.',
         }, width)
-        const lines = renderSupervisorTaskSurface(launchBay.lines, terminalSize())
+        const lines = renderSupervisorTaskSurface(launchBay.lines, terminalSize(), 'source')
         captureOverlayPointer(
           lines,
           width,
@@ -1526,11 +1528,11 @@ export async function runSupervisorTui(
             ui.requestRender()
           },
         )
-        return decorateSupervisorSourceLaunchBay(
+        return decorateSupervisorTaskSurface(decorateSupervisorSourceLaunchBay(
           lines,
           tuiTheme,
           sourceHoveredCommand,
-        )
+        ), tuiTheme)
       }
 
       override handleInput(data: string): void {
@@ -2003,7 +2005,7 @@ export async function runSupervisorTui(
     const panel = new (class implements Component {
       render(width: number): string[] {
         if (settingsSubmenuOpen) {
-          const lines = renderSupervisorTaskSurface(settings.render(width), terminalSize())
+          const lines = renderSupervisorTaskSurface(settings.render(width), terminalSize(), 'setup')
           captureOverlayPointer(
             lines,
             width,
@@ -2016,11 +2018,11 @@ export async function runSupervisorTui(
               ui.requestRender()
             },
           )
-          return decorateSupervisorSetupWorkbench(
+          return decorateSupervisorTaskSurface(decorateSupervisorSetupWorkbench(
             lines,
             tuiTheme,
             settingsHoveredCommand,
-          )
+          ), tuiTheme)
         }
         const studioItems: SupervisorSetupItem[] = items.map((item) => ({
           id: item.id,
@@ -2054,7 +2056,7 @@ export async function runSupervisorTui(
             ui.requestRender()
           },
         }
-        const lines = renderSupervisorTaskSurface(studio.lines, terminalSize())
+        const lines = renderSupervisorTaskSurface(studio.lines, terminalSize(), 'setup')
         captureOverlayPointer(
           lines,
           width,
@@ -2067,7 +2069,10 @@ export async function runSupervisorTui(
             ui.requestRender()
           },
         )
-        return decorateSupervisorSetupStudio(lines, tuiTheme, settingsHoveredCommand)
+        return decorateSupervisorTaskSurface(
+          decorateSupervisorSetupStudio(lines, tuiTheme, settingsHoveredCommand),
+          tuiTheme,
+        )
       }
 
       handleInput(data: string): void {
@@ -2385,7 +2390,7 @@ export async function runSupervisorTui(
             message: sanitize(message),
             fieldLines: component.render(supervisorProjectFoundryFieldWidth(width)),
           }, width)
-          const lines = renderSupervisorTaskSurface(foundry.lines, terminalSize())
+          const lines = renderSupervisorTaskSurface(foundry.lines, terminalSize(), 'projects')
           captureOverlayPointer(
             lines,
             width,
@@ -2398,11 +2403,11 @@ export async function runSupervisorTui(
               ui.requestRender()
             },
           )
-          return decorateSupervisorProjectFoundry(
+          return decorateSupervisorTaskSurface(decorateSupervisorProjectFoundry(
             lines,
             tuiTheme,
             projectsHoveredCommand,
-          )
+          ), tuiTheme)
         }
         const selectedItem = list.getSelectedItem()
         const activeIndex = Math.max(0, items.findIndex((item) => item.value === selectedItem?.value))
@@ -2432,7 +2437,7 @@ export async function runSupervisorTui(
             baseList.move(delta)
           },
         }
-        const lines = renderSupervisorTaskSurface(switchboard.lines, terminalSize())
+        const lines = renderSupervisorTaskSurface(switchboard.lines, terminalSize(), 'projects')
         captureOverlayPointer(
           lines,
           width,
@@ -2445,11 +2450,11 @@ export async function runSupervisorTui(
             ui.requestRender()
           },
         )
-        return decorateSupervisorProjectSwitchboard(
+        return decorateSupervisorTaskSurface(decorateSupervisorProjectSwitchboard(
           lines,
           tuiTheme,
           projectsHoveredCommand,
-        )
+        ), tuiTheme)
       }
 
       handleInput(data: string): void {

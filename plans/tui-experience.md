@@ -423,6 +423,24 @@ not imply maintainer approval of the finished interaction.
   task sheet so complete stacked content is not clipped. This is an autonomous
   topic decision, not a recorded maintainer approval.
 
+### Focus-workspace quiet-field decision
+
+- Leaving the newly cleared rows completely blank gives the task room to
+  breathe, but a 120x32 capture still reads as a compact dialog followed by an
+  unfinished lower half.
+- Stretching the split cards to the Control Console would fill the viewport,
+  but only turn the same six settings or three release lanes into oversized
+  empty boxes.
+- Filling the area with animated telemetry would look active while inventing
+  state that these configuration tasks do not own. The selected model follows
+  OMP's setup-stage hierarchy: a quiet `Focus Trajectory` uses only the task's
+  existing ordered contract and owner boundary. Setup shows Inspect/Edit/
+  Validate/Save; Source shows Select/Validate/Save/Launch; Projects shows
+  Inspect/Select or Create/Remember; Release shows Choose/Probe/Confirm/Install.
+  It is centered in genuine surplus rows, publishes no pointer target, and is
+  omitted below the existing 100x28 Focus Workspace boundary. This is an
+  autonomous topic decision, not a recorded maintainer approval.
+
 ### Setup Studio decision
 
 - Recoloring the existing single-column `SettingsList` would retain its proven
@@ -2180,6 +2198,24 @@ already large `supervisor-tui.ts` application controller.
   passed, 1 skipped; 6,199 tests passed, 10 skipped). Docker installer smoke
   passes without Node, npm, pnpm, Bun, or an Agent Runtime, and package dry-run
   contains `src/supervisor-task-surface.ts`.
+- OMP v17.3.4's live 120x32 setup stage confirmed that its apparent richness
+  comes from task title, ordered setup context, dividers, selection, and footer
+  controls rather than indiscriminate density. OpenAlice's Focus Workspace now
+  uses its lower quiet field for the selected task's real trajectory and owner
+  boundary instead of a blank half-screen or invented telemetry. The field is
+  visually subordinate to the split task cards, has no command geometry, and
+  disappears with the Focus Workspace below 100x28.
+- Focus-Trajectory acceptance passes with 113 focused task-surface, screen,
+  and real-PTY tests. Truecolor 120x32 Setup and Release captures place the
+  trajectory in rows 21–24 between task status and Control Console, retain the
+  split-card primary hierarchy, and expose matching `FOCUS`/Context Ribbon
+  identity. Tests prove all four exact workflows, display-width containment,
+  no invented CURRENT/DONE/READY state, no command targets, no-color parity,
+  and complete omission below either Focus Workspace boundary. CLI build and
+  root TypeScript pass; the 701-file suite passes (700 passed, 1 skipped;
+  6,202 tests passed, 10 skipped). Docker installer smoke passes without Node,
+  npm, pnpm, Bun, or an Agent Runtime, and package dry-run contains the changed
+  task-surface owner.
 
 ## Completion Criteria
 
