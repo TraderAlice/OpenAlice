@@ -478,7 +478,7 @@ function decorateDock(
   theme: SupervisorTuiTheme,
   hoveredCommand?: string,
 ): string {
-  const tokenPattern = /\[ \/ \] (?:Commands|Close)|\[ q \] Detach|\[ Esc \] (?:Back|Cancel)|\[ i \] .*?(?= +› +)|⌂ .*?(?= +› +)|⌁ .*?(?= +› +)|◆ (?:FOCUS WORKSPACE|DECISION GATE|OPERATION ACTIVE)|! RECOVERY|(?:◉|●) (?:LIVE|EXTERNAL)|○ COLD|◆ (?:(?:LIVE|EXTERNAL) · HOME MISSING|BLOCKED|DEGRADED)|× UNREACHABLE|◇ OFFLINE|[⠀-⣿◆]  WORKING .*?(?= ─╯)|✓  READY .*?(?= ─╯)|!  NOTICE .*?(?= ─╯)|×  ERROR .*?(?= ─╯)|◆  STATUS .*?(?= ─╯)|◇  PREVIEW .*?(?= ─╯)|◌ [A-Z][A-Z ]*?(?= +› +| ─╯)|[◆◇≋✦?] (?:OVERVIEW|FLEET|LAUNCH|LOGS|DOCTOR|HELP|SETUP|SOURCE|PROJECTS|RELEASE|TRANSFER|CONFIRMATION)/gu
+  const tokenPattern = /\[ \/ \] (?:Commands|Close)|\[ q \] Detach|\[ Esc \] (?:Back|Cancel)|\[ i \] .*?(?= +› +)|⌂ .*?(?= +› +)|⌁ .*?(?= +› +)|◆ (?:FOCUS WORKSPACE|DECISION GATE|OPERATION ACTIVE)|! RECOVERY|(?:◉|●) (?:LIVE|EXTERNAL)|○ COLD|◆ (?:(?:LIVE|EXTERNAL) · HOME MISSING|BLOCKED|DEGRADED)|× UNREACHABLE|◇ OFFLINE|[⠀-⣿◆]  WORKING .*?(?= ─╯)|✓  READY .*?(?= ─╯)|!  NOTICE .*?(?= ─╯)|×  ERROR .*?(?= ─╯)|◆  STATUS .*?(?= ─╯)|◇  PREVIEW .*?(?= ─╯)|◌ [A-Z][A-Z ]*?(?= +› +| ─╯)|[◆◇≋✦?] (?:OVERVIEW|CONNECTIONS|CONN|FLEET|LAUNCH|LOGS|DOCTOR|HELP|SETUP|SOURCE|PROJECTS|RELEASE|TRANSFER|CONFIRMATION)/gu
   let output = ''
   let cursor = 0
   for (const match of line.matchAll(tokenPattern)) {
@@ -510,7 +510,7 @@ function decorateDockToken(
   if (token.startsWith('◆  STATUS')) return theme.infoRail(token)
   if (token.startsWith('◇  PREVIEW')) return theme.navigationHover(token)
   if (token === '◆ OPERATION ACTIVE') return theme.dockControl(token)
-  if (token === '◆ FOCUS WORKSPACE' || token === '◆ DECISION GATE' || /^[◆◇≋✦?] (?:OVERVIEW|FLEET|LOGS|DOCTOR|HELP|SETUP|SOURCE|PROJECTS|RELEASE|TRANSFER|CONFIRMATION)$/u.test(token)) {
+  if (token === '◆ FOCUS WORKSPACE' || token === '◆ DECISION GATE' || /^[◆◇≋✦?] (?:OVERVIEW|CONNECTIONS|CONN|FLEET|LOGS|DOCTOR|HELP|SETUP|SOURCE|PROJECTS|RELEASE|TRANSFER|CONFIRMATION)$/u.test(token)) {
     return theme.dockPanel(token)
   }
   if (token.startsWith('● ') || token.startsWith('◉ ')) return theme.dockSuccess(token)

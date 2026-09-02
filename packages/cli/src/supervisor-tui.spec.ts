@@ -693,7 +693,7 @@ describe('Supervisor TUI screen', () => {
       runtimeState: 'running',
       projectAvailable: false,
     }, 120)
-    expect(missingHome).toContain('◆ LIVE · HOME MISSING  ›  ◇ FLEET')
+    expect(missingHome).toContain('◆ LIVE · HOME MISSING  ›  ◇ CONNECTIONS')
     expect(missingHome).not.toContain('● LIVE')
     const themedMissingHome = decorateSupervisorFrame([
       'header',
@@ -708,6 +708,33 @@ describe('Supervisor TUI screen', () => {
       '\u001b[1;38;2;255;214;128;48;2;10;34;39m◆ LIVE · HOME MISSING',
     )
     expect(themedMissingHome.replace(/\u001b\[[0-9;]*m/gu, '')).toBe(missingHome)
+
+    const connections = renderSupervisorDock({
+      panel: 'fleet',
+      projectName: 'Default AliceProject',
+      machineName: 'This computer',
+      targetKind: 'local',
+      runtimeState: 'running',
+      connectionHealth: 'connected',
+    }, 120)
+    expect(connections).toContain('● LIVE  ›  ◇ CONN')
+    expect(renderSupervisorDock({
+      panel: 'fleet',
+      projectName: 'Default AliceProject',
+      machineName: 'This computer',
+      targetKind: 'local',
+      runtimeState: 'running',
+      connectionHealth: 'connected',
+    }, 130)).toContain('● LIVE  ›  ◇ CONNECTIONS')
+    expect(decorateSupervisorFrame([
+      'header',
+      'divider',
+      'tabs',
+      connections,
+    ], createSupervisorTuiTheme({ TERM: 'xterm-256color' }), {
+      panel: 'fleet',
+      runtimeClass: 'running',
+    })[3]).toContain('\u001b[1;38;2;213;179;255;48;2;10;34;39m◇ CONN')
 
     const unreachableRemote = renderSupervisorDock({
       panel: 'overview',
@@ -778,7 +805,7 @@ describe('Supervisor TUI screen', () => {
       runtimeState: 'absent',
     }, 100)
     expect(transferFocus).toContain('⌂ Default AliceProject  ›  ○ COLD  ›  ◆ TRANSFER')
-    expect(transferFocus).not.toContain('◇ FLEET')
+    expect(transferFocus).not.toContain('◇ CONNECTIONS')
 
     const confirmationFocus = renderSupervisorDock({
       panel: 'overview',
@@ -954,10 +981,10 @@ describe('Supervisor TUI screen', () => {
     const locked = renderSupervisorContextTip({ panel: 'fleet', inputLocked: true }, 100)
     const launchFailure = renderSupervisorContextTip({ panel: 'fleet', launchFailure: true }, 100)
 
-    expect(fleet).toContain('First click focuses a pane')
+    expect(fleet).toContain('←→ changes pane; ↑↓ chooses')
     expect(activeFleet).toContain('Enter returns Home')
-    expect(activeFleet).toContain('switch')
-    expect(switchFleet).toContain('current target stays live until the new route is ready')
+    expect(activeFleet).toContain('active target')
+    expect(switchFleet).toContain('current target stays live until ready')
     expect(launcher).toContain('Enter runs Next')
     expect(launcher).toContain('Tab/←→ changes pane')
     expect(logs).toContain('f filters; y copies')
@@ -995,7 +1022,7 @@ describe('Supervisor TUI screen', () => {
       { panel: 'fleet' },
     )[3]!
     expect(themed).toContain('\u001b[1;38;2;116;235;226m◇  Tip:')
-    expect(themed).toContain('\u001b[38;2;116;132;153m First click focuses a pane')
+    expect(themed).toContain('\u001b[38;2;116;132;153m ←→ changes pane; ↑↓ chooses')
     expect(themed.replace(/\u001b\[[0-9;]*m/gu, '')).toBe(fleet)
     expect(decorateSupervisorFrame(
       ['header', 'navigation', 'rail', fleet],
@@ -1975,7 +2002,7 @@ describe('Supervisor TUI screen', () => {
 
     screen.render(100)
     expect(screen.snapshot.fleet?.focus).toBe('machines')
-    expect(screen.render(100).join('\n')).toContain('First click focuses a pane')
+    expect(screen.render(100).join('\n')).toContain('←→ changes pane; ↑↓ chooses')
     expect(screen.render(100).join('\n')).not.toContain('Enter returns Home')
 
     expect(screen.handlePointer(pointerClick(50, 6))).toBe(true)

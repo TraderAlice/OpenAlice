@@ -2231,7 +2231,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(plain).toContain('Switch Target')
     expect(plain).toContain('◇ SWITCH CANDIDATE')
     expect(plain).toContain('[ Enter ] Connect & Switch')
-    expect(plain).toContain('current target stays live until the new route is ready')
+    expect(plain).toContain('current target stays live until ready')
     expect(plain).toMatch(/This computer\s+● ACTIVE · 1/u)
     expect(plain).toContain('⌂ This comp… · LOCAL  ›  ● LIVE')
     expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=0 loads=0 diagnoses=0')

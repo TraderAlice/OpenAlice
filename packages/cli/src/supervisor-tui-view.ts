@@ -572,6 +572,9 @@ export function renderSupervisorDock(
   const panelIdentity = view.launcher
     ? '◆ LAUNCH'
     : view.focusLabel ? `◆ ${panel}` : panelBadge(panel)
+  const compactPanelIdentity = view.launcher || view.focusLabel
+    ? panelIdentity
+    : compactPanelBadge(panel)
   if (view.recovery) {
     return commandSpine(controls, `! RECOVERY${breadcrumb}${panelIdentity}`, width)
   }
@@ -601,6 +604,8 @@ export function renderSupervisorDock(
       : `${projectPrefix}${fullProjectName}`
   const signalSuffix = `${contextBreadcrumb}${signal}`
   const fullContext = `${targetIdentity}${signalSuffix}${panelSuffix}`
+  const compactPanelSuffix = `${contextBreadcrumb}${compactPanelIdentity}`
+  const compactFullContext = `${targetIdentity}${signalSuffix}${compactPanelSuffix}`
   const projectSignal = `${targetIdentity}${signalSuffix}`
   const projectNameBudget = contextBudget
     - displayWidth(view.launcher
@@ -621,13 +626,15 @@ export function renderSupervisorDock(
   const signalPanel = `${signal}${panelSuffix}`
   const context = displayWidth(fullContext) <= contextBudget
     ? fullContext
-    : displayWidth(projectSignal) <= contextBudget
-      ? projectSignal
-      : compactProjectSignal
-        ? compactProjectSignal
-        : displayWidth(signalPanel) <= contextBudget
-          ? signalPanel
-          : truncateDisplayWidth(signal, contextBudget)
+    : displayWidth(compactFullContext) <= contextBudget
+      ? compactFullContext
+      : displayWidth(projectSignal) <= contextBudget
+        ? projectSignal
+        : compactProjectSignal
+          ? compactProjectSignal
+          : displayWidth(signalPanel) <= contextBudget
+            ? signalPanel
+            : truncateDisplayWidth(signal, contextBudget)
   return commandSpine(controls, context, width)
 }
 
@@ -676,10 +683,10 @@ export function renderSupervisorContextTip(
       ? view.launcher
         ? 'Enter runs Next; ↑↓ selects; Tab/←→ changes pane; click again activates.'
         : view.activeSelection
-          ? 'Enter returns Home; choose another Machine or AliceProject to switch.'
+          ? '←→ changes pane; ↑↓ chooses; Enter returns Home from the active target.'
           : view.switchSelection
-            ? 'Enter switches; current target stays live until the new route is ready.'
-          : 'First click focuses a pane; click its selection again to activate it.'
+            ? '←→ changes pane; Enter switches; current target stays live until ready.'
+          : '←→ changes pane; ↑↓ chooses; Enter activates the selected target.'
       : view.panel === 'logs'
         ? view.targetKind === 'ssh'
           ? 'The Chronicle keeps the SSH forward while r checks endpoint health now.'
@@ -947,7 +954,7 @@ function commandSpine(left: string, right: string, width: number): string {
 
 function panelBadge(panel: string): string {
   if (panel === 'OVERVIEW') return '◆ OVERVIEW'
-  if (panel === 'FLEET') return '◇ FLEET'
+  if (panel === 'FLEET') return '◇ CONNECTIONS'
   if (panel === 'LOGS') return '≋ LOGS'
   if (panel === 'DOCTOR') return '✦ DOCTOR'
   if (panel === 'HELP') return '? HELP'
@@ -958,6 +965,11 @@ function panelBadge(panel: string): string {
   if (panel === 'TRANSFER') return '◆ TRANSFER'
   if (panel === 'CONFIRMATION') return '◆ CONFIRMATION'
   return panel
+}
+
+function compactPanelBadge(panel: string): string {
+  if (panel === 'FLEET') return '◇ CONN'
+  return panelBadge(panel)
 }
 
 function fillLine(value: string, width: number): string {

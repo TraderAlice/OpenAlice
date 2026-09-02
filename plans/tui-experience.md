@@ -3231,6 +3231,29 @@ already large `supervisor-tui.ts` application controller.
   real-PTY tests (including all 54 PTY cases), and the complete CLI suite (63
   files, 637 tests). CLI typecheck and build also pass.
 
+### Connections wayfinding decision
+
+- The current 120x32/80x24 connection captures exposed two leftover internal
+  assumptions. The top navigation called the surface Connections while the
+  persistent Spine called it Fleet, and compact mode showed only one inventory
+  pane without teaching how to return from AliceProjects to Machines.
+- Connections Tips now lead with the stable control grammar: `←→` changes the
+  focused pane and `↑↓` chooses inside it, followed by the exact Enter outcome
+  for an active target, a switch candidate, or an uncommitted selection. This
+  remains truthful in the wide two-pane layout and makes the hidden compact
+  Machine pane discoverable without opening Help.
+- The persistent Spine no longer exposes the internal Fleet owner name. It
+  renders `CONNECTIONS` when the complete Machine/AliceProject context fits,
+  contracts to `CONN` at the 120-column middle tier, and removes the view badge
+  only after that compact form also stops fitting. Identity and Runtime signal
+  keep their existing higher responsive priority.
+- Real active and remote-candidate 120x32/80x24 captures verify pane guidance,
+  state-specific Enter consequences, full target identity, and the responsive
+  `CONN` badge without changing selection or connection behavior.
+- Connections-wayfinding acceptance passes through 149 focused Fleet, screen,
+  and real-PTY tests (including all 54 PTY cases), and the complete CLI suite
+  (63 files, 637 tests). CLI typecheck and build also pass.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

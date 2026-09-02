@@ -182,6 +182,11 @@ intentionally parameter-free:
   spine names the Machine, AliceProject, loopback or SSH transport, and live
   Runtime signal on every page. Connections marks the active Machine and
   AliceProject independently from its current keyboard or pointer selection.
+  Its contextual Tip always teaches `←→` pane movement and `↑↓` selection
+  before the state-specific Enter consequence, so the single-pane compact
+  layout never hides the route back to Machines. The Command Spine calls this
+  surface `CONNECTIONS` when space permits, contracts it to `CONN` before
+  dropping the page badge, and never leaks the internal `fleet` owner name.
   Selecting another target closes the previous TUI-owned SSH forward; it never
   leaves hidden remote tunnels behind. A remote target exposes `x` Disconnect,
   which closes only the SSH forward and does not stop the remote Runtime. Its
