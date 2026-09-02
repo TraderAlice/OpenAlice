@@ -75,6 +75,7 @@ describe('Supervisor TUI screen', () => {
     expect(lines[0]).toMatch(/^╭─ /u)
     expect(lines[0]).toContain('OpenAlice Supervisor')
     expect(lines[0]).toContain('v0.87.0-beta · DEV')
+    expect(lines[0]).toContain('[ u ]')
     expect(lines[1]).toMatch(/^│ .+ │$/u)
     expect(lines[2]).toMatch(/^╰[─┬]+╯$/u)
     expect(lines[2].match(/┬/gu)).toHaveLength(1)
@@ -106,6 +107,11 @@ describe('Supervisor TUI screen', () => {
       .toBeLessThan(foldedLines.findIndex((line) => line.includes('╭ Runtime signal')))
     expect(foldedLines.join('\n')).not.toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
     expect(foldedLines.every((line) => displayWidth(line) <= 99)).toBe(true)
+
+    const narrowHeader = screen.render(46)[0]!
+    expect(narrowHeader).toContain('↗ v0.87.0-beta · DEV')
+    expect(displayWidth(narrowHeader)).toBe(46)
+    screen.render(80)
 
     expect(screen.handlePointer({
       button: 35, col: 60, row: 10, release: false, wheel: null, motion: true, leftClick: false,
@@ -527,6 +533,15 @@ describe('Supervisor TUI screen', () => {
     expect(screen.render(100).join('\n')).toContain('\u001b[38;2;')
     expect(screen.render(100)[2]).toContain('\u001b[1;38;2;116;235;226m┬')
     expect(screen.render(100)[1]!.replace(/\u001b\[[0-9;]*m/gu, '')).toContain('[Machines]·2')
+    const releaseColumn = screen.render(100)[0]!
+      .replace(/\u001b\[[0-9;]*m/gu, '')
+      .indexOf('[ u ]') + 3
+    expect(screen.handlePointer({
+      button: 35, col: releaseColumn, row: 1, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(100)[0]).toContain('\u001b[1;38;2;203;250;246;48;2;19;49;55m[ u ] vdev · DEV')
+    expect(screen.handlePointer(pointerClick(releaseColumn, 1))).toBe(true)
+    expect(actions).toContain('update')
     expect(screen.snapshot.fleet?.selectedMachine).toBe(0)
     expect(screen.handlePointer({
       button: 65, col: 2, row: 7, release: false, wheel: 1, motion: false, leftClick: false,

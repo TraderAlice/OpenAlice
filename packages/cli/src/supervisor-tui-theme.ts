@@ -28,6 +28,7 @@ export interface SupervisorTuiTheme {
 
 export interface SupervisorFrameStyleOptions {
   panel: string
+  headerReleaseHovered?: boolean
   hoveredPanel?: string
   hoveredCommand?: { row: number; label: string }
   runtimeClass?: string
@@ -131,6 +132,12 @@ export function decorateSupervisorFrame(
         ? options.hoveredCommand.label
         : undefined)
     }
+    if (index === 0) return decorateHeader(
+      line,
+      theme,
+      options.introFrame,
+      options.headerReleaseHovered,
+    )
     if (options.hoveredCommand?.row === index + 1) {
       const keycap = `[ ${options.hoveredCommand.label} ]`
       return line.replace(keycap, theme.selected(keycap))
@@ -140,7 +147,6 @@ export function decorateSupervisorFrame(
     if (line.startsWith('!  NOTICE')) return theme.warningRail(line)
     if (line.startsWith('×  ERROR')) return theme.dangerRail(line)
     if (line.startsWith('◆  STATUS')) return theme.infoRail(line)
-    if (index === 0) return decorateHeader(line, theme, options.introFrame)
     if (index === 1) return decorateTabs(line, theme, options.panel, options.hoveredPanel)
     if (index === 2) return decorateNavigationBeaconRail(line, theme)
     if (line.startsWith('› ') || line.startsWith('▶ ') || line.includes('│ › ')) return theme.selected(line)
@@ -325,15 +331,35 @@ function decorateHeader(
   line: string,
   theme: SupervisorTuiTheme,
   introFrame?: number,
+  releaseHovered = false,
 ): string {
   const brands = ['◆ OpenAlice Supervisor', '◆  OpenAlice Supervisor', '◆ OpenAlice']
   const brand = brands.find((candidate) => line.includes(candidate))
   if (!brand) return theme.brand(line, introFrame)
-  const offset = line.indexOf(brand)
+  const brandOffset = line.indexOf(brand)
+  const releaseOffset = ['[ u ]', '↗ v']
+    .map((marker) => line.indexOf(marker))
+    .find((offset) => offset >= 0) ?? -1
+  if (releaseOffset < 0) {
+    return [
+      theme.accent(line.slice(0, brandOffset)),
+      theme.brand(brand, introFrame),
+      theme.muted(line.slice(brandOffset + brand.length)),
+    ].join('')
+  }
+  const suffixOffset = line.lastIndexOf(' ─╮')
+  const releaseEnd = suffixOffset > releaseOffset ? suffixOffset : line.length
+  const release = line.slice(releaseOffset, releaseEnd)
+  const releaseMarker = release.startsWith('[ u ]') ? '[ u ]' : '↗'
+  const decoratedRelease = releaseHovered
+    ? theme.navigationHover(release)
+    : `${theme.accentStrong(releaseMarker)}${theme.muted(release.slice(releaseMarker.length))}`
   return [
-    theme.accent(line.slice(0, offset)),
+    theme.accent(line.slice(0, brandOffset)),
     theme.brand(brand, introFrame),
-    theme.muted(line.slice(offset + brand.length)),
+    theme.muted(line.slice(brandOffset + brand.length, releaseOffset)),
+    decoratedRelease,
+    theme.muted(line.slice(releaseEnd)),
   ].join('')
 }
 

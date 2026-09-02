@@ -81,7 +81,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         output += data
         if (!opened && output.includes('◆ [Overview]')) {
           opened = true
-          child.write('u')
+          child.write('\u001b[<35;90;1M')
+          child.write('\u001b[<0;90;1M')
         } else if (!laneHovered && output.includes('Release Observatory · 3 LANES')) {
           laneHovered = true
           setTimeout(() => child.write('\u001b[<35;20;13M'), 100)

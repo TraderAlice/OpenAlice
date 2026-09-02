@@ -502,6 +502,20 @@ not imply maintainer approval of the finished interaction.
   share one source of geometry. This is an autonomous topic decision, not a
   recorded maintainer approval.
 
+### Mission Header Release Control decision
+
+- Leaving version, channel, and update availability as decorated text keeps
+  provenance visible but forces mouse users to discover `u` elsewhere.
+- Adding a dedicated update row would make the action explicit at the cost of
+  another scarce baseline row and duplicate the Release Observatory.
+- The selected model turns the Mission Header's existing provenance tail into
+  a Release Control. Wide layouts expose `[ u ]`; compact layouts keep a `↗`
+  affordance while preserving the full installed version and channel. The
+  renderer publishes the exact truncated segment geometry for hover and click,
+  and activation routes through the existing `u` handler. No network request
+  occurs until the Observatory's explicit Check action. This is an autonomous
+  topic decision, not a recorded maintainer approval.
+
 ### Fixed activity-slot decision
 
 - Keeping the existing append-only feedback stack makes Working, Notice, and
@@ -632,6 +646,8 @@ already large `supervisor-tui.ts` application controller.
   Mission Header that frames brand, release provenance, and clickable navigation.
 - [x] Anchor the active view with a reduced-motion-safe beacon that travels
   along the Mission Header rail instead of animating operational page content.
+- [x] Turn Mission Header release provenance into a responsive whole-segment
+  Release Control backed by the existing Observatory path.
 - [x] Replace expanding feedback rows with a stable single-line activity slot.
 - [x] Replace inline confirmation cards with stable, focused compositor modals.
 - [x] Promote the Command Palette from page replacement to a focused overlay.
@@ -1217,6 +1233,19 @@ already large `supervisor-tui.ts` application controller.
   and root TypeScript pass; the 699-file suite passes (698 passed, 1 skipped;
   6,149 tests passed, 10 skipped). Docker installer smoke passes, and package
   dry-run includes the changed Supervisor controller and theme sources.
+- Mission Header release provenance is now a whole-segment Release Control.
+  Wide frames expose `[ u ]` beside version/channel/update state; compact frames
+  preserve the complete version and channel behind a `↗` affordance. Hover owns
+  the complete rendered tail rather than the keycap alone, and click enters the
+  existing Release Observatory without crossing its explicit Check boundary.
+- Release-Control acceptance passes with 77 focused screen and real-PTY tests.
+  Raw SGR pointer input opened the Observatory from the Header in the release
+  fixture; real Default AliceProject sessions repeated the path at 100×30 and
+  at 46×30 with `NO_COLOR` and motion disabled, then restored terminal modes
+  after cancel and detach. CLI build/typecheck and root TypeScript pass; the
+  699-file suite passes (698 passed, 1 skipped; 6,149 tests passed, 10 skipped).
+  Docker installer smoke passes, and package dry-run includes the changed
+  Supervisor view, controller, and theme sources.
 
 ## Completion Criteria
 

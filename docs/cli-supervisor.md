@@ -298,8 +298,12 @@ path is intentionally parameter-free:
   confirmation;
 - `l` reads the bounded, redacted log tail;
 - `d` runs read-only Doctor checks;
-- `u` opens the responsive Release Observatory: a stable/beta/dev lane map and
-  a selected Channel Brief sit side by side on wide terminals and stack at the
+- `u` opens the responsive Release Observatory. The Mission Header exposes that
+  same path as a responsive Release Control.
+  Wide terminals show `[ u ]` beside version/channel provenance, compact
+  terminals retain a `↗` affordance, and the whole rendered segment owns hover
+  and click rather than only the keycap. The lane map and selected Channel
+  Brief sit side by side on wide terminals and stack at the
   80-column baseline. Pointer movement or a lane click only changes the
   selection; `Enter` or the full `Check` action is the sole network boundary.
   It probes that one channel and, when a candidate is available, can install it

@@ -53,18 +53,38 @@ export interface SupervisorDockView {
   recovery?: boolean
 }
 
+export interface SupervisorHeaderRender {
+  line: string
+  releaseTarget: {
+    startColumn: number
+    endColumn: number
+  }
+}
+
 export function renderSupervisorHeader(
   version: string,
   channel: string,
   width: number,
   notice = '',
 ): string {
+  return renderSupervisorHeaderLayout(version, channel, width, notice).line
+}
+
+export function renderSupervisorHeaderLayout(
+  version: string,
+  channel: string,
+  width: number,
+  notice = '',
+): SupervisorHeaderRender {
   const prefix = '╭─ '
   const suffix = ' ─╮'
   const innerWidth = Math.max(1, width - displayWidth(prefix) - displayWidth(suffix))
   const left = width < 54 ? '◆ OpenAlice' : '◆ OpenAlice Supervisor'
-  const right = `v${version} · ${channel.toUpperCase()}${notice}`
-  const safeRight = truncateDisplayWidth(right, Math.max(1, Math.floor(innerWidth / 2)))
+  const release = `${width >= 72 ? '[ u ]' : '↗'} v${version} · ${channel.toUpperCase()}${notice}`
+  const releaseBudget = width < 54
+    ? Math.max(1, innerWidth - displayWidth(left) - 1)
+    : Math.max(1, Math.floor(innerWidth / 2))
+  const safeRight = truncateDisplayWidth(release, releaseBudget)
   const safeLeft = truncateDisplayWidth(
     left,
     Math.max(1, innerWidth - displayWidth(safeRight) - 1),
@@ -76,7 +96,15 @@ export function renderSupervisorHeader(
   const track = trackWidth >= 3
     ? ` ${'─'.repeat(trackWidth - 2)} `
     : ' '.repeat(trackWidth)
-  return truncateDisplayWidth(`${prefix}${safeLeft}${track}${safeRight}${suffix}`, width)
+  const line = truncateDisplayWidth(`${prefix}${safeLeft}${track}${safeRight}${suffix}`, width)
+  const startColumn = displayWidth(prefix) + displayWidth(safeLeft) + displayWidth(track) + 1
+  return {
+    line,
+    releaseTarget: {
+      startColumn,
+      endColumn: startColumn + displayWidth(safeRight) - 1,
+    },
+  }
 }
 
 export function renderSupervisorHome(

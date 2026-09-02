@@ -157,7 +157,7 @@ import {
 import {
   renderSupervisorCommandBar,
   renderSupervisorDock,
-  renderSupervisorHeader,
+  renderSupervisorHeaderLayout,
   renderSupervisorHome,
   renderSupervisorPanel,
   supervisorCommandTargets,
@@ -2928,6 +2928,8 @@ export class SupervisorScreen implements Component {
   private readonly onMotionDemandChange?: () => void
   private onDetach?: () => void
   private hoveredPanel?: SupervisorPanel
+  private headerReleaseHovered = false
+  private headerReleaseTarget?: { startColumn: number; endColumn: number }
   private navigationTargets: SupervisorNavigationTarget[] = []
   private navigationBeaconColumn?: number
   private hoveredFleetTarget?: SupervisorFleetPointerTarget
@@ -3430,6 +3432,13 @@ export class SupervisorScreen implements Component {
   }
 
   handlePointer(event: SupervisorPointerEvent): boolean {
+    const headerRelease = !this.commandDeckOpen
+      && event.row === 1
+      && this.headerReleaseTarget
+      && event.col >= this.headerReleaseTarget.startColumn
+      && event.col <= this.headerReleaseTarget.endColumn
+      ? this.headerReleaseTarget
+      : undefined
     const hovered = !this.commandDeckOpen && event.row === 2
       ? supervisorNavigationPanelAt(this.navigationTargets, event.col)
       : undefined
@@ -3481,8 +3490,11 @@ export class SupervisorScreen implements Component {
       const helpHoverChanged = helpHover !== this.helpState.hovered
       const homeHover = Boolean(homePrimaryTarget)
       const homeHoverChanged = homeHover !== this.homePrimaryHovered
+      const headerReleaseHover = Boolean(headerRelease)
+      const headerReleaseHoverChanged = headerReleaseHover !== this.headerReleaseHovered
       if (
-        hovered !== this.hoveredPanel
+        headerReleaseHoverChanged
+        || hovered !== this.hoveredPanel
         || fleetHoverChanged
         || commandHoverChanged
         || doctorHoverChanged
@@ -3490,6 +3502,7 @@ export class SupervisorScreen implements Component {
         || helpHoverChanged
         || homeHoverChanged
       ) {
+        this.headerReleaseHovered = headerReleaseHover
         this.hoveredPanel = hovered
         this.hoveredFleetTarget = fleetTarget
         this.hoveredCommandTarget = commandTarget
@@ -3500,6 +3513,10 @@ export class SupervisorScreen implements Component {
         this.requestRender?.()
       }
       return true
+    }
+    if (event.leftClick && headerRelease) {
+      this.headerReleaseHovered = true
+      return this.handleKey('u', (data, key) => data === key)
     }
     if (event.leftClick && hovered) {
       this.hoveredPanel = hovered
@@ -3604,8 +3621,15 @@ export class SupervisorScreen implements Component {
     this.navigationBeaconColumn = navigationBeaconIndex >= 0
       ? navigationBeaconIndex + 1
       : undefined
+    const header = renderSupervisorHeaderLayout(
+      this.snapshot.version,
+      this.snapshot.channel,
+      width,
+      updateBadge,
+    )
+    this.headerReleaseTarget = header.releaseTarget
     const lines = [
-      renderSupervisorHeader(this.snapshot.version, this.snapshot.channel, width, updateBadge),
+      header.line,
       `│ ${navigation.line} │`,
       navigationRail,
       '',
@@ -3748,6 +3772,7 @@ export class SupervisorScreen implements Component {
       this.theme,
       {
         panel: this.snapshot.panel ?? 'overview',
+        headerReleaseHovered: this.headerReleaseHovered,
         hoveredPanel: this.hoveredPanel,
         hoveredCommand: this.hoveredCommandTarget,
         runtimeClass: runtime?.class,
