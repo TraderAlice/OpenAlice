@@ -109,4 +109,43 @@ describe('Supervisor Runtime log presentation', () => {
     expect(rendered.lines.join('\n')).toContain('█')
     expect(rendered.lines.join('\n')).toContain('│')
   })
+
+  it('spends a wide Operational Canvas on additional real events', () => {
+    const many = {
+      entries: Array.from({ length: 20 }, (_, index) => ({ text: `event ${index + 1}` })),
+    }
+    const expanded = renderSupervisorLogs(many, 120, 0, 'all', null, 22)
+
+    expect(expanded.lines).toHaveLength(22)
+    expect(expanded.lines.join('\n')).toContain('1–20/20 · ALL · LATEST')
+    expect(expanded.lines.join('\n')).toContain('› · 20  event 20')
+    expect(expanded.lines.join('\n')).not.toContain('█')
+    expect(expanded.targets).toHaveLength(20)
+    expect(expanded.targets.at(-1)).toEqual({
+      row: 21,
+      startColumn: 2,
+      endColumn: 63,
+      fromEnd: 0,
+    })
+
+    const compact = renderSupervisorLogs(many, 80, 0, 'all')
+    expect(compact.targets).toHaveLength(7)
+    expect(compact.lines.join('\n')).toContain('█')
+  })
+
+  it('anchors a truthful Signal Scope action at the bottom of a wide canvas', () => {
+    const expanded = renderSupervisorLogs({ entries: [] }, 120, 0, 'all', null, 22)
+    const compact = renderSupervisorLogs({ entries: [] }, 80, 0, 'all', null, 22)
+    const targets = supervisorCommandTargets(expanded.lines)
+
+    expect(expanded.lines).toHaveLength(22)
+    expect(expanded.lines[1]).toContain('○  SIGNAL QUIET')
+    expect(expanded.lines[4]).toContain('SAFETY')
+    expect(expanded.lines.join('\n')).toContain('· ───── ○ ───── ·')
+    expect(expanded.lines[20]).toContain('◆ [ l ] Reload Runtime snapshot')
+    expect(targets).toEqual([
+      expect.objectContaining({ row: 21, label: 'l', primary: true }),
+    ])
+    expect(compact.lines).toHaveLength(7)
+  })
 })

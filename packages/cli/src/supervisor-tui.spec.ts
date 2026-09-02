@@ -965,6 +965,50 @@ describe('Supervisor TUI screen', () => {
     expect(constrained.join('\n')).toContain('█')
   })
 
+  it('gives wide Logs and Doctor an owned Operational Canvas', () => {
+    let viewportHeight = 32
+    const logsScreen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'logs',
+      runtime: { class: 'running', endpoints: {} },
+      logs: {
+        entries: Array.from({ length: 20 }, (_, index) => ({ text: `event ${index + 1}` })),
+      },
+    }, {
+      getViewportHeight: () => viewportHeight,
+      motionEnabled: false,
+    })
+    const expandedLogs = logsScreen.render(120).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
+    expect(expandedLogs).toHaveLength(32)
+    expect(expandedLogs.join('\n')).toContain('1–20/20 · ALL · LATEST')
+    expect(expandedLogs.join('\n')).not.toContain('█')
+    expect(expandedLogs.at(-3)).toContain('CONTROL CONSOLE')
+
+    viewportHeight = 20
+    const constrainedLogs = logsScreen.render(120).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
+    expect(constrainedLogs).toHaveLength(20)
+    expect(constrainedLogs.join('\n')).toContain('11–20/20 · ALL · LATEST')
+    expect(constrainedLogs.join('\n')).toContain('█')
+
+    viewportHeight = 32
+    const doctorScreen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'doctor',
+      runtime: { class: 'running', endpoints: {} },
+      doctor: null,
+    }, {
+      getViewportHeight: () => viewportHeight,
+      motionEnabled: false,
+    })
+    const standbyDoctor = doctorScreen.render(120).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
+    expect(standbyDoctor).toHaveLength(32)
+    expect(standbyDoctor[24]).toContain('◆ [ d ] Run Runtime Doctor')
+    expect(standbyDoctor[25]).toContain('╰')
+    expect(standbyDoctor.at(-3)).toContain('CONTROL CONSOLE')
+  })
+
   it('styles the application frame and routes pointer tabs and Fleet wheel input', () => {
     const actions: SupervisorAction[] = []
     const activated: string[] = []

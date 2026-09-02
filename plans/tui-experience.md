@@ -653,6 +653,27 @@ not imply maintainer approval of the finished interaction.
   in the elastic stage. This is an autonomous topic decision, not recorded
   maintainer approval.
 
+### Operational Canvas decision
+
+- Stretching every Supervisor page to the viewport would produce one uniform
+  silhouette, but Help, Setup, and bounded modal workflows would gain empty
+  framed regions with no additional information or interaction meaning.
+- Keeping Logs and Doctor compact while enlarging only the elastic stage would
+  preserve their current implementation, but a live 120x32 comparison with OMP
+  v17.3.4 shows the old CLI break clearly: the operational surface ends after
+  seven rows while the rest of the terminal becomes unowned background.
+- The selected model gives only Logs and Doctor an OMP-inspired Operational
+  Canvas at 100 columns and wider. Populated readers spend available height on
+  additional real bounded events or checks, with render windows, scroll rails,
+  and pointer targets sharing the final count. Standby, quiet, and filtered-
+  clear Signal Scopes instead keep their truthful facts top-anchored and their
+  existing primary action bottom-anchored inside the same framed surface. The
+  surplus quiet region carries only a centered, non-interactive echo of that
+  truthful state glyph; it does not imply an event, check, or progress value.
+  The 80x24, narrow, and constrained-height contracts retain their current
+  compact density. This is an autonomous topic decision, not recorded
+  maintainer approval.
+
 ### Bottom Control Console decision
 
 - Leaving the footer directly after page content preserves the current natural
@@ -1003,6 +1024,10 @@ already large `supervisor-tui.ts` application controller.
   Control Console with stateful OMP-style top-rail feedback.
 - [x] Let wide Fleet spend available height on additional real inventory rows
   before showing a scroll rail or leaving the remainder to the elastic stage.
+- [x] Give populated Logs and Doctor an Operational Canvas that spends wide
+  viewport height on additional real events and checks.
+- [x] Let truthful Logs and Doctor Signal Scopes own the same wide canvas with
+  top-anchored facts and a bottom-anchored primary action.
 - [x] Replace the disconnected title/divider/tabs stack with a same-height
   Mission Header that frames brand, release provenance, and clickable navigation.
 - [x] Anchor the active view with a reduced-motion-safe beacon that travels
@@ -1907,6 +1932,23 @@ already large `supervisor-tui.ts` application controller.
   passes (698 passed, 1 skipped; 6,176 tests passed, 10 skipped). Docker
   installer smoke passes without Node, npm, pnpm, Bun, or an Agent Runtime,
   and package dry-run contains both changed Supervisor Fleet/TUI sources.
+- A fresh live 120x32 comparison against OMP v17.3.4 exposed the next old-CLI
+  seam: quiet Logs and Doctor cards ended after seven rows and abandoned most
+  of the terminal as unowned background. Their wide Operational Canvas now
+  owns that height. Populated readers reveal additional real events or checks;
+  truthful empty scopes retain top facts, a centered non-interactive state echo,
+  and their existing action on the lower frame edge. The 80x24, narrow, and
+  constrained contracts keep their compact density.
+- Operational-Canvas acceptance passes with 114 focused view, screen, and
+  real-PTY tests. The isolated 120x32 PTY showed all twenty Runtime events
+  without a rail, hovered and clicked event 19 on row 24, updated the Inspector,
+  and restored terminal modes. A real truecolor 120x32 quiet Logs session kept
+  the Context Tip and Control Console below the owned frame; raw mouse hover and
+  click on the relocated row-25 Reload action incremented the real fixture read
+  count from one to two. CLI build/typecheck and root TypeScript pass; the
+  699-file suite passes (698 passed, 1 skipped; 6,182 tests passed, 10 skipped).
+  Docker installer smoke passes without Node, npm, pnpm, Bun, or an Agent
+  Runtime, and package dry-run contains all changed Supervisor sources.
 
 ## Completion Criteria
 

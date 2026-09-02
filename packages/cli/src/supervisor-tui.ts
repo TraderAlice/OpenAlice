@@ -242,6 +242,7 @@ const MACHINE_SCOPE = 'Machine defaults'
 const WIDE_OVERVIEW_MAX_HEIGHT = 17
 const WIDE_OVERVIEW_RESERVED_CHROME_HEIGHT = 6
 const FLEET_VIEWPORT_RESERVED_HEIGHT = 13
+const WIDE_OPERATIONAL_CANVAS_RESERVED_CHROME_HEIGHT = 6
 
 interface RuntimeSummary {
   class?: string
@@ -3760,6 +3761,14 @@ export class SupervisorScreen implements Component {
     this.helpTargets = []
     this.homePrimaryTarget = undefined
     this.homeHotspotTargets = []
+    const operationalCanvasHeight = width >= 100 && Number.isFinite(viewportHeight)
+      ? Math.max(
+          0,
+          Math.floor(viewportHeight ?? 0)
+            - lines.length
+            - WIDE_OPERATIONAL_CANVAS_RESERVED_CHROME_HEIGHT,
+        )
+      : undefined
     if (this.snapshot.panel === 'fleet' && this.snapshot.fleet) {
       this.fleetVisibleRows = width >= 72 && Number.isFinite(viewportHeight)
         ? Math.max(
@@ -3783,6 +3792,7 @@ export class SupervisorScreen implements Component {
         this.logsFromEnd,
         this.logFilter,
         this.hoveredLogFromEnd,
+        operationalCanvasHeight,
       )
       const rowOffset = lines.length
       this.logTargets = logs.targets.map((target) => ({
@@ -3795,7 +3805,12 @@ export class SupervisorScreen implements Component {
         this.doctorState,
         this.snapshot.doctor,
       )
-      const doctor = renderSupervisorDoctor(this.snapshot.doctor, this.doctorState, width)
+      const doctor = renderSupervisorDoctor(
+        this.snapshot.doctor,
+        this.doctorState,
+        width,
+        operationalCanvasHeight,
+      )
       const rowOffset = lines.length
       this.doctorTargets = doctor.targets.map((target) => ({
         ...target,

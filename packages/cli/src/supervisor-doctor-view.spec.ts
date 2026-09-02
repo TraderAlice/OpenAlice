@@ -106,4 +106,52 @@ describe('Supervisor Doctor inspector', () => {
     expect(output).toContain('█')
     expect(output).toContain('│')
   })
+
+  it('spends a wide Operational Canvas on additional real checks', () => {
+    const checks = Array.from({ length: 20 }, (_, index) => ({
+      status: 'pass',
+      summary: `Check ${index + 1}`,
+      detail: 'Verified.',
+    }))
+    const expanded = renderSupervisorDoctor(
+      { overall: 'pass', checks },
+      { selected: 19, hovered: null },
+      120,
+      22,
+    )
+
+    expect(expanded.lines).toHaveLength(22)
+    expect(expanded.lines.join('\n')).toContain('1–20/20')
+    expect(expanded.lines.join('\n')).toContain('› ✓ Check 20')
+    expect(expanded.lines.join('\n')).not.toContain('█')
+    expect(expanded.targets).toHaveLength(20)
+    expect(expanded.targets.at(-1)).toEqual({
+      row: 21,
+      startColumn: 2,
+      endColumn: 54,
+      index: 19,
+    })
+
+    const compact = renderSupervisorDoctor(
+      { overall: 'pass', checks },
+      { selected: 19, hovered: null },
+      80,
+    )
+    expect(compact.targets).toHaveLength(5)
+    expect(compact.lines.join('\n')).toContain('█')
+  })
+
+  it('anchors a truthful Diagnostic Radar action at the bottom of a wide canvas', () => {
+    const expanded = renderSupervisorDoctor(null, createSupervisorDoctorState(), 120, 22)
+    const targets = supervisorCommandTargets(expanded.lines)
+
+    expect(expanded.lines).toHaveLength(22)
+    expect(expanded.lines[1]).toContain('◇  DOCTOR STANDBY')
+    expect(expanded.lines[4]).toContain('WRITES')
+    expect(expanded.lines.join('\n')).toContain('· ───── ◇ ───── ·')
+    expect(expanded.lines[20]).toContain('◆ [ d ] Run Runtime Doctor')
+    expect(targets).toEqual([
+      expect.objectContaining({ row: 21, label: 'd', primary: true }),
+    ])
+  })
 })

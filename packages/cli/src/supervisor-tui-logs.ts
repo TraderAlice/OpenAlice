@@ -63,6 +63,7 @@ export function renderSupervisorLogs(
   fromEnd: number,
   filter: SupervisorLogFilter,
   hoveredFromEnd: number | null = null,
+  targetHeight?: number,
 ): SupervisorLogRender {
   if (!logs) {
     return {
@@ -77,7 +78,7 @@ export function renderSupervisorLogs(
           { label: 'Safety', value: 'Bounded · redacted · terminal-safe', compactValue: 'bounded · redacted' },
         ],
         action: { key: 'l', label: 'Load bounded Runtime tail', compactLabel: 'Load Runtime tail' },
-      }, width),
+      }, width, targetHeight),
       targets: [],
     }
   }
@@ -95,7 +96,7 @@ export function renderSupervisorLogs(
           { label: 'Safety', value: 'Bounded · redacted · terminal-safe', compactValue: 'bounded · redacted' },
         ],
         action: { key: 'l', label: 'Reload Runtime snapshot', compactLabel: 'Reload snapshot' },
-      }, width),
+      }, width, targetHeight),
       targets: [],
     }
   }
@@ -116,7 +117,7 @@ export function renderSupervisorLogs(
           { label: 'Safety', value: 'Bounded · redacted · terminal-safe', compactValue: 'bounded · redacted' },
         ],
         action: { key: 'f', label: 'Change severity lens', compactLabel: 'Change lens' },
-      }, width),
+      }, width, targetHeight),
       targets: [],
     }
   }
@@ -125,7 +126,13 @@ export function renderSupervisorLogs(
   const selectedIndex = entries.length - 1 - safeFromEnd
   const selected = entries[selectedIndex]!
   const wide = width >= 100
-  const visible = wide ? 10 : width < 60 ? 4 : 7
+  const baselineVisible = wide ? 10 : width < 60 ? 4 : 7
+  const targetBodyRows = wide && Number.isFinite(targetHeight)
+    ? Math.max(baselineVisible, Math.floor(targetHeight ?? 0) - 2)
+    : baselineVisible
+  const visible = targetBodyRows > baselineVisible
+    ? Math.max(baselineVisible, targetBodyRows - (logs.truncated ? 1 : 0))
+    : baselineVisible
   const start = windowStart(selectedIndex, entries.length, visible)
   const end = Math.min(entries.length, start + visible)
   const numberWidth = String(sourceEntries.length).length

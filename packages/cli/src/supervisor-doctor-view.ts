@@ -86,6 +86,7 @@ export function renderSupervisorDoctor(
   report: SupervisorDoctorReport | null | undefined,
   state: SupervisorDoctorState,
   width: number,
+  targetHeight?: number,
 ): SupervisorDoctorRender {
   if (!report) {
     return {
@@ -112,7 +113,7 @@ export function renderSupervisorDoctor(
           },
         ],
         action: { key: 'd', label: 'Run Runtime Doctor', compactLabel: 'Run Doctor' },
-      }, width),
+      }, width, targetHeight),
       targets: [],
     }
   }
@@ -138,14 +139,17 @@ export function renderSupervisorDoctor(
           },
         ],
         action: { key: 'd', label: 'Rerun Runtime Doctor', compactLabel: 'Rerun Doctor' },
-      }, width),
+      }, width, targetHeight),
       targets: [],
     }
   }
 
   const normalized = normalizeSupervisorDoctorState(state, report)
   const wide = width >= 100
-  const visible = wide ? 10 : width < 60 ? 4 : 5
+  const baselineVisible = wide ? 10 : width < 60 ? 4 : 5
+  const visible = wide && Number.isFinite(targetHeight)
+    ? Math.max(baselineVisible, Math.floor(targetHeight ?? 0) - 2)
+    : baselineVisible
   const start = windowStart(normalized.selected, checks.length, visible)
   const end = Math.min(checks.length, start + visible)
   const listRows = withSupervisorScrollRail(checks.slice(start, end).map((check, relativeIndex) => {

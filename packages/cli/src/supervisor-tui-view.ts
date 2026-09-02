@@ -549,6 +549,7 @@ export function renderSupervisorContextTip(
 export function renderSupervisorSignalScope(
   view: SupervisorSignalScopeView,
   width: number,
+  targetHeight?: number,
 ): string[] {
   const compact = width < 60
   const rows = [
@@ -560,7 +561,33 @@ export function renderSupervisorSignalScope(
       ? view.action.compactLabel ?? view.action.label
       : view.action.label}`,
   ]
+  const naturalHeight = rows.length + 2
+  const quietRows = width >= 100 && Number.isFinite(targetHeight)
+    ? Math.max(0, Math.floor(targetHeight ?? naturalHeight) - naturalHeight)
+    : 0
+  if (quietRows > 0) {
+    const quietField = Array.from({ length: quietRows }, () => '')
+    if (!compact && quietRows >= 7) {
+      const echo = signalScopeEcho(view.glyph, Math.max(1, width - 4))
+      const start = Math.floor((quietRows - echo.length) / 2)
+      quietField.splice(start, echo.length, ...echo)
+    }
+    rows.splice(-1, 0, ...quietField)
+  }
   return renderSupervisorPanel(view.title, view.meta, rows, width)
+}
+
+function signalScopeEcho(glyph: string, width: number): string[] {
+  return [
+    centerDisplayText('·', width),
+    centerDisplayText(`· ───── ${glyph} ───── ·`, width),
+    centerDisplayText('·', width),
+  ]
+}
+
+function centerDisplayText(value: string, width: number): string {
+  const safe = truncateDisplayWidth(value, Math.max(1, width))
+  return `${' '.repeat(Math.max(0, Math.floor((width - displayWidth(safe)) / 2)))}${safe}`
 }
 
 export function supervisorCommandTargets(lines: string[]): SupervisorCommandTarget[] {

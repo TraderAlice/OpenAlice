@@ -363,6 +363,66 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
 
+  it('uses a 120x32 Operational Canvas for twenty clickable Runtime events', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-event-canvas-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [eventLensFixtureEntry], {
+      cols: 120,
+      rows: 32,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_FIXTURE_EVENT_ROWS: '20',
+        OPENALICE_TUI_MOTION: '0',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    let expandedFrame = ''
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let hovered = false
+      let clicked = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Event Canvas timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!opened && output.includes('[ l ] Logs')) {
+          opened = true
+          child.write('l')
+        } else if (!hovered && output.includes('1–20/20 · ALL · LATEST')) {
+          hovered = true
+          expandedFrame = output.slice(output.lastIndexOf('Event stream · 1–20/20'))
+          child.write('\u001b[<35;20;24M')
+        } else if (!clicked && output.includes('» · 19  fixture event 19')) {
+          clicked = true
+          child.write('\u001b[<0;20;24M')
+        } else if (clicked && output.includes('Event Lens · LINE 19 · INFO · TEXT')) {
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && clicked) resolve(output)
+        else reject(new Error(`Supervisor Event Canvas exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(stripSgr(expandedFrame)).toContain('1–20/20 · ALL · LATEST')
+    expect(stripSgr(expandedFrame)).not.toContain('█')
+    expect(transcript).toContain('» · 19  fixture event 19')
+    expect(transcript).toContain('› · 19  fixture event 19')
+    expect(transcript).toContain('Event Lens · LINE 19 · INFO · TEXT')
+    expect(transcript).toContain('CONTROL CONSOLE')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
   it('hovers and clicks the Launchpad primary surface outside its keycap', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-launchpad-pointer-'))
     temporaryPaths.push(isolatedHome)

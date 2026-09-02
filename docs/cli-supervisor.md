@@ -764,6 +764,15 @@ over a redacted snapshot, not an unbounded file follower. Follow, pause, and
 component filtering remain later work and must reuse this bounded reader.
 When the stream exceeds its responsive window, its final content column renders
 a proportional `│` track and `█` thumb that follows the same selected window.
+At 100 columns and wider, a known terminal height turns Logs into an Operational
+Canvas: the compact ten-event baseline expands only as far as the loaded,
+filtered snapshot and available viewport permit. The Event stream, Lens height,
+scroll rail, and pointer rows consume that same final window. A Signal Scope has
+no events to invent, so it instead keeps its truthful rail and facts at the top
+and anchors the existing `l` or `f` action at the bottom of the owned frame.
+A centered, non-interactive state-glyph echo gives that quiet region a visual
+focus without claiming an event, count, progress value, or additional control.
+Constrained and narrower terminals retain the compact layout.
 
 ## Doctor
 
@@ -806,6 +815,12 @@ that emits the existing Doctor key; neither performs a repair or introduces a
 second diagnostic path.
 An overflowing checklist uses the same proportional `│`/`█` rail as Event Lens
 and Fleet; the rail is positional evidence rather than another control.
+At 100 columns and wider, a known terminal height applies the same Operational
+Canvas rule independently to Doctor: the ten-check baseline may expand to show
+more real checks, while the Inspector pads only to keep the two owning frames
+aligned. `DOCTOR STANDBY` and `NO CHECKS` contain their surplus quiet region
+inside the Radar frame and keep the existing `d` action on its lower edge.
+No additional check, evidence, repair affordance, or write path is synthesized.
 
 ## Shell Completion
 
