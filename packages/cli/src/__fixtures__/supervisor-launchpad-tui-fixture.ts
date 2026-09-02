@@ -10,6 +10,7 @@ let disconnects = 0
 let probes = 0
 let running = process.env['OPENALICE_TUI_FIXTURE_RUNTIME'] === 'running'
 const startDelayMs = Number(process.env['OPENALICE_TUI_FIXTURE_START_DELAY_MS'] ?? 0)
+const startFailure = process.env['OPENALICE_TUI_FIXTURE_START_FAILURE'] === '1'
 const remote = process.env['OPENALICE_TUI_FIXTURE_REMOTE'] === '1'
 const healthFlap = process.env['OPENALICE_TUI_FIXTURE_HEALTH'] === 'flap'
 const fleetRows = Number(process.env['OPENALICE_TUI_FIXTURE_FLEET_ROWS'] ?? 0)
@@ -39,6 +40,7 @@ const exitCode = await runSupervisorTui({}, {
     if (startDelayMs > 0) {
       await new Promise<void>((resolve) => setTimeout(resolve, startDelayMs))
     }
+    if (startFailure) throw new Error('Fixture Runtime start failed')
     running = true
   },
   open: async () => { opens += 1 },

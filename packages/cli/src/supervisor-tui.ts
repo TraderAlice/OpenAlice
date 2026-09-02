@@ -5040,6 +5040,7 @@ export class SupervisorScreen implements Component {
             && (selectedFleetMachine(this.snapshot.fleet)?.key !== this.snapshot.activeTarget.machineKey
               || selectedFleetProject(this.snapshot.fleet)?.key !== this.snapshot.activeTarget.projectKey),
           inputLocked: Boolean(this.snapshot.busy),
+          launchFailure: this.snapshot.launchFlight?.status === 'failed',
           recovery: isConfigRecovery(this.snapshot),
           itemCount: this.snapshot.panel === 'logs'
             ? supervisorFilteredLogCount(this.snapshot.logs, this.logFilter)

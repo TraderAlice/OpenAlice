@@ -191,6 +191,7 @@ describe('Supervisor TUI screen', () => {
     expect(failedFrame).toContain('RECOVERABLE FAILURE')
     expect(failedFrame).toContain('[ Enter ] Retry selected target')
     expect(failedFrame).toContain('[ Esc ] Back to targets')
+    expect(failedFrame).toContain('Enter retries; Esc returns to targets')
     expect(screen.handleEscape()).toBe(true)
     expect(screen.snapshot.launchFlight).toBeNull()
     expect(screen.render(100).join('\n')).toContain('OPENALICE LAUNCH')
@@ -951,6 +952,7 @@ describe('Supervisor TUI screen', () => {
     const stopped = renderSupervisorContextTip({ panel: 'overview', runtimeState: 'absent' }, 100)
     const recovery = renderSupervisorContextTip({ panel: 'overview', recovery: true }, 100)
     const locked = renderSupervisorContextTip({ panel: 'fleet', inputLocked: true }, 100)
+    const launchFailure = renderSupervisorContextTip({ panel: 'fleet', launchFailure: true }, 100)
 
     expect(fleet).toContain('First click focuses a pane')
     expect(activeFleet).toContain('Enter returns Home')
@@ -967,6 +969,7 @@ describe('Supervisor TUI screen', () => {
     expect(recovery).toContain('only safe Update and Detach routes')
     expect(locked).toContain('Operation owns input until ready')
     expect(locked).toContain('q detaches this TUI')
+    expect(launchFailure).toContain('Enter retries; Esc returns to targets')
     expect(supervisorCommandTargets([
       fleet,
       activeFleet,
@@ -980,6 +983,7 @@ describe('Supervisor TUI screen', () => {
       stopped,
       recovery,
       locked,
+      launchFailure,
     ])).toEqual([])
 
     const compact = renderSupervisorContextTip({ panel: 'fleet' }, 46)

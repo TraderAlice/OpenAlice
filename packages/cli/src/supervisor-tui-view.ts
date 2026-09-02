@@ -107,6 +107,7 @@ export interface SupervisorContextTipView {
   activeSelection?: boolean
   switchSelection?: boolean
   inputLocked?: boolean
+  launchFailure?: boolean
   recovery?: boolean
   itemCount?: number
 }
@@ -669,6 +670,8 @@ export function renderSupervisorContextTip(
     ? 'Recovery exposes only safe Update and Detach routes.'
     : view.inputLocked
       ? 'Operation owns input until ready; q detaches this TUI.'
+    : view.launchFailure
+      ? 'Enter retries; Esc returns to targets; q detaches this TUI.'
     : view.panel === 'fleet'
       ? view.launcher
         ? 'Enter runs Next; ↑↓ selects; Tab/←→ changes pane; click again activates.'

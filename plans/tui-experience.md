@@ -3159,9 +3159,14 @@ already large `supervisor-tui.ts` application controller.
 - Real 120x32 and 80x24 delayed-start captures verify the current stage,
   animated working rail, one-line Tip, Operation Active state, and Detach route
   remain simultaneously visible without advertising disabled commands.
-- Input-ownership acceptance passes through 95 focused Fleet and screen tests,
-  all 52 real-PTY cases including Briefing -> Flight -> Home, and the complete
-  CLI suite (63 files, 634 tests). CLI typecheck and build also pass.
+- The matching injected-failure captures exposed one remaining stale launcher
+  Tip after busy state ended. Recoverable Failure now teaches its actual
+  content-owned Enter Retry, Esc Back, and `q` Detach routes. Its red failure
+  stage, green completed stage, exact error prefix, and selected route stay
+  visible together; returning with Esc restores the unchanged Launcher.
+- In-flight-and-failure acceptance passes through 95 focused Fleet and screen
+  tests, all 53 real-PTY cases including failure -> Back -> Launcher, and the
+  complete CLI suite (63 files, 635 tests). CLI typecheck and build also pass.
 
 ## Completion Criteria
 

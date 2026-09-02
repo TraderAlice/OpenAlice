@@ -140,6 +140,69 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?25h')
   }, 12_000)
 
+  it('recovers from a failed local launch through Retry-or-Back guidance', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-launch-failure-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_START_VIEW: 'connect',
+        OPENALICE_TUI_BOOT: '0',
+        OPENALICE_TUI_MOTION: '0',
+        OPENALICE_TUI_FIXTURE_FLEET_ROWS: '1',
+        OPENALICE_TUI_FIXTURE_START_FAILURE: '1',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let stage = 0
+      let failureOffset = 0
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor launch failure timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        const plain = stripSgr(output)
+        if (stage === 0 && plain.includes('OPENALICE LAUNCH · SELECT → START → CONNECT')) {
+          stage = 1
+          child.write('\r')
+        } else if (stage === 1 && plain.includes('RECOVERABLE FAILURE')) {
+          stage = 2
+          failureOffset = plain.lastIndexOf('Launch Flight Recorder')
+          child.write('\u001b')
+        } else if (stage === 2
+          && plain.slice(failureOffset).includes('OPENALICE LAUNCH · SELECT → START → CONNECT')) {
+          stage = 3
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && stage === 3) resolve(output)
+        else reject(new Error(`Supervisor launch failure exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    const plain = stripSgr(transcript)
+    expect(plain).toContain('× RECOVERABLE FAILURE · This computer → Default AliceProject')
+    expect(plain).toContain('× 02  Prepare and start Runtime · FAILED')
+    expect(plain).toContain('Starting Runtime failed: Fixture Runtime…')
+    expect(plain).toContain('[ Enter ] Retry selected target')
+    expect(plain).toContain('[ Esc ] Back to targets')
+    expect(plain).toContain('Enter retries; Esc returns to targets; q detaches this TUI.')
+    expect(plain).toContain('FIXTURE_RESULT starts=1 opens=0 loads=0 diagnoses=0')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
   it('opens a stopped AliceProject in the connection-first Launcher by default', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-launcher-'))
     temporaryPaths.push(isolatedHome)
