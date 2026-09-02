@@ -82,6 +82,7 @@ export interface SupervisorSignalScopeView {
 
 export interface SupervisorDockView {
   panel: string
+  focusTask?: string
   projectName?: string
   runtimeState?: string
   pulse?: boolean
@@ -534,7 +535,7 @@ export function renderSupervisorDock(
     : `[ / ] Commands${breadcrumb}[ q ] Detach`
   if (width < 60) return commandSpine(controls, '', width)
 
-  const panel = view.panel.toUpperCase()
+  const panel = (view.focusTask ?? view.panel).toUpperCase()
   if (view.recovery) {
     return commandSpine(controls, `! RECOVERY${breadcrumb}${panelBadge(panel)}`, width)
   }
@@ -895,6 +896,10 @@ function panelBadge(panel: string): string {
   if (panel === 'LOGS') return '≋ LOGS'
   if (panel === 'DOCTOR') return '✦ DOCTOR'
   if (panel === 'HELP') return '? HELP'
+  if (panel === 'SETUP') return '◆ SETUP'
+  if (panel === 'SOURCE') return '◆ SOURCE'
+  if (panel === 'PROJECTS') return '◆ PROJECTS'
+  if (panel === 'RELEASE') return '◆ RELEASE'
   return panel
 }
 

@@ -4,6 +4,7 @@ export type SupervisorNavigationPanel = 'fleet' | 'overview' | 'logs' | 'doctor'
 
 export interface SupervisorNavigationView {
   selected: SupervisorNavigationPanel
+  focusTask?: string
   recovery?: boolean
   machineCount?: number
   logCount?: number
@@ -41,13 +42,15 @@ export function renderSupervisorNavigation(
 ): SupervisorNavigationLayout {
   const items = navigationItems(view)
   const variants = ['wide', 'compact', 'minimal'] as const
+  const selected = view.focusTask ? undefined : view.selected
+  const focus = view.focusTask ? `◆ FOCUS · ${view.focusTask.toUpperCase()}` : ''
   const variant = variants.find((candidate) => (
-    displayWidth(renderItems(items, view.selected, candidate)) <= width
+    displayWidth(renderItems(items, selected, candidate)) + (focus ? displayWidth(focus) + 2 : 0) <= width
   )) ?? 'minimal'
   const targets: SupervisorNavigationTarget[] = []
   let column = 1
   const segments = items.map((item) => {
-    const segment = renderItem(item, view.selected, variant)
+    const segment = renderItem(item, selected, variant)
     const segmentWidth = displayWidth(segment)
     const visibleWidth = Math.max(0, Math.min(segmentWidth, width - column + 1))
     if (visibleWidth > 0) {
@@ -61,8 +64,12 @@ export function renderSupervisorNavigation(
     return segment
   })
   const content = truncateDisplayWidth(segments.join(SEPARATOR), width)
+  const focusGap = focus ? Math.max(1, width - displayWidth(content) - displayWidth(focus)) : 0
+  const line = focus
+    ? truncateDisplayWidth(`${content}${' '.repeat(focusGap)}${focus}`, width)
+    : content
   return {
-    line: content.padEnd(width, ' '),
+    line: line.padEnd(width, ' '),
     targets,
   }
 }
@@ -78,7 +85,7 @@ export function supervisorNavigationPanelAt(
 
 function renderItems(
   items: NavigationItem[],
-  selected: SupervisorNavigationPanel,
+  selected: SupervisorNavigationPanel | undefined,
   variant: 'wide' | 'compact' | 'minimal',
 ): string {
   return items.map((item) => renderItem(item, selected, variant)).join(SEPARATOR)
@@ -86,7 +93,7 @@ function renderItems(
 
 function renderItem(
   item: NavigationItem,
-  selected: SupervisorNavigationPanel,
+  selected: SupervisorNavigationPanel | undefined,
   variant: 'wide' | 'compact' | 'minimal',
 ): string {
   const label = item[variant]

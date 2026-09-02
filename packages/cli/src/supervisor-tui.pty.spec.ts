@@ -188,14 +188,14 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           child.write('\u001b[<0;90;1M')
         } else if (!laneHovered && output.includes('Release Observatory · 3 LANES')) {
           laneHovered = true
-          setTimeout(() => child.write('\u001b[<35;20;13M'), 100)
+          setTimeout(() => child.write('\u001b[<35;20;7M'), 100)
         } else if (!laneSelected && output.includes('│ › Dev')) {
           laneSelected = true
-          child.write('\u001b[<0;20;13M')
+          child.write('\u001b[<0;20;7M')
           setTimeout(() => {
-            child.write('\u001b[<35;70;16M')
+            child.write('\u001b[<35;70;10M')
             setTimeout(() => {
-              child.write('\u001b[<0;70;16M')
+              child.write('\u001b[<0;70;10M')
               setTimeout(() => child.write('q'), 300)
             }, 100)
           }, 100)
@@ -1205,10 +1205,10 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           child.write('p')
         } else if (!hovered && output.includes('Setup Studio · Default AliceProject') && output.includes('Cycle value')) {
           hovered = true
-          child.write('\u001b[<35;75;15M')
+          child.write('\u001b[<35;75;9M')
         } else if (!clicked && output.includes('› [ Enter ] Cycle value')) {
           clicked = true
-          child.write('\u001b[<0;75;15M')
+          child.write('\u001b[<0;75;9M')
         } else if (!closed && clicked && output.includes('Current · Machine defaults')) {
           closed = true
           child.write('\u001b')
@@ -1758,8 +1758,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           submittedInvalidPath = true
           child.write('\u0005\u0015/definitely/not/openalice')
           setTimeout(() => {
-            child.write('\u001b[<35;63;14M')
-            setTimeout(() => child.write('\u001b[<0;63;14M'), 100)
+            child.write('\u001b[<35;63;10M')
+            setTimeout(() => child.write('\u001b[<0;63;10M'), 100)
           }, 100)
         } else if (!cancelledPrompt && output.includes('Could not use that checkout')) {
           cancelledPrompt = true
@@ -1965,8 +1965,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           submittedInvalidPort = true
           child.write('99999')
           setTimeout(() => {
-            child.write('\u001b[<35;65;15M')
-            setTimeout(() => child.write('\u001b[<0;65;15M'), 300)
+            child.write('\u001b[<35;65;10M')
+            setTimeout(() => child.write('\u001b[<0;65;10M'), 300)
           }, 100)
         } else if (
           !submittedPort
@@ -1976,8 +1976,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           submittedPort = true
           child.write('\u0005\u001549001')
           setTimeout(() => {
-            child.write('\u001b[<35;65;15M')
-            setTimeout(() => child.write('\u001b[<0;65;15M'), 300)
+            child.write('\u001b[<35;65;10M')
+            setTimeout(() => child.write('\u001b[<0;65;10M'), 300)
           }, 100)
         } else if (
           !closedSettings
@@ -2153,8 +2153,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           submittedName = true
           child.write('research')
           setTimeout(() => {
-            child.write('\u001b[<35;60;17M')
-            setTimeout(() => child.write('\u001b[<0;60;17M'), 100)
+            child.write('\u001b[<35;60;10M')
+            setTimeout(() => child.write('\u001b[<0;60;10M'), 100)
           }, 100)
         } else if (
           !acceptedHome
@@ -2162,8 +2162,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           && output.includes('Complete home')
         ) {
           acceptedHome = true
-          child.write('\u001b[<35;64;17M')
-          setTimeout(() => child.write('\u001b[<0;64;17M'), 100)
+          child.write('\u001b[<35;64;10M')
+          setTimeout(() => child.write('\u001b[<0;64;10M'), 100)
         } else if (
           !reopenedProjects
           && output.includes('Created and selected AliceProject Research.')
@@ -2335,17 +2335,17 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           && output.includes('Research')
         ) {
           rowHovered = true
-          child.write('\u001b[<35;20;11M')
+          child.write('\u001b[<35;20;6M')
         } else if (
           !actionHovered
           && output.includes('› Research')
           && output.includes('Inspector · 2/3')
         ) {
           actionHovered = true
-          child.write('\u001b[<35;75;15M')
+          child.write('\u001b[<35;75;10M')
         } else if (!actionClicked && output.includes('› [ Enter ] Select')) {
           actionClicked = true
-          child.write('\u001b[<0;75;15M')
+          child.write('\u001b[<0;75;10M')
         } else if (
           !detached
           && output.includes('Selected AliceProject Research; future bare starts use it.')

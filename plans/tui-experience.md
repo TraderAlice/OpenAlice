@@ -404,6 +404,25 @@ not imply maintainer approval of the finished interaction.
   and adapts hover, wheel, and click into each existing component’s keyboard
   state machine. No lifecycle or configuration action gains a second path.
 
+### Secondary-task workspace decision
+
+- Keeping Setup, Source, AliceProject, and Release as centered overlays preserves
+  their current implementation, but the Overview remains visible through every
+  unused row and around both pane edges. At a 120x32 terminal this creates
+  collisions between unrelated cards and makes a polished task surface read as
+  a dialog pasted onto an older dashboard.
+- Enlarging each overlay independently would hide more of the collision, but
+  leave four subtly different origins, margins, and resize behaviors.
+- Replacing the whole Supervisor with a second full-screen application for each
+  task would provide isolation at the cost of duplicated navigation, terminal
+  lifecycle, and pointer ownership. The selected model is therefore one shared
+  Focus Workspace: at 100x28 and above, the active task owns every row between
+  the persistent Mission Header and Control Console, blank surplus rows are
+  deliberately cleared, and the existing renderer and input state machine are
+  composed inside that stage. Smaller terminals retain the bounded responsive
+  task sheet so complete stacked content is not clipped. This is an autonomous
+  topic decision, not a recorded maintainer approval.
+
 ### Setup Studio decision
 
 - Recoloring the existing single-column `SettingsList` would retain its proven
@@ -2140,6 +2159,27 @@ already large `supervisor-tui.ts` application controller.
   passes (699 passed, 1 skipped; 6,196 tests passed, 10 skipped). Docker
   installer smoke passes without Node, npm, pnpm, Bun, or an Agent Runtime, and
   package dry-run contains the changed Fleet renderer.
+- A fresh 120x32 audit of Setup, Source, AliceProject, and Release found the
+  next cross-surface seam: each polished split-pane task was still centered on
+  Overview, whose cards leaked through unused rows and edges. The shared Focus
+  Workspace now gives these tasks every row between Mission Header and Control
+  Console at 100x28 and above, clears surplus rows, removes the false Overview
+  selection, and names SETUP, SOURCE, PROJECTS, or RELEASE in both navigation
+  focus and the Context Ribbon. Smaller terminals retain their complete
+  responsive sheets. Raw semantic rows continue to own hit-testing while ANSI
+  hover decoration remains presentation-only, so a hovered action stays
+  clickable.
+- Focus-Workspace acceptance passes with 115 focused task-surface,
+  navigation, screen, and real-PTY tests. Truecolor 120x32 captures show all
+  four tasks starting directly below the Header, no Overview text bleeding
+  through, explicit `FOCUS` identity above, and task identity in the anchored
+  Control Console below. Raw SGR hover then click still cycles Setup, selects a
+  Release lane, submits Source, advances Foundry, and selects a Switchboard
+  row; Esc restores top-level Overview identity and detach restores terminal
+  modes. CLI build and root TypeScript pass; the 701-file suite passes (700
+  passed, 1 skipped; 6,199 tests passed, 10 skipped). Docker installer smoke
+  passes without Node, npm, pnpm, Bun, or an Agent Runtime, and package dry-run
+  contains `src/supervisor-task-surface.ts`.
 
 ## Completion Criteria
 

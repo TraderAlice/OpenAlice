@@ -286,6 +286,15 @@ describe('Supervisor TUI screen', () => {
       }),
     ]))
 
+    const focus = renderSupervisorDock({
+      panel: 'overview',
+      focusTask: 'setup',
+      projectName: 'Default AliceProject',
+      runtimeState: 'absent',
+    }, 100)
+    expect(focus).toContain('[ i ] Default AliceProject  ›  ○ COLD  ›  ◆ SETUP')
+    expect(focus).not.toContain('◆ OVERVIEW')
+
     const compact = renderSupervisorDock({
       panel: 'logs',
       projectName: '研究 AliceProject with a very long name',
@@ -3111,7 +3120,7 @@ describe('Supervisor TUI screen', () => {
     expect(calls).toEqual(['check:beta', 'apply:beta:0.90.2-beta.1'])
   })
 
-  it('routes pointer selection through the centered update-channel overlay', async () => {
+  it('routes pointer selection through the focused update-channel stage', async () => {
     let inputListener: ((data: string) => unknown) | undefined
     const checked: string[] = []
     class FakeTui {
@@ -3126,11 +3135,10 @@ describe('Supervisor TUI screen', () => {
         return {
           hide: () => undefined,
           focus: () => {
-            const lines = component.render(72)
-            const overlayRow = 1 + Math.floor((28 - lines.length) / 2)
+            component.render(100)
             queueMicrotask(() => {
-              inputListener?.(`\u001b[<0;20;${overlayRow + 4}M`)
-              setTimeout(() => inputListener?.(`\u001b[<0;20;${overlayRow + 13}M`), 0)
+              inputListener?.('\u001b[<0;20;7M')
+              setTimeout(() => inputListener?.('\u001b[<0;65;10M'), 0)
             })
           },
         }

@@ -118,6 +118,10 @@ import {
   renderSupervisorReleaseObservatory,
 } from './supervisor-release-view.ts'
 import {
+  renderSupervisorTaskSurface,
+  supervisorTaskSurfaceOptions,
+} from './supervisor-task-surface.ts'
+import {
   createSupervisorHelpState,
   moveSupervisorHelpSelection,
   normalizeSupervisorHelpState,
@@ -309,6 +313,7 @@ interface UpdateResult {
 export type SupervisorUpdateChannel = 'stable' | 'beta' | 'dev'
 
 export type SupervisorPanel = 'fleet' | 'overview' | 'logs' | 'doctor' | 'help'
+export type SupervisorFocusTask = 'setup' | 'source' | 'projects' | 'release'
 
 interface SupervisorNavigationTransition {
   from: SupervisorPanel
@@ -339,6 +344,7 @@ export interface SupervisorSnapshot {
   recoveryReason?: SupervisorConfigRecoveryReason
   diagnostic?: string
   panel?: SupervisorPanel
+  focusTask?: SupervisorFocusTask
   busy?: string
   notice?: string
   confirmation?: SupervisorConfirmation
@@ -1106,6 +1112,7 @@ export async function runSupervisorTui(
       || actionRunning
     ) return
     updateChannelActive = true
+    screen.update({ focusTask: 'release' })
     let updateChannelHoveredCommand: string | undefined
     const items: SelectItem[] = [
       {
@@ -1136,12 +1143,12 @@ export async function runSupervisorTui(
       0,
       items.findIndex((item) => item.value === screen.snapshot.channel),
     ))
-    const overlayOptions = {
+    const overlayOptions = supervisorTaskSurfaceOptions(terminalSize(), {
       width: '90%',
       maxHeight: '90%',
       anchor: 'center',
       margin: 1,
-    } as const
+    } as const)
     const close = (notice?: string) => {
       if (!updateChannelActive) return
       updateChannelActive = false
@@ -1150,7 +1157,7 @@ export async function runSupervisorTui(
       updateChannelHoveredCommand = undefined
       overlay.unfocus?.({ target: screen })
       overlay.hide()
-      if (notice) screen.update({ notice })
+      screen.update({ focusTask: undefined, ...(notice ? { notice } : {}) })
       syncMotionTimer()
     }
     list.onCancel = () => close('Update channel unchanged.')
@@ -1198,8 +1205,9 @@ export async function runSupervisorTui(
           },
           activate: () => undefined,
         }
+        const lines = renderSupervisorTaskSurface(observatory.lines, terminalSize())
         captureOverlayPointer(
-          observatory.lines,
+          lines,
           width,
           overlayOptions,
           (data) => this.handleInput(data),
@@ -1211,7 +1219,7 @@ export async function runSupervisorTui(
           },
         )
         return decorateSupervisorReleaseObservatory(
-          observatory.lines,
+          lines,
           tuiTheme,
           updateChannelHoveredCommand,
         )
@@ -1474,15 +1482,16 @@ export async function runSupervisorTui(
     }
 
     sourcePromptActive = true
+    screen.update({ focusTask: 'source' })
     let saving = false
     let phase: SupervisorSourcePhase = 'select'
     let sourceHoveredCommand: string | undefined
-    const overlayOptions = {
+    const overlayOptions = supervisorTaskSurfaceOptions(terminalSize(), {
       width: '92%',
       maxHeight: 20,
       anchor: 'center',
       margin: 1,
-    } as const
+    } as const)
     const input = new (class extends piTui.Input {
       detail = reason
         ? `Start needs an OpenAlice source checkout. ${reason}`
@@ -1504,8 +1513,9 @@ export async function runSupervisorTui(
           detail: sanitize(this.detail),
           contract: 'Validate the checkout before saving; launch only follows a saved source.',
         }, width)
+        const lines = renderSupervisorTaskSurface(launchBay.lines, terminalSize())
         captureOverlayPointer(
-          launchBay.lines,
+          lines,
           width,
           overlayOptions,
           (data) => this.handleInput(data),
@@ -1517,7 +1527,7 @@ export async function runSupervisorTui(
           },
         )
         return decorateSupervisorSourceLaunchBay(
-          launchBay.lines,
+          lines,
           tuiTheme,
           sourceHoveredCommand,
         )
@@ -1542,7 +1552,7 @@ export async function runSupervisorTui(
       overlay.unfocus?.({ target: screen })
       overlay.hide()
       ui.setShowHardwareCursor(false)
-      if (notice) screen.update({ notice })
+      screen.update({ focusTask: undefined, ...(notice ? { notice } : {}) })
       syncMotionTimer()
     }
     closeSourcePrompt = () => close('Source configuration cancelled.')
@@ -1617,6 +1627,7 @@ export async function runSupervisorTui(
     if (!active) return
 
     settingsActive = true
+    screen.update({ focusTask: 'setup' })
     let saving = false
     let settingsSelectedIndex = 0
     let settingsSubmenuOpen = false
@@ -1642,7 +1653,7 @@ export async function runSupervisorTui(
       overlay.unfocus?.({ target: screen })
       overlay.hide()
       ui.setShowHardwareCursor(false)
-      screen.update({ notice })
+      screen.update({ focusTask: undefined, notice })
       syncMotionTimer()
     }
     const inputSubmenu = (
@@ -1983,16 +1994,16 @@ export async function runSupervisorTui(
       }
       settings.handleInput(data)
     }
-    const overlayOptions = {
+    const overlayOptions = supervisorTaskSurfaceOptions(terminalSize(), {
       width: '90%',
       maxHeight: '90%',
       anchor: 'center',
       margin: 1,
-    } as const
+    } as const)
     const panel = new (class implements Component {
       render(width: number): string[] {
         if (settingsSubmenuOpen) {
-          const lines = settings.render(width)
+          const lines = renderSupervisorTaskSurface(settings.render(width), terminalSize())
           captureOverlayPointer(
             lines,
             width,
@@ -2043,8 +2054,9 @@ export async function runSupervisorTui(
             ui.requestRender()
           },
         }
+        const lines = renderSupervisorTaskSurface(studio.lines, terminalSize())
         captureOverlayPointer(
-          studio.lines,
+          lines,
           width,
           overlayOptions,
           (data) => this.handleInput(data),
@@ -2055,7 +2067,7 @@ export async function runSupervisorTui(
             ui.requestRender()
           },
         )
-        return decorateSupervisorSetupStudio(studio.lines, tuiTheme, settingsHoveredCommand)
+        return decorateSupervisorSetupStudio(lines, tuiTheme, settingsHoveredCommand)
       }
 
       handleInput(data: string): void {
@@ -2105,6 +2117,7 @@ export async function runSupervisorTui(
     if (!active) return
 
     projectsActive = true
+    screen.update({ focusTask: 'projects' })
     let changing = false
     let projectsHoveredCommand: string | undefined
     let message = 'Selecting an AliceProject also makes it the next bare-start default. Copy AI credentials with openalice project copy-ai-creds.'
@@ -2180,12 +2193,12 @@ export async function runSupervisorTui(
     let component: Component = list
     let projectListActive = true
     let creatorView: Omit<SupervisorProjectFoundryView, 'fieldLines'> | null = null
-    const overlayOptions = {
+    const overlayOptions = supervisorTaskSurfaceOptions(terminalSize(), {
       width: '92%',
       maxHeight: '90%',
       anchor: 'center',
       margin: 1,
-    } as const
+    } as const)
 
     const setMessage = (next: string) => {
       message = next
@@ -2200,7 +2213,7 @@ export async function runSupervisorTui(
       overlay.unfocus?.({ target: screen })
       overlay.hide()
       ui.setShowHardwareCursor(false)
-      screen.update({ notice })
+      screen.update({ focusTask: undefined, notice })
       syncMotionTimer()
     }
     const showList = () => {
@@ -2372,8 +2385,9 @@ export async function runSupervisorTui(
             message: sanitize(message),
             fieldLines: component.render(supervisorProjectFoundryFieldWidth(width)),
           }, width)
+          const lines = renderSupervisorTaskSurface(foundry.lines, terminalSize())
           captureOverlayPointer(
-            foundry.lines,
+            lines,
             width,
             overlayOptions,
             (data) => this.handleInput(data),
@@ -2385,7 +2399,7 @@ export async function runSupervisorTui(
             },
           )
           return decorateSupervisorProjectFoundry(
-            foundry.lines,
+            lines,
             tuiTheme,
             projectsHoveredCommand,
           )
@@ -2418,8 +2432,9 @@ export async function runSupervisorTui(
             baseList.move(delta)
           },
         }
+        const lines = renderSupervisorTaskSurface(switchboard.lines, terminalSize())
         captureOverlayPointer(
-          switchboard.lines,
+          lines,
           width,
           overlayOptions,
           (data) => this.handleInput(data),
@@ -2431,7 +2446,7 @@ export async function runSupervisorTui(
           },
         )
         return decorateSupervisorProjectSwitchboard(
-          switchboard.lines,
+          lines,
           tuiTheme,
           projectsHoveredCommand,
         )
@@ -3868,6 +3883,7 @@ export class SupervisorScreen implements Component {
       : ''
     const navigation = renderSupervisorNavigation({
       selected: this.snapshot.panel ?? 'overview',
+      focusTask: this.snapshot.focusTask,
       recovery: isConfigRecovery(this.snapshot),
       machineCount: this.snapshot.fleet?.machines.length,
       logCount: this.snapshot.logs?.entries?.length,
@@ -4094,6 +4110,7 @@ export class SupervisorScreen implements Component {
       actionShelf,
       renderSupervisorDock({
         panel: this.snapshot.panel ?? 'overview',
+        focusTask: this.snapshot.focusTask,
         projectName: this.snapshot.context?.aliceProject.displayName,
         runtimeState: state,
         pulse: this.runtimePulse,

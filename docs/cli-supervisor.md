@@ -442,6 +442,17 @@ intentionally parameter-free:
   the selected AliceProject's source checkout;
 - `?` toggles Help; `[` and `]` expose the other top-level panels.
 
+Setup, Source, AliceProject, and Release use one secondary-task surface. At
+100x28 and larger, a Focus Workspace replaces every Overview content row
+between the Mission Header and Control Console instead of allowing unrelated
+cards to show through a centered dialog. The navigation rail clears its active
+top-level selection and names the focused task, while the Context Ribbon uses
+the same task identity. The task renderer, pointer targets, and mutation
+callbacks remain unchanged inside that stage. Smaller terminals retain the
+bounded centered sheet because their stacked responsive content takes priority
+over clearing the whole viewport. Closing the task restores the prior
+top-level panel identity without changing Runtime or selection state.
+
 The TUI refuses to stop or restart Electron, development, incompatible, or
 otherwise foreign owners. Its stop/restart confirmation states that active Web
 and agent sessions will disconnect. Detaching never implies stopping. Update
