@@ -217,37 +217,42 @@ export function renderSupervisorDock(
   view: SupervisorDockView,
   width: number,
 ): string {
+  const breadcrumb = '  ›  '
   const controls = view.commandPaletteOpen
-    ? '[ / ] Close palette   [ q ] Detach'
-    : '[ / ] Commands   [ q ] Detach'
-  if (width < 60) return fillLine(controls, width)
+    ? `[ / ] Close${breadcrumb}[ q ] Detach`
+    : `[ / ] Commands${breadcrumb}[ q ] Detach`
+  if (width < 60) return commandSpine(controls, '', width)
 
   const panel = view.panel.toUpperCase()
   if (view.recovery) {
-    return dockColumns(controls, `RECOVERY · ${panel}`, width)
+    return commandSpine(controls, `! RECOVERY${breadcrumb}${panelBadge(panel)}`, width)
   }
 
   const signal = runtimeSignal(view.runtimeState ?? 'unavailable', view.pulse ?? false)
   const fullProjectName = view.projectName ?? 'AliceProject'
-  const contextBudget = Math.max(1, width - displayWidth(controls) - 3)
-  const panelSuffix = ` · ${panel}`
+  const contextBudget = Math.max(1, width - 6 - displayWidth(controls) - 3)
+  const panelSuffix = `${breadcrumb}${panelBadge(panel)}`
   const projectPrefix = '[ i ] '
-  const signalSuffix = ` · ${signal}`
-  const fixedContextWidth = displayWidth(projectPrefix) + displayWidth(signalSuffix)
-  const fullNameWidth = contextBudget
-    - fixedContextWidth
-    - displayWidth(panelSuffix)
-  const mediumNameWidth = contextBudget - fixedContextWidth
-  const projectName = truncateDisplayWidth(
-    fullProjectName,
-    Math.max(1, fullNameWidth >= 8 ? fullNameWidth : mediumNameWidth),
-  )
-  const context = fullNameWidth >= 8
-    ? `[ i ] ${projectName} · ${signal}${panelSuffix}`
-    : mediumNameWidth >= 8
-      ? `[ i ] ${projectName} · ${signal}`
-      : `${signal} · ${panel}`
-  return dockColumns(controls, context, width)
+  const signalSuffix = `${breadcrumb}${signal}`
+  const fullContext = `${projectPrefix}${fullProjectName}${signalSuffix}${panelSuffix}`
+  const projectSignal = `${projectPrefix}${fullProjectName}${signalSuffix}`
+  const projectNameBudget = contextBudget
+    - displayWidth(projectPrefix)
+    - displayWidth(signalSuffix)
+  const compactProjectSignal = projectNameBudget >= 6
+    ? `${projectPrefix}${truncateDisplayWidth(fullProjectName, projectNameBudget)}${signalSuffix}`
+    : ''
+  const signalPanel = `${signal}${panelSuffix}`
+  const context = displayWidth(fullContext) <= contextBudget
+    ? fullContext
+    : displayWidth(projectSignal) <= contextBudget
+      ? projectSignal
+      : compactProjectSignal
+        ? compactProjectSignal
+        : displayWidth(signalPanel) <= contextBudget
+          ? signalPanel
+          : truncateDisplayWidth(signal, contextBudget)
+  return commandSpine(controls, context, width)
 }
 
 export function renderSupervisorPanel(
@@ -262,6 +267,11 @@ export function renderSupervisorPanel(
 export function supervisorCommandTargets(lines: string[]): SupervisorCommandTarget[] {
   const targets: SupervisorCommandTarget[] = []
   for (const [rowIndex, line] of lines.entries()) {
+    const dock = supervisorDockTargets(line, rowIndex + 1)
+    if (dock.length > 0) {
+      targets.push(...dock)
+      continue
+    }
     const shelf = supervisorActionShelfTargets(line, rowIndex + 1)
     if (shelf.length > 0) {
       targets.push(...shelf)
@@ -282,6 +292,29 @@ export function supervisorCommandTargets(lines: string[]): SupervisorCommandTarg
         label: match[1],
       })
     }
+  }
+  return targets
+}
+
+function supervisorDockTargets(
+  line: string,
+  row: number,
+): SupervisorCommandTarget[] {
+  if (!line.startsWith('╰─ ')) return []
+  const targets: SupervisorCommandTarget[] = []
+  const pattern = /\[ (\/) \] (?:Commands|Close)|\[ (q) \] Detach|\[ (i) \] .*?(?=  ›  | ─╯)/gu
+  for (const match of line.matchAll(pattern)) {
+    if (match.index === undefined) continue
+    const label = match[1] ?? match[2] ?? match[3]
+    if (!label) continue
+    const startColumn = displayWidth(line.slice(0, match.index)) + 1
+    targets.push({
+      row,
+      startColumn,
+      endColumn: startColumn + displayWidth(match[0]) - 1,
+      label,
+      surface: match[0],
+    })
   }
   return targets
 }
@@ -406,13 +439,29 @@ function labelAndTail(label: string, tail: string, width: number): string {
   return `${safeLabel}${' '.repeat(Math.max(1, width - displayWidth(safeLabel) - tailWidth))}${safeTail}`
 }
 
-function dockColumns(left: string, right: string, width: number): string {
-  const safeLeft = truncateDisplayWidth(left, width)
-  const remaining = Math.max(0, width - displayWidth(safeLeft) - 1)
-  if (remaining === 0) return fillLine(safeLeft, width)
-  const safeRight = truncateDisplayWidth(right, remaining)
-  const gap = Math.max(1, width - displayWidth(safeLeft) - displayWidth(safeRight))
-  return fillLine(`${safeLeft}${' '.repeat(gap)}${safeRight}`, width)
+function commandSpine(left: string, right: string, width: number): string {
+  const prefix = '╰─ '
+  const suffix = ' ─╯'
+  const innerWidth = Math.max(1, width - displayWidth(prefix) - displayWidth(suffix))
+  const safeLeft = truncateDisplayWidth(left, innerWidth)
+  const remaining = Math.max(0, innerWidth - displayWidth(safeLeft))
+  const safeRight = right
+    ? truncateDisplayWidth(right, Math.max(0, remaining - 1))
+    : ''
+  const trackWidth = Math.max(0, innerWidth - displayWidth(safeLeft) - displayWidth(safeRight))
+  const track = trackWidth >= 3
+    ? ` ${'─'.repeat(trackWidth - 2)} `
+    : ' '.repeat(trackWidth)
+  return truncateDisplayWidth(`${prefix}${safeLeft}${track}${safeRight}${suffix}`, width)
+}
+
+function panelBadge(panel: string): string {
+  if (panel === 'OVERVIEW') return '◆ OVERVIEW'
+  if (panel === 'FLEET') return '◇ FLEET'
+  if (panel === 'LOGS') return '≋ LOGS'
+  if (panel === 'DOCTOR') return '✦ DOCTOR'
+  if (panel === 'HELP') return '? HELP'
+  return panel
 }
 
 function fillLine(value: string, width: number): string {

@@ -18,6 +18,12 @@ export interface SupervisorTuiTheme {
   actionRail(value: string): string
   actionPrimary(value: string): string
   dockRail(value: string): string
+  dockControl(value: string): string
+  dockIdentity(value: string): string
+  dockSuccess(value: string): string
+  dockWarning(value: string): string
+  dockDanger(value: string): string
+  dockPanel(value: string): string
 }
 
 export interface SupervisorFrameStyleOptions {
@@ -81,6 +87,12 @@ export function createSupervisorTuiTheme(
     actionRail: style('\u001b[38;2;173;202;208;48;2;13;31;38m'),
     actionPrimary: style('\u001b[1;38;2;183;255;248;48;2;18;54;59m'),
     dockRail: style('\u001b[38;2;199;235;239;48;2;10;34;39m'),
+    dockControl: style('\u001b[1;38;2;183;255;248;48;2;10;34;39m'),
+    dockIdentity: style('\u001b[1;38;2;240;249;255;48;2;10;34;39m'),
+    dockSuccess: style('\u001b[1;38;2;145;242;187;48;2;10;34;39m'),
+    dockWarning: style('\u001b[1;38;2;255;214;128;48;2;10;34;39m'),
+    dockDanger: style('\u001b[1;38;2;255;151;169;48;2;10;34;39m'),
+    dockPanel: style('\u001b[1;38;2;213;179;255;48;2;10;34;39m'),
   }
 }
 
@@ -114,7 +126,7 @@ export function decorateSupervisorFrame(
           : undefined,
       )
     }
-    if (line.startsWith('[ / ]')) {
+    if (line.startsWith('[ / ]') || line.startsWith('╰─ [ / ]')) {
       return decorateDock(line, theme, options.hoveredCommand?.row === index + 1
         ? options.hoveredCommand.label
         : undefined)
@@ -261,15 +273,52 @@ function decorateDock(
   theme: SupervisorTuiTheme,
   hoveredCommand?: string,
 ): string {
-  if (!hoveredCommand) return theme.dockRail(line)
-  const keycap = `[ ${hoveredCommand} ]`
-  const offset = line.indexOf(keycap)
-  if (offset < 0) return theme.dockRail(line)
-  return [
-    theme.dockRail(line.slice(0, offset)),
-    theme.selected(keycap),
-    theme.dockRail(line.slice(offset + keycap.length)),
-  ].join('')
+  const tokenPattern = /\[ \/ \] (?:Commands|Close)|\[ q \] Detach|\[ i \] .*?(?=  ›  )|! RECOVERY|(?:◉|●) (?:LIVE|EXTERNAL)|○ COLD|◆ (?:BLOCKED|DEGRADED)|◇ OFFLINE|◌ [A-Z][A-Z ]*?(?=  ›  | ─╯)|[◆◇≋✦?] (?:OVERVIEW|FLEET|LOGS|DOCTOR|HELP)/gu
+  let output = ''
+  let cursor = 0
+  for (const match of line.matchAll(tokenPattern)) {
+    const offset = match.index
+    const token = match[0]
+    output += theme.dockRail(line.slice(cursor, offset))
+    output += decorateDockToken(token, theme, hoveredCommand)
+    cursor = offset + token.length
+  }
+  output += theme.dockRail(line.slice(cursor))
+  return output
+}
+
+function decorateDockToken(
+  token: string,
+  theme: SupervisorTuiTheme,
+  hoveredCommand?: string,
+): string {
+  if (token.startsWith('[ / ]') || token.startsWith('[ q ]')) {
+    return decorateDockKeyedToken(token, theme, theme.dockControl, hoveredCommand)
+  }
+  if (token.startsWith('[ i ]')) {
+    return decorateDockKeyedToken(token, theme, theme.dockIdentity, hoveredCommand)
+  }
+  if (/^[◆◇≋✦?] (?:OVERVIEW|FLEET|LOGS|DOCTOR|HELP)$/u.test(token)) {
+    return theme.dockPanel(token)
+  }
+  if (token.startsWith('● ') || token.startsWith('◉ ')) return theme.dockSuccess(token)
+  if (token.startsWith('◆ BLOCKED')) return theme.dockDanger(token)
+  if (token.startsWith('◆ ') || token.startsWith('◇ ') || token.startsWith('◌ ') || token.startsWith('! ')) {
+    return theme.dockWarning(token)
+  }
+  if (token.startsWith('○ ')) return theme.dockRail(token)
+  return theme.dockPanel(token)
+}
+
+function decorateDockKeyedToken(
+  token: string,
+  theme: SupervisorTuiTheme,
+  style: (value: string) => string,
+  hoveredCommand?: string,
+): string {
+  const match = /^\[ ([^\]]+) \]/u.exec(token)
+  if (!match?.[1] || match[1] !== hoveredCommand) return style(token)
+  return theme.selected(token)
 }
 
 function decorateHeader(

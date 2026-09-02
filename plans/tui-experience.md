@@ -456,6 +456,22 @@ not imply maintainer approval of the finished interaction.
   visible clickable keycap. This keeps identity present in Logs, Doctor, Fleet,
   Help, and the Command Palette without adding a route or backend read.
 
+### OMP-style Command Spine decision
+
+- Recoloring the flat context ribbon would improve contrast while preserving
+  its status-string silhouette and weak relationship to the rest of the frame.
+- Copying OMP's two-row prompt/status frame would create the strongest visual
+  likeness, but consume another row at the required 80×24 baseline even though
+  Supervisor has no text prompt to justify it.
+- The selected model evolves the existing one-row ribbon into a bottom Command
+  Spine. `╰─`/`─╯` close the application visually, a flexible `─` track joins
+  controls to context, and `›` breadcrumbs express AliceProject → Runtime →
+  active view. Wide layouts retain every segment; constrained layouts remove
+  view, project, then context before ever losing Commands or Detach. Color
+  terminals give controls, identity, Runtime, and view distinct tones on one
+  continuous rail; `NO_COLOR` keeps the same glyph hierarchy. Existing keycaps,
+  pointer targets, overlay routing, and one-row geometry remain authoritative.
+
 ### Fixed activity-slot decision
 
 - Keeping the existing append-only feedback stack makes Working, Notice, and
@@ -580,6 +596,8 @@ already large `supervisor-tui.ts` application controller.
   same pointer semantics as the application frame.
 - [x] Turn the bottom command dock into a persistent, pointer-aware
   AliceProject/Runtime/view context ribbon.
+- [x] Evolve the flat context ribbon into an OMP-style one-row Command Spine
+  with a closing frame, semantic breadcrumbs, and whole-segment pointer targets.
 - [x] Replace expanding feedback rows with a stable single-line activity slot.
 - [x] Replace inline confirmation cards with stable, focused compositor modals.
 - [x] Promote the Command Palette from page replacement to a focused overlay.
@@ -741,7 +759,7 @@ already large `supervisor-tui.ts` application controller.
   Commands are contextual to Runtime/recovery state and use an OMP-inspired
   primary/description/group/shortcut layout. Up/Down wraps selection, the wheel
   clamps it, pointer motion highlights the full row, a click selects and runs,
-  and direct shortcuts remain available. The dock changes to `Close palette`
+  and direct shortcuts remain available. The dock changes to `Close`
   while open. Real 80-column acceptance hovered Setup, moved selection with a
   raw SGR wheel event, clicked Setup into the existing overlay, then used `l`
   inside the reopened Palette to enter Logs; detach restored terminal modes.
@@ -1122,6 +1140,21 @@ already large `supervisor-tui.ts` application controller.
   TypeScript pass; the 699-file suite passes (698 passed, 1 skipped; 6,148 tests
   passed, 10 skipped). Docker installer smoke passes, and package dry-run
   retains the shared Supervisor theme source.
+- The flat bottom ribbon is now an OMP-inspired Command Spine. `╰─`/`─╯` close
+  the application frame, an elastic track joins controls to context, and `›`
+  breadcrumbs make AliceProject, Runtime, and active view scan as distinct
+  segments. Cyan controls, white identity, semantic Runtime, and purple view
+  tones share one continuous rail without relying on color for structure.
+- Command-Spine acceptance passes with 76 focused screen and real-PTY tests.
+  A real 80×24 run clicked the visible AliceProject name outside `[ i ]`, opened
+  and closed Switchboard, then clicked the Commands label to open the Palette;
+  whole segments, not only keycaps, own hover/click geometry. A real 120×30
+  Default AliceProject run confirmed the complete four-segment Spine beneath
+  the wide Beacon, while 60- and 46-column render contracts preserve Runtime/
+  view or essential controls without adding a row. CLI build/typecheck and root
+  TypeScript pass; the 699-file suite passes (698 passed, 1 skipped; 6,148 tests
+  passed, 10 skipped). Docker installer smoke passes, and package dry-run
+  retains the shared theme and view sources.
 
 ## Completion Criteria
 

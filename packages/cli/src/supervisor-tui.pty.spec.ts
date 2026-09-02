@@ -871,7 +871,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
 
-  it('keeps project and Runtime context in a clickable status ribbon', async () => {
+  it('keeps every visible Command Spine control segment clickable', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-context-ribbon-'))
     temporaryPaths.push(isolatedHome)
     const childEnv: NodeJS.ProcessEnv = {
@@ -896,18 +896,18 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       let openedPalette = false
       const timeout = setTimeout(() => {
         child.kill()
-        reject(new Error(`Supervisor context ribbon timed out:\n${output}`))
+        reject(new Error(`Supervisor Command Spine timed out:\n${output}`))
       }, 8_000)
       child.onData((data) => {
         output += data
         if (
           !clickedProject
           && output.includes('[ i ] Default AliceProject')
-          && output.includes('○ COLD · OVERVIEW')
+          && output.includes('○ COLD')
         ) {
           clickedProject = true
-          child.write('\u001b[<32;36;22M')
-          child.write('\u001b[<0;36;22M')
+          child.write('\u001b[<32;56;22M')
+          child.write('\u001b[<0;56;22M')
         } else if (!closedOverlay && output.includes('AliceProject Switchboard · 1 PROJECT')) {
           closedOverlay = true
           child.write('\u001b')
@@ -917,7 +917,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           && output.includes('STATUS   AliceProject selection closed.')
         ) {
           clickedAfterNotice = true
-          child.write('\u001b[<0;2;22M')
+          child.write('\u001b[<0;6;22M')
         } else if (!openedPalette && output.includes('Command Palette')) {
           openedPalette = true
           child.write('q')
@@ -926,14 +926,18 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       child.onExit(({ exitCode }) => {
         clearTimeout(timeout)
         if (exitCode === 0 && openedPalette) resolve(output)
-        else reject(new Error(`Supervisor context ribbon exited ${exitCode}:\n${output}`))
+        else reject(new Error(`Supervisor Command Spine exited ${exitCode}:\n${output}`))
       })
     })
 
     expect(transcript).toContain('AliceProject Switchboard · 1 PROJECT')
     expect(transcript).toContain('STATUS   AliceProject selection closed.')
     expect(transcript).toContain('Command Palette')
+    expect(transcript).toContain('╰─ ')
+    expect(transcript).toContain('  ›  ')
+    expect(transcript).toContain(' ─╯')
     expect(transcript).toContain('\u001b[38;2;199;235;239;48;2;10;34;39m')
+    expect(transcript).toContain('\u001b[1;38;2;240;249;255;48;2;10;34;39m[ i ] Default AliceProject')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)

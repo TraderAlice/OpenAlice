@@ -6,6 +6,7 @@ import { createSupervisorFleetState, displayWidth, selectedFleetProject } from '
 import {
   createSupervisorTuiTheme,
   decorateSupervisorActionShelf,
+  decorateSupervisorFrame,
 } from './supervisor-tui-theme.ts'
 import {
   renderSupervisorCommandBar,
@@ -79,8 +80,9 @@ describe('Supervisor TUI screen', () => {
     expect(lines.join('\n')).toContain('[ s ] Start quietly')
     expect(lines.join('\n')).toContain('[ c ] Source')
     expect(lines.join('\n')).toContain('[ ? ] More')
-    expect(lines.at(-1)).toContain('[ / ] Commands   [ q ] Detach')
-    expect(lines.at(-1)).toContain('[ i ] AliceProject · ○ COLD · OVERVIEW')
+    expect(lines.at(-1)).toContain('╰─ [ / ] Commands  ›  [ q ] Detach')
+    expect(lines.at(-1)).toContain('[ i ] AliceProject  ›  ○ COLD')
+    expect(lines.at(-1)).toMatch(/─╯$/u)
 
     const wideLines = screen.render(120)
     expect(wideLines[1]).toHaveLength(120)
@@ -122,7 +124,7 @@ describe('Supervisor TUI screen', () => {
     expect(screen.render(120)[0]).toContain('v0.87.0-beta · DEV · update 0.90.0')
   })
 
-  it('renders a responsive persistent context ribbon without adding a row', () => {
+  it('renders a responsive OMP-style Command Spine without adding a row', () => {
     const full = renderSupervisorDock({
       panel: 'doctor',
       projectName: 'Default AliceProject',
@@ -131,7 +133,39 @@ describe('Supervisor TUI screen', () => {
     }, 100)
     expect(full).toHaveLength(100)
     expect(full).toContain('[ / ] Commands')
-    expect(full).toContain('[ i ] Default AliceProject · ◉ LIVE · DOCTOR')
+    expect(full).toContain('[ i ] Default AliceProject  ›  ◉ LIVE  ›  ✦ DOCTOR')
+    expect(full).toMatch(/^╰─ .* ─╯$/u)
+    const themed = decorateSupervisorFrame([
+      'header',
+      'divider',
+      'tabs',
+      full,
+    ], createSupervisorTuiTheme({ TERM: 'xterm-256color' }), {
+      panel: 'doctor',
+      runtimeClass: 'running',
+    })[3]!
+    expect(themed).toContain('\u001b[1;38;2;183;255;248;48;2;10;34;39m[ / ] Commands')
+    expect(themed).toContain('\u001b[1;38;2;240;249;255;48;2;10;34;39m[ i ] Default AliceProject')
+    expect(themed).toContain('\u001b[1;38;2;145;242;187;48;2;10;34;39m◉ LIVE')
+    expect(themed).toContain('\u001b[1;38;2;213;179;255;48;2;10;34;39m✦ DOCTOR')
+    expect(themed.replace(/\u001b\[[0-9;]*m/gu, '')).toBe(full)
+    expect(decorateSupervisorFrame([
+      'header',
+      'divider',
+      'tabs',
+      full,
+    ], createSupervisorTuiTheme({ TERM: 'xterm-256color', NO_COLOR: '1' }), {
+      panel: 'doctor',
+      runtimeClass: 'running',
+    })[3]).toBe(full)
+    expect(supervisorCommandTargets([full])).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: '/', surface: '[ / ] Commands' }),
+      expect.objectContaining({ label: 'q', surface: '[ q ] Detach' }),
+      expect.objectContaining({
+        label: 'i',
+        surface: '[ i ] Default AliceProject',
+      }),
+    ]))
 
     const compact = renderSupervisorDock({
       panel: 'logs',
@@ -139,8 +173,35 @@ describe('Supervisor TUI screen', () => {
       runtimeState: 'absent',
     }, 60)
     expect(displayWidth(compact)).toBe(60)
-    expect(compact).toContain('[ i ]')
     expect(compact).toContain('○ COLD')
+    expect(compact).toContain('≋ LOGS')
+
+    const palette = renderSupervisorDock({
+      panel: 'overview',
+      projectName: 'Default AliceProject',
+      runtimeState: 'absent',
+      commandPaletteOpen: true,
+    }, 80)
+    expect(palette).toContain('[ / ] Close  ›  [ q ] Detach')
+    expect(palette).toContain('[ i ] Default AliceProject  ›  ○ COLD')
+    expect(palette).not.toContain('◆ OVERVIEW')
+    const overview = renderSupervisorDock({
+      panel: 'overview',
+      projectName: 'Default AliceProject',
+      runtimeState: 'absent',
+    }, 100)
+    const themedOverview = decorateSupervisorFrame([
+      'header',
+      'divider',
+      'tabs',
+      overview,
+    ], createSupervisorTuiTheme({ TERM: 'xterm-256color' }), {
+      panel: 'overview',
+      runtimeClass: 'absent',
+    })[3]!
+    expect(themedOverview).toContain(
+      '\u001b[1;38;2;213;179;255;48;2;10;34;39m◆ OVERVIEW',
+    )
 
     const narrow = renderSupervisorDock({
       panel: 'overview',
@@ -155,7 +216,7 @@ describe('Supervisor TUI screen', () => {
       panel: 'overview',
       recovery: true,
     }, 80)
-    expect(recovery).toContain('RECOVERY · OVERVIEW')
+    expect(recovery).toContain('! RECOVERY  ›  ◆ OVERVIEW')
   })
 
   it('renders semantic activity rails and advances only enabled busy motion', () => {
@@ -236,7 +297,7 @@ describe('Supervisor TUI screen', () => {
     let lines = screen.renderCommandPalette(80).lines
     expect(lines.join('\n')).toContain('Command Palette · 1/9 · ABSENT')
     expect(lines.join('\n')).toContain('› ◆ Start OpenAlice & open Workspace')
-    expect(screen.render(80).join('\n')).toContain('[ / ] Close palette')
+    expect(screen.render(80).join('\n')).toContain('[ / ] Close  ›  [ q ] Detach')
     screen.moveCommandPaletteSelection(1)
     expect(screen.renderCommandPalette(80).lines.join('\n')).toContain('›   Start quietly')
 

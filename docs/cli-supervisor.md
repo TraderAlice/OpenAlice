@@ -188,14 +188,20 @@ path is intentionally parameter-free:
   layout composes adjacent framed cards, theme decoration classifies each card
   column independently at the rendered gutter; a primary action in one card
   must not color fields, borders, or whitespace in its neighbor;
-- a persistent full-width context ribbon keeps `[ / ] Commands` and
-  `[ q ] Detach` visible on every Supervisor page. At 60 columns and wider it
-  also retains the selected AliceProject and compact Runtime signal; when space
-  allows it adds the active view. `[ i ]` makes the project identity a direct
-  pointer/keyboard route into the existing AliceProjects overlay. Narrow
-  terminals retain the two essential controls instead of clipping them. `/`
+- a persistent full-width Command Spine closes the application with `╰─`/`─╯`
+  while keeping `[ / ] Commands` and `[ q ] Detach` visible on every Supervisor
+  page. A flexible track joins those controls to an OMP-style breadcrumb of the
+  selected AliceProject, compact Runtime signal, and active-view badge. The
+  responsive order removes the view, then project context, before the essential
+  controls; 80 columns retain the complete project name and Runtime signal,
+  while wider terminals retain all four segments. Controls, project identity,
+  Runtime health, and view use distinct semantic tones on one continuous rail;
+  `NO_COLOR` preserves the border, track, glyphs, and breadcrumb hierarchy.
+  `[ i ]` and its complete visible project-name segment are one direct
+  pointer/keyboard route into the existing AliceProjects overlay. Commands and
+  Detach likewise expose their complete labels as pointer targets. `/`
   opens a compact centered Command Palette overlay over the unchanged current
-  page and changes the ribbon action to `Close palette`. The Palette exposes
+  page and changes the Spine action to `Close`. The Palette exposes
   only commands valid for the current Runtime/recovery context. Typing filters and ranks
   command names, groups, and shortcuts in place; Backspace edits, Ctrl+U clears,
   and an explicit empty state keeps the query available for correction. Up/Down
