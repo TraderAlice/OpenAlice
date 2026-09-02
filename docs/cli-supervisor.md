@@ -186,8 +186,11 @@ path is intentionally parameter-free:
   Each status badge is part of its tab's pointer target rather than a separate
   control.
   Fleet rows expose pointer hover and click: the first click selects or focuses,
-  and a second click on the focused selected AliceProject invokes Enter's
-  primary action.
+  including when the row was already selected only as inactive related context.
+  A second click on the focused selected Machine drills into AliceProjects; a
+  second click on the focused selected AliceProject invokes Enter's primary
+  action. Pointer activation therefore cannot cross an inactive pane boundary
+  on its first click.
   With only the local Machine, Fleet focus starts on its current AliceProject;
 - the footer is a contextual Action Shelf, not a complete shortcut legend. It
   exposes a few relevant actions as chips on one full-width surface. On

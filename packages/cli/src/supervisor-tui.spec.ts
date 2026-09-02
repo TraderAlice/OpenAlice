@@ -735,6 +735,44 @@ describe('Supervisor TUI screen', () => {
     expect(actions).toContain('logs')
   })
 
+  it('focuses an inactive Fleet pane before activating its selected row', () => {
+    const activated: string[] = []
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'fleet',
+      runtime: { class: 'absent', endpoints: {} },
+      fleet: createSupervisorFleetState(
+        '2026-09-02T00:00:00Z',
+        fleetMachines(),
+        'default',
+      ),
+    }, {
+      onActivateFleet: (machine, project) => activated.push(`${machine.key}/${project.key}`),
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+    })
+
+    screen.render(100)
+    expect(screen.snapshot.fleet?.focus).toBe('machines')
+
+    expect(screen.handlePointer(pointerClick(50, 6))).toBe(true)
+    expect(screen.snapshot.fleet?.focus).toBe('projects')
+    expect(activated).toEqual([])
+    expect(screen.render(100).join('\n')).toContain('▶ Default AliceProject')
+
+    expect(screen.handlePointer(pointerClick(8, 6))).toBe(true)
+    expect(screen.snapshot.fleet?.focus).toBe('machines')
+    expect(activated).toEqual([])
+    expect(screen.render(100).join('\n')).toContain('▶ This computer')
+
+    expect(screen.handlePointer(pointerClick(8, 6))).toBe(true)
+    expect(screen.snapshot.fleet?.focus).toBe('projects')
+    expect(activated).toEqual([])
+
+    expect(screen.handlePointer(pointerClick(50, 6))).toBe(true)
+    expect(activated).toEqual(['local/default'])
+  })
+
   it('derives responsive keycap hit regions and clicks visible commands through keyboard semantics', () => {
     expect(supervisorCommandTargets(['界 [ p ] Setup'])).toEqual([{
       row: 1,

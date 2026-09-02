@@ -149,6 +149,20 @@ not imply maintainer approval of the finished interaction.
   `NO_COLOR` preserves the hierarchy through glyphs alone. This is an
   autonomous topic decision, not a recorded maintainer approval.
 
+### Fleet pointer activation decision
+
+- Activating any already-selected row on click is compact, but an item may be
+  selected only as the related context of an inactive pane. Clicking it then
+  drills down or invokes a Runtime action without first moving visible focus.
+- Requiring a timed double-click would avoid that ambiguity but add terminal-
+  dependent timing and a second activation model beside keyboard Enter.
+- The selected model is focus-first and state-based: a click in an inactive
+  Fleet pane only moves focus and selection, even when that row is already the
+  related item. A subsequent click on the selected row while its pane is active
+  invokes the same primary action as Enter. This matches pointer feedback,
+  avoids accidental cross-pane activation, and changes no lifecycle callback.
+  This is an autonomous topic decision, not a recorded maintainer approval.
+
 ### Global command discovery decision
 
 - Restyling the legacy detach hint would improve finish but not discoverability.
@@ -760,6 +774,8 @@ already large `supervisor-tui.ts` application controller.
   inside the owning framed column.
 - [x] Separate Fleet's active keyboard/pointer pane from its related inactive
   selection with container and row-level focus hierarchy.
+- [x] Make Fleet pointer activation focus-first so an inactive related row
+  cannot invoke its pane's primary action on the first click.
 - [x] Replace the legacy global shortcut hint with a clickable command dock and
   contextual `/` Command Deck.
 - [x] Project structured Runtime logs into semantic event rows while preserving
@@ -1510,6 +1526,19 @@ already large `supervisor-tui.ts` application controller.
   passes (698 passed, 1 skipped; 6,157 tests passed, 10 skipped). Docker
   installer smoke passes without Node, npm, pnpm, Bun, or an Agent Runtime, and
   package dry-run contains the changed Fleet and TUI theme sources.
+- Fleet pointer activation now honors the visible pane owner before the related
+  selection. Clicking an inactive selected Machine or AliceProject transfers
+  focus without drilling down or invoking `onActivateFleet`; only a subsequent
+  click while that pane and row are active reuses its Enter action.
+- Focus-first pointer acceptance passes with 103 focused screen and real-PTY
+  tests. A real truecolor 100×30 Default AliceProject session entered the
+  project pane, clicked the inactive selected Machine once to move focus, then
+  clicked it again to drill down; no Runtime action fired and detach restored
+  cursor, bracketed-paste, mouse, and alternate-screen modes. CLI build/typecheck
+  and root TypeScript pass; the 699-file suite passes (698 passed, 1 skipped;
+  6,158 tests passed, 10 skipped). Docker installer smoke passes without Node,
+  npm, pnpm, Bun, or an Agent Runtime, and package dry-run contains the changed
+  Supervisor pointer controller source.
 
 ## Completion Criteria
 

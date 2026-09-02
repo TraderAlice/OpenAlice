@@ -3613,18 +3613,16 @@ export class SupervisorScreen implements Component {
       const selected = fleetTarget.focus === 'machines'
         ? fleet.selectedMachine
         : fleet.selectedProjects[selectedFleetMachine(fleet)?.key ?? ''] ?? 0
-      if (selected === fleetTarget.index) {
+      if (fleet.focus !== fleetTarget.focus || selected !== fleetTarget.index) {
+        this.update({ fleet: selectFleetIndex(fleet, fleetTarget.focus, fleetTarget.index) })
+      } else {
         if (fleetTarget.focus === 'machines') {
-          this.update({ fleet: setFleetFocus(fleet, 'projects') })
-        } else if (fleet.focus !== 'projects') {
           this.update({ fleet: setFleetFocus(fleet, 'projects') })
         } else {
           const machine = selectedFleetMachine(fleet)
           const project = selectedFleetProject(fleet)
           if (machine && project) this.onActivateFleet?.(machine, project)
         }
-      } else {
-        this.update({ fleet: selectFleetIndex(fleet, fleetTarget.focus, fleetTarget.index) })
       }
       return true
     }
