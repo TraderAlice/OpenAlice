@@ -334,6 +334,8 @@ export function decorateSupervisorFramedColumns(
       ? theme.selected
       : semantic.startsWith('» ')
         ? theme.accent
+        : /^[◆●◇] SELECTED ·/u.test(semantic)
+          ? theme.accentStrong
         : semantic.startsWith('◆ LIVE RUNTIME · PROJECT HOME MISSING')
           ? theme.warningRail
           : semantic.startsWith('◆ CONNECTION DEGRADED')

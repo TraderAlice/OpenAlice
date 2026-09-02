@@ -3206,6 +3206,31 @@ already large `supervisor-tui.ts` application controller.
   screen, and real-PTY tests (including all 54 PTY cases), and the complete CLI
   suite (63 files, 637 tests). CLI typecheck and build also pass.
 
+### Task-led Help console decision
+
+- A fresh real 120x32 comparison against OMP v17.3.4 showed the wide Help
+  surface had become a shortcut manual: Navigation, Runtime, and AliceProject
+  were all expanded at once, while OMP kept a small Tips field and let quiet
+  space preserve the active hierarchy.
+- Wide tall Help now uses a two-part mission console. The stable left rail
+  starts with Start/Connect/Open, command search, and AliceProject fast routes,
+  then offers three fixed system selectors. The right inspector expands only
+  the selected system, wraps its purpose statement, and keeps every visible
+  keycap directly executable. Up/Down, Home/End, wheel, hover, and click retain
+  the same shared selection model.
+- This deliberately supersedes the all-system Control Atlas Board only at the
+  wide/tall breakpoint. The ordinary wide inspector, compact 80-column card,
+  and configuration-recovery vocabulary are unchanged. System hit areas now
+  belong only to their fixed left-rail rows, so the right-side command keycaps
+  cannot ambiguously mean both “select this system” and “run this command.”
+- Real 120x32 and 80x24 captures verify the task-first wide hierarchy and the
+  unchanged compact fallback. A real color PTY hovers and clicks Runtime in the
+  left rail, observes the selected inspector, and exits with terminal modes
+  restored.
+- Task-led-Help acceptance passes through 137 focused Help, screen, and
+  real-PTY tests (including all 54 PTY cases), and the complete CLI suite (63
+  files, 637 tests). CLI typecheck and build also pass.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

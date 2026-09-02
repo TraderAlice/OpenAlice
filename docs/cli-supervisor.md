@@ -409,15 +409,18 @@ intentionally parameter-free:
   running Runtime alternates `●`/`◉` as a low-frequency heartbeat in Overview
   and Fleet; the adjacent `RUNNING`/`running` text never changes, and failed
   probes still surface through the diagnostic rail rather than animation;
-- Help is a responsive Control Atlas rather than a prose screen or static
-  shortcut wall. Wide tall terminals become an all-system Control Atlas Board:
-  Navigation, Runtime, and AliceProject remain simultaneously expanded in
-  full-width sections with bounded two-column command grids, and every row in
-  a section shares its pointer focus. Ordinary terminals split those groups
-  from the selected group's explanation and visible keycaps; narrower
-  terminals stack the same focus model. Arrow/Home/End keys, wheel movement,
-  and whole-row pointer hover/click share one selection. Ordinary Help owns a
-  final `◆ [ ? ] Close Help` content action in Board, wide list-detail, and
+- Help is a responsive task-led Control Atlas rather than a prose screen or
+  static shortcut wall. Wide tall terminals become a Help console: a stable
+  left rail exposes Start/Connect/Open, command search, AliceProject selection,
+  and the Navigation/Runtime/AliceProject systems; a single right inspector
+  explains only the selected system and presents its complete command list.
+  Description text wraps instead of being silently truncated. Ordinary
+  terminals split those groups from the selected group's explanation and
+  visible keycaps; narrower terminals stack the same focus model.
+  Arrow/Home/End keys, wheel movement, and whole-row pointer hover/click share
+  one selection. Keycaps in the inspector remain direct command targets rather
+  than enlarging the system-selection hit area. Ordinary Help owns a final
+  `◆ [ ? ] Close Help` content action in the wide console, list-detail, and
   compact stacked layouts; its visible row is pointer-active and invokes the
   same `?` toggle as the keyboard. It does not restore the ordinary footer
   Action Shelf. Recovery keeps its explicit `? Close safe controls` action

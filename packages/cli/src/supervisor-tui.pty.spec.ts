@@ -1269,7 +1269,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
 
-  it('focuses a complete wide Help section from any command row', async () => {
+  it('switches the wide Help inspector from its fixed system routes', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-help-board-'))
     temporaryPaths.push(isolatedHome)
     const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
@@ -1302,13 +1302,14 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         if (!opened && plain.includes('[ / ] Commands') && plain.includes('◆ OVERVIEW')) {
           opened = true
           child.write('?')
-        } else if (!hovered && plain.includes('Control Atlas Board · 3 SYSTEMS')) {
+        } else if (!hovered && plain.includes('Help · START · SEARCH · SWITCH')) {
           hovered = true
-          child.write('\u001b[<35;70;16M')
-        } else if (!selected && plain.includes('» ● RUNTIME  //  READ STATE, THEN ACT')) {
+          child.write('\u001b[<35;10;13M')
+        } else if (!selected && plain.includes('» ● Runtime  Read state, then act')) {
           selected = true
-          child.write('\u001b[<0;70;16M')
-        } else if (selected && plain.includes('› ● RUNTIME  //  READ STATE, THEN ACT')) {
+          child.write('\u001b[<0;10;13M')
+        } else if (selected && plain.includes('› ● Runtime  Read state, then act')
+          && plain.includes('● SELECTED · RUNTIME')) {
           child.write('q')
         }
       })
@@ -1319,9 +1320,10 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       })
     })
 
-    expect(stripSgr(transcript)).toContain('» ● RUNTIME  //  READ STATE, THEN ACT')
-    expect(stripSgr(transcript)).toContain('› ● RUNTIME  //  READ STATE, THEN ACT')
-    expect(stripSgr(transcript)).toContain('[ / ] Open the Command Dock')
+    expect(stripSgr(transcript)).toContain('» ● Runtime  Read state, then act')
+    expect(stripSgr(transcript)).toContain('› ● Runtime  Read state, then act')
+    expect(stripSgr(transcript)).toContain('● SELECTED · RUNTIME')
+    expect(stripSgr(transcript)).toContain('[ x ] Stop local / disconnect remote target')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)

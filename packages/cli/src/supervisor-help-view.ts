@@ -1,5 +1,5 @@
 import { displayWidth, truncateDisplayWidth } from './supervisor-display.ts'
-import { renderSupervisorPanel } from './supervisor-tui-view.ts'
+import { renderSupervisorPanel, wrapDisplayText } from './supervisor-tui-view.ts'
 
 export interface SupervisorHelpState {
   selected: number
@@ -83,53 +83,68 @@ export function renderSupervisorHelp(
     && Number.isFinite(targetHeight)
     && (targetHeight ?? 0) >= 22
   return boardAvailable
-    ? renderHelpAtlasBoard(groups, normalized, width, Math.floor(targetHeight ?? 21))
+    ? renderHelpMissionConsole(groups, selected, normalized, width, Math.floor(targetHeight ?? 21))
     : width >= 96
       ? renderWideHelp(groups, selected, normalized, recovery, width)
       : renderStackedHelp(groups, selected, normalized, recovery, width)
 }
 
-function renderHelpAtlasBoard(
+function renderHelpMissionConsole(
   groups: HelpGroup[],
+  selected: HelpGroup,
   state: SupervisorHelpState,
   width: number,
   targetHeight: number,
 ): SupervisorHelpRender {
-  const innerWidth = Math.max(1, width - 4)
-  const body = [
-    '◇ ALL SYSTEMS · Scan every control route without leaving this view.',
+  const gap = 3
+  const leftWidth = 42
+  const rightWidth = width - leftWidth - gap
+  const leftRows = [
+    'NOW · Fast routes',
+    '[ Enter ] Start / connect / open',
+    '[ / ] Find any command',
+    '[ i ] Choose an AliceProject',
     '',
+    'SYSTEMS · ↑↓ or hover to inspect',
   ]
-  const targetRows: Array<{ index: number; row: number }> = []
-
-  groups.forEach((group, index) => {
-    const start = body.length
-    const marker = index === state.selected ? '›' : index === state.hovered ? '»' : '·'
-    body.push(
-      `${marker} ${group.glyph} ${group.title.toUpperCase()}  //  ${group.summary.toUpperCase()}`,
-      group.description,
-      ...helpCommandGrid(group.commands, innerWidth),
-    )
-    for (let row = start; row < body.length; row += 1) targetRows.push({ index, row })
-    if (index < groups.length - 1) body.push('')
-  })
-
-  const desiredBodyHeight = Math.max(body.length + 1, targetHeight - 2)
-  while (body.length < desiredBodyHeight - 1) body.push('')
-  body.push(CLOSE_HELP_ACTION)
-  const lines = renderSupervisorPanel(
-    'Control Atlas Board',
-    `${groups.length} SYSTEMS · POINTER + KEYBOARD`,
-    body,
-    width,
+  const groupStart = leftRows.length
+  leftRows.push(...groupRows(groups, state))
+  const rightInnerWidth = Math.max(1, rightWidth - 4)
+  const rightRows = [
+    `${selected.glyph} SELECTED · ${selected.title.toUpperCase()}`,
+    ...wrapDisplayText(selected.description, rightInnerWidth),
+    '',
+    'KEY ROUTES',
+    ...selected.commands.map((command) => helpCommand(
+      command,
+      rightInnerWidth,
+    )),
+  ]
+  const bodyHeight = Math.max(
+    leftRows.length + 1,
+    rightRows.length,
+    targetHeight - 2,
   )
+  while (leftRows.length < bodyHeight - 1) leftRows.push('')
+  leftRows.push(CLOSE_HELP_ACTION)
+  while (rightRows.length < bodyHeight) rightRows.push('')
+
+  const left = renderSupervisorPanel('Help', 'START · SEARCH · SWITCH', leftRows, leftWidth)
+  const right = renderSupervisorPanel(selected.title, selected.summary, rightRows, rightWidth)
+  const lines = left.map((line, index) => joinColumns(
+    line,
+    right[index] ?? '',
+    leftWidth,
+    gap,
+    width,
+  ))
   return {
     lines,
-    targets: targetRows.map(({ index, row }) => ({
+    targets: groups.map((_, index) => ({
       index,
-      row: row + 2,
+      row: groupStart + index + 2,
       startColumn: 2,
-      endColumn: Math.max(2, width - 1),
+      endColumn: leftWidth - 1,
     })),
   }
 }

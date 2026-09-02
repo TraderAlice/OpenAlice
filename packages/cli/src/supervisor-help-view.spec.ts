@@ -27,32 +27,38 @@ describe('Supervisor Help control atlas', () => {
     ])
   })
 
-  it('uses a tall wide viewport for an all-system Control Atlas Board', () => {
+  it('uses a tall wide viewport for a task-led Help console', () => {
     const rendered = renderSupervisorHelp({ selected: 1, hovered: 2 }, false, 120, 22)
     const output = rendered.lines.join('\n')
 
     expect(rendered.lines).toHaveLength(22)
-    expect(output).toContain('Control Atlas Board · 3 SYSTEMS · POINTER + KEYBOARD')
-    expect(output).toContain('· ◆ NAVIGATION  //  MOVE WITH INTENT')
-    expect(output).toContain('› ● RUNTIME  //  READ STATE, THEN ACT')
-    expect(output).toContain('» ◇ ALICEPROJECT  //  SHAPE THE WORKSPACE')
-    expect(output).toContain('[ Shift+Tab / ← ] Previous view')
+    expect(output).toContain('Help · START · SEARCH · SWITCH')
+    expect(output).toContain('NOW · Fast routes')
+    expect(output).toContain('[ Enter ] Start / connect / open')
+    expect(output).toContain('[ / ] Find any command')
+    expect(output).toContain('[ i ] Choose an AliceProject')
+    expect(output).toContain('  ◆ Navigation  Move with intent')
+    expect(output).toContain('› ● Runtime  Read state, then act')
+    expect(output).toContain('» ◇ AliceProject  Shape the workspace')
+    expect(output).toContain('● SELECTED · RUNTIME')
+    expect(output).toContain('Runtime leads with the session Connection Chronicle; local mutations')
+    expect(output).toContain('keep confirmation while remote targets expose only safe link controls.')
+    expect(output).toContain('[ Enter ] Run the contextual primary action')
     expect(output).toContain('[ x ] Stop local / disconnect remote target')
-    expect(output).toContain('[ / ] Open the Command Dock')
     expect(output).toContain('◆ [ ? ] Close Help')
-    expect(rendered.targets.filter((target) => target.index === 0)).toHaveLength(4)
-    expect(rendered.targets.filter((target) => target.index === 1)).toHaveLength(6)
-    expect(rendered.targets.filter((target) => target.index === 2)).toHaveLength(5)
+    expect(rendered.targets).toHaveLength(3)
     expect(rendered.targets.every((target) => (
-      target.startColumn === 2 && target.endColumn === 119
+      target.startColumn === 2 && target.endColumn === 41
     ))).toBe(true)
     expect(rendered.lines.every((line) => displayWidth(line) === 120)).toBe(true)
 
     const boundary = renderSupervisorHelp({ selected: 0, hovered: null }, false, 100, 22)
     expect(boundary.lines).toHaveLength(22)
-    expect(boundary.lines.join('\n')).toContain('Control Atlas Board')
+    expect(boundary.lines.join('\n')).toContain('Help · START · SEARCH · SWITCH')
+    expect(renderSupervisorHelp({ selected: 1, hovered: null }, false, 100, 22)
+      .lines.join('\n')).toContain('safe link controls.')
     expect(renderSupervisorHelp({ selected: 0, hovered: null }, false, 100, 21)
-      .lines.join('\n')).not.toContain('Control Atlas Board')
+      .lines.join('\n')).not.toContain('START · SEARCH · SWITCH')
   })
 
   it('folds the same selected group into a narrow card', () => {
