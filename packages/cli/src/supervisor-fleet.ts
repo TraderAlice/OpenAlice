@@ -24,6 +24,12 @@ export interface SupervisorFleetState {
   tunnels: Record<string, 'connecting' | 'connected' | 'failed'>
 }
 
+export interface SupervisorFleetActiveTarget {
+  machineKey: string
+  projectKey: string
+  transport: 'loopback' | 'ssh-forward'
+}
+
 export interface SupervisorFleetPointerTarget {
   focus: FleetFocus
   index: number
@@ -192,6 +198,7 @@ export function renderSupervisorFleet(
   visibleRows = SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
   hoveredRail?: SupervisorFleetRailTarget,
   launcher = false,
+  activeTarget?: SupervisorFleetActiveTarget,
 ): string[] {
   const launchRail = launcher ? [...renderLaunchSequence(state, width), ''] : []
   if (width < 72) {
@@ -202,6 +209,7 @@ export function renderSupervisorFleet(
       pulse,
       SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
       hoveredRail,
+      activeTarget,
     )]
   }
   const rowCount = fleetVisibleRows(state, visibleRows)
@@ -217,6 +225,7 @@ export function renderSupervisorFleet(
     state.focus === 'machines',
     rowCount,
     hoveredRail?.focus === 'machines' ? hoveredRail.trackRow : null,
+    activeTarget,
   )
   const projectRows = renderProjectRows(
     state,
@@ -226,6 +235,7 @@ export function renderSupervisorFleet(
     state.focus === 'projects',
     rowCount,
     hoveredRail?.focus === 'projects' ? hoveredRail.trackRow : null,
+    activeTarget,
   )
   const leftPane = renderPane(
     `Machines · ${positionLabel(state.selectedMachine, state.machines.length)}`,
@@ -254,7 +264,7 @@ export function renderSupervisorFleet(
     ))
   }
   const detailRows = fleetDetailRows(width, visibleRows, rowCount)
-  lines.push('', ...renderDetailCard(state, width, pulse, detailRows))
+  lines.push('', ...renderDetailCard(state, width, pulse, detailRows, activeTarget))
   return [...launchRail, ...lines].map((line) => truncateDisplayWidth(line, width))
 }
 
@@ -309,6 +319,7 @@ function renderNarrowFleet(
   pulse = false,
   rowCount = SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
   hoveredRail?: SupervisorFleetRailTarget,
+  activeTarget?: SupervisorFleetActiveTarget,
 ): string[] {
   const machine = selectedFleetMachine(state)
   if (state.focus === 'machines') {
@@ -322,6 +333,7 @@ function renderNarrowFleet(
           true,
           rowCount,
           hoveredRail?.focus === 'machines' ? hoveredRail.trackRow : null,
+          activeTarget,
         ),
         width,
         true,
@@ -329,7 +341,7 @@ function renderNarrowFleet(
         rowCount,
       ),
       '',
-      ...renderDetailCard(state, width, pulse),
+      ...renderDetailCard(state, width, pulse, 2, activeTarget),
     ].map((line) => truncateDisplayWidth(line, width))
   }
   return [
@@ -343,6 +355,7 @@ function renderNarrowFleet(
         true,
         rowCount,
         hoveredRail?.focus === 'projects' ? hoveredRail.trackRow : null,
+        activeTarget,
       ),
       width,
       true,
@@ -350,7 +363,7 @@ function renderNarrowFleet(
       rowCount,
     ),
     '',
-    ...renderDetailCard(state, width, pulse),
+    ...renderDetailCard(state, width, pulse, 2, activeTarget),
   ].map((line) => truncateDisplayWidth(line, width))
 }
 
@@ -453,6 +466,7 @@ function renderMachineRows(
   focused = true,
   visibleRows = SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
   hoveredRailRow: number | null = null,
+  activeTarget?: SupervisorFleetActiveTarget,
 ): string[] {
   if (state.machines.length === 0) return ['  No Machines registered']
   const start = visibleWindowStart(state.machines.length, state.selectedMachine, visibleRows)
@@ -462,7 +476,9 @@ function renderMachineRows(
       ? focused ? '▶ ' : '◁ '
       : hovered?.surface !== 'pane' && hovered?.focus === 'machines' && hovered.index === index ? '» ' : '  '
     const status = machineStatus(item)
-    const count = item.connection === 'local' || item.connection === 'online'
+    const count = item.key === activeTarget?.machineKey
+      ? `● ACTIVE · ${item.projects.length}`
+      : item.connection === 'local' || item.connection === 'online'
       ? `${machineGlyph(item)} ${item.projects.length}`
       : `${machineGlyph(item)} ${status}`
     return labelAndTail(prefix + item.displayName, count, width)
@@ -482,6 +498,7 @@ function renderProjectRows(
   focused = true,
   visibleRows = SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
   hoveredRailRow: number | null = null,
+  activeTarget?: SupervisorFleetActiveTarget,
 ): string[] {
   const machine = selectedFleetMachine(state)
   if (!machine) return ['  Select a Machine']
@@ -496,6 +513,7 @@ function renderProjectRows(
       ? focused ? '▶ ' : '◁ '
       : hovered?.surface !== 'pane' && hovered?.focus === 'projects' && hovered.index === index ? '» ' : '  '
     const marks = [
+      activeTarget?.machineKey === machine.key && activeTarget.projectKey === item.key ? 'ACTIVE' : '',
       item.isDefault ? 'default' : '',
       projectStatus(item, pulse),
     ].filter(Boolean).join(' · ')
@@ -513,6 +531,7 @@ function fleetSelectionDetail(
   pulse = false,
   width = 76,
   expanded = false,
+  activeTarget?: SupervisorFleetActiveTarget,
 ): string[] {
   const machine = selectedFleetMachine(state)
   const project = selectedFleetProject(state)
@@ -520,14 +539,15 @@ function fleetSelectionDetail(
   if (state.focus === 'machines' || !project) {
     const target = machine.sshTarget ? ` · ${machine.sshTarget}` : ''
     const rows = [
-      `${machineGlyph(machine)} ${machine.displayName} · ${machineStatus(machine)}${target}`,
+      `${machine.key === activeTarget?.machineKey ? '● ACTIVE MACHINE · ' : ''}${machineGlyph(machine)} ${machine.displayName} · ${machineStatus(machine)}${target}`,
       `${machine.platform ?? 'unknown'} / ${machine.arch ?? 'unknown'} · ${machine.projects.length} AliceProjects · checked ${formatChecked(state.generatedAt)}`,
     ]
     return expanded ? [...rows, ...expandedMachineDetail(machine, state, width)] : rows
   }
   const tunnel = state.tunnels[fleetTunnelKey(machine.key, project.key)]
+  const active = activeTarget?.machineKey === machine.key && activeTarget.projectKey === project.key
   const rows = [
-    `${projectStatus(project, pulse)} ${project.displayName} · ${project.product === 'nano' ? 'NanoAlice' : 'TraderAlice'} · ${project.runtime.ownerSurface ?? 'no owner'}`,
+    `${active ? '● ACTIVE TARGET · ' : ''}${projectStatus(project, pulse)} ${project.displayName} · ${project.product === 'nano' ? 'NanoAlice' : 'TraderAlice'} · ${project.runtime.ownerSurface ?? 'no owner'}`,
     [project.home, tunnel ? `tunnel ${tunnel}` : ''].filter(Boolean).join(' · '),
   ]
   return expanded
@@ -540,6 +560,7 @@ function renderDetailCard(
   width: number,
   pulse = false,
   rowCount = 2,
+  activeTarget?: SupervisorFleetActiveTarget,
 ): string[] {
   const expanded = rowCount > 2
   const title = expanded
@@ -547,7 +568,7 @@ function renderDetailCard(
     : 'Selection'
   return renderPane(
     title,
-    fleetSelectionDetail(state, pulse, width - 4, expanded),
+    fleetSelectionDetail(state, pulse, width - 4, expanded, activeTarget),
     width,
     undefined,
     false,

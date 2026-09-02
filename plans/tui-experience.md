@@ -119,6 +119,23 @@ not imply maintainer approval of the finished interaction.
   mutate local context. This is an autonomous topic decision, not recorded
   maintainer approval.
 
+### Connected-state control-plane decision
+
+- Treating a successful SSH forward as a one-time navigation event leaves the
+  user unable to answer which target subsequent commands affect, how to leave
+  it, or what happened when the tunnel closes.
+- Allowing several background tunnels while only one target is rendered also
+  violates the active-target model and makes switching appear cheaper and safer
+  than it is.
+- The selected model keeps exactly one active target. The persistent command
+  spine names its Machine, AliceProject, transport, and live signal; Connections
+  marks that same target independently of list focus. Remote targets expose an
+  explicit Disconnect action and a target-scoped Command Dock. Selecting a new
+  local or remote target closes the previous SSH forward, while authoritative
+  local Runtime loss returns the default shell to the Launcher with a visible
+  reason. Browser opening remains a separate action. This is an autonomous
+  topic decision, not recorded maintainer approval.
+
 ### Launchpad action-surface decision
 
 - Keeping the current cockpit and merely recoloring its cards would improve a
@@ -2661,6 +2678,21 @@ already large `supervisor-tui.ts` application controller.
   Runtime. Package dry-run contains the new `supervisor-inbox.ts` owner among
   68 published files. `OPENALICE_TUI_START_VIEW=home` preserves an explicit
   expert/deep-regression entry without changing the adaptive product default.
+- Connected-state control now keeps one target instead of treating SSH as a
+  transient browser route. The persistent Dock names local or remote Machine,
+  AliceProject, transport, and signal; Connections marks the active Machine and
+  project independently from focus. Switching closes the old TUI-owned tunnel,
+  remote `x` disconnects without stopping OpenAlice, and the remote Command
+  Dock contains no local lifecycle or configuration mutations. Authoritative
+  local Runtime loss returns the adaptive shell to its Launcher.
+- State-control acceptance passes with 145 focused Command Dock, Fleet, Inbox,
+  screen, and real-PTY tests. Added integration coverage proves explicit SSH
+  disconnect aborts the tunnel and returns to Connections, and a polled local
+  stop clears the active target and restores the launch rail. Root TypeScript
+  and CLI build pass; the 703-file suite passes (702 passed, 1 skipped; 6,228
+  tests passed, 10 skipped). Docker installer smoke passes without Node, npm,
+  pnpm, Bun, or an Agent Runtime, and package dry-run retains all 68 published
+  CLI files including every changed TUI owner.
 
 ## Completion Criteria
 

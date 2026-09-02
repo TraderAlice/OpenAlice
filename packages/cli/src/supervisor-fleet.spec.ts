@@ -40,6 +40,25 @@ describe('Supervisor fleet state and presentation', () => {
     expect(lines.every((line) => displayWidth(line) <= 80)).toBe(true)
   })
 
+  it('marks the active target independently from Connections focus', () => {
+    let state = createSupervisorFleetState('2026-08-23T00:00:00Z', machines())
+    state = selectFleetIndex(state, 'machines', 1)
+    state = setFleetFocus(state, 'projects')
+    const output = renderSupervisorFleet(
+      state,
+      100,
+      undefined,
+      false,
+      5,
+      undefined,
+      false,
+      { machineKey: 'cloud', projectKey: 'research', transport: 'ssh-forward' },
+    ).join('\n')
+
+    expect(output).toMatch(/Research\s+ACTIVE · default · ● running/u)
+    expect(output).toContain('● ACTIVE TARGET · ● running Research')
+  })
+
   it('distinguishes active focus from the related inactive selection', () => {
     let state = createSupervisorFleetState('2026-08-23T00:00:00Z', machines())
     const machinesFocused = renderSupervisorFleet(state, 100).join('\n')

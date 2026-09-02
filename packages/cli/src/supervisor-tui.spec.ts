@@ -123,6 +123,53 @@ describe('Supervisor TUI screen', () => {
     expect(toggled).toEqual(['hello'])
   })
 
+  it('keeps remote controls target-scoped and exposes an explicit disconnect', () => {
+    let disconnected = 0
+    let sourceRequests = 0
+    const runtime = {
+      class: 'running',
+      endpoints: { web: 'http://127.0.0.1:45454' },
+    }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'overview',
+      runtime: { class: 'absent', endpoints: {} },
+      activeTarget: {
+        kind: 'ssh',
+        machineKey: 'cloud',
+        machineName: 'Cloud Lab',
+        projectKey: 'research',
+        projectName: 'Research',
+        home: '/srv/openalice/research',
+        transport: 'ssh-forward',
+        endpoint: 'http://127.0.0.1:45454',
+        clientUrl: 'http://127.0.0.1:45454/#openalice-remote=1',
+        runtime,
+      },
+    }, {
+      motionEnabled: false,
+      onDisconnectActiveTarget: () => { disconnected += 1 },
+      onConfigureSource: () => { sourceRequests += 1 },
+    })
+
+    const frame = screen.render(100).join('\n')
+    expect(frame).toContain('⌁ Cloud Lab / Research · SSH')
+    expect(frame).toContain('[ x ] Disconnect')
+    expect(frame).not.toContain('[ i ] Research')
+    expect(screen.renderCommandPalette(100).lines.join('\n')).toContain('Disconnect remote target')
+    expect(screen.renderCommandPalette(100).lines.join('\n')).not.toContain('Runtime Source')
+
+    expect(screen.handleKey('c', matchesKey)).toBe(true)
+    expect(screen.snapshot.panel).toBe('fleet')
+    expect(sourceRequests).toBe(0)
+    screen.update({ panel: 'overview' })
+    expect(screen.handleKey('x', matchesKey)).toBe(true)
+    expect(disconnected).toBe(1)
+    expect(screen.handleKey('d', matchesKey)).toBe(true)
+    expect(screen.snapshot.notice).toContain('controls a local Runtime')
+  })
+
   it('labels source-run, stable, beta, and dev channels from install provenance', async () => {
     await expect(resolveSupervisorChannel({
       resolveLayout: () => null,
@@ -2465,6 +2512,55 @@ describe('Supervisor TUI screen', () => {
     expect(calls).toEqual(['start'])
   })
 
+  it('returns to the Launcher when the active local Runtime disappears', async () => {
+    let inputListener: ((data: string) => unknown) | undefined
+    let screen: SupervisorScreen | undefined
+    let inspections = 0
+    const running = {
+      class: 'running',
+      owner: { surface: 'cli-server', pid: 42 },
+      endpoints: { web: 'http://127.0.0.1:47331' },
+    }
+    class FakeTui {
+      addChild(component: SupervisorScreen): void { screen = component }
+      addInputListener(listener: (data: string) => unknown): () => void {
+        inputListener = listener
+        return () => undefined
+      }
+      requestRender(): void {}
+      setShowHardwareCursor(): void {}
+      start(): void { setTimeout(() => inputListener?.('q'), 30) }
+      stop(): void {}
+    }
+    const context = resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' })
+
+    await expect(runSupervisorTui({}, {
+      stdin: { isTTY: true } as NodeJS.ReadStream,
+      stdout: { isTTY: true } as NodeJS.WriteStream,
+      resolveContext: () => context,
+      inspect: async () => inspections++ === 0
+        ? running
+        : { class: 'absent', owner: null, endpoints: {} },
+      seedFleet: async () => ({
+        schemaVersion: 1,
+        generatedAt: '2026-09-02T00:00:00Z',
+        machines: fleetMachines(),
+      }),
+      discoverUpdate: async () => null,
+      pollIntervalMs: 5,
+      loadTui: async () => ({
+        ProcessTerminal: class {},
+        TUI: FakeTui,
+        matchesKey,
+      }) as never,
+    })).resolves.toBe(0)
+
+    expect(screen?.snapshot.activeTarget).toBeNull()
+    expect(screen?.snapshot.panel).toBe('fleet')
+    expect(screen?.snapshot.notice).toContain('Runtime stopped')
+    expect(screen?.render(100).join('\n')).toContain('OPENALICE LAUNCH')
+  })
+
   it('aborts TUI-owned remote tunnels when the Supervisor detaches', async () => {
     let inputListener: ((data: string) => unknown) | undefined
     let tunnelAborted = false
@@ -2532,6 +2628,69 @@ describe('Supervisor TUI screen', () => {
       endpoint: 'http://127.0.0.1:45454',
       transport: 'ssh-forward',
     })
+  })
+
+  it('disconnects the active SSH target without stopping its remote Runtime', async () => {
+    let inputListener: ((data: string) => unknown) | undefined
+    let tunnelAborted = false
+    let screen: SupervisorScreen | undefined
+    class FakeTui {
+      addChild(component: SupervisorScreen): void { screen = component }
+      addInputListener(listener: (data: string) => unknown): () => void {
+        inputListener = listener
+        return () => undefined
+      }
+      requestRender(): void {}
+      setShowHardwareCursor(): void {}
+      start(): void {
+        queueMicrotask(() => {
+          inputListener?.('down')
+          inputListener?.('tab')
+          inputListener?.('o')
+        })
+      }
+      stop(): void {}
+    }
+    const fleet: MachineFleetEnvelope = {
+      schemaVersion: 1,
+      generatedAt: '2026-08-23T00:00:00Z',
+      machines: fleetMachines(),
+    }
+
+    await expect(runSupervisorTui({}, {
+      stdin: { isTTY: true } as NodeJS.ReadStream,
+      stdout: { isTTY: true } as NodeJS.WriteStream,
+      resolveContext: () => resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' }),
+      inspect: async () => ({ class: 'absent', owner: null, endpoints: {} }),
+      seedFleet: async () => fleet,
+      inspectFleet: async () => fleet,
+      connectRemoteProject: async ({ signal, onReady }) => {
+        onReady({
+          localPort: 45454,
+          localUrl: 'http://127.0.0.1:45454',
+          clientUrl: 'http://127.0.0.1:45454',
+        })
+        queueMicrotask(() => inputListener?.('x'))
+        return new Promise<number>((resolve) => {
+          signal.addEventListener('abort', () => {
+            tunnelAborted = true
+            setTimeout(() => inputListener?.('q'), 5)
+            resolve(0)
+          }, { once: true })
+        })
+      },
+      discoverUpdate: async () => null,
+      loadTui: async () => ({
+        ProcessTerminal: class {},
+        TUI: FakeTui,
+        matchesKey,
+      }) as never,
+    })).resolves.toBe(0)
+
+    expect(tunnelAborted).toBe(true)
+    expect(screen?.snapshot.activeTarget).toBeNull()
+    expect(screen?.snapshot.panel).toBe('fleet')
+    expect(screen?.snapshot.notice).toContain('Disconnected from')
   })
 
   it('preserves remote Fleet focus while the selected local Runtime polls', async () => {

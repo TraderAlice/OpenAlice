@@ -33,6 +33,21 @@ describe('Supervisor Command Dock', () => {
     expect(recovery.map((item) => item.input)).toEqual(['u', '?'])
   })
 
+  it('scopes the Command Dock to an active SSH target', () => {
+    const items = supervisorCommandDeckItems({ ...context, targetKind: 'ssh' })
+
+    expect(items.map((item) => item.input)).toEqual(['enter', 'x', 'c', 'tab', '?'])
+    expect(items.map((item) => item.label)).toEqual([
+      'Open active Web UI',
+      'Disconnect remote target',
+      'Connections',
+      'Next view',
+      'Help',
+    ])
+    expect(items.map((item) => item.label)).not.toContain('Runtime Source')
+    expect(items.map((item) => item.label)).not.toContain('Stop Runtime')
+  })
+
   it('wraps keyboard selection and clamps pointer-wheel selection', () => {
     const initial = createSupervisorCommandDeckState()
     expect(moveSupervisorCommandDeckSelection(initial, -1, 4).selected).toBe(3)

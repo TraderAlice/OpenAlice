@@ -31,6 +31,7 @@ export type SupervisorCommandDeckInput =
 
 export interface SupervisorCommandDeckContext {
   recovery: boolean
+  targetKind?: 'local' | 'ssh'
   runtimeState: string
   primaryLabel: string
   primaryAvailable: boolean
@@ -82,6 +83,31 @@ export function supervisorCommandDeckItems(
       command(
         '?', 'Recovery help', 'Review safe recovery controls',
         'Navigate', false, ['帮助', '恢复'],
+      ),
+    ]
+  }
+
+  if (context.targetKind === 'ssh') {
+    return [
+      command(
+        'enter', 'Open active Web UI', 'Open the verified Web UI through this SSH forward',
+        'Primary', true, ['open', 'remote', '打开', '远程'],
+      ),
+      command(
+        'x', 'Disconnect remote target', 'Close this SSH forward without stopping OpenAlice',
+        'Primary', false, ['disconnect', 'ssh', '断开'],
+      ),
+      command(
+        'c', 'Connections', 'Choose another Machine or AliceProject target',
+        'Navigate', false, ['switch', 'target', '连接', '切换'],
+      ),
+      command(
+        'tab', 'Next view', 'Move through the connected workbench',
+        'Navigate', false, ['下一页', '切换'],
+      ),
+      command(
+        '?', 'Help', 'Open the complete keyboard reference',
+        'Navigate', false, ['帮助'],
       ),
     ]
   }

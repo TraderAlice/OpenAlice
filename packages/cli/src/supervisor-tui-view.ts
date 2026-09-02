@@ -87,6 +87,9 @@ export interface SupervisorDockView {
   focusTask?: string
   focusLabel?: string
   projectName?: string
+  machineName?: string
+  targetKind?: 'local' | 'ssh'
+  transport?: 'loopback' | 'ssh-forward'
   runtimeState?: string
   projectAvailable?: boolean
   pulse?: boolean
@@ -652,14 +655,25 @@ export function renderSupervisorDock(
   const contextBudget = Math.max(1, width - 6 - displayWidth(controls) - 3)
   const panelSuffix = `${breadcrumb}${panelIdentity}`
   const projectPrefix = view.focusTask ? '⌂ ' : '[ i ] '
+  const targetIdentity = view.targetKind === 'ssh'
+    ? `⌁ ${view.machineName ?? 'Remote'} / ${fullProjectName} · SSH`
+    : view.targetKind === 'local'
+      ? `⌂ ${view.machineName ?? 'This computer'} / ${view.focusTask ? '' : '[ i ] '}${fullProjectName} · LOCAL`
+      : `${projectPrefix}${fullProjectName}`
   const signalSuffix = `${breadcrumb}${signal}`
-  const fullContext = `${projectPrefix}${fullProjectName}${signalSuffix}${panelSuffix}`
-  const projectSignal = `${projectPrefix}${fullProjectName}${signalSuffix}`
+  const fullContext = `${targetIdentity}${signalSuffix}${panelSuffix}`
+  const projectSignal = `${targetIdentity}${signalSuffix}`
   const projectNameBudget = contextBudget
-    - displayWidth(projectPrefix)
+    - displayWidth(view.targetKind === 'ssh'
+      ? '⌁  /  · SSH'
+      : view.targetKind === 'local' ? '⌂  / [ i ]  · LOCAL' : projectPrefix)
     - displayWidth(signalSuffix)
   const compactProjectSignal = projectNameBudget >= 6
-    ? `${projectPrefix}${truncateDisplayWidth(fullProjectName, projectNameBudget)}${signalSuffix}`
+    ? view.targetKind === 'ssh'
+      ? `⌁ ${truncateDisplayWidth(`${view.machineName ?? 'Remote'} / ${fullProjectName}`, projectNameBudget)} · SSH${signalSuffix}`
+      : view.targetKind === 'local'
+        ? `⌂ ${truncateDisplayWidth(`${view.machineName ?? 'This computer'} / ${fullProjectName}`, projectNameBudget)} · LOCAL${signalSuffix}`
+        : `${projectPrefix}${truncateDisplayWidth(fullProjectName, projectNameBudget)}${signalSuffix}`
     : ''
   const signalPanel = `${signal}${panelSuffix}`
   const context = displayWidth(fullContext) <= contextBudget

@@ -903,6 +903,9 @@ export async function runSupervisorTui(
         (error: unknown) => screen.update({ diagnostic: safeError(error) }),
       )
     },
+    onDisconnectActiveTarget: () => {
+      disconnectActiveRemoteTarget()
+    },
     onConfirmationChange: syncConfirmationOverlay,
     onCommandPaletteChange: syncCommandPaletteOverlay,
     requestRender: () => ui.requestRender(),
@@ -1005,6 +1008,37 @@ export async function runSupervisorTui(
   const startRemoteProject = dependencies.startRemoteProject
     ?? ((machine, projectKey) => runRemoteProjectStart(machine, projectKey))
 
+  function abortRemoteTunnels(exceptKey?: string): void {
+    for (const [key, controller] of tunnelControllers) {
+      if (key !== exceptKey) controller.abort()
+    }
+  }
+
+  function disconnectActiveRemoteTarget(): void {
+    const target = activeTarget
+    if (!target || target.kind !== 'ssh') return
+    const key = fleetTunnelKey(target.machineKey, target.projectKey)
+    const controller = tunnelControllers.get(key)
+    screen.update({
+      busy: `Disconnecting ${target.machineName} / ${target.projectName}`,
+      notice: undefined,
+      diagnostic: undefined,
+    })
+    if (controller) {
+      controller.abort()
+      return
+    }
+    activeTarget = localSupervisorTarget(context, runtime)
+    inbox = null
+    screen.update({
+      busy: undefined,
+      activeTarget: forceHomeStart && !activeTarget ? undefined : activeTarget,
+      inbox,
+      panel: activeTarget || forceHomeStart ? 'overview' : 'fleet',
+      notice: `Disconnected from ${target.machineName} / ${target.projectName}.`,
+    })
+  }
+
   async function refreshInbox(options: { quiet?: boolean } = {}): Promise<void> {
     const target = activeTarget
     if (!active || !target) return
@@ -1057,6 +1091,7 @@ export async function runSupervisorTui(
         activeTarget = localSupervisorTarget(context, nextRuntime)
         if (activeTarget?.endpoint !== previousTarget?.endpoint) inbox = null
       }
+      const localTargetLost = previousTarget?.kind === 'local' && !activeTarget
       const currentFleet = screen.snapshot.fleet
       screen.update({
         runtime: nextRuntime,
@@ -1064,6 +1099,14 @@ export async function runSupervisorTui(
         inbox,
         ...(activeTarget && !previousTarget && screen.snapshot.panel === 'fleet'
           ? { panel: 'overview' as const, notice: 'Runtime started. Connected to this AliceProject.' }
+          : {}),
+        ...(localTargetLost && !forceHomeStart
+          ? {
+              panel: 'fleet' as const,
+              notice: nextRuntime.class === 'absent'
+                ? 'Runtime stopped. Choose an AliceProject to start or connect.'
+                : 'Connection to the local Runtime was lost. Choose a target to continue.',
+            }
           : {}),
         fleet: currentFleet && context
           ? replaceFleetInventory(
@@ -1135,9 +1178,16 @@ export async function runSupervisorTui(
           context = await selectProject(context, project.key)
           services = createServices(dependencies, context)
           runtime = await services.inspect({ homeRoot: context.home, waitMs: 2_000 })
+          abortRemoteTunnels()
+          const previousEndpoint = activeTarget?.endpoint
+          activeTarget = localSupervisorTarget(context, runtime)
+          if (activeTarget?.endpoint !== previousEndpoint) inbox = null
           screen.update({
             context,
             runtime,
+            activeTarget: forceHomeStart && !activeTarget ? undefined : activeTarget,
+            inbox,
+            panel: activeTarget || forceHomeStart ? 'overview' : 'fleet',
             fleet: screen.snapshot.fleet
               ? selectFleetProjectByKey(
                   replaceFleetInventory(
@@ -1165,6 +1215,28 @@ export async function runSupervisorTui(
         }
         return
       }
+      if (activeTarget?.kind === 'ssh') {
+        abortRemoteTunnels()
+        activeTarget = null
+        inbox = null
+        screen.update({ activeTarget, inbox })
+      }
+      const localTarget = localSupervisorTarget(context, runtime)
+      if (localTarget) {
+        abortRemoteTunnels()
+        const previousEndpoint = activeTarget?.endpoint
+        activeTarget = localTarget
+        if (activeTarget.endpoint !== previousEndpoint) inbox = null
+        screen.update({
+          activeTarget,
+          inbox,
+          panel: 'overview',
+          notice: `Using ${localTarget.machineName} / ${localTarget.projectName}.`,
+          diagnostic: undefined,
+        })
+        if (!inbox) void refreshInbox({ quiet: true })
+        return
+      }
       const action = screen.snapshot.runtime?.class === 'absent'
         ? 'start'
         : primaryAction(screen.snapshot.runtime)
@@ -1182,6 +1254,15 @@ export async function runSupervisorTui(
       return
     }
     const key = fleetTunnelKey(machine.key, project.key)
+    if (activeTarget?.kind === 'ssh'
+      && activeTarget.machineKey === machine.key
+      && activeTarget.projectKey === project.key) {
+      screen.update({
+        panel: 'overview',
+        notice: `Already connected to ${machine.displayName} / ${project.displayName}.`,
+      })
+      return
+    }
     if (tunnelControllers.has(key)) {
       screen.update({ notice: `The ${machine.key}/${project.key} tunnel is already active.` })
       return
@@ -1196,6 +1277,7 @@ export async function runSupervisorTui(
         project,
         signal: controller.signal,
         onReady: ({ localUrl, clientUrl }) => {
+          abortRemoteTunnels(key)
           updateTunnelState(key, 'connected')
           activeTarget = remoteSupervisorTarget(machine, project, localUrl, clientUrl)
           inbox = null
@@ -1229,6 +1311,8 @@ export async function runSupervisorTui(
             activeTarget: forceHomeStart && !activeTarget ? undefined : activeTarget,
             inbox,
             panel: activeTarget || forceHomeStart ? 'overview' : 'fleet',
+            busy: undefined,
+            notice: `Disconnected from ${machine.displayName} / ${project.displayName}.`,
           })
         }
       }
@@ -3206,6 +3290,7 @@ export class SupervisorScreen implements Component {
   private readonly onRefreshInbox?: () => void
   private readonly onToggleInboxRead?: (entry: NonNullable<SupervisorInboxSnapshot['entries'][number]>) => void
   private readonly onOpenActiveTarget?: () => void
+  private readonly onDisconnectActiveTarget?: () => void
   private readonly onConfirmationChange?: (action?: SupervisorConfirmation) => void
   private readonly onCommandPaletteChange?: (open: boolean) => void
   private readonly requestRender?: () => void
@@ -3282,6 +3367,7 @@ export class SupervisorScreen implements Component {
       onRefreshInbox?: () => void
       onToggleInboxRead?: (entry: NonNullable<SupervisorInboxSnapshot['entries'][number]>) => void
       onOpenActiveTarget?: () => void
+      onDisconnectActiveTarget?: () => void
       onConfirmationChange?: (action?: SupervisorConfirmation) => void
       onCommandPaletteChange?: (open: boolean) => void
       requestRender?: () => void
@@ -3312,6 +3398,7 @@ export class SupervisorScreen implements Component {
     this.onRefreshInbox = callbacks.onRefreshInbox
     this.onToggleInboxRead = callbacks.onToggleInboxRead
     this.onOpenActiveTarget = callbacks.onOpenActiveTarget
+    this.onDisconnectActiveTarget = callbacks.onDisconnectActiveTarget
     this.onConfirmationChange = callbacks.onConfirmationChange
     this.onCommandPaletteChange = callbacks.onCommandPaletteChange
     this.requestRender = callbacks.requestRender
@@ -3496,6 +3583,7 @@ export class SupervisorScreen implements Component {
 
   renderCommandPalette(width: number) {
     const items = this.filteredCommandDeckItems()
+    const runtime = this.snapshot.activeTarget?.runtime ?? this.snapshot.runtime
     this.commandDeckState = normalizeSupervisorCommandDeckState(
       this.commandDeckState,
       items.length,
@@ -3505,7 +3593,7 @@ export class SupervisorScreen implements Component {
       this.commandDeckState,
       isConfigRecovery(this.snapshot)
         ? 'recovery'
-        : this.snapshot.runtime?.class ?? 'unavailable',
+        : runtime?.class ?? 'unavailable',
       width,
       this.commandDeckQuery,
       !this.motionEnabled || this.commandDeckCursorFrame < 6,
@@ -3794,6 +3882,23 @@ export class SupervisorScreen implements Component {
       if (matchesKey(data, 'home') || matchesKey(data, 'end')) {
         this.helpState = selectSupervisorHelpBoundary(recovery, matchesKey(data, 'end'))
         this.requestRender?.()
+        return true
+      }
+    }
+    if (this.snapshot.activeTarget?.kind === 'ssh') {
+      if (matchesKey(data, 'x')) {
+        this.onDisconnectActiveTarget?.()
+        return true
+      }
+      if (matchesKey(data, 'c') || matchesKey(data, 'i')) {
+        this.selectPanel('fleet')
+        return true
+      }
+      const localOnlyKeys: KeyId[] = ['s', 'r', 'l', 'd', 'p', 'm']
+      if (localOnlyKeys.some((key) => matchesKey(data, key))) {
+        this.update({
+          notice: 'That command controls a local Runtime. Use Connections to select a local target first.',
+        })
         return true
       }
     }
@@ -4330,6 +4435,13 @@ export class SupervisorScreen implements Component {
         this.fleetVisibleRows,
         fleetRailTargetFromPointer(this.hoveredRail),
         this.snapshot.activeTarget === null,
+        this.snapshot.activeTarget
+          ? {
+              machineKey: this.snapshot.activeTarget.machineKey,
+              projectKey: this.snapshot.activeTarget.projectKey,
+              transport: this.snapshot.activeTarget.transport,
+            }
+          : undefined,
       ))
     } else if (this.snapshot.panel === 'inbox') {
       this.inboxState = normalizeSupervisorInboxState(this.inboxState, this.snapshot.inbox)
@@ -4435,7 +4547,7 @@ export class SupervisorScreen implements Component {
         guidance: renderGuidance(runtime, this.snapshot.context),
         primaryAction: primaryActionLabel(runtime),
         primaryHovered: this.homePrimaryHovered,
-        projectHotspot: true,
+        projectHotspot: this.snapshot.activeTarget?.kind !== 'ssh',
         webHotspot: Boolean(runtime?.endpoints?.web),
         providerHotspot: runtime?.class === 'absent',
         hoveredHotspot: this.hoveredHomeHotspot,
@@ -4509,6 +4621,7 @@ export class SupervisorScreen implements Component {
               ? renderSupervisorCommandBar([
                   { key: 'o', label: 'Open Web', primary: true },
                   { key: 'c', label: 'Connections' },
+                  { key: 'x', label: 'Disconnect' },
                   { key: '?', label: 'More' },
                 ], actionWidth)
               : actionBar(runtime, this.snapshot.context, actionWidth, isConfigRecovery(this.snapshot))
@@ -4521,6 +4634,9 @@ export class SupervisorScreen implements Component {
         focusLabel: confirmation?.confirmLabel,
         projectName: this.snapshot.activeTarget?.projectName
           ?? this.snapshot.context?.aliceProject.displayName,
+        machineName: this.snapshot.activeTarget?.machineName,
+        targetKind: this.snapshot.activeTarget?.kind,
+        transport: this.snapshot.activeTarget?.transport,
         runtimeState: state,
         projectAvailable: activeTargetProjectAvailable(this.snapshot),
         pulse: this.runtimePulse,
@@ -4650,9 +4766,10 @@ export class SupervisorScreen implements Component {
   }
 
   private commandDeckItems(): SupervisorCommandDeckItem[] {
-    const runtime = this.snapshot.runtime
+    const runtime = this.snapshot.activeTarget?.runtime ?? this.snapshot.runtime
     return supervisorCommandDeckItems({
       recovery: isConfigRecovery(this.snapshot),
+      targetKind: this.snapshot.activeTarget?.kind,
       runtimeState: runtime?.class ?? 'unavailable',
       primaryLabel: primaryActionLabel(runtime),
       primaryAvailable: Boolean(primaryAction(runtime) && this.actionAvailable(primaryAction(runtime)!)),

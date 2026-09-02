@@ -140,6 +140,19 @@ intentionally parameter-free:
   stays in the TUI and transitions to the connected workbench after readiness.
   A stopped remote target starts on Enter and automatically continues into its
   SSH connection when the refreshed inventory advertises a Web endpoint;
+- the connected workbench has exactly one active target. Its persistent command
+  spine names the Machine, AliceProject, loopback or SSH transport, and live
+  Runtime signal on every page. Connections marks the active Machine and
+  AliceProject independently from its current keyboard or pointer selection.
+  Selecting another target closes the previous TUI-owned SSH forward; it never
+  leaves hidden remote tunnels behind. A remote target exposes `x` Disconnect,
+  which closes only the SSH forward and does not stop the remote Runtime. Its
+  Command Dock contains only remote-safe open, disconnect, navigation, and help
+  routes; local Source, Setup, Logs, Doctor, restart, and stop commands do not
+  silently act on the local Runtime while a remote target is active. If an
+  authoritative poll reports that the active local Runtime stopped, the default
+  shell returns to the Launcher and explains why. An SSH tunnel exit returns to
+  the available local target or Connections with a visible disconnect notice;
 - the connected Home page is an AliceProject status surface rather than a flat
   report. Its hero presents the selected project, a semantic launch/live/
   attention intent strip, human guidance, and a full-row primary action.

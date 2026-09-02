@@ -117,6 +117,66 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?25h')
   }, 12_000)
 
+  it('connects and explicitly disconnects one remote target through a real PTY', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-remote-target-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 110,
+      rows: 30,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_START_VIEW: 'connect',
+        OPENALICE_TUI_BOOT: '0',
+        OPENALICE_TUI_MOTION: '0',
+        OPENALICE_TUI_FIXTURE_FLEET_ROWS: '1',
+        OPENALICE_TUI_FIXTURE_REMOTE: '1',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let connecting = false
+      let disconnecting = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor remote target timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        const plain = stripSgr(output)
+        if (!connecting && plain.includes('OPENALICE LAUNCH')) {
+          connecting = true
+          child.write('\u001b[B')
+          child.write('\t')
+          child.write('\r')
+        } else if (connecting && !disconnecting && plain.includes('⌁ Cloud Lab / Research · SSH')) {
+          disconnecting = true
+          child.write('x')
+        } else if (disconnecting
+          && plain.includes('Disconnected from Cloud Lab / Research.')
+          && plain.includes('OPENALICE LAUNCH')) {
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && disconnecting) resolve(output)
+        else reject(new Error(`Supervisor remote target exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    const plain = stripSgr(transcript)
+    expect(plain).toContain('⌁ Cloud Lab / Research · SSH')
+    expect(plain).toContain('[ x ] Disconnect')
+    expect(plain).toContain('Disconnected from Cloud Lab / Research.')
+    expect(plain).toContain('FIXTURE_RESULT starts=0 opens=0 loads=0 diagnoses=0 disconnects=1')
+    expect(transcript).toContain('\u001b[?25h')
+  }, 12_000)
+
   it('skips the Boot Sequence with raw pointer input without click-through', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-boot-pointer-'))
     temporaryPaths.push(isolatedHome)
