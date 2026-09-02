@@ -356,6 +356,10 @@ export function renderSupervisorFleet(
       ...renderDirectLaunchBoard(state, width, pulse),
     ].map((line) => truncateDisplayWidth(line, width))
   }
+  if (!launcher && activeTarget && supervisorFleetHasSingleLaunchTarget(state)) {
+    return renderDirectConnectionBoard(state, width, pulse, activeTarget)
+      .map((line) => truncateDisplayWidth(line, width))
+  }
   const inventoryRows = launcher
     ? fleetLauncherInventoryRows(state, visibleRows)
     : fleetVisibleRows(state, visibleRows)
@@ -432,6 +436,97 @@ export function renderSupervisorFleet(
 
 export function supervisorFleetHasSingleLaunchTarget(state: SupervisorFleetState): boolean {
   return state.machines.length === 1 && state.machines[0]?.projects.length === 1
+}
+
+function renderDirectConnectionBoard(
+  state: SupervisorFleetState,
+  width: number,
+  pulse: boolean,
+  activeTarget: SupervisorFleetActiveTarget,
+): string[] {
+  const machine = selectedFleetMachine(state)
+  const project = selectedFleetProject(state)
+  if (!machine || !project) return renderPane('Connection Route', ['◇ Target unavailable'], width)
+  const active = machine.key === activeTarget.machineKey && project.key === activeTarget.projectKey
+  const remote = machine.key !== 'local'
+  const mode = active ? 'LIVE' : 'SWITCH'
+  const location = remote ? 'REMOTE' : 'LOCAL'
+  const title = `${active ? 'Active Route' : 'Switch Route'} · ${mode} · ${location}`
+  const primary = active
+    ? 'Return Home'
+    : remote ? 'Connect & Switch' : 'Switch AliceProject'
+  const secondary = remote
+    ? active ? '· [ x ] Disconnect SSH forward' : '· Current target stays live'
+    : project.available ? '· [ m ] Transfer AliceProject' : '· Transfer unavailable'
+  const identity = `${projectStatus(project, pulse)} ${project.displayName} · ${project.product === 'nano' ? 'NanoAlice' : 'TraderAlice'}`
+  const route = `⌁ ${machine.displayName} → ${project.displayName}`
+  const signal = compactConnectionSignals(project)
+  const action = `◆ [ Enter ] ${primary}`
+
+  if (width < 60) {
+    return renderPane(title, [
+      identity,
+      `⌁ ${machine.displayName} · ${location}`,
+      signal,
+      action,
+      secondary,
+    ], width, undefined, false, 5)
+  }
+  if (width < 96) {
+    return renderPane(title, [
+      identity,
+      route,
+      active ? 'NOW  This is the active OpenAlice target.' : 'NOW  Current target stays live until this route is ready.',
+      action,
+      signal,
+      secondary,
+    ], width, undefined, false, 6)
+  }
+
+  const innerWidth = Math.max(1, width - 4)
+  const gap = 4
+  const leftWidth = Math.max(34, Math.floor((innerWidth - gap) * 0.48))
+  const rightWidth = Math.max(1, innerWidth - leftWidth - gap)
+  const left = [
+    active ? 'ACTIVE ROUTE' : 'SWITCH CANDIDATE',
+    identity,
+    route,
+    project.home,
+    '',
+    'NOW',
+    active ? 'Connected and ready to use.' : 'Current target stays live until this route is ready.',
+    action,
+  ]
+  const right = [
+    'SIGNALS',
+    signal,
+    `↗ WEB  ${project.runtime.webEndpoint ?? 'not advertised'}`,
+    `SERVICES  ${formatProjectComponents(project)}`,
+    '',
+    'DETAIL',
+    `Product  ${project.product === 'nano' ? 'NanoAlice' : 'TraderAlice'} · Owner  ${project.runtime.ownerSurface ?? 'none'}`,
+    secondary,
+  ]
+  const rows = left.map((line, index) => joinColumns(
+    line,
+    right[index] ?? '',
+    leftWidth,
+    rightWidth,
+    gap,
+  ))
+  return renderPane(title, rows, width, undefined, false, rows.length)
+}
+
+function compactConnectionSignals(project: MachineProjectInventory): string {
+  const runtimeReady = project.runtime.class === 'running' || project.runtime.class === 'owned_elsewhere'
+  const webReady = Boolean(project.runtime.webEndpoint)
+  const alice = project.runtime.components.alice?.toLowerCase() ?? ''
+  const aliceReady = /\b(?:ready|running|connected|healthy|live)\b/u.test(alice)
+  return [
+    `${runtimeReady ? '●' : '○'} Runtime ${runtimeReady ? 'live' : project.runtime.class}`,
+    `${webReady ? '●' : '○'} Web ${webReady ? 'ready' : 'off'}`,
+    `${aliceReady ? '●' : '◇'} Alice ${aliceReady ? 'ready' : '?'}`,
+  ].join(' · ')
 }
 
 function renderDirectLaunchBoard(
@@ -696,9 +791,11 @@ export function supervisorFleetTargetAt(
   row: number,
   visibleRows = SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
   launcher = false,
+  directConnection = false,
 ): SupervisorFleetPointerTarget | undefined {
   if (launcher && visibleRows <= 0) return undefined
   if (launcher && supervisorFleetHasSingleLaunchTarget(state)) return undefined
+  if (directConnection) return undefined
   const narrow = fleetUsesNarrowLayout(width, launcher)
   const rowCount = launcher
     ? fleetLauncherInventoryRows(state, visibleRows)
@@ -758,9 +855,11 @@ export function supervisorFleetRailTargetAt(
   row: number,
   visibleRows = SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
   launcher = false,
+  directConnection = false,
 ): SupervisorFleetRailTarget | undefined {
   if (launcher && visibleRows <= 0) return undefined
   if (launcher && supervisorFleetHasSingleLaunchTarget(state)) return undefined
+  if (directConnection) return undefined
   const narrow = fleetUsesNarrowLayout(width, launcher)
   const rowCount = launcher
     ? fleetLauncherInventoryRows(state, visibleRows)

@@ -444,6 +444,94 @@ describe('Supervisor TUI screen', () => {
     expect(frame).toContain('[ / ] Commands')
   })
 
+  it('turns one connected target into a complete 46x16 Active Route', () => {
+    const activated: string[] = []
+    const local = fleetMachines()[0]!
+    const runtime = { class: 'running', endpoints: { web: 'http://127.0.0.1:47331' } }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'fleet',
+      runtime,
+      activeTarget: {
+        kind: 'local',
+        machineKey: 'local',
+        machineName: 'This computer',
+        projectKey: 'default',
+        projectName: 'Default AliceProject',
+        home: '/fixture/default',
+        transport: 'loopback',
+        endpoint: 'http://127.0.0.1:47331',
+        runtime,
+      },
+      fleet: createSupervisorFleetState('2026-09-03T00:00:00Z', [local], 'default'),
+    }, {
+      getViewportHeight: () => 16,
+      motionEnabled: false,
+      onActivateFleet: (machine, project) => activated.push(`${machine.key}/${project.key}`),
+    })
+
+    const lines = screen.render(46)
+    const frame = lines.join('\n')
+    expect(lines).toHaveLength(16)
+    expect(frame).toContain('◆ OpenAlice')
+    expect(frame).toContain('[Link]·1')
+    expect(frame).toContain('Active Route · LIVE · LOCAL')
+    expect(frame).toContain('● running Default AliceProject')
+    expect(frame).toContain('⌁ This computer · LOCAL')
+    expect(frame).toContain('● Runtime live · ● Web ready · ● Alice')
+    expect(frame).toContain('◆ [ Enter ] Return Home')
+    expect(frame).toContain('· [ m ] Transfer AliceProject')
+    expect(frame).not.toContain('Machines · 1/1')
+    expect(frame).not.toContain('AliceProjects ·')
+    expect(frame).toContain('◇  Tip: Enter returns Home')
+    expect(frame).toContain('[ / ] Commands')
+
+    const actionRow = lines.findIndex((line) => line.includes('[ Enter ] Return Home')) + 1
+    expect(screen.handlePointer(pointerClick(20, actionRow))).toBe(true)
+    expect(activated).toEqual(['local/default'])
+    expect(screen.handleEscape()).toBe(false)
+    expect(screen.handleKey('right', matchesKey)).toBe(true)
+    expect(screen.snapshot.panel).toBe('logs')
+  })
+
+  it('makes a one-target remote Active Route disconnect directly', () => {
+    let disconnects = 0
+    const remote = fleetMachines()[1]!
+    const project = remote.projects[0]!
+    const runtime = { class: 'running', endpoints: { web: project.runtime.webEndpoint } }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'fleet',
+      runtime: { class: 'absent', endpoints: {} },
+      activeTarget: {
+        kind: 'ssh',
+        machineKey: remote.key,
+        machineName: remote.displayName,
+        projectKey: project.key,
+        projectName: project.displayName,
+        home: project.home,
+        transport: 'ssh-forward',
+        endpoint: project.runtime.webEndpoint!,
+        runtime,
+      },
+      fleet: createSupervisorFleetState('2026-09-03T00:00:00Z', [remote], project.key),
+    }, {
+      getViewportHeight: () => 16,
+      motionEnabled: false,
+      onDisconnectActiveTarget: () => { disconnects += 1 },
+    })
+
+    const frame = screen.render(46).join('\n')
+    expect(frame).toContain('Active Route · LIVE · REMOTE')
+    expect(frame).toContain(`⌁ ${remote.displayName} · REMOTE`)
+    expect(frame).toContain('· [ x ] Disconnect SSH forward')
+    expect(frame).not.toContain('Transfer AliceProject')
+    expect(screen.handleKey('x', matchesKey)).toBe(true)
+    expect(disconnects).toBe(1)
+  })
+
   it('keeps Runtime status, controls, and application chrome visible at 46x16', () => {
     const runtime = {
       class: 'running',
@@ -1365,6 +1453,16 @@ describe('Supervisor TUI screen', () => {
       launcher: true,
       directLauncher: true,
     }, 100)
+    const directConnection = renderSupervisorContextTip({
+      panel: 'fleet',
+      directConnection: true,
+      targetKind: 'local',
+    }, 100)
+    const directRemoteConnection = renderSupervisorContextTip({
+      panel: 'fleet',
+      directConnection: true,
+      targetKind: 'ssh',
+    }, 100)
     const logs = renderSupervisorContextTip({ panel: 'logs' }, 100)
     const emptyLogs = renderSupervisorContextTip({ panel: 'logs', itemCount: 0 }, 100)
     const doctor = renderSupervisorContextTip({ panel: 'doctor' }, 100)
@@ -1385,6 +1483,10 @@ describe('Supervisor TUI screen', () => {
     expect(directLauncher).toContain('Enter starts OpenAlice')
     expect(directLauncher).toContain('brings you Home')
     expect(directLauncher).not.toContain('changes pane')
+    expect(directConnection).toContain('Enter returns Home; m transfers this AliceProject')
+    expect(directConnection).toContain('←→ changes view')
+    expect(directConnection).not.toContain('changes pane')
+    expect(directRemoteConnection).toContain('x disconnects this SSH forward')
     expect(logs).toContain('f filters; y copies')
     expect(emptyLogs).toContain('No Runtime events in this lens')
     expect(doctor).toContain('Doctor is read-only')
@@ -1401,6 +1503,8 @@ describe('Supervisor TUI screen', () => {
       activeFleet,
       switchFleet,
       launcher,
+      directConnection,
+      directRemoteConnection,
       logs,
       emptyLogs,
       doctor,

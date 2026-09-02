@@ -3802,6 +3802,34 @@ already large `supervisor-tui.ts` application controller.
   Chronicle/Lens/screen/PTY closure passes 155 tests, the complete CLI suite
   passes 651 tests, and CLI typecheck/build passes.
 
+### Single-target Active Route decision
+
+- Fresh 120x32 and 46x16 Connections captures exposed the same false-choice
+  problem already removed from Launcher: one Machine and one AliceProject still
+  appeared as two mostly empty 1/1 inventory panes above a diagnostic detail
+  card. On 46x16 the stack cropped Mission Header, the Machine pane, and the
+  contextual Tip, leaving no stable application or route context.
+- A connected inventory with exactly one Machine and one AliceProject now
+  progressively discloses one Active Route board. Wide terminals pair active
+  route and Now with signals and detail in an open two-column composition;
+  ordinary terminals use one six-row task stack; 46x16 uses five rows while
+  preserving the same AliceProject, Machine, health, and actions.
+- Return Home is the sole primary action. A local route exposes Transfer only
+  when the AliceProject home is available; a remote route exposes Disconnect
+  SSH forward. Enter and the whole painted action row act on the only target,
+  left/right navigate top-level views, Esc no longer changes invisible pane
+  focus, and removed pane/scroll regions publish no pointer targets. Multiple
+  Machines or AliceProjects automatically restore the existing selector and
+  current-target-safe switch flow.
+- Real 120x32, 80x24, and 46x16 PTY captures verify the bounded board and
+  application chrome. A wide real-PTY journey confirms the quiet field remains
+  pointer-passive, while focused screen coverage exercises local Return Home,
+  top-level navigation, emergency chrome, and direct remote Disconnect. The
+  change is TUI-only and retains inventory, SSH, tunnel, transfer, Runtime, and
+  lifecycle ownership; maintainer acceptance remains pending on this branch.
+  The focused Fleet/screen/PTY closure passes 161 tests, the complete CLI suite
+  passes 653 tests, and CLI typecheck/build passes.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

@@ -41,7 +41,7 @@ describe('Supervisor fleet state and presentation', () => {
     expect(lines.every((line) => displayWidth(line) <= 100)).toBe(true)
   })
 
-  it('gives an 80-column connection one complete focused pane', () => {
+  it('turns one active 80-column target into a direct route board', () => {
     const state = setFleetFocus(
       createSupervisorFleetState('2026-08-23T00:00:00Z', [machines()[0]!]),
       'projects',
@@ -57,11 +57,16 @@ describe('Supervisor fleet state and presentation', () => {
       { machineKey: 'local', projectKey: 'default', transport: 'loopback' },
     ).join('\n')
 
-    expect(output).toContain('AliceProjects · This Mac')
-    expect(output).toContain('Default AliceProject')
-    expect(output).not.toContain('╭ ◇ Machines')
-    expect(output).toContain('Active Connection')
+    expect(output).toContain('Active Route · LIVE · LOCAL')
+    expect(output).toContain('● running Default AliceProject · TraderAlice')
+    expect(output).toContain('⌁ This Mac → Default AliceProject')
+    expect(output).toContain('● Runtime live · ● Web ready · ● Alice ready')
     expect(output).toContain('[ Enter ] Return Home')
+    expect(output).toContain('[ m ] Transfer AliceProject')
+    expect(output).not.toContain('Machines · 1/1')
+    expect(output).not.toContain('AliceProjects · This Mac · 1/1')
+    expect(supervisorFleetTargetAt(state, 80, 20, 2, 5, false, true)).toBeUndefined()
+    expect(supervisorFleetRailTargetAt(state, 80, 78, 2, 5, false, true)).toBeUndefined()
   })
 
   it('marks the active target independently from Connections focus', () => {

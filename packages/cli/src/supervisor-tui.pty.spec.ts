@@ -2281,7 +2281,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
 
-  it('keeps the wide active Connection canvas pointer-passive', async () => {
+  it('keeps the wide direct Connection board bounded and its quiet field pointer-passive', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-fleet-constellation-'))
     temporaryPaths.push(isolatedHome)
     const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
@@ -2314,10 +2314,10 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         if (!opened && plain.includes('Alice Session · OpenAlice')) {
           opened = true
           child.write(']]')
-        } else if (!clicked && plain.includes('Active Connection · AliceProject')) {
+        } else if (!clicked && plain.includes('Active Route · LIVE · LOCAL')) {
           clicked = true
-          child.write('\u001b[<35;70;18M')
-          child.write('\u001b[<0;70;18M')
+          child.write('\u001b[<35;70;20M')
+          child.write('\u001b[<0;70;20M')
           setTimeout(() => child.write('q'), 150)
         }
       })
@@ -2328,14 +2328,17 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       })
     })
 
-    expect(stripSgr(transcript)).toContain('◇ CONTROL ROUTE')
+    expect(stripSgr(transcript)).toContain('Active Route · LIVE · LOCAL')
+    expect(stripSgr(transcript)).toContain('ACTIVE ROUTE')
     expect(stripSgr(transcript)).toContain('Runtime is live; AliceProject home is missing')
     expect(stripSgr(transcript)).toContain('Web route.')
     expect(stripSgr(transcript)).toContain('◆ running · home missing')
     expect(stripSgr(transcript)).toContain('◆ LIVE · HOME MISSING')
     expect(stripSgr(transcript)).not.toContain('◇ missing')
     expect(stripSgr(transcript)).toContain('↗ WEB  http://127.0.0.1:47331')
-    expect(stripSgr(transcript)).toContain('CAPS     inspect · lifecycle · tunnel')
+    expect(stripSgr(transcript)).toContain('◆ [ Enter ] Return Home')
+    expect(stripSgr(transcript)).toContain('· Transfer unavailable')
+    expect(stripSgr(transcript)).not.toContain('Machines · 1/1')
     expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=0 loads=0 diagnoses=0')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')

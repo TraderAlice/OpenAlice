@@ -4009,6 +4009,8 @@ export class SupervisorScreen implements Component {
     if (
       this.snapshot.panel === 'fleet'
       && this.snapshot.fleet?.focus === 'projects'
+      && !(this.snapshot.activeTarget != null
+        && supervisorFleetHasSingleLaunchTarget(this.snapshot.fleet))
     ) {
       this.update({ fleet: setFleetFocus(this.snapshot.fleet, 'machines') })
       return true
@@ -4116,7 +4118,18 @@ export class SupervisorScreen implements Component {
     }
     const fleet = this.snapshot.panel === 'fleet' ? this.snapshot.fleet : null
     if (fleet) {
+      const directConnection = this.snapshot.activeTarget !== null
+        && supervisorFleetHasSingleLaunchTarget(fleet)
+      if (directConnection && (matchesKey(data, 'tab') || matchesKey(data, 'right'))) {
+        this.selectAdjacentPanel(1)
+        return true
+      }
+      if (directConnection && (matchesKey(data, 'shift+tab') || matchesKey(data, 'left'))) {
+        this.selectAdjacentPanel(-1)
+        return true
+      }
       if (matchesKey(data, 'up') || matchesKey(data, 'down')) {
+        if (directConnection) return true
         this.update({
           fleet: moveFleetSelection(fleet, matchesKey(data, 'down') ? 1 : -1),
         })
@@ -4131,12 +4144,19 @@ export class SupervisorScreen implements Component {
         return true
       }
       if (matchesKey(data, 'enter')) {
-        this.activateFleetPrimary(fleet)
+        this.activateFleetPrimary(directConnection ? setFleetFocus(fleet, 'projects') : fleet)
         return true
       }
       const machine = selectedFleetMachine(fleet)
       const project = selectedFleetProject(fleet)
       const remote = machine?.key !== 'local'
+      const directSelectionActive = directConnection
+        && machine?.key === this.snapshot.activeTarget?.machineKey
+        && project?.key === this.snapshot.activeTarget?.projectKey
+      if (directSelectionActive && remote && matchesKey(data, 'x')) {
+        this.onDisconnectActiveTarget?.()
+        return true
+      }
       if (matchesKey(data, 'r') && (
         remote
         || (this.snapshot.activeTarget === null
@@ -4459,6 +4479,11 @@ export class SupervisorScreen implements Component {
       ? this.snapshot.fleet
       : undefined
     const fleetLauncher = fleet && this.snapshot.activeTarget === null
+    const directFleetConnection = Boolean(
+      fleet
+      && this.snapshot.activeTarget !== null
+      && supervisorFleetHasSingleLaunchTarget(fleet),
+    )
     const fleetContentOffset = supervisorFleetLauncherRows(this.renderWidth, Boolean(fleetLauncher))
     const fleetRailTarget = fleet
       ? supervisorFleetRailTargetAt(
@@ -4468,6 +4493,7 @@ export class SupervisorScreen implements Component {
           event.row - 4 - fleetContentOffset,
           this.fleetVisibleRows,
           Boolean(fleetLauncher),
+          directFleetConnection,
         )
       : undefined
     const fleetTarget = fleet && !fleetRailTarget
@@ -4478,6 +4504,7 @@ export class SupervisorScreen implements Component {
           event.row - 4 - fleetContentOffset,
           this.fleetVisibleRows,
           Boolean(fleetLauncher),
+          directFleetConnection,
         )
       : undefined
     const doctorRailTarget = !this.commandDeckOpen && this.snapshot.panel === 'doctor'
@@ -5114,6 +5141,10 @@ export class SupervisorScreen implements Component {
           launcher: this.snapshot.panel === 'fleet' && this.snapshot.activeTarget === null,
           directLauncher: this.snapshot.panel === 'fleet'
             && this.snapshot.activeTarget === null
+            && this.snapshot.fleet != null
+            && supervisorFleetHasSingleLaunchTarget(this.snapshot.fleet),
+          directConnection: this.snapshot.panel === 'fleet'
+            && this.snapshot.activeTarget != null
             && this.snapshot.fleet != null
             && supervisorFleetHasSingleLaunchTarget(this.snapshot.fleet),
           activeSelection: this.snapshot.panel === 'fleet'

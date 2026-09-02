@@ -262,7 +262,15 @@ intentionally parameter-free:
   terminals use two bordered panes, while a connected Connections page below
   96 columns gives the focused inventory one complete full-width pane instead
   of truncating both sides. Terminals below 72 columns retain the narrow
-  Machines-to-Projects drill-down;
+  Machines-to-Projects drill-down. When connected inventory contains exactly
+  one Machine and one AliceProject, Connections removes both false 1/1 panes
+  and becomes a direct Active Route board. Wide terminals pair route/Now with
+  signals/detail; ordinary and emergency terminals keep the same identity,
+  route, health, Return Home, and target-scoped Transfer or Disconnect actions
+  in one bounded stack. There is no hidden pane focus: Enter acts on the sole
+  target, left/right navigate top-level views, and pointer hit testing ignores
+  the removed inventory surface. Multiple candidates restore the complete
+  selector and Switch Target path;
   selection and list windows survive resize, use Unicode display width, and
   keep the action/detach footer visible at the supported 80×24 baseline.
   Overflowing Machine and AliceProject panes reserve their final content column

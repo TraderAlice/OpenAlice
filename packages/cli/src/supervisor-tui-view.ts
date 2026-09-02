@@ -108,6 +108,7 @@ export interface SupervisorContextTipView {
   targetKind?: 'local' | 'ssh'
   launcher?: boolean
   directLauncher?: boolean
+  directConnection?: boolean
   activeSelection?: boolean
   switchSelection?: boolean
   inputLocked?: boolean
@@ -793,6 +794,12 @@ export function renderSupervisorContextTip(
         ? view.directLauncher
           ? 'Enter starts OpenAlice; this TUI verifies readiness and brings you Home. / shows commands.'
           : '↑↓ selects; Tab/←→ changes pane; click selection again to activate.'
+        : view.directConnection
+          ? view.switchSelection
+            ? 'Enter switches the only candidate; the current target stays live until ready.'
+            : view.targetKind === 'ssh'
+              ? 'Enter returns Home; x disconnects this SSH forward; ←→ changes view.'
+              : 'Enter returns Home; m transfers this AliceProject; ←→ changes view.'
         : view.activeSelection
           ? '←→ changes pane; ↑↓ chooses; Enter returns Home from the active target.'
           : view.switchSelection
