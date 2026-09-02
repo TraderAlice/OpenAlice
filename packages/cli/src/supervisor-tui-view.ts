@@ -95,6 +95,7 @@ export interface SupervisorDockView {
   projectAvailable?: boolean
   pulse?: boolean
   commandPaletteOpen?: boolean
+  inputLocked?: boolean
   recovery?: boolean
 }
 
@@ -105,6 +106,7 @@ export interface SupervisorContextTipView {
   launcher?: boolean
   activeSelection?: boolean
   switchSelection?: boolean
+  inputLocked?: boolean
   recovery?: boolean
   itemCount?: number
 }
@@ -554,7 +556,9 @@ export function renderSupervisorDock(
   width: number,
 ): string {
   const breadcrumb = '  ›  '
-  const controls = view.focusTask
+  const controls = view.inputLocked
+    ? `◆ OPERATION ACTIVE${breadcrumb}[ q ] Detach`
+    : view.focusTask
     ? view.focusTask === 'confirmation'
       ? '◆ DECISION GATE'
       : `◆ FOCUS WORKSPACE${breadcrumb}[ Esc ] Back`
@@ -663,6 +667,8 @@ export function renderSupervisorContextTip(
 ): string {
   const message = view.recovery
     ? 'Recovery exposes only safe Update and Detach routes.'
+    : view.inputLocked
+      ? 'Operation owns input until ready; q detaches this TUI.'
     : view.panel === 'fleet'
       ? view.launcher
         ? 'Enter runs Next; ↑↓ selects; Tab/←→ changes pane; click again activates.'

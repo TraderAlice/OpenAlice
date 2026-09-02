@@ -162,7 +162,10 @@ intentionally parameter-free:
   and failed stages in text and glyphs without relying on color. Success hands
   directly to connected Home. A failure remains on the selected target with
   Enter to retry or Esc to return to target selection; `q` can still detach at
-  any time. The recorder is session-local presentation state and does not own
+  any time. While a stage is in flight, the Command Spine replaces the disabled
+  Commands affordance with Operation Active and the contextual Tip states that
+  input is owned until ready; only the truthful `q` detach route remains
+  actionable. The recorder is session-local presentation state and does not own
   Runtime readiness, lifecycle, SSH cancellation, or persistence;
   At 72–95 columns the launch path uses compact stage vocabulary that spends
   width on the selected target names plus an explicit `[Enter] START`, `USE`,

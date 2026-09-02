@@ -3143,6 +3143,26 @@ already large `supervisor-tui.ts` application controller.
   tests, all 52 real-PTY cases, and the complete CLI suite (63 files, 634
   tests). CLI typecheck and build also pass.
 
+### In-flight input-ownership decision
+
+- A real delayed-start capture showed the Flight Recorder correctly replacing
+  inventory while its surrounding chrome still advertised Commands and the
+  launcher Tip still taught arrows, pane movement, and repeated-click
+  activation. The controller rejects those inputs while `busy`, so both visible
+  affordances were false precisely when the user most needs trustworthy
+  feedback.
+- Busy operation state now replaces Commands with a bright Operation Active
+  marker and retains only the working `q` Detach control. Its contextual Tip
+  states that the operation owns input until ready and that `q` detaches this
+  TUI. This applies to any controller-owned busy operation, while recoverable
+  Flight failures continue to expose their content-owned Retry and Back routes.
+- Real 120x32 and 80x24 delayed-start captures verify the current stage,
+  animated working rail, one-line Tip, Operation Active state, and Detach route
+  remain simultaneously visible without advertising disabled commands.
+- Input-ownership acceptance passes through 95 focused Fleet and screen tests,
+  all 52 real-PTY cases including Briefing -> Flight -> Home, and the complete
+  CLI suite (63 files, 634 tests). CLI typecheck and build also pass.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

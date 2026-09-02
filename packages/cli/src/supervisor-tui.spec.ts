@@ -177,7 +177,10 @@ describe('Supervisor TUI screen', () => {
     const activeFrame = screen.render(100).join('\n')
     expect(activeFrame).toContain('Launch Flight Recorder · LOCAL START · IN FLIGHT · T+00:04')
     expect(activeFrame).toContain('◆ 02 START')
+    expect(activeFrame).toContain('◆ OPERATION ACTIVE')
+    expect(activeFrame).toContain('Operation owns input until ready')
     expect(activeFrame).toContain('[ q ] Detach')
+    expect(activeFrame).not.toContain('[ / ] Commands')
     expect(activeFrame).not.toContain('Machines · 1/1')
 
     screen.update({
@@ -862,6 +865,27 @@ describe('Supervisor TUI screen', () => {
       recovery: true,
     }, 80)
     expect(recovery).toContain('! RECOVERY  ›  ◆ OVERVIEW')
+
+    const locked = renderSupervisorDock({
+      panel: 'fleet',
+      launcher: true,
+      runtimeState: 'absent',
+      inputLocked: true,
+    }, 80)
+    expect(locked).toContain('◆ OPERATION ACTIVE  ›  [ q ] Detach')
+    expect(locked).not.toContain('[ / ] Commands')
+    expect(supervisorCommandTargets([locked]).map((target) => target.label)).toEqual(['q'])
+    const themedLocked = decorateSupervisorFrame([
+      'header',
+      'divider',
+      'tabs',
+      locked,
+    ], createSupervisorTuiTheme({ TERM: 'xterm-256color' }), {
+      panel: 'fleet',
+      runtimeClass: 'absent',
+    })[3]!
+    expect(themedLocked).toContain('\u001b[1;38;2;183;255;248;48;2;10;34;39m◆ OPERATION ACTIVE')
+    expect(themedLocked).toContain('\u001b[1;38;2;183;255;248;48;2;10;34;39m[ q ] Detach')
   })
 
   it('anchors one Command Spine to the live viewport without clipping content', () => {
@@ -926,6 +950,7 @@ describe('Supervisor TUI screen', () => {
     const help = renderSupervisorContextTip({ panel: 'help' }, 100)
     const stopped = renderSupervisorContextTip({ panel: 'overview', runtimeState: 'absent' }, 100)
     const recovery = renderSupervisorContextTip({ panel: 'overview', recovery: true }, 100)
+    const locked = renderSupervisorContextTip({ panel: 'fleet', inputLocked: true }, 100)
 
     expect(fleet).toContain('First click focuses a pane')
     expect(activeFleet).toContain('Enter returns Home')
@@ -940,6 +965,8 @@ describe('Supervisor TUI screen', () => {
     expect(help).toContain('/ searches every available command')
     expect(stopped).toContain('s starts quietly')
     expect(recovery).toContain('only safe Update and Detach routes')
+    expect(locked).toContain('Operation owns input until ready')
+    expect(locked).toContain('q detaches this TUI')
     expect(supervisorCommandTargets([
       fleet,
       activeFleet,
@@ -952,6 +979,7 @@ describe('Supervisor TUI screen', () => {
       help,
       stopped,
       recovery,
+      locked,
     ])).toEqual([])
 
     const compact = renderSupervisorContextTip({ panel: 'fleet' }, 46)
@@ -1213,7 +1241,7 @@ describe('Supervisor TUI screen', () => {
       return {
         height: lines.length,
         action: lines.findIndex((line) => line.includes('[ s ] Start quietly')),
-        ribbon: lines.findIndex((line) => line.includes('[ / ] Commands')),
+        ribbon: lines.findIndex((line) => line.includes('[ q ] Detach')),
       }
     }
     const idleRows = controlRows()
@@ -1225,7 +1253,10 @@ describe('Supervisor TUI screen', () => {
       diagnostic: 'Previous probe failed.',
     })
     expect(controlRows()).toEqual(idleRows)
-    expect(stable.render(80).join('\n')).toContain('◆  WORKING  Refreshing Runtime…')
+    const busyFrame = stable.render(80).join('\n')
+    expect(busyFrame).toContain('◆  WORKING  Refreshing Runtime…')
+    expect(busyFrame).toContain('◆ OPERATION ACTIVE')
+    expect(busyFrame).not.toContain('[ / ] Commands')
   })
 
   it('opens a selectable bottom command dock without creating a second action path', () => {

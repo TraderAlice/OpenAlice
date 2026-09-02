@@ -154,7 +154,9 @@ export function decorateSupervisorFrame(
           : undefined,
       )
     }
-    if (line.startsWith('[ / ]') || line.startsWith('╰─ [ / ]')) {
+    if (line.startsWith('[ / ]')
+      || line.startsWith('╰─ [ / ]')
+      || line.startsWith('╰─ ◆ OPERATION ACTIVE')) {
       return decorateDock(line, theme, options.hoveredCommand?.row === index + 1
         ? options.hoveredCommand.label
         : undefined)
@@ -473,7 +475,7 @@ function decorateDock(
   theme: SupervisorTuiTheme,
   hoveredCommand?: string,
 ): string {
-  const tokenPattern = /\[ \/ \] (?:Commands|Close)|\[ q \] Detach|\[ Esc \] (?:Back|Cancel)|\[ i \] .*?(?= +› +)|⌂ .*?(?= +› +)|⌁ .*?(?= +› +)|◆ (?:FOCUS WORKSPACE|DECISION GATE)|! RECOVERY|(?:◉|●) (?:LIVE|EXTERNAL)|○ COLD|◆ (?:(?:LIVE|EXTERNAL) · HOME MISSING|BLOCKED|DEGRADED)|× UNREACHABLE|◇ OFFLINE|[⠀-⣿◆]  WORKING .*?(?= ─╯)|✓  READY .*?(?= ─╯)|!  NOTICE .*?(?= ─╯)|×  ERROR .*?(?= ─╯)|◆  STATUS .*?(?= ─╯)|◇  PREVIEW .*?(?= ─╯)|◌ [A-Z][A-Z ]*?(?= +› +| ─╯)|[◆◇≋✦?] (?:OVERVIEW|FLEET|LAUNCH|LOGS|DOCTOR|HELP|SETUP|SOURCE|PROJECTS|RELEASE|TRANSFER|CONFIRMATION)/gu
+  const tokenPattern = /\[ \/ \] (?:Commands|Close)|\[ q \] Detach|\[ Esc \] (?:Back|Cancel)|\[ i \] .*?(?= +› +)|⌂ .*?(?= +› +)|⌁ .*?(?= +› +)|◆ (?:FOCUS WORKSPACE|DECISION GATE|OPERATION ACTIVE)|! RECOVERY|(?:◉|●) (?:LIVE|EXTERNAL)|○ COLD|◆ (?:(?:LIVE|EXTERNAL) · HOME MISSING|BLOCKED|DEGRADED)|× UNREACHABLE|◇ OFFLINE|[⠀-⣿◆]  WORKING .*?(?= ─╯)|✓  READY .*?(?= ─╯)|!  NOTICE .*?(?= ─╯)|×  ERROR .*?(?= ─╯)|◆  STATUS .*?(?= ─╯)|◇  PREVIEW .*?(?= ─╯)|◌ [A-Z][A-Z ]*?(?= +› +| ─╯)|[◆◇≋✦?] (?:OVERVIEW|FLEET|LAUNCH|LOGS|DOCTOR|HELP|SETUP|SOURCE|PROJECTS|RELEASE|TRANSFER|CONFIRMATION)/gu
   let output = ''
   let cursor = 0
   for (const match of line.matchAll(tokenPattern)) {
@@ -504,6 +506,7 @@ function decorateDockToken(
   if (token.startsWith('×  ERROR')) return theme.dangerRail(token)
   if (token.startsWith('◆  STATUS')) return theme.infoRail(token)
   if (token.startsWith('◇  PREVIEW')) return theme.navigationHover(token)
+  if (token === '◆ OPERATION ACTIVE') return theme.dockControl(token)
   if (token === '◆ FOCUS WORKSPACE' || token === '◆ DECISION GATE' || /^[◆◇≋✦?] (?:OVERVIEW|FLEET|LOGS|DOCTOR|HELP|SETUP|SOURCE|PROJECTS|RELEASE|TRANSFER|CONFIRMATION)$/u.test(token)) {
     return theme.dockPanel(token)
   }

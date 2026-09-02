@@ -5011,6 +5011,7 @@ export class SupervisorScreen implements Component {
         projectAvailable: launcherProject?.available ?? activeTargetProjectAvailable(this.snapshot),
         pulse: this.runtimePulse,
         commandPaletteOpen: this.commandDeckOpen,
+        inputLocked: Boolean(this.snapshot.busy),
         recovery: isConfigRecovery(this.snapshot),
       }, width),
       width,
@@ -5038,6 +5039,7 @@ export class SupervisorScreen implements Component {
             && selectedFleetProject(this.snapshot.fleet) != null
             && (selectedFleetMachine(this.snapshot.fleet)?.key !== this.snapshot.activeTarget.machineKey
               || selectedFleetProject(this.snapshot.fleet)?.key !== this.snapshot.activeTarget.projectKey),
+          inputLocked: Boolean(this.snapshot.busy),
           recovery: isConfigRecovery(this.snapshot),
           itemCount: this.snapshot.panel === 'logs'
             ? supervisorFilteredLogCount(this.snapshot.logs, this.logFilter)
