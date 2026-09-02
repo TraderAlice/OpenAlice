@@ -129,7 +129,14 @@ path is intentionally parameter-free:
   Doctor when neither action is truthfully available. Its
   Runtime Signal card keeps Home, Web endpoint, owner, provider identity,
   services, and uptime available without returning to the historical flat
-  field dump. From 72 through 99 columns it becomes a Signal Deck: the existing
+  field dump. Overview promotes only fields with a truthful existing action:
+  `⌂` AliceProject opens the Switchboard, `↗` Web opens an advertised verified
+  endpoint, and `⑂` Provider opens Source while the Runtime is stopped. Hover
+  changes the marker to `›`, highlights the complete responsive field, and
+  previews its consequence in the fixed activity slot; click emits the same
+  `i`, `o`, or `c` input as keyboard use. Owner, services, uptime, and unavailable
+  Web/source states remain passive telemetry. From 72 through 99 columns it
+  becomes a Signal Deck: the existing
   card composes a terminal-native `ALICE` mark and truthful Runtime state beside
   the complete telemetry without consuming another row. At 100 columns and
   wider the Launchpad and Runtime Signal become a two-column cockpit, and an

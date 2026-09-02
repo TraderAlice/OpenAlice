@@ -16,8 +16,14 @@ export interface SupervisorHomeView {
   guidance: string[]
   primaryAction: string
   primaryHovered?: boolean
+  projectHotspot?: boolean
+  webHotspot?: boolean
+  providerHotspot?: boolean
+  hoveredHotspot?: SupervisorHomeHotspotKind
   pulse?: boolean
 }
+
+export type SupervisorHomeHotspotKind = 'project' | 'web' | 'provider'
 
 export interface SupervisorHomeTarget {
   row: number
@@ -25,9 +31,16 @@ export interface SupervisorHomeTarget {
   endColumn: number
 }
 
+export interface SupervisorHomeHotspotTarget extends SupervisorHomeTarget {
+  kind: SupervisorHomeHotspotKind
+  input: 'i' | 'o' | 'c'
+  surface: string
+}
+
 export interface SupervisorHomeRender {
   lines: string[]
   primaryTarget: SupervisorHomeTarget
+  hotspotTargets: SupervisorHomeHotspotTarget[]
 }
 
 export interface SupervisorCommand {
@@ -115,7 +128,7 @@ export function renderSupervisorHome(
   const cardWidth = Math.max(24, width)
   const state = stateBadge(view.state, view.pulse ?? false)
   const projectBody = [
-    labelAndTail(view.projectName, state, cardWidth - 4),
+    labelAndTail(homeHotspotLabel(view.projectName, 'project', view), state, cardWidth - 4),
     launchIntent(view.state),
     ...view.guidance,
     primaryLaunchRow(view),
@@ -140,6 +153,7 @@ export function renderSupervisorHome(
   return {
     lines,
     primaryTarget: targetForLine(lines, '[ Enter ]', cardWidth),
+    hotspotTargets: homeHotspotTargets(lines, view),
   }
 }
 
@@ -167,9 +181,9 @@ function renderCompactSignalDeck(
 function runtimeDetailRows(view: SupervisorHomeView, width: number): string[] {
   const details = [
     detailRow('Home', view.home, width),
-    detailRow('Web', view.web, width),
+    detailRow(homeHotspotLabel('Web', 'web', view), view.web, width),
     detailRow('Owner', view.owner, width),
-    detailRow('Provider', view.provider, width),
+    detailRow(homeHotspotLabel('Provider', 'provider', view), view.provider, width),
     detailRow('Services', view.components, width),
   ]
   if (view.uptime) details.push(detailRow('Uptime', view.uptime, width))
@@ -188,14 +202,14 @@ function renderWideCockpit(
   const rightInnerWidth = rightWidth - 4
   const runtimeBody = [
     labelAndTail('Process', runtimeSignal(view.state, view.pulse ?? false), rightInnerWidth),
-    detailRow('Web', view.web, rightInnerWidth),
+    detailRow(homeHotspotLabel('Web', 'web', view), view.web, rightInnerWidth),
     detailRow('Owner', view.owner, rightInnerWidth),
-    ...wrappedDetailRows('Provider', view.provider, rightInnerWidth),
+    ...wrappedDetailRows(homeHotspotLabel('Provider', 'provider', view), view.provider, rightInnerWidth),
     detailRow('Services', view.components, rightInnerWidth),
     detailRow('Uptime', view.uptime ?? 'Waiting for Runtime', rightInnerWidth),
   ]
   const projectBody = [
-    labelAndTail(view.projectName, state, leftInnerWidth),
+    labelAndTail(homeHotspotLabel(view.projectName, 'project', view), state, leftInnerWidth),
     launchIntent(view.state),
     ...view.guidance,
     '',
@@ -219,7 +233,81 @@ function renderWideCockpit(
   return {
     lines,
     primaryTarget: targetForLine(lines, '[ Enter ]', leftWidth),
+    hotspotTargets: homeHotspotTargets(lines, view),
   }
+}
+
+function homeHotspotLabel(
+  label: string,
+  kind: SupervisorHomeHotspotKind,
+  view: SupervisorHomeView,
+): string {
+  const enabled = kind === 'project'
+    ? view.projectHotspot
+    : kind === 'web'
+      ? view.webHotspot
+      : view.providerHotspot
+  if (!enabled) return label
+  if (view.hoveredHotspot === kind) return `› ${label}`
+  return `${kind === 'project' ? '⌂' : kind === 'web' ? '↗' : '⑂'} ${label}`
+}
+
+function homeHotspotTargets(
+  lines: string[],
+  view: SupervisorHomeView,
+): SupervisorHomeHotspotTarget[] {
+  const specs: Array<{
+    kind: SupervisorHomeHotspotKind
+    input: SupervisorHomeHotspotTarget['input']
+    enabled: boolean | undefined
+    idleMarker: string
+    hoveredMarker: string
+  }> = [
+    {
+      kind: 'project',
+      input: 'i',
+      enabled: view.projectHotspot,
+      idleMarker: '⌂ ',
+      hoveredMarker: '│ › ',
+    },
+    {
+      kind: 'web',
+      input: 'o',
+      enabled: view.webHotspot,
+      idleMarker: '↗ Web',
+      hoveredMarker: '› Web',
+    },
+    {
+      kind: 'provider',
+      input: 'c',
+      enabled: view.providerHotspot,
+      idleMarker: '⑂ Provider',
+      hoveredMarker: '› Provider',
+    },
+  ]
+  return specs.flatMap((spec) => {
+    if (!spec.enabled) return []
+    const marker = view.hoveredHotspot === spec.kind
+      ? spec.hoveredMarker
+      : spec.idleMarker
+    const rowIndex = lines.findIndex((line) => line.includes(marker))
+    if (rowIndex < 0) return []
+    const line = lines[rowIndex]!
+    const markerIndex = line.indexOf(marker)
+      + (spec.kind === 'project' && marker.startsWith('│ ') ? 2 : 0)
+    const boundary = line.indexOf('│', markerIndex)
+    const surfaceEnd = boundary >= 0 ? boundary : line.length
+    const surface = line.slice(markerIndex, surfaceEnd)
+    const startColumn = displayWidth(line.slice(0, markerIndex)) + 1
+    return [{
+      kind: spec.kind,
+      input: spec.input,
+      row: rowIndex + 1,
+      startColumn,
+      endColumn: startColumn + displayWidth(surface) - 1,
+      surface,
+    }]
+  })
 }
 
 function renderLaunchpadBeacon(
@@ -460,14 +548,20 @@ function renderCard(title: string, body: string[], width: number): string[] {
 }
 
 function detailRow(label: string, value: string, width: number): string {
-  const labelWidth = width < 50 ? 9 : 12
+  const labelWidth = Math.min(
+    Math.max(width < 50 ? 9 : 12, displayWidth(label)),
+    Math.max(1, width - 2),
+  )
   const safeLabel = truncateDisplayWidth(label, labelWidth)
   const valueWidth = Math.max(1, width - labelWidth - 1)
   return `${safeLabel}${' '.repeat(Math.max(1, labelWidth - displayWidth(safeLabel)))}${truncateDisplayWidth(value, valueWidth)}`
 }
 
 function wrappedDetailRows(label: string, value: string, width: number): string[] {
-  const labelWidth = width < 50 ? 9 : 12
+  const labelWidth = Math.min(
+    Math.max(width < 50 ? 9 : 12, displayWidth(label)),
+    Math.max(1, width - 2),
+  )
   const chunks = wrapDisplayText(value, Math.max(1, width - labelWidth - 1))
   return chunks.map((chunk, index) => {
     const prefix = index === 0 ? truncateDisplayWidth(label, labelWidth) : ''

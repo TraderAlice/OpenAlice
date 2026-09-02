@@ -31,6 +31,7 @@ export interface SupervisorFrameStyleOptions {
   headerReleaseHovered?: boolean
   hoveredPanel?: string
   hoveredCommand?: { row: number; label: string }
+  hoveredHomeHotspot?: { row: number; surface: string }
   runtimeClass?: string
   introFrame?: number
   ambientBrandFrame?: number
@@ -117,6 +118,17 @@ export function decorateSupervisorFrame(
     ))
   }
   return lines.map((line, index) => {
+    if (options.hoveredHomeHotspot?.row === index + 1) {
+      const highlighted = line.replace(
+        options.hoveredHomeHotspot.surface,
+        theme.navigationHover(options.hoveredHomeHotspot.surface),
+      )
+      return decorateBrandMarkLine(
+        highlighted,
+        theme,
+        options.introFrame ?? options.ambientBrandFrame,
+      ) ?? highlighted
+    }
     const brandMark = decorateBrandMarkLine(
       line,
       theme,

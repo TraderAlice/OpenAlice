@@ -289,6 +289,63 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
 
+  it('opens the verified Web UI by clicking the running Signal Deck field', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-signal-hotspot-'))
+    temporaryPaths.push(isolatedHome)
+    const childEnv = { ...process.env }
+    delete childEnv.NO_COLOR
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...childEnv,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_FIXTURE_RUNTIME: 'running',
+        OPENALICE_TUI_MOTION: '0',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let hovered = false
+      let clicked = false
+      let detached = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Signal Hotspot pointer timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!hovered && output.includes('↗ Web') && output.includes('http://127.0.0.1:47331')) {
+          hovered = true
+          child.write('\u001b[<35;70;14M')
+        } else if (!clicked && output.includes('› Web') && output.includes('PREVIEW')) {
+          clicked = true
+          child.write('\u001b[<0;70;14M')
+        } else if (!detached && clicked && output.includes('Opened the verified Web UI.')) {
+          detached = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor Signal Hotspot pointer exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('› Web')
+    expect(transcript).toContain('\u001b[1;38;2;203;250;246;48;2;19;49;55m› Web')
+    expect(transcript).toContain('◇  PREVIEW  Open the verified Web UI')
+    expect(transcript).toContain('Opened the verified Web UI.')
+    expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=1')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
   it('renders the wide Alice Beacon without breaking Launchpad pointer geometry', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-wide-beacon-pointer-'))
     temporaryPaths.push(isolatedHome)

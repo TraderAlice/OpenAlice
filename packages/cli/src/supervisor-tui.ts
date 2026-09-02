@@ -163,6 +163,8 @@ import {
   renderSupervisorPanel,
   supervisorCommandTargets,
   type SupervisorCommandTarget,
+  type SupervisorHomeHotspotKind,
+  type SupervisorHomeHotspotTarget,
   type SupervisorHomeTarget,
 } from './supervisor-tui-view.ts'
 import { connectSsh } from './ssh-connect.mjs'
@@ -2972,6 +2974,8 @@ export class SupervisorScreen implements Component {
   private helpTargets: SupervisorHelpTarget[] = []
   private homePrimaryHovered = false
   private homePrimaryTarget?: SupervisorHomeTarget
+  private hoveredHomeHotspot?: SupervisorHomeHotspotKind
+  private homeHotspotTargets: SupervisorHomeHotspotTarget[] = []
   private renderWidth = 80
 
   constructor(
@@ -3521,6 +3525,13 @@ export class SupervisorScreen implements Component {
       && event.col <= this.homePrimaryTarget.endColumn
       ? this.homePrimaryTarget
       : undefined
+    const homeHotspot = !this.commandDeckOpen && this.snapshot.panel === 'overview'
+      ? this.homeHotspotTargets.find((target) => (
+          target.row === event.row
+          && event.col >= target.startColumn
+          && event.col <= target.endColumn
+        ))
+      : undefined
     const commandTarget = commandAtPosition(this.commandTargets, event.col, event.row)
     if (event.motion) {
       const fleetHoverChanged = fleetTarget?.focus !== this.hoveredFleetTarget?.focus
@@ -3535,6 +3546,8 @@ export class SupervisorScreen implements Component {
       const helpHoverChanged = helpHover !== this.helpState.hovered
       const homeHover = Boolean(homePrimaryTarget)
       const homeHoverChanged = homeHover !== this.homePrimaryHovered
+      const homeHotspotHover = homeHotspot?.kind
+      const homeHotspotHoverChanged = homeHotspotHover !== this.hoveredHomeHotspot
       const headerReleaseHover = Boolean(headerRelease)
       const headerReleaseHoverChanged = headerReleaseHover !== this.headerReleaseHovered
       if (
@@ -3546,6 +3559,7 @@ export class SupervisorScreen implements Component {
         || logHoverChanged
         || helpHoverChanged
         || homeHoverChanged
+        || homeHotspotHoverChanged
       ) {
         this.headerReleaseHovered = headerReleaseHover
         this.hoveredPanel = hovered
@@ -3555,6 +3569,7 @@ export class SupervisorScreen implements Component {
         this.hoveredLogFromEnd = logHover
         this.helpState = { ...this.helpState, hovered: helpHover }
         this.homePrimaryHovered = homeHover
+        this.hoveredHomeHotspot = homeHotspotHover
         this.requestRender?.()
       }
       return true
@@ -3576,6 +3591,10 @@ export class SupervisorScreen implements Component {
     }
     if (event.leftClick && commandTarget) {
       return this.activatePointerCommand(commandTarget.label)
+    }
+    if (event.leftClick && homeHotspot) {
+      this.hoveredHomeHotspot = homeHotspot.kind
+      return this.handleKey(homeHotspot.input, (data, key) => data === key)
     }
     if (event.leftClick && homePrimaryTarget) {
       return this.handleKey('enter', (data, key) => data === key)
@@ -3684,6 +3703,7 @@ export class SupervisorScreen implements Component {
     this.logTargets = []
     this.helpTargets = []
     this.homePrimaryTarget = undefined
+    this.homeHotspotTargets = []
     if (this.snapshot.panel === 'fleet' && this.snapshot.fleet) {
       lines.push(...renderSupervisorFleet(
         this.snapshot.fleet,
@@ -3752,6 +3772,10 @@ export class SupervisorScreen implements Component {
         guidance: renderGuidance(runtime, this.snapshot.context),
         primaryAction: primaryActionLabel(runtime),
         primaryHovered: this.homePrimaryHovered,
+        projectHotspot: true,
+        webHotspot: Boolean(runtime?.endpoints?.web),
+        providerHotspot: runtime?.class === 'absent',
+        hoveredHotspot: this.hoveredHomeHotspot,
         pulse: this.runtimePulse,
       }, width)
       const rowOffset = lines.length
@@ -3759,6 +3783,10 @@ export class SupervisorScreen implements Component {
         ...home.primaryTarget,
         row: home.primaryTarget.row + rowOffset,
       }
+      this.homeHotspotTargets = home.hotspotTargets.map((target) => ({
+        ...target,
+        row: target.row + rowOffset,
+      }))
       lines.push(...home.lines)
     }
 
@@ -3822,6 +3850,9 @@ export class SupervisorScreen implements Component {
         headerReleaseHovered: this.headerReleaseHovered,
         hoveredPanel: this.hoveredPanel,
         hoveredCommand: this.hoveredCommandTarget,
+        hoveredHomeHotspot: this.homeHotspotTargets.find(
+          (target) => target.kind === this.hoveredHomeHotspot,
+        ),
         runtimeClass: runtime?.class,
         introFrame: this.introFrame,
         ambientBrandFrame: this.ambientBrandFrame,
@@ -3844,6 +3875,22 @@ export class SupervisorScreen implements Component {
         doctor: 'Inspect read-only Runtime ownership and readiness checks.',
         help: 'Explore contextual controls and keyboard routes.',
       }[this.hoveredPanel]
+    }
+    if (this.hoveredHomeHotspot === 'project') {
+      return 'Open the AliceProject Switchboard without changing the current Runtime.'
+    }
+    if (this.hoveredHomeHotspot === 'web') {
+      return 'Open the verified Web UI for this running Runtime.'
+    }
+    if (this.hoveredHomeHotspot === 'provider') {
+      return 'Choose and validate the source checkout used by this stopped Runtime.'
+    }
+    if (this.homePrimaryHovered) {
+      return runtimeClass === 'absent'
+        ? 'Prepare the Runtime, start OpenAlice, and open its verified Web UI.'
+        : runtimeClass === 'running' || runtimeClass === 'owned_elsewhere'
+          ? 'Open the verified Web UI for this running Runtime.'
+          : 'Run read-only Runtime Doctor checks before making changes.'
     }
     const target = this.hoveredCommandTarget
     return target
@@ -3969,6 +4016,7 @@ export class SupervisorScreen implements Component {
   private selectPanel(panel: SupervisorPanel): void {
     this.setCommandPaletteOpen(false)
     this.homePrimaryHovered = false
+    this.hoveredHomeHotspot = undefined
     this.hoveredLogFromEnd = null
     const previous = this.snapshot.panel ?? 'overview'
     const previousTarget = this.navigationTargets.find((target) => target.panel === previous)

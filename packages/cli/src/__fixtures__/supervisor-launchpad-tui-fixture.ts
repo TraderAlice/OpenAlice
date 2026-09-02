@@ -3,6 +3,7 @@ import { runSupervisorTui } from '../supervisor-tui.ts'
 
 let starts = 0
 let opens = 0
+const running = process.env['OPENALICE_TUI_FIXTURE_RUNTIME'] === 'running'
 
 const exitCode = await runSupervisorTui({}, {
   env: process.env,
@@ -11,7 +12,14 @@ const exitCode = await runSupervisorTui({}, {
     homeDir: '/fixture',
     flags: { project: 'default', home: '/fixture/default' },
   }),
-  inspect: async () => ({ class: 'absent', state: 'absent', owner: null, endpoints: {} }),
+  inspect: async () => running
+    ? {
+        class: 'running',
+        state: 'ready',
+        owner: { surface: 'cli-server', pid: 4242 },
+        endpoints: { web: 'http://127.0.0.1:47331' },
+      }
+    : { class: 'absent', state: 'absent', owner: null, endpoints: {} },
   start: async () => { starts += 1 },
   open: async () => { opens += 1 },
   discoverUpdate: async () => null,

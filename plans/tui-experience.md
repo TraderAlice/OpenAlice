@@ -626,6 +626,23 @@ not imply maintainer approval of the finished interaction.
   paths. This is an autonomous topic decision, not a recorded maintainer
   approval.
 
+### Signal Hotspots decision
+
+- Keeping Overview telemetry read-only avoids accidental actions, but also
+  makes the visual object a dead end: a pointer user sees the verified Web
+  endpoint or selected AliceProject and must then hunt for a shortcut elsewhere.
+- Making every Runtime field clickable would over-promise controls for passive
+  facts such as PID, services, and uptime, and would weaken the Launchpad's
+  primary-action hierarchy.
+- The selected model promotes only identity and telemetry with a truthful,
+  already-owned route: AliceProject opens the Switchboard, a verified Web
+  endpoint opens the existing browser path, and Provider opens Source only
+  while the Runtime is stopped. `⌂`, `↗`, and `⑂` expose those affordances;
+  hover becomes `›`, highlights the complete field, and projects its consequence
+  into the fixed Activity Slot. Click still emits only `i`, `o`, or `c`, so
+  lifecycle, refusal, overlay, and recovery ownership remain unchanged. This is
+  an autonomous topic decision, not a recorded maintainer approval.
+
 ### Confirmation-modal decision
 
 - Keeping confirmation cards inline preserves the original implementation but
@@ -699,6 +716,8 @@ already large `supervisor-tui.ts` application controller.
   that keeps every command reachable without obscuring the operational frame.
 - [x] Project hovered control consequences into the fixed Activity Slot without
   displacing operational feedback or creating another action path.
+- [x] Promote actionable Overview identity and telemetry into responsive
+  whole-field pointer hotspots backed only by existing keyboard routes.
 - [x] Turn Overview into a responsive AliceProject/Runtime cockpit without
   changing lifecycle action semantics or sacrificing the 80x24 baseline.
 - [x] Promote Overview into an action-first Launchpad with a semantic intent
@@ -1411,6 +1430,25 @@ already large `supervisor-tui.ts` application controller.
   pass; the 699-file suite passes (698 passed, 1 skipped; 6,151 tests passed,
   10 skipped). Docker installer smoke passes, and package dry-run contains the
   changed feedback, theme, Command Dock, and Supervisor sources.
+- Overview now supports direct manipulation without turning passive telemetry
+  into fake controls. AliceProject identity opens the Switchboard, a running
+  Runtime's verified Web endpoint opens the browser, and a stopped Runtime's
+  Provider field opens Source. Each complete responsive field owns hover/click
+  geometry, a stable no-color marker, semantic focus color, and an Activity
+  Slot Preview; all three routes re-enter the existing `i`, `o`, or `c` input
+  state machine.
+- Signal-Hotspot acceptance passes with 80 focused screen and real-PTY tests.
+  Render-derived full-field targets pass at 46, 80, and 100 columns.
+  A real truecolor 80×24 Default AliceProject session hovered and clicked the
+  Project and Provider fields across their padded width, opened the existing
+  Switchboard and Source overlays, cancelled without writing configuration,
+  and restored cursor, bracketed-paste, mouse, and alternate-screen modes on
+  detach. A running-runtime PTY clicked the verified Web field outside its
+  label and reached the existing browser-open callback. CLI build/typecheck and
+  root TypeScript pass; the 699-file suite passes (698 passed, 1 skipped; 6,153
+  tests passed, 10 skipped). Docker installer smoke passes without Node, npm,
+  pnpm, Bun, or an Agent Runtime, and package dry-run contains the changed view,
+  theme, and Supervisor controller sources.
 
 ## Completion Criteria
 

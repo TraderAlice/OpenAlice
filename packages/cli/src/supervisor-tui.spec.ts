@@ -241,6 +241,104 @@ describe('Supervisor TUI screen', () => {
     expect(recovery).toContain('! RECOVERY  ›  ◆ OVERVIEW')
   })
 
+  it('turns Overview identity and actionable telemetry into direct pointer hotspots', () => {
+    const actions: SupervisorAction[] = []
+    let projectOpens = 0
+    let sourceOpens = 0
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: {
+        class: 'absent',
+        owner: null,
+        endpoints: {},
+      },
+    }, {
+      onAction: (action) => actions.push(action),
+      onProjects: () => { projectOpens += 1 },
+      onConfigureSource: () => { sourceOpens += 1 },
+      motionEnabled: false,
+    })
+
+    let lines = screen.render(80)
+    const projectRow = lines.findIndex((line) => line.includes('⌂ Default AliceProject')) + 1
+    const providerRow = lines.findIndex((line) => line.includes('⑂ Provider')) + 1
+    expect(projectRow).toBeGreaterThan(0)
+    expect(providerRow).toBeGreaterThan(0)
+    expect(lines.join('\n')).not.toContain('↗ Web')
+
+    expect(screen.handlePointer({
+      button: 35, col: 70, row: projectRow, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(80).join('\n')).toContain('› Default AliceProject')
+    expect(screen.render(80).join('\n')).toContain(
+      '◇  PREVIEW  Open the AliceProject Switchboard',
+    )
+    expect(screen.handlePointer(pointerClick(70, projectRow))).toBe(true)
+    expect(projectOpens).toBe(1)
+
+    expect(screen.handlePointer({
+      button: 35, col: 70, row: providerRow, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(80).join('\n')).toContain('› Provider')
+    expect(screen.render(80).join('\n')).toContain(
+      '◇  PREVIEW  Choose and validate the source checkout',
+    )
+    expect(screen.handlePointer(pointerClick(70, providerRow))).toBe(true)
+    expect(sourceOpens).toBe(1)
+    expect(screen.handlePointer({
+      button: 35, col: 40, row: 4, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+
+    lines = screen.render(100)
+    const wideProviderRow = lines.findIndex((line) => line.includes('⑂ Provider')) + 1
+    expect(wideProviderRow).toBeGreaterThan(0)
+    expect(screen.handlePointer({
+      button: 35, col: 95, row: wideProviderRow, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(100).join('\n')).toContain('› Provider')
+    expect(screen.handlePointer(pointerClick(95, wideProviderRow))).toBe(true)
+    expect(sourceOpens).toBe(2)
+
+    lines = screen.render(46)
+    const narrowProjectRow = lines.findIndex((line) => line.includes('⌂ Default AliceProject')) + 1
+    expect(narrowProjectRow).toBeGreaterThan(0)
+    expect(lines.every((line) => displayWidth(line) <= 46)).toBe(true)
+    expect(screen.handlePointer({
+      button: 35, col: 40, row: narrowProjectRow, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(46).join('\n')).toContain('› Default AliceProject')
+    expect(screen.handlePointer(pointerClick(40, narrowProjectRow))).toBe(true)
+    expect(projectOpens).toBe(2)
+
+    screen.update({
+      runtime: {
+        class: 'running',
+        owner: { surface: 'cli-server', pid: 42 },
+        endpoints: { web: 'http://127.0.0.1:47331' },
+      },
+    })
+    lines = screen.render(80)
+    const webRow = lines.findIndex((line) => line.includes('↗ Web')) + 1
+    expect(webRow).toBeGreaterThan(0)
+    expect(lines.join('\n')).not.toContain('⑂ Provider')
+
+    expect(screen.handlePointer({
+      button: 35, col: 70, row: webRow, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(80).join('\n')).toContain('› Web')
+    expect(screen.render(80).join('\n')).toContain(
+      '◇  PREVIEW  Open the verified Web UI for this running Runtime.',
+    )
+    expect(screen.handlePointer(pointerClick(70, webRow))).toBe(true)
+    expect(actions).toEqual(['open'])
+
+    expect(screen.handlePointer({
+      button: 35, col: 40, row: 4, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(80).join('\n')).not.toContain('PREVIEW')
+  })
+
   it('renders semantic activity rails and advances only enabled busy motion', () => {
     const motionDemandChanges = vi.fn()
     const animated = new SupervisorScreen({
