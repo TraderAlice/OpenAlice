@@ -137,8 +137,18 @@ intentionally parameter-free:
   explicit Machine → AliceProject → Runtime rail names all three selected
   values and whether Enter will browse, start, connect, or use the target.
   Machine and AliceProject panes remain keyboard- and pointer-selectable; the
-  bottom Action Shelf repeats the one current primary action. Starting locally
-  stays in the TUI and transitions to the connected workbench after readiness.
+  passive detail surface is a Launch Briefing rather than a pre-connection
+  telemetry dump. It names the selected route, explains the human outcome, and
+  previews the three-stage handoff into connected Home; wide terminals add
+  target context while ordinary and narrow terminals retain the outcome and
+  next command. The Briefing and bottom Action Shelf share one resolved intent,
+  so an offline, unavailable, capability-blocked, or endpoint-less target
+  promotes Refresh instead of advertising a stale Start or Connect. An offline
+  Machine can still expose its last known AliceProjects for inspection before
+  the selected project asks for Refresh. The connected Connections page keeps
+  the technical Selection Constellation for owner, service, endpoint, and
+  capability inspection. Starting locally stays in the TUI and transitions to
+  the connected workbench after readiness.
   A stopped remote target starts on Enter and automatically continues into its
   SSH connection when the refreshed inventory advertises a Web endpoint.
   While local start, remote start, or SSH connection owns input, the target

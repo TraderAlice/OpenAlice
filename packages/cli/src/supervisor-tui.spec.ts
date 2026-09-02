@@ -77,17 +77,64 @@ describe('Supervisor TUI screen', () => {
       onActivateFleet: (machine, project) => activated.push(`${machine.key}/${project.key}`),
     })
 
-    const frame = screen.render(140).join('\n')
+    const plainLines = screen.render(140)
+    const frame = plainLines.join('\n')
     expect(frame).toContain('◆ [Connect]·1')
     expect(frame).toContain('OPENALICE LAUNCH · SELECT → START → CONNECT')
     expect(frame).toContain('1 MACHINE ✓ This computer')
     expect(frame).toContain('2 ALICEPROJECT ✓ Default AliceProject')
     expect(frame).toContain('3 RUNTIME ○ READY · ENTER TO START')
+    expect(frame).toContain('Launch Briefing · AliceProject')
+    expect(frame).toContain('◆ LAUNCH READY · READY TO START')
+    expect(frame).toContain('NEXT  [ Enter ] Start OpenAlice')
     expect(frame).toContain('[ Enter ] Start OpenAlice')
     expect(frame).not.toContain('Inbox')
 
+    const themed = decorateSupervisorFrame(
+      plainLines,
+      createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+      { panel: 'fleet', runtimeClass: 'absent' },
+    )
+    expect(themed.join('\n')).toContain('\u001b[')
+    expect(themed.join('\n')).toContain('[ Enter ]')
+    expect(themed.map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))).toEqual(plainLines)
+
     expect(screen.handleKey('enter', matchesKey)).toBe(true)
     expect(activated).toEqual(['local/default'])
+  })
+
+  it('makes blocked Launch Briefings and the Action Shelf share Refresh', () => {
+    const refreshed: string[] = []
+    const activated: string[] = []
+    const remote = {
+      ...fleetMachines()[1]!,
+      capabilities: { ...fleetMachines()[1]!.capabilities, openTunnel: false },
+    }
+    const fleet = setFleetFocus(
+      createSupervisorFleetState('2026-09-02T00:00:00Z', [remote]),
+      'projects',
+    )
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'fleet',
+      runtime: { class: 'absent', endpoints: {} },
+      activeTarget: null,
+      fleet,
+    }, {
+      motionEnabled: false,
+      onRefreshFleet: () => refreshed.push('refresh'),
+      onActivateFleet: (machine, project) => activated.push(`${machine.key}/${project.key}`),
+    })
+
+    const frame = screen.render(100).join('\n')
+    expect(frame).toContain('× LAUNCH BLOCKED · SSH FORWARD UNAVAILABLE')
+    expect(frame).toContain('◆ [ r ] Refresh')
+    expect(frame).not.toContain('[ Enter ] Connect')
+    expect(screen.handleKey('r', matchesKey)).toBe(true)
+    screen.activateFleetPrimary(fleet)
+    expect(refreshed).toEqual(['refresh', 'refresh'])
+    expect(activated).toEqual([])
   })
 
   it('lets the Launch Flight Recorder own busy and recoverable-failure states', () => {

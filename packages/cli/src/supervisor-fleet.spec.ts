@@ -10,6 +10,7 @@ import {
   selectFleetIndex,
   selectedFleetProject,
   setFleetFocus,
+  supervisorFleetLaunchIntent,
   supervisorFleetRailTargetAt,
   supervisorFleetTargetAt,
 } from './supervisor-fleet.ts'
@@ -190,6 +191,88 @@ describe('Supervisor fleet state and presentation', () => {
       .toContain('Selection Constellation')
     expect(renderSupervisorFleet(state, 99, undefined, false, 15).join('\n'))
       .not.toContain('Selection Constellation')
+  })
+
+  it('turns disconnected detail into a task-first Launch Briefing', () => {
+    const stoppedLocal = {
+      ...machines()[0]!,
+      projects: machines()[0]!.projects.map((entry) => ({
+        ...entry,
+        runtime: {
+          ...entry.runtime,
+          class: 'absent' as const,
+          state: 'absent',
+          ownerSurface: null,
+          webEndpoint: null,
+        },
+      })),
+    }
+    const state = setFleetFocus(
+      createSupervisorFleetState('2026-08-23T00:00:00Z', [stoppedLocal], 'default'),
+      'projects',
+    )
+    const intent = supervisorFleetLaunchIntent(state)
+    const launcher = renderSupervisorFleet(
+      state,
+      120,
+      undefined,
+      false,
+      15,
+      undefined,
+      true,
+    )
+    const output = launcher.join('\n')
+
+    expect(intent).toMatchObject({
+      state: 'ready',
+      headline: 'READY TO START',
+      action: { key: 'Enter', label: 'Start OpenAlice' },
+    })
+    expect(output).toContain('Launch Briefing · AliceProject')
+    expect(output).toContain('◆ LAUNCH READY · READY TO START · This Mac → Default AliceProject')
+    expect(output).toContain('Start OpenAlice locally, verify readiness, and stay inside this terminal.')
+    expect(output).toContain('1 Start Runtime')
+    expect(output).toContain('2 Verify Web endpoint')
+    expect(output).toContain('3 Enter connected Home')
+    expect(output).toContain('NEXT     Use [ Enter ] Start OpenAlice in the Action Shelf.')
+    expect(output).not.toContain('Selection Constellation')
+    expect(output).not.toContain('OWNER    ')
+    expect(output).not.toContain('PORT  ')
+    expect(launcher.every((line) => displayWidth(line) <= 120)).toBe(true)
+
+    const connectedManager = renderSupervisorFleet(state, 120, undefined, false, 15)
+      .join('\n')
+    expect(connectedManager).toContain('Selection Constellation · AliceProject')
+    expect(connectedManager).toContain('OWNER    none')
+  })
+
+  it('shares blocked launch intent with the refresh primary action', () => {
+    const remote = {
+      ...machines()[1]!,
+      capabilities: { ...machines()[1]!.capabilities, openTunnel: false },
+    }
+    const state = setFleetFocus(
+      createSupervisorFleetState('2026-08-23T00:00:00Z', [remote]),
+      'projects',
+    )
+    const intent = supervisorFleetLaunchIntent(state)
+    const compact = renderSupervisorFleet(
+      state,
+      80,
+      undefined,
+      false,
+      5,
+      undefined,
+      true,
+    ).join('\n')
+
+    expect(intent).toMatchObject({
+      state: 'blocked',
+      headline: 'SSH FORWARD UNAVAILABLE',
+      action: { key: 'r', label: 'Refresh' },
+    })
+    expect(compact).toContain('× LAUNCH BLOCKED · SSH FORWARD UNAVAILABLE')
+    expect(compact).toContain('NEXT  [ r ] Refresh')
   })
 
   it('maps pointer rows to visible Machine and AliceProject selections', () => {

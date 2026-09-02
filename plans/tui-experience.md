@@ -187,6 +187,28 @@ not imply maintainer approval of the finished interaction.
   lifecycle, readiness, or tunnel authority. This is an autonomous topic
   decision, not recorded maintainer approval.
 
+### Launch-briefing decision
+
+- Keeping the disconnected Fleet's expanded Selection Constellation exposes
+  owner, uptime, service, port, and capability inventory before the user has a
+  connected target. That information is useful in the connected Connections
+  manager, but in the Launcher it competes with the more important questions:
+  what is selected, what will the primary action do, and where will it land.
+  Adding another tutorial overlay would hide the target hierarchy and create a
+  second dismissal/focus model.
+- The selected model gives the same Fleet primitive two semantic modes. Before
+  connection, its passive detail card becomes a Launch Briefing with the exact
+  Machine/AliceProject route, one human outcome, a three-stage handoff preview,
+  and the same primary command owned by the bottom Action Shelf. After
+  connection, Connections retains the technical Selection Constellation. The
+  briefing and Action Shelf resolve one shared launch intent so blocked or
+  unavailable targets cannot advertise a stale Start/Connect command. Wide
+  terminals show the handoff and target context; ordinary and narrow terminals
+  keep a two-line outcome plus next action. Glyphs and text preserve meaning in
+  `NO_COLOR`, every action remains keyboard-accessible, and no new pointer,
+  lifecycle, tunnel, readiness, or persistence authority is introduced. This
+  is an autonomous topic decision, not recorded maintainer approval.
+
 ### Launchpad action-surface decision
 
 - Keeping the current cockpit and merely recoloring its cards would improve a
@@ -2790,6 +2812,23 @@ already large `supervisor-tui.ts` application controller.
   (704 passed, 1 skipped; 6,244 tests passed, 10 skipped). CLI typecheck/build,
   the 71-file package dry-run, and Docker installer smoke all pass; the packaged
   installer remains independent of Node, npm, pnpm, Bun, and an Agent Runtime.
+- A live OMP 17.3.4 launch confirmed its welcome surface prioritizes context,
+  one next action, and the handoff into work over low-level inventory. The
+  disconnected Fleet now applies that hierarchy as a Launch Briefing: exact
+  target route, human outcome, three-stage handoff, target context, and one
+  shared Start/Connect/Refresh intent. Offline Machines retain last-known
+  project browsing, but unavailable projects, missing lifecycle/tunnel
+  capability, and endpoint-less Runtimes no longer advertise a stale launch.
+  Connected Connections deliberately retains the technical Selection
+  Constellation.
+- Launch-Briefing acceptance passes through 142 focused Fleet, theme, screen,
+  pointer/keyboard, and real-PTY tests. The wide PTY proves Briefing → Flight
+  Recorder → connected Home, while the resize PTY proves offline drill-down
+  remains available. The complete CLI suite passes (63 files, 628 tests), and
+  `test:affected` passes across 705 files (704 passed, 1 skipped; 6,247 tests
+  passed, 10 skipped). CLI typecheck/build, the 71-file package dry-run, and
+  Docker installer smoke all pass; the packaged installer remains independent
+  of Node, npm, pnpm, Bun, and an Agent Runtime.
 
 ## Completion Criteria
 

@@ -236,6 +236,7 @@ import {
   selectFleetProjectByKey,
   setFleetFocus,
   SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
+  supervisorFleetLaunchIntent,
   supervisorFleetRailTargetAt,
   supervisorFleetLauncherRows,
   supervisorFleetTargetAt,
@@ -3990,6 +3991,31 @@ export class SupervisorScreen implements Component {
     return false
   }
 
+  activateFleetPrimary(fleet: SupervisorFleetState): void {
+    if (this.snapshot.activeTarget === null) {
+      const intent = supervisorFleetLaunchIntent(fleet)
+      if (intent.action.key === 'r') {
+        this.onRefreshFleet?.()
+        return
+      }
+    }
+    if (fleet.focus === 'machines') {
+      this.update({ fleet: setFleetFocus(fleet, 'projects') })
+      return
+    }
+    const machine = selectedFleetMachine(fleet)
+    const project = selectedFleetProject(fleet)
+    if (!machine || !project) {
+      this.update({ notice: 'No AliceProject is available on the selected Machine.' })
+      return
+    }
+    if (machine.key !== 'local' && project.runtime.class === 'absent') {
+      this.onStartFleet?.(machine, project)
+    } else {
+      this.onActivateFleet?.(machine, project)
+    }
+  }
+
   handleKey(
     data: string,
     matchesKey: (data: string, key: KeyId) => boolean,
@@ -4080,26 +4106,17 @@ export class SupervisorScreen implements Component {
         return true
       }
       if (matchesKey(data, 'enter')) {
-        if (fleet.focus === 'machines') {
-          this.update({ fleet: setFleetFocus(fleet, 'projects') })
-        } else {
-          const machine = selectedFleetMachine(fleet)
-          const project = selectedFleetProject(fleet)
-          if (machine && project) {
-            if (machine.key !== 'local' && project.runtime.class === 'absent') {
-              this.onStartFleet?.(machine, project)
-            } else {
-              this.onActivateFleet?.(machine, project)
-            }
-          }
-          else this.update({ notice: 'No AliceProject is available on the selected Machine.' })
-        }
+        this.activateFleetPrimary(fleet)
         return true
       }
       const machine = selectedFleetMachine(fleet)
       const project = selectedFleetProject(fleet)
       const remote = machine?.key !== 'local'
-      if (matchesKey(data, 'r') && remote) {
+      if (matchesKey(data, 'r') && (
+        remote
+        || (this.snapshot.activeTarget === null
+          && supervisorFleetLaunchIntent(fleet).action.key === 'r')
+      )) {
         this.onRefreshFleet?.()
         return true
       }
@@ -4615,17 +4632,9 @@ export class SupervisorScreen implements Component {
         this.update({ fleet: selectFleetIndex(fleet, fleetTarget.focus, fleetTarget.index) })
       } else {
         if (fleetTarget.focus === 'machines') {
-          this.update({ fleet: setFleetFocus(fleet, 'projects') })
+          this.activateFleetPrimary(fleet)
         } else {
-          const machine = selectedFleetMachine(fleet)
-          const project = selectedFleetProject(fleet)
-          if (machine && project) {
-            if (machine.key !== 'local' && project.runtime.class === 'absent') {
-              this.onStartFleet?.(machine, project)
-            } else {
-              this.onActivateFleet?.(machine, project)
-            }
-          }
+          this.activateFleetPrimary(fleet)
         }
       }
       return true
@@ -5007,6 +5016,7 @@ export class SupervisorScreen implements Component {
           runtime,
           this.snapshot.context,
           actionWidth,
+          this.snapshot.activeTarget === null,
         )
         : this.snapshot.panel === 'inbox'
           ? renderSupervisorCommandBar([
@@ -5508,19 +5518,59 @@ function fleetActionBar(
   runtime: RuntimeSummary | null,
   _context: ResolvedLaunchContext | undefined,
   width: number,
+  launcher: boolean,
 ): string[] {
   const machine = selectedFleetMachine(fleet)
   const project = selectedFleetProject(fleet)
+  if (!launcher) {
+    if (machine?.key === 'local') {
+      return renderSupervisorCommandBar(fleet.focus === 'machines'
+        ? [
+            { key: 'Enter', label: 'Browse projects', primary: true },
+            ...(project?.available ? [{ key: 'm' as const, label: 'Transfer' }] : []),
+            { key: '↑↓', label: 'Select' },
+            { key: '?', label: 'More' },
+          ]
+        : [
+            { key: 'Enter', label: runtime?.class === 'absent' ? 'Start OpenAlice' : 'Use AliceProject', primary: true },
+            ...(project?.available ? [{ key: 'm' as const, label: 'Transfer' }] : []),
+            { key: '←', label: 'Machines' },
+            { key: '?', label: 'More' },
+          ], width)
+    }
+    if (fleet.focus === 'machines') {
+      return renderSupervisorCommandBar([
+        { key: 'Enter', label: 'Browse projects', primary: true },
+        { key: '↑↓', label: 'Select' },
+        { key: 'r', label: 'Refresh' },
+        { key: '?', label: 'More' },
+      ], width)
+    }
+    return renderSupervisorCommandBar([
+      project?.runtime.class === 'absent'
+        ? { key: 'Enter', label: 'Start OpenAlice', primary: true }
+        : { key: 'Enter', label: 'Connect', primary: true },
+      { key: '←', label: 'Machines' },
+      { key: 'r', label: 'Refresh' },
+      { key: '?', label: 'More' },
+    ], width)
+  }
+  const intent = supervisorFleetLaunchIntent(fleet)
+  const primary = {
+    key: intent.action.key,
+    label: intent.action.label,
+    primary: true,
+  } as const
   if (machine?.key === 'local') {
     return renderSupervisorCommandBar(fleet.focus === 'machines'
       ? [
-          { key: 'Enter', label: 'Browse projects', primary: true },
+          primary,
           ...(project?.available ? [{ key: 'm' as const, label: 'Transfer' }] : []),
           { key: '↑↓', label: 'Select' },
           { key: '?', label: 'More' },
         ]
       : [
-          { key: 'Enter', label: runtime?.class === 'absent' ? 'Start OpenAlice' : 'Use AliceProject', primary: true },
+          primary,
           ...(project?.available ? [{ key: 'm' as const, label: 'Transfer' }] : []),
           { key: '←', label: 'Machines' },
           { key: '?', label: 'More' },
@@ -5528,18 +5578,16 @@ function fleetActionBar(
   }
   if (fleet.focus === 'machines') {
     return renderSupervisorCommandBar([
-      { key: 'Enter', label: 'Browse projects', primary: true },
+      primary,
       { key: '↑↓', label: 'Select' },
-      { key: 'r', label: 'Refresh' },
+      ...(intent.action.key === 'r' ? [] : [{ key: 'r' as const, label: 'Refresh' }]),
       { key: '?', label: 'More' },
     ], width)
   }
   return renderSupervisorCommandBar([
-    project?.runtime.class === 'absent'
-      ? { key: 'Enter', label: 'Start OpenAlice', primary: true }
-      : { key: 'Enter', label: 'Connect', primary: true },
+    primary,
     { key: '←', label: 'Machines' },
-    { key: 'r', label: 'Refresh' },
+    ...(intent.action.key === 'r' ? [] : [{ key: 'r' as const, label: 'Refresh' }]),
     { key: '?', label: 'More' },
   ], width)
 }

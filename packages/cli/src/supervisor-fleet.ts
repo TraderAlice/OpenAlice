@@ -42,6 +42,17 @@ export interface SupervisorFleetRailTarget {
   trackRow: number
 }
 
+export interface SupervisorFleetLaunchIntent {
+  state: 'ready' | 'attention' | 'blocked' | 'select'
+  headline: string
+  summary: string
+  action: {
+    key: 'Enter' | 'r'
+    label: string
+  }
+  handoff: [string, string, string]
+}
+
 export function createSupervisorFleetState(
   generatedAt: string,
   machines: MachineInventory[],
@@ -186,6 +197,140 @@ export function selectedFleetProject(
   return machine?.projects[state?.selectedProjects[machine.key] ?? 0]
 }
 
+export function supervisorFleetLaunchIntent(
+  state: SupervisorFleetState,
+): SupervisorFleetLaunchIntent {
+  const machine = selectedFleetMachine(state)
+  const project = selectedFleetProject(state)
+  if (!machine) {
+    return launchIntent('blocked', 'NO MACHINE SELECTED', 'Refresh Machine inventory before continuing.', 'r', 'Refresh', [
+      'Refresh inventory', 'Choose a Machine', 'Choose an AliceProject',
+    ])
+  }
+  const machineReady = machine.connection === 'local' || machine.connection === 'online'
+  if (state.focus === 'machines') {
+    if (machine.projects.length === 0) {
+      return launchIntent(
+        machineReady ? 'attention' : 'blocked',
+        machineReady ? 'NO ALICEPROJECTS FOUND' : `MACHINE ${machineStatus(machine).toUpperCase()}`,
+        machine.issue?.message
+          ?? `${machine.displayName} reports no registered AliceProjects right now.`,
+        'r',
+        'Refresh',
+        ['Refresh inventory', 'Find AliceProjects', 'Choose a target'],
+      )
+    }
+    return launchIntent(
+      'select',
+      machineReady ? 'CHOOSE AN ALICEPROJECT' : 'INSPECT LAST KNOWN TARGETS',
+      machineReady
+        ? `${machine.displayName} is available with ${machine.projects.length} AliceProject${machine.projects.length === 1 ? '' : 's'}.`
+        : `${machine.displayName} is ${machineStatus(machine)}; its last known AliceProjects remain available to inspect.`,
+      'Enter',
+      'Browse projects',
+      ['Browse projects', 'Choose a target', machineReady ? 'Start or connect' : 'Refresh before launch'],
+    )
+  }
+  if (!machineReady) {
+    return launchIntent(
+      'blocked',
+      `MACHINE ${machineStatus(machine).toUpperCase()}`,
+      machine.issue?.message ?? `${machine.displayName} is not reachable right now.`,
+      'r',
+      'Refresh',
+      ['Refresh inventory', 'Recover Machine', 'Start or connect'],
+    )
+  }
+  if (!project) {
+    return launchIntent('blocked', 'NO ALICEPROJECT SELECTED', 'Choose a registered AliceProject before continuing.', 'r', 'Refresh', [
+      'Refresh inventory', 'Choose a project', 'Start or connect',
+    ])
+  }
+
+  const runtimeReady = (project.runtime.class === 'running'
+    || project.runtime.class === 'owned_elsewhere')
+    && Boolean(project.runtime.webEndpoint)
+  if (runtimeReady && machine.key === 'local') {
+    return launchIntent(
+      'ready',
+      project.available ? 'READY TO USE' : 'READY TO USE · HOME MISSING',
+      project.available
+        ? 'Use the verified local Runtime without restarting it or opening a browser.'
+        : 'Use the verified local Web route; the AliceProject home is currently missing.',
+      'Enter',
+      'Use AliceProject',
+      ['Verify endpoint', 'Bind local target', 'Enter connected Home'],
+    )
+  }
+  if (runtimeReady) {
+    if (!machine.capabilities.openTunnel) {
+      return launchIntent(
+        'blocked',
+        'SSH FORWARD UNAVAILABLE',
+        `${machine.displayName} does not advertise the tunnel capability required by this TUI.`,
+        'r',
+        'Refresh',
+        ['Refresh capability', 'Verify endpoint', 'Connect when ready'],
+      )
+    }
+    return launchIntent(
+      'ready',
+      project.available ? 'READY TO CONNECT' : 'READY TO CONNECT · HOME MISSING',
+      'Open a TUI-owned SSH forward without restarting the remote Runtime or opening a browser.',
+      'Enter',
+      'Connect',
+      ['Validate endpoint', 'Open SSH forward', 'Enter connected Home'],
+    )
+  }
+  if (!project.available) {
+    return launchIntent(
+      'blocked',
+      'ALICEPROJECT UNAVAILABLE',
+      `${project.displayName} is registered, but its project home is not available.`,
+      'r',
+      'Refresh',
+      ['Refresh inventory', 'Recover project home', 'Start when ready'],
+    )
+  }
+  if (project.runtime.class === 'absent') {
+    if (machine.key !== 'local' && !machine.capabilities.lifecycle) {
+      return launchIntent(
+        'blocked',
+        'REMOTE START UNAVAILABLE',
+        `${machine.displayName} does not advertise the lifecycle capability required to start OpenAlice.`,
+        'r',
+        'Refresh',
+        ['Refresh capability', 'Recover lifecycle', 'Start when ready'],
+      )
+    }
+    return machine.key === 'local'
+      ? launchIntent(
+          'ready',
+          'READY TO START',
+          'Start OpenAlice locally, verify readiness, and stay inside this terminal.',
+          'Enter',
+          'Start OpenAlice',
+          ['Start Runtime', 'Verify Web endpoint', 'Enter connected Home'],
+        )
+      : launchIntent(
+          'ready',
+          'READY TO START REMOTELY',
+          'Start OpenAlice on the selected Machine, then continue through its SSH forward.',
+          'Enter',
+          'Start OpenAlice',
+          ['Start remote Runtime', 'Refresh endpoint', 'Open SSH forward'],
+        )
+  }
+  return launchIntent(
+    'attention',
+    'RUNTIME NEEDS ATTENTION',
+    `${project.displayName} does not currently advertise a reachable Web endpoint.`,
+    'r',
+    'Refresh',
+    ['Refresh inventory', 'Verify Runtime endpoint', 'Connect when ready'],
+  )
+}
+
 export function fleetTunnelKey(machineKey: string, projectKey: string): string {
   return `${machineKey}/${projectKey}`
 }
@@ -210,6 +355,7 @@ export function renderSupervisorFleet(
       SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
       hoveredRail,
       activeTarget,
+      launcher,
     )]
   }
   const rowCount = fleetVisibleRows(state, visibleRows)
@@ -264,7 +410,7 @@ export function renderSupervisorFleet(
     ))
   }
   const detailRows = fleetDetailRows(width, visibleRows, rowCount)
-  lines.push('', ...renderDetailCard(state, width, pulse, detailRows, activeTarget))
+  lines.push('', ...renderDetailCard(state, width, pulse, detailRows, activeTarget, launcher))
   return [...launchRail, ...lines].map((line) => truncateDisplayWidth(line, width))
 }
 
@@ -320,6 +466,7 @@ function renderNarrowFleet(
   rowCount = SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
   hoveredRail?: SupervisorFleetRailTarget,
   activeTarget?: SupervisorFleetActiveTarget,
+  launcher = false,
 ): string[] {
   const machine = selectedFleetMachine(state)
   if (state.focus === 'machines') {
@@ -341,7 +488,7 @@ function renderNarrowFleet(
         rowCount,
       ),
       '',
-      ...renderDetailCard(state, width, pulse, 2, activeTarget),
+      ...renderDetailCard(state, width, pulse, 2, activeTarget, launcher),
     ].map((line) => truncateDisplayWidth(line, width))
   }
   return [
@@ -363,7 +510,7 @@ function renderNarrowFleet(
       rowCount,
     ),
     '',
-    ...renderDetailCard(state, width, pulse, 2, activeTarget),
+    ...renderDetailCard(state, width, pulse, 2, activeTarget, launcher),
   ].map((line) => truncateDisplayWidth(line, width))
 }
 
@@ -561,7 +708,9 @@ function renderDetailCard(
   pulse = false,
   rowCount = 2,
   activeTarget?: SupervisorFleetActiveTarget,
+  launcher = false,
 ): string[] {
+  if (launcher) return renderLaunchBriefing(state, width, rowCount)
   const expanded = rowCount > 2
   const title = expanded
     ? `Selection Constellation · ${state.focus === 'machines' ? 'Machine' : 'AliceProject'}`
@@ -574,6 +723,71 @@ function renderDetailCard(
     false,
     rowCount,
   )
+}
+
+function renderLaunchBriefing(
+  state: SupervisorFleetState,
+  width: number,
+  rowCount: number,
+): string[] {
+  const intent = supervisorFleetLaunchIntent(state)
+  const machine = selectedFleetMachine(state)
+  const project = selectedFleetProject(state)
+  const route = state.focus === 'projects' && project
+    ? `${machine?.displayName ?? 'No Machine'} → ${project.displayName}`
+    : machine?.displayName ?? 'No Machine selected'
+  const signal = intent.state === 'ready'
+    ? '◆ LAUNCH READY'
+    : intent.state === 'attention'
+      ? '! LAUNCH ATTENTION'
+      : intent.state === 'blocked'
+        ? '× LAUNCH BLOCKED'
+        : '◇ LAUNCH SELECT'
+  const keycap = `[ ${intent.action.key} ]`
+  if (rowCount <= 2) {
+    return renderPane(
+      `Launch Briefing · ${state.focus === 'machines' ? 'Machine' : 'AliceProject'}`,
+      [
+        `${signal} · ${intent.headline} · ${route}`,
+        `NEXT  ${keycap} ${intent.action.label} · ${compactLaunchOutcome(intent)}`,
+      ],
+      width,
+      undefined,
+      false,
+      rowCount,
+    )
+  }
+
+  const context = project && state.focus === 'projects'
+    ? `${machine?.key === 'local' ? 'LOCAL LOOPBACK' : 'SSH FORWARD'} · ${projectStatus(project)}`
+    : `${machine?.connection === 'local' ? 'LOCAL CONTROL PLANE' : 'SSH MACHINE'} · ${machine?.projects.length ?? 0} ALICEPROJECTS`
+  const target = project && state.focus === 'projects'
+    ? `${machine?.key ?? 'unknown'}/${project.key} · ${project.product === 'nano' ? 'NanoAlice' : 'TraderAlice'}`
+    : `${machine?.key ?? 'unknown'} · ${machine?.hostname ?? 'host not reported'}`
+  return renderPane(
+    `Launch Briefing · ${state.focus === 'machines' ? 'Machine' : 'AliceProject'}`,
+    [
+      `${signal} · ${intent.headline} · ${route}`,
+      intent.summary,
+      '',
+      '◇ HANDOFF · THIS TUI STAYS IN CONTROL',
+      joinLaunchSteps(intent.handoff.map((stage, index) => `${index + 1} ${stage}`), Math.max(1, width - 4)),
+      '',
+      `TARGET   ${target}`,
+      `CONTEXT  ${context}`,
+      `NEXT     Use ${keycap} ${intent.action.label} in the Action Shelf.`,
+    ],
+    width,
+    undefined,
+    false,
+    rowCount,
+  )
+}
+
+function compactLaunchOutcome(intent: SupervisorFleetLaunchIntent): string {
+  if (intent.state === 'ready') return intent.handoff.join(' → ')
+  if (intent.state === 'select') return 'choose the target, then start or connect'
+  return intent.summary
 }
 
 function expandedProjectDetail(
@@ -709,6 +923,17 @@ function formatFleetDuration(seconds: number | null): string {
   if (seconds < 60) return `${Math.max(0, Math.floor(seconds))}s`
   if (seconds < 3_600) return `${Math.floor(seconds / 60)}m`
   return `${Math.floor(seconds / 3_600)}h ${Math.floor((seconds % 3_600) / 60)}m`
+}
+
+function launchIntent(
+  state: SupervisorFleetLaunchIntent['state'],
+  headline: string,
+  summary: string,
+  key: SupervisorFleetLaunchIntent['action']['key'],
+  label: string,
+  handoff: SupervisorFleetLaunchIntent['handoff'],
+): SupervisorFleetLaunchIntent {
+  return { state, headline, summary, action: { key, label }, handoff }
 }
 
 function fleetDetailRows(width: number, requestedRows: number, inventoryRows: number): number {

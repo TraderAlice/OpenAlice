@@ -196,6 +196,10 @@ export function decorateSupervisorFrame(
     if (line.includes('│ ✓ ')) return theme.success(line)
     if (line.includes('│ ● ')) return theme.success(line)
     if (line.includes('│ ○ ')) return theme.muted(line)
+    if (line.includes('│ ◇ LAUNCH SELECT')) return theme.infoRail(line)
+    if (line.includes('│ ◇ HANDOFF')) return theme.accent(line)
+    if (/│ 1 .*━━━.*2 /u.test(line)) return theme.accent(line)
+    if (line.includes('│ NEXT')) return decorateLaunchBriefingNext(line, theme)
     if (/│ ◆ (?:IN FLIGHT|NOW|\d{2})/u.test(line)) return theme.accentStrong(line)
     if (/│ ◇ \d{2}/u.test(line)) return theme.muted(line)
     if (line.includes('│ ● LIVE SESSION')) return theme.successRail(line)
@@ -260,6 +264,13 @@ function decorateLaunchFlightRail(
     if (token.startsWith('×')) return theme.danger(token)
     return theme.muted(token)
   })
+}
+
+function decorateLaunchBriefingNext(
+  line: string,
+  theme: SupervisorTuiTheme,
+): string {
+  return line.replace(/\[ (?:Enter|r) \]/u, (keycap) => theme.accentStrong(keycap))
 }
 
 function decorateFocusHeader(
