@@ -25,9 +25,13 @@ describe('Supervisor Command Dock', () => {
   it('builds contextual commands without inventing another action contract', () => {
     const items = supervisorCommandDeckItems(context)
     expect(items.map((item) => item.input)).toEqual([
-      'enter', 'r', 'x', 'l', 'd', 'c', 'i', 'p', 'u', 'tab', '?',
+      'enter', 'l', 'd', 'tab', '?', 'i', 'c', 'p', 'u', 'r', 'x',
     ])
     expect(items[0]).toMatchObject({ label: 'Open Workspace', primary: true })
+    expect(items.slice(0, 4).map((item) => item.label)).toEqual([
+      'Open Workspace', 'Runtime logs', 'Runtime Doctor', 'Next view',
+    ])
+    expect(items.slice(-2).map((item) => item.group)).toEqual(['Manage', 'Manage'])
 
     const recovery = supervisorCommandDeckItems({ ...context, recovery: true })
     expect(recovery.map((item) => item.input)).toEqual(['u', '?'])
@@ -36,13 +40,13 @@ describe('Supervisor Command Dock', () => {
   it('scopes the Command Dock to an active SSH target', () => {
     const items = supervisorCommandDeckItems({ ...context, targetKind: 'ssh' })
 
-    expect(items.map((item) => item.input)).toEqual(['enter', 'x', 'c', 'tab', '?'])
+    expect(items.map((item) => item.input)).toEqual(['enter', 'c', 'tab', '?', 'x'])
     expect(items.map((item) => item.label)).toEqual([
       'Open active Web UI',
-      'Disconnect remote target',
       'Connections',
       'Next view',
       'Help',
+      'Disconnect remote target',
     ])
     expect(items.map((item) => item.label)).not.toContain('Runtime Source')
     expect(items.map((item) => item.label)).not.toContain('Stop Runtime')
@@ -54,7 +58,7 @@ describe('Supervisor Command Dock', () => {
       targetKind: 'ssh',
       targetHealth: 'unreachable',
     })
-    expect(remote.map((item) => item.input)).toEqual(['r', 'x', 'c', 'tab', '?'])
+    expect(remote.map((item) => item.input)).toEqual(['r', 'c', 'tab', '?', 'x'])
     expect(remote[0]).toMatchObject({ label: 'Retry connection', primary: true })
     expect(remote.map((item) => item.label)).not.toContain('Open active Web UI')
 
@@ -105,9 +109,9 @@ describe('Supervisor Command Dock', () => {
     const items = supervisorCommandDeckItems(context)
     const wide = renderSupervisorCommandDeck(items, { selected: 1, hovered: 2 }, 'running', 100)
     expect(wide.lines.join('\n')).toContain('Command Dock · 2/11 · RUNNING')
-    expect(wide.lines.join('\n')).toContain('›   Restart Runtime')
-    expect(wide.lines.join('\n')).toContain('»   Stop Runtime')
-    expect(wide.lines.join('\n')).toContain('Confirm before reconnecting active sessions')
+    expect(wide.lines.join('\n')).toContain('›   Runtime logs')
+    expect(wide.lines.join('\n')).toContain('»   Runtime Doctor')
+    expect(wide.lines.join('\n')).toContain('Run read-only ownership and readiness checks')
     expect(wide.lines.join('\n')).toContain('⌕  ▌ Type to filter commands')
     expect(wide.targets[1]).toEqual({ row: 4, startColumn: 2, endColumn: 99, index: 1 })
     expect(wide.lines).toHaveLength(9)
@@ -115,7 +119,8 @@ describe('Supervisor Command Dock', () => {
 
     const scrolled = renderSupervisorCommandDeck(items, { selected: 9, hovered: null }, 'running', 100)
     expect(scrolled.lines.join('\n')).toContain('Command Dock · 10/11 · RUNNING')
-    expect(scrolled.lines.join('\n')).toContain('›   Next view')
+    expect(scrolled.lines.join('\n')).toContain('›   Restart Runtime')
+    expect(scrolled.lines.join('\n')).toContain('MANAGE · R')
     expect(scrolled.lines.join('\n')).not.toContain('Open Workspace')
     expect(scrolled.targets.map((target) => target.index)).toEqual([7, 8, 9, 10])
 

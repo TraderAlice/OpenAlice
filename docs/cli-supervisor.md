@@ -372,7 +372,12 @@ intentionally parameter-free:
   and changes the Spine action to `Close`. The Dock spans the available width
   above the Spine, shows at most four results around the current selection, and
   contracts for filtered or empty states. It exposes
-  only commands valid for the current Runtime/recovery context. Typing filters
+  only commands valid for the current Runtime/recovery context. An empty local
+  Dock orders the current primary task before read-only Runtime evidence and
+  Next view, then navigation/configuration; Restart and Stop remain searchable
+  Manage commands at the tail rather than occupying the discovery surface as
+  Primary actions. A healthy remote Dock likewise keeps Connections, Next view,
+  and Help ahead of Disconnect. Typing filters
   and ranks command names, groups, shortcuts, and compact English/Chinese
   intent aliases in place. The focused search rail always exposes a caret;
   color terminals pulse it at a bounded cadence while reduced motion keeps the

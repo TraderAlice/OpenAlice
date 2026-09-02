@@ -297,8 +297,13 @@ describe('Supervisor TUI screen', () => {
     expect(frame).toContain('⌁ Cloud Lab / Research · SSH')
     expect(frame).not.toContain('╭─ ◆ [ x ] Disconnect')
     expect(frame).not.toContain('[ i ] Research')
+    expect(screen.handleKey('/', matchesKey)).toBe(true)
+    for (const character of 'disconnect') {
+      expect(screen.handleKey(character, matchesKey)).toBe(true)
+    }
     expect(screen.renderCommandPalette(100).lines.join('\n')).toContain('Disconnect remote target')
     expect(screen.renderCommandPalette(100).lines.join('\n')).not.toContain('Runtime Source')
+    expect(screen.handleEscape()).toBe(true)
 
     expect(screen.handleKey('c', matchesKey)).toBe(true)
     expect(screen.snapshot.panel).toBe('fleet')
@@ -1391,7 +1396,7 @@ describe('Supervisor TUI screen', () => {
     expect(paletteChanges).toEqual([true, false])
 
     screen.handleKey('/', matchesKey)
-    for (let index = 0; index < 6; index += 1) {
+    for (let index = 0; index < 8; index += 1) {
       expect(screen.handleKey('down', matchesKey)).toBe(true)
     }
     expect(screen.renderCommandPalette(80).lines.join('\n')).toContain('›   Setup')

@@ -3408,6 +3408,26 @@ already large `supervisor-tui.ts` application controller.
   real-PTY tests (including all 54 PTY cases), and the complete CLI suite (63
   files, 638 tests). CLI typecheck and build also pass.
 
+### Command Dock safe-discovery decision
+
+- Cell-accurate 120x32 and 80x24 empty-query captures showed Restart and Stop
+  occupying half of the four-row Command Dock discovery surface and labelling
+  both as PRIMARY. Confirmation preserved mutation safety, but the information
+  architecture still taught lifecycle disruption before ordinary exploration.
+- A healthy local Dock now leads with the current primary route, Runtime logs,
+  Runtime Doctor, and Next view. Help and configuration follow; Restart and
+  Stop remain direct-key and searchable Manage commands at the tail. A healthy
+  remote Dock similarly presents Connections, Next view, and Help before its
+  target-scoped Disconnect command.
+- Query scoring, direct shortcuts, contextual availability, confirmation,
+  overlay selection, pointer rows, and activation dispatch are unchanged. The
+  change affects only empty-query ordering and truthful group labels.
+- Real 120x32 and 80x24 captures verify the four visible results form a safe
+  task-first discovery surface without truncating command identity or metadata.
+- Command-Dock-safe-discovery acceptance passes through all 141 Command Dock,
+  screen, and real-PTY tests (including all 54 PTY cases), and the complete CLI
+  suite (63 files, 638 tests). CLI typecheck and build also pass.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

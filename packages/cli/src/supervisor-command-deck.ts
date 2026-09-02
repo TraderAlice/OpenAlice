@@ -102,10 +102,6 @@ export function supervisorCommandDeckItems(
           : ['retry', 'probe', '重试', '恢复'],
       ),
       command(
-        'x', 'Disconnect remote target', 'Close this SSH forward without stopping OpenAlice',
-        'Primary', false, ['disconnect', 'ssh', '断开'],
-      ),
-      command(
         'c', 'Connections', 'Choose another Machine or AliceProject target',
         'Navigate', false, ['switch', 'target', '连接', '切换'],
       ),
@@ -116,6 +112,10 @@ export function supervisorCommandDeckItems(
       command(
         '?', 'Help', 'Open the complete keyboard reference',
         'Navigate', false, ['帮助'],
+      ),
+      command(
+        'x', 'Disconnect remote target', 'Close this SSH forward without stopping OpenAlice',
+        'Manage', false, ['disconnect', 'ssh', '断开'],
       ),
     ]
   }
@@ -158,18 +158,6 @@ export function supervisorCommandDeckItems(
       'Primary', false, ['启动', '静默启动'],
     ))
   }
-  if (context.restartAvailable) {
-    items.push(command(
-      'r', 'Restart Runtime', 'Confirm before reconnecting active sessions',
-      'Primary', false, ['重启'],
-    ))
-  }
-  if (context.stopAvailable) {
-    items.push(command(
-      'x', 'Stop Runtime', 'Confirm before disconnecting active sessions',
-      'Primary', false, ['停止'],
-    ))
-  }
   items.push(
     command(
       'l', 'Runtime logs', 'Inspect the bounded, redacted snapshot',
@@ -180,12 +168,20 @@ export function supervisorCommandDeckItems(
       'Observe', false, ['诊断', '检查'],
     ),
     command(
-      'c', 'Runtime Source', 'Choose, validate, save, and launch a source checkout',
-      'Manage', false, ['source', 'checkout', '源码', '检出'],
+      'tab', 'Next view', 'Move through the Supervisor navigation rail',
+      'Navigate', false, ['下一页', '切换'],
+    ),
+    command(
+      '?', 'Help', 'Open the complete keyboard reference',
+      'Navigate', false, ['帮助'],
     ),
     command(
       'i', 'AliceProjects', 'Select or create a complete local home',
       'Manage', false, ['项目', '工作区'],
+    ),
+    command(
+      'c', 'Runtime Source', 'Choose, validate, save, and launch a source checkout',
+      'Manage', false, ['source', 'checkout', '源码', '检出'],
     ),
     command(
       'p', 'Setup', 'Review project and Machine defaults',
@@ -195,15 +191,19 @@ export function supervisorCommandDeckItems(
       'u', 'Update', 'Choose and inspect a release channel',
       'Manage', false, ['更新', '升级'],
     ),
-    command(
-      'tab', 'Next view', 'Move through the Supervisor navigation rail',
-      'Navigate', false, ['下一页', '切换'],
-    ),
-    command(
-      '?', 'Help', 'Open the complete keyboard reference',
-      'Navigate', false, ['帮助'],
-    ),
   )
+  if (context.restartAvailable) {
+    items.push(command(
+      'r', 'Restart Runtime', 'Confirm before reconnecting active sessions',
+      'Manage', false, ['重启'],
+    ))
+  }
+  if (context.stopAvailable) {
+    items.push(command(
+      'x', 'Stop Runtime', 'Confirm before disconnecting active sessions',
+      'Manage', false, ['停止'],
+    ))
+  }
   return items
 }
 
