@@ -76,7 +76,8 @@ describe('Supervisor TUI screen', () => {
     expect(lines[0]).toContain('OpenAlice Supervisor')
     expect(lines[0]).toContain('v0.87.0-beta · DEV')
     expect(lines[1]).toMatch(/^│ .+ │$/u)
-    expect(lines[2]).toMatch(/^╰─+╯$/u)
+    expect(lines[2]).toMatch(/^╰[─┬]+╯$/u)
+    expect(lines[2].match(/┬/gu)).toHaveLength(1)
     expect(lines.slice(0, 3).every((line) => displayWidth(line) === 80)).toBe(true)
     expect(lines.join('\n')).toContain('○ STOPPED')
     expect(lines.join('\n')).toContain('[ Enter ]  Start OpenAlice & open Workspace')
@@ -410,6 +411,40 @@ describe('Supervisor TUI screen', () => {
     expect(reduced.render(115).join('\n')).not.toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
   })
 
+  it('slides the Mission Header view beacon while reduced motion lands immediately', () => {
+    const animated = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'absent', endpoints: {} },
+    }, { motionEnabled: true })
+    for (let frame = 0; frame < 9; frame += 1) animated.advanceMotion()
+    const overviewColumn = animated.render(80)[2]!.indexOf('┬')
+    expect(animated.handleKey(']', matchesKey)).toBe(true)
+    expect(animated.snapshot.panel).toBe('fleet')
+    expect(animated.hasActiveMotion()).toBe(true)
+    expect(animated.render(80)[2]!.indexOf('┬')).toBe(overviewColumn)
+    animated.advanceMotion()
+    const movingColumn = animated.render(80)[2]!.indexOf('┬')
+    expect(movingColumn).toBeGreaterThan(overviewColumn)
+    expect(animated.handleKey(']', matchesKey)).toBe(true)
+    expect(animated.snapshot.panel).toBe('logs')
+    expect(animated.render(80)[2]!.indexOf('┬')).toBe(movingColumn)
+    for (let frame = 0; frame < 4; frame += 1) animated.advanceMotion()
+    const logsColumn = animated.render(80)[2]!.indexOf('┬')
+    expect(logsColumn).toBeGreaterThan(movingColumn)
+    expect(animated.hasActiveMotion()).toBe(false)
+
+    const reduced = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'absent', endpoints: {} },
+    }, { motionEnabled: false })
+    const reducedOverview = reduced.render(80)[2]!.indexOf('┬')
+    expect(reduced.handleKey(']', matchesKey)).toBe(true)
+    expect(reduced.render(80)[2]!.indexOf('┬')).toBeGreaterThan(reducedOverview)
+    expect(reduced.hasActiveMotion()).toBe(false)
+  })
+
   it('describes an externally owned Runtime without offering refused mutations', () => {
     const screen = new SupervisorScreen({
       version: 'dev',
@@ -490,6 +525,7 @@ describe('Supervisor TUI screen', () => {
     })
 
     expect(screen.render(100).join('\n')).toContain('\u001b[38;2;')
+    expect(screen.render(100)[2]).toContain('\u001b[1;38;2;116;235;226m┬')
     expect(screen.render(100)[1]!.replace(/\u001b\[[0-9;]*m/gu, '')).toContain('[Machines]·2')
     expect(screen.snapshot.fleet?.selectedMachine).toBe(0)
     expect(screen.handlePointer({

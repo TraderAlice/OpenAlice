@@ -488,6 +488,20 @@ not imply maintainer approval of the finished interaction.
   structure remain authoritative. This is an autonomous topic decision, not a
   recorded maintainer approval.
 
+### Mission Header View Beacon decision
+
+- Cross-fading or sliding whole page bodies would make navigation feel lively,
+  but destabilize operational text and pointer geometry during the transition.
+- Adding a separate active-view status row would preserve content, but repeat
+  information already present in the selected tab and Command Spine.
+- The selected model uses one junction glyph on the Mission Header's existing
+  closing rail as a View Beacon. It rests beneath the selected tab and, when
+  motion is enabled, follows a short eased path from the previous tab to the
+  next. Reduced motion lands directly on the final column. The renderer uses
+  the exact responsive navigation targets, so wide, compact, and minimal labels
+  share one source of geometry. This is an autonomous topic decision, not a
+  recorded maintainer approval.
+
 ### Fixed activity-slot decision
 
 - Keeping the existing append-only feedback stack makes Working, Notice, and
@@ -616,6 +630,8 @@ already large `supervisor-tui.ts` application controller.
   with a closing frame, semantic breadcrumbs, and whole-segment pointer targets.
 - [x] Replace the disconnected title/divider/tabs stack with a same-height
   Mission Header that frames brand, release provenance, and clickable navigation.
+- [x] Anchor the active view with a reduced-motion-safe beacon that travels
+  along the Mission Header rail instead of animating operational page content.
 - [x] Replace expanding feedback rows with a stable single-line activity slot.
 - [x] Replace inline confirmation cards with stable, focused compositor modals.
 - [x] Promote the Command Palette from page replacement to a focused overlay.
@@ -1187,6 +1203,20 @@ already large `supervisor-tui.ts` application controller.
   passed, 1 skipped; 6,148 tests passed, 10 skipped). Docker installer smoke
   passes, and package dry-run includes the changed Supervisor theme, view, and
   renderer sources.
+- The Mission Header's closing rail now owns an accent View Beacon aligned to
+  the selected navigation segment. Keyboard and pointer navigation move it over
+  a four-frame eased path; a second navigation action starts at the last
+  rendered beacon column instead of snapping to either tab center. The final
+  static frame is identical with motion disabled except that it lands
+  immediately, and operational page bodies never animate or shift.
+- View-Beacon acceptance passes with 77 focused screen and real-PTY tests. A
+  real 100×30 Default AliceProject session moved the beacon from Overview to
+  Machines while preserving the Fleet frame; a 46×30 `NO_COLOR` and
+  `OPENALICE_TUI_MOTION=0` session placed it directly under compact Home and
+  Logs targets and restored terminal modes after detach. CLI build/typecheck
+  and root TypeScript pass; the 699-file suite passes (698 passed, 1 skipped;
+  6,149 tests passed, 10 skipped). Docker installer smoke passes, and package
+  dry-run includes the changed Supervisor controller and theme sources.
 
 ## Completion Criteria
 

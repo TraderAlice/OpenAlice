@@ -161,7 +161,10 @@ path is intentionally parameter-free:
   the selected label in brackets. Wide labels collapse through compact and
   minimal variants so all five destinations remain reachable at 46 columns.
   The renderer publishes the exact final segment geometry used for pointer
-  hover and click, rather than reconstructing hit regions from labels.
+  hover and click, rather than reconstructing hit regions from labels. A View
+  Beacon on the Mission Header's closing rail anchors the active destination;
+  with motion enabled it travels between the old and new tab, while reduced
+  motion places it immediately without changing the final frame.
   `↑`/`↓` move within the active Fleet pane and the mouse wheel moves the
   focused Fleet selection.
   Fleet and loaded Logs expose their available counts in the navigation rail;

@@ -142,7 +142,7 @@ export function decorateSupervisorFrame(
     if (line.startsWith('◆  STATUS')) return theme.infoRail(line)
     if (index === 0) return decorateHeader(line, theme, options.introFrame)
     if (index === 1) return decorateTabs(line, theme, options.panel, options.hoveredPanel)
-    if (index === 2) return theme.muted(line)
+    if (index === 2) return decorateNavigationBeaconRail(line, theme)
     if (line.startsWith('› ') || line.startsWith('▶ ') || line.includes('│ › ')) return theme.selected(line)
     if (line.includes('│ » ')) return theme.accent(line)
     if (line.includes('│ × ')) return theme.danger(line)
@@ -374,4 +374,13 @@ function decorateTabs(
   return framed
     ? `${theme.navigationRail('│ ')}${decorated}${theme.navigationRail(' │')}`
     : decorated
+}
+
+function decorateNavigationBeaconRail(
+  line: string,
+  theme: SupervisorTuiTheme,
+): string {
+  const beacon = line.indexOf('┬')
+  if (beacon < 0) return theme.muted(line)
+  return `${theme.muted(line.slice(0, beacon))}${theme.accentStrong('┬')}${theme.muted(line.slice(beacon + 1))}`
 }

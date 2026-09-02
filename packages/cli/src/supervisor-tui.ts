@@ -282,6 +282,13 @@ interface UpdateResult {
 export type SupervisorUpdateChannel = 'stable' | 'beta' | 'dev'
 
 export type SupervisorPanel = 'fleet' | 'overview' | 'logs' | 'doctor' | 'help'
+
+interface SupervisorNavigationTransition {
+  from: SupervisorPanel
+  fromColumn?: number
+  to: SupervisorPanel
+  frame: number
+}
 export type SupervisorMode = 'normal' | 'config-recovery'
 export type SupervisorConfigRecoveryReason = 'newer-schema' | 'unreadable'
 export type SupervisorAction =
@@ -2922,6 +2929,7 @@ export class SupervisorScreen implements Component {
   private onDetach?: () => void
   private hoveredPanel?: SupervisorPanel
   private navigationTargets: SupervisorNavigationTarget[] = []
+  private navigationBeaconColumn?: number
   private hoveredFleetTarget?: SupervisorFleetPointerTarget
   private hoveredCommandTarget?: SupervisorCommandTarget
   private commandTargets: SupervisorCommandTarget[] = []
@@ -2930,6 +2938,7 @@ export class SupervisorScreen implements Component {
   private commandDeckQuery = ''
   private motionFrame = 0
   private introFrame?: number
+  private navigationTransition?: SupervisorNavigationTransition
   private runtimePulse = false
   private logsFromEnd = 0
   private logFilter: SupervisorLogFilter = 'all'
@@ -3045,12 +3054,25 @@ export class SupervisorScreen implements Component {
       this.motionFrame = (this.motionFrame + 1) % 10
       changed = true
     }
+    if (this.navigationTransition) {
+      this.navigationTransition = this.navigationTransition.frame >= 3
+        ? undefined
+        : {
+            ...this.navigationTransition,
+            frame: this.navigationTransition.frame + 1,
+          }
+      changed = true
+    }
     return changed
   }
 
   hasActiveMotion(): boolean {
     return this.motionEnabled
-      && (this.introFrame !== undefined || Boolean(this.snapshot.busy))
+      && (
+        this.introFrame !== undefined
+        || Boolean(this.snapshot.busy)
+        || Boolean(this.navigationTransition)
+      )
   }
 
   cancelConfirmation(): void {
@@ -3178,7 +3200,7 @@ export class SupervisorScreen implements Component {
       return true
     }
     if (matchesKey(data, '?')) {
-      this.update({ panel: this.snapshot.panel === 'help' ? 'overview' : 'help' })
+      this.selectPanel(this.snapshot.panel === 'help' ? 'overview' : 'help')
       return true
     }
     if (matchesKey(data, ']') || matchesKey(data, '[')) {
@@ -3572,10 +3594,20 @@ export class SupervisorScreen implements Component {
       startColumn: target.startColumn + 2,
       endColumn: target.endColumn + 2,
     }))
+    const navigationRail = renderNavigationBeaconRail(
+      width,
+      this.navigationTargets,
+      this.snapshot.panel ?? 'overview',
+      this.navigationTransition,
+    )
+    const navigationBeaconIndex = navigationRail.indexOf('┬')
+    this.navigationBeaconColumn = navigationBeaconIndex >= 0
+      ? navigationBeaconIndex + 1
+      : undefined
     const lines = [
       renderSupervisorHeader(this.snapshot.version, this.snapshot.channel, width, updateBadge),
       `│ ${navigation.line} │`,
-      `╰${'─'.repeat(Math.max(1, width - 2))}╯`,
+      navigationRail,
       '',
     ]
 
@@ -3838,10 +3870,50 @@ export class SupervisorScreen implements Component {
     this.setCommandPaletteOpen(false)
     this.homePrimaryHovered = false
     this.hoveredLogFromEnd = null
+    const previous = this.snapshot.panel ?? 'overview'
+    const previousTarget = this.navigationTargets.find((target) => target.panel === previous)
+    this.navigationTransition = this.motionEnabled && previous !== panel
+      ? {
+          from: previous,
+          fromColumn: this.navigationBeaconColumn ?? (previousTarget
+            ? Math.round((previousTarget.startColumn + previousTarget.endColumn) / 2)
+            : undefined),
+          to: panel,
+          frame: 0,
+        }
+      : undefined
     this.update({ panel })
+    if (this.navigationTransition) this.onMotionDemandChange?.()
     if (panel === 'logs') this.onAction?.('logs')
     if (panel === 'doctor') this.onAction?.('doctor')
   }
+}
+
+function renderNavigationBeaconRail(
+  width: number,
+  targets: SupervisorNavigationTarget[],
+  selected: SupervisorPanel,
+  transition?: SupervisorNavigationTransition,
+): string {
+  const rail = `╰${'─'.repeat(Math.max(1, width - 2))}╯`
+  const center = (panel: SupervisorPanel): number | undefined => {
+    const target = targets.find((candidate) => candidate.panel === panel)
+    return target
+      ? Math.round((target.startColumn + target.endColumn) / 2)
+      : undefined
+  }
+  const selectedCenter = center(selected)
+  if (selectedCenter === undefined) return rail
+  const fromCenter = transition?.fromColumn ?? (transition ? center(transition.from) : undefined)
+  const toCenter = transition ? center(transition.to) : undefined
+  const progress = transition
+    ? [0, 0.2, 0.6, 1][Math.min(3, transition.frame)] ?? 1
+    : 1
+  const beaconColumn = fromCenter !== undefined && toCenter !== undefined
+    ? Math.round(fromCenter + ((toCenter - fromCenter) * progress))
+    : selectedCenter
+  const index = Math.max(1, Math.min(rail.length - 2, beaconColumn - 1))
+  return `${rail.slice(0, index)}┬${rail.slice(index + 1)}`
 }
 
 function createServices(
