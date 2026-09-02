@@ -400,7 +400,7 @@ describe('Supervisor TUI screen', () => {
 
     screen.update({ panel: 'logs' })
     const runtimeFrame = screen.render(100).join('\n')
-    expect(runtimeFrame).toContain('Active Link · CONNECTION DEGRADED · LOCAL')
+    expect(runtimeFrame).toContain('Runtime Observatory · CONNECTION DEGRADED · LOCAL')
     expect(runtimeFrame).toContain('1 failed inspections')
     expect(runtimeFrame).toContain('◆ [ r ] Retry connection')
     expect(runtimeFrame).not.toContain('[ l ] Reload snapshot')

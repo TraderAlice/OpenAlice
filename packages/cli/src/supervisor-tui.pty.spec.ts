@@ -293,7 +293,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           child.write('\u001b[D')
         } else if (!exiting
           && openedRuntime
-          && plain.includes('Session Trail')
+          && plain.includes('Runtime Observatory')
           && plain.includes('RECOVERED')
           && plain.includes('UNREACHABLE')
           && plain.includes('DEGRADED')) {
@@ -313,8 +313,10 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(plain).toContain('× UNREACHABLE')
     expect(plain).toContain('[ r ] Retry connection')
     expect(plain).toContain('Connection to Cloud Lab / Research is healthy.')
-    expect(plain).toContain('Active Link · CONNECTED · REMOTE')
-    expect(plain).toContain('Session Trail')
+    expect(plain).toContain('Runtime Observatory · CONNECTED · REMOTE')
+    expect(plain).toContain('RUNTIME')
+    expect(plain).toContain('ROUTE')
+    expect(plain).toContain('SERVICES')
     expect(plain).toContain('RECOVERED')
     expect(plain).toContain('FIXTURE_RESULT starts=0 opens=0 loads=0 diagnoses=0 disconnects=1 probes=4')
     expect(transcript).toContain('\u001b[?25h')

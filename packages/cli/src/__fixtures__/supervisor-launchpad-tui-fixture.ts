@@ -29,6 +29,9 @@ const exitCode = await runSupervisorTui({}, {
         state: 'ready',
         owner: { surface: 'cli-server', pid: 4242 },
         endpoints: { web: 'http://127.0.0.1:47331' },
+        provider: { kind: 'source', appDir: '/fixture/openalice' },
+        components: { alice: 'ready', uta: 'disabled', connector: 'disabled' },
+        uptimeSeconds: 7_380,
       }
     : { class: 'absent', state: 'absent', owner: null, endpoints: {} },
   start: async () => {

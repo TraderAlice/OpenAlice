@@ -23,17 +23,19 @@ describe('Supervisor connection chronicle', () => {
     const lines = renderSupervisorConnectionChronicle({ target, events }, 80)
     const text = lines.join('\n')
 
-    expect(text).toContain('Connection Chronicle · ENDPOINT UNREACHABLE · 3/12')
-    expect(text).toContain('× ENDPOINT UNREACHABLE · SSH FORWARD')
-    expect(text).toContain('⌁ Cloud Lab → Research')
+    expect(text).toContain('Runtime Observatory · ENDPOINT UNREACHABLE · REMOTE · 3/12 EVENTS')
+    expect(text).toContain('× OPENALICE READY · ENDPOINT UNREACHABLE')
+    expect(text).toContain('⌁ Cloud Lab → Research · SSH FORWARD')
+    expect(text).toContain('Owner  cli-server · pid 4242 · Uptime  2h 3m')
+    expect(text).toContain('Provider  source')
+    expect(text).toContain('SERVICES  ● Alice  ready · ○ UTA  disabled · ○ Connector  disabled')
     expect(text).toContain('× 14:05:08 UNREACHABLE · automatic probe')
-    expect(text).toContain('! 14:05:07 DEGRADED · automatic probe')
     expect(text).not.toContain('ACQUIRED')
     expect(text).toContain('◆ [ r ] Retry active connection')
     expect(lines.every((line) => displayWidth(line) <= 80)).toBe(true)
   })
 
-  it('uses a two-column active-link and session-trail board on wide terminals', () => {
+  it('uses a three-column Runtime, route, and services observatory on wide terminals', () => {
     const target = fixtureTarget({ phase: 'connected', consecutiveFailures: 0 })
     const events = [
       createSupervisorConnectionEvent('connected', target, clock, 'ssh-forward'),
@@ -45,8 +47,14 @@ describe('Supervisor connection chronicle', () => {
     const text = lines.join('\n')
 
     expect(lines).toHaveLength(14)
-    expect(text).toContain('Active Link · CONNECTED · REMOTE')
-    expect(text).toContain('Session Trail · 3/12 · NEWEST FIRST')
+    expect(text).toContain('Runtime Observatory · CONNECTED · REMOTE · 3/12 EVENTS')
+    expect(text).toContain('RUNTIME')
+    expect(text).toContain('ROUTE')
+    expect(text).toContain('SERVICES')
+    expect(text).toContain('Owner  cli-server · pid 4242')
+    expect(text).toContain('Provider  source')
+    expect(text).toContain('● Alice  ready')
+    expect(text).toContain('○ UTA  disabled')
     expect(text).toContain('✓ 14:05:08 RECOVERED')
     expect(text).toContain('RECOVERED · manual retry · Cloud Lab/Research')
     expect(text).toContain('◆ [ o ] Open verified Web UI')
@@ -101,5 +109,13 @@ function fixtureTarget(
     transport: 'ssh-forward',
     endpoint: 'http://127.0.0.1:47331',
     health: { ...health, checkedAt: clock },
+    runtime: {
+      class: 'running',
+      state: 'ready',
+      owner: { surface: 'cli-server', pid: 4242 },
+      provider: { kind: 'source' },
+      components: { alice: 'ready', uta: 'disabled', connector: 'disabled' },
+      uptimeSeconds: 7_380,
+    },
   }
 }

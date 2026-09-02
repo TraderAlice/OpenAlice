@@ -2889,6 +2889,30 @@ already large `supervisor-tui.ts` application controller.
   Docker installer smoke all pass; the packaged installer remains independent
   of Node, npm, pnpm, Bun, and an Agent Runtime.
 
+### Runtime observatory decision
+
+- The previous Runtime surface spent its leading region on an Active Link and
+  Session Trail split while omitting the owner, provider, uptime, and component
+  facts needed to understand a running OpenAlice. Its local log lens then became
+  the largest object on the page despite being supporting evidence rather than
+  the status manager itself.
+- Runtime now uses one responsive Observatory. Wide terminals compose Runtime,
+  Route, and Services as three scan paths; compact terminals retain that order
+  in one stack. Recent connection transitions stay inside the same object,
+  local logs remain below it, and remote Runtime uses surplus height for more
+  session history instead of an empty log region.
+- Home can therefore remain a launcher and next-action surface. PID, owner,
+  provider, endpoint, uptime, component state, health checks, and connection
+  history have one diagnostic owner in Runtime. Disabled optional services are
+  neutral, actual failures use danger semantics, and absent telemetry remains
+  explicitly unreported. This change adds no backend read, lifecycle route, or
+  persisted state.
+- Observatory acceptance passes through 82 focused renderer/screen tests, all
+  51 real-PTY cases, and the complete CLI suite (63 files, 629 tests). Real
+  120×32 and 80×24 captures prove the three-column and compact-stack forms keep
+  their route, owner, provider, uptime, services, recent event, and valid action
+  visible without relying on the local log lens.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and
