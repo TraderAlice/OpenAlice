@@ -352,9 +352,9 @@ export function ChatWorkspaceSection({
               : {},
           })}
           variant="secondary"
-          className="oa-chat-new-action min-h-10 w-full justify-start px-2 text-sm text-sidebar-accent-foreground"
+          className="oa-chat-new-action h-9 w-full justify-start px-2.5 text-[13px] text-sidebar-accent-foreground"
         >
-          <MessageSquarePlus size={16} strokeWidth={2} className="shrink-0 text-primary" />
+          <MessageSquarePlus size={15} strokeWidth={2} className="shrink-0 text-primary" />
           <span>{mode === 'auto-quant'
             ? t('autoQuant.newResearch')
             : mode === 'prediction' ? t('autoPrediction.newResearch') : t('chat.newChat')}</span>

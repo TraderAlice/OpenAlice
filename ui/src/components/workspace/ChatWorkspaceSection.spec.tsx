@@ -343,6 +343,8 @@ describe('ChatWorkspaceSection actions', () => {
     const moreWorkspaceActions = screen.getByRole('button', { name: 'More actions for chat-jul11' })
 
     expect(newChat.className).toContain('w-full')
+    expect(newChat.className).toContain('h-9')
+    expect(newChat.className).toContain('text-[13px]')
     expect(newChat.textContent).toBe('New chat')
     expect(newChat.querySelector('.lucide-message-square-plus')).toBeTruthy()
     expect(workspaceHeading.parentElement?.nextElementSibling?.tagName).toBe('UL')
