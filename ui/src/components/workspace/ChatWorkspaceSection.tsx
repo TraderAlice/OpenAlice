@@ -690,7 +690,7 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
     pendingActionRef.current = action
   }
 
-  const menuItemClass = 'oa-workspace-context-item text-caption min-h-7 gap-2 rounded-md px-2 py-1 text-muted-foreground focus:bg-muted focus:text-foreground'
+  const menuItemClass = 'oa-workspace-context-item min-h-7 gap-2 rounded-md px-2 py-1 text-muted-foreground focus:bg-muted focus:text-foreground'
   const modeItemClass = `${menuItemClass} pr-7 text-foreground`
 
   return (
