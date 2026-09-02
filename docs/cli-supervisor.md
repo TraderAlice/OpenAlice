@@ -1045,8 +1045,9 @@ or last check. Pointer hover highlights a complete row and click selects it.
 At 100 columns and wider the checklist and Inspector render side by side;
 narrower terminals stack the same complete regions. The Inspector separates the
 check summary, existing Doctor evidence, and conservative status guidance. It
-does not run a repair, invent a command, or issue another diagnostic request;
-`d` remains the explicit read-only rerun action.
+does not run a repair or invent a command. Its final Action Shelf keeps `d`
+visible as the explicit read-only rerun request for pass, warning, failure, and
+unknown checks.
 Before a report exists, the same page renders a responsive Diagnostic Radar
 instead of a loose instruction line. `DOCTOR STANDBY` names the unrun state and
 keeps read-only mode, inspection scope, and the zero-write guarantee visible.
@@ -1062,8 +1063,9 @@ Doctor or performs a repair.
 At 100 columns and wider, a known terminal height applies the same Operational
 Canvas rule independently to Doctor: the ten-check baseline may expand to show
 more real checks, while the Inspector pads only to keep the two owning frames
-aligned. `DOCTOR STANDBY` and `NO CHECKS` contain their surplus quiet region
-inside the Radar frame and keep the existing `d` action on its lower edge.
+aligned and keeps Rerun on its own lower edge. `DOCTOR STANDBY` and `NO CHECKS`
+contain their surplus quiet region inside the Radar frame and keep the existing
+`d` action on its lower edge.
 No additional check, evidence, repair affordance, or write path is synthesized.
 
 ## Shell Completion

@@ -74,6 +74,10 @@ describe('Supervisor Doctor inspector', () => {
     expect(stackedText).toContain('› × Port collision')
     expect(stackedText).toContain('Inspection · 3/3 · FAIL')
     expect(stackedText).toContain('× Resolve this condition, then rerun Doctor.')
+    expect(stackedText).toContain('◆ [ d ] Rerun Runtime Doctor')
+    expect(supervisorCommandTargets(stacked.lines)).toEqual([
+      expect.objectContaining({ label: 'd', primary: true }),
+    ])
     expect(stackedText).not.toContain('\u001b')
     expect(stacked.targets[2]).toEqual({ row: 4, startColumn: 2, endColumn: 79, index: 2 })
 
@@ -82,6 +86,7 @@ describe('Supervisor Doctor inspector', () => {
     expect(wide.lines[0]).toContain('Inspection')
     expect(wide.lines.join('\n')).toContain('» ✓ Runtime reachable')
     expect(wide.lines.join('\n')).toContain('› ! Update available')
+    expect(wide.lines.join('\n')).toContain('◆ [ d ] Rerun Runtime Doctor')
     expect(wide.targets[0]?.endColumn).toBeLessThan(60)
 
     const narrow = renderSupervisorDoctor(report, state, 52)

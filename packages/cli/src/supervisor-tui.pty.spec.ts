@@ -1221,6 +1221,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('[ Enter ]  Run Runtime Doctor')
     expect(transcript).not.toContain('No primary action is available')
     expect(transcript).toContain('Fixture Runtime protocol mismatch')
+    expect(transcript).toContain('[ d ] Rerun Runtime Doctor')
     expect(transcript).toContain('FIXTURE_RESULT diagnoses=1')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')

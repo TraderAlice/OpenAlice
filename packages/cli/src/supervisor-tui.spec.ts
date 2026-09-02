@@ -2672,8 +2672,29 @@ describe('Supervisor TUI screen', () => {
     lines = screen.render(80)
     actionRow = lines.findIndex((line) => line.includes('[ d ] Rerun Runtime Doctor')) + 1
     expect(actionRow).toBeGreaterThan(0)
+    expect(screen.handlePointer({
+      button: 35, col: 24, row: actionRow, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(80)[actionRow - 1]).toContain('› [ d ] Rerun Runtime Doctor')
     expect(screen.handlePointer(pointerClick(24, actionRow))).toBe(true)
     expect(onAction).toHaveBeenCalledTimes(2)
+
+    screen.update({
+      doctor: {
+        overall: 'fail',
+        summary: { passed: 0, warnings: 0, failures: 1 },
+        checks: [{ status: 'fail', summary: 'Runtime protocol mismatch', detail: 'Protocol differs.' }],
+      },
+    })
+    lines = screen.render(80)
+    actionRow = lines.findIndex((line) => line.includes('[ d ] Rerun Runtime Doctor')) + 1
+    expect(actionRow).toBeGreaterThan(0)
+    expect(screen.handlePointer({
+      button: 35, col: 24, row: actionRow, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(80)[actionRow - 1]).toContain('› [ d ] Rerun Runtime Doctor')
+    expect(screen.handlePointer(pointerClick(24, actionRow))).toBe(true)
+    expect(onAction).toHaveBeenCalledTimes(3)
 
     const noColor = new SupervisorScreen({
       version: 'dev',

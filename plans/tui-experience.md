@@ -3578,6 +3578,26 @@ already large `supervisor-tui.ts` application controller.
   (including all 56 PTY cases), plus the complete CLI suite (63 files, 642
   tests). CLI typecheck and build also pass.
 
+### Populated Doctor action-closure decision
+
+- Real 120x32 and 80x24 failed-report captures showed that Diagnostic Radar and
+  NO CHECKS already owned visible Run/Rerun actions, while a populated Doctor
+  Inspector ended with “rerun Doctor” guidance and no action. The page with the
+  most useful evidence therefore had the weakest next step.
+- Every populated Inspection now ends with `[ d ] Rerun Runtime Doctor` inside
+  the same evidence frame. It uses the existing read-only Doctor input and
+  command-target parser, so keyboard, hover, and click share one request path.
+- Check selection, first-failure focus, scroll rails, evidence, severity,
+  diagnostics, and the no-repair/no-Runtime-write boundary remain unchanged.
+  Event Lens is unchanged because its existing `f`, `y`, and End guidance is
+  already visible and the inspected 20-event canvases remain coherent.
+- Real 120x32 and 80x24 captures verify the action remains inside Inspection
+  without pushing the contextual Tip or Command Spine out of the viewport.
+  Maintainer acceptance remains pending on the retained feature branch.
+- Acceptance passes through all 142 Doctor, screen, and real-PTY tests
+  (including all 56 PTY cases), plus the complete CLI suite (63 files, 642
+  tests). CLI typecheck and build also pass.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

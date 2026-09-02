@@ -268,7 +268,13 @@ function doctorDetailRows(
       : kind === 'fail'
         ? '× Resolve this condition, then rerun Doctor.'
         : '· Review this check before acting.'
-  return [summary, ...detailLines, guidance]
+  return [
+    summary,
+    ...detailLines,
+    guidance,
+    '',
+    '◆ [ d ] Rerun Runtime Doctor',
+  ]
 }
 
 interface DoctorStatus {
