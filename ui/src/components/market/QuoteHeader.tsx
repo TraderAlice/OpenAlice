@@ -108,7 +108,7 @@ export function QuoteHeader({ symbol }: Props) {
 function Field({ label, value, loading }: { label: string; value: string; loading?: boolean }) {
   return (
     <div className="flex min-w-0 flex-col justify-center py-0.5">
-      <dt className="text-[10.5px] font-medium leading-[14px] text-muted-foreground/70">{label}</dt>
+      <dt className="text-[11px] font-medium leading-4 text-muted-foreground/70">{label}</dt>
       <dd className="mt-px truncate font-mono leading-[16px] tabular-nums text-foreground">
         {loading ? <Skeleton className="h-3 w-12 rounded mt-0.5" /> : value}
       </dd>
