@@ -645,6 +645,59 @@ describe('Supervisor TUI screen', () => {
     expect(screen.snapshot.panel).toBe('overview')
   })
 
+  it('keeps one actionable Doctor path and application chrome visible at 46x16', () => {
+    const actions: SupervisorAction[] = []
+    const runtime = { class: 'running', endpoints: { web: 'http://127.0.0.1:2026' } }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'doctor',
+      runtime,
+      activeTarget: {
+        kind: 'local',
+        machineKey: 'local',
+        machineName: 'This computer',
+        projectKey: 'default',
+        projectName: 'Default AliceProject',
+        home: '/tmp/openalice',
+        transport: 'loopback',
+        endpoint: 'http://127.0.0.1:2026',
+        runtime,
+      },
+      doctor: {
+        overall: 'failure',
+        summary: { passed: 0, warnings: 0, failures: 1 },
+        checks: [{
+          status: 'fail',
+          summary: 'Runtime protocol mismatch',
+          detail: 'The configured runtime answered with an incompatible protocol.',
+        }],
+      },
+    }, {
+      getViewportHeight: () => 16,
+      motionEnabled: false,
+      onAction: (action) => actions.push(action),
+    })
+
+    const lines = screen.render(46)
+    const frame = lines.join('\n')
+    expect(lines).toHaveLength(16)
+    expect(frame).toContain('◆ OpenAlice')
+    expect(frame).toContain('Home │ ● Inbox │ ◇ Connect │ ≋ Runtime')
+    expect(frame).toContain('Doctor · 1F/0W/0P · 1/1')
+    expect(frame).toContain('× FAIL · Runtime protocol mismatch')
+    expect(frame).toContain('WHY   The configured runtime answered')
+    expect(frame).toContain('FIX   Resolve this condition, then rerun.')
+    expect(frame).toContain('CHECK 1/1 · ↑↓ chooses')
+    expect(frame).toContain('◆ [ d ] Rerun Runtime Doctor')
+    expect(frame).toContain('◇  Tip: Doctor is read-only')
+    expect(frame).toContain('[ / ] Commands')
+
+    const actionRow = lines.findIndex((line) => line.includes('[ d ] Rerun Runtime Doctor')) + 1
+    expect(screen.handlePointer(pointerClick(20, actionRow))).toBe(true)
+    expect(actions).toEqual(['doctor'])
+  })
+
   it('keeps remote controls target-scoped and exposes an explicit disconnect', () => {
     let disconnected = 0
     let sourceRequests = 0

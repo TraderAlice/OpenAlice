@@ -4997,11 +4997,23 @@ export class SupervisorScreen implements Component {
         this.doctorState,
         this.snapshot.doctor,
       )
+      const doctorCanvasHeight = Number.isFinite(operationalCanvasHeight)
+        ? operationalCanvasHeight
+        : width < 60
+          && Number.isFinite(viewportHeight)
+          && Math.floor(viewportHeight ?? 0) < 18
+          ? Math.max(
+              0,
+              Math.floor(viewportHeight ?? 0)
+                - lines.length
+                - WIDE_OPERATIONAL_CANVAS_RESERVED_CHROME_HEIGHT,
+            )
+          : undefined
       const doctor = renderSupervisorDoctor(
         this.snapshot.doctor,
         this.doctorState,
         width,
-        operationalCanvasHeight,
+        doctorCanvasHeight,
         this.hoveredRail?.surface === 'doctor' ? this.hoveredRail.trackRow : null,
       )
       const rowOffset = lines.length

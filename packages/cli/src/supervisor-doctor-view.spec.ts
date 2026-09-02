@@ -94,6 +94,23 @@ describe('Supervisor Doctor inspector', () => {
     expect(narrow.lines.join('\n')).toContain('1F/1W/1P')
   })
 
+  it('folds 46x16 Doctor into one result-cause-repair path', () => {
+    const state = createSupervisorDoctorState(report)
+    const rendered = renderSupervisorDoctor(report, state, 46, 7)
+    const output = rendered.lines.join('\n')
+
+    expect(rendered.lines).toHaveLength(7)
+    expect(output).toContain('Doctor · 1F/1W/1P · 3/3')
+    expect(output).toContain('× FAIL · Port collision')
+    expect(output).toContain('WHY   Port 47331 is already occupied.')
+    expect(output).toContain('FIX   Resolve this condition, then rerun.')
+    expect(output).toContain('CHECK 3/3 · ↑↓ chooses')
+    expect(output).toContain('◆ [ d ] Rerun Runtime Doctor')
+    expect(rendered.targets).toEqual([{ row: 2, startColumn: 2, endColumn: 45, index: 2 }])
+    expect(rendered.railTargets).toEqual([])
+    expect(rendered.lines.every((line) => displayWidth(line) <= 46)).toBe(true)
+  })
+
   it('shows the selected check position with a proportional scroll rail', () => {
     const checks = Array.from({ length: 12 }, (_, index) => ({
       status: 'pass',

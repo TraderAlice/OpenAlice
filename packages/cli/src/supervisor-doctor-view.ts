@@ -153,6 +153,9 @@ export function renderSupervisorDoctor(
   }
 
   const normalized = normalizeSupervisorDoctorState(state, report)
+  if (width < 60 && Number.isFinite(targetHeight)) {
+    return renderEmergencyDoctor(report, normalized, width)
+  }
   const wide = width >= 100
   const baselineVisible = wide ? 10 : width < 60 ? 4 : 5
   const visible = wide && Number.isFinite(targetHeight)
@@ -236,6 +239,44 @@ export function renderSupervisorDoctor(
     railTargets: railVisible
       ? doctorRailTargets(railViewportRows, checks.length, 2, width - 2)
       : [],
+  }
+}
+
+function renderEmergencyDoctor(
+  report: SupervisorDoctorReport,
+  state: SupervisorDoctorState,
+  width: number,
+): SupervisorDoctorRender {
+  const checks = report.checks ?? []
+  const selected = checks[state.selected]!
+  const status = doctorStatus(selected.status)
+  const guidance = status.kind === 'pass'
+    ? 'NEXT  No action needed.'
+    : status.kind === 'warn'
+      ? 'NEXT  Review before changing Runtime.'
+      : status.kind === 'fail'
+        ? 'FIX   Resolve this condition, then rerun.'
+        : 'NEXT  Review this check before acting.'
+  return {
+    lines: renderSupervisorPanel(
+      'Doctor',
+      `${doctorCompactMeta(report)} · ${state.selected + 1}/${checks.length}`,
+      [
+        `${status.glyph} ${status.label} · ${sanitize(selected.summary ?? 'Unnamed check')}`,
+        `WHY   ${sanitize(selected.detail ?? 'No additional evidence was reported.')}`,
+        guidance,
+        `CHECK ${state.selected + 1}/${checks.length} · ↑↓ chooses`,
+        '◆ [ d ] Rerun Runtime Doctor',
+      ],
+      width,
+    ),
+    targets: [{
+      row: 2,
+      startColumn: 2,
+      endColumn: Math.max(2, width - 1),
+      index: state.selected,
+    }],
+    railTargets: [],
   }
 }
 

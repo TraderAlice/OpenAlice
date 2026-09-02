@@ -370,7 +370,12 @@ intentionally parameter-free:
   Canvas. Its four-line panel states Standby, Quiet, or Clear and retains only
   snapshot reload or filter cycling plus Help. Empty Doctor keeps its truthful
   Signal Scope with Run/Rerun and Help. Scroll, copy, Inspect, Latest, First,
-  and Last return only when a filtered event or diagnostic check exists. Their
+  and Last return only when a filtered event or diagnostic check exists. Below
+  60 columns and 18 rows, a populated Doctor folds list and inspection into one
+  selected-check path: result, cause, repair guidance, position, and Rerun. The
+  selected failure or warning remains first, arrows/wheel retain selection, and
+  Mission Header, navigation, contextual read-only Tip, and Command Spine stay
+  visible. Their
   contextual Tips state the same empty contract;
 - at 100 columns and wider, Home's single Alice Session Board uses a bounded
   OMP-style two-column composition instead of stretching with every surplus

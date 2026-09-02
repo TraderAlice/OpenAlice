@@ -3856,6 +3856,30 @@ already large `supervisor-tui.ts` application controller.
   focused Help/screen/PTY closure passes 151 tests, the complete CLI suite passes
   655 tests, and CLI typecheck/build passes.
 
+### Extreme-compact Doctor action path decision
+
+- Doctor's 120x32 failure view was already content-sized and preserved a useful
+  checks/inspection relationship, so that composition remains unchanged. The
+  46x16 capture exposed a narrower failure: one check still occupied separate
+  list and inspection cards, cropping Mission Header and contextual Tip without
+  adding any real choice.
+- Below 60 columns and 18 rows, populated Doctor now folds into one five-row
+  action path: selected result, WHY evidence, FIX/NEXT guidance, check position
+  with arrow affordance, and Rerun Runtime Doctor. Failure-first and warning-
+  first selection, wheel/arrows, read-only semantics, and the existing Doctor
+  action remain authoritative.
+- Standby and no-check Diagnostic Radar states retain their existing truthful
+  action surface. Ordinary 80-column and wide 120-column populated Doctor keep
+  the complete list/detail inspector, real-check expansion, and scroll rails.
+  No diagnostic execution, Runtime, lifecycle, repair, or persistence contract
+  changes.
+- Real 46x16 and 80x24 PTY captures verify the emergency action path and
+  unchanged ordinary inspector. Focused renderer/screen coverage confirms exact
+  result/cause/repair text, full application chrome, and pointer activation of
+  Rerun. The focused Doctor/screen/PTY closure passes 154 tests, the complete
+  CLI suite passes 657 tests, and CLI typecheck/build passes. Maintainer
+  acceptance remains pending on this branch.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and
