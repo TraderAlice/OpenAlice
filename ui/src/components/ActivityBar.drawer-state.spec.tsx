@@ -47,7 +47,6 @@ vi.mock('react-i18next', () => ({
     t: (key: string) => ({
       'nav.item.chat': 'Ask Alice',
       'nav.item.settings': 'Settings',
-      'nav.item.dev': 'Dev Panel',
       'nav.section.beta': 'Beta',
       'nav.section.system': 'System',
       'nav.primaryNavigation': 'Primary navigation',

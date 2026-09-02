@@ -31,7 +31,6 @@ export const en = {
       issue: 'Issues',
       automation: 'Automation',
       settings: 'Settings',
-      dev: 'Dev Panel',
     },
     section: {
       beta: 'Beta',
@@ -365,6 +364,7 @@ export const en = {
       agents: 'Agents',
       operations: 'Operations',
       connections: 'Connections',
+      developer: 'Developer',
     },
     language: {
       title: 'Language',
@@ -546,7 +546,7 @@ export const en = {
       deleteGroup: 'Delete group',
       renameGroup: 'Group name',
       reset: 'Reset to default',
-      resetConfirm: 'Restore the default groups and hide Dev Panel?',
+      resetConfirm: 'Restore the default activity bar groups?',
       path: 'Saved to data/ui-layout.json',
       show: 'Show {{label}}',
       hide: 'Hide {{label}}',

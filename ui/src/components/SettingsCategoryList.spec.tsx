@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { SettingsCategoryList } from './SettingsCategoryList'
 
 const mocks = vi.hoisted(() => ({
   product: 'trader' as 'trader' | 'nano' | undefined,
+  focused: null as null | { kind: 'dev'; params: { tab: 'logs' } },
+  openOrFocus: vi.fn(),
 }))
 
 vi.mock('../hooks/useAliceProject', () => ({
@@ -20,12 +22,12 @@ vi.mock('../hooks/useAliceProject', () => ({
 
 vi.mock('../tabs/store', () => ({
   useWorkspace: (selector: (state: Record<string, unknown>) => unknown) => selector({
-    openOrFocus: vi.fn(),
+    openOrFocus: mocks.openOrFocus,
   }),
 }))
 
 vi.mock('../tabs/types', () => ({
-  getFocusedTab: () => null,
+  getFocusedTab: () => mocks.focused ? { spec: mocks.focused } : null,
 }))
 
 vi.mock('react-i18next', () => ({
@@ -35,8 +37,26 @@ vi.mock('react-i18next', () => ({
 }))
 
 vi.mock('./SidebarRow', () => ({
-  SidebarRow: ({ label }: { label: string }) => <button type="button">{label}</button>,
+  SidebarRow: ({
+    label,
+    onClick,
+    ariaExpanded,
+  }: {
+    label: string
+    onClick: () => void
+    ariaExpanded?: boolean
+  }) => (
+    <button type="button" onClick={onClick} aria-expanded={ariaExpanded}>
+      {label}
+    </button>
+  ),
 }))
+
+beforeEach(() => {
+  window.sessionStorage.clear()
+  mocks.focused = null
+  mocks.openOrFocus.mockClear()
+})
 
 afterEach(() => {
   cleanup()
@@ -51,5 +71,26 @@ describe('SettingsCategoryList', () => {
     expect(screen.queryByText('settings.category.marketData')).toBeNull()
     expect(screen.queryByText('settings.category.newsSources')).toBeNull()
     expect(screen.getByText('settings.category.aiProvider')).toBeTruthy()
+  })
+
+  it('keeps Developer collapsed by default and opens its original pages on demand', () => {
+    render(<SettingsCategoryList />)
+
+    const developer = screen.getByRole('button', { name: 'settings.group.developer' })
+    expect(developer.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByText('dev.frontend')).toBeNull()
+
+    fireEvent.click(developer)
+    expect(developer.getAttribute('aria-expanded')).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: 'common.logs' }))
+    expect(mocks.openOrFocus).toHaveBeenCalledWith({ kind: 'dev', params: { tab: 'logs' } })
+  })
+
+  it('automatically expands for a Developer deep link', () => {
+    mocks.focused = { kind: 'dev', params: { tab: 'logs' } }
+    render(<SettingsCategoryList />)
+
+    expect(screen.getByRole('button', { name: 'settings.group.developer' }).getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByRole('button', { name: 'common.logs' })).toBeTruthy()
   })
 })

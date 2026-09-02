@@ -6,7 +6,6 @@ type NavTitleKey =
   | 'nav.item.tracked'
   | 'nav.item.workspaces'
   | 'nav.item.settings'
-  | 'nav.item.dev'
   | 'nav.item.market'
   | 'nav.item.trading'
   | 'nav.item.automation'
