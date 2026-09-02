@@ -183,12 +183,35 @@ export function renderSupervisorHome(
   const state = homeStateBadge(view)
   const lines = width >= 100
     ? renderWideSessionStage(view, state, cardWidth, targetHeight)
+    : width < 60 && Number.isFinite(targetHeight)
+      ? renderEmergencySessionStage(view, state, cardWidth)
     : renderCompactSessionStage(view, state, cardWidth)
   return {
     lines,
     primaryTarget: targetForLine(lines, '[ Enter ]', cardWidth),
     hotspotTargets: homeHotspotTargets(lines, view),
   }
+}
+
+function renderEmergencySessionStage(
+  view: SupervisorHomeView,
+  state: string,
+  width: number,
+): string[] {
+  const innerWidth = width - 4
+  const signal = (view.inboxUnread ?? 0) > 0
+    ? homeAttentionRow(view)
+    : homeConnectionRow(view)
+  return renderCard('Alice Session · OpenAlice', [
+    labelAndTail(homeHotspotLabel(view.projectName, 'project', view), state, innerWidth),
+    sessionRoute(view),
+    `NOW  ${homeNowHeadline(view)}`,
+    primaryLaunchRow(
+      view,
+      view.state === 'absent' ? 'Start OpenAlice' : view.primaryAction,
+    ),
+    `SIGNAL  ${signal}`,
+  ], width)
 }
 
 function renderWideSessionStage(
@@ -527,8 +550,11 @@ function homeGuidance(view: SupervisorHomeView): string[] {
   return view.guidance
 }
 
-function primaryLaunchRow(view: SupervisorHomeView): string {
-  return `${view.primaryHovered ? '›' : '◆'} [ Enter ]  ${view.primaryAction}`
+function primaryLaunchRow(
+  view: SupervisorHomeView,
+  label = view.primaryAction,
+): string {
+  return `${view.primaryHovered ? '›' : '◆'} [ Enter ]  ${label}`
 }
 
 function targetForLine(

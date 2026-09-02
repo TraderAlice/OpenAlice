@@ -3659,6 +3659,28 @@ already large `supervisor-tui.ts` application controller.
   cases), the complete CLI suite (63 files, 644 tests), and CLI typecheck/build
   pass.
 
+### Extreme-compact Home decision
+
+- The same 46x16 audit showed connected Home preserving its primary action only
+  by cropping the two-row Mission Header and Navigation rail. Alice Session still
+  named OpenAlice, but the application-level location and Inbox/Connections
+  routes disappeared.
+- Below 60 columns and 18 rows, Home now folds to a five-row summary body:
+  AliceProject plus Runtime, Machine route, Now, the primary action, and one
+  highest-priority signal. Unread Inbox wins that signal; otherwise Connection
+  health remains visible. Recent returns automatically outside the emergency
+  threshold.
+- The fold uses the existing Home intent, hotspot, panel, and pointer contracts;
+  it changes no Runtime, Inbox, Connection, AliceProject, or lifecycle state.
+  Mission Navigation, contextual Tip, and Command Spine remain in the 46x16
+  viewport. The stopped action deliberately shortens to `Start OpenAlice` so
+  the primary control remains whole rather than ending in an ellipsis.
+- Acceptance: real PTY captures cover running and stopped Home at 46x16; a
+  continuous 46x16 pointer journey hovers and starts from Launcher, verifies
+  Mission Navigation, Now, the reset Home action, and Connection signal, then
+  exits with terminal modes restored. The focused TUI closure passes 155 tests,
+  the complete CLI suite passes 645 tests, and CLI typecheck/build passes.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

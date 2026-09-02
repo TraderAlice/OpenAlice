@@ -709,6 +709,75 @@ describe('Supervisor TUI screen', () => {
     )
   })
 
+  it('folds an extremely short Home without losing Mission Navigation or Now', () => {
+    let opens = 0
+    const runtime = { class: 'running', endpoints: { web: 'http://127.0.0.1:47331' } }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'overview',
+      runtime,
+      activeTarget: {
+        kind: 'local',
+        machineKey: 'local',
+        machineName: 'This computer',
+        projectKey: 'default',
+        projectName: 'Default AliceProject',
+        home: '/fixture/default',
+        transport: 'loopback',
+        endpoint: 'http://127.0.0.1:47331',
+        runtime,
+      },
+    }, {
+      getViewportHeight: () => 16,
+      motionEnabled: false,
+      onOpenActiveTarget: () => { opens += 1 },
+    })
+
+    const lines = screen.render(46)
+    const frame = lines.join('\n')
+    expect(lines).toHaveLength(16)
+    expect(frame).toContain('◆ OpenAlice')
+    expect(frame).toContain('[Home]')
+    expect(frame).toContain('Alice Session · OpenAlice')
+    expect(frame).toContain('Default AliceProject')
+    expect(frame).toContain('● RUNNING')
+    expect(frame).toContain('⌁ This computer · LOCAL')
+    expect(frame).toContain('NOW  Workspace is ready')
+    expect(frame).toContain('[ Enter ]  Open Workspace')
+    expect(frame).toContain('SIGNAL  ● Connection  healthy')
+    expect(frame).not.toContain('RECENT')
+    expect(frame).toContain('[ / ] Commands')
+    const actionRow = lines.findIndex((line) => line.includes('[ Enter ]  Open Workspace')) + 1
+    expect(screen.handlePointer({
+      button: 35,
+      col: 24,
+      row: actionRow,
+      release: false,
+      wheel: null,
+      motion: true,
+      leftClick: false,
+    })).toBe(true)
+    expect(screen.render(46).join('\n')).toContain('› [ Enter ]  Open Workspace')
+    screen.update({ panel: 'fleet' })
+    screen.update({ panel: 'overview' })
+    expect(screen.render(46).join('\n')).toContain('◆ [ Enter ]  Open Workspace')
+    expect(screen.handlePointer(pointerClick(24, actionRow))).toBe(true)
+    expect(opens).toBe(1)
+
+    const stoppedRuntime = { class: 'absent' as const, endpoints: {} }
+    screen.update({
+      runtime: stoppedRuntime,
+      activeTarget: {
+        ...screen.snapshot.activeTarget!,
+        runtime: stoppedRuntime,
+      },
+    })
+    const stoppedFrame = screen.render(46).join('\n')
+    expect(stoppedFrame).toContain('◆ [ Enter ]  Start OpenAlice')
+    expect(stoppedFrame).not.toContain('Start OpenAlice & open Works')
+  })
+
   it('keeps component diagnostics out of the task-oriented Home stage', () => {
     const screen = new SupervisorScreen({
       version: 'dev',

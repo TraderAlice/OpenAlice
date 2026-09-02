@@ -2029,6 +2029,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       let output = ''
       let hovered = false
       let clicked = false
+      let detached = false
       const timeout = setTimeout(() => {
         child.kill()
         reject(new Error(`Emergency Supervisor Launcher timed out:\n${output}`))
@@ -2042,7 +2043,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         } else if (!clicked && plain.includes('› [ Enter ] Start OpenAlice')) {
           clicked = true
           child.write('\u001b[<0;22;9M')
-        } else if (clicked && plain.includes('Alice Session · OpenAlice') && plain.includes('● RUNNING')) {
+        } else if (!detached && clicked && plain.includes('Alice Session · OpenAlice') && plain.includes('● RUNNING')) {
+          detached = true
           child.write('q')
         }
       })
@@ -2059,6 +2061,10 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(plain).toContain('2 ALICEPROJECT ✓ Default AliceProject')
     expect(plain).toContain('3 RUNTIME ○ READY TO START')
     expect(plain).toContain('› [ Enter ] Start OpenAlice')
+    expect(plain).toContain('╰─ [Home] │ Inbox │ Link·1 │ Run')
+    expect(plain).toContain('NOW  Workspace is ready')
+    expect(plain).toContain('◆ [ Enter ]  Open Workspace')
+    expect(plain).toContain('SIGNAL  ● Connection  healthy')
     expect(transcript).toContain('FIXTURE_RESULT starts=1 opens=0')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')

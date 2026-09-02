@@ -3820,6 +3820,23 @@ export class SupervisorScreen implements Component {
   update(patch: Partial<SupervisorSnapshot>): void {
     const wasBusy = Boolean(this.snapshot.busy)
     const previousConfirmation = this.snapshot.confirmation
+    const activeTargetChanged = 'activeTarget' in patch && (
+      patch.activeTarget?.machineKey !== this.snapshot.activeTarget?.machineKey
+      || patch.activeTarget?.projectKey !== this.snapshot.activeTarget?.projectKey
+    )
+    const surfaceChanged = ('panel' in patch && patch.panel !== this.snapshot.panel)
+      || activeTargetChanged
+      || ('focusTask' in patch && patch.focusTask !== this.snapshot.focusTask)
+      || ('confirmation' in patch && patch.confirmation !== this.snapshot.confirmation)
+    if (surfaceChanged) {
+      this.hoveredCommandTarget = undefined
+      this.focusConsoleHoveredCommand = undefined
+      this.homePrimaryHovered = false
+      this.hoveredHomeHotspot = undefined
+      this.hoveredFleetTarget = undefined
+      this.hoveredRail = undefined
+      this.activeRailDrag = undefined
+    }
     if (patch.logs !== undefined && patch.logs !== this.snapshot.logs) {
       this.logsFromEnd = 0
       this.hoveredLogFromEnd = null
@@ -4980,7 +4997,11 @@ export class SupervisorScreen implements Component {
         providerHotspot: runtime?.class === 'absent',
         hoveredHotspot: this.hoveredHomeHotspot,
         pulse: this.runtimePulse,
-      }, width, width >= 100 && Number.isFinite(viewportHeight)
+      }, width, (width >= 100 || (
+        width < 60
+        && Number.isFinite(viewportHeight)
+        && Math.floor(viewportHeight ?? 0) < 18
+      )) && Number.isFinite(viewportHeight)
         ? Math.max(
             0,
             Math.floor(viewportHeight ?? 0)

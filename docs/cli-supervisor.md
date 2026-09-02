@@ -244,7 +244,13 @@ intentionally parameter-free:
   a direct route into the Switchboard, while passive identity and status rows
   do not pretend to be controls. Color strengthens identity, focus, healthy
   state, and actionable attention, but glyphs and text keep the complete
-  contract under `NO_COLOR`;
+  contract under `NO_COLOR`. Below 60 columns and 18 rows, Home uses a five-row
+  summary body so bottom anchoring cannot remove Mission Navigation: selected
+  AliceProject and Runtime, Machine route, Now, the primary action, and the most
+  important Inbox-or-Connection signal remain visible; Recent returns with the
+  ordinary compact layout. The stopped primary action shortens to the complete
+  `Start OpenAlice` label in this emergency fold instead of clipping a longer
+  launch-and-open description;
 - the Fleet page renders `Machine → AliceProject`: launch-capable ordinary
   terminals use two bordered panes, while a connected Connections page below
   96 columns gives the focused inventory one complete full-width pane instead
