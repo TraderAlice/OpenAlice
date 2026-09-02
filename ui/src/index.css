@@ -254,8 +254,6 @@ body {
 
 .oa-chart .recharts-tooltip-wrapper {
   outline: none;
-  transition: none !important;
-  will-change: transform;
 }
 
 .oa-chart .recharts-default-tooltip,

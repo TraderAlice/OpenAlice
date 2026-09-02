@@ -164,14 +164,14 @@ export function ActivityBar({
         <img
           src="/alice.ico"
           alt=""
-          className={`${denseRail ? 'size-5' : 'size-[22px]'} pointer-events-none absolute object-contain opacity-100 transition-opacity duration-[var(--motion-fast)] group-hover:opacity-0 group-focus-visible:opacity-0 motion-reduce:transition-none`}
+          className={`${denseRail ? 'size-5' : 'size-[22px]'} pointer-events-none absolute object-contain opacity-100 transition-opacity duration-[var(--motion-fast)] group-hover:opacity-0 group-focus-visible:opacity-0 group-focus-visible:[transition-duration:0ms] motion-reduce:transition-none`}
           draggable={false}
           aria-hidden
         />
         <PanelLeftOpen
           size={denseRail ? 15 : 17}
           strokeWidth={1.75}
-          className="pointer-events-none absolute opacity-0 transition-opacity duration-[var(--motion-fast)] group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none"
+          className="pointer-events-none absolute opacity-0 transition-opacity duration-[var(--motion-fast)] group-hover:opacity-100 group-focus-visible:opacity-100 group-focus-visible:[transition-duration:0ms] motion-reduce:transition-none"
           aria-hidden
         />
       </TooltipTrigger>

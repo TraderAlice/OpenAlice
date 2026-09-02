@@ -161,7 +161,11 @@ function QuadrantChart({ points, t }: { points: Point[]; t: TFunction }) {
           />
           <ReferenceLine x={0} stroke="var(--border)" strokeDasharray="4 4" />
           <ReferenceLine y={0} stroke="var(--border)" strokeDasharray="4 4" />
-          <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<PointTooltip t={t} />} />
+          <Tooltip
+            isAnimationActive={false}
+            cursor={{ strokeDasharray: '3 3' }}
+            content={<PointTooltip t={t} />}
+          />
           <Scatter data={points}>
             {points.map((p) => <Cell key={p.symbol} fill={dotColor(p.score)} />)}
             <LabelList dataKey="symbol" position="top" style={{ fontSize: 10, fill: 'var(--text)', fontWeight: 600 }} />

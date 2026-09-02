@@ -1120,7 +1120,7 @@ function ConnectorCredentialsEditor({
         aria-controls={credentialsId}
         aria-describedby={credentialsStatusId}
         onClick={onToggle}
-        className="h-auto min-h-12 w-full justify-between gap-3 rounded-none px-4 py-3 text-left hover:bg-secondary/25 aria-expanded:bg-secondary/20"
+        className="group h-auto min-h-12 w-full justify-between gap-3 rounded-none px-4 py-3 text-left hover:bg-secondary/25 aria-expanded:bg-secondary/20"
       >
         <span className="flex min-w-0 items-center gap-3">
           <span className="flex size-6 shrink-0 items-center justify-center text-muted-foreground">
@@ -1138,7 +1138,7 @@ function ConnectorCredentialsEditor({
             <ChevronDown
               size={15}
               aria-hidden
-              className={`transition-transform duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] motion-reduce:transition-none ${open ? 'rotate-180' : ''}`}
+              className={`transition-transform duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] group-focus-visible:[transition-duration:0ms] motion-reduce:transition-none ${open ? 'rotate-180' : ''}`}
             />
           </span>
         </span>
@@ -1147,7 +1147,7 @@ function ConnectorCredentialsEditor({
         id={credentialsId}
         hidden={!open}
         inert={!open ? true : undefined}
-        className={`border-t border-border/45 px-4 pb-5 ${open ? 'oa-disclosure-enter' : ''}`}
+        className="border-t border-border/45 px-4 pb-5"
       >
         {!ready && <ConnectorSetupGuide definition={definition} t={t} />}
         <p className="mb-4 pt-3 text-[11.5px] leading-5 text-muted-foreground">

@@ -258,13 +258,15 @@ reading baseline.
 
 The compact activity rail uses its brand position as the expansion action when
 the current viewport can support a text rail. The Alice mark and expansion
-glyph occupy one fixed optical box and crossfade on pointer hover or keyboard
-focus. Constrained viewport modes keep the static Alice mark.
+glyph occupy one fixed optical box. Pointer hover uses a short crossfade.
+Keyboard focus reveals the action immediately. Constrained viewport modes keep
+the static Alice mark.
 
 Dense market panels use `oa-data-surface` for the shared border and canvas and
 `oa-data-surface-header` for section hierarchy. Data components retain their
 domain-owned layout and use the shared surfaces to align cards, charts, quote
-summaries, and launch actions.
+summaries, and launch actions. Recharts tooltips set `isAnimationActive={false}`
+at the component boundary, and the shared chart class owns their visual material.
 
 Clickable native and ARIA controls receive a pointer cursor globally. Disabled
 controls keep the default cursor and must remain visually disabled. Hover-only

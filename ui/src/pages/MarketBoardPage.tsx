@@ -689,10 +689,11 @@ function TermCurveCard({ curve }: { curve: TermCurve }) {
                 tickFormatter={(value: number) => formatTermAxisPrice(value, width)}
               />
               <Tooltip
+                isAnimationActive={false}
                 formatter={(v) => [Number(v).toLocaleString('en-US'), '']}
                 labelFormatter={(l) => `20${l}`}
                 separator=""
-                cursor={{ stroke: 'var(--border)', strokeDasharray: '3 3' }}
+                cursor={{ strokeDasharray: '3 3' }}
               />
               <Line
                 type="monotone"
@@ -949,9 +950,10 @@ function ChokepointCard({ curve }: { curve: ShippingCurve }) {
             <YAxis tick={{ fontSize: 9, fill: 'var(--chart-axis)' }} stroke="var(--chart-axis)" width={36}
               tickFormatter={(v: number) => v.toFixed(1)} domain={['auto', 'auto']} />
             <Tooltip
+              isAnimationActive={false}
               formatter={(v) => [`${Number(v).toFixed(2)}M t`, '']}
               separator=""
-              cursor={{ stroke: 'var(--border)', strokeDasharray: '3 3' }}
+              cursor={{ strokeDasharray: '3 3' }}
             />
             <Line
               type="monotone"

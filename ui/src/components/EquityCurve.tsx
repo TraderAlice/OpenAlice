@@ -157,7 +157,10 @@ export function EquityCurve({
             domain={yAxis?.domain ?? ['auto', 'auto']}
             ticks={yAxis?.ticks}
           />
-          <Tooltip content={<CustomTooltip isAllView={isAllView} accounts={accounts} />} />
+          <Tooltip
+            isAnimationActive={false}
+            content={<CustomTooltip isAllView={isAllView} accounts={accounts} />}
+          />
           <Area
             type="monotone"
             dataKey="equityNum"
