@@ -1,4 +1,4 @@
-import { Ellipsis, Laptop, Moon, Settings, Sun } from 'lucide-react'
+import { Laptop, Moon, Settings, Sun } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -51,7 +51,7 @@ export function ActivityBarUtilityMenu({
             onClick={() => {
               if (!menuOpen) setMenuOpen(true)
             }}
-            className={`oa-pressable flex min-w-0 items-center rounded-md text-left text-[12px] text-sidebar-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/45 ${
+            className={`oa-pressable flex min-w-0 cursor-pointer items-center rounded-md text-left text-[12px] text-sidebar-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/45 ${
               compactRail
                 ? `${denseRail ? 'h-[26px] w-[26px]' : 'h-8 w-8'} justify-center p-0`
                 : 'min-h-9 w-full gap-2 px-2 py-1.5'
@@ -59,9 +59,9 @@ export function ActivityBarUtilityMenu({
           />
         )}
       >
-        <Ellipsis size={denseRail ? 16 : 18} strokeWidth={1.75} aria-hidden />
+        <Settings size={denseRail ? 15 : 17} strokeWidth={1.75} aria-hidden />
         {!compactRail && (
-          <span className="min-w-0 flex-1 truncate font-medium">{t('nav.more')}</span>
+          <span className="min-w-0 flex-1 truncate font-medium">{t('nav.item.settings')}</span>
         )}
       </DropdownMenuTrigger>
 
@@ -73,7 +73,7 @@ export function ActivityBarUtilityMenu({
       >
         <DropdownMenuItem
           onClick={onOpenSettings}
-          className="min-h-9 gap-2 px-2.5 text-[12px]"
+          className="min-h-9 cursor-pointer gap-2 px-2.5 text-[12px]"
         >
           <Settings size={15} strokeWidth={1.75} aria-hidden />
           <span>{t('nav.item.settings')}</span>
@@ -82,7 +82,7 @@ export function ActivityBarUtilityMenu({
         <DropdownMenuSub>
           <DropdownMenuSubTrigger
             aria-label={t('nav.appearanceMenu', { mode: t(`theme.mode.${theme}`) })}
-            className="min-h-9 gap-2 px-2.5 text-[12px] [&>svg:last-child]:ml-1"
+            className="min-h-9 cursor-pointer gap-2 px-2.5 text-[12px] [&>svg:last-child]:ml-1"
           >
             <CurrentThemeIcon size={15} strokeWidth={1.75} aria-hidden />
             <span className="min-w-0 flex-1 truncate">{t('settings.category.appearance')}</span>
@@ -101,7 +101,7 @@ export function ActivityBarUtilityMenu({
                 <DropdownMenuRadioItem
                   key={mode}
                   value={mode}
-                  className="min-h-9 gap-2 px-2.5 pr-8 text-[12px]"
+                  className="min-h-9 cursor-pointer gap-2 px-2.5 pr-8 text-[12px]"
                 >
                   <Icon size={15} strokeWidth={1.75} aria-hidden />
                   <span>{t(`theme.mode.${mode}`)}</span>

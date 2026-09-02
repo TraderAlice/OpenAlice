@@ -21,9 +21,8 @@ vi.mock('../theme/store', () => ({
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, params?: { mode?: string }) => ({
-      'nav.applicationMenu': 'Open application menu',
+      'nav.applicationMenu': 'Open settings menu',
       'nav.appearanceMenu': `Appearance: ${params?.mode}`,
-      'nav.more': 'More',
       'nav.item.settings': 'Settings',
       'settings.category.appearance': 'Appearance',
       'theme.mode.auto': 'Auto',
@@ -52,14 +51,14 @@ describe('ActivityBarUtilityMenu', () => {
       />,
     )
 
-    await user.click(screen.getByRole('button', { name: 'Open application menu' }))
+    await user.click(screen.getByRole('button', { name: 'Open settings menu' }))
     expect(screen.getByRole('menuitem', { name: 'Settings' })).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: 'Appearance: Auto' })).toBeTruthy()
     expect(screen.queryByRole('menuitemradio', { name: 'Auto' })).toBeNull()
     await user.click(screen.getByRole('menuitem', { name: 'Settings' }))
     expect(onOpenSettings).toHaveBeenCalledOnce()
 
-    await user.click(screen.getByRole('button', { name: 'Open application menu' }))
+    await user.click(screen.getByRole('button', { name: 'Open settings menu' }))
     screen.getByRole('menuitem', { name: 'Appearance: Auto' }).focus()
     await user.keyboard('{ArrowRight}')
     expect(screen.getByRole('menuitemradio', { name: 'Auto' }).getAttribute('aria-checked')).toBe('true')
