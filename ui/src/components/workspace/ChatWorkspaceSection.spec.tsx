@@ -493,7 +493,9 @@ describe('ChatWorkspaceSection actions', () => {
     let dialog = screen.getByRole('dialog', { name: 'Browse all conversations' })
     let browser = within(dialog)
     expect(browser.getAllByRole('button', { name: /^Conversation \d+$/ })).toHaveLength(9)
-    expect(browser.getByRole('button', { name: 'Conversation 1' })).toBeTruthy()
+    expect(
+      browser.getByRole('button', { name: 'Conversation 1' }).querySelector('[data-agent-runtime-icon="pi"]'),
+    ).toBeTruthy()
     expect(browser.getByRole('button', { name: 'Current Workspace' }).getAttribute('aria-pressed')).toBe('true')
     expect(openOrFocus).not.toHaveBeenCalled()
 
