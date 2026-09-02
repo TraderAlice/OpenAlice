@@ -1,5 +1,6 @@
 import { displayWidth, truncateDisplayWidth } from './supervisor-display.ts'
 import { SUPERVISOR_BRAND_MARK_ROWS } from './supervisor-tui-theme.ts'
+import type { SupervisorFocusTask } from './supervisor-task-surface.ts'
 
 const SUPERVISOR_SIGNAL_DECK_MIN_WIDTH = 72
 
@@ -490,6 +491,25 @@ export function renderSupervisorCommandBar(
   return lines.length > 0 ? lines : ['No actions available']
 }
 
+export function renderSupervisorFocusActionBar(
+  task: SupervisorFocusTask,
+  width: number,
+): string[] {
+  const labels: Record<SupervisorFocusTask, readonly [string, string, string]> = {
+    setup: ['Edit / apply', 'Move field', 'Step back'],
+    source: ['Validate / continue', 'Move cursor', 'Step back'],
+    projects: ['Choose', 'Move project', 'Step back'],
+    release: ['Inspect / continue', 'Move channel', 'Step back'],
+    transfer: ['Continue', 'Move choice', 'Step back'],
+  }
+  const [primary, move, back] = labels[task]
+  return renderSupervisorCommandBar([
+    { key: 'Enter', label: primary, primary: true },
+    { key: '↑↓', label: move },
+    { key: 'Esc', label: back },
+  ], width)
+}
+
 export function renderSupervisorControlConsole(
   activity: string,
   actionLines: string[],
@@ -530,9 +550,11 @@ export function renderSupervisorDock(
   width: number,
 ): string {
   const breadcrumb = '  ›  '
-  const controls = view.commandPaletteOpen
-    ? `[ / ] Close${breadcrumb}[ q ] Detach`
-    : `[ / ] Commands${breadcrumb}[ q ] Detach`
+  const controls = view.focusTask
+    ? `◆ FOCUS WORKSPACE${breadcrumb}[ Esc ] Back`
+    : view.commandPaletteOpen
+      ? `[ / ] Close${breadcrumb}[ q ] Detach`
+      : `[ / ] Commands${breadcrumb}[ q ] Detach`
   if (width < 60) return commandSpine(controls, '', width)
 
   const panel = (view.focusTask ?? view.panel).toUpperCase()
@@ -544,7 +566,7 @@ export function renderSupervisorDock(
   const fullProjectName = view.projectName ?? 'AliceProject'
   const contextBudget = Math.max(1, width - 6 - displayWidth(controls) - 3)
   const panelSuffix = `${breadcrumb}${panelBadge(panel)}`
-  const projectPrefix = '[ i ] '
+  const projectPrefix = view.focusTask ? '⌂ ' : '[ i ] '
   const signalSuffix = `${breadcrumb}${signal}`
   const fullContext = `${projectPrefix}${fullProjectName}${signalSuffix}${panelSuffix}`
   const projectSignal = `${projectPrefix}${fullProjectName}${signalSuffix}`
@@ -702,10 +724,10 @@ function supervisorDockTargets(
 ): SupervisorCommandTarget[] {
   if (!line.startsWith('╰─ ')) return []
   const targets: SupervisorCommandTarget[] = []
-  const pattern = /\[ (\/) \] (?:Commands|Close)|\[ (q) \] Detach|\[ (i) \] .*?(?=  ›  | ─╯)/gu
+  const pattern = /\[ (\/) \] (?:Commands|Close)|\[ (q) \] Detach|\[ (Esc) \] Back|\[ (i) \] .*?(?=  ›  | ─╯)/gu
   for (const match of line.matchAll(pattern)) {
     if (match.index === undefined) continue
-    const label = match[1] ?? match[2] ?? match[3]
+    const label = match[1] ?? match[2] ?? match[3] ?? match[4]
     if (!label) continue
     const startColumn = displayWidth(line.slice(0, match.index)) + 1
     targets.push({

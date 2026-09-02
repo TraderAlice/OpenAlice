@@ -968,8 +968,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
               stage = 22
               child.write('\u0005\u0015Bad Key')
               setTimeout(() => {
-                child.write('\u001b[<35;50;10M')
-                setTimeout(() => child.write('\u001b[<0;50;10M'), 300)
+                child.write('\u001b[<35;10;29M')
+                setTimeout(() => child.write('\u001b[<0;10;29M'), 300)
               }, 100)
             } else {
               stage = 3
@@ -982,8 +982,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
             stage = 3
             child.write('\u0005\u0015source')
             setTimeout(() => {
-              child.write('\u001b[<35;50;10M')
-              setTimeout(() => child.write('\u001b[<0;50;10M'), 300)
+              child.write('\u001b[<35;10;29M')
+              setTimeout(() => child.write('\u001b[<0;10;29M'), 300)
             }, 100)
           } else if (stage === 3 && output.includes('Destination complete Home')) {
             stage = 4
@@ -1000,7 +1000,12 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
               : 'Destination key or Home became occupied before planning.'
             if (output.includes(expected)) {
               stage = 20
-              child.write('\r')
+              if (scenario === 'auth-loss') {
+                child.write('\u001b[<35;30;30M')
+                setTimeout(() => child.write('\u001b[<0;30;30M'), 300)
+              } else {
+                child.write('\r')
+              }
             }
           } else if (stage === 6 && output.includes('◆ Transfer manifest · READY')) {
             stage = scenario === 'default-no' ? 10 : 7
@@ -1049,6 +1054,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       if (scenario !== 'default-no') {
         expect(transcript).toContain('◆ FOCUS · TRANSFER')
         expect(transcript).toContain('◆ TRANSFER')
+        expect(transcript).toContain('◆ [ Enter ] Continue  │  [ ↑↓ ] Move choice  │  [ Esc ] Step back')
+        expect(transcript).toContain('◆ FOCUS WORKSPACE  ›  [ Esc ] Back')
       }
       expect(transcript).toContain('◆ Destination AliceProject key')
       expect(transcript).toContain('◆ Credentials')

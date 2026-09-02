@@ -119,4 +119,33 @@ describe('Supervisor overlay pointer routing', () => {
     expect(select).not.toHaveBeenCalled()
     expect(activate).not.toHaveBeenCalled()
   })
+
+  it('routes a Focus Console outside the overlay rectangle to the active task', () => {
+    const hoverCommand = vi.fn()
+    const input = vi.fn()
+    const router = new SupervisorOverlayPointerRouter()
+    router.capture({
+      lines: ['╭ Task ╮', '│ body │', '╰──────╯'],
+      width: 8,
+      terminalWidth: 80,
+      terminalHeight: 24,
+      options: { anchor: 'center' },
+      externalCommands: [
+        { row: 23, startColumn: 3, endColumn: 22, label: 'Enter' },
+        { row: 23, startColumn: 27, endColumn: 44, label: '↑↓' },
+        { row: 24, startColumn: 23, endColumn: 34, label: 'Esc' },
+      ],
+      input,
+      hoverCommand,
+    })
+
+    expect(router.route(pointer(10, 23, 'motion'))).toBe(true)
+    expect(hoverCommand).toHaveBeenLastCalledWith('Enter')
+    expect(router.route(pointer(10, 23))).toBe(true)
+    expect(input).toHaveBeenLastCalledWith('\r')
+    expect(router.route(pointer(30, 23))).toBe(true)
+    expect(input).toHaveBeenLastCalledWith('\u001b[B')
+    expect(router.route(pointer(28, 24))).toBe(true)
+    expect(input).toHaveBeenLastCalledWith('\u001b')
+  })
 })

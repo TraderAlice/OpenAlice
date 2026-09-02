@@ -121,7 +121,7 @@ import {
   decorateSupervisorTaskSurface,
   renderSupervisorTaskSurface,
   supervisorTaskSurfaceOptions,
-  type SupervisorTaskSurfaceTask,
+  type SupervisorFocusTask,
 } from './supervisor-task-surface.ts'
 import {
   createSupervisorHelpState,
@@ -172,6 +172,7 @@ import {
   renderSupervisorControlConsole,
   renderSupervisorContextTip,
   renderSupervisorDock,
+  renderSupervisorFocusActionBar,
   renderSupervisorHeaderLayout,
   renderSupervisorHome,
   renderSupervisorPanel,
@@ -315,7 +316,7 @@ interface UpdateResult {
 export type SupervisorUpdateChannel = 'stable' | 'beta' | 'dev'
 
 export type SupervisorPanel = 'fleet' | 'overview' | 'logs' | 'doctor' | 'help'
-export type SupervisorFocusTask = SupervisorTaskSurfaceTask | 'transfer'
+export type { SupervisorFocusTask } from './supervisor-task-surface.ts'
 
 interface SupervisorNavigationTransition {
   from: SupervisorPanel
@@ -584,15 +585,37 @@ export async function runSupervisorTui(
     hoverCommand?: (label?: string) => void,
   ) => {
     const terminal = terminalSize()
+    const focusTask = screen.snapshot.focusTask
+    const focusConsole = focusTask
+      ? renderSupervisorControlConsole(
+          '',
+          renderSupervisorFocusActionBar(focusTask, Math.max(1, terminal.width - 4)),
+          renderSupervisorDock({
+            panel: screen.snapshot.panel ?? 'overview',
+            focusTask,
+            projectName: screen.snapshot.context?.aliceProject.displayName,
+            runtimeState: screen.snapshot.runtime?.class,
+          }, terminal.width),
+          terminal.width,
+        )
+      : []
+    const focusConsoleRow = terminal.height - focusConsole.length
+    const externalCommands = supervisorCommandTargets(focusConsole)
+      .filter((target) => target.label === 'Enter' || target.label === '↑↓' || target.label === 'Esc')
+      .map((target) => ({ ...target, row: target.row + focusConsoleRow }))
     overlayPointer.capture({
       lines,
       width,
       terminalWidth: terminal.width,
       terminalHeight: terminal.height,
       options,
+      externalCommands,
       input,
       list,
-      hoverCommand,
+      hoverCommand: (label) => {
+        screen.setFocusConsoleHoveredCommand(label)
+        hoverCommand?.(label)
+      },
     })
   }
   const selectListPointerTarget = (
@@ -3017,6 +3040,7 @@ export class SupervisorScreen implements Component {
   private activeRailDrag?: SupervisorRailSurface
   private fleetVisibleRows = SUPERVISOR_FLEET_MIN_VISIBLE_ROWS
   private hoveredCommandTarget?: SupervisorCommandTarget
+  private focusConsoleHoveredCommand?: string
   private commandTargets: SupervisorCommandTarget[] = []
   private commandSpineTargets: SupervisorCommandTarget[] = []
   private commandDeckOpen = false
@@ -3154,12 +3178,23 @@ export class SupervisorScreen implements Component {
         ? !this.runtimePulse
         : false
     }
+    if ('focusTask' in patch && patch.focusTask === undefined) {
+      this.focusConsoleHoveredCommand = undefined
+      this.hoveredCommandTarget = undefined
+    }
     this.snapshot = { ...this.snapshot, ...patch }
     if (this.snapshot.confirmation !== previousConfirmation) {
       this.onConfirmationChange?.(this.snapshot.confirmation)
     }
     const isBusy = Boolean(this.snapshot.busy)
     if (isBusy !== wasBusy) this.onMotionDemandChange?.()
+    this.requestRender?.()
+  }
+
+  setFocusConsoleHoveredCommand(label?: string): void {
+    if (this.focusConsoleHoveredCommand === label) return
+    this.focusConsoleHoveredCommand = label
+    if (label === undefined) this.hoveredCommandTarget = undefined
     this.requestRender?.()
   }
 
@@ -4080,14 +4115,16 @@ export class SupervisorScreen implements Component {
       ...(hoverPreview ? { preview: sanitize(hoverPreview) } : {}),
     }, width, this.motionFrame, this.motionEnabled)
     const actionWidth = Math.max(1, width - 4)
-    const actionShelf = this.snapshot.panel === 'fleet' && this.snapshot.fleet
-      ? fleetActionBar(
+    const actionShelf = this.snapshot.focusTask
+      ? renderSupervisorFocusActionBar(this.snapshot.focusTask, actionWidth)
+      : this.snapshot.panel === 'fleet' && this.snapshot.fleet
+        ? fleetActionBar(
           this.snapshot.fleet,
           runtime,
           this.snapshot.context,
           actionWidth,
         )
-      : this.snapshot.panel === 'logs'
+        : this.snapshot.panel === 'logs'
         ? renderSupervisorCommandBar([
             { key: '↑↓', label: 'Scroll' },
             {
@@ -4137,6 +4174,11 @@ export class SupervisorScreen implements Component {
       }, width)],
     ).map((line) => truncate(line, width))
     this.commandTargets = supervisorCommandTargets(visibleLines)
+    if (this.focusConsoleHoveredCommand) {
+      this.hoveredCommandTarget = [...this.commandTargets].reverse().find((target) => (
+        target.label === this.focusConsoleHoveredCommand
+      ))
+    }
     const commandSpineRow = visibleLines.length
     this.commandSpineTargets = visibleLines.at(-1)?.startsWith('╰─ ')
       ? this.commandTargets.filter((target) => target.row === commandSpineRow)

@@ -457,6 +457,24 @@ not imply maintainer approval of the finished interaction.
   true centered modals. This is an autonomous topic decision, not a recorded
   maintainer approval.
 
+### Focus Console decision
+
+- Keeping the underlying Overview or Fleet Action Shelf visible is cheap, but
+  makes a focused task advertise commands that no longer own keyboard or mouse
+  input. A real Transfer frame still said Browse projects and Transfer after
+  the Flight Deck had already taken control.
+- Removing the Control Console entirely would avoid that false contract while
+  throwing away the stable bottom anchor, task identity, and global terminal
+  rhythm that now distinguish the Supervisor.
+- The selected model lets the active task own the full Focus Console. A
+  task-specific one-line Action Shelf exposes Enter, movement, and Back using
+  the task's vocabulary; the Command Spine becomes `FOCUS WORKSPACE` plus a
+  real Esc exit instead of advertising unavailable `/` and `q` controls. Both
+  rows route pointer input back to the same active overlay component, so the
+  footer is operational rather than decorative. Closing the task restores the
+  prior panel Console unchanged. This is an autonomous topic decision, not a
+  recorded maintainer approval.
+
 ### Setup Studio decision
 
 - Recoloring the existing single-column `SettingsList` would retain its proven
@@ -2247,6 +2265,23 @@ already large `supervisor-tui.ts` application controller.
   installer smoke passes without Node, npm, pnpm, Bun, or an Agent Runtime, and
   package dry-run contains the changed Supervisor, task-surface, and Transfer
   renderers.
+- A live OMP v17.3.4 comparison reinforced that its lower composer always owns
+  the current interaction context. OpenAlice's Focus Workspace still leaked
+  Overview or Fleet actions into that position even though those commands no
+  longer owned input. The new Focus Console gives Setup, Source, Projects,
+  Release, and Transfer task-specific Enter and movement language, a shared
+  Back action, `FOCUS WORKSPACE` identity, and a non-command `⌂` project label.
+  `/`, `q`, and `[ i ]` are no longer advertised while an overlay owns them.
+- Focus-Console acceptance passes with 128 focused renderer, pointer, screen,
+  and real-PTY tests. A truecolor 110x30 Transfer capture shows no underlying
+  Fleet commands in either bottom row. Raw SGR mouse input submits an invalid
+  and repaired project key through the mirrored bottom Enter segment, while a
+  second path closes recovery through the bottom Esc Spine; both reach the same
+  overlay state machine and restore the original Fleet Console on exit. CLI
+  build and root TypeScript pass; the 701-file suite passes (700 passed, 1
+  skipped; 6,204 tests passed, 10 skipped). Docker installer smoke passes
+  without Node, npm, pnpm, Bun, or an Agent Runtime, and package dry-run contains
+  every changed Supervisor source.
 
 ## Completion Criteria
 

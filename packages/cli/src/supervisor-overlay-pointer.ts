@@ -5,7 +5,10 @@
  */
 
 import type { SupervisorPointerEvent } from './supervisor-tui-pointer.ts'
-import { supervisorCommandTargets } from './supervisor-tui-view.ts'
+import {
+  supervisorCommandTargets,
+  type SupervisorCommandTarget,
+} from './supervisor-tui-view.ts'
 
 export interface SupervisorOverlayOptions {
   width?: number | `${number}%`
@@ -32,6 +35,7 @@ export interface SupervisorOverlayPointerFrame {
   terminalWidth: number
   terminalHeight: number
   options: SupervisorOverlayOptions
+  externalCommands?: SupervisorCommandTarget[]
   list?: SupervisorOverlayListTarget
   hoverCommand?(label?: string): void
   input(data: string): void
@@ -43,10 +47,11 @@ interface ResolvedOverlayFrame extends SupervisorOverlayPointerFrame {
   height: number
 }
 
-const commandInput = (label: string): string | undefined => {
+const supervisorOverlayCommandInput = (label: string): string | undefined => {
   const normalized = label.trim().toLowerCase()
   if (normalized === 'enter') return '\r'
   if (normalized === 'esc' || normalized === 'escape') return '\u001b'
+  if (normalized === '↑↓' || normalized === '↑ / ↓') return '\u001b[B'
   if (normalized === 'space') return ' '
   return normalized.length === 1 ? normalized : undefined
 }
@@ -161,6 +166,19 @@ export class SupervisorOverlayPointerRouter {
   route(event: SupervisorPointerEvent): boolean {
     const frame = this.frame
     if (!frame) return false
+    const externalCommand = frame.externalCommands?.find((target) => (
+      target.row === event.row
+      && event.col >= target.startColumn
+      && event.col <= target.endColumn
+    ))
+    if (externalCommand) {
+      if (event.motion) frame.hoverCommand?.(externalCommand.label)
+      if (event.leftClick) {
+        const data = supervisorOverlayCommandInput(externalCommand.label)
+        if (data) frame.input(data)
+      }
+      return true
+    }
     const localRow = event.row - frame.row
     const localColumn = event.col - frame.col
     if (
@@ -200,7 +218,7 @@ export class SupervisorOverlayPointerRouter {
     }
 
     if (event.leftClick) {
-      const data = command ? commandInput(command.label) : undefined
+      const data = command ? supervisorOverlayCommandInput(command.label) : undefined
       if (data) {
         frame.input(data)
         return true

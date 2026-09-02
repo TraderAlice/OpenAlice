@@ -373,7 +373,7 @@ function decorateDock(
   theme: SupervisorTuiTheme,
   hoveredCommand?: string,
 ): string {
-  const tokenPattern = /\[ \/ \] (?:Commands|Close)|\[ q \] Detach|\[ i \] .*?(?=  ›  )|! RECOVERY|(?:◉|●) (?:LIVE|EXTERNAL)|○ COLD|◆ (?:BLOCKED|DEGRADED)|◇ OFFLINE|◌ [A-Z][A-Z ]*?(?=  ›  | ─╯)|[◆◇≋✦?] (?:OVERVIEW|FLEET|LOGS|DOCTOR|HELP|SETUP|SOURCE|PROJECTS|RELEASE|TRANSFER)/gu
+  const tokenPattern = /\[ \/ \] (?:Commands|Close)|\[ q \] Detach|\[ Esc \] Back|\[ i \] .*?(?=  ›  )|⌂ .*?(?=  ›  )|◆ FOCUS WORKSPACE|! RECOVERY|(?:◉|●) (?:LIVE|EXTERNAL)|○ COLD|◆ (?:BLOCKED|DEGRADED)|◇ OFFLINE|◌ [A-Z][A-Z ]*?(?=  ›  | ─╯)|[◆◇≋✦?] (?:OVERVIEW|FLEET|LOGS|DOCTOR|HELP|SETUP|SOURCE|PROJECTS|RELEASE|TRANSFER)/gu
   let output = ''
   let cursor = 0
   for (const match of line.matchAll(tokenPattern)) {
@@ -392,13 +392,13 @@ function decorateDockToken(
   theme: SupervisorTuiTheme,
   hoveredCommand?: string,
 ): string {
-  if (token.startsWith('[ / ]') || token.startsWith('[ q ]')) {
+  if (token.startsWith('[ / ]') || token.startsWith('[ q ]') || token.startsWith('[ Esc ]')) {
     return decorateDockKeyedToken(token, theme, theme.dockControl, hoveredCommand)
   }
-  if (token.startsWith('[ i ]')) {
+  if (token.startsWith('[ i ]') || token.startsWith('⌂ ')) {
     return decorateDockKeyedToken(token, theme, theme.dockIdentity, hoveredCommand)
   }
-  if (/^[◆◇≋✦?] (?:OVERVIEW|FLEET|LOGS|DOCTOR|HELP|SETUP|SOURCE|PROJECTS|RELEASE|TRANSFER)$/u.test(token)) {
+  if (token === '◆ FOCUS WORKSPACE' || /^[◆◇≋✦?] (?:OVERVIEW|FLEET|LOGS|DOCTOR|HELP|SETUP|SOURCE|PROJECTS|RELEASE|TRANSFER)$/u.test(token)) {
     return theme.dockPanel(token)
   }
   if (token.startsWith('● ') || token.startsWith('◉ ')) return theme.dockSuccess(token)

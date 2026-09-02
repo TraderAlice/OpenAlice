@@ -16,6 +16,7 @@ import {
   renderSupervisorControlConsole,
   renderSupervisorContextTip,
   renderSupervisorDock,
+  renderSupervisorFocusActionBar,
   supervisorCommandTargets,
 } from './supervisor-tui-view.ts'
 import {
@@ -292,8 +293,11 @@ describe('Supervisor TUI screen', () => {
       projectName: 'Default AliceProject',
       runtimeState: 'absent',
     }, 100)
-    expect(focus).toContain('[ i ] Default AliceProject  ›  ○ COLD  ›  ◆ SETUP')
+    expect(focus).toContain('◆ FOCUS WORKSPACE  ›  [ Esc ] Back')
+    expect(focus).toContain('⌂ Default AliceProject  ›  ○ COLD  ›  ◆ SETUP')
+    expect(focus).not.toContain('[ / ] Commands')
     expect(focus).not.toContain('◆ OVERVIEW')
+    expect(supervisorCommandTargets([focus]).map((target) => target.label)).toEqual(['Esc'])
 
     const transferFocus = renderSupervisorDock({
       panel: 'fleet',
@@ -301,7 +305,7 @@ describe('Supervisor TUI screen', () => {
       projectName: 'Default AliceProject',
       runtimeState: 'absent',
     }, 100)
-    expect(transferFocus).toContain('[ i ] Default AliceProject  ›  ○ COLD  ›  ◆ TRANSFER')
+    expect(transferFocus).toContain('⌂ Default AliceProject  ›  ○ COLD  ›  ◆ TRANSFER')
     expect(transferFocus).not.toContain('◇ FLEET')
 
     const compact = renderSupervisorDock({
@@ -1533,6 +1537,24 @@ describe('Supervisor TUI screen', () => {
     expect(supervisorCommandTargets(lines).map((target) => target.label)).toEqual([
       'Enter', 's', 'p', '?',
     ])
+  })
+
+  it('gives each Focus Workspace an honest task-owned Action Shelf', () => {
+    expect(renderSupervisorFocusActionBar('setup', 96)[0]).toContain(
+      '◆ [ Enter ] Edit / apply  │  [ ↑↓ ] Move field  │  [ Esc ] Step back',
+    )
+    expect(renderSupervisorFocusActionBar('source', 96)[0]).toContain(
+      '◆ [ Enter ] Validate / continue  │  [ ↑↓ ] Move cursor',
+    )
+    expect(renderSupervisorFocusActionBar('projects', 96)[0]).toContain(
+      '◆ [ Enter ] Choose  │  [ ↑↓ ] Move project',
+    )
+    expect(renderSupervisorFocusActionBar('release', 96)[0]).toContain(
+      '◆ [ Enter ] Inspect / continue  │  [ ↑↓ ] Move channel',
+    )
+    expect(renderSupervisorFocusActionBar('transfer', 96)[0]).toContain(
+      '◆ [ Enter ] Continue  │  [ ↑↓ ] Move choice',
+    )
   })
 
   it('frames feedback, actions, and Command Spine as one same-height Control Console', () => {

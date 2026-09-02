@@ -443,15 +443,20 @@ intentionally parameter-free:
 - `?` toggles Help; `[` and `]` expose the other top-level panels.
 
 Setup, Source, AliceProject, Release, and Remote Transfer use one secondary-task
-surface. At 100x28 and larger, a Focus Workspace replaces every Overview content row
-between the Mission Header and Control Console instead of allowing unrelated
-cards to show through a centered dialog. The navigation rail clears its active
+surface. At 100x28 and larger, a Focus Workspace replaces every Overview
+content row between the Mission Header and Control Console instead of allowing
+unrelated cards to show through a centered dialog. The navigation rail clears its active
 top-level selection and names the focused task, while the Context Ribbon uses
 the same task identity. The task renderer, pointer targets, and mutation
 callbacks remain unchanged inside that stage. Smaller terminals retain the
 bounded centered sheet because their stacked responsive content takes priority
 over clearing the whole viewport. Closing the task restores the prior
 top-level panel identity without changing Runtime or selection state.
+The Control Console follows the same ownership rule: its Action Shelf uses the
+active task's Enter, movement, and Back vocabulary, while the Command Spine
+shows `FOCUS WORKSPACE` and a real Esc exit instead of leaking unavailable
+Overview or Fleet commands. Pointer activation on either Focus Console row is
+routed to the same overlay component that owns keyboard input.
 When the wide stage has enough surplus rows, a read-only Focus Trajectory
 centers the task's existing workflow and mutation boundary in that quiet field.
 It does not claim completion state, expose a hit target, or add another action
