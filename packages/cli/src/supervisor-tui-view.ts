@@ -1,7 +1,8 @@
 import { displayWidth, truncateDisplayWidth } from './supervisor-display.ts'
 import { SUPERVISOR_BRAND_MARK_ROWS } from './supervisor-tui-theme.ts'
 
-const SUPERVISOR_BRAND_BEACON_MIN_WIDTH = 116
+const SUPERVISOR_SIGNAL_DECK_MIN_WIDTH = 72
+const SUPERVISOR_BRAND_BEACON_MIN_WIDTH = 100
 
 export interface SupervisorHomeView {
   projectName: string
@@ -119,26 +120,60 @@ export function renderSupervisorHome(
     ...view.guidance,
     primaryLaunchRow(view),
   ]
-  const details = [
-    detailRow('Home', view.home, cardWidth - 4),
-    detailRow('Web', view.web, cardWidth - 4),
-    detailRow('Owner', view.owner, cardWidth - 4),
-    detailRow('Provider', view.provider, cardWidth - 4),
-    detailRow('Services', view.components, cardWidth - 4),
-  ]
-  if (view.uptime) details.push(detailRow('Uptime', view.uptime, cardWidth - 4))
+  const details = runtimeDetailRows(view, cardWidth - 4)
 
   if (width >= 100) return renderWideCockpit(view, state, width)
 
   const lines = [
     ...renderCard('Launchpad · AliceProject', projectBody, cardWidth),
     '',
-    ...renderCard('Runtime signal', details, cardWidth),
+    ...renderCard(
+      width >= SUPERVISOR_SIGNAL_DECK_MIN_WIDTH
+        ? 'Runtime Signal Deck · OpenAlice'
+        : 'Runtime signal',
+      width >= SUPERVISOR_SIGNAL_DECK_MIN_WIDTH
+        ? renderCompactSignalDeck(view, cardWidth - 4)
+        : details,
+      cardWidth,
+    ),
   ]
   return {
     lines,
     primaryTarget: targetForLine(lines, '[ Enter ]', cardWidth),
   }
+}
+
+function renderCompactSignalDeck(
+  view: SupervisorHomeView,
+  width: number,
+): string[] {
+  const divider = ' │ '
+  const leftWidth = displayWidth(SUPERVISOR_BRAND_MARK_ROWS[0]) + 2
+  const rightWidth = Math.max(1, width - leftWidth - displayWidth(divider))
+  const identity = [
+    ...SUPERVISOR_BRAND_MARK_ROWS.map((mark) => ` ${mark}`),
+    ' ◆ LOCAL CONTROL',
+    ` ${runtimeSignal(view.state, view.pulse ?? false)}`,
+  ]
+  const telemetry = runtimeDetailRows(view, rightWidth)
+  return Array.from(
+    { length: Math.max(identity.length, telemetry.length) },
+    (_, index) => (
+      `${fillLine(identity[index] ?? '', leftWidth)}${divider}${truncateDisplayWidth(telemetry[index] ?? '', rightWidth)}`
+    ),
+  )
+}
+
+function runtimeDetailRows(view: SupervisorHomeView, width: number): string[] {
+  const details = [
+    detailRow('Home', view.home, width),
+    detailRow('Web', view.web, width),
+    detailRow('Owner', view.owner, width),
+    detailRow('Provider', view.provider, width),
+    detailRow('Services', view.components, width),
+  ]
+  if (view.uptime) details.push(detailRow('Uptime', view.uptime, width))
+  return details
 }
 
 function renderWideCockpit(

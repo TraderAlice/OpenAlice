@@ -81,6 +81,10 @@ describe('Supervisor TUI screen', () => {
     expect(lines[2].match(/┬/gu)).toHaveLength(1)
     expect(lines.slice(0, 3).every((line) => displayWidth(line) === 80)).toBe(true)
     expect(lines.join('\n')).toContain('○ STOPPED')
+    expect(lines.join('\n')).toContain('Runtime Signal Deck · OpenAlice')
+    expect(lines.join('\n')).toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+    expect(lines.join('\n')).toContain('◆ LOCAL CONTROL')
+    expect(lines.length).toBeLessThanOrEqual(24)
     expect(lines.join('\n')).toContain('[ Enter ]  Start OpenAlice & open Workspace')
     expect(lines.join('\n')).not.toContain('◆ [ Enter ] Start & open')
     expect(lines.join('\n')).toContain('[ s ] Start quietly')
@@ -104,9 +108,16 @@ describe('Supervisor TUI screen', () => {
 
     const foldedLines = screen.render(99)
     expect(foldedLines.findIndex((line) => line.includes('╭ Launchpad · AliceProject')))
-      .toBeLessThan(foldedLines.findIndex((line) => line.includes('╭ Runtime signal')))
-    expect(foldedLines.join('\n')).not.toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+      .toBeLessThan(foldedLines.findIndex((line) => line.includes('╭ Runtime Signal Deck')))
+    expect(foldedLines.join('\n')).toContain('Runtime Signal Deck · OpenAlice')
+    expect(foldedLines.join('\n')).toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+    expect(foldedLines.join('\n')).toContain('◆ LOCAL CONTROL')
     expect(foldedLines.every((line) => displayWidth(line) <= 99)).toBe(true)
+
+    const compactLines = screen.render(71)
+    expect(compactLines.join('\n')).toContain('╭ Runtime signal')
+    expect(compactLines.join('\n')).not.toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+    expect(compactLines.every((line) => displayWidth(line) <= 71)).toBe(true)
 
     const narrowHeader = screen.render(46)[0]!
     expect(narrowHeader).toContain('↗ v0.87.0-beta · DEV')
@@ -414,7 +425,9 @@ describe('Supervisor TUI screen', () => {
     expect(plainBeacon).toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
     expect(plainBeacon).toContain('Default AliceProject')
     expect(plainBeacon).not.toContain('\u001b[')
-    expect(reduced.render(115).join('\n')).not.toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+    expect(reduced.render(99).join('\n')).toContain('Runtime Signal Deck · OpenAlice')
+    expect(reduced.render(99).join('\n')).toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+    expect(reduced.render(71).join('\n')).not.toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
   })
 
   it('slides the Mission Header view beacon while reduced motion lands immediately', () => {

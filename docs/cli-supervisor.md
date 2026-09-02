@@ -127,17 +127,19 @@ path is intentionally parameter-free:
   Launchpad is the sole primary-action surface on Overview: Enter starts and
   opens a stopped Runtime, opens a verified Web endpoint, or runs Runtime
   Doctor when neither action is truthfully available. Its
-  Runtime Signal card keeps Home, Web endpoint,
-  owner, provider identity, services, and uptime available without returning
-  to the historical flat field dump. At 100 columns and wider those surfaces
-  become a two-column cockpit, with the Launchpad on the left and Runtime
-  Signal on the right. From 116 columns, an OMP-inspired Launch System Beacon
+  Runtime Signal card keeps Home, Web endpoint, owner, provider identity,
+  services, and uptime available without returning to the historical flat
+  field dump. From 72 through 99 columns it becomes a Signal Deck: the existing
+  card composes a terminal-native `ALICE` mark and truthful Runtime state beside
+  the complete telemetry without consuming another row. At 100 columns and
+  wider the Launchpad and Runtime Signal become a two-column cockpit, and an
+  OMP-inspired Launch System Beacon
   adds a terminal-native `ALICE` pixel wordmark beside the selected
   AliceProject and truthful Runtime state. It is decorative enhancement rather
   than another control: the same bounded entrance sweep styles it, `NO_COLOR`
-  keeps the wordmark and state legible, and narrower terminals omit it entirely.
-  Narrower terminals fold the operational fields
-  into the complete vertical flow instead of hiding them. The application
+  keeps the wordmark and state legible, and terminals below 72 columns omit it
+  entirely. Those narrow terminals fold the operational fields into the
+  complete vertical flow instead of hiding them. The application
   divider follows the full terminal width, and an available-update notice is
   composed inside the responsive header instead of being appended beyond its
   clipping boundary;
@@ -233,7 +235,7 @@ path is intentionally parameter-free:
   color; only the busy glyph animates. The slot is a presentation of existing
   Supervisor state and does not introduce a second lifecycle or error path;
 - color-capable motion-enabled sessions play one bounded brand-color sweep on
-  entry across the OpenAlice header and any visible wide Beacon, then settle to
+  entry across the OpenAlice header and any visible brand mark, then settle to
   the static brand frame. A successfully refreshed
   running Runtime alternates `●`/`◉` as a low-frequency heartbeat in Overview
   and Fleet; the adjacent `RUNNING`/`running` text never changes, and failed

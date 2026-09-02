@@ -162,6 +162,9 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       })
     })
 
+    expect(transcript).toContain('Runtime Signal Deck · OpenAlice')
+    expect(transcript).toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+    expect(transcript).toContain('◆ LOCAL CONTROL')
     expect(transcript).toContain('│ › [ p ] Setup')
     expect(transcript).toContain('╭ Setup Studio · Default AliceProject')
     expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=0')
@@ -1534,7 +1537,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         ) {
           focusedDefault = true
           defaultFocusOffset = output.length
-          child.write('\u001b[A')
+          setTimeout(() => child.write('\u001b[A'), 50)
         } else if (
           focusedDefault
           && !selectedDefault

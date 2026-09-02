@@ -558,6 +558,24 @@ not imply maintainer approval of the finished interaction.
   The action-first Launchpad, 80×24 geometry, and lifecycle callbacks remain
   unchanged.
 
+### Responsive Signal Deck decision
+
+- Keeping the brand Beacon wide-only preserves the existing layout, but live
+  comparison with OMP v17.3.4 shows that OpenAlice loses its strongest visual
+  identity in the ordinary 80-column terminal where the experience matters
+  most.
+- Adding another standalone hero card at standard widths would reproduce OMP's
+  welcome-screen impact, but consume vertical capacity and push operational
+  controls toward or beyond the 80x24 boundary.
+- The selected model composes the existing three-row `ALICE` mark, local-control
+  identity, and truthful Runtime state into the left side of the existing
+  Runtime card from 72 through 99 columns. The complete telemetry remains on
+  the right at the same card height; below 72 columns the original text stack
+  remains authoritative. From 100 columns the existing full Beacon becomes the
+  wide composition. Brand entrance, `NO_COLOR`, reduced motion, lifecycle
+  actions, and pointer geometry keep their current owners. This is an
+  autonomous topic decision, not a recorded maintainer approval.
+
 ### Confirmation-modal decision
 
 - Keeping confirmation cards inline preserves the original implementation but
@@ -623,6 +641,8 @@ already large `supervisor-tui.ts` application controller.
   preserve the static reduced-motion frame as the complete experience.
 - [x] Add an OMP-inspired wide Launchpad brand Beacon without displacing the
   complete 80×24 operational frame.
+- [x] Compose that identity into a responsive Signal Deck at standard widths
+  and promote the complete Beacon to the 100-column wide cockpit.
 - [x] Turn Overview into a responsive AliceProject/Runtime cockpit without
   changing lifecycle action semantics or sacrificing the 80x24 baseline.
 - [x] Promote Overview into an action-first Launchpad with a semantic intent
@@ -1276,6 +1296,21 @@ already large `supervisor-tui.ts` application controller.
   passed, 1 skipped; 6,150 tests passed, 10 skipped). Docker installer smoke
   passes, and package dry-run includes the changed command-deck and Supervisor
   controller sources.
+- A live OMP v17.3.4 comparison exposed the remaining ordinary-width identity
+  gap: its 80-column welcome keeps animated brand art beside useful context,
+  while OpenAlice previously hid `ALICE` until 116 columns. The Overview now
+  composes the existing mark, local-control identity, and truthful Runtime
+  signal beside complete telemetry in a same-height Signal Deck from 72–99
+  columns; the full Launch System Beacon now begins at the 100-column cockpit.
+- Signal-Deck acceptance passes with 84 focused screen and real-PTY tests. A
+  real truecolor 80×24 Default AliceProject session retained Home, Web, Owner,
+  Provider, Services, Action Shelf, and Command Spine while the bounded prism
+  sweep stayed inside the mark; a real 100×24 reduced-motion session rendered
+  the full Beacon and complete controls in 22 rows. Both restored cursor,
+  bracketed-paste, mouse, and alternate-screen modes after detach. CLI
+  build/typecheck and root TypeScript pass; the 699-file suite passes (698
+  passed, 1 skipped; 6,150 tests passed, 10 skipped). Docker installer smoke
+  passes, and package dry-run includes the changed Supervisor view source.
 
 ## Completion Criteria
 
