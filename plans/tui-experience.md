@@ -3490,8 +3490,8 @@ already large `supervisor-tui.ts` application controller.
   Inspector, and Status sheets. AliceProject selection now joins the same
   compact stage; its status is folded into at most two rows so five visible
   projects plus the complete Inspector still fit the 18-row canvas.
-- The lower stage threshold remains task-specific. Release, Transfer, and their
-  existing centered-sheet thresholds do not change.
+- The lower stage threshold remains task-specific. Transfer and its existing
+  centered-sheet threshold do not change.
   Selection, editing, validation, save callbacks, inheritance rules, Runtime
   ownership, keyboard routes, and pointer activation remain unchanged.
 - The first compact Source stage then exposed the Launcher's selection Tip in
@@ -3509,6 +3509,26 @@ already large `supervisor-tui.ts` application controller.
   Task Surface, Source, Setup, AliceProject, screen, and real-PTY tests
   (including all 54 PTY cases), and the
   complete CLI suite (63 files, 639 tests). CLI typecheck and build also pass.
+
+### Compact Release Focus Workspace decision
+
+- A real 80x24 Release capture showed its lane map, Channel Brief, and Update
+  contract layered over the connected Home surface despite the Focus Header and
+  Focus Console already claiming task ownership. The underlying session state
+  remained visible as unrelated fragments between Release panels.
+- Release now joins the 72x24 Focus Workspace boundary. Its existing three-lane
+  map, selected Channel Brief, confirmation contract, and Choose/Probe/Confirm/
+  Install trajectory already fit the 18-row canvas, so no release information
+  or action was removed.
+- Channel selection, update probing, install confirmation, version/channel
+  provenance, pointer and keyboard routes, and update authority are unchanged.
+  Transfer retains its independent Flight Deck and centered-sheet threshold.
+- Real 120x32 and 80x24 captures verify one owned Release canvas at both
+  baselines. Maintainer acceptance remains pending on the retained feature
+  branch.
+- Acceptance passes through all 143 Task Surface, Release, screen, and real-PTY
+  tests (including all 55 PTY cases), plus the complete CLI suite (63 files,
+  640 tests). CLI typecheck and build also pass.
 
 ## Completion Criteria
 

@@ -1743,7 +1743,7 @@ export async function runSupervisorTui(
       maxHeight: '90%',
       anchor: 'center',
       margin: 1,
-    } as const)
+    } as const, 'release')
     const close = (notice?: string) => {
       if (!updateChannelActive) return
       updateChannelActive = false

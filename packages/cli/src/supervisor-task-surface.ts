@@ -21,8 +21,11 @@ export function supervisorUsesTaskStage(
   size: SupervisorTaskSurfaceSize,
   task?: SupervisorTaskSurfaceTask,
 ): boolean {
-  const launchPreparationTask = task === 'setup' || task === 'source' || task === 'projects'
-  return launchPreparationTask
+  const compactFocusTask = task === 'setup'
+    || task === 'source'
+    || task === 'projects'
+    || task === 'release'
+  return compactFocusTask
     ? size.width >= SUPERVISOR_COMPACT_TASK_STAGE_MIN_WIDTH
       && size.height >= SUPERVISOR_COMPACT_TASK_STAGE_MIN_HEIGHT
     : size.width >= SUPERVISOR_TASK_STAGE_MIN_WIDTH

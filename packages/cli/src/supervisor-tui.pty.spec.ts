@@ -494,12 +494,23 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
 
-  it('selects a release lane and clicks the Channel Brief action with raw pointer input', async () => {
+  it.each([
+    ['wide', 110, 30, 90, 70, 10, 'OpenAlice is current on dev.'],
+    ['compact', 80, 24, null, 15, 16, 'OpenAlice is current on d…'],
+  ] as const)('selects a release lane and clicks the %s Channel Brief action', async (
+    _layout,
+    cols,
+    rows,
+    releaseControlColumn,
+    briefActionColumn,
+    briefActionRow,
+    expectedFeedback,
+  ) => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-release-pointer-'))
     temporaryPaths.push(isolatedHome)
     const child = pty.spawn(process.execPath, [releaseFixtureEntry], {
-      cols: 110,
-      rows: 30,
+      cols,
+      rows,
       cwd: dirname(cliEntry),
       env: {
         ...process.env,
@@ -522,8 +533,12 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         output += data
         if (!opened && output.includes('◆ [Home]')) {
           opened = true
-          child.write('\u001b[<35;90;1M')
-          child.write('\u001b[<0;90;1M')
+          if (releaseControlColumn === null) {
+            child.write('u')
+          } else {
+            child.write(`\u001b[<35;${releaseControlColumn};1M`)
+            child.write(`\u001b[<0;${releaseControlColumn};1M`)
+          }
         } else if (!laneHovered && output.includes('Release Observatory · 3 LANES')) {
           laneHovered = true
           setTimeout(() => child.write('\u001b[<35;20;7M'), 100)
@@ -531,9 +546,9 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           laneSelected = true
           child.write('\u001b[<0;20;7M')
           setTimeout(() => {
-            child.write('\u001b[<35;70;10M')
+            child.write(`\u001b[<35;${briefActionColumn};${briefActionRow}M`)
             setTimeout(() => {
-              child.write('\u001b[<0;70;10M')
+              child.write(`\u001b[<0;${briefActionColumn};${briefActionRow}M`)
               setTimeout(() => child.write('q'), 300)
             }, 100)
           }, 100)
@@ -549,7 +564,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('│ › Dev')
     expect(transcript).toContain('Channel Brief · 3/3 · INSTALLED BETA')
     expect(transcript).toContain('› [ Enter ] Check')
-    expect(transcript).toContain('OpenAlice is current on dev.')
+    expect(transcript).toContain(expectedFeedback)
     expect(transcript).toContain('FIXTURE_RESULT checked=dev')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
