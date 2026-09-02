@@ -190,7 +190,10 @@ path is intentionally parameter-free:
   A second click on the focused selected Machine drills into AliceProjects; a
   second click on the focused selected AliceProject invokes Enter's primary
   action. Pointer activation therefore cannot cross an inactive pane boundary
-  on its first click.
+  on its first click. Pane headers and unused body space are focus-only pointer
+  surfaces: hovering an inactive pane changes its title marker from `◇` to `»`,
+  and clicking transfers focus without selecting or activating a row. The
+  inter-pane gutter remains inert.
   With only the local Machine, Fleet focus starts on its current AliceProject;
 - the footer is a contextual Action Shelf, not a complete shortcut legend. It
   exposes a few relevant actions as chips on one full-width surface. On

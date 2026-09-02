@@ -773,6 +773,45 @@ describe('Supervisor TUI screen', () => {
     expect(activated).toEqual(['local/default'])
   })
 
+  it('focuses Fleet panes from headers and unused space without activating rows', () => {
+    const activated = vi.fn()
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'fleet',
+      runtime: { class: 'absent', endpoints: {} },
+      fleet: createSupervisorFleetState(
+        '2026-09-02T00:00:00Z',
+        fleetMachines(),
+        'default',
+      ),
+    }, {
+      onActivateFleet: activated,
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+    })
+
+    screen.render(100)
+    expect(screen.handlePointer({
+      button: 35, col: 50, row: 5, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(100).join('\n').replace(/\u001b\[[0-9;]*m/gu, ''))
+      .toContain('╭ » AliceProjects')
+
+    expect(screen.handlePointer(pointerClick(50, 5))).toBe(true)
+    expect(screen.snapshot.fleet?.focus).toBe('projects')
+    expect(activated).not.toHaveBeenCalled()
+
+    expect(screen.handlePointer(pointerClick(50, 5))).toBe(true)
+    expect(screen.snapshot.fleet?.focus).toBe('projects')
+    expect(activated).not.toHaveBeenCalled()
+
+    expect(screen.handlePointer(pointerClick(8, 10))).toBe(true)
+    expect(screen.snapshot.fleet?.focus).toBe('machines')
+    expect(activated).not.toHaveBeenCalled()
+
+    expect(screen.handlePointer(pointerClick(38, 5))).toBe(false)
+  })
+
   it('derives responsive keycap hit regions and clicks visible commands through keyboard semantics', () => {
     expect(supervisorCommandTargets(['界 [ p ] Setup'])).toEqual([{
       row: 1,

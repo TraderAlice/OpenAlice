@@ -3536,6 +3536,7 @@ export class SupervisorScreen implements Component {
     if (event.motion) {
       const fleetHoverChanged = fleetTarget?.focus !== this.hoveredFleetTarget?.focus
         || fleetTarget?.index !== this.hoveredFleetTarget?.index
+        || fleetTarget?.surface !== this.hoveredFleetTarget?.surface
       const commandHoverChanged = commandTarget?.row !== this.hoveredCommandTarget?.row
         || commandTarget?.label !== this.hoveredCommandTarget?.label
       const doctorHover = doctorTarget?.index ?? null
@@ -3610,6 +3611,12 @@ export class SupervisorScreen implements Component {
       return true
     }
     if (event.leftClick && fleet && fleetTarget) {
+      if (fleetTarget.surface === 'pane') {
+        if (fleet.focus !== fleetTarget.focus) {
+          this.update({ fleet: setFleetFocus(fleet, fleetTarget.focus) })
+        }
+        return true
+      }
       const selected = fleetTarget.focus === 'machines'
         ? fleet.selectedMachine
         : fleet.selectedProjects[selectedFleetMachine(fleet)?.key ?? ''] ?? 0

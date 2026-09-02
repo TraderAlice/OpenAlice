@@ -163,6 +163,20 @@ not imply maintainer approval of the finished interaction.
   avoids accidental cross-pane activation, and changes no lifecycle callback.
   This is an autonomous topic decision, not a recorded maintainer approval.
 
+### Fleet pane-surface decision
+
+- Restricting hit targets to populated rows avoids ambiguous clicks, but makes
+  users precisely target text even though the UI visibly presents two large
+  focusable panes.
+- Treating every pane click as a selected-row click would enlarge targets while
+  weakening the focus-first safeguard and making empty space activate actions.
+- The selected model follows OMP's component-focus behavior: pane headers and
+  unused body space are focus-only surfaces, an inactive hovered title changes
+  from `◇` to `»`, and clicking anywhere on that surface transfers pane focus
+  without selecting or activating a row. Populated rows retain their existing
+  selection and second-click action semantics; the gutter remains inert. This
+  is an autonomous topic decision, not a recorded maintainer approval.
+
 ### Global command discovery decision
 
 - Restyling the legacy detach hint would improve finish but not discoverability.
@@ -776,6 +790,8 @@ already large `supervisor-tui.ts` application controller.
   selection with container and row-level focus hierarchy.
 - [x] Make Fleet pointer activation focus-first so an inactive related row
   cannot invoke its pane's primary action on the first click.
+- [x] Make Fleet headers and unused pane space focusable pointer surfaces while
+  keeping row activation and the inter-pane gutter isolated.
 - [x] Replace the legacy global shortcut hint with a clickable command dock and
   contextual `/` Command Deck.
 - [x] Project structured Runtime logs into semantic event rows while preserving
@@ -1539,6 +1555,19 @@ already large `supervisor-tui.ts` application controller.
   6,158 tests passed, 10 skipped). Docker installer smoke passes without Node,
   npm, pnpm, Bun, or an Agent Runtime, and package dry-run contains the changed
   Supervisor pointer controller source.
+- Fleet panes are now pointer surfaces rather than decorative boxes around row
+  targets. Headers and unused body space expose focus-only geometry, inactive
+  header hover uses `»`, and the three-column gutter remains inert; row
+  selection and second-click activation retain separate ownership.
+- Pane-surface acceptance passes with 105 focused screen and real-PTY tests. A
+  real truecolor 100×30 Default AliceProject session hovered and clicked the
+  inactive AliceProjects header, returned through blank Machine-pane space, and
+  verified the gutter caused no state change or action. Detach restored cursor,
+  bracketed-paste, mouse, and alternate-screen modes. CLI build/typecheck and
+  root TypeScript pass; the 699-file suite passes (698 passed, 1 skipped; 6,160
+  tests passed, 10 skipped). Docker installer smoke passes without Node, npm,
+  pnpm, Bun, or an Agent Runtime, and package dry-run contains the changed Fleet
+  geometry and Supervisor pointer-controller sources.
 
 ## Completion Criteria
 

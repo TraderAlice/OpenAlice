@@ -22,6 +22,7 @@ export interface SupervisorFleetState {
 export interface SupervisorFleetPointerTarget {
   focus: FleetFocus
   index: number
+  surface?: 'pane'
 }
 
 export function createSupervisorFleetState(
@@ -202,12 +203,14 @@ export function renderSupervisorFleet(
     machineRows,
     leftWidth,
     state.focus === 'machines',
+    hovered?.surface === 'pane' && hovered.focus === 'machines',
   )
   const rightPane = renderPane(
     `AliceProjects · ${machine?.displayName ?? 'none'} · ${positionLabel(projectIndex, machine?.projects.length ?? 0)}`,
     projectRows,
     rightWidth,
     state.focus === 'projects',
+    hovered?.surface === 'pane' && hovered.focus === 'projects',
   )
   const lines: string[] = []
   for (let index = 0; index < FLEET_VISIBLE_ROWS + 2; index += 1) {
@@ -237,6 +240,7 @@ function renderNarrowFleet(
         renderMachineRows(state, width - 4, hovered, true),
         width,
         true,
+        hovered?.surface === 'pane',
       ),
       '',
       ...renderDetailCard(state, width, pulse),
@@ -248,6 +252,7 @@ function renderNarrowFleet(
       renderProjectRows(state, width - 4, hovered, pulse, true),
       width,
       true,
+      hovered?.surface === 'pane',
     ),
     '',
     ...renderDetailCard(state, width, pulse),
@@ -260,8 +265,7 @@ export function supervisorFleetTargetAt(
   column: number,
   row: number,
 ): SupervisorFleetPointerTarget | undefined {
-  if (row < 2 || row > FLEET_VISIBLE_ROWS + 1) return undefined
-  const offset = row - 2
+  if (row < 1 || row > FLEET_VISIBLE_ROWS + 1) return undefined
   if (width < 72) {
     const items = state.focus === 'machines'
       ? state.machines
@@ -269,25 +273,42 @@ export function supervisorFleetTargetAt(
     const selected = state.focus === 'machines'
       ? state.selectedMachine
       : state.selectedProjects[selectedFleetMachine(state)?.key ?? ''] ?? 0
+    if (row === 1) return { focus: state.focus, index: selected, surface: 'pane' }
+    const offset = row - 2
     const index = visibleWindowStart(items.length, selected, FLEET_VISIBLE_ROWS) + offset
-    return index < items.length ? { focus: state.focus, index } : undefined
+    return index < items.length
+      ? { focus: state.focus, index }
+      : { focus: state.focus, index: selected, surface: 'pane' }
   }
   const leftWidth = Math.max(28, Math.min(36, Math.floor(width * 0.38)))
   const gap = 3
-  if (column <= leftWidth) {
+  const focus = column <= leftWidth
+    ? 'machines'
+    : column <= leftWidth + gap
+      ? undefined
+      : 'projects'
+  if (!focus) return undefined
+  if (focus === 'machines') {
+    if (row === 1) return { focus, index: state.selectedMachine, surface: 'pane' }
+    const offset = row - 2
     const index = visibleWindowStart(
       state.machines.length,
       state.selectedMachine,
       FLEET_VISIBLE_ROWS,
     ) + offset
-    return index < state.machines.length ? { focus: 'machines', index } : undefined
+    return index < state.machines.length
+      ? { focus, index }
+      : { focus, index: state.selectedMachine, surface: 'pane' }
   }
-  if (column <= leftWidth + gap) return undefined
   const machine = selectedFleetMachine(state)
   if (!machine) return undefined
   const selected = state.selectedProjects[machine.key] ?? 0
+  if (row === 1) return { focus, index: selected, surface: 'pane' }
+  const offset = row - 2
   const index = visibleWindowStart(machine.projects.length, selected, FLEET_VISIBLE_ROWS) + offset
-  return index < machine.projects.length ? { focus: 'projects', index } : undefined
+  return index < machine.projects.length
+    ? { focus, index }
+    : { focus, index: selected, surface: 'pane' }
 }
 
 function renderMachineRows(
@@ -302,7 +323,7 @@ function renderMachineRows(
     const selected = index === state.selectedMachine
     const prefix = selected
       ? focused ? '▶ ' : '◁ '
-      : hovered?.focus === 'machines' && hovered.index === index ? '» ' : '  '
+      : hovered?.surface !== 'pane' && hovered?.focus === 'machines' && hovered.index === index ? '» ' : '  '
     const status = machineStatus(item)
     const count = item.connection === 'local' || item.connection === 'online'
       ? `${machineGlyph(item)} ${item.projects.length}`
@@ -330,7 +351,7 @@ function renderProjectRows(
   const rows = visibleWindow(machine.projects, selectedIndex, FLEET_VISIBLE_ROWS).map(({ item, index }) => {
     const prefix = index === selectedIndex
       ? focused ? '▶ ' : '◁ '
-      : hovered?.focus === 'projects' && hovered.index === index ? '» ' : '  '
+      : hovered?.surface !== 'pane' && hovered?.focus === 'projects' && hovered.index === index ? '» ' : '  '
     const marks = [
       item.isDefault ? 'default' : '',
       projectStatus(item, pulse),
@@ -359,7 +380,7 @@ function fleetSelectionDetail(state: SupervisorFleetState, pulse = false): strin
 }
 
 function renderDetailCard(state: SupervisorFleetState, width: number, pulse = false): string[] {
-  return renderPane('Selection', fleetSelectionDetail(state, pulse), width, undefined, 2)
+  return renderPane('Selection', fleetSelectionDetail(state, pulse), width, undefined, false, 2)
 }
 
 function renderPane(
@@ -367,11 +388,12 @@ function renderPane(
   rows: string[],
   width: number,
   focused?: boolean,
+  hovered = false,
   rowCount = FLEET_VISIBLE_ROWS,
 ): string[] {
   const safeWidth = Math.max(12, width)
   const innerWidth = safeWidth - 4
-  const titlePrefix = focused === true ? '◆ ' : focused === false ? '◇ ' : ''
+  const titlePrefix = focused === true ? '◆ ' : hovered ? '» ' : focused === false ? '◇ ' : ''
   const titleText = ` ${titlePrefix}${title} `
   const topFill = Math.max(0, safeWidth - displayWidth(titleText) - 2)
   const body = Array.from({ length: rowCount }, (_, index) => rows[index] ?? '')

@@ -111,6 +111,47 @@ describe('Supervisor fleet state and presentation', () => {
     })
   })
 
+  it('maps pane headers and unused body space to focus-only surfaces', () => {
+    let state = createSupervisorFleetState('2026-08-23T00:00:00Z', machines())
+    expect(supervisorFleetTargetAt(state, 100, 4, 1)).toEqual({
+      focus: 'machines',
+      index: 0,
+      surface: 'pane',
+    })
+    expect(supervisorFleetTargetAt(state, 100, 50, 1)).toEqual({
+      focus: 'projects',
+      index: 0,
+      surface: 'pane',
+    })
+    expect(supervisorFleetTargetAt(state, 100, 38, 1)).toBeUndefined()
+    expect(supervisorFleetTargetAt(state, 100, 4, 6)).toEqual({
+      focus: 'machines',
+      index: 0,
+      surface: 'pane',
+    })
+
+    state = setFleetFocus(state, 'projects')
+    expect(supervisorFleetTargetAt(state, 40, 8, 1)).toEqual({
+      focus: 'projects',
+      index: 0,
+      surface: 'pane',
+    })
+    expect(supervisorFleetTargetAt(state, 40, 8, 6)).toEqual({
+      focus: 'projects',
+      index: 0,
+      surface: 'pane',
+    })
+
+    const hovered = renderSupervisorFleet(
+      createSupervisorFleetState('2026-08-23T00:00:00Z', machines()),
+      100,
+      { focus: 'projects', index: 0, surface: 'pane' },
+    ).join('\n')
+    expect(hovered).toContain('╭ ◆ Machines')
+    expect(hovered).toContain('╭ » AliceProjects')
+    expect(hovered).not.toContain('» Default AliceProject')
+  })
+
   it('keeps unauthorized and incompatible Machines as truthful rows', () => {
     const unavailable = ['unauthorized', 'incompatible'].map((connection) => ({
       ...machines()[1]!,
