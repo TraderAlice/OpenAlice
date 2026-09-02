@@ -508,6 +508,9 @@ intentionally parameter-free:
   Help remains available through `?`; Doctor remains a Runtime tool rather
   than a top-level product destination;
 - Runtime is a layered status-manager surface rather than a renamed log tail.
+  Its Command Spine identity is therefore `RUNTIME`, with `RUN` as the
+  intermediate responsive badge before the view identity is removed; the
+  internal `logs` panel key never appears in product chrome.
   Its responsive Runtime Observatory leads with three wide columns—Runtime,
   Route, and Services—or the same facts in one compact stack. It owns process
   state, owner/PID, provider identity, uptime, Alice/UTA/Connector status, the

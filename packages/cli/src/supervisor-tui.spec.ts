@@ -737,6 +737,33 @@ describe('Supervisor TUI screen', () => {
       runtimeClass: 'running',
     })[3]).toContain('\u001b[1;38;2;213;179;255;48;2;10;34;39m◇ CONN')
 
+    const compactRuntime = renderSupervisorDock({
+      panel: 'logs',
+      projectName: 'Default AliceProject',
+      machineName: 'This computer',
+      targetKind: 'local',
+      runtimeState: 'running',
+      connectionHealth: 'connected',
+    }, 113)
+    expect(compactRuntime).toContain('● LIVE  ›  ≋ RUN ─╯')
+    expect(renderSupervisorDock({
+      panel: 'logs',
+      projectName: 'Default AliceProject',
+      machineName: 'This computer',
+      targetKind: 'local',
+      runtimeState: 'running',
+      connectionHealth: 'connected',
+    }, 120)).toContain('● LIVE  ›  ≋ RUNTIME ─╯')
+    expect(decorateSupervisorFrame([
+      'header',
+      'divider',
+      'tabs',
+      compactRuntime,
+    ], createSupervisorTuiTheme({ TERM: 'xterm-256color' }), {
+      panel: 'logs',
+      runtimeClass: 'running',
+    })[3]).toContain('\u001b[1;38;2;213;179;255;48;2;10;34;39m≋ RUN')
+
     const unreachableRemote = renderSupervisorDock({
       panel: 'overview',
       projectName: 'Research',
@@ -827,7 +854,7 @@ describe('Supervisor TUI screen', () => {
     }, 60)
     expect(displayWidth(compact)).toBe(60)
     expect(compact).toContain('○ COLD')
-    expect(compact).toContain('≋ LOGS')
+    expect(compact).toContain('≋ RUNTIME')
 
     const palette = renderSupervisorDock({
       panel: 'overview',

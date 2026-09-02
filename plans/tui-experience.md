@@ -3279,6 +3279,25 @@ already large `supervisor-tui.ts` application controller.
   and real-PTY tests (including all 54 PTY cases), and the complete CLI suite
   (63 files, 637 tests). CLI typecheck and build also pass.
 
+### Runtime identity decision
+
+- A fresh 120x32/80x24 Runtime capture showed the surface itself consistently
+  naming Runtime Observatory, Runtime Lens, and `[Runtime]`, while the
+  persistent Command Spine still exposed the implementation panel name Logs.
+  That made the status manager appear to change products at the bottom edge.
+- The Spine now projects `RUNTIME` as the user-facing view badge and contracts
+  it to `RUN` only across the narrow middle tier where the full badge cannot
+  coexist with complete Machine/AliceProject and Runtime identity. Still
+  narrower widths retain the existing priority order and remove the view badge
+  before target or health truth.
+- Both forms retain the same purple view treatment and `NO_COLOR` text
+  identity; no log reader, filter, Runtime action, navigation key, or server
+  contract changes. Real 120x32 and 80x24 captures verify that Runtime remains
+  one coherent status-management surface from tab through Command Spine.
+- Runtime-identity acceptance passes through 140 focused Runtime Lens, screen,
+  and real-PTY tests (including all 54 PTY cases), and the complete CLI suite
+  (63 files, 637 tests). CLI typecheck and build also pass.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and
