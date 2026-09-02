@@ -31,7 +31,7 @@ describe('Supervisor Help control atlas', () => {
     const rendered = renderSupervisorHelp({ selected: 1, hovered: 2 }, false, 120, 22)
     const output = rendered.lines.join('\n')
 
-    expect(rendered.lines).toHaveLength(22)
+    expect(rendered.lines).toHaveLength(17)
     expect(output).toContain('Help · START · SEARCH · SWITCH')
     expect(output).toContain('NOW · Fast routes')
     expect(output).toContain('[ Enter ] Start / connect / open')
@@ -53,7 +53,7 @@ describe('Supervisor Help control atlas', () => {
     expect(rendered.lines.every((line) => displayWidth(line) === 120)).toBe(true)
 
     const boundary = renderSupervisorHelp({ selected: 0, hovered: null }, false, 100, 22)
-    expect(boundary.lines).toHaveLength(22)
+    expect(boundary.lines).toHaveLength(14)
     expect(boundary.lines.join('\n')).toContain('Help · START · SEARCH · SWITCH')
     expect(renderSupervisorHelp({ selected: 1, hovered: null }, false, 100, 22)
       .lines.join('\n')).toContain('safe link controls.')
@@ -85,6 +85,25 @@ describe('Supervisor Help control atlas', () => {
     )
     expect(baseline.targets[0]?.row).toBe(3)
     expect(baseline.lines.length).toBeLessThanOrEqual(19)
+  })
+
+  it('reduces 46x16 Help to one selected next step and three task domains', () => {
+    const rendered = renderSupervisorHelp({ selected: 0, hovered: null }, false, 46, 7)
+    const output = rendered.lines.join('\n')
+
+    expect(rendered.lines).toHaveLength(7)
+    expect(output).toContain('Control Guide · 1/3 · NAVIGATION')
+    expect(output).toContain('NEXT  [ Tab / → ] Next view')
+    expect(output).toContain('› ◆ Navigation  Move with intent')
+    expect(output).toContain('  ● Runtime  Read state, then act')
+    expect(output).toContain('  ◇ AliceProject  Shape the workspace')
+    expect(output).toContain('◆ [ ? ] Close Help')
+    expect(rendered.targets).toEqual([
+      { index: 0, row: 3, startColumn: 2, endColumn: 45 },
+      { index: 1, row: 4, startColumn: 2, endColumn: 45 },
+      { index: 2, row: 5, startColumn: 2, endColumn: 45 },
+    ])
+    expect(rendered.lines.every((line) => displayWidth(line) <= 46)).toBe(true)
   })
 
   it('wraps keyboard movement, clamps wheel movement, and selects boundaries', () => {

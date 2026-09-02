@@ -472,6 +472,8 @@ intentionally parameter-free:
   left rail exposes Start/Connect/Open, command search, AliceProject selection,
   and the Navigation/Runtime/AliceProject systems; a single right inspector
   explains only the selected system and presents its complete command list.
+  The console follows its real rail/inspector content with two breathing rows
+  rather than stretching both panes through the Operational Canvas.
   Description text wraps instead of being silently truncated. Ordinary
   terminals split those groups from the selected group's explanation and
   visible keycaps; narrower terminals stack the same focus model. The compact
@@ -479,6 +481,12 @@ intentionally parameter-free:
   with one responsive Fast-routes row for contextual Enter, `/` command search,
   and `i` AliceProject selection before presenting the reference groups. At
   very narrow widths that row becomes two lines rather than truncating a route.
+  Below 60 columns and 18 rows, Help becomes a seven-line Control Guide: the
+  selected system's first truthful Next command, all three task-domain choices,
+  and Close Help remain visible together with Mission Header, navigation,
+  contextual Tip, and Command Spine. Full descriptions and long-tail key routes
+  return automatically above that emergency threshold and remain searchable
+  through `/` Commands.
   Arrow/Home/End keys, wheel movement, and whole-row pointer hover/click share
   one selection. Keycaps in the inspector remain direct command targets rather
   than enlarging the system-selection hit area. Ordinary Help owns a final

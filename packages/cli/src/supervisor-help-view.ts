@@ -78,6 +78,9 @@ export function renderSupervisorHelp(
   const groups = helpGroups(recovery)
   const normalized = normalizeSupervisorHelpState(state, recovery)
   const selected = groups[normalized.selected] ?? groups[0]!
+  if (width < 60 && Number.isFinite(targetHeight)) {
+    return renderEmergencyHelp(groups, selected, normalized, recovery, width)
+  }
   const boardAvailable = !recovery
     && width >= 100
     && Number.isFinite(targetHeight)
@@ -87,6 +90,36 @@ export function renderSupervisorHelp(
     : width >= 96
       ? renderWideHelp(groups, selected, normalized, recovery, width)
       : renderStackedHelp(groups, selected, normalized, recovery, width)
+}
+
+function renderEmergencyHelp(
+  groups: HelpGroup[],
+  selected: HelpGroup,
+  state: SupervisorHelpState,
+  recovery: boolean,
+  width: number,
+): SupervisorHelpRender {
+  const selectorRows = groupRows(groups, state)
+  const rows = [
+    `NEXT  ${helpCommand(selected.commands[0], Math.max(1, width - 10))}`,
+    ...selectorRows,
+    ...(groups.length < 3 ? ['SAFETY · Project actions stay locked'] : []),
+    `◆ [ ? ] ${recovery ? 'Close safe controls' : 'Close Help'}`,
+  ]
+  return {
+    lines: renderSupervisorPanel(
+      recovery ? 'Safe controls' : 'Control Guide',
+      `${state.selected + 1}/${groups.length} · ${selected.title.toUpperCase()}`,
+      rows,
+      width,
+    ),
+    targets: groups.map((_, index) => ({
+      index,
+      row: index + 3,
+      startColumn: 2,
+      endColumn: Math.max(2, width - 1),
+    })),
+  }
 }
 
 function renderHelpMissionConsole(
@@ -120,10 +153,13 @@ function renderHelpMissionConsole(
       rightInnerWidth,
     )),
   ]
-  const bodyHeight = Math.max(
+  const naturalBodyHeight = Math.max(
     leftRows.length + 1,
     rightRows.length,
-    targetHeight - 2,
+  )
+  const bodyHeight = Math.max(
+    naturalBodyHeight,
+    Math.min(naturalBodyHeight + 2, targetHeight - 2),
   )
   while (leftRows.length < bodyHeight - 1) leftRows.push('')
   leftRows.push(CLOSE_HELP_ACTION)

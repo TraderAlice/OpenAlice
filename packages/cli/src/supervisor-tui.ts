@@ -5017,11 +5017,23 @@ export class SupervisorScreen implements Component {
     } else if (this.snapshot.panel === 'help') {
       const recovery = isConfigRecovery(this.snapshot)
       this.helpState = normalizeSupervisorHelpState(this.helpState, recovery)
+      const helpCanvasHeight = Number.isFinite(operationalCanvasHeight)
+        ? operationalCanvasHeight
+        : width < 60
+          && Number.isFinite(viewportHeight)
+          && Math.floor(viewportHeight ?? 0) < 18
+          ? Math.max(
+              0,
+              Math.floor(viewportHeight ?? 0)
+                - lines.length
+                - WIDE_OPERATIONAL_CANVAS_RESERVED_CHROME_HEIGHT,
+            )
+          : undefined
       const help = renderSupervisorHelp(
         this.helpState,
         recovery,
         width,
-        operationalCanvasHeight,
+        helpCanvasHeight,
       )
       const rowOffset = lines.length
       this.helpTargets = help.targets.map((target) => ({

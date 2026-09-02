@@ -600,6 +600,51 @@ describe('Supervisor TUI screen', () => {
     expect(remoteFrame).not.toContain('Reload Runtime snapshot')
   })
 
+  it('keeps a task-led Control Guide and application chrome visible at 46x16', () => {
+    const runtime = { class: 'running', endpoints: { web: 'http://127.0.0.1:2026' } }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'help',
+      runtime,
+      activeTarget: {
+        kind: 'local',
+        machineKey: 'local',
+        machineName: 'This computer',
+        projectKey: 'default',
+        projectName: 'Default AliceProject',
+        home: '/tmp/openalice',
+        transport: 'loopback',
+        endpoint: 'http://127.0.0.1:2026',
+        runtime,
+      },
+    }, {
+      getViewportHeight: () => 16,
+      motionEnabled: false,
+    })
+
+    const lines = screen.render(46)
+    const frame = lines.join('\n')
+    expect(lines).toHaveLength(16)
+    expect(frame).toContain('◆ OpenAlice')
+    expect(frame).toContain('Home │ ● Inbox │ ◇ Connect │ ≋ Runtime')
+    expect(frame).toContain('Control Guide · 1/3 · NAVIGATION')
+    expect(frame).toContain('NEXT  [ Tab / → ] Next view')
+    expect(frame).toContain('› ◆ Navigation  Move with intent')
+    expect(frame).toContain('● Runtime  Read state, then act')
+    expect(frame).toContain('◇ AliceProject  Shape the workspace')
+    expect(frame).toContain('◆ [ ? ] Close Help')
+    expect(frame).toContain('◇  Tip:')
+    expect(frame).toContain('[ / ] Commands')
+
+    const runtimeRow = lines.findIndex((line) => line.includes('Runtime  Read state')) + 1
+    expect(screen.handlePointer(pointerClick(20, runtimeRow))).toBe(true)
+    expect(screen.render(46).join('\n')).toContain('Control Guide · 2/3 · RUNTIME')
+    const closeRow = screen.render(46).findIndex((line) => line.includes('[ ? ] Close Help')) + 1
+    expect(screen.handlePointer(pointerClick(20, closeRow))).toBe(true)
+    expect(screen.snapshot.panel).toBe('overview')
+  })
+
   it('keeps remote controls target-scoped and exposes an explicit disconnect', () => {
     let disconnected = 0
     let sourceRequests = 0

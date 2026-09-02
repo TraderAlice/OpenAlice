@@ -3830,6 +3830,32 @@ already large `supervisor-tui.ts` application controller.
   The focused Fleet/screen/PTY closure passes 161 tests, the complete CLI suite
   passes 653 tests, and CLI typecheck/build passes.
 
+### Content-owned Control Guide decision
+
+- Fresh 120x32 Help capture showed three task domains and one short inspector
+  stretched through the full Operational Canvas. The empty space lived inside
+  both frames, making a concise rescue surface read like an unfinished document
+  browser. At 46x16, the stacked shortcut reference instead cropped Mission
+  Header, navigation, and contextual Tip to preserve commands already available
+  through the Command Dock.
+- Wide Help now follows the natural rail/inspector height and adds only two
+  breathing rows. Below 60 columns and 18 rows it progressively discloses a
+  seven-line Control Guide: the selected domain's first truthful Next command,
+  Navigation, Runtime, and AliceProject choices, and Close Help. Selecting a
+  domain immediately rewrites Next; ordinary and wide terminals restore the
+  complete description and key routes.
+- The emergency Guide preserves Mission Header, all adaptive destinations,
+  contextual command-search Tip, and Command Spine. Whole-row topic hover/click,
+  arrow/Home/End selection, the content-owned Close action, Recovery-safe groups,
+  and `/` Command Dock retain their existing owners. No Runtime, lifecycle,
+  Workspace, configuration, or command availability contract changes.
+- Real 120x32 and 46x16 PTY captures verify the bounded console and complete
+  emergency Guide. Existing 80/120 real-PTY Help journeys still exercise topic
+  hover/click and Close, while focused screen coverage clicks both a 46x16 topic
+  and its Close row. Maintainer acceptance remains pending on this branch. The
+  focused Help/screen/PTY closure passes 151 tests, the complete CLI suite passes
+  655 tests, and CLI typecheck/build passes.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and
