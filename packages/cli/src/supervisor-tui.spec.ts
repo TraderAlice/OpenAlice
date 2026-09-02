@@ -44,6 +44,85 @@ const pointerClick = (col: number, row: number) => ({
 } as const)
 
 describe('Supervisor TUI screen', () => {
+  it('makes the disconnected surface a three-step OpenAlice Launcher', () => {
+    const activated: string[] = []
+    const originalLocal = fleetMachines()[0]!
+    const local = {
+      ...originalLocal,
+      projects: originalLocal.projects.map((project) => ({
+        ...project,
+        runtime: {
+          ...project.runtime,
+          class: 'absent',
+          state: 'absent',
+          ownerSurface: null,
+          webEndpoint: null,
+        },
+      })),
+    }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'fleet',
+      runtime: { class: 'absent', endpoints: {} },
+      activeTarget: null,
+      fleet: createSupervisorFleetState('2026-09-02T00:00:00Z', [local], 'default'),
+    }, {
+      motionEnabled: false,
+      onActivateFleet: (machine, project) => activated.push(`${machine.key}/${project.key}`),
+    })
+
+    const frame = screen.render(140).join('\n')
+    expect(frame).toContain('◆ [Connect]·1')
+    expect(frame).toContain('OPENALICE LAUNCH · SELECT → START → CONNECT')
+    expect(frame).toContain('1 MACHINE ✓ This computer')
+    expect(frame).toContain('2 ALICEPROJECT ✓ Default AliceProject')
+    expect(frame).toContain('3 RUNTIME ○ READY · ENTER TO START')
+    expect(frame).toContain('[ Enter ] Start OpenAlice')
+    expect(frame).not.toContain('Inbox')
+
+    expect(screen.handleKey('enter', matchesKey)).toBe(true)
+    expect(activated).toEqual(['local/default'])
+  })
+
+  it('turns a connected target into a bounded workbench with Inbox attention', () => {
+    const toggled: string[] = []
+    const runtime = { class: 'running', endpoints: { web: 'http://127.0.0.1:2026' } }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'inbox',
+      runtime,
+      activeTarget: {
+        kind: 'local',
+        machineKey: 'local',
+        machineName: 'This computer',
+        projectKey: 'default',
+        projectName: 'Default AliceProject',
+        home: '/tmp/openalice',
+        transport: 'loopback',
+        endpoint: 'http://127.0.0.1:2026',
+        runtime,
+      },
+      inbox: {
+        endpoint: 'http://127.0.0.1:2026/',
+        refreshedAt: Date.now(),
+        hasMore: false,
+        entries: [{ id: 'hello', ts: Date.now(), workspaceId: 'ws', comments: 'Agent report ready.' }],
+      },
+    }, {
+      motionEnabled: false,
+      onToggleInboxRead: (entry) => toggled.push(entry.id),
+    })
+
+    const frame = screen.render(100).join('\n')
+    expect(frame).toContain('● [Inbox]·1')
+    expect(frame).toContain('Agent report ready.')
+    expect(frame).toContain('[ Enter ] Mark read')
+    expect(screen.handleKey('enter', matchesKey)).toBe(true)
+    expect(toggled).toEqual(['hello'])
+  })
+
   it('labels source-run, stable, beta, and dev channels from install provenance', async () => {
     await expect(resolveSupervisorChannel({
       resolveLayout: () => null,
@@ -595,8 +674,7 @@ describe('Supervisor TUI screen', () => {
     expect(emptyDoctor.at(-2)).not.toContain('[ Home ] First')
     expect(emptyDoctor.at(-2)).not.toContain('[ End ] Last')
     expect(emptyDoctor.join('\n')).toContain('No diagnostic checks in this report')
-    expect(emptyDoctor[1]).toContain('[Doctor]')
-    expect(emptyDoctor[1]).not.toContain('[Doctor]✓')
+    expect(emptyDoctor[1]).not.toContain('Doctor✓')
 
     screen.update({ doctor: null })
     expect(screen.render(120).at(-2)).toContain('◆ [ d ] Run Doctor')
@@ -610,7 +688,7 @@ describe('Supervisor TUI screen', () => {
     expect(screen.render(120).at(-2)).toContain('[ ↑↓ ] Inspect')
     expect(screen.render(120).at(-2)).toContain('[ Home ] First')
     expect(screen.render(120).at(-2)).toContain('[ End ] Last')
-    expect(screen.render(120)[1]).toContain('[Doctor]✓')
+    expect(screen.render(120)[1]).not.toContain('Doctor')
   })
 
   it('keeps the narrow Command Spine closed while Commands and Close remain clickable', () => {
@@ -1086,18 +1164,18 @@ describe('Supervisor TUI screen', () => {
     for (let frame = 0; frame < 9; frame += 1) animated.advanceMotion()
     const overviewColumn = animated.render(80)[2]!.indexOf('┬')
     expect(animated.handleKey(']', matchesKey)).toBe(true)
-    expect(animated.snapshot.panel).toBe('fleet')
+    expect(animated.snapshot.panel).toBe('inbox')
     expect(animated.hasActiveMotion()).toBe(true)
     expect(animated.render(80)[2]!.indexOf('┬')).toBe(overviewColumn)
     animated.advanceMotion()
     const movingColumn = animated.render(80)[2]!.indexOf('┬')
     expect(movingColumn).toBeGreaterThan(overviewColumn)
     expect(animated.handleKey(']', matchesKey)).toBe(true)
-    expect(animated.snapshot.panel).toBe('logs')
+    expect(animated.snapshot.panel).toBe('fleet')
     expect(animated.render(80)[2]!.indexOf('┬')).toBe(movingColumn)
     for (let frame = 0; frame < 4; frame += 1) animated.advanceMotion()
-    const logsColumn = animated.render(80)[2]!.indexOf('┬')
-    expect(logsColumn).toBeGreaterThan(movingColumn)
+    const fleetColumn = animated.render(80)[2]!.indexOf('┬')
+    expect(fleetColumn).toBeGreaterThan(movingColumn)
     expect(animated.hasActiveMotion()).toBe(false)
 
     const reduced = new SupervisorScreen({
@@ -1221,12 +1299,13 @@ describe('Supervisor TUI screen', () => {
     const output = screen.render(120).join('\n')
     expect(output).toContain('◆ running · home missing')
     expect(output).toContain('◆ LIVE · HOME MISSING')
-    expect(output).toContain('[ Enter ] Open')
+    expect(output).toContain('[ Enter ] Use AliceProject')
     expect(output).not.toContain('[ m ] Transfer')
     expect(screen.handleKey('m', matchesKey)).toBe(true)
     expect(transfers).toEqual([])
     expect(screen.snapshot.notice).toBe('Transfer requires an available AliceProject home.')
 
+    expect(screen.handleKey('[', matchesKey)).toBe(true)
     expect(screen.handleKey('[', matchesKey)).toBe(true)
     const overview = screen.render(120).join('\n')
     expect(overview).toContain('◆ RUNNING · HOME MISSING')
@@ -1475,7 +1554,7 @@ describe('Supervisor TUI screen', () => {
 
     expect(screen.render(100).join('\n')).toContain('\u001b[38;2;')
     expect(screen.render(100)[2]).toContain('\u001b[1;38;2;116;235;226m┬')
-    expect(screen.render(100)[1]!.replace(/\u001b\[[0-9;]*m/gu, '')).toContain('[Machines]·2')
+    expect(screen.render(100)[1]!.replace(/\u001b\[[0-9;]*m/gu, '')).toContain('[Connections]·2')
     const releaseColumn = screen.render(100)[0]!
       .replace(/\u001b\[[0-9;]*m/gu, '')
       .indexOf('[ u ]') + 3
@@ -1513,12 +1592,10 @@ describe('Supervisor TUI screen', () => {
     expect(activated).toEqual(['cloud/research'])
     const logsColumn = screen.render(100)[1]!
       .replace(/\u001b\[[0-9;]*m/gu, '')
-      .indexOf('Logs') + 1
+      .indexOf('Runtime') + 3
     expect(screen.handlePointer({
       button: 35, col: logsColumn, row: 2, release: false, wheel: null, motion: true, leftClick: false,
     })).toBe(true)
-    expect(screen.render(100)[1]).toContain('\u001b[1;38;2;203;250;246;48;2;19;49;55m≋ Logs')
-    expect(screen.render(100).join('\n')).toContain('◇  PREVIEW  Inspect the bounded, redacted Runtime event lens.')
     expect(screen.handlePointer({
       button: 0, col: logsColumn, row: 2, release: false, wheel: null, motion: false, leftClick: true,
     })).toBe(true)
@@ -1984,7 +2061,7 @@ describe('Supervisor TUI screen', () => {
       },
     })
     const semanticLogs = screen.render(80).join('\n')
-    expect(screen.render(80)[1]).toContain('[Logs]·2')
+    expect(screen.render(80)[1]).toContain('[Runtime]·2')
     expect(semanticLogs).toContain('! 1  03:04:05Z Runtime probe slowed · scope=guardian waitMs=120')
     expect(semanticLogs).toContain('· 2  plain adapter output')
     expect(semanticLogs).not.toContain('"msg"')
@@ -2003,7 +2080,7 @@ describe('Supervisor TUI screen', () => {
     expect(screen.render(80).join('\n')).toContain('· 2  plain adapter output')
 
     screen.update({ panel: 'doctor' })
-    expect(screen.render(80)[1]).toContain('[Doctor]×1')
+    expect(screen.render(80)[1]).not.toContain('Doctor')
     expect(screen.render(80).join('\n')).toContain('✓ Runtime reachable')
     expect(screen.render(80).join('\n')).toContain('! Update available')
     expect(screen.render(80).join('\n')).toContain('× Port collision')
@@ -2016,11 +2093,7 @@ describe('Supervisor TUI screen', () => {
     expect(screen.render(80).join('\n')).toContain('Inspection · 1/3 · PASS')
     expect(screen.handleKey('end', matchesKey)).toBe(true)
     expect(screen.render(80).join('\n')).toContain('Inspection · 3/3 · FAIL')
-    screen.update({ panel: 'overview' })
-    const navigation = screen.render(80)[1]!
-    const doctorBadgeColumn = navigation.indexOf('×1') + 2
-    expect(screen.handlePointer(pointerClick(doctorBadgeColumn, 2))).toBe(true)
-    expect(screen.snapshot.panel).toBe('doctor')
+    screen.update({ panel: 'doctor' })
     const doctorLines = screen.render(80)
     const reachableRow = doctorLines.findIndex((line) => line.includes('Runtime reachable')) + 1
     expect(screen.handlePointer({
@@ -2178,9 +2251,9 @@ describe('Supervisor TUI screen', () => {
     screen.handleKey('down', matchesKey)
     screen.handleKey('tab', matchesKey)
 
-    expect(screen.render(100).join('\n')).toContain('[ s ] Start project')
-    expect(screen.render(50).join('\n')).toContain('[ s ] Start project')
-    expect(screen.handleKey('s', matchesKey)).toBe(true)
+    expect(screen.render(100).join('\n')).toContain('[ Enter ] Start OpenAlice')
+    expect(screen.render(50).join('\n')).toContain('[ Enter ] Start OpenAlice')
+    expect(screen.handleKey('enter', matchesKey)).toBe(true)
     expect(starts).toEqual(['cloud/research'])
   })
 
@@ -2327,7 +2400,7 @@ describe('Supervisor TUI screen', () => {
     expect(screen.render(100).join('\n')).toContain('[ Enter ]  Open Workspace')
   })
 
-  it('starts the Runtime and opens the browser from one Enter key', async () => {
+  it('starts the Runtime from the Launcher and stays in the TUI', async () => {
     const calls: string[] = []
     let runtime: {
       class: string
@@ -2378,10 +2451,10 @@ describe('Supervisor TUI screen', () => {
           owner: { surface: 'cli-server', pid: 42 },
           endpoints: { web: 'http://127.0.0.1:47331' },
         }
+        queueMicrotask(() => inputListener?.('q'))
       },
       open: async () => {
         calls.push('open')
-        queueMicrotask(() => inputListener?.('q'))
       },
       discoverUpdate: async () => null,
       loadTui: async () => fakePiTui as never,
@@ -2389,14 +2462,15 @@ describe('Supervisor TUI screen', () => {
       channel: 'stable',
     })).resolves.toBe(0)
 
-    expect(calls).toEqual(['start', 'open'])
+    expect(calls).toEqual(['start'])
   })
 
   it('aborts TUI-owned remote tunnels when the Supervisor detaches', async () => {
     let inputListener: ((data: string) => unknown) | undefined
     let tunnelAborted = false
+    let screen: SupervisorScreen | undefined
     class FakeTui {
-      addChild(): void {}
+      addChild(component: SupervisorScreen): void { screen = component }
       addInputListener(listener: (data: string) => unknown): () => void {
         inputListener = listener
         return () => undefined
@@ -2405,7 +2479,6 @@ describe('Supervisor TUI screen', () => {
       setShowHardwareCursor(): void {}
       start(): void {
         queueMicrotask(() => {
-          inputListener?.('tab')
           inputListener?.('down')
           inputListener?.('tab')
           inputListener?.('o')
@@ -2430,7 +2503,11 @@ describe('Supervisor TUI screen', () => {
       seedFleet: async () => fleet,
       inspectFleet: async () => fleet,
       connectRemoteProject: async ({ signal, onReady }) => {
-        onReady()
+        onReady({
+          localPort: 45454,
+          localUrl: 'http://127.0.0.1:45454',
+          clientUrl: 'http://127.0.0.1:45454',
+        })
         queueMicrotask(() => inputListener?.('q'))
         return new Promise<number>((resolve) => {
           signal.addEventListener('abort', () => {
@@ -2448,6 +2525,13 @@ describe('Supervisor TUI screen', () => {
     })).resolves.toBe(0)
 
     expect(tunnelAborted).toBe(true)
+    expect(screen?.snapshot.activeTarget).toMatchObject({
+      kind: 'ssh',
+      machineKey: 'cloud',
+      projectKey: 'research',
+      endpoint: 'http://127.0.0.1:45454',
+      transport: 'ssh-forward',
+    })
   })
 
   it('preserves remote Fleet focus while the selected local Runtime polls', async () => {
@@ -2468,7 +2552,6 @@ describe('Supervisor TUI screen', () => {
       setShowHardwareCursor(): void {}
       start(): void {
         queueMicrotask(() => {
-          inputListener?.('tab')
           inputListener?.('down')
           inputListener?.('tab')
           setTimeout(() => inputListener?.('q'), 40)
@@ -2520,7 +2603,6 @@ describe('Supervisor TUI screen', () => {
       setShowHardwareCursor(): void {}
       start(): void {
         queueMicrotask(() => {
-          inputListener?.('tab')
           inputListener?.('down')
           inputListener?.('tab')
           inputListener?.('s')
@@ -2795,7 +2877,7 @@ describe('Supervisor TUI screen', () => {
     expect(aborted).toBe(true)
   })
 
-  it('uses installed provenance to prepare missing source before Enter starts and opens', async () => {
+  it('uses installed provenance to prepare missing source before Launcher Enter starts', async () => {
     const calls: string[] = []
     let runtime: {
       class: string
@@ -2881,10 +2963,10 @@ describe('Supervisor TUI screen', () => {
           owner: { surface: 'cli-server', pid: 42 },
           endpoints: { web: 'http://127.0.0.1:47331' },
         }
+        queueMicrotask(() => inputListener?.('q'))
       },
       open: async () => {
         calls.push('open')
-        queueMicrotask(() => inputListener?.('q'))
       },
       discoverUpdate: async () => null,
       loadTui: async () => fakePiTui as never,
@@ -2897,7 +2979,6 @@ describe('Supervisor TUI screen', () => {
       'prepare-managed',
       'configure-project',
       'start',
-      'open',
     ])
   })
 
@@ -3029,6 +3110,10 @@ describe('Supervisor TUI screen', () => {
       onAction: (action) => actions.push(action),
       onSettings: () => { settingsRequests += 1 },
     })
+
+    expect(screen.handleKey('tab', matchesKey)).toBe(true)
+    expect(screen.snapshot.panel).toBe('inbox')
+    expect(actions).toEqual([])
 
     expect(screen.handleKey('tab', matchesKey)).toBe(true)
     expect(screen.snapshot.panel).toBe('fleet')

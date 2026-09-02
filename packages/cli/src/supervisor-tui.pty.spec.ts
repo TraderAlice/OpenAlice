@@ -13,7 +13,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import * as pty from 'node-pty'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 const cliEntry = join(dirname(fileURLToPath(import.meta.url)), '../bin/openalice.ts')
 const transferFixtureEntry = join(
@@ -45,6 +45,16 @@ const cliVersion = JSON.parse(
   await readFile(join(cliPackageRoot, 'package.json'), 'utf8'),
 ).version
 const temporaryPaths: string[] = []
+const originalStartView = process.env.OPENALICE_TUI_START_VIEW
+
+beforeAll(() => {
+  process.env.OPENALICE_TUI_START_VIEW = 'home'
+})
+
+afterAll(() => {
+  if (originalStartView === undefined) delete process.env.OPENALICE_TUI_START_VIEW
+  else process.env.OPENALICE_TUI_START_VIEW = originalStartView
+})
 
 function stripSgr(value: string): string {
   return value.replace(/\u001b\[[0-9;]*m/gu, '')
@@ -57,6 +67,56 @@ afterEach(async () => {
 })
 
 describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
+  it('opens a stopped AliceProject in the connection-first Launcher by default', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-launcher-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 100,
+      rows: 28,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_START_VIEW: 'connect',
+        OPENALICE_TUI_BOOT: '0',
+        OPENALICE_TUI_MOTION: '0',
+        OPENALICE_TUI_FIXTURE_FLEET_ROWS: '1',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let launched = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Launcher timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!launched && output.includes('3 RUNTIME ○ READY')) {
+          launched = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && launched) resolve(output)
+        else reject(new Error(`Supervisor Launcher exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    const plain = stripSgr(transcript)
+    expect(plain).toContain('◆ [Connect]·1')
+    expect(plain).toContain('OPENALICE LAUNCH · SELECT → START → CONNECT')
+    expect(plain).toContain('1 MACHINE ✓ This computer')
+    expect(plain).toContain('2 ALICEPROJECT ✓ Default')
+    expect(plain).toContain('[ Enter ] Start OpenAlice')
+    expect(plain).not.toContain('Inbox')
+    expect(transcript).toContain('\u001b[?25h')
+  }, 12_000)
+
   it('skips the Boot Sequence with raw pointer input without click-through', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-boot-pointer-'))
     temporaryPaths.push(isolatedHome)
@@ -182,7 +242,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 8_000)
       child.onData((data) => {
         output += data
-        if (!opened && output.includes('◆ [Overview]')) {
+        if (!opened && output.includes('◆ [Home]')) {
           opened = true
           child.write('\u001b[<35;90;1M')
           child.write('\u001b[<0;90;1M')
@@ -828,7 +888,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
 
-  it('clicks the navigation rail and explores Help with raw pointer input', async () => {
+  it('opens contextual Help and explores it with raw pointer input', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-navigation-pointer-'))
     temporaryPaths.push(isolatedHome)
     const child = pty.spawn(process.execPath, [cliEntry], {
@@ -854,10 +914,9 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 8_000)
       child.onData((data) => {
         output += data
-        if (!clicked && output.includes('◆ [Overview]') && output.includes('? Help')) {
+        if (!clicked && output.includes('◆ [Home]')) {
           clicked = true
-          child.write('\u001b[<35;54;2M')
-          child.write('\u001b[<0;54;2M')
+          child.write('?')
         } else if (!inspected && clicked && output.includes('Control atlas · 1/3 · Navigation')) {
           inspected = true
           child.write('\u001b[<35;10;7M')
@@ -970,10 +1029,10 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           if (
             !openedFleet
             && output.includes('Start OpenAlice & open Workspace')
-            && (output.includes('Fleet') || output.includes('Machines'))
+            && output.includes('◆ [Home]')
           ) {
             openedFleet = true
-            child.write('\t')
+            child.write('\t\t')
           } else if (stage === 0 && output.includes('[ m ] Transfer')) {
             stage = 1
             child.write('m')
@@ -1623,9 +1682,9 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 8_000)
       child.onData((data) => {
         output += data
-        if (!openedFleet && output.includes('[Overview]') && output.includes('Machines')) {
+        if (!openedFleet && output.includes('[Home]') && output.includes('Connections')) {
           openedFleet = true
-          child.write('\t')
+          child.write('\t\t')
         } else if (!selectedRemote && output.includes('Cloud fixture') && output.includes('offline')) {
           selectedRemote = true
           child.resize(48, 24)
@@ -1687,9 +1746,9 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 8_000)
       child.onData((data) => {
         output += data
-        if (!openedFleet && output.includes('[Overview]')) {
+        if (!openedFleet && output.includes('[Home]')) {
           openedFleet = true
-          child.write(']')
+          child.write(']]')
         } else if (!hoveredSixth && output.includes('Local Project 6')) {
           hoveredSixth = true
           expandedFleet = output.slice(output.lastIndexOf('Machines · 1/1'))
@@ -1748,7 +1807,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         const plain = stripSgr(output)
         if (!opened && plain.includes('◆ OVERVIEW')) {
           opened = true
-          child.write(']')
+          child.write(']]')
         } else if (!clicked && plain.includes('Selection Constellation · AliceProject')) {
           clicked = true
           child.write('\u001b[<35;70;18M')

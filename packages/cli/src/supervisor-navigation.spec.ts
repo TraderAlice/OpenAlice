@@ -10,22 +10,24 @@ describe('Supervisor navigation rail', () => {
   it('renders a full-width operational rail with semantic badges', () => {
     const layout = renderSupervisorNavigation({
       selected: 'overview',
+      connected: true,
+      inboxUnread: 3,
       machineCount: 2,
       logCount: 42,
       doctor: { checks: 3, failures: 1, warnings: 2 },
     }, 80)
 
     expect(displayWidth(layout.line)).toBe(80)
-    expect(layout.line).toContain('◆ [Overview]')
-    expect(layout.line).toContain('◇ Machines·2')
-    expect(layout.line).toContain('≋ Logs·42')
-    expect(layout.line).toContain('✦ Doctor×1')
-    expect(layout.line).toContain('? Help')
+    expect(layout.line).toContain('◆ [Home]')
+    expect(layout.line).toContain('● Inbox·3')
+    expect(layout.line).toContain('◇ Connections·2')
+    expect(layout.line).toContain('≋ Runtime·42')
   })
 
   it('keeps every view reachable at narrow widths', () => {
     const layout = renderSupervisorNavigation({
-      selected: 'doctor',
+      selected: 'inbox',
+      connected: true,
       machineCount: 2,
       logCount: 9,
       doctor: { checks: 3, failures: 0, warnings: 3 },
@@ -33,11 +35,10 @@ describe('Supervisor navigation rail', () => {
 
     expect(displayWidth(layout.line)).toBe(46)
     expect(layout.line).toContain('Home')
-    expect(layout.line).toContain('Fleet·2')
-    expect(layout.line).toContain('Logs·9')
-    expect(layout.line).toContain('[Doc]!3')
-    expect(layout.line).toContain('Help')
-    expect(layout.targets).toHaveLength(5)
+    expect(layout.line).toContain('[Inbox]')
+    expect(layout.line).toContain('Connect·2')
+    expect(layout.line).toContain('Runtime·9')
+    expect(layout.targets).toHaveLength(4)
   })
 
   it('replaces false page affordances with a task-owned Focus Header', () => {
@@ -94,12 +95,13 @@ describe('Supervisor navigation rail', () => {
   it('derives badge-edge pointer hits from the rendered layout', () => {
     const layout = renderSupervisorNavigation({
       selected: 'overview',
-      doctor: { checks: 2, failures: 2, warnings: 0 },
+      connected: true,
+      inboxUnread: 2,
     }, 80)
-    const doctor = layout.targets.find((target) => target.panel === 'doctor')!
+    const inbox = layout.targets.find((target) => target.panel === 'inbox')!
 
-    expect(supervisorNavigationPanelAt(layout.targets, doctor.endColumn)).toBe('doctor')
-    expect(supervisorNavigationPanelAt(layout.targets, doctor.endColumn + 1)).toBeUndefined()
+    expect(supervisorNavigationPanelAt(layout.targets, inbox.endColumn)).toBe('inbox')
+    expect(supervisorNavigationPanelAt(layout.targets, inbox.endColumn + 1)).toBeUndefined()
   })
 
   it('reduces recovery mode to its valid destinations', () => {
@@ -108,8 +110,21 @@ describe('Supervisor navigation rail', () => {
       recovery: true,
     }, 32)
 
-    expect(layout.line).toContain('◆ [Overview]')
+    expect(layout.line).toContain('◆ [Recovery]')
     expect(layout.line).toContain('? Help')
     expect(layout.targets.map((target) => target.panel)).toEqual(['overview', 'help'])
+  })
+
+  it('reduces a disconnected launch to Connect and contextual Help', () => {
+    const layout = renderSupervisorNavigation({
+      selected: 'fleet',
+      connected: false,
+      machineCount: 3,
+    }, 60)
+
+    expect(layout.line).toContain('◆ [Connect]·3')
+    expect(layout.line).toContain('? Help')
+    expect(layout.line).not.toContain('Inbox')
+    expect(layout.targets.map((target) => target.panel)).toEqual(['fleet', 'help'])
   })
 })

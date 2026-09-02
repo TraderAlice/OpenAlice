@@ -56,6 +56,15 @@ not imply maintainer approval of the finished interaction.
 
 ## Interaction Model
 
+- Product priority is Launcher first, State Manager second, and bounded light
+  workbench third. Inbox is evidence that a connected target is useful, not the
+  reason the TUI exists.
+- The disconnected surface must make one linear promise without requiring Help:
+  choose a Machine, choose an AliceProject, then Start locally or Connect over
+  SSH. Each step exposes its current value and completion state, and successful
+  activation transitions into the connected workbench rather than opening a
+  browser implicitly.
+
 - Keyboard and mouse are equal inputs over one focus and action model.
 - Pointer hover communicates the target; click selects or activates according
   to the same rule as keyboard focus plus Enter; wheel scrolls the pane under
@@ -77,6 +86,37 @@ not imply maintainer approval of the finished interaction.
   AliceProject identity/guidance/action and Runtime telemetry occupy balanced
   side-by-side cards; below that threshold the same fields fold into the
   complete vertical flow. This is an autonomous topic decision, not recorded
+  maintainer approval.
+
+### Connection-first information architecture decision
+
+- Adding Inbox beside the five existing pages would expose more capability but
+  preserve a mixed hierarchy of setup, status, diagnostics, and documentation.
+- Expanding the Supervisor into a full terminal clone of the Web UI would make
+  the TUI broad, but duplicate feature ownership outside its frontend boundary.
+- The selected model is a two-phase adaptive shell. Before a usable target is
+  connected, the TUI is a guided three-step launch path: Machine, AliceProject,
+  then Runtime transport. After connection it becomes a workbench organized as
+  Home, Inbox, Connections, and Runtime; Help moves behind `?` and Logs plus
+  Doctor become Runtime tools instead of equal product destinations. Enter
+  connects or starts and remains in the TUI; opening the Web UI is a separate
+  explicit action. This is an autonomous topic decision, not recorded
+  maintainer approval.
+
+### Active target and Inbox boundary decision
+
+- Reading Inbox JSONL directly would bypass server-owned read state and couple
+  the frontend to persistence details. Reproducing the entire Web Inbox would
+  also exceed the Supervisor's bounded operational role.
+- The selected Inbox consumes only the existing authenticated HTTP history and
+  read-state routes. It provides a bounded unread-aware list and inspector,
+  supports read/unread and refresh, and deliberately omits destructive delete.
+- Every connected workbench binds to one explicit active target containing its
+  Machine, AliceProject, Runtime, transport, and reachable endpoint. Local
+  Runtime discovery may create that target directly; SSH connection must retain
+  the forwarded local URL instead of treating tunnel readiness as a boolean.
+  This prevents a remote connection from silently continuing to render and
+  mutate local context. This is an autonomous topic decision, not recorded
   maintainer approval.
 
 ### Launchpad action-surface decision
@@ -2599,6 +2639,28 @@ already large `supervisor-tui.ts` application controller.
   skipped; 6,212 tests passed, 10 skipped). Docker installer smoke passes
   without Node, npm, pnpm, Bun, or an Agent Runtime, and package dry-run retains
   every changed Overview, theme, and Supervisor owner.
+- The Supervisor now treats its disconnected state as an OpenAlice Launcher
+  rather than a status dashboard. Its adaptive header exposes only Connect and
+  contextual Help, and a visible Machine → AliceProject → Runtime rail names
+  the selected values plus the exact next action. Local Enter starts and stays
+  in the TUI; remote Enter starts or connects, and a ready post-start inventory
+  continues into the SSH forward. A successful target transition replaces the
+  launcher with Home, Inbox, Connections, and Runtime.
+- The connected shell owns one explicit active target across local loopback and
+  remote SSH-forward transports. Remote tunnel readiness retains the forwarded
+  endpoint instead of silently returning to local context, browser opening is
+  a separate `o` action, and tunnel loss falls back to the reachable local
+  target or the Launcher. Inbox consumes the existing bounded HTTP history and
+  shared read-state routes, renders responsive list/Inspector views, polls every
+  20 seconds, and deliberately exposes no destructive delete.
+- Launcher-Workbench acceptance passes with 139 focused navigation, Inbox,
+  Fleet, screen, and real-PTY tests, including a default stopped 100x28 launch
+  frame and terminal restoration. Root TypeScript and CLI build pass; the
+  703-file suite passes (702 passed, 1 skipped; 6,222 tests passed, 10 skipped).
+  Docker installer smoke passes without Node, npm, pnpm, Bun, or an Agent
+  Runtime. Package dry-run contains the new `supervisor-inbox.ts` owner among
+  68 published files. `OPENALICE_TUI_START_VIEW=home` preserves an explicit
+  expert/deep-regression entry without changing the adaptive product default.
 
 ## Completion Criteria
 

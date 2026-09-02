@@ -1,7 +1,7 @@
 import { displayWidth, truncateDisplayWidth } from './supervisor-display.ts'
 import type { SupervisorFocusTask } from './supervisor-task-surface.ts'
 
-export type SupervisorNavigationPanel = 'fleet' | 'overview' | 'logs' | 'doctor' | 'help'
+export type SupervisorNavigationPanel = 'fleet' | 'overview' | 'inbox' | 'logs' | 'doctor' | 'help'
 
 export interface SupervisorNavigationView {
   selected: SupervisorNavigationPanel
@@ -11,6 +11,8 @@ export interface SupervisorNavigationView {
     cancelLabel: string
   }
   recovery?: boolean
+  connected?: boolean
+  inboxUnread?: number
   machineCount?: number
   logCount?: number
   doctor?: {
@@ -173,18 +175,24 @@ function renderItem(
 }
 
 function navigationItems(view: SupervisorNavigationView): NavigationItem[] {
-  const items: NavigationItem[] = [
-    item('overview', '◆', 'Overview', 'Home', 'Home'),
-  ]
-  if (!view.recovery) {
-    items.push(
-      item('fleet', '◇', 'Machines', 'Fleet', 'Fleet', countBadge(view.machineCount)),
-      item('logs', '≋', 'Logs', 'Logs', 'Logs', countBadge(view.logCount)),
-      item('doctor', '✦', 'Doctor', 'Doctor', 'Doc', doctorBadge(view.doctor)),
-    )
+  if (view.recovery) {
+    return [
+      item('overview', '◆', 'Recovery', 'Recovery', 'Fix'),
+      item('help', '?', 'Help', 'Help', 'Help'),
+    ]
   }
-  items.push(item('help', '?', 'Help', 'Help', 'Help'))
-  return items
+  if (view.connected === false) {
+    return [
+      item('fleet', '◆', 'Connect', 'Connect', 'Connect', countBadge(view.machineCount)),
+      item('help', '?', 'Help', 'Help', 'Help'),
+    ]
+  }
+  return [
+    item('overview', '◆', 'Home', 'Home', 'Home'),
+    item('inbox', '●', 'Inbox', 'Inbox', 'Inbox', countBadge(view.inboxUnread)),
+    item('fleet', '◇', 'Connections', 'Connect', 'Link', countBadge(view.machineCount)),
+    item('logs', '≋', 'Runtime', 'Runtime', 'Run', countBadge(view.logCount)),
+  ]
 }
 
 function item(
@@ -200,11 +208,4 @@ function item(
 
 function countBadge(count?: number): string {
   return count && count > 0 ? `·${count}` : ''
-}
-
-function doctorBadge(doctor?: SupervisorNavigationView['doctor']): string {
-  if (!doctor || doctor.checks === 0) return ''
-  if (doctor.failures > 0) return `×${doctor.failures}`
-  if (doctor.warnings > 0) return `!${doctor.warnings}`
-  return '✓'
 }

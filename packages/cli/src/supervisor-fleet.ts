@@ -191,16 +191,18 @@ export function renderSupervisorFleet(
   pulse = false,
   visibleRows = SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
   hoveredRail?: SupervisorFleetRailTarget,
+  launcher = false,
 ): string[] {
+  const launchRail = launcher ? [...renderLaunchSequence(state, width), ''] : []
   if (width < 72) {
-    return renderNarrowFleet(
+    return [...launchRail, ...renderNarrowFleet(
       state,
       width,
       hovered,
       pulse,
       SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
       hoveredRail,
-    )
+    )]
   }
   const rowCount = fleetVisibleRows(state, visibleRows)
   const leftWidth = Math.max(28, Math.min(36, Math.floor(width * 0.38)))
@@ -253,7 +255,51 @@ export function renderSupervisorFleet(
   }
   const detailRows = fleetDetailRows(width, visibleRows, rowCount)
   lines.push('', ...renderDetailCard(state, width, pulse, detailRows))
-  return lines.map((line) => truncateDisplayWidth(line, width))
+  return [...launchRail, ...lines].map((line) => truncateDisplayWidth(line, width))
+}
+
+export function supervisorFleetLauncherRows(width: number, launcher: boolean): number {
+  if (!launcher) return 0
+  return width >= 72 ? 4 : 6
+}
+
+function renderLaunchSequence(state: SupervisorFleetState, width: number): string[] {
+  const machine = selectedFleetMachine(state)
+  const project = selectedFleetProject(state)
+  const machineReady = machine?.connection === 'local' || machine?.connection === 'online'
+  const projectReady = Boolean(machineReady && project?.available)
+  const runtime = launchRuntimeStep(machine, project, projectReady)
+  const machineStep = `1 MACHINE ${machineReady ? '✓' : '○'} ${machine?.displayName ?? 'Choose a Machine'}`
+  const projectStep = `2 ALICEPROJECT ${projectReady ? '✓' : '○'} ${project?.displayName ?? 'Choose an AliceProject'}`
+  const runtimeStep = `3 RUNTIME ${runtime}`
+  const inner = Math.max(12, width - 4)
+  const rows = width >= 72
+    ? [joinLaunchSteps([machineStep, projectStep, runtimeStep], inner)]
+    : [machineStep, projectStep, runtimeStep]
+  return renderPane('OPENALICE LAUNCH · SELECT → START → CONNECT', rows, width, undefined, false, rows.length)
+}
+
+function launchRuntimeStep(
+  machine: MachineInventory | undefined,
+  project: MachineProjectInventory | undefined,
+  projectReady: boolean,
+): string {
+  if (!projectReady || !machine || !project) return '○ WAITING FOR SELECTION'
+  if (project.runtime.class === 'absent') {
+    return '○ READY · ENTER TO START'
+  }
+  if ((project.runtime.class === 'running' || project.runtime.class === 'owned_elsewhere')
+    && project.runtime.webEndpoint) {
+    return machine.key === 'local' ? '● READY · ENTER TO USE' : '● READY · ENTER TO CONNECT'
+  }
+  return `◆ ${project.runtime.class.toUpperCase()} · OPEN RUNTIME TOOLS`
+}
+
+function joinLaunchSteps(steps: string[], width: number): string {
+  const separator = '  ━━━  '
+  const available = Math.max(1, width - displayWidth(separator) * (steps.length - 1))
+  const each = Math.max(8, Math.floor(available / steps.length))
+  return steps.map((step) => truncateDisplayWidth(step, each)).join(separator)
 }
 
 function renderNarrowFleet(

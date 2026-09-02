@@ -114,6 +114,11 @@ The TypeScript TUI reports and polls the selected Runtime, detaches with `q`,
 explicit commands. It owns an alternate-screen application canvas and restores
 the screen, cursor, and mouse modes on detach or signal exit. `NO_COLOR` and
 `TERM=dumb` remove decorative color without removing state text;
+the default start view adapts to connectivity: a stopped or unreachable Runtime
+opens the Machine → AliceProject → Runtime Launcher, while a reachable target
+opens the connected workbench. `OPENALICE_TUI_START_VIEW=home` explicitly opens
+the Home surface for expert workflows and focused regression checks without
+changing lifecycle state;
 `OPENALICE_TUI_MOUSE=0` keeps the full keyboard surface while disabling terminal
 mouse reporting, and `OPENALICE_TUI_MOTION=0` replaces purposeful activity
 animation with a stable glyph without changing its text or layout. A normal
@@ -127,7 +132,15 @@ Ctrl-C still detach immediately. Reduced motion, `NO_COLOR`, `TERM=dumb`, and
 no Runtime read, write, discovery, or lifecycle action. Its ordinary path is
 intentionally parameter-free:
 
-- the default Overview page is an AliceProject Launchpad rather than a status
+- before connection, the default Connect page is an OpenAlice Launcher. Its
+  explicit Machine → AliceProject → Runtime rail names all three selected
+  values and whether Enter will browse, start, connect, or use the target.
+  Machine and AliceProject panes remain keyboard- and pointer-selectable; the
+  bottom Action Shelf repeats the one current primary action. Starting locally
+  stays in the TUI and transitions to the connected workbench after readiness.
+  A stopped remote target starts on Enter and automatically continues into its
+  SSH connection when the refreshed inventory advertises a Web endpoint;
+- the connected Home page is an AliceProject status surface rather than a flat
   report. Its hero presents the selected project, a semantic launch/live/
   attention intent strip, human guidance, and a full-row primary action.
   Pointer hover focuses that action anywhere across the row, and click routes
@@ -399,17 +412,25 @@ intentionally parameter-free:
   Default No changes nothing. Success offers separate Start, Connect/Open, and
   Done actions and never auto-starts;
 - Enter or `o` on a running compatible remote AliceProject opens a TUI-owned
-  loopback tunnel and browser. Detaching aborts only those tunnel processes;
+  loopback tunnel and makes its forwarded endpoint the active target. It stays
+  in the TUI; `o` from the connected workbench opens the browser separately.
+  Detaching aborts only those tunnel processes;
   it never stops the local or remote Runtime. `s` on a stopped compatible
   remote AliceProject re-probes inventory and registration, then starts it
-  through the registered SSH Machine. Remote stop, restart, logs, Doctor,
+  through the registered SSH Machine. Enter is the visible primary equivalent.
+  Remote stop, restart, logs, Doctor,
   Setup, source, and other configuration mutations remain refused;
 
-- Enter starts the persistent Runtime and opens the verified Web endpoint when
-  stopped, or opens the endpoint when already running;
+- Enter on the disconnected local Launcher starts the persistent Runtime without
+  opening a browser; once connected, Enter on Home opens the active endpoint;
 - `s` starts the persistent Runtime in the background without opening a
   browser;
 - `o` opens an advertised, verified Web endpoint;
+- connected navigation is Home, Inbox, Connections, and Runtime. Inbox reads
+  the active target's bounded `/api/inbox/history` surface, shares server-owned
+  read/unread state, polls every 20 seconds, and offers no delete action. Help
+  remains available through `?`; Doctor remains a Runtime tool rather than a
+  top-level product destination;
 - `x` stops and `r` restarts only a `cli-server` owner, after an impact
   confirmation;
 - `l` reads the bounded, redacted log tail;
