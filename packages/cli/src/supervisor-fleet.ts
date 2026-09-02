@@ -346,7 +346,7 @@ export function renderSupervisorFleet(
   activeTarget?: SupervisorFleetActiveTarget,
 ): string[] {
   const launchRail = launcher ? [...renderLaunchSequence(state, width), ''] : []
-  if (width < 72) {
+  if (fleetUsesNarrowLayout(width, launcher)) {
     return [...launchRail, ...renderNarrowFleet(
       state,
       width,
@@ -545,12 +545,14 @@ export function supervisorFleetTargetAt(
   column: number,
   row: number,
   visibleRows = SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
+  launcher = false,
 ): SupervisorFleetPointerTarget | undefined {
-  const rowCount = width < 72
+  const narrow = fleetUsesNarrowLayout(width, launcher)
+  const rowCount = narrow
     ? SUPERVISOR_FLEET_MIN_VISIBLE_ROWS
     : fleetVisibleRows(state, visibleRows)
   if (row < 1 || row > rowCount + 1) return undefined
-  if (width < 72) {
+  if (narrow) {
     const items = state.focus === 'machines'
       ? state.machines
       : selectedFleetMachine(state)?.projects ?? []
@@ -601,15 +603,17 @@ export function supervisorFleetRailTargetAt(
   column: number,
   row: number,
   visibleRows = SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
+  launcher = false,
 ): SupervisorFleetRailTarget | undefined {
-  const rowCount = width < 72
+  const narrow = fleetUsesNarrowLayout(width, launcher)
+  const rowCount = narrow
     ? SUPERVISOR_FLEET_MIN_VISIBLE_ROWS
     : fleetVisibleRows(state, visibleRows)
   if (row < 2 || row > rowCount + 1) return undefined
   const trackRow = row - 2
   let focus: FleetFocus
   let items: readonly unknown[]
-  if (width < 72) {
+  if (narrow) {
     if (column !== width - 2) return undefined
     focus = state.focus
     items = focus === 'machines'
@@ -629,6 +633,10 @@ export function supervisorFleetRailTargetAt(
   }
   const index = supervisorScrollRailIndexAt(trackRow, rowCount, items.length)
   return index === undefined ? undefined : { focus, index, trackRow }
+}
+
+function fleetUsesNarrowLayout(width: number, launcher: boolean): boolean {
+  return width < 72 || (!launcher && width < 96)
 }
 
 function renderMachineRows(
@@ -721,11 +729,13 @@ function fleetSelectionDetail(
   const active = activeTarget?.machineKey === machine.key && activeTarget.projectKey === project.key
   const identity = `${active ? '● ACTIVE TARGET · ' : ''}${projectStatus(project, pulse)} ${project.displayName} · ${project.product === 'nano' ? 'NanoAlice' : 'TraderAlice'} · ${project.runtime.ownerSurface ?? 'no owner'}`
   const path = [project.home, tunnel ? `tunnel ${tunnel}` : ''].filter(Boolean).join(' · ')
-  const primary = project.runtime.class === 'absent'
-    ? 'Start OpenAlice'
-    : machine.key === 'local'
-      ? 'Use AliceProject'
-      : 'Connect'
+  const primary = active
+    ? 'Return Home'
+    : project.runtime.class === 'absent'
+      ? 'Start OpenAlice'
+      : machine.key === 'local'
+        ? 'Use AliceProject'
+        : 'Connect'
   const action = [
     `◆ [ Enter ] ${primary}`,
     ...(machine.key === 'local' && project.available ? ['[ m ] Transfer'] : []),
@@ -746,9 +756,16 @@ function renderDetailCard(
 ): string[] {
   if (launcher) return renderLaunchBriefing(state, width, rowCount)
   const expanded = rowCount > 2
-  const title = expanded
-    ? `Selection Constellation · ${state.focus === 'machines' ? 'Machine' : 'AliceProject'}`
-    : 'Selection'
+  const machine = selectedFleetMachine(state)
+  const project = selectedFleetProject(state)
+  const activeSelection = state.focus === 'projects'
+    && machine?.key === activeTarget?.machineKey
+    && project?.key === activeTarget?.projectKey
+  const title = activeSelection
+    ? expanded ? 'Active Connection · AliceProject' : 'Active Connection'
+    : expanded
+      ? `Selection Constellation · ${state.focus === 'machines' ? 'Machine' : 'AliceProject'}`
+      : 'Selection'
   return renderPane(
     title,
     fleetSelectionDetail(state, pulse, width - 4, expanded, activeTarget),

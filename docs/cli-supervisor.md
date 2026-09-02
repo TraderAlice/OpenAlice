@@ -213,9 +213,11 @@ intentionally parameter-free:
   do not pretend to be controls. Color strengthens identity, focus, healthy
   state, and actionable attention, but glyphs and text keep the complete
   contract under `NO_COLOR`;
-- the Fleet page renders `Machine → AliceProject`: ordinary terminals use two
-  bordered panes with a stable Selection inspector, while narrow terminals
-  drill down from Machines to Projects;
+- the Fleet page renders `Machine → AliceProject`: launch-capable ordinary
+  terminals use two bordered panes, while a connected Connections page below
+  96 columns gives the focused inventory one complete full-width pane instead
+  of truncating both sides. Terminals below 72 columns retain the narrow
+  Machines-to-Projects drill-down;
   selection and list windows survive resize, use Unicode display width, and
   keep the action/detach footer visible at the supported 80×24 baseline.
   Overflowing Machine and AliceProject panes reserve their final content column
@@ -276,7 +278,10 @@ intentionally parameter-free:
   has no pointer target or lifecycle action. The Selection surface owns the
   current Enter action in both forms and exposes Transfer only for an available
   local AliceProject; compact Selection remains two rows plus that content-
-  owned action.
+  owned action. When the exact connected AliceProject is selected, that surface
+  is titled Active Connection and Enter returns Home; choosing any other target
+  restores the Start, Connect, or Use AliceProject action. The contextual Tip
+  teaches that switch explicitly.
   With only the local Machine, Fleet focus starts on its current AliceProject;
 - ordinary workbench pages have one bottom surface: the Command Spine. Primary
   and contextual actions live with the object they affect: Alice Session,

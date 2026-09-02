@@ -916,6 +916,7 @@ describe('Supervisor TUI screen', () => {
 
   it('renders contextual OMP-style Tips without creating an action target', () => {
     const fleet = renderSupervisorContextTip({ panel: 'fleet' }, 100)
+    const activeFleet = renderSupervisorContextTip({ panel: 'fleet', activeSelection: true }, 100)
     const launcher = renderSupervisorContextTip({ panel: 'fleet', launcher: true }, 100)
     const logs = renderSupervisorContextTip({ panel: 'logs' }, 100)
     const emptyLogs = renderSupervisorContextTip({ panel: 'logs', itemCount: 0 }, 100)
@@ -926,6 +927,8 @@ describe('Supervisor TUI screen', () => {
     const recovery = renderSupervisorContextTip({ panel: 'overview', recovery: true }, 100)
 
     expect(fleet).toContain('First click focuses a pane')
+    expect(activeFleet).toContain('Enter returns Home')
+    expect(activeFleet).toContain('switch')
     expect(launcher).toContain('Enter runs Next')
     expect(launcher).toContain('Tab/←→ changes pane')
     expect(logs).toContain('f filters; y copies')
@@ -937,6 +940,7 @@ describe('Supervisor TUI screen', () => {
     expect(recovery).toContain('only safe Update and Detach routes')
     expect(supervisorCommandTargets([
       fleet,
+      activeFleet,
       launcher,
       logs,
       emptyLogs,

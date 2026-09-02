@@ -103,6 +103,7 @@ export interface SupervisorContextTipView {
   runtimeState?: string
   targetKind?: 'local' | 'ssh'
   launcher?: boolean
+  activeSelection?: boolean
   recovery?: boolean
   itemCount?: number
 }
@@ -664,7 +665,9 @@ export function renderSupervisorContextTip(
     : view.panel === 'fleet'
       ? view.launcher
         ? 'Enter runs Next; ↑↓ selects; Tab/←→ changes pane; click again activates.'
-        : 'First click focuses a pane; click its selection again to activate it.'
+        : view.activeSelection
+          ? 'Enter returns Home; choose another Machine or AliceProject to switch.'
+          : 'First click focuses a pane; click its selection again to activate it.'
       : view.panel === 'logs'
         ? view.targetKind === 'ssh'
           ? 'The Chronicle keeps the SSH forward while r checks endpoint health now.'

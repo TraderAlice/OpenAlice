@@ -33,12 +33,35 @@ describe('Supervisor fleet state and presentation', () => {
   it('renders a wide two-pane hierarchy within terminal width', () => {
     const lines = renderSupervisorFleet(
       createSupervisorFleetState('2026-08-23T00:00:00Z', machines()),
-      80,
+      100,
     )
     expect(lines.join('\n')).toContain('Machines')
     expect(lines.join('\n')).toContain('AliceProjects · This Mac')
     expect(lines.join('\n')).toContain('Default AliceProject')
-    expect(lines.every((line) => displayWidth(line) <= 80)).toBe(true)
+    expect(lines.every((line) => displayWidth(line) <= 100)).toBe(true)
+  })
+
+  it('gives an 80-column connection one complete focused pane', () => {
+    const state = setFleetFocus(
+      createSupervisorFleetState('2026-08-23T00:00:00Z', [machines()[0]!]),
+      'projects',
+    )
+    const output = renderSupervisorFleet(
+      state,
+      80,
+      undefined,
+      false,
+      5,
+      undefined,
+      false,
+      { machineKey: 'local', projectKey: 'default', transport: 'loopback' },
+    ).join('\n')
+
+    expect(output).toContain('AliceProjects · This Mac')
+    expect(output).toContain('Default AliceProject')
+    expect(output).not.toContain('╭ ◇ Machines')
+    expect(output).toContain('Active Connection')
+    expect(output).toContain('[ Enter ] Return Home')
   })
 
   it('marks the active target independently from Connections focus', () => {
@@ -58,6 +81,9 @@ describe('Supervisor fleet state and presentation', () => {
 
     expect(output).toMatch(/Research\s+ACTIVE · default · ● running/u)
     expect(output).toContain('● ACTIVE TARGET · ● running Research')
+    expect(output).toContain('Active Connection')
+    expect(output).toContain('[ Enter ] Return Home')
+    expect(output).not.toContain('[ Enter ] Use AliceProject')
   })
 
   it('distinguishes active focus from the related inactive selection', () => {
@@ -319,6 +345,10 @@ describe('Supervisor fleet state and presentation', () => {
     })
     state = selectFleetIndex(state, 'machines', 1)
     expect(supervisorFleetTargetAt(state, 80, 40, 2)).toEqual({
+      focus: 'machines',
+      index: 0,
+    })
+    expect(supervisorFleetTargetAt(state, 80, 40, 2, 5, true)).toEqual({
       focus: 'projects',
       index: 0,
     })

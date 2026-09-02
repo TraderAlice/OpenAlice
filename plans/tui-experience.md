@@ -3093,6 +3093,30 @@ already large `supervisor-tui.ts` application controller.
   the complete CLI suite (63 files, 631 tests). CLI typecheck and build also
   pass.
 
+### Active Connection decision
+
+- Real connected screenshots exposed a semantic contradiction: the current
+  AliceProject was labeled ACTIVE in inventory while its inspector still called
+  itself Selection Constellation and advertised `[Enter] Use AliceProject`.
+  At 80 columns, preserving two panes also truncated both Machine and
+  AliceProject identity instead of helping the user switch.
+- Selecting the exact live target now produces an Active Connection surface,
+  names it as `ACTIVE TARGET`, and makes Enter's honest consequence `Return
+  Home`. Selecting another Machine or AliceProject restores the existing Start,
+  Connect, or Use action, so Connections remains a target switcher rather than
+  a second status dashboard.
+- Connected Connections below 96 columns now devotes one complete pane to the
+  focused inventory. The disconnected Launcher deliberately retains its
+  80-column two-pane route because both Machine and AliceProject are required
+  to explain the launch decision. Pointer rows, pane surfaces, and scroll rails
+  consume the same layout breakpoint.
+- The contextual Tip explains that Enter returns Home and another selection
+  switches target. Real 120x32 and 80x24 captures verify the active identity,
+  action consequence, target detail, Tip, and Command Spine remain legible.
+- Active-Connection acceptance passes through 94 focused Fleet and screen
+  tests, all 51 real-PTY cases, and the complete CLI suite (63 files, 632
+  tests). CLI typecheck and build also pass.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

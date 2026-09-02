@@ -2042,7 +2042,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
 
-  it('keeps the wide Fleet Selection Constellation pointer-passive', async () => {
+  it('keeps the wide active Connection canvas pointer-passive', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-fleet-constellation-'))
     temporaryPaths.push(isolatedHome)
     const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
@@ -2055,6 +2055,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         OPENALICE_HOME: join(isolatedHome, 'state'),
         OPENALICE_TUI_BOOT: '0',
         OPENALICE_TUI_MOTION: '0',
+        OPENALICE_TUI_START_VIEW: 'connect',
         OPENALICE_TUI_FIXTURE_RUNTIME: 'running',
         TERM: 'xterm-256color',
       },
@@ -2066,15 +2067,15 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       let clicked = false
       const timeout = setTimeout(() => {
         child.kill()
-        reject(new Error(`Supervisor Fleet Constellation timed out:\n${output}`))
+        reject(new Error(`Supervisor active Connection timed out:\n${output}`))
       }, 8_000)
       child.onData((data) => {
         output += data
         const plain = stripSgr(output)
-        if (!opened && plain.includes('◆ OVERVIEW')) {
+        if (!opened && plain.includes('Alice Session · OpenAlice')) {
           opened = true
           child.write(']]')
-        } else if (!clicked && plain.includes('Selection Constellation · AliceProject')) {
+        } else if (!clicked && plain.includes('Active Connection · AliceProject')) {
           clicked = true
           child.write('\u001b[<35;70;18M')
           child.write('\u001b[<0;70;18M')
@@ -2084,7 +2085,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       child.onExit(({ exitCode }) => {
         clearTimeout(timeout)
         if (exitCode === 0 && clicked) resolve(output)
-        else reject(new Error(`Supervisor Fleet Constellation exited ${exitCode}:\n${output}`))
+        else reject(new Error(`Supervisor active Connection exited ${exitCode}:\n${output}`))
       })
     })
 
