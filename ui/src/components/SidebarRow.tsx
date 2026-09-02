@@ -52,7 +52,7 @@ export function SidebarRow({ label, active = false, onClick, icon, trail, title,
           onClick()
         }
       }}
-      className={`oa-nav-row group relative mx-2 flex min-h-10 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[13px] leading-[18px] outline-none focus-visible:ring-2 focus-visible:ring-ring/45 md:min-h-8 ${
+      className={`oa-nav-row group relative mx-2 flex min-h-10 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[13px] leading-[18px] outline-none md:min-h-8 ${
         active
           ? 'bg-sidebar-accent text-sidebar-accent-foreground'
           : 'text-sidebar-foreground hover:bg-sidebar-accent/60'

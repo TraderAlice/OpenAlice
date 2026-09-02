@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ActivityBar } from './ActivityBar'
@@ -52,6 +53,8 @@ vi.mock('react-i18next', () => ({
       'nav.connectorNeedsAttention': '1 connector needs attention',
       'nav.section.beta': 'Beta',
       'nav.section.system': 'System',
+      'nav.expandRail': 'Expand navigation',
+      'nav.collapseRail': 'Collapse navigation',
     })[key] ?? key,
   }),
 }))
@@ -101,5 +104,22 @@ describe('ActivityBar current destination', () => {
     render(<ActivityBar open onClose={vi.fn()} />)
 
     expect(screen.getByLabelText('1 connector needs attention').textContent).toBe('1')
+  })
+
+  it('turns the compact brand position into the workbench rail expansion action', async () => {
+    const user = userEvent.setup()
+    mocks.selectedSidebar = 'chat'
+    render(<ActivityBar open onClose={vi.fn()} railMode="full" />)
+
+    const rail = screen.getByTestId('activity-bar')
+    const expand = screen.getByRole('button', { name: 'Expand navigation' })
+    expect(rail.getAttribute('data-rail-layout')).toBe('compact')
+    expect(expand.querySelector('img')?.getAttribute('src')).toBe('/alice.ico')
+
+    await user.click(expand)
+
+    expect(mocks.setRailCollapsed).toHaveBeenCalledWith(false)
+    expect(rail.getAttribute('data-rail-layout')).toBe('full')
+    expect(screen.getByRole('button', { name: 'Collapse navigation' })).toBeTruthy()
   })
 })

@@ -515,7 +515,7 @@ function HarnessLandingPage({
                     type="button"
                     onClick={() => useExample(example.prompt)}
                     disabled={launching}
-                    className="group flex min-h-11 w-full items-center gap-3 border-b border-border/70 px-1 text-left outline-none transition-colors duration-[var(--motion-fast)] hover:border-border hover:text-foreground focus-visible:border-ring disabled:opacity-40"
+                    className="group flex min-h-11 w-full items-center gap-3 border-b border-border/70 px-1 text-left outline-none transition-[border-color,color,box-shadow] duration-[var(--motion-fast)] hover:border-border hover:text-foreground focus-visible:[box-shadow:var(--oa-focus-shadow)] disabled:opacity-40"
                   >
                     <IntentIcon
                       aria-hidden

@@ -29,6 +29,7 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
+- [[plans/interaction-density-convergence.md]] — Converges field focus, compact-rail expansion, Connector setup hierarchy, and dense market surfaces through shared interaction primitives on the current `dev` baseline.
 - [[plans/development-test-optimization.md]] — Rebuilds local and hosted
   development feedback around affected/owner/cross-owner verification, keeps
   full hermetic and release backstops explicit, and returns `AGENTS.md` to a

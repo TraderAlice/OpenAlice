@@ -31,7 +31,7 @@ function Switch({ className, size = 'md', ...props }: SwitchProps) {
       render={<button type="button" />}
       className={cn(
         'group/switch inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full outline-none disabled:cursor-not-allowed disabled:opacity-40',
-        'focus-visible:[&_[data-slot=switch-track]]:ring-2 focus-visible:[&_[data-slot=switch-track]]:ring-ring/45 focus-visible:[&_[data-slot=switch-track]]:ring-offset-1 focus-visible:[&_[data-slot=switch-track]]:ring-offset-background',
+        'focus-visible:[&_[data-slot=switch-track]]:[box-shadow:var(--oa-focus-shadow)]',
         geometry.footprint,
         className,
       )}
@@ -41,7 +41,7 @@ function Switch({ className, size = 'md', ...props }: SwitchProps) {
         aria-hidden="true"
         data-slot="switch-track"
         className={cn(
-          'inline-flex shrink-0 items-center rounded-full bg-muted p-[3px] transition-colors duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] group-data-checked/switch:bg-primary motion-reduce:transition-none',
+          'inline-flex shrink-0 items-center rounded-full bg-muted p-[3px] transition-[background-color,box-shadow] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] group-data-checked/switch:bg-primary motion-reduce:transition-none',
           geometry.track,
         )}
       >

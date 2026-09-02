@@ -98,6 +98,10 @@
   --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --motion-ease-drawer: var(--motion-ease-out);
+  --oa-control-hover-border: color-mix(in srgb, var(--foreground) 18%, transparent);
+  --oa-control-focus-border: color-mix(in srgb, var(--foreground) 28%, transparent);
+  --oa-focus-ring: color-mix(in srgb, var(--foreground) 46%, transparent);
+  --oa-focus-shadow: 0 0 0 1px var(--oa-focus-ring);
 }
 
 /* Japanese gets a JP-first sans stack so shared Han characters render in
@@ -129,7 +133,11 @@ body,
 body {
   background: var(--app-background-wash), var(--background);
   color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
   overflow: hidden;
+  text-rendering: optimizeLegibility;
   transition:
     background-color var(--motion-slow) var(--motion-ease-out),
     color var(--motion-slow) var(--motion-ease-out);
@@ -148,6 +156,27 @@ body {
 
 :where(button, [role="button"], summary, a[href], select):not(:disabled):not([aria-disabled="true"]) {
   cursor: pointer;
+}
+
+:root:not([data-ui-style="win98"]) .oa-field-control {
+  transition:
+    border-color var(--motion-fast) var(--motion-ease-out),
+    background-color var(--motion-fast) var(--motion-ease-out),
+    box-shadow var(--motion-fast) var(--motion-ease-out);
+}
+
+:root:not([data-ui-style="win98"]) .oa-field-control:hover:not(:disabled):not([aria-invalid="true"]) {
+  border-color: var(--oa-control-hover-border);
+}
+
+:root:not([data-ui-style="win98"]) .oa-field-control:focus-visible {
+  border-color: var(--oa-control-focus-border);
+  box-shadow: var(--oa-focus-shadow);
+}
+
+:root:not([data-ui-style="win98"]) .oa-field-control[aria-invalid="true"]:focus-visible {
+  border-color: color-mix(in srgb, var(--destructive) 64%, var(--border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--destructive) 42%, transparent);
 }
 
 :root:not([data-ui-style="win98"]) select.oa-field-control {
@@ -200,7 +229,23 @@ body {
 .oa-nav-row {
   transition:
     color var(--motion-fast) var(--motion-ease-out),
-    background-color var(--motion-fast) var(--motion-ease-out);
+    background-color var(--motion-fast) var(--motion-ease-out),
+    box-shadow var(--motion-fast) var(--motion-ease-out);
+}
+
+:where(.oa-pressable, .oa-nav-item, .oa-nav-row):focus-visible {
+  outline: none;
+  box-shadow: var(--oa-focus-shadow);
+}
+
+.oa-data-surface {
+  border-color: color-mix(in srgb, var(--foreground) 9%, transparent);
+  background: color-mix(in srgb, var(--card) 94%, var(--background));
+}
+
+.oa-data-surface-header {
+  border-color: color-mix(in srgb, var(--foreground) 7%, transparent);
+  background: color-mix(in srgb, var(--secondary) 38%, transparent);
 }
 
 .oa-status-surface {

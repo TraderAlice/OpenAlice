@@ -116,25 +116,80 @@ export function ActivityBar({
   const setRailCollapsed = useActivityBarCollapse((s) => s.setRailCollapsed)
   const shortRailHeight = useMediaQuery('(max-height: 700px)')
   const veryShortRailHeight = useMediaQuery('(max-height: 520px)')
+  const [workbenchRailExpanded, setWorkbenchRailExpanded] = useState(false)
   const workbenchRail = selectedSidebar === 'chat' ||
     selectedSidebar === 'auto-quant' ||
     selectedSidebar === 'prediction'
+  const constrainedCompactRail = desktopStatic && (
+    compactRailForced || railMode === 'compact' || veryShortRailHeight
+  )
   const forcedCompactRail = desktopStatic && (
-    compactRailForced || workbenchRail || railMode === 'compact' || veryShortRailHeight
+    constrainedCompactRail || (workbenchRail && !workbenchRailExpanded)
   )
   const compactRail = desktopStatic && (forcedCompactRail || railCollapsed)
+  const canExpandCompactRail = compactRail && !constrainedCompactRail
   const narrowRail = desktopStatic && railMode === 'narrow' && !compactRail
   const denseRail = desktopStatic && shortRailHeight
   const mobileDrawerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!workbenchRail) setWorkbenchRailExpanded(false)
+  }, [workbenchRail])
+
+  const expandCompactRail = () => {
+    setRailCollapsed(false)
+    if (workbenchRail) setWorkbenchRailExpanded(true)
+  }
+
+  const collapseExpandedRail = () => {
+    if (workbenchRail) {
+      setWorkbenchRailExpanded(false)
+      return
+    }
+    setRailCollapsed(true)
+  }
+
+  const brandMark = canExpandCompactRail ? (
+    <Tooltip>
+      <TooltipTrigger
+        render={(
+          <button
+            type="button"
+            onClick={expandCompactRail}
+            aria-label={t('nav.expandRail')}
+            className={`group relative hidden shrink-0 items-center justify-center rounded-md text-sidebar-foreground outline-none transition-[background-color,box-shadow] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] hover:bg-sidebar-accent focus-visible:[box-shadow:var(--oa-focus-shadow)] motion-reduce:transition-none md:flex ${denseRail ? 'size-7' : 'size-8'}`}
+          />
+        )}
+      >
+        <img
+          src="/alice.ico"
+          alt=""
+          className={`${denseRail ? 'size-5' : 'size-[22px]'} pointer-events-none absolute object-contain opacity-100 transition-opacity duration-[var(--motion-fast)] group-hover:opacity-0 group-focus-visible:opacity-0 motion-reduce:transition-none`}
+          draggable={false}
+          aria-hidden
+        />
+        <PanelLeftOpen
+          size={denseRail ? 15 : 17}
+          strokeWidth={1.75}
+          className="pointer-events-none absolute opacity-0 transition-opacity duration-[var(--motion-fast)] group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none"
+          aria-hidden
+        />
+      </TooltipTrigger>
+      <TooltipContent side="right" sideOffset={8}>{t('nav.expandRail')}</TooltipContent>
+    </Tooltip>
+  ) : (
+    <img
+      src="/alice.ico"
+      alt="Alice"
+      className={`${denseRail ? 'h-6 w-6 md:h-5 md:w-5' : 'h-[22px] w-[22px]'} shrink-0 object-contain`}
+      draggable={false}
+    />
+  )
+
   const railContent = (
     <>
         <div className={`${denseRail ? 'h-10 md:h-8' : 'h-10'} flex shrink-0 items-center ${compactRail ? 'justify-center px-0' : narrowRail ? 'gap-2 px-3' : 'gap-2.5 px-3.5'}`}>
-          <img
-            src="/alice.ico"
-            alt="Alice"
-            className={`${denseRail ? 'h-6 w-6 md:h-5 md:w-5' : 'h-[22px] w-[22px]'} shrink-0 object-contain`}
-            draggable={false}
-          />
+          {brandMark}
           <h1 className={`min-w-0 flex-1 truncate text-[13px] font-semibold leading-[18px] tracking-[-0.01em] text-foreground ${compactRail ? 'md:hidden' : ''}`}>OpenAlice</h1>
           {!desktopStatic && (
             <Button
@@ -279,14 +334,14 @@ export function ActivityBar({
         {/* Footer — global icon controls pinned to the bottom of the rail. */}
         <div className={`flex shrink-0 items-center ${compactRail ? `${denseRail ? 'py-2 md:py-0.5 md:gap-px' : 'py-2 md:gap-1'} px-4 md:flex-col md:items-center md:px-2` : 'justify-between gap-2 border-t border-border/55 px-2 py-1'}`}>
           <ThemeToggle compact={denseRail} />
-          {!forcedCompactRail && (
+          {!compactRail && !constrainedCompactRail && (
             <Tooltip>
               <TooltipTrigger
                 render={
                   <Button
                     type="button"
-                    onClick={() => setRailCollapsed(!railCollapsed)}
-                    aria-label={t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
+                    onClick={collapseExpandedRail}
+                    aria-label={t('nav.collapseRail')}
                     aria-hidden={!desktopStatic ? true : undefined}
                     tabIndex={!desktopStatic ? -1 : undefined}
                     className={`hidden ${denseRail ? 'md:h-[26px] md:w-[26px]' : ''} shrink-0 text-muted-foreground md:flex`}
@@ -295,12 +350,10 @@ export function ActivityBar({
                   />
                 }
               >
-                {railCollapsed
-                  ? <PanelLeftOpen size={denseRail ? 14 : 17} strokeWidth={1.75} aria-hidden />
-                  : <PanelLeftClose size={denseRail ? 14 : 17} strokeWidth={1.75} aria-hidden />}
+                <PanelLeftClose size={denseRail ? 14 : 17} strokeWidth={1.75} aria-hidden />
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={8}>
-                {t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
+                {t('nav.collapseRail')}
               </TooltipContent>
             </Tooltip>
           )}
