@@ -64,6 +64,7 @@ export function supervisorCommandHoverPreview(
   if (label === 'x') return 'Review impact before stopping the CLI-owned Runtime.'
   if (label === 'm') return 'Prepare transfer of the selected AliceProject to another Machine.'
   if (label === 'f') return 'Cycle the visible Runtime log severity filter.'
+  if (label === 'y') return 'Send the focused bounded, redacted Runtime event to the terminal clipboard.'
   if (label === '↑↓') return 'Move the current selection without activating it.'
   if (label === '←') return 'Return focus to the Machine list.'
   if (label === 'Home') return 'Jump to the first item in this operational view.'

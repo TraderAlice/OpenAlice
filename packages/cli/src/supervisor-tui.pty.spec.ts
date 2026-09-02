@@ -341,7 +341,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('Event Signal Scope · QUIET · 0 EVENTS')
     expect(transcript).toContain('○  SIGNAL QUIET')
     expect(stripSgr(transcript)).toContain(
-      '◇  Tip: f changes severity; End returns to the latest bounded event.',
+      '◇  Tip: y copies the focused safe event; End returns to the latest.',
     )
     expect(transcript).toContain('› [ l ] Reload Runtime snapshot')
     expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=0 loads=2')
@@ -428,6 +428,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       let opened = false
       let hovered = false
       let clicked = false
+      let copyHovered = false
+      let copyClicked = false
       const timeout = setTimeout(() => {
         child.kill()
         reject(new Error(`Supervisor Event Lens pointer timed out:\n${output}`))
@@ -443,7 +445,13 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         } else if (!clicked && output.includes('│ » !  9  03:04:09Z Fixture event 9')) {
           clicked = true
           child.write('\u001b[<0;20;11M')
-        } else if (clicked && output.includes('Event Lens · LINE 9 · WARNING · JSON')) {
+        } else if (!copyHovered && clicked && output.includes('Event Lens · LINE 9 · WARNING · JSON')) {
+          copyHovered = true
+          child.write('\u001b[<35;52;22M')
+        } else if (!copyClicked && output.includes('› [ y ] Copy event')) {
+          copyClicked = true
+          child.write('\u001b[<0;52;22M')
+        } else if (copyClicked && output.includes('Sent Runtime event 9 to the terminal clipboard.')) {
           child.write('q')
         }
       })
@@ -456,6 +464,11 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
 
     expect(transcript).toContain('│ » !  9  03:04:09Z Fixture event 9')
     expect(transcript).toContain('Event Lens · LINE 9 · WARNING · JSON')
+    expect(transcript).toContain('› [ y ] Copy event')
+    expect(transcript).toContain('Sent Runtime event 9 to the terminal clipboard.')
+    expect(transcript).toContain(
+      `\u001b]52;c;${Buffer.from('{"ts":"2026-09-02T03:04:09Z","level":"warn","msg":"Fixture event 9","scope":"pty"}').toString('base64')}\u0007`,
+    )
     expect(transcript).toContain('█')
     expect(transcript).toContain('FIXTURE_RESULT event-lens')
     expect(transcript).toContain('\u001b[?25h')

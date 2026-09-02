@@ -636,7 +636,7 @@ export function renderSupervisorContextTip(
     : view.panel === 'fleet'
       ? 'First click focuses a pane; click its selection again to activate it.'
       : view.panel === 'logs'
-        ? 'f changes severity; End returns to the latest bounded event.'
+        ? 'y copies the focused safe event; End returns to the latest.'
         : view.panel === 'doctor'
           ? 'Doctor is read-only; d refreshes checks without changing Runtime.'
           : view.panel === 'help'

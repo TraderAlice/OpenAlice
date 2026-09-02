@@ -454,7 +454,7 @@ describe('Supervisor TUI screen', () => {
     const recovery = renderSupervisorContextTip({ panel: 'overview', recovery: true }, 100)
 
     expect(fleet).toContain('First click focuses a pane')
-    expect(logs).toContain('End returns to the latest bounded event')
+    expect(logs).toContain('y copies the focused safe event')
     expect(doctor).toContain('Doctor is read-only')
     expect(help).toContain('/ searches every available command')
     expect(stopped).toContain('s starts quietly')
@@ -1732,6 +1732,7 @@ describe('Supervisor TUI screen', () => {
 
   it('scrolls Logs and Doctor with keyboard and pointer while keeping contextual controls', () => {
     const requestRender = vi.fn()
+    const copied: Array<{ number: number; text: string }> = []
     const screen = new SupervisorScreen({
       version: 'dev',
       channel: 'dev',
@@ -1749,7 +1750,13 @@ describe('Supervisor TUI screen', () => {
           { status: 'fail', summary: 'Port collision' },
         ],
       },
-    }, { requestRender })
+    }, {
+      requestRender,
+      onCopyLog: (entry) => {
+        copied.push(entry)
+        return { emitted: true, truncated: false }
+      },
+    })
 
     expect(screen.render(80).join('\n')).toContain('14–20/20 · ALL · LATEST')
     expect(screen.render(80).join('\n')).toContain('Event Lens · LINE 20 · INFO · TEXT')
@@ -1766,6 +1773,12 @@ describe('Supervisor TUI screen', () => {
     expect(screen.render(80)[previousEventRow - 1]).toContain('» · 19  log line 19')
     expect(screen.handlePointer(pointerClick(8, previousEventRow))).toBe(true)
     expect(screen.render(80).join('\n')).toContain('Event Lens · LINE 19 · INFO · TEXT')
+    const copyLines = screen.render(80)
+    const copyRow = copyLines.findIndex((line) => line.includes('[ y ] Copy event')) + 1
+    const copyColumn = copyLines[copyRow - 1]!.indexOf('Copy event') + 2
+    expect(screen.handlePointer(pointerClick(copyColumn, copyRow))).toBe(true)
+    expect(copied).toEqual([{ number: 19, text: 'log line 19' }])
+    expect(screen.snapshot.notice).toBe('Sent Runtime event 19 to the terminal clipboard.')
 
     screen.update({
       panel: 'logs',
@@ -1782,6 +1795,7 @@ describe('Supervisor TUI screen', () => {
     expect(semanticLogs).toContain('· 2  plain adapter output')
     expect(semanticLogs).not.toContain('"msg"')
     expect(semanticLogs).toContain('[ f ] Show alerts')
+    expect(semanticLogs).toContain('[ y ] Copy event')
     expect(screen.handleKey('f', matchesKey)).toBe(true)
     const attentionLogs = screen.render(80).join('\n')
     expect(attentionLogs).toContain('ATTENTION · 1/2 · LATEST')

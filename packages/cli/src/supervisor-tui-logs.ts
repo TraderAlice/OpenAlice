@@ -27,6 +27,11 @@ export interface SupervisorLogRender {
   railTargets: SupervisorScrollRailTarget[]
 }
 
+export interface SupervisorSelectedLogEntry {
+  number: number
+  text: string
+}
+
 interface FormattedLogEntry {
   glyph: '·' | '!' | '×'
   severity: 'INFO' | 'WARNING' | 'ERROR'
@@ -60,6 +65,21 @@ export function supervisorFilteredLogCount(
   filter: SupervisorLogFilter,
 ): number {
   return filterLogEntries(logs, filter).length
+}
+
+export function supervisorSelectedLogEntry(
+  logs: SupervisorRuntimeLogs | null | undefined,
+  filter: SupervisorLogFilter,
+  fromEnd: number,
+): SupervisorSelectedLogEntry | null {
+  const entries = filterLogEntries(logs, filter)
+  if (entries.length === 0) return null
+  const safeFromEnd = clamp(fromEnd, 0, entries.length - 1)
+  const entry = entries[entries.length - 1 - safeFromEnd]!
+  return {
+    number: entry.number,
+    text: entry.raw || '(empty)',
+  }
 }
 
 export function renderSupervisorLogs(

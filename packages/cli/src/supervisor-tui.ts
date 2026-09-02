@@ -152,10 +152,12 @@ import {
   renderSupervisorLogs,
   supervisorFilteredLogCount,
   supervisorLogFilterLabel,
+  supervisorSelectedLogEntry,
   type SupervisorLogFilter,
   type SupervisorLogTarget,
   type SupervisorRuntimeLogs as RuntimeLogs,
 } from './supervisor-tui-logs.ts'
+import { supervisorClipboardPayload } from './supervisor-terminal-clipboard.ts'
 import {
   createSupervisorDoctorState,
   moveSupervisorDoctorSelection,
@@ -832,6 +834,11 @@ export async function runSupervisorTui(
     },
     onPrepareManagedSource: () => {
       void prepareManagedSourceAndStart()
+    },
+    onCopyLog: (entry) => {
+      const payload = supervisorClipboardPayload(entry.text)
+      stdout.write(payload.sequence)
+      return { emitted: true, truncated: payload.truncated }
     },
     onConfirmationChange: syncConfirmationOverlay,
     onCommandPaletteChange: syncCommandPaletteOverlay,
@@ -3040,6 +3047,9 @@ export class SupervisorScreen implements Component {
   private readonly onTransferFleet?: (source: MachineProjectInventory) => void
   private readonly onRequestManagedSource?: () => void
   private readonly onPrepareManagedSource?: () => void
+  private readonly onCopyLog?: (
+    entry: { number: number; text: string },
+  ) => { emitted: boolean; truncated: boolean }
   private readonly onConfirmationChange?: (action?: SupervisorConfirmation) => void
   private readonly onCommandPaletteChange?: (open: boolean) => void
   private readonly requestRender?: () => void
@@ -3108,6 +3118,9 @@ export class SupervisorScreen implements Component {
       onTransferFleet?: (source: MachineProjectInventory) => void
       onRequestManagedSource?: () => void
       onPrepareManagedSource?: () => void
+      onCopyLog?: (
+        entry: { number: number; text: string },
+      ) => { emitted: boolean; truncated: boolean }
       onConfirmationChange?: (action?: SupervisorConfirmation) => void
       onCommandPaletteChange?: (open: boolean) => void
       requestRender?: () => void
@@ -3134,6 +3147,7 @@ export class SupervisorScreen implements Component {
     this.onTransferFleet = callbacks.onTransferFleet
     this.onRequestManagedSource = callbacks.onRequestManagedSource
     this.onPrepareManagedSource = callbacks.onPrepareManagedSource
+    this.onCopyLog = callbacks.onCopyLog
     this.onConfirmationChange = callbacks.onConfirmationChange
     this.onCommandPaletteChange = callbacks.onCommandPaletteChange
     this.requestRender = callbacks.requestRender
@@ -3487,6 +3501,24 @@ export class SupervisorScreen implements Component {
         this.logFilter = nextSupervisorLogFilter(this.logFilter)
         this.logsFromEnd = 0
         this.requestRender?.()
+        return true
+      }
+      if (this.snapshot.panel === 'logs' && matchesKey(data, 'y')) {
+        const entry = supervisorSelectedLogEntry(
+          this.snapshot.logs,
+          this.logFilter,
+          this.logsFromEnd,
+        )
+        if (!entry) {
+          this.update({ notice: 'No Runtime event is selected to copy.' })
+          return true
+        }
+        const result = this.onCopyLog?.(entry)
+        this.update({
+          notice: result?.emitted
+            ? `Sent Runtime event ${entry.number}${result.truncated ? ' (truncated)' : ''} to the terminal clipboard.`
+            : 'Terminal clipboard output is unavailable in this TUI host.',
+        })
         return true
       }
       const direction = matchesKey(data, 'up') || matchesKey(data, 'pageUp')
@@ -4150,9 +4182,11 @@ export class SupervisorScreen implements Component {
               key: 'f',
               label: `Show ${supervisorLogFilterLabel(nextSupervisorLogFilter(this.logFilter))}`,
             },
+            ...(supervisorSelectedLogEntry(this.snapshot.logs, this.logFilter, this.logsFromEnd)
+              ? [{ key: 'y', label: 'Copy event' }]
+              : []),
             { key: 'l', label: 'Reload' },
             { key: 'End', label: 'Latest' },
-            { key: '?', label: 'More' },
           ], actionWidth)
         : this.snapshot.panel === 'doctor'
           ? renderSupervisorCommandBar([
@@ -4573,6 +4607,7 @@ function pointerCommandInput(label: string): KeyId | undefined {
     x: 'x',
     l: 'l',
     f: 'f',
+    y: 'y',
     d: 'd',
     u: 'u',
     i: 'i',

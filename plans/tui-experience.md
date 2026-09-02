@@ -273,6 +273,22 @@ not imply maintainer approval of the finished interaction.
   Wide terminals use a stream/Inspector split and 80-column terminals stack the
   same model without another read or lifecycle path.
 
+### Event Lens clipboard decision
+
+- Relying on native terminal selection would leave the selected Event Lens row
+  without an application action and is unreliable while pointer reporting owns
+  ordinary mouse gestures.
+- Launching `pbcopy`, `xclip`, PowerShell, or another platform clipboard helper
+  would add host binaries and process behavior to the Node-compatible CLI
+  distribution boundary.
+- The selected model adds an explicit `y` / whole-segment Copy action for the
+  currently focused, already bounded and redacted Runtime event. It emits a
+  size-capped OSC 52 write only after that user action, never reads clipboard
+  contents, and reports the request truthfully because terminal policy may
+  reject clipboard writes. Keyboard and mouse share the existing Action Shelf
+  input path; empty or filtered-empty lenses expose no false Copy control. This
+  is an autonomous topic decision, not a recorded maintainer approval.
+
 ### Runtime zero-event Signal Scope decision
 
 - Keeping the old one-sentence cards preserves minimal height, but at the
@@ -2340,6 +2356,21 @@ already large `supervisor-tui.ts` application controller.
   skipped; 6,204 tests passed, 10 skipped). Docker installer smoke passes
   without Node, npm, pnpm, Bun, or an Agent Runtime, and package dry-run contains
   the changed Supervisor view and theme sources.
+- Event Lens selection now terminates in a useful explicit action: `y` and the
+  complete pointer-capable `Copy event` segment send the focused bounded,
+  redacted raw projection through a 24 KiB-capped OSC 52 request. Empty lenses
+  advertise no Copy action, UTF-8 is never split at the cap, no platform helper
+  or clipboard read enters the CLI, and feedback distinguishes a request sent
+  from terminal-policy acceptance.
+- Event-copy acceptance passes with 148 focused clipboard, Logs, feedback,
+  navigation, overlay, task-surface, transfer, screen, and real-PTY tests. The
+  80x24 PTY selected warning event 9 with raw SGR input, hovered and clicked the
+  complete Copy segment, emitted the exact sanitized JSON payload through OSC
+  52, reported the request, and restored terminal modes. Root TypeScript and
+  CLI build pass; the 702-file suite passes (701 passed, 1 skipped; 6,207 tests
+  passed, 10 skipped). Docker installer smoke passes without Node, npm, pnpm,
+  Bun, or an Agent Runtime, and package dry-run now proves the new clipboard
+  owner is present in the published CLI tarball.
 
 ## Completion Criteria
 

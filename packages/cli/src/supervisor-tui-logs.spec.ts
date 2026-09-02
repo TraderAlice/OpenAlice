@@ -4,6 +4,7 @@ import {
   nextSupervisorLogFilter,
   renderSupervisorLogs,
   supervisorFilteredLogCount,
+  supervisorSelectedLogEntry,
 } from './supervisor-tui-logs.ts'
 import { displayWidth } from './supervisor-display.ts'
 import { supervisorCommandTargets } from './supervisor-tui-view.ts'
@@ -51,6 +52,19 @@ describe('Supervisor Runtime log presentation', () => {
     const errors = renderSupervisorLogs(logs, 80, 0, 'errors').lines.join('\n')
     expect(errors).toContain('ERRORS · 1/4 · LATEST')
     expect(errors).toContain('× 3  03:04:07Z Probe failed')
+  })
+
+  it('returns the focused bounded event for an explicit clipboard action', () => {
+    expect(supervisorSelectedLogEntry(logs, 'all', 0)).toEqual({
+      number: 4,
+      text: 'plain adapter output [31m',
+    })
+    expect(supervisorSelectedLogEntry(logs, 'attention', 1)).toEqual({
+      number: 2,
+      text: 'adapter warning: slow response',
+    })
+    expect(supervisorSelectedLogEntry(logs, 'errors', 99)?.number).toBe(3)
+    expect(supervisorSelectedLogEntry({ entries: [] }, 'all', 0)).toBeNull()
   })
 
   it('turns unloaded, quiet, and filtered-empty snapshots into truthful Signal Scopes', () => {

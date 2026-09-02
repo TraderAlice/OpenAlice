@@ -810,7 +810,14 @@ narrow terminals stack the same information. End returns to the `LATEST` edge
 and `l` reloads it. `f`, or its clickable footer keycap, cycles
 All, Attention (warning plus error), and Errors views locally over that loaded
 snapshot. Filtering retains the source line numbers and resets navigation to
-the latest matching entry. Unloaded, loaded-but-quiet, and filtered-empty
+the latest matching entry. When an event is focused, `y` and the complete
+clickable `Copy event` shelf segment send its already redacted, terminal-safe
+raw projection through an explicit OSC 52 clipboard request. The request is
+capped at 24 KiB, never reads clipboard contents, and reports that it was sent
+rather than claiming the terminal accepted it; terminal policy may disable OSC
+52. Empty and filtered-empty lenses expose no Copy segment. Runtime events may
+still contain private product or trading context, so the action is always
+explicit. Unloaded, loaded-but-quiet, and filtered-empty
 snapshots share a responsive Event Signal Scope instead of collapsing to a
 one-line message. Its `STANDBY`, `QUIET`, or `LENS CLEAR` rail states the exact
 condition, then exposes snapshot, lens, and bounded/redacted safety context.
