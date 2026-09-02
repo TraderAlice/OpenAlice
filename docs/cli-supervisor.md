@@ -162,6 +162,13 @@ intentionally parameter-free:
   Enter to retry or Esc to return to target selection; `q` can still detach at
   any time. The recorder is session-local presentation state and does not own
   Runtime readiness, lifecycle, SSH cancellation, or persistence;
+  At 72–95 columns the launch path uses compact stage vocabulary that spends
+  width on the selected target names plus an explicit `[Enter] START`, `USE`,
+  or `CONNECT`, instead of independently truncating three equal-width technical
+  labels. The compact Briefing then
+  states only the resolved Next action and its immediate consequence; it does
+  not repeat the same three-stage handoff. Its Tip names Enter, selection,
+  pane movement, and repeated-click activation without requiring Help;
 - the connected workbench has exactly one active target. Its persistent command
   spine names the Machine, AliceProject, loopback or SSH transport, and live
   Runtime signal on every page. Connections marks the active Machine and

@@ -101,6 +101,7 @@ export interface SupervisorContextTipView {
   panel: string
   runtimeState?: string
   targetKind?: 'local' | 'ssh'
+  launcher?: boolean
   recovery?: boolean
   itemCount?: number
 }
@@ -649,7 +650,9 @@ export function renderSupervisorContextTip(
   const message = view.recovery
     ? 'Recovery exposes only safe Update and Detach routes.'
     : view.panel === 'fleet'
-      ? 'First click focuses a pane; click its selection again to activate it.'
+      ? view.launcher
+        ? 'Enter runs Next; ↑↓ selects; Tab/←→ changes pane; click again activates.'
+        : 'First click focuses a pane; click its selection again to activate it.'
       : view.panel === 'logs'
         ? view.targetKind === 'ssh'
           ? 'The Chronicle keeps the SSH forward while r checks endpoint health now.'

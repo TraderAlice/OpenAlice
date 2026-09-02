@@ -2979,6 +2979,30 @@ already large `supervisor-tui.ts` application controller.
   and screen tests, all 51 real-PTY cases, and the complete CLI suite (63 files,
   629 tests). CLI typecheck and build also pass.
 
+### Compact launch-path decision
+
+- The first post-Mission-Rail Launcher capture showed that 80×24 still divided
+  its three-stage path into equal technical columns. Machine and AliceProject
+  names acquired ellipses while the two-row Briefing repeated the complete
+  Start → Verify → Home handoff, so the most important instruction competed
+  with duplicated process detail.
+- Between 72 and 95 columns the path now uses compact stages that prioritize the
+  selected Machine and AliceProject names, then an explicit `[Enter] START`,
+  `USE`, or `CONNECT`. At wider sizes the renderer first attempts the complete
+  technical path and only applies per-stage truncation when the full route
+  truly exceeds available display width.
+- A two-row Launch Briefing now carries the resolved Next key, action, and one
+  immediate consequence such as “stay here through readiness.” The full
+  three-stage handoff remains available in the wide Briefing instead of being
+  duplicated into the compact surface. The launcher-specific Tip teaches Enter,
+  arrow selection, pane movement, and repeated-click activation in one line.
+- A real 80×24 capture proves that `This computer`, `Default AliceProject`,
+  `[Enter] START`, `Start OpenAlice`, and the consequence all remain visible
+  without ellipsis in the launch path or action line.
+- Compact launch-path acceptance passes through 93 focused Fleet and screen
+  tests, all 51 real-PTY cases, and the complete CLI suite (63 files, 630
+  tests). CLI typecheck and build also pass.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

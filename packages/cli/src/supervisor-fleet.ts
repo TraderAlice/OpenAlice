@@ -430,7 +430,9 @@ function renderLaunchSequence(state: SupervisorFleetState, width: number): strin
   const runtimeStep = `3 RUNTIME ${runtime}`
   const inner = Math.max(12, width - 4)
   const rows = width >= 72
-    ? [joinLaunchSteps([machineStep, projectStep, runtimeStep], inner)]
+    ? [joinLaunchSteps(width >= 96
+      ? [machineStep, projectStep, runtimeStep]
+      : compactLaunchSteps(machine, project, machineReady, projectReady), inner)]
     : [machineStep, projectStep, runtimeStep]
   return renderPane('OPENALICE LAUNCH · SELECT → START → CONNECT', rows, width, undefined, false, rows.length)
 }
@@ -451,8 +453,31 @@ function launchRuntimeStep(
   return `◆ ${project.runtime.class.toUpperCase()} · OPEN RUNTIME TOOLS`
 }
 
+function compactLaunchSteps(
+  machine: MachineInventory | undefined,
+  project: MachineProjectInventory | undefined,
+  machineReady: boolean,
+  projectReady: boolean,
+): string[] {
+  const machineStep = `1 ${machineReady ? '✓' : '○'} ${machine?.displayName ?? 'Choose Machine'}`
+  const projectStep = `2 ${projectReady ? '✓' : '○'} ${project?.displayName ?? 'Choose Project'}`
+  let runtimeStep = '3 ○ SELECT TARGET'
+  if (projectReady && machine && project) {
+    if (project.runtime.class === 'absent') runtimeStep = '3 ○ [Enter] START'
+    else if ((project.runtime.class === 'running' || project.runtime.class === 'owned_elsewhere')
+      && project.runtime.webEndpoint) {
+      runtimeStep = machine.key === 'local' ? '3 ● [Enter] USE' : '3 ● [Enter] CONNECT'
+    } else {
+      runtimeStep = '3 ◆ CHECK RUNTIME'
+    }
+  }
+  return [machineStep, projectStep, runtimeStep]
+}
+
 function joinLaunchSteps(steps: string[], width: number): string {
   const separator = '  ━━━  '
+  const complete = steps.join(separator)
+  if (displayWidth(complete) <= width) return complete
   const available = Math.max(1, width - displayWidth(separator) * (steps.length - 1))
   const each = Math.max(8, Math.floor(available / steps.length))
   return steps.map((step) => truncateDisplayWidth(step, each)).join(separator)
@@ -758,7 +783,7 @@ function renderLaunchBriefing(
       `Launch Briefing · ${state.focus === 'machines' ? 'Machine' : 'AliceProject'}`,
       [
         `${signal} · ${intent.headline} · ${route}`,
-        `NEXT  ${keycap} ${intent.action.label} · ${compactLaunchOutcome(intent)}`,
+        `NEXT  ${keycap} ${intent.action.label} · ${compactLaunchConsequence(intent)}`,
       ],
       width,
       undefined,
@@ -793,9 +818,12 @@ function renderLaunchBriefing(
   )
 }
 
-function compactLaunchOutcome(intent: SupervisorFleetLaunchIntent): string {
-  if (intent.state === 'ready') return intent.handoff.join(' → ')
-  if (intent.state === 'select') return 'choose the target, then start or connect'
+function compactLaunchConsequence(intent: SupervisorFleetLaunchIntent): string {
+  if (intent.action.key === 'r') return 'recheck target availability'
+  if (intent.action.label === 'Browse projects') return 'choose an AliceProject next'
+  if (intent.action.label === 'Start OpenAlice') return 'stay here through readiness'
+  if (intent.action.label === 'Connect') return 'open its SSH forward into Home'
+  if (intent.action.label === 'Use AliceProject') return 'enter connected Home'
   return intent.summary
 }
 

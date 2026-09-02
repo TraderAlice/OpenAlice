@@ -5008,6 +5008,7 @@ export class SupervisorScreen implements Component {
           panel: this.snapshot.panel ?? 'overview',
           runtimeState: state,
           targetKind: this.snapshot.activeTarget?.kind,
+          launcher: this.snapshot.panel === 'fleet' && this.snapshot.activeTarget === null,
           recovery: isConfigRecovery(this.snapshot),
           itemCount: this.snapshot.panel === 'logs'
             ? supervisorFilteredLogCount(this.snapshot.logs, this.logFilter)

@@ -240,6 +240,21 @@ describe('Supervisor fleet state and presentation', () => {
     expect(output).not.toContain('PORT  ')
     expect(launcher.every((line) => displayWidth(line) <= 120)).toBe(true)
 
+    const compactLauncher = renderSupervisorFleet(
+      state,
+      80,
+      undefined,
+      false,
+      5,
+      undefined,
+      true,
+    ).join('\n')
+    expect(compactLauncher).toContain('1 ✓ This Mac')
+    expect(compactLauncher).toContain('2 ✓ Default AliceProject')
+    expect(compactLauncher).toContain('3 ○ [Enter] START')
+    expect(compactLauncher).toContain('NEXT  [ Enter ] Start OpenAlice · stay here through readiness')
+    expect(compactLauncher).not.toContain('Start Runtime → Verify Web endpoint')
+
     const connectedManager = renderSupervisorFleet(state, 120, undefined, false, 15)
       .join('\n')
     expect(connectedManager).toContain('Selection Constellation · AliceProject')
@@ -273,6 +288,27 @@ describe('Supervisor fleet state and presentation', () => {
     })
     expect(compact).toContain('× LAUNCH BLOCKED · SSH FORWARD UNAVAILABLE')
     expect(compact).toContain('NEXT  [ r ] Refresh')
+  })
+
+  it('names compact local-use and remote-connect consequences explicitly', () => {
+    const local = setFleetFocus(
+      createSupervisorFleetState('2026-08-23T00:00:00Z', [machines()[0]!]),
+      'projects',
+    )
+    const localOutput = renderSupervisorFleet(
+      local, 80, undefined, false, 5, undefined, true,
+    ).join('\n')
+    expect(localOutput).toContain('3 ● [Enter] USE')
+    expect(localOutput).toContain('NEXT  [ Enter ] Use AliceProject · enter connected Home')
+
+    let remote = createSupervisorFleetState('2026-08-23T00:00:00Z', machines())
+    remote = selectFleetIndex(remote, 'machines', 1)
+    remote = setFleetFocus(remote, 'projects')
+    const remoteOutput = renderSupervisorFleet(
+      remote, 80, undefined, false, 5, undefined, true,
+    ).join('\n')
+    expect(remoteOutput).toContain('3 ● [Enter] CONNECT')
+    expect(remoteOutput).toContain('NEXT  [ Enter ] Connect · open its SSH forward into Home')
   })
 
   it('maps pointer rows to visible Machine and AliceProject selections', () => {
