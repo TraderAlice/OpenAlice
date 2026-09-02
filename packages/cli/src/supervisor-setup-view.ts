@@ -100,7 +100,7 @@ export function renderSupervisorSetupStudio(
     const bodyHeight = Math.max(listRows.length, detailRows.length)
     const left = renderSupervisorPanel(
       'Setup Studio',
-      `${view.projectName} · ${layer}`,
+      view.projectName,
       padRows(listRows, bodyHeight),
       listWidth,
     )
@@ -143,13 +143,16 @@ export function renderSupervisorSetupStudio(
     detailRows,
     width,
   )
+  const compactStatusRows = wrapDisplayText(
+    `${layer} · ${view.message}`,
+    Math.max(1, width - 2),
+  ).slice(0, 2).map((line, index) => `${index === 0 ? '◇' : ' '} ${line}`)
   return {
     lines: [
       ...list,
       '',
       ...detail,
-      '',
-      ...renderSupervisorPanel('Setup status', layer, statusRows, width),
+      ...compactStatusRows.map((line) => truncateDisplayWidth(line, width)),
     ],
     targets: view.items.map((_, index) => ({
       row: index + 2,

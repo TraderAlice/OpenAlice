@@ -1556,7 +1556,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   })
 
-  it('uses raw pointer input inside the centered Setup overlay', async () => {
+  it('uses raw pointer input inside the compact Setup Focus Workspace', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-overlay-pointer-'))
     temporaryPaths.push(isolatedHome)
     const child = pty.spawn(process.execPath, [cliEntry], {
@@ -1587,8 +1587,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           child.write('p')
         } else if (!clickedScope && output.includes('Setup Studio · Default AliceProject') && output.includes('Editing')) {
           clickedScope = true
-          child.write('\u001b[<32;10;3M')
-          child.write('\u001b[<0;10;3M')
+          child.write('\u001b[<32;10;5M')
+          child.write('\u001b[<0;10;5M')
         } else if (!closed && output.includes('› Editing') && output.includes('Current · Machine defaults')) {
           closed = true
           child.write('\u001b')

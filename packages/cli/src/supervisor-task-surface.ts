@@ -12,19 +12,28 @@ export interface SupervisorTaskSurfaceSize {
 
 export const SUPERVISOR_TASK_STAGE_MIN_WIDTH = 100
 export const SUPERVISOR_TASK_STAGE_MIN_HEIGHT = 28
+export const SUPERVISOR_SETUP_STAGE_MIN_WIDTH = 72
+export const SUPERVISOR_SETUP_STAGE_MIN_HEIGHT = 24
 export const SUPERVISOR_TASK_STAGE_HEADER_ROWS = 3
 export const SUPERVISOR_TASK_STAGE_CONSOLE_ROWS = 3
 
-export function supervisorUsesTaskStage(size: SupervisorTaskSurfaceSize): boolean {
-  return size.width >= SUPERVISOR_TASK_STAGE_MIN_WIDTH
-    && size.height >= SUPERVISOR_TASK_STAGE_MIN_HEIGHT
+export function supervisorUsesTaskStage(
+  size: SupervisorTaskSurfaceSize,
+  task?: SupervisorTaskSurfaceTask,
+): boolean {
+  return task === 'setup'
+    ? size.width >= SUPERVISOR_SETUP_STAGE_MIN_WIDTH
+      && size.height >= SUPERVISOR_SETUP_STAGE_MIN_HEIGHT
+    : size.width >= SUPERVISOR_TASK_STAGE_MIN_WIDTH
+      && size.height >= SUPERVISOR_TASK_STAGE_MIN_HEIGHT
 }
 
 export function supervisorTaskSurfaceOptions(
   size: SupervisorTaskSurfaceSize,
   fallback: SupervisorOverlayOptions,
+  task?: SupervisorTaskSurfaceTask,
 ): SupervisorOverlayOptions {
-  if (!supervisorUsesTaskStage(size)) return fallback
+  if (!supervisorUsesTaskStage(size, task)) return fallback
   return {
     width: '100%',
     maxHeight: '100%',
@@ -43,7 +52,7 @@ export function renderSupervisorTaskSurface(
   size: SupervisorTaskSurfaceSize,
   task?: SupervisorTaskSurfaceTask,
 ): string[] {
-  if (!supervisorUsesTaskStage(size)) return lines
+  if (!supervisorUsesTaskStage(size, task)) return lines
   const rows = Math.max(
     1,
     size.height - SUPERVISOR_TASK_STAGE_HEADER_ROWS - SUPERVISOR_TASK_STAGE_CONSOLE_ROWS,

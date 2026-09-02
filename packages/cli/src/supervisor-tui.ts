@@ -2619,7 +2619,7 @@ export async function runSupervisorTui(
       maxHeight: '90%',
       anchor: 'center',
       margin: 1,
-    } as const)
+    } as const, 'setup')
     const panel = new (class implements Component {
       render(width: number): string[] {
         if (settingsSubmenuOpen) {

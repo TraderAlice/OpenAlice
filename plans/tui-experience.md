@@ -3471,6 +3471,31 @@ already large `supervisor-tui.ts` application controller.
   real-PTY tests (including all 54 PTY cases), and the complete CLI suite (63
   files, 638 tests). CLI typecheck and build also pass.
 
+### Compact Setup Focus Workspace decision
+
+- A real 80x24 PTY capture showed the centered Setup sheet starting across the
+  Focus Header, leaving unrelated Home copy visible behind it, and stacking
+  List, Inspection, and Status frames into one visually overlapping surface.
+  The same workflow was clear at 120x32, so the failure was responsive
+  ownership rather than missing Setup information.
+- Setup now promotes to the complete header-to-console Focus Workspace at
+  72x24. Its compact Studio keeps the setting list and selected Inspector as
+  separate consecutive panels, then folds layer status into at most two plain
+  signal rows; the full surface fits the 18-row operational canvas.
+- The lower stage threshold is task-specific. Source, AliceProject, Release,
+  Transfer, and their existing centered-sheet thresholds do not change.
+  Selection, editing, validation, save callbacks, inheritance rules, Runtime
+  ownership, keyboard routes, and pointer activation remain unchanged.
+- Wide Setup removes the repeated Layer suffix from the constrained list-panel
+  title; Setup status remains the single Layer owner, while the AliceProject
+  name now survives intact.
+- Real 120x32 and 80x24 captures verify that Setup owns one non-overlapping
+  canvas at both baselines. Maintainer acceptance remains pending on the
+  retained feature branch.
+- Compact-Setup-Focus-Workspace acceptance passes through all 145 Task Surface,
+  Setup, screen, and real-PTY tests (including all 54 PTY cases), and the
+  complete CLI suite (63 files, 639 tests). CLI typecheck and build also pass.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

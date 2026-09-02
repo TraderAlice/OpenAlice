@@ -45,6 +45,22 @@ describe('Supervisor secondary-task surface', () => {
     }
   })
 
+  it('gives Setup a compact Focus Workspace without widening other tasks', () => {
+    const size = { width: 80, height: 24 }
+    expect(supervisorUsesTaskStage(size)).toBe(false)
+    expect(supervisorUsesTaskStage(size, 'setup')).toBe(true)
+    expect(supervisorUsesTaskStage({ width: 71, height: 24 }, 'setup')).toBe(false)
+    expect(supervisorUsesTaskStage({ width: 80, height: 23 }, 'setup')).toBe(false)
+    expect(supervisorTaskSurfaceOptions(size, sheet, 'setup')).toEqual({
+      width: '100%',
+      maxHeight: '100%',
+      anchor: 'top-left',
+      margin: { top: 3, right: 0, bottom: 3, left: 0 },
+    })
+    expect(renderSupervisorTaskSurface(['work'], size, 'setup')).toHaveLength(18)
+    expect(renderSupervisorTaskSurface(['work'], size, 'source')).toEqual(['work'])
+  })
+
   it('centers a truthful task trajectory inside genuine surplus rows', () => {
     const lines = renderSupervisorTaskSurface(
       Array.from({ length: 12 }, (_, index) => `content ${index + 1}`),

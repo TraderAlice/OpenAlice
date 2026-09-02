@@ -51,10 +51,10 @@ describe('Supervisor Setup Studio', () => {
     }, 72)
     const output = rendered.lines.join('\n')
     expect(output).toContain('Setup Studio · Default AliceProject')
-    expect(output).toContain('Setup status · MACHINE DEFAULTS LAYER')
+    expect(output).toContain('◇ MACHINE DEFAULTS LAYER · Machine defaults are inherited')
     expect(output).toContain('Inspection · 5/6')
     expect(output).toContain('◆ [ Esc ] Done')
-    expect(rendered.lines).toHaveLength(21)
+    expect(rendered.lines.length).toBeLessThanOrEqual(18)
     expect(rendered.lines.every((line) => displayWidth(line) <= 72)).toBe(true)
   })
 
