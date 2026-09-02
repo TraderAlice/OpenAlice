@@ -1153,6 +1153,20 @@ not imply maintainer approval of the finished interaction.
   from a live Runtime whose uptime was not reported. This is an autonomous topic
   refinement, not a recorded maintainer approval.
 
+### Empty-state control ownership decision
+
+- Keeping the normal Logs and Doctor shelves visible in an empty Signal Scope
+  preserves fixed command positions, but advertises Scroll, Copy, Inspect,
+  Latest, First, and Last when no event or check can receive those actions.
+- Hiding the entire Action Shelf would make the empty state visually quiet, but
+  would also remove the safe Reload/Rerun path that can resolve it.
+- The selected model gives each empty Signal Scope a contextual shelf and Tip.
+  Logs retain Reload, filter cycling, and Help; Doctor retains Run/Rerun and
+  Help. Object-dependent navigation and copy actions appear only when filtered
+  events or diagnostic checks exist. The full keyboard handlers remain safe,
+  but the visible control surface describes only truthful current affordances.
+  This is an autonomous topic refinement, not a recorded maintainer approval.
+
 ## Responsive and Accessibility Contract
 
 - `80x24` remains the minimum full experience. Wide terminals show the
@@ -2482,6 +2496,21 @@ already large `supervisor-tui.ts` application controller.
   pass; the 702-file suite passes (701 passed, 1 skipped; 6,209 tests passed, 10
   skipped). Docker installer smoke passes without Node, npm, pnpm, Bun, or an
   Agent Runtime, and package dry-run retains the changed TUI view owner.
+- A settled five-page 120x32 audit found that the empty Event Signal Scope and
+  Diagnostic Radar still advertised object-dependent Console actions even
+  though their bodies owned no event or check. Their Tips repeated the same
+  stale assumption, and a zero-check Doctor report incorrectly earned the
+  navigation success badge.
+- Empty-Scope acceptance passes with 117 focused navigation, screen, and
+  real-PTY tests. Settled truecolor 120x32 Logs and Doctor frames expose only
+  Reload/Rerun, filter, and Help recovery routes; Scroll, Copy, Inspect, Latest,
+  First, and Last return with real objects. The Tips name the empty contract,
+  existing card actions remain pointer-operable, and zero checks render neutral
+  `Doctor` while an actual all-pass report earns `Doctor✓`. Root TypeScript and
+  CLI build pass; the 702-file suite passes (701 passed, 1 skipped; 6,210 tests
+  passed, 10 skipped). Docker installer smoke passes without Node, npm, pnpm,
+  Bun, or an Agent Runtime, and package dry-run retains the changed navigation,
+  view, and Supervisor owners.
 
 ## Completion Criteria
 

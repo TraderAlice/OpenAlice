@@ -341,8 +341,11 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('Event Signal Scope · QUIET · 0 EVENTS')
     expect(transcript).toContain('○  SIGNAL QUIET')
     expect(stripSgr(transcript)).toContain(
-      '◇  Tip: y copies the focused safe event; End returns to the latest.',
+      '◇  Tip: No Runtime events in this lens; l reloads the bounded snapshot.',
     )
+    expect(stripSgr(transcript)).toContain('◆ [ l ] Reload snapshot')
+    expect(stripSgr(transcript)).not.toContain('[ ↑↓ ] Scroll')
+    expect(stripSgr(transcript)).not.toContain('[ End ] Latest')
     expect(transcript).toContain('› [ l ] Reload Runtime snapshot')
     expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=0 loads=2')
     expect(transcript).toContain('\u001b[?25h')
@@ -402,6 +405,9 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('Diagnostic Radar · NO CHECKS · 0F/0W/0P')
     expect(transcript).toContain('○  NO CHECKS')
     expect(transcript).toContain('› [ d ] Rerun Runtime Doctor')
+    expect(stripSgr(transcript)).toContain('◆ [ d ] Rerun Doctor')
+    expect(stripSgr(transcript)).not.toContain('[ ↑↓ ] Inspect')
+    expect(stripSgr(transcript)).not.toContain('[ Home ] First')
     expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=0 loads=0 diagnoses=2')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')

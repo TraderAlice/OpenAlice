@@ -204,7 +204,9 @@ intentionally parameter-free:
   `↑`/`↓` move within the active Fleet pane and the mouse wheel moves the
   focused Fleet selection.
   Fleet and loaded Logs expose their available counts in the navigation rail;
-  Doctor exposes `✓`, warning count, or failure count without relying on color.
+  Doctor exposes `✓`, warning count, or failure count without relying on color
+  only after at least one check exists; a loaded zero-check report remains
+  neutral instead of claiming success.
   Each status badge is part of its tab's pointer target rather than a separate
   control.
   Fleet rows expose pointer hover and click: the first click selects or focuses,
@@ -254,6 +256,11 @@ intentionally parameter-free:
   gutter, borders, and semantically neutral neighboring pane remain unchanged;
   independent semantic rows in both panes may still style themselves. Single-
   pane and `NO_COLOR` output retain their existing plain-text structure;
+- empty Logs and Doctor Signal Scopes own contextual Action Shelves instead of
+  advertising object-dependent commands. Empty Logs retain snapshot reload,
+  filter cycling, and Help; empty Doctor retains Run/Rerun and Help. Scroll,
+  copy, Inspect, Latest, First, and Last return only when a filtered event or
+  diagnostic check exists. Their contextual Tips state the same empty contract;
 - at 100 columns and wider, Overview's paired Launchpad and Runtime cards may
   absorb available terminal height as one bounded mission stage. They extend
   equally with quiet interior rows, keep the primary action and Uptime aligned

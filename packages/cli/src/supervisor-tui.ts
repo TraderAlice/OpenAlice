@@ -4013,6 +4013,7 @@ export class SupervisorScreen implements Component {
       logCount: this.snapshot.logs?.entries?.length,
       doctor: this.snapshot.doctor
         ? {
+            checks: this.snapshot.doctor.checks?.length ?? 0,
             failures: this.snapshot.doctor.summary?.failures ?? 0,
             warnings: this.snapshot.doctor.summary?.warnings ?? 0,
           }
@@ -4211,25 +4212,14 @@ export class SupervisorScreen implements Component {
           actionWidth,
         )
         : this.snapshot.panel === 'logs'
-        ? renderSupervisorCommandBar([
-            { key: '↑↓', label: 'Scroll' },
-            {
-              key: 'f',
-              label: `Show ${supervisorLogFilterLabel(nextSupervisorLogFilter(this.logFilter))}`,
-            },
-            ...(supervisorSelectedLogEntry(this.snapshot.logs, this.logFilter, this.logsFromEnd)
-              ? [{ key: 'y', label: 'Copy event' }]
-              : []),
-            { key: 'l', label: 'Reload' },
-            { key: 'End', label: 'Latest' },
-          ], actionWidth)
+        ? logsActionBar(
+            this.snapshot.logs,
+            this.logFilter,
+            this.logsFromEnd,
+            actionWidth,
+          )
         : this.snapshot.panel === 'doctor'
-          ? renderSupervisorCommandBar([
-              { key: '↑↓', label: 'Inspect' },
-              { key: 'd', label: 'Rerun' },
-              { key: 'Home', label: 'First' },
-              { key: 'End', label: 'Last' },
-            ], actionWidth)
+          ? doctorActionBar(this.snapshot.doctor, actionWidth)
           : this.snapshot.panel === 'help'
             ? renderSupervisorCommandBar([
                 { key: '↑↓', label: 'Explore', primary: true },
@@ -4259,10 +4249,15 @@ export class SupervisorScreen implements Component {
       focusTask === 'confirmation'
         ? []
         : [renderSupervisorContextTip({
-            panel: this.snapshot.panel ?? 'overview',
-            runtimeState: state,
-            recovery: isConfigRecovery(this.snapshot),
-          }, width)],
+          panel: this.snapshot.panel ?? 'overview',
+          runtimeState: state,
+          recovery: isConfigRecovery(this.snapshot),
+          itemCount: this.snapshot.panel === 'logs'
+            ? supervisorFilteredLogCount(this.snapshot.logs, this.logFilter)
+            : this.snapshot.panel === 'doctor'
+              ? this.snapshot.doctor?.checks?.length ?? 0
+              : undefined,
+        }, width)],
     ).map((line) => truncate(line, width))
     this.commandTargets = supervisorCommandTargets(visibleLines)
     if (this.focusConsoleHoveredCommand) {
@@ -4834,6 +4829,49 @@ function actionBar(
     { key: 'l', label: 'Logs' },
     { key: 'u', label: 'Update' },
     { key: '?', label: 'More' },
+  ], width)
+}
+
+function logsActionBar(
+  logs: RuntimeLogs | null | undefined,
+  filter: SupervisorLogFilter,
+  fromEnd: number,
+  width: number,
+): string[] {
+  const nextFilter = supervisorLogFilterLabel(nextSupervisorLogFilter(filter))
+  if (supervisorFilteredLogCount(logs, filter) === 0) {
+    return renderSupervisorCommandBar([
+      { key: 'l', label: 'Reload snapshot', primary: true },
+      { key: 'f', label: `Show ${nextFilter}` },
+      { key: '?', label: 'More' },
+    ], width)
+  }
+  return renderSupervisorCommandBar([
+    { key: '↑↓', label: 'Scroll' },
+    { key: 'f', label: `Show ${nextFilter}` },
+    ...(supervisorSelectedLogEntry(logs, filter, fromEnd)
+      ? [{ key: 'y', label: 'Copy event' }]
+      : []),
+    { key: 'l', label: 'Reload' },
+    { key: 'End', label: 'Latest' },
+  ], width)
+}
+
+function doctorActionBar(
+  report: DoctorReport | null | undefined,
+  width: number,
+): string[] {
+  if ((report?.checks?.length ?? 0) === 0) {
+    return renderSupervisorCommandBar([
+      { key: 'd', label: report ? 'Rerun Doctor' : 'Run Doctor', primary: true },
+      { key: '?', label: 'More' },
+    ], width)
+  }
+  return renderSupervisorCommandBar([
+    { key: '↑↓', label: 'Inspect' },
+    { key: 'd', label: 'Rerun' },
+    { key: 'Home', label: 'First' },
+    { key: 'End', label: 'Last' },
   ], width)
 }
 

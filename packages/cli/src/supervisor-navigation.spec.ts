@@ -12,7 +12,7 @@ describe('Supervisor navigation rail', () => {
       selected: 'overview',
       machineCount: 2,
       logCount: 42,
-      doctor: { failures: 1, warnings: 2 },
+      doctor: { checks: 3, failures: 1, warnings: 2 },
     }, 80)
 
     expect(displayWidth(layout.line)).toBe(80)
@@ -28,7 +28,7 @@ describe('Supervisor navigation rail', () => {
       selected: 'doctor',
       machineCount: 2,
       logCount: 9,
-      doctor: { failures: 0, warnings: 3 },
+      doctor: { checks: 3, failures: 0, warnings: 3 },
     }, 46)
 
     expect(displayWidth(layout.line)).toBe(46)
@@ -94,7 +94,7 @@ describe('Supervisor navigation rail', () => {
   it('derives badge-edge pointer hits from the rendered layout', () => {
     const layout = renderSupervisorNavigation({
       selected: 'overview',
-      doctor: { failures: 2, warnings: 0 },
+      doctor: { checks: 2, failures: 2, warnings: 0 },
     }, 80)
     const doctor = layout.targets.find((target) => target.panel === 'doctor')!
 

@@ -489,18 +489,31 @@ describe('Supervisor TUI screen', () => {
   it('renders contextual OMP-style Tips without creating an action target', () => {
     const fleet = renderSupervisorContextTip({ panel: 'fleet' }, 100)
     const logs = renderSupervisorContextTip({ panel: 'logs' }, 100)
+    const emptyLogs = renderSupervisorContextTip({ panel: 'logs', itemCount: 0 }, 100)
     const doctor = renderSupervisorContextTip({ panel: 'doctor' }, 100)
+    const emptyDoctor = renderSupervisorContextTip({ panel: 'doctor', itemCount: 0 }, 100)
     const help = renderSupervisorContextTip({ panel: 'help' }, 100)
     const stopped = renderSupervisorContextTip({ panel: 'overview', runtimeState: 'absent' }, 100)
     const recovery = renderSupervisorContextTip({ panel: 'overview', recovery: true }, 100)
 
     expect(fleet).toContain('First click focuses a pane')
     expect(logs).toContain('y copies the focused safe event')
+    expect(emptyLogs).toContain('No Runtime events in this lens')
     expect(doctor).toContain('Doctor is read-only')
+    expect(emptyDoctor).toContain('No diagnostic checks in this report')
     expect(help).toContain('/ searches every available command')
     expect(stopped).toContain('s starts quietly')
     expect(recovery).toContain('only safe Update and Detach routes')
-    expect(supervisorCommandTargets([fleet, logs, doctor, help, stopped, recovery])).toEqual([])
+    expect(supervisorCommandTargets([
+      fleet,
+      logs,
+      emptyLogs,
+      doctor,
+      emptyDoctor,
+      help,
+      stopped,
+      recovery,
+    ])).toEqual([])
 
     const compact = renderSupervisorContextTip({ panel: 'fleet' }, 46)
     expect(displayWidth(compact)).toBeLessThanOrEqual(46)
@@ -518,6 +531,59 @@ describe('Supervisor TUI screen', () => {
       createSupervisorTuiTheme({ TERM: 'xterm-256color', NO_COLOR: '1' }),
       { panel: 'fleet' },
     )[3]).toBe(fleet)
+  })
+
+  it('exposes only recovery actions when Logs or Doctor have no objects', () => {
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'logs',
+      runtime: { class: 'running', endpoints: {} },
+      logs: { entries: [] },
+      doctor: { overall: 'unknown', checks: [] },
+    }, {
+      getViewportHeight: () => 32,
+      motionEnabled: false,
+    })
+
+    const emptyLogs = screen.render(120)
+    expect(emptyLogs.at(-2)).toContain('◆ [ l ] Reload snapshot')
+    expect(emptyLogs.at(-2)).toContain('[ f ] Show alerts')
+    expect(emptyLogs.at(-2)).toContain('[ ? ] More')
+    expect(emptyLogs.at(-2)).not.toContain('[ ↑↓ ] Scroll')
+    expect(emptyLogs.at(-2)).not.toContain('[ y ] Copy event')
+    expect(emptyLogs.at(-2)).not.toContain('[ End ] Latest')
+    expect(emptyLogs.join('\n')).toContain('No Runtime events in this lens')
+
+    screen.update({ logs: { entries: [{ text: 'Runtime ready' }] } })
+    expect(screen.render(120).at(-2)).toContain('[ ↑↓ ] Scroll')
+    expect(screen.render(120).at(-2)).toContain('[ y ] Copy event')
+    expect(screen.render(120).at(-2)).toContain('[ End ] Latest')
+
+    screen.update({ panel: 'doctor' })
+    const emptyDoctor = screen.render(120)
+    expect(emptyDoctor.at(-2)).toContain('◆ [ d ] Rerun Doctor')
+    expect(emptyDoctor.at(-2)).toContain('[ ? ] More')
+    expect(emptyDoctor.at(-2)).not.toContain('[ ↑↓ ] Inspect')
+    expect(emptyDoctor.at(-2)).not.toContain('[ Home ] First')
+    expect(emptyDoctor.at(-2)).not.toContain('[ End ] Last')
+    expect(emptyDoctor.join('\n')).toContain('No diagnostic checks in this report')
+    expect(emptyDoctor[1]).toContain('[Doctor]')
+    expect(emptyDoctor[1]).not.toContain('[Doctor]✓')
+
+    screen.update({ doctor: null })
+    expect(screen.render(120).at(-2)).toContain('◆ [ d ] Run Doctor')
+
+    screen.update({
+      doctor: {
+        overall: 'pass',
+        checks: [{ status: 'pass', summary: 'Runtime reachable' }],
+      },
+    })
+    expect(screen.render(120).at(-2)).toContain('[ ↑↓ ] Inspect')
+    expect(screen.render(120).at(-2)).toContain('[ Home ] First')
+    expect(screen.render(120).at(-2)).toContain('[ End ] Last')
+    expect(screen.render(120)[1]).toContain('[Doctor]✓')
   })
 
   it('keeps the narrow Command Spine closed while Commands and Close remain clickable', () => {

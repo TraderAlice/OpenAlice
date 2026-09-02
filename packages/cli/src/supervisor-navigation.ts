@@ -14,6 +14,7 @@ export interface SupervisorNavigationView {
   machineCount?: number
   logCount?: number
   doctor?: {
+    checks: number
     failures: number
     warnings: number
   }
@@ -202,7 +203,7 @@ function countBadge(count?: number): string {
 }
 
 function doctorBadge(doctor?: SupervisorNavigationView['doctor']): string {
-  if (!doctor) return ''
+  if (!doctor || doctor.checks === 0) return ''
   if (doctor.failures > 0) return `×${doctor.failures}`
   if (doctor.warnings > 0) return `!${doctor.warnings}`
   return '✓'

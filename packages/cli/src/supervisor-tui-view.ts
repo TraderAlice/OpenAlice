@@ -96,6 +96,7 @@ export interface SupervisorContextTipView {
   panel: string
   runtimeState?: string
   recovery?: boolean
+  itemCount?: number
 }
 
 export interface SupervisorHeaderRender {
@@ -672,9 +673,13 @@ export function renderSupervisorContextTip(
     : view.panel === 'fleet'
       ? 'First click focuses a pane; click its selection again to activate it.'
       : view.panel === 'logs'
-        ? 'y copies the focused safe event; End returns to the latest.'
+        ? view.itemCount === 0
+          ? 'No Runtime events in this lens; l reloads the bounded snapshot.'
+          : 'y copies the focused safe event; End returns to the latest.'
         : view.panel === 'doctor'
-          ? 'Doctor is read-only; d refreshes checks without changing Runtime.'
+          ? view.itemCount === 0
+            ? 'No diagnostic checks in this report; d reruns read-only Doctor.'
+            : 'Doctor is read-only; d refreshes checks without changing Runtime.'
           : view.panel === 'help'
             ? '/ searches every available command without leaving this view.'
             : view.runtimeState === 'absent'
