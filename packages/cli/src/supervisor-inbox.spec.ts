@@ -73,7 +73,7 @@ describe('Supervisor Inbox', () => {
     expect(frame).toContain('Inbox Desk')
     expect(frame).toContain('MESSAGE STREAM')
     expect(frame).toContain('1 UNREAD')
-    expect(frame).toContain('● Morning brief')
+    expect(frame).toContain('● Macro desk / codex  ·  Morning brief')
     expect(frame).toContain('SELECTED · UNREAD')
     expect(frame).toContain('Risk is concentrated in semiconductors.')
     expect(frame).toContain('reports/morning.md')

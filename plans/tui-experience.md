@@ -3391,6 +3391,23 @@ already large `supervisor-tui.ts` application controller.
   and the complete CLI suite (63 files, 638 tests). CLI typecheck and build also
   pass.
 
+### Inbox source-first stream decision
+
+- Cell-accurate 120x32 and 80x24 Inbox captures showed Message Stream rows
+  spending their scarce leading width on body summaries. Workspace and agent
+  provenance came afterward and was commonly truncated, so repeated report
+  language made distinct messages look interchangeable until opened.
+- Stream rows now lead with `Workspace / agent`, followed by summary and
+  relative time. If no agent is reported they retain the Workspace alone. The
+  Selected inspector remains the owner of the complete title, Workspace, From,
+  body, documents, timestamp, and Mark read/unread action.
+- Real 120x32 and 80x24 captures verify source identities survive truncation
+  while summaries remain scannable, with no change to selection, pointer rows,
+  history polling, read-state mutation, ordering, or persistence.
+- Inbox-source-first acceptance passes through all 140 Inbox, screen, and
+  real-PTY tests (including all 54 PTY cases), and the complete CLI suite (63
+  files, 638 tests). CLI typecheck and build also pass.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

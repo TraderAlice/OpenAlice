@@ -514,8 +514,11 @@ intentionally parameter-free:
   read/unread state, polls every 20 seconds, and offers no delete action. Its
   single responsive Inbox Desk keeps Message Stream and Selected Message in
   open columns on wide terminals and stacks the same reading order at compact
-  widths. The selected message owns Enter's Mark read/unread action; arrows or
-  the wheel move selection, and the contextual Tip teaches that exact loop.
+  widths. Stream rows lead with Workspace and agent provenance before their
+  bounded summary and relative time, so truncation cannot hide the identity
+  users need to choose a message; Selected Message owns the complete body and
+  documents. The selected message owns Enter's Mark read/unread action; arrows
+  or the wheel move selection, and the contextual Tip teaches that exact loop.
   The Command Spine uses the themed `● INBOX` view identity, contracts it to
   `● BOX` only at the intermediate responsive tier, and removes the badge
   before sacrificing target or Runtime truth.

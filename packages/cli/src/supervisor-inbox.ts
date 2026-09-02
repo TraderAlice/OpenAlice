@@ -199,7 +199,7 @@ export function renderSupervisorInbox(
     const index = start + offset
     const marker = index === normalized.selected ? '›' : index === normalized.hovered ? '»' : ' '
     const attention = entry.readAt ? '○' : '●'
-    return `${marker} ${attention} ${entryTitle(entry)}  ·  ${workspaceLabel(entry)}  ·  ${relativeTime(entry.ts)}`
+    return `${marker} ${attention} ${streamSourceLabel(entry)}  ·  ${entryTitle(entry)}  ·  ${relativeTime(entry.ts)}`
   })
   const selected = entries[normalized.selected]!
   const unread = supervisorInboxUnreadCount(snapshot)
@@ -331,6 +331,12 @@ function entryTitle(entry: SupervisorInboxEntry): string {
 
 function workspaceLabel(entry: SupervisorInboxEntry): string {
   return safe(entry.workspaceLabel ?? entry.workspaceId)
+}
+
+function streamSourceLabel(entry: SupervisorInboxEntry): string {
+  const workspace = workspaceLabel(entry)
+  const agent = entry.origin?.agent ? safe(entry.origin.agent) : ''
+  return agent ? `${workspace} / ${agent}` : workspace
 }
 
 function wrapText(value: string, width: number, limit: number): string[] {
