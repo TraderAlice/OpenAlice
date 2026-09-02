@@ -600,9 +600,27 @@ export async function runSupervisorTui(
         )
       : []
     const focusConsoleRow = terminal.height - focusConsole.length
-    const externalCommands = supervisorCommandTargets(focusConsole)
+    const focusHeader = focusTask
+      ? renderSupervisorNavigation({
+          selected: screen.snapshot.panel ?? 'overview',
+          focusTask,
+        }, Math.max(1, terminal.width - 4)).line
+      : ''
+    const focusBack = '[ Esc ] Back'
+    const focusBackOffset = focusHeader.indexOf(focusBack)
+    const headerCommands: SupervisorCommandTarget[] = focusBackOffset >= 0
+      ? [{
+          row: 2,
+          startColumn: displayWidth(focusHeader.slice(0, focusBackOffset)) + 3,
+          endColumn: displayWidth(focusHeader.slice(0, focusBackOffset)) + 2 + displayWidth(focusBack),
+          label: 'Esc',
+          surface: focusBack,
+        }]
+      : []
+    const consoleCommands = supervisorCommandTargets(focusConsole)
       .filter((target) => target.label === 'Enter' || target.label === '↑↓' || target.label === 'Esc')
       .map((target) => ({ ...target, row: target.row + focusConsoleRow }))
+    const externalCommands = [...headerCommands, ...consoleCommands]
     overlayPointer.capture({
       lines,
       width,

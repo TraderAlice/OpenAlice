@@ -182,6 +182,9 @@ export function decorateSupervisorFrame(
     if (line.startsWith('×  ERROR')) return theme.dangerRail(line)
     if (line.startsWith('◆  STATUS')) return theme.infoRail(line)
     if (line.startsWith('◇  PREVIEW')) return theme.navigationHover(line)
+    if (index === 1 && line.includes('◆ FOCUS ·')) {
+      return decorateFocusHeader(line, theme, options.hoveredCommand?.label)
+    }
     if (index === 1) return decorateTabs(line, theme, options.panel, options.hoveredPanel)
     if (index === 2) return decorateNavigationBeaconRail(line, theme)
     if (line.startsWith('› ') || line.startsWith('▶ ') || line.includes('│ › ')) return theme.selected(line)
@@ -233,6 +236,32 @@ export function decorateSupervisorFrame(
     ) return theme.accentStrong(line)
     return line
   })
+}
+
+function decorateFocusHeader(
+  line: string,
+  theme: SupervisorTuiTheme,
+  hoveredCommand?: string,
+): string {
+  const pattern = /◆ FOCUS · [A-Z]+|\[ Esc \] Back|(?:SETUP STUDIO|SOURCE LAUNCH BAY|ALICEPROJECT SWITCHBOARD|RELEASE OBSERVATORY|TRANSFER FLIGHT DECK)|(?:INSPECT · EDIT · VALIDATE · SAVE|SELECT · VALIDATE · SAVE · LAUNCH|INSPECT · SELECT OR CREATE · REMEMBER|CHOOSE · PROBE · CONFIRM · INSTALL|8-STAGE GUARDED MIGRATION)/gu
+  let output = ''
+  let cursor = 0
+  for (const match of line.matchAll(pattern)) {
+    const offset = match.index
+    const token = match[0]
+    output += theme.navigationRail(line.slice(cursor, offset))
+    if (token.startsWith('◆ FOCUS')) output += theme.selected(token)
+    else if (token === '[ Esc ] Back') {
+      output += decorateDockKeyedToken(token, theme, theme.dockControl, hoveredCommand)
+    } else if (token.includes(' · ') || token.startsWith('8-STAGE')) {
+      output += theme.muted(token)
+    } else {
+      output += theme.accentStrong(token)
+    }
+    cursor = offset + token.length
+  }
+  output += theme.navigationRail(line.slice(cursor))
+  return output
 }
 
 export function decorateSupervisorFramedColumns(

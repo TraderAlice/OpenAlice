@@ -475,6 +475,23 @@ not imply maintainer approval of the finished interaction.
   prior panel Console unchanged. This is an autonomous topic decision, not a
   recorded maintainer approval.
 
+### Focus Header decision
+
+- Leaving Overview, Machines, Logs, Doctor, and Help visible preserves the
+  normal rail, but every label becomes a false affordance once an overlay owns
+  pointer and keyboard input. Clearing only the selected brackets does not tell
+  the user that page navigation has intentionally yielded to the task.
+- Allowing those tabs to remain live would punch through the focused workflow,
+  create ambiguous overlay lifetime, and make Back/validation semantics depend
+  on an unrelated page switch.
+- The selected model replaces the page rail with a task-owned Focus Header for
+  the overlay lifetime. It names the task surface and its existing contract,
+  anchors a real `[ Esc ] Back` at the right edge, publishes no page targets,
+  and routes that Back segment to the same active overlay component. The rail
+  below becomes a quiet divider with no stale selection beacon. Closing the
+  task restores the complete operational navigation unchanged. This is an
+  autonomous topic decision, not a recorded maintainer approval.
+
 ### Setup Studio decision
 
 - Recoloring the existing single-column `SettingsList` would retain its proven
@@ -2282,6 +2299,21 @@ already large `supervisor-tui.ts` application controller.
   skipped; 6,204 tests passed, 10 skipped). Docker installer smoke passes
   without Node, npm, pnpm, Bun, or an Agent Runtime, and package dry-run contains
   every changed Supervisor source.
+- The Focus Header now removes Overview, Machines, Logs, Doctor, and Help for
+  the exact lifetime in which those page targets do not own input. Setup,
+  Source, Projects, Release, and Transfer instead project their existing task
+  surface and workflow contract into the Header, with a right-anchored Esc
+  exit and a quiet divider instead of a stale selection beacon.
+- Focus-Header acceptance passes with 133 focused navigation, renderer,
+  pointer, screen, and real-PTY tests. A truecolor 110x30 Transfer capture shows
+  `TRANSFER FLIGHT DECK` and `8-STAGE GUARDED MIGRATION` above the uninterrupted
+  Flight Deck, with no page labels or beacon. Raw SGR hover/click on the top
+  Back key closes an authentication-recovery frame through the active overlay
+  state machine and restores Fleet navigation. CLI build and root TypeScript
+  pass; the 701-file suite passes (700 passed, 1 skipped; 6,204 tests passed, 10
+  skipped). Docker installer smoke passes without Node, npm, pnpm, Bun, or an
+  Agent Runtime, and package dry-run contains the changed navigation, theme,
+  pointer, and Supervisor sources.
 
 ## Completion Criteria
 

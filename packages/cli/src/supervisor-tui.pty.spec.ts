@@ -1001,8 +1001,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
             if (output.includes(expected)) {
               stage = 20
               if (scenario === 'auth-loss') {
-                child.write('\u001b[<35;30;30M')
-                setTimeout(() => child.write('\u001b[<0;30;30M'), 300)
+                child.write('\u001b[<35;90;2M')
+                setTimeout(() => child.write('\u001b[<0;90;2M'), 300)
               } else {
                 child.write('\r')
               }
@@ -1053,6 +1053,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }
       if (scenario !== 'default-no') {
         expect(transcript).toContain('◆ FOCUS · TRANSFER')
+        expect(transcript).toContain('TRANSFER FLIGHT DECK')
         expect(transcript).toContain('◆ TRANSFER')
         expect(transcript).toContain('◆ [ Enter ] Continue  │  [ ↑↓ ] Move choice  │  [ Esc ] Step back')
         expect(transcript).toContain('◆ FOCUS WORKSPACE  ›  [ Esc ] Back')

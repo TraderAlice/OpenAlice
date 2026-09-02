@@ -445,9 +445,11 @@ intentionally parameter-free:
 Setup, Source, AliceProject, Release, and Remote Transfer use one secondary-task
 surface. At 100x28 and larger, a Focus Workspace replaces every Overview
 content row between the Mission Header and Control Console instead of allowing
-unrelated cards to show through a centered dialog. The navigation rail clears its active
-top-level selection and names the focused task, while the Context Ribbon uses
-the same task identity. The task renderer, pointer targets, and mutation
+unrelated cards to show through a centered dialog. During focus, the ordinary
+navigation rail is replaced by a task-owned Focus Header: it names the task
+surface and existing workflow contract, exposes a real Esc Back action, and
+publishes no page targets. The Context Ribbon uses the same task identity. The
+task renderer, pointer targets, and mutation
 callbacks remain unchanged inside that stage. Smaller terminals retain the
 bounded centered sheet because their stacked responsive content takes priority
 over clearing the whole viewport. Closing the task restores the prior

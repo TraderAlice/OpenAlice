@@ -40,16 +40,29 @@ describe('Supervisor navigation rail', () => {
     expect(layout.targets).toHaveLength(5)
   })
 
-  it('yields page selection to a focused secondary task', () => {
+  it('replaces false page affordances with a task-owned Focus Header', () => {
     const layout = renderSupervisorNavigation({
       selected: 'overview',
       focusTask: 'setup',
     }, 100)
 
-    expect(layout.line).toContain('◆ Overview')
-    expect(layout.line).not.toContain('[Overview]')
     expect(layout.line).toContain('◆ FOCUS · SETUP')
+    expect(layout.line).toContain('SETUP STUDIO')
+    expect(layout.line).toContain('[ Esc ] Back')
+    expect(layout.line).not.toContain('Overview')
+    expect(layout.line).not.toContain('Machines')
+    expect(layout.targets).toEqual([])
     expect(displayWidth(layout.line)).toBe(100)
+
+    const compact = renderSupervisorNavigation({
+      selected: 'fleet',
+      focusTask: 'transfer',
+    }, 46)
+    expect(compact.line).toContain('◆ TRANSFER')
+    expect(compact.line).toContain('[ Esc ] Back')
+    expect(compact.line).not.toContain('Fleet')
+    expect(compact.targets).toEqual([])
+    expect(displayWidth(compact.line)).toBe(46)
   })
 
   it('derives badge-edge pointer hits from the rendered layout', () => {

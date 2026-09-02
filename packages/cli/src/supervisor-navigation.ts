@@ -1,10 +1,11 @@
 import { displayWidth, truncateDisplayWidth } from './supervisor-display.ts'
+import type { SupervisorFocusTask } from './supervisor-task-surface.ts'
 
 export type SupervisorNavigationPanel = 'fleet' | 'overview' | 'logs' | 'doctor' | 'help'
 
 export interface SupervisorNavigationView {
   selected: SupervisorNavigationPanel
-  focusTask?: string
+  focusTask?: SupervisorFocusTask
   recovery?: boolean
   machineCount?: number
   logCount?: number
@@ -40,12 +41,12 @@ export function renderSupervisorNavigation(
   view: SupervisorNavigationView,
   width: number,
 ): SupervisorNavigationLayout {
+  if (view.focusTask) return renderFocusHeader(view.focusTask, width)
   const items = navigationItems(view)
   const variants = ['wide', 'compact', 'minimal'] as const
-  const selected = view.focusTask ? undefined : view.selected
-  const focus = view.focusTask ? `◆ FOCUS · ${view.focusTask.toUpperCase()}` : ''
+  const selected = view.selected
   const variant = variants.find((candidate) => (
-    displayWidth(renderItems(items, selected, candidate)) + (focus ? displayWidth(focus) + 2 : 0) <= width
+    displayWidth(renderItems(items, selected, candidate)) <= width
   )) ?? 'minimal'
   const targets: SupervisorNavigationTarget[] = []
   let column = 1
@@ -64,13 +65,61 @@ export function renderSupervisorNavigation(
     return segment
   })
   const content = truncateDisplayWidth(segments.join(SEPARATOR), width)
-  const focusGap = focus ? Math.max(1, width - displayWidth(content) - displayWidth(focus)) : 0
-  const line = focus
-    ? truncateDisplayWidth(`${content}${' '.repeat(focusGap)}${focus}`, width)
-    : content
   return {
-    line: line.padEnd(width, ' '),
+    line: content.padEnd(width, ' '),
     targets,
+  }
+}
+
+function renderFocusHeader(
+  task: SupervisorFocusTask,
+  width: number,
+): SupervisorNavigationLayout {
+  const definition: Record<SupervisorFocusTask, {
+    title: string
+    compact: string
+    contract: string
+  }> = {
+    setup: {
+      title: 'SETUP STUDIO',
+      compact: 'SETUP',
+      contract: 'INSPECT · EDIT · VALIDATE · SAVE',
+    },
+    source: {
+      title: 'SOURCE LAUNCH BAY',
+      compact: 'SOURCE',
+      contract: 'SELECT · VALIDATE · SAVE · LAUNCH',
+    },
+    projects: {
+      title: 'ALICEPROJECT SWITCHBOARD',
+      compact: 'PROJECTS',
+      contract: 'INSPECT · SELECT OR CREATE · REMEMBER',
+    },
+    release: {
+      title: 'RELEASE OBSERVATORY',
+      compact: 'RELEASE',
+      contract: 'CHOOSE · PROBE · CONFIRM · INSTALL',
+    },
+    transfer: {
+      title: 'TRANSFER FLIGHT DECK',
+      compact: 'TRANSFER',
+      contract: '8-STAGE GUARDED MIGRATION',
+    },
+  }
+  const current = definition[task]
+  const back = '[ Esc ] Back'
+  const candidates = [
+    `◆ FOCUS · ${task.toUpperCase()}  │  ${current.title}  │  ${current.contract}`,
+    `◆ FOCUS · ${task.toUpperCase()}  │  ${current.title}`,
+    `◆ ${current.compact}`,
+  ]
+  const available = Math.max(1, width - displayWidth(back) - 2)
+  const left = candidates.find((candidate) => displayWidth(candidate) <= available)
+    ?? truncateDisplayWidth(candidates.at(-1)!, available)
+  const gap = Math.max(1, width - displayWidth(left) - displayWidth(back))
+  return {
+    line: truncateDisplayWidth(`${left}${' '.repeat(gap)}${back}`, width).padEnd(width, ' '),
+    targets: [],
   }
 }
 
