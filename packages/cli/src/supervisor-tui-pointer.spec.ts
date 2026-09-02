@@ -8,6 +8,9 @@ describe('Supervisor TUI pointer', () => {
       col: 12, row: 4, leftClick: true, motion: false, release: false, wheel: null,
     })
     expect(parseSupervisorPointer('\u001b[<35;8;9M')).toMatchObject({ motion: true, leftClick: false })
+    expect(parseSupervisorPointer('\u001b[<32;8;9M')).toMatchObject({
+      motion: true, leftClick: false, leftDrag: true,
+    })
     expect(parseSupervisorPointer('\u001b[<0;12;4m')).toMatchObject({ release: true, leftClick: false })
     expect(parseSupervisorPointer('\u001b[<64;3;7M')?.wheel).toBe(-1)
     expect(parseSupervisorPointer('\u001b[<65;3;7M')?.wheel).toBe(1)

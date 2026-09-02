@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
 import { displayWidth } from './supervisor-display.ts'
-import { withSupervisorScrollRail } from './supervisor-scroll-rail.ts'
+import {
+  supervisorScrollRailIndexAt,
+  withSupervisorScrollRail,
+} from './supervisor-scroll-rail.ts'
 
 describe('Supervisor scroll rail', () => {
   it('stays hidden when the complete collection fits', () => {
@@ -19,5 +22,20 @@ describe('Supervisor scroll rail', () => {
     expect(middle.map((row) => row.at(-1))).toEqual(['│', '│', '█', '│'])
     expect(bottom.map((row) => row.at(-1))).toEqual(['│', '│', '│', '█'])
     expect([...top, ...middle, ...bottom].every((row) => displayWidth(row) === 8)).toBe(true)
+  })
+
+  it('maps hover and direct manipulation onto real proportional items', () => {
+    const hovered = withSupervisorScrollRail(
+      ['one', 'two', 'three', 'four'],
+      8,
+      { offset: 4, total: 12, hoveredRow: 1 },
+    )
+    expect(hovered.map((row) => row.at(-1))).toEqual(['│', '◆', '█', '│'])
+    expect(supervisorScrollRailIndexAt(0, 4, 12)).toBe(0)
+    expect(supervisorScrollRailIndexAt(1, 4, 12)).toBe(4)
+    expect(supervisorScrollRailIndexAt(2, 4, 12)).toBe(7)
+    expect(supervisorScrollRailIndexAt(3, 4, 12)).toBe(11)
+    expect(supervisorScrollRailIndexAt(0, 4, 4)).toBeUndefined()
+    expect(supervisorScrollRailIndexAt(4, 4, 12)).toBeUndefined()
   })
 })

@@ -99,13 +99,23 @@ describe('Supervisor Runtime log presentation', () => {
     const many = {
       entries: Array.from({ length: 20 }, (_, index) => ({ text: `event ${index + 1}` })),
     }
-    const rendered = renderSupervisorLogs(many, 80, 9, 'all', 10)
+    const rendered = renderSupervisorLogs(many, 80, 9, 'all', 10, undefined, 3)
     expect(rendered.lines.join('\n')).toContain('8–14/20 · ALL')
     expect(rendered.lines.join('\n')).toContain('› · 11  event 11')
     expect(rendered.lines.join('\n')).toContain('» · 10  event 10')
     expect(rendered.lines.join('\n')).toContain('Event Lens · LINE 11 · INFO · TEXT')
     expect(rendered.targets).toHaveLength(7)
     expect(rendered.targets.find((target) => target.fromEnd === 10)?.row).toBe(4)
+    expect(rendered.railTargets).toEqual([
+      { row: 2, column: 78, trackRow: 0, index: 0 },
+      { row: 3, column: 78, trackRow: 1, index: 3 },
+      { row: 4, column: 78, trackRow: 2, index: 6 },
+      { row: 5, column: 78, trackRow: 3, index: 10 },
+      { row: 6, column: 78, trackRow: 4, index: 13 },
+      { row: 7, column: 78, trackRow: 5, index: 16 },
+      { row: 8, column: 78, trackRow: 6, index: 19 },
+    ])
+    expect(rendered.lines[4]?.at(-3)).toBe('◆')
     expect(rendered.lines.join('\n')).toContain('█')
     expect(rendered.lines.join('\n')).toContain('│')
   })
@@ -121,6 +131,7 @@ describe('Supervisor Runtime log presentation', () => {
     expect(expanded.lines.join('\n')).toContain('› · 20  event 20')
     expect(expanded.lines.join('\n')).not.toContain('█')
     expect(expanded.targets).toHaveLength(20)
+    expect(expanded.railTargets).toEqual([])
     expect(expanded.targets.at(-1)).toEqual({
       row: 21,
       startColumn: 2,

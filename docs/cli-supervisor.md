@@ -157,7 +157,11 @@ path is intentionally parameter-free:
   keep the action/detach footer visible at the supported 80×24 baseline.
   Overflowing Machine and AliceProject panes reserve their final content column
   for a proportional `│` track and `█` thumb, exposing each pane's independent
-  window position without changing keyboard or pointer selection. In the wide
+  window position. Hovering that Rail Navigator replaces the track cell with
+  `◆` and previews the proportional Machine or AliceProject; left press jumps
+  selection to it and owns a left-button drag until release. Rail interaction
+  only changes focus and selection, so it never drills in, opens, stops,
+  restarts, or detaches an AliceProject. In the wide
   hierarchy, the active pane uses a `◆` title and `▶` strong selection while
   the related inactive pane uses a `◇` title and foreground-only `◁` context.
   Enter, left-arrow, or pointer selection moves that same focus owner; narrow
@@ -764,6 +768,10 @@ over a redacted snapshot, not an unbounded file follower. Follow, pause, and
 component filtering remain later work and must reuse this bounded reader.
 When the stream exceeds its responsive window, its final content column renders
 a proportional `│` track and `█` thumb that follows the same selected window.
+Hovering that Rail Navigator marks the exact track row with `◆` and previews
+the proportional event. Left press jumps to that real event and begins a
+rail-owned left-button drag; motion scrubs the bounded snapshot until release.
+It never reloads Logs or invokes the selected event as an action.
 At 100 columns and wider, a known terminal height turns Logs into an Operational
 Canvas: the compact ten-event baseline expands only as far as the loaded,
 filtered snapshot and available viewport permit. The Event stream, Lens height,
@@ -814,7 +822,10 @@ than claiming health. Both states expose a pointer-capable `d` action segment
 that emits the existing Doctor key; neither performs a repair or introduces a
 second diagnostic path.
 An overflowing checklist uses the same proportional `│`/`█` rail as Event Lens
-and Fleet; the rail is positional evidence rather than another control.
+and Fleet. Hover marks a proportional check with `◆` and previews it; left
+press selects that real check and begins a rail-owned left-button drag until
+release. This Rail Navigator changes inspection selection only and never runs
+Doctor or performs a repair.
 At 100 columns and wider, a known terminal height applies the same Operational
 Canvas rule independently to Doctor: the ten-check baseline may expand to show
 more real checks, while the Inspector pads only to keep the two owning frames

@@ -12,6 +12,7 @@ export interface SupervisorPointerEvent {
   wheel: -1 | 1 | null
   motion: boolean
   leftClick: boolean
+  leftDrag?: boolean
 }
 
 export interface SupervisorTerminalCanvas {
@@ -43,7 +44,8 @@ export function parseSupervisorPointer(
   const wheel = button & 64 ? (button & 1 ? 1 : -1) as 1 | -1 : null
   const motion = (button & 32) !== 0 && wheel === null
   const leftClick = !release && wheel === null && !motion && (button & 3) === 0
-  return { button, col, row, release, wheel, motion, leftClick }
+  const leftDrag = motion && (button & 3) === 0
+  return { button, col, row, release, wheel, motion, leftClick, leftDrag }
 }
 
 export function createSupervisorTerminalCanvas(

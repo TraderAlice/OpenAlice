@@ -3,7 +3,10 @@ import type {
   MachineProjectInventory,
 } from './machine-inventory.ts'
 import { displayWidth, truncateDisplayWidth } from './supervisor-display.ts'
-import { withSupervisorScrollRail } from './supervisor-scroll-rail.ts'
+import {
+  supervisorScrollRailIndexAt,
+  withSupervisorScrollRail,
+} from './supervisor-scroll-rail.ts'
 
 export { displayWidth, truncateDisplayWidth } from './supervisor-display.ts'
 
@@ -25,6 +28,12 @@ export interface SupervisorFleetPointerTarget {
   focus: FleetFocus
   index: number
   surface?: 'pane'
+}
+
+export interface SupervisorFleetRailTarget {
+  focus: FleetFocus
+  index: number
+  trackRow: number
 }
 
 export function createSupervisorFleetState(
@@ -181,6 +190,7 @@ export function renderSupervisorFleet(
   hovered?: SupervisorFleetPointerTarget,
   pulse = false,
   visibleRows = SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
+  hoveredRail?: SupervisorFleetRailTarget,
 ): string[] {
   if (width < 72) {
     return renderNarrowFleet(
@@ -189,6 +199,7 @@ export function renderSupervisorFleet(
       hovered,
       pulse,
       SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
+      hoveredRail,
     )
   }
   const rowCount = fleetVisibleRows(state, visibleRows)
@@ -203,6 +214,7 @@ export function renderSupervisorFleet(
     hovered,
     state.focus === 'machines',
     rowCount,
+    hoveredRail?.focus === 'machines' ? hoveredRail.trackRow : null,
   )
   const projectRows = renderProjectRows(
     state,
@@ -211,6 +223,7 @@ export function renderSupervisorFleet(
     pulse,
     state.focus === 'projects',
     rowCount,
+    hoveredRail?.focus === 'projects' ? hoveredRail.trackRow : null,
   )
   const leftPane = renderPane(
     `Machines · ${positionLabel(state.selectedMachine, state.machines.length)}`,
@@ -248,13 +261,21 @@ function renderNarrowFleet(
   hovered?: SupervisorFleetPointerTarget,
   pulse = false,
   rowCount = SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
+  hoveredRail?: SupervisorFleetRailTarget,
 ): string[] {
   const machine = selectedFleetMachine(state)
   if (state.focus === 'machines') {
     return [
       ...renderPane(
         `Machines · ${positionLabel(state.selectedMachine, state.machines.length)}`,
-        renderMachineRows(state, width - 4, hovered, true, rowCount),
+        renderMachineRows(
+          state,
+          width - 4,
+          hovered,
+          true,
+          rowCount,
+          hoveredRail?.focus === 'machines' ? hoveredRail.trackRow : null,
+        ),
         width,
         true,
         hovered?.surface === 'pane',
@@ -267,7 +288,15 @@ function renderNarrowFleet(
   return [
     ...renderPane(
       `AliceProjects · ${machine?.displayName ?? 'none'} · ${positionLabel(state.selectedProjects[machine?.key ?? ''] ?? 0, machine?.projects.length ?? 0)}`,
-      renderProjectRows(state, width - 4, hovered, pulse, true, rowCount),
+      renderProjectRows(
+        state,
+        width - 4,
+        hovered,
+        pulse,
+        true,
+        rowCount,
+        hoveredRail?.focus === 'projects' ? hoveredRail.trackRow : null,
+      ),
       width,
       true,
       hovered?.surface === 'pane',
@@ -334,12 +363,49 @@ export function supervisorFleetTargetAt(
     : { focus, index: selected, surface: 'pane' }
 }
 
+export function supervisorFleetRailTargetAt(
+  state: SupervisorFleetState,
+  width: number,
+  column: number,
+  row: number,
+  visibleRows = SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
+): SupervisorFleetRailTarget | undefined {
+  const rowCount = width < 72
+    ? SUPERVISOR_FLEET_MIN_VISIBLE_ROWS
+    : fleetVisibleRows(state, visibleRows)
+  if (row < 2 || row > rowCount + 1) return undefined
+  const trackRow = row - 2
+  let focus: FleetFocus
+  let items: readonly unknown[]
+  if (width < 72) {
+    if (column !== width - 2) return undefined
+    focus = state.focus
+    items = focus === 'machines'
+      ? state.machines
+      : selectedFleetMachine(state)?.projects ?? []
+  } else {
+    const leftWidth = Math.max(28, Math.min(36, Math.floor(width * 0.38)))
+    if (column === leftWidth - 2) {
+      focus = 'machines'
+      items = state.machines
+    } else if (column === width - 2) {
+      focus = 'projects'
+      items = selectedFleetMachine(state)?.projects ?? []
+    } else {
+      return undefined
+    }
+  }
+  const index = supervisorScrollRailIndexAt(trackRow, rowCount, items.length)
+  return index === undefined ? undefined : { focus, index, trackRow }
+}
+
 function renderMachineRows(
   state: SupervisorFleetState,
   width: number,
   hovered?: SupervisorFleetPointerTarget,
   focused = true,
   visibleRows = SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
+  hoveredRailRow: number | null = null,
 ): string[] {
   if (state.machines.length === 0) return ['  No Machines registered']
   const start = visibleWindowStart(state.machines.length, state.selectedMachine, visibleRows)
@@ -354,7 +420,11 @@ function renderMachineRows(
       : `${machineGlyph(item)} ${status}`
     return labelAndTail(prefix + item.displayName, count, width)
   })
-  return withSupervisorScrollRail(rows, width, { offset: start, total: state.machines.length })
+  return withSupervisorScrollRail(rows, width, {
+    offset: start,
+    total: state.machines.length,
+    hoveredRow: hoveredRailRow,
+  })
 }
 
 function renderProjectRows(
@@ -364,6 +434,7 @@ function renderProjectRows(
   pulse = false,
   focused = true,
   visibleRows = SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
+  hoveredRailRow: number | null = null,
 ): string[] {
   const machine = selectedFleetMachine(state)
   if (!machine) return ['  Select a Machine']
@@ -383,7 +454,11 @@ function renderProjectRows(
     ].filter(Boolean).join(' · ')
     return labelAndTail(`${prefix}${item.displayName}`, marks, width)
   })
-  return withSupervisorScrollRail(rows, width, { offset: start, total: machine.projects.length })
+  return withSupervisorScrollRail(rows, width, {
+    offset: start,
+    total: machine.projects.length,
+    hoveredRow: hoveredRailRow,
+  })
 }
 
 function fleetSelectionDetail(state: SupervisorFleetState, pulse = false): string[] {

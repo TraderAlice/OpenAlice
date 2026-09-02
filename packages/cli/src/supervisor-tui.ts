@@ -188,10 +188,13 @@ import {
   selectFleetProjectByKey,
   setFleetFocus,
   SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
+  supervisorFleetRailTargetAt,
   supervisorFleetTargetAt,
+  type SupervisorFleetRailTarget,
   type SupervisorFleetPointerTarget,
   type SupervisorFleetState,
 } from './supervisor-fleet.ts'
+import type { SupervisorScrollRailTarget } from './supervisor-scroll-rail.ts'
 import {
   createSupervisorTransferWizard,
   renderTransferPlanReview,
@@ -243,6 +246,14 @@ const WIDE_OVERVIEW_MAX_HEIGHT = 17
 const WIDE_OVERVIEW_RESERVED_CHROME_HEIGHT = 6
 const FLEET_VIEWPORT_RESERVED_HEIGHT = 13
 const WIDE_OPERATIONAL_CANVAS_RESERVED_CHROME_HEIGHT = 6
+
+type SupervisorRailSurface = 'logs' | 'doctor' | 'fleet-machines' | 'fleet-projects'
+
+interface SupervisorRailPointerTarget {
+  surface: SupervisorRailSurface
+  index: number
+  trackRow: number
+}
 
 interface RuntimeSummary {
   class?: string
@@ -2965,6 +2976,8 @@ export class SupervisorScreen implements Component {
   private navigationTargets: SupervisorNavigationTarget[] = []
   private navigationBeaconColumn?: number
   private hoveredFleetTarget?: SupervisorFleetPointerTarget
+  private hoveredRail?: SupervisorRailPointerTarget
+  private activeRailDrag?: SupervisorRailSurface
   private fleetVisibleRows = SUPERVISOR_FLEET_MIN_VISIBLE_ROWS
   private hoveredCommandTarget?: SupervisorCommandTarget
   private commandTargets: SupervisorCommandTarget[] = []
@@ -2983,8 +2996,10 @@ export class SupervisorScreen implements Component {
   private logFilter: SupervisorLogFilter = 'all'
   private hoveredLogFromEnd: number | null = null
   private logTargets: SupervisorLogTarget[] = []
+  private logRailTargets: SupervisorScrollRailTarget[] = []
   private doctorState: SupervisorDoctorState = createSupervisorDoctorState()
   private doctorTargets: SupervisorDoctorTarget[] = []
+  private doctorRailTargets: SupervisorScrollRailTarget[] = []
   private helpState: SupervisorHelpState = createSupervisorHelpState()
   private helpTargets: SupervisorHelpTarget[] = []
   private homePrimaryHovered = false
@@ -3058,9 +3073,11 @@ export class SupervisorScreen implements Component {
     if (patch.logs !== undefined && patch.logs !== this.snapshot.logs) {
       this.logsFromEnd = 0
       this.hoveredLogFromEnd = null
+      if (this.hoveredRail?.surface === 'logs') this.hoveredRail = undefined
     }
     if (patch.doctor !== undefined && patch.doctor !== this.snapshot.doctor) {
       this.doctorState = createSupervisorDoctorState(patch.doctor)
+      if (this.hoveredRail?.surface === 'doctor') this.hoveredRail = undefined
     }
     if (patch.busy !== undefined && patch.busy !== this.snapshot.busy) this.motionFrame = 0
     if (patch.runtime !== undefined) {
@@ -3511,7 +3528,16 @@ export class SupervisorScreen implements Component {
     const fleet = !this.commandDeckOpen && this.snapshot.panel === 'fleet'
       ? this.snapshot.fleet
       : undefined
-    const fleetTarget = fleet
+    const fleetRailTarget = fleet
+      ? supervisorFleetRailTargetAt(
+          fleet,
+          this.renderWidth,
+          event.col,
+          event.row - 4,
+          this.fleetVisibleRows,
+        )
+      : undefined
+    const fleetTarget = fleet && !fleetRailTarget
       ? supervisorFleetTargetAt(
           fleet,
           this.renderWidth,
@@ -3520,14 +3546,26 @@ export class SupervisorScreen implements Component {
           this.fleetVisibleRows,
         )
       : undefined
-    const doctorTarget = !this.commandDeckOpen && this.snapshot.panel === 'doctor'
+    const doctorRailTarget = !this.commandDeckOpen && this.snapshot.panel === 'doctor'
+      ? this.doctorRailTargets.find((target) => (
+          target.row === event.row && target.column === event.col
+        ))
+      : undefined
+    const doctorTarget = !doctorRailTarget
+      && !this.commandDeckOpen && this.snapshot.panel === 'doctor'
       ? this.doctorTargets.find((target) => (
           target.row === event.row
           && event.col >= target.startColumn
           && event.col <= target.endColumn
         ))
       : undefined
-    const logTarget = !this.commandDeckOpen && this.snapshot.panel === 'logs'
+    const logRailTarget = !this.commandDeckOpen && this.snapshot.panel === 'logs'
+      ? this.logRailTargets.find((target) => (
+          target.row === event.row && target.column === event.col
+        ))
+      : undefined
+    const logTarget = !logRailTarget
+      && !this.commandDeckOpen && this.snapshot.panel === 'logs'
       ? this.logTargets.find((target) => (
           target.row === event.row
           && event.col >= target.startColumn
@@ -3556,7 +3594,27 @@ export class SupervisorScreen implements Component {
         ))
       : undefined
     const commandTarget = commandAtPosition(this.commandTargets, event.col, event.row)
+    const railTarget: SupervisorRailPointerTarget | undefined = fleetRailTarget
+      ? {
+          surface: fleetRailTarget.focus === 'machines'
+            ? 'fleet-machines'
+            : 'fleet-projects',
+          index: fleetRailTarget.index,
+          trackRow: fleetRailTarget.trackRow,
+        }
+      : logRailTarget
+        ? { surface: 'logs', index: logRailTarget.index, trackRow: logRailTarget.trackRow }
+        : doctorRailTarget
+          ? { surface: 'doctor', index: doctorRailTarget.index, trackRow: doctorRailTarget.trackRow }
+          : undefined
     if (event.motion) {
+      if (event.leftDrag && this.activeRailDrag) {
+        if (railTarget?.surface === this.activeRailDrag) {
+          this.hoveredRail = railTarget
+          this.selectRailTarget(railTarget)
+        }
+        return true
+      }
       const fleetHoverChanged = fleetTarget?.focus !== this.hoveredFleetTarget?.focus
         || fleetTarget?.index !== this.hoveredFleetTarget?.index
         || fleetTarget?.surface !== this.hoveredFleetTarget?.surface
@@ -3574,6 +3632,9 @@ export class SupervisorScreen implements Component {
       const homeHotspotHoverChanged = homeHotspotHover !== this.hoveredHomeHotspot
       const headerReleaseHover = Boolean(headerRelease)
       const headerReleaseHoverChanged = headerReleaseHover !== this.headerReleaseHovered
+      const railHoverChanged = railTarget?.surface !== this.hoveredRail?.surface
+        || railTarget?.index !== this.hoveredRail?.index
+        || railTarget?.trackRow !== this.hoveredRail?.trackRow
       if (
         headerReleaseHoverChanged
         || hovered !== this.hoveredPanel
@@ -3584,6 +3645,7 @@ export class SupervisorScreen implements Component {
         || helpHoverChanged
         || homeHoverChanged
         || homeHotspotHoverChanged
+        || railHoverChanged
       ) {
         this.headerReleaseHovered = headerReleaseHover
         this.hoveredPanel = hovered
@@ -3594,10 +3656,18 @@ export class SupervisorScreen implements Component {
         this.helpState = { ...this.helpState, hovered: helpHover }
         this.homePrimaryHovered = homeHover
         this.hoveredHomeHotspot = homeHotspotHover
+        this.hoveredRail = railTarget
         this.requestRender?.()
       }
       return true
     }
+    if (event.leftClick && railTarget) {
+      this.activeRailDrag = railTarget.surface
+      this.hoveredRail = railTarget
+      this.selectRailTarget(railTarget)
+      return true
+    }
+    if (event.leftClick) this.activeRailDrag = undefined
     if (event.leftClick && headerRelease) {
       this.headerReleaseHovered = true
       return this.handleKey('u', (data, key) => data === key)
@@ -3676,7 +3746,11 @@ export class SupervisorScreen implements Component {
       this.requestRender?.()
       return true
     }
-    return event.release
+    if (event.release) {
+      this.activeRailDrag = undefined
+      return true
+    }
+    return false
   }
 
   handleCommandSpinePointer(event: SupervisorPointerEvent): boolean {
@@ -3757,7 +3831,9 @@ export class SupervisorScreen implements Component {
     ]
 
     this.doctorTargets = []
+    this.doctorRailTargets = []
     this.logTargets = []
+    this.logRailTargets = []
     this.helpTargets = []
     this.homePrimaryTarget = undefined
     this.homeHotspotTargets = []
@@ -3784,6 +3860,7 @@ export class SupervisorScreen implements Component {
         this.hoveredFleetTarget,
         this.runtimePulse,
         this.fleetVisibleRows,
+        fleetRailTargetFromPointer(this.hoveredRail),
       ))
     } else if (this.snapshot.panel === 'logs') {
       const logs = renderSupervisorLogs(
@@ -3793,9 +3870,14 @@ export class SupervisorScreen implements Component {
         this.logFilter,
         this.hoveredLogFromEnd,
         operationalCanvasHeight,
+        this.hoveredRail?.surface === 'logs' ? this.hoveredRail.trackRow : null,
       )
       const rowOffset = lines.length
       this.logTargets = logs.targets.map((target) => ({
+        ...target,
+        row: target.row + rowOffset,
+      }))
+      this.logRailTargets = logs.railTargets.map((target) => ({
         ...target,
         row: target.row + rowOffset,
       }))
@@ -3810,9 +3892,14 @@ export class SupervisorScreen implements Component {
         this.doctorState,
         width,
         operationalCanvasHeight,
+        this.hoveredRail?.surface === 'doctor' ? this.hoveredRail.trackRow : null,
       )
       const rowOffset = lines.length
       this.doctorTargets = doctor.targets.map((target) => ({
+        ...target,
+        row: target.row + rowOffset,
+      }))
+      this.doctorRailTargets = doctor.railTargets.map((target) => ({
         ...target,
         row: target.row + rowOffset,
       }))
@@ -3970,6 +4057,22 @@ export class SupervisorScreen implements Component {
 
   private hoverPreview(runtimeClass = 'unavailable'): string | undefined {
     if (this.commandDeckOpen) return undefined
+    if (this.hoveredRail?.surface === 'logs') {
+      const total = supervisorFilteredLogCount(this.snapshot.logs, this.logFilter)
+      return `Drag the rail to inspect Runtime event ${this.hoveredRail.index + 1}/${total} without reloading.`
+    }
+    if (this.hoveredRail?.surface === 'doctor') {
+      const total = this.snapshot.doctor?.checks?.length ?? 0
+      return `Drag the rail to inspect Doctor check ${this.hoveredRail.index + 1}/${total} without rerunning.`
+    }
+    if (this.hoveredRail?.surface === 'fleet-machines') {
+      const total = this.snapshot.fleet?.machines.length ?? 0
+      return `Drag the rail to select Machine ${this.hoveredRail.index + 1}/${total} without activating it.`
+    }
+    if (this.hoveredRail?.surface === 'fleet-projects') {
+      const total = selectedFleetMachine(this.snapshot.fleet)?.projects.length ?? 0
+      return `Drag the rail to select AliceProject ${this.hoveredRail.index + 1}/${total} without activating it.`
+    }
     if (this.headerReleaseHovered) {
       return `Inspect the ${this.snapshot.channel} release lane and available update.`
     }
@@ -4067,6 +4170,29 @@ export class SupervisorScreen implements Component {
     this.requestRender?.()
   }
 
+  private selectRailTarget(target: SupervisorRailPointerTarget): void {
+    if (target.surface === 'logs') {
+      const total = supervisorFilteredLogCount(this.snapshot.logs, this.logFilter)
+      this.logsFromEnd = Math.max(0, total - 1 - clamp(target.index, 0, Math.max(0, total - 1)))
+      this.hoveredLogFromEnd = null
+      this.requestRender?.()
+      return
+    }
+    if (target.surface === 'doctor') {
+      const total = this.snapshot.doctor?.checks?.length ?? 0
+      this.doctorState = {
+        selected: clamp(target.index, 0, Math.max(0, total - 1)),
+        hovered: null,
+      }
+      this.requestRender?.()
+      return
+    }
+    const fleet = this.snapshot.fleet
+    if (!fleet) return
+    const focus = target.surface === 'fleet-machines' ? 'machines' : 'projects'
+    this.update({ fleet: selectFleetIndex(fleet, focus, target.index) })
+  }
+
   private scrollOperationalPanel(direction: number): void {
     if (this.snapshot.panel === 'logs') {
       const length = supervisorFilteredLogCount(this.snapshot.logs, this.logFilter)
@@ -4124,6 +4250,8 @@ export class SupervisorScreen implements Component {
     this.homePrimaryHovered = false
     this.hoveredHomeHotspot = undefined
     this.hoveredLogFromEnd = null
+    this.hoveredRail = undefined
+    this.activeRailDrag = undefined
     const previous = this.snapshot.panel ?? 'overview'
     const previousTarget = this.navigationTargets.find((target) => target.panel === previous)
     this.navigationTransition = this.motionEnabled && previous !== panel
@@ -4141,6 +4269,18 @@ export class SupervisorScreen implements Component {
     if (panel === 'logs') this.onAction?.('logs')
     if (panel === 'doctor') this.onAction?.('doctor')
   }
+}
+
+function fleetRailTargetFromPointer(
+  target?: SupervisorRailPointerTarget,
+): SupervisorFleetRailTarget | undefined {
+  if (target?.surface === 'fleet-machines') {
+    return { focus: 'machines', index: target.index, trackRow: target.trackRow }
+  }
+  if (target?.surface === 'fleet-projects') {
+    return { focus: 'projects', index: target.index, trackRow: target.trackRow }
+  }
+  return undefined
 }
 
 function appendCommandQueryInput(

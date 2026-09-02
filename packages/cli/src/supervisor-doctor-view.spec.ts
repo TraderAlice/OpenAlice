@@ -99,12 +99,22 @@ describe('Supervisor Doctor inspector', () => {
       { overall: 'pass', checks },
       { selected: 11, hovered: null },
       80,
+      undefined,
+      2,
     )
     const output = rendered.lines.join('\n')
     expect(output).toContain('8–12/12')
     expect(output).toContain('› ✓ Check 12')
     expect(output).toContain('█')
     expect(output).toContain('│')
+    expect(rendered.railTargets).toEqual([
+      { row: 2, column: 78, trackRow: 0, index: 0 },
+      { row: 3, column: 78, trackRow: 1, index: 3 },
+      { row: 4, column: 78, trackRow: 2, index: 6 },
+      { row: 5, column: 78, trackRow: 3, index: 8 },
+      { row: 6, column: 78, trackRow: 4, index: 11 },
+    ])
+    expect(rendered.lines[3]?.at(-3)).toBe('◆')
   })
 
   it('spends a wide Operational Canvas on additional real checks', () => {
@@ -125,6 +135,7 @@ describe('Supervisor Doctor inspector', () => {
     expect(expanded.lines.join('\n')).toContain('› ✓ Check 20')
     expect(expanded.lines.join('\n')).not.toContain('█')
     expect(expanded.targets).toHaveLength(20)
+    expect(expanded.railTargets).toEqual([])
     expect(expanded.targets.at(-1)).toEqual({
       row: 21,
       startColumn: 2,

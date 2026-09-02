@@ -10,6 +10,7 @@ import {
   selectFleetIndex,
   selectedFleetProject,
   setFleetFocus,
+  supervisorFleetRailTargetAt,
   supervisorFleetTargetAt,
 } from './supervisor-fleet.ts'
 
@@ -82,6 +83,22 @@ describe('Supervisor fleet state and presentation', () => {
     const top = renderSupervisorFleet(state, 100).join('\n')
     expect(top).toContain('█')
     expect(top).toContain('│')
+    expect(supervisorFleetRailTargetAt(state, 100, 34, 2)).toEqual({
+      focus: 'machines', index: 0, trackRow: 0,
+    })
+    expect(supervisorFleetRailTargetAt(state, 100, 98, 6)).toEqual({
+      focus: 'projects', index: 7, trackRow: 4,
+    })
+    expect(supervisorFleetRailTargetAt(state, 100, 50, 6)).toBeUndefined()
+    const hoveredRail = renderSupervisorFleet(
+      state,
+      100,
+      undefined,
+      false,
+      5,
+      { focus: 'projects', index: 4, trackRow: 2 },
+    ).join('\n')
+    expect(hoveredRail).toContain('◆')
 
     state = selectFleetIndex(state, 'machines', 6)
     state = setFleetFocus(state, 'projects')

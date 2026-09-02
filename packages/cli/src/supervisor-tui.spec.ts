@@ -1009,6 +1009,134 @@ describe('Supervisor TUI screen', () => {
     expect(standbyDoctor.at(-3)).toContain('CONTROL CONSOLE')
   })
 
+  it('scrubs Logs, Doctor, and Fleet rails without activating operations', () => {
+    const actions: SupervisorAction[] = []
+    const activated: string[] = []
+    const logsScreen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'logs',
+      runtime: { class: 'running', endpoints: {} },
+      logs: {
+        entries: Array.from({ length: 20 }, (_, index) => ({ text: `event ${index + 1}` })),
+      },
+    }, {
+      onAction: (action) => actions.push(action),
+      motionEnabled: false,
+    })
+    logsScreen.render(80)
+    expect(logsScreen.handlePointer({
+      button: 35, col: 78, row: 6, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(logsScreen.render(80).join('\n')).toContain('Runtime event 1/20')
+    expect(logsScreen.handlePointer({
+      button: 0, col: 78, row: 6, release: false, wheel: null, motion: false, leftClick: true,
+    })).toBe(true)
+    expect(logsScreen.render(80).join('\n')).toContain('Event Lens · LINE 1')
+    expect(logsScreen.handlePointer({
+      button: 32,
+      col: 78,
+      row: 12,
+      release: false,
+      wheel: null,
+      motion: true,
+      leftClick: false,
+      leftDrag: true,
+    })).toBe(true)
+    expect(logsScreen.render(80).join('\n')).toContain('Event Lens · LINE 20')
+    expect(logsScreen.handlePointer({
+      button: 0, col: 78, row: 12, release: true, wheel: null, motion: false, leftClick: false,
+    })).toBe(true)
+
+    const checks = Array.from({ length: 12 }, (_, index) => ({
+      status: 'pass',
+      summary: `Check ${index + 1}`,
+      detail: 'Verified.',
+    }))
+    const doctorScreen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'doctor',
+      runtime: { class: 'running', endpoints: {} },
+      doctor: { overall: 'pass', checks },
+    }, { motionEnabled: false })
+    doctorScreen.render(80)
+    expect(doctorScreen.handlePointer({
+      button: 0, col: 78, row: 10, release: false, wheel: null, motion: false, leftClick: true,
+    })).toBe(true)
+    expect(doctorScreen.render(80).join('\n')).toContain('Inspection · 12/12')
+    expect(doctorScreen.handlePointer({
+      button: 32,
+      col: 78,
+      row: 6,
+      release: false,
+      wheel: null,
+      motion: true,
+      leftClick: false,
+      leftDrag: true,
+    })).toBe(true)
+    expect(doctorScreen.render(80).join('\n')).toContain('Inspection · 1/12')
+    doctorScreen.handlePointer({
+      button: 0, col: 78, row: 6, release: true, wheel: null, motion: false, leftClick: false,
+    })
+
+    const seedMachines = fleetMachines()
+    const machineTemplate = seedMachines[0]!
+    const projectTemplate = machineTemplate.projects[0]!
+    const inventory = Array.from({ length: 7 }, (_, machineIndex) => ({
+      ...machineTemplate,
+      key: machineIndex === 0 ? 'local' : `machine-${machineIndex + 1}`,
+      displayName: `Machine ${machineIndex + 1}`,
+      projects: Array.from({ length: 8 }, (_, projectIndex) => ({
+        ...projectTemplate,
+        key: `project-${projectIndex + 1}`,
+        id: `alice-project-${machineIndex + 1}-${projectIndex + 1}`,
+        displayName: `Project ${projectIndex + 1}`,
+        home: `/fixture/${machineIndex + 1}/${projectIndex + 1}`,
+        isDefault: projectIndex === 0,
+      })),
+    }))
+    const fleetScreen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'fleet',
+      runtime: { class: 'running', endpoints: {} },
+      fleet: createSupervisorFleetState('2026-09-02T00:00:00Z', inventory, 'project-1'),
+    }, {
+      onActivateFleet: (machine, project) => activated.push(`${machine.key}/${project.key}`),
+      motionEnabled: false,
+    })
+    fleetScreen.render(100)
+    expect(fleetScreen.handlePointer({
+      button: 35, col: 98, row: 8, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(fleetScreen.render(100).join('\n')).toContain('AliceProject 5/8')
+    expect(fleetScreen.handlePointer({
+      button: 0, col: 98, row: 10, release: false, wheel: null, motion: false, leftClick: true,
+    })).toBe(true)
+    expect(fleetScreen.render(100).join('\n')).toContain('AliceProjects · Machine 1 · 8/8')
+    expect(fleetScreen.handlePointer({
+      button: 32,
+      col: 98,
+      row: 6,
+      release: false,
+      wheel: null,
+      motion: true,
+      leftClick: false,
+      leftDrag: true,
+    })).toBe(true)
+    expect(fleetScreen.render(100).join('\n')).toContain('AliceProjects · Machine 1 · 1/8')
+    fleetScreen.handlePointer({
+      button: 0, col: 98, row: 6, release: true, wheel: null, motion: false, leftClick: false,
+    })
+    expect(fleetScreen.handlePointer({
+      button: 0, col: 34, row: 10, release: false, wheel: null, motion: false, leftClick: true,
+    })).toBe(true)
+    expect(fleetScreen.render(100).join('\n')).toContain('Machines · 7/7')
+    expect(actions).toEqual([])
+    expect(activated).toEqual([])
+  })
+
   it('styles the application frame and routes pointer tabs and Fleet wheel input', () => {
     const actions: SupervisorAction[] = []
     const activated: string[] = []

@@ -363,6 +363,68 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
 
+  it('scrubs the Event Lens rail with raw hover, press, drag, and release reports', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-event-rail-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [eventLensFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_MOTION: '0',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let hovered = false
+      let pressed = false
+      let dragged = false
+      let released = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Event rail timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!opened && output.includes('[ l ] Logs')) {
+          opened = true
+          child.write('l')
+        } else if (!hovered && output.includes('4–10/10 · ALL · LATEST')) {
+          hovered = true
+          child.write('\u001b[<35;78;6M')
+        } else if (hovered && !pressed && output.includes('Runtime event 1/10')) {
+          pressed = true
+          child.write('\u001b[<0;78;6M')
+        } else if (pressed && !dragged && output.includes('Event Lens · LINE 1 · INFO · TEXT')) {
+          dragged = true
+          child.write('\u001b[<32;78;12M')
+        } else if (dragged && !released && output.includes('Event Lens · LINE 10 · INFO · TEXT')) {
+          released = true
+          child.write('\u001b[<0;78;12m')
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && released) resolve(output)
+        else reject(new Error(`Supervisor Event rail exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('Runtime event 1/10')
+    expect(transcript).toContain('Event Lens · LINE 1 · INFO · TEXT')
+    expect(transcript).toContain('Event Lens · LINE 10 · INFO · TEXT')
+    expect(transcript).toContain('FIXTURE_RESULT event-lens')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
   it('uses a 120x32 Operational Canvas for twenty clickable Runtime events', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-event-canvas-'))
     temporaryPaths.push(isolatedHome)

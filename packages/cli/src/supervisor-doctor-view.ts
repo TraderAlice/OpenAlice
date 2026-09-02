@@ -1,5 +1,9 @@
 import { displayWidth, truncateDisplayWidth } from './supervisor-display.ts'
-import { withSupervisorScrollRail } from './supervisor-scroll-rail.ts'
+import {
+  supervisorScrollRailIndexAt,
+  withSupervisorScrollRail,
+  type SupervisorScrollRailTarget,
+} from './supervisor-scroll-rail.ts'
 import { renderSupervisorPanel, renderSupervisorSignalScope } from './supervisor-tui-view.ts'
 
 export interface SupervisorDoctorCheck {
@@ -34,6 +38,7 @@ export interface SupervisorDoctorTarget {
 export interface SupervisorDoctorRender {
   lines: string[]
   targets: SupervisorDoctorTarget[]
+  railTargets: SupervisorScrollRailTarget[]
 }
 
 export function createSupervisorDoctorState(
@@ -87,6 +92,7 @@ export function renderSupervisorDoctor(
   state: SupervisorDoctorState,
   width: number,
   targetHeight?: number,
+  hoveredRailRow: number | null = null,
 ): SupervisorDoctorRender {
   if (!report) {
     return {
@@ -115,6 +121,7 @@ export function renderSupervisorDoctor(
         action: { key: 'd', label: 'Run Runtime Doctor', compactLabel: 'Run Doctor' },
       }, width, targetHeight),
       targets: [],
+      railTargets: [],
     }
   }
   const checks = report.checks ?? []
@@ -141,6 +148,7 @@ export function renderSupervisorDoctor(
         action: { key: 'd', label: 'Rerun Runtime Doctor', compactLabel: 'Rerun Doctor' },
       }, width, targetHeight),
       targets: [],
+      railTargets: [],
     }
   }
 
@@ -152,6 +160,8 @@ export function renderSupervisorDoctor(
     : baselineVisible
   const start = windowStart(normalized.selected, checks.length, visible)
   const end = Math.min(checks.length, start + visible)
+  const railViewportRows = end - start
+  const railVisible = checks.length > railViewportRows
   const listRows = withSupervisorScrollRail(checks.slice(start, end).map((check, relativeIndex) => {
     const index = start + relativeIndex
     const status = doctorStatus(check.status)
@@ -160,6 +170,7 @@ export function renderSupervisorDoctor(
   }), wide ? Math.max(38, Math.floor(width * 0.46) - 4) : Math.max(1, width - 4), {
     offset: start,
     total: checks.length,
+    hoveredRow: hoveredRailRow,
   })
   const selected = checks[normalized.selected]!
   const status = doctorStatus(selected.status)
@@ -196,6 +207,9 @@ export function renderSupervisorDoctor(
         endColumn: listWidth - 1,
         index: start + relativeIndex,
       })),
+      railTargets: railVisible
+        ? doctorRailTargets(railViewportRows, checks.length, 2, listWidth - 2)
+        : [],
     }
   }
 
@@ -219,7 +233,24 @@ export function renderSupervisorDoctor(
       endColumn: Math.max(2, width - 1),
       index: start + relativeIndex,
     })),
+    railTargets: railVisible
+      ? doctorRailTargets(railViewportRows, checks.length, 2, width - 2)
+      : [],
   }
+}
+
+function doctorRailTargets(
+  viewportRows: number,
+  total: number,
+  firstRow: number,
+  column: number,
+): SupervisorScrollRailTarget[] {
+  return Array.from({ length: viewportRows }, (_, trackRow) => ({
+    row: firstRow + trackRow,
+    column,
+    trackRow,
+    index: supervisorScrollRailIndexAt(trackRow, viewportRows, total) ?? 0,
+  }))
 }
 
 function doctorDetailRows(

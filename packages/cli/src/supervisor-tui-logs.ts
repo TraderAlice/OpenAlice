@@ -1,5 +1,9 @@
 import { displayWidth, truncateDisplayWidth } from './supervisor-display.ts'
-import { withSupervisorScrollRail } from './supervisor-scroll-rail.ts'
+import {
+  supervisorScrollRailIndexAt,
+  withSupervisorScrollRail,
+  type SupervisorScrollRailTarget,
+} from './supervisor-scroll-rail.ts'
 import { renderSupervisorPanel, renderSupervisorSignalScope } from './supervisor-tui-view.ts'
 
 export type SupervisorLogFilter = 'all' | 'attention' | 'errors'
@@ -20,6 +24,7 @@ export interface SupervisorLogTarget {
 export interface SupervisorLogRender {
   lines: string[]
   targets: SupervisorLogTarget[]
+  railTargets: SupervisorScrollRailTarget[]
 }
 
 interface FormattedLogEntry {
@@ -64,6 +69,7 @@ export function renderSupervisorLogs(
   filter: SupervisorLogFilter,
   hoveredFromEnd: number | null = null,
   targetHeight?: number,
+  hoveredRailRow: number | null = null,
 ): SupervisorLogRender {
   if (!logs) {
     return {
@@ -80,6 +86,7 @@ export function renderSupervisorLogs(
         action: { key: 'l', label: 'Load bounded Runtime tail', compactLabel: 'Load Runtime tail' },
       }, width, targetHeight),
       targets: [],
+      railTargets: [],
     }
   }
   const sourceEntries = logs.entries ?? []
@@ -98,6 +105,7 @@ export function renderSupervisorLogs(
         action: { key: 'l', label: 'Reload Runtime snapshot', compactLabel: 'Reload snapshot' },
       }, width, targetHeight),
       targets: [],
+      railTargets: [],
     }
   }
   const entries = filterLogEntries(logs, filter)
@@ -119,6 +127,7 @@ export function renderSupervisorLogs(
         action: { key: 'f', label: 'Change severity lens', compactLabel: 'Change lens' },
       }, width, targetHeight),
       targets: [],
+      railTargets: [],
     }
   }
 
@@ -144,11 +153,15 @@ export function renderSupervisorLogs(
     return `${marker} ${entry.glyph} ${String(entry.number).padStart(numberWidth, ' ')}  ${entry.text}`.trimEnd()
   })
   if (omitted) listRows.unshift('· … earlier lines were omitted by the bounded reader')
+  const railTotal = entries.length + (logs.truncated ? 1 : 0)
+  const railViewportRows = listRows.length
+  const railVisible = railTotal > railViewportRows
   listRows = withSupervisorScrollRail(listRows, wide
     ? Math.max(44, Math.floor(width * 0.54) - 4)
     : Math.max(1, width - 4), {
     offset: omitted ? 0 : start + (logs.truncated ? 1 : 0),
-    total: entries.length + (logs.truncated ? 1 : 0),
+    total: railTotal,
+    hoveredRow: hoveredRailRow,
   })
 
   const filterMeta = filter === 'all'
@@ -191,6 +204,9 @@ export function renderSupervisorLogs(
         endColumn: listWidth - 1,
         fromEnd: entries.length - 1 - (start + relativeIndex),
       })),
+      railTargets: railVisible
+        ? logRailTargets(railViewportRows, entries.length, 2, listWidth - 2)
+        : [],
     }
   }
 
@@ -209,7 +225,27 @@ export function renderSupervisorLogs(
       endColumn: Math.max(2, width - 1),
       fromEnd: entries.length - 1 - (start + relativeIndex),
     })),
+    railTargets: railVisible
+      ? logRailTargets(railViewportRows, entries.length, 2, width - 2)
+      : [],
   }
+}
+
+function logRailTargets(
+  viewportRows: number,
+  total: number,
+  firstRow: number,
+  column: number,
+): SupervisorScrollRailTarget[] {
+  return Array.from({ length: viewportRows }, (_, trackRow) => {
+    const mapped = supervisorScrollRailIndexAt(
+      trackRow,
+      viewportRows,
+      Math.max(total, viewportRows + 1),
+    ) ?? 0
+    const index = Math.min(Math.max(0, total - 1), mapped)
+    return { row: firstRow + trackRow, column, trackRow, index }
+  })
 }
 
 function pluralize(count: number, singular: string): string {

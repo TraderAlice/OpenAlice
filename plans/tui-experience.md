@@ -674,6 +674,25 @@ not imply maintainer approval of the finished interaction.
   compact density. This is an autonomous topic decision, not recorded
   maintainer approval.
 
+### Rail Navigator decision
+
+- Keeping proportional rails as positional evidence preserves the current
+  mouse-wheel and full-row selection model, but the `│`/`█` surface looks like
+  a control and then refuses the most direct pointer interaction.
+- Making track clicks page above or below the thumb would match a conventional
+  desktop scrollbar with little state, but it remains coarse in long bounded
+  snapshots and does not reward the terminal's all-motion SGR reports.
+- OMP v17.3.4 keeps `ScrollView` geometry independent from selection while its
+  list components own mouse routing. The selected OpenAlice model retains that
+  separation and adds one Rail Navigator contract across Logs, Doctor, and both
+  Fleet panes: hover exposes a structural marker and consequence preview; a
+  left press selects a proportional real item and begins a rail-owned drag;
+  left-button motion continuously scrubs; release ends the drag. The rail only
+  changes focus/selection and never activates an AliceProject, lifecycle action,
+  diagnostic request, or log reload. Wheel, row-click, and keyboard behavior
+  remain unchanged. This is an autonomous topic decision, not recorded
+  maintainer approval.
+
 ### Bottom Control Console decision
 
 - Leaving the footer directly after page content preserves the current natural
@@ -1028,6 +1047,8 @@ already large `supervisor-tui.ts` application controller.
   viewport height on additional real events and checks.
 - [x] Let truthful Logs and Doctor Signal Scopes own the same wide canvas with
   top-anchored facts and a bottom-anchored primary action.
+- [x] Turn every overflowing Logs, Doctor, Machine, and AliceProject rail into
+  one hoverable, clickable, left-drag Rail Navigator.
 - [x] Replace the disconnected title/divider/tabs stack with a same-height
   Mission Header that frames brand, release provenance, and clickable navigation.
 - [x] Anchor the active view with a reduced-motion-safe beacon that travels
@@ -1949,6 +1970,20 @@ already large `supervisor-tui.ts` application controller.
   699-file suite passes (698 passed, 1 skipped; 6,182 tests passed, 10 skipped).
   Docker installer smoke passes without Node, npm, pnpm, Bun, or an Agent
   Runtime, and package dry-run contains all changed Supervisor sources.
+- The proportional overflow marks are now one Rail Navigator across Logs,
+  Doctor, Machines, and AliceProjects. Hover replaces the exact track cell with
+  `◆` and previews the proportional real item; left press jumps selection and
+  owns left-button motion until release. The rail never activates a Runtime,
+  AliceProject, reload, or diagnostic request, while row, wheel, and keyboard
+  navigation retain their existing behavior.
+- Rail-Navigator acceptance passes with 131 focused renderer, pointer, screen,
+  and real-PTY tests. A real 80x24 terminal accepted raw SGR hover, press,
+  button-32 drag, and release reports: the first cell previewed Runtime event
+  1/10 and a drag to the last cell selected event 10/10 without reloading.
+  Root TypeScript and the CLI build pass; the 699-file suite passes (698 passed,
+  1 skipped; 6,185 tests passed, 10 skipped). Docker installer smoke passes
+  without Node, npm, pnpm, Bun, or an Agent Runtime, and package dry-run
+  contains the shared rail plus every changed Supervisor owner.
 
 ## Completion Criteria
 
