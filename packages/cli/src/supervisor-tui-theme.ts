@@ -373,7 +373,7 @@ function decorateDock(
   theme: SupervisorTuiTheme,
   hoveredCommand?: string,
 ): string {
-  const tokenPattern = /\[ \/ \] (?:Commands|Close)|\[ q \] Detach|\[ i \] .*?(?=  ›  )|! RECOVERY|(?:◉|●) (?:LIVE|EXTERNAL)|○ COLD|◆ (?:BLOCKED|DEGRADED)|◇ OFFLINE|◌ [A-Z][A-Z ]*?(?=  ›  | ─╯)|[◆◇≋✦?] (?:OVERVIEW|FLEET|LOGS|DOCTOR|HELP|SETUP|SOURCE|PROJECTS|RELEASE)/gu
+  const tokenPattern = /\[ \/ \] (?:Commands|Close)|\[ q \] Detach|\[ i \] .*?(?=  ›  )|! RECOVERY|(?:◉|●) (?:LIVE|EXTERNAL)|○ COLD|◆ (?:BLOCKED|DEGRADED)|◇ OFFLINE|◌ [A-Z][A-Z ]*?(?=  ›  | ─╯)|[◆◇≋✦?] (?:OVERVIEW|FLEET|LOGS|DOCTOR|HELP|SETUP|SOURCE|PROJECTS|RELEASE|TRANSFER)/gu
   let output = ''
   let cursor = 0
   for (const match of line.matchAll(tokenPattern)) {
@@ -398,7 +398,7 @@ function decorateDockToken(
   if (token.startsWith('[ i ]')) {
     return decorateDockKeyedToken(token, theme, theme.dockIdentity, hoveredCommand)
   }
-  if (/^[◆◇≋✦?] (?:OVERVIEW|FLEET|LOGS|DOCTOR|HELP|SETUP|SOURCE|PROJECTS|RELEASE)$/u.test(token)) {
+  if (/^[◆◇≋✦?] (?:OVERVIEW|FLEET|LOGS|DOCTOR|HELP|SETUP|SOURCE|PROJECTS|RELEASE|TRANSFER)$/u.test(token)) {
     return theme.dockPanel(token)
   }
   if (token.startsWith('● ') || token.startsWith('◉ ')) return theme.dockSuccess(token)

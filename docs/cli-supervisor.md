@@ -442,8 +442,8 @@ intentionally parameter-free:
   the selected AliceProject's source checkout;
 - `?` toggles Help; `[` and `]` expose the other top-level panels.
 
-Setup, Source, AliceProject, and Release use one secondary-task surface. At
-100x28 and larger, a Focus Workspace replaces every Overview content row
+Setup, Source, AliceProject, Release, and Remote Transfer use one secondary-task
+surface. At 100x28 and larger, a Focus Workspace replaces every Overview content row
 between the Mission Header and Control Console instead of allowing unrelated
 cards to show through a centered dialog. The navigation rail clears its active
 top-level selection and names the focused task, while the Context Ribbon uses
@@ -458,6 +458,9 @@ It does not claim completion state, expose a hit target, or add another action
 path: Setup projects Inspect/Edit/Validate/Save, Source projects
 Select/Validate/Save/Launch, AliceProjects project Inspect/Select or
 Create/Remember, and Release projects Choose/Probe/Confirm/Install.
+Remote Transfer does not add a second trajectory: its existing eight-stage
+Flight Deck already supplies destination, identity, location, secrets,
+schedules, checksums, stream, and arrival context inside the same stage.
 
 The TUI refuses to stop or restart Electron, development, incompatible, or
 otherwise foreign owners. Its stop/restart confirmation states that active Web

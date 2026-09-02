@@ -958,8 +958,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           } else if (stage === 1 && output.includes('destination Machine')) {
             stage = 2
             if (scenario === 'success') {
-              child.write('\u001b[<35;50;12M')
-              child.write('\u001b[<0;50;12M')
+              child.write('\u001b[<35;50;7M')
+              child.write('\u001b[<0;50;7M')
             } else {
               child.write('\r')
             }
@@ -968,8 +968,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
               stage = 22
               child.write('\u0005\u0015Bad Key')
               setTimeout(() => {
-                child.write('\u001b[<35;65;15M')
-                setTimeout(() => child.write('\u001b[<0;65;15M'), 300)
+                child.write('\u001b[<35;50;10M')
+                setTimeout(() => child.write('\u001b[<0;50;10M'), 300)
               }, 100)
             } else {
               stage = 3
@@ -982,8 +982,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
             stage = 3
             child.write('\u0005\u0015source')
             setTimeout(() => {
-              child.write('\u001b[<35;65;15M')
-              setTimeout(() => child.write('\u001b[<0;65;15M'), 300)
+              child.write('\u001b[<35;50;10M')
+              setTimeout(() => child.write('\u001b[<0;50;10M'), 300)
             }, 100)
           } else if (stage === 3 && output.includes('Destination complete Home')) {
             stage = 4
@@ -1007,15 +1007,15 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
             child.write(scenario === 'default-no' ? 'n' : 'y')
           } else if (stage === 7 && scenario === 'checksum-retry' && output.includes('Synthetic checksum mismatch')) {
             stage = 8
-            child.write('\u001b[<35;18;19M')
-            setTimeout(() => child.write('\u001b[<0;18;19M'), 300)
+            child.write('\u001b[<35;50;10M')
+            setTimeout(() => child.write('\u001b[<0;50;10M'), 300)
           } else if (stage === 7 && scenario === 'cancel-retry' && output.includes('◈ Transfer in flight · STREAMING')) {
             stage = 9
             child.write('\u001b')
           } else if (stage === 9 && output.includes('Synthetic transfer cancellation acknowledged.')) {
             stage = 8
-            child.write('\u001b[<35;18;19M')
-            setTimeout(() => child.write('\u001b[<0;18;19M'), 300)
+            child.write('\u001b[<35;50;10M')
+            setTimeout(() => child.write('\u001b[<0;50;10M'), 300)
           } else if ((stage === 7 || stage === 8) && output.includes('✓ AliceProject arrived · PUBLISHED')) {
             stage = 20
             child.write('\r')
@@ -1043,8 +1043,12 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         expect(transcript).toContain('Mission Brief · Source → Cloud fixture')
         expect(transcript).toContain('! Destination AliceProject key · FIX')
         expect(transcript).toContain('› [ Enter ] Continue')
-      } else {
+      } else if (scenario === 'default-no') {
         expect(transcript).toContain('Transfer Flight Deck')
+      }
+      if (scenario !== 'default-no') {
+        expect(transcript).toContain('◆ FOCUS · TRANSFER')
+        expect(transcript).toContain('◆ TRANSFER')
       }
       expect(transcript).toContain('◆ Destination AliceProject key')
       expect(transcript).toContain('◆ Credentials')
@@ -1054,7 +1058,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         expect(transcript).toContain('◈ Transfer in flight · STREAMING')
       }
       if (scenario === 'checksum-retry' || scenario === 'cancel-retry') {
-        expect(transcript).toContain('Transfer Flight Deck · 7/8 · STREAM')
+        expect(transcript).toContain('Flight Deck · 7/8 · STREAM')
         expect(transcript).toContain('› [ r ] Retry')
       }
       if (scenario === 'auth-loss') {

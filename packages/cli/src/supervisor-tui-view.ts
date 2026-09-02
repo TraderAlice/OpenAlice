@@ -900,6 +900,7 @@ function panelBadge(panel: string): string {
   if (panel === 'SOURCE') return '◆ SOURCE'
   if (panel === 'PROJECTS') return '◆ PROJECTS'
   if (panel === 'RELEASE') return '◆ RELEASE'
+  if (panel === 'TRANSFER') return '◆ TRANSFER'
   return panel
 }
 

@@ -441,6 +441,22 @@ not imply maintainer approval of the finished interaction.
   omitted below the existing 100x28 Focus Workspace boundary. This is an
   autonomous topic decision, not a recorded maintainer approval.
 
+### Transfer focus-workspace decision
+
+- Keeping Remote Transfer centered over Fleet preserves current coordinates,
+  but a real 110x30 destination frame shows Fleet selection, capability text,
+  and card borders crossing directly through the Flight Deck and Safety Rail.
+- Rebuilding Transfer as another task renderer would remove that collision at
+  the cost of duplicating its already-complete eight-stage route, Mission
+  Brief, validation, review, streaming, recovery, and arrival state machine.
+- The selected model moves the existing Flight Deck unchanged into the shared
+  Focus Workspace after source and destination preflight succeeds. Navigation
+  and Context Ribbon identify `TRANSFER`; every row between Header and Console
+  is cleared; the Flight Deck's own eight stages remain the only trajectory.
+  Narrow terminals retain the existing bounded sheet, and confirmations remain
+  true centered modals. This is an autonomous topic decision, not a recorded
+  maintainer approval.
+
 ### Setup Studio decision
 
 - Recoloring the existing single-column `SettingsList` would retain its proven
@@ -2216,6 +2232,21 @@ already large `supervisor-tui.ts` application controller.
   6,202 tests passed, 10 skipped). Docker installer smoke passes without Node,
   npm, pnpm, Bun, or an Agent Runtime, and package dry-run contains the changed
   task-surface owner.
+- A real 110x30 Transfer destination frame exposed Fleet card borders and
+  selection text crossing through the centered Flight Deck and Safety Rail.
+  Remote Transfer now enters the same Focus Workspace after preflight, clears
+  every Fleet row between Header and Console, and publishes matching
+  `FOCUS · TRANSFER` and `◆ TRANSFER` identity. Its existing eight-stage Flight
+  Deck remains the sole trajectory; the 80x24 fallback remains a bounded sheet.
+- Transfer-Focus acceptance passes with 121 focused renderer, task-surface,
+  screen, and real-PTY tests. The six-scenario PTY matrix proves mouse selection,
+  invalid-key repair, default-No cancellation, auth/occupancy recovery,
+  checksum retry, cancellation retry, focus exit, and terminal restoration at
+  80x24 through 110x30. CLI build and root TypeScript pass; the 701-file suite
+  passes (700 passed, 1 skipped; 6,202 tests passed, 10 skipped). Docker
+  installer smoke passes without Node, npm, pnpm, Bun, or an Agent Runtime, and
+  package dry-run contains the changed Supervisor, task-surface, and Transfer
+  renderers.
 
 ## Completion Criteria
 

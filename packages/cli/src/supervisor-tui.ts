@@ -315,7 +315,7 @@ interface UpdateResult {
 export type SupervisorUpdateChannel = 'stable' | 'beta' | 'dev'
 
 export type SupervisorPanel = 'fleet' | 'overview' | 'logs' | 'doctor' | 'help'
-export type SupervisorFocusTask = SupervisorTaskSurfaceTask
+export type SupervisorFocusTask = SupervisorTaskSurfaceTask | 'transfer'
 
 interface SupervisorNavigationTransition {
   from: SupervisorPanel
@@ -2499,6 +2499,7 @@ export async function runSupervisorTui(
       return
     }
     transferActive = true
+    screen.update({ focusTask: 'transfer' })
     let component: Component
     let activeChoice: {
       items: SelectItem[]
@@ -2526,7 +2527,7 @@ export async function runSupervisorTui(
       overlay.unfocus?.({ target: screen })
       overlay.hide()
       ui.setShowHardwareCursor(false)
-      screen.update({ notice })
+      screen.update({ focusTask: undefined, notice })
       syncMotionTimer()
     }
     const showInput = (
@@ -2762,12 +2763,12 @@ export async function runSupervisorTui(
       invalidate: () => undefined,
     })
     showDestination()
-    const overlayOptions = {
+    const overlayOptions = supervisorTaskSurfaceOptions(terminalSize(), {
       width: '92%',
       maxHeight: '92%',
       anchor: 'center',
       margin: 1,
-    } as const
+    } as const)
     const panel = new (class implements Component {
       render(width: number): string[] {
         const flightDeck = renderSupervisorTransferFlightDeck({
@@ -2786,8 +2787,9 @@ export async function runSupervisorTui(
               flightDeck.contentFirstRow + 2,
             )
           : undefined
+        const lines = renderSupervisorTaskSurface(flightDeck.lines, terminalSize())
         captureOverlayPointer(
-          flightDeck.lines,
+          lines,
           width,
           overlayOptions,
           (data) => this.handleInput(data),
@@ -2805,7 +2807,7 @@ export async function runSupervisorTui(
           },
         )
         return decorateSupervisorTransferFlightDeck(
-          flightDeck.lines,
+          lines,
           tuiTheme,
           transferHoveredCommand,
         )

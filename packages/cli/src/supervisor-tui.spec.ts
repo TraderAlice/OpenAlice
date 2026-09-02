@@ -295,6 +295,15 @@ describe('Supervisor TUI screen', () => {
     expect(focus).toContain('[ i ] Default AliceProject  ›  ○ COLD  ›  ◆ SETUP')
     expect(focus).not.toContain('◆ OVERVIEW')
 
+    const transferFocus = renderSupervisorDock({
+      panel: 'fleet',
+      focusTask: 'transfer',
+      projectName: 'Default AliceProject',
+      runtimeState: 'absent',
+    }, 100)
+    expect(transferFocus).toContain('[ i ] Default AliceProject  ›  ○ COLD  ›  ◆ TRANSFER')
+    expect(transferFocus).not.toContain('◇ FLEET')
+
     const compact = renderSupervisorDock({
       panel: 'logs',
       projectName: '研究 AliceProject with a very long name',
