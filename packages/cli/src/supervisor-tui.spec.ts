@@ -155,6 +155,60 @@ describe('Supervisor TUI screen', () => {
     expect(screen.render(120)[0]).toContain('v0.87.0-beta · DEV · update 0.90.0')
   })
 
+  it('uses wide surplus height for a bounded, bottom-aligned Overview stage', () => {
+    let viewportHeight = 32
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: {
+        class: 'absent',
+        home: '/tmp/openalice',
+        owner: null,
+        endpoints: {},
+      },
+    }, {
+      getViewportHeight: () => viewportHeight,
+      motionEnabled: false,
+    })
+
+    const tall = screen.render(120).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
+    const cockpitRow = tall.findIndex((line) => (
+      line.includes('Launchpad · AliceProject') && line.includes('Runtime signal')
+    ))
+    const actionRow = tall.findIndex((line) => line.includes('[ Enter ]'))
+    const uptimeRow = tall.findIndex((line) => line.includes('Uptime'))
+    const cardBottomRow = tall.findIndex((line, index) => (
+      index > cockpitRow && line.startsWith('╰') && line.includes('   ╰')
+    ))
+    const homeRow = tall.findIndex((line) => line.startsWith('⌂  Home'))
+    const tipRow = tall.findIndex((line) => line.startsWith('◇  Tip:'))
+
+    expect(tall).toHaveLength(32)
+    expect(cockpitRow).toBe(4)
+    expect(actionRow).toBe(18)
+    expect(uptimeRow).toBe(actionRow)
+    expect(cardBottomRow).toBe(actionRow + 1)
+    expect(homeRow).toBe(cardBottomRow + 1)
+    expect(tipRow).toBeGreaterThan(homeRow)
+    expect(tall.slice(cockpitRow + 1, actionRow).some((line) => (
+      /^│\s+│ {3}│\s+│$/u.test(line)
+    ))).toBe(true)
+    expect(tall.at(-3)?.trim()).toBe('')
+    expect(tall.at(-2)).toContain('[ s ] Start quietly')
+    expect(tall.at(-1)).toContain('[ / ] Commands')
+
+    viewportHeight = 48
+    const capped = screen.render(120).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
+    expect(capped).toHaveLength(48)
+    expect(capped.findIndex((line) => line.includes('[ Enter ]'))).toBe(actionRow)
+
+    const folded = screen.render(99).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
+    expect(folded.findIndex((line) => line.includes('Runtime Signal Deck'))).toBeLessThan(20)
+    expect(folded.join('\n')).not.toContain(
+      `│${' '.repeat(97)}│\n│${' '.repeat(97)}│`,
+    )
+  })
+
   it('renders a responsive OMP-style Command Spine without adding a row', () => {
     const full = renderSupervisorDock({
       panel: 'doctor',

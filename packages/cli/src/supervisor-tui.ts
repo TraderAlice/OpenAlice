@@ -237,6 +237,8 @@ const ENABLED_SETTING = 'Enabled'
 const DISABLED_SETTING = 'Disabled'
 const PROJECT_SCOPE = 'This AliceProject'
 const MACHINE_SCOPE = 'Machine defaults'
+const WIDE_OVERVIEW_MAX_HEIGHT = 17
+const WIDE_OVERVIEW_RESERVED_CHROME_HEIGHT = 6
 
 interface RuntimeSummary {
   class?: string
@@ -3696,6 +3698,7 @@ export class SupervisorScreen implements Component {
 
   render(width: number): string[] {
     this.renderWidth = width
+    const viewportHeight = this.getViewportHeight?.()
     const runtime = this.snapshot.runtime
     const state = runtime?.class ?? 'unavailable'
     const updateBadge = this.snapshot.update?.status === 'available'
@@ -3820,7 +3823,17 @@ export class SupervisorScreen implements Component {
         providerHotspot: runtime?.class === 'absent',
         hoveredHotspot: this.hoveredHomeHotspot,
         pulse: this.runtimePulse,
-      }, width)
+      }, width, width >= 100 && Number.isFinite(viewportHeight)
+        ? Math.min(
+            WIDE_OVERVIEW_MAX_HEIGHT,
+            Math.max(
+              0,
+              Math.floor(viewportHeight ?? 0)
+                - lines.length
+                - WIDE_OVERVIEW_RESERVED_CHROME_HEIGHT,
+            ),
+          )
+        : undefined)
       const rowOffset = lines.length
       this.homePrimaryTarget = {
         ...home.primaryTarget,
@@ -3886,7 +3899,7 @@ export class SupervisorScreen implements Component {
     const visibleLines = anchorSupervisorControlConsole(
       lines,
       controlConsole,
-      this.getViewportHeight?.() ?? lines.length + controlConsole.length,
+      viewportHeight ?? lines.length + controlConsole.length,
       [renderSupervisorContextTip({
         panel: this.snapshot.panel ?? 'overview',
         runtimeState: state,

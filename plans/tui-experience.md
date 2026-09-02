@@ -603,6 +603,23 @@ not imply maintainer approval of the finished interaction.
   also clears when the pointer returns to Dock content. This is an autonomous
   topic decision, not recorded maintainer approval.
 
+### Adaptive wide-Overview stage decision
+
+- Leaving all surplus height between the Context Tip and Control Console keeps
+  the cards compact, but a live 120x32 comparison with OMP v17.3.4 shows that
+  the primary OpenAlice surface then ends near the top of the terminal and
+  leaves most of the viewport as unowned whitespace.
+- Stretching every panel would make short lists and bounded Logs or Doctor
+  inspectors look artificially empty, and would blur their existing scrolling
+  contracts.
+- The selected model lets only the wide two-column Overview absorb a bounded
+  share of available height. Both cards gain the same quiet interior rows while
+  their existing primary action and Uptime anchors stay aligned at the bottom;
+  the AliceProject context rail, Context Tip, and Control Console retain their
+  order and the console remains terminal-grounded. The stage never grows beyond
+  17 rows and widths below 100 keep their existing dense layouts. This is an
+  autonomous topic decision, not recorded maintainer approval.
+
 ### Bottom Control Console decision
 
 - Leaving the footer directly after page content preserves the current natural
@@ -947,6 +964,8 @@ already large `supervisor-tui.ts` application controller.
   duplicating identity or losing guidance, motion, or pointer geometry.
 - [x] Keep the visible Command Spine mouse-capable while the Command Dock owns
   overlay input, without enabling click-through for any other modal surface.
+- [x] Let the wide Overview absorb a bounded share of surplus terminal height
+  instead of dumping the entire remainder into an unowned blank stage.
 - [x] Replace the disconnected title/divider/tabs stack with a same-height
   Mission Header that frames brand, release provenance, and clickable navigation.
 - [x] Anchor the active view with a reduced-motion-safe beacon that travels
@@ -1803,6 +1822,22 @@ already large `supervisor-tui.ts` application controller.
   passed, 1 skipped; 6,171 tests passed, 10 skipped). Docker installer smoke
   passes without Node, npm, pnpm, Bun, or an Agent Runtime, and package dry-run
   contains the changed Supervisor input controller.
+- A live 120x32 OMP v17.3.4 and Default AliceProject comparison exposed that
+  OpenAlice's wide Overview ended near the top of the terminal and left most of
+  the viewport as an unowned blank interval. The paired Launchpad and Runtime
+  cards now absorb a bounded share of that height as one mission stage, while
+  their existing primary action and Uptime rows remain aligned at its lower
+  edge. The 17-row cap preserves breathing room, and sub-100-column plus
+  non-Overview surfaces retain their natural density.
+- Adaptive-stage acceptance passes with 95 focused screen and real-PTY tests.
+  A real truecolor 120x32 Default AliceProject render keeps the stage, Home
+  context, Tip, and bottom Console in order; the 120x30 PTY hovers and clicks
+  the relocated row-19 primary surface and reaches start/open exactly once.
+  Unit coverage proves equal lower anchors, the 17-row cap at 48 rows, and the
+  unchanged 99-column stacked boundary. CLI build/typecheck and root TypeScript
+  pass; the 699-file suite passes (698 passed, 1 skipped; 6,172 tests passed, 10
+  skipped). Docker installer smoke passes without Node, npm, pnpm, Bun, or an
+  Agent Runtime, and package dry-run contains both changed Supervisor sources.
 
 ## Completion Criteria
 

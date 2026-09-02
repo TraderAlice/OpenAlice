@@ -220,6 +220,13 @@ path is intentionally parameter-free:
   gutter, borders, and semantically neutral neighboring pane remain unchanged;
   independent semantic rows in both panes may still style themselves. Single-
   pane and `NO_COLOR` output retain their existing plain-text structure;
+- at 100 columns and wider, Overview's paired Launchpad and Runtime cards may
+  absorb available terminal height as one bounded mission stage. They extend
+  equally with quiet interior rows, keep the primary action and Uptime aligned
+  against their lower edge, and stop at 17 total rows so taller terminals still
+  retain breathing room before the grounded Control Console. Compact and
+  stacked layouts keep their natural density; no other panel inherits this
+  Overview-only height policy;
 - a persistent full-width Command Spine closes the application with `╰─`/`─╯`
   while keeping `[ / ] Commands` and `[ q ] Detach` visible on every Supervisor
   page. A flexible track joins those controls to an OMP-style breadcrumb of the

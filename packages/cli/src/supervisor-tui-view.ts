@@ -152,6 +152,7 @@ export function renderSupervisorHeaderLayout(
 export function renderSupervisorHome(
   view: SupervisorHomeView,
   width: number,
+  targetHeight?: number,
 ): SupervisorHomeRender {
   const cardWidth = Math.max(24, width)
   const state = stateBadge(view.state, view.pulse ?? false)
@@ -163,7 +164,7 @@ export function renderSupervisorHome(
   ]
   const details = runtimeDetailRows(view, cardWidth - 4)
 
-  if (width >= 100) return renderWideCockpit(view, state, width)
+  if (width >= 100) return renderWideCockpit(view, state, width, targetHeight)
 
   const lines = [
     ...renderCard('Launchpad · AliceProject', projectBody, cardWidth),
@@ -222,6 +223,7 @@ function renderWideCockpit(
   view: SupervisorHomeView,
   state: string,
   width: number,
+  targetHeight?: number,
 ): SupervisorHomeRender {
   const gap = 3
   const leftWidth = Math.max(52, Math.floor(width * 0.52))
@@ -239,6 +241,16 @@ function renderWideCockpit(
   const projectBody = renderIntegratedWideLaunchpad(view, state, leftInnerWidth)
   while (projectBody.length < runtimeBody.length) projectBody.splice(-1, 0, '')
   while (runtimeBody.length < projectBody.length) runtimeBody.splice(-1, 0, '')
+  const context = contextRail('⌂  Home', view.home, width)
+  const naturalHeight = projectBody.length + 2 + context.length
+  const extraRows = Number.isFinite(targetHeight)
+    ? Math.max(0, Math.floor(targetHeight ?? naturalHeight) - naturalHeight)
+    : 0
+  if (extraRows > 0) {
+    const quietRows = Array.from({ length: extraRows }, () => '')
+    projectBody.splice(-1, 0, ...quietRows)
+    runtimeBody.splice(-1, 0, ...quietRows)
+  }
   const project = renderCard('Launchpad · AliceProject', projectBody, leftWidth)
   const runtime = renderCard('Runtime signal', runtimeBody, rightWidth)
 
@@ -249,7 +261,7 @@ function renderWideCockpit(
     gap,
     width,
   ))
-  const lines = [...cards, ...contextRail('⌂  Home', view.home, width)]
+  const lines = [...cards, ...context]
   return {
     lines,
     primaryTarget: targetForLine(lines, '[ Enter ]', leftWidth),
