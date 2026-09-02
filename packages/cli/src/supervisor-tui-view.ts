@@ -2,7 +2,6 @@ import { displayWidth, truncateDisplayWidth } from './supervisor-display.ts'
 import { SUPERVISOR_BRAND_MARK_ROWS } from './supervisor-tui-theme.ts'
 
 const SUPERVISOR_SIGNAL_DECK_MIN_WIDTH = 72
-const SUPERVISOR_BRAND_BEACON_MIN_WIDTH = 100
 
 export interface SupervisorHomeView {
   projectName: string
@@ -237,14 +236,9 @@ function renderWideCockpit(
     detailRow('Services', view.components, rightInnerWidth),
     detailRow('Uptime', view.uptime ?? 'Waiting for Runtime', rightInnerWidth),
   ]
-  const projectBody = [
-    labelAndTail(homeHotspotLabel(view.projectName, 'project', view), state, leftInnerWidth),
-    launchIntent(view.state),
-    ...view.guidance,
-    '',
-    primaryLaunchRow(view),
-  ]
+  const projectBody = renderIntegratedWideLaunchpad(view, state, leftInnerWidth)
   while (projectBody.length < runtimeBody.length) projectBody.splice(-1, 0, '')
+  while (runtimeBody.length < projectBody.length) runtimeBody.splice(-1, 0, '')
   const project = renderCard('Launchpad · AliceProject', projectBody, leftWidth)
   const runtime = renderCard('Runtime signal', runtimeBody, rightWidth)
 
@@ -255,15 +249,41 @@ function renderWideCockpit(
     gap,
     width,
   ))
-  const beacon = width >= SUPERVISOR_BRAND_BEACON_MIN_WIDTH
-    ? [...renderLaunchpadBeacon(view, state, width), '']
-    : []
-  const lines = [...beacon, ...cards, ...contextRail('⌂  Home', view.home, width)]
+  const lines = [...cards, ...contextRail('⌂  Home', view.home, width)]
   return {
     lines,
     primaryTarget: targetForLine(lines, '[ Enter ]', leftWidth),
     hotspotTargets: homeHotspotTargets(lines, view),
   }
+}
+
+function renderIntegratedWideLaunchpad(
+  view: SupervisorHomeView,
+  state: string,
+  width: number,
+): string[] {
+  const gap = '  '
+  const brandWidth = Math.min(
+    displayWidth(SUPERVISOR_BRAND_MARK_ROWS[0]) + 2,
+    Math.max(1, width - displayWidth(gap) - 1),
+  )
+  const guidanceWidth = Math.max(1, width - brandWidth - displayWidth(gap))
+  const guidance = wrapDisplayText(view.guidance.join(' '), guidanceWidth)
+  const brand = [
+    ...SUPERVISOR_BRAND_MARK_ROWS.map((mark) => ` ${mark}`),
+  ]
+  const briefing = Array.from(
+    { length: Math.max(brand.length, guidance.length) },
+    (_, index) => (
+      `${fillLine(brand[index] ?? '', brandWidth)}${gap}${guidance[index] ?? ''}`
+    ),
+  )
+  return [
+    labelAndTail(homeHotspotLabel(view.projectName, 'project', view), state, width),
+    launchIntent(view.state),
+    ...briefing,
+    primaryLaunchRow(view),
+  ]
 }
 
 function homeHotspotLabel(
@@ -337,29 +357,6 @@ function homeHotspotTargets(
       surface,
     }]
   })
-}
-
-function renderLaunchpadBeacon(
-  view: SupervisorHomeView,
-  state: string,
-  width: number,
-): string[] {
-  const innerWidth = Math.max(1, width - 4)
-  const divider = ' │ '
-  const leftWidth = Math.min(
-    48,
-    Math.max(displayWidth(SUPERVISOR_BRAND_MARK_ROWS[0]) + 2, Math.floor(innerWidth * 0.44)),
-  )
-  const rightWidth = Math.max(1, innerWidth - leftWidth - displayWidth(divider))
-  const signals = [
-    '◆ ALICEPROJECT',
-    truncateDisplayWidth(view.projectName, Math.max(1, Math.floor(innerWidth * 0.42))),
-    state,
-  ]
-  const rows = SUPERVISOR_BRAND_MARK_ROWS.map((mark, index) => (
-    `${fillLine(`  ${mark}`, leftWidth)}${divider}${truncateDisplayWidth(signals[index] ?? '', rightWidth)}`
-  ))
-  return renderCard('OpenAlice · launch system', rows, width)
 }
 
 function launchIntent(state: string): string {

@@ -465,8 +465,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
 
-  it('renders the wide Alice Beacon without breaking Launchpad pointer geometry', async () => {
-    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-wide-beacon-pointer-'))
+  it('integrates the wide Alice mark without breaking Launchpad pointer geometry', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-integrated-launchpad-'))
     temporaryPaths.push(isolatedHome)
     const childEnv = { ...process.env }
     delete childEnv.NO_COLOR
@@ -488,21 +488,21 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       let clicked = false
       const timeout = setTimeout(() => {
         child.kill()
-        reject(new Error(`Supervisor wide Beacon pointer timed out:\n${output}`))
+        reject(new Error(`Supervisor integrated Launchpad pointer timed out:\n${output}`))
       }, 8_000)
       child.onData((data) => {
         output += data
         const plainOutput = output.replace(/\u001b\[[0-9;?<>]*[A-Za-z~]/gu, '')
         if (
           !hovered
-          && plainOutput.includes('OpenAlice · launch system')
-          && plainOutput.includes('◆ ALICEPROJECT')
+          && plainOutput.includes('Launchpad · AliceProject')
+          && plainOutput.includes('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
         ) {
           hovered = true
-          child.write('\u001b[<35;50;17M')
+          child.write('\u001b[<35;50;11M')
         } else if (!clicked && plainOutput.includes('│ › [ Enter ]')) {
           clicked = true
-          child.write('\u001b[<0;50;17M')
+          child.write('\u001b[<0;50;11M')
         } else if (clicked && plainOutput.includes('OpenAlice started and opened in your browser.')) {
           child.write('q')
         }
@@ -510,12 +510,13 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       child.onExit(({ exitCode }) => {
         clearTimeout(timeout)
         if (exitCode === 0) resolve(output)
-        else reject(new Error(`Supervisor wide Beacon pointer exited ${exitCode}:\n${output}`))
+        else reject(new Error(`Supervisor integrated Launchpad pointer exited ${exitCode}:\n${output}`))
       })
     })
 
-    expect(transcript).toContain('OpenAlice · launch system')
-    expect(transcript).toContain('◆ ALICEPROJECT')
+    expect(transcript).not.toContain('OpenAlice · launch system')
+    expect(stripSgr(transcript)).toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+    expect(stripSgr(transcript)).toContain('OpenAlice is ready to start.')
     expect(transcript).toContain('\u001b[1;38;2;')
     expect(transcript).not.toMatch(
       /\u001b\[1;38;2;183;255;248;48;2;18;54;59m[^\u001b\r\n]*Uptime/u,

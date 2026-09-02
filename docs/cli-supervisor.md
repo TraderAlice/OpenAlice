@@ -139,17 +139,17 @@ path is intentionally parameter-free:
   becomes a Signal Deck: the existing
   card composes a terminal-native `ALICE` mark and truthful Runtime state beside
   the complete telemetry without consuming another row. At 100 columns and
-  wider the Launchpad and Runtime Signal become a two-column cockpit, and an
-  OMP-inspired Launch System Beacon
-  adds a terminal-native `ALICE` pixel wordmark beside the selected
-  AliceProject and truthful Runtime state. It is decorative enhancement rather
-  than another control: the same bounded entrance sweep styles it, `NO_COLOR`
-  keeps the wordmark and state legible, and terminals below 72 columns omit it
-  entirely. Those narrow terminals fold the operational fields into the
-  complete vertical flow instead of hiding them. The application
-  divider follows the full terminal width, and an available-update notice is
-  composed inside the responsive header instead of being appended beyond its
-  clipping boundary;
+  wider the Launchpad and Runtime Signal become a two-column cockpit. The
+  action-first Launchpad integrates the terminal-native `ALICE` mark beside its
+  complete wrapped guidance instead of repeating AliceProject identity and
+  Runtime state in a standalone hero card. Runtime telemetry remains an
+  independent right-hand pane, while the bounded entrance/prism sweep styles
+  the integrated mark. `NO_COLOR` keeps the wordmark and state legible, and
+  terminals below 72 columns omit it entirely. Those narrow terminals fold the
+  operational fields into the complete vertical flow instead of hiding them.
+  The application divider follows the full terminal width, and an
+  available-update notice is composed inside the responsive header instead of
+  being appended beyond its clipping boundary;
 - the Fleet page renders `Machine → AliceProject`: ordinary terminals use two
   bordered panes with a stable Selection inspector, while narrow terminals
   drill down from Machines to Projects;

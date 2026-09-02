@@ -713,6 +713,25 @@ not imply maintainer approval of the finished interaction.
   actions, and pointer geometry keep their current owners. This is an
   autonomous topic decision, not a recorded maintainer approval.
 
+### Integrated wide Launchpad decision
+
+- Keeping the standalone wide Beacon maximizes brand area, but repeats the
+  selected AliceProject and Runtime state immediately above the Launchpad that
+  owns the same identity and action. The result reads as three stacked cards
+  rather than one operational welcome surface.
+- Wrapping brand, Launchpad, and Runtime in one giant compound frame would most
+  closely copy OMP's Welcome card, but merge action and telemetry into one
+  semantic styling and pointer container.
+- The selected model retires the standalone Beacon at 100 columns and wider and
+  integrates the same three-row `ALICE` mark into the Launchpad pane. Project
+  identity and launch intent remain above it; complete guidance wraps beside
+  the mark, and the existing primary action remains the final row. Runtime stays
+  an independent right-hand pane so its passive telemetry cannot inherit action
+  focus or color. The 72–99 Signal Deck and below-72 compact flow remain
+  unchanged. Brand entrance/prism styling, `NO_COLOR`, and every lifecycle and
+  pointer callback keep their existing owners. This is an autonomous topic
+  decision, not recorded maintainer approval.
+
 ### Ambient brand-prism decision
 
 - Keeping the bounded entrance as the only brand motion is quiet and cheap,
@@ -909,6 +928,8 @@ already large `supervisor-tui.ts` application controller.
   Control Console without changing page content or action semantics.
 - [x] Add one OMP-inspired contextual Tip Beacon to surplus stage space without
   consuming a required row or adding an action path.
+- [x] Fold the standalone wide Beacon into the action-first Launchpad without
+  duplicating identity or losing guidance, motion, or pointer geometry.
 - [x] Replace the disconnected title/divider/tabs stack with a same-height
   Mission Header that frames brand, release provenance, and clickable navigation.
 - [x] Anchor the active view with a reduced-motion-safe beacon that travels
@@ -1734,6 +1755,23 @@ already large `supervisor-tui.ts` application controller.
   suite passes (698 passed, 1 skipped; 6,170 tests passed, 10 skipped). Docker
   installer smoke passes without Node, npm, pnpm, Bun, or an Agent Runtime, and
   package dry-run contains the changed view, theme, and Supervisor sources.
+- The wide Overview no longer stacks a standalone Launch System Beacon above a
+  second copy of AliceProject identity and Runtime state. At 100 columns and
+  wider, the `ALICE` mark now lives inside the action-first Launchpad, with the
+  complete guidance wrapping beside it and the existing primary action closing
+  the pane. Runtime remains a separate right pane whose final Uptime row aligns
+  with the Launchpad action without inheriting its semantic background.
+- Integrated-Launchpad acceptance passes with 96 focused screen, pointer, and
+  real-PTY tests. Truecolor 100x24 and 120x24 boundary frames retain every
+  guidance phrase, show one stopped/running identity instead of the duplicated
+  hero, preserve the 99-column Signal Deck, and keep the Context Tip plus bottom
+  Control Console fixed. A 120x30 PTY hovered and clicked the relocated primary
+  row outside its keycap, reached start/open exactly once, and restored terminal
+  modes; motion tests prove the integrated mark still participates in entrance
+  and ambient prism frames. CLI build/typecheck and root TypeScript pass; the
+  699-file suite passes (698 passed, 1 skipped; 6,170 tests passed, 10 skipped).
+  Docker installer smoke passes without Node, npm, pnpm, Bun, or an Agent
+  Runtime, and package dry-run contains the changed Supervisor view source.
 
 ## Completion Criteria
 

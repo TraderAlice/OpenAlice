@@ -100,13 +100,18 @@ describe('Supervisor TUI screen', () => {
 
     const wideLines = screen.render(120)
     expect(wideLines[1]).toHaveLength(120)
-    expect(wideLines.join('\n')).toContain('OpenAlice · launch system')
+    expect(wideLines.join('\n')).not.toContain('OpenAlice · launch system')
     expect(wideLines.join('\n')).toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
-    expect(wideLines.join('\n')).toContain('ALICEPROJECT')
+    expect(wideLines.join('\n')).not.toContain('ALICEPROJECT')
+    expect(wideLines.filter((line) => line.includes('○ STOPPED'))).toHaveLength(1)
+    expect(wideLines.join('\n')).toContain('OpenAlice is ready to start.')
+    expect(wideLines.join('\n')).toContain('prepares anything missing and opens')
+    expect(wideLines.join('\n')).toContain('the browser; c chooses a checkout.')
     const wideCockpitHeader = wideLines.find((line) => (
       line.includes('Launchpad · AliceProject') && line.includes('Runtime signal')
     ))
     expect(wideCockpitHeader).toBeDefined()
+    expect(wideLines.find((line) => line.includes('[ Enter ]'))).toContain('Uptime')
     expect(wideLines.join('\n')).toContain('○ COLD')
     expect(wideLines.every((line) => displayWidth(line) <= 120)).toBe(true)
 
@@ -629,13 +634,15 @@ describe('Supervisor TUI screen', () => {
 
     expect(screen.hasActiveMotion()).toBe(true)
     const intro = screen.render(80)[0]
-    const beaconIntro = screen.render(120).find((line) => line.includes('ALICEPROJECT'))
-    expect(beaconIntro).toContain('\u001b[1;38;2;')
+    const integratedMarkIntro = screen.render(120).find((line) => (
+      line.includes('OpenAlice is ready.')
+    ))
+    expect(integratedMarkIntro).toContain('\u001b[1;38;2;')
     expect(intro).toContain('\u001b[1;38;2;116;235;226m◆')
     screen.advanceMotion()
     expect(screen.render(80)[0]).not.toBe(intro)
-    expect(screen.render(120).find((line) => line.includes('ALICEPROJECT')))
-      .not.toBe(beaconIntro)
+    expect(screen.render(120).find((line) => line.includes('OpenAlice is ready.')))
+      .not.toBe(integratedMarkIntro)
     for (let frame = 0; frame < 8; frame += 1) screen.advanceMotion()
     expect(screen.hasActiveMotion()).toBe(true)
     expect(screen.render(80)[0]).toContain('\u001b[1;38;2;116;235;226m◆ OpenAlice Supervisor')
