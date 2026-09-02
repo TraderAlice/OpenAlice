@@ -194,13 +194,15 @@ intentionally parameter-free:
   SSH `x` Disconnect remains available and still does not stop the remote
   Runtime. Automatic checks continue while the target is retained;
 - the connected Home page is one responsive `Alice Session` stage rather than
-  a dashboard. It orders the selected context as Now, Attention, Recent, then
-  one full-row primary action. Wide terminals keep the terminal-native `ALICE`
-  mark and AliceProject/Machine identity in a quiet left column while the task
-  sequence owns the right; ordinary terminals preserve the same task order in
-  one column and omit illustration before task truth. Home intentionally does
-  not repeat PID, provider, endpoint, uptime, or component telemetry; Runtime
-  owns those diagnostic facts.
+  a dashboard. It orders the selected context as identity, Now, one full-row
+  primary action, Signals, then Recent. Wide terminals keep the terminal-native
+  `ALICE` mark and AliceProject/Machine identity in a quiet left region while
+  the task sequence owns the right; an open gutter rather than an internal
+  border keeps both regions inside one visual canvas. Ordinary terminals
+  preserve the same task order in one column, add bounded whitespace between
+  each decision layer, and omit illustration before task truth. Home
+  intentionally does not repeat PID, provider, endpoint, uptime, or component
+  telemetry; Runtime owns those diagnostic facts.
   Before connection, Enter starts or connects the selected target. A degraded
   or unreachable endpoint always promotes Retry. After a healthy connection,
   unread Inbox reports promote Enter to Review Inbox and keep `o` as the
@@ -309,9 +311,10 @@ intentionally parameter-free:
   contextual Tips state the same empty contract;
 - at 100 columns and wider, Home's single Alice Session stage may absorb
   available terminal height up to a bounded 17 rows. The identity column stays
-  quiet while the task sequence and primary action settle against the stage's
-  lower edge. Compact layouts keep their natural density, and no other panel
-  inherits this Home-only height policy;
+  quiet while both identity and task sequences center independently; the
+  primary action follows Now instead of settling against the stage's lower
+  edge. Compact layouts use the same hierarchy with bounded vertical rhythm,
+  and no other panel inherits this Home-only height policy;
 - a persistent full-width Command Spine is the sole default footer and closes
   the application with `╰─`/`─╯`
   while keeping `[ / ] Commands` and `[ q ] Detach` visible on every Supervisor

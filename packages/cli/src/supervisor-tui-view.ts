@@ -192,9 +192,9 @@ function renderWideSessionStage(
   targetHeight?: number,
 ): string[] {
   const innerWidth = width - 4
-  const divider = ' │ '
+  const gutter = '    '
   const identityWidth = Math.min(29, Math.max(22, Math.floor(innerWidth * 0.25)))
-  const taskWidth = Math.max(1, innerWidth - identityWidth - displayWidth(divider))
+  const taskWidth = Math.max(1, innerWidth - identityWidth - displayWidth(gutter))
   const identity = wideSessionIdentity(view, state, identityWidth)
   const task = sessionTaskRows(view, taskWidth)
   const naturalBodyHeight = Math.max(identity.length, task.length)
@@ -202,10 +202,10 @@ function renderWideSessionStage(
     ? Math.max(naturalBodyHeight, Math.floor(targetHeight ?? 0) - 2)
     : naturalBodyHeight
   const bodyHeight = Math.min(17, requestedBodyHeight)
-  const left = padSessionRows(identity, bodyHeight)
-  const right = padSessionTaskRows(task, bodyHeight)
+  const left = centerSessionRows(identity, bodyHeight)
+  const right = centerSessionRows(task, bodyHeight)
   const body = Array.from({ length: bodyHeight }, (_, index) => (
-    `${fillLine(left[index] ?? '', identityWidth)}${divider}${truncateDisplayWidth(right[index] ?? '', taskWidth)}`
+    `${fillLine(left[index] ?? '', identityWidth)}${gutter}${truncateDisplayWidth(right[index] ?? '', taskWidth)}`
   ))
   return renderCard('Alice Session · OpenAlice', body, width)
 }
@@ -221,11 +221,16 @@ function renderCompactSessionStage(
   return renderCard('Alice Session · OpenAlice', [
     labelAndTail(homeHotspotLabel(view.projectName, 'project', view), state, innerWidth),
     sessionRoute(view),
+    '',
     `NOW  ${homeNowHeadline(view)}`,
     ...guidance,
-    homeAttentionRow(view),
-    `RECENT  ${recent[0] ?? 'No connection changes in this TUI session'}`,
+    '',
     primaryLaunchRow(view),
+    '',
+    `SIGNALS  ${homeAttentionRow(view)}`,
+    `         ${homeConnectionRow(view)}`,
+    '',
+    `RECENT   ${recent[0] ?? 'No connection changes in this TUI session'}`,
   ], width)
 }
 
@@ -255,13 +260,14 @@ function sessionTaskRows(view: SupervisorHomeView, width: number): string[] {
     homeNowHeadline(view),
     ...guidance,
     '',
-    'ATTENTION',
+    primaryLaunchRow(view),
+    '',
+    'SIGNALS',
     homeAttentionRow(view),
     homeConnectionRow(view),
     '',
     'RECENT',
     ...recent,
-    primaryLaunchRow(view),
   ]
 }
 
@@ -325,18 +331,14 @@ function sessionIdentityState(view: SupervisorHomeView): string {
   return '◇ STATE UNKNOWN'
 }
 
-function padSessionRows(rows: string[], height: number): string[] {
-  return [...rows, ...Array.from({ length: Math.max(0, height - rows.length) }, () => '')]
-    .slice(0, height)
-}
-
-function padSessionTaskRows(rows: string[], height: number): string[] {
+function centerSessionRows(rows: string[], height: number): string[] {
   if (rows.length >= height) return rows.slice(0, height)
-  const action = rows.at(-1) ?? ''
+  const quietRows = Math.max(0, height - rows.length)
+  const before = Math.floor(quietRows / 2)
   return [
-    ...rows.slice(0, -1),
-    ...Array.from({ length: Math.max(0, height - rows.length) }, () => ''),
-    action,
+    ...Array.from({ length: before }, () => ''),
+    ...rows,
+    ...Array.from({ length: quietRows - before }, () => ''),
   ]
 }
 

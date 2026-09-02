@@ -3044,6 +3044,31 @@ already large `supervisor-tui.ts` application controller.
   tests, all 51 real-PTY cases including an 80x24 pointer close, and the
   complete CLI suite (63 files, 630 tests). CLI typecheck and build also pass.
 
+### Home Session Canvas decision
+
+- The post-navigation screenshots proved that removing the old dashboard did
+  not completely remove its layout premise. Wide Home still drew an internal
+  divider between identity and work, pushed the primary action to the panel's
+  bottom edge, and left a conspicuous empty monitoring field between Recent
+  state and the only useful next move. Compact Home compressed the same facts
+  into an eight-row block at the top of a mostly empty terminal.
+- Home now behaves as one Session Canvas. Its open wide gutter separates brand
+  identity from the decision flow without pretending they are two panels; both
+  regions are optically centered inside the bounded stage. The task flow is
+  `Now -> primary action -> Signals -> Recent`, so Start, Retry, Review Inbox,
+  or Open Workspace appears immediately after the sentence that explains it.
+- The 80-column form keeps the same order and introduces bounded blank rhythm
+  between route, Now, action, Signals, and Recent. It therefore uses the middle
+  of the terminal without adding telemetry, secondary controls, or a different
+  state machine. `NO_COLOR`, keyboard, mouse, motion, and hotspot ownership stay
+  unchanged.
+- Real running and cold 120x32/80x24 captures verify that the complete selected
+  AliceProject, Machine transport, Runtime state, next action, connection
+  signal, recent event, contextual Tip, and Command Spine remain visible.
+- Session-Canvas acceptance passes through 78 focused screen and theme tests,
+  all 51 real-PTY cases, and the complete CLI suite (63 files, 630 tests). CLI
+  typecheck and build also pass.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

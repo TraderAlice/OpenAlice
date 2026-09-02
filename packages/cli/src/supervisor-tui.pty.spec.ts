@@ -1052,10 +1052,10 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           && plainOutput.includes('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
         ) {
           hovered = true
-          child.write('\u001b[<35;70;20M')
-        } else if (!clicked && plainOutput.includes('│ › [ Enter ]')) {
+          child.write('\u001b[<35;70;12M')
+        } else if (!clicked && plainOutput.includes('› [ Enter ]')) {
           clicked = true
-          child.write('\u001b[<0;70;20M')
+          child.write('\u001b[<0;70;12M')
         } else if (clicked && plainOutput.includes('OpenAlice started')) {
           child.write('q')
         }
@@ -1071,14 +1071,14 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(stripSgr(transcript)).toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
     expect(stripSgr(transcript)).toContain('OpenAlice is ready to start.')
     expect(stripSgr(transcript)).toContain('ALICEPROJECT')
-    expect(stripSgr(transcript)).toContain('ATTENTION')
+    expect(stripSgr(transcript)).toContain('SIGNALS')
     expect(stripSgr(transcript)).toContain('RECENT')
     expect(stripSgr(transcript)).not.toContain('COMPONENT TELEMETRY')
     expect(transcript).toContain('\u001b[1;38;2;')
     expect(transcript).not.toMatch(
       /\u001b\[1;38;2;183;255;248;48;2;18;54;59m[^\u001b\r\n]*Uptime/u,
     )
-    expect(transcript.replace(/\u001b\[[0-9;?<>]*[A-Za-z~]/gu, '')).toContain('│ › [ Enter ]')
+    expect(transcript.replace(/\u001b\[[0-9;?<>]*[A-Za-z~]/gu, '')).toContain('› [ Enter ]')
     expect(transcript).toContain('FIXTURE_RESULT starts=1 opens=1')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')

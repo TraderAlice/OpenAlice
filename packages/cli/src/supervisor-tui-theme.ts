@@ -212,8 +212,9 @@ export function decorateSupervisorFrame(
     if (line.includes('│ ○  NO CHECKS')) return theme.infoRail(line)
     if (line.includes('│ × ATTENTION')) return theme.dangerRail(line)
     if (line.includes('│ ◇ CHECKING')) return theme.warningRail(line)
-    if (/│ (?:NOW|ATTENTION|RECENT)\s*$/u.test(line)
-      || /│ (?:NOW|ATTENTION|RECENT)\s+│/u.test(line)) return theme.accentStrong(line)
+    if (line.startsWith('│ ') && /\b(?:NOW|SIGNALS|RECENT)\b/u.test(line)) {
+      return line.replace(/\b(?:NOW|SIGNALS|RECENT)\b/u, (label) => theme.accentStrong(label))
+    }
     if (line.includes('│ ◆ Inbox')) return theme.warning(line)
     if (line.includes('│ ! Connection')) return theme.warning(line)
     if (line.includes('│ × Connection')) return theme.danger(line)
