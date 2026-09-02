@@ -122,7 +122,9 @@ describe('Supervisor Command Dock', () => {
     const narrow = renderSupervisorCommandDeck(items, createSupervisorCommandDeckState(), 'running', 52)
     expect(narrow.lines.every((line) => displayWidthWithoutAnsi(line) <= 52)).toBe(true)
     expect(narrow.lines.join('\n')).not.toContain('Confirm before reconnecting')
-    expect(narrow.lines.join('\n')).toContain('[ ↑ / ↓ ] Select')
+    expect(narrow.lines.join('\n')).toContain('[ ↑↓ ] Navigate')
+    expect(narrow.lines.join('\n')).toContain('[ Esc ] Close')
+    expect(narrow.lines.join('\n')).not.toContain('Type to filter   [')
   })
 
   it('renders the live query and a corrective empty state without fake targets', () => {
@@ -173,6 +175,7 @@ describe('Supervisor Command Dock', () => {
 
     expect(plain).toEqual(deck.lines)
     expect(colored.join('\n')).toContain('\u001b[')
+    expect(colored.join('\n')).toContain('\u001b[1;38;2;116;235;226m[ ↑↓ ]')
     expect(colored.join('\n')).toContain('› ◆ Open Workspace')
     expect(SUPERVISOR_COMMAND_DOCK_OVERLAY_OPTIONS).toMatchObject({
       width: '100%',

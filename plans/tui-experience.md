@@ -3186,6 +3186,26 @@ already large `supervisor-tui.ts` application controller.
   screen tests, all 54 real-PTY cases, and the complete CLI suite (63 files, 637
   tests). CLI typecheck and build also pass.
 
+### Command Dock focus-line decision
+
+- Real 120x32 and 80x24 captures showed three competing tutorials around one
+  overlay: the search rail said to type, the footer repeated that instruction
+  and `/` Close, and the persistent Command Spine repeated `/` Close again.
+- The focused search rail now solely owns the typing prompt. The footer is a
+  terse status line for Navigate, Run, and Esc Close; once a query exists it
+  substitutes Edit and Clear routes. Only the keycaps are accented, leaving
+  their verbs deliberately muted, while the persistent Spine remains the sole
+  owner of `/` Close.
+- Result geometry, the four-row window, pointer targets, and command actions are
+  unchanged. The existing spacer and footer rows remain stable, so the quieter
+  hierarchy does not move overlay anchors or underlying content.
+- Real 120x32 and 80x24 captures verify that input focus, current selection,
+  executable shortcut, and both close routes remain visible without repeating
+  the same sentence at three visual levels.
+- Command-Dock focus acceptance passes through 140 focused Command Dock,
+  screen, and real-PTY tests (including all 54 PTY cases), and the complete CLI
+  suite (63 files, 637 tests). CLI typecheck and build also pass.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

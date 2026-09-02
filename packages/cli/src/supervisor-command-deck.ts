@@ -313,6 +313,7 @@ export function decorateSupervisorCommandDeck(
     if (line.includes('No commands match')) return theme.muted(line)
     if (line.includes('│ › ')) return theme.selected(line)
     if (line.includes('│ » ')) return theme.accent(line)
+    if (line.includes('[ ↑↓ ] Navigate')) return decorateCommandFooter(line, theme)
     if (line.includes('[ Enter ]') || line.includes('[ / ]')) return theme.accentStrong(line)
     return line
   })
@@ -382,10 +383,22 @@ function renderEmptyState(query: string, width: number): string {
 }
 
 function renderCommandFooter(query: string, width: number): string {
-  if (width < 48) return query ? '⌫ Edit  ^U Clear  ↑↓ Select  ↵ Run' : 'Type filter  ↑↓ Select  ↵ Run'
+  if (width < 48) return query ? '⌫ Edit  ^U Clear  ↑↓ Navigate  ↵ Run' : '↑↓ Navigate  ↵ Run  Esc Close'
   return query
-    ? '[ Backspace ] Edit   [ Ctrl+U ] Clear   [ ↑ / ↓ ] Select   [ Enter ] Run'
-    : 'Type to filter   [ ↑ / ↓ ] Select   [ Enter ] Run   [ / ] Close'
+    ? '[ Backspace ] Edit   [ Ctrl+U ] Clear   [ ↑↓ ] Navigate   [ Enter ] Run'
+    : '[ ↑↓ ] Navigate   [ Enter ] Run   [ Esc ] Close'
+}
+
+function decorateCommandFooter(line: string, theme: SupervisorTuiTheme): string {
+  const pattern = /\[ (?:Backspace|Ctrl\+U|↑↓|Enter|Esc) \]/gu
+  let output = ''
+  let cursor = 0
+  for (const match of line.matchAll(pattern)) {
+    output += theme.muted(line.slice(cursor, match.index))
+    output += theme.accentStrong(match[0])
+    cursor = match.index + match[0].length
+  }
+  return `${output}${theme.muted(line.slice(cursor))}`
 }
 
 function command(

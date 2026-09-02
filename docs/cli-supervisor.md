@@ -357,8 +357,11 @@ intentionally parameter-free:
   and ranks command names, groups, shortcuts, and compact English/Chinese
   intent aliases in place. The focused search rail always exposes a caret;
   color terminals pulse it at a bounded cadence while reduced motion keeps the
-  same solid affordance. Unicode input is preserved, Backspace removes one code
-  point, Ctrl+U clears,
+  same solid affordance. That rail is the sole typing instruction. A muted
+  footer names only the current navigation, run, close, and—once a query
+  exists—edit/clear routes; keycaps carry the emphasis while the persistent
+  Spine remains the owner of `/` Close. Unicode input is preserved, Backspace
+  removes one code point, Ctrl+U clears,
   and an explicit empty state keeps the query available for correction. Up/Down
   wraps selection, the mouse wheel moves within the visible result set, pointer
   hover highlights a complete row, and clicking a row selects and runs it.
