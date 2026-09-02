@@ -1,4 +1,4 @@
-import { ChevronUp, Laptop, Moon, Settings, Sun } from 'lucide-react'
+import { Ellipsis, Laptop, Moon, Settings, Sun } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -6,12 +6,13 @@ import { useThemeStore, type AppTheme } from '../theme/store'
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu'
 
@@ -22,7 +23,6 @@ const THEME_MODES = [
 ] as const satisfies ReadonlyArray<{ mode: AppTheme; Icon: typeof Laptop }>
 
 interface ActivityBarUtilityMenuProps {
-  projectName: string
   compactRail: boolean
   denseRail: boolean
   active: boolean
@@ -30,7 +30,6 @@ interface ActivityBarUtilityMenuProps {
 }
 
 export function ActivityBarUtilityMenu({
-  projectName,
   compactRail,
   denseRail,
   active,
@@ -40,6 +39,7 @@ export function ActivityBarUtilityMenu({
   const theme = useThemeStore((state) => state.theme)
   const setTheme = useThemeStore((state) => state.setTheme)
   const [menuOpen, setMenuOpen] = useState(false)
+  const CurrentThemeIcon = THEME_MODES.find((item) => item.mode === theme)?.Icon ?? Laptop
 
   return (
     <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
@@ -47,7 +47,7 @@ export function ActivityBarUtilityMenu({
         render={(
           <button
             type="button"
-            aria-label={t('nav.applicationMenu', { name: projectName })}
+            aria-label={t('nav.applicationMenu')}
             onClick={() => {
               if (!menuOpen) setMenuOpen(true)
             }}
@@ -59,18 +59,9 @@ export function ActivityBarUtilityMenu({
           />
         )}
       >
-        <img
-          src="/alice.ico"
-          alt=""
-          aria-hidden
-          draggable={false}
-          className={`${denseRail ? 'h-4 w-4' : 'h-[18px] w-[18px]'} shrink-0 object-contain`}
-        />
+        <Ellipsis size={denseRail ? 16 : 18} strokeWidth={1.75} aria-hidden />
         {!compactRail && (
-          <>
-            <span className="min-w-0 flex-1 truncate font-medium">{projectName}</span>
-            <ChevronUp size={13} strokeWidth={1.75} className="shrink-0 text-muted-foreground" aria-hidden />
-          </>
+          <span className="min-w-0 flex-1 truncate font-medium">{t('nav.more')}</span>
         )}
       </DropdownMenuTrigger>
 
@@ -78,7 +69,7 @@ export function ActivityBarUtilityMenu({
         align="start"
         side="top"
         sideOffset={6}
-        className="w-[220px] max-w-[calc(100vw-1rem)] rounded-xl border border-border/70 bg-popover p-1.5 shadow-lg ring-0"
+        className="w-[208px] max-w-[calc(100vw-1rem)] rounded-xl border border-border/70 bg-popover p-1.5 shadow-lg ring-0"
       >
         <DropdownMenuItem
           onClick={onOpenSettings}
@@ -88,31 +79,37 @@ export function ActivityBarUtilityMenu({
           <span>{t('nav.item.settings')}</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuGroup>
-          <DropdownMenuLabel className="px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
-            {t('settings.category.appearance')}
-          </DropdownMenuLabel>
-          <DropdownMenuRadioGroup
-            value={theme}
-            onValueChange={(value) => {
-              if (THEME_MODES.some((item) => item.mode === value)) {
-                setTheme(value as AppTheme)
-              }
-            }}
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger
+            aria-label={t('nav.appearanceMenu', { mode: t(`theme.mode.${theme}`) })}
+            className="min-h-9 gap-2 px-2.5 text-[12px] [&>svg:last-child]:ml-1"
           >
-            {THEME_MODES.map(({ mode, Icon }) => (
-              <DropdownMenuRadioItem
-                key={mode}
-                value={mode}
-                closeOnClick={false}
-                className="min-h-9 gap-2 px-2.5 pr-8 text-[12px]"
-              >
-                <Icon size={15} strokeWidth={1.75} aria-hidden />
-                <span>{t(`theme.mode.${mode}`)}</span>
-              </DropdownMenuRadioItem>
-            ))}
-          </DropdownMenuRadioGroup>
-        </DropdownMenuGroup>
+            <CurrentThemeIcon size={15} strokeWidth={1.75} aria-hidden />
+            <span className="min-w-0 flex-1 truncate">{t('settings.category.appearance')}</span>
+            <span className="shrink-0 text-muted-foreground">{t(`theme.mode.${theme}`)}</span>
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="w-[148px] border border-border/70 bg-popover p-1.5 shadow-lg ring-0">
+            <DropdownMenuRadioGroup
+              value={theme}
+              onValueChange={(value) => {
+                if (THEME_MODES.some((item) => item.mode === value)) {
+                  setTheme(value as AppTheme)
+                }
+              }}
+            >
+              {THEME_MODES.map(({ mode, Icon }) => (
+                <DropdownMenuRadioItem
+                  key={mode}
+                  value={mode}
+                  className="min-h-9 gap-2 px-2.5 pr-8 text-[12px]"
+                >
+                  <Icon size={15} strokeWidth={1.75} aria-hidden />
+                  <span>{t(`theme.mode.${mode}`)}</span>
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
       </DropdownMenuContent>
     </DropdownMenu>
   )

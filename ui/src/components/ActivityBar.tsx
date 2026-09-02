@@ -302,10 +302,9 @@ export function ActivityBar({
           })}
         </nav>
 
-        {/* Project-scoped application controls pinned to the bottom of the rail. */}
+        {/* Application controls pinned to the bottom of the rail. */}
         <div className={`shrink-0 border-t border-border/55 ${compactRail ? `flex justify-center ${denseRail ? 'py-0.5' : 'py-2'}` : 'p-1.5'}`}>
           <ActivityBarUtilityMenu
-            projectName={project?.displayName ?? 'OpenAlice'}
             compactRail={compactRail}
             denseRail={denseRail}
             active={selectedSidebar === 'settings'}

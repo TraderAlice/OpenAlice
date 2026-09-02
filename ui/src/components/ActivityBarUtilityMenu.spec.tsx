@@ -20,8 +20,10 @@ vi.mock('../theme/store', () => ({
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, params?: { name?: string }) => ({
-      'nav.applicationMenu': `${params?.name} application menu`,
+    t: (key: string, params?: { mode?: string }) => ({
+      'nav.applicationMenu': 'Open application menu',
+      'nav.appearanceMenu': `Appearance: ${params?.mode}`,
+      'nav.more': 'More',
       'nav.item.settings': 'Settings',
       'settings.category.appearance': 'Appearance',
       'theme.mode.auto': 'Auto',
@@ -38,12 +40,11 @@ afterEach(() => {
 })
 
 describe('ActivityBarUtilityMenu', () => {
-  it('opens Settings and exposes direct Auto, Day, and Night choices', async () => {
+  it('keeps theme choices in an Appearance submenu', async () => {
     const user = userEvent.setup()
     const onOpenSettings = vi.fn()
     render(
       <ActivityBarUtilityMenu
-        projectName="Default AliceProject"
         compactRail={false}
         denseRail={false}
         active={false}
@@ -51,14 +52,20 @@ describe('ActivityBarUtilityMenu', () => {
       />,
     )
 
-    await user.click(screen.getByRole('button', { name: 'Default AliceProject application menu' }))
+    await user.click(screen.getByRole('button', { name: 'Open application menu' }))
     expect(screen.getByRole('menuitem', { name: 'Settings' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: 'Appearance: Auto' })).toBeTruthy()
+    expect(screen.queryByRole('menuitemradio', { name: 'Auto' })).toBeNull()
+    await user.click(screen.getByRole('menuitem', { name: 'Settings' }))
+    expect(onOpenSettings).toHaveBeenCalledOnce()
+
+    await user.click(screen.getByRole('button', { name: 'Open application menu' }))
+    screen.getByRole('menuitem', { name: 'Appearance: Auto' }).focus()
+    await user.keyboard('{ArrowRight}')
     expect(screen.getByRole('menuitemradio', { name: 'Auto' }).getAttribute('aria-checked')).toBe('true')
     expect(screen.getByRole('menuitemradio', { name: 'Day' })).toBeTruthy()
     await user.click(screen.getByRole('menuitemradio', { name: 'Night' }))
     expect(mocks.setTheme).toHaveBeenCalledWith('night')
 
-    await user.click(screen.getByRole('menuitem', { name: 'Settings' }))
-    expect(onOpenSettings).toHaveBeenCalledOnce()
   })
 })
