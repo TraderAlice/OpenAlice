@@ -1107,6 +1107,20 @@ not imply maintainer approval of the finished interaction.
   restores the exact previous page without mutation. This is an autonomous
   topic refinement, not a recorded maintainer approval.
 
+### Decision action-language decision
+
+- A generic bottom `Confirm / Cancel` shelf keeps the Decision Gate reusable,
+  but a live Stop frame showed it contradicting the focused card's precise
+  `Stop Runtime / Keep running` safety language.
+- Repeating the action-to-label mapping inside the Screen would make the chrome
+  precise while allowing modal and Console wording to drift independently.
+- The selected model lets the centered card and grounded Console render one
+  shared confirmation Action Shelf projection. Stop, Restart, managed Source,
+  and Update therefore preserve their exact positive and refusal labels at
+  every visible activation edge, while Enter/Esc still enter the existing
+  confirmation state machine. This is an autonomous topic decision, not a
+  recorded maintainer approval.
+
 ## Responsive and Accessibility Contract
 
 - `80x24` remains the minimum full experience. Wide terminals show the
@@ -2379,9 +2393,9 @@ already large `supervisor-tui.ts` application controller.
   controls around the centered card. Confirmation now enters a Decision Gate:
   the card stays bounded and centered, the field clears, Header navigation and
   release affordances become confirmation identity plus read-only BUILD, and
-  the grounded Console advertises only Confirm and Cancel. Confirmation takes
-  priority over any existing Focus task and cancellation restores that task or
-  page unchanged.
+  the grounded Console advertises only the active action/refusal pair.
+  Confirmation takes priority over any existing Focus task and cancellation
+  restores that task or page unchanged.
 - Decision-Gate acceptance passes with 125 focused navigation, task-surface,
   overlay-pointer, screen, and real-PTY tests. Truecolor 120x32 and 80x24 frames
   contain no underlying Launchpad/Fleet copy or page commands; the 80x24 PTY
@@ -2391,6 +2405,21 @@ already large `supervisor-tui.ts` application controller.
   CLI build pass; the 702-file suite passes (701 passed, 1 skipped; 6,207 tests
   passed, 10 skipped). Docker installer smoke passes without Node, npm, pnpm,
   Bun, or an Agent Runtime, and package dry-run retains every changed TUI owner.
+- The Decision Gate now derives its centered card and grounded Console from one
+  shared Action Shelf projection. Destructive Runtime control therefore keeps
+  the exact `Stop Runtime / Keep running` or `Restart Runtime / Keep running`
+  language in both locations, while managed Source and Update keep their own
+  exact positive and refusal labels instead of collapsing to generic
+  `Confirm / Cancel` copy.
+- Exact-action acceptance passes with 123 focused confirmation, navigation,
+  overlay-pointer, screen, and real-PTY tests. A settled truecolor 120x32 Stop
+  frame shows `Stop Runtime / Keep running` in both the centered card and the
+  bottom Control Console with no operational action leakage; the 80-column
+  managed-Source PTY proves the longer `Prepare source / Not now` shelf remains
+  pointer-operable. Root TypeScript and CLI build pass; the 702-file suite
+  passes (701 passed, 1 skipped; 6,207 tests passed, 10 skipped). Docker
+  installer smoke passes without Node, npm, pnpm, Bun, or an Agent Runtime, and
+  package dry-run retains the shared confirmation projection in the CLI.
 
 ## Completion Criteria
 

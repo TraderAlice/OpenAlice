@@ -47,12 +47,19 @@ export function renderSupervisorConfirmation(
     'IMPACT',
     ...view.impact.flatMap((line) => wrapDisplayText(line, innerWidth)),
     '',
-    ...renderSupervisorCommandBar([
-      { key: 'Enter', label: view.confirmLabel, primary: true },
-      { key: 'Esc', label: view.cancelLabel },
-    ], innerWidth),
+    ...renderSupervisorConfirmationActionBar(view, innerWidth),
   ], width)
   return decorateConfirmation(raw, theme, destructive, hoveredCommand)
+}
+
+export function renderSupervisorConfirmationActionBar(
+  view: Pick<SupervisorConfirmationView, 'confirmLabel' | 'cancelLabel'>,
+  width: number,
+): string[] {
+  return renderSupervisorCommandBar([
+    { key: 'Enter', label: view.confirmLabel, primary: true },
+    { key: 'Esc', label: view.cancelLabel },
+  ], width)
 }
 
 function decorateConfirmation(

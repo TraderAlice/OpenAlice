@@ -25,6 +25,7 @@ import {
   type SupervisorAction,
   SupervisorScreen,
 } from './supervisor-tui.ts'
+import { renderSupervisorConfirmationActionBar } from './supervisor-confirmation.ts'
 
 const matchesKey = (data: string, key: string) => data === key
 const pointerClick = (col: number, row: number) => ({
@@ -1529,8 +1530,8 @@ describe('Supervisor TUI screen', () => {
     expect(plainDecisionFrame).toContain('◆ FOCUS · CONFIRMATION')
     expect(plainDecisionFrame).toContain('DECISION GATE')
     expect(plainDecisionFrame).toContain('◇ BUILD vdev · DEV')
-    expect(plainDecisionFrame).toContain('◆ [ Enter ] Confirm')
-    expect(plainDecisionFrame).toContain('[ Esc ] Cancel')
+    expect(plainDecisionFrame).toContain('◆ [ Enter ] Stop Runtime')
+    expect(plainDecisionFrame).toContain('[ Esc ] Keep running')
     expect(plainDecisionFrame).not.toContain('Launchpad')
     expect(plainDecisionFrame).not.toContain('[ / ] Commands')
     expect(plainDecisionFrame).not.toContain('[ p ] Setup')
@@ -1582,8 +1583,11 @@ describe('Supervisor TUI screen', () => {
     expect(renderSupervisorFocusActionBar('transfer', 96)[0]).toContain(
       '◆ [ Enter ] Continue  │  [ ↑↓ ] Move choice',
     )
-    expect(renderSupervisorFocusActionBar('confirmation', 96)[0]).toContain(
-      '◆ [ Enter ] Confirm  │  [ Esc ] Cancel',
+    expect(renderSupervisorConfirmationActionBar({
+      confirmLabel: 'Stop Runtime',
+      cancelLabel: 'Keep running',
+    }, 96)[0]).toContain(
+      '◆ [ Enter ] Stop Runtime  │  [ Esc ] Keep running',
     )
   })
 

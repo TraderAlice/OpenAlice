@@ -1284,12 +1284,12 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         if (!requested && output.includes('[ / ] Commands') && output.includes('○ COLD')) {
           requested = true
           child.write('m')
-        } else if (!hoveredCancel && output.includes('Confirm Managed Source') && output.includes('◆ [ Enter ] Confirm')) {
+        } else if (!hoveredCancel && output.includes('Confirm Managed Source') && output.includes('◆ [ Enter ] Prepare source')) {
           hoveredCancel = true
-          child.write('\u001b[<35;31;23M')
-        } else if (!clickedCancel && output.includes('│ › [ Esc ] Cancel')) {
+          child.write('\u001b[<35;40;23M')
+        } else if (!clickedCancel && output.includes('│ › [ Esc ] Not now')) {
           clickedCancel = true
-          child.write('\u001b[<0;31;23M')
+          child.write('\u001b[<0;40;23M')
         } else if (!cancelled && output.includes('STATUS   Action cancelled.')) {
           cancelled = true
           child.write('q')
@@ -1307,12 +1307,12 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('IMPACT')
     expect(transcript).toContain('[ Enter ] Prepare source')
     expect(transcript).toContain('[ Esc ] Not now')
-    expect(transcript).toContain('│ › [ Esc ] Cancel')
+    expect(transcript).toContain('│ › [ Esc ] Not now')
     expect(transcript).toContain('◆ FOCUS · CONFIRMATION')
     expect(transcript).toContain('DECISION GATE')
     expect(transcript).toContain('◇ BUILD')
-    expect(transcript).toContain('◆ [ Enter ] Confirm')
-    expect(transcript).toContain('[ Esc ] Cancel')
+    expect(transcript).toContain('◆ [ Enter ] Prepare source')
+    expect(transcript).toContain('[ Esc ] Not now')
     expect(transcript).toContain('STATUS   Action cancelled.')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')

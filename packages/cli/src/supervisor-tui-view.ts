@@ -499,15 +499,9 @@ export function renderSupervisorCommandBar(
 }
 
 export function renderSupervisorFocusActionBar(
-  task: SupervisorFocusTask,
+  task: Exclude<SupervisorFocusTask, 'confirmation'>,
   width: number,
 ): string[] {
-  if (task === 'confirmation') {
-    return renderSupervisorCommandBar([
-      { key: 'Enter', label: 'Confirm', primary: true },
-      { key: 'Esc', label: 'Cancel' },
-    ], width)
-  }
   const labels: Record<Exclude<SupervisorFocusTask, 'confirmation'>, readonly [string, string, string]> = {
     setup: ['Edit / apply', 'Move field', 'Step back'],
     source: ['Validate / continue', 'Move cursor', 'Step back'],

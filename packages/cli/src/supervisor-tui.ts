@@ -67,6 +67,7 @@ import {
 } from './supervisor-overlay-pointer.ts'
 import {
   renderSupervisorConfirmation,
+  renderSupervisorConfirmationActionBar,
   SUPERVISOR_CONFIRMATION_OVERLAY_OPTIONS,
   type SupervisorConfirmation,
   type SupervisorConfirmationView,
@@ -591,7 +592,7 @@ export async function runSupervisorTui(
     const focusConsole = focusTask
       ? renderSupervisorControlConsole(
           '',
-          renderSupervisorFocusActionBar(focusTask, Math.max(1, terminal.width - 4)),
+          screen.renderFocusActionBar(Math.max(1, terminal.width - 4)),
           renderSupervisorDock({
             panel: screen.snapshot.panel ?? 'overview',
             focusTask,
@@ -3170,6 +3171,19 @@ export class SupervisorScreen implements Component {
     return this.snapshot.confirmation ? 'confirmation' : this.snapshot.focusTask
   }
 
+  renderFocusActionBar(width: number): string[] {
+    if (this.snapshot.confirmation) {
+      return renderSupervisorConfirmationActionBar(confirmationView(
+        this.snapshot.confirmation,
+        this.snapshot.runtime,
+        this.snapshot.managedSource,
+        this.snapshot.update,
+      ), width)
+    }
+    if (!this.snapshot.focusTask || this.snapshot.focusTask === 'confirmation') return []
+    return renderSupervisorFocusActionBar(this.snapshot.focusTask, width)
+  }
+
   bootSequenceActive(): boolean {
     return this.bootFrame !== undefined
   }
@@ -4175,7 +4189,7 @@ export class SupervisorScreen implements Component {
     }, width, this.motionFrame, this.motionEnabled)
     const actionWidth = Math.max(1, width - 4)
     const actionShelf = focusTask
-      ? renderSupervisorFocusActionBar(focusTask, actionWidth)
+      ? this.renderFocusActionBar(actionWidth)
       : this.snapshot.panel === 'fleet' && this.snapshot.fleet
         ? fleetActionBar(
           this.snapshot.fleet,
