@@ -4,7 +4,7 @@ import { defaultUiLayout, type UiLayout } from '../live/ui-layout'
 import { filterNavSections, joinNavLayout, NAV_SECTIONS, navSectionsForProduct } from './activity-navigation'
 
 describe('ActivityBar navigation hierarchy', () => {
-  it('keeps the primary workflow ordered with Quant below Issues', () => {
+  it('keeps the primary workflow ordered with LEAN GUI in Beta', () => {
     const primary = NAV_SECTIONS.find((section) => section.sectionLabel === '')
     const beta = NAV_SECTIONS.find((section) => section.sectionLabel === 'Beta')
     const system = NAV_SECTIONS.find((section) => section.sectionLabel === 'System')
@@ -21,6 +21,7 @@ describe('ActivityBar navigation hierarchy', () => {
       'prediction',
       'office',
       'portfolio',
+      'quant-lab',
       'connectors',
     ])
     expect(beta?.items.find((item) => item.page === 'portfolio')?.labelKey).toBe('nav.item.trading')
@@ -37,6 +38,7 @@ describe('ActivityBar navigation hierarchy', () => {
       'tracked',
       'prediction',
       'office',
+      'quant-lab',
       'connectors',
       'workspaces',
       'automation',

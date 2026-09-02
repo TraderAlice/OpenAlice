@@ -16,6 +16,7 @@ export const zh: Resources = {
       tradingAsGit: '交易即 Git',
       trading: '交易',
       portfolio: '投资组合',
+      quantLab: 'LEAN GUI',
       connectors: '连接器',
       issue: '议题',
       automation: '自动化',

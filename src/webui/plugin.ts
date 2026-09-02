@@ -34,6 +34,7 @@ import { createHarnessSurfaceRoutes } from './routes/harness-surfaces.js'
 import { createAuthRoutes } from './routes/auth.js'
 import { createPreferencesRoutes } from './routes/preferences.js'
 import { createUiLayoutRoutes } from './routes/ui-layout.js'
+import { createLeanRoutes } from './routes/lean.js'
 import { initializeWindowsWorkspaceShellPreference } from '../core/windows-workspace-shell.js'
 import { createAuthMiddleware } from './middleware/auth.js'
 import { mountMarketDataCompat } from '../server/market-data-compat.js'
@@ -263,6 +264,7 @@ export class WebPlugin implements Plugin {
     app.route('/api/inbox', createInboxRoutes({ inboxStore: ctx.inboxStore }))
     app.route('/api/version', createVersionRoutes())
     app.route('/api/alice-project', createAliceProjectRoutes())
+    app.route('/api/lean', createLeanRoutes(ctx))
 
     // ==================== Workspaces (launcher-style PTY) ====================
     // Self-contained subsystem ported from auto-quant-launcher. Owns its own

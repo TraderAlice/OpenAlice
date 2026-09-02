@@ -8,6 +8,7 @@ export const ACTIVITY_PAGE_IDS = [
   'tracked',
   'workspaces',
   'portfolio',
+  'quant-lab',
   'office',
   'automation',
   'market',
@@ -46,7 +47,7 @@ export function defaultUiLayout(): UiLayout {
     version: 1,
     groups: [
       { id: 'primary', items: ['chat', 'inbox', 'issue', 'auto-quant', 'tracked', 'market'] },
-      { id: 'beta', items: ['prediction', 'office', 'portfolio', 'connectors'] },
+      { id: 'beta', items: ['prediction', 'office', 'portfolio', 'quant-lab', 'connectors'] },
       { id: 'system', items: ['workspaces', 'automation', 'settings', 'dev'] },
     ],
     hidden: ['dev'],

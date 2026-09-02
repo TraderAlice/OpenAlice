@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Beaker,
   Building2,
   Code2,
   Inbox,
@@ -31,6 +32,7 @@ type NavItemKey =
   | 'nav.item.inbox' | 'nav.item.tracked' | 'nav.item.chat' | 'nav.item.autoQuant' | 'nav.item.autoPrediction' | 'nav.item.workspaces'
   | 'nav.item.market' | 'nav.item.office' | 'nav.item.issue'
   | 'nav.item.trading' | 'nav.item.connectors' | 'nav.item.automation' | 'nav.item.settings' | 'nav.item.dev'
+  | 'nav.item.quantLab'
 
 interface NavLeaf {
   page: Page
@@ -102,7 +104,8 @@ export const NAV_SECTIONS: NavSection[] = [
       { page: 'office',     labelKey: 'nav.item.office',     icon: Building2, defaultTab: { kind: 'office', params: {} } },
       // Trading as Git and broker accounts are Trading navigator leaves, not rail items.
       { page: 'portfolio',  labelKey: 'nav.item.trading',    icon: LineChart, defaultTab: { kind: 'portfolio', params: {} } },
-      { page: 'connectors', labelKey: 'nav.item.connectors', icon: Plug, defaultTab: { kind: 'connectors', params: {} } },
+      { page: 'quant-lab',  labelKey: 'nav.item.quantLab',   icon: Beaker,    defaultTab: { kind: 'quant-lab', params: {} } },
+      { page: 'connectors', labelKey: 'nav.item.connectors', icon: Plug,      defaultTab: { kind: 'connectors', params: {} } },
     ],
   },
   {

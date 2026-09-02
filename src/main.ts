@@ -76,6 +76,8 @@ import { artifactConversationToolFactories } from './tool/conversation-artifacts
 import { createToolCallLog } from './core/tool-call-log.js'
 import { NewsCollectorStore, NewsCollector } from './domain/news/index.js'
 import { createNewsArchiveTools } from './tool/news.js'
+import { createLeanTools } from './tool/lean.js'
+import { LeanService } from './domain/lean/service.js'
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 const RAILWAY_RUNTIME_REQUIRED = Boolean(
@@ -281,6 +283,10 @@ async function main() {
     toolCenter.register(createIndexTools(indexClient), 'indices')
   }
   toolCenter.register(createEconomyTools(economyClient, commodityClient), 'economy')
+
+  // LEAN integration — independently disableable via data/config/lean.json
+  const leanService = await LeanService.create()
+  if (leanService) toolCenter.register(createLeanTools({ leanService }), 'lean')
 
   console.log(`tool-center: ${toolCenter.list().length} tools registered`)
 

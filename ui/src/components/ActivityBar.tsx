@@ -42,6 +42,7 @@ function activitySectionFor(page: Page): ActivitySection {
     case 'issue':                return 'issue'
     case 'automation':           return 'automation'
     case 'office':               return 'office'
+    case 'quant-lab':            return 'quant-lab'
   }
 }
 

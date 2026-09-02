@@ -16,6 +16,7 @@ export const ja: Resources = {
       tradingAsGit: 'Trading as Git',
       trading: '取引',
       portfolio: 'ポートフォリオ',
+      quantLab: 'LEAN GUI',
       connectors: 'コネクター',
       issue: 'イシュー',
       automation: '自動化',

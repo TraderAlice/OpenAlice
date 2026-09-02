@@ -294,6 +294,42 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
       },
     },
   },
+  quant: {
+    binary: 'alice-quant',
+    scope: 'global',
+    description: 'LEAN GUI — QuantConnect LEAN strategies, backtesting, experiments, and research integrity',
+    groupDescriptions: {
+      system: 'Inspect LEAN GUI readiness, Docker, native LEAN CLI, and managed paths',
+      strategy: 'Scaffold, inspect, and manage Python LEAN trading strategies',
+      backtest: 'Execute isolated backtests and fetch execution metrics and equity curves',
+      experiment: 'Explore and audit parameter sweeps and experiment lineage',
+      integrity: 'Evaluate Deflated Sharpe Ratio, walk-forward, and statistical bias',
+      journal: 'Record trade hypotheses and formalize them into systematic algorithms',
+    },
+    commands: {
+      system: {
+        status: 'leanStatus',
+      },
+      strategy: {
+        create: 'leanCreateStrategy',
+      },
+      backtest: {
+        run: 'leanRunBacktest',
+        results: 'leanGetResults',
+        optimize: 'leanOptimize',
+      },
+      experiment: {
+        list: 'leanListExperiments',
+      },
+      integrity: {
+        evaluate: 'leanResearchIntegrity',
+      },
+      journal: {
+        entry: 'leanJournalEntry',
+        formalize: 'leanFormalizeIdea',
+      },
+    },
+  },
   // cron: deliberately NOT exported — scheduling stays MCP-only.
 }
 

@@ -82,6 +82,13 @@ export function UrlAdopter() {
         <Route path="/trading-as-git" element={<AdoptTraderStatic spec={{ kind: 'trading-as-git', params: {} }} />} />
         <Route path="/connectors" element={<AdoptStatic spec={{ kind: 'connectors', params: {} }} />} />
 
+        {/* LEAN GUI (QuantConnect LEAN Engine quantitative research) */}
+        <Route path="/quant-lab" element={<AdoptStatic spec={{ kind: 'quant-lab', params: {} }} />} />
+        <Route path="/quant-lab/strategy/:id" element={<AdoptQuantLabStrategy />} />
+        <Route path="/quant-lab/results/:id" element={<AdoptQuantLabResults />} />
+        <Route path="/quant-lab/integrity/:experimentId" element={<AdoptQuantLabIntegrity />} />
+        <Route path="/quant-lab/journal" element={<AdoptStatic spec={{ kind: 'quant-lab-journal', params: {} }} />} />
+
         {/* Settings — one entry per category */}
         <Route path="/settings" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'general' } }} />} />
         <Route path="/settings/appearance" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'appearance' } }} />} />
@@ -376,6 +383,24 @@ function AdoptFileViewer() {
   )
 }
 
+function AdoptQuantLabStrategy() {
+  const { id } = useParams<{ id: string }>()
+  if (!id) return <Navigate to="/quant-lab" replace />
+  return <AdoptStatic spec={{ kind: 'quant-lab-strategy', params: { id } }} />
+}
+
+function AdoptQuantLabResults() {
+  const { id } = useParams<{ id: string }>()
+  if (!id) return <Navigate to="/quant-lab" replace />
+  return <AdoptStatic spec={{ kind: 'quant-lab-results', params: { id } }} />
+}
+
+function AdoptQuantLabIntegrity() {
+  const { experimentId } = useParams<{ experimentId: string }>()
+  if (!experimentId) return <Navigate to="/quant-lab" replace />
+  return <AdoptStatic spec={{ kind: 'quant-lab-integrity', params: { experimentId } }} />
+}
+
 function AdoptChatFileViewer() {
   const { wsId, path } = useParams<{ wsId: string; path: string }>()
   const [search] = useSearchParams()
@@ -502,8 +527,13 @@ function specToSection(spec: ViewSpec): ActivitySection {
     case 'uta-detail':         return 'portfolio'
     case 'issue':
     case 'issue-detail':       return 'issue'
-    case 'automation':         return 'automation'
-    case 'office':             return 'office'
+    case 'automation':           return 'automation'
+    case 'office':               return 'office'
+    case 'quant-lab':
+    case 'quant-lab-strategy':
+    case 'quant-lab-results':
+    case 'quant-lab-integrity':
+    case 'quant-lab-journal':    return 'quant-lab'
     case 'news':
     case 'market-list':
     case 'market-rotation':

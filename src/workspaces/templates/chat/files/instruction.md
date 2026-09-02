@@ -47,7 +47,8 @@ files, Issues, Inbox reports, tracked entities, and attributable Sessions.
 
 ## Choose the right surface
 
-OpenAlice places four boundary-specific CLIs on PATH. Their live top-level help
+OpenAlice places OpenAlice-specific CLIs on PATH, and may also expose the native
+QuantConnect LEAN CLI when it is installed on the machine. Their live top-level help
 explains each group; their skills own procedures and exact examples. Read the
 relevant skill before the first domain command and never guess flags.
 
@@ -58,6 +59,8 @@ relevant skill before the first domain command and never guess flags.
 | Peer addressing, Agent conversation, Inbox, Issues and provenance | `alice-workspace` | `alice-workspace` |
 | Issue files, schedules, headless delivery contracts | `.alice/issues/` + `alice-workspace issue` | `self-scheduling` |
 | Accounts, positions, orders, trading-as-git | `alice-uta` | `alice-uta` |
+| LEAN GUI, managed LEAN backtesting, strategy research, integrity | `alice-quant` | `quant-lab` |
+| Native QuantConnect LEAN project commands | `lean` | `quant-lab` |
 | Optional sources Alice does not ship | `opencli` | `opencli-reader` |
 
 Use the bundled research skills (`build-thesis`, `sector-rotation`,
