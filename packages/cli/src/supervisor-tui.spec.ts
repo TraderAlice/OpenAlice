@@ -371,7 +371,7 @@ describe('Supervisor TUI screen', () => {
     expect(detached).toBe(1)
   })
 
-  it('settles a bounded brand entrance and pulses running state only on refresh', () => {
+  it('settles the brand entrance into an overlay-aware ambient prism', () => {
     const screen = new SupervisorScreen({
       version: 'dev',
       channel: 'dev',
@@ -391,8 +391,21 @@ describe('Supervisor TUI screen', () => {
     expect(screen.render(120).find((line) => line.includes('ALICEPROJECT')))
       .not.toBe(beaconIntro)
     for (let frame = 0; frame < 8; frame += 1) screen.advanceMotion()
-    expect(screen.hasActiveMotion()).toBe(false)
+    expect(screen.hasActiveMotion()).toBe(true)
     expect(screen.render(80)[0]).toContain('\u001b[1;38;2;116;235;226m◆ OpenAlice Supervisor')
+    const settledHeader = screen.render(80)[0]
+    const settledMark = screen.render(80).find((line) => line.includes('│ Home'))
+    expect(screen.hasActiveMotion(false)).toBe(false)
+    for (let frame = 0; frame < 6; frame += 1) {
+      expect(screen.advanceMotion(false)).toBe(false)
+    }
+    expect(screen.render(80)[0]).toBe(settledHeader)
+    expect(screen.render(80).find((line) => line.includes('│ Home')))
+      .toBe(settledMark)
+    for (let frame = 0; frame < 3; frame += 1) screen.advanceMotion()
+    expect(screen.render(80)[0]).toBe(settledHeader)
+    expect(screen.render(80).find((line) => line.includes('│ Home')))
+      .not.toBe(settledMark)
 
     screen.update({ runtime: { class: 'running', endpoints: {} } })
     expect(screen.render(80).join('\n')).toContain('◉ RUNNING')
@@ -428,6 +441,7 @@ describe('Supervisor TUI screen', () => {
     expect(reduced.render(99).join('\n')).toContain('Runtime Signal Deck · OpenAlice')
     expect(reduced.render(99).join('\n')).toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
     expect(reduced.render(71).join('\n')).not.toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+    expect(reduced.hasActiveMotion()).toBe(false)
   })
 
   it('slides the Mission Header view beacon while reduced motion lands immediately', () => {

@@ -576,6 +576,22 @@ not imply maintainer approval of the finished interaction.
   actions, and pointer geometry keep their current owners. This is an
   autonomous topic decision, not a recorded maintainer approval.
 
+### Ambient brand-prism decision
+
+- Keeping the bounded entrance as the only brand motion is quiet and cheap,
+  but the Signal Deck settles back into the same static texture as every other
+  status card after less than a second.
+- Copying OMP's continuously changing welcome composition across the complete
+  Overview would feel alive, but redraw operational content behind focused
+  overlays and compete with Working, confirmation, and error states.
+- The selected model gives only the visible `ALICE` mark a slow six-phase prism
+  loop after the entrance settles. It advances once per 240ms, leaves geometry
+  and all surrounding telemetry byte-stable, and pauses while any compositor
+  overlay, confirmation, or busy operation owns attention. Closing the overlay
+  resumes the same phase. `NO_COLOR` and reduced motion never start the ambient
+  timer. This is an autonomous topic decision, not a recorded maintainer
+  approval.
+
 ### Confirmation-modal decision
 
 - Keeping confirmation cards inline preserves the original implementation but
@@ -643,6 +659,8 @@ already large `supervisor-tui.ts` application controller.
   complete 80×24 operational frame.
 - [x] Compose that identity into a responsive Signal Deck at standard widths
   and promote the complete Beacon to the 100-column wide cockpit.
+- [x] Give the responsive brand mark an overlay-aware ambient prism while
+  keeping operational content and reduced-motion frames static.
 - [x] Turn Overview into a responsive AliceProject/Runtime cockpit without
   changing lifecycle action semantics or sacrificing the 80x24 baseline.
 - [x] Promote Overview into an action-first Launchpad with a semantic intent
@@ -1311,6 +1329,19 @@ already large `supervisor-tui.ts` application controller.
   build/typecheck and root TypeScript pass; the 699-file suite passes (698
   passed, 1 skipped; 6,150 tests passed, 10 skipped). Docker installer smoke
   passes, and package dry-run includes the changed Supervisor view source.
+- The responsive `ALICE` mark now remains alive after its entrance with a
+  six-phase prism that advances every 240ms. The Header and operational
+  telemetry stay byte-stable; focused overlays, confirmations, and busy work
+  pause the ambient loop, while closing the owner resumes it. Reduced-motion
+  and `NO_COLOR` sessions retain the complete static composition.
+- Ambient-prism acceptance passes with 84 focused screen and real-PTY tests. A
+  real truecolor 80×24 Default AliceProject session confirmed three-row-only
+  incremental updates, visual silence while Setup owned focus, resumption after
+  Escape, and complete cursor, bracketed-paste, mouse, and alternate-screen
+  restoration on detach. CLI build/typecheck and root TypeScript pass; the
+  699-file suite passes (698 passed, 1 skipped; 6,150 tests passed, 10 skipped).
+  Docker installer smoke passes, and package dry-run contains the changed TUI
+  theme and Supervisor controller sources.
 
 ## Completion Criteria
 

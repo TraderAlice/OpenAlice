@@ -33,6 +33,7 @@ export interface SupervisorFrameStyleOptions {
   hoveredCommand?: { row: number; label: string }
   runtimeClass?: string
   introFrame?: number
+  ambientBrandFrame?: number
 }
 
 const RESET = '\u001b[0m'
@@ -116,7 +117,11 @@ export function decorateSupervisorFrame(
     ))
   }
   return lines.map((line, index) => {
-    const brandMark = decorateBrandMarkLine(line, theme, options.introFrame)
+    const brandMark = decorateBrandMarkLine(
+      line,
+      theme,
+      options.introFrame ?? options.ambientBrandFrame,
+    )
     if (brandMark) return brandMark
     if (isSupervisorActionShelf(line)) {
       return decorateSupervisorActionShelf(

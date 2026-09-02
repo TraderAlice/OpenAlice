@@ -46,6 +46,10 @@ const cliVersion = JSON.parse(
 ).version
 const temporaryPaths: string[] = []
 
+function stripSgr(value: string): string {
+  return value.replace(/\u001b\[[0-9;]*m/gu, '')
+}
+
 afterEach(async () => {
   await Promise.all(temporaryPaths.splice(0).map((path) => (
     rm(path, { recursive: true, force: true })
@@ -129,6 +133,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       },
     })
 
+    let overlayIdleOutput = ''
     const transcript = await new Promise<string>((resolve, reject) => {
       let output = ''
       let hovered = false
@@ -149,7 +154,11 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           child.write('\u001b[<0;34;21M')
         } else if (!closed && clicked && output.includes('╭ Setup Studio · Default AliceProject')) {
           closed = true
-          child.write('\u001b')
+          const pausedAt = output.length
+          setTimeout(() => {
+            overlayIdleOutput = output.slice(pausedAt)
+            child.write('\u001b')
+          }, 650)
         } else if (!detached && closed && output.includes('Setup closed.')) {
           detached = true
           child.write('q')
@@ -163,8 +172,9 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     })
 
     expect(transcript).toContain('Runtime Signal Deck · OpenAlice')
-    expect(transcript).toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+    expect(stripSgr(transcript)).toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
     expect(transcript).toContain('◆ LOCAL CONTROL')
+    expect(stripSgr(overlayIdleOutput)).not.toContain('OpenAlice Supervisor')
     expect(transcript).toContain('│ › [ p ] Setup')
     expect(transcript).toContain('╭ Setup Studio · Default AliceProject')
     expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=0')
@@ -305,7 +315,6 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           !hovered
           && output.includes('OpenAlice · launch system')
           && output.includes('◆ ALICEPROJECT')
-          && output.includes('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
         ) {
           hovered = true
           child.write('\u001b[<35;50;17M')

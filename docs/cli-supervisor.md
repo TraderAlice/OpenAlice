@@ -235,8 +235,11 @@ path is intentionally parameter-free:
   color; only the busy glyph animates. The slot is a presentation of existing
   Supervisor state and does not introduce a second lifecycle or error path;
 - color-capable motion-enabled sessions play one bounded brand-color sweep on
-  entry across the OpenAlice header and any visible brand mark, then settle to
-  the static brand frame. A successfully refreshed
+  entry across the OpenAlice header and any visible brand mark. The header then
+  settles while a visible Overview `ALICE` mark continues a slow six-phase
+  prism at 240ms per phase. The ambient mark pauses whenever a focused overlay,
+  confirmation, or busy operation owns attention and resumes after it closes;
+  `NO_COLOR` and reduced motion remain completely static. A successfully refreshed
   running Runtime alternates `●`/`◉` as a low-frequency heartbeat in Overview
   and Fleet; the adjacent `RUNNING`/`running` text never changes, and failed
   probes still surface through the diagnostic rail rather than animation;

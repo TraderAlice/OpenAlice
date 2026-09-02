@@ -587,15 +587,25 @@ export async function runSupervisorTui(
     if (motionTimer) clearInterval(motionTimer)
     motionTimer = undefined
   }
+  const ambientMotionAllowed = () => !(
+    sourcePromptActive
+    || settingsActive
+    || projectsActive
+    || transferActive
+    || updateChannelActive
+    || confirmationActive
+    || commandPaletteActive
+  )
   const syncMotionTimer = () => {
-    if (!motionEnabled || !screen.hasActiveMotion()) {
+    if (!active || !motionEnabled || !screen.hasActiveMotion(ambientMotionAllowed())) {
       stopMotionTimer()
       return
     }
     if (motionTimer) return
     motionTimer = setInterval(() => {
-      if (screen.advanceMotion()) ui.requestRender()
-      if (!screen.hasActiveMotion()) stopMotionTimer()
+      const allowAmbient = ambientMotionAllowed()
+      if (screen.advanceMotion(allowAmbient)) ui.requestRender()
+      if (!screen.hasActiveMotion(allowAmbient)) stopMotionTimer()
     }, 80)
     motionTimer.unref()
   }
@@ -652,6 +662,7 @@ export async function runSupervisorTui(
       hoveredCommand = undefined
       overlayPointer.clear()
       overlay.hide()
+      syncMotionTimer()
     }
     overlay.focus()
   }
@@ -1106,6 +1117,7 @@ export async function runSupervisorTui(
       overlay.unfocus?.({ target: screen })
       overlay.hide()
       if (notice) screen.update({ notice })
+      syncMotionTimer()
     }
     list.onCancel = () => close('Update channel unchanged.')
     list.onSelect = (item) => {
@@ -1497,6 +1509,7 @@ export async function runSupervisorTui(
       overlay.hide()
       ui.setShowHardwareCursor(false)
       if (notice) screen.update({ notice })
+      syncMotionTimer()
     }
     closeSourcePrompt = () => close('Source configuration cancelled.')
     input.onEscape = closeSourcePrompt
@@ -1596,6 +1609,7 @@ export async function runSupervisorTui(
       overlay.hide()
       ui.setShowHardwareCursor(false)
       screen.update({ notice })
+      syncMotionTimer()
     }
     const inputSubmenu = (
       title: string,
@@ -2153,6 +2167,7 @@ export async function runSupervisorTui(
       overlay.hide()
       ui.setShowHardwareCursor(false)
       screen.update({ notice })
+      syncMotionTimer()
     }
     const showList = () => {
       ui.setShowHardwareCursor(false)
@@ -2458,6 +2473,7 @@ export async function runSupervisorTui(
       overlay.hide()
       ui.setShowHardwareCursor(false)
       screen.update({ notice })
+      syncMotionTimer()
     }
     const showInput = (
       title: string,
@@ -2941,6 +2957,8 @@ export class SupervisorScreen implements Component {
   private commandDeckCursorFrame = 0
   private motionFrame = 0
   private introFrame?: number
+  private ambientBrandFrame = 0
+  private ambientBrandTick = 0
   private navigationTransition?: SupervisorNavigationTransition
   private runtimePulse = false
   private logsFromEnd = 0
@@ -3004,7 +3022,7 @@ export class SupervisorScreen implements Component {
     this.theme = callbacks.theme ?? createSupervisorTuiTheme({ NO_COLOR: '1' })
     this.motionEnabled = callbacks.motionEnabled ?? true
     this.onMotionDemandChange = callbacks.onMotionDemandChange
-    this.introFrame = this.motionEnabled ? 0 : undefined
+    this.introFrame = this.motionEnabled && this.theme.enabled ? 0 : undefined
     this.onDetach = callbacks.onDetach
   }
 
@@ -3046,12 +3064,20 @@ export class SupervisorScreen implements Component {
     this.requestRender?.()
   }
 
-  advanceMotion(): boolean {
+  advanceMotion(ambientMotionAllowed = true): boolean {
     if (!this.motionEnabled) return false
     let changed = false
-    if (this.introFrame !== undefined) {
+    const brandMotionAllowed = ambientMotionAllowed && !this.snapshot.busy
+    if (this.introFrame !== undefined && brandMotionAllowed) {
       this.introFrame = this.introFrame >= 8 ? undefined : this.introFrame + 1
       changed = true
+    }
+    if (this.ambientBrandMotionActive(brandMotionAllowed)) {
+      this.ambientBrandTick = (this.ambientBrandTick + 1) % 3
+      if (this.ambientBrandTick === 0) {
+        this.ambientBrandFrame = (this.ambientBrandFrame + 1) % 6
+        changed = this.renderWidth >= 72 || changed
+      }
     }
     if (this.snapshot.busy) {
       this.motionFrame = (this.motionFrame + 1) % 10
@@ -3074,14 +3100,23 @@ export class SupervisorScreen implements Component {
     return changed
   }
 
-  hasActiveMotion(): boolean {
+  hasActiveMotion(ambientMotionAllowed = true): boolean {
+    const brandMotionAllowed = ambientMotionAllowed && !this.snapshot.busy
     return this.motionEnabled
       && (
-        this.introFrame !== undefined
+        (brandMotionAllowed && this.introFrame !== undefined)
+        || this.ambientBrandMotionActive(brandMotionAllowed)
         || Boolean(this.snapshot.busy)
         || Boolean(this.navigationTransition)
         || this.commandDeckOpen
       )
+  }
+
+  private ambientBrandMotionActive(brandMotionAllowed: boolean): boolean {
+    return brandMotionAllowed
+      && this.theme.enabled
+      && this.introFrame === undefined
+      && (this.snapshot.panel ?? 'overview') === 'overview'
   }
 
   cancelConfirmation(): void {
@@ -3786,6 +3821,7 @@ export class SupervisorScreen implements Component {
         hoveredCommand: this.hoveredCommandTarget,
         runtimeClass: runtime?.class,
         introFrame: this.introFrame,
+        ambientBrandFrame: this.ambientBrandFrame,
       },
     )
   }
