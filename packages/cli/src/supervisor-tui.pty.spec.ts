@@ -958,7 +958,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 8_000)
       child.onData((data) => {
         output += data
-        if (!hovered && output.includes('Start OpenAlice for this AliceProject') && output.includes('[ Enter ]')) {
+        if (!hovered && output.includes('Your workspace is one step away') && output.includes('[ Enter ]')) {
           hovered = true
           child.write('\u001b[<35;60;13M')
         } else if (!clicked && stripSgr(output).includes('│ › [ Enter ]')) {
@@ -1145,7 +1145,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
 
     expect(transcript).toContain('Alice Session · OpenAlice')
     expect(stripSgr(transcript)).toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
-    expect(stripSgr(transcript)).toContain('OpenAlice is ready to start.')
+    expect(stripSgr(transcript)).toContain('Your workspace is one step away')
     expect(stripSgr(transcript)).toContain('ALICEPROJECT')
     expect(stripSgr(transcript)).toContain('SIGNALS')
     expect(stripSgr(transcript)).toContain('RECENT')

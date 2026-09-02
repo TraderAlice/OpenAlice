@@ -5485,13 +5485,13 @@ function renderGuidance(
   if (runtime.class === 'absent') {
     if (context?.runtimeProvider.kind === 'bundle') {
       return [
-        'OpenAlice is ready to start.',
-        'Press Enter to start and open the browser, or p to review setup first.',
+        'The TUI will prepare OpenAlice, verify readiness, and open the Web UI.',
+        'Review setup first with p.',
       ]
     }
     return [
-      'OpenAlice is ready to start.',
-      'Enter prepares anything missing and opens the browser; c chooses a checkout.',
+      'The TUI will prepare the selected checkout, verify readiness, and open the Web UI.',
+      'Need another checkout? Press c before launch.',
     ]
   }
   if (runtime.class === 'incompatible') {

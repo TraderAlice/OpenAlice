@@ -228,7 +228,11 @@ intentionally parameter-free:
   unread Inbox reports promote Enter to Review Inbox and keep `o` as the
   explicit Open Web route; when attention clears, Enter returns to Open
   Workspace. The rendered label, whole-row pointer target, and Enter handler
-  resolve from the same intent. `⌂` AliceProject remains
+  resolve from the same intent. A stopped Home does not repeat the same Start
+  instruction across every layer: Now names the user outcome, guidance previews
+  preparation and readiness verification, the Action Shelf owns the command,
+  and the contextual Tip teaches only alternate `s` and `/` routes. `⌂`
+  AliceProject remains
   a direct route into the Switchboard, while passive identity and status rows
   do not pretend to be controls. Color strengthens identity, focus, healthy
   state, and actionable attention, but glyphs and text keep the complete

@@ -289,7 +289,7 @@ function homeNowHeadline(view: SupervisorHomeView): string {
     && (view.state === 'running' || view.state === 'owned_elsewhere')
   ) return 'Runtime is live; AliceProject home is missing'
   if (view.state === 'running' || view.state === 'owned_elsewhere') return 'Workspace is ready'
-  if (view.state === 'absent') return 'Start OpenAlice for this AliceProject'
+  if (view.state === 'absent') return 'Your workspace is one step away'
   if (view.state === 'incompatible') return 'Review Runtime Doctor before changing anything'
   return 'Resolving Runtime state'
 }
@@ -702,7 +702,7 @@ export function renderSupervisorContextTip(
             : view.panel === 'inbox'
               ? '↑↓ or wheel selects; Enter toggles read state; Home follows unread work.'
               : view.runtimeState === 'absent'
-                ? 'Enter starts and opens; s starts quietly inside this terminal.'
+                ? 'Alternate route: s starts without opening Web; / reveals every command.'
                 : view.runtimeState === 'running' || view.runtimeState === 'owned_elsewhere'
                   ? 'Enter follows Now; o opens Web; Runtime keeps the diagnostic detail.'
                   : 'Run Doctor before acting on an uncertain Runtime signal.'

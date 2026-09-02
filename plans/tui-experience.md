@@ -3352,6 +3352,26 @@ already large `supervisor-tui.ts` application controller.
   real-PTY tests (including all 54 PTY cases), and the complete CLI suite (63
   files, 638 tests). CLI typecheck and build also pass.
 
+### Cold-Home guidance decision
+
+- Cell-accurate 120x32 and 80x24 captures showed the stopped Home repeating one
+  Start instruction in four layers: Now headline, explanatory prose, Action
+  Shelf, and contextual Tip. The primary route was unmistakable but the page
+  read like four competing tutorials rather than one confident launcher.
+- The stopped task sequence now reads as outcome, consequence, command, then
+  alternatives. `Your workspace is one step away` leads; guidance explains
+  checkout preparation, readiness verification, and Web handoff; the Action
+  Shelf alone says Start; the Tip teaches quiet `s` and discoverable `/`.
+- Installed-runtime guidance stays product-oriented and does not expose bundle,
+  source path, content identity, or provider implementation. The source route
+  may name the user-selected checkout and its existing `c` escape hatch.
+- Real 120x32 and 80x24 captures verify the new hierarchy fits without clipping
+  or changing primary intent, pointer geometry, keyboard dispatch, Runtime
+  lifecycle, or responsive structure.
+- Cold-Home-guidance acceptance passes through all 133 focused screen and
+  real-PTY tests (including all 54 PTY cases), and the complete CLI suite (63
+  files, 638 tests). CLI typecheck and build also pass.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and
