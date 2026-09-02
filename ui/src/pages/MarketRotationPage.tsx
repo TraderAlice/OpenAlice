@@ -145,7 +145,7 @@ function QuadrantChart({ points, t }: { points: Point[]; t: TFunction }) {
       </div>
       <MeasuredChartFrame className="h-[420px] w-full">
         {({ width, height }) => (
-          <ScatterChart width={width} height={height} margin={{ top: 24, right: 28, bottom: 28, left: 8 }}>
+          <ScatterChart accessibilityLayer width={width} height={height} margin={{ top: 24, right: 28, bottom: 28, left: 8 }}>
           <XAxis
             type="number" dataKey="x" name={t('market.axisRelStrength')}
             tickFormatter={(v: number) => `${v.toFixed(0)}%`}
@@ -185,7 +185,7 @@ function PointTooltip({ active, payload, t }: { active?: boolean; payload?: Arra
   if (!active || !payload?.length) return null
   const p = payload[0].payload
   return (
-    <div className="rounded-xl border border-border bg-popover px-2.5 py-1.5 text-[11px] leading-[15px] shadow-md">
+    <div className="oa-chart-tooltip px-2.5 py-1.5 text-[11px] leading-[15px]">
       <div className="font-mono font-semibold text-foreground">{p.symbol} <span className="text-muted-foreground font-sans font-normal">{p.sector}</span></div>
       <div className="mt-0.5 grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5">
         <span className="text-muted-foreground">{t('market.colScore')}</span><span className={signColor(p.score)}>{p.score ?? '—'}</span>

@@ -248,6 +248,37 @@ body {
   background: color-mix(in srgb, var(--secondary) 38%, transparent);
 }
 
+.oa-chart {
+  font-variant-numeric: tabular-nums;
+}
+
+.oa-chart .recharts-tooltip-wrapper {
+  outline: none;
+  transition: none !important;
+  will-change: transform;
+}
+
+.oa-chart .recharts-default-tooltip,
+.oa-chart-tooltip {
+  border: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent) !important;
+  border-radius: var(--radius-lg) !important;
+  background: color-mix(in srgb, var(--popover) 96%, transparent) !important;
+  color: var(--popover-foreground) !important;
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--shadow-color) 8%, transparent),
+    0 8px 24px color-mix(in srgb, var(--shadow-color) 12%, transparent);
+}
+
+.oa-chart .recharts-default-tooltip {
+  padding: 0.375rem 0.625rem !important;
+  font-size: 0.6875rem !important;
+  line-height: 0.9375rem !important;
+}
+
+.oa-chart .recharts-tooltip-cursor {
+  stroke: color-mix(in srgb, var(--foreground) 18%, transparent);
+}
+
 .oa-status-surface {
   transition:
     border-color var(--motion-slow) var(--motion-ease-standard),

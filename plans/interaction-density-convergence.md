@@ -8,12 +8,16 @@
 
 Converge the current `dev` interface on one compact interaction system. The delivered increment gives form controls a quiet shared focus treatment, makes the compact Alice brand position expose the rail expansion action, flattens Connector setup hierarchy, and tightens repeated market information surfaces. Existing routes, data flow, and page layout remain stable.
 
+The convergence pass also establishes a more generous shared radius scale, refined credential disclosure geometry, and one chart interaction layer for Recharts and lightweight-charts consumers.
+
 ## Decisions
 
 - A 14px by 20px body baseline and shared focus tokens establish common field and text metrics. The existing `oa-field-control` seam owns field emphasis. Feature-local blue focus shadows leave the common path.
 - The compact brand action follows the existing rail state boundary. Hover and keyboard focus crossfade the Alice mark with the expansion glyph inside one fixed optical box.
 - Connector credentials keep one disclosure boundary. Setup guidance uses separators and aligned content inside that boundary.
 - Existing market card owners receive shared surface classes after repeated geometry is confirmed in current consumers.
+- Shared radius tokens own control, card, popover, and dialog curvature. Product profiles retain their explicit geometry overrides.
+- Disclosure headers expose one label, one status, and one chevron in fixed optical boxes. Chart frames own tooltip material, numeric rhythm, cursor feedback, and active-point geometry.
 
 ## Checklist
 
@@ -22,6 +26,10 @@ Converge the current `dev` interface on one compact interaction system. The deli
 - [x] Flatten Connector setup guidance and align disclosure geometry.
 - [x] Apply the dense-surface hierarchy to current market consumers.
 - [x] Run targeted tests, complete UI checks, and capture representative routes.
+- [x] Increase the shared radius scale and audit common component primitives.
+- [x] Refine Connector credential disclosures through one coherent surface pattern.
+- [x] Standardize chart tooltip, crosshair, and active-point interaction.
+- [x] Run the complete verification set and capture updated interaction screenshots.
 
 ## Verification
 

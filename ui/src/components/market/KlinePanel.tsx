@@ -152,6 +152,10 @@ export function KlinePanel({ selection, source, onSnapshot }: Props) {
         vertLines: { color: colors.grid },
         horzLines: { color: colors.grid },
       },
+      crosshair: {
+        vertLine: { color: colors.primaryMuted, labelBackgroundColor: colors.labelBackground },
+        horzLine: { color: colors.primaryMuted, labelBackgroundColor: colors.labelBackground },
+      },
       rightPriceScale: { borderColor: colors.grid },
       timeScale: { borderColor: colors.grid, timeVisible: false, secondsVisible: false },
       autoSize: true,
@@ -398,6 +402,7 @@ function readKlineChartColors() {
     text: readSemanticColor('chart-axis'),
     grid: readSemanticColor('chart-grid'),
     primaryMuted: readSemanticColor('primary-muted'),
+    labelBackground: readSemanticColor('popover'),
     positive: readSemanticColor('chart-positive'),
     negative: readSemanticColor('chart-negative'),
     positiveMuted: readSemanticColor('chart-positive-muted'),
