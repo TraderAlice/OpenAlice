@@ -45,6 +45,7 @@ const MAX_NARROW_PROJECTS = 5
 export function renderSupervisorProjectSwitchboard(
   view: SupervisorProjectSwitchboardView,
   width: number,
+  compactStage = false,
 ): SupervisorProjectSwitchboardRender {
   const selected = clamp(view.selected, 0, Math.max(0, view.items.length - 1))
   const item = view.items[selected]
@@ -139,20 +140,36 @@ export function renderSupervisorProjectSwitchboard(
     inspectorRows,
     width,
   )
+  const compactStatusRows = wrapDisplayText(
+    `${view.currentProjectName} · ${view.message}`,
+    Math.max(1, width - 2),
+  ).slice(0, 2).map((line, index) => `${index === 0 ? '◇' : ' '} ${line}`)
+  const targets = visibleIndexes.map((index, row) => ({
+    row: row + 2,
+    startColumn: 2,
+    endColumn: Math.max(2, width - 1),
+    index,
+  }))
+  if (!compactStage) {
+    return {
+      lines: [
+        ...map,
+        '',
+        ...inspector,
+        '',
+        ...renderSupervisorPanel('Switchboard status', view.currentProjectName, statusRows, width),
+      ],
+      targets,
+    }
+  }
   return {
     lines: [
       ...map,
       '',
       ...inspector,
-      '',
-      ...renderSupervisorPanel('Switchboard status', view.currentProjectName, statusRows, width),
+      ...compactStatusRows.map((line) => truncateDisplayWidth(line, width)),
     ],
-    targets: visibleIndexes.map((index, row) => ({
-      row: row + 2,
-      startColumn: 2,
-      endColumn: Math.max(2, width - 1),
-      index,
-    })),
+    targets,
   }
 }
 

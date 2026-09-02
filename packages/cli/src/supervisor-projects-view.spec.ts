@@ -45,6 +45,7 @@ describe('Supervisor AliceProject Switchboard', () => {
     expect(output).toContain('AliceProject Switchboard · 2 PROJECTS')
     expect(output).toContain('Inspector · 1/2 · READ ONLY')
     expect(output).toContain('Role · CURRENT CONTEXT · BARE-START DEFAULT')
+    expect(output).toContain('Switchboard status · Research')
     expect(output).toContain('◆ [ Esc ] Done')
     expect(output).not.toContain('[ Enter ] Select')
     expect(rendered.lines.every((line) => displayWidth(line) <= 72)).toBe(true)
@@ -91,6 +92,18 @@ describe('Supervisor AliceProject Switchboard', () => {
     }, 72)
     expect(short.targets.map((target) => target.index)).toEqual([8, 9])
     expect(short.lines.length).toBeLessThanOrEqual(18)
+
+    const compactStage = renderSupervisorProjectSwitchboard({
+      currentProjectName: 'Project 9',
+      message: 'Selecting an AliceProject also makes it the next bare-start default.',
+      locked: false,
+      items: many,
+      selected: 9,
+    }, 80, true)
+    expect(compactStage.lines.length).toBeLessThanOrEqual(18)
+    expect(compactStage.lines.join('\n')).toContain(
+      '◇ Project 9 · Selecting an AliceProject also makes it the next',
+    )
   })
 
   it('keeps the complete action hover visible with and without color', () => {

@@ -615,12 +615,12 @@ publishes no page targets. The Context Ribbon uses the same task identity. The
 task renderer, pointer targets, and mutation
 callbacks remain unchanged inside that stage. Smaller terminals retain the
 bounded centered sheet because their stacked responsive content takes priority
-over clearing the whole viewport, except the launch-preparation Setup and Source
-tasks: from 72x24 they use the complete header-to-console Focus Workspace so
-their content never overlaps the Focus Header or reveals unrelated Home or
-Launcher content behind the task. Compact Setup status becomes a bounded
-two-line signal rather than a third framed sheet, keeping the complete task
-within its 18-row canvas. Closing the
+over clearing the whole viewport, except the launch-preparation Setup, Source,
+and AliceProject tasks: from 72x24 they use the complete header-to-console Focus
+Workspace so their content never overlaps the Focus Header or reveals unrelated
+Home or Launcher content behind the task. Compact Setup and AliceProject status
+become bounded two-line signals rather than third framed sheets, keeping each
+complete task within its 18-row canvas. Closing the
 task restores the prior top-level panel identity without changing Runtime or
 selection state.
 While a Focus Workspace owns the screen, ordinary Home, Launcher, and workbench

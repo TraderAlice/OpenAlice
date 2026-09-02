@@ -3486,8 +3486,12 @@ already large `supervisor-tui.ts` application controller.
   Launch Bay, checkout field, contract, Launcher inventory, and Focus Console
   overlapped. Source now shares the compact Focus Workspace threshold and keeps
   its existing Select/Validate/Save/Launch content inside one owned canvas.
-- The lower stage threshold remains task-specific. AliceProject, Release,
-  Transfer, and their existing centered-sheet thresholds do not change.
+- The real 80x24 AliceProject Switchboard repeated the failure across its Map,
+  Inspector, and Status sheets. AliceProject selection now joins the same
+  compact stage; its status is folded into at most two rows so five visible
+  projects plus the complete Inspector still fit the 18-row canvas.
+- The lower stage threshold remains task-specific. Release, Transfer, and their
+  existing centered-sheet thresholds do not change.
   Selection, editing, validation, save callbacks, inheritance rules, Runtime
   ownership, keyboard routes, and pointer activation remain unchanged.
 - The first compact Source stage then exposed the Launcher's selection Tip in
@@ -3498,12 +3502,12 @@ already large `supervisor-tui.ts` application controller.
 - Wide Setup removes the repeated Layer suffix from the constrained list-panel
   title; Setup status remains the single Layer owner, while the AliceProject
   name now survives intact.
-- Real 120x32 and 80x24 captures verify that Setup and Source own one
-  non-overlapping canvas at both baselines. Maintainer acceptance remains
+- Real 120x32 and 80x24 captures verify that Setup, Source, and AliceProject own
+  one non-overlapping canvas at both baselines. Maintainer acceptance remains
   pending on the retained feature branch.
-- Compact-launch-preparation-Focus-Workspace acceptance passes through all 148
-  Task Surface, Source, Setup, screen, and real-PTY tests (including all 54 PTY
-  cases), and the
+- Compact-launch-preparation-Focus-Workspace acceptance passes through all 152
+  Task Surface, Source, Setup, AliceProject, screen, and real-PTY tests
+  (including all 54 PTY cases), and the
   complete CLI suite (63 files, 639 tests). CLI typecheck and build also pass.
 
 ## Completion Criteria

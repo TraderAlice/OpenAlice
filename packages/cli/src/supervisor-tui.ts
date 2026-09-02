@@ -123,6 +123,7 @@ import {
   decorateSupervisorTaskSurface,
   renderSupervisorTaskSurface,
   supervisorTaskSurfaceOptions,
+  supervisorUsesTaskStage,
   type SupervisorFocusTask,
 } from './supervisor-task-surface.ts'
 import {
@@ -2821,7 +2822,7 @@ export async function runSupervisorTui(
       maxHeight: '90%',
       anchor: 'center',
       margin: 1,
-    } as const)
+    } as const, 'projects')
 
     const setMessage = (next: string) => {
       message = next
@@ -3038,7 +3039,7 @@ export async function runSupervisorTui(
           maxVisible: width >= 92
             ? 8
             : Math.max(1, Math.min(5, Math.floor(terminalSize().height * 0.9) - 16)),
-        }, width)
+        }, width, supervisorUsesTaskStage(terminalSize(), 'projects'))
         const baseList = selectListPointerTarget(items, list, 8, switchboard.targets[0]?.row ?? 2)
         const firstTarget = switchboard.targets[0]
         const listTarget: SupervisorOverlayListTarget = {

@@ -50,6 +50,7 @@ describe('Supervisor secondary-task surface', () => {
     expect(supervisorUsesTaskStage(size)).toBe(false)
     expect(supervisorUsesTaskStage(size, 'setup')).toBe(true)
     expect(supervisorUsesTaskStage(size, 'source')).toBe(true)
+    expect(supervisorUsesTaskStage(size, 'projects')).toBe(true)
     expect(supervisorUsesTaskStage({ width: 71, height: 24 }, 'setup')).toBe(false)
     expect(supervisorUsesTaskStage({ width: 80, height: 23 }, 'setup')).toBe(false)
     expect(supervisorTaskSurfaceOptions(size, sheet, 'setup')).toEqual({
@@ -60,7 +61,8 @@ describe('Supervisor secondary-task surface', () => {
     })
     expect(renderSupervisorTaskSurface(['work'], size, 'setup')).toHaveLength(18)
     expect(renderSupervisorTaskSurface(['work'], size, 'source')).toHaveLength(18)
-    expect(renderSupervisorTaskSurface(['work'], size, 'projects')).toEqual(['work'])
+    expect(renderSupervisorTaskSurface(['work'], size, 'projects')).toHaveLength(18)
+    expect(renderSupervisorTaskSurface(['work'], size, 'release')).toEqual(['work'])
   })
 
   it('centers a truthful task trajectory inside genuine surplus rows', () => {
