@@ -20,8 +20,8 @@ Converge the current `dev` interface on one compact interaction system. The deli
 - [x] Add shared focus and dense-surface primitives.
 - [x] Add the compact-rail brand expansion action and behavior tests.
 - [x] Flatten Connector setup guidance and align disclosure geometry.
-- [ ] Apply the dense-surface hierarchy to current market consumers.
-- [ ] Run targeted tests, complete UI checks, and capture representative routes.
+- [x] Apply the dense-surface hierarchy to current market consumers.
+- [x] Run targeted tests, complete UI checks, and capture representative routes.
 
 ## Verification
 

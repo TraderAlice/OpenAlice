@@ -328,7 +328,7 @@ export function KlinePanel({ selection, source, onSnapshot }: Props) {
               <select
                 value={selectedBarId ?? meta?.barId ?? ''}
                 onChange={(e) => setSelectedBarId(e.target.value || null)}
-                className="max-w-[240px] cursor-pointer rounded-md border border-border bg-background px-2 py-1 text-[12px] leading-[18px] text-foreground"
+                className="oa-field-control max-w-[240px] cursor-pointer rounded-md border border-input bg-background px-2 py-1 text-[12px] leading-[18px] text-foreground outline-none transition-[border-color,box-shadow] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] motion-reduce:transition-none"
                 title="Which provider's K-line to show — sources are never merged; you pick"
               >
                 {sourceOptions.map((c) => (
@@ -368,7 +368,7 @@ export function KlinePanel({ selection, source, onSnapshot }: Props) {
         </div>
       </div>
 
-      <div className="relative min-h-0 flex-1 rounded-lg border border-border bg-card">
+      <div className="oa-data-surface relative min-h-0 flex-1 overflow-hidden rounded-lg border">
         <div ref={containerRef} className="absolute inset-0" />
         {!selection && (
           <div className="absolute inset-0 flex items-center justify-center text-[13px] leading-5 text-muted-foreground">

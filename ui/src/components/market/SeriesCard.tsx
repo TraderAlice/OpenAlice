@@ -9,7 +9,7 @@ import type { MacroSeriesCard } from '../../api/reference'
 export function SeriesCard({ card, label, emptyText }: { card: MacroSeriesCard; label: string; emptyText: string }) {
   const empty = card.points.length === 0
   return (
-    <div className="flex min-w-0 flex-col gap-1.5 rounded-lg border border-border bg-card px-3 py-2.5">
+    <div className="oa-data-surface flex min-w-0 flex-col gap-1.5 rounded-lg border px-3 py-2.5">
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-[12px] text-muted-foreground truncate" title={card.id}>{label}</span>
         <span className="shrink-0 text-[10px] text-muted-foreground">{card.latestDate ?? ''}</span>

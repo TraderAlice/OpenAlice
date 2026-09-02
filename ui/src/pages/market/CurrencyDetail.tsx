@@ -256,7 +256,7 @@ export function CurrencyDetail({ symbol, source }: Props) {
               step="100000"
               value={notional}
               onChange={(event) => setNotional(event.target.value)}
-              className="min-h-8 w-full rounded-md border border-border bg-background px-2.5 text-[12px] leading-[18px] font-mono text-foreground focus:border-primary focus:outline-none"
+              className="oa-field-control min-h-8 w-full rounded-md border border-input bg-background px-2.5 font-mono text-[12px] leading-[18px] text-foreground outline-none"
             />
           </label>
           <div>
@@ -281,7 +281,7 @@ export function CurrencyDetail({ symbol, source }: Props) {
                 step="1"
                 value={movePips}
                 onChange={(event) => setMovePips(event.target.value)}
-                className="min-h-8 w-24 rounded-md border border-border bg-background px-2 text-right text-[11px] leading-[15px] font-mono text-foreground focus:border-primary focus:outline-none"
+                className="oa-field-control min-h-8 w-24 rounded-md border border-input bg-background px-2 text-right font-mono text-[11px] leading-[15px] text-foreground outline-none"
               />
             </div>
           </div>

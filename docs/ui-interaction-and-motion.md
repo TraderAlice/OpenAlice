@@ -246,6 +246,26 @@ Prefer these primitives over copying arbitrary `duration-*`, easing curves, or
 keyframes into individual pages. A local animation is justified when it conveys
 domain-specific state that the shared vocabulary cannot express.
 
+Keyboard focus uses the neutral `--oa-focus-ring` and `--oa-focus-shadow`
+tokens. `oa-field-control` owns the shared input, textarea, and select border
+transition. The same shadow token covers buttons, navigation rows, tabs,
+segmented controls, switches, and resizable handles. Product accent color keeps
+its selection and action meaning.
+
+The application body establishes a 14px type size with 20px leading. Explicit
+display, heading, control, caption, and data roles build from that stable
+reading baseline.
+
+The compact activity rail uses its brand position as the expansion action when
+the current viewport can support a text rail. The Alice mark and expansion
+glyph occupy one fixed optical box and crossfade on pointer hover or keyboard
+focus. Constrained viewport modes keep the static Alice mark.
+
+Dense market panels use `oa-data-surface` for the shared border and canvas and
+`oa-data-surface-header` for section hierarchy. Data components retain their
+domain-owned layout and use the shared surfaces to align cards, charts, quote
+summaries, and launch actions.
+
 Clickable native and ARIA controls receive a pointer cursor globally. Disabled
 controls keep the default cursor and must remain visually disabled. Hover-only
 transforms are gated to fine pointers, so touch devices do not inherit a fake

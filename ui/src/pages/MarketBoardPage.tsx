@@ -348,7 +348,7 @@ function EquityDetailButton({
         event.stopPropagation()
         open(symbol)
       }}
-      className="inline-flex max-w-full items-baseline gap-2 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+      className="inline-flex max-w-full items-baseline gap-2 rounded-sm text-left outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
     >
       <span className="shrink-0 font-mono font-semibold text-foreground">{symbol}</span>
       {name && <span className="min-w-0 truncate text-muted-foreground">{name}</span>}
