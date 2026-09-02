@@ -1226,6 +1226,16 @@ describe('Supervisor TUI screen', () => {
     expect(screen.handleKey('m', matchesKey)).toBe(true)
     expect(transfers).toEqual([])
     expect(screen.snapshot.notice).toBe('Transfer requires an available AliceProject home.')
+
+    expect(screen.handleKey('[', matchesKey)).toBe(true)
+    const overview = screen.render(120).join('\n')
+    expect(overview).toContain('◆ RUNNING · HOME MISSING')
+    expect(overview).toContain('◆ LIVE RUNTIME · PROJECT HOME MISSING')
+    expect(overview).toContain('Runtime is live, but the')
+    expect(overview).toContain('AliceProject home is missing. Open')
+    expect(overview).toContain('still uses the verified Web route.')
+    expect(overview).toContain('◆  HOME MISSING  /home/alice/default')
+    expect(overview).not.toContain('● LIVE SESSION · OPEN THE WORKSPACE')
   })
 
   it('gives wide Fleet real inventory rows from the live viewport budget', () => {

@@ -7,6 +7,7 @@ const SUPERVISOR_SIGNAL_DECK_MIN_WIDTH = 72
 export interface SupervisorHomeView {
   projectName: string
   state: string
+  projectAvailable?: boolean
   home: string
   web: string
   owner: string
@@ -167,11 +168,11 @@ export function renderSupervisorHome(
   targetHeight?: number,
 ): SupervisorHomeRender {
   const cardWidth = Math.max(24, width)
-  const state = stateBadge(view.state, view.pulse ?? false)
+  const state = homeStateBadge(view)
   const projectBody = [
     labelAndTail(homeHotspotLabel(view.projectName, 'project', view), state, cardWidth - 4),
-    launchIntent(view.state),
-    ...view.guidance,
+    launchIntent(view),
+    ...homeGuidance(view),
     primaryLaunchRow(view),
   ]
   const details = runtimeDetailRows(view, cardWidth - 4)
@@ -208,7 +209,7 @@ function renderCompactSignalDeck(
   const identity = [
     ...SUPERVISOR_BRAND_MARK_ROWS.map((mark) => ` ${mark}`),
     ' ◆ LOCAL CONTROL',
-    ` ${runtimeSignal(view.state, view.pulse ?? false)}`,
+    ` ${runtimeSignal(view.state, view.pulse ?? false, view.projectAvailable)}`,
   ]
   const telemetry = runtimeDetailRows(view, rightWidth)
   return Array.from(
@@ -221,7 +222,7 @@ function renderCompactSignalDeck(
 
 function runtimeDetailRows(view: SupervisorHomeView, width: number): string[] {
   const details = [
-    detailRow('Home', view.home, width),
+    detailRow(view.projectAvailable === false ? 'Home missing' : 'Home', view.home, width),
     detailRow(homeHotspotLabel('Web', 'web', view), view.web, width),
     detailRow('Owner', view.owner, width),
     detailRow(homeHotspotLabel('Provider', 'provider', view), view.provider, width),
@@ -243,7 +244,11 @@ function renderWideCockpit(
   const leftInnerWidth = leftWidth - 4
   const rightInnerWidth = rightWidth - 4
   const runtimeBody = [
-    labelAndTail('Process', runtimeSignal(view.state, view.pulse ?? false), rightInnerWidth),
+    labelAndTail(
+      'Process',
+      runtimeSignal(view.state, view.pulse ?? false, view.projectAvailable),
+      rightInnerWidth,
+    ),
     detailRow(homeHotspotLabel('Web', 'web', view), view.web, rightInnerWidth),
     detailRow('Owner', view.owner, rightInnerWidth),
     ...wrappedDetailRows(homeHotspotLabel('Provider', 'provider', view), view.provider, rightInnerWidth),
@@ -253,7 +258,11 @@ function renderWideCockpit(
   const projectBody = renderIntegratedWideLaunchpad(view, state, leftInnerWidth)
   while (projectBody.length < runtimeBody.length) projectBody.splice(-1, 0, '')
   while (runtimeBody.length < projectBody.length) runtimeBody.splice(-1, 0, '')
-  const context = contextRail('⌂  Home', view.home, width)
+  const context = contextRail(
+    view.projectAvailable === false ? '◆  HOME MISSING' : '⌂  Home',
+    view.home,
+    width,
+  )
   const naturalHeight = projectBody.length + 2 + context.length
   const extraRows = Number.isFinite(targetHeight)
     ? Math.max(0, Math.floor(targetHeight ?? naturalHeight) - naturalHeight)
@@ -310,7 +319,7 @@ function renderWideControlPath(
   project[start] = '◇ CONTROL PATH'
   project[start + 1] = truncateDisplayWidth(`◆ ALICEPROJECT  ${projectIdentity}`, projectWidth)
   project[start + 2] = truncateDisplayWidth(
-    `╰${routeTrack} ${runtimeSignal(view.state, view.pulse ?? false)}`,
+    `╰${routeTrack} ${runtimeSignal(view.state, view.pulse ?? false, view.projectAvailable)}`,
     projectWidth,
   )
   project[start + 3] = truncateDisplayWidth(
@@ -397,7 +406,7 @@ function renderIntegratedWideLaunchpad(
     Math.max(1, width - displayWidth(gap) - 1),
   )
   const guidanceWidth = Math.max(1, width - brandWidth - displayWidth(gap))
-  const guidance = wrapDisplayText(view.guidance.join(' '), guidanceWidth)
+  const guidance = wrapDisplayText(homeGuidance(view).join(' '), guidanceWidth)
   const brand = [
     ...SUPERVISOR_BRAND_MARK_ROWS.map((mark) => ` ${mark}`),
   ]
@@ -409,7 +418,7 @@ function renderIntegratedWideLaunchpad(
   )
   return [
     labelAndTail(homeHotspotLabel(view.projectName, 'project', view), state, width),
-    launchIntent(view.state),
+    launchIntent(view),
     ...briefing,
     primaryLaunchRow(view),
   ]
@@ -488,11 +497,38 @@ function homeHotspotTargets(
   })
 }
 
-function launchIntent(state: string): string {
+function launchIntent(view: SupervisorHomeView): string {
+  const state = view.state
+  if (view.projectAvailable === false && (state === 'running' || state === 'owned_elsewhere')) {
+    return '◆ LIVE RUNTIME · PROJECT HOME MISSING'
+  }
   if (state === 'running' || state === 'owned_elsewhere') return '● LIVE SESSION · OPEN THE WORKSPACE'
   if (state === 'absent') return '◆ LAUNCH READY · LOCAL RUNTIME'
   if (state === 'incompatible') return '× ATTENTION · REVIEW DOCTOR BEFORE CHANGES'
   return '◇ CHECKING · RUNTIME STATE IS SETTLING'
+}
+
+function homeStateBadge(view: SupervisorHomeView): string {
+  if (view.projectAvailable === false && view.state === 'running') {
+    return '◆ RUNNING · HOME MISSING'
+  }
+  if (view.projectAvailable === false && view.state === 'owned_elsewhere') {
+    return '◆ EXTERNAL · HOME MISSING'
+  }
+  return stateBadge(view.state, view.pulse ?? false)
+}
+
+function homeGuidance(view: SupervisorHomeView): string[] {
+  if (
+    view.projectAvailable === false
+    && (view.state === 'running' || view.state === 'owned_elsewhere')
+  ) {
+    return [
+      'Runtime is live, but the AliceProject home is missing.',
+      'Open still uses the verified Web route.',
+    ]
+  }
+  return view.guidance
 }
 
 function primaryLaunchRow(view: SupervisorHomeView): string {

@@ -1195,6 +1195,19 @@ not imply maintainer approval of the finished interaction.
   focus and responsive fallbacks consume the same projection. This is an
   autonomous topic refinement, not a recorded maintainer approval.
 
+### Compound Launchpad decision
+
+- Keeping Overview Runtime-only would leave its green RUNNING badge, LIVE
+  intent, and ordinary Home rail contradicting the persistent compound Dock.
+- Treating the whole Launchpad as failed would hide the verified Web route and
+  turn a recoverable file-ownership edge into a false Runtime outage.
+- The selected model keeps Open as the primary action while projecting
+  `RUNNING · HOME MISSING`, `LIVE RUNTIME · PROJECT HOME MISSING`, and an
+  explicit missing-Home rail through wide and compact Overview layouts. The
+  briefing explains that Open uses the verified Web route. Healthy and stopped
+  Launchpads retain their current hierarchy. This is an autonomous topic
+  refinement, not a recorded maintainer approval.
+
 ## Responsive and Accessibility Contract
 
 - `80x24` remains the minimum full experience. Wide terminals show the
@@ -1237,6 +1250,8 @@ already large `supervisor-tui.ts` application controller.
   compound Fleet state without hiding either the live route or missing home.
 - [x] Carry that compound warning into the persistent Command Dock without
   changing healthy LIVE/EXTERNAL styling or narrow responsive behavior.
+- [x] Reconcile the Overview Launchpad, Runtime signal, briefing, and Home rail
+  with the same live-Runtime/missing-home truth while retaining verified Open.
 - [x] Dogfood the real `pnpm cli` surface across wide, 80x24, and narrow sizes;
   inspect mouse, resize, copy/selection, signal exit, and failure recovery.
 - [x] Run the owning package typecheck and tests, affected tests, full hermetic
@@ -2570,6 +2585,20 @@ already large `supervisor-tui.ts` application controller.
   passes (701 passed, 1 skipped; 6,212 tests passed, 10 skipped). Docker
   installer smoke passes without Node, npm, pnpm, Bun, or an Agent Runtime, and
   package dry-run contains every changed Dock projection and theme owner.
+- Overview now consumes the same current-project availability signal as Fleet
+  and Dock. Wide and compact Launchpads replace the falsely ordinary RUNNING,
+  LIVE SESSION, and Home rail with a compound attention state, explain that the
+  verified Web route remains usable, and retain Open as the exact primary
+  action. The Runtime signal deck and wide control path use the same warning;
+  healthy and stopped views remain unchanged.
+- Compound-Launchpad acceptance passes with 113 focused Overview, theme,
+  pointer, screen, and real-PTY tests. The 80x24 PTY proves the added briefing
+  row preserves hover, preview, click, verified Web open, and terminal cleanup;
+  the 120x32 PTY proves the full warning hierarchy and Fleet transition. Root
+  TypeScript and CLI build pass; the 702-file suite passes (701 passed, 1
+  skipped; 6,212 tests passed, 10 skipped). Docker installer smoke passes
+  without Node, npm, pnpm, Bun, or an Agent Runtime, and package dry-run retains
+  every changed Overview, theme, and Supervisor owner.
 
 ## Completion Criteria
 

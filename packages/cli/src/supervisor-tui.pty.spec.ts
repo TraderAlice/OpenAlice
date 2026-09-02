@@ -683,10 +683,10 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         output += data
         if (!hovered && output.includes('↗ Web') && output.includes('http://127.0.0.1:47331')) {
           hovered = true
-          child.write('\u001b[<35;70;14M')
+          child.write('\u001b[<35;70;15M')
         } else if (!clicked && output.includes('› Web') && output.includes('PREVIEW')) {
           clicked = true
-          child.write('\u001b[<0;70;14M')
+          child.write('\u001b[<0;70;15M')
         } else if (!detached && clicked && output.includes('Opened the verified Web UI.')) {
           detached = true
           child.write('q')
@@ -702,6 +702,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('› Web')
     expect(transcript).toContain('\u001b[1;38;2;203;250;246;48;2;19;49;55m› Web')
     expect(transcript).toContain('◇  PREVIEW  Open the verified Web UI')
+    expect(stripSgr(transcript)).toContain('Home missing')
     expect(transcript).toContain('Opened the verified Web UI.')
     expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=1')
     expect(transcript).toContain('\u001b[?25h')
@@ -1763,6 +1764,10 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     })
 
     expect(stripSgr(transcript)).toContain('◇ CONTROL ROUTE')
+    expect(stripSgr(transcript)).toContain('◆ RUNNING · HOME MISSING')
+    expect(stripSgr(transcript)).toContain('◆ LIVE RUNTIME · PROJECT HOME MISSING')
+    expect(stripSgr(transcript)).toContain('still uses the verified Web route.')
+    expect(stripSgr(transcript)).toContain('◆  HOME MISSING  /fixture/default')
     expect(stripSgr(transcript)).toContain('◆ running · home missing')
     expect(stripSgr(transcript)).toContain('◆ LIVE · HOME MISSING')
     expect(stripSgr(transcript)).not.toContain('◇ missing')

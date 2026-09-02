@@ -181,6 +181,7 @@ export function decorateSupervisorFrame(
     if (line.startsWith('!  NOTICE')) return theme.warningRail(line)
     if (line.startsWith('×  ERROR')) return theme.dangerRail(line)
     if (line.startsWith('◆  STATUS')) return theme.infoRail(line)
+    if (line.startsWith('◆  HOME MISSING')) return theme.warningRail(line)
     if (line.startsWith('◇  PREVIEW')) return theme.navigationHover(line)
     if (index === 1 && line.includes('◆ FOCUS ·')) {
       return decorateFocusHeader(line, theme, options.hoveredCommand?.label)
@@ -193,6 +194,7 @@ export function decorateSupervisorFrame(
     if (line.includes('│ ! ')) return theme.warning(line)
     if (line.includes('│ ✓ ')) return theme.success(line)
     if (line.includes('│ ● LIVE SESSION')) return theme.successRail(line)
+    if (line.includes('│ ◆ LIVE RUNTIME · PROJECT HOME MISSING')) return theme.warningRail(line)
     if (line.includes('│ ◆ LAUNCH READY')) return theme.infoRail(line)
     if (line.includes('│ ◇  SIGNAL STANDBY')) return theme.warningRail(line)
     if (line.includes('│ ○  SIGNAL QUIET')) return theme.infoRail(line)
@@ -277,7 +279,9 @@ export function decorateSupervisorFramedColumns(
       ? theme.selected
       : semantic.startsWith('» ')
         ? theme.accent
-        : semantic.startsWith('× ATTENTION')
+        : semantic.startsWith('◆ LIVE RUNTIME · PROJECT HOME MISSING')
+          ? theme.warningRail
+          : semantic.startsWith('× ATTENTION')
           ? theme.dangerRail
           : semantic.startsWith('◇ CHECKING')
             ? theme.warningRail

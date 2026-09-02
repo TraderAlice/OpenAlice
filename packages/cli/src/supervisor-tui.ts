@@ -4162,6 +4162,10 @@ export class SupervisorScreen implements Component {
       const home = renderSupervisorHome({
         projectName: this.snapshot.context?.aliceProject.displayName ?? 'Default AliceProject',
         state,
+        projectAvailable: currentFleetProjectAvailable(
+          this.snapshot.fleet,
+          this.snapshot.context,
+        ),
         home: this.snapshot.context?.home ?? runtime?.home ?? 'default',
         web: runtime?.endpoints?.web ?? 'Not available until the Runtime starts',
         owner: formatOwner(runtime),
