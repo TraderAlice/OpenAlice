@@ -123,7 +123,10 @@ path is intentionally parameter-free:
   report. Its hero presents the selected project, a semantic launch/live/
   attention intent strip, human guidance, and a full-row primary action.
   Pointer hover focuses that action anywhere across the row, and click routes
-  through the same Enter lifecycle/refusal state machine as the keycap. Its
+  through the same Enter lifecycle/refusal state machine as the keycap. The
+  Launchpad is the sole primary-action surface on Overview: Enter starts and
+  opens a stopped Runtime, opens a verified Web endpoint, or runs Runtime
+  Doctor when neither action is truthfully available. Its
   Runtime Signal card keeps Home, Web endpoint,
   owner, provider identity, services, and uptime available without returning
   to the historical flat field dump. At 100 columns and wider those surfaces
@@ -167,9 +170,11 @@ path is intentionally parameter-free:
   primary action.
   With only the local Machine, Fleet focus starts on its current AliceProject;
 - the footer is a contextual Action Shelf, not a complete shortcut legend. It
-  exposes the current primary action as a high-priority `◆` segment and a few
-  adjacent actions as quieter chips on one full-width surface. Segments wrap
-  atomically instead of clipping labels;
+  exposes a few relevant actions as chips on one full-width surface. On
+  Overview these are supporting commands only because the Launchpad owns the
+  sole primary action; other surfaces can expose their current primary action
+  as a high-priority `◆` segment. Segments wrap atomically instead of clipping
+  labels;
   `?` keeps the complete keyboard reference available without crowding every
   operational page. Each complete action segment derives a display-width-aware
   pointer target from the final responsive layout, so hover and click survive

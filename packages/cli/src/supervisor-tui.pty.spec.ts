@@ -28,6 +28,10 @@ const launchpadFixtureEntry = join(
   dirname(fileURLToPath(import.meta.url)),
   '__fixtures__/supervisor-launchpad-tui-fixture.ts',
 )
+const doctorPrimaryFixtureEntry = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '__fixtures__/supervisor-doctor-primary-tui-fixture.ts',
+)
 const releaseFixtureEntry = join(
   dirname(fileURLToPath(import.meta.url)),
   '__fixtures__/supervisor-release-tui-fixture.ts',
@@ -138,10 +142,10 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         output += data
         if (!hovered && output.includes('[ p ] Setup')) {
           hovered = true
-          child.write('\u001b[<35;62;21M')
+          child.write('\u001b[<35;34;21M')
         } else if (!clicked && output.includes('│ › [ p ] Setup')) {
           clicked = true
-          child.write('\u001b[<0;62;21M')
+          child.write('\u001b[<0;34;21M')
         } else if (!closed && clicked && output.includes('╭ Setup Studio · Default AliceProject')) {
           closed = true
           child.write('\u001b')
@@ -320,6 +324,57 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[1;38;2;')
     expect(transcript).toContain('│ › [ Enter ]')
     expect(transcript).toContain('FIXTURE_RESULT starts=1 opens=1')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it('runs Doctor from the degraded Launchpad primary action', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-doctor-primary-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [doctorPrimaryFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let invoked = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Doctor primary timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (
+          !invoked
+          && output.includes('[ Enter ]  Run Runtime Doctor')
+          && output.includes('· [ l ] Logs')
+          && output.includes('[ u ] Update')
+        ) {
+          invoked = true
+          child.write('\r')
+        } else if (invoked && output.includes('Fixture Runtime protocol mismatch')) {
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor Doctor primary exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('[ Enter ]  Run Runtime Doctor')
+    expect(transcript).not.toContain('No primary action is available')
+    expect(transcript).toContain('Fixture Runtime protocol mismatch')
+    expect(transcript).toContain('FIXTURE_RESULT diagnoses=1')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)

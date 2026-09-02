@@ -92,6 +92,19 @@ not imply maintainer approval of the finished interaction.
   paths feed the existing primary-action state machine. The 52:48 wide cockpit
   and folded 80x24 layout retain every truthful Runtime field.
 
+### Overview action-hierarchy decision
+
+- Keeping Enter in both the Launchpad and bottom Action Shelf reinforces its
+  shortcut, but renders two competing primary surfaces on the same page.
+- Removing the Launchpad action would simplify the frame while returning the
+  AliceProject card to the status-report hierarchy the redesign replaced.
+- The selected model makes the Launchpad the only Overview primary surface.
+  Its Enter action is always truthful: stopped starts and opens, a verified Web
+  endpoint opens, and every other non-recovery Runtime state runs Doctor. The
+  bottom shelf contains only supporting commands such as quiet start, Setup,
+  Source, Restart, Stop, Logs, and Update. All keys and callbacks already exist;
+  this change removes duplication rather than adding an execution path.
+
 ### Global command discovery decision
 
 - Restyling the legacy detach hint would improve finish but not discoverability.
@@ -525,6 +538,8 @@ already large `supervisor-tui.ts` application controller.
   changing lifecycle action semantics or sacrificing the 80x24 baseline.
 - [x] Promote Overview into an action-first Launchpad with a semantic intent
   strip and whole-row primary-action pointer target.
+- [x] Make the Overview Launchpad the single truthful primary surface and keep
+  its Action Shelf focused on supporting commands.
 - [x] Replace the legacy global shortcut hint with a clickable command dock and
   contextual `/` Command Deck.
 - [x] Project structured Runtime logs into semantic event rows while preserving
@@ -1065,6 +1080,19 @@ already large `supervisor-tui.ts` application controller.
   TypeScript pass; the 699-file suite passes (698 passed, 1 skipped; 6,145 tests
   passed, 10 skipped). Docker installer smoke passes, and package dry-run
   retains the theme, view, and Supervisor sources.
+- Overview now has one visual and behavioral primary action instead of repeating
+  Enter in both the Launchpad and Action Shelf. Stopped and Web-ready states
+  retain start/open and open; incompatible or otherwise unavailable Runtime
+  states now truthfully run the existing Doctor action. The shelf carries only
+  supporting commands, including Source, lifecycle controls, Logs, and Update.
+- Action-hierarchy acceptance passes with 75 focused screen and real-PTY tests.
+  The degraded-Runtime PTY fixture pressed Enter on `Run Runtime Doctor`,
+  observed the diagnostic service result exactly once, and restored terminal
+  modes; the stopped Overview fixture also hovered and clicked Setup outside its
+  keycap after the shelf reflow. CLI build/typecheck and root TypeScript pass;
+  the 699-file suite passes (698 passed, 1 skipped; 6,147 tests passed, 10
+  skipped). Docker installer smoke passes, and package dry-run retains the
+  Supervisor source without publishing test fixtures.
 
 ## Completion Criteria
 

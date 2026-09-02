@@ -72,8 +72,9 @@ describe('Supervisor TUI screen', () => {
     expect(lines[0]).toContain('v0.87.0-beta · DEV')
     expect(lines.join('\n')).toContain('○ STOPPED')
     expect(lines.join('\n')).toContain('[ Enter ]  Start OpenAlice & open Workspace')
-    expect(lines.join('\n')).toContain('◆ [ Enter ] Start & open')
+    expect(lines.join('\n')).not.toContain('◆ [ Enter ] Start & open')
     expect(lines.join('\n')).toContain('[ s ] Start quietly')
+    expect(lines.join('\n')).toContain('[ c ] Source')
     expect(lines.join('\n')).toContain('[ ? ] More')
     expect(lines.at(-1)).toContain('[ / ] Commands   [ q ] Detach')
     expect(lines.at(-1)).toContain('[ i ] AliceProject · ○ COLD · OVERVIEW')
@@ -194,7 +195,7 @@ describe('Supervisor TUI screen', () => {
       const lines = stable.render(80)
       return {
         height: lines.length,
-        action: lines.findIndex((line) => line.includes('[ Enter ] Start & open')),
+        action: lines.findIndex((line) => line.includes('[ s ] Start quietly')),
         ribbon: lines.findIndex((line) => line.includes('[ / ] Commands')),
       }
     }
@@ -355,7 +356,8 @@ describe('Supervisor TUI screen', () => {
 
     const output = screen.render(80).join('\n')
     expect(output).toContain('● RUNNING ELSEWHERE')
-    expect(output).toContain('[ Enter ] Open workspace')
+    expect(output).toContain('[ Enter ]  Open Workspace')
+    expect(output).not.toContain('[ Enter ] Open workspace')
     expect(output).toContain('[ d ] Doctor')
     expect(output).not.toContain('[ r ] Restart')
     expect(output).not.toContain('[ x ] Stop')
@@ -795,6 +797,34 @@ describe('Supervisor TUI screen', () => {
     expect(actions).toEqual(['open', 'restart'])
     expect(screen.snapshot.confirmation).toBeUndefined()
     expect(confirmations).toEqual(['restart', undefined])
+  })
+
+  it('turns the degraded Launchpad promise into the existing Doctor action', () => {
+    const actions: SupervisorAction[] = []
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: {
+        class: 'incompatible',
+        owner: null,
+        endpoints: {},
+      },
+    }, {
+      onAction: (action) => actions.push(action),
+    })
+
+    let lines = screen.render(80)
+    expect(lines.join('\n')).toContain('◆ [ Enter ]  Run Runtime Doctor')
+    expect(lines.join('\n')).toContain('· [ l ] Logs  │  [ u ] Update  │  [ ? ] More')
+    expect(lines.join('\n')).not.toContain('[ d ] Review Doctor')
+    const row = lines.findIndex((line) => line.includes('[ Enter ]  Run Runtime Doctor')) + 1
+    expect(screen.handlePointer(pointerClick(60, row))).toBe(true)
+    expect(actions).toEqual(['doctor'])
+
+    expect(screen.handleKey('enter', matchesKey)).toBe(true)
+    expect(actions).toEqual(['doctor', 'doctor'])
+    lines = screen.render(80)
+    expect(lines.join('\n')).not.toContain('No primary action is available')
   })
 
   it('uses Enter as the human-first start-and-open or open action', () => {

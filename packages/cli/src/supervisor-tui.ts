@@ -4086,29 +4086,27 @@ function actionBar(
   }
   if (runtime?.class === 'absent') {
     return renderSupervisorCommandBar([
-      { key: 'Enter', label: 'Start & open', primary: true },
       { key: 's', label: 'Start quietly' },
       { key: 'p', label: 'Setup' },
+      { key: 'c', label: 'Source' },
       { key: '?', label: 'More' },
     ], width)
   }
   if (runtime?.endpoints?.web) {
     return renderSupervisorCommandBar(runtime.owner?.surface === 'cli-server'
       ? [
-          { key: 'Enter', label: 'Open workspace', primary: true },
           { key: 'r', label: 'Restart' },
           { key: 'x', label: 'Stop' },
+          { key: 'l', label: 'Logs' },
           { key: '?', label: 'More' },
         ]
       : [
-          { key: 'Enter', label: 'Open workspace', primary: true },
           { key: 'd', label: 'Doctor' },
           { key: 'l', label: 'Logs' },
           { key: '?', label: 'More' },
         ], width)
   }
   return renderSupervisorCommandBar([
-    { key: 'd', label: 'Review Doctor', primary: true },
     { key: 'l', label: 'Logs' },
     { key: 'u', label: 'Update' },
     { key: '?', label: 'More' },
@@ -4150,14 +4148,13 @@ function primaryAction(
 ): SupervisorAction | undefined {
   if (runtime?.class === 'absent') return 'start-open'
   if (runtime?.endpoints?.web) return 'open'
-  return undefined
+  return 'doctor'
 }
 
 function primaryActionLabel(runtime: RuntimeSummary | null): string {
   if (runtime?.class === 'absent') return 'Start OpenAlice & open Workspace'
   if (runtime?.endpoints?.web) return 'Open Workspace'
-  if (runtime?.class === 'incompatible') return 'Review Doctor diagnostics'
-  return 'Review Runtime status'
+  return 'Run Runtime Doctor'
 }
 
 function formatUpdateNotice(
