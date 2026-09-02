@@ -11,6 +11,7 @@ import {
   decorateSupervisorFrame,
 } from './supervisor-tui-theme.ts'
 import {
+  anchorSupervisorControlConsole,
   renderSupervisorCommandBar,
   renderSupervisorDock,
   supervisorCommandTargets,
@@ -265,6 +266,48 @@ describe('Supervisor TUI screen', () => {
       recovery: true,
     }, 80)
     expect(recovery).toContain('! RECOVERY  ›  ◆ OVERVIEW')
+  })
+
+  it('anchors the Control Console to the live viewport without clipping content', () => {
+    let viewportHeight = 32
+    const paletteChanges: boolean[] = []
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'running', endpoints: {} },
+    }, {
+      getViewportHeight: () => viewportHeight,
+      onCommandPaletteChange: (open) => paletteChanges.push(open),
+      motionEnabled: false,
+    })
+
+    const tall = screen.render(80)
+    expect(tall).toHaveLength(32)
+    expect(tall.at(-3)?.trim()).toBe('')
+    expect(tall.at(-2)).toContain('[ l ] Logs')
+    expect(tall.at(-1)).toContain('╰─ [ / ] Commands')
+    expect(tall.findIndex((line) => line.includes('Runtime Signal Deck'))).toBeLessThan(20)
+    expect(screen.handlePointer(pointerClick(6, 32))).toBe(true)
+    expect(paletteChanges).toEqual([true])
+    expect(screen.render(80).at(-1)).toContain('[ / ] Close')
+
+    viewportHeight = 24
+    const resized = screen.render(80)
+    expect(resized).toHaveLength(24)
+    expect(resized.at(-3)?.trim()).toBe('')
+    expect(resized.at(-2)).toContain('[ l ] Logs')
+    expect(resized.at(-1)).toContain('[ / ] Close')
+    expect(screen.handlePointer(pointerClick(6, 24))).toBe(true)
+    expect(paletteChanges).toEqual([true, false])
+
+    viewportHeight = 10
+    const short = screen.render(80)
+    expect(short.length).toBeGreaterThan(10)
+    expect(short.join('\n')).toContain('Runtime Signal Deck')
+    expect(short.at(-1)).toContain('╰─ [ / ] Commands')
+
+    expect(anchorSupervisorControlConsole(['content'], ['activity', 'actions', 'spine'], 7))
+      .toEqual(['content', '', '', '', 'activity', 'actions', 'spine'])
   })
 
   it('keeps the narrow Command Spine closed while Commands and Close remain clickable', () => {

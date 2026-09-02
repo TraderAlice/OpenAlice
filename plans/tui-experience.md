@@ -588,6 +588,24 @@ not imply maintainer approval of the finished interaction.
   breadcrumb separator and suffix. This is an autonomous topic decision, not a
   recorded maintainer approval.
 
+### Bottom Control Console decision
+
+- Leaving the footer directly after page content preserves the current natural
+  line count, but makes taller terminals read like a report printed at the top
+  of an otherwise unused canvas. In a live 120x32 comparison, OpenAlice ended
+  its Command Spine ten rows above the terminal edge while OMP kept its global
+  controls grounded at the bottom.
+- Distributing spare rows through cards would fill the canvas, but make content
+  and pointer geometry drift vertically as the terminal grows.
+- The selected model treats Activity Slot, contextual Action Shelf, and Command
+  Spine as one bottom Control Console. A single elastic stage between page
+  content and that console absorbs only surplus terminal rows, so content stays
+  top-anchored and every control settles against the bottom edge. Short
+  terminals keep the existing natural flow without clipping or compression.
+  The viewport height is read at render time so resize updates the stage without
+  resetting focus, selection, or action state. This is an autonomous topic
+  decision, not recorded maintainer approval.
+
 ### Mission Header decision
 
 - Recoloring the existing title, divider, and tabs would be the least invasive
@@ -869,6 +887,8 @@ already large `supervisor-tui.ts` application controller.
   with a closing frame, semantic breadcrumbs, and whole-segment pointer targets.
 - [x] Close the context-free narrow Command Spine with one continuous track
   while preserving Commands/Close and Detach pointer geometry.
+- [x] Anchor Activity Slot, Action Shelf, and Command Spine as one bottom
+  Control Console without changing page content or action semantics.
 - [x] Replace the disconnected title/divider/tabs stack with a same-height
   Mission Header that frames brand, release provenance, and clickable navigation.
 - [x] Anchor the active view with a reduced-motion-safe beacon that travels
@@ -1661,6 +1681,22 @@ already large `supervisor-tui.ts` application controller.
   passed, 10 skipped). Docker installer smoke passes without Node, npm, pnpm,
   Bun, or an Agent Runtime, and package dry-run contains the changed shared TUI
   view source.
+- A live OMP v17.3.4 comparison at 120x32 made the remaining vertical-canvas
+  break visible: OpenAlice's Command Spine ended ten rows above the terminal
+  edge while OMP grounded its global controls. The Supervisor now composes its
+  Activity Slot, Action Shelf, and Command Spine as one bottom Control Console;
+  only a single elastic stage above it grows with surplus terminal height.
+- Control-Console acceptance passes with 95 focused screen, pointer, and
+  real-PTY tests. A real truecolor PTY rendered Activity, actions, and Spine on
+  rows 30/31/32 at 120x32, opened the Command Dock by pointer, resized live to
+  80x24, rendered the same three surfaces on rows 22/23/24, and opened the Dock
+  again through the recomputed bottom-row target. Detach restored cursor,
+  bracketed-paste, mouse, and alternate-screen modes. A 46x30 PTY likewise
+  activates the Spine on row 30, while a short-height unit path proves content
+  remains complete rather than clipped. CLI build/typecheck and root TypeScript
+  pass; the 699-file suite passes (698 passed, 1 skipped; 6,169 tests passed, 10
+  skipped). Docker installer smoke passes without Node, npm, pnpm, Bun, or an
+  Agent Runtime, and package dry-run contains both changed Supervisor sources.
 
 ## Completion Criteria
 

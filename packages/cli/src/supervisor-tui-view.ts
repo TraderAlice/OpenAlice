@@ -452,6 +452,23 @@ export function renderSupervisorPanel(
   return renderCard(`${title}${meta ? ` · ${meta}` : ''}`, rows, Math.max(24, width))
 }
 
+export function anchorSupervisorControlConsole(
+  content: string[],
+  consoleLines: string[],
+  viewportHeight: number,
+): string[] {
+  const naturalHeight = content.length + consoleLines.length
+  const safeViewportHeight = Number.isFinite(viewportHeight)
+    ? Math.max(0, Math.floor(viewportHeight))
+    : naturalHeight
+  const stageHeight = Math.max(0, safeViewportHeight - naturalHeight)
+  return [
+    ...content,
+    ...Array.from({ length: stageHeight }, () => ''),
+    ...consoleLines,
+  ]
+}
+
 export function renderSupervisorSignalScope(
   view: SupervisorSignalScopeView,
   width: number,

@@ -265,7 +265,12 @@ path is intentionally parameter-free:
   preview states retain distinct glyph and text labels without depending on
   color; only the busy glyph animates. The slot is a presentation of existing
   Supervisor and pointer state and does not introduce a second lifecycle or
-  error path;
+  error path. The Activity Slot, contextual Action Shelf, and Command Spine form
+  one bottom Control Console. When the terminal is taller than the current page,
+  a single elastic blank stage appears above that console so its controls remain
+  anchored to the terminal edge; short terminals retain the natural complete
+  flow without clipping. Resize changes only that elastic stage and does not
+  reset selection, focus, or action state;
 - color-capable motion-enabled sessions play one bounded brand-color sweep on
   entry across the OpenAlice header and any visible brand mark. The header then
   settles while a visible Overview `ALICE` mark continues a slow six-phase

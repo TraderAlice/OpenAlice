@@ -156,6 +156,7 @@ import {
   type SupervisorDoctorTarget,
 } from './supervisor-doctor-view.ts'
 import {
+  anchorSupervisorControlConsole,
   renderSupervisorCommandBar,
   renderSupervisorDock,
   renderSupervisorHeaderLayout,
@@ -761,6 +762,7 @@ export async function runSupervisorTui(
     theme: tuiTheme,
     motionEnabled,
     onMotionDemandChange: syncMotionTimer,
+    getViewportHeight: () => terminalSize().height,
   })
   ui.addChild(screen)
 
@@ -2945,6 +2947,7 @@ export class SupervisorScreen implements Component {
   private readonly theme: SupervisorTuiTheme
   private readonly motionEnabled: boolean
   private readonly onMotionDemandChange?: () => void
+  private readonly getViewportHeight?: () => number
   private onDetach?: () => void
   private hoveredPanel?: SupervisorPanel
   private headerReleaseHovered = false
@@ -3003,6 +3006,7 @@ export class SupervisorScreen implements Component {
       theme?: SupervisorTuiTheme
       motionEnabled?: boolean
       onMotionDemandChange?: () => void
+      getViewportHeight?: () => number
       onDetach?: () => void
     } = {},
   ) {
@@ -3027,6 +3031,7 @@ export class SupervisorScreen implements Component {
     this.theme = callbacks.theme ?? createSupervisorTuiTheme({ NO_COLOR: '1' })
     this.motionEnabled = callbacks.motionEnabled ?? true
     this.onMotionDemandChange = callbacks.onMotionDemandChange
+    this.getViewportHeight = callbacks.getViewportHeight
     this.introFrame = this.motionEnabled && this.theme.enabled ? 0 : undefined
     this.onDetach = callbacks.onDetach
   }
@@ -3802,7 +3807,7 @@ export class SupervisorScreen implements Component {
       ...(this.snapshot.diagnostic ? { diagnostic: sanitize(this.snapshot.diagnostic) } : {}),
       ...(hoverPreview ? { preview: sanitize(hoverPreview) } : {}),
     }, width, this.motionFrame, this.motionEnabled)
-    lines.push(
+    const controlConsole = [
       activity,
       ...(this.snapshot.panel === 'fleet' && this.snapshot.fleet
         ? fleetActionBar(
@@ -3844,8 +3849,12 @@ export class SupervisorScreen implements Component {
         commandPaletteOpen: this.commandDeckOpen,
         recovery: isConfigRecovery(this.snapshot),
       }, width),
-    )
-    const visibleLines = lines.map((line) => truncate(line, width))
+    ]
+    const visibleLines = anchorSupervisorControlConsole(
+      lines,
+      controlConsole,
+      this.getViewportHeight?.() ?? lines.length + controlConsole.length,
+    ).map((line) => truncate(line, width))
     this.commandTargets = supervisorCommandTargets(visibleLines)
     return decorateSupervisorFrame(
       visibleLines,
