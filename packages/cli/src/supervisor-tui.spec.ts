@@ -499,6 +499,7 @@ describe('Supervisor TUI screen', () => {
     const focusLines = screen.render(80)
     expect(focusLines[0]).toContain('◇ BUILD v0.87.0-beta · DEV')
     expect(focusLines[0]).not.toContain('[ u ]')
+    expect(focusLines.join('\n')).not.toContain('Tip:')
     expect(screen.handlePointer(pointerClick(70, 1))).toBe(false)
     expect(actions).toEqual([])
     screen.update({ focusTask: undefined })

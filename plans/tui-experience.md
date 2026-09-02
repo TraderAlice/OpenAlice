@@ -3471,7 +3471,7 @@ already large `supervisor-tui.ts` application controller.
   real-PTY tests (including all 54 PTY cases), and the complete CLI suite (63
   files, 638 tests). CLI typecheck and build also pass.
 
-### Compact Setup Focus Workspace decision
+### Compact launch-preparation Focus Workspace decision
 
 - A real 80x24 PTY capture showed the centered Setup sheet starting across the
   Focus Header, leaving unrelated Home copy visible behind it, and stacking
@@ -3482,18 +3482,28 @@ already large `supervisor-tui.ts` application controller.
   72x24. Its compact Studio keeps the setting list and selected Inspector as
   separate consecutive panels, then folds layer status into at most two plain
   signal rows; the full surface fits the 18-row operational canvas.
-- The lower stage threshold is task-specific. Source, AliceProject, Release,
+- A subsequent real 80x24 Source capture exposed the same container failure:
+  Launch Bay, checkout field, contract, Launcher inventory, and Focus Console
+  overlapped. Source now shares the compact Focus Workspace threshold and keeps
+  its existing Select/Validate/Save/Launch content inside one owned canvas.
+- The lower stage threshold remains task-specific. AliceProject, Release,
   Transfer, and their existing centered-sheet thresholds do not change.
   Selection, editing, validation, save callbacks, inheritance rules, Runtime
   ownership, keyboard routes, and pointer activation remain unchanged.
+- The first compact Source stage then exposed the Launcher's selection Tip in
+  the first row reserved for the Focus Console. The root cause was not overlay
+  padding: ordinary page Tips were still mounted while a task owned focus.
+  Focused tasks now suppress that unrelated Tip, leaving only their own Header,
+  contract, Action Shelf, and Back guidance.
 - Wide Setup removes the repeated Layer suffix from the constrained list-panel
   title; Setup status remains the single Layer owner, while the AliceProject
   name now survives intact.
-- Real 120x32 and 80x24 captures verify that Setup owns one non-overlapping
-  canvas at both baselines. Maintainer acceptance remains pending on the
-  retained feature branch.
-- Compact-Setup-Focus-Workspace acceptance passes through all 145 Task Surface,
-  Setup, screen, and real-PTY tests (including all 54 PTY cases), and the
+- Real 120x32 and 80x24 captures verify that Setup and Source own one
+  non-overlapping canvas at both baselines. Maintainer acceptance remains
+  pending on the retained feature branch.
+- Compact-launch-preparation-Focus-Workspace acceptance passes through all 148
+  Task Surface, Source, Setup, screen, and real-PTY tests (including all 54 PTY
+  cases), and the
   complete CLI suite (63 files, 639 tests). CLI typecheck and build also pass.
 
 ## Completion Criteria

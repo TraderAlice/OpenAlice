@@ -2111,7 +2111,7 @@ export async function runSupervisorTui(
       maxHeight: 20,
       anchor: 'center',
       margin: 1,
-    } as const)
+    } as const, 'source')
     const input = new (class extends piTui.Input {
       detail = reason
         ? `Start needs an OpenAlice source checkout. ${reason}`
@@ -5024,7 +5024,7 @@ export class SupervisorScreen implements Component {
       lines,
       controlConsole,
       viewportHeight ?? lines.length + controlConsole.length,
-      focusTask === 'confirmation'
+      focusTask
         ? []
         : [renderSupervisorContextTip({
           panel: this.snapshot.panel ?? 'overview',

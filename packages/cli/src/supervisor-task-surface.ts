@@ -12,8 +12,8 @@ export interface SupervisorTaskSurfaceSize {
 
 export const SUPERVISOR_TASK_STAGE_MIN_WIDTH = 100
 export const SUPERVISOR_TASK_STAGE_MIN_HEIGHT = 28
-export const SUPERVISOR_SETUP_STAGE_MIN_WIDTH = 72
-export const SUPERVISOR_SETUP_STAGE_MIN_HEIGHT = 24
+export const SUPERVISOR_COMPACT_TASK_STAGE_MIN_WIDTH = 72
+export const SUPERVISOR_COMPACT_TASK_STAGE_MIN_HEIGHT = 24
 export const SUPERVISOR_TASK_STAGE_HEADER_ROWS = 3
 export const SUPERVISOR_TASK_STAGE_CONSOLE_ROWS = 3
 
@@ -21,9 +21,10 @@ export function supervisorUsesTaskStage(
   size: SupervisorTaskSurfaceSize,
   task?: SupervisorTaskSurfaceTask,
 ): boolean {
-  return task === 'setup'
-    ? size.width >= SUPERVISOR_SETUP_STAGE_MIN_WIDTH
-      && size.height >= SUPERVISOR_SETUP_STAGE_MIN_HEIGHT
+  const launchPreparationTask = task === 'setup' || task === 'source'
+  return launchPreparationTask
+    ? size.width >= SUPERVISOR_COMPACT_TASK_STAGE_MIN_WIDTH
+      && size.height >= SUPERVISOR_COMPACT_TASK_STAGE_MIN_HEIGHT
     : size.width >= SUPERVISOR_TASK_STAGE_MIN_WIDTH
       && size.height >= SUPERVISOR_TASK_STAGE_MIN_HEIGHT
 }

@@ -45,10 +45,11 @@ describe('Supervisor secondary-task surface', () => {
     }
   })
 
-  it('gives Setup a compact Focus Workspace without widening other tasks', () => {
+  it('gives launch preparation a compact Focus Workspace without widening other tasks', () => {
     const size = { width: 80, height: 24 }
     expect(supervisorUsesTaskStage(size)).toBe(false)
     expect(supervisorUsesTaskStage(size, 'setup')).toBe(true)
+    expect(supervisorUsesTaskStage(size, 'source')).toBe(true)
     expect(supervisorUsesTaskStage({ width: 71, height: 24 }, 'setup')).toBe(false)
     expect(supervisorUsesTaskStage({ width: 80, height: 23 }, 'setup')).toBe(false)
     expect(supervisorTaskSurfaceOptions(size, sheet, 'setup')).toEqual({
@@ -58,7 +59,8 @@ describe('Supervisor secondary-task surface', () => {
       margin: { top: 3, right: 0, bottom: 3, left: 0 },
     })
     expect(renderSupervisorTaskSurface(['work'], size, 'setup')).toHaveLength(18)
-    expect(renderSupervisorTaskSurface(['work'], size, 'source')).toEqual(['work'])
+    expect(renderSupervisorTaskSurface(['work'], size, 'source')).toHaveLength(18)
+    expect(renderSupervisorTaskSurface(['work'], size, 'projects')).toEqual(['work'])
   })
 
   it('centers a truthful task trajectory inside genuine surplus rows', () => {
