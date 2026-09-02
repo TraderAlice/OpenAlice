@@ -600,6 +600,10 @@ export async function runSupervisorTui(
             focusLabel: confirmation?.confirmLabel,
             projectName: screen.snapshot.context?.aliceProject.displayName,
             runtimeState: screen.snapshot.runtime?.class,
+            projectAvailable: currentFleetProjectAvailable(
+              screen.snapshot.fleet,
+              screen.snapshot.context,
+            ),
           }, terminal.width),
           terminal.width,
         )
@@ -4237,6 +4241,10 @@ export class SupervisorScreen implements Component {
         focusLabel: confirmation?.confirmLabel,
         projectName: this.snapshot.context?.aliceProject.displayName,
         runtimeState: state,
+        projectAvailable: currentFleetProjectAvailable(
+          this.snapshot.fleet,
+          this.snapshot.context,
+        ),
         pulse: this.runtimePulse,
         commandPaletteOpen: this.commandDeckOpen,
         recovery: isConfigRecovery(this.snapshot),
@@ -4692,6 +4700,17 @@ function fleetActionBar(
     { key: 'r', label: 'Refresh' },
     { key: '?', label: 'More' },
   ], width)
+}
+
+function currentFleetProjectAvailable(
+  fleet: SupervisorFleetState | null | undefined,
+  context: ResolvedLaunchContext | undefined,
+): boolean | undefined {
+  if (!context) return undefined
+  return fleet?.machines
+    .find((machine) => machine.key === 'local')
+    ?.projects.find((project) => project.key === context.project)
+    ?.available
 }
 
 function renderGuidance(

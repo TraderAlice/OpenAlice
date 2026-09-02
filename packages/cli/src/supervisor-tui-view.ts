@@ -87,6 +87,7 @@ export interface SupervisorDockView {
   focusLabel?: string
   projectName?: string
   runtimeState?: string
+  projectAvailable?: boolean
   pulse?: boolean
   commandPaletteOpen?: boolean
   recovery?: boolean
@@ -606,7 +607,11 @@ export function renderSupervisorDock(
     return commandSpine(controls, `! RECOVERY${breadcrumb}${panelIdentity}`, width)
   }
 
-  const signal = runtimeSignal(view.runtimeState ?? 'unavailable', view.pulse ?? false)
+  const signal = runtimeSignal(
+    view.runtimeState ?? 'unavailable',
+    view.pulse ?? false,
+    view.projectAvailable,
+  )
   const fullProjectName = view.projectName ?? 'AliceProject'
   const contextBudget = Math.max(1, width - 6 - displayWidth(controls) - 3)
   const panelSuffix = `${breadcrumb}${panelIdentity}`
@@ -1003,7 +1008,9 @@ function stateBadge(state: string, pulse: boolean): string {
   return `◌ ${state.toUpperCase()}`
 }
 
-function runtimeSignal(state: string, pulse: boolean): string {
+function runtimeSignal(state: string, pulse: boolean, projectAvailable?: boolean): string {
+  if (projectAvailable === false && state === 'running') return '◆ LIVE · HOME MISSING'
+  if (projectAvailable === false && state === 'owned_elsewhere') return '◆ EXTERNAL · HOME MISSING'
   const runningGlyph = pulse ? '◉' : '●'
   if (state === 'running') return `${runningGlyph} LIVE`
   if (state === 'owned_elsewhere') return `${runningGlyph} EXTERNAL`

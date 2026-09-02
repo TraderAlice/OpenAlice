@@ -329,6 +329,28 @@ describe('Supervisor TUI screen', () => {
       }),
     ]))
 
+    const missingHome = renderSupervisorDock({
+      panel: 'fleet',
+      projectName: 'Default AliceProject',
+      runtimeState: 'running',
+      projectAvailable: false,
+    }, 120)
+    expect(missingHome).toContain('◆ LIVE · HOME MISSING  ›  ◇ FLEET')
+    expect(missingHome).not.toContain('● LIVE')
+    const themedMissingHome = decorateSupervisorFrame([
+      'header',
+      'divider',
+      'tabs',
+      missingHome,
+    ], createSupervisorTuiTheme({ TERM: 'xterm-256color' }), {
+      panel: 'fleet',
+      runtimeClass: 'running',
+    })[3]!
+    expect(themedMissingHome).toContain(
+      '\u001b[1;38;2;255;214;128;48;2;10;34;39m◆ LIVE · HOME MISSING',
+    )
+    expect(themedMissingHome.replace(/\u001b\[[0-9;]*m/gu, '')).toBe(missingHome)
+
     const focus = renderSupervisorDock({
       panel: 'overview',
       focusTask: 'setup',
@@ -1178,6 +1200,11 @@ describe('Supervisor TUI screen', () => {
       version: 'dev',
       channel: 'development',
       runtime: { class: 'running', endpoints: { web: 'http://127.0.0.1:47331' } },
+      context: resolveLaunchContext({
+        cwd: '/tmp',
+        homeDir: '/home/alice',
+        flags: { project: 'default', home: '/home/alice/default' },
+      }),
       panel: 'fleet',
       fleet: setFleetFocus(createSupervisorFleetState(
         '2026-08-23T00:00:00Z',
@@ -1193,6 +1220,7 @@ describe('Supervisor TUI screen', () => {
 
     const output = screen.render(120).join('\n')
     expect(output).toContain('◆ running · home missing')
+    expect(output).toContain('◆ LIVE · HOME MISSING')
     expect(output).toContain('[ Enter ] Open')
     expect(output).not.toContain('[ m ] Transfer')
     expect(screen.handleKey('m', matchesKey)).toBe(true)

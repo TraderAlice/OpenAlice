@@ -402,7 +402,7 @@ function decorateDock(
   theme: SupervisorTuiTheme,
   hoveredCommand?: string,
 ): string {
-  const tokenPattern = /\[ \/ \] (?:Commands|Close)|\[ q \] Detach|\[ Esc \] (?:Back|Cancel)|\[ i \] .*?(?=  ›  )|⌂ .*?(?=  ›  )|◆ (?:FOCUS WORKSPACE|DECISION GATE)|! RECOVERY|(?:◉|●) (?:LIVE|EXTERNAL)|○ COLD|◆ (?:BLOCKED|DEGRADED)|◇ OFFLINE|◌ [A-Z][A-Z ]*?(?=  ›  | ─╯)|[◆◇≋✦?] (?:OVERVIEW|FLEET|LOGS|DOCTOR|HELP|SETUP|SOURCE|PROJECTS|RELEASE|TRANSFER|CONFIRMATION)/gu
+  const tokenPattern = /\[ \/ \] (?:Commands|Close)|\[ q \] Detach|\[ Esc \] (?:Back|Cancel)|\[ i \] .*?(?=  ›  )|⌂ .*?(?=  ›  )|◆ (?:FOCUS WORKSPACE|DECISION GATE)|! RECOVERY|(?:◉|●) (?:LIVE|EXTERNAL)|○ COLD|◆ (?:(?:LIVE|EXTERNAL) · HOME MISSING|BLOCKED|DEGRADED)|◇ OFFLINE|◌ [A-Z][A-Z ]*?(?=  ›  | ─╯)|[◆◇≋✦?] (?:OVERVIEW|FLEET|LOGS|DOCTOR|HELP|SETUP|SOURCE|PROJECTS|RELEASE|TRANSFER|CONFIRMATION)/gu
   let output = ''
   let cursor = 0
   for (const match of line.matchAll(tokenPattern)) {

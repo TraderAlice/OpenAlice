@@ -1182,6 +1182,19 @@ not imply maintainer approval of the finished interaction.
   `missing` state. This is an autonomous topic refinement, not a recorded
   maintainer approval.
 
+### Compound Runtime signal decision
+
+- Leaving the Command Dock at green `LIVE` preserves its narrow Runtime-only
+  contract, but visually overrules the adjacent Fleet warning at the strongest
+  persistent status boundary.
+- Replacing LIVE with a generic warning would acknowledge the missing home, but
+  discard the verified fact that the Runtime and Web route remain online.
+- The selected model projects the same dual truth into the Dock as `LIVE · HOME
+  MISSING` or `EXTERNAL · HOME MISSING` and styles that complete signal as a
+  warning. Normal active projects keep the green LIVE/EXTERNAL signal, while
+  focus and responsive fallbacks consume the same projection. This is an
+  autonomous topic refinement, not a recorded maintainer approval.
+
 ## Responsive and Accessibility Contract
 
 - `80x24` remains the minimum full experience. Wide terminals show the
@@ -1222,6 +1235,8 @@ already large `supervisor-tui.ts` application controller.
   to consistent overlays and dialogs.
 - [x] Represent an active Runtime whose AliceProject home disappeared as one
   compound Fleet state without hiding either the live route or missing home.
+- [x] Carry that compound warning into the persistent Command Dock without
+  changing healthy LIVE/EXTERNAL styling or narrow responsive behavior.
 - [x] Dogfood the real `pnpm cli` surface across wide, 80x24, and narrow sizes;
   inspect mouse, resize, copy/selection, signal exit, and failure recovery.
 - [x] Run the owning package typecheck and tests, affected tests, full hermetic
@@ -2543,6 +2558,18 @@ already large `supervisor-tui.ts` application controller.
   passes (701 passed, 1 skipped; 6,212 tests passed, 10 skipped). Docker
   installer smoke passes without Node, npm, pnpm, Bun, or an Agent Runtime, and
   package dry-run retains both changed Supervisor owners in the published CLI.
+- The persistent Command Dock now consumes current-project availability instead
+  of restating Runtime class alone. A verified live Runtime over a missing home
+  reads `LIVE · HOME MISSING` at the strongest global signal boundary and uses
+  warning color; healthy LIVE/EXTERNAL, responsive elision, focus ownership,
+  command targeting, and no-color output retain their existing contracts.
+- Compound-Signal acceptance passes with 113 focused Dock, theme, screen, and
+  real-PTY tests. Truecolor unit coverage proves the complete warning token and
+  exact ANSI-free parity; the 120x32 PTY proves the responsive Fleet frame and
+  terminal restoration. Root TypeScript and CLI build pass; the 702-file suite
+  passes (701 passed, 1 skipped; 6,212 tests passed, 10 skipped). Docker
+  installer smoke passes without Node, npm, pnpm, Bun, or an Agent Runtime, and
+  package dry-run contains every changed Dock projection and theme owner.
 
 ## Completion Criteria
 
