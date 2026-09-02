@@ -405,19 +405,21 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
               stage = 20
               child.write('\r')
             }
-          } else if (stage === 6 && output.includes('Review AliceProject transfer')) {
+          } else if (stage === 6 && output.includes('◆ Transfer manifest · READY')) {
             stage = scenario === 'default-no' ? 10 : 7
             child.write(scenario === 'default-no' ? 'n' : 'y')
           } else if (stage === 7 && scenario === 'checksum-retry' && output.includes('Synthetic checksum mismatch')) {
             stage = 8
-            child.write('r')
-          } else if (stage === 7 && scenario === 'cancel-retry' && output.includes('Transferring')) {
+            child.write('\u001b[<35;18;19M')
+            setTimeout(() => child.write('\u001b[<0;18;19M'), 300)
+          } else if (stage === 7 && scenario === 'cancel-retry' && output.includes('◈ Transfer in flight · STREAMING')) {
             stage = 9
             child.write('\u001b')
           } else if (stage === 9 && output.includes('Synthetic transfer cancellation acknowledged.')) {
             stage = 8
-            child.write('r')
-          } else if ((stage === 7 || stage === 8) && output.includes('AliceProject transfer complete')) {
+            child.write('\u001b[<35;18;19M')
+            setTimeout(() => child.write('\u001b[<0;18;19M'), 300)
+          } else if ((stage === 7 || stage === 8) && output.includes('✓ AliceProject arrived · PUBLISHED')) {
             stage = 20
             child.write('\r')
           } else if (stage === 10 && output.includes('Transfer cancelled. Nothing changed.')) {
@@ -450,8 +452,13 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       expect(transcript).toContain('◆ Destination AliceProject key')
       expect(transcript).toContain('◆ Credentials')
       expect(transcript).toContain('◆ [ Enter ] Choose')
+      if (scenario !== 'auth-loss' && scenario !== 'occupied' && scenario !== 'default-no') {
+        expect(transcript).toContain('◆ Transfer manifest · READY')
+        expect(transcript).toContain('◈ Transfer in flight · STREAMING')
+      }
       if (scenario === 'checksum-retry' || scenario === 'cancel-retry') {
         expect(transcript).toContain('Transfer Flight Deck · 7/8 · STREAM')
+        expect(transcript).toContain('› [ r ] Retry')
       }
       if (scenario === 'auth-loss') {
         expect(transcript).toContain('SSH authentication required after destination selection.')
@@ -459,6 +466,10 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         expect(transcript).toContain('Destination key or Home became occupied before planning.')
       } else {
         expect(transcript).toContain('Sessions  0 imported')
+      }
+      if (scenario === 'success' || scenario === 'checksum-retry' || scenario === 'cancel-retry') {
+        expect(transcript).toContain('✓ AliceProject arrived · PUBLISHED')
+        expect(transcript).toContain('◆ [ s ] Start')
       }
       expect(transcript).toContain('\u001b[?25h')
       expect(transcript).toContain('\u001b[?2004l')

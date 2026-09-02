@@ -245,6 +245,11 @@ path is intentionally parameter-free:
   visible validation repair state, and whole-segment Continue, Choose, and Back
   actions; these project the existing wizard inputs and lists rather than
   introducing another transfer controller.
+  Planning and execution stay in the same Mission Control region: Manifest
+  exposes READY/HOLD evidence and the default-No boundary, In Flight shows
+  files, bytes, progress, verification, and cancellation, Recovery distinguishes
+  transaction retry from plan rebuild, and Arrival keeps Start, Connect/Open,
+  and Done as separate whole-segment actions.
   It renders the same checksum and exclusion plan as the explicit command.
   Default No changes nothing. Success offers separate Start, Connect/Open, and
   Done actions and never auto-starts;

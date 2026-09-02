@@ -3,7 +3,7 @@ import {
   decorateSupervisorActionShelf,
   type SupervisorTuiTheme,
 } from './supervisor-tui-theme.ts'
-import { renderSupervisorPanel } from './supervisor-tui-view.ts'
+import { renderSupervisorPanel, wrapDisplayText } from './supervisor-tui-view.ts'
 import type { TransferWizardPhase } from './supervisor-transfer.ts'
 
 export interface SupervisorTransferFlightDeckView {
@@ -48,6 +48,98 @@ export function renderSupervisorTransferChoice(
     '',
     '◆ [ Enter ] Choose  │  [ Esc ] Back',
   ]
+}
+
+export function renderSupervisorTransferPlanning(width: number): string[] {
+  return fitTransferRows([
+    '◇ Building transfer manifest · CHECKSUMS',
+    '',
+    ...wrapDisplayText(
+      'Indexing portable files, exclusions, credentials, and scheduled Issue owners.',
+      Math.max(1, width),
+    ),
+    'No destination state changes before review.',
+  ], width)
+}
+
+export function renderSupervisorTransferReview(
+  planLines: string[],
+  ready: boolean,
+  width: number,
+): string[] {
+  return fitTransferRows([
+    `${ready ? '◆' : '!'} Transfer manifest · ${ready ? 'READY' : 'HOLD'}`,
+    ...stripLegacyTransferCard(planLines),
+    '',
+    ready
+      ? '✓ Boundaries checked; ready to transfer.'
+      : '! Resolve every blocker before transfer.',
+    ready
+      ? '◆ [ Enter ] Transfer  │  [ Esc ] Cancel'
+      : '◆ [ Esc ] Close',
+  ], width)
+}
+
+export interface SupervisorTransferProgressView {
+  files: number
+  bytes: number
+  totalFiles: number
+  totalBytes: number
+}
+
+export function renderSupervisorTransferProgress(
+  progress: SupervisorTransferProgressView,
+  width: number,
+): string[] {
+  const fraction = transferFraction(progress)
+  const percent = Math.floor(fraction * 100)
+  const meterWidth = Math.max(8, Math.min(28, width - 8))
+  const complete = Math.round(fraction * meterWidth)
+  const meter = `${'━'.repeat(complete)}${'·'.repeat(meterWidth - complete)}`
+  return fitTransferRows([
+    '◈ Transfer in flight · STREAMING',
+    '',
+    `[${meter}] ${String(percent).padStart(3, ' ')}%`,
+    `${progress.files} / ${progress.totalFiles} files`,
+    `${formatTransferBytes(progress.bytes)} / ${formatTransferBytes(progress.totalBytes)}`,
+    '',
+    'VERIFY · checksum gate → atomic publish',
+    '◆ [ Esc ] Cancel',
+    'Ctrl+C cancels this transfer and detaches OpenAlice.',
+  ], width)
+}
+
+export function renderSupervisorTransferRecovery(
+  error: string,
+  retryTransaction: boolean,
+  width: number,
+): string[] {
+  const detail = wrapDisplayText(error || 'Unknown transfer error.', Math.max(1, width)).slice(0, 3)
+  return fitTransferRows([
+    '! Transfer interrupted · RECOVERY',
+    '',
+    ...detail,
+    '',
+    retryTransaction
+      ? 'Marked transaction staging is safe to retry.'
+      : 'No transfer transaction was published.',
+    `◆ [ r ] ${retryTransaction ? 'Retry' : 'Rebuild'}  │  [ Esc ] Close`,
+  ], width)
+}
+
+export function renderSupervisorTransferArrival(
+  resultLines: string[],
+  width: number,
+): string[] {
+  return fitTransferRows([
+    '✓ AliceProject arrived · PUBLISHED',
+    ...stripLegacyTransferCard(resultLines),
+    '',
+    '◆ Remote Runtime is stopped · source unchanged',
+    width < 58
+      ? '◆ [ s ] Start  │  [ o ] Open  │  [ Enter ] Done'
+      : '◆ [ s ] Start  │  [ o ] Connect/Open  │  [ Enter ] Done',
+  ], width)
 }
 
 interface TransferStage {
@@ -142,6 +234,13 @@ export function decorateSupervisorTransferFlightDeck(
     const action = [
       '◆ [ Enter ] Continue  │  [ Esc ] Back',
       '◆ [ Enter ] Choose  │  [ Esc ] Back',
+      '◆ [ Enter ] Transfer  │  [ Esc ] Cancel',
+      '◆ [ Esc ] Close',
+      '◆ [ Esc ] Cancel',
+      '◆ [ r ] Retry  │  [ Esc ] Close',
+      '◆ [ r ] Rebuild  │  [ Esc ] Close',
+      '◆ [ s ] Start  │  [ o ] Connect/Open  │  [ Enter ] Done',
+      '◆ [ s ] Start  │  [ o ] Open  │  [ Enter ] Done',
     ].find((candidate) => line.includes(candidate))
     if (action) {
       return line.replace(action, decorateSupervisorActionShelf(action, theme, hoveredCommand))
@@ -158,11 +257,49 @@ export function decorateSupervisorTransferFlightDeck(
     if (line.startsWith('│ ') && line.includes('◆ ') && line.indexOf('│', 1) === line.lastIndexOf('│')) {
       return theme.accentStrong(line)
     }
-    if (line.includes('FAILED') || line.includes('Transfer failed')) return theme.danger(line)
+    if (
+      line.includes('FAILED')
+      || line.includes('Transfer interrupted')
+      || line.includes('Transfer manifest · HOLD')
+    ) return theme.danger(line)
     if (line.includes(' · FIX')) return theme.danger(line)
-    if (line.includes('ARRIVAL') || line.includes('transfer complete')) return theme.success(line)
+    if (line.includes('Transfer manifest · READY') || line.includes('AliceProject arrived')) return theme.success(line)
+    if (
+      line.includes('Transfer in flight')
+      || line.includes('Building transfer manifest')
+    ) return theme.accentStrong(line)
+    if (line.includes('checksum gate') || line.includes('Ctrl+C cancels')) return theme.muted(line)
+    if (line.includes('ARRIVAL')) return theme.success(line)
     return line
   })
+}
+
+function stripLegacyTransferCard(lines: string[]): string[] {
+  const body = lines.slice(1)
+  while (body[0] === '') body.shift()
+  if (body.at(-1)?.startsWith('[')) body.pop()
+  while (body.at(-1) === '') body.pop()
+  return body
+}
+
+function fitTransferRows(lines: string[], width: number): string[] {
+  return lines.map((line) => truncateDisplayWidth(line, Math.max(1, width)))
+}
+
+function transferFraction(progress: SupervisorTransferProgressView): number {
+  const ratio = progress.totalBytes > 0
+    ? progress.bytes / progress.totalBytes
+    : progress.totalFiles > 0
+      ? progress.files / progress.totalFiles
+      : 0
+  return Math.max(0, Math.min(1, ratio))
+}
+
+function formatTransferBytes(value: number): string {
+  if (value < 1024) return `${value} B`
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KiB`
+  if (value < 1024 * 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MiB`
+  return `${(value / (1024 * 1024 * 1024)).toFixed(1)} GiB`
 }
 
 function stageRows(active: number, width: number): string[] {

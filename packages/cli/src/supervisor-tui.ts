@@ -193,9 +193,14 @@ import {
 } from './supervisor-transfer.ts'
 import {
   decorateSupervisorTransferFlightDeck,
+  renderSupervisorTransferArrival,
   renderSupervisorTransferChoice,
   renderSupervisorTransferFlightDeck,
   renderSupervisorTransferInput,
+  renderSupervisorTransferPlanning,
+  renderSupervisorTransferProgress,
+  renderSupervisorTransferRecovery,
+  renderSupervisorTransferReview,
 } from './supervisor-transfer-view.ts'
 import {
   createSupervisorAliceProject,
@@ -2551,7 +2556,10 @@ export async function runSupervisorTui(
       state.phase = 'planning'
       activeChoice = null
       setMessage('Building a checksum and exclusion plan…')
-      component = { render: () => ['Planning transfer…'], invalidate: () => undefined }
+      component = {
+        render: (width) => renderSupervisorTransferPlanning(width),
+        invalidate: () => undefined,
+      }
       try {
         const latest = await inspectFleet()
         const remote = latest.machines.find((machine) => machine.key === destination.key)
@@ -2579,7 +2587,11 @@ export async function runSupervisorTui(
       }
     }
     const reviewComponent = (): Component => ({
-      render: (width) => renderTransferPlanReview(state.plan!, width),
+      render: (width) => renderSupervisorTransferReview(
+        renderTransferPlanReview(state.plan!, width),
+        state.plan!.readyToApply,
+        width,
+      ),
       handleInput: (data) => {
         if (piTui.matchesKey(data, 'escape') || piTui.matchesKey(data, 'n')) close()
         else if ((piTui.matchesKey(data, 'y') || piTui.matchesKey(data, 'enter')) && state.plan?.readyToApply) void applyTransfer()
@@ -2587,15 +2599,11 @@ export async function runSupervisorTui(
       invalidate: () => undefined,
     })
     const failureComponent = (): Component => ({
-      render: (width) => [
-        'Transfer failed',
-        '',
+      render: (width) => renderSupervisorTransferRecovery(
         sanitize(state.error ?? 'Unknown error'),
-        '',
-        state.plan?.readyToApply
-          ? '[ r ] Retry the same transaction · [ Enter ] / [ Esc ] Close'
-          : '[ r ] Rebuild the plan · [ Enter ] / [ Esc ] Close',
-      ].map((line) => truncate(line, width)),
+        Boolean(state.plan?.readyToApply),
+        width,
+      ),
       handleInput: (data) => {
         if (piTui.matchesKey(data, 'r')) {
           state.error = null
@@ -2616,13 +2624,7 @@ export async function runSupervisorTui(
       transferController = new AbortController()
       let progress = { files: 0, bytes: 0, totalFiles: state.plan!.portable.files, totalBytes: state.plan!.portable.bytes }
       component = {
-        render: () => [
-          'Transferring…',
-          '',
-          `${progress.files}/${progress.totalFiles} files · ${formatTransferProgress(progress.bytes, progress.totalBytes)}`,
-          'Checksums are verified before atomic publish.',
-          '[ Esc ] Cancel · Ctrl+C Detach',
-        ],
+        render: (width) => renderSupervisorTransferProgress(progress, width),
         handleInput: (data) => {
           if (piTui.matchesKey(data, 'escape')) {
             transferController?.abort()
@@ -2660,7 +2662,10 @@ export async function runSupervisorTui(
       ui.requestRender()
     }
     const successComponent = (machine: RegisteredMachine): Component => ({
-      render: (width) => renderTransferResult(state.receipt!, machine.displayName, state.projectKey, width),
+      render: (width) => renderSupervisorTransferArrival(
+        renderTransferResult(state.receipt!, machine.displayName, state.projectKey, width),
+        width,
+      ),
       handleInput: (data) => {
         if (piTui.matchesKey(data, 'enter') || piTui.matchesKey(data, 'escape')) { close(`Transferred ${machine.key}/${state.projectKey}.`) }
         else if (piTui.matchesKey(data, 's')) void (async () => {
@@ -4417,12 +4422,6 @@ function remoteHomesOverlap(left: string, right: string): boolean {
   return leftRelative === ''
     || (!leftRelative.startsWith('../') && leftRelative !== '..')
     || (!rightRelative.startsWith('../') && rightRelative !== '..')
-}
-
-function formatTransferProgress(bytes: number, total: number): string {
-  if (total <= 0) return '0 B'
-  const percent = Math.min(100, Math.floor((bytes / total) * 100))
-  return `${percent}% · ${bytes}/${total} bytes`
 }
 
 async function runRemoteProjectStart(

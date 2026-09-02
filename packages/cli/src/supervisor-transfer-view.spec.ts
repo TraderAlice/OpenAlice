@@ -3,9 +3,14 @@ import { describe, expect, it } from 'vitest'
 import { displayWidth } from './supervisor-display.ts'
 import {
   decorateSupervisorTransferFlightDeck,
+  renderSupervisorTransferArrival,
   renderSupervisorTransferFlightDeck,
   renderSupervisorTransferChoice,
   renderSupervisorTransferInput,
+  renderSupervisorTransferPlanning,
+  renderSupervisorTransferProgress,
+  renderSupervisorTransferRecovery,
+  renderSupervisorTransferReview,
 } from './supervisor-transfer-view.ts'
 import { createSupervisorTuiTheme } from './supervisor-tui-theme.ts'
 
@@ -104,5 +109,70 @@ describe('Supervisor Transfer Flight Deck', () => {
       'Enter',
     )[0]!
     expect(plain).toContain('│ › [ Enter ] Continue')
+  })
+
+  it('projects planning and review as a bounded Manifest console', () => {
+    const planning = renderSupervisorTransferPlanning(44)
+    expect(planning).toContain('◇ Building transfer manifest · CHECKSUMS')
+    expect(planning.every((line) => displayWidth(line) <= 44)).toBe(true)
+
+    const review = renderSupervisorTransferReview([
+      'Review AliceProject transfer',
+      '',
+      'From      Research (research)',
+      'To        cloud / Research',
+      '',
+      'Source stays unchanged.',
+      '',
+      '[ y ] / [ Enter ] Transfer · [ n ] / [ Esc ] Cancel',
+    ], true, 44)
+    expect(review[0]).toBe('◆ Transfer manifest · READY')
+    expect(review).toContain('✓ Boundaries checked; ready to transfer.')
+    expect(review).toContain('◆ [ Enter ] Transfer  │  [ Esc ] Cancel')
+    expect(review.join('\n')).not.toContain('Review AliceProject transfer')
+  })
+
+  it('renders responsive streaming, recovery, and arrival status cards', () => {
+    const progress = renderSupervisorTransferProgress({
+      files: 3,
+      totalFiles: 4,
+      bytes: 3 * 1024,
+      totalBytes: 4 * 1024,
+    }, 36)
+    expect(progress).toContain('◈ Transfer in flight · STREAMING')
+    expect(progress).toContain('[━━━━━━━━━━━━━━━━━━━━━·······]  75%')
+    expect(progress).toContain('3.0 KiB / 4.0 KiB')
+    expect(progress.every((line) => displayWidth(line) <= 36)).toBe(true)
+
+    const recovery = renderSupervisorTransferRecovery(
+      'Remote checksum did not match the manifest after the receiver verified every file.',
+      true,
+      38,
+    )
+    expect(recovery[0]).toBe('! Transfer interrupted · RECOVERY')
+    expect(recovery).toContain('◆ [ r ] Retry  │  [ Esc ] Close')
+    expect(recovery.every((line) => displayWidth(line) <= 38)).toBe(true)
+
+    const arrival = renderSupervisorTransferArrival([
+      'AliceProject transfer complete',
+      '',
+      'Cloud / research',
+      '/home/alice/.openalice-research',
+      '',
+      '[ s ] Start · [ o ] Connect/Open · [ Enter ] Done',
+    ], 56)
+    expect(arrival[0]).toBe('✓ AliceProject arrived · PUBLISHED')
+    expect(arrival).toContain('◆ Remote Runtime is stopped · source unchanged')
+    expect(arrival).toContain('◆ [ s ] Start  │  [ o ] Open  │  [ Enter ] Done')
+  })
+
+  it('keeps Mission Control shelves clickable and visible without color', () => {
+    const line = '│ ◆ [ r ] Retry  │  [ Esc ] Close │'
+    const plain = decorateSupervisorTransferFlightDeck(
+      [line],
+      createSupervisorTuiTheme({ TERM: 'xterm-256color', NO_COLOR: '1' }),
+      'r',
+    )[0]!
+    expect(plain).toContain('│ › [ r ] Retry')
   })
 })

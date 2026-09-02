@@ -52,16 +52,20 @@ const exitCode = await runSupervisorTui({}, {
   },
   sendProjectTransfer: async (input) => {
     sendCalls += 1
-    if (scenario === 'checksum-retry' && sendCalls === 1) {
-      throw new Error('Synthetic checksum mismatch from remote receiver.')
-    }
+    input.onProgress?.({ files: 1, bytes: 1024, totalFiles: 4, totalBytes: 4096 })
     if (scenario === 'cancel-retry' && sendCalls === 1) {
       await new Promise<never>((_resolve, reject) => {
-        input.signal?.addEventListener('abort', () => {
+        const abort = () => {
           aborted = true
           reject(new Error('Synthetic transfer cancellation acknowledged.'))
-        }, { once: true })
+        }
+        if (input.signal?.aborted) abort()
+        else input.signal?.addEventListener('abort', abort, { once: true })
       })
+    }
+    await new Promise((resolve) => setTimeout(resolve, 80))
+    if (scenario === 'checksum-retry' && sendCalls === 1) {
+      throw new Error('Synthetic checksum mismatch from remote receiver.')
     }
     return receipt(input.plan)
   },
@@ -144,7 +148,7 @@ function transferPlan(sourceHome: string, destinationHome: string, destinationKe
       requiredFreeBytes: 64 * 1024 * 1024,
     },
     policy: { credentials: 'omit', scheduledIssues: 'keep-blocked' },
-    portable: { entries: [], files: 0, directories: 0, symlinks: 0, bytes: 0 },
+    portable: { entries: [], files: 4, directories: 0, symlinks: 0, bytes: 4096 },
     excluded: [{
       reason: 'session-plane',
       files: 3,

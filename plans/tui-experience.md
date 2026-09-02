@@ -338,6 +338,23 @@ not imply maintainer approval of the finished interaction.
   route and Safety Rail; existing `SelectList`, validators, and phase callbacks
   remain the only navigation and mutation paths.
 
+### Transfer Mission Control decision
+
+- Keeping review, streaming, failure, and completion as unrelated text blocks
+  would preserve their callbacks, but the Flight Deck would still lose visual
+  continuity exactly when checksum evidence, cancellation, recovery, and the
+  final Runtime choice matter most.
+- Replacing those phases with a separate full-screen transfer application could
+  expose more telemetry, but would duplicate the existing plan, sender, retry,
+  abort, and activation controller and compete with the Flight Deck route.
+- The selected model follows OMP's stable framed status hierarchy: one Mission
+  Control region projects four semantic cards — Manifest, In Flight, Recovery,
+  and Arrival — with a strong state signal, bounded evidence, and complete
+  action shelves. The existing plan review renderer, progress callback, retry
+  decision, receipt, and Start/Open/Done handlers remain authoritative. Wide and
+  80×24 layouts retain the same information and pointer targets; only spacing
+  and progress-meter width respond.
+
 ### AliceProject Foundry decision
 
 - Keeping the creator as a bordered raw `Input` would preserve its compactness,
@@ -524,6 +541,8 @@ already large `supervisor-tui.ts` application controller.
   while preserving the SettingsList validation and applySetting boundary.
 - [x] Replace raw transfer entry controls with Mission Console fields, choices,
   validation state, and whole-action pointer targets.
+- [x] Unify transfer review, streaming, recovery, and arrival as Mission Control
+  status cards while preserving plan, abort, retry, and activation ownership.
 
 ## Progress
 
@@ -970,6 +989,19 @@ already large `supervisor-tui.ts` application controller.
   699-file suite passes (698 passed, 1 skipped; 6139 tests passed, 10 skipped).
   Docker installer smoke passes, and package dry-run retains both
   `src/supervisor-transfer-view.ts` and `src/supervisor-tui.ts`.
+- Transfer review, execution, recovery, and completion now share one Mission
+  Control language. Manifest carries READY/HOLD evidence and the default-No
+  boundary; In Flight exposes a proportional file/byte meter and atomic-publish
+  gate; Recovery distinguishes transaction retry from manifest rebuild; Arrival
+  keeps stopped-Runtime state beside Start, Connect/Open, and Done.
+- Mission-Control acceptance passes with 89 focused view, pointer, screen, and
+  real-PTY tests. Six real transfer scenarios cover the 80×24 default-No review,
+  110×30 successful arrival, live 25% progress, planning failures, and two
+  100-column recovery paths that hover and click Retry outside its keycap. Root
+  TypeScript and CLI build/typecheck pass; the 699-file suite passes (698 passed,
+  1 skipped; 6142 tests passed, 10 skipped). Docker installer smoke passes, and
+  package dry-run retains both `src/supervisor-transfer-view.ts` and
+  `src/supervisor-tui.ts`.
 
 ## Completion Criteria
 
