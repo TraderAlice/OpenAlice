@@ -1763,6 +1763,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     })
 
     expect(stripSgr(transcript)).toContain('◇ CONTROL ROUTE')
+    expect(stripSgr(transcript)).toContain('◆ running · home missing')
+    expect(stripSgr(transcript)).not.toContain('◇ missing')
     expect(stripSgr(transcript)).toContain('↗ WEB  http://127.0.0.1:47331')
     expect(stripSgr(transcript)).toContain('CAPS     inspect · lifecycle · tunnel')
     expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=0 loads=0 diagnoses=0')

@@ -253,6 +253,27 @@ describe('Supervisor fleet state and presentation', () => {
     expect(output).toContain('unauthorized')
     expect(output).toContain('incompatible')
   })
+
+  it('keeps an active Runtime visible when its AliceProject home is missing', () => {
+    const missingHome = {
+      ...machines()[0]!,
+      projects: [{
+        ...machines()[0]!.projects[0]!,
+        available: false,
+      }],
+    }
+    const output = renderSupervisorFleet(
+      createSupervisorFleetState('2026-08-23T00:00:00Z', [missingHome], 'default'),
+      120,
+      undefined,
+      false,
+      15,
+    ).join('\n')
+
+    expect(output).toContain('◆ running · home missing')
+    expect(output).toContain('↗ WEB  http://127.0.0.1:47331')
+    expect(output).not.toContain('◇ missing')
+  })
 })
 
 function machines(): MachineInventory[] {

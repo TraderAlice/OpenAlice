@@ -688,6 +688,12 @@ function machineGlyph(machine: MachineInventory): string {
 }
 
 function projectStatus(project: MachineProjectInventory, pulse = false): string {
+  if (!project.available && project.runtime.class === 'running') {
+    return '◆ running · home missing'
+  }
+  if (!project.available && project.runtime.class === 'owned_elsewhere') {
+    return '◆ external · home missing'
+  }
   if (!project.available) return '◇ missing'
   const runningGlyph = pulse ? '◉' : '●'
   if (project.runtime.class === 'running') return `${runningGlyph} running`

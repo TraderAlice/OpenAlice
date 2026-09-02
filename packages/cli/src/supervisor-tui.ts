@@ -3513,7 +3513,8 @@ export class SupervisorScreen implements Component {
         return true
       }
       if (matchesKey(data, 'm') && !remote) {
-        if (project) this.onTransferFleet?.(project)
+        if (project?.available) this.onTransferFleet?.(project)
+        else if (project) this.update({ notice: 'Transfer requires an available AliceProject home.' })
         else this.update({ notice: 'Select a local AliceProject to transfer.' })
         return true
       }
@@ -4664,13 +4665,13 @@ function fleetActionBar(
     return renderSupervisorCommandBar(fleet.focus === 'machines'
       ? [
           { key: 'Enter', label: 'Browse projects', primary: true },
-          { key: 'm', label: 'Transfer' },
+          ...(project?.available ? [{ key: 'm' as const, label: 'Transfer' }] : []),
           { key: '↑↓', label: 'Select' },
           { key: '?', label: 'More' },
         ]
       : [
           { key: 'Enter', label: runtime?.class === 'absent' ? 'Start & open' : 'Open', primary: true },
-          { key: 'm', label: 'Transfer' },
+          ...(project?.available ? [{ key: 'm' as const, label: 'Transfer' }] : []),
           { key: '←', label: 'Machines' },
           { key: '?', label: 'More' },
         ], width)

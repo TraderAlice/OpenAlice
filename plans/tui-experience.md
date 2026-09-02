@@ -1167,6 +1167,21 @@ not imply maintainer approval of the finished interaction.
   but the visible control surface describes only truthful current affordances.
   This is an autonomous topic refinement, not a recorded maintainer approval.
 
+### Active Runtime with missing Project home decision
+
+- Keeping `missing` as the sole Fleet status preserves a simple availability
+  rule, but hides a Runtime that the Supervisor has just verified is still
+  serving a Web endpoint.
+- Prioritizing `running` would make the global LIVE state and Fleet row agree,
+  but would conceal that the remembered AliceProject home can no longer support
+  ordinary file-backed project operations.
+- The selected model renders one compound attention state: `running · home
+  missing` or `external · home missing`. The active control route and verified
+  Web endpoint remain visible, while the row no longer presents the project as
+  normally available. A purely missing, inactive project keeps the quieter
+  `missing` state. This is an autonomous topic refinement, not a recorded
+  maintainer approval.
+
 ## Responsive and Accessibility Contract
 
 - `80x24` remains the minimum full experience. Wide terminals show the
@@ -1205,6 +1220,8 @@ already large `supervisor-tui.ts` application controller.
   presentation inside the existing read-only contracts.
 - [x] Upgrade Help, Setup, Project selection, Update, source, and transfer flows
   to consistent overlays and dialogs.
+- [x] Represent an active Runtime whose AliceProject home disappeared as one
+  compound Fleet state without hiding either the live route or missing home.
 - [x] Dogfood the real `pnpm cli` surface across wide, 80x24, and narrow sizes;
   inspect mouse, resize, copy/selection, signal exit, and failure recovery.
 - [x] Run the owning package typecheck and tests, affected tests, full hermetic
@@ -2511,6 +2528,21 @@ already large `supervisor-tui.ts` application controller.
   passed, 10 skipped). Docker installer smoke passes without Node, npm, pnpm,
   Bun, or an Agent Runtime, and package dry-run retains the changed navigation,
   view, and Supervisor owners.
+- A settled 120x32 Fleet audit exposed a cross-state contradiction: the global
+  Dock truthfully reported LIVE and the selected project exposed a verified Web
+  endpoint, while both project surfaces reduced the same selection to
+  `missing`. Fleet now represents that edge as `running · home missing` (or
+  `external · home missing`) so neither live ownership nor the unavailable
+  file-backed home is concealed. Transfer disappears from the Action Shelf and
+  its hidden shortcut refuses the unavailable home; Open remains available for
+  the verified current Runtime route.
+- Compound-Fleet acceptance passes with 124 focused Fleet, screen, and real-PTY
+  tests. The real 120x32 PTY fixture proves the compound status, retained Web
+  route, removed pure-missing claim, passive Selection Constellation, and clean
+  terminal restoration. Root TypeScript and CLI build pass; the 702-file suite
+  passes (701 passed, 1 skipped; 6,212 tests passed, 10 skipped). Docker
+  installer smoke passes without Node, npm, pnpm, Bun, or an Agent Runtime, and
+  package dry-run retains both changed Supervisor owners in the published CLI.
 
 ## Completion Criteria
 

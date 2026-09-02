@@ -2,7 +2,12 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { resolveLaunchContext } from './launch-context.ts'
 import type { MachineFleetEnvelope, MachineInventory } from './machine-inventory.ts'
-import { createSupervisorFleetState, displayWidth, selectedFleetProject } from './supervisor-fleet.ts'
+import {
+  createSupervisorFleetState,
+  displayWidth,
+  selectedFleetProject,
+  setFleetFocus,
+} from './supervisor-fleet.ts'
 import {
   createSupervisorTuiTheme,
   decorateSupervisorActionShelf,
@@ -1164,6 +1169,35 @@ describe('Supervisor TUI screen', () => {
     expect(screen.snapshot.notice).toContain('only for a stopped remote AliceProject')
     expect(screen.handleEscape()).toBe(true)
     expect(screen.snapshot.fleet?.focus).toBe('machines')
+  })
+
+  it('keeps Transfer out of the action shelf when the local Project home is missing', () => {
+    const transfers: string[] = []
+    const local = fleetMachines()[0]!
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'development',
+      runtime: { class: 'running', endpoints: { web: 'http://127.0.0.1:47331' } },
+      panel: 'fleet',
+      fleet: setFleetFocus(createSupervisorFleetState(
+        '2026-08-23T00:00:00Z',
+        [{
+          ...local,
+          projects: [{ ...local.projects[0]!, available: false }],
+        }],
+        'default',
+      ), 'projects'),
+    }, {
+      onTransferFleet: (project) => transfers.push(project.key),
+    })
+
+    const output = screen.render(120).join('\n')
+    expect(output).toContain('◆ running · home missing')
+    expect(output).toContain('[ Enter ] Open')
+    expect(output).not.toContain('[ m ] Transfer')
+    expect(screen.handleKey('m', matchesKey)).toBe(true)
+    expect(transfers).toEqual([])
+    expect(screen.snapshot.notice).toBe('Transfer requires an available AliceProject home.')
   })
 
   it('gives wide Fleet real inventory rows from the live viewport budget', () => {
