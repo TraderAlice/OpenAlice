@@ -102,6 +102,7 @@ export interface SupervisorDockView {
 export interface SupervisorContextTipView {
   panel: string
   runtimeState?: string
+  targetKind?: 'local' | 'ssh'
   recovery?: boolean
   itemCount?: number
 }
@@ -751,7 +752,9 @@ export function renderSupervisorContextTip(
     : view.panel === 'fleet'
       ? 'First click focuses a pane; click its selection again to activate it.'
       : view.panel === 'logs'
-        ? view.itemCount === 0
+        ? view.targetKind === 'ssh'
+          ? 'The Chronicle keeps the SSH forward while r checks endpoint health now.'
+          : view.itemCount === 0
           ? 'No Runtime events in this lens; l reloads the bounded snapshot.'
           : 'y copies the focused safe event; End returns to the latest.'
         : view.panel === 'doctor'

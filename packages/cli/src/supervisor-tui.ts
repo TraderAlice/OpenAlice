@@ -159,6 +159,15 @@ import {
   type SupervisorLogTarget,
   type SupervisorRuntimeLogs as RuntimeLogs,
 } from './supervisor-tui-logs.ts'
+import {
+  appendSupervisorConnectionEvent,
+  createSupervisorConnectionEvent,
+  renderSupervisorConnectionChronicle,
+  type SupervisorConnectionEvent,
+  type SupervisorConnectionEventKind,
+  type SupervisorConnectionEventOrigin,
+  type SupervisorConnectionPhase,
+} from './supervisor-connection-chronicle.ts'
 import { supervisorClipboardPayload } from './supervisor-terminal-clipboard.ts'
 import {
   createSupervisorInboxState,
@@ -194,7 +203,6 @@ import {
   renderSupervisorHeaderLayout,
   renderSupervisorHome,
   renderSupervisorPanel,
-  renderSupervisorSignalScope,
   supervisorCommandTargets,
   type SupervisorCommandTarget,
   type SupervisorHomeHotspotKind,
@@ -358,8 +366,6 @@ export type SupervisorAction =
   | 'apply-update'
 export type { SupervisorConfirmation } from './supervisor-confirmation.ts'
 
-export type SupervisorConnectionPhase = 'connected' | 'checking' | 'degraded' | 'unreachable'
-
 export interface SupervisorConnectionHealth {
   phase: SupervisorConnectionPhase
   consecutiveFailures: number
@@ -399,6 +405,7 @@ export interface SupervisorSnapshot {
   managedSource?: ManagedSourcePlan | null
   fleet?: SupervisorFleetState | null
   activeTarget?: SupervisorActiveTarget | null
+  connectionEvents?: SupervisorConnectionEvent[]
   inbox?: SupervisorInboxSnapshot | null
 }
 
@@ -456,6 +463,7 @@ export interface SupervisorTuiDependencies {
   pollIntervalMs?: number
   connectionPollIntervalMs?: number
   probeTarget?: (endpoint: string) => Promise<boolean>
+  now?: () => number
   seedFleet?: () => Promise<MachineFleetEnvelope>
   inspectFleet?: () => Promise<MachineFleetEnvelope>
   loadMachineRegistry?: () => Promise<MachineRegistrySummary>
@@ -577,7 +585,11 @@ export async function runSupervisorTui(
       diagnostic = diagnostic ?? safeError(error)
     }
   }
+  const now = dependencies.now ?? (() => Date.now())
   let activeTarget = localSupervisorTarget(context, runtime)
+  let connectionEvents: SupervisorConnectionEvent[] = activeTarget
+    ? [createSupervisorConnectionEvent('connected', activeTarget, now(), 'startup')]
+    : []
   let inbox: SupervisorInboxSnapshot | null = null
   const piTui = await (dependencies.loadTui ?? loadPiTui)(dependencies.env)
   const resolvedChannel = dependencies.channel
@@ -614,6 +626,7 @@ export async function runSupervisorTui(
   let fleetRefreshing = false
   let targetProbeRunning = false
   const tunnelControllers = new Map<string, AbortController>()
+  const tunnelCloseOrigins = new Map<string, SupervisorConnectionEventOrigin>()
   let managedStartAction: 'start' | 'start-open' = 'start'
   let closeSourcePrompt: (() => void) | null = null
   let closeSettings: (() => void) | null = null
@@ -864,6 +877,7 @@ export async function runSupervisorTui(
     notice: startupNotice,
     fleet,
     activeTarget: forceHomeStart ? undefined : activeTarget,
+    connectionEvents,
     inbox,
   }, {
     onAction: (action) => {
@@ -1027,6 +1041,18 @@ export async function runSupervisorTui(
   const probeTarget = dependencies.probeTarget
     ?? ((endpoint) => probeOpenAlice(endpoint, { timeoutMs: 1_500 }))
 
+  function recordConnectionEvent(
+    kind: SupervisorConnectionEventKind,
+    target: SupervisorActiveTarget,
+    origin: SupervisorConnectionEventOrigin,
+  ): SupervisorConnectionEvent[] {
+    connectionEvents = appendSupervisorConnectionEvent(
+      connectionEvents,
+      createSupervisorConnectionEvent(kind, target, now(), origin),
+    )
+    return connectionEvents
+  }
+
   function abortRemoteTunnels(exceptKey?: string): void {
     for (const [key, controller] of tunnelControllers) {
       if (key !== exceptKey) controller.abort()
@@ -1044,14 +1070,18 @@ export async function runSupervisorTui(
       diagnostic: undefined,
     })
     if (controller) {
+      tunnelCloseOrigins.set(key, 'user-disconnect')
       controller.abort()
       return
     }
+    recordConnectionEvent('disconnected', target, 'user-disconnect')
     activeTarget = localSupervisorTarget(context, runtime)
+    if (activeTarget) recordConnectionEvent('connected', activeTarget, 'target-switch')
     inbox = null
     screen.update({
       busy: undefined,
       activeTarget: forceHomeStart && !activeTarget ? undefined : activeTarget,
+      connectionEvents,
       inbox,
       panel: activeTarget || forceHomeStart ? 'overview' : 'fleet',
       notice: `Disconnected from ${target.machineName} / ${target.projectName}.`,
@@ -1101,11 +1131,19 @@ export async function runSupervisorTui(
       : failures >= 3 ? 'unreachable' : 'degraded'
     activeTarget = {
       ...activeTarget,
-      health: { phase, consecutiveFailures: failures, checkedAt: Date.now() },
+      health: { phase, consecutiveFailures: failures, checkedAt: now() },
     }
     const transitioned = phase !== previousPhase
+    if (transitioned) {
+      recordConnectionEvent(
+        reachable ? 'recovered' : phase === 'unreachable' ? 'unreachable' : 'degraded',
+        activeTarget,
+        options.manual ? 'manual-retry' : 'automatic-probe',
+      )
+    }
     screen.update({
       activeTarget,
+      connectionEvents,
       ...(reachable ? { diagnostic: undefined } : {}),
       ...(reachable && (previousPhase !== 'connected' || options.manual)
         ? { notice: `Connection to ${target.machineName} / ${target.projectName} is healthy.` }
@@ -1185,10 +1223,18 @@ export async function runSupervisorTui(
         && previousTarget.health?.phase !== undefined
         && previousTarget.health.phase !== 'connected'
         && activeTarget?.kind === 'local'
+      if (activeTarget && !previousTarget) {
+        recordConnectionEvent('connected', activeTarget, 'local-inspection')
+      } else if (localTargetLost && previousTarget) {
+        recordConnectionEvent('stopped', previousTarget, 'local-inspection')
+      } else if (localTargetRecovered && activeTarget) {
+        recordConnectionEvent('recovered', activeTarget, options.manual ? 'manual-retry' : 'local-inspection')
+      }
       const currentFleet = screen.snapshot.fleet
       screen.update({
         runtime: nextRuntime,
         activeTarget: forceHomeStart && !activeTarget ? undefined : activeTarget,
+        connectionEvents,
         inbox,
         ...(activeTarget && !previousTarget && screen.snapshot.panel === 'fleet'
           ? { panel: 'overview' as const, notice: 'Runtime started. Connected to this AliceProject.' }
@@ -1228,10 +1274,18 @@ export async function runSupervisorTui(
         const phase: SupervisorConnectionPhase = failures >= 3 ? 'unreachable' : 'degraded'
         activeTarget = {
           ...activeTarget,
-          health: { phase, consecutiveFailures: failures, checkedAt: Date.now() },
+          health: { phase, consecutiveFailures: failures, checkedAt: now() },
+        }
+        if (phase !== previousPhase) {
+          recordConnectionEvent(
+            phase === 'unreachable' ? 'unreachable' : 'degraded',
+            activeTarget,
+            options.manual ? 'manual-retry' : 'local-inspection',
+          )
         }
         screen.update({
           activeTarget,
+          connectionEvents,
           diagnostic: safeError(error),
           ...(phase !== previousPhase
             ? {
@@ -1298,13 +1352,21 @@ export async function runSupervisorTui(
           services = createServices(dependencies, context)
           runtime = await services.inspect({ homeRoot: context.home, waitMs: 2_000 })
           abortRemoteTunnels()
+          const previousTarget = activeTarget
           const previousEndpoint = activeTarget?.endpoint
           activeTarget = localSupervisorTarget(context, runtime)
+          if (previousTarget && previousTarget.endpoint !== activeTarget?.endpoint) {
+            recordConnectionEvent('disconnected', previousTarget, 'target-switch')
+          }
+          if (activeTarget && previousTarget?.endpoint !== activeTarget.endpoint) {
+            recordConnectionEvent('connected', activeTarget, 'target-switch')
+          }
           if (activeTarget?.endpoint !== previousEndpoint) inbox = null
           screen.update({
             context,
             runtime,
             activeTarget: forceHomeStart && !activeTarget ? undefined : activeTarget,
+            connectionEvents,
             inbox,
             panel: activeTarget || forceHomeStart ? 'overview' : 'fleet',
             fleet: screen.snapshot.fleet
@@ -1335,19 +1397,24 @@ export async function runSupervisorTui(
         return
       }
       if (activeTarget?.kind === 'ssh') {
+        recordConnectionEvent('disconnected', activeTarget, 'target-switch')
         abortRemoteTunnels()
         activeTarget = null
         inbox = null
-        screen.update({ activeTarget, inbox })
+        screen.update({ activeTarget, connectionEvents, inbox })
       }
       const localTarget = localSupervisorTarget(context, runtime)
       if (localTarget) {
         abortRemoteTunnels()
         const previousEndpoint = activeTarget?.endpoint
         activeTarget = localTarget
+        if (activeTarget.endpoint !== previousEndpoint) {
+          recordConnectionEvent('connected', activeTarget, 'target-switch')
+        }
         if (activeTarget.endpoint !== previousEndpoint) inbox = null
         screen.update({
           activeTarget,
+          connectionEvents,
           inbox,
           panel: 'overview',
           notice: `Using ${localTarget.machineName} / ${localTarget.projectName}.`,
@@ -1396,12 +1463,20 @@ export async function runSupervisorTui(
         project,
         signal: controller.signal,
         onReady: ({ localUrl, clientUrl }) => {
+          const previousTarget = activeTarget
+          if (previousTarget && (previousTarget.machineKey !== machine.key
+            || previousTarget.projectKey !== project.key
+            || previousTarget.kind !== 'ssh')) {
+            recordConnectionEvent('disconnected', previousTarget, 'target-switch')
+          }
           abortRemoteTunnels(key)
           updateTunnelState(key, 'connected')
           activeTarget = remoteSupervisorTarget(machine, project, localUrl, clientUrl)
+          recordConnectionEvent('connected', activeTarget, 'ssh-forward')
           inbox = null
           screen.update({
             activeTarget,
+            connectionEvents,
             inbox,
             panel: 'overview',
             notice: `Connected to ${machine.displayName} / ${project.displayName}.`,
@@ -1419,15 +1494,20 @@ export async function runSupervisorTui(
       }
     } finally {
       tunnelControllers.delete(key)
+      const closeOrigin = tunnelCloseOrigins.get(key) ?? 'tunnel-exit'
+      tunnelCloseOrigins.delete(key)
       if (active) {
         clearTunnelState(key)
         if (activeTarget?.kind === 'ssh'
           && activeTarget.machineKey === machine.key
           && activeTarget.projectKey === project.key) {
+          recordConnectionEvent('disconnected', activeTarget, closeOrigin)
           activeTarget = localSupervisorTarget(context, runtime)
+          if (activeTarget) recordConnectionEvent('connected', activeTarget, 'target-switch')
           inbox = null
           screen.update({
             activeTarget: forceHomeStart && !activeTarget ? undefined : activeTarget,
+            connectionEvents,
             inbox,
             panel: activeTarget || forceHomeStart ? 'overview' : 'fleet',
             busy: undefined,
@@ -4617,28 +4697,45 @@ export class SupervisorScreen implements Component {
         row: target.row + rowOffset,
       }))
       lines.push(...inboxView.lines)
-    } else if (this.snapshot.panel === 'logs' && this.snapshot.activeTarget?.kind === 'ssh') {
-      lines.push(...renderRemoteRuntimeTarget(this.snapshot.activeTarget, width, operationalCanvasHeight))
     } else if (this.snapshot.panel === 'logs') {
-      const logs = renderSupervisorLogs(
-        this.snapshot.logs,
-        width,
-        this.logsFromEnd,
-        this.logFilter,
-        this.hoveredLogFromEnd,
-        operationalCanvasHeight,
-        this.hoveredRail?.surface === 'logs' ? this.hoveredRail.trackRow : null,
-      )
-      const rowOffset = lines.length
-      this.logTargets = logs.targets.map((target) => ({
-        ...target,
-        row: target.row + rowOffset,
-      }))
-      this.logRailTargets = logs.railTargets.map((target) => ({
-        ...target,
-        row: target.row + rowOffset,
-      }))
-      lines.push(...logs.lines)
+      const chronicle = this.snapshot.activeTarget
+        ? renderSupervisorConnectionChronicle({
+            target: this.snapshot.activeTarget,
+            events: this.snapshot.connectionEvents ?? [],
+          }, width, this.snapshot.activeTarget.kind === 'ssh' ? operationalCanvasHeight : undefined)
+        : []
+      if (this.snapshot.activeTarget?.kind === 'ssh') {
+        lines.push(...chronicle)
+      } else {
+        if (chronicle.length > 0) lines.push(...chronicle, '')
+        const remainingHeight = Number.isFinite(operationalCanvasHeight)
+          ? Math.max(
+              0,
+              Math.floor(operationalCanvasHeight ?? 0)
+                - chronicle.length
+                - (chronicle.length > 0 ? 1 : 0),
+            )
+          : undefined
+        const logs = renderSupervisorLogs(
+          this.snapshot.logs,
+          width,
+          this.logsFromEnd,
+          this.logFilter,
+          this.hoveredLogFromEnd,
+          remainingHeight,
+          this.hoveredRail?.surface === 'logs' ? this.hoveredRail.trackRow : null,
+        )
+        const rowOffset = lines.length
+        this.logTargets = logs.targets.map((target) => ({
+          ...target,
+          row: target.row + rowOffset,
+        }))
+        this.logRailTargets = logs.railTargets.map((target) => ({
+          ...target,
+          row: target.row + rowOffset,
+        }))
+        lines.push(...logs.lines)
+      }
     } else if (this.snapshot.panel === 'doctor') {
       this.doctorState = normalizeSupervisorDoctorState(
         this.doctorState,
@@ -4765,12 +4862,20 @@ export class SupervisorScreen implements Component {
               { key: '?', label: 'More' },
             ], actionWidth)
         : this.snapshot.panel === 'logs'
-        ? logsActionBar(
-            this.snapshot.logs,
-            this.logFilter,
-            this.logsFromEnd,
-            actionWidth,
-          )
+        ? this.snapshot.activeTarget?.kind === 'ssh'
+          ? remoteRuntimeActionBar(this.snapshot.activeTarget, actionWidth)
+          : this.snapshot.activeTarget && !activeTargetIsReachable(this.snapshot.activeTarget)
+            ? renderSupervisorCommandBar([
+                { key: 'r', label: 'Retry connection', primary: true },
+                { key: 'c', label: 'Connections' },
+                { key: '?', label: 'More' },
+              ], actionWidth)
+          : logsActionBar(
+              this.snapshot.logs,
+              this.logFilter,
+              this.logsFromEnd,
+              actionWidth,
+            )
         : this.snapshot.panel === 'doctor'
           ? doctorActionBar(this.snapshot.doctor, actionWidth)
           : this.snapshot.panel === 'help'
@@ -4828,6 +4933,7 @@ export class SupervisorScreen implements Component {
         : [renderSupervisorContextTip({
           panel: this.snapshot.panel ?? 'overview',
           runtimeState: state,
+          targetKind: this.snapshot.activeTarget?.kind,
           recovery: isConfigRecovery(this.snapshot),
           itemCount: this.snapshot.panel === 'logs'
             ? supervisorFilteredLogCount(this.snapshot.logs, this.logFilter)
@@ -5496,33 +5602,20 @@ function confirmationView(
   }
 }
 
-function renderRemoteRuntimeTarget(
+function remoteRuntimeActionBar(
   target: SupervisorActiveTarget,
   width: number,
-  targetHeight?: number,
 ): string[] {
-  const phase = target.health?.phase ?? 'connected'
-  const healthy = phase === 'connected'
-  return renderSupervisorSignalScope({
-    title: 'Remote Runtime',
-    glyph: healthy ? '●' : phase === 'checking' ? '◌' : phase === 'degraded' ? '!' : '×',
-    state: healthy
-      ? 'SSH FORWARD ACTIVE'
-      : phase === 'checking' ? 'CHECKING ENDPOINT' : phase === 'degraded' ? 'CONNECTION DEGRADED' : 'ENDPOINT UNREACHABLE',
-    meta: `${target.machineName.toUpperCase()} · ${target.projectName.toUpperCase()}`,
-    facts: [
-      { label: 'Machine', value: `${target.machineName} · ${target.machineKey}` },
-      { label: 'AliceProject', value: `${target.projectName} · ${target.projectKey}` },
-      {
-        label: 'Runtime',
-        value: `${phase} · ${target.health?.consecutiveFailures ?? 0} failed probes · SSH forward · ${target.endpoint}`,
-        compactValue: `${phase} · SSH`,
-      },
-    ],
-    action: healthy
-      ? { key: 'o', label: 'Open active Web UI', compactLabel: 'Open Web' }
-      : { key: 'r', label: 'Retry active connection', compactLabel: 'Retry' },
-  }, width, targetHeight)
+  const healthy = activeTargetIsReachable(target)
+  return renderSupervisorCommandBar([
+    healthy
+      ? { key: 'o', label: 'Open Web', primary: true }
+      : { key: 'r', label: 'Retry connection', primary: true },
+    ...(healthy ? [{ key: 'r' as const, label: 'Check now' }] : []),
+    { key: 'c', label: 'Connections' },
+    { key: 'x', label: 'Disconnect' },
+    { key: '?', label: 'More' },
+  ], width)
 }
 
 function actionBar(

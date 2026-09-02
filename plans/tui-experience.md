@@ -153,6 +153,23 @@ not imply maintainer approval of the finished interaction.
   Runtime returns to the Launcher. This is an autonomous topic decision, not
   recorded maintainer approval.
 
+### Runtime-status chronicle decision
+
+- Naming the connected navigation destination Runtime while rendering only a
+  bounded process-log tail leaves the status-manager promise unresolved. A
+  colored health badge says what is true now but cannot explain whether the
+  target was just acquired, degraded, recovered, switched, or released.
+- The selected model makes Runtime a layered status surface. A bounded,
+  session-local Connection Chronicle leads with the exact Machine →
+  AliceProject → transport route, current health, and the valid target action;
+  it records only meaningful target and health transitions rather than every
+  poll. Local Runtime events remain directly below as supporting evidence;
+  remote targets retain a complete Chronicle without pretending local log and
+  Doctor controls apply remotely. The trail is presentation state only: it is
+  not persisted, does not create a second health authority, and never changes
+  lifecycle or tunnel ownership. This is an autonomous topic decision, not
+  recorded maintainer approval.
+
 ### Launchpad action-surface decision
 
 - Keeping the current cockpit and merely recoloring its cards would improve a
@@ -2725,6 +2742,22 @@ already large `supervisor-tui.ts` application controller.
   (702 passed, 1 skipped; 6,235 tests passed, 10 skipped). CLI build, the
   68-file package dry-run, and Docker installer smoke all pass; the installer
   remains independent of Node, npm, pnpm, Bun, and an Agent Runtime.
+- Runtime now begins with a bounded Connection Chronicle instead of presenting
+  a process-log tail as the complete status manager. Wide terminals pair Active
+  Link truth with a newest-first Session Trail; ordinary terminals retain the
+  exact route, two newest transitions, and one valid action. The trail records
+  acquire, release, degraded, unreachable, recovered, and stopped transitions,
+  deduplicates and caps them at twelve, sanitizes target identity, and remains
+  session-local. Local Runtime logs stay directly below as evidence; remote
+  Runtime keeps only Open, Check, Disconnect, Connections, and Help.
+- Chronicle acceptance passes through the complete CLI suite (62 files, 620
+  tests), including all 49 real-PTY cases. The remote PTY visibly traverses
+  degraded → unreachable → recovered, opens Runtime, and proves all four
+  semantic events remain in the live Session Trail while the SSH forward stays
+  owned. `test:affected` passes across 704 files (703 passed, 1 skipped; 6,239
+  tests passed, 10 skipped). CLI build, the 70-file package dry-run, and Docker
+  installer smoke all pass; the packaged installer remains independent of
+  Node, npm, pnpm, Bun, and an Agent Runtime.
 
 ## Completion Criteria
 

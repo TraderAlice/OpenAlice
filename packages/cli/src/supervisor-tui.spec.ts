@@ -260,6 +260,13 @@ describe('Supervisor TUI screen', () => {
     expect(frame).toContain('[ r ] Retry connection')
     expect(screen.handleKey('r', matchesKey)).toBe(true)
     expect(retries).toBe(1)
+
+    screen.update({ panel: 'logs' })
+    const runtimeFrame = screen.render(100).join('\n')
+    expect(runtimeFrame).toContain('Active Link · CONNECTION DEGRADED · LOCAL')
+    expect(runtimeFrame).toContain('1 failed inspections')
+    expect(runtimeFrame).toContain('◆ [ r ] Retry connection')
+    expect(runtimeFrame).not.toContain('[ l ] Reload snapshot')
   })
 
   it('labels source-run, stable, beta, and dev channels from install provenance', async () => {
@@ -2880,6 +2887,12 @@ describe('Supervisor TUI screen', () => {
       kind: 'ssh',
       health: { phase: 'connected', consecutiveFailures: 0 },
     })
+    expect(screen?.snapshot.connectionEvents?.map((event) => event.kind)).toEqual([
+      'connected',
+      'degraded',
+      'unreachable',
+      'recovered',
+    ])
   })
 
   it('degrades local inspection without pretending the Runtime stopped, then recovers', async () => {
@@ -2943,6 +2956,12 @@ describe('Supervisor TUI screen', () => {
       kind: 'local',
       health: { phase: 'connected', consecutiveFailures: 0 },
     })
+    expect(screen?.snapshot.connectionEvents?.map((event) => event.kind)).toEqual([
+      'connected',
+      'degraded',
+      'unreachable',
+      'recovered',
+    ])
   })
 
   it('preserves remote Fleet focus while the selected local Runtime polls', async () => {
@@ -3548,7 +3567,7 @@ describe('Supervisor TUI screen', () => {
     expect(screen.handlePointer({
       button: 64, col: 8, row: 8, release: false, wheel: -1, motion: false, leftClick: false,
     })).toBe(true)
-    expect(screen.render(100).join('\n')).toContain('Runtime · Operate locally')
+    expect(screen.render(100).join('\n')).toContain('Runtime · Read state, then act')
     expect(screen.handlePointer(pointerClick(8, 8))).toBe(true)
     const projectHelp = screen.render(100)
     const setupRow = projectHelp.findIndex((line) => line.includes('[ p ]'))

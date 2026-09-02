@@ -16,9 +16,9 @@ describe('Supervisor Help control atlas', () => {
     expect(output).toContain('Control atlas · 2/3')
     expect(output).toContain('› ● Runtime')
     expect(output).toContain('» ◇ AliceProject')
-    expect(output).toContain('Runtime · Operate locally')
-    expect(output).toContain('[ r ] Restart with confirmation')
-    expect(output).toContain('[ x ] Stop with confirmation')
+    expect(output).toContain('Runtime · Read state, then act')
+    expect(output).toContain('[ r ] Restart local / check remote target')
+    expect(output).toContain('[ x ] Stop local / disconnect remote target')
     expect(rendered.targets).toEqual([
       { index: 0, row: 2, startColumn: 2, endColumn: 31 },
       { index: 1, row: 3, startColumn: 2, endColumn: 31 },
@@ -33,10 +33,10 @@ describe('Supervisor Help control atlas', () => {
     expect(rendered.lines).toHaveLength(22)
     expect(output).toContain('Control Atlas Board · 3 SYSTEMS · POINTER + KEYBOARD')
     expect(output).toContain('· ◆ NAVIGATION  //  MOVE WITH INTENT')
-    expect(output).toContain('› ● RUNTIME  //  OPERATE LOCALLY')
+    expect(output).toContain('› ● RUNTIME  //  READ STATE, THEN ACT')
     expect(output).toContain('» ◇ ALICEPROJECT  //  SHAPE THE WORKSPACE')
     expect(output).toContain('[ Shift+Tab / ← ] Previous view')
-    expect(output).toContain('[ x ] Stop with confirmation')
+    expect(output).toContain('[ x ] Stop local / disconnect remote target')
     expect(output).toContain('[ / ] Open the Command Dock')
     expect(rendered.targets.filter((target) => target.index === 0)).toHaveLength(4)
     expect(rendered.targets.filter((target) => target.index === 1)).toHaveLength(6)

@@ -193,6 +193,8 @@ export function decorateSupervisorFrame(
     if (line.includes('│ × ')) return theme.danger(line)
     if (line.includes('│ ! ')) return theme.warning(line)
     if (line.includes('│ ✓ ')) return theme.success(line)
+    if (line.includes('│ ● ')) return theme.success(line)
+    if (line.includes('│ ○ ')) return theme.muted(line)
     if (line.includes('│ ● LIVE SESSION')) return theme.successRail(line)
     if (line.includes('│ ◆ LIVE RUNTIME · PROJECT HOME MISSING')) return theme.warningRail(line)
     if (line.includes('│ ◆ CONNECTION DEGRADED')) return theme.warningRail(line)
@@ -308,7 +310,11 @@ export function decorateSupervisorFramedColumns(
                       ? theme.warning
                       : semantic.startsWith('✓ ')
                         ? theme.success
-                        : undefined
+                        : semantic.startsWith('● ')
+                          ? theme.success
+                          : semantic.startsWith('○ ')
+                            ? theme.muted
+                            : undefined
     if (!style) return column
     const trailing = column.slice(trimmed.length)
     return `│ ${style(content)} │${trailing}`

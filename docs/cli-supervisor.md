@@ -456,6 +456,15 @@ intentionally parameter-free:
   read/unread state, polls every 20 seconds, and offers no delete action. Help
   remains available through `?`; Doctor remains a Runtime tool rather than a
   top-level product destination;
+- Runtime is a layered status-manager surface rather than a renamed log tail.
+  Its bounded, session-local Connection Chronicle leads with the active
+  Machine → AliceProject route, loopback or SSH-forward transport, current
+  endpoint health, failed-check count, and the valid Open or Retry action. It
+  records only meaningful acquire, release, degraded, unreachable, recovered,
+  and stopped transitions, keeps at most twelve newest events, sanitizes target
+  identity, and is never persisted. Local Runtime log evidence remains directly
+  below the Chronicle; remote targets show the complete Chronicle and only
+  remote-safe Open, Check, Disconnect, Connections, and Help actions;
 - `x` stops and `r` restarts only a `cli-server` owner, after an impact
   confirmation;
 - `l` reads the bounded, redacted log tail;

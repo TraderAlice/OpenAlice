@@ -202,6 +202,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       let output = ''
       let connected = false
       let unreachable = false
+      let openedRuntime = false
       let exiting = false
       const timeout = setTimeout(() => {
         child.kill()
@@ -217,7 +218,15 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           child.write('\r')
         } else if (connected && !unreachable && plain.includes('× UNREACHABLE')) {
           unreachable = true
-        } else if (!exiting && unreachable && plain.includes('Connection to Cloud Lab / Research is healthy.')) {
+        } else if (!openedRuntime && unreachable && plain.includes('Connection to Cloud Lab / Research is healthy.')) {
+          openedRuntime = true
+          child.write('\u001b[D')
+        } else if (!exiting
+          && openedRuntime
+          && plain.includes('Session Trail')
+          && plain.includes('RECOVERED')
+          && plain.includes('UNREACHABLE')
+          && plain.includes('DEGRADED')) {
           exiting = true
           child.write('q')
         }
@@ -234,6 +243,9 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(plain).toContain('× UNREACHABLE')
     expect(plain).toContain('[ r ] Retry connection')
     expect(plain).toContain('Connection to Cloud Lab / Research is healthy.')
+    expect(plain).toContain('Active Link · CONNECTED · REMOTE')
+    expect(plain).toContain('Session Trail')
+    expect(plain).toContain('RECOVERED')
     expect(plain).toContain('FIXTURE_RESULT starts=0 opens=0 loads=0 diagnoses=0 disconnects=1 probes=4')
     expect(transcript).toContain('\u001b[?25h')
   }, 12_000)
@@ -1095,10 +1107,10 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         } else if (!hovered && plain.includes('Control Atlas Board · 3 SYSTEMS')) {
           hovered = true
           child.write('\u001b[<35;70;16M')
-        } else if (!selected && plain.includes('» ● RUNTIME  //  OPERATE LOCALLY')) {
+        } else if (!selected && plain.includes('» ● RUNTIME  //  READ STATE, THEN ACT')) {
           selected = true
           child.write('\u001b[<0;70;16M')
-        } else if (selected && plain.includes('› ● RUNTIME  //  OPERATE LOCALLY')) {
+        } else if (selected && plain.includes('› ● RUNTIME  //  READ STATE, THEN ACT')) {
           child.write('q')
         }
       })
@@ -1109,8 +1121,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       })
     })
 
-    expect(stripSgr(transcript)).toContain('» ● RUNTIME  //  OPERATE LOCALLY')
-    expect(stripSgr(transcript)).toContain('› ● RUNTIME  //  OPERATE LOCALLY')
+    expect(stripSgr(transcript)).toContain('» ● RUNTIME  //  READ STATE, THEN ACT')
+    expect(stripSgr(transcript)).toContain('› ● RUNTIME  //  READ STATE, THEN ACT')
     expect(stripSgr(transcript)).toContain('[ / ] Open the Command Dock')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
