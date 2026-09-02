@@ -162,6 +162,9 @@ export function decorateSupervisorFrame(
     if (splitFramedColumns(line).length > 1) {
       return decorateSupervisorFramedColumns(line, theme)
     }
+    if (splitFramedHeaderColumns(line).length > 1) {
+      return decorateSupervisorFramedHeaders(line, theme)
+    }
     if (/^[⠀-⣿◆]  WORKING /u.test(line)) return theme.busyRail(line)
     if (line.startsWith('✓  READY')) return theme.successRail(line)
     if (line.startsWith('!  NOTICE')) return theme.warningRail(line)
@@ -238,17 +241,32 @@ export function decorateSupervisorFramedColumns(
               ? theme.successRail
               : semantic.startsWith('◆ LAUNCH READY')
                 ? theme.infoRail
-                : semantic.startsWith('× ')
-                  ? theme.danger
-                  : semantic.startsWith('! ')
-                    ? theme.warning
-                    : semantic.startsWith('✓ ')
-                      ? theme.success
-                      : undefined
+                : semantic.startsWith('◁ ')
+                  ? theme.accentStrong
+                  : semantic.startsWith('× ')
+                    ? theme.danger
+                    : semantic.startsWith('! ')
+                      ? theme.warning
+                      : semantic.startsWith('✓ ')
+                        ? theme.success
+                        : undefined
     if (!style) return column
     const trailing = column.slice(trimmed.length)
     return `│ ${style(content)} │${trailing}`
   }).join('   ')
+}
+
+export function decorateSupervisorFramedHeaders(
+  line: string,
+  theme: SupervisorTuiTheme,
+): string {
+  return splitFramedHeaderColumns(line).map((column) => (
+    column.includes('◆ ')
+      ? theme.accentStrong(column)
+      : column.includes('◇ ')
+        ? theme.muted(column)
+        : theme.accent(column)
+  )).join('   ')
 }
 
 function decorateBrandMarkLine(
@@ -327,6 +345,10 @@ function isSingleSupervisorActionShelf(line: string): boolean {
 
 function splitFramedColumns(line: string): string[] {
   return line.split(/(?<=│) {3}(?=│)/u)
+}
+
+function splitFramedHeaderColumns(line: string): string[] {
+  return line.split(/(?<=╮) {3}(?=╭)/u)
 }
 
 function decorateDock(

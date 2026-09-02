@@ -184,8 +184,19 @@ export function renderSupervisorFleet(
   const rightWidth = Math.max(1, width - leftWidth - gap)
   const machine = selectedFleetMachine(state)
   const projectIndex = machine ? state.selectedProjects[machine.key] ?? 0 : 0
-  const machineRows = renderMachineRows(state, leftWidth - 4, hovered)
-  const projectRows = renderProjectRows(state, rightWidth - 4, hovered, pulse)
+  const machineRows = renderMachineRows(
+    state,
+    leftWidth - 4,
+    hovered,
+    state.focus === 'machines',
+  )
+  const projectRows = renderProjectRows(
+    state,
+    rightWidth - 4,
+    hovered,
+    pulse,
+    state.focus === 'projects',
+  )
   const leftPane = renderPane(
     `Machines · ${positionLabel(state.selectedMachine, state.machines.length)}`,
     machineRows,
@@ -223,7 +234,7 @@ function renderNarrowFleet(
     return [
       ...renderPane(
         `Machines · ${positionLabel(state.selectedMachine, state.machines.length)}`,
-        renderMachineRows(state, width - 4, hovered),
+        renderMachineRows(state, width - 4, hovered, true),
         width,
         true,
       ),
@@ -234,7 +245,7 @@ function renderNarrowFleet(
   return [
     ...renderPane(
       `AliceProjects · ${machine?.displayName ?? 'none'} · ${positionLabel(state.selectedProjects[machine?.key ?? ''] ?? 0, machine?.projects.length ?? 0)}`,
-      renderProjectRows(state, width - 4, hovered, pulse),
+      renderProjectRows(state, width - 4, hovered, pulse, true),
       width,
       true,
     ),
@@ -283,12 +294,15 @@ function renderMachineRows(
   state: SupervisorFleetState,
   width: number,
   hovered?: SupervisorFleetPointerTarget,
+  focused = true,
 ): string[] {
   if (state.machines.length === 0) return ['  No Machines registered']
   const start = visibleWindowStart(state.machines.length, state.selectedMachine, FLEET_VISIBLE_ROWS)
   const rows = visibleWindow(state.machines, state.selectedMachine, FLEET_VISIBLE_ROWS).map(({ item, index }) => {
     const selected = index === state.selectedMachine
-    const prefix = selected ? '› ' : hovered?.focus === 'machines' && hovered.index === index ? '» ' : '  '
+    const prefix = selected
+      ? focused ? '▶ ' : '◁ '
+      : hovered?.focus === 'machines' && hovered.index === index ? '» ' : '  '
     const status = machineStatus(item)
     const count = item.connection === 'local' || item.connection === 'online'
       ? `${machineGlyph(item)} ${item.projects.length}`
@@ -303,6 +317,7 @@ function renderProjectRows(
   width: number,
   hovered?: SupervisorFleetPointerTarget,
   pulse = false,
+  focused = true,
 ): string[] {
   const machine = selectedFleetMachine(state)
   if (!machine) return ['  Select a Machine']
@@ -314,7 +329,7 @@ function renderProjectRows(
   const start = visibleWindowStart(machine.projects.length, selectedIndex, FLEET_VISIBLE_ROWS)
   const rows = visibleWindow(machine.projects, selectedIndex, FLEET_VISIBLE_ROWS).map(({ item, index }) => {
     const prefix = index === selectedIndex
-      ? '› '
+      ? focused ? '▶ ' : '◁ '
       : hovered?.focus === 'projects' && hovered.index === index ? '» ' : '  '
     const marks = [
       item.isDefault ? 'default' : '',
@@ -344,19 +359,20 @@ function fleetSelectionDetail(state: SupervisorFleetState, pulse = false): strin
 }
 
 function renderDetailCard(state: SupervisorFleetState, width: number, pulse = false): string[] {
-  return renderPane('Selection', fleetSelectionDetail(state, pulse), width, false, 2)
+  return renderPane('Selection', fleetSelectionDetail(state, pulse), width, undefined, 2)
 }
 
 function renderPane(
   title: string,
   rows: string[],
   width: number,
-  focused: boolean,
+  focused?: boolean,
   rowCount = FLEET_VISIBLE_ROWS,
 ): string[] {
   const safeWidth = Math.max(12, width)
   const innerWidth = safeWidth - 4
-  const titleText = ` ${focused ? '◆ ' : ''}${title} `
+  const titlePrefix = focused === true ? '◆ ' : focused === false ? '◇ ' : ''
+  const titleText = ` ${titlePrefix}${title} `
   const topFill = Math.max(0, safeWidth - displayWidth(titleText) - 2)
   const body = Array.from({ length: rowCount }, (_, index) => rows[index] ?? '')
   return [

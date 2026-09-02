@@ -7,6 +7,7 @@ import {
   createSupervisorTuiTheme,
   decorateSupervisorActionShelf,
   decorateSupervisorFramedColumns,
+  decorateSupervisorFramedHeaders,
   decorateSupervisorFrame,
 } from './supervisor-tui-theme.ts'
 import {
@@ -895,6 +896,20 @@ describe('Supervisor TUI screen', () => {
     )).toBe(selected)
   })
 
+  it('styles active and contextual Fleet pane headers independently', () => {
+    const theme = createSupervisorTuiTheme({ TERM: 'xterm-256color' })
+    const line = '╭ ◆ Machines · 1/2 ─────────╮   ╭ ◇ AliceProjects · This Mac · 1/1 ─────╮'
+    const decorated = decorateSupervisorFramedHeaders(line, theme)
+
+    expect(decorated).toContain('\u001b[1;38;2;116;235;226m╭ ◆ Machines')
+    expect(decorated).toContain('\u001b[38;2;116;132;153m╭ ◇ AliceProjects')
+    expect(decorated.replace(/\u001b\[[0-9;]*m/gu, '')).toBe(line)
+    expect(decorateSupervisorFramedHeaders(
+      line,
+      createSupervisorTuiTheme({ TERM: 'xterm-256color', NO_COLOR: '1' }),
+    )).toBe(line)
+  })
+
   it('keeps wide Overview, Fleet, Logs, Doctor, and Help focus inside its owning pane', () => {
     const theme = createSupervisorTuiTheme({ TERM: 'xterm-256color' })
     const selectedEscape = '\u001b[1;38;2;230;255;252;48;2;24;64;69m'
@@ -925,12 +940,14 @@ describe('Supervisor TUI screen', () => {
       runtime: { class: 'absent', endpoints: {} },
       fleet: createSupervisorFleetState('2026-09-02T00:00:00Z', fleetMachines(), 'default'),
     }, { theme, motionEnabled: false }).render(100)
-    const fleetRow = fleet.find((line) => plain(line).includes('› This computer'))
+    const fleetRow = fleet.find((line) => plain(line).includes('▶ This computer'))
     expect(fleetRow).toBeDefined()
     const fleetColumns = columnsFor(fleetRow!)
     expect(fleetColumns).toHaveLength(2)
     expect(fleetColumns[0]).toContain(selectedEscape)
-    expect(fleetColumns[1]).toContain(selectedEscape)
+    expect(plain(fleetColumns[1]!)).toContain('◁ Default AliceProject')
+    expect(fleetColumns[1]).toContain('\u001b[1;38;2;116;235;226m')
+    expect(fleetColumns[1]).not.toContain('48;2;24;64;69m')
     expect(fleetRow).toContain('\u001b[0m │   │ ')
 
     const logs = new SupervisorScreen({

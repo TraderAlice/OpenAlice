@@ -39,12 +39,32 @@ describe('Supervisor fleet state and presentation', () => {
     expect(lines.every((line) => displayWidth(line) <= 80)).toBe(true)
   })
 
+  it('distinguishes active focus from the related inactive selection', () => {
+    let state = createSupervisorFleetState('2026-08-23T00:00:00Z', machines())
+    const machinesFocused = renderSupervisorFleet(state, 100).join('\n')
+    expect(machinesFocused).toContain('╭ ◆ Machines · 1/2')
+    expect(machinesFocused).toContain('╭ ◇ AliceProjects · This Mac · 1/1')
+    expect(machinesFocused).toContain('│ ▶ This Mac')
+    expect(machinesFocused).toContain('│ ◁ Default AliceProject')
+    expect(machinesFocused).toContain('╭ Selection ')
+
+    state = setFleetFocus(state, 'projects')
+    const projectsFocused = renderSupervisorFleet(state, 100).join('\n')
+    expect(projectsFocused).toContain('╭ ◇ Machines · 1/2')
+    expect(projectsFocused).toContain('╭ ◆ AliceProjects · This Mac · 1/1')
+    expect(projectsFocused).toContain('│ ◁ This Mac')
+    expect(projectsFocused).toContain('│ ▶ Default AliceProject')
+    expect(projectsFocused).not.toContain('◇ Selection')
+  })
+
   it('uses a narrow drill-down and handles wide Unicode labels', () => {
     let state = createSupervisorFleetState('2026-08-23T00:00:00Z', machines())
     expect(renderSupervisorFleet(state, 40).join('\n')).toContain('◆ Machines · 1/2')
+    expect(renderSupervisorFleet(state, 40).join('\n')).toContain('▶ This Mac')
     state = setFleetFocus(state, 'projects')
     const lines = renderSupervisorFleet(state, 40)
     expect(lines.join('\n')).toContain('◆ AliceProjects · This Mac')
+    expect(lines.join('\n')).toContain('▶ Default Alice')
     expect(lines.every((line) => displayWidth(line) <= 40)).toBe(true)
   })
 

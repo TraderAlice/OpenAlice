@@ -134,6 +134,21 @@ not imply maintainer approval of the finished interaction.
   `NO_COLOR` output keep their current byte contract. This is an autonomous
   topic decision, not a recorded maintainer approval.
 
+### Fleet pane-focus hierarchy decision
+
+- Keeping both selected Machine and selected AliceProject as identical strong
+  background rows preserves their relationship, but makes the arrow-key owner
+  ambiguous in the wide two-pane hierarchy.
+- Highlighting only the active row would clarify focus but make the related
+  selection in the other pane disappear as users move between hierarchy levels.
+- The selected model follows OMP's focused-container hierarchy with terminal-
+  native semantics: the active pane uses a `◆` title and `▶` selected row with
+  the strong focus surface; the inactive pane uses a `◇` title and `◁` related
+  row with foreground-only context. Hover remains `»`, clicking a pane moves
+  the same existing focus state, narrow drill-down keeps one active pane, and
+  `NO_COLOR` preserves the hierarchy through glyphs alone. This is an
+  autonomous topic decision, not a recorded maintainer approval.
+
 ### Global command discovery decision
 
 - Restyling the legacy detach hint would improve finish but not discoverability.
@@ -743,6 +758,8 @@ already large `supervisor-tui.ts` application controller.
   layouts compose adjacent cards.
 - [x] Contain split-pane selection, hover, diagnostic, and launch-intent styling
   inside the owning framed column.
+- [x] Separate Fleet's active keyboard/pointer pane from its related inactive
+  selection with container and row-level focus hierarchy.
 - [x] Replace the legacy global shortcut hint with a clickable command dock and
   contextual `/` Command Deck.
 - [x] Project structured Runtime logs into semantic event rows while preserving
@@ -1479,6 +1496,20 @@ already large `supervisor-tui.ts` application controller.
   passed, 1 skipped; 6,155 tests passed, 10 skipped). Docker installer smoke
   passes without Node, npm, pnpm, Bun, or an Agent Runtime, and package dry-run
   contains the changed TUI theme source.
+- A live OMP v17.3.4 comparison and real Fleet walk exposed that two identical
+  strong selections hid which pane owned arrow-key input. Fleet now renders the
+  active pane as `◆` + `▶`, the related inactive context as `◇` + `◁`, and
+  leaves non-focus information cards unmarked. Enter, left-arrow, and pointer
+  selection transfer the same existing focus owner without changing actions.
+- Fleet-focus acceptance passes with 102 focused screen and real-PTY tests.
+  Real truecolor 100×30 input moved focus Machine → AliceProject → Machine →
+  AliceProject by keyboard and pointer across local and remote inventory; a
+  real 46×30 `NO_COLOR` session preserved the single-pane drill-down hierarchy.
+  Both restored cursor, bracketed-paste, mouse, and alternate-screen modes on
+  detach. CLI build/typecheck and root TypeScript pass; the 699-file suite
+  passes (698 passed, 1 skipped; 6,157 tests passed, 10 skipped). Docker
+  installer smoke passes without Node, npm, pnpm, Bun, or an Agent Runtime, and
+  package dry-run contains the changed Fleet and TUI theme sources.
 
 ## Completion Criteria
 

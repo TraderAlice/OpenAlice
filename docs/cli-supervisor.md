@@ -157,7 +157,12 @@ path is intentionally parameter-free:
   keep the action/detach footer visible at the supported 80×24 baseline.
   Overflowing Machine and AliceProject panes reserve their final content column
   for a proportional `│` track and `█` thumb, exposing each pane's independent
-  window position without changing keyboard or pointer selection.
+  window position without changing keyboard or pointer selection. In the wide
+  hierarchy, the active pane uses a `◆` title and `▶` strong selection while
+  the related inactive pane uses a `◇` title and foreground-only `◁` context.
+  Enter, left-arrow, or pointer selection moves that same focus owner; narrow
+  drill-down retains one active pane, and `NO_COLOR` keeps the distinction in
+  the glyphs.
   Background refresh of the selected local Runtime updates its inventory row
   without moving a user who is inspecting another Machine or AliceProject;
 - the top-level chrome is a three-row Mission Header: a framed brand/release
