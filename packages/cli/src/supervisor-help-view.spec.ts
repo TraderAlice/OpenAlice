@@ -65,14 +65,26 @@ describe('Supervisor Help control atlas', () => {
     const rendered = renderSupervisorHelp({ selected: 2, hovered: null }, false, 46)
     const output = rendered.lines.join('\n')
 
-    expect(output).toContain('Control atlas · 3/3 · AliceProject')
+    expect(output).toContain('Help · START · SEARCH · SWITCH · 3/3')
+    expect(output).toContain('NOW · [ Enter ] Act')
+    expect(output).toContain('[ / ] Find · [ i ] AliceProject')
     expect(output).toContain('› ◇ AliceProject')
     expect(output).toContain('[ i ] Choose or create an AliceProject')
     expect(output).toContain('[ / ] Open the Command Dock')
     expect(output).toContain('◆ [ ? ] Close Help')
     expect(rendered.targets).toHaveLength(3)
+    expect(rendered.targets[0]?.row).toBe(4)
     expect(rendered.lines.every((line) => displayWidth(line) <= 46)).toBe(true)
     expect(rendered.lines.length).toBeLessThanOrEqual(16)
+
+    const baseline = renderSupervisorHelp({ selected: 0, hovered: null }, false, 80, 19)
+    const baselineOutput = baseline.lines.join('\n')
+    expect(baselineOutput).toContain('Help · START · SEARCH · SWITCH · 1/3')
+    expect(baselineOutput).toContain(
+      'NOW · [ Enter ] Start/connect/open · [ / ] Find · [ i ] AliceProject',
+    )
+    expect(baseline.targets[0]?.row).toBe(3)
+    expect(baseline.lines.length).toBeLessThanOrEqual(19)
   })
 
   it('wraps keyboard movement, clamps wheel movement, and selects boundaries', () => {

@@ -224,17 +224,30 @@ function renderStackedHelp(
   recovery: boolean,
   width: number,
 ): SupervisorHelpRender {
+  const fastRouteRows = recovery
+    ? []
+    : width >= 64
+      ? [
+          'NOW · [ Enter ] Start/connect/open · [ / ] Find · [ i ] AliceProject',
+        ]
+      : [
+          'NOW · [ Enter ] Act',
+          '[ / ] Find · [ i ] AliceProject',
+        ]
   const selectorRows = groupRows(groups, state)
   const lines = renderSupervisorPanel(
-    recovery ? 'Safe controls' : 'Control atlas',
-    `${state.selected + 1}/${groups.length} · ${selected.title}`,
+    recovery ? 'Safe controls' : 'Help',
+    recovery
+      ? `${state.selected + 1}/${groups.length} · ${selected.title}`
+      : `START · SEARCH · SWITCH · ${state.selected + 1}/${groups.length}`,
     [
+      ...fastRouteRows,
       ...selectorRows,
       '',
       `${selected.glyph} ${selected.title.toUpperCase()} · ${selected.summary}`,
       selected.description,
       ...selected.commands.map((command) => `[ ${command.key} ] ${command.label}`),
-      ...(!recovery ? ['', CLOSE_HELP_ACTION] : []),
+      ...(!recovery ? [...(width < 64 ? [] : ['']), CLOSE_HELP_ACTION] : []),
     ],
     width,
   )
@@ -242,7 +255,7 @@ function renderStackedHelp(
     lines,
     targets: groups.map((_, index) => ({
       index,
-      row: index + 2,
+      row: fastRouteRows.length + index + 2,
       startColumn: 2,
       endColumn: Math.max(2, width - 1),
     })),

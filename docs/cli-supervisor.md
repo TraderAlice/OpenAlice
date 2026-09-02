@@ -443,7 +443,11 @@ intentionally parameter-free:
   explains only the selected system and presents its complete command list.
   Description text wraps instead of being silently truncated. Ordinary
   terminals split those groups from the selected group's explanation and
-  visible keycaps; narrower terminals stack the same focus model.
+  visible keycaps; narrower terminals stack the same focus model. The compact
+  card retains the task-led `Help · START · SEARCH · SWITCH` identity and leads
+  with one responsive Fast-routes row for contextual Enter, `/` command search,
+  and `i` AliceProject selection before presenting the reference groups. At
+  very narrow widths that row becomes two lines rather than truncating a route.
   Arrow/Home/End keys, wheel movement, and whole-row pointer hover/click share
   one selection. Keycaps in the inspector remain direct command targets rather
   than enlarging the system-selection hit area. Ordinary Help owns a final

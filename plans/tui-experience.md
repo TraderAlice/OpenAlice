@@ -3449,6 +3449,28 @@ already large `supervisor-tui.ts` application controller.
   real-PTY tests (including all 54 PTY cases), and the complete CLI suite (63
   files, 638 tests). CLI typecheck and build also pass.
 
+### Compact Help task-entry decision
+
+- Cell-accurate 120x32 and 80x24 captures exposed a responsive priority
+  inversion: wide Help led with Start/Connect/Open, command search, and
+  AliceProject selection, while the compact baseline removed all three and
+  opened on the Navigation reference. The terminal most likely to need concise
+  guidance therefore received the least task-oriented first screen.
+- Compact Help now shares the wide console's `START · SEARCH · SWITCH` identity
+  and places contextual Enter, `/` command search, and `i` AliceProject
+  selection before its Navigation/Runtime/AliceProject inspector. The 80-column
+  route uses one row; very narrow terminals use two complete rows.
+- Category selection, complete group commands, recovery-safe Help, keyboard and
+  wheel movement, whole-row hover/click, direct key dispatch, and the content-
+  owned Close Help action are unchanged. Pointer rows derive from the final
+  responsive Fast-route height instead of a fixed offset.
+- Real 120x32 and 80x24 captures verify parity without growing the widest Help
+  console or exceeding the compact Operational Canvas. Maintainer acceptance
+  remains pending on the retained feature branch.
+- Compact-Help-task-entry acceptance passes through all 138 Help, screen, and
+  real-PTY tests (including all 54 PTY cases), and the complete CLI suite (63
+  files, 638 tests). CLI typecheck and build also pass.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

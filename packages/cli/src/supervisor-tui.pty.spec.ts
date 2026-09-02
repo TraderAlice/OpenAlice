@@ -1242,15 +1242,15 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         if (!clicked && output.includes('◆ [Home]')) {
           clicked = true
           child.write('?')
-        } else if (!inspected && clicked && output.includes('Control atlas · 1/3 · Navigation')) {
+        } else if (!inspected && clicked && output.includes('Help · START · SEARCH · SWITCH · 1/3')) {
           inspected = true
-          child.write('\u001b[<35;10;7M')
-          child.write('\u001b[<0;10;7M')
-        } else if (!closing && inspected && output.includes('Control atlas · 2/3 · Runtime')) {
+          child.write('\u001b[<35;10;8M')
+          child.write('\u001b[<0;10;8M')
+        } else if (!closing && inspected && output.includes('Help · START · SEARCH · SWITCH · 2/3')) {
           closing = true
           closeOffset = output.length
-          child.write('\u001b[<35;10;21M')
-          child.write('\u001b[<0;10;21M')
+          child.write('\u001b[<35;10;22M')
+          child.write('\u001b[<0;10;22M')
         } else if (closing && !closed && output.slice(closeOffset).includes('Alice Session · OpenAlice')) {
           closed = true
           child.write('q')
@@ -1263,8 +1263,9 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       })
     })
 
-    expect(transcript).toContain('Control atlas · 1/3 · Navigation')
-    expect(transcript).toContain('Control atlas · 2/3 · Runtime')
+    expect(transcript).toContain('Help · START · SEARCH · SWITCH · 1/3')
+    expect(transcript).toContain('Help · START · SEARCH · SWITCH · 2/3')
+    expect(transcript).toContain('NOW · [ Enter ] Start/connect/open')
     expect(transcript).toContain('[ ? ] Close Help')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
@@ -1534,7 +1535,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         if (!openedHelp && output.includes('[ / ] Commands') && output.includes('[ q ] Detach')) {
           openedHelp = true
           child.write('?')
-        } else if (!detached && output.includes('Control atlas · 1/3 · Navigation')) {
+        } else if (!detached && output.includes('Help · START · SEARCH · SWITCH · 1/3')) {
           detached = true
           child.write('q')
         }
@@ -1549,7 +1550,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('OpenAlice Supervisor')
     expect(transcript).toContain(`v${cliVersion} · DEV`)
     expect(transcript).toContain('○ STOPPED')
-    expect(transcript).toContain('Control atlas · 1/3 · Navigation')
+    expect(transcript).toContain('Help · START · SEARCH · SWITCH · 1/3')
+    expect(transcript).toContain('NOW · [ Enter ] Start/connect/open')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   })
