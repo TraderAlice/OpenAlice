@@ -187,7 +187,6 @@ export function decorateSupervisorFrame(
       return decorateFocusHeader(line, theme, options.hoveredCommand?.label)
     }
     if (index === 1) return decorateTabs(line, theme, options.panel, options.hoveredPanel)
-    if (index === 2) return decorateNavigationBeaconRail(line, theme)
     if (line.startsWith('› ') || line.startsWith('▶ ') || line.includes('│ › ')) return theme.selected(line)
     if (line.includes('│ » ')) return theme.accent(line)
     if (line.includes('│ × ')) return theme.danger(line)
@@ -562,9 +561,10 @@ function decorateTabs(
   hoveredPanel?: string,
 ): string {
   const labels: Record<string, string[]> = {
-    fleet: ['Machines', 'Fleet'],
-    overview: ['Overview', 'Home'],
-    logs: ['Logs'],
+    fleet: ['Machines', 'Fleet', 'Connections', 'Connect', 'Link'],
+    overview: ['Overview', 'Home', 'Recovery'],
+    inbox: ['Inbox'],
+    logs: ['Logs', 'Runtime', 'Run'],
     doctor: ['Doctor', 'Doc'],
     help: ['Help'],
   }
@@ -578,27 +578,18 @@ function decorateTabs(
       candidates.some((label) => content.includes(label))
     ))?.[0]
     const style = panel === selectedPanel
-      ? theme.selected
-      : panel === hoveredPanel
+      ? theme.accentStrong
+      : hoveredPanel !== undefined && panel === hoveredPanel
         ? theme.navigationHover
-        : theme.navigationRail
+        : theme.muted
     const suffix = index < parts.length - 1 ? ' │ ' : ''
     return [
       style(content),
-      padding ? theme.navigationRail(padding) : '',
-      suffix ? theme.navigationRail(suffix) : '',
+      padding ? theme.muted(padding) : '',
+      suffix ? theme.muted(suffix) : '',
     ].join('')
   }).join('')
   return framed
-    ? `${theme.navigationRail('│ ')}${decorated}${theme.navigationRail(' │')}`
+    ? `${theme.muted('│ ')}${decorated}${theme.muted(' │')}`
     : decorated
-}
-
-function decorateNavigationBeaconRail(
-  line: string,
-  theme: SupervisorTuiTheme,
-): string {
-  const beacon = line.indexOf('┬')
-  if (beacon < 0) return theme.muted(line)
-  return `${theme.muted(line.slice(0, beacon))}${theme.accentStrong('┬')}${theme.muted(line.slice(beacon + 1))}`
 }

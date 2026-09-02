@@ -1938,16 +1938,16 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         } else if (!selectedRemote && output.includes('Cloud fixture') && output.includes('offline')) {
           selectedRemote = true
           child.resize(48, 24)
-          child.write('\u001b[B\u001b[C')
+          setTimeout(() => child.write('\u001b[B\u001b[C'), 120)
         } else if (!drilledDown && output.includes('AliceProjects · Cloud fixture')) {
           drilledDown = true
           returnOffset = output.length
-          child.write('\u001b[D')
+          setTimeout(() => child.write('\u001b[D'), 120)
         } else if (
           drilledDown
           && !returned
           && output.slice(returnOffset).includes('Machines · ')
-          && output.slice(returnOffset).includes('[ Enter ] Browse projects')
+          && output.slice(returnOffset).includes('▶ Cloud fixture')
         ) {
           returned = true
           child.write('q')

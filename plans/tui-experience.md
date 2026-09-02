@@ -1542,10 +1542,10 @@ already large `supervisor-tui.ts` application controller.
   top-anchored facts and a bottom-anchored primary action.
 - [x] Turn every overflowing Logs, Doctor, Machine, and AliceProject rail into
   one hoverable, clickable, left-drag Rail Navigator.
-- [x] Replace the disconnected title/divider/tabs stack with a same-height
-  Mission Header that frames brand, release provenance, and clickable navigation.
-- [x] Anchor the active view with a reduced-motion-safe beacon that travels
-  along the Mission Header rail instead of animating operational page content.
+- [x] Collapse the title/divider/tabs stack into a two-row Mission Rail that
+  frames brand, release provenance, and clickable navigation.
+- [x] Remove the decorative traveling View Beacon so selected state changes
+  immediately through foreground emphasis, brackets, and pointer hover.
 - [x] Turn Mission Header release provenance into a responsive whole-segment
   Release Control backed by the existing Observatory path.
 - [x] Replace expanding feedback rows with a stable single-line activity slot.
@@ -2950,6 +2950,34 @@ already large `supervisor-tui.ts` application controller.
 - Single-spine acceptance passes through 101 focused screen and renderer tests,
   all 51 real-PTY cases, and the complete CLI suite (63 files, 629 tests). CLI
   typecheck and build also pass.
+
+### Two-row Mission Rail decision
+
+- The single-spine screenshot audit exposed one remaining piece of legacy
+  chrome: brand masthead, full-width colored tab strip, and animated closing
+  beacon still occupied three visual layers above an otherwise stage-oriented
+  Home. A fresh OMP 17.3.4 comparison showed one framed identity line and a
+  restrained context rail with foreground emphasis instead of a persistent
+  selected-tab color slab.
+- The Mission Header is now two rows. Brand, release control, version, and
+  channel remain on the masthead; the second row is itself the closing
+  navigation rail. Selected destinations use bold foreground plus brackets,
+  pointer hover alone owns a bounded background, and passive destinations are
+  muted. The decorative View Beacon and its transition state are removed, so
+  view changes are immediate and no animation timer exists solely for chrome.
+- Exact rendered segment geometry continues to own mouse targets after the
+  frame offset. Connected, Launcher, Recovery, focus-task, compact, minimal,
+  release-hover, keyboard, and `NO_COLOR` behavior retain their existing input
+  and accessibility contracts. Two quiet rows remain between navigation and
+  content, preserving pointer row stability and giving the stage deliberate
+  breathing room rather than replacing removed chrome with denser content.
+- Real 120×32 and 80×24 Home and Runtime captures prove the rail closes cleanly,
+  every valid destination remains visible, selected state does not depend on
+  color, and the main stage plus single bottom Command Spine retain their
+  hierarchy.
+- Two-row Mission Rail acceptance passes through 85 focused navigation, theme,
+  and screen tests, all 51 real-PTY cases, and the complete CLI suite (63 files,
+  629 tests). CLI typecheck and build also pass.
 
 ## Completion Criteria
 

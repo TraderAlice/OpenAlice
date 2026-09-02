@@ -452,10 +452,11 @@ describe('Supervisor TUI screen', () => {
     expect(lines[0]).toContain('OpenAlice Supervisor')
     expect(lines[0]).toContain('v0.87.0-beta · DEV')
     expect(lines[0]).toContain('[ u ]')
-    expect(lines[1]).toMatch(/^│ .+ │$/u)
-    expect(lines[2]).toMatch(/^╰[─┬]+╯$/u)
-    expect(lines[2].match(/┬/gu)).toHaveLength(1)
-    expect(lines.slice(0, 3).every((line) => displayWidth(line) === 80)).toBe(true)
+    expect(lines[1]).toMatch(/^╰─ ◆ \[Home\].+─╯$/u)
+    expect(lines[1]).toContain('● Inbox')
+    expect(lines[1]).toContain('◇ Connections')
+    expect(lines[1]).toContain('≋ Runtime')
+    expect(lines.slice(0, 2).every((line) => displayWidth(line) === 80)).toBe(true)
     expect(lines.join('\n')).toContain('○ STOPPED')
     expect(lines.join('\n')).toContain('Alice Session · OpenAlice')
     expect(lines.join('\n')).not.toContain('Runtime Signal Deck')
@@ -1407,27 +1408,21 @@ describe('Supervisor TUI screen', () => {
     expect(reduced.render(80)[0]).toContain('OpenAlice Supervisor')
   })
 
-  it('slides the Mission Header view beacon while reduced motion lands immediately', () => {
+  it('keeps Mission Rail navigation immediate instead of animating application chrome', () => {
     const animated = new SupervisorScreen({
       version: 'dev',
       channel: 'dev',
       runtime: { class: 'absent', endpoints: {} },
     }, { motionEnabled: true })
     for (let frame = 0; frame < 9; frame += 1) animated.advanceMotion()
-    const overviewColumn = animated.render(80)[2]!.indexOf('┬')
+    expect(animated.render(80)[1]).toContain('◆ [Home]')
     expect(animated.handleKey(']', matchesKey)).toBe(true)
     expect(animated.snapshot.panel).toBe('inbox')
-    expect(animated.hasActiveMotion()).toBe(true)
-    expect(animated.render(80)[2]!.indexOf('┬')).toBe(overviewColumn)
-    animated.advanceMotion()
-    const movingColumn = animated.render(80)[2]!.indexOf('┬')
-    expect(movingColumn).toBeGreaterThan(overviewColumn)
+    expect(animated.render(80)[1]).toContain('● [Inbox]')
+    expect(animated.hasActiveMotion()).toBe(false)
     expect(animated.handleKey(']', matchesKey)).toBe(true)
     expect(animated.snapshot.panel).toBe('fleet')
-    expect(animated.render(80)[2]!.indexOf('┬')).toBe(movingColumn)
-    for (let frame = 0; frame < 4; frame += 1) animated.advanceMotion()
-    const fleetColumn = animated.render(80)[2]!.indexOf('┬')
-    expect(fleetColumn).toBeGreaterThan(movingColumn)
+    expect(animated.render(80)[1]).toContain('◇ [Connections]')
     expect(animated.hasActiveMotion()).toBe(false)
 
     const reduced = new SupervisorScreen({
@@ -1435,9 +1430,9 @@ describe('Supervisor TUI screen', () => {
       channel: 'dev',
       runtime: { class: 'absent', endpoints: {} },
     }, { motionEnabled: false })
-    const reducedOverview = reduced.render(80)[2]!.indexOf('┬')
+    expect(reduced.render(80)[1]).toContain('◆ [Home]')
     expect(reduced.handleKey(']', matchesKey)).toBe(true)
-    expect(reduced.render(80)[2]!.indexOf('┬')).toBeGreaterThan(reducedOverview)
+    expect(reduced.render(80)[1]).toContain('● [Inbox]')
     expect(reduced.hasActiveMotion()).toBe(false)
   })
 
@@ -1810,7 +1805,7 @@ describe('Supervisor TUI screen', () => {
     })
 
     expect(screen.render(100).join('\n')).toContain('\u001b[38;2;')
-    expect(screen.render(100)[2]).toContain('\u001b[1;38;2;116;235;226m┬')
+    expect(screen.render(100)[1]).toContain('\u001b[1;38;2;116;235;226m◇ [Connections]·2')
     expect(screen.render(100)[1]!.replace(/\u001b\[[0-9;]*m/gu, '')).toContain('[Connections]·2')
     const releaseColumn = screen.render(100)[0]!
       .replace(/\u001b\[[0-9;]*m/gu, '')

@@ -244,6 +244,7 @@ import {
   type SupervisorFleetPointerTarget,
   type SupervisorFleetState,
 } from './supervisor-fleet.ts'
+import { truncateDisplayWidth } from './supervisor-display.ts'
 import type { SupervisorScrollRailTarget } from './supervisor-scroll-rail.ts'
 import {
   createSupervisorTransferWizard,
@@ -356,12 +357,6 @@ export type SupervisorUpdateChannel = 'stable' | 'beta' | 'dev'
 export type SupervisorPanel = 'fleet' | 'overview' | 'inbox' | 'logs' | 'doctor' | 'help'
 export type { SupervisorFocusTask } from './supervisor-task-surface.ts'
 
-interface SupervisorNavigationTransition {
-  from: SupervisorPanel
-  fromColumn?: number
-  to: SupervisorPanel
-  frame: number
-}
 export type SupervisorMode = 'normal' | 'config-recovery'
 export type SupervisorConfigRecoveryReason = 'newer-schema' | 'unreadable'
 export type SupervisorAction =
@@ -3653,7 +3648,6 @@ export class SupervisorScreen implements Component {
   private headerReleaseHovered = false
   private headerReleaseTarget?: { startColumn: number; endColumn: number }
   private navigationTargets: SupervisorNavigationTarget[] = []
-  private navigationBeaconColumn?: number
   private hoveredFleetTarget?: SupervisorFleetPointerTarget
   private hoveredRail?: SupervisorRailPointerTarget
   private activeRailDrag?: SupervisorRailSurface
@@ -3672,7 +3666,6 @@ export class SupervisorScreen implements Component {
   private introFrame?: number
   private ambientBrandFrame = 0
   private ambientBrandTick = 0
-  private navigationTransition?: SupervisorNavigationTransition
   private runtimePulse = false
   private logsFromEnd = 0
   private logFilter: SupervisorLogFilter = 'all'
@@ -3893,15 +3886,6 @@ export class SupervisorScreen implements Component {
       this.motionFrame = (this.motionFrame + 1) % 10
       changed = true
     }
-    if (this.navigationTransition) {
-      this.navigationTransition = this.navigationTransition.frame >= 3
-        ? undefined
-        : {
-            ...this.navigationTransition,
-            frame: this.navigationTransition.frame + 1,
-          }
-      changed = true
-    }
     if (this.commandDeckOpen) {
       const wasVisible = this.commandDeckCursorFrame < 6
       this.commandDeckCursorFrame = (this.commandDeckCursorFrame + 1) % 12
@@ -3919,7 +3903,6 @@ export class SupervisorScreen implements Component {
         || (brandMotionAllowed && this.introFrame !== undefined)
         || this.ambientBrandMotionActive(brandMotionAllowed)
         || Boolean(this.snapshot.busy)
-        || Boolean(this.navigationTransition)
         || this.commandDeckOpen
       )
   }
@@ -4777,19 +4760,9 @@ export class SupervisorScreen implements Component {
     }, Math.max(1, width - 4))
     this.navigationTargets = navigation.targets.map((target) => ({
       ...target,
-      startColumn: target.startColumn + 2,
-      endColumn: target.endColumn + 2,
+      startColumn: target.startColumn + 3,
+      endColumn: target.endColumn + 3,
     }))
-    const navigationRail = renderNavigationBeaconRail(
-      width,
-      this.navigationTargets,
-      this.snapshot.panel ?? 'overview',
-      this.navigationTransition,
-    )
-    const navigationBeaconIndex = navigationRail.indexOf('┬')
-    this.navigationBeaconColumn = navigationBeaconIndex >= 0
-      ? navigationBeaconIndex + 1
-      : undefined
     const header = renderSupervisorHeaderLayout(
       this.snapshot.version,
       this.snapshot.channel,
@@ -4800,8 +4773,8 @@ export class SupervisorScreen implements Component {
     this.headerReleaseTarget = header.releaseTarget
     const lines = [
       header.line,
-      `│ ${navigation.line} │`,
-      navigationRail,
+      renderMissionNavigationRail(navigation.line, width),
+      '',
       '',
     ]
 
@@ -5280,20 +5253,7 @@ export class SupervisorScreen implements Component {
     this.hoveredLogFromEnd = null
     this.hoveredRail = undefined
     this.activeRailDrag = undefined
-    const previous = this.snapshot.panel ?? 'overview'
-    const previousTarget = this.navigationTargets.find((target) => target.panel === previous)
-    this.navigationTransition = this.motionEnabled && previous !== panel
-      ? {
-          from: previous,
-          fromColumn: this.navigationBeaconColumn ?? (previousTarget
-            ? Math.round((previousTarget.startColumn + previousTarget.endColumn) / 2)
-            : undefined),
-          to: panel,
-          frame: 0,
-        }
-      : undefined
     this.update({ panel })
-    if (this.navigationTransition) this.onMotionDemandChange?.()
     if (panel === 'logs' && this.snapshot.activeTarget?.kind !== 'ssh') this.onAction?.('logs')
     if (panel === 'doctor') this.onAction?.('doctor')
   }
@@ -5325,31 +5285,16 @@ function dropLastCommandQueryCodePoint(query: string): string {
   return [...query].slice(0, -1).join('')
 }
 
-function renderNavigationBeaconRail(
-  width: number,
-  targets: SupervisorNavigationTarget[],
-  selected: SupervisorPanel,
-  transition?: SupervisorNavigationTransition,
-): string {
-  const rail = `╰${'─'.repeat(Math.max(1, width - 2))}╯`
-  const center = (panel: SupervisorPanel): number | undefined => {
-    const target = targets.find((candidate) => candidate.panel === panel)
-    return target
-      ? Math.round((target.startColumn + target.endColumn) / 2)
-      : undefined
-  }
-  const selectedCenter = center(selected)
-  if (selectedCenter === undefined) return rail
-  const fromCenter = transition?.fromColumn ?? (transition ? center(transition.from) : undefined)
-  const toCenter = transition ? center(transition.to) : undefined
-  const progress = transition
-    ? [0, 0.2, 0.6, 1][Math.min(3, transition.frame)] ?? 1
-    : 1
-  const beaconColumn = fromCenter !== undefined && toCenter !== undefined
-    ? Math.round(fromCenter + ((toCenter - fromCenter) * progress))
-    : selectedCenter
-  const index = Math.max(1, Math.min(rail.length - 2, beaconColumn - 1))
-  return `${rail.slice(0, index)}┬${rail.slice(index + 1)}`
+function renderMissionNavigationRail(line: string, width: number): string {
+  const prefix = '╰─ '
+  const suffix = '╯'
+  const innerWidth = Math.max(1, width - displayWidth(prefix) - displayWidth(suffix))
+  const content = truncateDisplayWidth(line.trimEnd(), innerWidth)
+  const trackWidth = Math.max(0, innerWidth - displayWidth(content))
+  const track = trackWidth > 0
+    ? ` ${'─'.repeat(Math.max(0, trackWidth - 1))}`
+    : ''
+  return truncateDisplayWidth(`${prefix}${content}${track}${suffix}`, width)
 }
 
 function createServices(

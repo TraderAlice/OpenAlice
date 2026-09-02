@@ -223,26 +223,25 @@ intentionally parameter-free:
   the glyphs.
   Background refresh of the selected local Runtime updates its inventory row
   without moving a user who is inspecting another Machine or AliceProject;
-- the top-level chrome is a three-row Mission Header: a framed brand/release
-  masthead, the Overview/Fleet/Logs/Doctor/Help navigation, and a closing rail.
-  It replaces the disconnected legacy title/divider/tab stack without taking
-  another terminal row. The navigation accepts Tab, left/right, and `[`/`]`;
-  its visible tabs are composed as a full-width segmented rail with a
-  stable glyph, label, and optional status badge. Color terminals render the
-  rail, selected chip, and hover chip as distinct surfaces; `NO_COLOR` keeps
-  the selected label in brackets. Wide labels collapse through compact and
-  minimal variants so all five destinations remain reachable at 46 columns.
-  The renderer publishes the exact final segment geometry used for pointer
-  hover and click, rather than reconstructing hit regions from labels. A View
-  Beacon on the Mission Header's closing rail anchors the active destination;
-  with motion enabled it travels between the old and new tab, while reduced
-  motion places it immediately without changing the final frame.
+- the top-level chrome is a two-row Mission Rail: a framed brand/release
+  masthead and one OMP-style closing navigation rail. It replaces the legacy
+  title/divider/tab stack and removes the decorative traveling View Beacon.
+  Navigation changes immediately instead of animating application chrome and
+  accepts Tab, left/right, and `[`/`]`. Its valid destinations are adaptive:
+  connected sessions expose Home, Inbox, Connections, and Runtime; the
+  Launcher exposes Connect and Help; Recovery exposes Recovery and Help. Each
+  destination keeps a stable glyph, label, and optional status badge. Color
+  terminals use strong foreground emphasis for the selected bracketed label,
+  a bounded background only for pointer hover, and a muted rail for passive
+  destinations; `NO_COLOR` preserves the same brackets and glyphs. Wide labels
+  collapse through compact and minimal variants so every valid destination
+  remains reachable at 46 columns. The renderer publishes exact final segment
+  geometry for pointer hover and click rather than reconstructing hit regions
+  from labels.
   `↑`/`↓` move within the active Fleet pane and the mouse wheel moves the
   focused Fleet selection.
-  Fleet and loaded Logs expose their available counts in the navigation rail;
-  Doctor exposes `✓`, warning count, or failure count without relying on color
-  only after at least one check exists; a loaded zero-check report remains
-  neutral instead of claiming success.
+  Connections, Inbox, and loaded Runtime events expose available counts in the
+  navigation rail.
   Each status badge is part of its tab's pointer target rather than a separate
   control.
   Fleet rows expose pointer hover and click: the first click selects or focuses,
