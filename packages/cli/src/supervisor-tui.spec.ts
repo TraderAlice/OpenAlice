@@ -444,6 +444,74 @@ describe('Supervisor TUI screen', () => {
     expect(frame).toContain('[ / ] Commands')
   })
 
+  it('keeps Runtime status, controls, and application chrome visible at 46x16', () => {
+    const runtime = {
+      class: 'running',
+      state: 'ready',
+      owner: { surface: 'cli-server', pid: 4242 },
+      provider: { kind: 'source' },
+      components: { alice: 'ready', uta: 'disabled', connector: 'disabled' },
+      uptimeSeconds: 7_380,
+      endpoints: { web: 'http://127.0.0.1:2026' },
+    }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'logs',
+      runtime,
+      activeTarget: {
+        kind: 'local',
+        machineKey: 'local',
+        machineName: 'This computer',
+        projectKey: 'default',
+        projectName: 'Default AliceProject',
+        home: '/tmp/openalice',
+        transport: 'loopback',
+        endpoint: 'http://127.0.0.1:2026',
+        health: { phase: 'connected', consecutiveFailures: 0 },
+        runtime,
+      },
+      logs: { entries: [] },
+    }, {
+      getViewportHeight: () => 16,
+      motionEnabled: false,
+    })
+
+    const lines = screen.render(46)
+    const frame = lines.join('\n')
+    expect(lines).toHaveLength(16)
+    expect(frame).toContain('◆ OpenAlice')
+    expect(frame).toContain('[Runtime]')
+    expect(frame).toContain('Runtime · LIVE · LOCAL · QUIET')
+    expect(frame).toContain('● OPENALICE READY · source · 2h 3m')
+    expect(frame).toContain('⌁ This computer → Default AliceProject')
+    expect(frame).toContain('● Alice ready · ○ UTA off · ○ Conn off')
+    expect(frame).toContain('◆ [ o ] Open verified Web UI')
+    expect(frame).toContain('· [ l ] Reload Runtime snapshot')
+    expect(frame).toContain('◇  Tip:')
+    expect(frame).toContain('[ / ] Commands')
+
+    screen.update({
+      activeTarget: {
+        kind: 'ssh',
+        machineKey: 'cloud',
+        machineName: 'Cloud Lab',
+        projectKey: 'research',
+        projectName: 'Research',
+        home: '/srv/openalice',
+        transport: 'ssh-forward',
+        endpoint: 'http://127.0.0.1:47331',
+        health: { phase: 'connected', consecutiveFailures: 0 },
+        runtime,
+      },
+    })
+    const remoteFrame = screen.render(46).join('\n')
+    expect(remoteFrame).toContain('Runtime · LIVE · REMOTE')
+    expect(remoteFrame).toContain('⌁ Cloud Lab → Research')
+    expect(remoteFrame).toContain('· [ x ] Disconnect SSH forward')
+    expect(remoteFrame).not.toContain('Reload Runtime snapshot')
+  })
+
   it('keeps remote controls target-scoped and exposes an explicit disconnect', () => {
     let disconnected = 0
     let sourceRequests = 0

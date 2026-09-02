@@ -5,6 +5,7 @@ import {
   appendSupervisorConnectionEvent,
   createSupervisorConnectionEvent,
   renderSupervisorConnectionChronicle,
+  renderSupervisorRuntimeSummary,
   type SupervisorConnectionChronicleTarget,
   type SupervisorConnectionEvent,
 } from './supervisor-connection-chronicle.ts'
@@ -61,6 +62,24 @@ describe('Supervisor connection chronicle', () => {
     expect(text).toContain('RECOVERED · manual retry · Cloud Lab/Research')
     expect(text).toContain('◆ [ o ] Open verified Web UI')
     expect(lines.every((line) => displayWidth(line) <= 120)).toBe(true)
+  })
+
+  it('folds tiny Runtime status and controls into one five-row work surface', () => {
+    const target = fixtureTarget({ phase: 'connected', consecutiveFailures: 0 })
+    const lines = renderSupervisorRuntimeSummary({ target, events: [] }, 46, {
+      meta: 'QUIET',
+      action: { key: 'l', label: 'Reload Runtime snapshot' },
+    })
+    const text = lines.join('\n')
+
+    expect(lines).toHaveLength(7)
+    expect(text).toContain('Runtime · LIVE · REMOTE · QUIET')
+    expect(text).toContain('● OPENALICE READY · source · 2h 3m')
+    expect(text).toContain('⌁ Cloud Lab → Research')
+    expect(text).toContain('● Alice ready · ○ UTA off · ○ Conn off')
+    expect(text).toContain('◆ [ o ] Open verified Web UI')
+    expect(text).toContain('· [ l ] Reload Runtime snapshot')
+    expect(lines.every((line) => displayWidth(line) <= 46)).toBe(true)
   })
 
   it('keeps a deduplicated bounded session trail', () => {

@@ -164,6 +164,7 @@ import {
   appendSupervisorConnectionEvent,
   createSupervisorConnectionEvent,
   renderSupervisorConnectionChronicle,
+  renderSupervisorRuntimeSummary,
   type SupervisorConnectionEvent,
   type SupervisorConnectionEventKind,
   type SupervisorConnectionEventOrigin,
@@ -4910,13 +4911,29 @@ export class SupervisorScreen implements Component {
       }))
       lines.push(...inboxView.lines)
     } else if (this.snapshot.panel === 'logs') {
+      const emergencyRuntime = width < 60
+        && Number.isFinite(viewportHeight)
+        && Math.floor(viewportHeight ?? 0) < 18
       const chronicle = this.snapshot.activeTarget
-        ? renderSupervisorConnectionChronicle({
-            target: this.snapshot.activeTarget,
-            events: this.snapshot.connectionEvents ?? [],
-          }, width, this.snapshot.activeTarget.kind === 'ssh' ? operationalCanvasHeight : undefined)
+        ? emergencyRuntime
+          ? renderSupervisorRuntimeSummary({
+              target: this.snapshot.activeTarget,
+              events: this.snapshot.connectionEvents ?? [],
+            }, width, this.snapshot.activeTarget.kind === 'ssh'
+              ? undefined
+              : {
+                  meta: compactRuntimeLensMeta(this.snapshot.logs, this.logFilter),
+                  action: {
+                    key: 'l',
+                    label: this.snapshot.logs ? 'Reload Runtime snapshot' : 'Load Runtime tail',
+                  },
+                })
+          : renderSupervisorConnectionChronicle({
+              target: this.snapshot.activeTarget,
+              events: this.snapshot.connectionEvents ?? [],
+            }, width, this.snapshot.activeTarget.kind === 'ssh' ? operationalCanvasHeight : undefined)
         : []
-      if (this.snapshot.activeTarget?.kind === 'ssh') {
+      if (emergencyRuntime || this.snapshot.activeTarget?.kind === 'ssh') {
         lines.push(...chronicle)
       } else {
         if (chronicle.length > 0) lines.push(...chronicle, '')
@@ -5390,6 +5407,19 @@ function appendCommandQueryInput(
   if (!input || /[\u0000-\u001f\u007f-\u009f]/u.test(input)) return null
   const remaining = Math.max(0, maxCodePoints - [...current].length)
   return `${current}${[...input].slice(0, remaining).join('')}`
+}
+
+function compactRuntimeLensMeta(
+  logs: RuntimeLogs | null | undefined,
+  filter: SupervisorLogFilter,
+): string {
+  if (!logs) return 'STANDBY'
+  const total = logs.entries?.length ?? 0
+  if (total === 0) return 'QUIET'
+  const visible = supervisorFilteredLogCount(logs, filter)
+  return filter === 'all'
+    ? `${visible} EVENTS`
+    : `${visible}/${total} ${supervisorLogFilterLabel(filter).toUpperCase()}`
 }
 
 function dropLastCommandQueryCodePoint(query: string): string {

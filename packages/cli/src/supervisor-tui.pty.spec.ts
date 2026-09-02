@@ -2079,6 +2079,73 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
 
+  it('keeps and activates tiny Runtime status controls at 46x16', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-emergency-runtime-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 46,
+      rows: 16,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+        OPENALICE_TUI_BOOT: '0',
+        OPENALICE_TUI_MOTION: '0',
+        OPENALICE_TUI_FIXTURE_RUNTIME: 'running',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let hovered = false
+      let clicked = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Emergency Supervisor Runtime timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        const plain = stripSgr(output)
+        if (!opened && plain.includes('Alice Session · OpenAlice')) {
+          opened = true
+          child.write('l')
+        } else if (!hovered
+          && plain.includes('Runtime · LIVE · LOCAL · QUIET')
+          && plain.includes('◇  Tip:')) {
+          hovered = true
+          child.write('\u001b[<35;20;10M')
+        } else if (!clicked && plain.includes('› [ l ] Reload Runtime snapshot')) {
+          clicked = true
+          child.write('\u001b[<0;20;10M')
+          setTimeout(() => child.write('q'), 250)
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && clicked) resolve(output)
+        else reject(new Error(`Emergency Supervisor Runtime exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    const plain = stripSgr(transcript)
+    expect(plain).toContain('╰─ Home │ Inbox │ Link·1 │ [Run]')
+    expect(plain).toContain('Runtime · LIVE · LOCAL · QUIET')
+    expect(plain).toContain('● OPENALICE READY · source')
+    expect(plain).toContain('⌁ This computer → Default AliceProject')
+    expect(plain).toContain('● Alice ready · ○ UTA off · ○ Conn off')
+    expect(plain).toContain('◆ [ o ] Open verified Web UI')
+    expect(plain).toContain('› [ l ] Reload Runtime snapshot')
+    expect(plain).toContain('◇  Tip: No Runtime events in this lens')
+    expect(plain).toContain('╰─ [ / ] Commands  ›  [ q ] Detach')
+    expect(plain).toContain('FIXTURE_RESULT starts=0 opens=0 loads=2')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+    expect(transcript).toContain('\u001b[?1006l')
+  }, 12_000)
+
   it('renders an offline registered Machine and preserves drill-down across resize', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-fleet-offline-'))
     temporaryPaths.push(isolatedHome)

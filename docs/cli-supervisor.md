@@ -584,7 +584,12 @@ intentionally parameter-free:
   in the Observatory title with Runtime Lens event counts. Local Runtime log
   evidence remains directly below the Observatory; remote
   targets give surplus height to recent transitions and expose only remote-safe
-  Open, Check, Disconnect, Connections, and Help actions;
+  Open, Check, Disconnect, Connections, and Help actions. Below 60 columns and
+  18 rows, Runtime folds Observatory and Lens into one five-row status surface:
+  Runtime/provider/uptime identity, active route, compact Alice/UTA/Connector
+  health, the valid Open-or-Retry action, and a local Load/Reload or remote
+  Disconnect action. The fold preserves Mission Header, navigation, contextual
+  Tip, and Command Spine instead of cropping application wayfinding;
 - `x` stops and `r` restarts only a `cli-server` owner, after an impact
   confirmation;
 - `l` reads the bounded, redacted log tail;

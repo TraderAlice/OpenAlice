@@ -60,6 +60,11 @@ export interface SupervisorConnectionChronicleView {
   events: SupervisorConnectionEvent[]
 }
 
+export interface SupervisorRuntimeSummaryLens {
+  meta: string
+  action: { key: string; label: string }
+}
+
 const MAX_CONNECTION_EVENTS = 12
 
 export function createSupervisorConnectionEvent(
@@ -125,6 +130,30 @@ export function renderSupervisorConnectionChronicle(
     rows,
     safeWidth,
   )
+}
+
+export function renderSupervisorRuntimeSummary(
+  view: SupervisorConnectionChronicleView,
+  width: number,
+  lens?: SupervisorRuntimeSummaryLens,
+): string[] {
+  const safeWidth = Math.max(24, width)
+  const phase = view.target.health?.phase ?? 'connected'
+  const state = connectionPhasePresentation(phase)
+  const primary = phase === 'connected'
+    ? { key: 'o', label: 'Open verified Web UI' }
+    : { key: 'r', label: 'Retry active connection' }
+  const secondary = lens?.action ?? { key: 'x', label: 'Disconnect SSH forward' }
+  const location = view.target.kind === 'ssh' ? 'REMOTE' : 'LOCAL'
+  const meta = [state.compactLabel, location, lens?.meta].filter(Boolean).join(' · ')
+
+  return renderSupervisorPanel('Runtime', meta, [
+    compactRuntimeIdentityRow(view.target, state.glyph),
+    `⌁ ${cleanValue(view.target.machineName)} → ${cleanValue(view.target.projectName)}`,
+    compactServiceRow(view.target.runtime?.components),
+    `◆ [ ${primary.key} ] ${primary.label}`,
+    `· [ ${secondary.key} ] ${secondary.label}`,
+  ], safeWidth)
 }
 
 function wideObservatoryRows(
@@ -264,6 +293,36 @@ function serviceRows(components?: Record<string, string>): [string, string, stri
   }) as [string, string, string]
 }
 
+function compactRuntimeIdentityRow(
+  target: SupervisorConnectionChronicleTarget,
+  glyph: '●' | '◌' | '!' | '×',
+): string {
+  const runtimeState = cleanValue(target.runtime?.state ?? target.runtime?.class ?? 'unknown').toUpperCase()
+  const provider = cleanValue(target.runtime?.provider?.kind ?? '')
+  const uptime = target.runtime?.uptimeSeconds
+  const details = [
+    provider && provider !== 'unknown' ? provider : '',
+    Number.isFinite(uptime) ? formatDuration(Math.max(0, uptime ?? 0)) : '',
+  ].filter(Boolean)
+  return `${glyph} OPENALICE ${runtimeState}${details.length > 0 ? ` · ${details.join(' · ')}` : ''}`
+}
+
+function compactServiceRow(components?: Record<string, string>): string {
+  const labels = [
+    ['alice', 'Alice'],
+    ['uta', 'UTA'],
+    ['connector', 'Conn'],
+  ] as const
+  return labels.map(([key, label]) => {
+    const value = cleanValue(components?.[key] ?? 'unknown')
+    const normalized = value.toLowerCase()
+    if (/\b(?:ready|running|connected|healthy|live)\b/u.test(normalized)) return `● ${label} ready`
+    if (/\b(?:failed|error|unhealthy|unreachable)\b/u.test(normalized)) return `× ${label} failed`
+    if (/\b(?:disabled|stopped|absent|off)\b/u.test(normalized)) return `○ ${label} off`
+    return `◇ ${label} ?`
+  }).join(' · ')
+}
+
 function composeColumns(
   left: string,
   center: string,
@@ -288,11 +347,12 @@ function fillColumn(value: string, width: number): string {
 function connectionPhasePresentation(phase: SupervisorConnectionPhase): {
   glyph: '●' | '◌' | '!' | '×'
   label: string
+  compactLabel: string
 } {
-  if (phase === 'checking') return { glyph: '◌', label: 'CHECKING ENDPOINT' }
-  if (phase === 'degraded') return { glyph: '!', label: 'CONNECTION DEGRADED' }
-  if (phase === 'unreachable') return { glyph: '×', label: 'ENDPOINT UNREACHABLE' }
-  return { glyph: '●', label: 'CONNECTED' }
+  if (phase === 'checking') return { glyph: '◌', label: 'CHECKING ENDPOINT', compactLabel: 'CHECKING' }
+  if (phase === 'degraded') return { glyph: '!', label: 'CONNECTION DEGRADED', compactLabel: 'DEGRADED' }
+  if (phase === 'unreachable') return { glyph: '×', label: 'ENDPOINT UNREACHABLE', compactLabel: 'UNREACHABLE' }
+  return { glyph: '●', label: 'CONNECTED', compactLabel: 'LIVE' }
 }
 
 function eventPresentation(kind: SupervisorConnectionEventKind): {

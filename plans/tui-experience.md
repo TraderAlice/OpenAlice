@@ -3780,6 +3780,28 @@ already large `supervisor-tui.ts` application controller.
   The focused Inbox/Fleet/screen/PTY closure passes 166 tests, the complete CLI
   suite passes 648 tests, and CLI typecheck/build passes.
 
+### Extreme-compact Runtime work-surface decision
+
+- A fresh 46x16 Runtime capture showed the compact Observatory plus quiet Lens
+  consuming every available row and cropping Mission Header, navigation, and
+  contextual Tip. The user could inspect technical state but had no visible
+  application location or route back to Home, Inbox, or Connections.
+- Below 60 columns and 18 rows, Runtime now composes one five-row work surface:
+  OpenAlice state with provider and uptime, Machine to AliceProject route,
+  compact Alice/UTA/Connector health, the authoritative Open-or-Retry action,
+  and one target-scoped secondary action. Local targets expose Load/Reload
+  Runtime snapshot; SSH targets expose Disconnect SSH forward.
+- Ordinary 80-column Runtime keeps the complete stacked Observatory and Lens;
+  wide terminals keep the three-domain Observatory. The fold reuses existing
+  health, Runtime log, pointer-command, SSH disconnect, and lifecycle owners and
+  changes no polling, endpoint, log-reader, connection, or persistence contract.
+- Real 46x16 and 80x24 PTY captures verify the new fold and unchanged ordinary
+  composition. A real 46x16 PTY journey hovers and clicks Reload, observes the
+  second Runtime load, and restores cursor, paste, and mouse modes. Maintainer
+  acceptance remains pending on the retained feature branch. The focused
+  Chronicle/Lens/screen/PTY closure passes 155 tests, the complete CLI suite
+  passes 651 tests, and CLI typecheck/build passes.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and
