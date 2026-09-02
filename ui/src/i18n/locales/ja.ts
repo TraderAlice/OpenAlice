@@ -20,7 +20,6 @@ export const ja: Resources = {
       issue: 'イシュー',
       automation: '自動化',
       settings: '設定',
-      dev: '開発パネル',
     },
     section: {
       beta: 'ベータ',
@@ -354,6 +353,7 @@ export const ja: Resources = {
       agents: 'エージェント',
       operations: '運用',
       connections: '接続',
+      developer: '開発者向け',
     },
     language: {
       title: '言語',
@@ -535,7 +535,7 @@ export const ja: Resources = {
       deleteGroup: 'グループを削除',
       renameGroup: 'グループ名',
       reset: 'デフォルトに戻す',
-      resetConfirm: 'デフォルトのグループに戻し、Dev Panel を非表示にしますか？',
+      resetConfirm: 'アクティビティバーのグループをデフォルトに戻しますか？',
       path: 'data/ui-layout.json に保存',
       show: '{{label}}を表示',
       hide: '{{label}}を非表示',

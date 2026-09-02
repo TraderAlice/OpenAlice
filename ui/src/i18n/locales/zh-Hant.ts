@@ -28,7 +28,6 @@ export const zhHant: Resources = {
       issue: '議題',
       automation: '自動化',
       settings: '設定',
-      dev: '開發面板',
     },
     section: {
       beta: '測試版',
@@ -361,6 +360,7 @@ export const zhHant: Resources = {
       agents: '智慧體',
       operations: '運行',
       connections: '連接',
+      developer: '開發者',
     },
     language: {
       title: '語言',
@@ -542,7 +542,7 @@ export const zhHant: Resources = {
       deleteGroup: '刪除分組',
       renameGroup: '分組名稱',
       reset: '恢復預設',
-      resetConfirm: '恢復預設分組並隱藏開發面板？',
+      resetConfirm: '恢復預設側欄分組？',
       path: '儲存在 data/ui-layout.json',
       show: '顯示{{label}}',
       hide: '隱藏{{label}}',

@@ -92,6 +92,13 @@ describe('Settings URL projection', () => {
       params: { category: 'agent-runtimes' },
     })).toBe('/settings/agent-runtimes')
   })
+
+  it('projects Developer tools into the Settings route', () => {
+    expect(getView('dev').toUrl({
+      kind: 'dev',
+      params: { tab: 'logs' },
+    })).toBe('/settings/developer/logs')
+  })
 })
 
 describe('shared product shells', () => {
