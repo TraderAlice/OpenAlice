@@ -168,6 +168,9 @@ intentionally parameter-free:
   directly to connected Home. A failure remains on the selected target with
   Enter to retry or Esc to return to target selection; its contextual Tip names
   Retry, Back, and Detach rather than teaching the hidden inventory controls.
+  The failed Recorder owns the failure explanation and recovery actions; the
+  Command Spine keeps Machine, AliceProject, Runtime, and Launch context instead
+  of repeating the same diagnostic in a second, independently truncated row.
   `q` can still detach at any time. While a stage is in flight, the Command
   Spine replaces the disabled Commands affordance with Operation Active and the
   contextual Tip states that input is owned until ready; only the truthful `q`

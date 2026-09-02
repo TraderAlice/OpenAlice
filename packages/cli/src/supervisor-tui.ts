@@ -4971,10 +4971,13 @@ export class SupervisorScreen implements Component {
     }
 
     const hoverPreview = this.hoverPreview(runtime?.class)
+    const launchFlightOwnsFailure = this.snapshot.launchFlight?.status === 'failed'
     const activity = renderSupervisorActivitySlot({
       ...(this.snapshot.busy ? { busy: sanitize(this.snapshot.busy) } : {}),
       ...(this.snapshot.notice ? { notice: sanitize(this.snapshot.notice) } : {}),
-      ...(this.snapshot.diagnostic ? { diagnostic: sanitize(this.snapshot.diagnostic) } : {}),
+      ...(this.snapshot.diagnostic && !launchFlightOwnsFailure
+        ? { diagnostic: sanitize(this.snapshot.diagnostic) }
+        : {}),
       ...(hoverPreview ? { preview: sanitize(hoverPreview) } : {}),
     }, width, this.motionFrame, this.motionEnabled)
     const actionShelf = focusTask

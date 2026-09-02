@@ -187,12 +187,16 @@ describe('Supervisor TUI screen', () => {
     screen.update({
       busy: undefined,
       launchFlight: failSupervisorLaunchFlight(running, 'Runtime readiness timed out'),
+      diagnostic: 'Runtime readiness timed out',
     })
     const failedFrame = screen.render(100).join('\n')
     expect(failedFrame).toContain('RECOVERABLE FAILURE')
+    expect(failedFrame).toContain('Runtime readiness timed out')
     expect(failedFrame).toContain('[ Enter ] Retry selected target')
     expect(failedFrame).toContain('[ Esc ] Back to targets')
     expect(failedFrame).toContain('Enter retries; Esc returns to targets')
+    expect(failedFrame).not.toContain('×  ERROR')
+    expect(failedFrame).toContain('⌁ This computer / Default AliceProject · LOCAL › ○ COLD')
     expect(screen.handleEscape()).toBe(true)
     expect(screen.snapshot.launchFlight).toBeNull()
     expect(screen.render(100).join('\n')).toContain('OPENALICE LAUNCH')

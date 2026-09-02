@@ -198,6 +198,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(plain).toContain('[ Enter ] Retry selected target')
     expect(plain).toContain('[ Esc ] Back to targets')
     expect(plain).toContain('Enter retries; Esc returns to targets; q detaches this TUI.')
+    expect(plain).toContain('Default AliceProject · LOCAL › ○ COLD')
     expect(plain).toContain('FIXTURE_RESULT starts=1 opens=0 loads=0 diagnoses=0')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')

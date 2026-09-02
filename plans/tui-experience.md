@@ -3428,6 +3428,27 @@ already large `supervisor-tui.ts` application controller.
   screen, and real-PTY tests (including all 54 PTY cases), and the complete CLI
   suite (63 files, 638 tests). CLI typecheck and build also pass.
 
+### Launch-failure ownership decision
+
+- Cell-accurate 120x32 and 80x24 failure captures showed one diagnostic in the
+  Recorder status, failed stage, `NOW` detail, and generic Command Spine
+  activity. The compact activity copy truncated while displacing the selected
+  target context, so repetition reduced both clarity and recovery confidence.
+- A failed Launch Flight Recorder now exclusively owns the failure explanation,
+  Retry, and Back actions. The Command Spine returns to its contextual route:
+  Machine, AliceProject, Runtime state, and Launch focus, reduced by the normal
+  responsive priority rules at compact widths.
+- Only the generic diagnostic activity slot is suppressed while a Recorder is
+  failed. Ordinary diagnostics on every other page, in-flight busy feedback,
+  notices, hover previews, lifecycle behavior, and Retry/Back dispatch are
+  unchanged.
+- Real 120x32 and 80x24 captures verify one bounded recovery surface and a
+  stable contextual Spine. Maintainer acceptance remains pending on the retained
+  feature branch.
+- Launch-failure-ownership acceptance passes through all 133 focused screen and
+  real-PTY tests (including all 54 PTY cases), and the complete CLI suite (63
+  files, 638 tests). CLI typecheck and build also pass.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and
