@@ -454,6 +454,9 @@ callbacks remain unchanged inside that stage. Smaller terminals retain the
 bounded centered sheet because their stacked responsive content takes priority
 over clearing the whole viewport. Closing the task restores the prior
 top-level panel identity without changing Runtime or selection state.
+The Mission Header keeps version, channel, and update provenance as a read-only
+`◇ BUILD` signal while focused; the normal `[ u ]` Release Control and its
+pointer target return only after the task closes.
 The Control Console follows the same ownership rule: its Action Shelf uses the
 active task's Enter, movement, and Back vocabulary, while the Command Spine
 shows `FOCUS WORKSPACE` and a real Esc exit instead of leaking unavailable

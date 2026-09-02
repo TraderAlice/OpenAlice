@@ -1052,6 +1052,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         expect(transcript).toContain('Transfer Flight Deck')
       }
       if (scenario !== 'default-no') {
+        expect(transcript).toContain('◇ BUILD v0.91.0-beta.3 · DEV')
         expect(transcript).toContain('◆ FOCUS · TRANSFER')
         expect(transcript).toContain('TRANSFER FLIGHT DECK')
         expect(transcript).toContain('◆ TRANSFER')

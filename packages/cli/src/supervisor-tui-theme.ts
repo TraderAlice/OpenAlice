@@ -460,7 +460,7 @@ function decorateHeader(
   const brand = brands.find((candidate) => line.includes(candidate))
   if (!brand) return theme.brand(line, introFrame)
   const brandOffset = line.indexOf(brand)
-  const releaseOffset = ['[ u ]', '↗ v']
+  const releaseOffset = ['[ u ]', '↗ v', '◇ BUILD', '◇ v']
     .map((marker) => line.indexOf(marker))
     .find((offset) => offset >= 0) ?? -1
   if (releaseOffset < 0) {
@@ -473,7 +473,13 @@ function decorateHeader(
   const suffixOffset = line.lastIndexOf(' ─╮')
   const releaseEnd = suffixOffset > releaseOffset ? suffixOffset : line.length
   const release = line.slice(releaseOffset, releaseEnd)
-  const releaseMarker = release.startsWith('[ u ]') ? '[ u ]' : '↗'
+  const releaseMarker = release.startsWith('[ u ]')
+    ? '[ u ]'
+    : release.startsWith('◇ BUILD')
+      ? '◇ BUILD'
+      : release.startsWith('◇ ')
+        ? '◇'
+        : '↗'
   const decoratedRelease = releaseHovered
     ? theme.navigationHover(release)
     : `${theme.accentStrong(releaseMarker)}${theme.muted(release.slice(releaseMarker.length))}`

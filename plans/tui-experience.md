@@ -492,6 +492,19 @@ not imply maintainer approval of the finished interaction.
   task restores the complete operational navigation unchanged. This is an
   autonomous topic decision, not a recorded maintainer approval.
 
+### Focus build-provenance decision
+
+- Keeping `[ u ]` in the Mission Header preserves the normal frame, but falsely
+  advertises a Release control while a focused overlay explicitly prevents
+  opening another task. Its current inertness is an event-routing accident, not
+  an honest interaction contract.
+- Making Release live through the overlay would create nested task ownership
+  and bypass the Focus Header and Console Back semantics.
+- The selected model keeps version, channel, and update provenance visible but
+  removes the keycap and pointer target for the focused-task lifetime. The
+  normal `[ u ]` Release Control returns unchanged when the task closes. This
+  is an autonomous topic decision, not a recorded maintainer approval.
+
 ### Setup Studio decision
 
 - Recoloring the existing single-column `SettingsList` would retain its proven
@@ -2314,6 +2327,19 @@ already large `supervisor-tui.ts` application controller.
   skipped). Docker installer smoke passes without Node, npm, pnpm, Bun, or an
   Agent Runtime, and package dry-run contains the changed navigation, theme,
   pointer, and Supervisor sources.
+- Focus mode now projects version, channel, and update provenance as a
+  read-only `◇ BUILD` signal in the Mission Header. The normal `[ u ]` Release
+  keycap and its complete pointer target are absent while any focused overlay
+  owns input, then return unchanged with the operational page chrome.
+- Focus-build acceptance remains green across the 133 focused navigation,
+  renderer, pointer, screen, and real-PTY tests. A truecolor 110x30 Transfer
+  capture shows `◇ BUILD v0.91.0-beta.3 · DEV` without an interactive release
+  marker; unit coverage proves the old header location cannot dispatch Update
+  in focus and that ordinary stopped-state chrome still exposes `[ u ]`. CLI
+  build and root TypeScript pass; the 701-file suite passes (700 passed, 1
+  skipped; 6,204 tests passed, 10 skipped). Docker installer smoke passes
+  without Node, npm, pnpm, Bun, or an Agent Runtime, and package dry-run contains
+  the changed Supervisor view and theme sources.
 
 ## Completion Criteria
 

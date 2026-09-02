@@ -100,6 +100,14 @@ describe('Supervisor TUI screen', () => {
     expect(lines.at(-1)).toContain('[ i ] AliceProject  ›  ○ COLD')
     expect(lines.at(-1)).toMatch(/─╯$/u)
 
+    screen.update({ focusTask: 'setup' })
+    const focusLines = screen.render(80)
+    expect(focusLines[0]).toContain('◇ BUILD v0.87.0-beta · DEV')
+    expect(focusLines[0]).not.toContain('[ u ]')
+    expect(screen.handlePointer(pointerClick(70, 1))).toBe(false)
+    expect(actions).toEqual([])
+    screen.update({ focusTask: undefined })
+
     const wideLines = screen.render(120)
     expect(wideLines[1]).toHaveLength(120)
     expect(wideLines.join('\n')).not.toContain('OpenAlice · launch system')

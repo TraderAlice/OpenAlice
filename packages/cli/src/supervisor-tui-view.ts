@@ -99,7 +99,7 @@ export interface SupervisorContextTipView {
 
 export interface SupervisorHeaderRender {
   line: string
-  releaseTarget: {
+  releaseTarget?: {
     startColumn: number
     endColumn: number
   }
@@ -119,12 +119,15 @@ export function renderSupervisorHeaderLayout(
   channel: string,
   width: number,
   notice = '',
+  interactiveRelease = true,
 ): SupervisorHeaderRender {
   const prefix = '╭─ '
   const suffix = ' ─╮'
   const innerWidth = Math.max(1, width - displayWidth(prefix) - displayWidth(suffix))
   const left = width < 54 ? '◆ OpenAlice' : '◆ OpenAlice Supervisor'
-  const release = `${width >= 72 ? '[ u ]' : '↗'} v${version} · ${channel.toUpperCase()}${notice}`
+  const release = `${interactiveRelease
+    ? width >= 72 ? '[ u ]' : '↗'
+    : width >= 72 ? '◇ BUILD' : '◇'} v${version} · ${channel.toUpperCase()}${notice}`
   const releaseBudget = width < 54
     ? Math.max(1, innerWidth - displayWidth(left) - 1)
     : Math.max(1, Math.floor(innerWidth / 2))
@@ -144,10 +147,14 @@ export function renderSupervisorHeaderLayout(
   const startColumn = displayWidth(prefix) + displayWidth(safeLeft) + displayWidth(track) + 1
   return {
     line,
-    releaseTarget: {
-      startColumn,
-      endColumn: startColumn + displayWidth(safeRight) - 1,
-    },
+    ...(interactiveRelease
+      ? {
+          releaseTarget: {
+            startColumn,
+            endColumn: startColumn + displayWidth(safeRight) - 1,
+          },
+        }
+      : {}),
   }
 }
 

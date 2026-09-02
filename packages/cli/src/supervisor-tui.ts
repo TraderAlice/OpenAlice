@@ -3974,6 +3974,7 @@ export class SupervisorScreen implements Component {
       this.snapshot.channel,
       width,
       updateBadge,
+      !this.snapshot.focusTask,
     )
     this.headerReleaseTarget = header.releaseTarget
     const lines = [
