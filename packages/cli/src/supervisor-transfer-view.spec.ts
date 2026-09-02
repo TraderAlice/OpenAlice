@@ -4,6 +4,8 @@ import { displayWidth } from './supervisor-display.ts'
 import {
   decorateSupervisorTransferFlightDeck,
   renderSupervisorTransferFlightDeck,
+  renderSupervisorTransferChoice,
+  renderSupervisorTransferInput,
 } from './supervisor-transfer-view.ts'
 import { createSupervisorTuiTheme } from './supervisor-tui-theme.ts'
 
@@ -68,5 +70,39 @@ describe('Supervisor Transfer Flight Deck', () => {
     )
     expect(color.join('\n')).toContain('\u001b[')
     expect(plain.join('\n')).toContain('◆ 07 Transfer')
+  })
+
+  it('projects entry controls as semantic Mission Console content', () => {
+    expect(renderSupervisorTransferInput(
+      'Destination AliceProject key',
+      ['> research'],
+      'Existing remote AliceProjects are never replaced.',
+    )).toEqual([
+      '◆ Destination AliceProject key',
+      '> research',
+      '',
+      'Existing remote AliceProjects are never replaced.',
+      '',
+      '◆ [ Enter ] Continue  │  [ Esc ] Back',
+    ])
+    expect(renderSupervisorTransferInput(
+      'Destination complete Home',
+      ['> relative'],
+      'Enter an absolute remote path.',
+      true,
+    )[0]).toBe('! Destination complete Home · FIX')
+    const choice = renderSupervisorTransferChoice('Credentials', ['› Transfer and re-seal'])
+    expect(choice).toContain('◆ Credentials')
+    expect(choice).toContain('◆ [ Enter ] Choose  │  [ Esc ] Back')
+  })
+
+  it('keeps Mission Console action hover visible without color', () => {
+    const line = '│ ◆ [ Enter ] Continue  │  [ Esc ] Back │'
+    const plain = decorateSupervisorTransferFlightDeck(
+      [line],
+      createSupervisorTuiTheme({ TERM: 'xterm-256color', NO_COLOR: '1' }),
+      'Enter',
+    )[0]!
+    expect(plain).toContain('│ › [ Enter ] Continue')
   })
 })

@@ -325,6 +325,19 @@ not imply maintainer approval of the finished interaction.
   from the rendered Flight Deck so both responsive forms keep the existing
   keyboard and mutation paths.
 
+### Transfer Mission Console decision
+
+- Keeping raw `Input` and `SelectList` output inside Mission Brief would retain
+  the Flight Deck route, but field purpose, validation failure, and the full
+  action target would still fall back to dependency-default presentation.
+- Replacing the transfer wizard state machine with a new form controller would
+  unify rendering, but duplicate its safety, retry, and recovery ownership.
+- The selected model keeps the existing wizard and projects its entry stages as
+  a Mission Console: semantic field/choice headers, explicit fix state, and
+  whole-segment Continue/Choose/Back shelves. The Flight Deck remains the outer
+  route and Safety Rail; existing `SelectList`, validators, and phase callbacks
+  remain the only navigation and mutation paths.
+
 ### AliceProject Foundry decision
 
 - Keeping the creator as a bordered raw `Input` would preserve its compactness,
@@ -509,6 +522,8 @@ already large `supervisor-tui.ts` application controller.
   while preserving its validate-save-start execution boundary.
 - [x] Replace the legacy Setup Editor fallback with a responsive Workbench
   while preserving the SettingsList validation and applySetting boundary.
+- [x] Replace raw transfer entry controls with Mission Console fields, choices,
+  validation state, and whole-action pointer targets.
 
 ## Progress
 
@@ -942,6 +957,19 @@ already large `supervisor-tui.ts` application controller.
   699-file suite passes (698 passed, 1 skipped; 6137 tests passed, 10 skipped).
   Docker installer smoke passes, and package dry-run retains
   `src/supervisor-setup-view.ts`.
+- Transfer entry now reads as a Mission Console instead of exposing raw Input
+  and SelectList cards inside the Flight Deck. Project identity, destination,
+  credentials, and policy phases use semantic field or choice headers, explicit
+  `FIX` validation state, and whole-segment Continue/Choose/Back shelves while
+  the existing wizard, validators, and transfer controller remain authoritative.
+- Mission-Console acceptance passes with 82 focused view, pointer, screen, and
+  real-PTY tests. The six transfer PTY scenarios include a 110×30 run that used
+  raw SGR pointer input to submit an invalid destination key from outside the
+  keycap, observed the `FIX` state, corrected it, and completed the remaining
+  semantic choice phases. Root TypeScript and CLI build/typecheck pass; the
+  699-file suite passes (698 passed, 1 skipped; 6139 tests passed, 10 skipped).
+  Docker installer smoke passes, and package dry-run retains both
+  `src/supervisor-transfer-view.ts` and `src/supervisor-tui.ts`.
 
 ## Completion Criteria
 

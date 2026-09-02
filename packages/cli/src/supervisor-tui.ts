@@ -193,7 +193,9 @@ import {
 } from './supervisor-transfer.ts'
 import {
   decorateSupervisorTransferFlightDeck,
+  renderSupervisorTransferChoice,
   renderSupervisorTransferFlightDeck,
+  renderSupervisorTransferInput,
 } from './supervisor-transfer-view.ts'
 import {
   createSupervisorAliceProject,
@@ -2423,6 +2425,7 @@ export async function runSupervisorTui(
     } | null = null
     let message = 'Choose the SSH Machine that will own the new AliceProject.'
     let transferController: AbortController | null = null
+    let transferHoveredCommand: string | undefined
     const theme: SelectListTheme = {
       selectedPrefix: (text) => tuiTheme.accentStrong(text),
       selectedText: (text) => tuiTheme.selected(text),
@@ -2437,6 +2440,7 @@ export async function runSupervisorTui(
       transferActive = false
       closeTransfer = null
       overlayPointer.clear()
+      transferHoveredCommand = undefined
       overlay.unfocus?.({ target: screen })
       overlay.hide()
       ui.setShowHardwareCursor(false)
@@ -2453,8 +2457,14 @@ export async function runSupervisorTui(
       activeChoice = null
       const input = new (class extends piTui.Input {
         detailText = detail
+        invalid = false
         override render(width: number): string[] {
-          return [title, '', ...super.render(width), '', sanitize(this.detailText), '', '[ Enter ] Continue · [ Esc ] Back']
+          return renderSupervisorTransferInput(
+            title,
+            super.render(width),
+            sanitize(this.detailText),
+            this.invalid,
+          )
         }
       })()
       input.setValue(initial)
@@ -2464,7 +2474,7 @@ export async function runSupervisorTui(
       input.onSubmit = (value) => {
         const normalized = value.trim()
         const issue = validate(normalized)
-        if (issue) { input.detailText = issue; input.invalidate(); ui.requestRender(); return }
+        if (issue) { input.detailText = issue; input.invalid = true; input.invalidate(); ui.requestRender(); return }
         input.focused = false
         ui.setShowHardwareCursor(false)
         submit(normalized)
@@ -2484,7 +2494,9 @@ export async function runSupervisorTui(
       list.onCancel = back
       activeChoice = { items, list, maxVisible }
       component = new (class implements Component {
-        render(width: number): string[] { return [title, '', ...list.render(width)] }
+        render(width: number): string[] {
+          return renderSupervisorTransferChoice(title, list.render(width))
+        }
         handleInput(data: string): void { list.handleInput(data) }
         invalidate(): void { list.invalidate() }
       })()
@@ -2703,10 +2715,22 @@ export async function runSupervisorTui(
                 endColumn: flightDeck.contentEndColumn,
               }
             : undefined,
+          (label) => {
+            if (transferHoveredCommand === label) return
+            transferHoveredCommand = label
+            ui.requestRender()
+          },
         )
-        return decorateSupervisorTransferFlightDeck(flightDeck.lines, tuiTheme)
+        return decorateSupervisorTransferFlightDeck(
+          flightDeck.lines,
+          tuiTheme,
+          transferHoveredCommand,
+        )
       }
-      handleInput(data: string): void { component.handleInput?.(data) }
+      handleInput(data: string): void {
+        transferHoveredCommand = undefined
+        component.handleInput?.(data)
+      }
       invalidate(): void { component.invalidate() }
     })()
     const overlay = ui.showOverlay(panel, overlayOptions)

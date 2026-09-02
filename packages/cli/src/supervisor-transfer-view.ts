@@ -1,5 +1,8 @@
 import { displayWidth, truncateDisplayWidth } from './supervisor-display.ts'
-import type { SupervisorTuiTheme } from './supervisor-tui-theme.ts'
+import {
+  decorateSupervisorActionShelf,
+  type SupervisorTuiTheme,
+} from './supervisor-tui-theme.ts'
 import { renderSupervisorPanel } from './supervisor-tui-view.ts'
 import type { TransferWizardPhase } from './supervisor-transfer.ts'
 
@@ -16,6 +19,35 @@ export interface SupervisorTransferFlightDeckRender {
   contentFirstRow: number
   contentStartColumn: number
   contentEndColumn: number
+}
+
+export function renderSupervisorTransferInput(
+  title: string,
+  fieldLines: string[],
+  detail: string,
+  invalid = false,
+): string[] {
+  return [
+    `${invalid ? '!' : '◆'} ${title}${invalid ? ' · FIX' : ''}`,
+    ...fieldLines,
+    '',
+    detail,
+    '',
+    '◆ [ Enter ] Continue  │  [ Esc ] Back',
+  ]
+}
+
+export function renderSupervisorTransferChoice(
+  title: string,
+  choiceLines: string[],
+): string[] {
+  return [
+    `◆ ${title}`,
+    '',
+    ...choiceLines,
+    '',
+    '◆ [ Enter ] Choose  │  [ Esc ] Back',
+  ]
 }
 
 interface TransferStage {
@@ -104,9 +136,17 @@ export function renderSupervisorTransferFlightDeck(
 export function decorateSupervisorTransferFlightDeck(
   lines: string[],
   theme: SupervisorTuiTheme,
+  hoveredCommand?: string,
 ): string[] {
-  if (!theme.enabled) return lines
   return lines.map((line) => {
+    const action = [
+      '◆ [ Enter ] Continue  │  [ Esc ] Back',
+      '◆ [ Enter ] Choose  │  [ Esc ] Back',
+    ].find((candidate) => line.includes(candidate))
+    if (action) {
+      return line.replace(action, decorateSupervisorActionShelf(action, theme, hoveredCommand))
+    }
+    if (!theme.enabled) return line
     if (line.startsWith('╭')) return theme.accent(line)
     if (line.startsWith('╰')) return theme.muted(line)
     if (line.startsWith('│ ◆ ')) {
@@ -119,6 +159,7 @@ export function decorateSupervisorTransferFlightDeck(
       return theme.accentStrong(line)
     }
     if (line.includes('FAILED') || line.includes('Transfer failed')) return theme.danger(line)
+    if (line.includes(' · FIX')) return theme.danger(line)
     if (line.includes('ARRIVAL') || line.includes('transfer complete')) return theme.success(line)
     return line
   })

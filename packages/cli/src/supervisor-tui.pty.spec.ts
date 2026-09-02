@@ -367,15 +367,34 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
               child.write('\r')
             }
           } else if (stage === 2 && output.includes('Destination AliceProject key')) {
+            if (scenario === 'success') {
+              stage = 22
+              child.write('\u0005\u0015Bad Key')
+              setTimeout(() => {
+                child.write('\u001b[<35;65;15M')
+                setTimeout(() => child.write('\u001b[<0;65;15M'), 300)
+              }, 100)
+            } else {
+              stage = 3
+              child.write('\r')
+            }
+          } else if (
+            stage === 22
+            && output.includes('! Destination AliceProject key · FIX')
+          ) {
             stage = 3
-            child.write('\r')
+            child.write('\u0005\u0015source')
+            setTimeout(() => {
+              child.write('\u001b[<35;65;15M')
+              setTimeout(() => child.write('\u001b[<0;65;15M'), 300)
+            }, 100)
           } else if (stage === 3 && output.includes('Destination complete Home')) {
             stage = 4
             child.write('\r')
-          } else if (stage === 4 && output.includes('Credentials')) {
+          } else if (stage === 4 && output.includes('◆ Credentials')) {
             stage = 5
             child.write('\r')
-          } else if (stage === 5 && output.includes('Exact-Session scheduled Issue owners')) {
+          } else if (stage === 5 && output.includes('◆ Exact-Session scheduled Issue owners')) {
             stage = 6
             child.write('\r')
           } else if (stage === 6 && (scenario === 'auth-loss' || scenario === 'occupied')) {
@@ -423,9 +442,14 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       if (scenario === 'success') {
         expect(transcript).toContain('Flight Deck · 1/8 · DESTINATION')
         expect(transcript).toContain('Mission Brief · Source → Cloud fixture')
+        expect(transcript).toContain('! Destination AliceProject key · FIX')
+        expect(transcript).toContain('› [ Enter ] Continue')
       } else {
         expect(transcript).toContain('Transfer Flight Deck')
       }
+      expect(transcript).toContain('◆ Destination AliceProject key')
+      expect(transcript).toContain('◆ Credentials')
+      expect(transcript).toContain('◆ [ Enter ] Choose')
       if (scenario === 'checksum-retry' || scenario === 'cancel-retry') {
         expect(transcript).toContain('Transfer Flight Deck · 7/8 · STREAM')
       }

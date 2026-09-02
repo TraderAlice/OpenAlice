@@ -241,6 +241,10 @@ path is intentionally parameter-free:
   key/Home, credential handling, exact-Session Issue policy, checksum review,
   streaming, and arrival. Wide terminals pair route and Brief; the 80-column
   baseline compresses completed/current/next stages above the complete Brief.
+  Entry phases render as a Mission Console with semantic field/choice headers,
+  visible validation repair state, and whole-segment Continue, Choose, and Back
+  actions; these project the existing wizard inputs and lists rather than
+  introducing another transfer controller.
   It renders the same checksum and exclusion plan as the explicit command.
   Default No changes nothing. Success offers separate Start, Connect/Open, and
   Done actions and never auto-starts;
