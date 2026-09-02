@@ -64,6 +64,15 @@ afterEach(() => {
 })
 
 describe('SettingsCategoryList', () => {
+  it('owns the vertical scroll region for long settings navigation', () => {
+    render(<SettingsCategoryList />)
+
+    const list = screen.getByTestId('settings-category-list')
+    expect(list.className).toContain('overflow-y-auto')
+    expect(list.className).toContain('overscroll-contain')
+    expect(list.className).toContain('[scrollbar-gutter:stable]')
+  })
+
   it('hides trading and market-data categories on NanoAlice', () => {
     mocks.product = 'nano'
     render(<SettingsCategoryList />)

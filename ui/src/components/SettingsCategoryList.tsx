@@ -127,7 +127,10 @@ export function SettingsCategoryList({ onSelect }: { onSelect?: () => void }) {
   }, [developerActive])
 
   return (
-    <div className="pb-2">
+    <div
+      data-testid="settings-category-list"
+      className="h-full min-h-0 overflow-y-auto overscroll-contain pb-2 [scrollbar-gutter:stable]"
+    >
       {groups.map((group) => (
         <div key={group.labelKey}>
           <SidebarSectionHeader>{t(group.labelKey)}</SidebarSectionHeader>
