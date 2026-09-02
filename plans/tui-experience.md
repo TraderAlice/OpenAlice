@@ -637,6 +637,22 @@ not imply maintainer approval of the finished interaction.
   its priority and fixed slot, and `NO_COLOR` retains the same structural box.
   This is an autonomous topic decision, not recorded maintainer approval.
 
+### Viewport-aware Fleet window decision
+
+- Stretching the two Fleet panes to consume all surplus height would make the
+  page look grounded, but blank pane rows would become large focus-only mouse
+  surfaces without exposing more useful inventory.
+- Applying one height rule to Fleet, Logs, Doctor, and Help would ignore their
+  different bounded-reader and inspector semantics.
+- The selected model expands only Fleet's real visible window. At 72 columns
+  and wider, the viewport budget may raise the five-row baseline up to the
+  larger of the current Machine or selected AliceProject inventories; it never
+  creates rows beyond real inventory. Rendering, scroll rails, and pointer
+  mapping share that final row count. Narrow drill-down keeps five rows, short
+  terminals preserve the natural complete layout, and remaining surplus stays
+  in the elastic stage. This is an autonomous topic decision, not recorded
+  maintainer approval.
+
 ### Bottom Control Console decision
 
 - Leaving the footer directly after page content preserves the current natural
@@ -985,6 +1001,8 @@ already large `supervisor-tui.ts` application controller.
   instead of dumping the entire remainder into an unowned blank stage.
 - [x] Recompose Activity, actions, and Command Spine into one same-height framed
   Control Console with stateful OMP-style top-rail feedback.
+- [x] Let wide Fleet spend available height on additional real inventory rows
+  before showing a scroll rail or leaving the remainder to the elastic stage.
 - [x] Replace the disconnected title/divider/tabs stack with a same-height
   Mission Header that frames brand, release provenance, and clickable navigation.
 - [x] Anchor the active view with a reduced-motion-safe beacon that travels
@@ -1874,6 +1892,21 @@ already large `supervisor-tui.ts` application controller.
   skipped). Docker installer smoke passes without Node, npm, pnpm, Bun, or an
   Agent Runtime, and package dry-run contains the changed view, theme, and
   Supervisor sources.
+- A real 120x32 Default AliceProject Fleet exposed a false scarcity: six local
+  projects were compressed into five visible rows and a scroll rail while ten
+  usable terminal rows remained unowned below the panel. Wide Fleet now spends
+  its viewport budget on additional real Machine or selected AliceProject rows,
+  capped by actual inventory; narrow drill-down and short terminals retain the
+  five-row baseline, so the change never manufactures blank focus targets.
+- Viewport-aware Fleet acceptance passes with 107 focused renderer, screen,
+  and real-PTY tests. The live truecolor 120x32 Default AliceProject session
+  showed all six projects without a scroll rail, and raw mouse movement plus a
+  click selected `Ui Dev` on row 11 as item 6/6. The isolated six-project PTY
+  covers the same path, while unit coverage proves narrow and 20-row fallback
+  behavior. CLI build/typecheck and root TypeScript pass; the 699-file suite
+  passes (698 passed, 1 skipped; 6,176 tests passed, 10 skipped). Docker
+  installer smoke passes without Node, npm, pnpm, Bun, or an Agent Runtime,
+  and package dry-run contains both changed Supervisor Fleet/TUI sources.
 
 ## Completion Criteria
 

@@ -1280,6 +1280,65 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   })
 
+  it('reveals and clicks a sixth Fleet row before showing a scroll rail', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-fleet-viewport-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 120,
+      rows: 32,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_FIXTURE_FLEET_ROWS: '6',
+        OPENALICE_TUI_MOTION: '0',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    let expandedFleet = ''
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let openedFleet = false
+      let hoveredSixth = false
+      let clickedSixth = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor expanded Fleet timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!openedFleet && output.includes('[Overview]')) {
+          openedFleet = true
+          child.write(']')
+        } else if (!hoveredSixth && output.includes('Local Project 6')) {
+          hoveredSixth = true
+          expandedFleet = output.slice(output.lastIndexOf('Machines · 1/1'))
+          child.write('\u001b[<35;70;11M')
+        } else if (!clickedSixth && output.includes('» Local Project 6')) {
+          clickedSixth = true
+          child.write('\u001b[<0;70;11M')
+        } else if (clickedSixth && output.includes('AliceProjects · This computer · 6/6')) {
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && clickedSixth) resolve(output)
+        else reject(new Error(`Supervisor expanded Fleet exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(stripSgr(expandedFleet)).toContain('Local Project 6')
+    expect(stripSgr(expandedFleet)).not.toContain('█')
+    expect(transcript).toContain('» Local Project 6')
+    expect(transcript).toContain('▶ Local Project 6')
+    expect(transcript).toContain('AliceProjects · This computer · 6/6')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
   it('renders an explicitly selected launch context before detach', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-context-'))
     temporaryPaths.push(isolatedHome)

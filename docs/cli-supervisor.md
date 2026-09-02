@@ -194,6 +194,12 @@ path is intentionally parameter-free:
   surfaces: hovering an inactive pane changes its title marker from `◇` to `»`,
   and clicking transfers focus without selecting or activating a row. The
   inter-pane gutter remains inert.
+  Fleet uses five visible inventory rows as its compact baseline. At 72 columns
+  and wider, surplus viewport height expands that window only as far as real
+  Machine or selected AliceProject inventory requires. Both panes, independent
+  scroll rails, and pointer row mapping consume the same final count, so a tall
+  terminal reveals more real rows before it asks the user to scroll; narrow
+  drill-down and constrained terminals keep the five-row contract.
   With only the local Machine, Fleet focus starts on its current AliceProject;
 - the footer is a contextual Action Shelf, not a complete shortcut legend. It
   exposes a few relevant actions as chips on one full-width surface. On

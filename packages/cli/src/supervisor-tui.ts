@@ -187,6 +187,7 @@ import {
   selectedFleetProject,
   selectFleetProjectByKey,
   setFleetFocus,
+  SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
   supervisorFleetTargetAt,
   type SupervisorFleetPointerTarget,
   type SupervisorFleetState,
@@ -240,6 +241,7 @@ const PROJECT_SCOPE = 'This AliceProject'
 const MACHINE_SCOPE = 'Machine defaults'
 const WIDE_OVERVIEW_MAX_HEIGHT = 17
 const WIDE_OVERVIEW_RESERVED_CHROME_HEIGHT = 6
+const FLEET_VIEWPORT_RESERVED_HEIGHT = 13
 
 interface RuntimeSummary {
   class?: string
@@ -2962,6 +2964,7 @@ export class SupervisorScreen implements Component {
   private navigationTargets: SupervisorNavigationTarget[] = []
   private navigationBeaconColumn?: number
   private hoveredFleetTarget?: SupervisorFleetPointerTarget
+  private fleetVisibleRows = SUPERVISOR_FLEET_MIN_VISIBLE_ROWS
   private hoveredCommandTarget?: SupervisorCommandTarget
   private commandTargets: SupervisorCommandTarget[] = []
   private commandSpineTargets: SupervisorCommandTarget[] = []
@@ -3508,7 +3511,13 @@ export class SupervisorScreen implements Component {
       ? this.snapshot.fleet
       : undefined
     const fleetTarget = fleet
-      ? supervisorFleetTargetAt(fleet, this.renderWidth, event.col, event.row - 4)
+      ? supervisorFleetTargetAt(
+          fleet,
+          this.renderWidth,
+          event.col,
+          event.row - 4,
+          this.fleetVisibleRows,
+        )
       : undefined
     const doctorTarget = !this.commandDeckOpen && this.snapshot.panel === 'doctor'
       ? this.doctorTargets.find((target) => (
@@ -3752,11 +3761,20 @@ export class SupervisorScreen implements Component {
     this.homePrimaryTarget = undefined
     this.homeHotspotTargets = []
     if (this.snapshot.panel === 'fleet' && this.snapshot.fleet) {
+      this.fleetVisibleRows = width >= 72 && Number.isFinite(viewportHeight)
+        ? Math.max(
+            SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
+            Math.floor(viewportHeight ?? 0)
+              - lines.length
+              - FLEET_VIEWPORT_RESERVED_HEIGHT,
+          )
+        : SUPERVISOR_FLEET_MIN_VISIBLE_ROWS
       lines.push(...renderSupervisorFleet(
         this.snapshot.fleet,
         width,
         this.hoveredFleetTarget,
         this.runtimePulse,
+        this.fleetVisibleRows,
       ))
     } else if (this.snapshot.panel === 'logs') {
       const logs = renderSupervisorLogs(

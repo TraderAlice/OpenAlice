@@ -922,6 +922,49 @@ describe('Supervisor TUI screen', () => {
     expect(screen.snapshot.fleet?.focus).toBe('machines')
   })
 
+  it('gives wide Fleet real inventory rows from the live viewport budget', () => {
+    let viewportHeight = 32
+    const inventory = fleetMachines()
+    const template = inventory[0]!.projects[0]!
+    inventory[0] = {
+      ...inventory[0]!,
+      projects: Array.from({ length: 6 }, (_, index) => ({
+        ...template,
+        key: index === 0 ? 'default' : `local-${index + 1}`,
+        id: `alice-project-local-${index + 1}`,
+        displayName: index === 0 ? 'Default AliceProject' : `Local Project ${index + 1}`,
+        home: `/home/alice/local-${index + 1}`,
+        isDefault: index === 0,
+      })),
+    }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'fleet',
+      runtime: { class: 'absent', endpoints: {} },
+      fleet: createSupervisorFleetState(
+        '2026-08-23T00:00:00Z',
+        inventory,
+        'default',
+      ),
+    }, {
+      getViewportHeight: () => viewportHeight,
+      motionEnabled: false,
+    })
+
+    const expanded = screen.render(120).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
+    expect(expanded).toHaveLength(32)
+    expect(expanded.join('\n')).toContain('Local Project 6')
+    expect(expanded.join('\n')).not.toContain('█')
+    expect(expanded.at(-3)).toContain('CONTROL CONSOLE')
+
+    viewportHeight = 20
+    const constrained = screen.render(120).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
+    expect(constrained).toHaveLength(20)
+    expect(constrained.join('\n')).not.toContain('Local Project 6')
+    expect(constrained.join('\n')).toContain('█')
+  })
+
   it('styles the application frame and routes pointer tabs and Fleet wheel input', () => {
     const actions: SupervisorAction[] = []
     const activated: string[] = []

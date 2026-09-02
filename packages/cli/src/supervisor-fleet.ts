@@ -9,6 +9,8 @@ export { displayWidth, truncateDisplayWidth } from './supervisor-display.ts'
 
 export type FleetFocus = 'machines' | 'projects'
 
+export const SUPERVISOR_FLEET_MIN_VISIBLE_ROWS = 5
+
 export interface SupervisorFleetState {
   generatedAt: string
   machines: MachineInventory[]
@@ -178,8 +180,18 @@ export function renderSupervisorFleet(
   width: number,
   hovered?: SupervisorFleetPointerTarget,
   pulse = false,
+  visibleRows = SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
 ): string[] {
-  if (width < 72) return renderNarrowFleet(state, width, hovered, pulse)
+  if (width < 72) {
+    return renderNarrowFleet(
+      state,
+      width,
+      hovered,
+      pulse,
+      SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
+    )
+  }
+  const rowCount = fleetVisibleRows(state, visibleRows)
   const leftWidth = Math.max(28, Math.min(36, Math.floor(width * 0.38)))
   const gap = 3
   const rightWidth = Math.max(1, width - leftWidth - gap)
@@ -190,6 +202,7 @@ export function renderSupervisorFleet(
     leftWidth - 4,
     hovered,
     state.focus === 'machines',
+    rowCount,
   )
   const projectRows = renderProjectRows(
     state,
@@ -197,6 +210,7 @@ export function renderSupervisorFleet(
     hovered,
     pulse,
     state.focus === 'projects',
+    rowCount,
   )
   const leftPane = renderPane(
     `Machines · ${positionLabel(state.selectedMachine, state.machines.length)}`,
@@ -204,6 +218,7 @@ export function renderSupervisorFleet(
     leftWidth,
     state.focus === 'machines',
     hovered?.surface === 'pane' && hovered.focus === 'machines',
+    rowCount,
   )
   const rightPane = renderPane(
     `AliceProjects · ${machine?.displayName ?? 'none'} · ${positionLabel(projectIndex, machine?.projects.length ?? 0)}`,
@@ -211,9 +226,10 @@ export function renderSupervisorFleet(
     rightWidth,
     state.focus === 'projects',
     hovered?.surface === 'pane' && hovered.focus === 'projects',
+    rowCount,
   )
   const lines: string[] = []
-  for (let index = 0; index < FLEET_VISIBLE_ROWS + 2; index += 1) {
+  for (let index = 0; index < rowCount + 2; index += 1) {
     lines.push(joinColumns(
       leftPane[index] ?? '',
       rightPane[index] ?? '',
@@ -231,16 +247,18 @@ function renderNarrowFleet(
   width: number,
   hovered?: SupervisorFleetPointerTarget,
   pulse = false,
+  rowCount = SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
 ): string[] {
   const machine = selectedFleetMachine(state)
   if (state.focus === 'machines') {
     return [
       ...renderPane(
         `Machines · ${positionLabel(state.selectedMachine, state.machines.length)}`,
-        renderMachineRows(state, width - 4, hovered, true),
+        renderMachineRows(state, width - 4, hovered, true, rowCount),
         width,
         true,
         hovered?.surface === 'pane',
+        rowCount,
       ),
       '',
       ...renderDetailCard(state, width, pulse),
@@ -249,10 +267,11 @@ function renderNarrowFleet(
   return [
     ...renderPane(
       `AliceProjects · ${machine?.displayName ?? 'none'} · ${positionLabel(state.selectedProjects[machine?.key ?? ''] ?? 0, machine?.projects.length ?? 0)}`,
-      renderProjectRows(state, width - 4, hovered, pulse, true),
+      renderProjectRows(state, width - 4, hovered, pulse, true, rowCount),
       width,
       true,
       hovered?.surface === 'pane',
+      rowCount,
     ),
     '',
     ...renderDetailCard(state, width, pulse),
@@ -264,8 +283,12 @@ export function supervisorFleetTargetAt(
   width: number,
   column: number,
   row: number,
+  visibleRows = SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
 ): SupervisorFleetPointerTarget | undefined {
-  if (row < 1 || row > FLEET_VISIBLE_ROWS + 1) return undefined
+  const rowCount = width < 72
+    ? SUPERVISOR_FLEET_MIN_VISIBLE_ROWS
+    : fleetVisibleRows(state, visibleRows)
+  if (row < 1 || row > rowCount + 1) return undefined
   if (width < 72) {
     const items = state.focus === 'machines'
       ? state.machines
@@ -275,7 +298,7 @@ export function supervisorFleetTargetAt(
       : state.selectedProjects[selectedFleetMachine(state)?.key ?? ''] ?? 0
     if (row === 1) return { focus: state.focus, index: selected, surface: 'pane' }
     const offset = row - 2
-    const index = visibleWindowStart(items.length, selected, FLEET_VISIBLE_ROWS) + offset
+    const index = visibleWindowStart(items.length, selected, rowCount) + offset
     return index < items.length
       ? { focus: state.focus, index }
       : { focus: state.focus, index: selected, surface: 'pane' }
@@ -294,7 +317,7 @@ export function supervisorFleetTargetAt(
     const index = visibleWindowStart(
       state.machines.length,
       state.selectedMachine,
-      FLEET_VISIBLE_ROWS,
+      rowCount,
     ) + offset
     return index < state.machines.length
       ? { focus, index }
@@ -305,7 +328,7 @@ export function supervisorFleetTargetAt(
   const selected = state.selectedProjects[machine.key] ?? 0
   if (row === 1) return { focus, index: selected, surface: 'pane' }
   const offset = row - 2
-  const index = visibleWindowStart(machine.projects.length, selected, FLEET_VISIBLE_ROWS) + offset
+  const index = visibleWindowStart(machine.projects.length, selected, rowCount) + offset
   return index < machine.projects.length
     ? { focus, index }
     : { focus, index: selected, surface: 'pane' }
@@ -316,10 +339,11 @@ function renderMachineRows(
   width: number,
   hovered?: SupervisorFleetPointerTarget,
   focused = true,
+  visibleRows = SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
 ): string[] {
   if (state.machines.length === 0) return ['  No Machines registered']
-  const start = visibleWindowStart(state.machines.length, state.selectedMachine, FLEET_VISIBLE_ROWS)
-  const rows = visibleWindow(state.machines, state.selectedMachine, FLEET_VISIBLE_ROWS).map(({ item, index }) => {
+  const start = visibleWindowStart(state.machines.length, state.selectedMachine, visibleRows)
+  const rows = visibleWindow(state.machines, state.selectedMachine, visibleRows).map(({ item, index }) => {
     const selected = index === state.selectedMachine
     const prefix = selected
       ? focused ? '▶ ' : '◁ '
@@ -339,6 +363,7 @@ function renderProjectRows(
   hovered?: SupervisorFleetPointerTarget,
   pulse = false,
   focused = true,
+  visibleRows = SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
 ): string[] {
   const machine = selectedFleetMachine(state)
   if (!machine) return ['  Select a Machine']
@@ -347,8 +372,8 @@ function renderProjectRows(
   }
   if (machine.projects.length === 0) return ['  No registered AliceProjects']
   const selectedIndex = state.selectedProjects[machine.key] ?? 0
-  const start = visibleWindowStart(machine.projects.length, selectedIndex, FLEET_VISIBLE_ROWS)
-  const rows = visibleWindow(machine.projects, selectedIndex, FLEET_VISIBLE_ROWS).map(({ item, index }) => {
+  const start = visibleWindowStart(machine.projects.length, selectedIndex, visibleRows)
+  const rows = visibleWindow(machine.projects, selectedIndex, visibleRows).map(({ item, index }) => {
     const prefix = index === selectedIndex
       ? focused ? '▶ ' : '◁ '
       : hovered?.surface !== 'pane' && hovered?.focus === 'projects' && hovered.index === index ? '» ' : '  '
@@ -389,7 +414,7 @@ function renderPane(
   width: number,
   focused?: boolean,
   hovered = false,
-  rowCount = FLEET_VISIBLE_ROWS,
+  rowCount = SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
 ): string[] {
   const safeWidth = Math.max(12, width)
   const innerWidth = safeWidth - 4
@@ -465,7 +490,17 @@ function visibleWindowStart(length: number, selected: number, limit: number): nu
   return Math.min(Math.max(0, selected - Math.floor(limit / 2)), length - limit)
 }
 
-const FLEET_VISIBLE_ROWS = 5
+function fleetVisibleRows(state: SupervisorFleetState, requested: number): number {
+  const inventoryRows = Math.max(
+    SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
+    state.machines.length,
+    selectedFleetMachine(state)?.projects.length ?? 0,
+  )
+  const safeRequested = Number.isFinite(requested)
+    ? Math.max(SUPERVISOR_FLEET_MIN_VISIBLE_ROWS, Math.floor(requested))
+    : SUPERVISOR_FLEET_MIN_VISIBLE_ROWS
+  return Math.min(safeRequested, inventoryRows)
+}
 
 function formatChecked(value: string): string {
   const date = new Date(value)

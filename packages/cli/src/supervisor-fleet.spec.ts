@@ -93,6 +93,35 @@ describe('Supervisor fleet state and presentation', () => {
     expect(bottom).toContain('│')
   })
 
+  it('spends a larger viewport window on real Fleet inventory before scrolling', () => {
+    const inventory = Array.from({ length: 7 }, (_, index) => machine(
+      `machine-${index}`,
+      `Machine ${index + 1}`,
+      index === 0 ? 'local' : 'online',
+      Array.from({ length: 8 }, (_, projectIndex) => project(
+        `project-${projectIndex}`,
+        `Project ${projectIndex + 1}`,
+      )),
+    ))
+    const state = createSupervisorFleetState('2026-08-23T00:00:00Z', inventory)
+    const expanded = renderSupervisorFleet(state, 100, undefined, false, 8)
+
+    expect(expanded).toHaveLength(15)
+    expect(expanded.join('\n')).toContain('Machine 7')
+    expect(expanded.join('\n')).toContain('Project 8')
+    expect(expanded.join('\n')).not.toContain('█')
+    expect(supervisorFleetTargetAt(state, 100, 50, 9, 8)).toEqual({
+      focus: 'projects',
+      index: 7,
+    })
+    expect(supervisorFleetTargetAt(state, 100, 50, 10, 8)).toBeUndefined()
+
+    const narrow = renderSupervisorFleet(state, 46, undefined, false, 8)
+    expect(narrow).toHaveLength(12)
+    expect(narrow.join('\n')).not.toContain('Machine 7')
+    expect(supervisorFleetTargetAt(state, 46, 8, 7, 8)).toBeUndefined()
+  })
+
   it('maps pointer rows to visible Machine and AliceProject selections', () => {
     let state = createSupervisorFleetState('2026-08-23T00:00:00Z', machines())
     expect(supervisorFleetTargetAt(state, 80, 4, 3)).toEqual({
