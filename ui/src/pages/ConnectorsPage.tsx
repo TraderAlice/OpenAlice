@@ -1006,7 +1006,7 @@ function ConnectorChoiceField({
                   if (event.target.checked) onChange(option.value)
                 }}
               />
-              <span className={`oa-pressable flex min-h-12 items-center gap-2.5 rounded-lg border px-3 py-2 text-left peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-ring/45 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background ${
+              <span className={`oa-pressable flex min-h-12 items-center gap-2.5 rounded-lg border px-3 py-2 text-left peer-focus-visible:outline-none peer-focus-visible:[box-shadow:var(--oa-focus-shadow)] ${
                 selected
                   ? 'border-foreground/20 bg-accent text-foreground'
                   : 'border-border bg-background/60 text-foreground hover:border-foreground/15 hover:bg-secondary/35'
@@ -1118,13 +1118,15 @@ function ConnectorCredentialsEditor({
         aria-expanded={open}
         aria-controls={credentialsId}
         onClick={onToggle}
-        className="h-auto min-h-12 w-full justify-between gap-3 px-3.5 py-3 text-left hover:bg-secondary/35"
+        className="h-auto min-h-11 w-full justify-between gap-3 rounded-none px-3.5 py-2.5 text-left hover:bg-secondary/30"
       >
         <span className="flex min-w-0 items-center gap-2.5">
-          <KeyRound size={15} className="shrink-0 text-muted-foreground" aria-hidden />
-          <span className="text-[12px] font-medium text-foreground">{t('connectorSettings.connectionDetails')}</span>
-          <span className={`rounded-md px-2 py-0.5 text-[9.5px] leading-[14px] font-medium ${
-            ready ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'
+          <span className="flex size-5 shrink-0 items-center justify-center text-muted-foreground">
+            <KeyRound size={14} aria-hidden />
+          </span>
+          <span className="text-[12.5px] font-medium leading-[18px] text-foreground">{t('connectorSettings.connectionDetails')}</span>
+          <span className={`rounded-sm border px-1.5 py-px text-[9.5px] font-medium leading-[14px] ${
+            ready ? 'border-success/20 text-success' : 'border-warning/20 text-warning'
           }`}>
             {ready ? t('connectorSettings.saved') : t('connectorSettings.required')}
           </span>
@@ -1141,10 +1143,10 @@ function ConnectorCredentialsEditor({
         id={credentialsId}
         hidden={!open}
         inert={!open ? true : undefined}
-        className="border-t border-border/60 px-3.5 pb-4 pt-3"
+        className={`border-t border-border/60 px-3.5 pb-4 ${open ? 'oa-disclosure-enter' : ''}`}
       >
         {!ready && <ConnectorSetupGuide definition={definition} t={t} />}
-        <p className="mb-4 text-[11.5px] leading-5 text-muted-foreground">
+        <p className="mb-4 pt-3 text-[11.5px] leading-5 text-muted-foreground">
           {t('connectorSettings.secretsNote')}
         </p>
         {credentialFields.map((field) => {
@@ -1211,7 +1213,7 @@ function ConnectorCredentialsEditor({
                         aria-label={`${definition.label} ${fieldLabel}`}
                         aria-invalid={secretError ? true : undefined}
                         aria-describedby={secretError ? inputErrorId : undefined}
-                        className={`${inputClass} pr-10 ${secretError ? '!border-destructive/60 focus:!border-destructive' : ''}`}
+                        className={`${inputClass} pr-10 ${secretError ? '!border-destructive/60' : ''}`}
                         type={secretMasked ? 'password' : 'text'}
                         required={fieldMissing}
                         value={secretDraft}
@@ -1355,13 +1357,13 @@ function ConnectorSetupGuide({ definition, t }: { definition: ConnectorDefinitio
     .filter((step) => typeof step === 'string' && step.trim().length > 0)
 
   return (
-    <aside className="mb-4 rounded-lg border border-primary/15 bg-primary/[0.045] p-3.5">
-      <div className="flex items-start gap-3">
-        <span className="flex size-8 shrink-0 items-center justify-center text-primary">
-          <ListChecks size={16} aria-hidden />
+    <aside className="border-b border-border/60 py-3.5">
+      <div className="flex items-start gap-2.5">
+        <span className="flex size-5 shrink-0 items-center justify-center text-primary">
+          <ListChecks size={15} aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
-          <h4 className="text-[12.5px] font-semibold text-foreground">
+          <h4 className="text-[12.5px] font-semibold leading-[18px] text-foreground">
             {t('connectorSettings.setupGuide.title', { name: definition.label })}
           </h4>
           <p className="mt-0.5 text-[11.5px] leading-5 text-muted-foreground">
@@ -1372,7 +1374,7 @@ function ConnectorSetupGuide({ definition, t }: { definition: ConnectorDefinitio
         </div>
       </div>
       {definition.setupLinks && definition.setupLinks.length > 0 && (
-        <div data-connector-setup-links className="mt-3 flex flex-wrap gap-2 pl-11">
+        <div data-connector-setup-links className="mt-2.5 flex flex-wrap gap-1.5 pl-7.5">
           {definition.setupLinks.map((link) => {
             const label = t(`connectorSettings.setupGuide.links.${link.key}`, {
               defaultValue: t('connectorSettings.setupGuide.openSetup', { name: definition.label }),
@@ -1384,7 +1386,7 @@ function ConnectorSetupGuide({ definition, t }: { definition: ConnectorDefinitio
                 target="_blank"
                 rel="noreferrer"
                 aria-label={t('connectorSettings.setupGuide.openSetupAria', { label })}
-                className="oa-pressable inline-flex h-8 items-center gap-1.5 rounded-md border border-primary/20 bg-background/65 px-2.5 py-1.5 text-[11px] leading-[15px] font-medium text-primary hover:border-primary/40 hover:bg-primary/5"
+                className="oa-pressable inline-flex h-8 items-center gap-1.5 rounded-md border border-border/80 bg-background px-2.5 text-[11px] font-medium leading-[15px] text-primary hover:border-foreground/20 hover:bg-secondary/40 focus-visible:outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
               >
                 {label}
                 <ExternalLink size={12} aria-hidden />
@@ -1394,7 +1396,7 @@ function ConnectorSetupGuide({ definition, t }: { definition: ConnectorDefinitio
         </div>
       )}
       {steps.length > 0 && (
-        <ol className="mt-3 space-y-2 pl-11 text-[11.5px] leading-5 text-foreground/90">
+        <ol className="mt-2.5 space-y-1.5 pl-7.5 text-[11.5px] leading-5 text-foreground/90">
           {steps.map((step, index) => (
             <li key={step} className="flex gap-2">
               <span className="w-4 shrink-0 text-right text-[10px] leading-[14px] font-medium tabular-nums text-muted-foreground">
