@@ -6,6 +6,7 @@ import { createSupervisorFleetState, displayWidth, selectedFleetProject } from '
 import {
   createSupervisorTuiTheme,
   decorateSupervisorActionShelf,
+  decorateSupervisorFramedColumns,
   decorateSupervisorFrame,
 } from './supervisor-tui-theme.ts'
 import {
@@ -868,6 +869,102 @@ describe('Supervisor TUI screen', () => {
       line,
       createSupervisorTuiTheme({ TERM: 'xterm-256color', NO_COLOR: '1' }),
     )).toBe(line)
+  })
+
+  it('contains split-pane semantic focus inside each framed column', () => {
+    const theme = createSupervisorTuiTheme({ TERM: 'xterm-256color' })
+    const selected = '│ › ! Runtime ownership needs review   │   │ Evidence remains neutral           │'
+    const hovered = '│ » · 19  Runtime event                  │   │ Raw event remains neutral          │'
+    const intent = '│ ◆ LAUNCH READY · LOCAL RUNTIME         │   │ Process                       ○ COLD │'
+
+    for (const [line, escape] of [
+      [selected, '\u001b[1;38;2;230;255;252;48;2;24;64;69m'],
+      [hovered, '\u001b[38;2;92;220;211m'],
+      [intent, '\u001b[38;2;189;229;255;48;2;17;35;52m'],
+    ] as const) {
+      const decorated = decorateSupervisorFramedColumns(line, theme)
+      const [left, right] = decorated.split(/(?<=│) {3}(?=│)/u)
+      expect(left).toContain(escape)
+      expect(right).not.toContain('\u001b[')
+      expect(decorated.replace(/\u001b\[[0-9;]*m/gu, '')).toBe(line)
+    }
+
+    expect(decorateSupervisorFramedColumns(
+      selected,
+      createSupervisorTuiTheme({ TERM: 'xterm-256color', NO_COLOR: '1' }),
+    )).toBe(selected)
+  })
+
+  it('keeps wide Overview, Fleet, Logs, Doctor, and Help focus inside its owning pane', () => {
+    const theme = createSupervisorTuiTheme({ TERM: 'xterm-256color' })
+    const selectedEscape = '\u001b[1;38;2;230;255;252;48;2;24;64;69m'
+    const columnsFor = (line: string) => line.split(/(?<=│) {3}(?=│)/u)
+    const plain = (line: string) => line.replace(/\u001b\[[0-9;]*m/gu, '')
+    const expectNeutralInspector = (lines: string[], marker: string, escape: string) => {
+      const row = lines.find((line) => plain(line).includes(marker))
+      expect(row).toBeDefined()
+      const [owner, inspector] = columnsFor(row!)
+      expect(owner).toContain(escape)
+      expect(inspector).not.toContain('\u001b[')
+    }
+
+    const overview = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'absent', endpoints: {} },
+    }, { theme, motionEnabled: false }).render(100)
+    expectNeutralInspector(
+      overview,
+      '◆ LAUNCH READY · LOCAL RUNTIME',
+      '\u001b[38;2;189;229;255;48;2;17;35;52m',
+    )
+
+    const fleet = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'absent', endpoints: {} },
+      fleet: createSupervisorFleetState('2026-09-02T00:00:00Z', fleetMachines(), 'default'),
+    }, { theme, motionEnabled: false }).render(100)
+    const fleetRow = fleet.find((line) => plain(line).includes('› This computer'))
+    expect(fleetRow).toBeDefined()
+    const fleetColumns = columnsFor(fleetRow!)
+    expect(fleetColumns).toHaveLength(2)
+    expect(fleetColumns[0]).toContain(selectedEscape)
+    expect(fleetColumns[1]).toContain(selectedEscape)
+    expect(fleetRow).toContain('\u001b[0m │   │ ')
+
+    const logs = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'logs',
+      runtime: { class: 'running', endpoints: {} },
+      logs: { entries: [{ text: 'first' }, { text: 'second' }] },
+    }, { theme, motionEnabled: false }).render(100)
+    expectNeutralInspector(logs, '› · 2', selectedEscape)
+
+    const doctor = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'doctor',
+      runtime: { class: 'running', endpoints: {} },
+      doctor: {
+        overall: 'warning',
+        summary: { passed: 1, warnings: 1, failures: 0 },
+        checks: [
+          { status: 'warning', summary: 'Runtime ownership needs review', detail: 'Evidence stays readable.' },
+          { status: 'pass', summary: 'Runtime reachable' },
+        ],
+      },
+    }, { theme, motionEnabled: false }).render(100)
+    expectNeutralInspector(doctor, '› ! Runtime ownership', selectedEscape)
+
+    const help = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'help',
+      runtime: { class: 'running', endpoints: {} },
+    }, { theme, motionEnabled: false }).render(100)
+    expectNeutralInspector(help, '› ◆ Navigation', selectedEscape)
   })
 
   it('scrolls Logs and Doctor with keyboard and pointer while keeping contextual controls', () => {

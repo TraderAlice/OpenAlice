@@ -203,6 +203,12 @@ path is intentionally parameter-free:
   layout composes adjacent framed cards, theme decoration classifies each card
   column independently at the rendered gutter; a primary action in one card
   must not color fields, borders, or whitespace in its neighbor;
+- wide split-pane content follows the same containment contract. Selection,
+  pointer hover, diagnostic severity, and launch-intent styling own only the
+  inner content of the framed column that carries that semantic state. The
+  gutter, borders, and semantically neutral neighboring pane remain unchanged;
+  independent semantic rows in both panes may still style themselves. Single-
+  pane and `NO_COLOR` output retain their existing plain-text structure;
 - a persistent full-width Command Spine closes the application with `╰─`/`─╯`
   while keeping `[ / ] Commands` and `[ q ] Detach` visible on every Supervisor
   page. A flexible track joins those controls to an OMP-style breadcrumb of the

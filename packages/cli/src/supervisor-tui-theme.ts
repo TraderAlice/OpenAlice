@@ -159,6 +159,9 @@ export function decorateSupervisorFrame(
       const keycap = `[ ${options.hoveredCommand.label} ]`
       return line.replace(keycap, theme.selected(keycap))
     }
+    if (splitFramedColumns(line).length > 1) {
+      return decorateSupervisorFramedColumns(line, theme)
+    }
     if (/^[⠀-⣿◆]  WORKING /u.test(line)) return theme.busyRail(line)
     if (line.startsWith('✓  READY')) return theme.successRail(line)
     if (line.startsWith('!  NOTICE')) return theme.warningRail(line)
@@ -212,6 +215,40 @@ export function decorateSupervisorFrame(
     ) return theme.accentStrong(line)
     return line
   })
+}
+
+export function decorateSupervisorFramedColumns(
+  line: string,
+  theme: SupervisorTuiTheme,
+): string {
+  return splitFramedColumns(line).map((column) => {
+    const trimmed = column.trimEnd()
+    if (!trimmed.startsWith('│ ') || !trimmed.endsWith(' │')) return column
+    const content = trimmed.slice(2, -2)
+    const semantic = content.trimStart()
+    const style = semantic.startsWith('› ') || semantic.startsWith('▶ ')
+      ? theme.selected
+      : semantic.startsWith('» ')
+        ? theme.accent
+        : semantic.startsWith('× ATTENTION')
+          ? theme.dangerRail
+          : semantic.startsWith('◇ CHECKING')
+            ? theme.warningRail
+            : semantic.startsWith('● LIVE SESSION')
+              ? theme.successRail
+              : semantic.startsWith('◆ LAUNCH READY')
+                ? theme.infoRail
+                : semantic.startsWith('× ')
+                  ? theme.danger
+                  : semantic.startsWith('! ')
+                    ? theme.warning
+                    : semantic.startsWith('✓ ')
+                      ? theme.success
+                      : undefined
+    if (!style) return column
+    const trailing = column.slice(trimmed.length)
+    return `│ ${style(content)} │${trailing}`
+  }).join('   ')
 }
 
 function decorateBrandMarkLine(

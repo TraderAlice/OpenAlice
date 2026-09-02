@@ -373,17 +373,18 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 8_000)
       child.onData((data) => {
         output += data
+        const plainOutput = output.replace(/\u001b\[[0-9;?<>]*[A-Za-z~]/gu, '')
         if (
           !hovered
-          && output.includes('OpenAlice · launch system')
-          && output.includes('◆ ALICEPROJECT')
+          && plainOutput.includes('OpenAlice · launch system')
+          && plainOutput.includes('◆ ALICEPROJECT')
         ) {
           hovered = true
           child.write('\u001b[<35;50;17M')
-        } else if (!clicked && output.includes('│ › [ Enter ]')) {
+        } else if (!clicked && plainOutput.includes('│ › [ Enter ]')) {
           clicked = true
           child.write('\u001b[<0;50;17M')
-        } else if (clicked && output.includes('OpenAlice started and opened in your browser.')) {
+        } else if (clicked && plainOutput.includes('OpenAlice started and opened in your browser.')) {
           child.write('q')
         }
       })
@@ -400,7 +401,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).not.toMatch(
       /\u001b\[1;38;2;183;255;248;48;2;18;54;59m[^\u001b\r\n]*Uptime/u,
     )
-    expect(transcript).toContain('│ › [ Enter ]')
+    expect(transcript.replace(/\u001b\[[0-9;?<>]*[A-Za-z~]/gu, '')).toContain('│ › [ Enter ]')
     expect(transcript).toContain('FIXTURE_RESULT starts=1 opens=1')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')

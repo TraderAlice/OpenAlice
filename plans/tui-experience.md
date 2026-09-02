@@ -119,6 +119,21 @@ not imply maintainer approval of the finished interaction.
   recomposed with an unstyled gutter. `NO_COLOR` remains byte-for-byte plain,
   and the fix becomes shared protection for every future wide TUI surface.
 
+### Split-pane focus containment decision
+
+- Keeping row-level semantic decoration is simple, but a selected row in one
+  pane paints the adjacent Inspector at the same terminal row, visually joining
+  two independent surfaces into one focus band.
+- Removing background focus from split views would prevent bleed but weaken
+  pointer and keyboard position precisely where dense operational lists need it.
+- The selected model extends framed-column composition beyond Action Shelves.
+  Fleet, Logs, Doctor, Help, and wide Overview rows are split at the rendered
+  `│   │` gutter, then selected, hovered, pass/warn/fail, and launch-intent
+  semantics decorate only the owning card's inner content. Borders, gutter, and
+  semantically neutral neighbor columns remain untouched. Single-pane and
+  `NO_COLOR` output keep their current byte contract. This is an autonomous
+  topic decision, not a recorded maintainer approval.
+
 ### Global command discovery decision
 
 - Restyling the legacy detach hint would improve finish but not discoverability.
@@ -726,6 +741,8 @@ already large `supervisor-tui.ts` application controller.
   its Action Shelf focused on supporting commands.
 - [x] Contain semantic Action Shelf color inside its framed column when wide
   layouts compose adjacent cards.
+- [x] Contain split-pane selection, hover, diagnostic, and launch-intent styling
+  inside the owning framed column.
 - [x] Replace the legacy global shortcut hint with a clickable command dock and
   contextual `/` Command Deck.
 - [x] Project structured Runtime logs into semantic event rows while preserving
@@ -1449,6 +1466,19 @@ already large `supervisor-tui.ts` application controller.
   tests passed, 10 skipped). Docker installer smoke passes without Node, npm,
   pnpm, Bun, or an Agent Runtime, and package dry-run contains the changed view,
   theme, and Supervisor controller sources.
+- Wide split-pane semantic decoration now stops at the owning card's inner
+  content. Overview launch intent, Fleet selections, Logs hover/selection,
+  Doctor severity, and Help selection no longer paint the gutter, borders, or
+  a neutral Inspector at the same terminal row; independently semantic content
+  in the neighboring pane still receives its own status treatment.
+- Split-pane containment acceptance passes with 100 focused screen and
+  real-PTY tests. A real truecolor 100×30 Default AliceProject session walked
+  Overview, Fleet, Logs, Doctor, and Help and confirmed independent card focus;
+  detach restored cursor, bracketed-paste, mouse, and alternate-screen modes.
+  CLI build/typecheck and root TypeScript pass; the 699-file suite passes (698
+  passed, 1 skipped; 6,155 tests passed, 10 skipped). Docker installer smoke
+  passes without Node, npm, pnpm, Bun, or an Agent Runtime, and package dry-run
+  contains the changed TUI theme source.
 
 ## Completion Criteria
 
