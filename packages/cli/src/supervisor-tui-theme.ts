@@ -145,7 +145,6 @@ export function decorateSupervisorFrame(
     if (line.startsWith('╭─ ×  ERROR')) return theme.dangerRail(line)
     if (line.startsWith('╭─ ◆  STATUS')) return theme.infoRail(line)
     if (line.startsWith('╭─ ◇  PREVIEW')) return theme.navigationHover(line)
-    if (line.startsWith('╭─ ◇  CONTROL CONSOLE')) return theme.accent(line)
     if (isSupervisorActionShelf(line)) {
       return decorateSupervisorActionShelf(
         line,
@@ -214,6 +213,12 @@ export function decorateSupervisorFrame(
     if (line.includes('│ ○  NO CHECKS')) return theme.infoRail(line)
     if (line.includes('│ × ATTENTION')) return theme.dangerRail(line)
     if (line.includes('│ ◇ CHECKING')) return theme.warningRail(line)
+    if (/│ (?:NOW|ATTENTION|RECENT)\s*$/u.test(line)
+      || /│ (?:NOW|ATTENTION|RECENT)\s+│/u.test(line)) return theme.accentStrong(line)
+    if (line.includes('│ ◆ Inbox')) return theme.warning(line)
+    if (line.includes('│ ! Connection')) return theme.warning(line)
+    if (line.includes('│ × Connection')) return theme.danger(line)
+    if (line.includes('│ ● Connection')) return theme.success(line)
     if (line.includes('│ NAVIGATION') || line.includes('│ RUNTIME') || line.includes('│ PROJECT') || line.includes('│ RECOVERY') || line.includes('│ PRIMARY') || line.includes('│ OBSERVE') || line.includes('│ MANAGE')) {
       return theme.accentStrong(line)
     }
@@ -395,11 +400,14 @@ function decorateSingleSupervisorActionShelf(
   const separator = '  │  '
   const trimmed = line.trimEnd()
   const framed = trimmed.startsWith('│ ') && trimmed.endsWith(' │')
-  const prefix = framed ? '│ ' : ''
-  const suffix = framed ? ' │' : ''
-  const rawContent = framed ? trimmed.slice(2, -2) : trimmed
+  const capped = trimmed.startsWith('╭─ ') && trimmed.endsWith('╮')
+  const prefix = framed ? '│ ' : capped ? '╭─ ' : ''
+  const suffix = framed ? ' │' : capped ? '╮' : ''
+  const rawContent = framed
+    ? trimmed.slice(2, -2)
+    : capped ? trimmed.slice(3, -1) : trimmed
   const content = rawContent.trimEnd()
-  const trailing = framed
+  const trailing = framed || capped
     ? rawContent.slice(content.length)
     : line.slice(trimmed.length)
   const parts = content.split(separator)
@@ -419,8 +427,8 @@ function decorateSingleSupervisorActionShelf(
     const joiner = key && key === hoveredCommand ? ' │ › ' : separator
     return `${result}${theme.actionRail(joiner)}${part}`
   }, '')
-  const framedPrefix = framed ? theme.actionRail(prefix) : prefix
-  const framedSuffix = framed ? theme.actionRail(suffix) : suffix
+  const framedPrefix = framed || capped ? theme.actionRail(prefix) : prefix
+  const framedSuffix = framed || capped ? theme.actionRail(suffix) : suffix
   return `${framedPrefix}${decorated}${theme.actionRail(trailing)}${framedSuffix}`
 }
 
@@ -432,7 +440,9 @@ function isSingleSupervisorActionShelf(line: string): boolean {
   const trimmed = line.trimEnd()
   const content = trimmed.startsWith('│ ') && trimmed.endsWith(' │')
     ? trimmed.slice(2, -2).trimEnd()
-    : trimmed
+    : trimmed.startsWith('╭─ ') && trimmed.endsWith('╮')
+      ? trimmed.slice(3, -1).trimEnd()
+      : trimmed
   return /^[◆·] \[ [^\]]+ \] /u.test(content)
 }
 
@@ -449,7 +459,7 @@ function decorateDock(
   theme: SupervisorTuiTheme,
   hoveredCommand?: string,
 ): string {
-  const tokenPattern = /\[ \/ \] (?:Commands|Close)|\[ q \] Detach|\[ Esc \] (?:Back|Cancel)|\[ i \] .*?(?=  ›  )|⌂ .*?(?=  ›  )|⌁ .*?(?=  ›  )|◆ (?:FOCUS WORKSPACE|DECISION GATE)|! RECOVERY|(?:◉|●) (?:LIVE|EXTERNAL)|○ COLD|◆ (?:(?:LIVE|EXTERNAL) · HOME MISSING|BLOCKED|DEGRADED)|× UNREACHABLE|◇ OFFLINE|◌ [A-Z][A-Z ]*?(?=  ›  | ─╯)|[◆◇≋✦?] (?:OVERVIEW|FLEET|LOGS|DOCTOR|HELP|SETUP|SOURCE|PROJECTS|RELEASE|TRANSFER|CONFIRMATION)/gu
+  const tokenPattern = /\[ \/ \] (?:Commands|Close)|\[ q \] Detach|\[ Esc \] (?:Back|Cancel)|\[ i \] .*?(?=  ›  )|⌂ .*?(?=  ›  )|⌁ .*?(?=  ›  )|◆ (?:FOCUS WORKSPACE|DECISION GATE)|! RECOVERY|(?:◉|●) (?:LIVE|EXTERNAL)|○ COLD|◆ (?:(?:LIVE|EXTERNAL) · HOME MISSING|BLOCKED|DEGRADED)|× UNREACHABLE|◇ OFFLINE|[⠀-⣿◆]  WORKING .*?(?= ─╯)|✓  READY .*?(?= ─╯)|!  NOTICE .*?(?= ─╯)|×  ERROR .*?(?= ─╯)|◆  STATUS .*?(?= ─╯)|◇  PREVIEW .*?(?= ─╯)|◌ [A-Z][A-Z ]*?(?=  ›  | ─╯)|[◆◇≋✦?] (?:OVERVIEW|FLEET|LOGS|DOCTOR|HELP|SETUP|SOURCE|PROJECTS|RELEASE|TRANSFER|CONFIRMATION)/gu
   let output = ''
   let cursor = 0
   for (const match of line.matchAll(tokenPattern)) {
@@ -474,6 +484,12 @@ function decorateDockToken(
   if (token.startsWith('[ i ]') || token.startsWith('⌂ ') || token.startsWith('⌁ ')) {
     return decorateDockKeyedToken(token, theme, theme.dockIdentity, hoveredCommand)
   }
+  if (/^[⠀-⣿◆]  WORKING /u.test(token)) return theme.busyRail(token)
+  if (token.startsWith('✓  READY')) return theme.successRail(token)
+  if (token.startsWith('!  NOTICE')) return theme.warningRail(token)
+  if (token.startsWith('×  ERROR')) return theme.dangerRail(token)
+  if (token.startsWith('◆  STATUS')) return theme.infoRail(token)
+  if (token.startsWith('◇  PREVIEW')) return theme.navigationHover(token)
   if (token === '◆ FOCUS WORKSPACE' || token === '◆ DECISION GATE' || /^[◆◇≋✦?] (?:OVERVIEW|FLEET|LOGS|DOCTOR|HELP|SETUP|SOURCE|PROJECTS|RELEASE|TRANSFER|CONFIRMATION)$/u.test(token)) {
     return theme.dockPanel(token)
   }

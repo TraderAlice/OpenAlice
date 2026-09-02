@@ -13,6 +13,7 @@ const startDelayMs = Number(process.env['OPENALICE_TUI_FIXTURE_START_DELAY_MS'] 
 const remote = process.env['OPENALICE_TUI_FIXTURE_REMOTE'] === '1'
 const healthFlap = process.env['OPENALICE_TUI_FIXTURE_HEALTH'] === 'flap'
 const fleetRows = Number(process.env['OPENALICE_TUI_FIXTURE_FLEET_ROWS'] ?? 0)
+const inboxUnread = Number(process.env['OPENALICE_TUI_FIXTURE_INBOX_UNREAD'] ?? 0)
 const fleet = fleetRows > 0 ? fixtureFleet(fleetRows, remote) : undefined
 
 const exitCode = await runSupervisorTui({}, {
@@ -83,6 +84,28 @@ const exitCode = await runSupervisorTui({}, {
       }
     : {}),
   discoverUpdate: async () => null,
+  ...(inboxUnread > 0
+    ? {
+        readInbox: async (endpoint: string) => ({
+          endpoint,
+          refreshedAt: Date.now(),
+          hasMore: false,
+          entries: Array.from({ length: inboxUnread }, (_, index) => ({
+            id: `fixture-inbox-${index + 1}`,
+            ts: Date.now() - index * 60_000,
+            workspaceId: `fixture-workspace-${index + 1}`,
+            workspaceLabel: index === 0 ? 'Morning research' : `Workspace ${index + 1}`,
+            comments: index === 0
+              ? 'Agent report is ready for review.'
+              : `Fixture report ${index + 1} is ready.`,
+            origin: { kind: 'headless' as const, agent: 'fixture-agent' },
+          })),
+        }),
+        setInboxRead: async (_endpoint: string, _id: string, read: boolean) => (
+          read ? Date.now() : undefined
+        ),
+      }
+    : {}),
   pollIntervalMs: 60_000,
 })
 

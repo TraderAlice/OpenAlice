@@ -235,6 +235,65 @@ not imply maintainer approval of the finished interaction.
   Source, Restart, Stop, Logs, and Update. All keys and callbacks already exist;
   this change removes duplication rather than adding an execution path.
 
+### Launcher-to-state-manager handoff decision
+
+- Keeping `Enter` bound to Open Web after a healthy connection makes Home
+  remain a launcher forever, even when the connected AliceProject has state
+  that needs attention.
+- Adding a separate Inbox card would expose that state, but create a second
+  primary surface and make the compact layout harder to scan.
+- The selected model lets the existing Launchpad change responsibility. Before
+  connection it starts or connects; connection recovery always retains highest
+  priority; after a healthy connection, unread Inbox reports promote `Enter`
+  to Review Inbox and leave `o` as the explicit Open Web accelerator. When no
+  unread state remains, Home returns to Open Workspace. The same resolved
+  intent owns the label, keyboard path, pointer target, and Action Shelf, so
+  visual guidance cannot disagree with execution. No persistence or Inbox API
+  ownership changes.
+- Responsive behavior adds no rows: compact and wide Launchpads reuse the same
+  semantic intent, one-line guidance, and full-row pointer target. Glyphs and
+  text retain no-color meaning, and keyboard-only use remains complete. This
+  is an autonomous topic decision, not recorded maintainer approval.
+
+### Connected Home session-stage decision
+
+- A same-size 120×32 and 80×24 ANSI-frame comparison against OMP 17.3.4
+  confirmed that color is not the remaining Home problem. OpenAlice splits the
+  first frame into equally loud Launchpad and Telemetry cards, repeats live
+  truth through the brand, Control Path, service array, context row, and Dock,
+  then leaves a large empty gulf above a detached Control Console.
+- Copying OMP's three-column welcome card literally would preserve its identity
+  but also copy its 80×24 top clipping. Replacing Home with several smaller
+  dashboard cards would retain the old telemetry-first premise.
+- The selected model is one responsive Session Stage. At wide widths, a bounded
+  identity column anchors one selected AliceProject while a single content
+  column flows through Now, Attention, Recent, and the resolved primary action.
+  Ordinary widths preserve that exact order in one column and omit the brand
+  illustration before omitting task truth. PID, complete URL, provider, uptime,
+  and component diagnostics move back to Runtime; Home keeps only state needed
+  to decide what happens next. Existing Inbox and Connection Chronicle
+  snapshots supply Attention and Recent without a new backend contract.
+- The OMP-inspired lower rail remains contextual and stable, but Home has only
+  one primary action surface. Saturated color is reserved for identity, current
+  focus, and actionable attention; optional disabled services are neutral, not
+  failures. This is an autonomous topic decision, not recorded maintainer
+  approval.
+
+### Stable action-rail decision
+
+- The former Control Console spent one permanent row naming its own chrome,
+  then inserted a separate status row that shifted every mouse target whenever
+  work started, completed, or failed.
+- The selected rail keeps its geometry stable: a capped contextual action row
+  sits directly above the Command Dock, while transient Working, Ready,
+  Notice, Error, and Preview feedback replaces the Dock's right-hand context
+  instead of adding height. The activity token keeps its semantic color and
+  leads with the affected object so useful text survives truncation.
+- At compact widths, when Inbox owns Home's primary action, Restart and Stop
+  remain discoverable in `/ Commands` while the visible shelf retains Open Web,
+  Logs, and More. Wider terminals keep the full action inventory. Keyboard and
+  mouse routes continue to resolve through the same command targets.
+
 ### Wide framed-column theme decision
 
 - Removing the Launchpad primary background at wide widths would hide the

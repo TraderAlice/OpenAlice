@@ -194,11 +194,12 @@ describe('Supervisor TUI screen', () => {
 
   it('turns a connected target into a bounded workbench with Inbox attention', () => {
     const toggled: string[] = []
+    let opens = 0
     const runtime = { class: 'running', endpoints: { web: 'http://127.0.0.1:2026' } }
     const screen = new SupervisorScreen({
       version: 'dev',
       channel: 'dev',
-      panel: 'inbox',
+      panel: 'overview',
       runtime,
       activeTarget: {
         kind: 'local',
@@ -220,14 +221,37 @@ describe('Supervisor TUI screen', () => {
     }, {
       motionEnabled: false,
       onToggleInboxRead: (entry) => toggled.push(entry.id),
+      onOpenActiveTarget: () => { opens += 1 },
     })
 
-    const frame = screen.render(100).join('\n')
-    expect(frame).toContain('● [Inbox]·1')
-    expect(frame).toContain('Agent report ready.')
-    expect(frame).toContain('[ Enter ] Mark read')
+    const home = screen.render(100).join('\n')
+    expect(home).toContain('● Inbox·1')
+    expect(home).toContain('1 unread report needs your attention')
+    expect(home).toContain('1 unread report is waiting in this AliceProject.')
+    expect(home).toContain('[ Enter ]  Review 1 unread report')
+    expect(home).toContain('[ o ] Open Web')
+    expect(screen.handleKey('enter', matchesKey)).toBe(true)
+    expect(screen.snapshot.panel).toBe('inbox')
+    expect(opens).toBe(0)
+
+    const inbox = screen.render(100).join('\n')
+    expect(inbox).toContain('Agent report ready.')
+    expect(inbox).toContain('[ Enter ] Mark read')
     expect(screen.handleKey('enter', matchesKey)).toBe(true)
     expect(toggled).toEqual(['hello'])
+
+    screen.update({
+      panel: 'overview',
+      inbox: {
+        ...screen.snapshot.inbox!,
+        entries: [{ ...screen.snapshot.inbox!.entries[0]!, readAt: Date.now() }],
+      },
+    })
+    const settledHome = screen.render(100).join('\n')
+    expect(settledHome).not.toContain('INBOX ATTENTION')
+    expect(settledHome).toContain('[ Enter ]  Open Workspace')
+    expect(screen.handleKey('enter', matchesKey)).toBe(true)
+    expect(opens).toBe(1)
   })
 
   it('keeps remote controls target-scoped and exposes an explicit disconnect', () => {
@@ -301,6 +325,12 @@ describe('Supervisor TUI screen', () => {
         runtime,
         health: { phase: 'unreachable', consecutiveFailures: 3, checkedAt: 42 },
       },
+      inbox: {
+        endpoint: 'http://127.0.0.1:45454/',
+        refreshedAt: Date.now(),
+        hasMore: false,
+        entries: [{ id: 'waiting', ts: Date.now(), workspaceId: 'ws', comments: 'Unread report.' }],
+      },
     }, {
       motionEnabled: false,
       onRefreshActiveTarget: () => { retries += 1 },
@@ -310,10 +340,10 @@ describe('Supervisor TUI screen', () => {
     const frame = screen.render(100).join('\n')
     expect(frame).toContain('◆ [Home]·×')
     expect(frame).toContain('× UNREACHABLE')
-    expect(frame).toContain('ENDPOINT UNREACHABLE · RETRY OR DISCONNECT')
-    expect(frame).toMatch(/Process\s+× UNREACHABLE/u)
-    expect(frame).toContain('Last snapshot')
+    expect(frame).toContain('Active endpoint is unreachable')
+    expect(frame).toContain('× Connection  unreachable')
     expect(frame).not.toContain('● LIVE SESSION · OPEN THE WORKSPACE')
+    expect(frame).not.toContain('INBOX ATTENTION')
     expect(frame).toContain('currently unreachable')
     expect(frame).toContain('[ r ] Retry connection')
     expect(frame).not.toContain('[ o ] Open Web')
@@ -361,8 +391,8 @@ describe('Supervisor TUI screen', () => {
     const frame = screen.render(100).join('\n')
     expect(frame).toContain('◆ [Home]·!')
     expect(frame).toContain('! DEGRADED')
-    expect(frame).toContain('CONNECTION DEGRADED · RETRY AVAILABLE')
-    expect(frame).toMatch(/Process\s+◆ DEGRADED/u)
+    expect(frame).toContain('Connection needs a retry')
+    expect(frame).toContain('! Connection  degraded')
     expect(frame).toContain('endpoint missed a Runtime')
     expect(frame).toContain('[ r ] Retry connection')
     expect(screen.handleKey('r', matchesKey)).toBe(true)
@@ -425,9 +455,9 @@ describe('Supervisor TUI screen', () => {
     expect(lines[2].match(/┬/gu)).toHaveLength(1)
     expect(lines.slice(0, 3).every((line) => displayWidth(line) === 80)).toBe(true)
     expect(lines.join('\n')).toContain('○ STOPPED')
-    expect(lines.join('\n')).toContain('Runtime Signal Deck · OpenAlice')
-    expect(lines.join('\n')).toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
-    expect(lines.join('\n')).toContain('◆ LOCAL CONTROL')
+    expect(lines.join('\n')).toContain('Alice Session · OpenAlice')
+    expect(lines.join('\n')).not.toContain('Runtime Signal Deck')
+    expect(lines.join('\n')).not.toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
     expect(lines.length).toBeLessThanOrEqual(24)
     expect(lines.join('\n')).toContain('[ Enter ]  Start OpenAlice & open Workspace')
     expect(lines.join('\n')).not.toContain('◆ [ Enter ] Start & open')
@@ -448,31 +478,29 @@ describe('Supervisor TUI screen', () => {
 
     const wideLines = screen.render(120)
     expect(wideLines[1]).toHaveLength(120)
-    expect(wideLines.join('\n')).not.toContain('OpenAlice · launch system')
+    expect(wideLines.join('\n')).toContain('Alice Session · OpenAlice')
     expect(wideLines.join('\n')).toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
-    expect(wideLines.join('\n')).not.toContain('ALICEPROJECT')
+    expect(wideLines.join('\n')).toContain('ALICEPROJECT')
     expect(wideLines.filter((line) => line.includes('○ STOPPED'))).toHaveLength(1)
     expect(wideLines.join('\n')).toContain('OpenAlice is ready to start.')
     expect(wideLines.join('\n')).toContain('prepares anything missing and opens')
-    expect(wideLines.join('\n')).toContain('the browser; c chooses a checkout.')
-    const wideCockpitHeader = wideLines.find((line) => (
-      line.includes('Launchpad · AliceProject') && line.includes('Runtime Telemetry · OpenAlice')
-    ))
-    expect(wideCockpitHeader).toBeDefined()
-    expect(wideLines.find((line) => line.includes('[ Enter ]'))).toContain('Uptime')
+    expect(wideLines.join('\n')).toContain('c chooses a checkout.')
+    expect(wideLines.filter((line) => line.includes('Alice Session · OpenAlice'))).toHaveLength(1)
+    expect(wideLines.join('\n')).toContain('NOW')
+    expect(wideLines.join('\n')).toContain('ATTENTION')
+    expect(wideLines.join('\n')).toContain('RECENT')
+    expect(wideLines.find((line) => line.includes('[ Enter ]'))).not.toContain('Uptime')
     expect(wideLines.join('\n')).toContain('○ COLD')
     expect(wideLines.every((line) => displayWidth(line) <= 120)).toBe(true)
 
     const foldedLines = screen.render(99)
-    expect(foldedLines.findIndex((line) => line.includes('╭ Launchpad · AliceProject')))
-      .toBeLessThan(foldedLines.findIndex((line) => line.includes('╭ Runtime Signal Deck')))
-    expect(foldedLines.join('\n')).toContain('Runtime Signal Deck · OpenAlice')
-    expect(foldedLines.join('\n')).toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
-    expect(foldedLines.join('\n')).toContain('◆ LOCAL CONTROL')
+    expect(foldedLines.join('\n')).toContain('Alice Session · OpenAlice')
+    expect(foldedLines.join('\n')).not.toContain('Runtime Signal Deck')
+    expect(foldedLines.join('\n')).not.toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
     expect(foldedLines.every((line) => displayWidth(line) <= 99)).toBe(true)
 
     const compactLines = screen.render(71)
-    expect(compactLines.join('\n')).toContain('╭ Runtime signal')
+    expect(compactLines.join('\n')).toContain('Alice Session · OpenAlice')
     expect(compactLines.join('\n')).not.toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
     expect(compactLines.every((line) => displayWidth(line) <= 71)).toBe(true)
 
@@ -481,11 +509,12 @@ describe('Supervisor TUI screen', () => {
     expect(displayWidth(narrowHeader)).toBe(46)
     screen.render(80)
 
+    const primaryRow = screen.render(80).findIndex((line) => line.includes('[ Enter ]')) + 1
     expect(screen.handlePointer({
-      button: 35, col: 60, row: 10, release: false, wheel: null, motion: true, leftClick: false,
+      button: 35, col: 60, row: primaryRow, release: false, wheel: null, motion: true, leftClick: false,
     })).toBe(true)
     expect(screen.render(80).join('\n')).toContain('│ › [ Enter ]  Start OpenAlice & open Workspace')
-    expect(screen.handlePointer(pointerClick(60, 10))).toBe(true)
+    expect(screen.handlePointer(pointerClick(60, primaryRow))).toBe(true)
     expect(actions).toEqual(['start-open'])
     expect(screen.handleKey(']', matchesKey)).toBe(true)
     expect(screen.handleKey('[', matchesKey)).toBe(true)
@@ -503,7 +532,7 @@ describe('Supervisor TUI screen', () => {
     expect(screen.render(120)[0]).toContain('v0.87.0-beta · DEV · update 0.90.0')
   })
 
-  it('uses wide surplus height for a bounded, bottom-aligned Overview stage', () => {
+  it('uses wide surplus height for one bounded OMP-style Session Stage', () => {
     let viewportHeight = 32
     const screen = new SupervisorScreen({
       version: 'dev',
@@ -520,40 +549,23 @@ describe('Supervisor TUI screen', () => {
     })
 
     const tall = screen.render(120).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
-    const cockpitRow = tall.findIndex((line) => (
-      line.includes('Launchpad · AliceProject') && line.includes('Runtime Telemetry · OpenAlice')
-    ))
+    const stageRow = tall.findIndex((line) => line.includes('Alice Session · OpenAlice'))
     const actionRow = tall.findIndex((line) => line.includes('[ Enter ]'))
-    const uptimeRow = tall.findIndex((line) => line.includes('Uptime'))
-    const cardBottomRow = tall.findIndex((line, index) => (
-      index > cockpitRow && line.startsWith('╰') && line.includes('   ╰')
-    ))
-    const homeRow = tall.findIndex((line) => line.startsWith('⌂  Home'))
+    const cardBottomRow = tall.findIndex((line, index) => index > stageRow && line.startsWith('╰'))
     const tipRow = tall.findIndex((line) => line.startsWith('◇  Tip:'))
 
     expect(tall).toHaveLength(32)
-    expect(cockpitRow).toBe(4)
-    expect(actionRow).toBe(18)
-    expect(uptimeRow).toBe(actionRow)
+    expect(stageRow).toBe(4)
+    expect(actionRow).toBe(19)
     expect(cardBottomRow).toBe(actionRow + 1)
-    expect(homeRow).toBe(cardBottomRow + 1)
-    expect(tipRow).toBeGreaterThan(homeRow)
-    expect(tall.join('\n')).toContain('◇ CONTROL PATH')
-    expect(tall.join('\n')).toContain('◆ ALICEPROJECT')
-    expect(tall.join('\n')).toContain('◇ WORKSPACE WAITING')
-    expect(tall.join('\n')).toContain('◇ COMPONENT TELEMETRY')
-    expect(tall.join('\n')).toContain('· AVAILABLE AFTER LAUNCH')
-    expect(tall.join('\n')).toContain('Alice · UTA · Connector')
-    expect(tall.join('\n')).not.toContain('Alice not reported')
-    const quietStageRows = tall.slice(cockpitRow + 1, actionRow).map((line) => (
-      /^│\s+│ {3}│\s+│$/u.test(line)
-    ))
-    expect(quietStageRows.filter(Boolean).length).toBeLessThanOrEqual(3)
-    expect(quietStageRows.some((quiet, index) => (
-      quiet && quietStageRows[index + 1] && quietStageRows[index + 2]
-    ))).toBe(false)
-    expect(tall.at(-3)).toContain('CONTROL CONSOLE')
-    expect(tall.at(-2)).toContain('[ s ] Start quietly')
+    expect(tipRow).toBeGreaterThan(cardBottomRow)
+    expect(tall.join('\n')).toContain('NOW')
+    expect(tall.join('\n')).toContain('ATTENTION')
+    expect(tall.join('\n')).toContain('RECENT')
+    expect(tall.join('\n')).not.toContain('CONTROL PATH')
+    expect(tall.join('\n')).not.toContain('Runtime Telemetry')
+    expect(tall.at(-2)).toMatch(/^╭─ · \[ s \] Start quietly/u)
+    expect(tall.join('\n')).not.toContain('CONTROL CONSOLE')
     expect(tall.at(-1)).toContain('[ / ] Commands')
 
     viewportHeight = 48
@@ -562,14 +574,14 @@ describe('Supervisor TUI screen', () => {
     expect(capped.findIndex((line) => line.includes('[ Enter ]'))).toBe(actionRow)
 
     const folded = screen.render(99).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
-    expect(folded.findIndex((line) => line.includes('Runtime Signal Deck'))).toBeLessThan(20)
+    expect(folded.findIndex((line) => line.includes('Alice Session'))).toBeLessThan(20)
     expect(folded.join('\n')).not.toContain('CONTROL PATH')
     expect(folded.join('\n')).not.toContain(
       `│${' '.repeat(97)}│\n│${' '.repeat(97)}│`,
     )
   })
 
-  it('maps reported component truth into the wide Service Array', () => {
+  it('keeps component diagnostics out of the task-oriented Home stage', () => {
     const screen = new SupervisorScreen({
       version: 'dev',
       channel: 'dev',
@@ -585,15 +597,14 @@ describe('Supervisor TUI screen', () => {
     })
 
     const wide = screen.render(120).join('\n')
-    expect(wide).toContain('↗ WORKSPACE READY')
-    expect(wide).toContain('◇ SERVICE ARRAY')
-    expect(wide).toContain('◆ Alice ready')
-    expect(wide).toContain('× UTA disabled')
-    expect(wide).toContain('◆ Connector connected')
-    expect(screen.render(99).join('\n')).not.toContain('SERVICE ARRAY')
+    expect(wide).toContain('Workspace is ready')
+    expect(wide).toContain('● Connection  healthy')
+    expect(wide).not.toContain('SERVICE ARRAY')
+    expect(wide).not.toContain('UTA disabled')
+    expect(wide).not.toContain('Connector connected')
   })
 
-  it('renders one honest pending cluster for a live Runtime without telemetry', () => {
+  it('does not invent component state when Home only knows the Runtime is live', () => {
     const screen = new SupervisorScreen({
       version: 'dev',
       channel: 'dev',
@@ -608,14 +619,10 @@ describe('Supervisor TUI screen', () => {
     })
 
     const wide = screen.render(120).join('\n')
-    expect(wide).toContain('Runtime Telemetry · OpenAlice')
-    expect(wide).toContain('Telemetry   Component snapshot pending')
-    expect(wide).toContain('Uptime      Live · not reported')
-    expect(wide).toContain('◇ COMPONENT TELEMETRY')
-    expect(wide).toContain('· SNAPSHOT PENDING')
-    expect(wide).toContain('Runtime live · states unavailable')
-    expect(wide).not.toContain('Alice not reported')
-    expect(wide).not.toContain('Waiting for Runtime')
+    expect(wide).toContain('Workspace is ready')
+    expect(wide).toContain('● LIVE TARGET')
+    expect(wide).not.toContain('Component snapshot pending')
+    expect(wide).not.toContain('not reported')
   })
 
   it('renders a responsive OMP-style Command Spine without adding a row', () => {
@@ -815,7 +822,7 @@ describe('Supervisor TUI screen', () => {
     expect(recovery).toContain('! RECOVERY  ›  ◆ OVERVIEW')
   })
 
-  it('anchors the Control Console to the live viewport without clipping content', () => {
+  it('anchors the two-line action rail to the live viewport without clipping content', () => {
     let viewportHeight = 32
     const paletteChanges: boolean[] = []
     const screen = new SupervisorScreen({
@@ -830,11 +837,11 @@ describe('Supervisor TUI screen', () => {
 
     const tall = screen.render(80)
     expect(tall).toHaveLength(32)
-    expect(tall.at(-3)).toContain('CONTROL CONSOLE')
     expect(tall.at(-2)).toContain('[ l ] Logs')
+    expect(tall.join('\n')).not.toContain('CONTROL CONSOLE')
     expect(tall.at(-1)).toContain('╰─ [ / ] Commands')
     expect(tall.join('\n')).toContain(
-      '◇  Tip: Hover an active signal to preview its consequence before clicking.',
+      '◇  Tip: Enter follows Now; o opens Web; Runtime keeps the diagnostic detail.',
     )
     expect(tall.findIndex((line) => line.includes('Runtime Signal Deck'))).toBeLessThan(20)
     expect(screen.handlePointer(pointerClick(6, 32))).toBe(true)
@@ -844,19 +851,16 @@ describe('Supervisor TUI screen', () => {
     viewportHeight = 24
     const resized = screen.render(80)
     expect(resized).toHaveLength(24)
-    expect(resized.at(-3)).toContain('CONTROL CONSOLE')
     expect(resized.at(-2)).toContain('[ l ] Logs')
     expect(resized.at(-1)).toContain('[ / ] Close')
-    expect(resized.at(-6)?.trim()).toBe('')
-    expect(resized.at(-5)).toContain('◇  Tip: Hover an active signal')
-    expect(resized.at(-4)?.trim()).toBe('')
+    expect(resized.join('\n')).toContain('◇  Tip: Enter follows Now; o opens Web; Runtime keeps the diagnostic detail.')
     expect(screen.handlePointer(pointerClick(6, 24))).toBe(true)
     expect(paletteChanges).toEqual([true, false])
 
     viewportHeight = 10
     const short = screen.render(80)
     expect(short.length).toBeGreaterThan(10)
-    expect(short.join('\n')).toContain('Runtime Signal Deck')
+    expect(short.join('\n')).toContain('Alice Session')
     expect(short.join('\n')).not.toContain('◇  Tip:')
     expect(short.at(-1)).toContain('╰─ [ / ] Commands')
 
@@ -1052,10 +1056,9 @@ describe('Supervisor TUI screen', () => {
     expect(onDetach).toHaveBeenCalledTimes(1)
   })
 
-  it('turns Overview identity and actionable telemetry into direct pointer hotspots', () => {
+  it('keeps the AliceProject identity clickable without leaking Runtime setup into Home', () => {
     const actions: SupervisorAction[] = []
     let projectOpens = 0
-    let sourceOpens = 0
     const screen = new SupervisorScreen({
       version: 'dev',
       channel: 'dev',
@@ -1067,15 +1070,13 @@ describe('Supervisor TUI screen', () => {
     }, {
       onAction: (action) => actions.push(action),
       onProjects: () => { projectOpens += 1 },
-      onConfigureSource: () => { sourceOpens += 1 },
       motionEnabled: false,
     })
 
     let lines = screen.render(80)
     const projectRow = lines.findIndex((line) => line.includes('⌂ Default AliceProject')) + 1
-    const providerRow = lines.findIndex((line) => line.includes('⑂ Provider')) + 1
     expect(projectRow).toBeGreaterThan(0)
-    expect(providerRow).toBeGreaterThan(0)
+    expect(lines.join('\n')).not.toContain('⑂ Provider')
     expect(lines.join('\n')).not.toContain('↗ Web')
 
     expect(screen.handlePointer({
@@ -1083,33 +1084,18 @@ describe('Supervisor TUI screen', () => {
     })).toBe(true)
     expect(screen.render(80).join('\n')).toContain('› Default AliceProject')
     expect(screen.render(80).join('\n')).toContain(
-      '◇  PREVIEW  Open the AliceProject Switchboard',
+      '◇  PREVIEW  AliceProject Switchboard',
     )
     expect(screen.handlePointer(pointerClick(70, projectRow))).toBe(true)
     expect(projectOpens).toBe(1)
 
     expect(screen.handlePointer({
-      button: 35, col: 70, row: providerRow, release: false, wheel: null, motion: true, leftClick: false,
-    })).toBe(true)
-    expect(screen.render(80).join('\n')).toContain('› Provider')
-    expect(screen.render(80).join('\n')).toContain(
-      '◇  PREVIEW  Choose and validate the source checkout',
-    )
-    expect(screen.handlePointer(pointerClick(70, providerRow))).toBe(true)
-    expect(sourceOpens).toBe(1)
-    expect(screen.handlePointer({
       button: 35, col: 40, row: 4, release: false, wheel: null, motion: true, leftClick: false,
     })).toBe(true)
 
     lines = screen.render(100)
-    const wideProviderRow = lines.findIndex((line) => line.includes('⑂ Provider')) + 1
-    expect(wideProviderRow).toBeGreaterThan(0)
-    expect(screen.handlePointer({
-      button: 35, col: 95, row: wideProviderRow, release: false, wheel: null, motion: true, leftClick: false,
-    })).toBe(true)
-    expect(screen.render(100).join('\n')).toContain('› Provider')
-    expect(screen.handlePointer(pointerClick(95, wideProviderRow))).toBe(true)
-    expect(sourceOpens).toBe(2)
+    expect(lines.join('\n')).toContain('Alice Session · OpenAlice')
+    expect(lines.join('\n')).not.toContain('Provider')
 
     lines = screen.render(46)
     const narrowProjectRow = lines.findIndex((line) => line.includes('⌂ Default AliceProject')) + 1
@@ -1130,18 +1116,10 @@ describe('Supervisor TUI screen', () => {
       },
     })
     lines = screen.render(80)
-    const webRow = lines.findIndex((line) => line.includes('↗ Web')) + 1
-    expect(webRow).toBeGreaterThan(0)
+    expect(lines.join('\n')).toContain('[ Enter ]  Open Workspace')
     expect(lines.join('\n')).not.toContain('⑂ Provider')
-
-    expect(screen.handlePointer({
-      button: 35, col: 70, row: webRow, release: false, wheel: null, motion: true, leftClick: false,
-    })).toBe(true)
-    expect(screen.render(80).join('\n')).toContain('› Web')
-    expect(screen.render(80).join('\n')).toContain(
-      '◇  PREVIEW  Open the verified Web UI for this running Runtime.',
-    )
-    expect(screen.handlePointer(pointerClick(70, webRow))).toBe(true)
+    const actionRow = lines.findIndex((line) => line.includes('[ Enter ]')) + 1
+    expect(screen.handlePointer(pointerClick(70, actionRow))).toBe(true)
     expect(actions).toEqual(['open'])
 
     expect(screen.handlePointer({
@@ -1307,17 +1285,23 @@ describe('Supervisor TUI screen', () => {
     expect(screen.hasActiveMotion()).toBe(true)
     expect(screen.render(80)[0]).toContain('\u001b[1;38;2;116;235;226m◆ OpenAlice Supervisor')
     const settledHeader = screen.render(80)[0]
-    const settledMark = screen.render(80).find((line) => line.includes('│ Home'))
+    const settledMark = screen.render(120).find((line) => (
+      line.replace(/\u001b\[[0-9;]*m/gu, '').includes('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+    ))
     expect(screen.hasActiveMotion(false)).toBe(false)
     for (let frame = 0; frame < 6; frame += 1) {
       expect(screen.advanceMotion(false)).toBe(false)
     }
     expect(screen.render(80)[0]).toBe(settledHeader)
-    expect(screen.render(80).find((line) => line.includes('│ Home')))
+    expect(screen.render(120).find((line) => (
+      line.replace(/\u001b\[[0-9;]*m/gu, '').includes('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+    )))
       .toBe(settledMark)
     for (let frame = 0; frame < 3; frame += 1) screen.advanceMotion()
     expect(screen.render(80)[0]).toBe(settledHeader)
-    expect(screen.render(80).find((line) => line.includes('│ Home')))
+    expect(screen.render(120).find((line) => (
+      line.replace(/\u001b\[[0-9;]*m/gu, '').includes('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+    )))
       .not.toBe(settledMark)
 
     screen.update({ runtime: { class: 'running', endpoints: {} } })
@@ -1351,8 +1335,8 @@ describe('Supervisor TUI screen', () => {
     expect(plainBeacon).toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
     expect(plainBeacon).toContain('Default AliceProject')
     expect(plainBeacon).not.toContain('\u001b[')
-    expect(reduced.render(99).join('\n')).toContain('Runtime Signal Deck · OpenAlice')
-    expect(reduced.render(99).join('\n')).toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+    expect(reduced.render(99).join('\n')).toContain('Alice Session · OpenAlice')
+    expect(reduced.render(99).join('\n')).not.toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
     expect(reduced.render(71).join('\n')).not.toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
     expect(reduced.hasActiveMotion()).toBe(false)
   })
@@ -1584,13 +1568,12 @@ describe('Supervisor TUI screen', () => {
     expect(screen.handleKey('[', matchesKey)).toBe(true)
     expect(screen.handleKey('[', matchesKey)).toBe(true)
     const overview = screen.render(120).join('\n')
-    expect(overview).toContain('◆ RUNNING · HOME MISSING')
-    expect(overview).toContain('◆ LIVE RUNTIME · PROJECT HOME MISSING')
+    expect(overview).toContain('Runtime is live; AliceProject home is missing')
     expect(overview).toContain('Runtime is live, but the')
     expect(overview).toContain('AliceProject home is missing. Open')
-    expect(overview).toContain('still uses the verified Web route.')
-    expect(overview).toContain('◆  HOME MISSING  /home/alice/default')
-    expect(overview).not.toContain('● LIVE SESSION · OPEN THE WORKSPACE')
+    expect(overview).toContain('Web route.')
+    expect(overview).not.toContain('/home/alice/default')
+    expect(overview).not.toContain('LIVE SESSION · OPEN THE WORKSPACE')
   })
 
   it('gives wide Fleet real inventory rows from the live viewport budget', () => {
@@ -1627,7 +1610,7 @@ describe('Supervisor TUI screen', () => {
     expect(expanded).toHaveLength(32)
     expect(expanded.join('\n')).toContain('Local Project 6')
     expect(expanded.join('\n')).not.toContain('█')
-    expect(expanded.at(-3)).toContain('CONTROL CONSOLE')
+    expect(expanded.at(-2)).toContain('[ Enter ] Browse projects')
 
     viewportHeight = 20
     const constrained = screen.render(120).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
@@ -1654,7 +1637,7 @@ describe('Supervisor TUI screen', () => {
     expect(expandedLogs).toHaveLength(32)
     expect(expandedLogs.join('\n')).toContain('1–20/20 · ALL · LATEST')
     expect(expandedLogs.join('\n')).not.toContain('█')
-    expect(expandedLogs.at(-3)).toContain('CONTROL CONSOLE')
+    expect(expandedLogs.at(-2)).toContain('[ ↑↓ ] Scroll')
 
     viewportHeight = 20
     const constrainedLogs = logsScreen.render(120).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
@@ -1677,7 +1660,7 @@ describe('Supervisor TUI screen', () => {
     expect(standbyDoctor).toHaveLength(32)
     expect(standbyDoctor[24]).toContain('◆ [ d ] Run Runtime Doctor')
     expect(standbyDoctor[25]).toContain('╰')
-    expect(standbyDoctor.at(-3)).toContain('CONTROL CONSOLE')
+    expect(standbyDoctor.at(-2)).toContain('[ d ] Run Doctor')
   })
 
   it('scrubs Logs, Doctor, and Fleet rails without activating operations', () => {
@@ -1838,7 +1821,7 @@ describe('Supervisor TUI screen', () => {
       button: 35, col: releaseColumn, row: 1, release: false, wheel: null, motion: true, leftClick: false,
     })).toBe(true)
     expect(screen.render(100)[0]).toContain('\u001b[1;38;2;203;250;246;48;2;19;49;55m[ u ] vdev · DEV')
-    expect(screen.render(100).join('\n')).toContain('◇  PREVIEW  Inspect the dev release lane and available update.')
+    expect(screen.render(100).join('\n')).toContain('◇  PREVIEW  Release dev · inspect lane and update.')
     expect(screen.handlePointer(pointerClick(releaseColumn, 1))).toBe(true)
     expect(actions).toContain('update')
     expect(screen.snapshot.fleet?.selectedMachine).toBe(0)
@@ -2015,7 +1998,7 @@ describe('Supervisor TUI screen', () => {
     expect(screen.render(80)[row - 1]).toContain('\u001b[1;38;2;230;255;252;48;2;24;64;69m[ p ] Setup')
     expect(screen.render(80)[row - 1]!.replace(/\u001b\[[0-9;]*m/gu, '')).toContain('│ › [ p ] Setup')
     expect(screen.render(80).join('\n').replace(/\u001b\[[0-9;]*m/gu, ''))
-      .toContain('◇  PREVIEW  Review AliceProject and Machine defaults in Setup Studio.')
+      .toContain('◇  PREVIEW  Setup Studio · review')
     expect(screen.handlePointer({
       button: 35, col: 40, row: row - 1, release: false, wheel: null, motion: true, leftClick: false,
     })).toBe(true)
@@ -2112,7 +2095,7 @@ describe('Supervisor TUI screen', () => {
     )
   })
 
-  it('frames feedback, actions, and Command Spine as one same-height Control Console', () => {
+  it('keeps actions and contextual feedback in one stable two-line command rail', () => {
     const actionLines = renderSupervisorCommandBar([
       { key: 's', label: 'Start quietly' },
       { key: 'p', label: 'Setup' },
@@ -2124,14 +2107,13 @@ describe('Supervisor TUI screen', () => {
     }, 80)
     const idle = renderSupervisorControlConsole(' '.repeat(80), actionLines, dock, 80)
 
-    expect(idle).toHaveLength(3)
+    expect(idle).toHaveLength(2)
     expect(idle.every((line) => displayWidth(line) === 80)).toBe(true)
-    expect(idle[0]).toMatch(/^╭─ ◇  CONTROL CONSOLE ─+╮$/u)
-    expect(idle[1]).toMatch(/^│ · \[ s \] Start quietly  │  \[ p \] Setup +│$/u)
-    expect(idle[2]).toBe(dock)
+    expect(idle[0]).toMatch(/^╭─ · \[ s \] Start quietly  │  \[ p \] Setup +╮$/u)
+    expect(idle[1]).toBe(dock)
     const targets = supervisorCommandTargets(idle)
     expect(targets.map((target) => target.label)).toEqual(['s', 'p', '/', 'q', 'i'])
-    expect(targets.find((target) => target.label === 's')?.startColumn).toBe(3)
+    expect(targets.find((target) => target.label === 's')?.startColumn).toBe(4)
 
     const ready = renderSupervisorControlConsole(
       '✓  READY    Runtime started in the background.',
@@ -2139,10 +2121,13 @@ describe('Supervisor TUI screen', () => {
       dock,
       80,
     )
-    expect(ready[0]).toMatch(/^╭─ ✓  READY +Runtime started in the background\. ─+╮$/u)
+    expect(ready).toHaveLength(2)
+    expect(ready[0]).toBe(idle[0])
+    expect(ready[1]).toContain('[ / ] Commands  ›  [ q ] Detach')
+    expect(ready[1]).toContain('✓  READY    Runtime started')
     const colorTheme = createSupervisorTuiTheme({ TERM: 'xterm-256color' })
     const decorated = decorateSupervisorFrame(ready, colorTheme, { panel: 'overview' })
-    expect(decorated[0]).toContain('\u001b[1;38;2;170;255;207;48;2;13;45;31m')
+    expect(decorated[1]).toContain('\u001b[1;38;2;170;255;207;48;2;13;45;31m')
     expect(decorated.map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))).toEqual(ready)
     expect(decorateSupervisorFrame(
       ready,
@@ -2203,7 +2188,7 @@ describe('Supervisor TUI screen', () => {
     )).toBe(line)
   })
 
-  it('keeps wide Overview, Fleet, Logs, Doctor, and Help focus inside its owning pane', () => {
+  it('keeps wide split-pane focus scoped while Home remains one unified stage', () => {
     const theme = createSupervisorTuiTheme({ TERM: 'xterm-256color' })
     const selectedEscape = '\u001b[1;38;2;230;255;252;48;2;24;64;69m'
     const columnsFor = (line: string) => line.split(/(?<=│) {3}(?=│)/u)
@@ -2221,11 +2206,9 @@ describe('Supervisor TUI screen', () => {
       channel: 'dev',
       runtime: { class: 'absent', endpoints: {} },
     }, { theme, motionEnabled: false }).render(100)
-    expectNeutralInspector(
-      overview,
-      '◆ LAUNCH READY · LOCAL RUNTIME',
-      '\u001b[38;2;189;229;255;48;2;17;35;52m',
-    )
+    expect(plain(overview.join('\n'))).toContain('Alice Session · OpenAlice')
+    expect(plain(overview.join('\n'))).toContain('NOW')
+    expect(plain(overview.join('\n'))).not.toContain('Runtime Telemetry')
 
     const fleet = new SupervisorScreen({
       version: 'dev',
@@ -2548,7 +2531,7 @@ describe('Supervisor TUI screen', () => {
     expect(lines.every((line) => line.length <= 40)).toBe(true)
   })
 
-  it('shows the installed Runtime as a product identity instead of a long path', () => {
+  it('keeps installer implementation identity out of the task-oriented Home', () => {
     const context = resolveLaunchContext({
       cwd: '/tmp',
       homeDir: '/home/alice',
@@ -2571,10 +2554,10 @@ describe('Supervisor TUI screen', () => {
     })
 
     const output = screen.render(100).join('\n')
-    expect(output).toContain('Provider')
-    expect(output).toContain('OpenAlice 0.87.0-beta ·')
-    expect(output).toContain('bundle')
-    expect(output).toContain('1234567890abcdef')
+    expect(output).toContain('Start OpenAlice for this AliceProject')
+    expect(output).not.toContain('Provider')
+    expect(output).not.toContain('bundle')
+    expect(output).not.toContain('1234567890abcdef')
     expect(output).not.toContain('/opt/openalice/releases/runtime')
   })
 

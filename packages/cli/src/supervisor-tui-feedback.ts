@@ -50,7 +50,7 @@ export function supervisorCommandHoverPreview(
       ? 'Start the selected remote AliceProject on its owning Machine.'
       : 'Start the selected Runtime without opening a browser.'
   }
-  if (label === 'p') return 'Review AliceProject and Machine defaults in Setup Studio.'
+  if (label === 'p') return 'Setup Studio · review AliceProject and Machine defaults.'
   if (label === 'c') return 'Choose, validate, save, and launch a Runtime source checkout.'
   if (label === '?') return 'Open contextual controls and the complete keyboard reference.'
   if (label === 'l') return 'Inspect the bounded, redacted Runtime log snapshot.'

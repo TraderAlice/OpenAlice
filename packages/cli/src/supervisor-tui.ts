@@ -474,6 +474,8 @@ export interface SupervisorTuiDependencies {
   pollIntervalMs?: number
   connectionPollIntervalMs?: number
   probeTarget?: (endpoint: string) => Promise<boolean>
+  readInbox?: typeof readSupervisorInbox
+  setInboxRead?: typeof setSupervisorInboxRead
   now?: () => number
   seedFleet?: () => Promise<MachineFleetEnvelope>
   inspectFleet?: () => Promise<MachineFleetEnvelope>
@@ -508,12 +510,20 @@ interface SupervisorServices {
   applyUpdate: NonNullable<SupervisorTuiDependencies['applyUpdate']>
 }
 
+interface SupervisorHomePrimaryIntent {
+  kind: 'runtime' | 'inbox'
+  label: string
+  inboxUnread: number
+}
+
 export async function runSupervisorTui(
   launchFlags: TuiLaunchFlags = {},
   dependencies: SupervisorTuiDependencies = {},
 ): Promise<number> {
   const stdin = dependencies.stdin ?? process.stdin
   const stdout = dependencies.stdout ?? process.stdout
+  const readInbox = dependencies.readInbox ?? readSupervisorInbox
+  const setInboxRead = dependencies.setInboxRead ?? setSupervisorInboxRead
   if (!stdin.isTTY || !stdout.isTTY) {
     throw Object.assign(
       new Error('the Supervisor TUI requires an interactive terminal; use "openalice status --json" for automation'),
@@ -1216,7 +1226,7 @@ export async function runSupervisorTui(
     if (!active || !target) return
     if (!options.quiet) screen.update({ busy: 'Refreshing Inbox', diagnostic: undefined })
     try {
-      const next = await readSupervisorInbox(target.endpoint)
+      const next = await readInbox(target.endpoint)
       if (!active || activeTarget?.endpoint !== target.endpoint) return
       inbox = next
       screen.update({ inbox: next, ...(options.quiet ? {} : { notice: 'Inbox refreshed.' }) })
@@ -1237,7 +1247,7 @@ export async function runSupervisorTui(
     const read = !current.readAt
     screen.update({ busy: read ? 'Marking message read' : 'Marking message unread', diagnostic: undefined })
     try {
-      const readAt = await setSupervisorInboxRead(target.endpoint, id, read)
+      const readAt = await setInboxRead(target.endpoint, id, read)
       if (!active || activeTarget?.endpoint !== target.endpoint || !inbox) return
       inbox = updateSupervisorInboxEntryRead(inbox, id, readAt)
       screen.update({ inbox, notice: read ? 'Message marked read.' : 'Message marked unread.' })
@@ -4295,6 +4305,13 @@ export class SupervisorScreen implements Component {
         this.update({ notice: configRecoveryBlockedNotice() })
         return true
       }
+      if (
+        this.snapshot.panel === 'overview'
+        && supervisorHomePrimaryIntent(this.snapshot).kind === 'inbox'
+      ) {
+        this.selectPanel('inbox')
+        return true
+      }
       if (this.snapshot.activeTarget) {
         if (this.onOpenActiveTarget) this.onOpenActiveTarget()
         else this.onAction?.('open')
@@ -4727,6 +4744,7 @@ export class SupervisorScreen implements Component {
     }
     const runtime = this.snapshot.activeTarget?.runtime ?? this.snapshot.runtime
     const connectionHealth = this.snapshot.activeTarget?.health?.phase
+    const homePrimaryIntent = supervisorHomePrimaryIntent(this.snapshot)
     const state = connectionHealth === 'checking'
       ? 'checking'
       : connectionHealth === 'degraded'
@@ -4931,34 +4949,21 @@ export class SupervisorScreen implements Component {
     } else if (isConfigRecovery(this.snapshot)) {
       lines.push(...renderConfigRecovery(this.snapshot))
     } else {
-      const reportedProvider = runtime?.provider?.kind
-      const provider = this.snapshot.activeTarget?.kind === 'ssh'
-        ? 'remote Runtime via SSH'
-        : reportedProvider && reportedProvider !== 'unknown'
-        ? reportedProvider
-        : this.snapshot.context?.runtimeProvider.kind ?? 'not resolved'
-      const providerLabel = this.snapshot.activeTarget?.kind !== 'ssh'
-        && this.snapshot.context?.runtimeProvider.kind === 'bundle'
-        ? `OpenAlice ${this.snapshot.version} · bundle ${this.snapshot.context.runtimeProvider.contentIdentity ?? 'verified'}`
-        : provider
-      const uptime = Number.isInteger(runtime?.uptimeSeconds)
-        ? formatDuration(runtime?.uptimeSeconds ?? 0)
-        : undefined
       const home = renderSupervisorHome({
         projectName: this.snapshot.activeTarget?.projectName
           ?? this.snapshot.context?.aliceProject.displayName
           ?? 'Default AliceProject',
+        machineName: this.snapshot.activeTarget?.machineName ?? 'This computer',
+        targetKind: this.snapshot.activeTarget?.kind ?? 'local',
+        transport: this.snapshot.activeTarget?.transport ?? 'loopback',
         state,
         connectionHealth,
         projectAvailable: activeTargetProjectAvailable(this.snapshot),
-        home: this.snapshot.activeTarget?.home ?? this.snapshot.context?.home ?? runtime?.home ?? 'default',
-        web: runtime?.endpoints?.web ?? 'Not available until the Runtime starts',
-        owner: formatOwner(runtime),
-        provider: providerLabel,
-        components: formatComponents(runtime),
-        ...(uptime ? { uptime } : {}),
         guidance: renderGuidance(runtime, this.snapshot.context, this.snapshot.activeTarget),
-        primaryAction: activeTargetPrimaryActionLabel(runtime, this.snapshot.activeTarget),
+        primaryAction: homePrimaryIntent.label,
+        inboxPrimary: homePrimaryIntent.kind === 'inbox',
+        inboxUnread: homePrimaryIntent.inboxUnread,
+        recentActivity: supervisorHomeRecentActivity(this.snapshot.connectionEvents),
         primaryHovered: this.homePrimaryHovered,
         projectHotspot: this.snapshot.activeTarget?.kind !== 'ssh',
         webHotspot: Boolean(runtime?.endpoints?.web)
@@ -5063,13 +5068,19 @@ export class SupervisorScreen implements Component {
             : this.snapshot.activeTarget?.kind === 'ssh'
               ? renderSupervisorCommandBar([
                   activeTargetIsReachable(this.snapshot.activeTarget)
-                    ? { key: 'o', label: 'Open Web', primary: true }
+                    ? { key: 'o', label: 'Open Web', primary: homePrimaryIntent.kind !== 'inbox' }
                     : { key: 'r', label: 'Retry connection', primary: true },
                   { key: 'c', label: 'Connections' },
                   { key: 'x', label: 'Disconnect' },
                   { key: '?', label: 'More' },
                 ], actionWidth)
-              : actionBar(runtime, this.snapshot.context, actionWidth, isConfigRecovery(this.snapshot))
+              : actionBar(
+                  runtime,
+                  this.snapshot.context,
+                  actionWidth,
+                  isConfigRecovery(this.snapshot),
+                  homePrimaryIntent.kind === 'inbox',
+                )
     const controlConsole = renderSupervisorControlConsole(
       activity,
       actionShelf,
@@ -5143,22 +5154,22 @@ export class SupervisorScreen implements Component {
     if (this.commandDeckOpen) return undefined
     if (this.hoveredRail?.surface === 'logs') {
       const total = supervisorFilteredLogCount(this.snapshot.logs, this.logFilter)
-      return `Drag the rail to inspect Runtime event ${this.hoveredRail.index + 1}/${total} without reloading.`
+      return `Runtime event ${this.hoveredRail.index + 1}/${total} · drag to inspect.`
     }
     if (this.hoveredRail?.surface === 'doctor') {
       const total = this.snapshot.doctor?.checks?.length ?? 0
-      return `Drag the rail to inspect Doctor check ${this.hoveredRail.index + 1}/${total} without rerunning.`
+      return `Doctor check ${this.hoveredRail.index + 1}/${total} · drag to inspect.`
     }
     if (this.hoveredRail?.surface === 'fleet-machines') {
       const total = this.snapshot.fleet?.machines.length ?? 0
-      return `Drag the rail to select Machine ${this.hoveredRail.index + 1}/${total} without activating it.`
+      return `Machine ${this.hoveredRail.index + 1}/${total} · drag to select.`
     }
     if (this.hoveredRail?.surface === 'fleet-projects') {
       const total = selectedFleetMachine(this.snapshot.fleet)?.projects.length ?? 0
-      return `Drag the rail to select AliceProject ${this.hoveredRail.index + 1}/${total} without activating it.`
+      return `AliceProject ${this.hoveredRail.index + 1}/${total} · drag to select.`
     }
     if (this.headerReleaseHovered) {
-      return `Inspect the ${this.snapshot.channel} release lane and available update.`
+      return `Release ${this.snapshot.channel} · inspect lane and update.`
     }
     if (this.hoveredPanel) {
       return {
@@ -5171,7 +5182,7 @@ export class SupervisorScreen implements Component {
       }[this.hoveredPanel]
     }
     if (this.hoveredHomeHotspot === 'project') {
-      return 'Open the AliceProject Switchboard without changing the current Runtime.'
+      return 'AliceProject Switchboard · Runtime unchanged.'
     }
     if (this.hoveredHomeHotspot === 'web') {
       return 'Open the verified Web UI for this running Runtime.'
@@ -5829,6 +5840,7 @@ function actionBar(
   _context: ResolvedLaunchContext | undefined,
   width: number,
   recovery = false,
+  inboxPrimary = false,
 ): string[] {
   if (recovery) {
     return renderSupervisorCommandBar([
@@ -5845,14 +5857,23 @@ function actionBar(
     ], width)
   }
   if (runtime?.endpoints?.web) {
+    if (inboxPrimary && width < 96 && runtime.owner?.surface === 'cli-server') {
+      return renderSupervisorCommandBar([
+        { key: 'o', label: 'Open Web' },
+        { key: 'l', label: 'Logs' },
+        { key: '?', label: 'More' },
+      ], width)
+    }
     return renderSupervisorCommandBar(runtime.owner?.surface === 'cli-server'
       ? [
+          ...(inboxPrimary ? [{ key: 'o' as const, label: 'Open Web' }] : []),
           { key: 'r', label: 'Restart' },
           { key: 'x', label: 'Stop' },
           { key: 'l', label: 'Logs' },
           { key: '?', label: 'More' },
         ]
       : [
+          ...(inboxPrimary ? [{ key: 'o' as const, label: 'Open Web' }] : []),
           { key: 'd', label: 'Doctor' },
           { key: 'l', label: 'Logs' },
           { key: '?', label: 'More' },
@@ -5863,6 +5884,67 @@ function actionBar(
     { key: 'u', label: 'Update' },
     { key: '?', label: 'More' },
   ], width)
+}
+
+function supervisorHomePrimaryIntent(
+  snapshot: SupervisorSnapshot,
+): SupervisorHomePrimaryIntent {
+  const runtime = snapshot.activeTarget?.runtime ?? snapshot.runtime
+  const inboxUnread = supervisorInboxUnreadCount(snapshot.inbox)
+  const target = snapshot.activeTarget
+  const inboxTargetReachable = target
+    ? activeTargetIsReachable(target)
+    : Boolean(runtime && runtimeIsConnected(runtime) && runtime.endpoints?.web)
+  const inboxOwnsPrimary = Boolean(
+    inboxTargetReachable
+    && inboxUnread > 0,
+  )
+  if (inboxOwnsPrimary) {
+    return {
+      kind: 'inbox',
+      label: `Review ${inboxUnread} unread ${inboxUnread === 1 ? 'report' : 'reports'}`,
+      inboxUnread,
+    }
+  }
+  return {
+    kind: 'runtime',
+    label: activeTargetPrimaryActionLabel(runtime, target),
+    inboxUnread,
+  }
+}
+
+function supervisorHomeRecentActivity(
+  events: SupervisorConnectionEvent[] | undefined,
+): string[] {
+  return (events ?? []).slice(-2).reverse().map((event) => {
+    const date = new Date(event.at)
+    const time = [date.getHours(), date.getMinutes()]
+      .map((part) => String(part).padStart(2, '0'))
+      .join(':')
+    const presentation = event.kind === 'degraded'
+      ? '! DEGRADED'
+      : event.kind === 'unreachable'
+        ? '× UNREACHABLE'
+        : event.kind === 'recovered'
+          ? '✓ RECOVERED'
+          : event.kind === 'disconnected'
+            ? '○ DISCONNECTED'
+            : event.kind === 'stopped'
+              ? '○ STOPPED'
+              : '● CONNECTED'
+    return `${presentation}  ${time} · ${homeConnectionOrigin(event.origin)}`
+  })
+}
+
+function homeConnectionOrigin(origin: SupervisorConnectionEventOrigin): string {
+  if (origin === 'startup') return 'startup discovery'
+  if (origin === 'local-inspection') return 'local inspection'
+  if (origin === 'automatic-probe') return 'automatic probe'
+  if (origin === 'manual-retry') return 'manual retry'
+  if (origin === 'ssh-forward') return 'SSH forward ready'
+  if (origin === 'target-switch') return 'target switch'
+  if (origin === 'user-disconnect') return 'user disconnect'
+  return 'tunnel exit'
 }
 
 function logsActionBar(

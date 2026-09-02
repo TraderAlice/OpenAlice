@@ -2,21 +2,19 @@ import { displayWidth, truncateDisplayWidth } from './supervisor-display.ts'
 import { SUPERVISOR_BRAND_MARK_ROWS } from './supervisor-tui-theme.ts'
 import type { SupervisorFocusTask } from './supervisor-task-surface.ts'
 
-const SUPERVISOR_SIGNAL_DECK_MIN_WIDTH = 72
-
 export interface SupervisorHomeView {
   projectName: string
+  machineName?: string
+  targetKind?: 'local' | 'ssh'
+  transport?: 'loopback' | 'ssh-forward'
   state: string
   connectionHealth?: 'connected' | 'checking' | 'degraded' | 'unreachable'
   projectAvailable?: boolean
-  home: string
-  web: string
-  owner: string
-  provider: string
-  components: string
-  uptime?: string
   guidance: string[]
   primaryAction: string
+  inboxPrimary?: boolean
+  inboxUnread?: number
+  recentActivity?: string[]
   primaryHovered?: boolean
   projectHotspot?: boolean
   webHotspot?: boolean
@@ -175,29 +173,9 @@ export function renderSupervisorHome(
 ): SupervisorHomeRender {
   const cardWidth = Math.max(24, width)
   const state = homeStateBadge(view)
-  const projectBody = [
-    labelAndTail(homeHotspotLabel(view.projectName, 'project', view), state, cardWidth - 4),
-    launchIntent(view),
-    ...homeGuidance(view),
-    primaryLaunchRow(view),
-  ]
-  const details = runtimeDetailRows(view, cardWidth - 4)
-
-  if (width >= 100) return renderWideCockpit(view, state, width, targetHeight)
-
-  const lines = [
-    ...renderCard('Launchpad · AliceProject', projectBody, cardWidth),
-    '',
-    ...renderCard(
-      width >= SUPERVISOR_SIGNAL_DECK_MIN_WIDTH
-        ? 'Runtime Signal Deck · OpenAlice'
-        : 'Runtime signal',
-      width >= SUPERVISOR_SIGNAL_DECK_MIN_WIDTH
-        ? renderCompactSignalDeck(view, cardWidth - 4)
-        : details,
-      cardWidth,
-    ),
-  ]
+  const lines = width >= 100
+    ? renderWideSessionStage(view, state, cardWidth, targetHeight)
+    : renderCompactSessionStage(view, state, cardWidth)
   return {
     lines,
     primaryTarget: targetForLine(lines, '[ Enter ]', cardWidth),
@@ -205,240 +183,158 @@ export function renderSupervisorHome(
   }
 }
 
-function renderCompactSignalDeck(
-  view: SupervisorHomeView,
-  width: number,
-): string[] {
-  const divider = ' │ '
-  const leftWidth = displayWidth(SUPERVISOR_BRAND_MARK_ROWS[0]) + 2
-  const rightWidth = Math.max(1, width - leftWidth - displayWidth(divider))
-  const identity = [
-    ...SUPERVISOR_BRAND_MARK_ROWS.map((mark) => ` ${mark}`),
-    ' ◆ LOCAL CONTROL',
-    ` ${runtimeSignal(view.state, view.pulse ?? false, view.projectAvailable)}`,
-  ]
-  const telemetry = runtimeDetailRows(view, rightWidth)
-  return Array.from(
-    { length: Math.max(identity.length, telemetry.length) },
-    (_, index) => (
-      `${fillLine(identity[index] ?? '', leftWidth)}${divider}${truncateDisplayWidth(telemetry[index] ?? '', rightWidth)}`
-    ),
-  )
-}
-
-function runtimeDetailRows(view: SupervisorHomeView, width: number): string[] {
-  const stale = view.connectionHealth
-    && view.connectionHealth !== 'connected'
-  const details = [
-    detailRow(view.projectAvailable === false ? 'Home missing' : 'Home', view.home, width),
-    detailRow(homeHotspotLabel('Web', 'web', view), view.web, width),
-    detailRow('Owner', view.owner, width),
-    detailRow(homeHotspotLabel('Provider', 'provider', view), view.provider, width),
-    detailRow(stale ? 'Last snapshot' : 'Telemetry', componentTelemetrySummary(view), width),
-  ]
-  if (view.uptime) details.push(detailRow(stale ? 'Last uptime' : 'Uptime', view.uptime, width))
-  return details
-}
-
-function renderWideCockpit(
+function renderWideSessionStage(
   view: SupervisorHomeView,
   state: string,
   width: number,
   targetHeight?: number,
-): SupervisorHomeRender {
-  const gap = 3
-  const leftWidth = Math.max(52, Math.floor(width * 0.52))
-  const rightWidth = Math.max(1, width - leftWidth - gap)
-  const leftInnerWidth = leftWidth - 4
-  const rightInnerWidth = rightWidth - 4
-  const runtimeBody = [
-    labelAndTail(
-      'Process',
-      runtimeSignal(view.state, view.pulse ?? false, view.projectAvailable),
-      rightInnerWidth,
-    ),
-    detailRow(homeHotspotLabel('Web', 'web', view), view.web, rightInnerWidth),
-    detailRow('Owner', view.owner, rightInnerWidth),
-    ...wrappedDetailRows(homeHotspotLabel('Provider', 'provider', view), view.provider, rightInnerWidth),
-    detailRow(view.connectionHealth && view.connectionHealth !== 'connected' ? 'Last snapshot' : 'Telemetry', componentTelemetrySummary(view), rightInnerWidth),
-    detailRow(view.connectionHealth && view.connectionHealth !== 'connected' ? 'Last uptime' : 'Uptime', runtimeUptime(view), rightInnerWidth),
-  ]
-  const projectBody = renderIntegratedWideLaunchpad(view, state, leftInnerWidth)
-  while (projectBody.length < runtimeBody.length) projectBody.splice(-1, 0, '')
-  while (runtimeBody.length < projectBody.length) runtimeBody.splice(-1, 0, '')
-  const context = contextRail(
-    view.projectAvailable === false ? '◆  HOME MISSING' : '⌂  Home',
-    view.home,
-    width,
-  )
-  const naturalHeight = projectBody.length + 2 + context.length
-  const extraRows = Number.isFinite(targetHeight)
-    ? Math.max(0, Math.floor(targetHeight ?? naturalHeight) - naturalHeight)
-    : 0
-  if (extraRows > 0) {
-    const stage = renderWideControlPath(
-      view,
-      extraRows,
-      leftInnerWidth,
-      rightInnerWidth,
-    )
-    projectBody.splice(-1, 0, ...stage.project)
-    runtimeBody.splice(-1, 0, ...stage.runtime)
-  }
-  const project = renderCard('Launchpad · AliceProject', projectBody, leftWidth)
-  const runtime = renderCard('Runtime Telemetry · OpenAlice', runtimeBody, rightWidth)
-
-  const cards = project.map((line, index) => joinColumns(
-    line,
-    runtime[index] ?? '',
-    leftWidth,
-    gap,
-    width,
+): string[] {
+  const innerWidth = width - 4
+  const divider = ' │ '
+  const identityWidth = Math.min(29, Math.max(22, Math.floor(innerWidth * 0.25)))
+  const taskWidth = Math.max(1, innerWidth - identityWidth - displayWidth(divider))
+  const identity = wideSessionIdentity(view, state, identityWidth)
+  const task = sessionTaskRows(view, taskWidth)
+  const naturalBodyHeight = Math.max(identity.length, task.length)
+  const requestedBodyHeight = Number.isFinite(targetHeight)
+    ? Math.max(naturalBodyHeight, Math.floor(targetHeight ?? 0) - 2)
+    : naturalBodyHeight
+  const bodyHeight = Math.min(17, requestedBodyHeight)
+  const left = padSessionRows(identity, bodyHeight)
+  const right = padSessionTaskRows(task, bodyHeight)
+  const body = Array.from({ length: bodyHeight }, (_, index) => (
+    `${fillLine(left[index] ?? '', identityWidth)}${divider}${truncateDisplayWidth(right[index] ?? '', taskWidth)}`
   ))
-  const lines = [...cards, ...context]
-  return {
-    lines,
-    primaryTarget: targetForLine(lines, '[ Enter ]', leftWidth),
-    hotspotTargets: homeHotspotTargets(lines, view),
-  }
+  return renderCard('Alice Session · OpenAlice', body, width)
 }
 
-function renderWideControlPath(
-  view: SupervisorHomeView,
-  height: number,
-  projectWidth: number,
-  runtimeWidth: number,
-): { project: string[]; runtime: string[] } {
-  const project = Array.from({ length: height }, () => '')
-  const runtime = Array.from({ length: height }, () => '')
-  if (height < 5) return { project, runtime }
-
-  const start = Math.max(0, Math.floor((height - 5) / 2))
-  const activeRuntime = view.state === 'running' || view.state === 'owned_elsewhere'
-  const connectionUnhealthy = view.connectionHealth
-    && view.connectionHealth !== 'connected'
-  const routeTrack = renderRouteTrack(
-    Math.max(5, Math.min(13, projectWidth - 23)),
-    activeRuntime,
-    view.pulse ?? false,
-  )
-  const workspaceTrack = renderRouteTrack(5, activeRuntime, !(view.pulse ?? false))
-  const workspace = view.webHotspot ? '↗ WORKSPACE READY' : '◇ WORKSPACE WAITING'
-  const projectIdentity = truncateDisplayWidth(view.projectName, Math.max(1, projectWidth - 17))
-
-  project[start] = '◇ CONTROL PATH'
-  project[start + 1] = truncateDisplayWidth(`◆ ALICEPROJECT  ${projectIdentity}`, projectWidth)
-  project[start + 2] = truncateDisplayWidth(
-    `╰${routeTrack} ${runtimeSignal(view.state, view.pulse ?? false, view.projectAvailable)}`,
-    projectWidth,
-  )
-  project[start + 3] = truncateDisplayWidth(
-    ` ${' '.repeat(Math.max(2, Math.min(8, projectWidth - 24)))}╰${workspaceTrack} ${workspace}`,
-    projectWidth,
-  )
-  project[start + 4] = truncateDisplayWidth(
-    `  PROVIDER  ${view.provider}`,
-    projectWidth,
-  )
-
-  if (connectionUnhealthy) {
-    runtime[start] = '◇ CONNECTION HEALTH'
-    runtime[start + 1] = view.connectionHealth === 'checking'
-      ? '◌ CHECKING ENDPOINT'
-      : view.connectionHealth === 'degraded' ? '! DEGRADED' : '× UNREACHABLE'
-    runtime[start + 2] = '  Last Runtime snapshot retained'
-    runtime[start + 3] = '  No lifecycle action inferred'
-    runtime[start + 4] = '◆ CONTROL  Retry or choose Connections'
-  } else if (view.components === 'not reported') {
-    runtime[start] = '◇ COMPONENT TELEMETRY'
-    runtime[start + 1] = activeRuntime
-      ? '· SNAPSHOT PENDING'
-      : '· AVAILABLE AFTER LAUNCH'
-    runtime[start + 2] = '  Alice · UTA · Connector'
-    runtime[start + 3] = activeRuntime
-      ? '  Runtime live · states unavailable'
-      : '  Starts reporting with Runtime'
-    runtime[start + 4] = activeRuntime
-      ? '◆ CONTROL  Runtime ownership confirmed'
-      : '◇ CONTROL  Waiting for Runtime ownership'
-  } else {
-    runtime[start] = '◇ SERVICE ARRAY'
-    for (const [index, service] of serviceArray(view.components).entries()) {
-      runtime[start + index + 1] = truncateDisplayWidth(service, runtimeWidth)
-    }
-    runtime[start + 4] = activeRuntime
-      ? '  SIGNAL  Runtime report is live'
-      : '  SIGNAL  Waiting for Runtime ownership'
-  }
-  return { project, runtime }
-}
-
-function componentTelemetrySummary(view: SupervisorHomeView): string {
-  if (view.components !== 'not reported') return view.components
-  if (view.state === 'running' || view.state === 'owned_elsewhere') {
-    return 'Component snapshot pending'
-  }
-  if (view.state === 'absent') return 'Available after launch'
-  return 'Component snapshot unavailable'
-}
-
-function runtimeUptime(view: SupervisorHomeView): string {
-  if (view.uptime) return view.uptime
-  if (view.state === 'running' || view.state === 'owned_elsewhere') {
-    return 'Live · not reported'
-  }
-  if (view.state === 'absent') return 'Waiting for Runtime'
-  return 'Unavailable'
-}
-
-function renderRouteTrack(width: number, active: boolean, pulse: boolean): string {
-  const track = Array.from({ length: Math.max(3, width) }, () => '━')
-  const packet = pulse
-    ? Math.max(1, Math.floor(track.length * 0.7))
-    : Math.max(1, Math.floor(track.length * 0.3))
-  track[Math.min(track.length - 2, packet)] = active ? '◆' : '·'
-  return track.join('')
-}
-
-function serviceArray(components: string): [string, string, string] {
-  const reported = components === 'not reported'
-    ? ['Alice not reported', 'UTA not reported', 'Connector not reported']
-    : components.split(/\s+·\s+/u)
-  return (['Alice', 'UTA', 'Connector'] as const).map((name, index) => {
-    const value = reported[index] ?? `${name} not reported`
-    const normalized = value.toLowerCase()
-    const active = /\b(?:ready|running|connected|healthy)\b/u.test(normalized)
-    const unavailable = /\b(?:disabled|unavailable|failed|error)\b/u.test(normalized)
-    return `${active ? '◆' : unavailable ? '×' : '◇'} ${value}`
-  }) as [string, string, string]
-}
-
-function renderIntegratedWideLaunchpad(
+function renderCompactSessionStage(
   view: SupervisorHomeView,
   state: string,
   width: number,
 ): string[] {
-  const gap = '  '
-  const brandWidth = Math.min(
-    displayWidth(SUPERVISOR_BRAND_MARK_ROWS[0]) + 2,
-    Math.max(1, width - displayWidth(gap) - 1),
-  )
-  const guidanceWidth = Math.max(1, width - brandWidth - displayWidth(gap))
-  const guidance = wrapDisplayText(homeGuidance(view).join(' '), guidanceWidth)
-  const brand = [
-    ...SUPERVISOR_BRAND_MARK_ROWS.map((mark) => ` ${mark}`),
-  ]
-  const briefing = Array.from(
-    { length: Math.max(brand.length, guidance.length) },
-    (_, index) => (
-      `${fillLine(brand[index] ?? '', brandWidth)}${gap}${guidance[index] ?? ''}`
-    ),
-  )
-  return [
-    labelAndTail(homeHotspotLabel(view.projectName, 'project', view), state, width),
-    launchIntent(view),
-    ...briefing,
+  const innerWidth = width - 4
+  const guidance = wrapDisplayText(homeGuidance(view).join(' '), innerWidth).slice(0, 2)
+  const recent = homeRecentRows(view, innerWidth).slice(0, 1)
+  return renderCard('Alice Session · OpenAlice', [
+    labelAndTail(homeHotspotLabel(view.projectName, 'project', view), state, innerWidth),
+    sessionRoute(view),
+    `NOW  ${homeNowHeadline(view)}`,
+    ...guidance,
+    homeAttentionRow(view),
+    `RECENT  ${recent[0] ?? 'No connection changes in this TUI session'}`,
     primaryLaunchRow(view),
+  ], width)
+}
+
+function wideSessionIdentity(
+  view: SupervisorHomeView,
+  state: string,
+  width: number,
+): string[] {
+  const markWidth = displayWidth(SUPERVISOR_BRAND_MARK_ROWS[0])
+  const markInset = ' '.repeat(Math.max(0, Math.floor((width - markWidth) / 2)))
+  return [
+    labelAndTail('ALICEPROJECT', state, width),
+    '',
+    ...SUPERVISOR_BRAND_MARK_ROWS.map((row) => `${markInset}${row}`),
+    '',
+    truncateDisplayWidth(homeHotspotLabel(view.projectName, 'project', view), width),
+    truncateDisplayWidth(sessionRoute(view), width),
+    truncateDisplayWidth(sessionIdentityState(view), width),
+  ]
+}
+
+function sessionTaskRows(view: SupervisorHomeView, width: number): string[] {
+  const guidance = wrapDisplayText(homeGuidance(view).join(' '), width).slice(0, 2)
+  const recent = homeRecentRows(view, width).slice(0, 2)
+  return [
+    'NOW',
+    homeNowHeadline(view),
+    ...guidance,
+    '',
+    'ATTENTION',
+    homeAttentionRow(view),
+    homeConnectionRow(view),
+    '',
+    'RECENT',
+    ...recent,
+    primaryLaunchRow(view),
+  ]
+}
+
+function homeNowHeadline(view: SupervisorHomeView): string {
+  if (view.connectionHealth === 'checking') return 'Checking the active endpoint'
+  if (view.connectionHealth === 'degraded') return 'Connection needs a retry'
+  if (view.connectionHealth === 'unreachable') return 'Active endpoint is unreachable'
+  if (view.inboxPrimary) {
+    const count = view.inboxUnread ?? 0
+    return `${count} unread ${count === 1 ? 'report needs' : 'reports need'} your attention`
+  }
+  if (
+    view.projectAvailable === false
+    && (view.state === 'running' || view.state === 'owned_elsewhere')
+  ) return 'Runtime is live; AliceProject home is missing'
+  if (view.state === 'running' || view.state === 'owned_elsewhere') return 'Workspace is ready'
+  if (view.state === 'absent') return 'Start OpenAlice for this AliceProject'
+  if (view.state === 'incompatible') return 'Review Runtime Doctor before changing anything'
+  return 'Resolving Runtime state'
+}
+
+function homeAttentionRow(view: SupervisorHomeView): string {
+  const count = view.inboxUnread ?? 0
+  if (count > 0) return `◆ Inbox  ${count} unread ${count === 1 ? 'report' : 'reports'}`
+  if (view.state === 'absent') return '◇ Runtime  stopped · ready to launch'
+  if (view.state === 'incompatible') return '× Runtime  incompatible owner'
+  return '◇ Inbox  clear'
+}
+
+function homeConnectionRow(view: SupervisorHomeView): string {
+  if (view.connectionHealth === 'checking') return '◌ Connection  checking endpoint'
+  if (view.connectionHealth === 'degraded') return '! Connection  degraded'
+  if (view.connectionHealth === 'unreachable') return '× Connection  unreachable'
+  if (view.state === 'running' || view.state === 'owned_elsewhere') {
+    return '● Connection  healthy'
+  }
+  return '◇ Connection  waiting for Runtime'
+}
+
+function homeRecentRows(view: SupervisorHomeView, width: number): string[] {
+  const rows = view.recentActivity?.length
+    ? view.recentActivity
+    : ['· No connection changes in this TUI session']
+  return rows.map((row) => truncateDisplayWidth(row, width))
+}
+
+function sessionRoute(view: SupervisorHomeView): string {
+  const machine = view.machineName ?? 'This computer'
+  const transport = view.transport === 'ssh-forward' || view.targetKind === 'ssh'
+    ? 'SSH'
+    : 'LOCAL'
+  return `⌁ ${machine} · ${transport}`
+}
+
+function sessionIdentityState(view: SupervisorHomeView): string {
+  if (view.connectionHealth === 'checking') return '◌ ENDPOINT CHECK'
+  if (view.connectionHealth === 'degraded') return '! DEGRADED'
+  if (view.connectionHealth === 'unreachable') return '× UNREACHABLE'
+  if (view.state === 'running' || view.state === 'owned_elsewhere') return '● LIVE TARGET'
+  if (view.state === 'absent') return '○ READY TO START'
+  return '◇ STATE UNKNOWN'
+}
+
+function padSessionRows(rows: string[], height: number): string[] {
+  return [...rows, ...Array.from({ length: Math.max(0, height - rows.length) }, () => '')]
+    .slice(0, height)
+}
+
+function padSessionTaskRows(rows: string[], height: number): string[] {
+  if (rows.length >= height) return rows.slice(0, height)
+  const action = rows.at(-1) ?? ''
+  return [
+    ...rows.slice(0, -1),
+    ...Array.from({ length: Math.max(0, height - rows.length) }, () => ''),
+    action,
   ]
 }
 
@@ -515,20 +411,6 @@ function homeHotspotTargets(
   })
 }
 
-function launchIntent(view: SupervisorHomeView): string {
-  const state = view.state
-  if (view.connectionHealth === 'checking') return '◌ CHECKING ENDPOINT · TARGET RETAINED'
-  if (view.connectionHealth === 'degraded') return '◆ CONNECTION DEGRADED · RETRY AVAILABLE'
-  if (view.connectionHealth === 'unreachable') return '× ENDPOINT UNREACHABLE · RETRY OR DISCONNECT'
-  if (view.projectAvailable === false && (state === 'running' || state === 'owned_elsewhere')) {
-    return '◆ LIVE RUNTIME · PROJECT HOME MISSING'
-  }
-  if (state === 'running' || state === 'owned_elsewhere') return '● LIVE SESSION · OPEN THE WORKSPACE'
-  if (state === 'absent') return '◆ LAUNCH READY · LOCAL RUNTIME'
-  if (state === 'incompatible') return '× ATTENTION · REVIEW DOCTOR BEFORE CHANGES'
-  return '◇ CHECKING · RUNTIME STATE IS SETTLING'
-}
-
 function homeStateBadge(view: SupervisorHomeView): string {
   if (view.projectAvailable === false && view.state === 'running') {
     return '◆ RUNNING · HOME MISSING'
@@ -540,6 +422,10 @@ function homeStateBadge(view: SupervisorHomeView): string {
 }
 
 function homeGuidance(view: SupervisorHomeView): string[] {
+  if (view.inboxPrimary) {
+    const count = view.inboxUnread ?? 0
+    return [`${count} unread ${count === 1 ? 'report is' : 'reports are'} waiting in this AliceProject.`]
+  }
   if (
     view.projectAvailable === false
     && (view.state === 'running' || view.state === 'owned_elsewhere')
@@ -618,30 +504,40 @@ export function renderSupervisorControlConsole(
   const safeWidth = Math.max(1, width)
   const bodyWidth = Math.max(1, safeWidth - 4)
   return [
-    controlConsoleCap(activity, safeWidth),
-    ...actionLines.map((line) => (
-      safeWidth < 4
-        ? truncateDisplayWidth(line, safeWidth)
-        : `│ ${fillLine(truncateDisplayWidth(line, bodyWidth), bodyWidth)} │`
+    ...actionLines.map((line, index) => (
+      index === 0
+        ? safeWidth < 4
+          ? truncateDisplayWidth(line, safeWidth)
+          : `╭─ ${fillLine(truncateDisplayWidth(line, bodyWidth), bodyWidth)}╮`
+        : safeWidth < 4
+          ? truncateDisplayWidth(line, safeWidth)
+          : `│ ${fillLine(truncateDisplayWidth(line, bodyWidth), bodyWidth)} │`
     )),
-    truncateDisplayWidth(dock, safeWidth),
+    activity.trim()
+      ? dockWithSupervisorActivity(dock, activity, safeWidth)
+      : truncateDisplayWidth(dock, safeWidth),
   ]
 }
 
-function controlConsoleCap(activity: string, width: number): string {
-  if (width < 8) {
-    return width === 1
-      ? '╭'
-      : `╭${'─'.repeat(Math.max(0, width - 2))}╮`
-  }
-  const contentWidth = width - 4
-  const rawContent = activity.trimEnd() || '◇  CONTROL CONSOLE'
-  const content = truncateDisplayWidth(rawContent, Math.max(1, contentWidth - 4))
-  const trackWidth = Math.max(0, contentWidth - displayWidth(content))
-  const track = trackWidth > 0
-    ? ` ${'─'.repeat(Math.max(0, trackWidth - 1))}`
-    : ''
-  return `╭─ ${content}${track}╮`
+function dockWithSupervisorActivity(
+  dock: string,
+  activity: string,
+  width: number,
+): string {
+  const match = /^(╰─ .*?(?:\[ q \] Detach|\[ Esc \] Back))/u.exec(dock)
+  if (!match?.[1] || width < 16) return truncateDisplayWidth(dock, width)
+  const label = activity.trim()
+    .replace(/^╭─ /u, '')
+    .replace(/ ─+╮$/u, '')
+  const joiner = '  ›  '
+  const suffix = ' ─╯'
+  const budget = Math.max(
+    1,
+    width - displayWidth(match[1]) - displayWidth(joiner) - displayWidth(suffix),
+  )
+  const visible = truncateDisplayWidth(label, budget)
+  const track = '─'.repeat(Math.max(0, budget - displayWidth(visible)))
+  return `${match[1]}${joiner}${visible}${track}${suffix}`
 }
 
 export function renderSupervisorDock(
@@ -765,8 +661,8 @@ export function renderSupervisorContextTip(
             ? '/ searches every available command without leaving this view.'
             : view.runtimeState === 'absent'
               ? 'Enter starts and opens; s starts quietly inside this terminal.'
-              : view.runtimeState === 'running' || view.runtimeState === 'owned_elsewhere'
-                ? 'Hover an active signal to preview its consequence before clicking.'
+            : view.runtimeState === 'running' || view.runtimeState === 'owned_elsewhere'
+                ? 'Enter follows Now; o opens Web; Runtime keeps the diagnostic detail.'
                 : 'Run Doctor before acting on an uncertain Runtime signal.'
   return truncateDisplayWidth(`◇  Tip: ${message}`, Math.max(1, width))
 }
@@ -893,8 +789,11 @@ function supervisorActionShelfTargets(
 ): SupervisorCommandTarget[] {
   const trimmed = line.trimEnd()
   const framed = trimmed.startsWith('│ ') && trimmed.endsWith(' │')
-  const contentOffset = framed ? 2 : 0
-  const body = (framed ? trimmed.slice(2, -2) : trimmed).trimEnd()
+  const capped = trimmed.startsWith('╭─ ') && trimmed.endsWith('╮')
+  const contentOffset = framed ? 2 : capped ? 3 : 0
+  const body = (framed
+    ? trimmed.slice(2, -2)
+    : capped ? trimmed.slice(3, -1) : trimmed).trimEnd()
   if (!/^[◆·] \[ [^\]]+ \] /u.test(body)) return []
   const parts = body.split('  │  ')
   if (!parts.every((part) => /^(?:[◆·] )?\[ [^\]]+ \] \S/u.test(part))) return []
@@ -952,36 +851,6 @@ function signalScopeFact(
   return `${safeLabel}${' '.repeat(Math.max(1, labelWidth - displayWidth(safeLabel)))}${
     compact ? fact.compactValue ?? fact.value : fact.value
   }`
-}
-
-function detailRow(label: string, value: string, width: number): string {
-  const labelWidth = Math.min(
-    Math.max(width < 50 ? 9 : 12, displayWidth(label)),
-    Math.max(1, width - 2),
-  )
-  const safeLabel = truncateDisplayWidth(label, labelWidth)
-  const valueWidth = Math.max(1, width - labelWidth - 1)
-  return `${safeLabel}${' '.repeat(Math.max(1, labelWidth - displayWidth(safeLabel)))}${truncateDisplayWidth(value, valueWidth)}`
-}
-
-function wrappedDetailRows(label: string, value: string, width: number): string[] {
-  const labelWidth = Math.min(
-    Math.max(width < 50 ? 9 : 12, displayWidth(label)),
-    Math.max(1, width - 2),
-  )
-  const chunks = wrapDisplayText(value, Math.max(1, width - labelWidth - 1))
-  return chunks.map((chunk, index) => {
-    const prefix = index === 0 ? truncateDisplayWidth(label, labelWidth) : ''
-    return `${prefix}${' '.repeat(Math.max(1, labelWidth - displayWidth(prefix)))}${chunk}`
-  })
-}
-
-function contextRail(label: string, value: string, width: number): string[] {
-  const labelWidth = displayWidth(label) + 2
-  const chunks = wrapDisplayText(value, Math.max(1, width - labelWidth))
-  return chunks.map((chunk, index) => (
-    `${index === 0 ? label : ''}${' '.repeat(index === 0 ? 2 : labelWidth)}${chunk}`
-  ))
 }
 
 export function wrapDisplayText(value: string, width: number): string[] {
@@ -1059,18 +928,6 @@ function panelBadge(panel: string): string {
 function fillLine(value: string, width: number): string {
   const safe = truncateDisplayWidth(value, Math.max(1, width))
   return `${safe}${' '.repeat(Math.max(0, width - displayWidth(safe)))}`
-}
-
-function joinColumns(
-  left: string,
-  right: string,
-  leftWidth: number,
-  gap: number,
-  width: number,
-): string {
-  const safeLeft = truncateDisplayWidth(left, leftWidth)
-  const combined = `${safeLeft}${' '.repeat(Math.max(0, leftWidth - displayWidth(safeLeft) + gap))}${right}`
-  return truncateDisplayWidth(combined, width)
 }
 
 function stateBadge(state: string, pulse: boolean): string {

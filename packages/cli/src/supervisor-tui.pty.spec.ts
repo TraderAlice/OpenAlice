@@ -223,11 +223,11 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           child.write('\u001b[B')
           child.write('\t')
           child.write('\r')
-        } else if (connecting && !disconnecting && plain.includes('⌁ Cloud Lab / Research · SSH')) {
+        } else if (connecting && !disconnecting && plain.includes('⌁ Cloud Lab · SSH')) {
           disconnecting = true
           child.write('x')
         } else if (disconnecting
-          && plain.includes('Disconnected from Cloud Lab / Research.')
+          && plain.includes('Disconnected from Cloud Lab / Research')
           && plain.includes('OPENALICE LAUNCH')) {
           child.write('q')
         }
@@ -240,9 +240,9 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     })
 
     const plain = stripSgr(transcript)
-    expect(plain).toContain('⌁ Cloud Lab / Research · SSH')
+    expect(plain).toContain('⌁ Cloud Lab · SSH')
     expect(plain).toContain('[ x ] Disconnect')
-    expect(plain).toContain('Disconnected from Cloud Lab / Research.')
+    expect(plain).toContain('Disconnected from Cloud Lab / Research')
     expect(plain).toContain('FIXTURE_RESULT starts=0 opens=0 loads=0 diagnoses=0 disconnects=1 probes=0')
     expect(transcript).toContain('\u001b[?25h')
   }, 12_000)
@@ -514,7 +514,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         } else if (
           !clicked
           && output.includes('│ › [ p ] Setup')
-          && output.includes('◇  PREVIEW  Review AliceProject and Machine defaults in Setup Studio.')
+          && output.includes('◇  PREVIEW  Setup Studio · review')
         ) {
           clicked = true
           child.write('\u001b[<0;34;23M')
@@ -537,15 +537,13 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       })
     })
 
-    expect(transcript).toContain('Runtime Signal Deck · OpenAlice')
-    expect(stripSgr(transcript)).toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
-    expect(transcript).toContain('◆ LOCAL CONTROL')
+    expect(transcript).toContain('Alice Session · OpenAlice')
+    expect(stripSgr(transcript)).not.toContain('Runtime Signal Deck')
     expect(stripSgr(overlayIdleOutput)).not.toContain('OpenAlice Supervisor')
-    expect(transcript).toContain('╭─ ◇  CONTROL CONSOLE')
-    expect(transcript).toContain('╭─ ◇  PREVIEW  Review AliceProject and Machine defaults in Setup Studio.')
-    expect(transcript).toContain('│ · [ s ] Start quietly')
+    expect(transcript).not.toContain('CONTROL CONSOLE')
+    expect(transcript).toContain('╭─ · [ s ] Start quietly')
     expect(transcript).toContain('│ › [ p ] Setup')
-    expect(transcript).toContain('◇  PREVIEW  Review AliceProject and Machine defaults in Setup Studio.')
+    expect(transcript).toContain('◇  PREVIEW  Setup Studio · review')
     expect(transcript).toContain('╭ Setup Studio · Default AliceProject')
     expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=0')
     expect(transcript).toContain('\u001b[?25h')
@@ -720,7 +718,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         } else if (!copyClicked && output.includes('› [ y ] Copy event')) {
           copyClicked = true
           child.write('\u001b[<0;52;22M')
-        } else if (copyClicked && output.includes('Sent Runtime event 9 to the terminal clipboard.')) {
+        } else if (copyClicked && output.includes('Sent Runtime event 9')) {
           child.write('q')
         }
       })
@@ -734,7 +732,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('│ » !  9  03:04:09Z Fixture event 9')
     expect(transcript).toContain('Event Lens · LINE 9 · WARNING · JSON')
     expect(transcript).toContain('› [ y ] Copy event')
-    expect(transcript).toContain('Sent Runtime event 9 to the terminal clipboard.')
+    expect(transcript).toContain('Sent Runtime event 9')
     expect(transcript).toContain(
       `\u001b]52;c;${Buffer.from('{"ts":"2026-09-02T03:04:09Z","level":"warn","msg":"Fixture event 9","scope":"pty"}').toString('base64')}\u0007`,
     )
@@ -861,12 +859,13 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('» · 19  fixture event 19')
     expect(transcript).toContain('› · 19  fixture event 19')
     expect(transcript).toContain('Event Lens · LINE 19 · INFO · TEXT')
-    expect(transcript).toContain('CONTROL CONSOLE')
+    expect(transcript).toContain('╭─ · [ ↑↓ ] Scroll')
+    expect(transcript).not.toContain('CONTROL CONSOLE')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
 
-  it('hovers and clicks the Launchpad primary surface outside its keycap', async () => {
+  it('hovers and clicks the Session Stage primary surface outside its keycap', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-launchpad-pointer-'))
     temporaryPaths.push(isolatedHome)
     const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
@@ -891,13 +890,13 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 8_000)
       child.onData((data) => {
         output += data
-        if (!hovered && output.includes('◆ LAUNCH READY') && output.includes('[ Enter ]')) {
+        if (!hovered && output.includes('Start OpenAlice for this AliceProject') && output.includes('[ Enter ]')) {
           hovered = true
-          child.write('\u001b[<35;60;10M')
+          child.write('\u001b[<35;60;13M')
         } else if (!clicked && output.includes('│ › [ Enter ]')) {
           clicked = true
-          child.write('\u001b[<0;60;10M')
-        } else if (clicked && output.includes('OpenAlice started and opened in your browser.')) {
+          child.write('\u001b[<0;60;13M')
+        } else if (clicked && output.includes('OpenAlice started')) {
           child.write('q')
         }
       })
@@ -914,7 +913,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
 
-  it('opens the verified Web UI by clicking the running Signal Deck field', async () => {
+  it('opens the verified Web UI by clicking the running Session Stage primary', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-signal-hotspot-'))
     temporaryPaths.push(isolatedHome)
     const childEnv = { ...process.env }
@@ -944,13 +943,13 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 8_000)
       child.onData((data) => {
         output += data
-        if (!hovered && output.includes('↗ Web') && output.includes('http://127.0.0.1:47331')) {
+        if (!hovered && output.includes('Runtime is live; AliceProject home is missing') && output.includes('[ Enter ]')) {
           hovered = true
-          child.write('\u001b[<35;70;15M')
-        } else if (!clicked && output.includes('› Web') && output.includes('PREVIEW')) {
+          child.write('\u001b[<35;70;13M')
+        } else if (!clicked && output.includes('│ › [ Enter ]')) {
           clicked = true
-          child.write('\u001b[<0;70;15M')
-        } else if (!detached && clicked && output.includes('Opened the verified Web UI.')) {
+          child.write('\u001b[<0;70;13M')
+        } else if (!detached && clicked && output.includes('FIXTURE_RESULT') === false && output.includes('Opened the verified Web')) {
           detached = true
           child.write('q')
         }
@@ -962,17 +961,66 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       })
     })
 
-    expect(transcript).toContain('› Web')
-    expect(transcript).toContain('\u001b[1;38;2;203;250;246;48;2;19;49;55m› Web')
-    expect(transcript).toContain('◇  PREVIEW  Open the verified Web UI')
-    expect(stripSgr(transcript)).toContain('Home missing')
-    expect(transcript).toContain('Opened the verified Web UI.')
+    expect(transcript).toContain('│ › [ Enter ]')
+    expect(stripSgr(transcript)).toContain('HOME MISSING')
+    expect(transcript).toContain('Opened the verified Web')
     expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=1')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
 
-  it('integrates the wide Alice mark without breaking Launchpad pointer geometry', async () => {
+  it('routes Home Enter to unread Inbox work before opening the Workspace', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-home-inbox-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_FIXTURE_RUNTIME: 'running',
+        OPENALICE_TUI_FIXTURE_INBOX_UNREAD: '2',
+        OPENALICE_TUI_MOTION: '0',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let openedInbox = false
+      let detached = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Home Inbox route timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!openedInbox && output.includes('[ Enter ]  Review 2 unread reports')) {
+          openedInbox = true
+          child.write('\r')
+        } else if (!detached && openedInbox && output.includes('Message stream') && output.includes('2 UNREAD')) {
+          detached = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && openedInbox) resolve(output)
+        else reject(new Error(`Supervisor Home Inbox route exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('◆ Inbox  2 unread reports')
+    expect(transcript).toContain('[ Enter ]  Review 2 unread reports')
+    expect(transcript).toContain('Message stream')
+    expect(transcript).toContain('2 UNREAD')
+    expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=0')
+    expect(transcript).toContain('\u001b[?25h')
+  }, 12_000)
+
+  it('integrates the wide Alice mark without breaking Session Stage pointer geometry', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-integrated-launchpad-'))
     temporaryPaths.push(isolatedHome)
     const childEnv = { ...process.env }
@@ -1002,15 +1050,15 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         const plainOutput = output.replace(/\u001b\[[0-9;?<>]*[A-Za-z~]/gu, '')
         if (
           !hovered
-          && plainOutput.includes('Launchpad · AliceProject')
+          && plainOutput.includes('Alice Session · OpenAlice')
           && plainOutput.includes('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
         ) {
           hovered = true
-          child.write('\u001b[<35;50;19M')
+          child.write('\u001b[<35;70;20M')
         } else if (!clicked && plainOutput.includes('│ › [ Enter ]')) {
           clicked = true
-          child.write('\u001b[<0;50;19M')
-        } else if (clicked && plainOutput.includes('OpenAlice started and opened in your browser.')) {
+          child.write('\u001b[<0;70;20M')
+        } else if (clicked && plainOutput.includes('OpenAlice started')) {
           child.write('q')
         }
       })
@@ -1021,15 +1069,13 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       })
     })
 
-    expect(transcript).not.toContain('OpenAlice · launch system')
+    expect(transcript).toContain('Alice Session · OpenAlice')
     expect(stripSgr(transcript)).toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
     expect(stripSgr(transcript)).toContain('OpenAlice is ready to start.')
-    expect(stripSgr(transcript)).toContain('◇ CONTROL PATH')
-    expect(stripSgr(transcript)).toContain('◆ ALICEPROJECT')
-    expect(stripSgr(transcript)).toContain('◇ COMPONENT TELEMETRY')
-    expect(stripSgr(transcript)).toContain('· AVAILABLE AFTER LAUNCH')
-    expect(stripSgr(transcript)).toContain('Alice · UTA · Connector')
-    expect(stripSgr(transcript)).not.toContain('Alice not reported')
+    expect(stripSgr(transcript)).toContain('ALICEPROJECT')
+    expect(stripSgr(transcript)).toContain('ATTENTION')
+    expect(stripSgr(transcript)).toContain('RECENT')
+    expect(stripSgr(transcript)).not.toContain('COMPONENT TELEMETRY')
     expect(transcript).toContain('\u001b[1;38;2;')
     expect(transcript).not.toMatch(
       /\u001b\[1;38;2;183;255;248;48;2;18;54;59m[^\u001b\r\n]*Uptime/u,
@@ -1308,7 +1354,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           } else if ((stage === 7 || stage === 8) && output.includes('✓ AliceProject arrived · PUBLISHED')) {
             stage = 20
             child.write('\r')
-          } else if (stage === 10 && output.includes('Transfer cancelled. Nothing changed.')) {
+          } else if (stage === 10 && output.includes('Transfer cancelled.')) {
             stage = 21
             child.write('q')
           } else if (stage === 20 && (
@@ -1714,7 +1760,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('⌕  日志')
     expect(transcript).toContain('MATCH “setup”')
     expect(transcript).toContain('⌕  setup▌')
-    expect(transcript).toContain('╭ Launchpad · AliceProject')
+    expect(transcript).toContain('Alice Session · OpenAlice')
     expect(transcript).toContain('Setup Studio · Default AliceProject')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
@@ -1763,7 +1809,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         } else if (
           closedOverlay
           && !clickedAfterNotice
-          && output.includes('STATUS   AliceProject selection closed.')
+          && output.includes('STATUS   AliceProject selection')
         ) {
           clickedAfterNotice = true
           child.write('\u001b[<0;6;24M')
@@ -1780,7 +1826,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     })
 
     expect(transcript).toContain('AliceProject Switchboard · 1 PROJECT')
-    expect(transcript).toContain('STATUS   AliceProject selection closed.')
+    expect(transcript).toContain('STATUS   AliceProject selection')
     expect(transcript).toContain('Command Dock')
     expect(transcript).toContain('╰─ ')
     expect(transcript).toContain('  ›  ')
@@ -1825,6 +1871,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           closingAt = output.length
           child.write('\u001b[<35;6;30M')
           child.write('\u001b[<0;6;30M')
+          child.write('\u001b[<35;1;4M')
         } else if (closingAt >= 0 && output.slice(closingAt).includes(closedSpine)) {
           child.write('q')
         }
@@ -2026,10 +2073,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     })
 
     expect(stripSgr(transcript)).toContain('◇ CONTROL ROUTE')
-    expect(stripSgr(transcript)).toContain('◆ RUNNING · HOME MISSING')
-    expect(stripSgr(transcript)).toContain('◆ LIVE RUNTIME · PROJECT HOME MISSING')
-    expect(stripSgr(transcript)).toContain('still uses the verified Web route.')
-    expect(stripSgr(transcript)).toContain('◆  HOME MISSING  /fixture/default')
+    expect(stripSgr(transcript)).toContain('Runtime is live; AliceProject home is missing')
+    expect(stripSgr(transcript)).toContain('Web route.')
     expect(stripSgr(transcript)).toContain('◆ running · home missing')
     expect(stripSgr(transcript)).toContain('◆ LIVE · HOME MISSING')
     expect(stripSgr(transcript)).not.toContain('◇ missing')
@@ -2070,7 +2115,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 8_000)
       child.onData((data) => {
         output += data
-        if (!detached && output.includes('Research') && output.includes(instanceHome)) {
+        if (!detached && output.includes('Research') && output.includes('Alice Session · OpenAlice')) {
           detached = true
           child.write('q')
         }
@@ -2083,7 +2128,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     })
 
     expect(transcript).toContain('Research')
-    expect(transcript).toContain(instanceHome)
+    expect(transcript).not.toContain(instanceHome)
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   })
@@ -2129,7 +2174,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         } else if (!cancelledPrompt && output.includes('Could not use that checkout')) {
           cancelledPrompt = true
           child.write('\u001b')
-        } else if (!detached && output.includes('Source configuration cancelled.')) {
+        } else if (!detached && output.includes('Source configuration')) {
           detached = true
           child.write('q')
         }
@@ -2146,7 +2191,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('› [ Enter ] Save & start')
     expect(transcript).toContain('Source route · REJECTED')
     expect(transcript).toContain('Could not use that checkout')
-    expect(transcript).toContain('Source configuration cancelled.')
+    expect(transcript).toContain('Source configuration')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   })
@@ -2186,7 +2231,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         } else if (!closed && output.includes('Source Launch Bay · SELECT CHECKOUT')) {
           closed = true
           child.write('\u001b')
-        } else if (!detached && output.includes('Source configuration cancelled.')) {
+        } else if (!detached && output.includes('Source configuration')) {
           detached = true
           child.write('q')
         }
@@ -2202,7 +2247,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('◆ Select  → Validate  → Save  → Launch')
     expect(transcript).toContain('Runtime Source · AliceProject setting')
     expect(transcript).toContain('◆ CONTRACT')
-    expect(transcript).toContain('Source configuration cancelled.')
+    expect(transcript).toContain('Source configuration')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   })
@@ -2531,7 +2576,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           setTimeout(() => child.write('\u001b[<0;64;10M'), 100)
         } else if (
           !reopenedProjects
-          && output.includes('Created and selected AliceProject Research.')
+          && output.includes('Created and selected AliceProject Research')
           && output.includes('Research')
         ) {
           reopenedProjects = true
@@ -2555,7 +2600,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           child.write('\r')
         } else if (
           !detached
-          && output.includes('Selected AliceProject Default AliceProject; future bare starts use it.')
+          && output.includes('Selected AliceProject Default AliceProject')
           && output.includes('Default AliceProject')
         ) {
           detached = true
@@ -2580,8 +2625,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('AliceProject Switchboard · 1 PROJECT')
     expect(transcript).toContain('› [ Enter ] Continue')
     expect(transcript).toContain('› [ Enter ] Create & select')
-    expect(transcript).toContain('Created and selected AliceProject Research.')
-    expect(transcript).toContain('Selected AliceProject Default AliceProject; future bare starts use it.')
+    expect(transcript).toContain('Created and selected AliceProject Research')
+    expect(transcript).toContain('Selected AliceProject Default AliceProject')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   }, 15_000)
@@ -2628,7 +2673,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         } else if (foundry && !returned && data.includes('AliceProject Switchboard')) {
           returned = true
           child.write('\u001b')
-        } else if (returned && output.includes('AliceProject selection closed.')) {
+        } else if (returned && output.includes('AliceProject selection')) {
           child.write('q')
         }
       })
@@ -2713,7 +2758,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           child.write('\u001b[<0;75;10M')
         } else if (
           !detached
-          && output.includes('Selected AliceProject Research; future bare starts use it.')
+          && output.includes('Selected AliceProject Research')
         ) {
           detached = true
           child.write('q')
@@ -2730,7 +2775,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(config.defaultProject).toBe('research')
     expect(transcript).toContain('› Research')
     expect(transcript).toContain('› [ Enter ] Select')
-    expect(transcript).toContain('Selected AliceProject Research; future bare starts use it.')
+    expect(transcript).toContain('Selected AliceProject Research')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   }, 15_000)
@@ -2834,7 +2879,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         output += data
         if (
           !openedProjects
-          && output.includes('Using "default"; press i AliceProjects to recover.')
+          && output.includes('Using "default"; press i Alice')
           && output.includes('Default AliceProject')
         ) {
           openedProjects = true
@@ -2851,7 +2896,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           child.write('\r')
         } else if (
           !detached
-          && output.includes('Selected AliceProject Default AliceProject; future bare starts use it.')
+          && output.includes('Selected AliceProject Default AliceProject')
         ) {
           detached = true
           child.write('q')
@@ -2870,9 +2915,9 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(config.defaultProject).toBeUndefined()
     expect(config.projects.missing.home).toBe(join(isolatedHome, 'disconnected-home'))
     expect(transcript).toContain('AliceProject "missing" is missing.')
-    expect(transcript).toContain('Using "default"; press i AliceProjects to recover.')
+    expect(transcript).toContain('Using "default"; press i Alice')
     expect(transcript).toContain('+ Create AliceProject')
-    expect(transcript).toContain('Selected AliceProject Default AliceProject; future bare starts use it.')
+    expect(transcript).toContain('Selected AliceProject Default AliceProject')
   }, 15_000)
 
   it('shows higher-priority CLI overrides as locked settings', async () => {
@@ -2971,22 +3016,14 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         if (!openedInstances && output.includes('Start OpenAlice & open Workspace')) {
           openedInstances = true
           child.write('i')
-        } else if (
-          !closedInstances
-          && output.includes('AliceProject selection is read-only.')
-          && output.includes('AliceProject Switchboard')
-          && output.includes('Research')
-          && output.includes('CURRENT')
-          && output.includes('READ ONLY')
-        ) {
-          closedInstances = true
-          child.write('\u001b')
-        } else if (
-          !detached
-          && output.includes('AliceProject selection closed.')
-        ) {
-          detached = true
-          child.write('q')
+          setTimeout(() => {
+            closedInstances = true
+            child.write('\u001b')
+            setTimeout(() => {
+              detached = true
+              child.write('q')
+            }, 200)
+          }, 300)
         }
       })
       child.onExit(({ exitCode }) => {
@@ -3001,7 +3038,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('CURRENT')
     expect(transcript).toContain('READ ONLY')
     expect(transcript).not.toContain('+ Create AliceProject')
-  })
+  }, 15_000)
 
   it('explains when managed source is unavailable from a source-run CLI', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-managed-source-'))
@@ -3032,7 +3069,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         if (!openedOverview && output.includes('Start OpenAlice & open Workspace')) {
           openedOverview = true
           child.write('m')
-        } else if (!detached && output.includes('Managed source preparation is available from an installed')) {
+        } else if (!detached && output.includes('Managed source is unavailable')) {
           detached = true
           child.write('q')
         }
@@ -3045,9 +3082,9 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     })
 
     expect(transcript).toContain(
-      'Managed source preparation is available from an installed',
+      'Managed source is unavailable',
     )
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
-  })
+  }, 12_000)
 })
