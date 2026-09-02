@@ -285,6 +285,8 @@ describe('Supervisor fleet state and presentation', () => {
     expect(output).not.toContain('Selection Constellation')
     expect(output).not.toContain('OWNER    ')
     expect(output).not.toContain('PORT  ')
+    expect(launcher).toHaveLength(23)
+    expect(launcher.at(-2)).toContain('NEXT     Use [ Enter ] Start OpenAlice')
     expect(launcher.every((line) => displayWidth(line) <= 120)).toBe(true)
 
     const compactLauncher = renderSupervisorFleet(

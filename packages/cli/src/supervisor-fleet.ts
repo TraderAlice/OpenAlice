@@ -409,7 +409,10 @@ export function renderSupervisorFleet(
       gap,
     ))
   }
-  const detailRows = fleetDetailRows(width, visibleRows, rowCount)
+  const availableDetailRows = fleetDetailRows(width, visibleRows, rowCount)
+  const detailRows = launcher && availableDetailRows > 2
+    ? 9
+    : availableDetailRows
   lines.push('', ...renderDetailCard(state, width, pulse, detailRows, activeTarget, launcher))
   return [...launchRail, ...lines].map((line) => truncateDisplayWidth(line, width))
 }

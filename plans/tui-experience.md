@@ -3102,9 +3102,9 @@ already large `supervisor-tui.ts` application controller.
   AliceProject identity instead of helping the user switch.
 - Selecting the exact live target now produces an Active Connection surface,
   names it as `ACTIVE TARGET`, and makes Enter's honest consequence `Return
-  Home`. Selecting another Machine or AliceProject restores the existing Start,
-  Connect, or Use action, so Connections remains a target switcher rather than
-  a second status dashboard.
+  Home`. Selecting another Machine or AliceProject becomes an explicit switch,
+  so Connections remains a target switcher rather than a second status
+  dashboard.
 - Connected Connections below 96 columns now devotes one complete pane to the
   focused inventory. The disconnected Launcher deliberately retains its
   80-column two-pane route because both Machine and AliceProject are required
@@ -3121,6 +3121,25 @@ already large `supervisor-tui.ts` application controller.
   target stays live until the new route is ready. Returning to Machine focus
   restores Browse projects guidance instead of falsely advertising Return Home.
 - Active-and-switch acceptance passes through 95 focused Fleet and screen
+  tests, all 52 real-PTY cases, and the complete CLI suite (63 files, 634
+  tests). CLI typecheck and build also pass.
+
+### Content-sized Launch Briefing decision
+
+- A fresh 120x32 cold-start capture showed the nine meaningful Briefing rows
+  followed by three empty framed rows. That stretched the launch decision into
+  an empty dashboard card, stranded Next in the upper field, and pushed the
+  contextual Tip out of the viewport. The 80x24 Briefing was already compact
+  and did not share the problem.
+- Wide Launcher Briefing now owns exactly its nine real content rows: selected
+  route, human outcome, handoff promise, three stages, target, context, and
+  Next. Remaining height stays as open stage space between content and the
+  Command Spine, allowing the Tip to remain visible without adding controls or
+  telemetry. Inventory expansion and connected Selection Constellations keep
+  their existing independent height rules.
+- Real 120x32 and 80x24 captures verify that the wide stage ends directly after
+  Next, restores the launcher Tip, and leaves the compact form unchanged.
+- Content-sized-Briefing acceptance passes through 95 focused Fleet and screen
   tests, all 52 real-PTY cases, and the complete CLI suite (63 files, 634
   tests). CLI typecheck and build also pass.
 

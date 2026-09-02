@@ -140,9 +140,11 @@ intentionally parameter-free:
   passive detail surface is a Launch Briefing rather than a pre-connection
   telemetry dump. It names the selected route, explains the human outcome, and
   previews the three-stage handoff into connected Home; wide terminals add
-  target context while ordinary and narrow terminals retain the outcome and
-  next command. The Briefing and its content-owned action share one resolved
-  intent,
+  target context in a content-sized nine-row stage while ordinary and narrow
+  terminals retain the outcome and next command. Surplus viewport height stays
+  outside the Briefing so its final Next instruction remains visually adjacent
+  to the contextual Tip. The Briefing and its content-owned action share one
+  resolved intent,
   so an offline, unavailable, capability-blocked, or endpoint-less target
   promotes Refresh instead of advertising a stale Start or Connect. An offline
   Machine can still expose its last known AliceProjects for inspection before
