@@ -114,8 +114,9 @@ The TypeScript TUI reports and polls the selected Runtime, detaches with `q`,
 explicit commands. It owns an alternate-screen application canvas and restores
 the screen, cursor, and mouse modes on detach or signal exit. `NO_COLOR` and
 `TERM=dumb` remove decorative color without removing state text;
-the default start view adapts to connectivity: a stopped or unreachable Runtime
-opens the Machine → AliceProject → Runtime Launcher, while a reachable target
+the default start view adapts to connectivity: a stopped Runtime or startup
+without a reachable target opens the Machine → AliceProject → Runtime Launcher,
+while a reachable target
 opens the connected workbench. `OPENALICE_TUI_START_VIEW=home` explicitly opens
 the Home surface for expert workflows and focused regression checks without
 changing lifecycle state;
@@ -153,6 +154,17 @@ intentionally parameter-free:
   authoritative poll reports that the active local Runtime stopped, the default
   shell returns to the Launcher and explains why. An SSH tunnel exit returns to
   the available local target or Connections with a visible disconnect notice;
+- active-target health is independent from tunnel ownership. A bounded
+  `/api/auth/status` probe moves a TUI-owned SSH target from connected to
+  degraded after one failed check and unreachable after three consecutive
+  failures without closing the forward. Any later success restores connected
+  in place. Local inspection failures use the same degraded/unreachable
+  presentation but do not claim the Runtime stopped; only an authoritative
+  absent result returns to the Launcher. Navigation, Home guidance, Runtime,
+  the persistent Dock, and the Command Dock expose the same non-color phase.
+  An unhealthy target replaces Open and lifecycle mutations with `r` Retry;
+  SSH `x` Disconnect remains available and still does not stop the remote
+  Runtime. Automatic checks continue while the target is retained;
 - the connected Home page is an AliceProject status surface rather than a flat
   report. Its hero presents the selected project, a semantic launch/live/
   attention intent strip, human guidance, and a full-row primary action.

@@ -47,6 +47,7 @@ import { resolveInstalledLayout } from './install-layout.mjs'
 import { CLI_VERSION, readInstallSource } from './install-source.mjs'
 import { findOpenAliceRoot } from './local-start.mjs'
 import { readRuntimeLogs } from './logs.mjs'
+import { probeOpenAlice } from './runtime-client.mjs'
 import {
   inspectManagedSource,
   prepareManagedSource,
@@ -357,6 +358,14 @@ export type SupervisorAction =
   | 'apply-update'
 export type { SupervisorConfirmation } from './supervisor-confirmation.ts'
 
+export type SupervisorConnectionPhase = 'connected' | 'checking' | 'degraded' | 'unreachable'
+
+export interface SupervisorConnectionHealth {
+  phase: SupervisorConnectionPhase
+  consecutiveFailures: number
+  checkedAt?: number
+}
+
 export interface SupervisorActiveTarget {
   kind: 'local' | 'ssh'
   machineKey: string
@@ -368,6 +377,7 @@ export interface SupervisorActiveTarget {
   endpoint: string
   clientUrl?: string
   runtime: RuntimeSummary
+  health?: SupervisorConnectionHealth
 }
 
 export interface SupervisorSnapshot {
@@ -444,6 +454,8 @@ export interface SupervisorTuiDependencies {
   version?: string
   channel?: string
   pollIntervalMs?: number
+  connectionPollIntervalMs?: number
+  probeTarget?: (endpoint: string) => Promise<boolean>
   seedFleet?: () => Promise<MachineFleetEnvelope>
   inspectFleet?: () => Promise<MachineFleetEnvelope>
   loadMachineRegistry?: () => Promise<MachineRegistrySummary>
@@ -600,6 +612,7 @@ export async function runSupervisorTui(
   let confirmationActive = false
   let commandPaletteActive = false
   let fleetRefreshing = false
+  let targetProbeRunning = false
   const tunnelControllers = new Map<string, AbortController>()
   let managedStartAction: 'start' | 'start-open' = 'start'
   let closeSourcePrompt: (() => void) | null = null
@@ -906,6 +919,10 @@ export async function runSupervisorTui(
     onDisconnectActiveTarget: () => {
       disconnectActiveRemoteTarget()
     },
+    onRefreshActiveTarget: () => {
+      if (activeTarget?.kind === 'local') void refreshRuntime({ manual: true })
+      else void refreshActiveTargetHealth({ manual: true })
+    },
     onConfirmationChange: syncConfirmationOverlay,
     onCommandPaletteChange: syncCommandPaletteOverlay,
     requestRender: () => ui.requestRender(),
@@ -1007,6 +1024,8 @@ export async function runSupervisorTui(
     ?? ((home) => inspectRuntime({ homeRoot: home, waitMs: 2_000 }))
   const startRemoteProject = dependencies.startRemoteProject
     ?? ((machine, projectKey) => runRemoteProjectStart(machine, projectKey))
+  const probeTarget = dependencies.probeTarget
+    ?? ((endpoint) => probeOpenAlice(endpoint, { timeoutMs: 1_500 }))
 
   function abortRemoteTunnels(exceptKey?: string): void {
     for (const [key, controller] of tunnelControllers) {
@@ -1039,6 +1058,69 @@ export async function runSupervisorTui(
     })
   }
 
+  async function refreshActiveTargetHealth(
+    options: { manual?: boolean } = {},
+  ): Promise<void> {
+    const target = activeTarget
+    if (!active || !target || target.kind !== 'ssh' || targetProbeRunning) return
+    targetProbeRunning = true
+    const previousPhase = target.health?.phase ?? 'connected'
+    if (options.manual) {
+      activeTarget = {
+        ...target,
+        health: {
+          phase: 'checking',
+          consecutiveFailures: target.health?.consecutiveFailures ?? 0,
+          checkedAt: target.health?.checkedAt,
+        },
+      }
+      screen.update({
+        activeTarget,
+        busy: `Checking ${target.machineName} / ${target.projectName}`,
+        notice: undefined,
+        diagnostic: undefined,
+      })
+    }
+    let reachable = false
+    try {
+      reachable = await probeTarget(target.endpoint)
+    } catch {
+      reachable = false
+    }
+    if (!active
+      || activeTarget?.kind !== 'ssh'
+      || activeTarget.endpoint !== target.endpoint) {
+      targetProbeRunning = false
+      return
+    }
+    const failures = reachable
+      ? 0
+      : (target.health?.consecutiveFailures ?? 0) + 1
+    const phase: SupervisorConnectionPhase = reachable
+      ? 'connected'
+      : failures >= 3 ? 'unreachable' : 'degraded'
+    activeTarget = {
+      ...activeTarget,
+      health: { phase, consecutiveFailures: failures, checkedAt: Date.now() },
+    }
+    const transitioned = phase !== previousPhase
+    screen.update({
+      activeTarget,
+      ...(reachable ? { diagnostic: undefined } : {}),
+      ...(reachable && (previousPhase !== 'connected' || options.manual)
+        ? { notice: `Connection to ${target.machineName} / ${target.projectName} is healthy.` }
+        : !reachable && transitioned
+          ? {
+              notice: phase === 'unreachable'
+                ? `OpenAlice at ${target.machineName} / ${target.projectName} is unreachable. Retry or disconnect.`
+                : `Connection to ${target.machineName} / ${target.projectName} is degraded; retrying automatically.`,
+            }
+          : {}),
+      ...(options.manual ? { busy: undefined } : {}),
+    })
+    targetProbeRunning = false
+  }
+
   async function refreshInbox(options: { quiet?: boolean } = {}): Promise<void> {
     const target = activeTarget
     if (!active || !target) return
@@ -1049,7 +1131,7 @@ export async function runSupervisorTui(
       inbox = next
       screen.update({ inbox: next, ...(options.quiet ? {} : { notice: 'Inbox refreshed.' }) })
     } catch (error: unknown) {
-      if (active && activeTarget?.endpoint === target.endpoint) {
+      if (active && !options.quiet && activeTarget?.endpoint === target.endpoint) {
         screen.update({ diagnostic: safeError(error) })
       }
     } finally {
@@ -1077,8 +1159,15 @@ export async function runSupervisorTui(
     }
   }
 
-  async function refreshRuntime(): Promise<void> {
+  async function refreshRuntime(options: { manual?: boolean } = {}): Promise<void> {
     if (!active || actionRunning || configRecovery || !context) return
+    if (options.manual) {
+      screen.update({
+        busy: `Checking ${activeTarget?.machineName ?? 'local Runtime'} / ${activeTarget?.projectName ?? context.aliceProject.displayName}`,
+        notice: undefined,
+        diagnostic: undefined,
+      })
+    }
     try {
       const nextRuntime = await services.inspect({
         homeRoot: context.home,
@@ -1092,6 +1181,10 @@ export async function runSupervisorTui(
         if (activeTarget?.endpoint !== previousTarget?.endpoint) inbox = null
       }
       const localTargetLost = previousTarget?.kind === 'local' && !activeTarget
+      const localTargetRecovered = previousTarget?.kind === 'local'
+        && previousTarget.health?.phase !== undefined
+        && previousTarget.health.phase !== 'connected'
+        && activeTarget?.kind === 'local'
       const currentFleet = screen.snapshot.fleet
       screen.update({
         runtime: nextRuntime,
@@ -1107,6 +1200,9 @@ export async function runSupervisorTui(
                 ? 'Runtime stopped. Choose an AliceProject to start or connect.'
                 : 'Connection to the local Runtime was lost. Choose a target to continue.',
             }
+          : {}),
+        ...(localTargetRecovered
+          ? { notice: `Connection to ${activeTarget?.machineName ?? 'This computer'} / ${activeTarget?.projectName ?? context.aliceProject.displayName} recovered.` }
           : {}),
         fleet: currentFleet && context
           ? replaceFleetInventory(
@@ -1126,7 +1222,30 @@ export async function runSupervisorTui(
       }
     } catch (error: unknown) {
       if (!active) return
-      screen.update({ diagnostic: safeError(error) })
+      if (activeTarget?.kind === 'local') {
+        const previousPhase = activeTarget.health?.phase ?? 'connected'
+        const failures = (activeTarget.health?.consecutiveFailures ?? 0) + 1
+        const phase: SupervisorConnectionPhase = failures >= 3 ? 'unreachable' : 'degraded'
+        activeTarget = {
+          ...activeTarget,
+          health: { phase, consecutiveFailures: failures, checkedAt: Date.now() },
+        }
+        screen.update({
+          activeTarget,
+          diagnostic: safeError(error),
+          ...(phase !== previousPhase
+            ? {
+                notice: phase === 'unreachable'
+                  ? 'The local Runtime is unreachable. Status polling will keep trying.'
+                  : 'The local Runtime connection is degraded; retrying automatically.',
+              }
+            : {}),
+        })
+      } else {
+        screen.update({ diagnostic: safeError(error) })
+      }
+    } finally {
+      if (active && options.manual) screen.update({ busy: undefined })
     }
   }
 
@@ -3134,6 +3253,11 @@ export async function runSupervisorTui(
     poll.unref()
     const inboxPoll = setInterval(() => void refreshInbox({ quiet: true }), 20_000)
     inboxPoll.unref()
+    const connectionPoll = setInterval(
+      () => void refreshActiveTargetHealth(),
+      dependencies.connectionPollIntervalMs ?? 5_000,
+    )
+    connectionPoll.unref()
 
     const finish = (code = 0) => {
       if (settled) return
@@ -3141,6 +3265,7 @@ export async function runSupervisorTui(
       active = false
       clearInterval(poll)
       clearInterval(inboxPoll)
+      clearInterval(connectionPoll)
       stopMotionTimer()
       for (const controller of tunnelControllers.values()) controller.abort()
       tunnelControllers.clear()
@@ -3291,6 +3416,7 @@ export class SupervisorScreen implements Component {
   private readonly onToggleInboxRead?: (entry: NonNullable<SupervisorInboxSnapshot['entries'][number]>) => void
   private readonly onOpenActiveTarget?: () => void
   private readonly onDisconnectActiveTarget?: () => void
+  private readonly onRefreshActiveTarget?: () => void
   private readonly onConfirmationChange?: (action?: SupervisorConfirmation) => void
   private readonly onCommandPaletteChange?: (open: boolean) => void
   private readonly requestRender?: () => void
@@ -3368,6 +3494,7 @@ export class SupervisorScreen implements Component {
       onToggleInboxRead?: (entry: NonNullable<SupervisorInboxSnapshot['entries'][number]>) => void
       onOpenActiveTarget?: () => void
       onDisconnectActiveTarget?: () => void
+      onRefreshActiveTarget?: () => void
       onConfirmationChange?: (action?: SupervisorConfirmation) => void
       onCommandPaletteChange?: (open: boolean) => void
       requestRender?: () => void
@@ -3399,6 +3526,7 @@ export class SupervisorScreen implements Component {
     this.onToggleInboxRead = callbacks.onToggleInboxRead
     this.onOpenActiveTarget = callbacks.onOpenActiveTarget
     this.onDisconnectActiveTarget = callbacks.onDisconnectActiveTarget
+    this.onRefreshActiveTarget = callbacks.onRefreshActiveTarget
     this.onConfirmationChange = callbacks.onConfirmationChange
     this.onCommandPaletteChange = callbacks.onCommandPaletteChange
     this.requestRender = callbacks.requestRender
@@ -3885,16 +4013,40 @@ export class SupervisorScreen implements Component {
         return true
       }
     }
+    if (this.snapshot.activeTarget?.kind === 'local'
+      && !activeTargetIsReachable(this.snapshot.activeTarget)) {
+      if (matchesKey(data, 'r') || matchesKey(data, 'enter')) {
+        this.onRefreshActiveTarget?.()
+        return true
+      }
+      if (matchesKey(data, 'o')) {
+        this.update({ notice: 'The local endpoint is not healthy. Retry the connection before opening it.' })
+        return true
+      }
+      if (matchesKey(data, 'c')) {
+        this.selectPanel('fleet')
+        return true
+      }
+    }
     if (this.snapshot.activeTarget?.kind === 'ssh') {
+      const healthy = activeTargetIsReachable(this.snapshot.activeTarget)
       if (matchesKey(data, 'x')) {
         this.onDisconnectActiveTarget?.()
+        return true
+      }
+      if (matchesKey(data, 'r') || (matchesKey(data, 'enter') && !healthy)) {
+        this.onRefreshActiveTarget?.()
+        return true
+      }
+      if (matchesKey(data, 'o') && !healthy) {
+        this.update({ notice: 'The active endpoint is not healthy. Retry the connection before opening it.' })
         return true
       }
       if (matchesKey(data, 'c') || matchesKey(data, 'i')) {
         this.selectPanel('fleet')
         return true
       }
-      const localOnlyKeys: KeyId[] = ['s', 'r', 'l', 'd', 'p', 'm']
+      const localOnlyKeys: KeyId[] = ['s', 'l', 'd', 'p', 'm']
       if (localOnlyKeys.some((key) => matchesKey(data, key))) {
         this.update({
           notice: 'That command controls a local Runtime. Use Connections to select a local target first.',
@@ -4346,7 +4498,14 @@ export class SupervisorScreen implements Component {
       )
     }
     const runtime = this.snapshot.activeTarget?.runtime ?? this.snapshot.runtime
-    const state = runtime?.class ?? 'unavailable'
+    const connectionHealth = this.snapshot.activeTarget?.health?.phase
+    const state = connectionHealth === 'checking'
+      ? 'checking'
+      : connectionHealth === 'degraded'
+        ? 'unhealthy'
+        : connectionHealth === 'unreachable'
+          ? 'unreachable'
+          : runtime?.class ?? 'unavailable'
     const focusTask = this.activeFocusTask()
     const confirmation = this.activeConfirmationView()
     const updateBadge = this.snapshot.update?.status === 'available'
@@ -4358,6 +4517,7 @@ export class SupervisorScreen implements Component {
       confirmation,
       recovery: isConfigRecovery(this.snapshot),
       connected: this.snapshot.activeTarget !== null,
+      connectionHealth: this.snapshot.activeTarget?.health?.phase,
       inboxUnread: supervisorInboxUnreadCount(this.snapshot.inbox),
       machineCount: this.snapshot.fleet?.machines.length,
       logCount: this.snapshot.logs?.entries?.length,
@@ -4537,6 +4697,7 @@ export class SupervisorScreen implements Component {
           ?? this.snapshot.context?.aliceProject.displayName
           ?? 'Default AliceProject',
         state,
+        connectionHealth,
         projectAvailable: activeTargetProjectAvailable(this.snapshot),
         home: this.snapshot.activeTarget?.home ?? this.snapshot.context?.home ?? runtime?.home ?? 'default',
         web: runtime?.endpoints?.web ?? 'Not available until the Runtime starts',
@@ -4544,11 +4705,12 @@ export class SupervisorScreen implements Component {
         provider: providerLabel,
         components: formatComponents(runtime),
         ...(uptime ? { uptime } : {}),
-        guidance: renderGuidance(runtime, this.snapshot.context),
-        primaryAction: primaryActionLabel(runtime),
+        guidance: renderGuidance(runtime, this.snapshot.context, this.snapshot.activeTarget),
+        primaryAction: activeTargetPrimaryActionLabel(runtime, this.snapshot.activeTarget),
         primaryHovered: this.homePrimaryHovered,
         projectHotspot: this.snapshot.activeTarget?.kind !== 'ssh',
-        webHotspot: Boolean(runtime?.endpoints?.web),
+        webHotspot: Boolean(runtime?.endpoints?.web)
+          && (!this.snapshot.activeTarget || activeTargetIsReachable(this.snapshot.activeTarget)),
         providerHotspot: runtime?.class === 'absent',
         hoveredHotspot: this.hoveredHomeHotspot,
         pulse: this.runtimePulse,
@@ -4617,9 +4779,20 @@ export class SupervisorScreen implements Component {
                 { key: '?', label: 'Close help' },
                 { key: 'q', label: 'Detach' },
               ], actionWidth)
+            : this.snapshot.activeTarget && !activeTargetIsReachable(this.snapshot.activeTarget)
+              ? renderSupervisorCommandBar([
+                  { key: 'r', label: 'Retry connection', primary: true },
+                  { key: 'c', label: 'Connections' },
+                  ...(this.snapshot.activeTarget.kind === 'ssh'
+                    ? [{ key: 'x' as const, label: 'Disconnect' }]
+                    : []),
+                  { key: '?', label: 'More' },
+                ], actionWidth)
             : this.snapshot.activeTarget?.kind === 'ssh'
               ? renderSupervisorCommandBar([
-                  { key: 'o', label: 'Open Web', primary: true },
+                  activeTargetIsReachable(this.snapshot.activeTarget)
+                    ? { key: 'o', label: 'Open Web', primary: true }
+                    : { key: 'r', label: 'Retry connection', primary: true },
                   { key: 'c', label: 'Connections' },
                   { key: 'x', label: 'Disconnect' },
                   { key: '?', label: 'More' },
@@ -4637,6 +4810,7 @@ export class SupervisorScreen implements Component {
         machineName: this.snapshot.activeTarget?.machineName,
         targetKind: this.snapshot.activeTarget?.kind,
         transport: this.snapshot.activeTarget?.transport,
+        connectionHealth: this.snapshot.activeTarget?.health?.phase,
         runtimeState: state,
         projectAvailable: activeTargetProjectAvailable(this.snapshot),
         pulse: this.runtimePulse,
@@ -4733,6 +4907,9 @@ export class SupervisorScreen implements Component {
       return 'Choose and validate the source checkout used by this stopped Runtime.'
     }
     if (this.homePrimaryHovered) {
+      if (this.snapshot.activeTarget && !activeTargetIsReachable(this.snapshot.activeTarget)) {
+        return 'Probe the selected OpenAlice endpoint and recover this target in place.'
+      }
       return runtimeClass === 'absent'
         ? 'Prepare the Runtime, start OpenAlice, and open its verified Web UI.'
         : runtimeClass === 'running' || runtimeClass === 'owned_elsewhere'
@@ -4770,6 +4947,7 @@ export class SupervisorScreen implements Component {
     return supervisorCommandDeckItems({
       recovery: isConfigRecovery(this.snapshot),
       targetKind: this.snapshot.activeTarget?.kind,
+      targetHealth: this.snapshot.activeTarget?.health?.phase,
       runtimeState: runtime?.class ?? 'unavailable',
       primaryLabel: primaryActionLabel(runtime),
       primaryAvailable: Boolean(primaryAction(runtime) && this.actionAvailable(primaryAction(runtime)!)),
@@ -5127,7 +5305,36 @@ function activeTargetProjectAvailable(snapshot: SupervisorSnapshot): boolean | u
 function renderGuidance(
   runtime: RuntimeSummary | null,
   context?: ResolvedLaunchContext,
+  target?: SupervisorActiveTarget | null,
 ): string[] {
+  if (target?.health?.phase === 'checking') {
+    return [
+      'Checking the active OpenAlice endpoint now.',
+      target.kind === 'ssh'
+        ? 'The SSH forward stays open while readiness is verified.'
+        : 'The local Runtime stays selected while readiness is verified.',
+    ]
+  }
+  if (target?.health?.phase === 'degraded') {
+    return [
+      target.kind === 'ssh'
+        ? 'The SSH forward is open, but the OpenAlice endpoint missed a health check.'
+        : 'The local OpenAlice endpoint missed a Runtime inspection.',
+      target.kind === 'ssh'
+        ? 'Press Enter or r to retry now; automatic probes will continue.'
+        : 'Automatic Runtime inspection will continue.',
+    ]
+  }
+  if (target?.health?.phase === 'unreachable') {
+    return [
+      target.kind === 'ssh'
+        ? 'The SSH forward is open, but OpenAlice is currently unreachable.'
+        : 'The selected local Runtime cannot currently be inspected.',
+      target.kind === 'ssh'
+        ? 'Press Enter or r to retry, or x to disconnect without stopping the remote Runtime.'
+        : 'Automatic inspection will continue; no lifecycle mutation has been attempted.',
+    ]
+  }
   if (!runtime) return ['Runtime status is unavailable. Doctor may explain why.']
   if (runtime.class === 'absent') {
     if (context?.runtimeProvider.kind === 'bundle') {
@@ -5150,6 +5357,16 @@ function renderGuidance(
   return [`Runtime is ${runtime.class ?? runtime.state ?? 'unknown'}; status will refresh automatically.`]
 }
 
+function activeTargetPrimaryActionLabel(
+  runtime: RuntimeSummary | null,
+  target?: SupervisorActiveTarget | null,
+): string {
+  if (target && !activeTargetIsReachable(target)) {
+    return 'Retry active connection'
+  }
+  return primaryActionLabel(runtime)
+}
+
 function localSupervisorTarget(
   context: ResolvedLaunchContext | undefined,
   runtime: RuntimeSummary | null,
@@ -5166,6 +5383,7 @@ function localSupervisorTarget(
     transport: 'loopback',
     endpoint,
     runtime,
+    health: { phase: 'connected', consecutiveFailures: 0, checkedAt: Date.now() },
   }
 }
 
@@ -5194,11 +5412,16 @@ function remoteSupervisorTarget(
       owner: project.runtime.ownerSurface ? { surface: project.runtime.ownerSurface } : null,
       components: project.runtime.components,
     },
+    health: { phase: 'connected', consecutiveFailures: 0, checkedAt: Date.now() },
   }
 }
 
 function runtimeIsConnected(runtime: { class?: string }): boolean {
   return runtime.class === 'running' || runtime.class === 'owned_elsewhere'
+}
+
+function activeTargetIsReachable(target: SupervisorActiveTarget): boolean {
+  return !target.health || target.health.phase === 'connected'
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {
@@ -5278,21 +5501,27 @@ function renderRemoteRuntimeTarget(
   width: number,
   targetHeight?: number,
 ): string[] {
+  const phase = target.health?.phase ?? 'connected'
+  const healthy = phase === 'connected'
   return renderSupervisorSignalScope({
     title: 'Remote Runtime',
-    glyph: '●',
-    state: 'SSH FORWARD ACTIVE',
+    glyph: healthy ? '●' : phase === 'checking' ? '◌' : phase === 'degraded' ? '!' : '×',
+    state: healthy
+      ? 'SSH FORWARD ACTIVE'
+      : phase === 'checking' ? 'CHECKING ENDPOINT' : phase === 'degraded' ? 'CONNECTION DEGRADED' : 'ENDPOINT UNREACHABLE',
     meta: `${target.machineName.toUpperCase()} · ${target.projectName.toUpperCase()}`,
     facts: [
       { label: 'Machine', value: `${target.machineName} · ${target.machineKey}` },
       { label: 'AliceProject', value: `${target.projectName} · ${target.projectKey}` },
       {
         label: 'Runtime',
-        value: `${target.runtime.class ?? target.runtime.state ?? 'connected'} · SSH forward · ${target.endpoint}`,
-        compactValue: `${target.runtime.class ?? 'connected'} · SSH`,
+        value: `${phase} · ${target.health?.consecutiveFailures ?? 0} failed probes · SSH forward · ${target.endpoint}`,
+        compactValue: `${phase} · SSH`,
       },
     ],
-    action: { key: 'o', label: 'Open active Web UI', compactLabel: 'Open Web' },
+    action: healthy
+      ? { key: 'o', label: 'Open active Web UI', compactLabel: 'Open Web' }
+      : { key: 'r', label: 'Retry active connection', compactLabel: 'Retry' },
   }, width, targetHeight)
 }
 

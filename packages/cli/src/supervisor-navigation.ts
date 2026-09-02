@@ -12,6 +12,7 @@ export interface SupervisorNavigationView {
   }
   recovery?: boolean
   connected?: boolean
+  connectionHealth?: 'connected' | 'checking' | 'degraded' | 'unreachable'
   inboxUnread?: number
   machineCount?: number
   logCount?: number
@@ -188,7 +189,7 @@ function navigationItems(view: SupervisorNavigationView): NavigationItem[] {
     ]
   }
   return [
-    item('overview', '◆', 'Home', 'Home', 'Home'),
+    item('overview', '◆', 'Home', 'Home', 'Home', connectionBadge(view.connectionHealth)),
     item('inbox', '●', 'Inbox', 'Inbox', 'Inbox', countBadge(view.inboxUnread)),
     item('fleet', '◇', 'Connections', 'Connect', 'Link', countBadge(view.machineCount)),
     item('logs', '≋', 'Runtime', 'Runtime', 'Run', countBadge(view.logCount)),
@@ -208,4 +209,11 @@ function item(
 
 function countBadge(count?: number): string {
   return count && count > 0 ? `·${count}` : ''
+}
+
+function connectionBadge(health?: SupervisorNavigationView['connectionHealth']): string {
+  if (health === 'checking') return '·…'
+  if (health === 'degraded') return '·!'
+  if (health === 'unreachable') return '·×'
+  return ''
 }

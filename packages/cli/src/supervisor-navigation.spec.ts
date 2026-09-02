@@ -24,6 +24,22 @@ describe('Supervisor navigation rail', () => {
     expect(layout.line).toContain('≋ Runtime·42')
   })
 
+  it('projects connection health without relying on color', () => {
+    const degraded = renderSupervisorNavigation({
+      selected: 'overview', connected: true, connectionHealth: 'degraded',
+    }, 80)
+    const unreachable = renderSupervisorNavigation({
+      selected: 'overview', connected: true, connectionHealth: 'unreachable',
+    }, 80)
+    const checking = renderSupervisorNavigation({
+      selected: 'overview', connected: true, connectionHealth: 'checking',
+    }, 80)
+
+    expect(degraded.line).toContain('[Home]·!')
+    expect(unreachable.line).toContain('[Home]·×')
+    expect(checking.line).toContain('[Home]·…')
+  })
+
   it('keeps every view reachable at narrow widths', () => {
     const layout = renderSupervisorNavigation({
       selected: 'inbox',

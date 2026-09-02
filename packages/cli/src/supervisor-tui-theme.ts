@@ -195,6 +195,9 @@ export function decorateSupervisorFrame(
     if (line.includes('│ ✓ ')) return theme.success(line)
     if (line.includes('│ ● LIVE SESSION')) return theme.successRail(line)
     if (line.includes('│ ◆ LIVE RUNTIME · PROJECT HOME MISSING')) return theme.warningRail(line)
+    if (line.includes('│ ◆ CONNECTION DEGRADED')) return theme.warningRail(line)
+    if (line.includes('│ × ENDPOINT UNREACHABLE')) return theme.dangerRail(line)
+    if (line.includes('│ ◌ CHECKING ENDPOINT')) return theme.warningRail(line)
     if (line.includes('│ ◆ LAUNCH READY')) return theme.infoRail(line)
     if (line.includes('│ ◇  SIGNAL STANDBY')) return theme.warningRail(line)
     if (line.includes('│ ○  SIGNAL QUIET')) return theme.infoRail(line)
@@ -211,6 +214,8 @@ export function decorateSupervisorFrame(
     if (line.includes('[ Enter ]') || line.startsWith('◆ [')) return theme.accentStrong(line)
     if (line.includes('● RUNNING') || line.includes('◉ RUNNING')) return theme.success(line)
     if (line.includes('◆ NEEDS ATTENTION')) return theme.danger(line)
+    if (line.includes('◆ UNHEALTHY')) return theme.warning(line)
+    if (line.includes('× UNREACHABLE')) return theme.danger(line)
     if (line.includes('◇ UNAVAILABLE')) return theme.warning(line)
     if (line.startsWith('Working:')) return theme.accent(line)
     if (line.startsWith('Notice:')) return theme.warning(line)
@@ -281,6 +286,12 @@ export function decorateSupervisorFramedColumns(
         ? theme.accent
         : semantic.startsWith('◆ LIVE RUNTIME · PROJECT HOME MISSING')
           ? theme.warningRail
+          : semantic.startsWith('◆ CONNECTION DEGRADED')
+            ? theme.warningRail
+            : semantic.startsWith('× ENDPOINT UNREACHABLE')
+              ? theme.dangerRail
+              : semantic.startsWith('◌ CHECKING ENDPOINT')
+                ? theme.warningRail
           : semantic.startsWith('× ATTENTION')
           ? theme.dangerRail
           : semantic.startsWith('◇ CHECKING')
@@ -406,7 +417,7 @@ function decorateDock(
   theme: SupervisorTuiTheme,
   hoveredCommand?: string,
 ): string {
-  const tokenPattern = /\[ \/ \] (?:Commands|Close)|\[ q \] Detach|\[ Esc \] (?:Back|Cancel)|\[ i \] .*?(?=  ›  )|⌂ .*?(?=  ›  )|◆ (?:FOCUS WORKSPACE|DECISION GATE)|! RECOVERY|(?:◉|●) (?:LIVE|EXTERNAL)|○ COLD|◆ (?:(?:LIVE|EXTERNAL) · HOME MISSING|BLOCKED|DEGRADED)|◇ OFFLINE|◌ [A-Z][A-Z ]*?(?=  ›  | ─╯)|[◆◇≋✦?] (?:OVERVIEW|FLEET|LOGS|DOCTOR|HELP|SETUP|SOURCE|PROJECTS|RELEASE|TRANSFER|CONFIRMATION)/gu
+  const tokenPattern = /\[ \/ \] (?:Commands|Close)|\[ q \] Detach|\[ Esc \] (?:Back|Cancel)|\[ i \] .*?(?=  ›  )|⌂ .*?(?=  ›  )|⌁ .*?(?=  ›  )|◆ (?:FOCUS WORKSPACE|DECISION GATE)|! RECOVERY|(?:◉|●) (?:LIVE|EXTERNAL)|○ COLD|◆ (?:(?:LIVE|EXTERNAL) · HOME MISSING|BLOCKED|DEGRADED)|× UNREACHABLE|◇ OFFLINE|◌ [A-Z][A-Z ]*?(?=  ›  | ─╯)|[◆◇≋✦?] (?:OVERVIEW|FLEET|LOGS|DOCTOR|HELP|SETUP|SOURCE|PROJECTS|RELEASE|TRANSFER|CONFIRMATION)/gu
   let output = ''
   let cursor = 0
   for (const match of line.matchAll(tokenPattern)) {
@@ -428,14 +439,14 @@ function decorateDockToken(
   if (token.startsWith('[ / ]') || token.startsWith('[ q ]') || token.startsWith('[ Esc ]')) {
     return decorateDockKeyedToken(token, theme, theme.dockControl, hoveredCommand)
   }
-  if (token.startsWith('[ i ]') || token.startsWith('⌂ ')) {
+  if (token.startsWith('[ i ]') || token.startsWith('⌂ ') || token.startsWith('⌁ ')) {
     return decorateDockKeyedToken(token, theme, theme.dockIdentity, hoveredCommand)
   }
   if (token === '◆ FOCUS WORKSPACE' || token === '◆ DECISION GATE' || /^[◆◇≋✦?] (?:OVERVIEW|FLEET|LOGS|DOCTOR|HELP|SETUP|SOURCE|PROJECTS|RELEASE|TRANSFER|CONFIRMATION)$/u.test(token)) {
     return theme.dockPanel(token)
   }
   if (token.startsWith('● ') || token.startsWith('◉ ')) return theme.dockSuccess(token)
-  if (token.startsWith('◆ BLOCKED')) return theme.dockDanger(token)
+  if (token.startsWith('◆ BLOCKED') || token.startsWith('× ')) return theme.dockDanger(token)
   if (token.startsWith('◆ ') || token.startsWith('◇ ') || token.startsWith('◌ ') || token.startsWith('! ')) {
     return theme.dockWarning(token)
   }

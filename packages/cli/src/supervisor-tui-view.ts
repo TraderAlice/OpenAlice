@@ -7,6 +7,7 @@ const SUPERVISOR_SIGNAL_DECK_MIN_WIDTH = 72
 export interface SupervisorHomeView {
   projectName: string
   state: string
+  connectionHealth?: 'connected' | 'checking' | 'degraded' | 'unreachable'
   projectAvailable?: boolean
   home: string
   web: string
@@ -90,6 +91,7 @@ export interface SupervisorDockView {
   machineName?: string
   targetKind?: 'local' | 'ssh'
   transport?: 'loopback' | 'ssh-forward'
+  connectionHealth?: 'connected' | 'checking' | 'degraded' | 'unreachable'
   runtimeState?: string
   projectAvailable?: boolean
   pulse?: boolean
@@ -224,14 +226,16 @@ function renderCompactSignalDeck(
 }
 
 function runtimeDetailRows(view: SupervisorHomeView, width: number): string[] {
+  const stale = view.connectionHealth
+    && view.connectionHealth !== 'connected'
   const details = [
     detailRow(view.projectAvailable === false ? 'Home missing' : 'Home', view.home, width),
     detailRow(homeHotspotLabel('Web', 'web', view), view.web, width),
     detailRow('Owner', view.owner, width),
     detailRow(homeHotspotLabel('Provider', 'provider', view), view.provider, width),
-    detailRow('Telemetry', componentTelemetrySummary(view), width),
+    detailRow(stale ? 'Last snapshot' : 'Telemetry', componentTelemetrySummary(view), width),
   ]
-  if (view.uptime) details.push(detailRow('Uptime', view.uptime, width))
+  if (view.uptime) details.push(detailRow(stale ? 'Last uptime' : 'Uptime', view.uptime, width))
   return details
 }
 
@@ -255,8 +259,8 @@ function renderWideCockpit(
     detailRow(homeHotspotLabel('Web', 'web', view), view.web, rightInnerWidth),
     detailRow('Owner', view.owner, rightInnerWidth),
     ...wrappedDetailRows(homeHotspotLabel('Provider', 'provider', view), view.provider, rightInnerWidth),
-    detailRow('Telemetry', componentTelemetrySummary(view), rightInnerWidth),
-    detailRow('Uptime', runtimeUptime(view), rightInnerWidth),
+    detailRow(view.connectionHealth && view.connectionHealth !== 'connected' ? 'Last snapshot' : 'Telemetry', componentTelemetrySummary(view), rightInnerWidth),
+    detailRow(view.connectionHealth && view.connectionHealth !== 'connected' ? 'Last uptime' : 'Uptime', runtimeUptime(view), rightInnerWidth),
   ]
   const projectBody = renderIntegratedWideLaunchpad(view, state, leftInnerWidth)
   while (projectBody.length < runtimeBody.length) projectBody.splice(-1, 0, '')
@@ -310,6 +314,8 @@ function renderWideControlPath(
 
   const start = Math.max(0, Math.floor((height - 5) / 2))
   const activeRuntime = view.state === 'running' || view.state === 'owned_elsewhere'
+  const connectionUnhealthy = view.connectionHealth
+    && view.connectionHealth !== 'connected'
   const routeTrack = renderRouteTrack(
     Math.max(5, Math.min(13, projectWidth - 23)),
     activeRuntime,
@@ -334,7 +340,15 @@ function renderWideControlPath(
     projectWidth,
   )
 
-  if (view.components === 'not reported') {
+  if (connectionUnhealthy) {
+    runtime[start] = '◇ CONNECTION HEALTH'
+    runtime[start + 1] = view.connectionHealth === 'checking'
+      ? '◌ CHECKING ENDPOINT'
+      : view.connectionHealth === 'degraded' ? '! DEGRADED' : '× UNREACHABLE'
+    runtime[start + 2] = '  Last Runtime snapshot retained'
+    runtime[start + 3] = '  No lifecycle action inferred'
+    runtime[start + 4] = '◆ CONTROL  Retry or choose Connections'
+  } else if (view.components === 'not reported') {
     runtime[start] = '◇ COMPONENT TELEMETRY'
     runtime[start + 1] = activeRuntime
       ? '· SNAPSHOT PENDING'
@@ -502,6 +516,9 @@ function homeHotspotTargets(
 
 function launchIntent(view: SupervisorHomeView): string {
   const state = view.state
+  if (view.connectionHealth === 'checking') return '◌ CHECKING ENDPOINT · TARGET RETAINED'
+  if (view.connectionHealth === 'degraded') return '◆ CONNECTION DEGRADED · RETRY AVAILABLE'
+  if (view.connectionHealth === 'unreachable') return '× ENDPOINT UNREACHABLE · RETRY OR DISCONNECT'
   if (view.projectAvailable === false && (state === 'running' || state === 'owned_elsewhere')) {
     return '◆ LIVE RUNTIME · PROJECT HOME MISSING'
   }
@@ -646,11 +663,17 @@ export function renderSupervisorDock(
     return commandSpine(controls, `! RECOVERY${breadcrumb}${panelIdentity}`, width)
   }
 
-  const signal = runtimeSignal(
-    view.runtimeState ?? 'unavailable',
-    view.pulse ?? false,
-    view.projectAvailable,
-  )
+  const signal = view.connectionHealth === 'checking'
+    ? '◌ CHECKING'
+    : view.connectionHealth === 'degraded'
+      ? '! DEGRADED'
+      : view.connectionHealth === 'unreachable'
+        ? '× UNREACHABLE'
+        : runtimeSignal(
+            view.runtimeState ?? 'unavailable',
+            view.pulse ?? false,
+            view.projectAvailable,
+          )
   const fullProjectName = view.projectName ?? 'AliceProject'
   const contextBudget = Math.max(1, width - 6 - displayWidth(controls) - 3)
   const panelSuffix = `${breadcrumb}${panelIdentity}`
@@ -1054,6 +1077,7 @@ function stateBadge(state: string, pulse: boolean): string {
   if (state === 'absent') return '○ STOPPED'
   if (state === 'incompatible') return '◆ NEEDS ATTENTION'
   if (state === 'unhealthy') return '◆ UNHEALTHY'
+  if (state === 'unreachable') return '× UNREACHABLE'
   if (state === 'unavailable') return '◇ UNAVAILABLE'
   return `◌ ${state.toUpperCase()}`
 }
@@ -1067,6 +1091,7 @@ function runtimeSignal(state: string, pulse: boolean, projectAvailable?: boolean
   if (state === 'absent') return '○ COLD'
   if (state === 'incompatible') return '◆ BLOCKED'
   if (state === 'unhealthy') return '◆ DEGRADED'
+  if (state === 'unreachable') return '× UNREACHABLE'
   if (state === 'unavailable') return '◇ OFFLINE'
   return `◌ ${state.toUpperCase()}`
 }

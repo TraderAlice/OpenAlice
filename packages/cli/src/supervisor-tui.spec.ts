@@ -170,6 +170,98 @@ describe('Supervisor TUI screen', () => {
     expect(screen.snapshot.notice).toContain('controls a local Runtime')
   })
 
+  it('turns an unhealthy active target into an explicit recovery surface', () => {
+    let retries = 0
+    let opens = 0
+    const runtime = {
+      class: 'running',
+      endpoints: { web: 'http://127.0.0.1:45454' },
+    }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'overview',
+      runtime: { class: 'absent', endpoints: {} },
+      activeTarget: {
+        kind: 'ssh',
+        machineKey: 'cloud',
+        machineName: 'Cloud Lab',
+        projectKey: 'research',
+        projectName: 'Research',
+        home: '/srv/openalice/research',
+        transport: 'ssh-forward',
+        endpoint: 'http://127.0.0.1:45454',
+        runtime,
+        health: { phase: 'unreachable', consecutiveFailures: 3, checkedAt: 42 },
+      },
+    }, {
+      motionEnabled: false,
+      onRefreshActiveTarget: () => { retries += 1 },
+      onOpenActiveTarget: () => { opens += 1 },
+    })
+
+    const frame = screen.render(100).join('\n')
+    expect(frame).toContain('◆ [Home]·×')
+    expect(frame).toContain('× UNREACHABLE')
+    expect(frame).toContain('ENDPOINT UNREACHABLE · RETRY OR DISCONNECT')
+    expect(frame).toMatch(/Process\s+× UNREACHABLE/u)
+    expect(frame).toContain('Last snapshot')
+    expect(frame).not.toContain('● LIVE SESSION · OPEN THE WORKSPACE')
+    expect(frame).toContain('currently unreachable')
+    expect(frame).toContain('[ r ] Retry connection')
+    expect(frame).not.toContain('[ o ] Open Web')
+    expect(screen.renderCommandPalette(100).lines.join('\n')).toContain('Retry connection')
+
+    expect(screen.handleKey('enter', matchesKey)).toBe(true)
+    expect(screen.handleKey('r', matchesKey)).toBe(true)
+    expect(retries).toBe(2)
+    expect(screen.handleKey('o', matchesKey)).toBe(true)
+    expect(opens).toBe(0)
+    expect(screen.snapshot.notice).toContain('not healthy')
+
+    screen.update({ panel: 'logs' })
+    const runtimeFrame = screen.render(100).join('\n')
+    expect(runtimeFrame).toContain('ENDPOINT UNREACHABLE')
+    expect(runtimeFrame).toContain('3 failed probes')
+    expect(runtimeFrame).toContain('[ r ] Retry active connection')
+  })
+
+  it('uses the same recovery contract for a degraded local target', () => {
+    let retries = 0
+    const runtime = { class: 'running', endpoints: { web: 'http://127.0.0.1:47331' } }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'overview',
+      runtime,
+      activeTarget: {
+        kind: 'local',
+        machineKey: 'local',
+        machineName: 'This computer',
+        projectKey: 'default',
+        projectName: 'Default AliceProject',
+        home: '/tmp/openalice',
+        transport: 'loopback',
+        endpoint: 'http://127.0.0.1:47331',
+        runtime,
+        health: { phase: 'degraded', consecutiveFailures: 1 },
+      },
+    }, {
+      motionEnabled: false,
+      onRefreshActiveTarget: () => { retries += 1 },
+    })
+
+    const frame = screen.render(100).join('\n')
+    expect(frame).toContain('◆ [Home]·!')
+    expect(frame).toContain('! DEGRADED')
+    expect(frame).toContain('CONNECTION DEGRADED · RETRY AVAILABLE')
+    expect(frame).toMatch(/Process\s+◆ DEGRADED/u)
+    expect(frame).toContain('endpoint missed a Runtime')
+    expect(frame).toContain('[ r ] Retry connection')
+    expect(screen.handleKey('r', matchesKey)).toBe(true)
+    expect(retries).toBe(1)
+  })
+
   it('labels source-run, stable, beta, and dev channels from install provenance', async () => {
     await expect(resolveSupervisorChannel({
       resolveLayout: () => null,
@@ -476,6 +568,29 @@ describe('Supervisor TUI screen', () => {
       '\u001b[1;38;2;255;214;128;48;2;10;34;39m◆ LIVE · HOME MISSING',
     )
     expect(themedMissingHome.replace(/\u001b\[[0-9;]*m/gu, '')).toBe(missingHome)
+
+    const unreachableRemote = renderSupervisorDock({
+      panel: 'overview',
+      projectName: 'Research',
+      machineName: 'Cloud Lab',
+      targetKind: 'ssh',
+      transport: 'ssh-forward',
+      runtimeState: 'running',
+      connectionHealth: 'unreachable',
+    }, 110)
+    expect(unreachableRemote).toContain('⌁ Cloud Lab / Research · SSH')
+    expect(unreachableRemote).toContain('× UNREACHABLE')
+    const themedUnreachable = decorateSupervisorFrame([
+      'header',
+      'divider',
+      'tabs',
+      unreachableRemote,
+    ], createSupervisorTuiTheme({ TERM: 'xterm-256color' }), {
+      panel: 'overview',
+      runtimeClass: 'unhealthy',
+    })[3]!
+    expect(themedUnreachable).toContain('\u001b[')
+    expect(themedUnreachable.replace(/\u001b\[[0-9;]*m/gu, '')).toBe(unreachableRemote)
 
     const focus = renderSupervisorDock({
       panel: 'overview',
@@ -2691,6 +2806,143 @@ describe('Supervisor TUI screen', () => {
     expect(screen?.snapshot.activeTarget).toBeNull()
     expect(screen?.snapshot.panel).toBe('fleet')
     expect(screen?.snapshot.notice).toContain('Disconnected from')
+  })
+
+  it('degrades, declares unreachable, and recovers an SSH endpoint in place', async () => {
+    let inputListener: ((data: string) => unknown) | undefined
+    let screen: SupervisorScreen | undefined
+    let probes = 0
+    const phases: string[] = []
+    class FakeTui {
+      addChild(component: SupervisorScreen): void { screen = component }
+      addInputListener(listener: (data: string) => unknown): () => void {
+        inputListener = listener
+        return () => undefined
+      }
+      requestRender(): void {
+        const phase = screen?.snapshot.activeTarget?.health?.phase
+        if (phase) phases.push(phase)
+      }
+      setShowHardwareCursor(): void {}
+      start(): void {
+        queueMicrotask(() => {
+          inputListener?.('down')
+          inputListener?.('tab')
+          inputListener?.('o')
+        })
+      }
+      stop(): void {}
+    }
+    const fleet: MachineFleetEnvelope = {
+      schemaVersion: 1,
+      generatedAt: '2026-08-23T00:00:00Z',
+      machines: fleetMachines(),
+    }
+
+    await expect(runSupervisorTui({}, {
+      stdin: { isTTY: true } as NodeJS.ReadStream,
+      stdout: { isTTY: true } as NodeJS.WriteStream,
+      resolveContext: () => resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' }),
+      inspect: async () => ({ class: 'absent', owner: null, endpoints: {} }),
+      seedFleet: async () => fleet,
+      inspectFleet: async () => fleet,
+      connectRemoteProject: async ({ signal, onReady }) => {
+        onReady({
+          localPort: 45454,
+          localUrl: 'http://127.0.0.1:45454',
+          clientUrl: 'http://127.0.0.1:45454',
+        })
+        return new Promise<number>((resolve) => {
+          signal.addEventListener('abort', () => resolve(0), { once: true })
+        })
+      },
+      probeTarget: async () => {
+        probes += 1
+        const healthy = probes >= 4
+        if (healthy) setTimeout(() => inputListener?.('q'), 5)
+        return healthy
+      },
+      pollIntervalMs: 60_000,
+      connectionPollIntervalMs: 5,
+      discoverUpdate: async () => null,
+      loadTui: async () => ({
+        ProcessTerminal: class {},
+        TUI: FakeTui,
+        matchesKey,
+      }) as never,
+    })).resolves.toBe(0)
+
+    expect(probes).toBeGreaterThanOrEqual(4)
+    expect(phases).toContain('degraded')
+    expect(phases).toContain('unreachable')
+    expect(phases.at(-1)).toBe('connected')
+    expect(screen?.snapshot.activeTarget).toMatchObject({
+      kind: 'ssh',
+      health: { phase: 'connected', consecutiveFailures: 0 },
+    })
+  })
+
+  it('degrades local inspection without pretending the Runtime stopped, then recovers', async () => {
+    let inputListener: ((data: string) => unknown) | undefined
+    let screen: SupervisorScreen | undefined
+    let inspections = 0
+    const phases: string[] = []
+    const running = {
+      class: 'running',
+      owner: { surface: 'cli-server', pid: 42 },
+      endpoints: { web: 'http://127.0.0.1:47331' },
+    }
+    class FakeTui {
+      addChild(component: SupervisorScreen): void { screen = component }
+      addInputListener(listener: (data: string) => unknown): () => void {
+        inputListener = listener
+        return () => undefined
+      }
+      requestRender(): void {
+        const phase = screen?.snapshot.activeTarget?.health?.phase
+        if (phase) phases.push(phase)
+      }
+      setShowHardwareCursor(): void {}
+      start(): void {}
+      stop(): void {}
+    }
+    const context = resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' })
+
+    await expect(runSupervisorTui({}, {
+      stdin: { isTTY: true } as NodeJS.ReadStream,
+      stdout: { isTTY: true } as NodeJS.WriteStream,
+      resolveContext: () => context,
+      inspect: async () => {
+        inspections += 1
+        if (inspections === 1 || inspections >= 5) {
+          if (inspections >= 5) setTimeout(() => inputListener?.('q'), 5)
+          return running
+        }
+        throw new Error('fixture inspection timeout')
+      },
+      seedFleet: async () => ({
+        schemaVersion: 1,
+        generatedAt: '2026-09-02T00:00:00Z',
+        machines: fleetMachines(),
+      }),
+      pollIntervalMs: 5,
+      connectionPollIntervalMs: 60_000,
+      discoverUpdate: async () => null,
+      loadTui: async () => ({
+        ProcessTerminal: class {},
+        TUI: FakeTui,
+        matchesKey,
+      }) as never,
+    })).resolves.toBe(0)
+
+    expect(phases).toContain('degraded')
+    expect(phases).toContain('unreachable')
+    expect(phases.at(-1)).toBe('connected')
+    expect(screen?.snapshot.panel).toBe('overview')
+    expect(screen?.snapshot.activeTarget).toMatchObject({
+      kind: 'local',
+      health: { phase: 'connected', consecutiveFailures: 0 },
+    })
   })
 
   it('preserves remote Fleet focus while the selected local Runtime polls', async () => {

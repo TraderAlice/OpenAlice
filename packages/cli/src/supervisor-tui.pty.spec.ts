@@ -173,7 +173,68 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(plain).toContain('⌁ Cloud Lab / Research · SSH')
     expect(plain).toContain('[ x ] Disconnect')
     expect(plain).toContain('Disconnected from Cloud Lab / Research.')
-    expect(plain).toContain('FIXTURE_RESULT starts=0 opens=0 loads=0 diagnoses=0 disconnects=1')
+    expect(plain).toContain('FIXTURE_RESULT starts=0 opens=0 loads=0 diagnoses=0 disconnects=1 probes=0')
+    expect(transcript).toContain('\u001b[?25h')
+  }, 12_000)
+
+  it('shows remote degradation and recovers in place through a real PTY', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-remote-health-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 110,
+      rows: 30,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_START_VIEW: 'connect',
+        OPENALICE_TUI_BOOT: '0',
+        OPENALICE_TUI_MOTION: '0',
+        OPENALICE_TUI_FIXTURE_FLEET_ROWS: '1',
+        OPENALICE_TUI_FIXTURE_REMOTE: '1',
+        OPENALICE_TUI_FIXTURE_HEALTH: 'flap',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let connected = false
+      let unreachable = false
+      let exiting = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor remote health timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        const plain = stripSgr(output)
+        if (!connected && plain.includes('OPENALICE LAUNCH')) {
+          connected = true
+          child.write('\u001b[B')
+          child.write('\t')
+          child.write('\r')
+        } else if (connected && !unreachable && plain.includes('× UNREACHABLE')) {
+          unreachable = true
+        } else if (!exiting && unreachable && plain.includes('Connection to Cloud Lab / Research is healthy.')) {
+          exiting = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && unreachable) resolve(output)
+        else reject(new Error(`Supervisor remote health exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    const plain = stripSgr(transcript)
+    expect(plain).toContain('! DEGRADED')
+    expect(plain).toContain('× UNREACHABLE')
+    expect(plain).toContain('[ r ] Retry connection')
+    expect(plain).toContain('Connection to Cloud Lab / Research is healthy.')
+    expect(plain).toContain('FIXTURE_RESULT starts=0 opens=0 loads=0 diagnoses=0 disconnects=1 probes=4')
     expect(transcript).toContain('\u001b[?25h')
   }, 12_000)
 

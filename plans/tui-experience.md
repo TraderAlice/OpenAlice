@@ -136,6 +136,23 @@ not imply maintainer approval of the finished interaction.
   reason. Browser opening remains a separate action. This is an autonomous
   topic decision, not recorded maintainer approval.
 
+### Connection-health recovery decision
+
+- Leaving an SSH target visually LIVE until its process exits hides endpoint
+  stalls; immediately destroying the tunnel after one failed probe turns a
+  transient network wobble into unnecessary user disruption.
+- The selected model separates transport ownership from endpoint health. A
+  TUI-owned SSH forward remains the active target while bounded readiness
+  probes move it through connected, degraded, and unreachable states. One
+  failure is degraded; three consecutive failures are unreachable; any later
+  success restores connected in place. Home, navigation, the persistent Dock,
+  and the Command Dock project the same phase. An unhealthy target replaces
+  Open with an explicit Retry action, while Disconnect remains available and
+  never stops the remote Runtime. Local inspection failures degrade the current
+  target without pretending the Runtime stopped; only an authoritative absent
+  Runtime returns to the Launcher. This is an autonomous topic decision, not
+  recorded maintainer approval.
+
 ### Launchpad action-surface decision
 
 - Keeping the current cockpit and merely recoloring its cards would improve a
@@ -2693,6 +2710,21 @@ already large `supervisor-tui.ts` application controller.
   tests passed, 10 skipped). Docker installer smoke passes without Node, npm,
   pnpm, Bun, or an Agent Runtime, and package dry-run retains all 68 published
   CLI files including every changed TUI owner.
+- Active-target health is now a recoverable state machine instead of a LIVE
+  boolean. Bounded probes preserve the owned local or SSH target through
+  connected, degraded, and unreachable phases; one failure warns, three
+  consecutive failures block stale Open actions, and a later success restores
+  the same target in place. Home, navigation, Dock, Runtime, and Command Dock
+  share the phase, expose Retry, retain remote Disconnect, and label retained
+  telemetry as a last snapshot rather than a live session.
+- Connection-recovery acceptance passes with 158 focused Command Dock,
+  navigation, theme, screen, integration, and real-PTY tests, including an
+  automatic remote degraded-to-unreachable-to-connected cycle and local
+  inspection recovery without a false Launcher transition. The complete CLI
+  suite passes (61 files, 616 tests); `test:affected` passes across 703 files
+  (702 passed, 1 skipped; 6,235 tests passed, 10 skipped). CLI build, the
+  68-file package dry-run, and Docker installer smoke all pass; the installer
+  remains independent of Node, npm, pnpm, Bun, and an Agent Runtime.
 
 ## Completion Criteria
 

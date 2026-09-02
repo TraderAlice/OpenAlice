@@ -48,6 +48,26 @@ describe('Supervisor Command Dock', () => {
     expect(items.map((item) => item.label)).not.toContain('Stop Runtime')
   })
 
+  it('replaces unsafe open and lifecycle commands with health recovery', () => {
+    const remote = supervisorCommandDeckItems({
+      ...context,
+      targetKind: 'ssh',
+      targetHealth: 'unreachable',
+    })
+    expect(remote.map((item) => item.input)).toEqual(['r', 'x', 'c', 'tab', '?'])
+    expect(remote[0]).toMatchObject({ label: 'Retry connection', primary: true })
+    expect(remote.map((item) => item.label)).not.toContain('Open active Web UI')
+
+    const local = supervisorCommandDeckItems({
+      ...context,
+      targetKind: 'local',
+      targetHealth: 'degraded',
+    })
+    expect(local.map((item) => item.input)).toEqual(['r', 'c', '?'])
+    expect(local[0]).toMatchObject({ label: 'Retry local connection', primary: true })
+    expect(local.map((item) => item.label)).not.toContain('Restart Runtime')
+  })
+
   it('wraps keyboard selection and clamps pointer-wheel selection', () => {
     const initial = createSupervisorCommandDeckState()
     expect(moveSupervisorCommandDeckSelection(initial, -1, 4).selected).toBe(3)

@@ -7,8 +7,10 @@ let opens = 0
 let loads = 0
 let diagnoses = 0
 let disconnects = 0
+let probes = 0
 const running = process.env['OPENALICE_TUI_FIXTURE_RUNTIME'] === 'running'
 const remote = process.env['OPENALICE_TUI_FIXTURE_REMOTE'] === '1'
+const healthFlap = process.env['OPENALICE_TUI_FIXTURE_HEALTH'] === 'flap'
 const fleetRows = Number(process.env['OPENALICE_TUI_FIXTURE_FLEET_ROWS'] ?? 0)
 const fleet = fleetRows > 0 ? fixtureFleet(fleetRows, remote) : undefined
 
@@ -64,11 +66,20 @@ const exitCode = await runSupervisorTui({}, {
         },
       }
     : {}),
+  ...(healthFlap
+    ? {
+        probeTarget: async () => {
+          probes += 1
+          return probes >= 4
+        },
+        connectionPollIntervalMs: 40,
+      }
+    : {}),
   discoverUpdate: async () => null,
   pollIntervalMs: 60_000,
 })
 
-process.stdout.write(`\nFIXTURE_RESULT starts=${starts} opens=${opens} loads=${loads} diagnoses=${diagnoses} disconnects=${disconnects}\n`)
+process.stdout.write(`\nFIXTURE_RESULT starts=${starts} opens=${opens} loads=${loads} diagnoses=${diagnoses} disconnects=${disconnects} probes=${probes}\n`)
 process.exitCode = exitCode
 
 function fixtureFleet(projectCount: number, includeRemote = false): MachineFleetEnvelope {
