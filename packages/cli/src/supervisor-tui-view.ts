@@ -90,6 +90,12 @@ export interface SupervisorDockView {
   recovery?: boolean
 }
 
+export interface SupervisorContextTipView {
+  panel: string
+  runtimeState?: string
+  recovery?: boolean
+}
+
 export interface SupervisorHeaderRender {
   line: string
   releaseTarget: {
@@ -456,17 +462,44 @@ export function anchorSupervisorControlConsole(
   content: string[],
   consoleLines: string[],
   viewportHeight: number,
+  stageContent: string[] = [],
 ): string[] {
   const naturalHeight = content.length + consoleLines.length
   const safeViewportHeight = Number.isFinite(viewportHeight)
     ? Math.max(0, Math.floor(viewportHeight))
     : naturalHeight
   const stageHeight = Math.max(0, safeViewportHeight - naturalHeight)
+  const stage = Array.from({ length: stageHeight }, () => '')
+  for (const [index, line] of stageContent.slice(0, Math.max(0, stageHeight - 1)).entries()) {
+    stage[index + 1] = line
+  }
   return [
     ...content,
-    ...Array.from({ length: stageHeight }, () => ''),
+    ...stage,
     ...consoleLines,
   ]
+}
+
+export function renderSupervisorContextTip(
+  view: SupervisorContextTipView,
+  width: number,
+): string {
+  const message = view.recovery
+    ? 'Recovery exposes only safe Update and Detach routes.'
+    : view.panel === 'fleet'
+      ? 'First click focuses a pane; click its selection again to activate it.'
+      : view.panel === 'logs'
+        ? 'f changes severity; End returns to the latest bounded event.'
+        : view.panel === 'doctor'
+          ? 'Doctor is read-only; d refreshes checks without changing Runtime.'
+          : view.panel === 'help'
+            ? '/ searches every available command without leaving this view.'
+            : view.runtimeState === 'absent'
+              ? 'Enter starts and opens; s starts quietly inside this terminal.'
+              : view.runtimeState === 'running' || view.runtimeState === 'owned_elsewhere'
+                ? 'Hover an active signal to preview its consequence before clicking.'
+                : 'Run Doctor before acting on an uncertain Runtime signal.'
+  return truncateDisplayWidth(`◇  Tip: ${message}`, Math.max(1, width))
 }
 
 export function renderSupervisorSignalScope(

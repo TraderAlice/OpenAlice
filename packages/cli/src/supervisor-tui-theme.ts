@@ -135,6 +135,10 @@ export function decorateSupervisorFrame(
       options.introFrame ?? options.ambientBrandFrame,
     )
     if (brandMark) return brandMark
+    if (line.startsWith('◇  Tip:')) {
+      const label = '◇  Tip:'
+      return `${theme.accentStrong(label)}${theme.muted(line.slice(label.length))}`
+    }
     if (isSupervisorActionShelf(line)) {
       return decorateSupervisorActionShelf(
         line,

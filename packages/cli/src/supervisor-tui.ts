@@ -158,6 +158,7 @@ import {
 import {
   anchorSupervisorControlConsole,
   renderSupervisorCommandBar,
+  renderSupervisorContextTip,
   renderSupervisorDock,
   renderSupervisorHeaderLayout,
   renderSupervisorHome,
@@ -3854,6 +3855,11 @@ export class SupervisorScreen implements Component {
       lines,
       controlConsole,
       this.getViewportHeight?.() ?? lines.length + controlConsole.length,
+      [renderSupervisorContextTip({
+        panel: this.snapshot.panel ?? 'overview',
+        runtimeState: state,
+        recovery: isConfigRecovery(this.snapshot),
+      }, width)],
     ).map((line) => truncate(line, width))
     this.commandTargets = supervisorCommandTargets(visibleLines)
     return decorateSupervisorFrame(

@@ -13,6 +13,7 @@ import {
 import {
   anchorSupervisorControlConsole,
   renderSupervisorCommandBar,
+  renderSupervisorContextTip,
   renderSupervisorDock,
   supervisorCommandTargets,
 } from './supervisor-tui-view.ts'
@@ -286,6 +287,9 @@ describe('Supervisor TUI screen', () => {
     expect(tall.at(-3)?.trim()).toBe('')
     expect(tall.at(-2)).toContain('[ l ] Logs')
     expect(tall.at(-1)).toContain('╰─ [ / ] Commands')
+    expect(tall.join('\n')).toContain(
+      '◇  Tip: Hover an active signal to preview its consequence before clicking.',
+    )
     expect(tall.findIndex((line) => line.includes('Runtime Signal Deck'))).toBeLessThan(20)
     expect(screen.handlePointer(pointerClick(6, 32))).toBe(true)
     expect(paletteChanges).toEqual([true])
@@ -297,6 +301,9 @@ describe('Supervisor TUI screen', () => {
     expect(resized.at(-3)?.trim()).toBe('')
     expect(resized.at(-2)).toContain('[ l ] Logs')
     expect(resized.at(-1)).toContain('[ / ] Close')
+    expect(resized.at(-6)?.trim()).toBe('')
+    expect(resized.at(-5)).toContain('◇  Tip: Hover an active signal')
+    expect(resized.at(-4)?.trim()).toBe('')
     expect(screen.handlePointer(pointerClick(6, 24))).toBe(true)
     expect(paletteChanges).toEqual([true, false])
 
@@ -304,10 +311,49 @@ describe('Supervisor TUI screen', () => {
     const short = screen.render(80)
     expect(short.length).toBeGreaterThan(10)
     expect(short.join('\n')).toContain('Runtime Signal Deck')
+    expect(short.join('\n')).not.toContain('◇  Tip:')
     expect(short.at(-1)).toContain('╰─ [ / ] Commands')
 
-    expect(anchorSupervisorControlConsole(['content'], ['activity', 'actions', 'spine'], 7))
-      .toEqual(['content', '', '', '', 'activity', 'actions', 'spine'])
+    expect(anchorSupervisorControlConsole(
+      ['content'],
+      ['activity', 'actions', 'spine'],
+      7,
+      ['tip'],
+    )).toEqual(['content', '', 'tip', '', 'activity', 'actions', 'spine'])
+  })
+
+  it('renders contextual OMP-style Tips without creating an action target', () => {
+    const fleet = renderSupervisorContextTip({ panel: 'fleet' }, 100)
+    const logs = renderSupervisorContextTip({ panel: 'logs' }, 100)
+    const doctor = renderSupervisorContextTip({ panel: 'doctor' }, 100)
+    const help = renderSupervisorContextTip({ panel: 'help' }, 100)
+    const stopped = renderSupervisorContextTip({ panel: 'overview', runtimeState: 'absent' }, 100)
+    const recovery = renderSupervisorContextTip({ panel: 'overview', recovery: true }, 100)
+
+    expect(fleet).toContain('First click focuses a pane')
+    expect(logs).toContain('End returns to the latest bounded event')
+    expect(doctor).toContain('Doctor is read-only')
+    expect(help).toContain('/ searches every available command')
+    expect(stopped).toContain('s starts quietly')
+    expect(recovery).toContain('only safe Update and Detach routes')
+    expect(supervisorCommandTargets([fleet, logs, doctor, help, stopped, recovery])).toEqual([])
+
+    const compact = renderSupervisorContextTip({ panel: 'fleet' }, 46)
+    expect(displayWidth(compact)).toBeLessThanOrEqual(46)
+    expect(compact).toMatch(/…$/u)
+    const themed = decorateSupervisorFrame(
+      ['header', 'navigation', 'rail', fleet],
+      createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+      { panel: 'fleet' },
+    )[3]!
+    expect(themed).toContain('\u001b[1;38;2;116;235;226m◇  Tip:')
+    expect(themed).toContain('\u001b[38;2;116;132;153m First click focuses a pane')
+    expect(themed.replace(/\u001b\[[0-9;]*m/gu, '')).toBe(fleet)
+    expect(decorateSupervisorFrame(
+      ['header', 'navigation', 'rail', fleet],
+      createSupervisorTuiTheme({ TERM: 'xterm-256color', NO_COLOR: '1' }),
+      { panel: 'fleet' },
+    )[3]).toBe(fleet)
   })
 
   it('keeps the narrow Command Spine closed while Commands and Close remain clickable', () => {

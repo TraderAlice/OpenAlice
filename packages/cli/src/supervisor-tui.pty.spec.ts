@@ -238,6 +238,9 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
 
     expect(transcript).toContain('Event Signal Scope · QUIET · 0 EVENTS')
     expect(transcript).toContain('○  SIGNAL QUIET')
+    expect(stripSgr(transcript)).toContain(
+      '◇  Tip: f changes severity; End returns to the latest bounded event.',
+    )
     expect(transcript).toContain('› [ l ] Reload Runtime snapshot')
     expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=0 loads=2')
     expect(transcript).toContain('\u001b[?25h')

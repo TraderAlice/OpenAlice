@@ -606,6 +606,24 @@ not imply maintainer approval of the finished interaction.
   resetting focus, selection, or action state. This is an autonomous topic
   decision, not recorded maintainer approval.
 
+### Context Tip Beacon decision
+
+- Leaving the elastic stage completely blank keeps the composition calm, but
+  wastes the exact space OMP uses to teach high-value interactions without
+  opening Help.
+- Filling the stage with an ambient constellation or animated telemetry would
+  look more decorative, but add motion and visual competition without helping
+  a user operate the Supervisor.
+- The selected model ports OMP's contextual Tip pattern into one quiet Tip
+  Beacon. Overview changes its hint with Runtime state; Fleet, Logs, Doctor,
+  Help, and Recovery each explain the most useful non-obvious interaction on
+  that surface. The Beacon occupies the elastic stage only when at least one
+  blank row can remain between page content and the hint, so it never grows the
+  natural layout or moves the bottom Control Console. It has no pointer target,
+  action, timer, or backend read. Color gives only its `Tip:` lead-in emphasis;
+  `NO_COLOR` preserves identical text. This is an autonomous topic decision,
+  not recorded maintainer approval.
+
 ### Mission Header decision
 
 - Recoloring the existing title, divider, and tabs would be the least invasive
@@ -889,6 +907,8 @@ already large `supervisor-tui.ts` application controller.
   while preserving Commands/Close and Detach pointer geometry.
 - [x] Anchor Activity Slot, Action Shelf, and Command Spine as one bottom
   Control Console without changing page content or action semantics.
+- [x] Add one OMP-inspired contextual Tip Beacon to surplus stage space without
+  consuming a required row or adding an action path.
 - [x] Replace the disconnected title/divider/tabs stack with a same-height
   Mission Header that frames brand, release provenance, and clickable navigation.
 - [x] Anchor the active view with a reduced-motion-safe beacon that travels
@@ -1697,6 +1717,23 @@ already large `supervisor-tui.ts` application controller.
   pass; the 699-file suite passes (698 passed, 1 skipped; 6,169 tests passed, 10
   skipped). Docker installer smoke passes without Node, npm, pnpm, Bun, or an
   Agent Runtime, and package dry-run contains both changed Supervisor sources.
+- OMP v17.3.4 uses the quiet region directly beneath its welcome card for a
+  concise `Tip:` rather than decorative motion. The Supervisor now follows that
+  pattern with a Context Tip Beacon: Overview responds to live/stopped/uncertain
+  Runtime state, and Fleet, Logs, Doctor, Help, and Recovery each teach their
+  most useful non-obvious interaction. It appears only in an elastic stage with
+  at least two spare rows and keeps one blank row after page content.
+- Context-Tip acceptance passes with 96 focused screen, pointer, and real-PTY
+  tests. Real truecolor 120x32, 80x24, and 46x30 frames place the same semantic
+  Tip at display-width-safe sizes without moving the bottom Control Console; a
+  real Logs PTY switches from the Overview signal hint to the `f`/`End` event
+  hint while preserving its reload pointer action. Unit acceptance covers every
+  context, ensures the Tip publishes no command target, proves a constrained
+  terminal omits it instead of clipping content, and keeps `NO_COLOR` text
+  byte-identical. CLI build/typecheck and root TypeScript pass; the 699-file
+  suite passes (698 passed, 1 skipped; 6,170 tests passed, 10 skipped). Docker
+  installer smoke passes without Node, npm, pnpm, Bun, or an Agent Runtime, and
+  package dry-run contains the changed view, theme, and Supervisor sources.
 
 ## Completion Criteria
 

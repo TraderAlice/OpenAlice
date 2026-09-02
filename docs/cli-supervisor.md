@@ -270,7 +270,11 @@ path is intentionally parameter-free:
   a single elastic blank stage appears above that console so its controls remain
   anchored to the terminal edge; short terminals retain the natural complete
   flow without clipping. Resize changes only that elastic stage and does not
-  reset selection, focus, or action state;
+  reset selection, focus, or action state. When that stage has at least two
+  spare rows, one contextual `Tip:` Beacon teaches a useful interaction for the
+  active view or Runtime state while preserving a blank row after page content.
+  It disappears rather than consume a required row, has no pointer target or
+  action path, and remains identical text under `NO_COLOR`;
 - color-capable motion-enabled sessions play one bounded brand-color sweep on
   entry across the OpenAlice header and any visible brand mark. The header then
   settles while a visible Overview `ALICE` mark continues a slow six-phase
