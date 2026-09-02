@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createSupervisorCommandDeckState,
   decorateSupervisorCommandDeck,
+  filterSupervisorCommandDeckItems,
   moveSupervisorCommandDeckSelection,
   renderSupervisorCommandDeck,
   SUPERVISOR_COMMAND_PALETTE_OVERLAY_OPTIONS,
@@ -42,6 +43,20 @@ describe('Supervisor Command Palette', () => {
     })
   })
 
+  it('ranks visible command text and keeps non-matches out of the result model', () => {
+    const items = supervisorCommandDeckItems(context)
+    expect(filterSupervisorCommandDeckItems(items, 'set').map((item) => item.label)).toEqual([
+      'Setup',
+    ])
+    expect(filterSupervisorCommandDeckItems(items, 'runtime log').map((item) => item.label)).toEqual([
+      'Runtime logs',
+    ])
+    expect(filterSupervisorCommandDeckItems(items, 'rtr doc').map((item) => item.label)).toEqual([
+      'Runtime Doctor',
+    ])
+    expect(filterSupervisorCommandDeckItems(items, 'no such command')).toEqual([])
+  })
+
   it('renders selected and hovered full-row targets responsively', () => {
     const items = supervisorCommandDeckItems(context)
     const wide = renderSupervisorCommandDeck(items, { selected: 1, hovered: 2 }, 'running', 100)
@@ -49,12 +64,32 @@ describe('Supervisor Command Palette', () => {
     expect(wide.lines.join('\n')).toContain('›   Restart Runtime')
     expect(wide.lines.join('\n')).toContain('»   Stop Runtime')
     expect(wide.lines.join('\n')).toContain('Confirm before reconnecting active sessions')
-    expect(wide.targets[1]).toEqual({ row: 3, startColumn: 2, endColumn: 99, index: 1 })
+    expect(wide.lines.join('\n')).toContain('⌕  Type to filter commands')
+    expect(wide.targets[1]).toEqual({ row: 4, startColumn: 2, endColumn: 99, index: 1 })
 
     const narrow = renderSupervisorCommandDeck(items, createSupervisorCommandDeckState(), 'running', 52)
     expect(narrow.lines.every((line) => displayWidthWithoutAnsi(line) <= 52)).toBe(true)
     expect(narrow.lines.join('\n')).not.toContain('Confirm before reconnecting')
     expect(narrow.lines.join('\n')).toContain('[ ↑ / ↓ ] Select')
+  })
+
+  it('renders the live query and a corrective empty state without fake targets', () => {
+    const items = filterSupervisorCommandDeckItems(supervisorCommandDeckItems(context), 'setup')
+    const match = renderSupervisorCommandDeck(
+      items,
+      createSupervisorCommandDeckState(),
+      'running',
+      76,
+      'setup',
+    )
+    expect(match.lines.join('\n')).toContain('Command Palette · 1/1 · MATCH “setup” · RUNNING')
+    expect(match.lines.join('\n')).toContain('⌕  setup▌')
+    expect(match.targets).toEqual([{ row: 3, startColumn: 2, endColumn: 75, index: 0 }])
+
+    const empty = renderSupervisorCommandDeck([], createSupervisorCommandDeckState(), 'running', 76, 'xyz')
+    expect(empty.lines.join('\n')).toContain('Command Palette · 0/0 · MATCH “xyz” · RUNNING')
+    expect(empty.lines.join('\n')).toContain('No commands match “xyz”')
+    expect(empty.targets).toEqual([])
   })
 
   it('owns focused overlay chrome without hiding no-color meaning', () => {

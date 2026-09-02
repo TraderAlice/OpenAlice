@@ -709,6 +709,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     const transcript = await new Promise<string>((resolve, reject) => {
       let output = ''
       let opened = false
+      let typedSearch = false
       let clickedSetup = false
       let setupOpened = false
       const timeout = setTimeout(() => {
@@ -720,10 +721,18 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         if (!opened && output.includes('[ / ] Commands') && output.includes('○ COLD')) {
           opened = true
           child.write('/')
-        } else if (!clickedSetup && output.includes('Command Palette') && output.includes('› ◆ Start OpenAlice')) {
+        } else if (!typedSearch && output.includes('Command Palette') && output.includes('› ◆ Start OpenAlice')) {
+          typedSearch = true
+          child.write('setup')
+        } else if (
+          !clickedSetup
+          && output.includes('MATCH “setup”')
+          && output.includes('⌕  setup▌')
+          && output.includes('›   Setup')
+        ) {
           clickedSetup = true
-          child.write('\u001b[<32;6;12M')
-          child.write('\u001b[<0;6;12M')
+          child.write('\u001b[<32;32;12M')
+          child.write('\u001b[<0;32;12M')
         } else if (!setupOpened && output.includes('Setup Studio · Default AliceProject')) {
           setupOpened = true
           child.write('\u001b')
@@ -738,6 +747,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     })
 
     expect(transcript).toContain('Command Palette')
+    expect(transcript).toContain('MATCH “setup”')
+    expect(transcript).toContain('⌕  setup▌')
     expect(transcript).toContain('╭ Launchpad · AliceProject')
     expect(transcript).toContain('Setup Studio · Default AliceProject')
     expect(transcript).toContain('\u001b[?25h')

@@ -74,6 +74,7 @@ import {
 import {
   createSupervisorCommandDeckState,
   decorateSupervisorCommandDeck,
+  filterSupervisorCommandDeckItems,
   moveSupervisorCommandDeckSelection,
   normalizeSupervisorCommandDeckState,
   renderSupervisorCommandDeck,
@@ -662,8 +663,8 @@ export async function runSupervisorTui(
           SUPERVISOR_COMMAND_PALETTE_OVERLAY_OPTIONS,
           (data) => this.handleInput(data),
           {
-            firstRow: 2,
-            indexes: Array.from({ length: screen.commandPaletteItemCount() }, (_, index) => index),
+            firstRow: deck.targets[0]?.row ?? 3,
+            indexes: deck.targets.map((target) => target.index),
             select: (index) => screen.selectCommandPaletteItem(index),
             activate: () => screen.activateCommandPaletteItem(),
             move: (delta) => screen.moveCommandPaletteSelection(delta),
@@ -2926,6 +2927,7 @@ export class SupervisorScreen implements Component {
   private commandTargets: SupervisorCommandTarget[] = []
   private commandDeckOpen = false
   private commandDeckState: SupervisorCommandDeckState = createSupervisorCommandDeckState()
+  private commandDeckQuery = ''
   private motionFrame = 0
   private introFrame?: number
   private runtimePulse = false
@@ -3056,7 +3058,7 @@ export class SupervisorScreen implements Component {
   }
 
   renderCommandPalette(width: number) {
-    const items = this.commandDeckItems()
+    const items = this.filteredCommandDeckItems()
     this.commandDeckState = normalizeSupervisorCommandDeckState(
       this.commandDeckState,
       items.length,
@@ -3068,11 +3070,12 @@ export class SupervisorScreen implements Component {
         ? 'recovery'
         : this.snapshot.runtime?.class ?? 'unavailable',
       width,
+      this.commandDeckQuery,
     )
   }
 
   commandPaletteItemCount(): number {
-    return this.commandDeckItems().length
+    return this.filteredCommandDeckItems().length
   }
 
   selectCommandPaletteItem(index: number): void {
@@ -3095,7 +3098,7 @@ export class SupervisorScreen implements Component {
 
   activateCommandPaletteItem(): boolean {
     return this.activateCommandDeckItem(
-      this.commandDeckItems()[this.commandDeckState.selected],
+      this.filteredCommandDeckItems()[this.commandDeckState.selected],
     )
   }
 
@@ -3138,12 +3141,16 @@ export class SupervisorScreen implements Component {
       }
       return false
     }
-    if (data === '/') {
-      this.setCommandPaletteOpen(!this.commandDeckOpen)
+    if (data === '/' && !this.commandDeckOpen) {
+      this.setCommandPaletteOpen(true)
       return true
     }
     if (this.commandDeckOpen) {
-      const items = this.commandDeckItems()
+      if (data === '/') {
+        this.setCommandPaletteOpen(false)
+        return true
+      }
+      const items = this.filteredCommandDeckItems()
       if (matchesKey(data, 'up') || matchesKey(data, 'down')) {
         this.commandDeckState = moveSupervisorCommandDeckSelection(
           this.commandDeckState,
@@ -3156,8 +3163,18 @@ export class SupervisorScreen implements Component {
       if (matchesKey(data, 'enter')) {
         return this.activateCommandDeckItem(items[this.commandDeckState.selected])
       }
-      const direct = items.find((item) => matchesKey(data, item.input as KeyId))
-      if (direct) return this.activateCommandDeckItem(direct)
+      if (data === '\x7f' || data === '\b') {
+        this.setCommandDeckQuery(this.commandDeckQuery.slice(0, -1))
+        return true
+      }
+      if (data === '\x15') {
+        this.setCommandDeckQuery('')
+        return true
+      }
+      if (/^[\x20-\x7e]$/u.test(data) && this.commandDeckQuery.length < 48) {
+        this.setCommandDeckQuery(`${this.commandDeckQuery}${data}`)
+        return true
+      }
       return true
     }
     if (matchesKey(data, '?')) {
@@ -3733,6 +3750,17 @@ export class SupervisorScreen implements Component {
     })
   }
 
+  private filteredCommandDeckItems(): SupervisorCommandDeckItem[] {
+    return filterSupervisorCommandDeckItems(this.commandDeckItems(), this.commandDeckQuery)
+  }
+
+  private setCommandDeckQuery(query: string): void {
+    if (this.commandDeckQuery === query) return
+    this.commandDeckQuery = query
+    this.commandDeckState = createSupervisorCommandDeckState()
+    this.requestRender?.()
+  }
+
   private activateCommandDeckItem(item?: SupervisorCommandDeckItem): boolean {
     if (!item) return true
     this.setCommandPaletteOpen(false)
@@ -3742,6 +3770,7 @@ export class SupervisorScreen implements Component {
   private setCommandPaletteOpen(open: boolean): void {
     if (this.commandDeckOpen === open) return
     this.commandDeckOpen = open
+    this.commandDeckQuery = ''
     this.commandDeckState = open
       ? createSupervisorCommandDeckState()
       : { ...this.commandDeckState, hovered: null }

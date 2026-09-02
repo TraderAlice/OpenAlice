@@ -121,6 +121,21 @@ not imply maintainer approval of the finished interaction.
   Closing restores the same page; activation closes the Palette before opening
   a child overlay or confirmation modal, so overlay ownership never forks.
 
+### Command palette search decision
+
+- Keeping arrow-only selection would preserve the current compact menu, but it
+  would become slower and less discoverable as the Supervisor gains commands.
+- Replacing the Palette with a generic Input or dependency SelectList would
+  provide text entry while splitting OpenAlice's contextual command ownership,
+  pointer geometry, and existing activation callbacks across components.
+- The selected model follows OMP's model-browser interaction more closely: a
+  stable search rail edits in place, match quality ranks the contextual command
+  set, the visible results alone own keyboard/wheel/pointer selection, and a
+  truthful empty state keeps the overlay open for correction. Backspace edits,
+  Ctrl+U clears, arrows or the wheel select, Enter or a whole-row click invokes
+  the same existing Supervisor action, and `/` or Esc closes. No command or
+  backend action is added by search.
+
 ### Runtime log presentation decision
 
 - Coloring raw JSON would leave the event message behind long metadata and
@@ -508,6 +523,8 @@ already large `supervisor-tui.ts` application controller.
   responsive Inspector while preserving the same bounded snapshot.
 - [x] Replace the static Command Deck with a contextual, selectable, whole-row
   mouse-capable Command Palette.
+- [x] Upgrade the Command Palette with OMP-inspired in-place fuzzy search,
+  ranked results, and a corrective empty state without adding action paths.
 - [x] Replace Doctor's flat line scroller with a responsive, selectable
   checklist and detail Inspector.
 - [x] Replace Help's static shortcut wall with a responsive, pointer-aware
@@ -687,6 +704,20 @@ already large `supervisor-tui.ts` application controller.
   skipped). The Docker installer smoke passes, and
   `pnpm pack --dry-run --json` confirms the new Palette module is included in
   the published CLI file set.
+- The Command Palette now follows OMP's search-first browser model instead of
+  stopping at arrow navigation. A stable `⌕` rail filters contextual command
+  names, groups, and shortcuts with exact/substring matches ahead of restrained
+  label-only fuzzy matches; description prose cannot flood the result set.
+  Backspace edits, Ctrl+U clears, arrows and the wheel operate only on visible
+  results, and an explicit zero-match state remains open for correction. Real
+  80-column PTY acceptance typed `setup`, then clicked the filtered row well
+  outside its label and entered the existing Setup Studio action path.
+- Searchable-Palette acceptance passes with 78 focused Palette, screen, and
+  real-PTY tests; CLI build/typecheck; root TypeScript check; and the 699-file
+  repository suite (698 passed, 1 skipped; 6,144 tests passed, 10 skipped). The
+  Docker installer smoke passes without Node or an Agent Runtime, and
+  `pnpm pack --dry-run --json` confirms both Palette and Supervisor sources are
+  present in the published CLI payload.
 - Doctor is now a list-detail inspector rather than a flat text report. It
   selects the first failure, otherwise the first warning; Up/Down wraps, page
   keys and wheel clamp, Home/End jump to boundaries, pointer motion highlights

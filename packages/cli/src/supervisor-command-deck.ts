@@ -130,18 +130,35 @@ export function moveSupervisorCommandDeckSelection(
   return { selected, hovered: null }
 }
 
+export function filterSupervisorCommandDeckItems(
+  items: readonly SupervisorCommandDeckItem[],
+  query: string,
+): SupervisorCommandDeckItem[] {
+  const normalizedQuery = normalizeSearchText(query)
+  if (!normalizedQuery) return [...items]
+  const tokens = normalizedQuery.split(' ').filter(Boolean)
+  return items
+    .map((item, index) => ({ item, index, score: commandSearchScore(item, tokens) }))
+    .filter((entry): entry is typeof entry & { score: number } => entry.score !== null)
+    .sort((left, right) => left.score - right.score || left.index - right.index)
+    .map(({ item }) => item)
+}
+
 export function renderSupervisorCommandDeck(
   items: readonly SupervisorCommandDeckItem[],
   state: SupervisorCommandDeckState,
   runtimeState: string,
   width: number,
+  query = '',
 ): SupervisorCommandDeckRender {
   const normalized = normalizeSupervisorCommandDeckState(state, items.length)
   const innerWidth = Math.max(1, width - 4)
-  const labelColumnWidth = Math.min(
-    Math.max(...items.map((item) => displayWidth(commandLabel(item, false, false))), 16),
-    Math.max(16, Math.floor(innerWidth * 0.52)),
-  )
+  const labelColumnWidth = items.length === 0
+    ? 16
+    : Math.min(
+        Math.max(...items.map((item) => displayWidth(commandLabel(item, false, false))), 16),
+        Math.max(16, Math.floor(innerWidth * 0.52)),
+      )
   const rows = items.map((item, index) => renderCommandRow(
     item,
     index === normalized.selected,
@@ -149,17 +166,23 @@ export function renderSupervisorCommandDeck(
     innerWidth,
     labelColumnWidth,
   ))
-  rows.push('', '[ ↑ / ↓ ] Select   [ Enter ] Run   [ / ] Close')
+  rows.unshift(renderSearchRail(query, innerWidth))
+  if (items.length === 0) rows.push(renderEmptyState(query, innerWidth))
+  rows.push('', renderCommandFooter(query, innerWidth))
+  const queryMeta = query.trim()
+    ? ` · MATCH “${truncateDisplayWidth(query.trim(), Math.max(4, Math.floor(innerWidth * 0.28)))}”`
+    : ''
+  const position = items.length === 0 ? '0/0' : `${normalized.selected + 1}/${items.length}`
   const lines = renderSupervisorPanel(
     'Command Palette',
-    `${normalized.selected + 1}/${Math.max(1, items.length)} · ${runtimeState.toUpperCase()}`,
+    `${position}${queryMeta} · ${runtimeState.toUpperCase()}`,
     rows,
     width,
   )
   return {
     lines,
     targets: items.map((_, index) => ({
-      row: index + 2,
+      row: index + 3,
       startColumn: 2,
       endColumn: Math.max(2, width - 1),
       index,
@@ -175,11 +198,83 @@ export function decorateSupervisorCommandDeck(
   return lines.map((line, index) => {
     if (index === 0) return theme.accentStrong(line)
     if (index === lines.length - 1) return theme.muted(line)
+    if (line.includes('│ ⌕ ')) return theme.accent(line)
+    if (line.includes('No commands match')) return theme.muted(line)
     if (line.includes('│ › ')) return theme.selected(line)
     if (line.includes('│ » ')) return theme.accent(line)
     if (line.includes('[ Enter ]') || line.includes('[ / ]')) return theme.accentStrong(line)
     return line
   })
+}
+
+function commandSearchScore(
+  item: SupervisorCommandDeckItem,
+  tokens: readonly string[],
+): number | null {
+  const label = normalizeSearchText(item.label)
+  const searchable = normalizeSearchText(
+    `${item.label} ${item.group} ${commandShortcut(item.input)}`,
+  )
+  let score = 0
+  for (const token of tokens) {
+    if (label.startsWith(token)) {
+      score += label === token ? 0 : 4
+      continue
+    }
+    const labelIndex = label.indexOf(token)
+    if (labelIndex >= 0) {
+      score += 20 + labelIndex
+      continue
+    }
+    const searchableIndex = searchable.indexOf(token)
+    if (searchableIndex >= 0) {
+      score += 100 + searchableIndex
+      continue
+    }
+    const span = subsequenceSpan(label, token)
+    if (span === null) return null
+    score += 1_000 + span
+  }
+  return score
+}
+
+function normalizeSearchText(value: string): string {
+  return value
+    .toLocaleLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+}
+
+function subsequenceSpan(value: string, query: string): number | null {
+  let queryIndex = 0
+  let first = -1
+  let last = -1
+  for (let index = 0; index < value.length && queryIndex < query.length; index += 1) {
+    if (value[index] !== query[queryIndex]) continue
+    if (first < 0) first = index
+    last = index
+    queryIndex += 1
+  }
+  return queryIndex === query.length ? last - first : null
+}
+
+function renderSearchRail(query: string, width: number): string {
+  const value = query || 'Type to filter commands'
+  const cursor = query ? '▌' : ''
+  const prefix = '⌕  '
+  return `${prefix}${truncateDisplayWidth(`${value}${cursor}`, Math.max(1, width - displayWidth(prefix)))}`
+}
+
+function renderEmptyState(query: string, width: number): string {
+  const value = query.trim() || 'that query'
+  return truncateDisplayWidth(`×  No commands match “${value}”`, width)
+}
+
+function renderCommandFooter(query: string, width: number): string {
+  if (width < 48) return query ? '⌫ Edit  ^U Clear  ↑↓ Select  ↵ Run' : 'Type filter  ↑↓ Select  ↵ Run'
+  return query
+    ? '[ Backspace ] Edit   [ Ctrl+U ] Clear   [ ↑ / ↓ ] Select   [ Enter ] Run'
+    : 'Type to filter   [ ↑ / ↓ ] Select   [ Enter ] Run   [ / ] Close'
 }
 
 function command(

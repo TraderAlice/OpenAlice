@@ -230,9 +230,17 @@ describe('Supervisor TUI screen', () => {
     screen.moveCommandPaletteSelection(1)
     expect(screen.renderCommandPalette(80).lines.join('\n')).toContain('›   Start quietly')
 
-    screen.selectCommandPaletteItem(5)
-    expect(screen.renderCommandPalette(80).lines.join('\n')).toContain('›   Setup')
-    expect(screen.activateCommandPaletteItem()).toBe(true)
+    expect(screen.handleKey('\x15', matchesKey)).toBe(true)
+    for (const character of 'setup') {
+      expect(screen.handleKey(character, matchesKey)).toBe(true)
+    }
+    const searched = screen.renderCommandPalette(80).lines.join('\n')
+    expect(searched).toContain('⌕  setup▌')
+    expect(searched).toContain('Command Palette · 1/1 · MATCH “setup” · ABSENT')
+    expect(searched).toContain('›   Setup')
+    expect(searched).not.toContain('Runtime logs')
+    expect(screen.commandPaletteItemCount()).toBe(1)
+    expect(screen.handleKey('enter', matchesKey)).toBe(true)
     expect(settingsOpened).toBe(1)
     expect(paletteChanges).toEqual([true, false])
 
@@ -245,6 +253,12 @@ describe('Supervisor TUI screen', () => {
     expect(settingsOpened).toBe(2)
 
     screen.handleKey('/', matchesKey)
+    screen.handleKey('z', matchesKey)
+    screen.handleKey('z', matchesKey)
+    expect(screen.commandPaletteItemCount()).toBe(0)
+    expect(screen.renderCommandPalette(80).lines.join('\n')).toContain('No commands match “zz”')
+    expect(screen.handleKey('\x7f', matchesKey)).toBe(true)
+    expect(screen.handleKey('\x15', matchesKey)).toBe(true)
     const compactDeck = screen.renderCommandPalette(52).lines
     expect(compactDeck.length).toBeLessThanOrEqual(20)
     expect(compactDeck.every((line) => displayWidth(line) <= 52)).toBe(true)
