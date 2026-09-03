@@ -484,6 +484,9 @@ build harness when it improves the next investigation.
   AUR Git access without logging or weakening the external credentials.
 - [x] Expose the authority preflight as a bounded manual, read-only rehearsal
   that cannot publish packages, push metadata, or create a release.
+- [x] Let an authenticated first stable publication claim the five fixed,
+  unreserved npm names, while retaining maintainer checks for existing names
+  and integrity-checked idempotent retries after partial publication.
 - [ ] Publish Brew/AUR metadata only after the referenced release assets are
   public and verified. The opt-in automation and public-byte receipt are ready;
   external repository creation, credentials, activation, and first public
@@ -977,6 +980,16 @@ This plan is complete only when:
   absent from the Runtime `PATH`. Stable registry/tap/AUR publication and the
   tagged-release matrix remain release activation work; Windows remains
   deferred.
+- 2026-09-03: Public-channel inspection confirmed the direct Bash installer is
+  live, all five intended npm names remain unreserved, the Homebrew Tap does
+  not exist, and the repository's `NPM_TOKEN` now returns HTTP 401. The npm
+  authority gate now treats 404 names as explicit first-publication targets
+  after authenticating the token, while existing names still require matching
+  maintainership. Stable npm publication now verifies every tarball against
+  the accepted manifest and safely skips an already-published identical
+  version, so a partial first publication can be retried without weakening
+  package identity. External activation remains blocked on replacing the npm
+  token and deliberately enabling the stable npm switch.
 - 2026-08-30: Closed the Linuxbrew acceptance gap with pinned official
   Homebrew 6.0.15 images for native Linux arm64 and x64 runners. The shared
   system-package lifecycle now accepts Homebrew on macOS or Linux, while a

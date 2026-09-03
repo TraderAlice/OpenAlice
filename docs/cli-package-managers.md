@@ -117,13 +117,16 @@ External channels are explicit release switches:
 | AUR / paru | `OPENALICE_PUBLISH_AUR=true` | dedicated `AUR_SSH_PRIVATE_KEY` plus manually verified `AUR_KNOWN_HOSTS` |
 
 Before a stable GitHub Release can be created, the release workflow preflights
-every enabled switch. npm must identify the token owner and confirm that all
-five package names already list that identity as a maintainer; the Homebrew
-token must see `TraderAlice/homebrew-tap` with push authority; and the AUR key
-plus pinned known-hosts entry must be able to read the `openalice-bin` Git
-repository. Disabled channels perform no external authority checks. This makes
-missing setup a release-planning failure instead of discovering it after the
-accepted assets are already public.
+every enabled switch. npm must identify the token owner, confirm that every
+existing package lists that identity as a maintainer, and report any 404 names
+as explicit first-publication targets. A missing name is not proof of npm
+ownership, but the enabled stable publication switch is the maintainer's
+deliberate instruction to claim that fixed OpenAlice package name. The
+Homebrew token must see `TraderAlice/homebrew-tap` with push authority; and the
+AUR key plus pinned known-hosts entry must be able to read the `openalice-bin`
+Git repository. Disabled channels perform no external authority checks. This
+makes missing credentials or conflicting ownership a release-planning failure
+instead of discovering it after the accepted assets are already public.
 
 The `Public CLI Channel Authority` workflow exposes the same checks as a manual
 read-only rehearsal. Select npm, Homebrew, AUR, or any combination before a
@@ -131,13 +134,17 @@ stable promotion; the run uses repository secrets but cannot publish packages,
 push metadata, or create a GitHub Release. Use it after reserving names and
 installing credentials, before enabling the corresponding release switch.
 
-The Tap and AUR writers are idempotent: if the verified metadata is already
-active, they make no commit. AUR never learns its SSH host key from the same
-untrusted connection used to publish; the maintainer supplies the verified
-known-hosts entry as a secret. Creating registry packages, creating the Tap,
-and enrolling the AUR key remain deliberate maintainer actions. Enabling a
-switch without its external repository or authority is a release failure, not
-permission to invent another channel or silently skip publication.
+The npm, Tap, and AUR writers are idempotent. npm verifies each local tarball
+against the accepted publish manifest, skips an already-public version only
+when registry integrity is identical, and keeps the meta package last. This
+makes a partially successful first publication safe to retry. Tap and AUR make
+no commit when the verified metadata is already active. AUR never learns its
+SSH host key from the same untrusted connection used to publish; the
+maintainer supplies the verified known-hosts entry as a secret. Creating
+registry packages, creating the Tap, and enrolling the AUR key remain
+deliberate maintainer actions. Enabling a switch without its external
+repository or authority is a release failure, not permission to invent another
+channel or silently skip publication.
 
 ## Update and uninstall ownership
 
