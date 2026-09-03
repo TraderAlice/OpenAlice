@@ -7,6 +7,7 @@ import {
   moveSupervisorCommandDeckSelection,
   renderSupervisorCommandDeck,
   SUPERVISOR_COMMAND_DOCK_OVERLAY_OPTIONS,
+  supervisorCommandDockOverlayOptions,
   supervisorCommandDeckItems,
 } from './supervisor-command-deck.ts'
 import { createSupervisorTuiTheme } from './supervisor-tui-theme.ts'
@@ -188,6 +189,14 @@ describe('Supervisor Command Dock', () => {
       maxHeight: 9,
       margin: { bottom: 2 },
     })
+    expect(supervisorCommandDockOverlayOptions({ width: 46, height: 16 })).toEqual({
+      width: '100%',
+      anchor: 'top-left',
+      maxHeight: 9,
+      margin: { top: 4, right: 0, bottom: 1, left: 0 },
+    })
+    expect(supervisorCommandDockOverlayOptions({ width: 60, height: 20 }))
+      .toBe(SUPERVISOR_COMMAND_DOCK_OVERLAY_OPTIONS)
   })
 })
 

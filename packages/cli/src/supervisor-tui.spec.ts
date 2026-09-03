@@ -1190,7 +1190,7 @@ describe('Supervisor TUI screen', () => {
     expect(screen.render(120)[0]).toContain('v0.87.0-beta · DEV · update 0.90.0')
   })
 
-  it('keeps wide Home as one content-sized OMP-style interaction cluster', () => {
+  it('anchors wide Home between its task board and bottom Command Spine', () => {
     let viewportHeight = 32
     const screen = new SupervisorScreen({
       version: 'dev',
@@ -1229,11 +1229,10 @@ describe('Supervisor TUI screen', () => {
     expect(tall.join('\n')).toContain('ACTIVITY')
     expect(tall.join('\n')).not.toContain('CONTROL PATH')
     expect(tall.join('\n')).not.toContain('Runtime Telemetry')
-    expect(tall.at(-2)).toBe('')
     expect(tall.join('\n')).not.toContain('CONTROL CONSOLE')
-    expect(spineRow).toBe(tipRow + 2)
-    expect(spineRow).toBeLessThan(tall.length - 1)
-    expect(tall.slice(spineRow + 1).every((line) => line === '')).toBe(true)
+    expect(tipRow).toBe(cardBottomRow + 2)
+    expect(spineRow).toBe(tall.length - 1)
+    expect(tall.slice(tipRow + 1, spineRow).every((line) => line === '')).toBe(true)
 
     viewportHeight = 48
     const expanded = screen.render(120).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
@@ -1243,9 +1242,9 @@ describe('Supervisor TUI screen', () => {
     const expandedSpine = expanded.findIndex((line) => line.includes('[ / ] Commands'))
     expect(expandedBottom).toBe(cardBottomRow)
     expect(expandedRecent).toBe(recentRow)
-    expect(expandedSpine).toBe(spineRow)
+    expect(expandedSpine).toBe(expanded.length - 1)
     expect(expanded.findIndex((line) => line.includes('[ Enter ]'))).toBe(actionRow)
-    expect(expanded.slice(expandedSpine + 1).filter((line) => line === '').length)
+    expect(expanded.slice(expandedRecent + 1, expandedSpine).filter((line) => line === '').length)
       .toBeGreaterThan(10)
 
     const folded = screen.render(99).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))

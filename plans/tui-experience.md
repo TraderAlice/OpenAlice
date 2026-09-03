@@ -4179,6 +4179,42 @@ already large `supervisor-tui.ts` application controller.
   unchanged. The complete CLI suite passes 667 tests and CLI typecheck/build
   passes. Maintainer acceptance remains pending on this branch.
 
+### Emergency Command-Dock workspace decision
+
+- A real 46x16 Command Dock capture exposed one unusable line of the underlying
+  Alice Session card immediately above the bottom drawer. That remnant provided
+  no context or action and made the overlay look like an incomplete repaint.
+- Below 60 columns and 18 rows the Dock now owns the workspace immediately below
+  Mission Navigation. Its four command results, filter caret, navigation/run
+  footer, and persistent Close/Detach Spine remain visible together. Ordinary
+  60x20, 80x24, and 120x32 terminals retain the bottom-drawer relationship to
+  the current page.
+- A real 46x16 PTY capture verifies that no underlying Home row leaks around the
+  Dock. The focused Command Dock, screen, and real-PTY closure passes 158 tests;
+  the complete CLI suite passes 667 tests and CLI typecheck/build passes.
+  Command ranking, keyboard and pointer dispatch, overlay isolation, lifecycle
+  behavior, and global Detach ownership are unchanged. Maintainer acceptance
+  remains pending on this branch.
+
+### Wide Home vertical-anchor decision
+
+- Fresh 120x32 OpenAlice and Oh My Pi captures separated two kinds of empty
+  space. OMP bounds its workbench at the top and its input rail at the terminal
+  edge, so the interval between them reads as breathing room. OpenAlice placed
+  its Board, Tip, and Command Spine in one upper cluster, leaving every rendered
+  control above a large unowned black field that looked unfinished.
+- At 100 columns and wider, Home now keeps the bounded Alice Session Board and
+  its contextual Tip at the top while anchoring the global Command Spine to the
+  bottom row. Surplus belongs between local guidance and global controls. Below
+  100 columns the complete Home task remains one continuous flow, preserving
+  established 80x24 and 46x16 pointer geometry and avoiding height-driven
+  displacement of the primary action.
+- Real 120x32, 80x24, and 46x16 PTY captures verify the responsive boundary. The
+  focused screen, Command Dock, and real-PTY closure passes 158 tests; the
+  complete CLI suite passes 667 tests and CLI typecheck/build passes. Home task
+  semantics, Runtime lifecycle, hotspots, navigation, and Detach behavior are
+  unchanged. Maintainer acceptance remains pending on this branch.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

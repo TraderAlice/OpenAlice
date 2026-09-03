@@ -80,7 +80,7 @@ import {
   moveSupervisorCommandDeckSelection,
   normalizeSupervisorCommandDeckState,
   renderSupervisorCommandDeck,
-  SUPERVISOR_COMMAND_DOCK_OVERLAY_OPTIONS,
+  supervisorCommandDockOverlayOptions,
   supervisorCommandDeckItems,
   type SupervisorCommandDeckItem,
   type SupervisorCommandDeckState,
@@ -846,13 +846,14 @@ export async function runSupervisorTui(
     if (!open) return
 
     commandPaletteActive = true
+    const overlayOptions = supervisorCommandDockOverlayOptions(terminalSize())
     const panel = new (class implements Component {
       render(width: number): string[] {
         const deck = screen.renderCommandPalette(width)
         captureOverlayPointer(
           deck.lines,
           width,
-          SUPERVISOR_COMMAND_DOCK_OVERLAY_OPTIONS,
+          overlayOptions,
           (data) => this.handleInput(data),
           {
             firstRow: deck.targets[0]?.row ?? 3,
@@ -872,7 +873,7 @@ export async function runSupervisorTui(
 
       invalidate(): void {}
     })()
-    const overlay = ui.showOverlay(panel, SUPERVISOR_COMMAND_DOCK_OVERLAY_OPTIONS)
+    const overlay = ui.showOverlay(panel, overlayOptions)
     closeCommandPalette = () => {
       if (!commandPaletteActive) return
       commandPaletteActive = false
@@ -5182,7 +5183,7 @@ export class SupervisorScreen implements Component {
       width,
     )
     const flowContentConsole = (
-      this.snapshot.panel === 'overview'
+      (this.snapshot.panel === 'overview' && width < 100)
       || this.snapshot.panel === 'inbox'
       || (this.snapshot.panel === 'logs' && (this.snapshot.logs?.entries?.length ?? 0) === 0)
       || this.snapshot.panel === 'help'

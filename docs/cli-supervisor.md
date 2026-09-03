@@ -409,10 +409,12 @@ intentionally parameter-free:
   OMP-style two-column composition instead of stretching with every surplus
   terminal row. The identity column centers the selected AliceProject while the
   task column keeps one ordered path together: Next and its primary action,
-  Status, then Activity. Home keeps the board, contextual Tip, and Command Spine
-  in one continuous interaction cluster; surplus terminal height follows that
-  cluster instead of separating its guidance from its controls. Compact layouts
-  keep the same hierarchy and flow with bounded vertical rhythm. Inbox and
+  Status, then Activity. The contextual Tip follows the board, while the
+  Command Spine anchors the terminal's bottom edge; genuine surplus becomes a
+  quiet field between guidance and global controls, matching OMP's top-workbench
+  and bottom-input composition. Below 100 columns Home keeps the same hierarchy
+  in one continuous flow so compact and emergency terminals do not displace the
+  primary task to preserve decorative space. Inbox and
   Connection signals are whole-row pointer targets
   backed by the same panel-selection path as Mission Navigation; hover previews
   their destination in the stable Activity Slot;
@@ -436,9 +438,12 @@ intentionally parameter-free:
   `[ i ]` and its complete visible project-name segment are one direct
   pointer/keyboard route into the existing AliceProjects overlay. Commands and
   Detach likewise expose their complete labels as pointer targets. `/`
-  opens a shallow bottom-anchored Command Dock over the unchanged current page
-  and changes the Spine action to `Close`. The Dock spans the available width
-  above the Spine, shows at most four results around the current selection, and
+  opens a shallow Command Dock and changes the Spine action to `Close`. At
+  ordinary sizes it remains a bottom-anchored drawer over the unchanged current
+  page. Below 60 columns and 18 rows it instead owns the workspace immediately
+  below Mission Navigation, preventing a clipped one-line remnant of the
+  underlying page from competing with the command task. The Dock spans the
+  available width, shows at most four results around the current selection, and
   contracts for filtered or empty states. It exposes
   only commands valid for the current Runtime/recovery context. An empty local
   Dock orders the current primary task before read-only Runtime evidence and

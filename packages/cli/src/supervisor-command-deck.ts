@@ -15,6 +15,21 @@ export const SUPERVISOR_COMMAND_DOCK_OVERLAY_OPTIONS = {
 
 export const SUPERVISOR_COMMAND_DOCK_VISIBLE_RESULTS = 4
 
+export function supervisorCommandDockOverlayOptions(size: {
+  width: number
+  height: number
+}): SupervisorOverlayOptions {
+  if (size.width < 60 && size.height < 18) {
+    return {
+      width: '100%',
+      maxHeight: 9,
+      anchor: 'top-left',
+      margin: { top: 4, right: 0, bottom: 1, left: 0 },
+    }
+  }
+  return SUPERVISOR_COMMAND_DOCK_OVERLAY_OPTIONS
+}
+
 export type SupervisorCommandDeckInput =
   | 'enter'
   | 'tab'
