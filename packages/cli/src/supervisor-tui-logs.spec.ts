@@ -105,6 +105,28 @@ describe('Supervisor Runtime log presentation', () => {
     expect(rendered.lines.join('\n')).toContain('◆ [ l ] Load Runtime tail')
   })
 
+  it('keeps populated events visible in the 46x16 emergency canvas', () => {
+    const many = {
+      entries: Array.from({ length: 10 }, (_, index) => ({ text: `event ${index + 1}` })),
+    }
+    const rendered = renderSupervisorLogs(many, 46, 0, 'all', null, 7)
+    const text = rendered.lines.join('\n')
+
+    expect(rendered.lines).toHaveLength(7)
+    expect(rendered.lines.every((line) => displayWidth(line) === 46)).toBe(true)
+    expect(text).toContain('Event Lens · 10/10 · ALL · INFO')
+    expect(text).toContain('·  9  event 9')
+    expect(text).toContain('› · 10  event 10')
+    expect(text).toContain('DETAIL  event 10')
+    expect(text).toContain('RAW     event 10')
+    expect(text).toContain('KEYS    ↑↓ browse · f lens · y copy')
+    expect(rendered.targets).toEqual([
+      expect.objectContaining({ row: 2, fromEnd: 1 }),
+      expect.objectContaining({ row: 3, fromEnd: 0 }),
+    ])
+    expect(rendered.railTargets).toEqual([])
+  })
+
   it('keeps pointer targets aligned with a centered event window and inspector focus', () => {
     const many = {
       entries: Array.from({ length: 20 }, (_, index) => ({ text: `event ${index + 1}` })),

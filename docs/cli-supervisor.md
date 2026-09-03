@@ -638,8 +638,12 @@ intentionally parameter-free:
   Lens is empty or not yet reported, Observatory, quiet Lens, contextual Tip,
   and Command Spine form one content-flow cluster. Once events exist, the Spine
   remains viewport-anchored so log selection and scrolling keep a stable frame.
-  Below 60 columns and
-  18 rows, Runtime folds Observatory and Lens into one five-row status surface:
+  Below 60 columns and 18 rows, a populated Runtime without an active endpoint
+  becomes a seven-line Emergency Event Lens instead of disappearing behind the
+  target-summary fallback. It retains the selected and adjacent events, detail,
+  sanitized raw text, browse/filter/copy vocabulary, clickable visible rows,
+  contextual Tip, and Command Spine. A Runtime with an active target instead
+  folds Observatory and Lens into one five-row status surface:
   Runtime/provider/uptime identity, active route, compact Alice/UTA/Connector
   health, the valid Open-or-Retry action, and a local Load/Reload or remote
   Disconnect action. The fold preserves Mission Header, navigation, contextual

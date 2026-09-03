@@ -675,6 +675,32 @@ describe('Supervisor TUI screen', () => {
     expect(remoteFrame).not.toContain('Reload Runtime snapshot')
   })
 
+  it('keeps populated Runtime events visible without an active endpoint at 46x16', () => {
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'logs',
+      runtime: { class: 'running', state: 'running', endpoints: {} },
+      logs: {
+        entries: Array.from({ length: 10 }, (_, index) => ({ text: `event ${index + 1}` })),
+      },
+    }, {
+      getViewportHeight: () => 16,
+      motionEnabled: false,
+    })
+
+    const lines = screen.render(46)
+    const frame = lines.join('\n')
+    expect(lines).toHaveLength(16)
+    expect(frame).toContain('[Run]·10')
+    expect(frame).toContain('Event Lens · 10/10 · ALL · INFO')
+    expect(frame).toContain('› · 10  event 10')
+    expect(frame).toContain('DETAIL  event 10')
+    expect(frame).toContain('KEYS    ↑↓ browse · f lens · y copy')
+    expect(frame).toContain('◇  Tip: ↑↓ explores; f filters; y copies; End…')
+    expect(frame).toContain('[ / ] Commands')
+  })
+
   it('keeps a task-led Control Guide and application chrome visible at 46x16', () => {
     let viewportHeight = 16
     const runtime = { class: 'running', endpoints: { web: 'http://127.0.0.1:2026' } }

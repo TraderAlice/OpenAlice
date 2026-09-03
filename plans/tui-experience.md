@@ -4089,6 +4089,28 @@ already large `supervisor-tui.ts` application controller.
   passes 660 tests, and CLI typecheck/build passes. Maintainer acceptance remains
   pending on this branch.
 
+### Emergency populated-Event-Lens decision
+
+- Real 46x16 PTY serialization exposed a hidden-content failure that ordinary
+  80x24 and 120x32 Event Lens captures could not show. The emergency Runtime
+  branch assumed an active endpoint existed and rendered only its target summary;
+  a running Runtime with ten readable events but no bindable Web endpoint showed
+  the Runtime badge, Tip, and Command Spine while hiding every event.
+- The emergency branch now distinguishes target status from event inspection.
+  An active target retains its five-row status/actions summary. Without one, a
+  seven-line Emergency Event Lens shows the selected and adjacent event, compact
+  detail and sanitized raw text, plus browse/filter/copy vocabulary. Visible
+  event rows remain pointer targets and Up/Down continues through the full
+  filtered collection; wider layouts retain the existing stream-and-inspector
+  composition unchanged.
+- A real 46x16 PTY capture verifies the complete emergency canvas and a real-PTY
+  journey browses from event 10 to warning event 9. Direct renderer and screen
+  coverage lock exact height, full-width framing, selected-row identity, Tip,
+  and Command Spine. Log loading, filtering, clipboard payloads, scroll rails,
+  and Runtime ownership are unchanged. The focused log, screen, and real-PTY
+  closure passes 158 tests, the complete CLI suite passes 663 tests, and CLI
+  typecheck/build passes. Maintainer acceptance remains pending on this branch.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

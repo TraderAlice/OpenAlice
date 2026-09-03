@@ -4947,6 +4947,17 @@ export class SupervisorScreen implements Component {
       const emergencyRuntime = width < 60
         && Number.isFinite(viewportHeight)
         && Math.floor(viewportHeight ?? 0) < 18
+      const emergencyRuntimeSummary = emergencyRuntime && this.snapshot.activeTarget != null
+      const runtimeCanvasHeight = Number.isFinite(operationalCanvasHeight)
+        ? operationalCanvasHeight
+        : emergencyRuntime
+          ? Math.max(
+              0,
+              Math.floor(viewportHeight ?? 0)
+                - lines.length
+                - WIDE_OPERATIONAL_CANVAS_RESERVED_CHROME_HEIGHT,
+            )
+          : undefined
       const chronicle = this.snapshot.activeTarget
         ? emergencyRuntime
           ? renderSupervisorRuntimeSummary({
@@ -4966,14 +4977,14 @@ export class SupervisorScreen implements Component {
               events: this.snapshot.connectionEvents ?? [],
             }, width, this.snapshot.activeTarget.kind === 'ssh' ? operationalCanvasHeight : undefined)
         : []
-      if (emergencyRuntime || this.snapshot.activeTarget?.kind === 'ssh') {
+      if (emergencyRuntimeSummary || this.snapshot.activeTarget?.kind === 'ssh') {
         lines.push(...chronicle)
       } else {
         if (chronicle.length > 0) lines.push(...chronicle, '')
-        const remainingHeight = Number.isFinite(operationalCanvasHeight)
+        const remainingHeight = Number.isFinite(runtimeCanvasHeight)
           ? Math.max(
               0,
-              Math.floor(operationalCanvasHeight ?? 0)
+              Math.floor(runtimeCanvasHeight ?? 0)
                 - chronicle.length
                 - (chronicle.length > 0 ? 1 : 0),
             )

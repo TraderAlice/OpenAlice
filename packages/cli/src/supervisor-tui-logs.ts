@@ -136,6 +136,19 @@ export function renderSupervisorLogs(
   const safeFromEnd = clamp(fromEnd, 0, entries.length - 1)
   const selectedIndex = entries.length - 1 - safeFromEnd
   const selected = entries[selectedIndex]!
+  const emergencyHeight = Number.isFinite(targetHeight)
+    ? Math.max(0, Math.floor(targetHeight ?? 0))
+    : undefined
+  if (width < 60 && emergencyHeight !== undefined && emergencyHeight <= 7) {
+    return renderEmergencyEventLens(
+      entries,
+      sourceEntries.length,
+      selectedIndex,
+      filter,
+      width,
+      emergencyHeight,
+    )
+  }
   const wide = width >= 100
   const baselineVisible = wide ? 10 : width < 60 ? 4 : 7
   const targetBodyRows = wide && Number.isFinite(targetHeight)
@@ -230,6 +243,54 @@ export function renderSupervisorLogs(
     railTargets: railVisible
       ? logRailTargets(railViewportRows, entries.length, 2, width - 2)
       : [],
+  }
+}
+
+function renderEmergencyEventLens(
+  entries: IndexedLogEntry[],
+  sourceCount: number,
+  selectedIndex: number,
+  filter: SupervisorLogFilter,
+  width: number,
+  targetHeight: number,
+): SupervisorLogRender {
+  const selected = entries[selectedIndex]!
+  const bodyCapacity = Math.max(1, targetHeight - 2)
+  const visibleCount = Math.min(entries.length, bodyCapacity >= 4 ? 2 : 1)
+  const start = windowStart(selectedIndex, entries.length, visibleCount)
+  const end = Math.min(entries.length, start + visibleCount)
+  const numberWidth = String(sourceCount).length
+  const listRows = entries.slice(start, end).map((entry, relativeIndex) => {
+    const index = start + relativeIndex
+    const marker = index === selectedIndex ? '›' : ' '
+    return `${marker} ${entry.glyph} ${String(entry.number).padStart(numberWidth, ' ')}  ${entry.text}`.trimEnd()
+  })
+  const rows = [...listRows]
+  let remaining = Math.max(0, bodyCapacity - rows.length)
+  if (remaining >= 2) {
+    rows.push(`DETAIL  ${selected.text || '(empty)'}`)
+    remaining -= 1
+  }
+  if (remaining >= 2) {
+    rows.push(`RAW     ${selected.raw || '(empty)'}`)
+    remaining -= 1
+  }
+  if (remaining >= 1) rows.push('KEYS    ↑↓ browse · f lens · y copy')
+  const lines = renderSupervisorPanel(
+    'Event Lens',
+    `${selected.number}/${sourceCount} · ${supervisorLogFilterLabel(filter).toUpperCase()} · ${selected.severity}`,
+    padRows(rows, bodyCapacity),
+    width,
+  )
+  return {
+    lines,
+    targets: entries.slice(start, end).map((_, relativeIndex) => ({
+      row: relativeIndex + 2,
+      startColumn: 2,
+      endColumn: Math.max(2, width - 1),
+      fromEnd: entries.length - 1 - (start + relativeIndex),
+    })),
+    railTargets: [],
   }
 }
 

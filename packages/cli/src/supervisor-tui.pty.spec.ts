@@ -841,6 +841,62 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   }, 12_000)
 
+  it('keeps a browsable Emergency Event Lens at 46x16', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-emergency-event-lens-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [eventLensFixtureEntry], {
+      cols: 46,
+      rows: 16,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_BOOT: '0',
+        OPENALICE_TUI_MOTION: '0',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let moved = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Emergency Event Lens timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        const plain = stripSgr(output)
+        if (!opened && plain.includes('Alice Session · OpenAlice')) {
+          opened = true
+          child.write('l')
+        } else if (!moved && plain.includes('Event Lens · 10/10 · ALL · INFO')) {
+          moved = true
+          child.write('\u001b[A')
+        } else if (moved && plain.includes('Event Lens · 9/10 · ALL · WARNING')) {
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && moved) resolve(output)
+        else reject(new Error(`Emergency Event Lens exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    const plain = stripSgr(transcript)
+    expect(plain).toContain('Event Lens · 10/10 · ALL · INFO')
+    expect(plain).toContain('Event Lens · 9/10 · ALL · WARNING')
+    expect(plain).toContain('DETAIL  03:04:09Z Fixture event 9')
+    expect(plain).toContain('KEYS    ↑↓ browse · f lens · y copy')
+    expect(plain).toContain('╰─ [ / ] Commands  ›  [ q ] Detach')
+    expect(plain).toContain('FIXTURE_RESULT event-lens')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
   it('scrubs the Event Lens rail with raw hover, press, drag, and release reports', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-event-rail-'))
     temporaryPaths.push(isolatedHome)
