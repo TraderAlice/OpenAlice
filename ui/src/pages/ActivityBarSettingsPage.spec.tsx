@@ -12,13 +12,13 @@ const mocks = vi.hoisted(() => ({
   layout: {
     version: 1 as const,
     groups: [] as UiLayout['groups'],
-    hidden: ['dev'] as UiLayout['hidden'],
+    hidden: [] as UiLayout['hidden'],
   },
   save: vi.fn(async (layout: UiLayout) => { mocks.layout = layout }),
   reset: vi.fn(async () => { mocks.layout = {
     version: 1 as const,
     groups: [],
-    hidden: ['dev'],
+    hidden: [],
   } }),
 }))
 
@@ -60,12 +60,12 @@ describe('ActivityBarSettingsPage', () => {
   it('persists the first visibility edit instead of treating it as hydration', async () => {
     render(<ActivityBarSettingsPage />)
 
-    const toggle = screen.getByRole('switch', { name: 'Show Dev Panel' })
-    expect(toggle.getAttribute('aria-checked')).toBe('false')
+    const toggle = screen.getByRole('switch', { name: 'Hide Workspaces' })
+    expect(toggle.getAttribute('aria-checked')).toBe('true')
     fireEvent.click(toggle)
-    expect(screen.getByRole('switch', { name: 'Hide Dev Panel' }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByRole('switch', { name: 'Show Workspaces' }).getAttribute('aria-checked')).toBe('false')
     await waitFor(() => expect(mocks.save).toHaveBeenCalledOnce(), { timeout: 1_500 })
-    expect(mocks.save.mock.calls[0]?.[0].hidden).not.toContain('dev')
+    expect(mocks.save.mock.calls[0]?.[0].hidden).toContain('workspaces')
   })
 
   it('creates a custom group and can reset to the default document', () => {

@@ -1,8 +1,13 @@
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Bot,
+  Camera,
   Cpu,
   CandlestickChart,
+  ChevronRight,
+  Code2,
+  Compass,
   FlaskConical,
   Layers3,
   LineChart,
@@ -10,7 +15,9 @@ import {
   Newspaper,
   Palette,
   PanelLeft,
+  PanelsTopLeft,
   Plug,
+  ScrollText,
   ShieldCheck,
   SlidersHorizontal,
   Wrench,
@@ -21,6 +28,36 @@ import { useWorkspace } from '../tabs/store'
 import { getFocusedTab } from '../tabs/types'
 import { SidebarRow } from './SidebarRow'
 import { SidebarSectionHeader } from './SidebarSectionHeader'
+
+const DEVELOPER_DISCLOSURE_SESSION_KEY = 'openalice.settings.developer-expanded'
+const DEVELOPER_GROUP_ID = 'settings-developer-pages'
+
+const DEVELOPER_ITEMS = [
+  { labelKey: 'dev.frontend', tab: 'frontend', Icon: PanelsTopLeft },
+  { labelKey: 'common.tools', tab: 'tools', Icon: Wrench },
+  { labelKey: 'dev.onboarding', tab: 'onboarding', Icon: Compass },
+  { labelKey: 'dev.snapshots', tab: 'snapshots', Icon: Camera },
+  { labelKey: 'common.logs', tab: 'logs', Icon: ScrollText },
+  { labelKey: 'simulator.title', tab: 'simulator', Icon: FlaskConical },
+] as const
+
+function readDeveloperDisclosure(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.sessionStorage.getItem(DEVELOPER_DISCLOSURE_SESSION_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function writeDeveloperDisclosure(expanded: boolean): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.sessionStorage.setItem(DEVELOPER_DISCLOSURE_SESSION_KEY, expanded ? '1' : '0')
+  } catch {
+    // Navigation still works when session storage is unavailable.
+  }
+}
 
 const CATEGORY_GROUPS = [
   {
@@ -70,6 +107,10 @@ export function SettingsCategoryList({ onSelect }: { onSelect?: () => void }) {
   const { project } = useAliceProject()
   const focused = useWorkspace((state) => getFocusedTab(state)?.spec)
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
+  const developerActive = focused?.kind === 'dev'
+  const [developerExpanded, setDeveloperExpanded] = useState(
+    () => developerActive || readDeveloperDisclosure(),
+  )
   const groups = CATEGORY_GROUPS
     .map((group) => ({
       ...group,
@@ -79,8 +120,17 @@ export function SettingsCategoryList({ onSelect }: { onSelect?: () => void }) {
     }))
     .filter((group) => group.items.length > 0)
 
+  useEffect(() => {
+    if (!developerActive) return
+    setDeveloperExpanded(true)
+    writeDeveloperDisclosure(true)
+  }, [developerActive])
+
   return (
-    <div className="pb-2">
+    <div
+      data-testid="settings-category-list"
+      className="h-full min-h-0 overflow-y-auto overscroll-contain pb-2 [scrollbar-gutter:stable]"
+    >
       {groups.map((group) => (
         <div key={group.labelKey}>
           <SidebarSectionHeader>{t(group.labelKey)}</SidebarSectionHeader>
@@ -102,6 +152,54 @@ export function SettingsCategoryList({ onSelect }: { onSelect?: () => void }) {
           })}
         </div>
       ))}
+      <div className="mt-2">
+        <SidebarRow
+          label={t('settings.group.developer')}
+          active={developerActive && !developerExpanded}
+          icon={<Code2 size={14} strokeWidth={1.75} className="text-muted-foreground/70" aria-hidden />}
+          trail={(
+            <ChevronRight
+              size={14}
+              strokeWidth={1.75}
+              aria-hidden
+              className={`text-muted-foreground transition-transform motion-reduce:transition-none ${developerExpanded ? 'rotate-90' : ''}`}
+            />
+          )}
+          ariaExpanded={developerExpanded}
+          ariaControls={DEVELOPER_GROUP_ID}
+          onClick={() => {
+            setDeveloperExpanded((current) => {
+              const next = !current
+              writeDeveloperDisclosure(next)
+              return next
+            })
+          }}
+        />
+        {developerExpanded && (
+          <div
+            id={DEVELOPER_GROUP_ID}
+            role="group"
+            aria-label={t('settings.group.developer')}
+            className="ml-5 border-l border-border/70 pl-1"
+          >
+            {DEVELOPER_ITEMS.map((item) => {
+              const active = focused?.kind === 'dev' && focused.params.tab === item.tab
+              return (
+                <SidebarRow
+                  key={item.tab}
+                  label={t(item.labelKey)}
+                  active={active}
+                  icon={<item.Icon size={14} strokeWidth={1.75} className="text-muted-foreground/70" aria-hidden />}
+                  onClick={() => {
+                    openOrFocus({ kind: 'dev', params: { tab: item.tab } })
+                    onSelect?.()
+                  }}
+                />
+              )
+            })}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

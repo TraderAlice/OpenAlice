@@ -205,6 +205,36 @@ describe('UrlAdopter Settings Beta', () => {
   })
 })
 
+describe('UrlAdopter Settings Developer', () => {
+  it('adopts a Developer page under Settings and highlights Settings', async () => {
+    render(
+      <MemoryRouter initialEntries={['/settings/developer/logs']}>
+        <UrlAdopter />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'dev',
+      params: { tab: 'logs' },
+    }))
+    expect(mocks.setSidebar).toHaveBeenCalledWith('settings')
+  })
+
+  it('redirects the legacy standalone Dev Panel route', async () => {
+    render(
+      <MemoryRouter initialEntries={['/dev/simulator']}>
+        <UrlAdopter />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'dev',
+      params: { tab: 'simulator' },
+    }))
+    expect(mocks.setSidebar).toHaveBeenCalledWith('settings')
+  })
+})
+
 describe('UrlAdopter Office occupancy', () => {
   it('keeps the internal Office return checkpoint passive during an excursion', async () => {
     render(

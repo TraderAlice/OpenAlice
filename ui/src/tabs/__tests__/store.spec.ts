@@ -18,7 +18,7 @@ function resetStore() {
 beforeEach(resetStore)
 
 describe('Dev URL tabs', () => {
-  it('keeps product surfaces out of the internal Dev Panel', () => {
+  it('keeps product surfaces out of the internal Developer section', () => {
     expect(isDevTab('connectors')).toBe(false)
     expect(isDevTab('connector')).toBe(false)
     expect(isDevTab('tools')).toBe(true)
@@ -221,8 +221,8 @@ describe('setSidebar / toggleSidebar', () => {
   it('toggleSidebar to a different section switches without collapsing first', () => {
     const s = useWorkspace.getState()
     s.toggleSidebar('settings')
-    s.toggleSidebar('dev')
-    expect(useWorkspace.getState().selectedSidebar).toBe('dev')
+    s.toggleSidebar('chat')
+    expect(useWorkspace.getState().selectedSidebar).toBe('chat')
   })
 
   it('sidebar selection is independent of focused tab', () => {

@@ -1,7 +1,6 @@
 import {
   BarChart3,
   Building2,
-  Code2,
   Inbox,
   LineChart,
   ListChecks,
@@ -30,7 +29,7 @@ import {
 type NavItemKey =
   | 'nav.item.inbox' | 'nav.item.tracked' | 'nav.item.chat' | 'nav.item.autoQuant' | 'nav.item.autoPrediction' | 'nav.item.workspaces'
   | 'nav.item.market' | 'nav.item.office' | 'nav.item.issue'
-  | 'nav.item.trading' | 'nav.item.connectors' | 'nav.item.automation' | 'nav.item.settings' | 'nav.item.dev'
+  | 'nav.item.trading' | 'nav.item.connectors' | 'nav.item.automation' | 'nav.item.settings'
 
 interface NavLeaf {
   page: Page
@@ -115,7 +114,6 @@ export const NAV_SECTIONS: NavSection[] = [
       { page: 'workspaces', labelKey: 'nav.item.workspaces', icon: TerminalSquare, defaultTab: { kind: 'workspace-list', params: {} } },
       { page: 'automation', labelKey: 'nav.item.automation', icon: Zap, defaultTab: { kind: 'automation', params: { section: 'runs' } } },
       { page: 'settings',   labelKey: 'nav.item.settings',   icon: Settings, defaultTab: { kind: 'settings', params: { category: 'general' } } },
-      { page: 'dev',        labelKey: 'nav.item.dev',        icon: Code2, defaultTab: { kind: 'dev', params: { tab: 'tools' } } },
     ],
   },
 ]
