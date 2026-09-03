@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { execFile } from 'node:child_process'
-import { chmod, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { access, chmod, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { promisify } from 'node:util'
@@ -20,7 +20,7 @@ afterEach(async () => {
 })
 
 describe.skipIf(process.platform === 'win32')('CLI dev channel assets', () => {
-  it('validates all four native candidates and preserves their exact archive bytes', async () => {
+  it('validates all four native candidates and prepares immutable bytes plus a compatibility receipt', async () => {
     const root = await fixture()
     const output = join(root, 'output')
     const manifest = prepareCliDevAssets({
@@ -42,11 +42,13 @@ describe.skipIf(process.platform === 'win32')('CLI dev channel assets', () => {
       const versioned = `openalice-cli-${version}-${target.platform}-${target.arch}.tar.gz`
       const alias = `openalice-cli-dev-${target.platform}-${target.arch}.tar.gz`
       expect(await readFile(join(output, 'releases', commit, versioned))).toEqual(
-        await readFile(join(output, 'aliases', alias)),
+        await readFile(join(root, 'input', versioned)),
       )
+      await expect(access(join(output, 'aliases', alias))).rejects.toMatchObject({ code: 'ENOENT' })
       expect(await readFile(join(output, 'aliases', `${alias}.sha256`), 'utf8')).toBe(
         `${target.sha256}  ${alias}\n`,
       )
+      expect(target.archive).toBe(alias)
     }
     expect(await readFile(join(output, 'releases', commit, 'install'), 'utf8'))
       .toBe('#!/usr/bin/env bash\n')

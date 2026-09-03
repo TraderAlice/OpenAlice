@@ -9,8 +9,8 @@ This file contains only rules that apply at the start of every task. Current
 code, tests, rendered behavior, and GitHub state override stale prose. Before
 editing a subsystem, select and read its owner guide from [[docs/README.md]].
 Detailed delivery and release procedure lives in
-[[docs/development-workflow.md]], and active multi-step work lives in
-[[PLANS.md]].
+[[docs/development-workflow.md]], test selection and side effects live in
+[[docs/testing.md]], and active multi-step work lives in [[PLANS.md]].
 
 ## Start Here
 
@@ -19,11 +19,11 @@ pnpm install              # full local install, including Electron
 pnpm dev                  # Guardian -> UTA + Alice + Vite
 pnpm dev --takeover       # replace the recorded local Guardian owner tree
 pnpm build                # packages + UI + UTA + Alice
-pnpm test:affected        # feature-branch test closure against origin/dev
-pnpm test:node            # complete Node Vitest project
-pnpm test:ui              # complete UI Vitest project
+pnpm test:changed         # hermetic changed-file closure against origin/dev
+pnpm test:owner:ui        # complete hermetic UI owner suite
+pnpm test:integration     # deterministic local product integration
 pnpm test                 # complete hermetic monorepo Vitest suite
-pnpm test:e2e             # non-trading product/integration E2E
+pnpm test:select --help   # owners, lanes, areas, packages, and side effects
 ```
 
 Before changing files:
@@ -117,16 +117,18 @@ with ownership breadth and risk:
 
 | Change shape | Minimum evidence |
 |---|---|
-| Leaf change inside one owner | `pnpm test:affected` or explicit affected specs; owning typecheck; real affected surface |
-| Shared change inside one owner | Complete owner/project suite such as `pnpm test:ui`, `pnpm test:node`, or a subsystem command; owning typecheck; real affected surface |
+| Leaf change inside one owner | `pnpm test:changed` or an explicit `test:select` intersection; owning typecheck; real affected surface |
+| Shared change inside one owner | Matching `pnpm test:owner:*` suite or package-local test; owning typecheck; real affected surface |
 | Cross-owner, shared test/build infrastructure, dependency/config change, or uncertain impact | Root and applicable package/UI typechecks; complete `pnpm test`; every touched surface's acceptance |
 | Master promotion, scheduled/manual backstop, or stable release | Complete remote matrix and release gates from [[docs/development-workflow.md]] |
 
-`pnpm test:affected` compares the feature branch and working tree with freshly
+`pnpm test:changed` compares the feature branch and working tree with freshly
 fetched `origin/dev`. It follows Vitest's static import graph; dynamic imports,
 generated contracts, registries, implicit runtime coupling, and a zero-test
-selection require explicit specs or escalation. It is development feedback,
-not a release gate. `pnpm test` retains the deterministic full-suite meaning.
+selection require an explicit owner/area/package selection or escalation. It
+is development feedback, not a release gate. `pnpm test` retains the
+deterministic full-suite meaning. See [[docs/testing.md]] for the complete
+namespace, composition rules, and side-effect contracts.
 
 Typecheck the owner that changed: root `npx tsc --noEmit` covers `src/`; UI uses
 `cd ui && npx tsc -b`; a package uses its own `typecheck` command. Do not cite a
@@ -136,25 +138,27 @@ Add the applicable surface gate:
 
 | Surface | Required evidence |
 |---|---|
-| `ui/` | UI typecheck, affected/full UI specs as appropriate, and the real browser route |
+| `ui/` | UI typecheck, changed specs or `pnpm test:owner:ui` as appropriate, and the real browser route |
 | UI `/api/*` contract or demo | Update `ui/src/demo/` handlers and walk `pnpm -F open-alice-ui dev:demo` |
-| `packages/<name>/` | `pnpm -F @traderalice/<name> typecheck` plus package/affected specs |
-| UTA state, ledger, staging, or sync | MockBroker lifecycle plus targeted specs from [[docs/uta-live-testing.md]] |
+| `packages/<name>/` | Package typecheck; use its local `test` or `pnpm test:select --package <workspace-name>` when it owns specs, then escalate to the owner suite for shared behavior |
+| UTA state, ledger, staging, or sync | `pnpm test:integration:uta` plus targeted specs from [[docs/uta-live-testing.md]] |
 | Broker adapter, order write, or permission | Smallest explicit live-paper scenario; verify demo/paper mode and leave the account flat |
 | Workspace issues, schedules, headless dispatch | Follow [[docs/workspace-issues-and-scheduling.md]] |
-| Guardian lock, ownership, or takeover | `pnpm test:guardian-recovery` and the real launcher path |
+| Guardian lock, ownership, or takeover | `pnpm test:system:guardian` and the real launcher path |
 | Desktop, IPC, PTY, managed runtime, or packaging | Matching unsigned Electron/package smoke from [[docs/managed-workspace-runtime.md]] |
-| Root installer or distributed CLI | [[docs/cli-installer.md]], `pnpm test:install:docker`, and the interactive playground before release |
-| Docker/server/remote deployment | [[docs/docker-deployment.md]], the applicable local Railway/Docker smoke, and explicit external acceptance only when needed |
+| Root installer or distributed CLI | [[docs/cli-installer.md]], `pnpm test:system:installer`, and the interactive playground before release |
+| Docker/server/remote deployment | [[docs/docker-deployment.md]], `pnpm docker:smoke`, `pnpm test:system:railway`, or `pnpm test:system:remote` as applicable |
 | Persisted state | Apply the shipped-boundary rule above; shipped shapes need an idempotent migration, spec, and regenerated index |
 | Onboarding, first run, or auth | Isolated state plus dev and packaged paths where relevant |
 
 `pnpm test` is hermetic: it must not invoke Railway CLI, open real SSH, read
 cloud credentials, deploy, publish, or contend for a host-global Railway fence.
-Those system paths remain explicit commands. `pnpm test:e2e` is non-trading and
-must never load configured broker accounts or submit orders. Live-paper tests
-require explicit `OPENALICE_UTA_LIVE_PAPER=1`, a verified demo/paper account,
-and a flat-account check even after failure.
+Those system paths remain explicit `test:system:*` or artifact-owner commands.
+`pnpm test:integration` is non-trading and must never load configured broker
+accounts or contact public providers. External read-only and live-paper lanes
+are opt-in; an all-skipped run is not acceptance. Live-paper tests require
+explicit `OPENALICE_UTA_LIVE_PAPER=1`, a verified demo/paper account, and a
+flat-account check even after failure.
 
 Routine development and package smoke must not read release signing secrets.
 If an applicable native, browser, package, or external gate cannot run, state

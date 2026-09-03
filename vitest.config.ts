@@ -64,6 +64,7 @@ export default defineConfig({
           exclude: [
             '**/*.e2e.spec.*',
             '**/*.bbProvider.spec.*',
+            '**/*.live.spec.*',
             '**/node_modules/**',
             'scripts/railway-entrypoint.spec.ts',
             'scripts/railway-fence-pty.spec.ts',

@@ -11,7 +11,7 @@ const interactive = args.includes('--interactive')
 let imageBuilt = false
 
 if (args.includes('--help') || args.includes('-h')) {
-  console.log(`Usage: pnpm test:install:docker [--interactive] [--keep-image]
+  console.log(`Usage: pnpm test:system:installer [--interactive] [--keep-image]
 
 Build a clean local Linux container with no Node, npm, Bun, or Agent Runtime,
 then exercise the native archive installer and atomic update path.

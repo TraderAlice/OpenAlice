@@ -20,7 +20,7 @@
  *
  * Get testnet funds at app.hyperliquid-testnet.xyz/drip.
  *
- * Run: OPENALICE_UTA_LIVE_PAPER=1 pnpm test:uta:live-paper
+ * Run: OPENALICE_UTA_LIVE_PAPER=1 pnpm test:live:hyperliquid-paper
  */
 
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'

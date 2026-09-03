@@ -351,15 +351,35 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
       .resolves.toMatchObject({ stdout: expect.stringContaining('OpenAlice 0.91.0 is ready') })
   })
 
-  it('uses the fixed dev-channel archive and records dev provenance', async () => {
+  it('resolves the dev manifest to a commit-addressed archive and records dev provenance', async () => {
     const fixture = await makeReleaseArchive('0.92.0', '7'.repeat(16))
     const installRoot = join(fixture.root, 'installed')
+    const commit = '0123456789abcdef0123456789abcdef01234567'
+    const versionedArchive = `/cli/dev/releases/${commit}/openalice-cli-0.92.0-${platform}-${architecture}.tar.gz`
+    const requestedPaths = []
     const server = createServer(async (request, response) => {
-      if (request.url?.endsWith('.sha256')) {
-        response.end(`${fixture.sha256}  archive.tar.gz\n`)
+      requestedPaths.push(request.url)
+      if (request.url === '/cli/dev/manifest.json') {
+        response.setHeader('content-type', 'application/json')
+        response.end(JSON.stringify({
+          schemaVersion: 1,
+          channel: 'dev',
+          repository: 'TraderAlice/OpenAlice',
+          version: '0.92.0',
+          commit,
+        }))
         return
       }
-      response.end(await readFile(fixture.archive))
+      if (request.url === `${versionedArchive}.sha256`) {
+        response.end(`${fixture.sha256}  ${versionedArchive.split('/').at(-1)}\n`)
+        return
+      }
+      if (request.url === versionedArchive) {
+        response.end(await readFile(fixture.archive))
+        return
+      }
+      response.statusCode = 404
+      response.end()
     })
     await new Promise((resolvePromise, rejectPromise) => {
       server.once('error', rejectPromise)
@@ -377,8 +397,15 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
           ...process.env,
           HOME: fixture.root,
           OPENALICE_DOWNLOAD_BASE_URL: `http://127.0.0.1:${address.port}`,
+          OPENALICE_EXPECTED_DEV_COMMIT: commit,
         },
       })
+      expect(requestedPaths).toEqual([
+        '/cli/dev/manifest.json',
+        `${versionedArchive}.sha256`,
+        versionedArchive,
+      ])
+      expect(requestedPaths.some((path) => path?.includes('openalice-cli-dev-'))).toBe(false)
       const [provenanceName] = await readdir(join(installRoot, 'cli', 'provenance'))
       const provenance = JSON.parse(await readFile(join(installRoot, 'cli', 'provenance', provenanceName), 'utf8'))
       expect(provenance).toMatchObject({
@@ -386,6 +413,49 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
         updateChannel: 'development',
         installerUrl: 'https://raw.githubusercontent.com/TraderAlice/OpenAlice/dev/install',
       })
+    } finally {
+      await new Promise((resolvePromise) => server.close(resolvePromise))
+    }
+  })
+
+  it('rejects a superseded dev manifest before downloading its candidate', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-dev-commit-'))
+    temporaryPaths.push(root)
+    const currentCommit = '0123456789abcdef0123456789abcdef01234567'
+    const expectedCommit = 'fedcba9876543210fedcba9876543210fedcba98'
+    const requestedPaths = []
+    const server = createServer((request, response) => {
+      requestedPaths.push(request.url)
+      response.setHeader('content-type', 'application/json')
+      response.end(JSON.stringify({
+        schemaVersion: 1,
+        channel: 'dev',
+        repository: 'TraderAlice/OpenAlice',
+        version: '0.92.0',
+        commit: currentCommit,
+      }))
+    })
+    await new Promise((resolvePromise, rejectPromise) => {
+      server.once('error', rejectPromise)
+      server.listen(0, '127.0.0.1', resolvePromise)
+    })
+    try {
+      const address = server.address()
+      await expect(execFileAsync('bash', [installer,
+        '--channel', 'dev',
+        '--install-dir', join(root, 'installed'),
+        '--plan',
+      ], {
+        env: {
+          ...process.env,
+          HOME: root,
+          OPENALICE_DOWNLOAD_BASE_URL: `http://127.0.0.1:${address.port}`,
+          OPENALICE_EXPECTED_DEV_COMMIT: expectedCommit,
+        },
+      })).rejects.toMatchObject({
+        stderr: expect.stringContaining(`Dev manifest commit ${currentCommit} does not match expected ${expectedCommit}`),
+      })
+      expect(requestedPaths).toEqual(['/cli/dev/manifest.json'])
     } finally {
       await new Promise((resolvePromise) => server.close(resolvePromise))
     }
