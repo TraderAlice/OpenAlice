@@ -5189,7 +5189,7 @@ export class SupervisorScreen implements Component {
       || this.snapshot.panel === 'help'
       || boundedDoctor
       || directLauncherTarget
-      || directConnectionTarget
+      || (directConnectionTarget && width < 100)
     )
       && !focusTask
       && !this.commandDeckOpen

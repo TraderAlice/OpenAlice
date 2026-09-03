@@ -482,6 +482,7 @@ describe('Supervisor TUI screen', () => {
 
   it('turns one connected target into a complete 46x16 Active Route', () => {
     const activated: string[] = []
+    let viewportHeight = 16
     const local = fleetMachines()[0]!
     const runtime = { class: 'running', endpoints: { web: 'http://127.0.0.1:47331' } }
     const screen = new SupervisorScreen({
@@ -502,7 +503,7 @@ describe('Supervisor TUI screen', () => {
       },
       fleet: createSupervisorFleetState('2026-09-03T00:00:00Z', [local], 'default'),
     }, {
-      getViewportHeight: () => 16,
+      getViewportHeight: () => viewportHeight,
       motionEnabled: false,
       onActivateFleet: (machine, project) => activated.push(`${machine.key}/${project.key}`),
     })
@@ -522,6 +523,16 @@ describe('Supervisor TUI screen', () => {
     expect(frame).not.toContain('AliceProjects ·')
     expect(frame).toContain('◇  Tip: Enter returns Home')
     expect(frame).toContain('[ / ] Commands')
+
+    viewportHeight = 32
+    const wide = screen.render(120)
+    const wideTipRow = wide.findIndex((line) => line.startsWith('◇  Tip:'))
+    const wideSpineRow = wide.findIndex((line) => line.includes('[ / ] Commands'))
+    expect(wideSpineRow).toBe(wide.length - 1)
+    expect(wide.slice(wideTipRow + 1, wideSpineRow).every((line) => line === '')).toBe(true)
+
+    viewportHeight = 16
+    screen.render(46)
 
     const actionRow = lines.findIndex((line) => line.includes('[ Enter ] Return Home')) + 1
     expect(screen.handlePointer(pointerClick(20, actionRow))).toBe(true)
@@ -612,7 +623,7 @@ describe('Supervisor TUI screen', () => {
     expect(recovery.join('\n')).toContain('STATUS  × Connection  unreachable')
   })
 
-  it('keeps one Active Route, its guidance, and global controls together', () => {
+  it('anchors one wide Active Route between its guidance and bottom controls', () => {
     let viewportHeight = 32
     const local = fleetMachines()[0]!
     const runtime = { class: 'running', endpoints: { web: 'http://127.0.0.1:47331' } }
@@ -643,13 +654,14 @@ describe('Supervisor TUI screen', () => {
     const spineRow = lines.findIndex((line) => line.includes('[ / ] Commands'))
     expect(lines).toHaveLength(32)
     expect(lines.join('\n')).toContain('Active Route · LIVE · LOCAL')
-    expect(spineRow).toBe(tipRow + 2)
-    expect(lines.slice(spineRow + 1).every((line) => line === '')).toBe(true)
+    expect(spineRow).toBe(lines.length - 1)
+    expect(lines.slice(tipRow + 1, spineRow).every((line) => line === '')).toBe(true)
 
     viewportHeight = 48
     const expanded = screen.render(120)
     expect(expanded).toHaveLength(48)
-    expect(expanded.findIndex((line) => line.includes('[ / ] Commands'))).toBe(spineRow)
+    expect(expanded.findIndex((line) => line.includes('[ / ] Commands')))
+      .toBe(expanded.length - 1)
   })
 
   it('makes a one-target remote Active Route disconnect directly', () => {

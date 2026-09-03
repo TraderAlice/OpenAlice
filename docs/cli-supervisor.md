@@ -289,9 +289,10 @@ intentionally parameter-free:
   and becomes a direct Active Route board. Wide terminals pair route/Now with
   signals/detail; ordinary and emergency terminals keep the same identity,
   route, health, Return Home, and target-scoped Transfer or Disconnect actions
-  in one bounded stack. The direct board, contextual Tip, and Command Spine form
-  one content-flow cluster with surplus height after the complete route; multi-
-  target selectors retain their viewport-anchored Spine. There is no hidden
+  in one bounded stack. At 100 columns and wider the direct board and contextual
+  Tip remain together while the Command Spine anchors the terminal edge; below
+  100 columns all three form one compact content-flow cluster. Multi-target
+  selectors retain their viewport-anchored Spine. There is no hidden
   pane focus: Enter acts on the sole
   target, left/right navigate top-level views, and pointer hit testing ignores
   the removed inventory surface. Multiple candidates restore the complete

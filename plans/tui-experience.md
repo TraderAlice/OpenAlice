@@ -4252,6 +4252,24 @@ already large `supervisor-tui.ts` application controller.
   targets, and global Detach behavior are unchanged. Maintainer acceptance
   remains pending on this branch.
 
+### Wide Active-Route vertical-anchor decision
+
+- A fresh one-target 120x32 Connections capture showed its bounded Active Route,
+  contextual Tip, and Command Spine ending near the viewport midpoint, leaving
+  the lower terminal edge unowned. The same route at 80x24 and 46x16 remained a
+  complete compact transaction with no need for additional spacing.
+- At 100 columns and wider, a direct Active Route now keeps route facts and Tip
+  at the top while anchoring the Command Spine to the bottom row. Below 100
+  columns it retains the established content-flow cluster. Multi-target Fleet
+  selectors already own a viewport-height operational canvas and remain
+  unchanged.
+- Real 120x32, 80x24, and 46x16 PTY captures verify the responsive boundary.
+  Focused Fleet, screen, and real-PTY coverage passes 167 tests; the complete
+  CLI suite passes 667 tests and CLI typecheck/build passes. Return Home,
+  Transfer, Disconnect, endpoint health, selector navigation, pointer targets,
+  and Runtime ownership are unchanged. Maintainer acceptance remains pending
+  on this branch.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and
