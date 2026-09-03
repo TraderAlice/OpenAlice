@@ -3964,6 +3964,25 @@ already large `supervisor-tui.ts` application controller.
   658 tests, and CLI typecheck/build passes. Maintainer acceptance remains
   pending on this branch.
 
+### Quiet Runtime cluster decision
+
+- Runtime's 120x32 audit showed a complete Observatory followed by an empty
+  two-row Event Lens, then a large elastic gap before Command Spine. Because the
+  status manager had no event collection to navigate, the fixed rail added
+  visual distance without preserving any active scrolling context.
+- Runtime now uses content flow only while the Event Lens is empty or has not
+  yet been reported: Observatory, quiet Lens, contextual Tip, and Command Spine
+  remain together. As soon as one event exists, the existing viewport-anchored
+  operational frame returns, preserving stable coordinates for event selection,
+  scroll rails, copy, filtering, and latest/first/last navigation. Remote health,
+  lifecycle, diagnostics, snapshot loading, and event retention are unchanged.
+- Real 120x48, 120x32, 80x24, and 46x16 PTY captures verify the quiet Runtime
+  cluster. Screen coverage locks its Spine after the Tip across a 32-to-48-row
+  resize, while the existing twenty-event screen and real-PTY canvas tests keep
+  the populated Runtime Spine anchored. The focused screen/PTY closure passes
+  147 tests, the complete CLI suite passes 658 tests, and CLI typecheck/build
+  passes. Maintainer acceptance remains pending on this branch.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

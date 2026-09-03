@@ -5162,6 +5162,7 @@ export class SupervisorScreen implements Component {
     const flowContentConsole = (
       this.snapshot.panel === 'overview'
       || this.snapshot.panel === 'inbox'
+      || (this.snapshot.panel === 'logs' && (this.snapshot.logs?.entries?.length ?? 0) === 0)
       || directLauncherTarget
       || directConnectionTarget
     )

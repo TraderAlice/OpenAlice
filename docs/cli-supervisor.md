@@ -617,7 +617,11 @@ intentionally parameter-free:
   in the Observatory title with Runtime Lens event counts. Local Runtime log
   evidence remains directly below the Observatory; remote
   targets give surplus height to recent transitions and expose only remote-safe
-  Open, Check, Disconnect, Connections, and Help actions. Below 60 columns and
+  Open, Check, Disconnect, Connections, and Help actions. When the local Event
+  Lens is empty or not yet reported, Observatory, quiet Lens, contextual Tip,
+  and Command Spine form one content-flow cluster. Once events exist, the Spine
+  remains viewport-anchored so log selection and scrolling keep a stable frame.
+  Below 60 columns and
   18 rows, Runtime folds Observatory and Lens into one five-row status surface:
   Runtime/provider/uptime identity, active route, compact Alice/UTA/Connector
   health, the valid Open-or-Retry action, and a local Load/Reload or remote

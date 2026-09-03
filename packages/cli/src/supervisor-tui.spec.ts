@@ -1713,6 +1713,7 @@ describe('Supervisor TUI screen', () => {
   })
 
   it('keeps empty recovery actions in content and long-tail controls in Commands', () => {
+    let viewportHeight = 32
     const screen = new SupervisorScreen({
       version: 'dev',
       channel: 'dev',
@@ -1721,17 +1722,26 @@ describe('Supervisor TUI screen', () => {
       logs: { entries: [] },
       doctor: { overall: 'unknown', checks: [] },
     }, {
-      getViewportHeight: () => 32,
+      getViewportHeight: () => viewportHeight,
       motionEnabled: false,
     })
 
     const emptyLogs = screen.render(120)
     expect(emptyLogs.join('\n')).toContain('◆ [ l ] Reload Runtime snapshot')
-    expect(emptyLogs.at(-1)).toContain('[ / ] Commands')
-    expect(emptyLogs.at(-2)).toBe('')
+    const logsTipRow = emptyLogs.findIndex((line) => line.startsWith('◇  Tip:'))
+    const logsSpineRow = emptyLogs.findIndex((line) => line.includes('[ / ] Commands'))
+    expect(logsSpineRow).toBe(logsTipRow + 2)
+    expect(logsSpineRow).toBeLessThan(emptyLogs.length - 1)
+    expect(emptyLogs.slice(logsSpineRow + 1).every((line) => line === '')).toBe(true)
     expect(emptyLogs.join('\n')).not.toContain('[ y ] Copy event')
     expect(emptyLogs.join('\n')).toContain('No Runtime events in this lens')
 
+    viewportHeight = 48
+    const expandedEmptyLogs = screen.render(120)
+    expect(expandedEmptyLogs).toHaveLength(48)
+    expect(expandedEmptyLogs.findIndex((line) => line.includes('[ / ] Commands'))).toBe(logsSpineRow)
+
+    viewportHeight = 32
     screen.update({ logs: { entries: [{ text: 'Runtime ready' }] } })
     expect(screen.render(120).join('\n')).toContain('Event Lens · LINE 1')
 
