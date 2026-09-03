@@ -113,6 +113,19 @@ successful no-op. Candidate upload and channel activation can therefore be
 retried independently without rebuilding accepted native archives, and the
 manifest is the completed-set authority rather than an archive alias.
 
+The rolling-dev matrix does not rebuild the platform-neutral server inputs on
+four hosts. One clean Ubuntu job runs `pnpm build:server` and publishes a
+commit-bound, SHA-256-verified artifact containing exactly `ui/dist` and the
+`dist` outputs of connector-protocol, guardian-runtime, ibkr, opentypebb, and
+uta-protocol. Each native host still checks out the same commit, installs its
+own dependencies and pinned Bun, verifies every received file and the exact
+commit before installing those six roots, then performs the host-native Bun
+compile and smoke. The receipt rejects missing, extra, changed, or pre-existing
+outputs rather than merging trees. It never carries `node_modules`, dugite Git,
+a Bun executable, service/root build output, or a host-native release. Adding a
+shared root requires a reviewed import/build need and a matching contract test;
+a missing input must fail closed instead of widening the artifact to the repo.
+
 The currently published channel-neutral installer predates this resolver and
 still downloads `openalice-cli-dev-<platform>-<arch>.tar.gz`. Activation
 temporarily refreshes those aliases after the exact-head check solely to keep

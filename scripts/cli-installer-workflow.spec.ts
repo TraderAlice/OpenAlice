@@ -15,6 +15,7 @@ interface WorkflowStep {
 interface WorkflowJob {
   if?: string
   needs?: string | string[]
+  'runs-on'?: string
   outputs?: Record<string, string>
   steps?: WorkflowStep[]
   strategy?: {
@@ -63,7 +64,32 @@ describe('CLI installer dev publication workflow', () => {
   })
 
   it('builds all four supported native targets with the pinned Bun version', () => {
+    const neutral = workflow.jobs['build-dev-cli-neutral']
     const build = workflow.jobs['build-dev-cli']
+    expect(neutral.needs).toBeUndefined()
+    expect(neutral['runs-on']).toBe('ubuntu-24.04')
+    expect(neutral.if).toBe("github.event_name == 'push'")
+    const neutralInstall = neutral.steps?.findIndex(
+      (candidate) => candidate.run === "pnpm install --frozen-lockfile --filter='!@traderalice/desktop'",
+    ) ?? -1
+    const neutralBuild = neutral.steps?.findIndex(
+      (candidate) => candidate.name === 'Build platform-neutral server inputs',
+    ) ?? -1
+    expect(neutralInstall).toBeGreaterThanOrEqual(0)
+    expect(neutralBuild).toBeGreaterThan(neutralInstall)
+    expect(step(neutral, 'Build platform-neutral server inputs').run).toBe('pnpm build:server')
+    const prepareNeutral = step(neutral, 'Prepare commit-bound neutral input receipt').run ?? ''
+    expect(prepareNeutral).toContain('prepare-cli-neutral-inputs.mjs prepare')
+    expect(prepareNeutral).toContain('--commit "$GITHUB_SHA"')
+    const neutralUpload = step(neutral, 'Preserve platform-neutral inputs').with
+    expect(neutralUpload).toMatchObject({
+      name: 'rolling-dev-neutral-inputs',
+      path: 'dist/dev-neutral-inputs',
+      'if-no-files-found': 'error',
+      'retention-days': 7,
+    })
+    expect(String(neutralUpload?.name)).not.toMatch(/^dev-cli-/)
+    expect(build.needs).toBe('build-dev-cli-neutral')
     expect(build.strategy?.matrix?.include).toEqual([
       { os: 'macos-14', platform: 'darwin', arch: 'arm64' },
       { os: 'macos-15-intel', platform: 'darwin', arch: 'x64' },
@@ -75,10 +101,26 @@ describe('CLI installer dev publication workflow', () => {
       if: "matrix.platform == 'linux' && matrix.arch == 'x64'",
       run: 'pnpm build:bun-runtime:feasibility',
     })
-    expect(step(build, 'Build Alice server').run).toBe('pnpm build:server')
+    expect(build.steps?.some((candidate) => candidate.run?.includes('pnpm build:server'))).toBe(false)
+    expect(step(build, 'Download platform-neutral inputs').with).toMatchObject({
+      name: 'rolling-dev-neutral-inputs',
+      path: 'dist/dev-neutral-inputs',
+    })
+    const verifyNeutral = step(build, 'Verify and install commit-bound neutral inputs').run ?? ''
+    expect(verifyNeutral).toContain('prepare-cli-neutral-inputs.mjs verify')
+    expect(verifyNeutral).toContain('--commit "$GITHUB_SHA"')
+    expect(verifyNeutral).toContain('--install')
     expect(step(build, 'Build native CLI').run).toBe('pnpm build:bun:release')
     const stepNames = build.steps?.map((candidate) => candidate.name)
-    expect(stepNames?.indexOf('Build Alice server')).toBeLessThan(
+    const install = build.steps?.findIndex(
+      (candidate) => candidate.run === "pnpm install --frozen-lockfile --filter='!@traderalice/desktop'",
+    ) ?? -1
+    expect(install).toBeGreaterThanOrEqual(0)
+    expect(install).toBeLessThan(stepNames?.indexOf('Download platform-neutral inputs') ?? -1)
+    expect(stepNames?.indexOf('Download platform-neutral inputs')).toBeLessThan(
+      stepNames?.indexOf('Verify and install commit-bound neutral inputs') ?? -1,
+    )
+    expect(stepNames?.indexOf('Verify and install commit-bound neutral inputs')).toBeLessThan(
       stepNames?.indexOf('Accept multiprocess recovery once per dev commit') ?? -1,
     )
     expect(stepNames?.indexOf('Accept multiprocess recovery once per dev commit')).toBeLessThan(
@@ -88,6 +130,20 @@ describe('CLI installer dev publication workflow', () => {
       'dev-cli-${{ matrix.platform }}-${{ matrix.arch }}',
     )
     expect(step(build, 'Preserve accepted dev candidate').with?.['retention-days']).toBe(7)
+  })
+
+  it('shares only the reviewed platform-neutral build roots', async () => {
+    const { CLI_NEUTRAL_INPUT_ROOTS } = await import('./prepare-cli-neutral-inputs.mjs')
+    expect(CLI_NEUTRAL_INPUT_ROOTS).toEqual([
+      'ui/dist',
+      'packages/connector-protocol/dist',
+      'packages/guardian-runtime/dist',
+      'packages/ibkr/dist',
+      'packages/opentypebb/dist',
+      'packages/uta-protocol/dist',
+    ])
+    expect(CLI_NEUTRAL_INPUT_ROOTS).not.toContain('node_modules')
+    expect(CLI_NEUTRAL_INPUT_ROOTS.every((path: string) => !path.includes('bun-release'))).toBe(true)
   })
 
   it('accepts native npm and Bun installs on PR macOS and Linux hosts', () => {

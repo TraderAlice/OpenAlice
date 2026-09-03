@@ -44,6 +44,8 @@ on:
       - "scripts/prepare-cli-previous-release.mjs"
       - "scripts/prepare-cli-dev-assets.mjs"
       - "scripts/prepare-cli-dev-assets.spec.mjs"
+      - "scripts/prepare-cli-neutral-inputs.mjs"
+      - "scripts/prepare-cli-neutral-inputs.spec.mjs"
       - "THIRD_PARTY_NOTICES.md"
       - "scripts/remote-ssh-smoke.mjs"
       - "scripts/remote-smoke/**"
@@ -199,7 +201,44 @@ jobs:
       - name: Exercise clean SSH host fixture
         run: node scripts/remote-ssh-smoke.mjs --skip-tui
 
+  build-dev-cli-neutral:
+    if: github.event_name == 'push'
+    name: Build dev platform-neutral inputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
+
+      - name: Build platform-neutral server inputs
+        run: pnpm build:server
+
+      - name: Prepare commit-bound neutral input receipt
+        run: >-
+          node scripts/prepare-cli-neutral-inputs.mjs prepare
+          --repository-root .
+          --output-dir dist/dev-neutral-inputs
+          --commit "$GITHUB_SHA"
+
+      - name: Preserve platform-neutral inputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: rolling-dev-neutral-inputs
+          path: dist/dev-neutral-inputs
+          if-no-files-found: error
+          retention-days: 7
+
   build-dev-cli:
+    needs: build-dev-cli-neutral
     if: github.event_name == 'push'
     name: Build dev native CLI (${{ matrix.platform }}-${{ matrix.arch }})
     strategy:
@@ -237,8 +276,19 @@ jobs:
 
       - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
 
-      - name: Build Alice server
-        run: pnpm build:server
+      - name: Download platform-neutral inputs
+        uses: actions/download-artifact@v4
+        with:
+          name: rolling-dev-neutral-inputs
+          path: dist/dev-neutral-inputs
+
+      - name: Verify and install commit-bound neutral inputs
+        run: >-
+          node scripts/prepare-cli-neutral-inputs.mjs verify
+          --repository-root .
+          --input-dir dist/dev-neutral-inputs
+          --commit "$GITHUB_SHA"
+          --install
 
       - name: Accept multiprocess recovery once per dev commit
         if: matrix.platform == 'linux' && matrix.arch == 'x64'
