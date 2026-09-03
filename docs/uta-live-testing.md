@@ -26,8 +26,10 @@ are present:
 OPENALICE_UTA_LIVE_PAPER=1 pnpm test:uta:live-paper
 ```
 
-`pnpm test:e2e` never submits broker orders. It contains only local product
-integration tests and read-only network/provider checks.
+`pnpm test:e2e` never submits broker orders or contacts public providers. It
+contains only deterministic local product integration tests. Public providers,
+locally configured API keys, and read-only TWS/Gateway checks live in the
+explicit `pnpm test:external:readonly` lane.
 
 ## Choose the verification layer
 
@@ -38,7 +40,7 @@ touched contract requires it.
 | Change surface | Minimum verification | When live-paper is required |
 |---|---|---|
 | UTA staging, commit, ledger, reconciliation, or state transitions | Targeted unit specs, then `pnpm test:e2e` (`uta-lifecycle` uses `MockBroker`) | Only when venue behavior or a real execution response is part of the claim |
-| Public market loading or read-only provider integration | Targeted read-only E2E; failures from DNS/TLS/provider downtime must be reported separately from product failures | Not required when no configured account or private endpoint is used |
+| Public market loading or read-only provider integration | `pnpm test:external:readonly` or a targeted spec with `vitest.external.config.ts`; report DNS/TLS/provider downtime separately from product failures | Not required when no configured account or private endpoint is used |
 | Broker account parsing, order ids, status mapping, modify/cancel, permissions, TP/SL, or venue-specific parameters | Targeted broker spec against one verified demo/paper account | Required: these semantics cannot be proven by `MockBroker` |
 | Alice-to-UTA protocol or `alice-uta` CLI changes | Protocol/unit specs, then the relevant scenario through a real Workspace CLI | Required if the changed command reaches an order write or approval boundary |
 | New broker or new traded market type | Full applicable S1-S14 catalog for that venue | Always required before claiming support |
@@ -50,8 +52,8 @@ as `alice analysis bars(..., count=50)`, and asserts that Binance, OKX, and
 Bybit still return a latest bar across 1m, 15m, 1h, 4h, and 1d:
 
 ```bash
-CCXT_E2E=1 pnpm exec vitest run \
-  --config vitest.e2e.config.ts \
+pnpm exec vitest run \
+  --config vitest.external.config.ts \
   services/uta/src/domain/trading/brokers/ccxt/CcxtBroker.e2e.spec.ts
 ```
 
@@ -65,6 +67,10 @@ The commands are intentionally asymmetric:
 ```bash
 # Ordinary product E2E: safe for routine local development and CI.
 pnpm test:e2e
+
+# Explicit read-only external integration: may use public network APIs, local
+# provider keys, or a locally running TWS/Gateway, but never submits orders.
+pnpm test:external:readonly
 
 # One explicitly selected account-trading spec. Invoke Vitest directly so
 # pnpm does not forward a literal `--` that defeats Vitest's file filter.

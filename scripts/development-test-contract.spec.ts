@@ -29,7 +29,13 @@ describe('development test command contract', () => {
     expect(scripts.test).toBe('vitest run')
     expect(scripts['test:affected']).toBe('vitest run --changed origin/dev')
     expect(scripts['test:node']).toBe('vitest run --project node')
-    expect(scripts['test:ui']).toBe('vitest run --project ui')
+    expect(scripts['test:alice']).toBe('node scripts/run-owner-tests.mjs alice')
+    expect(scripts['test:ui']).toBe('node scripts/run-owner-tests.mjs ui')
+    expect(scripts['test:uta']).toBe('node scripts/run-owner-tests.mjs uta')
+    expect(scripts['test:connector']).toBe('node scripts/run-owner-tests.mjs connector')
+    expect(scripts['test:runtime-cli']).toBe('node scripts/run-owner-tests.mjs runtime-cli')
+    expect(scripts['test:desktop']).toBe('node scripts/run-owner-tests.mjs desktop')
+    expect(scripts['test:repo-tooling']).toBe('node scripts/run-owner-tests.mjs repo-tooling')
   })
 
   it('reruns every project when collection-wide inputs change', () => {

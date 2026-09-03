@@ -1,12 +1,10 @@
 import { fileURLToPath } from 'node:url'
 import { resolve, dirname } from 'node:path'
 
-import { deterministicProductE2eIncludes } from './scripts/test-lanes.mjs'
+import { externalReadonlyIncludes } from './scripts/test-lanes.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-// Match vitest.config.ts — workspace packages alias directly to src/*.ts so
-// e2e tests don't need packages/*/dist pre-built.
 const workspaceAliases = {
   '@': resolve(__dirname, './src'),
   '@traderalice/guardian-runtime': resolve(__dirname, './packages/guardian-runtime/src/index.ts'),
@@ -16,18 +14,24 @@ const workspaceAliases = {
   '@traderalice/opentypebb': resolve(__dirname, './packages/opentypebb/src/index.ts'),
 }
 
-// Deterministic local product/integration E2E only. Public providers and local
-// credentials belong to vitest.external.config.ts; tests that submit orders
-// belong to vitest.uta-live.config.ts.
+// Explicit read-only integration lane. These tests may contact public providers,
+// a locally running TWS/Gateway, or APIs backed by keys in the local OpenAlice
+// config, but they never submit broker orders.
 export default {
   resolve: {
     alias: workspaceAliases,
   },
   test: {
-    include: deterministicProductE2eIncludes,
+    include: externalReadonlyIncludes,
     testTimeout: 60_000,
     fileParallelism: false,
     pool: 'forks',
     singleFork: true,
+    env: {
+      CCXT_E2E: '1',
+      TWSE_LIVE: '1',
+      CCXT_INIT_RETRIES: '2',
+      CCXT_INIT_RETRY_BASE_MS: '250',
+    },
   },
 }
