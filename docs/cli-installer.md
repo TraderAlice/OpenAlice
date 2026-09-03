@@ -96,22 +96,48 @@ Git changes all produce a new identity.
 
 The channel-neutral installer defaults to the OpenAlice-owned stable
 `manifest.json`. `--channel beta` resolves `beta/manifest.json`, while
-`--channel dev` downloads the fixed per-commit preview aliases:
+`--channel dev` resolves `cli/dev/manifest.json` and derives a commit-addressed
+archive URL from its `commit` and `version`:
 
 ```text
-https://download.openalice.ai/cli/dev/openalice-cli-dev-<platform>-<arch>.tar.gz
-https://download.openalice.ai/cli/dev/openalice-cli-dev-<platform>-<arch>.tar.gz.sha256
+https://download.openalice.ai/cli/dev/releases/<commit>/openalice-cli-<version>-<platform>-<arch>.tar.gz
+https://download.openalice.ai/cli/dev/releases/<commit>/openalice-cli-<version>-<platform>-<arch>.tar.gz.sha256
 ```
 
 Every `dev` push builds all four native targets. Publication verifies each
 sidecar and the archive's target/version metadata, uploads an immutable copy
-under `cli/dev/releases/<commit>/`, then replaces the fixed archive aliases.
-Each checksum alias is written after its archive, so a reader racing a publish
-can fail verification but cannot activate mismatched bytes. The dev manifest is
-published last as the completed-set receipt. Versioned beta and stable releases
-publish the same four target archives and sidecars as GitHub Release assets and
-mirror them unchanged to the download CDN. Stable and beta manifests remain separate;
-immutable `OpenAlice-<version>-install` and
+under `cli/dev/releases/<commit>/`, and preserves a small candidate receipt.
+A separate activation stage rechecks that remote `refs/heads/dev` is exactly
+the workflow commit before replacing the live manifest. A stale rerun is a
+successful no-op. Candidate upload and channel activation can therefore be
+retried independently without rebuilding accepted native archives, and the
+manifest is the completed-set authority rather than an archive alias.
+
+The rolling-dev matrix does not rebuild the platform-neutral server inputs on
+four hosts. One clean Ubuntu job runs `pnpm build:server` and publishes a
+commit-bound, SHA-256-verified artifact containing exactly `ui/dist` and the
+`dist` outputs of connector-protocol, guardian-runtime, ibkr, opentypebb, and
+uta-protocol. Each native host still checks out the same commit, installs its
+own dependencies and pinned Bun, verifies every received file and the exact
+commit before installing those six roots, then performs the host-native Bun
+compile and smoke. The receipt rejects missing, extra, changed, or pre-existing
+outputs rather than merging trees. It never carries `node_modules`, dugite Git,
+a Bun executable, service/root build output, or a host-native release. Adding a
+shared root requires a reviewed import/build need and a matching contract test;
+a missing input must fail closed instead of widening the artifact to the repo.
+
+The currently published channel-neutral installer predates this resolver and
+still downloads `openalice-cli-dev-<platform>-<arch>.tar.gz`. Activation
+temporarily refreshes those aliases after the exact-head check solely to keep
+that released bootstrap working. New installer snapshots and native dev
+updates do not consume them. Remove the compatibility writes after a beta or
+stable release has placed the manifest-driven installer on the shared public
+endpoint; do not make aliases part of the next manifest schema.
+
+Versioned beta and stable releases publish the same four target archives and
+sidecars as GitHub Release assets and mirror them unchanged to the download
+CDN. Stable and beta manifests remain separate; immutable
+`OpenAlice-<version>-install` and
 `cli/dev/releases/<commit>/install` files are verified snapshots of the same
 root `install` source, not separate channel scripts.
 
@@ -185,48 +211,6 @@ install root, release root, provenance path, content identity, and install
 method to the native executable. They never hard-code one release path, so an
 atomic pointer change is enough for update or rollback.
 
-### Volume-backed service hosts
-
-A persistent service host must keep the native install root separate from the
-AliceProject Home even when both live on one mounted volume. The Railway SSH
-profile uses:
-
-```text
-/data/home                  fixed persistent Railway SSH HOME
-/data/home/.openalice       OPENALICE_INSTALL_DIR
-/data/projects/default      OPENALICE_HOME
-```
-
-The image fixes and exports `/data/home`, `/data/home/.openalice`,
-`/data/home/.local`, `/data/home/.bun`, and their persistent executable `PATH`.
-That image environment is intentional: a Railway SSH process must see the same
-user and installed commands as Guardian. The entrypoint starts installer
-bootstrap with system-only `PATH`, validates those fixed roots, and restores
-the persistent `PATH` only after the native CLI passes provenance and Runtime
-checks. These user/install paths are not deployment options.
-
-Only `OPENALICE_HOME` may select another AliceProject beneath `/data`.
-`AQ_LAUNCHER_ROOT` is always derived as `<OPENALICE_HOME>/workspaces`; an
-independent Workspace-root override is not honored, while an alternate
-Volume/user/install/npm/Bun root or normalized path escape is rejected.
-
-The install root owns immutable native releases, activation, provenance, and
-the five OpenAlice launchers. The AliceProject root owns user configuration,
-credentials, Workspaces, and Runtime state. Machine-level convenience links
-under `/usr/local/bin` may be rebuilt on every container boot; they are not the
-durable install or data authority. AliceProject transfer likewise excludes
-top-level `bin/`, `cli/`, and machine-local or escaping symlinks rather than
-copying installation bytes to another machine.
-
-Service bootstrap may call the shared installer with `--yes`,
-`--no-modify-path`, the fixed install root, and a stable, beta, or dev selector.
-This is service configuration authority, not a relaxation of the interactive
-user consent contract. Installation still does not start a background service
-by itself; the Railway entrypoint separately validates the active launcher and
-`exec`s foreground `openalice server run`. Agent Runtime executables and their
-user-level install roots remain outside both the OpenAlice install root and
-AliceProject transfer.
-
 ## Consent and transaction
 
 Before creating the install root, the installer prints:
@@ -298,15 +282,17 @@ change channels or trust boundaries.
 Installed provenance and the runtime profile determine which surface may
 offer an update; package semver alone is not authority:
 
-- source checkouts use Git and may show source-update guidance;
+- source checkouts launched by `pnpm dev` or Electron development identify as
+  `dev`/source before package-semver fallback, use Git for source movement, and
+  may show source-update guidance;
 - packaged Electron uses the native desktop updater;
 - installed stable and beta releases use `openalice update` as the update entry
   point; that command defers to npm, Bun, Homebrew, or AUR when provenance says
   a package manager owns the files;
 - a direct dev CLI resolves updates in the native CLI by complete artifact
   checksum and content identity, never by a Web semver comparison;
-- Railway and Docker are updated by their service/deployment owner, not by the
-  browser UI or a command run inside the service; and
+- Docker is updated by its service/deployment owner, not by the browser UI or
+  a command run inside the service; and
 - pinned, custom, or invalid provenance is non-updating until the user repairs
   it or explicitly selects another channel.
 
@@ -315,6 +301,12 @@ channel and update authority. They never expose the provenance file path.
 Service-managed, dev, pinned, and custom contexts do not fetch a release
 manifest through these routes, so the Web UI cannot invent a second update
 path beside the native CLI or deployment workflow.
+
+The root and CLI package versions still supply runtime-visible build metadata.
+After a beta or stable release is publicly accepted, copy the two synchronized
+version values back to `dev` in a focused PR. That bookkeeping keeps source
+display and consumers of `getCurrentVersion()` current; it does not select the
+source checkout's update channel or import unrelated `master` changes.
 
 The standalone launcher propagates the already-discovered `install-source.json`
 path into Guardian and Alice. This covers metadata beside the install prefix
@@ -400,7 +392,7 @@ is no permanent dual-runtime resolver. Before changing the active pointer, the
 cutover also backs up every legacy launcher; a validation failure restores the
 old launchers and removes the unconfirmed native pointer.
 
-Both `dev` alias publication and every versioned beta/stable release replay this
+Both rolling `dev` publication and every versioned beta/stable release replay this
 cutover from the published v0.90.1 installer on Linux x64. The acceptance
 fixture pins the historical Pi manifests by SHA-256 because the upstream Pi
 release assets are not part of OpenAlice's durable release surface. It then
@@ -471,6 +463,7 @@ Bounded environment seams:
 | `OPENALICE_DOWNLOAD_BASE_URL` | Default stable/beta-manifest and dev-preview artifact base |
 | `OPENALICE_STABLE_MANIFEST_URL` | Stable release discovery manifest |
 | `OPENALICE_BETA_MANIFEST_URL` | Beta release discovery manifest |
+| `OPENALICE_DEV_MANIFEST_URL` | Dev completed-candidate discovery manifest |
 | `OPENALICE_RELEASE_ASSET_BASE_URL` | Versioned release asset base for release tests/mirrors |
 | `OPENALICE_LEGACY_STABLE_INSTALLER_URL` | Test override for the pinned v0.90.1 transition installer |
 | `OPENALICE_LEGACY_STABLE_INSTALLER_SHA256` | Test override for that transition installer's pinned digest |
@@ -478,6 +471,7 @@ Bounded environment seams:
 | `OPENALICE_EXPECTED_CLI_VERSION` | Update handoff binding to one artifact version |
 | `OPENALICE_EXPECTED_CLI_ARTIFACT_SHA256` | Dev update handoff binding to one complete archive |
 | `OPENALICE_EXPECTED_CLI_CONTENT_IDENTITY` | Dev update binding to the complete payload identity |
+| `OPENALICE_EXPECTED_DEV_COMMIT` | Dev publication smoke binding to one manifest commit |
 
 Do not add source package lists, managed Agent Runtime pins, package-manager
 installation, or system dependency mutation back to these seams.
@@ -489,34 +483,35 @@ For installer changes run:
 ```bash
 bash -n install
 pnpm exec vitest run packages/cli/src/install.spec.mjs
-pnpm test:install:docker
+pnpm test:system:installer
 npx tsc --noEmit
 pnpm test
 ```
 
-For a volume-backed Railway bootstrap or managed cross-target change, also run:
+For a managed SSH or AliceProject cross-target change, also run:
 
 ```bash
-bash -n scripts/railway/*.sh
-pnpm exec vitest run \
-  scripts/railway-entrypoint.spec.ts \
-  packages/cli/src/remote.spec.mjs \
-  packages/cli/src/project-transfer.spec.ts \
-  packages/cli/src/project-transfer-ssh.spec.ts \
+pnpm test:system:remote
+pnpm exec vitest run \\
+  packages/cli/src/remote.spec.mjs \\
+  packages/cli/src/project-transfer.spec.ts \\
+  packages/cli/src/project-transfer-ssh.spec.ts \\
   packages/cli/src/project-transfer-stream.spec.ts
 ```
 
-These local checks replace neither hosted acceptance journey: a disposable
-empty-Volume bootstrap/fail-closed drill, nor a non-destructive deployment,
-AliceProject transfer, restart/redeploy, and SSH tunnel journey against the
-retained real Volume. The authoritative checklist is owned by
-[[docs/docker-deployment.md]]; run-specific progress and measurements live only
-in [[plans/bun-cli-distribution.md]].
+OpenAlice assumes the target is already reachable through ordinary SSH. These
+checks exercise installation and transfer on disposable targets; they do not
+provision a cloud service or manage an infrastructure provider.
 
 The Docker smoke uses a clean non-root Debian host with Node, npm, pnpm, Bun,
 and Agent Runtimes absent. It verifies plan, consent, native installation,
 dynamic launchers, update activation, retention, PATH, and lock cleanup. Use
-`pnpm test:install:docker -- --interactive` for the manual prompt playground.
+`pnpm test:system:installer -- --interactive` for the manual prompt playground.
+
+Use `pnpm test:system:installer:dev` only for the published dev-channel path.
+It downloads the current network installer and requires both network access and
+an activated dev candidate; it is not part of the hermetic or checkout-only
+installer gate.
 
 Before promotion also:
 
@@ -524,8 +519,8 @@ Before promotion also:
 2. install it into an isolated root and run `version --json`;
 3. update from a distinct retained release and exercise rollback;
 4. build/install on native macOS and clean Linux for each supported arch;
-5. publish the fixed dev aliases and exercise the raw `dev/install` plus
-   `--channel dev` network path;
+5. publish the immutable dev candidate, activate its exact-commit manifest,
+   and exercise the raw `dev/install` plus `--channel dev` network path;
 6. verify release assets and sidecar checksums before making any channel alias
    visible; a beta mirror must also prove the stable manifest and stable update
    feeds remained byte-for-byte unchanged. The shared installer may change only

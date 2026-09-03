@@ -4,10 +4,12 @@
  * The current version comes from package.json#version (read once at module
  * load). The latest stable or beta version comes from the matching OpenAlice
  * CDN manifest and is cached in memory with separate success/error TTLs.
- * Installed provenance, rather than package semver, selects the channel and
- * update authority. Dev discovery stays in the native CLI, pinned/custom
- * installs do not discover updates, and service-managed runtimes defer to the
- * service that deployed them.
+ * Explicit runtime identity and installed provenance, rather than package
+ * semver alone, select the channel and update authority. Source development
+ * stays on the dev channel even though package.json still supplies its display
+ * version. Dev discovery stays in the native CLI, pinned/custom installs do
+ * not discover updates, and service-managed runtimes defer to the service that
+ * deployed them.
  * GitHub Release assets remain the immutable payload source, but update
  * discovery does not depend on GitHub's anonymous API.
  */
@@ -341,6 +343,15 @@ function resolveUpdateContext(
   readTextFile: ReadTextFile,
   currentVersion: string,
 ): UpdateContext {
+  const runtimeProfile = env['OPENALICE_RUNTIME_PROFILE']?.trim()
+    || env['OPENALICE_LAUNCHER']?.trim()
+
+  // package.json remains the source runtime's display/build baseline, but it
+  // must not turn a dev checkout into the stable or beta update channel.
+  if (isSourceRuntimeProfile(runtimeProfile)) {
+    return { channel: 'dev', authority: 'source', error: null }
+  }
+
   const installedSourcePath = env['OPENALICE_INSTALL_SOURCE']?.trim()
   const installedChannel = installedSourcePath
     ? readInstalledChannel(installedSourcePath, readTextFile)
@@ -354,12 +365,6 @@ function resolveUpdateContext(
       : releaseChannelForVersion(currentVersion)
   )
 
-  if (env['OPENALICE_SERVICE_MANAGER']?.trim() === 'railway') {
-    return { channel, authority: 'service', error: provenanceError }
-  }
-
-  const runtimeProfile = env['OPENALICE_RUNTIME_PROFILE']?.trim()
-    || env['OPENALICE_LAUNCHER']?.trim()
   if (runtimeProfile === 'electron-packaged') {
     return { channel, authority: 'desktop', error: provenanceError }
   }
@@ -373,6 +378,12 @@ function resolveUpdateContext(
   }
 
   return { channel, authority: 'source', error: null }
+}
+
+function isSourceRuntimeProfile(runtimeProfile: string | undefined): boolean {
+  return runtimeProfile === 'dev'
+    || runtimeProfile === 'electron-dev'
+    || runtimeProfile === 'electron'
 }
 
 function readInstalledChannel(path: string, readTextFile: ReadTextFile): VersionChannel | null {

@@ -8,11 +8,14 @@
 import { fetchAndParseFeed } from './rss-parser.js'
 import { computeDedupKey, type NewsCollectorStore } from '../store.js'
 import type { RSSFeedConfig } from '../types.js'
+import type { NewsRecord } from '../types.js'
 
 export interface CollectorOpts {
   store: NewsCollectorStore
   feeds: RSSFeedConfig[]
   intervalMs: number
+  /** Optional product activity sink installed by the composition root. */
+  onIngested?: (record: NewsRecord) => void | Promise<void>
 }
 
 export class NewsCollector {
@@ -20,6 +23,7 @@ export class NewsCollector {
   private store: NewsCollectorStore
   private feeds: RSSFeedConfig[]
   private intervalMs: number
+  private onIngested?: (record: NewsRecord) => void | Promise<void>
   /**
    * In-flight guard: if a fetchAll is already running when the next interval
    * tick fires, share the existing promise instead of starting a second pass.
@@ -31,6 +35,7 @@ export class NewsCollector {
     this.store = opts.store
     this.feeds = opts.feeds
     this.intervalMs = opts.intervalMs
+    this.onIngested = opts.onIngested
   }
 
   /** Start periodic collection. Fetches immediately, then at interval. */
@@ -109,7 +114,7 @@ export class NewsCollector {
         content: item.content,
       })
 
-      const isNew = await this.store.ingest({
+      const record = await this.store.ingestRecord({
         title: item.title,
         content: item.content,
         pubTime: item.pubDate ?? new Date(),
@@ -124,7 +129,10 @@ export class NewsCollector {
         },
       })
 
-      if (isNew) ingested++
+      if (record) {
+        ingested++
+        await this.onIngested?.(record)
+      }
     }
 
     return { fetched: items.length, ingested }

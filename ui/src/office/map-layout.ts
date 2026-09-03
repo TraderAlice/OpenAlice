@@ -25,6 +25,7 @@ export interface OfficeMapLayout {
   rows: number
   alice: { x: number; y: number }
   pods: OfficeMapPodLayout[]
+  serviceZone: { x: number; y: number; width: number; height: number }
 }
 
 function candidateScore(count: number, columns: number): number {
@@ -40,18 +41,7 @@ function candidateScore(count: number, columns: number): number {
   return aspectPenalty + emptyPenalty
 }
 
-export function layoutOfficeMap(inputs: readonly OfficeMapLayoutInput[]): OfficeMapLayout {
-  if (inputs.length === 0) {
-    return {
-      width: 960,
-      height: 672,
-      columns: 0,
-      rows: 0,
-      alice: { x: 480, y: 336 },
-      pods: [],
-    }
-  }
-  const count = Math.max(1, inputs.length)
+function bestColumnCount(count: number): number {
   let columns = 1
   let bestScore = Number.POSITIVE_INFINITY
   for (let candidate = 1; candidate <= count; candidate += 1) {
@@ -61,6 +51,29 @@ export function layoutOfficeMap(inputs: readonly OfficeMapLayoutInput[]): Office
       bestScore = score
     }
   }
+  return columns
+}
+
+export function layoutOfficeMap(inputs: readonly OfficeMapLayoutInput[]): OfficeMapLayout {
+  if (inputs.length === 0) {
+    return {
+      width: 960,
+      height: 672,
+      columns: 0,
+      rows: 0,
+      alice: { x: 480, y: 336 },
+      pods: [],
+      serviceZone: { x: 336, y: 456, width: OFFICE_POD_WIDTH, height: OFFICE_POD_HEIGHT },
+    }
+  }
+  const workspaceColumns = bestColumnCount(inputs.length)
+  const workspaceRows = Math.ceil(inputs.length / workspaceColumns)
+  // One-row floors already have a generous lower lobby. Partial final rows
+  // already have a spare cell. Only a complete multi-row floor needs the
+  // packer to reserve a new cell for the Inbox and News service zone.
+  const needsServiceCell = workspaceRows > 1 && inputs.length % workspaceColumns === 0
+  const count = inputs.length + Number(needsServiceCell)
+  const columns = bestColumnCount(count)
   const rows = Math.ceil(count / columns)
   const contentWidth = columns * OFFICE_POD_WIDTH
     + Math.max(0, columns - 1) * OFFICE_POD_GAP
@@ -81,6 +94,22 @@ export function layoutOfficeMap(inputs: readonly OfficeMapLayoutInput[]): Office
       height: OFFICE_POD_HEIGHT,
     }
   })
+  const serviceColumn = inputs.length % columns
+  const serviceRow = Math.floor(inputs.length / columns)
+  const packedServiceZone = {
+    x: originX + serviceColumn * (OFFICE_POD_WIDTH + OFFICE_POD_GAP),
+    y: originY + serviceRow * (OFFICE_POD_HEIGHT + OFFICE_POD_GAP),
+    width: OFFICE_POD_WIDTH,
+    height: OFFICE_POD_HEIGHT,
+  }
+  const serviceZone = rows <= 1
+    ? {
+        x: Math.round((width - OFFICE_POD_WIDTH) / (2 * OFFICE_MAP_TILE)) * OFFICE_MAP_TILE,
+        y: height - OFFICE_POD_HEIGHT,
+        width: OFFICE_POD_WIDTH,
+        height: OFFICE_POD_HEIGHT,
+      }
+    : packedServiceZone
   const aliceX = columns > 1
     ? originX + Math.floor(columns / 2) * (OFFICE_POD_WIDTH + OFFICE_POD_GAP) - OFFICE_POD_GAP / 2
     : originX + OFFICE_POD_WIDTH + OFFICE_POD_GAP / 2
@@ -98,5 +127,6 @@ export function layoutOfficeMap(inputs: readonly OfficeMapLayoutInput[]): Office
       y: Math.round(aliceY / OFFICE_MAP_TILE) * OFFICE_MAP_TILE,
     },
     pods,
+    serviceZone,
   }
 }

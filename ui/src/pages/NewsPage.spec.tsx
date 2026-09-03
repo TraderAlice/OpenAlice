@@ -173,7 +173,7 @@ describe('NewsPage article disclosures', () => {
     const source = compact?.querySelector('span.font-semibold')
     expect(source?.textContent).toBe('SeekingAlpha')
     expect(source?.className).not.toContain('bg-primary')
-    expect(screen.getByText('markets · us').className).toContain('hidden')
+    expect(screen.getByText('markets, us').className).toContain('hidden')
   })
 
   it('groups several calendar days without disturbing newest-first order', async () => {

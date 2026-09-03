@@ -62,7 +62,14 @@ export function UrlAdopter() {
         <Route path="/automation" element={<Navigate to="/automation/runs" replace />} />
         <Route path="/automation/runtime" element={<Navigate to="/office" replace />} />
         <Route path="/automation/:section" element={<AdoptAutomation />} />
-        <Route path="/office" element={<AdoptStatic spec={{ kind: 'office', params: {} }} />} />
+        <Route
+          path="/office/return"
+          element={<OfficeReturnCheckpoint />}
+        />
+        <Route
+          path="/office"
+          element={<AdoptStatic key="office-floor" spec={{ kind: 'office', params: {} }} />}
+        />
         <Route path="/news" element={<Navigate to="/market/news" replace />} />
         <Route path="/market" element={<AdoptTraderStatic spec={{ kind: 'market-list', params: {} }} />} />
         <Route path="/market/rotation" element={<AdoptTraderStatic spec={{ kind: 'market-rotation', params: {} }} />} />
@@ -91,10 +98,12 @@ export function UrlAdopter() {
         <Route path="/settings/news-collector" element={<AdoptTraderSettings category="news-collector" />} />
         <Route path="/settings/connectors" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'connectors' } }} />} />
         <Route path="/settings/beta" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'beta' } }} />} />
+        <Route path="/settings/developer" element={<AdoptStatic spec={{ kind: 'dev', params: { tab: 'tools' } }} />} />
+        <Route path="/settings/developer/:tab" element={<AdoptDev />} />
         <Route path="/settings/uta/:id" element={<TraderOnly fallback="/settings"><AdoptUtaDetail /></TraderOnly>} />
 
-        {/* Dev */}
-        <Route path="/dev" element={<Navigate to="/dev/tools" replace />} />
+        {/* Legacy standalone Dev Panel routes now live inside Settings. */}
+        <Route path="/dev" element={<AdoptStatic spec={{ kind: 'dev', params: { tab: 'tools' } }} />} />
         <Route path="/dev/:tab" element={<AdoptDev />} />
 
         {/* Legacy /notifications (retired NotificationsStore inbox) →
@@ -121,9 +130,9 @@ export function UrlAdopter() {
         <Route path="/workspaces/:wsId/s/:sessionId" element={<AdoptWorkspace />} />
 
         {/* Legacy redirects */}
-        <Route path="/logs" element={<Navigate to="/dev/logs" replace />} />
-        <Route path="/events" element={<Navigate to="/dev/logs" replace />} />
-        <Route path="/agent-status" element={<Navigate to="/dev/logs" replace />} />
+        <Route path="/logs" element={<AdoptStatic spec={{ kind: 'dev', params: { tab: 'logs' } }} />} />
+        <Route path="/events" element={<AdoptStatic spec={{ kind: 'dev', params: { tab: 'logs' } }} />} />
+        <Route path="/agent-status" element={<AdoptStatic spec={{ kind: 'dev', params: { tab: 'logs' } }} />} />
         {/* Schedules were absorbed into the Issue board — scheduled issues now
             live there (carrying a cadence pill). */}
         <Route path="/scheduler" element={<Navigate to="/issues" replace />} />
@@ -143,6 +152,14 @@ export function UrlAdopter() {
       <UrlSync />
     </>
   )
+}
+
+/**
+ * Passive Router location used only while an Office-launched surface owns the
+ * focused tab. Browser Back lands on the normal /office adopter behind it.
+ */
+function OfficeReturnCheckpoint() {
+  return null
 }
 
 /**
@@ -261,7 +278,9 @@ function AdoptUtaDetail() {
 
 function AdoptDev() {
   const { tab } = useParams<{ tab: string }>()
-  if (!tab || !isDevTab(tab)) return <Navigate to="/dev/tools" replace />
+  if (!tab || !isDevTab(tab)) {
+    return <AdoptStatic spec={{ kind: 'dev', params: { tab: 'tools' } }} />
+  }
   return (
     <AdoptStatic
       spec={{
@@ -436,7 +455,7 @@ function AdoptTrackedFileViewer() {
 
 function AdoptDesignProject() {
   const { project } = useParams<{ project: string }>()
-  if (!project) return <Navigate to="/dev/tools" replace />
+  if (!project) return <Navigate to="/settings/developer/tools" replace />
   return <AdoptStatic spec={{ kind: 'design-project', params: { project } }} />
 }
 
@@ -496,8 +515,8 @@ function specToSection(spec: ViewSpec): ActivitySection {
     case 'market-detail':      return 'market'
     case 'settings':
     case 'onboarding':         return 'settings'
-    case 'design-project':     return 'dev'
-    case 'dev':                return 'dev'
+    case 'design-project':
+    case 'dev':                return 'settings'
   }
 }
 

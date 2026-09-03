@@ -18,7 +18,8 @@ import {
 import { PageHeader } from '../components/PageHeader'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Skeleton } from '../components/StateViews'
+import { EmptyState as SharedEmptyState, Skeleton } from '../components/StateViews'
+import { Button } from '../components/ui/button'
 import { MarkdownContent } from '../components/MarkdownContent'
 import { FileContentView } from '../components/FileContentView'
 import { InboxReplyThread } from '../components/InboxReplyThread'
@@ -32,6 +33,12 @@ import { useWorkspaces } from '../contexts/workspaces-context'
 import { readWorkspaceFile, type ReadFileResult } from '../components/workspace/api'
 import { workspaceDisplayName, workspaceDisplayTitle } from '../components/workspace/display'
 import { presentInboxEntry } from '../lib/inbox-presentation'
+import {
+  isActiveOfficeInboxDutyReviewTarget,
+  readOfficeInboxDutyExcursion,
+} from '../office/inbox-duty-excursion'
+import { OfficeInboxDutyReturnBar } from '../office/OfficeInboxDutyReturnBar'
+import { useOfficeInboxDutyReturn } from '../office/useOfficeInboxDutyReturn'
 import type { InboxEntry, InboxDoc } from '../api/inbox'
 
 interface InboxPageProps {
@@ -51,8 +58,9 @@ interface InboxPageProps {
  * background or open the same Session interactively.
  *
  * Selection (an entryId) is owned by `useInboxSelection`; the sidebar
- * drives it and marks the entry read on select. Confirmed Delete (header
- * trash + page-level Delete/Backspace) advances selection to the next entry.
+ * drives it and ordinarily marks the entry read on select. An active Office
+ * review target remains unread for dossier disposition. Confirmed Delete
+ * (header trash + page-level Delete/Backspace) advances to the next entry.
  */
 export function InboxPage({ visible }: InboxPageProps) {
   const { t } = useTranslation()
@@ -63,9 +71,22 @@ export function InboxPage({ visible }: InboxPageProps) {
   const markRead = useInboxRead((s) => s.markRead)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const returnToOffice = useOfficeInboxDutyReturn()
 
-  const selected = entries.find((e) => e.id === selectedId) ?? null
+  const capturedOfficeEntry = readOfficeInboxDutyExcursion()?.duty.delivery.entry ?? null
+  const capturedOfficeEntryId = capturedOfficeEntry?.id ?? null
+  const selectedFromLive = entries.find((e) => e.id === selectedId) ?? null
+  const selected = selectedFromLive
+    ?? (capturedOfficeEntry?.id === selectedId ? capturedOfficeEntry : null)
   const pendingDelete = entries.find((e) => e.id === pendingDeleteId) ?? null
+
+  // Selection is normally disposable UI state. An Office field trip is the
+  // exception: after reload, restore its exact captured delivery before an
+  // ordinary Inbox default can sever the route and select a newer row.
+  useEffect(() => {
+    if (!visible || selectedId !== null || !capturedOfficeEntryId) return
+    select(capturedOfficeEntryId)
+  }, [capturedOfficeEntryId, select, selectedId, visible])
 
   /** Hard-delete an entry. The durable DELETE must succeed before the UI
    *  removes anything: a failed destructive action should keep both the
@@ -78,7 +99,7 @@ export function InboxPage({ visible }: InboxPageProps) {
 
     // entries is newest-first; the "next" one is the next older entry.
     // Fall back to the previous (newer) if we deleted the tail.
-    const nextId = entries[idx + 1]?.id ?? entries[idx - 1]?.id ?? null
+    const nextEntry = entries[idx + 1] ?? entries[idx - 1] ?? null
 
     try {
       await api.inbox.delete(id)
@@ -89,9 +110,14 @@ export function InboxPage({ visible }: InboxPageProps) {
     }
 
     removeInboxAfterDelete(id)
-    if (nextId) {
-      select(nextId)
-      markRead(nextId)
+    if (nextEntry) {
+      select(nextEntry.id)
+      if (!isActiveOfficeInboxDutyReviewTarget({
+        workspaceId: nextEntry.workspaceId,
+        inboxEntryId: nextEntry.id,
+      })) {
+        markRead(nextEntry.id)
+      }
     } else {
       select(null)
     }
@@ -111,6 +137,7 @@ export function InboxPage({ visible }: InboxPageProps) {
   useEffect(() => {
     if (!visible) return
     if (!selectedId) return
+    if (!entries.some((entry) => entry.id === selectedId)) return
     function onKey(e: KeyboardEvent) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
       if (e.metaKey || e.ctrlKey || e.altKey) return
@@ -120,20 +147,42 @@ export function InboxPage({ visible }: InboxPageProps) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [visible, selectedId, requestDelete])
+  }, [entries, visible, selectedId, requestDelete])
 
   return (
     <>
       <div className="flex flex-col flex-1 min-h-0">
-        <PageHeader
-          title={t('nav.item.inbox')}
-          description={t('inbox.pageDescription', { count: entries.length })}
-        />
+        {selected ? (
+          <OfficeInboxDutyReturnBar
+            surface={{
+              kind: 'inbox',
+              visible,
+              workspaceId: selected.workspaceId,
+              inboxEntryId: selected.id,
+            }}
+            onReturn={returnToOffice}
+            fallback={(
+              <PageHeader
+                title={t('nav.item.inbox')}
+                description={t('inbox.pageDescription', { count: entries.length })}
+              />
+            )}
+          />
+        ) : (
+          <PageHeader
+            title={t('nav.item.inbox')}
+            description={t('inbox.pageDescription', { count: entries.length })}
+          />
+        )}
         <div className="flex-1 overflow-y-auto min-h-0">
-          {loading && entries.length === 0 ? (
+          {loading && entries.length === 0 && !selected ? (
             <InboxLoadingSkeleton />
-          ) : entries.length === 0 ? (
-            <EmptyState />
+          ) : entries.length === 0 && !selected ? (
+            <SharedEmptyState
+              icon={<MessageSquare aria-hidden />}
+              title={t('inbox.noMessages')}
+              description={t('inbox.emptyHint')}
+            />
           ) : !selected ? (
             <div className="px-6 py-8 text-muted-foreground text-sm">
               {t('inbox.selectFromSidebar')}
@@ -142,7 +191,7 @@ export function InboxPage({ visible }: InboxPageProps) {
             <Detail
               key={selected.id}
               entry={selected}
-              onDelete={() => requestDelete(selected.id)}
+              onDelete={selectedFromLive ? () => requestDelete(selected.id) : undefined}
             />
           )}
         </div>
@@ -197,25 +246,9 @@ function InboxLoadingSkeleton() {
   )
 }
 
-function EmptyState() {
-  const { t } = useTranslation()
-  return (
-    <div className="px-6 py-16 text-center max-w-[520px] mx-auto">
-      <div className="text-[15px] text-foreground mb-2">{t('inbox.noMessages')}</div>
-      <p className="text-[13px] text-muted-foreground leading-relaxed">
-        Workspaces push updates here as they work — finished analysis,
-        blocked tasks, questions back to you. An agent surfaces one by
-        calling the
-        <code className="mx-1 px-1 py-0.5 rounded bg-muted text-[11px]">inbox_push</code>
-        tool from inside its workspace. Nothing to read yet.
-      </p>
-    </div>
-  )
-}
-
 // ==================== Detail (single push) ====================
 
-function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }) {
+function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete?: () => void }) {
   const { t } = useTranslation()
   const hasDocs = (entry.docs?.length ?? 0) > 0
   const hasComments = (entry.comments ?? '').trim().length > 0
@@ -242,7 +275,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
   const origin = entry.origin
   const issueId = origin?.issueId
   const senderSignature = origin?.resumeId ? `@${origin.resumeId}` : null
-  const senderLabel = [origin?.agent, senderSignature].filter(Boolean).join(' · ') || null
+  const senderLabel = [origin?.agent, senderSignature].filter(Boolean).join(' — ') || null
   const senderDisplay = origin?.agent ?? (senderSignature ? t('inbox.senderSession') : null)
   // Interactive provenance — the human-attended session this push came from
   // (server-stamped from AQ_SESSION_ID, validated against the session registry).
@@ -347,7 +380,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
             <h1 className="text-pretty break-words text-[1.35rem] font-semibold leading-snug tracking-[-0.02em] text-foreground md:text-[1.5rem]">
               {documentTitle}
             </h1>
-            <div className="mt-2.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground">
+            <div className="mt-2.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[12px] leading-[18px] text-muted-foreground">
               <span
                 className={wsAlive ? 'min-w-0 break-words' : 'min-w-0 break-words text-muted-foreground/70 line-through'}
                 title={wsAlive ? displayTitle : t('inbox.workspaceNotExists')}
@@ -355,15 +388,14 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
                 {displayLabel}
               </span>
               {senderLabel && senderDisplay && (
-                <span className="inline-flex min-w-0 items-center">
-                  <span className="mr-2 text-muted-foreground/35" aria-hidden>·</span>
+                <span className="inline-flex min-w-0 items-center border-l border-border/70 pl-2">
                   <Popover open={senderPopoverOpen} onOpenChange={setSenderPopoverOpen}>
                     <PopoverTrigger
                       render={<button
                         ref={senderTriggerRef}
                         type="button"
                         aria-label={t('inbox.showSenderDetails', { sender: senderDisplay })}
-                        className="inline-flex min-h-10 min-w-0 items-center gap-1.5 rounded-sm text-[12px] text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 sm:min-h-0"
+                        className="inline-flex min-h-10 min-w-0 items-center gap-1.5 rounded-sm text-[12px] leading-[18px] text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 sm:min-h-8"
                       />}
                     >
                         {origin?.kind === 'interactive'
@@ -381,7 +413,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
                       finalFocus={senderTriggerRef}
                       className="z-30 w-72 max-w-[calc(100vw-3rem)] gap-0 rounded-xl border border-border/70 bg-secondary p-3 text-left shadow-lg ring-0"
                     >
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">
+                      <p className="text-[11px] font-medium text-muted-foreground/70">
                         {t('inbox.senderSession')}
                       </p>
                       {origin?.agent && (
@@ -393,53 +425,56 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
                         </p>
                       )}
                       {wsAlive && (
-                        <button
+                        <Button
                           type="button"
+                          size="lg"
                           onClick={() => void continueOrigin()}
                           disabled={continuing}
-                          className="oa-pressable mt-3 min-h-10 w-full rounded-lg bg-primary px-3 py-2 text-[11px] font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-wait disabled:opacity-50"
+                          className="mt-3 min-h-10 w-full text-[11px] disabled:cursor-wait"
                         >
                           {continuing
                             ? t('inbox.continuingSession')
                             : canContinueOrigin
                               ? t('inbox.openConversation')
                               : t('inbox.openWorkspace')}
-                        </button>
+                        </Button>
                       )}
                     </PopoverContent>
                   </Popover>
                 </span>
               )}
               {issueId && (
-                <span className="inline-flex min-w-0 items-center">
-                  <span className="mr-2 text-muted-foreground/35" aria-hidden>·</span>
-                  <button
+                <span className="inline-flex min-w-0 items-center border-l border-border/70 pl-2">
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={openIssue}
                     title={t('inbox.fromIssueTitle', { issue: issueId })}
-                    className="oa-pressable inline-flex min-h-10 min-w-0 items-center gap-1 rounded-sm py-1 text-left text-[12px] text-muted-foreground hover:text-primary sm:min-h-0 sm:py-0"
+                    className="min-h-10 min-w-0 justify-start px-0 text-left text-[12px] text-muted-foreground hover:bg-transparent hover:text-foreground sm:min-h-8"
                   >
                     <ListChecks size={12} strokeWidth={1.75} className="shrink-0" />
                     <span className="min-w-0 break-words sm:max-w-[220px] sm:truncate">
                       {t('inbox.fromIssue', { issue: issueTitle ?? issueId })}
                     </span>
-                  </button>
+                  </Button>
                 </span>
               )}
             </div>
-            <div className="mt-1.5 text-[11px] tabular-nums text-muted-foreground/55">
-              {formatAbsolute(entry.ts)}
-              <span className="mx-1.5 text-muted-foreground/30">·</span>
-              {relativeTime}
+            <div className="mt-1.5 flex flex-wrap gap-x-2 text-[11px] leading-[15px] tabular-nums text-muted-foreground/55">
+              <span>{formatAbsolute(entry.ts)}</span>
+              <span>{relativeTime}</span>
             </div>
           </div>
           <div className="-mr-1 flex shrink-0 items-center gap-1">
             {wsAlive && !senderLabel && (
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => void continueOrigin()}
                 disabled={continuing}
-                className="oa-pressable inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-border bg-background px-2 text-[11px] font-medium text-muted-foreground hover:border-primary/35 hover:text-primary disabled:cursor-not-allowed disabled:opacity-45 sm:h-8 sm:px-2.5"
+                className="h-10 px-2 text-[11px] text-muted-foreground sm:h-8 sm:px-2.5"
                 title={canContinueOrigin ? t('inbox.openConversation') : t('inbox.openWorkspace')}
                 aria-label={canContinueOrigin ? t('inbox.openConversation') : t('inbox.openWorkspace')}
               >
@@ -456,21 +491,25 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
                 <span className="sm:hidden">
                   {canContinueOrigin ? t('inbox.openConversationShort') : t('inbox.openWorkspaceShort')}
                 </span>
-              </button>
+              </Button>
             )}
-            <button
-              type="button"
-              onClick={onDelete}
-              className="oa-pressable inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground/55 hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive sm:h-8 sm:w-8 sm:border-transparent sm:bg-transparent"
-              title={t('inbox.deleteEntryTitle')}
-              aria-label={t('inbox.deleteEntryAriaLabel')}
-            >
-              <Trash2 size={14} strokeWidth={1.75} />
-            </button>
+            {onDelete && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={onDelete}
+                className="h-10 w-10 shrink-0 text-muted-foreground/55 hover:bg-destructive/10 hover:text-destructive sm:h-8 sm:w-8"
+                title={t('inbox.deleteEntryTitle')}
+                aria-label={t('inbox.deleteEntryAriaLabel')}
+              >
+                <Trash2 size={14} strokeWidth={1.75} />
+              </Button>
+            )}
           </div>
         </div>
       </header>
-      {continueError && <div className="-mt-4 mb-6 text-[12px] text-destructive">{continueError}</div>}
+      {continueError && <div className="-mt-4 mb-6 text-[12px] leading-[18px] text-destructive">{continueError}</div>}
 
       {hasComments && (
         <div className="min-w-0">
@@ -491,7 +530,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
         >
           <h2
             id={`inbox-attachments-${entry.id}`}
-            className="mb-3 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground/60"
+            className="mb-3 flex items-center gap-2 text-[12px] leading-[18px] font-medium text-muted-foreground/70"
           >
             <Paperclip size={12} aria-hidden />
             {t('inbox.documentsSection')}
@@ -594,7 +633,7 @@ export function InboxAttachment({
 
   return (
     <div
-      className={`group overflow-hidden rounded-xl border bg-background/55 transition-colors ${expanded ? 'border-primary/25' : 'border-border hover:border-muted-foreground/35'}`}
+      className={`group overflow-hidden rounded-lg border bg-background/55 ${expanded ? 'border-primary/25' : 'border-border hover:border-muted-foreground/35'}`}
       title={doc.revision ? t('inbox.docRevisionTitle', { revision: doc.revision }) : undefined}
     >
       <div className="flex min-w-0 items-center gap-1">
@@ -605,55 +644,59 @@ export function InboxAttachment({
           aria-label={t(expanded ? 'inbox.docCollapseAria' : 'inbox.docExpandAria', { name })}
           className="oa-pressable flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left"
         >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted/70 text-muted-foreground/70">
+          <span className="flex h-8 w-6 shrink-0 items-center justify-center text-muted-foreground/70">
             {isHtml
               ? <FileCode2 size={15} strokeWidth={1.75} aria-hidden />
               : <FileText size={15} strokeWidth={1.75} aria-hidden />}
           </span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[12px] font-medium text-foreground/90">{name}</span>
-            <span className="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground/50">
+            <span className="mt-0.5 block truncate font-mono text-[10px] leading-[14px] text-muted-foreground/50">
               {directory || t('inbox.workspaceRoot')}
             </span>
           </span>
-          <span className="hidden shrink-0 items-center gap-1.5 text-[10px] text-muted-foreground/50 sm:flex">
+          <span className="hidden shrink-0 items-center gap-1.5 text-[10px] leading-[14px] text-muted-foreground/50 sm:flex">
             <span>{fileKind}</span>
-            {size && <><span className="text-muted-foreground/25">·</span><span>{size}</span></>}
+            {size && <span>{size}</span>}
           </span>
           <ChevronDown
             size={14}
             strokeWidth={1.75}
             aria-hidden
-            className={`shrink-0 text-muted-foreground/50 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+            className={`shrink-0 text-muted-foreground/50 transition-transform duration-[var(--motion-fast)] motion-reduce:transition-none ${expanded ? 'rotate-180' : ''}`}
           />
         </button>
         {isMarkdownPath(doc.path) && (
           <div className="flex shrink-0 items-center gap-0.5 border-l border-border/60 px-1 sm:px-2">
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={copyMarkdown}
               disabled={!markdownActionsAvailable}
               title={copied ? t('inbox.docCopiedMarkdown') : t('inbox.docCopyMarkdown')}
               aria-label={copied ? t('inbox.docCopiedMarkdown') : t('inbox.docCopyMarkdown')}
-              className="oa-pressable inline-flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground/55 hover:bg-muted hover:text-primary disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground/55 sm:h-7 sm:w-7"
+              className="h-10 w-10 text-muted-foreground/55 hover:text-foreground disabled:cursor-default disabled:opacity-30 sm:h-7 sm:w-7"
             >
               {copied ? <Check size={14} strokeWidth={2} /> : <Copy size={14} strokeWidth={1.75} />}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={downloadMarkdown}
               disabled={!markdownActionsAvailable}
               title={t('inbox.docDownloadMarkdown')}
               aria-label={t('inbox.docDownloadMarkdown')}
-              className="oa-pressable inline-flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground/55 hover:bg-muted hover:text-primary disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground/55 sm:h-7 sm:w-7"
+              className="h-10 w-10 text-muted-foreground/55 hover:text-foreground disabled:cursor-default disabled:opacity-30 sm:h-7 sm:w-7"
             >
               <Download size={14} strokeWidth={1.75} />
-            </button>
+            </Button>
           </div>
         )}
       </div>
       {expanded && (
-        <div className="oa-disclosure-enter border-t border-border/60 bg-background px-3 py-3 sm:px-4">
+        <div className="border-t border-border/60 bg-background px-3 py-3 sm:px-4">
           {result === null ? (
             <div className="py-3 text-center text-[12px] text-muted-foreground">{t('common.loading')}</div>
           ) : (

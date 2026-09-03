@@ -29,26 +29,34 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
+- [[plans/tui-experience.md]] — Rebuilds the Shell Supervisor as a polished,
+  mouse-capable terminal control surface using Oh My Pi as the interaction and
+  finish benchmark while preserving the Node CLI and Runtime ownership
+  boundary. Work remains on `codex/tui-usability` for integrated acceptance
+  before any `dev` PR.
 - [[plans/bun-cli-distribution.md]] — Replaces the expanded Node headless
   Runtime with a Bun-compiled, multi-process CLI distribution. Direct,
   npm/Bun, Homebrew, and AUR channels consume one accepted artifact set. The
   CLI package owns OpenAlice only: Agent Runtime installation and Electron
   packaging stay outside this plan. The native CLI is public through the
-  separately dispatched `v0.91.0-beta.2`; stable/beta discovery now uses the
-  OpenAlice CDN manifests. The retained no-domain Railway profile has passed
-  real migration, OpenCode resume, normal restart, hard-kill recovery, and a
-  non-destructive dev-to-pinned-beta2 replacement; disposable empty-Volume and
-  failure-fallback journeys, native PowerShell, and external package-manager
-  activation remain open on focused branches from current `dev`.
+  separately dispatched `v0.91.0-beta.3`; stable/beta discovery now uses the
+  OpenAlice CDN manifests. Managed SSH installation and Project transfer pass
+  the disposable Docker target; beta3 core Runtime/PTY state survives a long
+  tunnel outage, and the following `dev` increment refreshes Settings identity
+  after recovery. Native PowerShell and external package-manager activation
+  remain open on focused branches from current `dev`. Routine dev
+  and exact-beta source feedback is reduced to local-first, lightweight
+  hosted lanes while `master` promotion, stable, and final artifact acceptance
+  retain the complete gates.
 - [[plans/remote-project-fleet.md]] — Adds a machine-aware Supervisor fleet,
   remote AliceProject inventory/connection, and safe local-to-SSH project
   transfer for portable configuration and Workspaces while deliberately
-  excluding native/OpenAlice Session continuation state. The current
-  beta-blocking increment makes the attached browser truthful about remote
+  excluding native/OpenAlice Session continuation state. The completed
+  remote-readiness increment makes the attached browser truthful about remote
   identity, Agent and Broker Pack capability, scheduled-work blockers,
   reconnect recovery, and public Session titles. Controller/remote release
-  negotiation and a consented Railway redeploy adapter remain a separate
-  authority increment without background polling or SSH-owned installation.
+  negotiation remains a separate SSH-managed increment without background
+  polling or infrastructure-provider ownership.
 - [[plans/auto-prediction-harness.md]] — Auto Prediction Beta conversation
   Harness is in `dev`; managed AP/AQ Studio supervision, opaque routing, and
   embedded product surfaces are implemented. Shared verified/unverified source
@@ -56,10 +64,10 @@ the durable truth after it changes. Git history is the archive.
 - [[plans/antigravity-adapter.md]] — Antigravity (`agy`) CliAdapter.
   PATH `agy` only; never spawn `antigravity` / `gemini`.
   Serial PR from `feat/agy-adapter`; do not merge until Ame says so.
-- [[plans/agent-runtime-log.md]] — Append-only agent runtime lifecycle log
-  (`session.born` / started / stopped / rejected / headless turn assets).
-  Occupancy + Office timeline + headless text/tool/completion are in;
-  the floor canvas lives in [[plans/office-floor.md]].
+- [[plans/product-activity-journal.md]] — Standard append-only product activity
+  journal consumed by Office and Sonner. Agent runtime facts are live; Inbox
+  and per-item News facts are the current increment. It remains a projection,
+  never a dispatch bus.
 - [[plans/office-floor.md]] — Office overworld rebuild: one continuous 4:3
   top-down tilemap; Harness=functional neighborhood, Workspace=furniture pod,
   `resumeId`=employee. Scene graph, top-down placeholders, game chrome, camera,

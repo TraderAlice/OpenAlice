@@ -12,7 +12,6 @@
 
 import { Hono } from 'hono'
 import { serve } from '@hono/node-server'
-import { adoptRailwayRuntimeFence } from '@traderalice/guardian-runtime'
 import { loadConfig, readUTAsConfig, purgeEphemeralUTAs, type UTAConfig } from '@/core/config.js'
 import { parseDuration } from '@/core/duration.js'
 import { createEventLog } from '@/core/event-log.js'
@@ -38,17 +37,8 @@ import type { UTAEngineContext } from './types.js'
 
 const UTA_PORT = Number(process.env['OPENALICE_UTA_PORT'] ?? 47333)
 const CATALOG_REFRESH_MS = 6 * 60 * 60 * 1000  // 6h
-const RAILWAY_RUNTIME_REQUIRED = Boolean(
-  process.env['OPENALICE_RAILWAY_FENCE_FD']
-  || process.env['OPENALICE_RAILWAY_ENTRYPOINT_OWNER']
-  || process.env['OPENALICE_SERVICE_MANAGER']?.trim() === 'railway',
-)
-const RUNTIME_LOCK_OWNER_AUTHORITY = adoptRailwayRuntimeFence(process.env)
 
 export async function startUTAService(): Promise<void> {
-  if (RAILWAY_RUNTIME_REQUIRED && RUNTIME_LOCK_OWNER_AUTHORITY !== 'railway-fenced-handoff') {
-    throw new Error('invalid or missing inherited Railway lifecycle fence; refusing to start UTA')
-  }
   const startedAt = new Date().toISOString()
   console.log(`[uta] bootstrap @ ${startedAt}`)
 
@@ -63,7 +53,7 @@ export async function startUTAService(): Promise<void> {
     console.log(`[uta] outbound proxy detected (${outboundProxy.replace(/\/\/[^@/]*@/, '//***@')}) — bridging into CCXT exchanges`)
   }
 
-  const config = await loadConfig({ ownerAuthority: RUNTIME_LOCK_OWNER_AUTHORITY })
+  const config = await loadConfig()
 
   // ==================== Trading-only dependencies ====================
   // UTA needs eventLog (UTAManager journaling) + toolCenter (CCXT tool

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api } from '../api'
-import type { VersionInfo } from '../api/types'
+import { useVersionInfo } from '../hooks/useVersionInfo'
 
 const SKIP_STORAGE_KEY = 'openalice.update.skipVersion'
 type RuntimeMode = 'browser' | 'electron-dev' | 'electron-packaged'
@@ -21,12 +20,12 @@ type RuntimeMode = 'browser' | 'electron-dev' | 'electron-packaged'
  * native updater. Service-managed and non-updating installs do not render.
  */
 export function UpdateBanner() {
-  const [info, setInfo] = useState<VersionInfo | null>(null)
+  const { info } = useVersionInfo()
   const [runtimeMode, setRuntimeMode] = useState<RuntimeMode>('browser')
   const [sessionDismissed, setSessionDismissed] = useState(false)
+  const [sessionSkippedVersion, setSessionSkippedVersion] = useState<string | null>(null)
 
   useEffect(() => {
-    api.version.get().then(setInfo).catch(() => {})
     window.openAlice?.runtime.info()
       .then((runtime) => setRuntimeMode(runtime.mode))
       .catch(() => setRuntimeMode('browser'))
@@ -43,11 +42,11 @@ export function UpdateBanner() {
   const skippedVersion = (() => {
     try { return localStorage.getItem(SKIP_STORAGE_KEY) } catch { return null }
   })()
-  if (skippedVersion === info.latest) return null
+  if (skippedVersion === info.latest || sessionSkippedVersion === info.latest) return null
 
   const handleSkip = () => {
     try { localStorage.setItem(SKIP_STORAGE_KEY, info.latest!) } catch { /* ignore */ }
-    setSessionDismissed(true)
+    setSessionSkippedVersion(info.latest)
   }
   const handleDismiss = () => {
     setSessionDismissed(true)

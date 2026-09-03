@@ -4,6 +4,14 @@
 @import "./theme/palette.css";
 @import "./theme/style-profiles.css";
 
+@font-face {
+  font-family: "Instrument Sans Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 700;
+  src: url("./assets/fonts/instrument-sans-latin-wght-normal.woff2") format("woff2-variations");
+}
+
 /* Tailwind aliases for the semantic color card. The core names intentionally
    mirror Orca/shadcn; this does not import or require the shadcn component
    library. `inline` keeps utilities connected to the active runtime palette. */
@@ -67,19 +75,29 @@
   --color-office-label: var(--office-label);
   --color-office-label-foreground: var(--office-label-foreground);
 
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+  --font-sans: "Instrument Sans Variable", "PingFang SC",
     "Microsoft YaHei", "Hiragino Sans GB", "Noto Sans CJK SC", sans-serif;
   --font-mono: "SF Mono", "Fira Code", "Cascadia Code", Menlo, Consolas,
     monospace;
+
+  /* Compact workbench geometry. Composer and drawer silhouettes keep their
+     dedicated larger radii at the component boundary. */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-2xl: 12px;
+  --radius-3xl: 16px;
 }
 
 /* Base resolution (no attribute / explicit light). */
 :root {
-  --motion-fast: 120ms;
-  --motion-standard: 180ms;
-  --motion-slow: 260ms;
+  --motion-fast: 110ms;
+  --motion-standard: 160ms;
+  --motion-slow: 250ms;
   --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --motion-ease-drawer: var(--motion-ease-out);
 }
 
 /* Japanese gets a JP-first sans stack so shared Han characters render in
@@ -87,7 +105,7 @@
    would pick (Han unification). Scoped via <html lang="ja">, which the locale
    store keeps in sync. */
 :root:lang(ja) {
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI",
+  --font-sans: "Instrument Sans Variable",
     "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", "YuGothic",
     "Meiryo", "Noto Sans JP", sans-serif;
 }
@@ -97,7 +115,7 @@
    the default stack would pick. Scoped via <html lang="zh-Hant"> — region-
    neutral (serves both Taiwan and Hong Kong Traditional readers). */
 :root:lang(zh-Hant) {
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI",
+  --font-sans: "Instrument Sans Variable",
     "PingFang TC", "Microsoft JhengHei", "Noto Sans TC",
     "Noto Sans CJK TC", sans-serif;
 }
@@ -112,7 +130,9 @@ body {
   background: var(--app-background-wash), var(--background);
   color: var(--foreground);
   overflow: hidden;
-  transition: background-color 0.4s ease, color 0.4s ease;
+  transition:
+    background-color var(--motion-slow) var(--motion-ease-out),
+    color var(--motion-slow) var(--motion-ease-out);
 }
 
 ::selection {
@@ -130,17 +150,40 @@ body {
   cursor: pointer;
 }
 
+:root:not([data-ui-style="win98"]) select.oa-field-control {
+  appearance: none;
+  padding-right: 2rem;
+  background-image:
+    linear-gradient(45deg, transparent 46%, var(--muted-foreground) 46% 54%, transparent 54%),
+    linear-gradient(-45deg, transparent 46%, var(--muted-foreground) 46% 54%, transparent 54%);
+  background-position:
+    calc(100% - 0.8125rem) 50%,
+    calc(100% - 0.5625rem) 50%;
+  background-repeat: no-repeat;
+  background-size: 0.375rem 0.375rem;
+}
+
+@media (forced-colors: active) {
+  :root:not([data-ui-style="win98"]) select.oa-field-control {
+    appearance: auto;
+    background-image: none;
+  }
+}
+
 :where(button:disabled, [role="button"][aria-disabled="true"]) {
   cursor: default;
 }
 
+[data-slot="resizable-handle"] {
+  cursor: col-resize;
+}
+
 .oa-pressable {
   transition:
-    transform var(--motion-fast) var(--motion-ease-standard),
-    border-color var(--motion-standard) var(--motion-ease-standard),
-    background-color var(--motion-standard) var(--motion-ease-standard),
-    color var(--motion-standard) var(--motion-ease-standard),
-    box-shadow var(--motion-standard) var(--motion-ease-standard);
+    transform var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out),
+    background-color var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out);
 }
 
 .oa-icon-action,
@@ -156,9 +199,8 @@ body {
 .oa-nav-item,
 .oa-nav-row {
   transition:
-    transform var(--motion-fast) var(--motion-ease-out),
-    color var(--motion-standard) var(--motion-ease-standard),
-    background-color var(--motion-standard) var(--motion-ease-standard);
+    color var(--motion-fast) var(--motion-ease-out),
+    background-color var(--motion-fast) var(--motion-ease-out);
 }
 
 .oa-status-surface {
@@ -168,35 +210,157 @@ body {
     box-shadow var(--motion-slow) var(--motion-ease-standard);
 }
 
+.oa-composer-notice {
+  background: color-mix(in srgb, var(--card) 88%, var(--background));
+  border-color: color-mix(in srgb, var(--foreground) 9%, transparent);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--shadow-color) 5%, transparent);
+}
+
+.oa-composer-notice[data-tone="warning"] .oa-composer-notice-icon {
+  color: var(--warning);
+}
+
+.oa-composer-notice[data-tone="error"] {
+  border-color: color-mix(in srgb, var(--destructive) 24%, transparent);
+}
+
+.oa-composer-notice[data-tone="error"] .oa-composer-notice-icon {
+  color: var(--destructive);
+}
+
+.oa-demo-banner {
+  background: color-mix(in srgb, var(--secondary) 78%, var(--background));
+  border-color: color-mix(in srgb, var(--foreground) 7%, transparent);
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--shadow-color) 4%, transparent);
+}
+
+.oa-demo-install {
+  background: color-mix(in srgb, var(--card) 72%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--foreground) 7%, transparent);
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    box-shadow var(--motion-fast) var(--motion-ease-out);
+}
+
+.oa-demo-install:hover {
+  background: color-mix(in srgb, var(--card) 90%, var(--secondary));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--foreground) 11%, transparent);
+}
+
+.oa-harness-context-tray {
+  background: color-mix(in srgb, var(--secondary) 86%, var(--card));
+  box-shadow:
+    inset 1px 0 0 color-mix(in srgb, var(--foreground) 5%, transparent),
+    inset -1px 0 0 color-mix(in srgb, var(--foreground) 5%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--foreground) 4%, transparent);
+  transition:
+    background-color var(--motion-standard) var(--motion-ease-standard),
+    box-shadow var(--motion-standard) var(--motion-ease-standard);
+}
+
+.oa-harness-composer-shell {
+  background: color-mix(in srgb, var(--card) 94%, transparent);
+  backdrop-filter: blur(16px);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--shadow-color) 4%, transparent),
+    0 2px 8px color-mix(in srgb, var(--shadow-color) 4%, transparent),
+    0 14px 52px color-mix(in srgb, var(--shadow-color) 8%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--foreground) 4%, transparent);
+  transition:
+    box-shadow var(--motion-fast) var(--motion-ease-out);
+}
+
+.oa-harness-composer-shell:focus-within {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--shadow-color) 5%, transparent),
+    0 2px 8px color-mix(in srgb, var(--shadow-color) 5%, transparent),
+    0 16px 58px color-mix(in srgb, var(--shadow-color) 10%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+
+@supports (corner-shape: superellipse(1.5)) {
+  .oa-harness-context-tray,
+  .oa-harness-composer-shell {
+    corner-shape: superellipse(1.5);
+  }
+}
+
+.oa-chat-new-action {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--foreground) 3.5%, transparent);
+}
+
+.oa-session-row:has(.oa-session-row-main:focus-visible) {
+  background: var(--accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--foreground) 12%, transparent);
+}
+
 @media (hover: hover) and (pointer: fine) {
-  .oa-pressable:hover:not(:disabled):not([aria-disabled="true"]) {
-    transform: translateY(-1px);
-    box-shadow: 0 5px 14px color-mix(in srgb, var(--foreground) 9%, transparent);
+  .oa-session-overflow-action {
+    position: absolute;
+    inset-inline-end: 0.5rem;
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.96);
+    visibility: hidden;
+    transition:
+      opacity var(--motion-fast) var(--motion-ease-out),
+      transform var(--motion-fast) var(--motion-ease-out),
+      visibility 0s linear var(--motion-fast);
   }
 
+  .oa-session-row:hover .oa-session-overflow-action,
+  .oa-session-row:focus-within .oa-session-overflow-action {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+    visibility: visible;
+    transition-delay: 0s;
+  }
+
+  .oa-session-state-action {
+    transition:
+      color var(--motion-fast) var(--motion-ease-standard),
+      background-color var(--motion-fast) var(--motion-ease-standard),
+      opacity var(--motion-fast) var(--motion-ease-out),
+      transform var(--motion-fast) var(--motion-ease-out),
+      visibility 0s linear 0s;
+  }
+
+  .oa-session-row:hover .oa-session-state-action,
+  .oa-session-row:focus-within .oa-session-state-action {
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.96);
+    visibility: hidden;
+    transition-delay: 0s, 0s, 0s, 0s, var(--motion-fast);
+  }
+}
+
+@media (max-height: 34rem) {
+  .oa-harness-scroll {
+    padding-block: 0.5rem;
+  }
+
+  .oa-harness-hero-mark {
+    display: none;
+  }
+
+  .oa-harness-title {
+    margin-top: 0;
+  }
+
+  .oa-harness-starters {
+    margin-top: 0.5rem;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
   .oa-pressable:active:not(:disabled):not([aria-disabled="true"]) {
-    transform: translateY(0) scale(0.98);
-    box-shadow: none;
-  }
-
-  .oa-icon-action:hover:not(:disabled):not([aria-disabled="true"]) {
-    transform: translateY(-1px);
-  }
-
-  .oa-icon-action:hover:not(:disabled):not([aria-disabled="true"]) > svg {
-    transform: scale(1.1);
+    transform: scale(0.98);
   }
 
   .oa-icon-action:active:not(:disabled):not([aria-disabled="true"]) {
-    transform: translateY(0) scale(0.92);
-  }
-
-  .oa-nav-item:hover .oa-nav-icon {
-    transform: translateX(1px) scale(1.04);
-  }
-
-  .oa-nav-row:hover {
-    transform: translateX(1px);
+    transform: scale(0.96);
   }
 }
 
@@ -242,17 +406,6 @@ body {
   from {
     opacity: 0;
     transform: translateY(3px) scale(0.985);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-@keyframes oa-suggestion-enter {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
   }
   to {
     opacity: 1;
@@ -405,12 +558,12 @@ body {
 
 .oa-page-sidebar-resizable[data-overdrag-state="resisting"]
   > [data-slot="resizable-handle"] {
-  background-color: color-mix(in srgb, var(--primary) 48%, var(--border));
+  background-color: color-mix(in srgb, var(--foreground) 22%, var(--border));
 }
 
 .oa-page-sidebar-resizable[data-overdrag-state="armed"]
   > [data-slot="resizable-handle"] {
-  background-color: color-mix(in srgb, var(--primary) 78%, var(--border));
+  background-color: color-mix(in srgb, var(--foreground) 36%, var(--border));
 }
 
 /* Page-owned navigators become touch surfaces inside the phone drawer.
@@ -431,6 +584,22 @@ body {
     min-width: 2.25rem;
     min-height: 2.25rem;
   }
+
+  .oa-workspace-context-item {
+    min-height: 2.5rem;
+  }
+
+  .oa-harness-context-tray :is(button, [role="button"]),
+  .oa-harness-composer :is(button, [role="button"]),
+  .oa-harness-starters .oa-icon-action {
+    min-height: 2.25rem;
+  }
+
+  .oa-harness-context-tray .oa-icon-action,
+  .oa-harness-composer .oa-icon-action,
+  .oa-harness-starters .oa-icon-action {
+    min-width: 2.25rem;
+  }
 }
 
 .oa-page-sidebar-dialog :is(
@@ -448,10 +617,6 @@ body {
 .oa-popover-enter {
   transform-origin: top;
   animation: oa-popover-enter var(--motion-standard) var(--motion-ease-out) both;
-}
-
-.oa-suggestion-enter {
-  animation: oa-suggestion-enter var(--motion-standard) var(--motion-ease-out) backwards;
 }
 
 .oa-sortable-placeholder {
@@ -486,19 +651,19 @@ body {
    - .text-micro    badges, timestamps, table metadata */
 
 .text-display {
-  @apply text-[28px] md:text-[36px] font-bold leading-tight tabular-nums;
+  @apply text-[28px] leading-[34px] font-bold tabular-nums md:text-[36px] md:leading-[42px];
 }
 .text-title {
-  @apply text-[16px] font-semibold leading-snug;
+  @apply text-[16px] leading-[22px] font-semibold;
 }
 .text-body {
-  @apply text-[13px] leading-relaxed;
+  @apply text-[13px] leading-5;
 }
 .text-caption {
-  @apply text-[12px] leading-relaxed;
+  @apply text-[12px] leading-[18px];
 }
 .text-micro {
-  @apply text-[11px] tracking-wide;
+  @apply text-[11px] leading-[15px];
 }
 
 /* Page headers normally keep compact actions inline. Dense operational
@@ -776,8 +941,7 @@ html[lang="ja"] .oa-onboarding-title {
   .oa-dialog-surface,
   .oa-dialog-backdrop,
   .oa-disclosure-enter,
-  .oa-popover-enter,
-  .oa-suggestion-enter {
+  .oa-popover-enter {
     animation: none;
   }
   .oa-sortable-overlay {
@@ -817,52 +981,67 @@ html[lang="ja"] .oa-onboarding-title {
 /* ==================== Button utility classes ==================== */
 
 .btn-primary {
-  @apply px-4 py-2 text-[13px] font-medium rounded-lg
+  @apply px-4 py-2 text-[13px] leading-[18px] font-medium rounded-md
     bg-primary border border-primary text-primary-foreground
-    hover:bg-primary/90 transition-all active:scale-[0.98]
+    hover:bg-primary/90 transition-[color,background-color,border-color,box-shadow,transform] duration-[var(--motion-fast)] active:scale-[0.98]
     disabled:opacity-40 disabled:cursor-default cursor-pointer
     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
 }
 
 .btn-secondary {
-  @apply px-4 py-2 text-[13px] font-medium rounded-lg border border-border text-muted-foreground
-    hover:bg-muted hover:text-foreground transition-all active:scale-[0.98]
+  @apply px-4 py-2 text-[13px] leading-[18px] font-medium rounded-md border border-border text-muted-foreground
+    hover:bg-muted hover:text-foreground transition-[color,background-color,border-color,box-shadow,transform] duration-[var(--motion-fast)] active:scale-[0.98]
     disabled:opacity-40 disabled:cursor-default cursor-pointer
     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
 }
 
 .btn-danger {
-  @apply px-4 py-2 text-[13px] font-medium rounded-lg border border-destructive/30 text-destructive
-    hover:bg-destructive/10 transition-all active:scale-[0.98]
+  @apply px-4 py-2 text-[13px] leading-[18px] font-medium rounded-md border border-destructive/30 text-destructive
+    hover:bg-destructive/10 transition-[color,background-color,border-color,box-shadow,transform] duration-[var(--motion-fast)] active:scale-[0.98]
     disabled:opacity-40 disabled:cursor-default cursor-pointer
     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
 }
 
 .btn-primary-sm {
-  @apply px-3 py-1.5 text-xs font-medium rounded-md
+  @apply px-3 py-1.5 text-xs leading-4 font-medium rounded-md
     bg-primary border border-primary text-primary-foreground
-    hover:bg-primary/90 transition-all active:scale-[0.98]
+    hover:bg-primary/90 transition-[color,background-color,border-color,box-shadow,transform] duration-[var(--motion-fast)] active:scale-[0.98]
     disabled:opacity-40 disabled:cursor-default cursor-pointer
     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background;
 }
 
 .btn-secondary-sm {
-  @apply px-3 py-1.5 text-xs font-medium rounded-md border border-border text-muted-foreground
-    hover:bg-muted hover:text-foreground transition-all active:scale-[0.98]
+  @apply px-3 py-1.5 text-xs leading-4 font-medium rounded-md border border-border text-muted-foreground
+    hover:bg-muted hover:text-foreground transition-[color,background-color,border-color,box-shadow,transform] duration-[var(--motion-fast)] active:scale-[0.98]
     disabled:opacity-40 disabled:cursor-default cursor-pointer
     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background;
 }
 
-/* Scrollbar styling */
+/* Native scrollbars stay subtle and gain contrast under the pointer. */
+* {
+  scrollbar-color: color-mix(in srgb, var(--muted-foreground) 22%, transparent) transparent;
+  scrollbar-width: thin;
+}
+
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 3px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted-foreground) 22%, transparent);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--muted-foreground) 34%, transparent);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-button {
+  display: none;
 }
 
 /* Hide scrollbar utility — content still scrolls (programmatically or via

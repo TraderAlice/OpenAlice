@@ -24,7 +24,7 @@ export type Page =
   | 'chat' | 'auto-quant' | 'prediction' | 'inbox' | 'tracked' | 'workspaces' | 'portfolio' | 'office' | 'automation' | 'market'
   | 'issue'
   | 'connectors'
-  | 'settings' | 'dev'
+  | 'settings'
 
 /** Subscribe to a CSS media query, SSR-safe (defaults to matched). */
 function useMediaQuery(query: string): boolean {

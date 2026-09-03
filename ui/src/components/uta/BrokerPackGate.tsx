@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, LoaderCircle } from 'lucide-react'
 import type { BrokerEngine, BrokerHealthInfo } from '../../api/types'
 import type { AccountPackReadiness } from '../../hooks/useBrokerPackReadiness'
 import { HealthBadge } from './HealthBadge'
+import { Button } from '../ui/button'
 
 export function AccountReadinessBadge({ readiness, health, size = 'sm' }: {
   readiness: AccountPackReadiness
@@ -25,11 +26,13 @@ export function AccountReadinessBadge({ readiness, health, size = 'sm' }: {
           : 'Support status unavailable'
   return (
     <span
-      className="inline-flex items-center gap-1.5 text-[11px] text-warning"
+      className="inline-flex items-center gap-1.5 text-[11px] leading-[15px] text-warning"
       title={readiness.reason}
       data-testid="account-readiness-badge"
     >
-      <span className={`h-1.5 w-1.5 shrink-0 rounded-full bg-warning ${readiness.state === 'checking' ? 'animate-pulse' : ''}`} />
+      {readiness.state === 'checking'
+        ? <LoaderCircle aria-hidden className="size-3 shrink-0 animate-spin motion-reduce:animate-none" />
+        : <AlertTriangle aria-hidden className="size-3 shrink-0" />}
       {label}
     </span>
   )
@@ -67,25 +70,27 @@ export function BrokerSupportGate({ readiness, installingEngine, onInstall, onRe
       <div className="flex items-start gap-2.5">
         <AlertTriangle size={15} className="mt-0.5 shrink-0 text-warning" aria-hidden />
         <div className="min-w-0 flex-1">
-          <div className="text-[12px] font-medium text-foreground">{title}</div>
-          <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+          {!compact && <div className="text-[12px] font-medium text-foreground">{title}</div>}
+          <p className={`${compact ? '' : 'mt-0.5'} text-[11px] leading-relaxed text-muted-foreground`}>
             {readiness.reason ?? (
               readiness.state === 'checking'
                 ? 'Reading support installed on this Runtime.'
-                : 'This account is still configured, but this Runtime cannot load it until its machine-local Broker Pack is available.'
+                : 'This Runtime can load the configured account after its machine-local Broker Pack is available.'
             )}
           </p>
           {!compact && !readiness.operational && readiness.state !== 'checking' && (
             <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground/80">
-              Installing or repairing support changes this Runtime only. It does not connect the broker or submit a trade.
+              Installation changes this Runtime. Broker connections and trading remain unchanged.
             </p>
           )}
           {actionError && <p className="mt-1 text-[11px] text-destructive" role="alert">{actionError}</p>}
         </div>
         {installable && (readiness.state === 'needs-install' || readiness.state === 'needs-repair') ? (
-          <button
+          <Button
             type="button"
-            className="btn-secondary-sm shrink-0"
+            className="shrink-0"
+            variant="outline"
+            size="sm"
             disabled={Boolean(installingEngine)}
             onClick={() => {
               setActionError(null)
@@ -95,16 +100,22 @@ export function BrokerSupportGate({ readiness, installingEngine, onInstall, onRe
             }}
           >
             {isInstalling ? (actionLabel === 'Repair' ? 'Repairing…' : 'Installing…') : actionLabel}
-          </button>
+          </Button>
         ) : readiness.state !== 'checking' ? (
-          <button type="button" className="btn-secondary-sm shrink-0" onClick={() => {
-            setActionError(null)
-            void onRetry().catch((err: unknown) => {
-              setActionError(err instanceof Error ? err.message : String(err))
-            })
-          }}>
+          <Button
+            type="button"
+            className="shrink-0"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setActionError(null)
+              void onRetry().catch((err: unknown) => {
+                setActionError(err instanceof Error ? err.message : String(err))
+              })
+            }}
+          >
             Retry
-          </button>
+          </Button>
         ) : null}
       </div>
     </div>

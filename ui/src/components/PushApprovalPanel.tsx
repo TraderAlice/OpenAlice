@@ -3,6 +3,7 @@ import type { TFunction } from 'i18next'
 import { AlertTriangle, CheckCircle2, ChevronLeft, Clock3, GitCommitHorizontal, GitPullRequest, History, RefreshCw, XCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { EmptyState, Skeleton } from './StateViews'
+import { Button } from './ui/button'
 import { formatRelativeTime, getIntlLocale } from '../lib/intl'
 import { api } from '../api'
 import { isUnsetDecimal } from '../lib/format'
@@ -203,7 +204,7 @@ function historyOperationDisplay(op: WalletCommitLog['operations'][number], t: T
         side,
         symbol: op.symbol !== 'unknown' ? op.symbol : t('tradingReview.operation.unknown'),
       }),
-      detail: detailParts.join(' · '),
+      detail: detailParts.join(', '),
       symbol: op.symbol,
       status: op.status,
     }
@@ -263,7 +264,7 @@ function itemTitle(item: ReviewItem, t: TFunction): string {
     const quantity = primaryOrder.order.totalQuantity
       || (primaryOrder.order.cashQuantity ? `$${primaryOrder.order.cashQuantity}` : '')
     const price = primaryOrder.order.limitPrice ? `@ ${primaryOrder.order.limitPrice}` : ''
-    return [operation.title, quantity, price].filter(Boolean).join(' · ')
+    return [operation.title, quantity, price].filter(Boolean).join(', ')
   }
   return item.commit.message
 }
@@ -560,7 +561,7 @@ export function PushApprovalPanel() {
           className={`${mobileDetailOpen ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col bg-secondary md:flex md:border-r`}
         >
           <div className="shrink-0 border-b border-border/70 px-4 py-3">
-            <div className="flex items-center gap-2 text-[12px] font-medium text-foreground">
+            <div className="flex items-center gap-2 text-[12px] leading-[18px] font-medium text-foreground">
               {verificationIncomplete || waitingCount > 0 ? (
                 <AlertTriangle size={15} className="text-warning" aria-hidden />
               ) : (
@@ -577,14 +578,14 @@ export function PushApprovalPanel() {
 
           {historyAccounts.length > 1 && (
             <div className="shrink-0 border-b border-border/60 px-4 py-2">
-              <div className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
+              <div className="mb-1.5 text-[11px] font-medium text-muted-foreground/70">
                 {t('tradingReview.queue.accountFilter')}
               </div>
               <div className="flex flex-wrap gap-1">
                 <button
                   type="button"
                   onClick={() => setHistoryFilter(null)}
-                  className={`rounded-full border px-2 py-0.5 text-[10px] transition-colors ${
+                  className={`rounded-full border px-2 py-0.5 text-[10px] leading-[14px] transition-colors ${
                     effectiveFilter === null
                       ? 'border-border bg-muted text-foreground'
                       : 'border-border/50 text-muted-foreground hover:border-border hover:text-foreground'
@@ -598,7 +599,7 @@ export function PushApprovalPanel() {
                     type="button"
                     onClick={() => setHistoryFilter(account.id)}
                     title={account.label}
-                    className={`max-w-[120px] truncate rounded-full border px-2 py-0.5 text-[10px] transition-colors ${
+                    className={`max-w-[120px] truncate rounded-full border px-2 py-0.5 text-[10px] leading-[14px] transition-colors ${
                       effectiveFilter === account.id
                         ? 'border-border bg-muted text-foreground'
                         : 'border-border/50 text-muted-foreground hover:border-border hover:text-foreground'
@@ -640,18 +641,19 @@ export function PushApprovalPanel() {
           className={`${mobileDetailOpen ? 'block' : 'hidden'} min-h-0 min-w-0 overflow-x-hidden overflow-y-auto md:block`}
         >
           <div className="sticky top-0 z-10 border-b border-border bg-secondary/95 px-3 py-2 md:hidden">
-            <button
+            <Button
               ref={mobileBackRef}
-              type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => {
                 setMobileDetailOpen(false)
                 requestAnimationFrame(() => activeQueueRowRef.current?.focus())
               }}
-              className="oa-pressable inline-flex min-h-10 items-center gap-1.5 rounded-md px-2 text-[12px] font-medium text-primary"
+              className="min-h-10 text-foreground"
             >
               <ChevronLeft size={15} aria-hidden />
               {t('tradingReview.queue.backToQueue')}
-            </button>
+            </Button>
           </div>
           <ReviewDetail
             item={selected}
@@ -707,15 +709,16 @@ function VerificationNotice({
           </p>
         )}
       </div>
-      <button
-        type="button"
+      <Button
+        variant="outline"
+        size="sm"
         disabled={retrying}
         onClick={onRetry}
-        className="oa-pressable inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-md border border-warning/35 bg-background px-2.5 py-1.5 text-[12px] font-medium text-foreground hover:bg-warning/10 disabled:cursor-wait disabled:opacity-60"
+        className="min-h-8 shrink-0 disabled:cursor-wait"
       >
         <RefreshCw size={13} className={retrying ? 'animate-spin' : undefined} aria-hidden />
         {retrying ? t('tradingReview.queue.retrying') : t('tradingReview.queue.retry')}
-      </button>
+      </Button>
     </div>
   )
 }
@@ -744,7 +747,7 @@ function QueueStat({ label, value, tone }: { label: string; value: number; tone:
   return (
     <div className={`rounded-md border px-2 py-1.5 ${tone === 'warn' ? 'border-warning/30 bg-warning/5' : 'border-border/60 bg-background/35'}`}>
       <div className={`text-sm font-semibold tabular-nums ${tone === 'warn' ? 'text-warning' : 'text-foreground'}`}>{value}</div>
-      <div className="text-[9px] uppercase tracking-wider text-muted-foreground/55">{label}</div>
+      <div className="text-[10px] text-muted-foreground/60">{label}</div>
     </div>
   )
 }
@@ -779,19 +782,19 @@ function QueueRow({
       onClick={onClick}
       className={`w-full rounded-md border px-3 py-2 text-left transition-colors ${
         active
-          ? 'border-primary/50 bg-primary-muted text-foreground'
+          ? 'border-border bg-muted text-foreground'
           : 'border-transparent text-muted-foreground hover:border-border/70 hover:bg-accent hover:text-foreground'
       }`}
     >
       <div className="flex items-center gap-2">
-        <span className={active ? 'text-primary' : 'text-muted-foreground/70'}>{icon}</span>
+        <span className="text-muted-foreground/70">{icon}</span>
         <span className="min-w-0 flex-1 truncate text-[12px] font-medium">{itemTitle(item, t)}</span>
       </div>
-      <div className="mt-1 flex min-w-0 items-center gap-2 text-[10px] text-muted-foreground/65">
+      <div className="mt-1 flex min-w-0 items-center gap-2 text-[10px] leading-[14px] text-muted-foreground/65">
         <span className="truncate">{itemAccountLabel(item)}</span>
         <span className="text-muted-foreground/35">/</span>
         <span>{t('tradingReview.queue.operationCount', { count: ops.length })}</span>
-        <span className="ml-auto rounded border border-border/60 px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground/60">{badge}</span>
+        <span className="ml-auto rounded border border-border/60 px-1.5 py-0.5 font-mono text-[10px] leading-[14px] text-muted-foreground/60">{badge}</span>
       </div>
       {timestamp && (
         <div className="mt-1 text-[10px] text-muted-foreground/45">{formatRelativeTime(timestamp)}</div>
@@ -885,12 +888,12 @@ function ReviewDetail({
           <ResultBanner result={lastResult.data} onDismiss={onDismissResult} />
         )}
         {error && (
-          <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] text-destructive">
+          <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] leading-[18px] text-destructive">
             <XCircle size={15} className="mt-0.5 shrink-0" aria-hidden />
             <span className="min-w-0 flex-1">{error}</span>
-            <button type="button" onClick={onDismissError} className="text-muted-foreground hover:text-foreground">
+            <Button variant="ghost" size="xs" onClick={onDismissError} className="text-muted-foreground">
               {t('tradingReview.dismiss')}
-            </button>
+            </Button>
           </div>
         )}
 
@@ -902,7 +905,7 @@ function ReviewDetail({
                   <StatusPill item={item} />
                   <span className="text-[11px] text-muted-foreground">{itemAccountLabel(item)}</span>
                   {item.kind === 'history' && (
-                    <span className="font-mono text-[11px] text-muted-foreground/60">{shortHash(item.commit.hash)}</span>
+                    <span className="font-mono text-[11px] leading-[15px] text-muted-foreground/60">{shortHash(item.commit.hash)}</span>
                   )}
                 </div>
                 <h3 className="text-lg font-semibold text-foreground">{title}</h3>
@@ -924,40 +927,39 @@ function ReviewDetail({
                 <div className="flex shrink-0 items-center gap-2">
                   {confirmingPush === accountId ? (
                     <>
-                      <button
-                        type="button"
+                      <Button
+                        size="sm"
                         onClick={() => onPush(accountId)}
                         disabled={pushing !== null}
-                        className="btn-primary-sm"
                       >
                         {pushing === accountId ? t('tradingReview.pushing') : t('tradingReview.confirmPush')}
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => onConfirmPush(null)}
-                        className="rounded-md px-2.5 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                        className="text-muted-foreground"
                       >
                         {t('tradingReview.cancel')}
-                      </button>
+                      </Button>
                     </>
                   ) : (
                     <>
-                      <button
-                        type="button"
+                      <Button
+                        size="sm"
                         onClick={() => onConfirmPush(accountId)}
                         disabled={pushing !== null || rejecting !== null}
-                        className="btn-primary-sm"
                       >
                         {t('tradingReview.approvePush')}
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
                         onClick={() => onReject(accountId)}
                         disabled={pushing !== null || rejecting !== null}
-                        className="rounded-md border border-border px-3 py-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:border-destructive/50 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {rejecting === accountId ? t('tradingReview.rejecting') : t('tradingReview.reject')}
-                      </button>
+                      </Button>
                     </>
                   )}
                 </div>
@@ -967,7 +969,7 @@ function ReviewDetail({
 
           <div className="grid gap-4 p-4 xl:grid-cols-[minmax(0,1fr)_260px]">
             <section className="min-w-0 space-y-3">
-              <div className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+              <div className="flex items-center gap-2 text-[12px] leading-[18px] font-medium text-muted-foreground/70">
                 <GitCommitHorizontal size={14} aria-hidden />
                 {t('tradingReview.operationDiff')}
               </div>
@@ -1002,7 +1004,7 @@ function StatusPill({ item }: { item: ReviewItem }) {
   const { t } = useTranslation()
   if (item.kind === 'pending') {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-[11px] font-medium text-warning">
+      <span className="inline-flex items-center gap-1 rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-[11px] leading-[15px] font-medium text-warning">
         <AlertTriangle size={12} aria-hidden />
         {t('tradingReview.status.needsApproval')}
       </span>
@@ -1010,14 +1012,14 @@ function StatusPill({ item }: { item: ReviewItem }) {
   }
   if (item.kind === 'staged') {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-info/25 bg-info/10 px-2 py-0.5 text-[11px] font-medium text-info">
+      <span className="inline-flex items-center gap-1 rounded-full border border-info/25 bg-info/10 px-2 py-0.5 text-[11px] leading-[15px] font-medium text-info">
         <Clock3 size={12} aria-hidden />
         {t('tradingReview.status.staged')}
       </span>
     )
   }
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-success/25 bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success">
+    <span className="inline-flex items-center gap-1 rounded-full border border-success/25 bg-success/10 px-2 py-0.5 text-[11px] leading-[15px] font-medium text-success">
       <CheckCircle2 size={12} aria-hidden />
       {t('tradingReview.status.pushed')}
     </span>
@@ -1033,7 +1035,7 @@ function OperationRow({ op }: { op: OperationDisplay }) {
       </div>
       <div className="min-w-0 px-3 py-2">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="min-w-0 break-all font-mono text-[13px] font-medium text-foreground">{op.title}</span>
+          <span className="min-w-0 break-all font-mono text-[13px] leading-[18px] font-medium text-foreground">{op.title}</span>
           {op.status && (
             <span className={`text-[11px] ${statusClass(op.status)}`}>{statusLabel(op.status, t)}</span>
           )}
@@ -1055,7 +1057,7 @@ function ReviewSummary({ item, operations }: { item: ReviewItem; operations: Ope
 
   return (
     <div className="rounded-md border border-border bg-secondary/60 p-3">
-      <div className="text-[12px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+      <div className="text-[12px] font-medium text-muted-foreground/70">
         {t('tradingReview.summary.title')}
       </div>
       <dl className="mt-3 space-y-2 text-[12px]">
@@ -1087,7 +1089,7 @@ function ResultBanner({ result, onDismiss }: { result: WalletPushResult; onDismi
   const { t } = useTranslation()
   const hasRejected = result.rejected.length > 0
   return (
-    <div className={`flex items-start gap-2 rounded-md border px-3 py-2 text-[12px] ${
+    <div className={`flex items-start gap-2 rounded-md border px-3 py-2 text-[12px] leading-[18px] ${
       hasRejected ? 'border-destructive/30 bg-destructive/5 text-destructive' : 'border-success/25 bg-success/5 text-success'
     }`}>
       {hasRejected ? <AlertTriangle size={15} className="mt-0.5 shrink-0" aria-hidden /> : <CheckCircle2 size={15} className="mt-0.5 shrink-0" aria-hidden />}
@@ -1102,9 +1104,9 @@ function ResultBanner({ result, onDismiss }: { result: WalletPushResult; onDismi
           <div key={`${entry.action}:${index}`} className="mt-0.5 text-destructive/80">{entry.error || entry.action}</div>
         ))}
       </div>
-      <button type="button" onClick={onDismiss} className="text-muted-foreground hover:text-foreground">
+      <Button variant="ghost" size="xs" onClick={onDismiss} className="text-muted-foreground">
         {t('tradingReview.dismiss')}
-      </button>
+      </Button>
     </div>
   )
 }

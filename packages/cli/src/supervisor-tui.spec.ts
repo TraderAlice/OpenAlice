@@ -2,17 +2,1074 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { resolveLaunchContext } from './launch-context.ts'
 import type { MachineFleetEnvelope, MachineInventory } from './machine-inventory.ts'
-import { createSupervisorFleetState } from './supervisor-fleet.ts'
+import {
+  createSupervisorFleetState,
+  displayWidth,
+  selectedFleetProject,
+  setFleetFocus,
+} from './supervisor-fleet.ts'
+import {
+  createSupervisorTuiTheme,
+  decorateSupervisorActionShelf,
+  decorateSupervisorFramedColumns,
+  decorateSupervisorFramedHeaders,
+  decorateSupervisorFrame,
+} from './supervisor-tui-theme.ts'
+import { supervisorTuiBaseStyle } from './supervisor-tui-palette.ts'
+import {
+  anchorSupervisorControlConsole,
+  renderSupervisorCommandBar,
+  renderSupervisorControlConsole,
+  renderSupervisorContextTip,
+  renderSupervisorDock,
+  renderSupervisorFocusActionBar,
+  supervisorCommandTargets,
+} from './supervisor-tui-view.ts'
 import {
   resolveSupervisorChannel,
   runSupervisorTui,
   type SupervisorAction,
   SupervisorScreen,
 } from './supervisor-tui.ts'
+import { renderSupervisorConfirmationActionBar } from './supervisor-confirmation.ts'
+import {
+  advanceSupervisorLaunchFlight,
+  createSupervisorLaunchFlight,
+  failSupervisorLaunchFlight,
+} from './supervisor-launch-flight.ts'
 
 const matchesKey = (data: string, key: string) => data === key
+const asyncTuiTimeoutMs = process.env.CI ? 15_000 : 5_000
+const pointerClick = (col: number, row: number) => ({
+  button: 0,
+  col,
+  row,
+  release: false,
+  wheel: null,
+  motion: false,
+  leftClick: true,
+} as const)
 
 describe('Supervisor TUI screen', () => {
+  it('makes the disconnected surface a three-step OpenAlice Launcher', () => {
+    const activated: string[] = []
+    let viewportHeight = 32
+    const originalLocal = fleetMachines()[0]!
+    const local = {
+      ...originalLocal,
+      projects: originalLocal.projects.map((project) => ({
+        ...project,
+        runtime: {
+          ...project.runtime,
+          class: 'absent',
+          state: 'absent',
+          ownerSurface: null,
+          webEndpoint: null,
+        },
+      })),
+    }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'fleet',
+      runtime: { class: 'absent', endpoints: {} },
+      activeTarget: null,
+      fleet: createSupervisorFleetState('2026-09-02T00:00:00Z', [local], 'default'),
+    }, {
+      getViewportHeight: () => viewportHeight,
+      motionEnabled: false,
+      onActivateFleet: (machine, project) => activated.push(`${machine.key}/${project.key}`),
+    })
+
+    const plainLines = screen.render(140)
+    const frame = plainLines.join('\n')
+    expect(frame).toContain('◆ [Connect]·1')
+    expect(frame).toContain('OPENALICE LAUNCH · READY → START → CONNECT')
+    expect(frame).toContain('1 MACHINE ✓ This computer')
+    expect(frame).toContain('2 ALICEPROJECT ✓ Default AliceProject')
+    expect(frame).toContain('3 RUNTIME ○ READY TO START')
+    expect(frame).toContain('Launchpad · Default AliceProject')
+    expect(frame).toContain('◆ READY TO LAUNCH · READY TO START')
+    expect(frame).toContain('This computer → Default AliceProject')
+    expect(frame).toContain('◆ [ Enter ] Start OpenAlice')
+    expect(frame).toContain('[ Enter ] Start OpenAlice')
+    expect(frame).not.toContain('Machines · 1/1')
+    expect(frame).not.toContain('AliceProjects · This computer · 1/1')
+    expect(frame).not.toContain('Inbox')
+    const tipRow = plainLines.findIndex((line) => line.startsWith('◇  Tip:'))
+    const spineRow = plainLines.findIndex((line) => line.includes('[ / ] Commands'))
+    expect(plainLines).toHaveLength(32)
+    expect(spineRow).toBe(tipRow + 2)
+    expect(plainLines.slice(spineRow + 1).every((line) => line === '')).toBe(true)
+
+    const themed = decorateSupervisorFrame(
+      plainLines,
+      createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+      { panel: 'fleet', runtimeClass: 'absent' },
+    )
+    expect(themed.join('\n')).toContain('\u001b[')
+    expect(themed.join('\n')).toContain('[ Enter ]')
+    expect(themed.map((line) => line.replace(/\u001b\[[0-9;]*m/gu, '').trimEnd()))
+      .toEqual(plainLines.map((line) => line.trimEnd()))
+
+    const actionRow = plainLines.findIndex((line) => line.includes('◆ [ Enter ] Start OpenAlice')) + 1
+    expect(screen.handlePointer(pointerClick(130, actionRow))).toBe(true)
+    expect(activated).toEqual(['local/default'])
+
+    viewportHeight = 48
+    const expanded = screen.render(140)
+    expect(expanded).toHaveLength(48)
+    expect(expanded.findIndex((line) => line.includes('[ / ] Commands'))).toBe(spineRow)
+  })
+
+  it('folds an extremely short Launcher into one complete target card', () => {
+    const activated: string[] = []
+    const originalLocal = fleetMachines()[0]!
+    const local = {
+      ...originalLocal,
+      projects: originalLocal.projects.map((project) => ({
+        ...project,
+        runtime: {
+          ...project.runtime,
+          class: 'absent',
+          state: 'absent',
+          ownerSurface: null,
+          webEndpoint: null,
+        },
+      })),
+    }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'fleet',
+      runtime: { class: 'absent', endpoints: {} },
+      activeTarget: null,
+      fleet: createSupervisorFleetState('2026-09-02T00:00:00Z', [local], 'default'),
+    }, {
+      getViewportHeight: () => 16,
+      motionEnabled: false,
+      onActivateFleet: (machine, project) => activated.push(`${machine.key}/${project.key}`),
+    })
+
+    const lines = screen.render(46)
+    const frame = lines.join('\n')
+    expect(lines).toHaveLength(16)
+    expect(frame).toContain('◆ OpenAlice')
+    expect(frame).toContain('[Connect]·1')
+    expect(frame).toContain('OPENALICE LAUNCH · ALICEPROJECT')
+    expect(frame).toContain('1 MACHINE ✓ This computer')
+    expect(frame).toContain('2 ALICEPROJECT ✓ Default AliceProject')
+    expect(frame).toContain('3 RUNTIME ○ READY TO START')
+    expect(frame).toContain('◆ [ Enter ] Start OpenAlice')
+    expect(frame).not.toContain('AliceProjects · This computer')
+    const actionRow = lines.findIndex((line) => line.includes('[ Enter ] Start OpenAlice')) + 1
+    expect(screen.handlePointer(pointerClick(22, actionRow))).toBe(true)
+    expect(activated).toEqual(['local/default'])
+  })
+
+  it('keeps multi-target Launcher guidance complete at 60x20', () => {
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'fleet',
+      runtime: { class: 'absent', endpoints: {} },
+      activeTarget: null,
+      fleet: createSupervisorFleetState(
+        '2026-09-03T00:00:00Z',
+        fleetMachines(),
+        'default',
+      ),
+    }, {
+      getViewportHeight: () => 20,
+      motionEnabled: false,
+    })
+
+    const lines = screen.render(60)
+    const frame = lines.join('\n')
+    expect(lines).toHaveLength(20)
+    expect(frame).toContain('◆ OpenAlice Supervisor')
+    expect(frame).toContain('[Connect]·2')
+    expect(frame).toContain('OPENALICE LAUNCH · SELECT → START → CONNECT')
+    expect(frame).toContain('1 ✓ This computer')
+    expect(frame).toContain('2 ✓ Default AliceProject')
+    expect(frame).toContain('3 ● READY TO USE')
+    expect(frame).toContain('Machines · 1/2')
+    expect(frame).toContain('Launch Briefing · Machine')
+    expect(frame).toContain('◇  Tip:')
+    expect(frame).toContain('[ / ] Commands')
+  })
+
+  it('makes a blocked Launch Briefing own its visible Refresh action', () => {
+    const refreshed: string[] = []
+    const activated: string[] = []
+    const remote = {
+      ...fleetMachines()[1]!,
+      capabilities: { ...fleetMachines()[1]!.capabilities, openTunnel: false },
+    }
+    const fleet = setFleetFocus(
+      createSupervisorFleetState('2026-09-02T00:00:00Z', [remote]),
+      'projects',
+    )
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'fleet',
+      runtime: { class: 'absent', endpoints: {} },
+      activeTarget: null,
+      fleet,
+    }, {
+      motionEnabled: false,
+      onRefreshFleet: () => refreshed.push('refresh'),
+      onActivateFleet: (machine, project) => activated.push(`${machine.key}/${project.key}`),
+    })
+
+    const frame = screen.render(100).join('\n')
+    expect(frame).toContain('× LAUNCH BLOCKED · SSH FORWARD UNAVAILABLE')
+    expect(frame).toContain('◆ [ r ] Refresh')
+    expect(frame).not.toContain('╭─ ◆ [ r ] Refresh')
+    expect(frame).not.toContain('[ Enter ] Connect')
+    expect(screen.handleKey('r', matchesKey)).toBe(true)
+    screen.activateFleetPrimary(fleet)
+    expect(refreshed).toEqual(['refresh', 'refresh'])
+    expect(activated).toEqual([])
+  })
+
+  it('lets the Launch Flight Recorder own busy and recoverable-failure states', () => {
+    const originalLocal = fleetMachines()[0]!
+    const local = {
+      ...originalLocal,
+      projects: originalLocal.projects.map((project) => ({
+        ...project,
+        runtime: { ...project.runtime, class: 'absent', state: 'absent', webEndpoint: null },
+      })),
+    }
+    const startedAt = new Date(2026, 8, 3, 0, 0, 0).getTime()
+    const target = {
+      machineKey: 'local',
+      machineName: 'This computer',
+      projectKey: 'default',
+      projectName: 'Default AliceProject',
+      transport: 'loopback' as const,
+    }
+    const running = advanceSupervisorLaunchFlight(
+      createSupervisorLaunchFlight('local-start', target, startedAt),
+      'start-runtime',
+    )
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'fleet',
+      runtime: { class: 'absent', endpoints: {} },
+      activeTarget: null,
+      fleet: createSupervisorFleetState('2026-09-02T00:00:00Z', [local], 'default'),
+      launchFlight: running,
+      busy: 'Preparing and starting local Runtime',
+    }, {
+      motionEnabled: false,
+      now: () => startedAt + 4_000,
+      getViewportHeight: () => 28,
+    })
+
+    const activeFrame = screen.render(100).join('\n')
+    expect(activeFrame).toContain('◆ OPERATION · LOCAL START')
+    expect(activeFrame).toContain('INPUT OWNED UNTIL READY')
+    expect(activeFrame).not.toContain('[Connect]')
+    expect(activeFrame).not.toContain('? Help')
+    expect(activeFrame).toContain('Launch Flight Recorder · LOCAL START · IN FLIGHT · T+00:04')
+    expect(activeFrame).toContain('◆ 02 START')
+    expect(activeFrame).toContain('◆ OPERATION ACTIVE')
+    expect(activeFrame).toContain('Operation owns input until ready')
+    expect(activeFrame).toContain('[ q ] Detach')
+    expect(activeFrame).not.toContain('[ / ] Commands')
+    expect(activeFrame).not.toContain('Machines · 1/1')
+
+    screen.update({
+      busy: undefined,
+      launchFlight: failSupervisorLaunchFlight(running, 'Runtime readiness timed out'),
+      diagnostic: 'Runtime readiness timed out',
+    })
+    const failedFrame = screen.render(100).join('\n')
+    expect(failedFrame).toContain('× RECOVERY · LOCAL START')
+    expect(failedFrame).toContain('RETRY OR CHANGE TARGET')
+    expect(failedFrame).not.toContain('[Connect]')
+    expect(failedFrame).not.toContain('? Help')
+    expect(failedFrame).toContain('RECOVERABLE FAILURE')
+    expect(failedFrame).toContain('◇ RECOVERY BRIEF')
+    expect(failedFrame).toContain('FAILED AT  02 Prepare and start Runtime')
+    expect(failedFrame).toContain('NEXT       Enter retries this target · Esc changes target')
+    expect(failedFrame).toContain('Runtime readiness timed out')
+    expect(failedFrame).toContain('[ Enter ] Retry selected target')
+    expect(failedFrame).toContain('[ Esc ] Back to targets')
+    expect(failedFrame).toContain('Enter retries; Esc returns to targets')
+    expect(failedFrame).not.toContain('×  ERROR')
+    expect(failedFrame).toContain('⌁ This computer / Default AliceProject · LOCAL › ○ COLD')
+    expect(screen.handleEscape()).toBe(true)
+    expect(screen.snapshot.launchFlight).toBeNull()
+    expect(screen.render(100).join('\n')).toContain('OPENALICE LAUNCH')
+  })
+
+  it('turns a connected target into a bounded workbench with Inbox attention', () => {
+    const toggled: string[] = []
+    const openedInbox: string[] = []
+    let opens = 0
+    let viewportHeight = 32
+    const runtime = { class: 'running', endpoints: { web: 'http://127.0.0.1:2026' } }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'overview',
+      runtime,
+      activeTarget: {
+        kind: 'local',
+        machineKey: 'local',
+        machineName: 'This computer',
+        projectKey: 'default',
+        projectName: 'Default AliceProject',
+        home: '/tmp/openalice',
+        transport: 'loopback',
+        endpoint: 'http://127.0.0.1:2026',
+        runtime,
+      },
+      inbox: {
+        endpoint: 'http://127.0.0.1:2026/',
+        refreshedAt: Date.now(),
+        hasMore: false,
+        entries: [{ id: 'hello', ts: Date.now(), workspaceId: 'ws', comments: 'Agent report ready.' }],
+      },
+    }, {
+      getViewportHeight: () => viewportHeight,
+      motionEnabled: false,
+      onToggleInboxRead: (entry) => toggled.push(entry.id),
+      onOpenInboxEntry: (entry) => openedInbox.push(entry.id),
+      onOpenActiveTarget: () => { opens += 1 },
+    })
+
+    const homeLines = screen.render(100)
+    const home = homeLines.join('\n')
+    expect(home).toContain('● Inbox·1')
+    expect(home).toContain('1 unread report needs your attention')
+    expect(home).toContain('1 unread report is waiting in this AliceProject.')
+    expect(home).toContain('[ Enter ]  Review 1 unread report')
+    expect(home).toContain('Enter reviews')
+    expect(home).toContain('Inbox; o opens the Web UI.')
+    const inboxSignalRow = homeLines.findIndex((line) => line.includes('◆ Inbox  1 unread report')) + 1
+    const inboxSignalColumn = homeLines[inboxSignalRow - 1]!.indexOf('◆ Inbox') + 1
+    expect(screen.handlePointer({
+      button: 35,
+      col: inboxSignalColumn,
+      row: inboxSignalRow,
+      release: false,
+      wheel: null,
+      motion: true,
+      leftClick: false,
+    })).toBe(true)
+    expect(screen.render(100).join('\n')).toContain('› Inbox  1 unread report')
+    expect(screen.render(100).join('\n')).toContain('Open Inbox reports for')
+    expect(screen.handlePointer(pointerClick(inboxSignalColumn, inboxSignalRow))).toBe(true)
+    expect(screen.snapshot.panel).toBe('inbox')
+    screen.update({ panel: 'overview' })
+    expect(screen.handleKey('enter', matchesKey)).toBe(true)
+    expect(screen.snapshot.panel).toBe('inbox')
+    expect(opens).toBe(0)
+
+    const inboxLines = screen.render(100)
+    const inbox = inboxLines.join('\n')
+    expect(inbox).toContain('Agent report ready.')
+    expect(inbox).toContain('[ o ] Open Workspace')
+    expect(inbox).toContain('[ Enter ] Mark read')
+    const inboxTipRow = inboxLines.findIndex((line) => line.startsWith('◇  Tip:'))
+    const inboxSpineRow = inboxLines.findIndex((line) => line.includes('[ / ] Commands'))
+    expect(inboxLines).toHaveLength(32)
+    expect(inboxSpineRow).toBe(inboxLines.length - 1)
+    expect(inboxLines.slice(inboxTipRow + 1, inboxSpineRow).every((line) => line === '')).toBe(true)
+    expect(renderSupervisorContextTip({ panel: 'inbox' }, 80))
+      .toContain('o opens its Workspace')
+    expect(renderSupervisorContextTip({ panel: 'inbox' }, 80))
+      .toContain('Enter toggles read state')
+    expect(screen.handleKey('o', matchesKey)).toBe(true)
+    expect(openedInbox).toEqual(['hello'])
+    expect(opens).toBe(0)
+    const openRow = inboxLines.findIndex((line) => line.includes('[ o ] Open Workspace')) + 1
+    const openColumn = inboxLines[openRow - 1]!.indexOf('[ o ]') + 3
+    expect(screen.handlePointer(pointerClick(openColumn, openRow))).toBe(true)
+    expect(openedInbox).toEqual(['hello', 'hello'])
+    expect(screen.handleKey('enter', matchesKey)).toBe(true)
+    expect(toggled).toEqual(['hello'])
+
+    viewportHeight = 48
+    const expandedInbox = screen.render(100)
+    expect(expandedInbox).toHaveLength(48)
+    expect(expandedInbox.findIndex((line) => line.includes('[ / ] Commands')))
+      .toBe(expandedInbox.length - 1)
+
+    screen.update({
+      panel: 'overview',
+      inbox: {
+        ...screen.snapshot.inbox!,
+        entries: [{ ...screen.snapshot.inbox!.entries[0]!, readAt: Date.now() }],
+      },
+    })
+    const settledHomeLines = screen.render(100)
+    const settledHome = settledHomeLines.join('\n')
+    expect(settledHome).not.toContain('INBOX ATTENTION')
+    expect(settledHome).toContain('[ Enter ]  Open Workspace')
+    expect(screen.handleKey('enter', matchesKey)).toBe(true)
+    expect(opens).toBe(1)
+    const connectionRow = settledHomeLines.findIndex((line) => line.includes('● Connection')) + 1
+    const connectionColumn = settledHomeLines[connectionRow - 1]!.indexOf('● Connection') + 1
+    expect(screen.handlePointer({
+      button: 35,
+      col: connectionColumn,
+      row: connectionRow,
+      release: false,
+      wheel: null,
+      motion: true,
+      leftClick: false,
+    })).toBe(true)
+    expect(screen.render(100).join('\n')).toContain('› Connection  healthy')
+    expect(screen.render(100).join('\n')).toContain('Open Connections to inspect')
+    expect(screen.handlePointer(pointerClick(connectionColumn, connectionRow))).toBe(true)
+    expect(screen.snapshot.panel).toBe('fleet')
+  })
+
+  it('keeps selected Inbox work and application chrome visible at 46x16', () => {
+    const runtime = { class: 'running', endpoints: { web: 'http://127.0.0.1:2026' } }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'inbox',
+      runtime,
+      activeTarget: {
+        kind: 'local',
+        machineKey: 'local',
+        machineName: 'This computer',
+        projectKey: 'default',
+        projectName: 'Default AliceProject',
+        home: '/tmp/openalice',
+        transport: 'loopback',
+        endpoint: 'http://127.0.0.1:2026',
+        runtime,
+      },
+      inbox: {
+        endpoint: 'http://127.0.0.1:2026/',
+        refreshedAt: Date.now(),
+        hasMore: false,
+        entries: [{
+          id: 'hello',
+          ts: Date.now(),
+          workspaceId: 'morning',
+          workspaceLabel: 'Morning research',
+          comments: 'Agent report ready.',
+          origin: { kind: 'headless', agent: 'fixture-agent' },
+        }],
+      },
+    }, {
+      getViewportHeight: () => 16,
+      motionEnabled: false,
+    })
+
+    const lines = screen.render(46)
+    const frame = lines.join('\n')
+    expect(lines).toHaveLength(16)
+    expect(frame).toContain('◆ OpenAlice')
+    expect(frame).toContain('[Inbox]·1')
+    expect(frame).toContain('Inbox · 1 UNREAD · 1/1')
+    expect(frame).toContain('SELECTED · UNREAD · Morning research')
+    expect(frame).toContain('◆ Agent report ready.')
+    expect(frame).toContain('From  fixture-agent')
+    expect(frame).toContain('◆ [ o ] Open Workspace')
+    expect(frame).toContain('· [ Enter ] Mark read')
+    expect(frame).toContain('◇  Tip:')
+    expect(frame).toContain('[ / ] Commands')
+  })
+
+  it('turns one connected target into a complete 46x16 Active Route', () => {
+    const activated: string[] = []
+    let viewportHeight = 16
+    const local = fleetMachines()[0]!
+    const runtime = { class: 'running', endpoints: { web: 'http://127.0.0.1:47331' } }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'fleet',
+      runtime,
+      activeTarget: {
+        kind: 'local',
+        machineKey: 'local',
+        machineName: 'This computer',
+        projectKey: 'default',
+        projectName: 'Default AliceProject',
+        home: '/fixture/default',
+        transport: 'loopback',
+        endpoint: 'http://127.0.0.1:47331',
+        runtime,
+      },
+      fleet: createSupervisorFleetState('2026-09-03T00:00:00Z', [local], 'default'),
+    }, {
+      getViewportHeight: () => viewportHeight,
+      motionEnabled: false,
+      onActivateFleet: (machine, project) => activated.push(`${machine.key}/${project.key}`),
+    })
+
+    const lines = screen.render(46)
+    const frame = lines.join('\n')
+    expect(lines).toHaveLength(16)
+    expect(frame).toContain('◆ OpenAlice')
+    expect(frame).toContain('[Link]·1')
+    expect(frame).toContain('Active Route · LIVE · LOCAL')
+    expect(frame).toContain('● running Default AliceProject')
+    expect(frame).toContain('⌁ This computer · LOCAL')
+    expect(frame).toContain('● Runtime live · ● Web ready · ● Alice')
+    expect(frame).toContain('◆ [ Enter ] Return Home')
+    expect(frame).toContain('· [ m ] Transfer AliceProject')
+    expect(frame).not.toContain('Machines · 1/1')
+    expect(frame).not.toContain('AliceProjects ·')
+    expect(frame).toContain('◇  Tip: Enter returns Home')
+    expect(frame).toContain('[ / ] Commands')
+
+    viewportHeight = 32
+    const wide = screen.render(120)
+    const wideTipRow = wide.findIndex((line) => line.startsWith('◇  Tip:'))
+    const wideSpineRow = wide.findIndex((line) => line.includes('[ / ] Commands'))
+    expect(wideSpineRow).toBe(wide.length - 1)
+    expect(wide.slice(wideTipRow + 1, wideSpineRow).every((line) => line === '')).toBe(true)
+
+    viewportHeight = 16
+    screen.render(46)
+
+    const actionRow = lines.findIndex((line) => line.includes('[ Enter ] Return Home')) + 1
+    expect(screen.handlePointer(pointerClick(20, actionRow))).toBe(true)
+    expect(activated).toEqual(['local/default'])
+    expect(screen.handleEscape()).toBe(false)
+    expect(screen.handleKey('right', matchesKey)).toBe(true)
+    expect(screen.snapshot.panel).toBe('logs')
+  })
+
+  it('preserves the Mission Header through a 46x16 remote switch and recovery', () => {
+    const machines = fleetMachines()
+    const localRuntime = { class: 'running', endpoints: { web: 'http://127.0.0.1:47331' } }
+    const fleet = setFleetFocus({
+      ...createSupervisorFleetState('2026-09-03T00:00:00Z', machines, 'default'),
+      selectedMachine: 1,
+      selectedProjects: { local: 0, cloud: 0 },
+    }, 'projects')
+    const localTarget = {
+      kind: 'local' as const,
+      machineKey: 'local',
+      machineName: 'This computer',
+      projectKey: 'default',
+      projectName: 'Default AliceProject',
+      home: '/home/alice/default',
+      transport: 'loopback' as const,
+      endpoint: 'http://127.0.0.1:47331',
+      runtime: localRuntime,
+    }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'fleet',
+      runtime: localRuntime,
+      activeTarget: localTarget,
+      fleet,
+    }, {
+      getViewportHeight: () => 16,
+      motionEnabled: false,
+    })
+
+    const connections = screen.render(46)
+    expect(connections).toHaveLength(16)
+    expect(connections[0]).toContain('◆ OpenAlice')
+    expect(connections.join('\n')).toContain('AliceProjects · Cloud · 1/1')
+
+    screen.update({
+      launchFlight: advanceSupervisorLaunchFlight(
+        createSupervisorLaunchFlight('remote-connect', {
+          machineKey: 'cloud',
+          machineName: 'Cloud',
+          projectKey: 'research',
+          projectName: 'Research',
+          transport: 'ssh-forward',
+        }, 0),
+        'open-forward',
+      ),
+    })
+    const flight = screen.render(46)
+    expect(flight).toHaveLength(16)
+    expect(flight[0]).toContain('◆ OpenAlice')
+    expect(flight.join('\n')).toContain('◆ STEP 2/3 · Open SSH forward')
+
+    const remoteRuntime = { class: 'running', endpoints: { web: 'http://127.0.0.1:45454' } }
+    screen.update({
+      panel: 'overview',
+      launchFlight: undefined,
+      activeTarget: {
+        kind: 'ssh',
+        machineKey: 'cloud',
+        machineName: 'Cloud',
+        projectKey: 'research',
+        projectName: 'Research',
+        home: '/home/alice/research',
+        transport: 'ssh-forward',
+        endpoint: 'http://127.0.0.1:45454',
+        runtime: remoteRuntime,
+        health: {
+          phase: 'unreachable',
+          consecutiveFailures: 3,
+          checkedAt: 1,
+        },
+      },
+    })
+    const recovery = screen.render(46)
+    expect(recovery).toHaveLength(16)
+    expect(recovery[0]).toContain('◆ OpenAlice')
+    expect(recovery.join('\n')).toContain('NEXT  Active endpoint is unreachable')
+    expect(recovery.join('\n')).toContain('STATUS  × Connection  unreachable')
+  })
+
+  it('anchors one wide Active Route between its guidance and bottom controls', () => {
+    let viewportHeight = 32
+    const local = fleetMachines()[0]!
+    const runtime = { class: 'running', endpoints: { web: 'http://127.0.0.1:47331' } }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'fleet',
+      runtime,
+      activeTarget: {
+        kind: 'local',
+        machineKey: 'local',
+        machineName: 'This computer',
+        projectKey: 'default',
+        projectName: 'Default AliceProject',
+        home: '/fixture/default',
+        transport: 'loopback',
+        endpoint: 'http://127.0.0.1:47331',
+        runtime,
+      },
+      fleet: createSupervisorFleetState('2026-09-03T00:00:00Z', [local], 'default'),
+    }, {
+      getViewportHeight: () => viewportHeight,
+      motionEnabled: false,
+    })
+
+    const lines = screen.render(120)
+    const tipRow = lines.findIndex((line) => line.startsWith('◇  Tip:'))
+    const spineRow = lines.findIndex((line) => line.includes('[ / ] Commands'))
+    expect(lines).toHaveLength(32)
+    expect(lines.join('\n')).toContain('Active Route · LIVE · LOCAL')
+    expect(spineRow).toBe(lines.length - 1)
+    expect(lines.slice(tipRow + 1, spineRow).every((line) => line === '')).toBe(true)
+
+    viewportHeight = 48
+    const expanded = screen.render(120)
+    expect(expanded).toHaveLength(48)
+    expect(expanded.findIndex((line) => line.includes('[ / ] Commands')))
+      .toBe(expanded.length - 1)
+  })
+
+  it('makes a one-target remote Active Route disconnect directly', () => {
+    let disconnects = 0
+    const remote = fleetMachines()[1]!
+    const project = remote.projects[0]!
+    const runtime = { class: 'running', endpoints: { web: project.runtime.webEndpoint } }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'fleet',
+      runtime: { class: 'absent', endpoints: {} },
+      activeTarget: {
+        kind: 'ssh',
+        machineKey: remote.key,
+        machineName: remote.displayName,
+        projectKey: project.key,
+        projectName: project.displayName,
+        home: project.home,
+        transport: 'ssh-forward',
+        endpoint: project.runtime.webEndpoint!,
+        runtime,
+      },
+      fleet: createSupervisorFleetState('2026-09-03T00:00:00Z', [remote], project.key),
+    }, {
+      getViewportHeight: () => 16,
+      motionEnabled: false,
+      onDisconnectActiveTarget: () => { disconnects += 1 },
+    })
+
+    const frame = screen.render(46).join('\n')
+    expect(frame).toContain('Active Route · LIVE · REMOTE')
+    expect(frame).toContain(`⌁ ${remote.displayName} · REMOTE`)
+    expect(frame).toContain('· [ x ] Disconnect SSH forward')
+    expect(frame).not.toContain('Transfer AliceProject')
+    expect(screen.handleKey('x', matchesKey)).toBe(true)
+    expect(disconnects).toBe(1)
+  })
+
+  it('keeps Runtime status, controls, and application chrome visible at 46x16', () => {
+    const runtime = {
+      class: 'running',
+      state: 'ready',
+      owner: { surface: 'cli-server', pid: 4242 },
+      provider: { kind: 'source' },
+      components: { alice: 'ready', uta: 'disabled', connector: 'disabled' },
+      uptimeSeconds: 7_380,
+      endpoints: { web: 'http://127.0.0.1:2026' },
+    }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'logs',
+      runtime,
+      activeTarget: {
+        kind: 'local',
+        machineKey: 'local',
+        machineName: 'This computer',
+        projectKey: 'default',
+        projectName: 'Default AliceProject',
+        home: '/tmp/openalice',
+        transport: 'loopback',
+        endpoint: 'http://127.0.0.1:2026',
+        health: { phase: 'connected', consecutiveFailures: 0 },
+        runtime,
+      },
+      logs: { entries: [] },
+    }, {
+      getViewportHeight: () => 16,
+      motionEnabled: false,
+    })
+
+    const lines = screen.render(46)
+    const frame = lines.join('\n')
+    expect(lines).toHaveLength(16)
+    expect(frame).toContain('◆ OpenAlice')
+    expect(frame).toContain('[Runtime]')
+    expect(frame).toContain('Runtime · LIVE · LOCAL · QUIET')
+    expect(frame).toContain('● OPENALICE READY · source · 2h 3m')
+    expect(frame).toContain('⌁ This computer → Default AliceProject')
+    expect(frame).toContain('● Alice ready · ○ UTA off · ○ Conn off')
+    expect(frame).toContain('◆ [ o ] Open verified Web UI')
+    expect(frame).toContain('· [ l ] Reload Runtime snapshot')
+    expect(frame).toContain('◇  Tip:')
+    expect(frame).toContain('[ / ] Commands')
+
+    screen.update({
+      activeTarget: {
+        kind: 'ssh',
+        machineKey: 'cloud',
+        machineName: 'Cloud Lab',
+        projectKey: 'research',
+        projectName: 'Research',
+        home: '/srv/openalice',
+        transport: 'ssh-forward',
+        endpoint: 'http://127.0.0.1:47331',
+        health: { phase: 'connected', consecutiveFailures: 0 },
+        runtime,
+      },
+    })
+    const remoteFrame = screen.render(46).join('\n')
+    expect(remoteFrame).toContain('Runtime · LIVE · REMOTE')
+    expect(remoteFrame).toContain('⌁ Cloud Lab → Research')
+    expect(remoteFrame).toContain('· [ x ] Disconnect SSH forward')
+    expect(remoteFrame).not.toContain('Reload Runtime snapshot')
+  })
+
+  it('keeps populated Runtime events visible without an active endpoint at 46x16', () => {
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'logs',
+      runtime: { class: 'running', state: 'running', endpoints: {} },
+      logs: {
+        entries: Array.from({ length: 10 }, (_, index) => ({ text: `event ${index + 1}` })),
+      },
+    }, {
+      getViewportHeight: () => 16,
+      motionEnabled: false,
+    })
+
+    const lines = screen.render(46)
+    const frame = lines.join('\n')
+    expect(lines).toHaveLength(16)
+    expect(frame).toContain('[Run]·10')
+    expect(frame).toContain('Event Lens · 10/10 · ALL · INFO')
+    expect(frame).toContain('› · 10  event 10')
+    expect(frame).toContain('DETAIL  event 10')
+    expect(frame).toContain('KEYS    ↑↓ browse · f lens · y copy')
+    expect(frame).toContain('◇  Tip: ↑↓ explores; f filters; y copies; End…')
+    expect(frame).toContain('[ / ] Commands')
+  })
+
+  it('keeps a task-led Control Guide and application chrome visible at 46x16', () => {
+    let viewportHeight = 16
+    const runtime = { class: 'running', endpoints: { web: 'http://127.0.0.1:2026' } }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'help',
+      runtime,
+      activeTarget: {
+        kind: 'local',
+        machineKey: 'local',
+        machineName: 'This computer',
+        projectKey: 'default',
+        projectName: 'Default AliceProject',
+        home: '/tmp/openalice',
+        transport: 'loopback',
+        endpoint: 'http://127.0.0.1:2026',
+        runtime,
+      },
+    }, {
+      getViewportHeight: () => viewportHeight,
+      motionEnabled: false,
+    })
+
+    const lines = screen.render(46)
+    const frame = lines.join('\n')
+    expect(lines).toHaveLength(16)
+    expect(frame).toContain('◆ OpenAlice')
+    expect(frame).toContain('Home │ ● Inbox │ ◇ Connect │ ≋ Runtime')
+    expect(frame).toContain('Control Guide · 1/3 · NAVIGATION')
+    expect(frame).toContain('NEXT  [ Tab / → ] Next view')
+    expect(frame).toContain('› ◆ Navigation  Move with intent')
+    expect(frame).toContain('● Runtime  Read state, then act')
+    expect(frame).toContain('◇ AliceProject  Shape the workspace')
+    expect(frame).toContain('◆ [ ? ] Close Help')
+    expect(frame).toContain('◇  Tip:')
+    expect(frame).toContain('[ / ] Commands')
+
+    viewportHeight = 32
+    const wide = screen.render(120)
+    const wideTipRow = wide.findIndex((line) => line.startsWith('◇  Tip:'))
+    const wideSpineRow = wide.findIndex((line) => line.includes('[ / ] Commands'))
+    expect(wide).toHaveLength(32)
+    expect(wideSpineRow).toBe(wideTipRow + 2)
+    expect(wide.slice(wideSpineRow + 1).every((line) => line === '')).toBe(true)
+
+    viewportHeight = 16
+    screen.render(46)
+    const runtimeRow = lines.findIndex((line) => line.includes('Runtime  Read state')) + 1
+    expect(screen.handlePointer(pointerClick(20, runtimeRow))).toBe(true)
+    expect(screen.render(46).join('\n')).toContain('Control Guide · 2/3 · RUNTIME')
+    const closeRow = screen.render(46).findIndex((line) => line.includes('[ ? ] Close Help')) + 1
+    expect(screen.handlePointer(pointerClick(20, closeRow))).toBe(true)
+    expect(screen.snapshot.panel).toBe('overview')
+  })
+
+  it('keeps one actionable Doctor path and application chrome visible at 46x16', () => {
+    const actions: SupervisorAction[] = []
+    const runtime = { class: 'running', endpoints: { web: 'http://127.0.0.1:2026' } }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'doctor',
+      runtime,
+      activeTarget: {
+        kind: 'local',
+        machineKey: 'local',
+        machineName: 'This computer',
+        projectKey: 'default',
+        projectName: 'Default AliceProject',
+        home: '/tmp/openalice',
+        transport: 'loopback',
+        endpoint: 'http://127.0.0.1:2026',
+        runtime,
+      },
+      doctor: {
+        overall: 'failure',
+        summary: { passed: 0, warnings: 0, failures: 1 },
+        checks: [{
+          status: 'fail',
+          summary: 'Runtime protocol mismatch',
+          detail: 'The configured runtime answered with an incompatible protocol.',
+        }],
+      },
+    }, {
+      getViewportHeight: () => 16,
+      motionEnabled: false,
+      onAction: (action) => actions.push(action),
+    })
+
+    const lines = screen.render(46)
+    const frame = lines.join('\n')
+    expect(lines).toHaveLength(16)
+    expect(frame).toContain('◆ OpenAlice')
+    expect(frame).toContain('Home │ ● Inbox │ ◇ Connect │ ≋ Runtime')
+    expect(frame).toContain('Doctor · 1F/0W/0P · 1/1')
+    expect(frame).toContain('× FAIL · Runtime protocol mismatch')
+    expect(frame).toContain('WHY   The configured runtime answered')
+    expect(frame).toContain('FIX   Resolve this condition, then rerun.')
+    expect(frame).toContain('CHECK 1/1 · ↑↓ chooses')
+    expect(frame).toContain('◆ [ d ] Rerun Runtime Doctor')
+    expect(frame).toContain('◇  Tip: Doctor is read-only')
+    expect(frame).toContain('[ / ] Commands')
+
+    const actionRow = lines.findIndex((line) => line.includes('[ d ] Rerun Runtime Doctor')) + 1
+    expect(screen.handlePointer(pointerClick(20, actionRow))).toBe(true)
+    expect(actions).toEqual(['doctor'])
+  })
+
+  it('keeps remote controls target-scoped and exposes an explicit disconnect', () => {
+    let disconnected = 0
+    let sourceRequests = 0
+    const runtime = {
+      class: 'running',
+      endpoints: { web: 'http://127.0.0.1:45454' },
+    }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'overview',
+      runtime: { class: 'absent', endpoints: {} },
+      activeTarget: {
+        kind: 'ssh',
+        machineKey: 'cloud',
+        machineName: 'Cloud Lab',
+        projectKey: 'research',
+        projectName: 'Research',
+        home: '/srv/openalice/research',
+        transport: 'ssh-forward',
+        endpoint: 'http://127.0.0.1:45454',
+        clientUrl: 'http://127.0.0.1:45454/#openalice-remote=1',
+        runtime,
+      },
+    }, {
+      motionEnabled: false,
+      onDisconnectActiveTarget: () => { disconnected += 1 },
+      onConfigureSource: () => { sourceRequests += 1 },
+    })
+
+    const frame = screen.render(100).join('\n')
+    expect(frame).toContain('⌁ Cloud Lab / Research · SSH')
+    expect(frame).not.toContain('╭─ ◆ [ x ] Disconnect')
+    expect(frame).not.toContain('[ i ] Research')
+    expect(screen.handleKey('/', matchesKey)).toBe(true)
+    for (const character of 'disconnect') {
+      expect(screen.handleKey(character, matchesKey)).toBe(true)
+    }
+    expect(screen.renderCommandPalette(100).lines.join('\n')).toContain('Disconnect remote target')
+    expect(screen.renderCommandPalette(100).lines.join('\n')).not.toContain('Runtime Source')
+    expect(screen.handleEscape()).toBe(true)
+
+    expect(screen.handleKey('c', matchesKey)).toBe(true)
+    expect(screen.snapshot.panel).toBe('fleet')
+    expect(sourceRequests).toBe(0)
+    screen.update({ panel: 'overview' })
+    expect(screen.handleKey('x', matchesKey)).toBe(true)
+    expect(disconnected).toBe(1)
+    expect(screen.handleKey('d', matchesKey)).toBe(true)
+    expect(screen.snapshot.notice).toContain('controls a local Runtime')
+  })
+
+  it('turns an unhealthy active target into an explicit recovery surface', () => {
+    let retries = 0
+    let opens = 0
+    const runtime = {
+      class: 'running',
+      endpoints: { web: 'http://127.0.0.1:45454' },
+    }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'overview',
+      runtime: { class: 'absent', endpoints: {} },
+      activeTarget: {
+        kind: 'ssh',
+        machineKey: 'cloud',
+        machineName: 'Cloud Lab',
+        projectKey: 'research',
+        projectName: 'Research',
+        home: '/srv/openalice/research',
+        transport: 'ssh-forward',
+        endpoint: 'http://127.0.0.1:45454',
+        runtime,
+        health: { phase: 'unreachable', consecutiveFailures: 3, checkedAt: 42 },
+      },
+      inbox: {
+        endpoint: 'http://127.0.0.1:45454/',
+        refreshedAt: Date.now(),
+        hasMore: false,
+        entries: [{ id: 'waiting', ts: Date.now(), workspaceId: 'ws', comments: 'Unread report.' }],
+      },
+    }, {
+      motionEnabled: false,
+      getViewportHeight: () => 32,
+      onRefreshActiveTarget: () => { retries += 1 },
+      onOpenActiveTarget: () => { opens += 1 },
+    })
+
+    const frame = screen.render(100).join('\n')
+    expect(frame).toContain('◆ [Home]·×')
+    expect(frame).toContain('× UNREACHABLE')
+    expect(frame).toContain('Active endpoint is unreachable')
+    expect(frame).toContain('× Connection  unreachable')
+    expect(frame).not.toContain('● LIVE SESSION · OPEN THE WORKSPACE')
+    expect(frame).not.toContain('INBOX ATTENTION')
+    expect(frame).toContain('currently unreachable')
+    expect(frame).toContain('[ Enter ]  Retry active connection')
+    expect(frame).toContain('◇  Tip: Enter retries now; x disconnects without stopping the remote Runtime.')
+    expect(frame).not.toContain('Run Doctor before acting')
+    expect(frame).not.toContain('[ o ] Open Web')
+    expect(screen.renderCommandPalette(100).lines.join('\n')).toContain('Retry connection')
+
+    expect(screen.handleKey('enter', matchesKey)).toBe(true)
+    expect(screen.handleKey('r', matchesKey)).toBe(true)
+    expect(retries).toBe(2)
+    expect(screen.handleKey('o', matchesKey)).toBe(true)
+    expect(opens).toBe(0)
+    expect(screen.snapshot.notice).toContain('not healthy')
+
+    screen.update({ panel: 'logs' })
+    const runtimeFrame = screen.render(100).join('\n')
+    expect(runtimeFrame).toContain('ENDPOINT UNREACHABLE')
+    expect(runtimeFrame).toContain('3 failed probes')
+    expect(runtimeFrame).toContain('[ r ] Retry active connection')
+  })
+
+  it('uses the same recovery contract for a degraded local target', () => {
+    let retries = 0
+    const runtime = { class: 'running', endpoints: { web: 'http://127.0.0.1:47331' } }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'overview',
+      runtime,
+      activeTarget: {
+        kind: 'local',
+        machineKey: 'local',
+        machineName: 'This computer',
+        projectKey: 'default',
+        projectName: 'Default AliceProject',
+        home: '/tmp/openalice',
+        transport: 'loopback',
+        endpoint: 'http://127.0.0.1:47331',
+        runtime,
+        health: { phase: 'degraded', consecutiveFailures: 1 },
+      },
+    }, {
+      motionEnabled: false,
+      getViewportHeight: () => 32,
+      onRefreshActiveTarget: () => { retries += 1 },
+    })
+
+    const frame = screen.render(100).join('\n')
+    expect(frame).toContain('◆ [Home]·!')
+    expect(frame).toContain('! DEGRADED')
+    expect(frame).toContain('Connection needs a retry')
+    expect(frame).toContain('! Connection  degraded')
+    expect(frame).toContain('endpoint missed a Runtime')
+    expect(frame).toContain('[ Enter ]  Retry active connection')
+    expect(frame).toContain('◇  Tip: Enter retries inspection; automatic checks continue without changing Runtime.')
+    expect(frame).not.toContain('Run Doctor before acting')
+    expect(screen.handleKey('r', matchesKey)).toBe(true)
+    expect(retries).toBe(1)
+
+    screen.update({ panel: 'logs' })
+    const runtimeFrame = screen.render(100).join('\n')
+    expect(runtimeFrame).toContain('Runtime Observatory · CONNECTION DEGRADED · LOCAL')
+    expect(runtimeFrame).toContain('1 failed inspections')
+    expect(runtimeFrame).toContain('◆ [ r ] Retry active connection')
+    expect(runtimeFrame).not.toContain('[ l ] Reload snapshot')
+  })
+
   it('labels source-run, stable, beta, and dev channels from install provenance', async () => {
     await expect(resolveSupervisorChannel({
       resolveLayout: () => null,
@@ -39,6 +1096,7 @@ describe('Supervisor TUI screen', () => {
   })
 
   it('renders stable stopped-state application chrome', () => {
+    const actions: SupervisorAction[] = []
     const screen = new SupervisorScreen({
       version: '0.87.0-beta',
       channel: 'dev',
@@ -48,16 +1106,1368 @@ describe('Supervisor TUI screen', () => {
         owner: null,
         endpoints: {},
       },
-    })
+    }, { onAction: (action) => actions.push(action) })
 
     const lines = screen.render(80)
 
-    expect(lines).toContain('OpenAlice  0.87.0-beta  channel dev')
-    expect(lines).toContain('Runtime state: absent')
-    expect(lines.join('\n')).toContain('Enter Start & open · s Background · p Setup')
-    expect(lines.join('\n')).toContain('i AliceProjects')
-    expect(lines).toContain('d Doctor · l Logs · u Update · ? Help')
-    expect(lines).toContain('q / Esc / Ctrl+C  Detach without stopping')
+    expect(lines[0]).toMatch(/^╭─ /u)
+    expect(lines[0]).toContain('OpenAlice Supervisor')
+    expect(lines[0]).toContain('v0.87.0-beta · DEV')
+    expect(lines[0]).toContain('[ u ]')
+    expect(lines[1]).toMatch(/^╰─ ◆ \[Home\].+─╯$/u)
+    expect(lines[1]).toContain('● Inbox')
+    expect(lines[1]).toContain('◇ Connections')
+    expect(lines[1]).toContain('≋ Runtime')
+    expect(lines.slice(0, 2).every((line) => displayWidth(line) === 80)).toBe(true)
+    expect(lines.join('\n')).toContain('○ STOPPED')
+    expect(lines.join('\n')).toContain('Alice Session · OpenAlice')
+    expect(lines.join('\n')).not.toContain('Runtime Signal Deck')
+    expect(lines.join('\n')).not.toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+    expect(lines.length).toBeLessThanOrEqual(24)
+    expect(lines.join('\n')).toContain('[ Enter ]  Start OpenAlice & open Workspace')
+    expect(lines.join('\n')).toContain('Your workspace is one step away')
+    expect(lines.join('\n')).not.toContain('Enter starts and opens')
+    expect(lines.join('\n')).not.toContain('◆ [ Enter ] Start & open')
+    expect(lines.join('\n')).not.toContain('╭─ · [ s ] Start quietly')
+    expect(screen.renderCommandPalette(80).lines.join('\n')).toContain('Start quietly')
+    expect(lines.at(-1)).toContain('╰─ [ / ] Commands  ›  [ q ] Detach')
+    expect(lines.at(-1)).toContain('[ i ] AliceProject  ›  ○ COLD')
+    expect(lines.at(-1)).toMatch(/─╯$/u)
+    const compactNowRow = lines.findIndex((line) => line.includes('NEXT'))
+    const compactActionRow = lines.findIndex((line) => line.includes('[ Enter ]'))
+    const compactSignalsRow = lines.findIndex((line) => line.includes('STATUS'))
+    const compactRecentRow = lines.findIndex((line) => line.includes('ACTIVITY'))
+    expect(compactActionRow).toBeGreaterThan(compactNowRow)
+    expect(compactSignalsRow).toBeGreaterThan(compactActionRow + 1)
+    expect(compactRecentRow).toBeGreaterThan(compactSignalsRow + 1)
+
+    screen.update({ focusTask: 'setup' })
+    const focusLines = screen.render(80)
+    expect(focusLines[0]).toContain('◇ BUILD v0.87.0-beta · DEV')
+    expect(focusLines[0]).not.toContain('[ u ]')
+    expect(focusLines.join('\n')).not.toContain('Tip:')
+    expect(screen.handlePointer(pointerClick(70, 1))).toBe(false)
+    expect(actions).toEqual([])
+    screen.update({ focusTask: undefined })
+
+    const wideLines = screen.render(120)
+    expect(wideLines[1]).toHaveLength(120)
+    expect(wideLines.join('\n')).toContain('Alice Session · OpenAlice')
+    expect(wideLines.join('\n')).toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+    expect(wideLines.join('\n')).toContain('⌂ Default AliceProject')
+    expect(wideLines.filter((line) => line.includes('○ READY TO START'))).toHaveLength(1)
+    expect(wideLines.join('\n')).not.toContain('○ STOPPED')
+    expect(wideLines.join('\n')).toContain('Your workspace is one step away')
+    expect(wideLines.join('\n')).toContain('prepare the selected checkout, verify readiness')
+    expect(wideLines.join('\n')).toContain('Need another checkout? Press c before launch.')
+    expect(wideLines.filter((line) => line.includes('Alice Session · OpenAlice'))).toHaveLength(1)
+    expect(wideLines.join('\n')).toContain('NEXT')
+    expect(wideLines.join('\n')).toContain('STATUS')
+    expect(wideLines.join('\n')).toContain('ACTIVITY')
+    expect(wideLines.find((line) => line.includes('[ Enter ]'))).not.toContain('Uptime')
+    expect(wideLines.join('\n')).toContain('○ COLD')
+    expect(wideLines.every((line) => displayWidth(line) <= 120)).toBe(true)
+
+    const foldedLines = screen.render(99)
+    expect(foldedLines.join('\n')).toContain('Alice Session · OpenAlice')
+    expect(foldedLines.join('\n')).not.toContain('Runtime Signal Deck')
+    expect(foldedLines.join('\n')).not.toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+    expect(foldedLines.every((line) => displayWidth(line) <= 99)).toBe(true)
+
+    const compactLines = screen.render(71)
+    expect(compactLines.join('\n')).toContain('Alice Session · OpenAlice')
+    expect(compactLines.join('\n')).not.toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+    expect(compactLines.every((line) => displayWidth(line) <= 71)).toBe(true)
+
+    const narrowHeader = screen.render(46)[0]!
+    expect(narrowHeader).toContain('↗ v0.87.0-beta · DEV')
+    expect(displayWidth(narrowHeader)).toBe(46)
+    screen.render(80)
+
+    const primaryRow = screen.render(80).findIndex((line) => line.includes('[ Enter ]')) + 1
+    expect(screen.handlePointer({
+      button: 35, col: 60, row: primaryRow, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(80).join('\n')).toContain('│ › [ Enter ]  Start OpenAlice & open Workspace')
+    expect(screen.handlePointer(pointerClick(60, primaryRow))).toBe(true)
+    expect(actions).toEqual(['start-open'])
+    expect(screen.handleKey(']', matchesKey)).toBe(true)
+    expect(screen.handleKey('[', matchesKey)).toBe(true)
+    expect(screen.render(80).join('\n')).toContain('│ ◆ [ Enter ]  Start OpenAlice & open Workspace')
+
+    screen.update({
+      update: {
+        status: 'available',
+        currentVersion: '0.87.0-beta',
+        latestVersion: '0.90.0',
+        channel: 'dev',
+        sourceChannel: 'dev',
+      },
+    })
+    expect(screen.render(120)[0]).toContain('v0.87.0-beta · DEV · update 0.90.0')
+  })
+
+  it('anchors wide Home between its task board and bottom Command Spine', () => {
+    let viewportHeight = 32
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: {
+        class: 'absent',
+        home: '/tmp/openalice',
+        owner: null,
+        endpoints: {},
+      },
+    }, {
+      getViewportHeight: () => viewportHeight,
+      motionEnabled: false,
+    })
+
+    const tall = screen.render(120).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
+    const stageRow = tall.findIndex((line) => line.includes('Alice Session · OpenAlice'))
+    const actionRow = tall.findIndex((line) => line.includes('[ Enter ]'))
+    const cardBottomRow = tall.findIndex((line, index) => index > stageRow && line.startsWith('╰'))
+    const tipRow = tall.findIndex((line) => line.startsWith('◇  Tip:'))
+    const spineRow = tall.findIndex((line) => line.includes('[ / ] Commands'))
+
+    expect(tall).toHaveLength(32)
+    expect(stageRow).toBe(4)
+    const signalsRow = tall.findIndex((line) => line.includes('STATUS'))
+    const recentRow = tall.findIndex((line) => line.includes('ACTIVITY'))
+    expect(actionRow).toBeGreaterThan(stageRow)
+    expect(signalsRow).toBeGreaterThan(actionRow)
+    expect(recentRow).toBeGreaterThan(signalsRow)
+    expect(cardBottomRow).toBeGreaterThan(recentRow)
+    expect(tipRow).toBeGreaterThan(cardBottomRow)
+    expect(cardBottomRow).toBeGreaterThanOrEqual(20)
+    expect(cardBottomRow).toBeLessThanOrEqual(22)
+    expect(tall.join('\n')).toContain('NEXT')
+    expect(tall.join('\n')).toContain('STATUS')
+    expect(tall.join('\n')).toContain('ACTIVITY')
+    expect(tall.join('\n')).not.toContain('CONTROL PATH')
+    expect(tall.join('\n')).not.toContain('Runtime Telemetry')
+    expect(tall.join('\n')).not.toContain('CONTROL CONSOLE')
+    expect(tipRow).toBe(cardBottomRow + 2)
+    expect(spineRow).toBe(tall.length - 1)
+    expect(tall.slice(tipRow + 1, spineRow).every((line) => line === '')).toBe(true)
+
+    viewportHeight = 48
+    const expanded = screen.render(120).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
+    expect(expanded).toHaveLength(48)
+    const expandedBottom = expanded.findIndex((line, index) => index > stageRow && line.startsWith('╰'))
+    const expandedRecent = expanded.findIndex((line) => line.includes('ACTIVITY'))
+    const expandedSpine = expanded.findIndex((line) => line.includes('[ / ] Commands'))
+    expect(expandedBottom).toBe(cardBottomRow)
+    expect(expandedRecent).toBe(recentRow)
+    expect(expandedSpine).toBe(expanded.length - 1)
+    expect(expanded.findIndex((line) => line.includes('[ Enter ]'))).toBe(actionRow)
+    expect(expanded.slice(expandedRecent + 1, expandedSpine).filter((line) => line === '').length)
+      .toBeGreaterThan(10)
+
+    const folded = screen.render(99).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
+    expect(folded.findIndex((line) => line.includes('Alice Session'))).toBeLessThan(20)
+    expect(folded.join('\n')).not.toContain('CONTROL PATH')
+    expect(folded.join('\n')).not.toContain(
+      `│${' '.repeat(97)}│\n│${' '.repeat(97)}│`,
+    )
+  })
+
+  it('folds an extremely short Home without losing Mission Navigation or Next', () => {
+    let opens = 0
+    const runtime = { class: 'running', endpoints: { web: 'http://127.0.0.1:47331' } }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'overview',
+      runtime,
+      activeTarget: {
+        kind: 'local',
+        machineKey: 'local',
+        machineName: 'This computer',
+        projectKey: 'default',
+        projectName: 'Default AliceProject',
+        home: '/fixture/default',
+        transport: 'loopback',
+        endpoint: 'http://127.0.0.1:47331',
+        runtime,
+      },
+    }, {
+      getViewportHeight: () => 16,
+      motionEnabled: false,
+      onOpenActiveTarget: () => { opens += 1 },
+    })
+
+    const lines = screen.render(46)
+    const frame = lines.join('\n')
+    expect(lines).toHaveLength(16)
+    expect(frame).toContain('◆ OpenAlice')
+    expect(frame).toContain('[Home]')
+    expect(frame).toContain('Alice Session · OpenAlice')
+    expect(frame).toContain('Default AliceProject')
+    expect(frame).toContain('● RUNNING')
+    expect(frame).toContain('⌁ This computer · LOCAL')
+    expect(frame).toContain('NEXT  Workspace is ready')
+    expect(frame).toContain('[ Enter ]  Open Workspace')
+    expect(frame).toContain('STATUS  ● Connection  healthy')
+    expect(frame).not.toContain('ACTIVITY')
+    expect(frame).toContain('[ / ] Commands')
+    const actionRow = lines.findIndex((line) => line.includes('[ Enter ]  Open Workspace')) + 1
+    expect(screen.handlePointer({
+      button: 35,
+      col: 24,
+      row: actionRow,
+      release: false,
+      wheel: null,
+      motion: true,
+      leftClick: false,
+    })).toBe(true)
+    expect(screen.render(46).join('\n')).toContain('› [ Enter ]  Open Workspace')
+    screen.update({ panel: 'fleet' })
+    screen.update({ panel: 'overview' })
+    expect(screen.render(46).join('\n')).toContain('◆ [ Enter ]  Open Workspace')
+    expect(screen.handlePointer(pointerClick(24, actionRow))).toBe(true)
+    expect(opens).toBe(1)
+
+    const stoppedRuntime = { class: 'absent' as const, endpoints: {} }
+    screen.update({
+      runtime: stoppedRuntime,
+      activeTarget: {
+        ...screen.snapshot.activeTarget!,
+        runtime: stoppedRuntime,
+      },
+    })
+    const stoppedFrame = screen.render(46).join('\n')
+    expect(stoppedFrame).toContain('◆ [ Enter ]  Start OpenAlice')
+    expect(stoppedFrame).not.toContain('Start OpenAlice & open Works')
+  })
+
+  it('keeps component diagnostics out of the task-oriented Home stage', () => {
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: {
+        class: 'running',
+        owner: null,
+        endpoints: { web: 'http://127.0.0.1:47331' },
+        components: { alice: 'ready', uta: 'disabled', connector: 'connected' },
+      },
+    }, {
+      getViewportHeight: () => 32,
+      motionEnabled: false,
+    })
+
+    const wide = screen.render(120).join('\n')
+    expect(wide).toContain('Workspace is ready')
+    expect(wide).toContain('● Connection  healthy')
+    expect(wide).not.toContain('SERVICE ARRAY')
+    expect(wide).not.toContain('UTA disabled')
+    expect(wide).not.toContain('Connector connected')
+  })
+
+  it('does not invent component state when Home only knows the Runtime is live', () => {
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: {
+        class: 'running',
+        owner: { surface: 'cli-server', pid: 42 },
+        endpoints: { web: 'http://127.0.0.1:47331' },
+      },
+    }, {
+      getViewportHeight: () => 32,
+      motionEnabled: false,
+    })
+
+    const wide = screen.render(120).join('\n')
+    expect(wide).toContain('Workspace is ready')
+    expect(wide).toContain('● LIVE TARGET')
+    expect(wide).not.toContain('Default AliceProject  ● RUNNING')
+    expect(wide).not.toContain('Component snapshot pending')
+    expect(wide).not.toContain('not reported')
+  })
+
+  it('renders a responsive OMP-style Command Spine without adding a row', () => {
+    const full = renderSupervisorDock({
+      panel: 'doctor',
+      projectName: 'Default AliceProject',
+      runtimeState: 'running',
+      pulse: true,
+    }, 100)
+    expect(full).toHaveLength(100)
+    expect(full).toContain('[ / ] Commands')
+    expect(full).toContain('[ i ] Default AliceProject  ›  ◉ LIVE  ›  ✦ DOCTOR')
+    expect(full).toMatch(/^╰─ .* ─╯$/u)
+    const themed = decorateSupervisorFrame([
+      'header',
+      'divider',
+      'tabs',
+      full,
+    ], createSupervisorTuiTheme({ TERM: 'xterm-256color' }), {
+      panel: 'doctor',
+      runtimeClass: 'running',
+    })[3]!
+    expect(themed).toContain('\u001b[1;38;2;183;255;248;48;2;10;34;39m[ / ] Commands')
+    expect(themed).toContain('\u001b[1;38;2;240;249;255;48;2;10;34;39m[ i ] Default AliceProject')
+    expect(themed).toContain('\u001b[1;38;2;145;242;187;48;2;10;34;39m◉ LIVE')
+    expect(themed).toContain('\u001b[1;38;2;213;179;255;48;2;10;34;39m✦ DOCTOR')
+    expect(themed.replace(/\u001b\[[0-9;]*m/gu, '')).toBe(full)
+    expect(decorateSupervisorFrame([
+      'header',
+      'divider',
+      'tabs',
+      full,
+    ], createSupervisorTuiTheme({ TERM: 'xterm-256color', NO_COLOR: '1' }), {
+      panel: 'doctor',
+      runtimeClass: 'running',
+    })[3]).toBe(full)
+    expect(supervisorCommandTargets([full])).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: '/', surface: '[ / ] Commands' }),
+      expect.objectContaining({ label: 'q', surface: '[ q ] Detach' }),
+      expect.objectContaining({
+        label: 'i',
+        surface: '[ i ] Default AliceProject',
+      }),
+    ]))
+
+    const missingHome = renderSupervisorDock({
+      panel: 'fleet',
+      projectName: 'Default AliceProject',
+      runtimeState: 'running',
+      projectAvailable: false,
+    }, 120)
+    expect(missingHome).toContain('◆ LIVE · HOME MISSING  ›  ◇ CONNECTIONS')
+    expect(missingHome).not.toContain('● LIVE')
+    const themedMissingHome = decorateSupervisorFrame([
+      'header',
+      'divider',
+      'tabs',
+      missingHome,
+    ], createSupervisorTuiTheme({ TERM: 'xterm-256color' }), {
+      panel: 'fleet',
+      runtimeClass: 'running',
+    })[3]!
+    expect(themedMissingHome).toContain(
+      '\u001b[1;38;2;255;214;128;48;2;10;34;39m◆ LIVE · HOME MISSING',
+    )
+    expect(themedMissingHome.replace(/\u001b\[[0-9;]*m/gu, '')).toBe(missingHome)
+
+    const connections = renderSupervisorDock({
+      panel: 'fleet',
+      projectName: 'Default AliceProject',
+      machineName: 'This computer',
+      targetKind: 'local',
+      runtimeState: 'running',
+      connectionHealth: 'connected',
+    }, 120)
+    expect(connections).toContain('● LIVE  ›  ◇ CONN')
+    expect(renderSupervisorDock({
+      panel: 'fleet',
+      projectName: 'Default AliceProject',
+      machineName: 'This computer',
+      targetKind: 'local',
+      runtimeState: 'running',
+      connectionHealth: 'connected',
+    }, 130)).toContain('● LIVE  ›  ◇ CONNECTIONS')
+    expect(decorateSupervisorFrame([
+      'header',
+      'divider',
+      'tabs',
+      connections,
+    ], createSupervisorTuiTheme({ TERM: 'xterm-256color' }), {
+      panel: 'fleet',
+      runtimeClass: 'running',
+    })[3]).toContain('\u001b[1;38;2;213;179;255;48;2;10;34;39m◇ CONN')
+
+    const compactRuntime = renderSupervisorDock({
+      panel: 'logs',
+      projectName: 'Default AliceProject',
+      machineName: 'This computer',
+      targetKind: 'local',
+      runtimeState: 'running',
+      connectionHealth: 'connected',
+    }, 113)
+    expect(compactRuntime).toContain('● LIVE  ›  ≋ RUN ─╯')
+    expect(renderSupervisorDock({
+      panel: 'logs',
+      projectName: 'Default AliceProject',
+      machineName: 'This computer',
+      targetKind: 'local',
+      runtimeState: 'running',
+      connectionHealth: 'connected',
+    }, 120)).toContain('● LIVE  ›  ≋ RUNTIME ─╯')
+    expect(decorateSupervisorFrame([
+      'header',
+      'divider',
+      'tabs',
+      compactRuntime,
+    ], createSupervisorTuiTheme({ TERM: 'xterm-256color' }), {
+      panel: 'logs',
+      runtimeClass: 'running',
+    })[3]).toContain('\u001b[1;38;2;213;179;255;48;2;10;34;39m≋ RUN')
+
+    const compactInbox = renderSupervisorDock({
+      panel: 'inbox',
+      projectName: 'Default AliceProject',
+      machineName: 'This computer',
+      targetKind: 'local',
+      runtimeState: 'running',
+      connectionHealth: 'connected',
+    }, 113)
+    expect(compactInbox).toContain('● LIVE  ›  ● BOX ─╯')
+    expect(renderSupervisorDock({
+      panel: 'inbox',
+      projectName: 'Default AliceProject',
+      machineName: 'This computer',
+      targetKind: 'local',
+      runtimeState: 'running',
+      connectionHealth: 'connected',
+    }, 115)).toContain('● LIVE  ›  ● INBOX ─╯')
+    expect(decorateSupervisorFrame([
+      'header',
+      'divider',
+      'tabs',
+      compactInbox,
+    ], createSupervisorTuiTheme({ TERM: 'xterm-256color' }), {
+      panel: 'inbox',
+      runtimeClass: 'running',
+    })[3]).toContain('\u001b[1;38;2;213;179;255;48;2;10;34;39m● BOX')
+
+    const unreachableRemote = renderSupervisorDock({
+      panel: 'overview',
+      projectName: 'Research',
+      machineName: 'Cloud Lab',
+      targetKind: 'ssh',
+      transport: 'ssh-forward',
+      runtimeState: 'running',
+      connectionHealth: 'unreachable',
+    }, 110)
+    expect(unreachableRemote).toContain('⌁ Cloud Lab / Research · SSH')
+    expect(unreachableRemote).toContain('× UNREACHABLE')
+    const themedUnreachable = decorateSupervisorFrame([
+      'header',
+      'divider',
+      'tabs',
+      unreachableRemote,
+    ], createSupervisorTuiTheme({ TERM: 'xterm-256color' }), {
+      panel: 'overview',
+      runtimeClass: 'unhealthy',
+    })[3]!
+    expect(themedUnreachable).toContain('\u001b[')
+    expect(themedUnreachable.replace(/\u001b\[[0-9;]*m/gu, '')).toBe(unreachableRemote)
+
+    const remoteLauncher = renderSupervisorDock({
+      panel: 'fleet',
+      launcher: true,
+      projectName: 'Research',
+      machineName: 'Cloud Lab',
+      targetKind: 'ssh',
+      transport: 'ssh-forward',
+      runtimeState: 'running',
+    }, 110)
+    expect(remoteLauncher).toContain('⌁ Cloud Lab / Research · SSH')
+    expect(remoteLauncher).toContain('● LIVE › ◆ LAUNCH')
+    expect(remoteLauncher).not.toContain('[ i ]')
+    expect(supervisorCommandTargets([remoteLauncher]).map((target) => target.label))
+      .toEqual(['/', 'q'])
+
+    const localLauncher = renderSupervisorDock({
+      panel: 'fleet',
+      launcher: true,
+      projectName: 'Default AliceProject',
+      machineName: 'This computer',
+      targetKind: 'local',
+      transport: 'loopback',
+      runtimeState: 'absent',
+    }, 80)
+    expect(localLauncher).toContain('⌁ Default AliceProject · LOCAL › ○ COLD')
+    expect(localLauncher).not.toContain('[ i ]')
+
+    const focus = renderSupervisorDock({
+      panel: 'overview',
+      focusTask: 'setup',
+      projectName: 'Default AliceProject',
+      runtimeState: 'absent',
+    }, 100)
+    expect(focus).toContain('◆ FOCUS WORKSPACE  ›  [ Esc ] Back')
+    expect(focus).toContain('⌂ Default AliceProject  ›  ○ COLD  ›  ◆ SETUP')
+    expect(focus).not.toContain('[ / ] Commands')
+    expect(focus).not.toContain('◆ HOME')
+    expect(supervisorCommandTargets([focus]).map((target) => target.label)).toEqual(['Esc'])
+
+    const transferFocus = renderSupervisorDock({
+      panel: 'fleet',
+      focusTask: 'transfer',
+      projectName: 'Default AliceProject',
+      runtimeState: 'absent',
+    }, 100)
+    expect(transferFocus).toContain('⌂ Default AliceProject  ›  ○ COLD  ›  ◆ TRANSFER')
+    expect(transferFocus).not.toContain('◇ CONNECTIONS')
+
+    const confirmationFocus = renderSupervisorDock({
+      panel: 'overview',
+      focusTask: 'confirmation',
+      focusLabel: 'Stop Runtime',
+      projectName: 'Default AliceProject',
+      runtimeState: 'absent',
+    }, 100)
+    expect(confirmationFocus).toContain('◆ DECISION GATE')
+    expect(confirmationFocus).toContain('◆ STOP RUNTIME')
+    expect(confirmationFocus).not.toContain('[ Esc ] Cancel')
+    expect(confirmationFocus).not.toContain('[ / ] Commands')
+
+    const compact = renderSupervisorDock({
+      panel: 'logs',
+      projectName: '研究 AliceProject with a very long name',
+      runtimeState: 'absent',
+    }, 60)
+    expect(displayWidth(compact)).toBe(60)
+    expect(compact).toContain('○ COLD')
+    expect(compact).toContain('≋ RUNTIME')
+
+    const palette = renderSupervisorDock({
+      panel: 'overview',
+      projectName: 'Default AliceProject',
+      runtimeState: 'absent',
+      commandPaletteOpen: true,
+    }, 80)
+    expect(palette).toContain('[ / ] Close  ›  [ q ] Detach')
+    expect(palette).toContain('[ i ] Default AliceProject  ›  ○ COLD')
+    expect(palette).not.toContain('◆ HOME')
+    const overview = renderSupervisorDock({
+      panel: 'overview',
+      projectName: 'Default AliceProject',
+      runtimeState: 'absent',
+    }, 100)
+    const themedOverview = decorateSupervisorFrame([
+      'header',
+      'divider',
+      'tabs',
+      overview,
+    ], createSupervisorTuiTheme({ TERM: 'xterm-256color' }), {
+      panel: 'overview',
+      runtimeClass: 'absent',
+    })[3]!
+    expect(themedOverview).toContain(
+      '\u001b[1;38;2;213;179;255;48;2;10;34;39m◆ HOME',
+    )
+
+    const narrow = renderSupervisorDock({
+      panel: 'overview',
+      projectName: 'Default AliceProject',
+      runtimeState: 'absent',
+    }, 52)
+    expect(narrow).toHaveLength(52)
+    expect(narrow).toContain('[ q ] Detach')
+    expect(narrow).not.toContain('[ i ]')
+    expect(narrow).toMatch(/\[ q \] Detach ─+╯$/u)
+    expect(narrow).not.toContain('  ─╯')
+    expect(displayWidth(narrow)).toBe(52)
+    expect(supervisorCommandTargets([narrow])).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: '/', surface: '[ / ] Commands' }),
+      expect.objectContaining({ label: 'q', surface: '[ q ] Detach' }),
+    ]))
+    expect(decorateSupervisorFrame([
+      'header',
+      'divider',
+      'tabs',
+      narrow,
+    ], createSupervisorTuiTheme({ TERM: 'xterm-256color', NO_COLOR: '1' }), {
+      panel: 'overview',
+      runtimeClass: 'absent',
+    })[3]).toBe(narrow)
+
+    const narrowPalette = renderSupervisorDock({
+      panel: 'overview',
+      commandPaletteOpen: true,
+    }, 46)
+    expect(narrowPalette).toMatch(/\[ \/ \] Close  ›  \[ q \] Detach ─+╯$/u)
+    expect(narrowPalette).not.toContain('  ─╯')
+    expect(displayWidth(narrowPalette)).toBe(46)
+
+    const recovery = renderSupervisorDock({
+      panel: 'overview',
+      recovery: true,
+    }, 80)
+    expect(recovery).toContain('! RECOVERY  ›  ◆ HOME')
+
+    const locked = renderSupervisorDock({
+      panel: 'fleet',
+      launcher: true,
+      runtimeState: 'absent',
+      inputLocked: true,
+    }, 80)
+    expect(locked).toContain('◆ OPERATION ACTIVE  ›  [ q ] Detach')
+    expect(locked).not.toContain('[ / ] Commands')
+    expect(supervisorCommandTargets([locked]).map((target) => target.label)).toEqual(['q'])
+    const themedLocked = decorateSupervisorFrame([
+      'header',
+      'divider',
+      'tabs',
+      locked,
+    ], createSupervisorTuiTheme({ TERM: 'xterm-256color' }), {
+      panel: 'fleet',
+      runtimeClass: 'absent',
+    })[3]!
+    expect(themedLocked).toContain('\u001b[1;38;2;183;255;248;48;2;10;34;39m◆ OPERATION ACTIVE')
+    expect(themedLocked).toContain('\u001b[1;38;2;183;255;248;48;2;10;34;39m[ q ] Detach')
+  })
+
+  it('flows Home controls with its task while operational controls stay viewport-anchored', () => {
+    let viewportHeight = 32
+    const paletteChanges: boolean[] = []
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'running', endpoints: {} },
+    }, {
+      getViewportHeight: () => viewportHeight,
+      onCommandPaletteChange: (open) => paletteChanges.push(open),
+      motionEnabled: false,
+    })
+
+    const tall = screen.render(80)
+    expect(tall).toHaveLength(32)
+    expect(tall.at(-2)).toBe('')
+    expect(tall.join('\n')).not.toContain('CONTROL CONSOLE')
+    const tallSpineRow = tall.findIndex((line) => line.includes('[ / ] Commands')) + 1
+    const tallTipRow = tall.findIndex((line) => line.startsWith('◇  Tip:')) + 1
+    expect(tallSpineRow).toBe(tallTipRow + 2)
+    expect(tallSpineRow).toBeLessThan(tall.length)
+    expect(tall.slice(tallSpineRow).every((line) => line === '')).toBe(true)
+    expect(tall.join('\n')).toContain(
+      '◇  Tip: Enter follows Next; o opens Web; Runtime keeps the diagnostic detail.',
+    )
+    expect(tall.findIndex((line) => line.includes('Runtime Signal Deck'))).toBeLessThan(20)
+    expect(screen.handlePointer(pointerClick(6, tallSpineRow))).toBe(true)
+    expect(paletteChanges).toEqual([true])
+    expect(screen.render(80).at(-1)).toContain('[ / ] Close')
+
+    viewportHeight = 24
+    const resized = screen.render(80)
+    expect(resized).toHaveLength(24)
+    expect(resized.at(-2)).toBe('')
+    expect(resized.at(-1)).toContain('[ / ] Close')
+    expect(resized.join('\n')).toContain('◇  Tip: Enter follows Next; o opens Web; Runtime keeps the diagnostic detail.')
+    expect(screen.handlePointer(pointerClick(6, 24))).toBe(true)
+    expect(paletteChanges).toEqual([true, false])
+
+    viewportHeight = 10
+    const short = screen.render(80)
+    expect(short.length).toBeGreaterThan(10)
+    expect(short.join('\n')).toContain('Alice Session')
+    expect(short.join('\n')).not.toContain('◇  Tip:')
+    expect(short.at(-1)).toContain('╰─ [ / ] Commands')
+
+    expect(anchorSupervisorControlConsole(
+      ['content'],
+      ['activity', 'actions', 'spine'],
+      7,
+      ['tip'],
+    )).toEqual(['content', '', 'tip', '', 'activity', 'actions', 'spine'])
+    expect(anchorSupervisorControlConsole(
+      ['content'],
+      ['spine'],
+      7,
+      ['tip'],
+      'flow',
+    )).toEqual(['content', '', 'tip', '', 'spine', '', ''])
+  })
+
+  it('renders contextual OMP-style Tips without creating an action target', () => {
+    const fleet = renderSupervisorContextTip({ panel: 'fleet' }, 100)
+    const activeFleet = renderSupervisorContextTip({ panel: 'fleet', activeSelection: true }, 100)
+    const switchFleet = renderSupervisorContextTip({ panel: 'fleet', switchSelection: true }, 100)
+    const launcher = renderSupervisorContextTip({ panel: 'fleet', launcher: true }, 100)
+    const directLauncher = renderSupervisorContextTip({
+      panel: 'fleet',
+      launcher: true,
+      directLauncher: true,
+    }, 100)
+    const directConnection = renderSupervisorContextTip({
+      panel: 'fleet',
+      directConnection: true,
+      targetKind: 'local',
+    }, 100)
+    const directRemoteConnection = renderSupervisorContextTip({
+      panel: 'fleet',
+      directConnection: true,
+      targetKind: 'ssh',
+    }, 100)
+    const logs = renderSupervisorContextTip({ panel: 'logs' }, 100)
+    const emptyLogs = renderSupervisorContextTip({ panel: 'logs', itemCount: 0 }, 100)
+    const doctor = renderSupervisorContextTip({ panel: 'doctor' }, 100)
+    const emptyDoctor = renderSupervisorContextTip({ panel: 'doctor', itemCount: 0 }, 100)
+    const help = renderSupervisorContextTip({ panel: 'help' }, 100)
+    const stopped = renderSupervisorContextTip({ panel: 'overview', runtimeState: 'absent' }, 100)
+    const recovery = renderSupervisorContextTip({ panel: 'overview', recovery: true }, 100)
+    const locked = renderSupervisorContextTip({ panel: 'fleet', inputLocked: true }, 100)
+    const launchFailure = renderSupervisorContextTip({ panel: 'fleet', launchFailure: true }, 100)
+    const checkingRemote = renderSupervisorContextTip({
+      panel: 'overview', targetKind: 'ssh', connectionHealth: 'checking',
+    }, 100)
+    const degradedRemote = renderSupervisorContextTip({
+      panel: 'overview', targetKind: 'ssh', connectionHealth: 'degraded',
+    }, 100)
+    const unreachableRemote = renderSupervisorContextTip({
+      panel: 'overview', targetKind: 'ssh', connectionHealth: 'unreachable',
+    }, 100)
+
+    expect(fleet).toContain('←→ changes pane; ↑↓ chooses')
+    expect(activeFleet).toContain('Enter returns Home')
+    expect(activeFleet).toContain('active target')
+    expect(switchFleet).toContain('current target stays live until ready')
+    expect(launcher).toContain('↑↓ selects')
+    expect(launcher).not.toContain('Enter runs Next')
+    expect(launcher).toContain('Tab/←→ changes pane')
+    expect(directLauncher).toContain('Enter starts OpenAlice')
+    expect(directLauncher).toContain('brings you Home')
+    expect(directLauncher).not.toContain('changes pane')
+    expect(directConnection).toContain('Enter returns Home; m transfers this AliceProject')
+    expect(directConnection).toContain('←→ changes view')
+    expect(directConnection).not.toContain('changes pane')
+    expect(directRemoteConnection).toContain('x disconnects this SSH forward')
+    expect(logs).toContain('f filters; y copies')
+    expect(emptyLogs).toContain('No Runtime events in this lens')
+    expect(doctor).toContain('Doctor is read-only')
+    expect(emptyDoctor).toContain('No diagnostic checks in this report')
+    expect(help).toContain('/ searches every available command')
+    expect(stopped).toContain('Alternate route: s starts without opening Web')
+    expect(stopped).not.toContain('Enter starts and opens')
+    expect(recovery).toContain('only safe Update and Detach routes')
+    expect(locked).toContain('Operation owns input until ready')
+    expect(locked).toContain('q detaches this TUI')
+    expect(launchFailure).toContain('Enter retries; Esc returns to targets')
+    expect(checkingRemote).toContain('SSH forward stays open')
+    expect(degradedRemote).toContain('Enter retries now; automatic probes')
+    expect(unreachableRemote).toContain('x disconnects without stopping the remote Runtime')
+    expect(supervisorCommandTargets([
+      fleet,
+      activeFleet,
+      switchFleet,
+      launcher,
+      directConnection,
+      directRemoteConnection,
+      logs,
+      emptyLogs,
+      doctor,
+      emptyDoctor,
+      help,
+      stopped,
+      recovery,
+      locked,
+      launchFailure,
+      checkingRemote,
+      degradedRemote,
+      unreachableRemote,
+    ])).toEqual([])
+
+    const compact = renderSupervisorContextTip({ panel: 'fleet' }, 46)
+    expect(displayWidth(compact)).toBeLessThanOrEqual(46)
+    expect(compact).toMatch(/…$/u)
+    const themed = decorateSupervisorFrame(
+      ['header', 'navigation', 'rail', fleet],
+      createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+      { panel: 'fleet' },
+    )[3]!
+    expect(themed).toContain('\u001b[1;38;2;116;235;226m◇  Tip:')
+    expect(themed).toContain('\u001b[38;2;116;132;153m ←→ changes pane; ↑↓ chooses')
+    expect(themed.replace(/\u001b\[[0-9;]*m/gu, '')).toBe(fleet)
+    expect(decorateSupervisorFrame(
+      ['header', 'navigation', 'rail', fleet],
+      createSupervisorTuiTheme({ TERM: 'xterm-256color', NO_COLOR: '1' }),
+      { panel: 'fleet' },
+    )[3]).toBe(fleet)
+  })
+
+  it('keeps empty recovery actions in content and long-tail controls in Commands', () => {
+    let viewportHeight = 32
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'logs',
+      runtime: { class: 'running', endpoints: {} },
+      logs: { entries: [] },
+      doctor: { overall: 'unknown', checks: [] },
+    }, {
+      getViewportHeight: () => viewportHeight,
+      motionEnabled: false,
+    })
+
+    const emptyLogs = screen.render(120)
+    expect(emptyLogs.join('\n')).toContain('◆ [ l ] Reload Runtime snapshot')
+    const logsTipRow = emptyLogs.findIndex((line) => line.startsWith('◇  Tip:'))
+    const logsSpineRow = emptyLogs.findIndex((line) => line.includes('[ / ] Commands'))
+    expect(logsSpineRow).toBe(logsTipRow + 2)
+    expect(logsSpineRow).toBeLessThan(emptyLogs.length - 1)
+    expect(emptyLogs.slice(logsSpineRow + 1).every((line) => line === '')).toBe(true)
+    expect(emptyLogs.join('\n')).not.toContain('[ y ] Copy event')
+    expect(emptyLogs.join('\n')).toContain('No Runtime events in this lens')
+
+    viewportHeight = 48
+    const expandedEmptyLogs = screen.render(120)
+    expect(expandedEmptyLogs).toHaveLength(48)
+    expect(expandedEmptyLogs.findIndex((line) => line.includes('[ / ] Commands'))).toBe(logsSpineRow)
+
+    viewportHeight = 32
+    screen.update({ logs: { entries: [{ text: 'Runtime ready' }] } })
+    expect(screen.render(120).join('\n')).toContain('Event Lens · LINE 1')
+
+    screen.update({ panel: 'doctor' })
+    const emptyDoctor = screen.render(120)
+    expect(emptyDoctor.join('\n')).toContain('◆ [ d ] Rerun Runtime Doctor')
+    const doctorTipRow = emptyDoctor.findIndex((line) => line.startsWith('◇  Tip:'))
+    const doctorSpineRow = emptyDoctor.findIndex((line) => line.includes('[ / ] Commands'))
+    expect(doctorSpineRow).toBe(doctorTipRow + 2)
+    expect(emptyDoctor.slice(doctorSpineRow + 1).every((line) => line === '')).toBe(true)
+    expect(emptyDoctor.join('\n')).toContain('No diagnostic checks in this report')
+    expect(emptyDoctor[1]).not.toContain('Doctor✓')
+
+    screen.update({ doctor: null })
+    expect(screen.render(120).join('\n')).toContain('◆ [ d ] Run Runtime Doctor')
+
+    screen.update({
+      doctor: {
+        overall: 'pass',
+        checks: [{ status: 'pass', summary: 'Runtime reachable' }],
+      },
+    })
+    const boundedDoctor = screen.render(120)
+    expect(boundedDoctor.join('\n')).toContain('Doctor checks')
+    expect(boundedDoctor.findIndex((line) => line.includes('[ / ] Commands')))
+      .toBe(boundedDoctor.findIndex((line) => line.startsWith('◇  Tip:')) + 2)
+    expect(screen.render(120)[1]).not.toContain('Doctor')
+
+    screen.update({
+      doctor: {
+        overall: 'pass',
+        checks: Array.from({ length: 11 }, (_, index) => ({
+          status: 'pass' as const,
+          summary: `Check ${index + 1}`,
+        })),
+      },
+    })
+    expect(screen.render(120).at(-1)).toContain('[ / ] Commands')
+  })
+
+  it('keeps the narrow Command Spine closed while Commands and Close remain clickable', () => {
+    const paletteChanges: boolean[] = []
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'overview',
+      runtime: { class: 'absent', endpoints: {} },
+    }, {
+      onCommandPaletteChange: (open) => paletteChanges.push(open),
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+      motionEnabled: false,
+    })
+
+    let lines = screen.render(46)
+    let spineRow = lines.findIndex((line) => line.includes('[ / ] Commands')) + 1
+    expect(spineRow).toBeGreaterThan(0)
+    let plainSpine = lines[spineRow - 1]?.replace(/\u001b\[[0-9;]*m/gu, '') ?? ''
+    expect(plainSpine).toMatch(/^╰─ \[ \/ \] Commands  ›  \[ q \] Detach ─+╯$/u)
+    expect(displayWidth(plainSpine)).toBe(46)
+    expect(screen.handlePointer(pointerClick(6, spineRow))).toBe(true)
+    expect(paletteChanges).toEqual([true])
+
+    lines = screen.render(46)
+    spineRow = lines.findIndex((line) => line.includes('[ / ] Close')) + 1
+    plainSpine = lines[spineRow - 1]?.replace(/\u001b\[[0-9;]*m/gu, '') ?? ''
+    expect(plainSpine).toMatch(/^╰─ \[ \/ \] Close  ›  \[ q \] Detach ─+╯$/u)
+    expect(displayWidth(plainSpine)).toBe(46)
+    expect(screen.handleCommandSpinePointer(pointerClick(6, spineRow))).toBe(true)
+    expect(paletteChanges).toEqual([true, false])
+  })
+
+  it('routes only persistent Command Spine targets while the Command Dock is open', () => {
+    const paletteChanges: boolean[] = []
+    const actions: SupervisorAction[] = []
+    const onProjects = vi.fn()
+    const onDetach = vi.fn()
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'overview',
+      runtime: { class: 'absent', endpoints: {} },
+    }, {
+      onAction: (action) => actions.push(action),
+      onCommandPaletteChange: (open) => paletteChanges.push(open),
+      onProjects,
+      onDetach,
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+      motionEnabled: false,
+    })
+
+    let lines = screen.render(80)
+    let spineRow = lines.findIndex((line) => line.includes('[ / ] Commands')) + 1
+    expect(screen.handlePointer(pointerClick(6, spineRow))).toBe(true)
+    lines = screen.render(80)
+
+    const actionRow = lines.findIndex((line) => line.includes('[ Enter ]  Start OpenAlice')) + 1
+    const actionLine = lines[actionRow - 1]?.replace(/\u001b\[[0-9;]*m/gu, '') ?? ''
+    const actionCol = actionLine.indexOf('[ Enter ]') + 3
+    expect(actionRow).toBeGreaterThan(0)
+    expect(actionCol).toBeGreaterThan(2)
+    expect(screen.handleCommandSpinePointer(pointerClick(actionCol, actionRow))).toBe(false)
+    expect(actions).toEqual([])
+    expect(paletteChanges).toEqual([true])
+
+    const projectRow = lines.findIndex((line) => line.includes('[ i ]')) + 1
+    const projectLine = lines[projectRow - 1]?.replace(/\u001b\[[0-9;]*m/gu, '') ?? ''
+    const projectCol = projectLine.indexOf('[ i ]') + 3
+    expect(projectRow).toBe(lines.length)
+    expect(projectCol).toBeGreaterThan(2)
+    expect(screen.handleCommandSpinePointer(pointerClick(projectCol, projectRow))).toBe(true)
+    expect(paletteChanges).toEqual([true, false])
+    expect(onProjects).toHaveBeenCalledTimes(1)
+
+    lines = screen.render(80)
+    spineRow = lines.findIndex((line) => line.includes('[ / ] Commands')) + 1
+    expect(screen.handlePointer(pointerClick(6, spineRow))).toBe(true)
+    lines = screen.render(80)
+    const detachRow = lines.findIndex((line) => line.includes('[ q ] Detach')) + 1
+    const detachLine = lines[detachRow - 1]?.replace(/\u001b\[[0-9;]*m/gu, '') ?? ''
+    const detachCol = detachLine.indexOf('[ q ]') + 3
+    expect(detachRow).toBe(lines.length)
+    expect(screen.handleCommandSpinePointer(pointerClick(detachCol, detachRow))).toBe(true)
+    expect(onDetach).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the AliceProject identity clickable without leaking Runtime setup into Home', () => {
+    const actions: SupervisorAction[] = []
+    let projectOpens = 0
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: {
+        class: 'absent',
+        owner: null,
+        endpoints: {},
+      },
+    }, {
+      onAction: (action) => actions.push(action),
+      onProjects: () => { projectOpens += 1 },
+      motionEnabled: false,
+    })
+
+    let lines = screen.render(80)
+    const projectRow = lines.findIndex((line) => line.includes('⌂ Default AliceProject')) + 1
+    expect(projectRow).toBeGreaterThan(0)
+    expect(lines.join('\n')).not.toContain('⑂ Provider')
+    expect(lines.join('\n')).not.toContain('↗ Web')
+
+    expect(screen.handlePointer({
+      button: 35, col: 70, row: projectRow, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(80).join('\n')).toContain('› Default AliceProject')
+    expect(screen.render(80).join('\n')).toContain(
+      '◇  PREVIEW  AliceProject Switchboard',
+    )
+    expect(screen.handlePointer(pointerClick(70, projectRow))).toBe(true)
+    expect(projectOpens).toBe(1)
+
+    expect(screen.handlePointer({
+      button: 35, col: 40, row: 4, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+
+    lines = screen.render(100)
+    expect(lines.join('\n')).toContain('Alice Session · OpenAlice')
+    expect(lines.join('\n')).not.toContain('Provider')
+
+    lines = screen.render(46)
+    const narrowProjectRow = lines.findIndex((line) => line.includes('⌂ Default AliceProject')) + 1
+    expect(narrowProjectRow).toBeGreaterThan(0)
+    expect(lines.every((line) => displayWidth(line) <= 46)).toBe(true)
+    expect(screen.handlePointer({
+      button: 35, col: 40, row: narrowProjectRow, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(46).join('\n')).toContain('› Default AliceProject')
+    expect(screen.handlePointer(pointerClick(40, narrowProjectRow))).toBe(true)
+    expect(projectOpens).toBe(2)
+
+    screen.update({
+      runtime: {
+        class: 'running',
+        owner: { surface: 'cli-server', pid: 42 },
+        endpoints: { web: 'http://127.0.0.1:47331' },
+      },
+    })
+    lines = screen.render(80)
+    expect(lines.join('\n')).toContain('[ Enter ]  Open Workspace')
+    expect(lines.join('\n')).not.toContain('⑂ Provider')
+    const actionRow = lines.findIndex((line) => line.includes('[ Enter ]')) + 1
+    expect(screen.handlePointer(pointerClick(70, actionRow))).toBe(true)
+    expect(actions).toEqual(['open'])
+
+    expect(screen.handlePointer({
+      button: 35, col: 40, row: 4, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(80).join('\n')).not.toContain('PREVIEW')
+  })
+
+  it('renders semantic activity rails and advances only enabled busy motion', () => {
+    const motionDemandChanges = vi.fn()
+    const animated = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'absent' },
+    }, {
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+      motionEnabled: true,
+      onMotionDemandChange: motionDemandChanges,
+    })
+    animated.update({ busy: 'Starting Runtime' })
+    expect(motionDemandChanges).toHaveBeenCalledOnce()
+    const first = animated.render(80).find((line) => line.includes('WORKING'))
+    expect(first).toContain('\u001b[1;38;2;183;255;248;48;2;12;42;45m')
+    expect(animated.advanceMotion()).toBe(true)
+    const second = animated.render(80).find((line) => line.includes('WORKING'))
+    expect(second).not.toBe(first)
+    animated.update({ busy: undefined })
+    expect(motionDemandChanges).toHaveBeenCalledTimes(2)
+
+    const reduced = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'absent' },
+      busy: 'Starting Runtime',
+    }, { motionEnabled: false })
+    expect(reduced.advanceMotion()).toBe(false)
+    expect(reduced.hasActiveMotion()).toBe(false)
+    expect(reduced.render(80).join('\n')).toContain('◆  WORKING  Starting Runtime…')
+
+    const stable = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'absent' },
+    }, { motionEnabled: false })
+    const controlRows = () => {
+      const lines = stable.render(80)
+      return {
+        height: lines.length,
+        action: lines.findIndex((line) => line.includes('[ s ] Start quietly')),
+        ribbon: lines.findIndex((line) => line.includes('[ q ] Detach')),
+      }
+    }
+    const idleRows = controlRows()
+    stable.update({ notice: 'Runtime started.', diagnostic: undefined, busy: undefined })
+    expect(controlRows()).toEqual(idleRows)
+    stable.update({
+      busy: 'Refreshing Runtime',
+      notice: 'Runtime started.',
+      diagnostic: 'Previous probe failed.',
+    })
+    expect(controlRows()).toEqual(idleRows)
+    const busyFrame = stable.render(80).join('\n')
+    expect(busyFrame).toContain('◆  WORKING  Refreshing Runtime…')
+    expect(busyFrame).toContain('◆ OPERATION ACTIVE')
+    expect(busyFrame).not.toContain('[ / ] Commands')
+  })
+
+  it('opens a selectable bottom command dock without creating a second action path', () => {
+    let settingsOpened = 0
+    let projectsOpened = 0
+    let detached = 0
+    const paletteChanges: boolean[] = []
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'absent', endpoints: {} },
+    }, {
+      onSettings: () => { settingsOpened += 1 },
+      onProjects: () => { projectsOpened += 1 },
+      onDetach: () => { detached += 1 },
+      onCommandPaletteChange: (open) => paletteChanges.push(open),
+    })
+
+    expect(screen.handleKey('/', matchesKey)).toBe(true)
+    expect(paletteChanges).toEqual([true])
+    expect(screen.render(80).join('\n')).not.toContain('Command Dock')
+    let lines = screen.renderCommandPalette(80).lines
+    expect(lines.join('\n')).toContain('Command Dock · 1/10 · ABSENT')
+    expect(lines).toHaveLength(9)
+    expect(lines.join('\n')).toContain('› ◆ Start OpenAlice & open Workspace')
+    expect(screen.render(80).join('\n')).toContain('[ / ] Close  ›  [ q ] Detach')
+    screen.moveCommandPaletteSelection(1)
+    expect(screen.renderCommandPalette(80).lines.join('\n')).toContain('›   Start quietly')
+
+    expect(screen.handleKey('\x15', matchesKey)).toBe(true)
+    for (const character of 'setup') {
+      expect(screen.handleKey(character, matchesKey)).toBe(true)
+    }
+    const searched = screen.renderCommandPalette(80).lines.join('\n')
+    expect(searched).toContain('⌕  setup▌')
+    expect(searched).toContain('Command Dock · 1/1 · MATCH “setup” · ABSENT')
+    expect(searched).toContain('›   Setup')
+    expect(searched).not.toContain('Runtime logs')
+    expect(screen.commandPaletteItemCount()).toBe(1)
+    expect(screen.handleKey('enter', matchesKey)).toBe(true)
+    expect(settingsOpened).toBe(1)
+    expect(paletteChanges).toEqual([true, false])
+
+    screen.handleKey('/', matchesKey)
+    for (let index = 0; index < 8; index += 1) {
+      expect(screen.handleKey('down', matchesKey)).toBe(true)
+    }
+    expect(screen.renderCommandPalette(80).lines.join('\n')).toContain('›   Setup')
+    expect(screen.handleKey('enter', matchesKey)).toBe(true)
+    expect(settingsOpened).toBe(2)
+
+    screen.handleKey('/', matchesKey)
+    screen.handleKey('z', matchesKey)
+    screen.handleKey('z', matchesKey)
+    expect(screen.commandPaletteItemCount()).toBe(0)
+    expect(screen.renderCommandPalette(80).lines.join('\n')).toContain('No commands match “zz”')
+    expect(screen.handleKey('\x7f', matchesKey)).toBe(true)
+    expect(screen.handleKey('\x15', matchesKey)).toBe(true)
+    const compactDeck = screen.renderCommandPalette(52).lines
+    expect(compactDeck.length).toBeLessThanOrEqual(20)
+    expect(compactDeck.every((line) => displayWidth(line) <= 52)).toBe(true)
+    expect(compactDeck.join('\n')).not.toContain('Update')
+    expect(compactDeck).toHaveLength(9)
+    expect(screen.handleEscape()).toBe(true)
+    expect(paletteChanges.at(-1)).toBe(false)
+
+    lines = screen.render(80)
+    const projectRow = lines.findIndex((line) => line.includes('[ i ] AliceProject')) + 1
+    const projectColumn = lines[projectRow - 1]!.indexOf('[ i ]') + 2
+    expect(screen.handlePointer(pointerClick(projectColumn, projectRow))).toBe(true)
+    expect(projectsOpened).toBe(1)
+
+    const detachRow = lines.findIndex((line) => line.includes('[ q ] Detach')) + 1
+    const detachColumn = lines[detachRow - 1]!.indexOf('[ q ]') + 2
+    expect(screen.handlePointer(pointerClick(detachColumn, detachRow))).toBe(true)
+    expect(detached).toBe(1)
+  })
+
+  it('settles the brand entrance into an overlay-aware ambient prism', () => {
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'running', endpoints: {} },
+    }, {
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+      motionEnabled: true,
+    })
+
+    expect(screen.hasActiveMotion()).toBe(true)
+    const intro = screen.render(80)[0]
+    const integratedMarkIntro = screen.render(120).find((line) => (
+      line.replace(/\u001b\[[0-9;]*m/gu, '').includes('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+    ))
+    expect(integratedMarkIntro).toContain('\u001b[1;38;2;')
+    expect(intro).toContain('\u001b[1;38;2;116;235;226m◆')
+    screen.advanceMotion()
+    expect(screen.render(80)[0]).not.toBe(intro)
+    expect(screen.render(120).find((line) => (
+      line.replace(/\u001b\[[0-9;]*m/gu, '').includes('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+    )))
+      .not.toBe(integratedMarkIntro)
+    for (let frame = 0; frame < 8; frame += 1) screen.advanceMotion()
+    expect(screen.hasActiveMotion()).toBe(true)
+    expect(screen.render(80)[0]).toContain('\u001b[1;38;2;116;235;226m◆ OpenAlice Supervisor')
+    const settledHeader = screen.render(80)[0]
+    const settledMark = screen.render(120).find((line) => (
+      line.replace(/\u001b\[[0-9;]*m/gu, '').includes('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+    ))
+    expect(screen.hasActiveMotion(false)).toBe(false)
+    for (let frame = 0; frame < 6; frame += 1) {
+      expect(screen.advanceMotion(false)).toBe(false)
+    }
+    expect(screen.render(80)[0]).toBe(settledHeader)
+    expect(screen.render(120).find((line) => (
+      line.replace(/\u001b\[[0-9;]*m/gu, '').includes('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+    )))
+      .toBe(settledMark)
+    for (let frame = 0; frame < 3; frame += 1) screen.advanceMotion()
+    expect(screen.render(80)[0]).toBe(settledHeader)
+    expect(screen.render(120).find((line) => (
+      line.replace(/\u001b\[[0-9;]*m/gu, '').includes('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+    )))
+      .not.toBe(settledMark)
+
+    screen.update({ runtime: { class: 'running', endpoints: {} } })
+    expect(screen.render(80).join('\n')).toContain('◉ RUNNING')
+    screen.update({ runtime: { class: 'running', endpoints: {} } })
+    expect(screen.render(80).join('\n')).toContain('● RUNNING')
+
+    const fleetScreen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'fleet',
+      runtime: { class: 'absent', endpoints: {} },
+      fleet: createSupervisorFleetState(
+        '2026-08-23T00:00:00Z',
+        fleetMachines(),
+        'default',
+      ),
+    }, { motionEnabled: true })
+    fleetScreen.update({ runtime: { class: 'absent', endpoints: {} } })
+    expect(fleetScreen.render(100).join('\n')).toContain('◉ running')
+
+    const reduced = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'absent', endpoints: {} },
+    }, {
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color', NO_COLOR: '1' }),
+      motionEnabled: false,
+    })
+    const plainBeacon = reduced.render(120).join('\n')
+    expect(plainBeacon).toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+    expect(plainBeacon).toContain('Default AliceProject')
+    expect(plainBeacon).not.toContain('\u001b[')
+    expect(reduced.render(99).join('\n')).toContain('Alice Session · OpenAlice')
+    expect(reduced.render(99).join('\n')).not.toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+    expect(reduced.render(71).join('\n')).not.toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+    expect(reduced.hasActiveMotion()).toBe(false)
+  })
+
+  it('owns startup input with a skippable full-viewport Boot Sequence', () => {
+    const actions: SupervisorAction[] = []
+    const motionDemand = vi.fn()
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'running', endpoints: {} },
+    }, {
+      onAction: (action) => actions.push(action),
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+      motionEnabled: true,
+      bootSequence: true,
+      getViewportHeight: () => 32,
+      onMotionDemandChange: motionDemand,
+    })
+
+    expect(screen.bootSequenceActive()).toBe(true)
+    const splash = screen.render(120)
+    expect(splash).toHaveLength(32)
+    expect(splash.join('\n')).toContain('O P E N A L I C E')
+    expect(splash.join('\n')).not.toContain('OpenAlice Supervisor')
+    expect(screen.handlePointer({
+      button: 35,
+      col: 60,
+      row: 16,
+      release: false,
+      wheel: null,
+      motion: true,
+      leftClick: false,
+    })).toBe(true)
+    expect(screen.bootSequenceActive()).toBe(true)
+
+    expect(screen.handleKey('o', matchesKey)).toBe(true)
+    expect(screen.bootSequenceActive()).toBe(false)
+    expect(actions).toEqual([])
+    expect(screen.render(120).join('\n').replace(/\u001b\[[0-9;]*m/gu, ''))
+      .toContain('OpenAlice Supervisor')
+    expect(motionDemand).toHaveBeenCalledTimes(1)
+
+    const clicked = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'running', endpoints: {} },
+    }, {
+      onAction: (action) => actions.push(action),
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+      bootSequence: true,
+    })
+    expect(clicked.handlePointer(pointerClick(40, 12))).toBe(true)
+    expect(clicked.bootSequenceActive()).toBe(false)
+    expect(actions).toEqual([])
+
+    const automatic = new SupervisorScreen({ version: 'dev', channel: 'dev', runtime: null }, {
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+      bootSequence: true,
+    })
+    for (let frame = 0; frame <= 15; frame += 1) {
+      expect(automatic.advanceMotion()).toBe(true)
+    }
+    expect(automatic.bootSequenceActive()).toBe(false)
+    expect(automatic.bootSequenceOwnsInput()).toBe(true)
+    expect(automatic.handleKey('o', matchesKey)).toBe(true)
+    expect(automatic.advanceMotion()).toBe(false)
+    expect(automatic.bootSequenceOwnsInput()).toBe(false)
+
+    const reduced = new SupervisorScreen({ version: 'dev', channel: 'dev', runtime: null }, {
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+      motionEnabled: false,
+      bootSequence: true,
+    })
+    expect(reduced.bootSequenceActive()).toBe(false)
+    expect(reduced.render(80)[0]).toContain('OpenAlice Supervisor')
+  })
+
+  it('keeps Mission Rail navigation immediate instead of animating application chrome', () => {
+    const animated = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'absent', endpoints: {} },
+    }, { motionEnabled: true })
+    for (let frame = 0; frame < 9; frame += 1) animated.advanceMotion()
+    expect(animated.render(80)[1]).toContain('◆ [Home]')
+    expect(animated.handleKey(']', matchesKey)).toBe(true)
+    expect(animated.snapshot.panel).toBe('inbox')
+    expect(animated.render(80)[1]).toContain('● [Inbox]')
+    expect(animated.hasActiveMotion()).toBe(false)
+    expect(animated.handleKey(']', matchesKey)).toBe(true)
+    expect(animated.snapshot.panel).toBe('fleet')
+    expect(animated.render(80)[1]).toContain('◇ [Connections]')
+    expect(animated.hasActiveMotion()).toBe(false)
+
+    const reduced = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'absent', endpoints: {} },
+    }, { motionEnabled: false })
+    expect(reduced.render(80)[1]).toContain('◆ [Home]')
+    expect(reduced.handleKey(']', matchesKey)).toBe(true)
+    expect(reduced.render(80)[1]).toContain('● [Inbox]')
+    expect(reduced.hasActiveMotion()).toBe(false)
+  })
+
+  it('accepts Unicode Command Palette queries and edits them by code point', () => {
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'running', endpoints: {} },
+    }, { motionEnabled: false })
+    expect(screen.handleKey('/', matchesKey)).toBe(true)
+    expect(screen.renderCommandPalette(76).lines.join('\n')).toContain('⌕  ▌ Type to filter commands')
+    expect(screen.handleKey('日志', matchesKey)).toBe(true)
+    expect(screen.renderCommandPalette(76).lines.join('\n')).toContain('MATCH “日志”')
+    expect(screen.renderCommandPalette(76).lines.join('\n')).toContain('›   Runtime logs')
+    expect(screen.handleKey('\x7f', matchesKey)).toBe(true)
+    expect(screen.renderCommandPalette(76).lines.join('\n')).toContain('MATCH “日”')
+    expect(screen.handleKey('\x15', matchesKey)).toBe(true)
+    expect(screen.renderCommandPalette(76).lines.join('\n')).toContain('⌕  ▌ Type to filter commands')
+    expect(screen.handleKey('🧭', matchesKey)).toBe(true)
+    expect(screen.renderCommandPalette(76).lines.join('\n')).toContain('MATCH “🧭”')
+    expect(screen.handleKey('\x7f', matchesKey)).toBe(true)
+    expect(screen.renderCommandPalette(76).lines.join('\n')).toContain('⌕  ▌ Type to filter commands')
+    expect(screen.handleEscape()).toBe(true)
+    expect(screen.hasActiveMotion()).toBe(false)
+  })
+
+  it('describes an externally owned Runtime without offering refused mutations', () => {
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'overview',
+      runtime: {
+        class: 'owned_elsewhere',
+        owner: { surface: 'dev', pid: 42 },
+        endpoints: { web: 'http://127.0.0.1:5173' },
+      },
+    })
+
+    const output = screen.render(80).join('\n')
+    expect(output).toContain('● RUNNING ELSEWHERE')
+    expect(output).toContain('[ Enter ]  Open Workspace')
+    expect(output).not.toContain('[ Enter ] Open workspace')
+    expect(screen.renderCommandPalette(80).lines.join('\n')).toContain('Runtime Doctor')
+    expect(output).not.toContain('[ r ] Restart')
+    expect(output).not.toContain('[ x ] Stop')
   })
 
   it('renders and navigates the Machine to AliceProject fleet', () => {
@@ -81,10 +2491,13 @@ describe('Supervisor TUI screen', () => {
 
     const localFleet = screen.render(100).join('\n')
     expect(localFleet).toContain('AliceProjects · This computer')
-    expect(localFleet.match(/m Transfer/gu)).toHaveLength(1)
+    expect(localFleet).not.toContain('[ m ] Transfer')
     expect(localFleet).not.toContain('m Managed')
+    expect(screen.handleKey('tab', matchesKey)).toBe(true)
+    expect(screen.render(100).join('\n').match(/\[ m \] Transfer/gu)).toHaveLength(1)
     expect(screen.handleKey('m', matchesKey)).toBe(true)
     expect(transfers).toEqual(['default'])
+    expect(screen.handleKey('shift+tab', matchesKey)).toBe(true)
     expect(screen.handleKey('down', matchesKey)).toBe(true)
     expect(screen.handleKey('tab', matchesKey)).toBe(true)
     expect(screen.render(100).join('\n')).toContain('AliceProjects · Cloud')
@@ -96,6 +2509,1027 @@ describe('Supervisor TUI screen', () => {
     expect(screen.snapshot.notice).toContain('only for a stopped remote AliceProject')
     expect(screen.handleEscape()).toBe(true)
     expect(screen.snapshot.fleet?.focus).toBe('machines')
+  })
+
+  it('keeps Transfer out of Commands when the local Project home is missing', () => {
+    const transfers: string[] = []
+    const local = fleetMachines()[0]!
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'development',
+      runtime: { class: 'running', endpoints: { web: 'http://127.0.0.1:47331' } },
+      context: resolveLaunchContext({
+        cwd: '/tmp',
+        homeDir: '/home/alice',
+        flags: { project: 'default', home: '/home/alice/default' },
+      }),
+      panel: 'fleet',
+      fleet: setFleetFocus(createSupervisorFleetState(
+        '2026-08-23T00:00:00Z',
+        [{
+          ...local,
+          projects: [{ ...local.projects[0]!, available: false }],
+        }],
+        'default',
+      ), 'projects'),
+    }, {
+      onTransferFleet: (project) => transfers.push(project.key),
+    })
+
+    const output = screen.render(120).join('\n')
+    expect(output).toContain('◆ running · home missing')
+    expect(output).toContain('◆ LIVE · HOME MISSING')
+    expect(output).toContain('Selection')
+    expect(output).not.toContain('[ m ] Transfer')
+    expect(screen.renderCommandPalette(120).lines.join('\n')).not.toContain('Transfer AliceProject')
+    expect(screen.handleKey('m', matchesKey)).toBe(true)
+    expect(transfers).toEqual([])
+    expect(screen.snapshot.notice).toBe('Transfer requires an available AliceProject home.')
+
+    expect(screen.handleKey('[', matchesKey)).toBe(true)
+    expect(screen.handleKey('[', matchesKey)).toBe(true)
+    const overview = screen.render(120).join('\n')
+    expect(overview).toContain('Runtime is live; AliceProject home is missing')
+    expect(overview).toContain('Runtime is live, but the')
+    expect(overview).toContain('AliceProject home is missing. Open')
+    expect(overview).toContain('Web route.')
+    expect(overview).not.toContain('/home/alice/default')
+    expect(overview).not.toContain('LIVE SESSION · OPEN THE WORKSPACE')
+  })
+
+  it('gives wide Fleet real inventory rows from the live viewport budget', () => {
+    let viewportHeight = 32
+    const inventory = fleetMachines()
+    const template = inventory[0]!.projects[0]!
+    inventory[0] = {
+      ...inventory[0]!,
+      projects: Array.from({ length: 6 }, (_, index) => ({
+        ...template,
+        key: index === 0 ? 'default' : `local-${index + 1}`,
+        id: `alice-project-local-${index + 1}`,
+        displayName: index === 0 ? 'Default AliceProject' : `Local Project ${index + 1}`,
+        home: `/home/alice/local-${index + 1}`,
+        isDefault: index === 0,
+      })),
+    }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'fleet',
+      runtime: { class: 'absent', endpoints: {} },
+      fleet: createSupervisorFleetState(
+        '2026-08-23T00:00:00Z',
+        inventory,
+        'default',
+      ),
+    }, {
+      getViewportHeight: () => viewportHeight,
+      motionEnabled: false,
+    })
+
+    const expanded = screen.render(120).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
+    expect(expanded).toHaveLength(32)
+    expect(expanded.join('\n')).toContain('Local Project 6')
+    expect(expanded.join('\n')).not.toContain('█')
+    expect(expanded.at(-2)).toBe('')
+    expect(expanded.at(-1)).toContain('[ / ] Commands')
+
+    viewportHeight = 20
+    const constrained = screen.render(120).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
+    expect(constrained).toHaveLength(20)
+    expect(constrained.join('\n')).not.toContain('Local Project 6')
+    expect(constrained.join('\n')).toContain('█')
+  })
+
+  it('gives wide Logs and Doctor an owned Operational Canvas', () => {
+    let viewportHeight = 32
+    const logsScreen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'logs',
+      runtime: { class: 'running', endpoints: {} },
+      logs: {
+        entries: Array.from({ length: 20 }, (_, index) => ({ text: `event ${index + 1}` })),
+      },
+    }, {
+      getViewportHeight: () => viewportHeight,
+      motionEnabled: false,
+    })
+    const expandedLogs = logsScreen.render(120).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
+    expect(expandedLogs).toHaveLength(32)
+    expect(expandedLogs.join('\n')).toContain('1–20/20 · ALL · LATEST')
+    expect(expandedLogs.join('\n')).not.toContain('█')
+    expect(expandedLogs.at(-2)).toBe('')
+    expect(expandedLogs.at(-1)).toContain('[ / ] Commands')
+
+    viewportHeight = 20
+    const constrainedLogs = logsScreen.render(120).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
+    expect(constrainedLogs).toHaveLength(20)
+    expect(constrainedLogs.join('\n')).toContain('11–20/20 · ALL · LATEST')
+    expect(constrainedLogs.join('\n')).toContain('█')
+
+    viewportHeight = 32
+    const doctorScreen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'doctor',
+      runtime: { class: 'running', endpoints: {} },
+      doctor: null,
+    }, {
+      getViewportHeight: () => viewportHeight,
+      motionEnabled: false,
+    })
+    const standbyDoctor = doctorScreen.render(120).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
+    expect(standbyDoctor).toHaveLength(32)
+    expect(standbyDoctor.join('\n')).toContain('◆ [ d ] Run Runtime Doctor')
+    const standbyTipRow = standbyDoctor.findIndex((line) => line.startsWith('◇  Tip:'))
+    const standbySpineRow = standbyDoctor.findIndex((line) => line.includes('[ / ] Commands'))
+    expect(standbySpineRow).toBe(standbyTipRow + 2)
+    expect(standbyDoctor.slice(standbySpineRow + 1).every((line) => line === '')).toBe(true)
+  })
+
+  it('scrubs Logs, Doctor, and Fleet rails without activating operations', () => {
+    const actions: SupervisorAction[] = []
+    const activated: string[] = []
+    const logsScreen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'logs',
+      runtime: { class: 'running', endpoints: {} },
+      logs: {
+        entries: Array.from({ length: 20 }, (_, index) => ({ text: `event ${index + 1}` })),
+      },
+    }, {
+      onAction: (action) => actions.push(action),
+      motionEnabled: false,
+    })
+    logsScreen.render(80)
+    expect(logsScreen.handlePointer({
+      button: 35, col: 78, row: 6, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(logsScreen.render(80).join('\n')).toContain('Runtime event 1/20')
+    expect(logsScreen.handlePointer({
+      button: 0, col: 78, row: 6, release: false, wheel: null, motion: false, leftClick: true,
+    })).toBe(true)
+    expect(logsScreen.render(80).join('\n')).toContain('Event Lens · LINE 1')
+    expect(logsScreen.handlePointer({
+      button: 32,
+      col: 78,
+      row: 12,
+      release: false,
+      wheel: null,
+      motion: true,
+      leftClick: false,
+      leftDrag: true,
+    })).toBe(true)
+    expect(logsScreen.render(80).join('\n')).toContain('Event Lens · LINE 20')
+    expect(logsScreen.handlePointer({
+      button: 0, col: 78, row: 12, release: true, wheel: null, motion: false, leftClick: false,
+    })).toBe(true)
+
+    const checks = Array.from({ length: 12 }, (_, index) => ({
+      status: 'pass',
+      summary: `Check ${index + 1}`,
+      detail: 'Verified.',
+    }))
+    const doctorScreen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'doctor',
+      runtime: { class: 'running', endpoints: {} },
+      doctor: { overall: 'pass', checks },
+    }, { motionEnabled: false })
+    doctorScreen.render(80)
+    expect(doctorScreen.handlePointer({
+      button: 0, col: 78, row: 10, release: false, wheel: null, motion: false, leftClick: true,
+    })).toBe(true)
+    expect(doctorScreen.render(80).join('\n')).toContain('Inspection · 12/12')
+    expect(doctorScreen.handlePointer({
+      button: 32,
+      col: 78,
+      row: 6,
+      release: false,
+      wheel: null,
+      motion: true,
+      leftClick: false,
+      leftDrag: true,
+    })).toBe(true)
+    expect(doctorScreen.render(80).join('\n')).toContain('Inspection · 1/12')
+    doctorScreen.handlePointer({
+      button: 0, col: 78, row: 6, release: true, wheel: null, motion: false, leftClick: false,
+    })
+
+    const seedMachines = fleetMachines()
+    const machineTemplate = seedMachines[0]!
+    const projectTemplate = machineTemplate.projects[0]!
+    const inventory = Array.from({ length: 7 }, (_, machineIndex) => ({
+      ...machineTemplate,
+      key: machineIndex === 0 ? 'local' : `machine-${machineIndex + 1}`,
+      displayName: `Machine ${machineIndex + 1}`,
+      projects: Array.from({ length: 8 }, (_, projectIndex) => ({
+        ...projectTemplate,
+        key: `project-${projectIndex + 1}`,
+        id: `alice-project-${machineIndex + 1}-${projectIndex + 1}`,
+        displayName: `Project ${projectIndex + 1}`,
+        home: `/fixture/${machineIndex + 1}/${projectIndex + 1}`,
+        isDefault: projectIndex === 0,
+      })),
+    }))
+    const fleetScreen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'fleet',
+      runtime: { class: 'running', endpoints: {} },
+      fleet: createSupervisorFleetState('2026-09-02T00:00:00Z', inventory, 'project-1'),
+    }, {
+      onActivateFleet: (machine, project) => activated.push(`${machine.key}/${project.key}`),
+      motionEnabled: false,
+    })
+    fleetScreen.render(100)
+    expect(fleetScreen.handlePointer({
+      button: 35, col: 98, row: 8, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(fleetScreen.render(100).join('\n')).toContain('AliceProject 5/8')
+    expect(fleetScreen.handlePointer({
+      button: 0, col: 98, row: 10, release: false, wheel: null, motion: false, leftClick: true,
+    })).toBe(true)
+    expect(fleetScreen.render(100).join('\n')).toContain('AliceProjects · Machine 1 · 8/8')
+    expect(fleetScreen.handlePointer({
+      button: 32,
+      col: 98,
+      row: 6,
+      release: false,
+      wheel: null,
+      motion: true,
+      leftClick: false,
+      leftDrag: true,
+    })).toBe(true)
+    expect(fleetScreen.render(100).join('\n')).toContain('AliceProjects · Machine 1 · 1/8')
+    fleetScreen.handlePointer({
+      button: 0, col: 98, row: 6, release: true, wheel: null, motion: false, leftClick: false,
+    })
+    expect(fleetScreen.handlePointer({
+      button: 0, col: 34, row: 10, release: false, wheel: null, motion: false, leftClick: true,
+    })).toBe(true)
+    expect(fleetScreen.render(100).join('\n')).toContain('Machines · 7/7')
+    expect(actions).toEqual([])
+    expect(activated).toEqual([])
+  })
+
+  it('styles the application frame and routes pointer tabs and Fleet wheel input', () => {
+    const actions: SupervisorAction[] = []
+    const activated: string[] = []
+    const requestRender = vi.fn()
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'running', endpoints: { web: 'http://127.0.0.1:2024' } },
+      fleet: createSupervisorFleetState(
+        '2026-08-23T00:00:00Z',
+        fleetMachines(),
+        'default',
+      ),
+    }, {
+      onAction: (action) => actions.push(action),
+      onActivateFleet: (machine, project) => activated.push(`${machine.key}/${project.key}`),
+      requestRender,
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+    })
+
+    expect(screen.render(100).join('\n')).toContain('\u001b[38;2;')
+    expect(screen.render(100)[1]).toContain('\u001b[1;38;2;116;235;226m◇ [Connections]·2')
+    expect(screen.render(100)[1]!.replace(/\u001b\[[0-9;]*m/gu, '')).toContain('[Connections]·2')
+    const releaseColumn = screen.render(100)[0]!
+      .replace(/\u001b\[[0-9;]*m/gu, '')
+      .indexOf('[ u ]') + 3
+    expect(screen.handlePointer({
+      button: 35, col: releaseColumn, row: 1, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(100)[0]).toContain('\u001b[1;38;2;203;250;246;48;2;19;49;55m[ u ] vdev · DEV')
+    expect(screen.render(100).join('\n')).toContain('◇  PREVIEW  Release dev · inspect lane and update.')
+    expect(screen.handlePointer(pointerClick(releaseColumn, 1))).toBe(true)
+    expect(actions).toContain('update')
+    expect(screen.snapshot.fleet?.selectedMachine).toBe(0)
+    expect(screen.handlePointer({
+      button: 65, col: 2, row: 7, release: false, wheel: 1, motion: false, leftClick: false,
+    })).toBe(true)
+    expect(screen.snapshot.fleet?.selectedMachine).toBe(1)
+    expect(screen.handlePointer({
+      button: 0, col: 8, row: 6, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(requestRender).toHaveBeenCalled()
+    expect(screen.render(100).join('\n')).toContain('» This computer')
+    expect(screen.handlePointer({
+      button: 0, col: 8, row: 6, release: false, wheel: null, motion: false, leftClick: true,
+    })).toBe(true)
+    expect(screen.handlePointer({
+      button: 0, col: 8, row: 7, release: false, wheel: null, motion: false, leftClick: true,
+    })).toBe(true)
+    expect(screen.handlePointer({
+      button: 0, col: 50, row: 6, release: false, wheel: null, motion: false, leftClick: true,
+    })).toBe(true)
+    expect(screen.snapshot.fleet?.focus).toBe('projects')
+    expect(screen.snapshot.fleet && selectedFleetProject(screen.snapshot.fleet)?.key).toBe('research')
+    expect(screen.handlePointer({
+      button: 0, col: 50, row: 6, release: false, wheel: null, motion: false, leftClick: true,
+    })).toBe(true)
+    expect(activated).toEqual(['cloud/research'])
+    const logsColumn = screen.render(100)[1]!
+      .replace(/\u001b\[[0-9;]*m/gu, '')
+      .indexOf('Runtime') + 3
+    expect(screen.handlePointer({
+      button: 35, col: logsColumn, row: 2, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.handlePointer({
+      button: 0, col: logsColumn, row: 2, release: false, wheel: null, motion: false, leftClick: true,
+    })).toBe(true)
+    expect(screen.snapshot.panel).toBe('logs')
+    expect(actions).toContain('logs')
+  })
+
+  it('focuses an inactive Fleet pane before activating its selected row', () => {
+    const activated: string[] = []
+    const runtime = { class: 'running' as const, endpoints: { web: 'http://127.0.0.1:2024' } }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'fleet',
+      runtime,
+      activeTarget: {
+        kind: 'local',
+        machineKey: 'local',
+        machineName: 'This computer',
+        projectKey: 'default',
+        projectName: 'Default AliceProject',
+        home: '/fixture/default',
+        transport: 'loopback',
+        endpoint: 'http://127.0.0.1:2024',
+        runtime,
+      },
+      fleet: createSupervisorFleetState(
+        '2026-09-02T00:00:00Z',
+        fleetMachines(),
+        'default',
+      ),
+    }, {
+      onActivateFleet: (machine, project) => activated.push(`${machine.key}/${project.key}`),
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+      getViewportHeight: () => 32,
+    })
+
+    screen.render(100)
+    expect(screen.snapshot.fleet?.focus).toBe('machines')
+    expect(screen.render(100).join('\n')).toContain('←→ changes pane; ↑↓ chooses')
+    expect(screen.render(100).join('\n')).not.toContain('Enter returns Home')
+
+    expect(screen.handlePointer(pointerClick(50, 6))).toBe(true)
+    expect(screen.snapshot.fleet?.focus).toBe('projects')
+    expect(activated).toEqual([])
+    expect(screen.render(100).join('\n')).toContain('▶ Default AliceProject')
+    expect(screen.render(100).join('\n')).toContain('Enter returns Home')
+
+    expect(screen.handlePointer(pointerClick(8, 6))).toBe(true)
+    expect(screen.snapshot.fleet?.focus).toBe('machines')
+    expect(activated).toEqual([])
+    expect(screen.render(100).join('\n')).toContain('▶ This computer')
+
+    expect(screen.handlePointer(pointerClick(8, 6))).toBe(true)
+    expect(screen.snapshot.fleet?.focus).toBe('projects')
+    expect(activated).toEqual([])
+
+    expect(screen.handlePointer(pointerClick(50, 6))).toBe(true)
+    expect(activated).toEqual(['local/default'])
+  })
+
+  it('focuses Fleet panes from headers and unused space without activating rows', () => {
+    const activated = vi.fn()
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'fleet',
+      runtime: { class: 'absent', endpoints: {} },
+      fleet: createSupervisorFleetState(
+        '2026-09-02T00:00:00Z',
+        fleetMachines(),
+        'default',
+      ),
+    }, {
+      onActivateFleet: activated,
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+    })
+
+    screen.render(100)
+    expect(screen.handlePointer({
+      button: 35, col: 50, row: 5, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(100).join('\n').replace(/\u001b\[[0-9;]*m/gu, ''))
+      .toContain('╭ » AliceProjects')
+
+    expect(screen.handlePointer(pointerClick(50, 5))).toBe(true)
+    expect(screen.snapshot.fleet?.focus).toBe('projects')
+    expect(activated).not.toHaveBeenCalled()
+
+    expect(screen.handlePointer(pointerClick(50, 5))).toBe(true)
+    expect(screen.snapshot.fleet?.focus).toBe('projects')
+    expect(activated).not.toHaveBeenCalled()
+
+    expect(screen.handlePointer(pointerClick(8, 10))).toBe(true)
+    expect(screen.snapshot.fleet?.focus).toBe('machines')
+    expect(activated).not.toHaveBeenCalled()
+
+    expect(screen.handlePointer(pointerClick(38, 5))).toBe(false)
+  })
+
+  it('derives responsive keycap hit regions and clicks visible commands through keyboard semantics', () => {
+    expect(supervisorCommandTargets(['界 [ p ] Setup'])).toEqual([{
+      row: 1,
+      startColumn: 4,
+      endColumn: 8,
+      label: 'p',
+    }])
+    expect(supervisorCommandTargets(['◆ [ Enter ] Start  │  [ p ] Setup'])).toEqual([
+      {
+        row: 1,
+        startColumn: 1,
+        endColumn: 17,
+        label: 'Enter',
+        surface: '◆ [ Enter ] Start',
+        primary: true,
+      },
+      {
+        row: 1,
+        startColumn: 23,
+        endColumn: 33,
+        label: 'p',
+        surface: '[ p ] Setup',
+        primary: false,
+      },
+    ])
+    const singleAction = '│ ◆ [ Enter ] Start OpenAlice'.padEnd(39, ' ') + '│'
+    expect(supervisorCommandTargets([singleAction])).toEqual([
+      expect.objectContaining({
+        row: 1,
+        startColumn: 3,
+        endColumn: 39,
+        label: 'Enter',
+        surface: '◆ [ Enter ] Start OpenAlice',
+        primary: true,
+      }),
+    ])
+    expect(supervisorCommandTargets([
+      '│ left pane │   │ ◆ [ Enter ] Edit value  │  [ Esc ] Done │',
+    ])).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: 'Enter', surface: '◆ [ Enter ] Edit value', primary: true }),
+      expect.objectContaining({ label: 'Esc', surface: '[ Esc ] Done', primary: false }),
+    ]))
+    const actions: SupervisorAction[] = []
+    const detach = vi.fn()
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'overview',
+      runtime: { class: 'absent', endpoints: {} },
+    }, {
+      onAction: (action) => actions.push(action),
+      onDetach: detach,
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+    })
+
+    let lines = screen.render(80)
+    let plainLines = lines.map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
+    let row = plainLines.findIndex((line) => line.includes('[ Enter ]  Start')) + 1
+    let col = plainLines[row - 1]!.indexOf('[ Enter ]') + 2
+    screen.handlePointer({
+      button: 0, col, row, release: false, wheel: null, motion: false, leftClick: true,
+    })
+    expect(actions).toContain('start-open')
+
+    screen.update({
+      runtime: {
+        class: 'running',
+        owner: { surface: 'cli-server', pid: 42 },
+        endpoints: { web: 'http://127.0.0.1:47331' },
+      },
+    })
+    screen.handleKey('x', matchesKey)
+    const decisionFrame = screen.render(80)
+    const plainDecisionFrame = decisionFrame.join('\n').replace(/\u001b\[[0-9;]*m/gu, '')
+    expect(plainDecisionFrame).toContain('◆ FOCUS · STOP RUNTIME')
+    expect(plainDecisionFrame).toContain('DECISION GATE')
+    expect(plainDecisionFrame).toContain('[ Esc ] Keep running')
+    expect(plainDecisionFrame).toContain('◇ BUILD vdev · DEV')
+    expect(plainDecisionFrame).toContain('◆ [ Enter ] Stop Runtime')
+    expect(plainDecisionFrame).toContain('[ Esc ] Keep running')
+    expect(plainDecisionFrame).not.toContain('Launchpad')
+    expect(plainDecisionFrame).not.toContain('[ / ] Commands')
+    expect(plainDecisionFrame).not.toContain('[ p ] Setup')
+    expect(plainDecisionFrame).not.toContain('Confirm Stop')
+    screen.handleKey('enter', matchesKey)
+    expect(actions).toContain('stop')
+
+    screen.update({ panel: 'help' })
+    lines = screen.render(80)
+    plainLines = lines.map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
+    row = plainLines.findIndex((line) => line.includes('[ q ] Detach')) + 1
+    col = plainLines[row - 1]!.indexOf('[ q ]') + 2
+    screen.handlePointer({
+      button: 0, col, row, release: false, wheel: null, motion: false, leftClick: true,
+    })
+    expect(detach).toHaveBeenCalledOnce()
+  })
+
+  it('wraps Action Shelf segments atomically at narrow widths', () => {
+    const lines = renderSupervisorCommandBar([
+      { key: 'Enter', label: 'Start & open', primary: true },
+      { key: 's', label: 'Start quietly' },
+      { key: 'p', label: 'Setup' },
+      { key: '?', label: 'More' },
+    ], 46)
+    expect(lines).toHaveLength(3)
+    expect(lines[0]).toMatch(/^◆ \[ Enter \] Start & open/u)
+    expect(lines[1]).toMatch(/^· \[ s \] Start quietly  │  \[ p \] Setup/u)
+    expect(lines[2]).toMatch(/^· \[ \? \] More/u)
+    expect(lines.every((line) => displayWidth(line) === 46)).toBe(true)
+    expect(supervisorCommandTargets(lines).map((target) => target.label)).toEqual([
+      'Enter', 's', 'p', '?',
+    ])
+  })
+
+  it('gives each Focus Workspace an honest task-owned Action Shelf', () => {
+    expect(renderSupervisorFocusActionBar('setup', 96)[0]).toContain(
+      '◆ [ Enter ] Edit / apply  │  [ ↑↓ ] Move field',
+    )
+    expect(renderSupervisorFocusActionBar('source', 96)[0]).toContain(
+      '◆ [ Enter ] Validate / continue  │  [ ↑↓ ] Move cursor',
+    )
+    expect(renderSupervisorFocusActionBar('projects', 96)[0]).toContain(
+      '◆ [ Enter ] Choose  │  [ ↑↓ ] Move project',
+    )
+    expect(renderSupervisorFocusActionBar('release', 96)[0]).toContain(
+      '◆ [ Enter ] Inspect / continue  │  [ ↑↓ ] Move channel',
+    )
+    expect(renderSupervisorFocusActionBar('transfer', 96)[0]).toContain(
+      '◆ [ Enter ] Choose / next  │  [ ↑↓ ] Move choice',
+    )
+    expect(renderSupervisorFocusActionBar('transfer', 96)[0]).not.toContain('[ Esc ]')
+    expect(renderSupervisorConfirmationActionBar({
+      confirmLabel: 'Stop Runtime',
+      cancelLabel: 'Keep running',
+    }, 96)[0]).toContain(
+      '◆ [ Enter ] Stop Runtime  │  [ Esc ] Keep running',
+    )
+  })
+
+  it('keeps actions and contextual feedback in one stable two-line command rail', () => {
+    const actionLines = renderSupervisorCommandBar([
+      { key: 's', label: 'Start quietly' },
+      { key: 'p', label: 'Setup' },
+    ], 76)
+    const dock = renderSupervisorDock({
+      panel: 'overview',
+      projectName: 'Default AliceProject',
+      runtimeState: 'absent',
+    }, 80)
+    const idle = renderSupervisorControlConsole(' '.repeat(80), actionLines, dock, 80)
+
+    expect(idle).toHaveLength(2)
+    expect(idle.every((line) => displayWidth(line) === 80)).toBe(true)
+    expect(idle[0]).toMatch(/^╭─ · \[ s \] Start quietly  │  \[ p \] Setup +╮$/u)
+    expect(idle[1]).toBe(dock)
+    const targets = supervisorCommandTargets(idle)
+    expect(targets.map((target) => target.label)).toEqual(['s', 'p', '/', 'q', 'i'])
+    expect(targets.find((target) => target.label === 's')?.startColumn).toBe(4)
+
+    const ready = renderSupervisorControlConsole(
+      '✓  READY    Runtime started in the background.',
+      actionLines,
+      dock,
+      80,
+    )
+    expect(ready).toHaveLength(2)
+    expect(ready[0]).toBe(idle[0])
+    expect(ready[1]).toContain('[ / ] Commands  ›  [ q ] Detach')
+    expect(ready[1]).toContain('✓  READY    Runtime started')
+    const colorTheme = createSupervisorTuiTheme({ TERM: 'xterm-256color' })
+    const decorated = decorateSupervisorFrame(ready, colorTheme, { panel: 'overview' })
+    expect(decorated[1]).toContain('\u001b[1;38;2;170;255;207;48;2;13;45;31m')
+    expect(decorated.map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))).toEqual(ready)
+    expect(decorateSupervisorFrame(
+      ready,
+      createSupervisorTuiTheme({ TERM: 'xterm-256color', NO_COLOR: '1' }),
+      { panel: 'overview' },
+    )).toEqual(ready)
+  })
+
+  it('contains Action Shelf color inside its framed column', () => {
+    const line = '│ ◆ [ Enter ]  Start OpenAlice & open Workspace │   │ Uptime      Waiting for Runtime │'
+    const colorTheme = createSupervisorTuiTheme({ TERM: 'xterm-256color' })
+    const decorated = decorateSupervisorActionShelf(line, colorTheme)
+    const rightColumn = decorated.slice(decorated.indexOf('   │ Uptime'))
+
+    expect(decorated).toContain('\u001b[1;38;2;183;255;248;48;2;18;54;59m')
+    expect(rightColumn).toBe('   │ Uptime      Waiting for Runtime │')
+    expect(decorateSupervisorActionShelf(
+      line,
+      createSupervisorTuiTheme({ TERM: 'xterm-256color', NO_COLOR: '1' }),
+    )).toBe(line)
+  })
+
+  it('promotes an Action Shelf embedded in the wide Home task column', () => {
+    const line = '│      ▄▀▄ █   ▀█▀ ▄▀▀ █▀▀         ◆ [ Enter ]  Open Workspace                         │'
+    const colorTheme = createSupervisorTuiTheme({ TERM: 'xterm-256color' })
+    const decorated = decorateSupervisorFrame(
+      ['header', line],
+      colorTheme,
+      { panel: 'overview', runtimeClass: 'running' },
+    )[1]!
+
+    expect(decorated).toContain('\u001b[1;38;2;116;235;226m▄')
+    expect(decorated).toContain(
+      '\u001b[1;38;2;183;255;248;48;2;18;54;59m◆ [ Enter ]  Open Workspace',
+    )
+    expect(decorated.replace(/\u001b\[[0-9;]*m/gu, '')).toBe(line)
+    expect(decorateSupervisorFrame(
+      ['header', line],
+      colorTheme,
+      {
+        panel: 'overview',
+        runtimeClass: 'running',
+        hoveredCommand: { row: 2, label: 'Enter' },
+      },
+    )[1]).toContain(
+      '\u001b[1;38;2;230;255;252;48;2;24;64;69m› [ Enter ]  Open Workspace',
+    )
+    expect(decorateSupervisorFrame(
+      ['header', line.replace('◆ [ Enter ]', '› [ Enter ]')],
+      colorTheme,
+      { panel: 'overview', runtimeClass: 'running' },
+    )[1]).toContain(
+      '\u001b[1;38;2;230;255;252;48;2;24;64;69m› [ Enter ]  Open Workspace',
+    )
+    expect(decorateSupervisorFrame(
+      ['header', line],
+      createSupervisorTuiTheme({ TERM: 'xterm-256color', NO_COLOR: '1' }),
+      { panel: 'overview', runtimeClass: 'running' },
+    )[1]).toBe(line)
+  })
+
+  it('contains split-pane semantic focus inside each framed column', () => {
+    const theme = createSupervisorTuiTheme({ TERM: 'xterm-256color' })
+    const selected = '│ › ! Runtime ownership needs review   │   │ Evidence remains neutral           │'
+    const hovered = '│ » · 19  Runtime event                  │   │ Raw event remains neutral          │'
+    const intent = '│ ◆ LAUNCH READY · LOCAL RUNTIME         │   │ Process                       ○ COLD │'
+
+    for (const [line, escape] of [
+      [selected, '\u001b[1;38;2;230;255;252;48;2;24;64;69m'],
+      [hovered, '\u001b[38;2;92;220;211m'],
+      [intent, '\u001b[38;2;189;229;255;48;2;17;35;52m'],
+    ] as const) {
+      const decorated = decorateSupervisorFramedColumns(line, theme)
+      const [left, right] = decorated.split(/(?<=│) {3}(?=│)/u)
+      expect(left).toContain(escape)
+      expect(right).not.toContain('\u001b[')
+      expect(decorated.replace(/\u001b\[[0-9;]*m/gu, '')).toBe(line)
+    }
+    const baseStyle = supervisorTuiBaseStyle()
+    expect(decorateSupervisorFramedColumns(selected, theme))
+      .toContain(`│${baseStyle}\u001b[1;38;2;230;255;252;48;2;24;64;69m `)
+
+    expect(decorateSupervisorFramedColumns(
+      selected,
+      createSupervisorTuiTheme({ TERM: 'xterm-256color', NO_COLOR: '1' }),
+    )).toBe(selected)
+  })
+
+  it('styles active and contextual Fleet pane headers independently', () => {
+    const theme = createSupervisorTuiTheme({ TERM: 'xterm-256color' })
+    const line = '╭ ◆ Machines · 1/2 ─────────╮   ╭ ◇ AliceProjects · This Mac · 1/1 ─────╮'
+    const decorated = decorateSupervisorFramedHeaders(line, theme)
+
+    expect(decorated).toContain('\u001b[1;38;2;116;235;226m╭ ◆ Machines')
+    expect(decorated).toContain('\u001b[38;2;116;132;153m╭ ◇ AliceProjects')
+    expect(decorated.replace(/\u001b\[[0-9;]*m/gu, '')).toBe(line)
+    expect(decorateSupervisorFramedHeaders(
+      line,
+      createSupervisorTuiTheme({ TERM: 'xterm-256color', NO_COLOR: '1' }),
+    )).toBe(line)
+  })
+
+  it('keeps wide split-pane focus scoped while Home remains one unified stage', () => {
+    const theme = createSupervisorTuiTheme({ TERM: 'xterm-256color' })
+    const baseStyle = supervisorTuiBaseStyle()
+    const selectedEscape = '\u001b[1;38;2;230;255;252;48;2;24;64;69m'
+    const columnsFor = (line: string) => line.split(/(?<=│) {3}(?=│)/u)
+    const plain = (line: string) => line.replace(/\u001b\[[0-9;]*m/gu, '')
+    const expectNeutralInspector = (lines: string[], marker: string, escape: string) => {
+      const row = lines.find((line) => plain(line).includes(marker))
+      expect(row).toBeDefined()
+      const [owner, inspector] = columnsFor(row!)
+      expect(owner).toContain(escape)
+      expect(inspector.replaceAll(baseStyle, '').replaceAll('\u001b[0m', ''))
+        .not.toContain('\u001b[')
+    }
+
+    const overview = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'absent', endpoints: {} },
+    }, { theme, motionEnabled: false }).render(100)
+    expect(plain(overview.join('\n'))).toContain('Alice Session · OpenAlice')
+    expect(plain(overview.join('\n'))).toContain('NEXT')
+    expect(plain(overview.join('\n'))).not.toContain('Runtime Telemetry')
+
+    const fleet = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'absent', endpoints: {} },
+      fleet: createSupervisorFleetState('2026-09-02T00:00:00Z', fleetMachines(), 'default'),
+    }, { theme, motionEnabled: false }).render(100)
+    const fleetRow = fleet.find((line) => plain(line).includes('▶ This computer'))
+    expect(fleetRow).toBeDefined()
+    const fleetColumns = columnsFor(fleetRow!)
+    expect(fleetColumns).toHaveLength(2)
+    expect(fleetColumns[0]).toContain(selectedEscape)
+    expect(plain(fleetColumns[1]!)).toContain('◁ Default AliceProject')
+    expect(fleetColumns[1]).toContain('\u001b[1;38;2;116;235;226m')
+    expect(fleetColumns[1]).not.toContain('48;2;24;64;69m')
+    expect(fleetRow).toContain(`\u001b[0m${baseStyle}│   │ `)
+
+    const logs = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'logs',
+      runtime: { class: 'running', endpoints: {} },
+      logs: { entries: [{ text: 'first' }, { text: 'second' }] },
+    }, { theme, motionEnabled: false }).render(100)
+    expectNeutralInspector(logs, '› · 2', selectedEscape)
+
+    const doctor = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'doctor',
+      runtime: { class: 'running', endpoints: {} },
+      doctor: {
+        overall: 'warning',
+        summary: { passed: 1, warnings: 1, failures: 0 },
+        checks: [
+          { status: 'warning', summary: 'Runtime ownership needs review', detail: 'Evidence stays readable.' },
+          { status: 'pass', summary: 'Runtime reachable' },
+        ],
+      },
+    }, { theme, motionEnabled: false }).render(100)
+    expectNeutralInspector(doctor, '› ! Runtime ownership', selectedEscape)
+
+    const help = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'help',
+      runtime: { class: 'running', endpoints: {} },
+    }, { theme, motionEnabled: false }).render(100)
+    expectNeutralInspector(help, '› ◆ Navigation', selectedEscape)
+  })
+
+  it('scrolls Logs and Doctor with keyboard and pointer while keeping contextual controls', () => {
+    const requestRender = vi.fn()
+    const copied: Array<{ number: number; text: string }> = []
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'logs',
+      runtime: { class: 'running', endpoints: {} },
+      logs: {
+        entries: Array.from({ length: 20 }, (_, index) => ({ text: `log line ${index + 1}` })),
+      },
+      doctor: {
+        overall: 'warning',
+        summary: { passed: 1, warnings: 1, failures: 1 },
+        checks: [
+          { status: 'pass', summary: 'Runtime reachable' },
+          { status: 'warning', summary: 'Update available', detail: 'Install when convenient.' },
+          { status: 'fail', summary: 'Port collision' },
+        ],
+      },
+    }, {
+      requestRender,
+      onCopyLog: (entry) => {
+        copied.push(entry)
+        return { emitted: true, truncated: false }
+      },
+    })
+
+    expect(screen.render(80).join('\n')).toContain('14–20/20 · ALL · LATEST')
+    expect(screen.render(80).join('\n')).toContain('Event Lens · LINE 20 · INFO · TEXT')
+    expect(screen.render(80).at(-1)).toContain('[ / ] Commands')
+    expect(screen.handleKey('up', matchesKey)).toBe(true)
+    expect(screen.render(80).join('\n')).toContain('Event Lens · LINE 19 · INFO · TEXT')
+    expect(screen.handleKey('end', matchesKey)).toBe(true)
+    expect(screen.render(80).join('\n')).toContain('14–20/20 · ALL · LATEST')
+    const logLines = screen.render(80)
+    const previousEventRow = logLines.findIndex((line) => line.includes('log line 19')) + 1
+    expect(screen.handlePointer({
+      button: 32, col: 8, row: previousEventRow, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(80)[previousEventRow - 1]).toContain('» · 19  log line 19')
+    expect(screen.handlePointer(pointerClick(8, previousEventRow))).toBe(true)
+    expect(screen.render(80).join('\n')).toContain('Event Lens · LINE 19 · INFO · TEXT')
+    expect(screen.handleKey('y', matchesKey)).toBe(true)
+    expect(copied).toEqual([{ number: 19, text: 'log line 19' }])
+    expect(screen.snapshot.notice).toBe('Sent Runtime event 19 to the terminal clipboard.')
+
+    screen.update({
+      panel: 'logs',
+      logs: {
+        entries: [
+          { text: '{"ts":"2026-09-02T03:04:05.123Z","level":"warn","msg":"Runtime probe slowed","scope":"guardian","waitMs":120}' },
+          { text: 'plain adapter output' },
+        ],
+      },
+    })
+    const semanticLogs = screen.render(80).join('\n')
+    expect(screen.render(80)[1]).toContain('[Runtime]·2')
+    expect(semanticLogs).toContain('! 1  03:04:05Z Runtime probe slowed · scope=guardian waitMs=120')
+    expect(semanticLogs).toContain('· 2  plain adapter output')
+    expect(semanticLogs).not.toContain('"msg"')
+    expect(semanticLogs).not.toContain('╭─ [ f ] Show alerts')
+    expect(screen.handleKey('f', matchesKey)).toBe(true)
+    const attentionLogs = screen.render(80).join('\n')
+    expect(attentionLogs).toContain('ATTENTION · 1/2 · LATEST')
+    expect(attentionLogs).toContain('Event Lens · LINE 1 · WARNING · JSON')
+    expect(attentionLogs).toContain('! 1  03:04:05Z Runtime probe slowed')
+    expect(attentionLogs).not.toContain('plain adapter output')
+    expect(screen.handleKey('f', matchesKey)).toBe(true)
+    expect(screen.render(80).join('\n')).toContain('0/2 · ERRORS')
+    expect(screen.handleKey('f', matchesKey)).toBe(true)
+    expect(screen.render(80).join('\n')).toContain('· 2  plain adapter output')
+
+    screen.update({ panel: 'doctor' })
+    expect(screen.render(80)[1]).not.toContain('Doctor')
+    expect(screen.render(80).join('\n')).toContain('✓ Runtime reachable')
+    expect(screen.render(80).join('\n')).toContain('! Update available')
+    expect(screen.render(80).join('\n')).toContain('× Port collision')
+    expect(screen.render(80).join('\n')).toContain('Inspection · 3/3 · FAIL')
+    expect(screen.handleKey('up', matchesKey)).toBe(true)
+    expect(screen.render(80).join('\n')).toContain('Inspection · 2/3 · WARNING')
+    expect(screen.render(80).join('\n')).toContain('Install when convenient.')
+    expect(screen.handleKey('home', matchesKey)).toBe(true)
+    expect(screen.render(80).join('\n')).toContain('Inspection · 1/3 · PASS')
+    expect(screen.handleKey('end', matchesKey)).toBe(true)
+    expect(screen.render(80).join('\n')).toContain('Inspection · 3/3 · FAIL')
+    screen.update({ panel: 'doctor' })
+    const doctorLines = screen.render(80)
+    const reachableRow = doctorLines.findIndex((line) => line.includes('Runtime reachable')) + 1
+    expect(screen.handlePointer({
+      button: 32, col: 4, row: reachableRow, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(80)[reachableRow - 1]).toContain('» ✓ Runtime reachable')
+    expect(screen.handlePointer(pointerClick(4, reachableRow))).toBe(true)
+    expect(screen.render(80).join('\n')).toContain('Inspection · 1/3 · PASS')
+    expect(screen.handlePointer({
+      button: 65, col: 10, row: reachableRow, release: false, wheel: 1, motion: false, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(80).join('\n')).toContain('Inspection · 2/3 · WARNING')
+    expect(requestRender).toHaveBeenCalled()
+  })
+
+  it('routes Signal Scope action segments through the existing Logs keys', () => {
+    const onAction = vi.fn()
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'logs',
+      runtime: { class: 'absent', endpoints: {} },
+      logs: null,
+    }, {
+      onAction,
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+      motionEnabled: false,
+    })
+
+    let lines = screen.render(80)
+    let actionRow = lines.findIndex((line) => line.includes('[ l ] Load bounded Runtime tail')) + 1
+    expect(actionRow).toBeGreaterThan(0)
+    expect(screen.handlePointer({
+      button: 35, col: 30, row: actionRow, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(80)[actionRow - 1]).toContain('› [ l ] Load bounded Runtime tail')
+    expect(screen.handlePointer(pointerClick(30, actionRow))).toBe(true)
+    expect(onAction).toHaveBeenCalledWith('logs')
+
+    screen.update({ logs: { entries: [{ text: 'all good' }] } })
+    expect(screen.handleKey('f', matchesKey)).toBe(true)
+    expect(screen.handleKey('f', matchesKey)).toBe(true)
+    lines = screen.render(80)
+    actionRow = lines.findIndex((line) => line.includes('[ f ] Change severity lens')) + 1
+    expect(actionRow).toBeGreaterThan(0)
+    expect(screen.handlePointer(pointerClick(28, actionRow))).toBe(true)
+    expect(screen.render(80).join('\n')).toContain('Event Lens · LINE 1 · INFO · TEXT')
+
+    const noColor = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'logs',
+      runtime: { class: 'absent', endpoints: {} },
+      logs: null,
+    }, {
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color', NO_COLOR: '1' }),
+      motionEnabled: false,
+    }).render(46)
+    expect(noColor.join('\n')).toContain('◇ STANDBY · Snapshot not loaded')
+    expect(noColor.join('\n')).toContain('◆ [ l ] Load Runtime tail')
+    expect(noColor.join('\n')).not.toContain('\u001b[')
+  })
+
+  it('routes Diagnostic Radar action segments through the existing Doctor key', () => {
+    const onAction = vi.fn()
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'doctor',
+      runtime: { class: 'absent', endpoints: {} },
+      doctor: null,
+    }, {
+      onAction,
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color' }),
+      motionEnabled: false,
+    })
+
+    let lines = screen.render(80)
+    let actionRow = lines.findIndex((line) => line.includes('[ d ] Run Runtime Doctor')) + 1
+    expect(actionRow).toBeGreaterThan(0)
+    expect(screen.handlePointer({
+      button: 35, col: 24, row: actionRow, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(80)[actionRow - 1]).toContain('› [ d ] Run Runtime Doctor')
+    expect(screen.handlePointer(pointerClick(24, actionRow))).toBe(true)
+    expect(onAction).toHaveBeenLastCalledWith('doctor')
+
+    screen.update({
+      doctor: {
+        overall: 'unknown',
+        summary: { passed: 0, warnings: 0, failures: 0 },
+        checks: [],
+      },
+    })
+    lines = screen.render(80)
+    actionRow = lines.findIndex((line) => line.includes('[ d ] Rerun Runtime Doctor')) + 1
+    expect(actionRow).toBeGreaterThan(0)
+    expect(screen.handlePointer({
+      button: 35, col: 24, row: actionRow, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(80)[actionRow - 1]).toContain('› [ d ] Rerun Runtime Doctor')
+    expect(screen.handlePointer(pointerClick(24, actionRow))).toBe(true)
+    expect(onAction).toHaveBeenCalledTimes(2)
+
+    screen.update({
+      doctor: {
+        overall: 'fail',
+        summary: { passed: 0, warnings: 0, failures: 1 },
+        checks: [{ status: 'fail', summary: 'Runtime protocol mismatch', detail: 'Protocol differs.' }],
+      },
+    })
+    lines = screen.render(80)
+    actionRow = lines.findIndex((line) => line.includes('[ d ] Rerun Runtime Doctor')) + 1
+    expect(actionRow).toBeGreaterThan(0)
+    expect(screen.handlePointer({
+      button: 35, col: 24, row: actionRow, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(80)[actionRow - 1]).toContain('› [ d ] Rerun Runtime Doctor')
+    expect(screen.handlePointer(pointerClick(24, actionRow))).toBe(true)
+    expect(onAction).toHaveBeenCalledTimes(3)
+
+    const noColor = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'doctor',
+      runtime: { class: 'absent', endpoints: {} },
+      doctor: null,
+    }, {
+      theme: createSupervisorTuiTheme({ TERM: 'xterm-256color', NO_COLOR: '1' }),
+      motionEnabled: false,
+    }).render(46)
+    expect(noColor.join('\n')).toContain('◇  DOCTOR STANDBY')
+    expect(noColor.join('\n')).toContain('◆ [ d ] Run Doctor')
+    expect(noColor.join('\n')).not.toContain('\u001b[')
+  })
+
+  it('treats keycap-like log text as an Event Lens row instead of a command', () => {
+    const detach = vi.fn()
+    const requestRender = vi.fn()
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'logs',
+      runtime: { class: 'running', endpoints: {} },
+      logs: { entries: [{ text: '[ q ] adapter emitted this text' }] },
+    }, { onDetach: detach, requestRender })
+
+    const lines = screen.render(80)
+    const row = lines.findIndex((line) => line.includes('[ q ] adapter emitted')) + 1
+    const col = lines[row - 1]!.indexOf('[ q ]') + 2
+    expect(screen.handlePointer(pointerClick(col, row))).toBe(true)
+    expect(detach).not.toHaveBeenCalled()
+    expect(requestRender).toHaveBeenCalledOnce()
+    expect(screen.render(80).join('\n')).toContain('Event Lens · LINE 1 · INFO · TEXT')
   })
 
   it('offers Start for a stopped compatible remote AliceProject', () => {
@@ -120,9 +3554,9 @@ describe('Supervisor TUI screen', () => {
     screen.handleKey('down', matchesKey)
     screen.handleKey('tab', matchesKey)
 
-    expect(screen.render(100).join('\n')).toContain('s Start stopped AliceProject')
-    expect(screen.render(50).join('\n')).toContain('s Start')
-    expect(screen.handleKey('s', matchesKey)).toBe(true)
+    expect(screen.render(100).join('\n')).toContain('○ stopped Research')
+    expect(screen.render(50).join('\n')).toContain('○ stopped')
+    expect(screen.handleKey('enter', matchesKey)).toBe(true)
     expect(starts).toEqual(['cloud/research'])
   })
 
@@ -136,12 +3570,12 @@ describe('Supervisor TUI screen', () => {
 
     const lines = screen.render(40)
 
-    expect(lines).toContain('Runtime: unavailable')
+    expect(lines.join('\n')).toContain('◇ UNAVAILABLE')
     expect(lines.join('\n')).not.toContain('\u001b')
     expect(lines.every((line) => line.length <= 40)).toBe(true)
   })
 
-  it('shows the installed Runtime as a product identity instead of a long path', () => {
+  it('keeps installer implementation identity out of the task-oriented Home', () => {
     const context = resolveLaunchContext({
       cwd: '/tmp',
       homeDir: '/home/alice',
@@ -164,15 +3598,16 @@ describe('Supervisor TUI screen', () => {
     })
 
     const output = screen.render(100).join('\n')
-    expect(output).toContain('Provider: bundle (installed)')
-    expect(output).toContain(
-      'Runtime: OpenAlice 0.87.0-beta · bundle 1234567890abcdef',
-    )
+    expect(output).toContain('Your workspace is one step away')
+    expect(output).not.toContain('Provider')
+    expect(output).not.toContain('bundle')
+    expect(output).not.toContain('1234567890abcdef')
     expect(output).not.toContain('/opt/openalice/releases/runtime')
   })
 
   it('dispatches available actions and confirms Runtime mutations', () => {
     const actions: SupervisorAction[] = []
+    const confirmations: Array<string | undefined> = []
     const screen = new SupervisorScreen({
       version: 'dev',
       channel: 'development',
@@ -185,6 +3620,7 @@ describe('Supervisor TUI screen', () => {
       },
     }, {
       onAction: (action) => actions.push(action),
+      onConfirmationChange: (action) => confirmations.push(action),
     })
 
     expect(screen.handleKey('o', matchesKey)).toBe(true)
@@ -192,10 +3628,54 @@ describe('Supervisor TUI screen', () => {
 
     expect(screen.handleKey('r', matchesKey)).toBe(true)
     expect(screen.snapshot.confirmation).toBe('restart')
-    expect(screen.render(100).join('\n')).toContain('active Web/agent sessions reconnect or end')
+    expect(confirmations).toEqual(['restart'])
+    const restartFrame = screen.render(100).join('\n')
+    expect(restartFrame).not.toContain('Confirm Restart')
+    expect(restartFrame).toContain('FOCUS · RESTART RUNTIME')
+    expect(restartFrame).toContain('◆ RESTART RUNTIME')
+    expect(restartFrame).toContain('[ Esc ] Keep running')
 
     expect(screen.handleKey('enter', matchesKey)).toBe(true)
     expect(actions).toEqual(['open', 'restart'])
+    expect(screen.snapshot.confirmation).toBeUndefined()
+    expect(confirmations).toEqual(['restart', undefined])
+
+    screen.update({ focusTask: 'release', confirmation: 'update' })
+    expect(screen.activeFocusTask()).toBe('confirmation')
+    const updateFrame = screen.render(100).join('\n')
+    expect(updateFrame).toContain('DECISION GATE')
+    expect(updateFrame).toContain('FOCUS · INSTALL UPDATE')
+    expect(updateFrame).toContain('◆ INSTALL UPDATE')
+    expect(updateFrame).toContain('[ Esc ] Not now')
+  })
+
+  it('turns the degraded Launchpad promise into the existing Doctor action', () => {
+    const actions: SupervisorAction[] = []
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: {
+        class: 'incompatible',
+        owner: null,
+        endpoints: {},
+      },
+    }, {
+      onAction: (action) => actions.push(action),
+    })
+
+    let lines = screen.render(80)
+    expect(lines.join('\n')).toContain('◆ [ Enter ]  Run Runtime Doctor')
+    expect(lines.at(-1)).toContain('[ / ] Commands')
+    expect(screen.renderCommandPalette(80).lines.join('\n')).toContain('Runtime logs')
+    expect(lines.join('\n')).not.toContain('[ d ] Review Doctor')
+    const row = lines.findIndex((line) => line.includes('[ Enter ]  Run Runtime Doctor')) + 1
+    expect(screen.handlePointer(pointerClick(60, row))).toBe(true)
+    expect(actions).toEqual(['doctor'])
+
+    expect(screen.handleKey('enter', matchesKey)).toBe(true)
+    expect(actions).toEqual(['doctor', 'doctor'])
+    lines = screen.render(80)
+    expect(lines.join('\n')).not.toContain('No primary action is available')
   })
 
   it('uses Enter as the human-first start-and-open or open action', () => {
@@ -210,9 +3690,7 @@ describe('Supervisor TUI screen', () => {
 
     expect(screen.handleKey('enter', matchesKey)).toBe(true)
     expect(actions).toEqual(['start-open'])
-    expect(screen.render(100).join('\n')).toContain(
-      'Enter prepares anything missing and opens the browser',
-    )
+    expect(screen.render(100).join('\n')).toContain('[ Enter ]  Start OpenAlice & open Workspace')
 
     screen.update({
       runtime: {
@@ -223,13 +3701,12 @@ describe('Supervisor TUI screen', () => {
     })
     expect(screen.handleKey('enter', matchesKey)).toBe(true)
     expect(actions).toEqual(['start-open', 'open'])
-    expect(screen.render(100).join('\n')).toContain(
-      'Press Enter or o to open the Web UI',
-    )
+    expect(screen.render(100).join('\n')).toContain('[ Enter ]  Open Workspace')
   })
 
-  it('starts the Runtime and opens the browser from one Enter key', async () => {
+  it('starts the Runtime from the Launcher and stays in the TUI', async () => {
     const calls: string[] = []
+    let screen: SupervisorScreen | undefined
     let runtime: {
       class: string
       owner: { surface: string; pid: number } | null
@@ -241,7 +3718,7 @@ describe('Supervisor TUI screen', () => {
     }
     let inputListener: ((data: string) => unknown) | undefined
     class FakeTui {
-      addChild(): void {}
+      addChild(component: SupervisorScreen): void { screen = component }
       addInputListener(listener: (data: string) => unknown): () => void {
         inputListener = listener
         return () => undefined
@@ -274,15 +3751,19 @@ describe('Supervisor TUI screen', () => {
       inspect: async () => runtime,
       start: async () => {
         calls.push('start')
+        expect(screen?.snapshot.launchFlight?.kind).toBe('local-start')
+        expect(screen?.snapshot.launchFlight?.stages.map((stage) => stage.state)).toEqual([
+          'complete', 'active', 'waiting',
+        ])
         runtime = {
           class: 'running',
           owner: { surface: 'cli-server', pid: 42 },
           endpoints: { web: 'http://127.0.0.1:47331' },
         }
+        setTimeout(() => inputListener?.('q'), 0)
       },
       open: async () => {
         calls.push('open')
-        queueMicrotask(() => inputListener?.('q'))
       },
       discoverUpdate: async () => null,
       loadTui: async () => fakePiTui as never,
@@ -290,14 +3771,65 @@ describe('Supervisor TUI screen', () => {
       channel: 'stable',
     })).resolves.toBe(0)
 
-    expect(calls).toEqual(['start', 'open'])
+    expect(calls).toEqual(['start'])
+    expect(screen?.snapshot.launchFlight).toBeNull()
+  }, asyncTuiTimeoutMs)
+
+  it('returns to the Launcher when the active local Runtime disappears', async () => {
+    let inputListener: ((data: string) => unknown) | undefined
+    let screen: SupervisorScreen | undefined
+    let inspections = 0
+    const running = {
+      class: 'running',
+      owner: { surface: 'cli-server', pid: 42 },
+      endpoints: { web: 'http://127.0.0.1:47331' },
+    }
+    class FakeTui {
+      addChild(component: SupervisorScreen): void { screen = component }
+      addInputListener(listener: (data: string) => unknown): () => void {
+        inputListener = listener
+        return () => undefined
+      }
+      requestRender(): void {}
+      setShowHardwareCursor(): void {}
+      start(): void { setTimeout(() => inputListener?.('q'), 30) }
+      stop(): void {}
+    }
+    const context = resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' })
+
+    await expect(runSupervisorTui({}, {
+      stdin: { isTTY: true } as NodeJS.ReadStream,
+      stdout: { isTTY: true } as NodeJS.WriteStream,
+      resolveContext: () => context,
+      inspect: async () => inspections++ === 0
+        ? running
+        : { class: 'absent', owner: null, endpoints: {} },
+      seedFleet: async () => ({
+        schemaVersion: 1,
+        generatedAt: '2026-09-02T00:00:00Z',
+        machines: fleetMachines(),
+      }),
+      discoverUpdate: async () => null,
+      pollIntervalMs: 5,
+      loadTui: async () => ({
+        ProcessTerminal: class {},
+        TUI: FakeTui,
+        matchesKey,
+      }) as never,
+    })).resolves.toBe(0)
+
+    expect(screen?.snapshot.activeTarget).toBeNull()
+    expect(screen?.snapshot.panel).toBe('fleet')
+    expect(screen?.snapshot.notice).toContain('Runtime stopped')
+    expect(screen?.render(100).join('\n')).toContain('OPENALICE LAUNCH')
   })
 
   it('aborts TUI-owned remote tunnels when the Supervisor detaches', async () => {
     let inputListener: ((data: string) => unknown) | undefined
     let tunnelAborted = false
+    let screen: SupervisorScreen | undefined
     class FakeTui {
-      addChild(): void {}
+      addChild(component: SupervisorScreen): void { screen = component }
       addInputListener(listener: (data: string) => unknown): () => void {
         inputListener = listener
         return () => undefined
@@ -330,7 +3862,11 @@ describe('Supervisor TUI screen', () => {
       seedFleet: async () => fleet,
       inspectFleet: async () => fleet,
       connectRemoteProject: async ({ signal, onReady }) => {
-        onReady()
+        onReady({
+          localPort: 45454,
+          localUrl: 'http://127.0.0.1:45454',
+          clientUrl: 'http://127.0.0.1:45454',
+        })
         queueMicrotask(() => inputListener?.('q'))
         return new Promise<number>((resolve) => {
           signal.addEventListener('abort', () => {
@@ -348,10 +3884,275 @@ describe('Supervisor TUI screen', () => {
     })).resolves.toBe(0)
 
     expect(tunnelAborted).toBe(true)
+    expect(screen?.snapshot.activeTarget).toMatchObject({
+      kind: 'ssh',
+      machineKey: 'cloud',
+      projectKey: 'research',
+      endpoint: 'http://127.0.0.1:45454',
+      transport: 'ssh-forward',
+    })
+  })
+
+  it('disconnects the active SSH target without stopping its remote Runtime', async () => {
+    let inputListener: ((data: string) => unknown) | undefined
+    let tunnelAborted = false
+    let screen: SupervisorScreen | undefined
+    class FakeTui {
+      addChild(component: SupervisorScreen): void { screen = component }
+      addInputListener(listener: (data: string) => unknown): () => void {
+        inputListener = listener
+        return () => undefined
+      }
+      requestRender(): void {}
+      setShowHardwareCursor(): void {}
+      start(): void {
+        queueMicrotask(() => {
+          inputListener?.('down')
+          inputListener?.('tab')
+          inputListener?.('o')
+        })
+      }
+      stop(): void {}
+    }
+    const fleet: MachineFleetEnvelope = {
+      schemaVersion: 1,
+      generatedAt: '2026-08-23T00:00:00Z',
+      machines: fleetMachines(),
+    }
+
+    await expect(runSupervisorTui({}, {
+      stdin: { isTTY: true } as NodeJS.ReadStream,
+      stdout: { isTTY: true } as NodeJS.WriteStream,
+      resolveContext: () => resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' }),
+      inspect: async () => ({ class: 'absent', owner: null, endpoints: {} }),
+      seedFleet: async () => fleet,
+      inspectFleet: async () => fleet,
+      connectRemoteProject: async ({ signal, onReady }) => {
+        onReady({
+          localPort: 45454,
+          localUrl: 'http://127.0.0.1:45454',
+          clientUrl: 'http://127.0.0.1:45454',
+        })
+        queueMicrotask(() => inputListener?.('x'))
+        return new Promise<number>((resolve) => {
+          signal.addEventListener('abort', () => {
+            tunnelAborted = true
+            setTimeout(() => inputListener?.('q'), 5)
+            resolve(0)
+          }, { once: true })
+        })
+      },
+      discoverUpdate: async () => null,
+      loadTui: async () => ({
+        ProcessTerminal: class {},
+        TUI: FakeTui,
+        matchesKey,
+      }) as never,
+    })).resolves.toBe(0)
+
+    expect(tunnelAborted).toBe(true)
+    expect(screen?.snapshot.activeTarget).toBeNull()
+    expect(screen?.snapshot.panel).toBe('fleet')
+    expect(screen?.snapshot.notice).toContain('Disconnected from')
+  })
+
+  it('degrades, declares unreachable, and recovers an SSH endpoint in place', async () => {
+    let inputListener: ((data: string) => unknown) | undefined
+    let screen: SupervisorScreen | undefined
+    let probes = 0
+    const phases: string[] = []
+    class FakeTui {
+      addChild(component: SupervisorScreen): void { screen = component }
+      addInputListener(listener: (data: string) => unknown): () => void {
+        inputListener = listener
+        return () => undefined
+      }
+      requestRender(): void {
+        const phase = screen?.snapshot.activeTarget?.health?.phase
+        if (phase) phases.push(phase)
+      }
+      setShowHardwareCursor(): void {}
+      start(): void {
+        queueMicrotask(() => {
+          inputListener?.('down')
+          inputListener?.('tab')
+          inputListener?.('o')
+        })
+      }
+      stop(): void {}
+    }
+    const fleet: MachineFleetEnvelope = {
+      schemaVersion: 1,
+      generatedAt: '2026-08-23T00:00:00Z',
+      machines: fleetMachines(),
+    }
+
+    await expect(runSupervisorTui({}, {
+      stdin: { isTTY: true } as NodeJS.ReadStream,
+      stdout: { isTTY: true } as NodeJS.WriteStream,
+      resolveContext: () => resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' }),
+      inspect: async () => ({ class: 'absent', owner: null, endpoints: {} }),
+      seedFleet: async () => fleet,
+      inspectFleet: async () => fleet,
+      connectRemoteProject: async ({ signal, onReady }) => {
+        onReady({
+          localPort: 45454,
+          localUrl: 'http://127.0.0.1:45454',
+          clientUrl: 'http://127.0.0.1:45454',
+        })
+        return new Promise<number>((resolve) => {
+          signal.addEventListener('abort', () => resolve(0), { once: true })
+        })
+      },
+      probeTarget: async () => {
+        probes += 1
+        const healthy = probes >= 4
+        if (healthy) setTimeout(() => inputListener?.('q'), 5)
+        return healthy
+      },
+      pollIntervalMs: 60_000,
+      connectionPollIntervalMs: 5,
+      discoverUpdate: async () => null,
+      loadTui: async () => ({
+        ProcessTerminal: class {},
+        TUI: FakeTui,
+        matchesKey,
+      }) as never,
+    })).resolves.toBe(0)
+
+    expect(probes).toBeGreaterThanOrEqual(4)
+    expect(phases).toContain('degraded')
+    expect(phases).toContain('unreachable')
+    expect(phases.at(-1)).toBe('connected')
+    expect(screen?.snapshot.activeTarget).toMatchObject({
+      kind: 'ssh',
+      health: { phase: 'connected', consecutiveFailures: 0 },
+    })
+    expect(screen?.snapshot.connectionEvents?.map((event) => event.kind)).toEqual([
+      'connected',
+      'degraded',
+      'unreachable',
+      'recovered',
+    ])
+  })
+
+  it('degrades local inspection without pretending the Runtime stopped, then recovers', async () => {
+    let inputListener: ((data: string) => unknown) | undefined
+    let screen: SupervisorScreen | undefined
+    let inspections = 0
+    const phases: string[] = []
+    const running = {
+      class: 'running',
+      owner: { surface: 'cli-server', pid: 42 },
+      endpoints: { web: 'http://127.0.0.1:47331' },
+    }
+    class FakeTui {
+      addChild(component: SupervisorScreen): void { screen = component }
+      addInputListener(listener: (data: string) => unknown): () => void {
+        inputListener = listener
+        return () => undefined
+      }
+      requestRender(): void {
+        const phase = screen?.snapshot.activeTarget?.health?.phase
+        if (phase) phases.push(phase)
+      }
+      setShowHardwareCursor(): void {}
+      start(): void {}
+      stop(): void {}
+    }
+    const context = resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' })
+
+    await expect(runSupervisorTui({}, {
+      stdin: { isTTY: true } as NodeJS.ReadStream,
+      stdout: { isTTY: true } as NodeJS.WriteStream,
+      resolveContext: () => context,
+      inspect: async () => {
+        inspections += 1
+        if (inspections === 1 || inspections >= 5) {
+          if (inspections >= 5) setTimeout(() => inputListener?.('q'), 5)
+          return running
+        }
+        throw new Error('fixture inspection timeout')
+      },
+      seedFleet: async () => ({
+        schemaVersion: 1,
+        generatedAt: '2026-09-02T00:00:00Z',
+        machines: fleetMachines(),
+      }),
+      pollIntervalMs: 5,
+      connectionPollIntervalMs: 60_000,
+      discoverUpdate: async () => null,
+      loadTui: async () => ({
+        ProcessTerminal: class {},
+        TUI: FakeTui,
+        matchesKey,
+      }) as never,
+    })).resolves.toBe(0)
+
+    expect(phases).toContain('degraded')
+    expect(phases.at(-1)).toBe('connected')
+    expect(screen?.snapshot.panel).toBe('overview')
+    expect(screen?.snapshot.activeTarget).toMatchObject({
+      kind: 'local',
+      health: { phase: 'connected', consecutiveFailures: 0 },
+    })
+    // Render requests may coalesce while the host is busy; the durable event
+    // sequence is the authoritative proof that unreachable was observed.
+    expect(screen?.snapshot.connectionEvents?.map((event) => event.kind)).toEqual([
+      'connected',
+      'degraded',
+      'unreachable',
+      'recovered',
+    ])
+  })
+
+  it('preserves remote Fleet focus while the selected local Runtime polls', async () => {
+    let inputListener: ((data: string) => unknown) | undefined
+    let screen: SupervisorScreen | undefined
+    const fleet: MachineFleetEnvelope = {
+      schemaVersion: 1,
+      generatedAt: '2026-08-23T00:00:00Z',
+      machines: fleetMachines(),
+    }
+    class FakeTui {
+      addChild(component: SupervisorScreen): void { screen = component }
+      addInputListener(listener: (data: string) => unknown): () => void {
+        inputListener = listener
+        return () => undefined
+      }
+      requestRender(): void {}
+      setShowHardwareCursor(): void {}
+      start(): void {
+        queueMicrotask(() => {
+          inputListener?.('down')
+          inputListener?.('tab')
+          setTimeout(() => inputListener?.('q'), 40)
+        })
+      }
+      stop(): void {}
+    }
+
+    await expect(runSupervisorTui({}, {
+      stdin: { isTTY: true } as NodeJS.ReadStream,
+      stdout: { isTTY: true } as NodeJS.WriteStream,
+      resolveContext: () => resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' }),
+      inspect: async () => ({ class: 'absent', owner: null, endpoints: {} }),
+      seedFleet: async () => fleet,
+      inspectFleet: async () => fleet,
+      pollIntervalMs: 5,
+      discoverUpdate: async () => null,
+      loadTui: async () => ({ ProcessTerminal: class {}, TUI: FakeTui, matchesKey }) as never,
+    })).resolves.toBe(0)
+
+    const selectedFleet = screen?.snapshot.fleet
+    expect(selectedFleet?.machines[selectedFleet.selectedMachine]?.key).toBe('cloud')
+    expect(selectedFleet?.focus).toBe('projects')
   })
 
   it('re-probes and starts a selected stopped remote AliceProject', async () => {
     let inputListener: ((data: string) => unknown) | undefined
+    let screen: SupervisorScreen | undefined
+    const observedStages: string[] = []
     const machines = fleetMachines()
     machines[1]!.projects[0]!.runtime = {
       ...machines[1]!.projects[0]!.runtime,
@@ -366,11 +4167,20 @@ describe('Supervisor TUI screen', () => {
       machines,
     }
     const startRemoteProject = vi.fn(async () => {
-      setTimeout(() => inputListener?.('q'), 0)
+      observedStages.push(screen?.snapshot.launchFlight?.stages.find((stage) => (
+        stage.state === 'active'
+      ))?.id ?? 'missing')
+      machines[1]!.projects[0]!.runtime = {
+        ...machines[1]!.projects[0]!.runtime,
+        class: 'running',
+        state: 'ready',
+        ownerSurface: 'cli-server',
+        webEndpoint: 'http://127.0.0.1:47331',
+      }
     })
     const inspectFleet = vi.fn(async () => fleet)
     class FakeTui {
-      addChild(): void {}
+      addChild(component: SupervisorScreen): void { screen = component }
       addInputListener(listener: (data: string) => unknown): () => void { inputListener = listener; return () => undefined }
       requestRender(): void {}
       setShowHardwareCursor(): void {}
@@ -396,6 +4206,20 @@ describe('Supervisor TUI screen', () => {
         machines: [{ key: 'cloud', displayName: 'Cloud', sshTarget: 'cloud.example.com', isDefault: false }],
       }),
       startRemoteProject,
+      connectRemoteProject: async ({ signal, onReady }) => {
+        observedStages.push(screen?.snapshot.launchFlight?.stages.find((stage) => (
+          stage.state === 'active'
+        ))?.id ?? 'missing')
+        onReady({
+          localPort: 45454,
+          localUrl: 'http://127.0.0.1:45454',
+          clientUrl: 'http://127.0.0.1:45454',
+        })
+        queueMicrotask(() => inputListener?.('q'))
+        return new Promise<number>((resolve) => {
+          signal.addEventListener('abort', () => resolve(0), { once: true })
+        })
+      },
       discoverUpdate: async () => null,
       loadTui: async () => ({ ProcessTerminal: class {}, TUI: FakeTui, matchesKey }) as never,
     })).resolves.toBe(0)
@@ -405,6 +4229,13 @@ describe('Supervisor TUI screen', () => {
       expect.objectContaining({ key: 'cloud', sshTarget: 'cloud.example.com' }),
       'research',
     )
+    expect(observedStages).toEqual(['start-runtime', 'open-forward'])
+    expect(screen?.snapshot.launchFlight).toBeNull()
+    expect(screen?.snapshot.activeTarget).toMatchObject({
+      kind: 'ssh',
+      machineKey: 'cloud',
+      projectKey: 'research',
+    })
   })
 
   it('keeps the transfer wizard default-no and never invokes the sender', async () => {
@@ -443,7 +4274,9 @@ describe('Supervisor TUI screen', () => {
         }
       }
       start(): void {
-        queueMicrotask(() => inputListener?.('m'))
+        queueMicrotask(() => {
+          inputListener?.('m')
+        })
         setTimeout(() => inputListener?.('\u0003'), 100)
       }
       stop(): void {}
@@ -454,6 +4287,7 @@ describe('Supervisor TUI screen', () => {
       stdout: { isTTY: true } as NodeJS.WriteStream,
       resolveContext: () => resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' }),
       inspect: async () => ({ class: 'absent', owner: null, endpoints: {} }),
+      initialPanel: 'fleet',
       inspectTransferSource: async () => ({ class: 'absent', owner: null, endpoints: {} }),
       seedFleet: async () => fleet,
       inspectFleet: async () => fleet,
@@ -517,18 +4351,20 @@ describe('Supervisor TUI screen', () => {
             overlayComponent?.handleInput?.('\r')
             await waitForOverlay('Exact-Session scheduled Issue owners')
             overlayComponent?.handleInput?.('\r')
-            await waitForOverlay('Review AliceProject transfer')
+            await waitForOverlay('◆ Transfer manifest · READY')
             overlayComponent?.handleInput?.('y')
             await waitForOverlay('synthetic checksum failure')
             overlayComponent?.handleInput?.('r')
-            await waitForOverlay('AliceProject transfer complete')
+            await waitForOverlay('✓ AliceProject arrived · PUBLISHED')
             overlayComponent?.handleInput?.('\r')
             inputListener?.('\u0003')
           })() },
         }
       }
       start(): void {
-        queueMicrotask(() => inputListener?.('m'))
+        queueMicrotask(() => {
+          inputListener?.('m')
+        })
         setTimeout(() => inputListener?.('\u0003'), 1_000)
       }
       stop(): void {}
@@ -540,6 +4376,7 @@ describe('Supervisor TUI screen', () => {
       stdout: { isTTY: true } as NodeJS.WriteStream,
       resolveContext: () => resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' }),
       inspect: async () => ({ class: 'absent', owner: null, endpoints: {} }),
+      initialPanel: 'fleet',
       inspectTransferSource: async () => ({ class: 'absent', owner: null, endpoints: {} }),
       seedFleet: async () => fleet,
       inspectFleet: async () => fleet,
@@ -601,9 +4438,9 @@ describe('Supervisor TUI screen', () => {
               await waitForOverlay(label)
               overlayComponent?.handleInput?.('\r')
             }
-            await waitForOverlay('Review AliceProject transfer')
+            await waitForOverlay('◆ Transfer manifest · READY')
             overlayComponent?.handleInput?.('y')
-            await waitForOverlay('Transferring…')
+            await waitForOverlay('◈ Transfer in flight · STREAMING')
             overlayComponent?.handleInput?.('\u001b')
             await waitForOverlay('synthetic cancellation')
             overlayComponent?.handleInput?.('\r')
@@ -612,7 +4449,9 @@ describe('Supervisor TUI screen', () => {
         }
       }
       start(): void {
-        queueMicrotask(() => inputListener?.('m'))
+        queueMicrotask(() => {
+          inputListener?.('m')
+        })
         setTimeout(() => inputListener?.('\u0003'), 1_000)
       }
       stop(): void {}
@@ -624,6 +4463,7 @@ describe('Supervisor TUI screen', () => {
       stdout: { isTTY: true } as NodeJS.WriteStream,
       resolveContext: () => resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' }),
       inspect: async () => ({ class: 'absent', owner: null, endpoints: {} }),
+      initialPanel: 'fleet',
       inspectTransferSource: async () => ({ class: 'absent', owner: null, endpoints: {} }),
       seedFleet: async () => fleet,
       inspectFleet: async () => fleet,
@@ -641,7 +4481,7 @@ describe('Supervisor TUI screen', () => {
     expect(aborted).toBe(true)
   })
 
-  it('uses installed provenance to prepare missing source before Enter starts and opens', async () => {
+  it('uses installed provenance to prepare missing source before Launcher Enter starts', async () => {
     const calls: string[] = []
     let runtime: {
       class: string
@@ -661,6 +4501,9 @@ describe('Supervisor TUI screen', () => {
       }
       requestRender(): void {}
       setShowHardwareCursor(): void {}
+      showOverlay() {
+        return { hide: () => undefined, focus: () => undefined }
+      }
       start(): void {
         queueMicrotask(() => inputListener?.('enter'))
       }
@@ -724,10 +4567,10 @@ describe('Supervisor TUI screen', () => {
           owner: { surface: 'cli-server', pid: 42 },
           endpoints: { web: 'http://127.0.0.1:47331' },
         }
+        queueMicrotask(() => inputListener?.('q'))
       },
       open: async () => {
         calls.push('open')
-        queueMicrotask(() => inputListener?.('q'))
       },
       discoverUpdate: async () => null,
       loadTui: async () => fakePiTui as never,
@@ -740,9 +4583,8 @@ describe('Supervisor TUI screen', () => {
       'prepare-managed',
       'configure-project',
       'start',
-      'open',
     ])
-  })
+  }, asyncTuiTimeoutMs)
 
   it('keeps foreign-owned lifecycle mutations unavailable', () => {
     const actions: SupervisorAction[] = []
@@ -836,6 +4678,7 @@ describe('Supervisor TUI screen', () => {
 
   it('confirms managed source preparation before dispatch', () => {
     let prepareRequests = 0
+    const confirmations: Array<string | undefined> = []
     const screen = new SupervisorScreen({
       version: 'dev',
       channel: 'development',
@@ -847,27 +4690,38 @@ describe('Supervisor TUI screen', () => {
       onPrepareManagedSource: () => {
         prepareRequests += 1
       },
+      onConfirmationChange: (action) => confirmations.push(action),
     })
 
     expect(screen.handleKey('m', matchesKey)).toBe(true)
     expect(screen.snapshot.confirmation).toBe('managed-source')
-    expect(screen.render(100).join('\n')).toContain(
-      'branch/version paired with this CLI',
-    )
+    expect(confirmations).toEqual(['managed-source'])
+    expect(screen.render(100).join('\n')).not.toContain('Confirm Managed Source')
 
     expect(screen.handleKey('enter', matchesKey)).toBe(true)
     expect(prepareRequests).toBe(1)
+    expect(confirmations).toEqual(['managed-source', undefined])
   })
 
   it('navigates detail panels and requests their read-only data', () => {
     const actions: SupervisorAction[] = []
+    let settingsRequests = 0
     const screen = new SupervisorScreen({
       version: 'dev',
       channel: 'development',
       runtime: { class: 'absent' },
     }, {
       onAction: (action) => actions.push(action),
+      onSettings: () => { settingsRequests += 1 },
     })
+
+    expect(screen.handleKey('tab', matchesKey)).toBe(true)
+    expect(screen.snapshot.panel).toBe('inbox')
+    expect(actions).toEqual([])
+
+    expect(screen.handleKey('tab', matchesKey)).toBe(true)
+    expect(screen.snapshot.panel).toBe('fleet')
+    expect(actions).toEqual([])
 
     expect(screen.handleKey('tab', matchesKey)).toBe(true)
     expect(screen.snapshot.panel).toBe('logs')
@@ -875,7 +4729,25 @@ describe('Supervisor TUI screen', () => {
 
     expect(screen.handleKey('?', matchesKey)).toBe(true)
     expect(screen.snapshot.panel).toBe('help')
-    expect(screen.render(100).join('\n')).toContain('Supervisor controls')
+    expect(screen.render(100).join('\n')).toContain('Control atlas · 1/3')
+    expect(screen.handleKey('down', matchesKey)).toBe(true)
+    expect(screen.render(100).join('\n')).toContain('› ● Runtime')
+    expect(screen.handlePointer({
+      button: 35, col: 8, row: 8, release: false, wheel: null, motion: true, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(100).join('\n')).toContain('» ◇ AliceProject')
+    expect(screen.handlePointer(pointerClick(8, 8))).toBe(true)
+    expect(screen.render(100).join('\n')).toContain('AliceProject · Shape the workspace')
+    expect(screen.handlePointer({
+      button: 64, col: 8, row: 8, release: false, wheel: -1, motion: false, leftClick: false,
+    })).toBe(true)
+    expect(screen.render(100).join('\n')).toContain('Runtime · Read state, then act')
+    expect(screen.handlePointer(pointerClick(8, 8))).toBe(true)
+    const projectHelp = screen.render(100)
+    const setupRow = projectHelp.findIndex((line) => line.includes('[ p ]'))
+    const setupColumn = projectHelp[setupRow]!.indexOf('[ p ]') + 2
+    expect(screen.handlePointer(pointerClick(setupColumn, setupRow + 1))).toBe(true)
+    expect(settingsRequests).toBe(1)
   })
 
   it('renders a machine-level recovery shell and gates project actions', () => {
@@ -910,7 +4782,9 @@ describe('Supervisor TUI screen', () => {
     expect(output).toContain('AliceProject configuration cannot be read.')
     expect(output).toContain('requires a newer OpenAlice')
     expect(output).toContain('will not inspect, start, open, stop, restart, or configure a project')
-    expect(output).toContain('u Update · ? Help')
+    expect(output).toContain('Press u to choose a channel')
+    expect(screen.renderCommandPalette(100).lines.join('\n')).toContain('Check for update')
+    expect(screen.renderCommandPalette(100).lines.join('\n')).toContain('Recovery help')
     expect(output).not.toContain('Enter Start & open')
     expect(output).not.toContain('i AliceProjects')
     expect(output).not.toContain('Default AliceProject')
@@ -934,7 +4808,7 @@ describe('Supervisor TUI screen', () => {
 
     expect(screen.handleKey('tab', matchesKey)).toBe(true)
     expect(screen.snapshot.panel).toBe('help')
-    expect(screen.render(100).join('\n')).toContain('Supervisor recovery controls')
+    expect(screen.render(100).join('\n')).toContain('Safe controls · 1/2')
     expect(screen.render(100).join('\n')).not.toContain('i  Select or create')
 
     expect(screen.handleKey('u', matchesKey)).toBe(true)
@@ -943,12 +4817,14 @@ describe('Supervisor TUI screen', () => {
 
   it('confirms an available update before dispatching the installer', () => {
     const actions: SupervisorAction[] = []
+    const confirmations: Array<string | undefined> = []
     const screen = new SupervisorScreen({
       version: '0.89.4-beta',
       channel: 'stable',
       runtime: { class: 'absent' },
     }, {
       onAction: (action) => actions.push(action),
+      onConfirmationChange: (action) => confirmations.push(action),
     })
 
     expect(screen.handleKey('u', matchesKey)).toBe(true)
@@ -964,10 +4840,8 @@ describe('Supervisor TUI screen', () => {
       },
       confirmation: 'update',
     })
-    const confirmation = screen.render(100).join('\n')
-    expect(confirmation).toContain('Install OpenAlice 0.90.0 from stable now?')
-    expect(confirmation).toContain('will not reload')
-    expect(confirmation).toContain('run openalice again')
+    expect(confirmations).toEqual(['update'])
+    expect(screen.render(100).join('\n')).not.toContain('Confirm Update')
 
     expect(screen.handleKey('n', matchesKey)).toBe(true)
     expect(actions).toEqual(['update'])
@@ -1193,6 +5067,52 @@ describe('Supervisor TUI screen', () => {
     })).resolves.toBe(0)
 
     expect(calls).toEqual(['check:beta', 'apply:beta:0.90.2-beta.1'])
+  })
+
+  it('routes pointer selection through the focused update-channel stage', async () => {
+    let inputListener: ((data: string) => unknown) | undefined
+    const checked: string[] = []
+    class FakeTui {
+      addChild(): void {}
+      addInputListener(listener: (data: string) => unknown): () => void {
+        inputListener = listener
+        return () => undefined
+      }
+      requestRender(): void {}
+      setShowHardwareCursor(): void {}
+      showOverlay(component: { render(width: number): string[] }) {
+        return {
+          hide: () => undefined,
+          focus: () => {
+            component.render(100)
+            queueMicrotask(() => {
+              inputListener?.('\u001b[<0;20;7M')
+              setTimeout(() => inputListener?.('\u001b[<0;65;10M'), 0)
+            })
+          },
+        }
+      }
+      start(): void { queueMicrotask(() => inputListener?.('u')) }
+      stop(): void {}
+    }
+    const realTui = await (await import('./pi-tui-loader.ts')).loadPiTui()
+
+    await expect(runSupervisorTui({}, {
+      stdin: { isTTY: true } as NodeJS.ReadStream,
+      stdout: { isTTY: true, columns: 100, rows: 30 } as NodeJS.WriteStream,
+      resolveContext: () => resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' }),
+      inspect: async () => ({ class: 'absent', owner: null, endpoints: {} }),
+      checkUpdate: async (channel) => {
+        checked.push(channel)
+        queueMicrotask(() => inputListener?.('q'))
+        return { status: 'current', currentVersion: 'dev', channel, sourceChannel: channel }
+      },
+      discoverUpdate: async () => null,
+      loadTui: async () => ({ ...realTui, TUI: FakeTui }) as never,
+      channel: 'stable',
+    })).resolves.toBe(0)
+
+    expect(checked).toEqual(['dev'])
   })
 
   it('does not replace a package-manager installation from the TUI', async () => {

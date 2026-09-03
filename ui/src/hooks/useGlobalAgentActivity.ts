@@ -2,12 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { api } from '../api'
 import type { AgentRuntimeCause, AgentRuntimeEvent } from '../api/agentRuntimeLog'
-import type { InboxEntry } from '../api/inbox'
 
 const POLL_MS = 4_000
 const INITIAL_EVENT_LIMIT = 100
 const EVENT_CACHE_LIMIT = 500
-const INBOX_LIMIT = 25
 const RECENT_SIGNAL_MS = 12_000
 const FAILURE_SIGNAL_MS = 12_000
 // Runtime logs are append-only, but a hard process exit can omit the matching
@@ -25,6 +23,7 @@ export type AgentActivityKind =
   | 'conversation'
   | 'conversation-failed'
   | 'inbox'
+  | 'news'
   | 'sonner-test-running'
   | 'sonner-test-success'
   | 'sonner-test-error'
@@ -32,12 +31,14 @@ export type AgentActivityKind =
 export interface AgentActivitySignal {
   readonly id: string
   readonly kind: AgentActivityKind
-  readonly workspaceId: string
+  readonly workspaceId?: string
   readonly agent?: string
   readonly resumeId?: string
   readonly sessionRecordId?: string
   readonly taskId?: string
   readonly inboxEntryId?: string
+  readonly newsItemId?: number
+  readonly source?: string
   readonly cause?: AgentRuntimeCause
   readonly detail?: string
   readonly occurredAt: number
@@ -47,7 +48,6 @@ export interface AgentActivitySignal {
 
 export interface GlobalActivitySources {
   readonly runtimeEvents: readonly AgentRuntimeEvent[]
-  readonly inboxEntries: readonly InboxEntry[]
 }
 
 /** Extend global activity projection by registering another narrow source filter here. */
@@ -175,21 +175,42 @@ export const conversationActivityFilter: GlobalActivityFilter = {
 
 export const inboxActivityFilter: GlobalActivityFilter = {
   id: 'agent-inbox',
-  project({ inboxEntries }, now) {
-    return inboxEntries.flatMap((entry): AgentActivitySignal[] => {
-      if (!entry.origin?.agent || entry.origin.kind === 'manual') return []
-      if (Math.max(0, now - entry.ts) > RECENT_SIGNAL_MS) return []
+  project({ runtimeEvents }, now) {
+    return runtimeEvents.flatMap((event): AgentActivitySignal[] => {
+      if (event.type !== 'inbox.received' || !event.payload.inboxEntryId) return []
+      if (!event.payload.agent || event.payload.originKind === 'manual') return []
+      if (Math.max(0, now - event.ts) > RECENT_SIGNAL_MS) return []
       return [{
-        id: `inbox:${entry.id}`,
+        id: `inbox:${event.payload.inboxEntryId}`,
         kind: 'inbox',
-        workspaceId: entry.workspaceId,
-        agent: entry.origin.agent,
-        ...(entry.origin.resumeId ? { resumeId: entry.origin.resumeId } : {}),
-        ...(entry.origin.sessionId ? { sessionRecordId: entry.origin.sessionId } : {}),
-        ...(entry.origin.runId ? { taskId: entry.origin.runId } : {}),
-        inboxEntryId: entry.id,
-        occurredAt: entry.ts,
-        revision: entry.ts,
+        workspaceId: event.payload.workspaceId,
+        agent: event.payload.agent,
+        ...(event.payload.resumeId ? { resumeId: event.payload.resumeId } : {}),
+        ...(event.payload.sessionRecordId ? { sessionRecordId: event.payload.sessionRecordId } : {}),
+        ...(event.payload.taskId ? { taskId: event.payload.taskId } : {}),
+        inboxEntryId: event.payload.inboxEntryId,
+        detail: event.payload.summary,
+        occurredAt: event.ts,
+        revision: event.seq,
+      }]
+    })
+  },
+}
+
+export const newsActivityFilter: GlobalActivityFilter = {
+  id: 'product-news',
+  project({ runtimeEvents }, now) {
+    return runtimeEvents.flatMap((event): AgentActivitySignal[] => {
+      if (event.type !== 'news.ingested' || event.payload.newsItemId === undefined) return []
+      if (Math.max(0, now - event.ts) > RECENT_SIGNAL_MS) return []
+      return [{
+        id: `news:${event.payload.newsItemId}`,
+        kind: 'news',
+        newsItemId: event.payload.newsItemId,
+        source: event.payload.source,
+        detail: event.payload.title,
+        occurredAt: event.ts,
+        revision: event.seq,
       }]
     })
   },
@@ -217,6 +238,7 @@ export const sonnerTestActivityFilter: GlobalActivityFilter = {
 export const globalActivityFilters: readonly GlobalActivityFilter[] = [
   conversationActivityFilter,
   inboxActivityFilter,
+  newsActivityFilter,
   sonnerTestActivityFilter,
 ]
 
@@ -248,7 +270,6 @@ export function summarizeAgentActivity(
  */
 export function useGlobalAgentActivity(): GlobalAgentActivityData {
   const [runtimeEvents, setRuntimeEvents] = useState<AgentRuntimeEvent[]>([])
-  const [inboxEntries, setInboxEntries] = useState<InboxEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [now, setNow] = useState(Date.now())
@@ -256,13 +277,14 @@ export function useGlobalAgentActivity(): GlobalAgentActivityData {
   const initializedRef = useRef(false)
 
   const refresh = useCallback(async () => {
+    const activityApi = api.productActivity ?? api.agentRuntime
     const runtimeRequest = initializedRef.current
-      ? api.agentRuntime.query({ afterSeq: cursorRef.current, limit: INITIAL_EVENT_LIMIT })
-      : api.agentRuntime.query({ page: 1, pageSize: INITIAL_EVENT_LIMIT })
-    const [runtimeResult, inboxResult] = await Promise.allSettled([
-      runtimeRequest,
-      api.inbox.history({ limit: INBOX_LIMIT }),
-    ])
+      ? activityApi.query({ afterSeq: cursorRef.current, limit: INITIAL_EVENT_LIMIT })
+      : activityApi.query({ page: 1, pageSize: INITIAL_EVENT_LIMIT })
+    const runtimeResult = await runtimeRequest.then(
+      (value) => ({ status: 'fulfilled' as const, value }),
+      (reason) => ({ status: 'rejected' as const, reason }),
+    )
 
     const errors: string[] = []
     if (runtimeResult.status === 'fulfilled') {
@@ -284,14 +306,6 @@ export function useGlobalAgentActivity(): GlobalAgentActivityData {
         : String(runtimeResult.reason))
     }
 
-    if (inboxResult.status === 'fulfilled') {
-      setInboxEntries(inboxResult.value.entries)
-    } else {
-      errors.push(inboxResult.reason instanceof Error
-        ? inboxResult.reason.message
-        : String(inboxResult.reason))
-    }
-
     setNow(Date.now())
     setError(errors.length > 0 ? errors.join('; ') : null)
     setLoading(false)
@@ -309,10 +323,10 @@ export function useGlobalAgentActivity(): GlobalAgentActivityData {
   }, [refresh])
 
   const signals = useMemo(() => projectGlobalActivity(
-    { runtimeEvents, inboxEntries },
+    { runtimeEvents },
     now,
     globalActivityFilters,
-  ), [inboxEntries, now, runtimeEvents])
+  ), [now, runtimeEvents])
   const summary = useMemo(() => summarizeAgentActivity(signals), [signals])
 
   return { signals, summary, loading, error, refresh }

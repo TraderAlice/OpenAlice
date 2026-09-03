@@ -1,6 +1,5 @@
 import {
   acquireOpenAliceRuntimeLocks,
-  adoptRailwayRuntimeFence,
   takeoverRequested,
   type OpenAliceRuntimeLock,
 } from '@traderalice/guardian-runtime'
@@ -78,12 +77,6 @@ import { NewsCollectorStore, NewsCollector } from './domain/news/index.js'
 import { createNewsArchiveTools } from './tool/news.js'
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
-const RAILWAY_RUNTIME_REQUIRED = Boolean(
-  process.env['OPENALICE_RAILWAY_FENCE_FD']
-  || process.env['OPENALICE_RAILWAY_ENTRYPOINT_OWNER']
-  || process.env['OPENALICE_SERVICE_MANAGER']?.trim() === 'railway',
-)
-const RUNTIME_LOCK_OWNER_AUTHORITY = adoptRailwayRuntimeFence(process.env)
 let runtimeLock: OpenAliceRuntimeLock | null = null
 
 async function releaseRuntimeLock(): Promise<void> {
@@ -98,7 +91,7 @@ async function main() {
   // `pnpm start`; guardian children get OPENALICE_HOME so this stays quiet).
   printLegacyDataNotice('[alice]')
 
-  const config = await loadConfig({ ownerAuthority: RUNTIME_LOCK_OWNER_AUTHORITY })
+  const config = await loadConfig()
 
   const toolCallLog = await createToolCallLog()
 
@@ -326,16 +319,6 @@ async function main() {
   // ==================== News Collector ====================
 
   let newsCollector: NewsCollector | null = null
-  if (config.news.enabled && config.news.feeds.length > 0) {
-    newsCollector = new NewsCollector({
-      store: newsStore,
-      feeds: config.news.feeds,
-      intervalMs: config.news.intervalMinutes * 60 * 1000,
-    })
-    newsCollector.start()
-    const activeCount = config.news.feeds.filter((f) => f.enabled !== false).length
-    console.log(`news-collector: started (${activeCount}/${config.news.feeds.length} feeds active, every ${config.news.intervalMinutes}m)`)
-  }
 
   // ==================== Plugins ====================
 
@@ -424,6 +407,37 @@ async function main() {
     console.log(`plugin started: ${plugin.name}`)
   }
 
+  // Optional products actively install their own journal producer after the
+  // shared Workspace service is ready. NanoAlice can omit News entirely; the
+  // journal core never imports or starts the collector.
+  if (config.news.enabled && config.news.feeds.length > 0) {
+    const newsActivity = workspaceServiceRef.current?.activityJournal.registerFamily({
+      family: 'news',
+      types: ['news.ingested'] as const,
+    })
+    newsCollector = new NewsCollector({
+      store: newsStore,
+      feeds: config.news.feeds,
+      intervalMs: config.news.intervalMinutes * 60 * 1000,
+      ...(newsActivity ? {
+        onIngested: async (record) => {
+          await newsActivity.record('news.ingested', {
+            newsItemId: record.seq,
+            dedupKey: record.dedupKey,
+            title: record.title,
+            ...(record.metadata.source ? { source: record.metadata.source } : {}),
+            ...(record.metadata.link ? { link: record.metadata.link } : {}),
+            publishedAt: record.pubTs,
+            ingestSource: record.metadata.ingestSource ?? 'rss',
+          })
+        },
+      } : {}),
+    })
+    newsCollector.start()
+    const activeCount = config.news.feeds.filter((f) => f.enabled !== false).length
+    console.log(`news-collector: started (${activeCount}/${config.news.feeds.length} feeds active, every ${config.news.intervalMinutes}m)`)
+  }
+
   console.log('engine: started')
   scheduleInstalledBrokerPackReconciliation()
 
@@ -455,9 +469,6 @@ async function main() {
 }
 
 export async function startAliceRuntime(): Promise<void> {
-  if (RAILWAY_RUNTIME_REQUIRED && RUNTIME_LOCK_OWNER_AUTHORITY !== 'railway-fenced-handoff') {
-    throw new Error('invalid or missing inherited Railway lifecycle fence; refusing to start Alice')
-  }
   const guardianPid = positiveInteger(process.env['OPENALICE_GUARDIAN_PID'])
   const guardianStartedAt = positiveInteger(process.env['OPENALICE_GUARDIAN_STARTED_AT'])
   runtimeLock = await acquireOpenAliceRuntimeLocks({
@@ -465,7 +476,6 @@ export async function startAliceRuntime(): Promise<void> {
     launcherRoot: resolveLauncherRoot(),
     launcher: process.env['OPENALICE_LAUNCHER'] ?? 'standalone',
     takeover: takeoverRequested(),
-    ownerAuthority: RUNTIME_LOCK_OWNER_AUTHORITY,
     ...(guardianPid ? { guardianPid } : {}),
     ...(guardianStartedAt ? { guardianStartedAt } : {}),
     onOwnershipLost: (err) => {

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -12,6 +12,7 @@ const employee: OfficeFloorEmployee = {
   resumeId: 'demo-resume-chat',
   agent: 'codex',
   name: 'Desk mate',
+  awake: true,
   mood: 'working',
   bubble: { kind: 'text', text: 'Polishing the Office floor.' },
   lastSeq: 7,
@@ -23,6 +24,13 @@ const employee: OfficeFloorEmployee = {
     at: Date.now(),
     label: 'desk-note.md',
     path: 'docs/desk-note.md',
+  }, {
+    id: 'handoff-note',
+    kind: 'report',
+    action: 'open-file',
+    at: Date.now() - 1,
+    label: 'handoff.md',
+    path: 'docs/handoff.md',
   }],
 }
 
@@ -53,20 +61,385 @@ describe('OfficeInspectRail', () => {
     )
 
     expect(screen.getByText('Polishing the Office floor.')).toBeTruthy()
+    expect(screen.queryByText('Result')).toBeNull()
+    expect(screen.getByText('Codex Mechanic')).toBeTruthy()
+    expect(screen.getByText('codex · Desk mate')).toBeTruthy()
+    expect(container.textContent).not.toContain('demo-resume-chat')
     expect(container.querySelector<HTMLImageElement>('.oa-office-inspect__portrait .oa-office-coworker img')?.src)
-      .toContain('/office/coworkers/codex-v1.webp')
-    expect(screen.getByRole('button', { name: 'Close' }).querySelector('img')?.getAttribute('src'))
-      .toBe('/office/hud/window-close-v1.png')
-    expect(screen.getByRole('button', { name: 'Open session' }).querySelector('img')?.getAttribute('src'))
-      .toBe('/office/hud/session-portal-v1.png')
-    expect(screen.getByRole('button', { name: 'desk-note.md' }).querySelector('img')?.getAttribute('src'))
-      .toBe('/office/hud/drawer-record-v1.png')
+      .toContain('/office/coworkers/codex-')
+    expect(Number.parseFloat(
+      (container.querySelector('.oa-office-inspect__portrait .oa-office-coworker') as HTMLElement)
+        ?.style.height ?? '',
+    )).toBeCloseTo(87.36)
+    expect(screen.getByRole('button', { name: 'Close' }).querySelector('.oa-office-window__close-mark'))
+      .toBeTruthy()
+    const openSession = screen.getByRole('button', { name: 'Open session' })
+    expect(openSession.querySelector('img')?.getAttribute('src'))
+      .toBe('/office/hud/session-portal-v2.png')
+    const drawerExit = screen.getByRole('button', { name: /Open Desk Note, Report, .* in Workspace/ })
+    const handoffExit = screen.getByRole('button', { name: /Open handoff\.md, Report, .* in Workspace/ })
+    expect(drawerExit.querySelector('img')?.getAttribute('src')).toBe('/office/hud/drawer-record-v2.png')
+    expect(drawerExit.querySelector('.oa-office-drawer__destination img')?.getAttribute('src'))
+      .toBe('/office/hud/session-portal-v2.png')
+    expect(drawerExit.querySelector('.oa-office-drawer__destination')?.textContent).toBe('Open')
     expect(container.querySelector('svg')).toBeNull()
+    expect(screen.getByText('working').closest('dd')?.getAttribute('data-power')).toBe('awake')
+    expect(screen.getByTestId('office-inspect').dataset.awake).toBe('true')
 
-    await userEvent.click(screen.getByRole('button', { name: 'Open session' }))
+    expect(document.activeElement).toBe(openSession)
+    await userEvent.keyboard('{Enter}')
+    expect(onOpen).toHaveBeenCalledTimes(1)
+    await userEvent.keyboard(' ')
+    expect(onOpen).toHaveBeenCalledTimes(2)
+    onOpen.mockClear()
+    await userEvent.keyboard('{Tab}')
+    expect(document.activeElement).toBe(drawerExit)
+    await userEvent.keyboard('{Enter}')
+    expect(onOpenDrawer).toHaveBeenLastCalledWith(employee.drawers[0])
+    await userEvent.keyboard(' ')
+    expect(onOpenDrawer).toHaveBeenCalledTimes(2)
+    onOpenDrawer.mockClear()
+    vi.spyOn(drawerExit, 'getBoundingClientRect').mockReturnValue({
+      left: 0, right: 120, top: 0, bottom: 38,
+    } as DOMRect)
+    vi.spyOn(handoffExit, 'getBoundingClientRect').mockReturnValue({
+      left: 128, right: 248, top: 0, bottom: 38,
+    } as DOMRect)
+    await userEvent.keyboard('{ArrowRight}')
+    expect(document.activeElement).toBe(handoffExit)
+    await userEvent.keyboard('{Home}')
+    expect(document.activeElement).toBe(drawerExit)
+    await userEvent.keyboard('{End}')
+    expect(document.activeElement).toBe(handoffExit)
+    await userEvent.keyboard('{Tab}')
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close' }))
+    await userEvent.keyboard('{Enter}')
+    expect(onClose).toHaveBeenCalledOnce()
+    onClose.mockClear()
+    await userEvent.keyboard('{Tab}')
+    expect(document.activeElement).toBe(openSession)
+
+    await userEvent.click(openSession)
     expect(onOpen).toHaveBeenCalledOnce()
-    await userEvent.click(screen.getByRole('button', { name: 'desk-note.md' }))
+    await userEvent.click(drawerExit)
     expect(onOpenDrawer).toHaveBeenCalledWith(employee.drawers[0])
+    await userEvent.keyboard('{Escape}')
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('identifies a fresh completed reply as the Agent result', () => {
+    const { container } = render(
+      <OfficeInspectRail
+        employee={{
+          ...employee,
+          awake: false,
+          mood: 'review',
+          bubble: { kind: 'text', text: 'NORTH DESK CLEAR\nFLOOR SIGNAL CLEAR' },
+          latestResult: {
+            text: 'NORTH DESK CLEAR\nFLOOR SIGNAL CLEAR',
+            at: Date.now(),
+          },
+        }}
+        roomName="Chat"
+        onOpen={vi.fn()}
+        onOpenDrawer={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Result')).toBeTruthy()
+    expect(screen.getByText('NORTH DESK CLEAR FLOOR SIGNAL CLEAR')).toBeTruthy()
+    expect(container.querySelector('blockquote')?.dataset.result).toBe('true')
+    expect(screen.getByText('review').closest('dd')?.getAttribute('data-power')).toBe('asleep')
+    expect(screen.queryByText('Latest result')).toBeNull()
+  })
+
+  it('gives a quiet coworker in-world dialogue instead of repeating machine facts', () => {
+    const { container } = render(
+      <OfficeInspectRail
+        employee={{
+          ...employee,
+          awake: false,
+          mood: 'idle',
+          bubble: null,
+          surface: 'headless',
+          latestResult: {
+            text: '## Result\n**Filed** the [finished report](/tracked/report.md).',
+            at: Date.now() - 60_000,
+          },
+        }}
+        roomName="Prediction"
+        onOpen={vi.fn()}
+        onOpenDrawer={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Off duty. Ready when the floor wakes.')).toBeTruthy()
+    expect(screen.getByText('Latest result')).toBeTruthy()
+    expect(screen.getByText('Result Filed the finished report.')).toBeTruthy()
+    expect(container.textContent).not.toContain('**')
+    expect(container.textContent).not.toContain('/tracked/report.md')
+    expect(container.querySelector('blockquote')?.textContent).not.toContain('idle · headless')
+    expect(screen.queryByText('idle')).toBeNull()
+    expect(screen.getByText('asleep').closest('dd')?.getAttribute('data-power')).toBe('asleep')
+    expect(screen.getByTestId('office-inspect').dataset.awake).toBe('false')
+    expect(screen.getByText('Run mode')).toBeTruthy()
+    expect(screen.getByText('Background run')).toBeTruthy()
+    expect(container.textContent).not.toContain('headless')
+  })
+
+  it('keeps a replay-focused coworker inside the historical event narrative', async () => {
+    const onReviewActivity = vi.fn()
+    const { container } = render(
+      <OfficeInspectRail
+        employee={{
+          ...employee,
+          awake: false,
+          mood: 'idle',
+          bubble: null,
+          latestResult: { text: 'Current result outside the replay beat.', at: Date.now() },
+        }}
+        roomName="Chat"
+        replayFocus={{
+          seq: 5530,
+          targetIds: ['employee:chat-1:demo-resume-chat'],
+          workspaceId: 'chat-1',
+          resumeId: 'demo-resume-chat',
+          label: 'Grok Alchemist',
+          summary: 'LIVE PRESENCE COMPLETE',
+          channel: 'agent',
+        }}
+        onOpen={vi.fn()}
+        onReviewActivity={onReviewActivity}
+        onOpenDrawer={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByTestId('office-inspect').dataset.replay).toBe('true')
+    expect(screen.getByText('Seq 5530')).toBeTruthy()
+    expect(container.querySelector<HTMLImageElement>('.oa-office-inspect__replay-icon')?.src)
+      .toContain('/office/hud/replay-latch-v1.png')
+    expect(container.querySelector('blockquote')?.textContent).toBe('LIVE PRESENCE COMPLETE')
+    expect(screen.queryByText('Off duty. Ready when the floor wakes.')).toBeNull()
+    expect(screen.queryByText('Latest result')).toBeNull()
+    expect(screen.queryByText('Current result outside the replay beat.')).toBeNull()
+    const statusValue = screen.getByText('active in replay')
+    expect(statusValue.classList.contains('oa-office-inspect__fact-value')).toBe(true)
+    expect(statusValue.closest('dd')?.getAttribute('data-power')).toBe('replay')
+    const reviewActivity = screen.getByRole('button', { name: 'Review activity' })
+    expect(document.activeElement).toBe(reviewActivity)
+    await userEvent.click(reviewActivity)
+    expect(onReviewActivity).toHaveBeenCalledOnce()
+  })
+
+  it('lets keyboard players read and collapse a complete latest result', async () => {
+    const onClose = vi.fn()
+    const result = `The full shift report is ready. ${'Detailed evidence remains visible. '.repeat(12)}`
+    const normalizedResult = result.trim()
+    const { container } = render(
+      <OfficeInspectRail
+        employee={{
+          ...employee,
+          awake: false,
+          mood: 'idle',
+          bubble: null,
+          latestResult: { text: result, at: Date.now() - 60_000 },
+        }}
+        roomName="Prediction"
+        onOpen={vi.fn()}
+        onOpenDrawer={vi.fn()}
+        onClose={onClose}
+      />,
+    )
+
+    const resultText = screen.getByText(normalizedResult)
+    expect(resultText.textContent?.length).toBeGreaterThan(180)
+    expect(resultText.textContent?.endsWith('…')).toBe(false)
+    const toggle = screen.getByRole('button', { name: 'Read full result' })
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    expect(resultText.getAttribute('data-expanded')).toBeNull()
+
+    await userEvent.click(toggle)
+    expect(screen.getByRole('button', { name: 'Collapse result' }).getAttribute('aria-expanded')).toBe('true')
+    expect(resultText.getAttribute('data-expanded')).toBe('true')
+    expect(screen.getByRole('region', { name: 'Latest result' })).toBe(resultText)
+    expect(resultText.getAttribute('tabindex')).toBe('0')
+    expect(document.activeElement).toBe(resultText)
+    expect(container.querySelector('.oa-office-inspect__latest-result p')?.textContent).toBe(normalizedResult)
+
+    await userEvent.keyboard('{Escape}')
+    expect(screen.getByRole('button', { name: 'Read full result' }).getAttribute('aria-expanded')).toBe('false')
+    expect(document.activeElement).toBe(toggle)
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('keeps a stopped failure actionable while preserving asleep power state', async () => {
+    const onReviewActivity = vi.fn()
+    render(
+      <OfficeInspectRail
+        employee={{ ...employee, awake: false, mood: 'failed', bubble: null, surface: 'headless' }}
+        roomName="Chat"
+        onOpen={vi.fn()}
+        onReviewActivity={onReviewActivity}
+        onOpenDrawer={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('The last run needs attention.')).toBeTruthy()
+    const status = screen.getByText('failed').closest('dd')!
+    expect(status.getAttribute('data-mood')).toBe('failed')
+    expect(status.getAttribute('data-power')).toBe('asleep')
+    expect(screen.getByTestId('office-inspect').dataset.awake).toBe('false')
+    const reviewActivity = screen.getByRole('button', { name: 'Review activity' })
+    expect(reviewActivity.querySelector('img')?.getAttribute('src'))
+      .toBe('/office/hud/occupancy-log-v2.png')
+    expect(document.activeElement).toBe(reviewActivity)
+    await userEvent.keyboard('{Enter}')
+    await userEvent.keyboard(' ')
+    expect(onReviewActivity).toHaveBeenCalledTimes(2)
+    await userEvent.keyboard('{Tab}')
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Open session' }))
+    await userEvent.keyboard('{Shift>}{Tab}{/Shift}')
+    expect(document.activeElement).toBe(reviewActivity)
+  })
+
+  it('promotes the existing review command while the coworker owns a captured duty', () => {
+    const { container, rerender } = render(
+      <OfficeInspectRail
+        employee={{ ...employee, awake: false, mood: 'idle', bubble: null }}
+        roomName="Chat"
+        dutyPending
+        onOpen={vi.fn()}
+        onReviewActivity={vi.fn()}
+        onOpenDrawer={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+
+    const actions = container.querySelector<HTMLElement>('.oa-office-inspect__actions')
+    expect(actions?.dataset.dutyPending).toBe('true')
+    expect(screen.getByRole('button', { name: 'Review this result' })).toBe(document.activeElement)
+    expect(screen.getByRole('button', { name: 'Open session' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Review activity' })).toBeNull()
+
+    rerender(
+      <OfficeInspectRail
+        employee={{ ...employee, awake: false, mood: 'idle', bubble: null }}
+        roomName="Chat"
+        dutyPending
+        dutyReviewIntent="run"
+        onOpen={vi.fn()}
+        onReviewActivity={vi.fn()}
+        onOpenDrawer={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+    expect(screen.getByRole('button', { name: 'Review this run' })).toBe(document.activeElement)
+  })
+
+  it('keeps a long Assignment readable across live snapshot refreshes', async () => {
+    const longTitle = 'Research question: Is NVDA in a buyable technical setup right now, and does the broader semiconductor sector support it?'
+    const onClose = vi.fn()
+    const onOpen = vi.fn()
+    const onOpenDrawer = vi.fn()
+    const { container, rerender } = render(
+      <OfficeInspectRail
+        employee={{ ...employee, title: longTitle, bubble: null }}
+        roomName="Auto Quant"
+        onOpen={onOpen}
+        onOpenDrawer={onOpenDrawer}
+        onClose={onClose}
+      />,
+    )
+
+    const title = screen.getByText(longTitle)
+    Object.defineProperty(title, 'clientHeight', { configurable: true, value: 100 })
+    Object.defineProperty(title, 'scrollHeight', { configurable: true, value: 260 })
+    const toggle = screen.getByRole('button', { name: 'Read full assignment' })
+    expect(screen.getByText('Assignment')).toBeTruthy()
+    expect(screen.getByRole('dialog').getAttribute('aria-label')).toMatch(/^Codex/)
+    expect(title.getAttribute('data-expanded')).toBeNull()
+    expect(container.querySelector('.oa-office-inspect')?.lastElementChild)
+      .toBe(container.querySelector('.oa-office-inspect__actions'))
+    expect(screen.getByRole('button', { name: 'Close' }).querySelector('.oa-office-window__close-mark'))
+      .toBeTruthy()
+    screen.getByRole('button', { name: 'Close' }).focus()
+    await userEvent.keyboard('{Tab}')
+    expect(document.activeElement).toBe(toggle)
+    await userEvent.keyboard('{Enter}')
+    expect(title.dataset.expanded).toBe('true')
+    expect(title.getAttribute('tabindex')).toBe('0')
+    expect(screen.getByRole('region', { name: 'Assignment' })).toBe(title)
+    expect(document.activeElement).toBe(title)
+    expect(container.querySelector('.oa-office-inspect__assignment-scroll-cue')).toBeTruthy()
+    title.scrollTop = 160
+    fireEvent.scroll(title)
+    expect(container.querySelector('.oa-office-inspect__assignment-scroll-cue')).toBeNull()
+    title.scrollTop = 0
+    fireEvent.scroll(title)
+    expect(container.querySelector('.oa-office-inspect__assignment-scroll-cue')).toBeTruthy()
+    rerender(
+      <OfficeInspectRail
+        employee={{ ...employee, title: longTitle, bubble: null, drawers: [...employee.drawers] }}
+        roomName="Auto Quant"
+        onOpen={onOpen}
+        onOpenDrawer={onOpenDrawer}
+        onClose={onClose}
+      />,
+    )
+    expect(title.dataset.expanded).toBe('true')
+    expect(document.activeElement).toBe(title)
+    await userEvent.keyboard('{Escape}')
+    expect(screen.getByRole('button', { name: 'Read full assignment' })).toBeTruthy()
+    expect(container.querySelector('.oa-office-inspect__assignment-scroll-cue')).toBeNull()
+    expect(title.getAttribute('tabindex')).toBeNull()
+    expect(title.getAttribute('role')).toBeNull()
+    await vi.waitFor(() => expect(document.activeElement).toBe(toggle))
+    expect(onClose).not.toHaveBeenCalled()
+    await userEvent.keyboard('{Escape}')
+    expect(onClose).toHaveBeenCalledOnce()
+    await userEvent.keyboard(' ')
+    expect(title.dataset.expanded).toBe('true')
+    expect(document.activeElement).toBe(title)
+    await userEvent.keyboard('{Escape}')
+    await vi.waitFor(() => expect(document.activeElement).toBe(toggle))
+    await userEvent.keyboard(' ')
+    expect(title.dataset.expanded).toBe('true')
+    await userEvent.keyboard('{Escape}')
+    await vi.waitFor(() => expect(document.activeElement).toBe(toggle))
+    await userEvent.keyboard('{Tab}')
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Open session' }))
+    const profile = container.querySelector<HTMLElement>('.oa-office-inspect__profile')
+    expect(profile).toBeTruthy()
+    if (profile) profile.scrollTop = 80
+    await userEvent.click(toggle)
+    expect(title.dataset.expanded).toBe('true')
+    expect(profile?.scrollTop).toBe(0)
+    expect(document.activeElement).toBe(title)
+    expect(screen.getByRole('button', { name: 'Collapse assignment' })).toBeTruthy()
+  })
+
+  it('uses the generated roster-return control when opened from the team list', async () => {
+    const onClose = vi.fn()
+    render(
+      <OfficeInspectRail
+        employee={employee}
+        roomName="Chat"
+        onOpen={vi.fn()}
+        onOpenDrawer={vi.fn()}
+        onClose={onClose}
+        returnToRoster
+      />,
+    )
+
+    const back = screen.getByRole('button', { name: 'Back to team roster' })
+    expect(back.querySelector('img')?.getAttribute('src')).toBe('/office/hud/window-back-v2.png')
+    expect(document.activeElement).toBe(back)
+    await userEvent.keyboard('{Tab}')
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Open session' }))
     await userEvent.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalledOnce()
   })

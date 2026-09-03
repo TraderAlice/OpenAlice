@@ -1,13 +1,12 @@
 import { type ReactNode } from 'react'
+import { Info } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface Props {
   title: string
   /**
-   * Free-form hover explanation surfaced next to the title as a small
-   * circled "i". Panels pass context like the data source, provider-
-   * specific caveats ("ratios not reported here"), period conventions,
-   * or anything else worth whispering without spending chrome. Rendered
-   * via the native `title` attribute — newlines are honoured.
+   * Supporting context surfaced next to the title through the shared Tooltip.
    */
   info?: string | null
   right?: ReactNode
@@ -27,26 +26,26 @@ export function Card({ title, info, right, className, headerClassName, contentCl
     <section className={`flex flex-col border border-border rounded bg-secondary/30 ${className ?? ''}`}>
       <header className={`flex gap-3 border-b border-border/60 px-3 py-2 ${headerClassName ?? 'items-center justify-between'}`}>
         <div className="flex items-center gap-1.5 min-w-0">
-          <h3 className="text-[13px] font-medium text-foreground truncate">{title}</h3>
+          <h3 className="text-[13px] leading-[18px] font-medium text-foreground truncate">{title}</h3>
           {info && (
-            // Custom CSS-only tooltip via Tailwind's group/group-hover.
-            // Native `title=` was the first instinct but the browser-level
-            // hover delay (~700ms) feels unresponsive — this one pops
-            // instantly and lets us style / wrap freely.
-            <span className="relative group inline-flex items-center">
-              <span
-                className="inline-flex items-center justify-center w-[14px] h-[14px] rounded-full bg-muted-foreground/30 text-background text-[10px] font-bold leading-none cursor-help select-none shrink-0"
-                aria-label={info}
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    className="size-5 shrink-0 text-muted-foreground"
+                    aria-label={info}
+                  />
+                }
               >
-                i
-              </span>
-              <span
-                role="tooltip"
-                className="absolute left-0 top-full mt-1.5 z-50 hidden group-hover:block w-max max-w-sm whitespace-pre-line px-2.5 py-1.5 bg-muted border border-border rounded shadow-lg text-[11px] text-foreground leading-relaxed pointer-events-none"
-              >
+                <Info aria-hidden className="size-3.5" />
+              </TooltipTrigger>
+              <TooltipContent side="top" align="start" className="max-w-sm whitespace-pre-line">
                 {info}
-              </span>
-            </span>
+              </TooltipContent>
+            </Tooltip>
           )}
         </div>
         {right && <div className="shrink-0">{right}</div>}

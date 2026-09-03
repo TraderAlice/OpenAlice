@@ -12,6 +12,15 @@ export interface PublicSessionRuntime {
   readonly reasoningEffort?: ModelReasoningEffort;
 }
 
+/** A running terminal or WebPi record owns the interactive execution slot.
+ * Headless records use the separate launcher lease so stale persisted state
+ * cannot make an Issue owner look busy after its process has exited. */
+export function isInteractiveSessionActive(
+  record: Pick<SessionRecord, 'state' | 'surface'> | null | undefined,
+): boolean {
+  return record?.state === 'running' && record.surface !== 'headless';
+}
+
 /** Secret-free credential/model/effort projection of a persisted Session binding. */
 export function projectPublicSessionRuntime(
   binding: SessionRuntimeBinding,

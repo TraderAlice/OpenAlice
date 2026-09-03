@@ -1,44 +1,32 @@
-name: CI
+name: Full Source Validation
 
 on:
-  push:
-    branches: [master]
   pull_request:
-    branches: [dev, master, codex/usability-improvements]
-  # Keep a full cross-platform safety net for lightweight PRs that intentionally
-  # skip the focused host matrix. Scheduled workflows run from the default
-  # branch, while checkout below points the jobs at the current dev branch.
-  schedule:
-    - cron: "0 19 * * *"
+    branches: [master]
   workflow_dispatch:
 
 permissions:
   contents: read
-  pull-requests: read
 
-# Agent-driven iterations often supersede an earlier commit before its Windows
-# job finishes. Keep only the latest PR run while never cancelling a master or
-# scheduled validation.
 concurrency:
-  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  group: full-source-validation-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # UI and prose changes are built and tested on Ubuntu, but do not need to
-  # repeat the host-sensitive runtime suite on macOS and Windows. This is a
-  # deliberately narrow allowlist: every other path keeps the full matrix.
-  change-scope:
-    if: github.event_name != 'push' || github.ref == 'refs/heads/master'
+  # This is the bounded automatic gate for master PRs and the entry gate for an
+  # explicitly requested full validation. The classifier is
+  # loaded from the trusted base revision so a candidate cannot weaken its own
+  # lane. A classifier failure retains the normal Windows PR smoke instead of
+  # granting the exact-beta fast path; a source-gate failure stops dependents.
+  source-contracts:
     runs-on: ubuntu-latest
     outputs:
-      cross_platform: ${{ steps.changes.outputs.cross_platform }}
       beta_release_prep: ${{ steps.beta-release-prep.outcome == 'success' && steps.beta-release-prep.outputs.beta_release_prep || 'false' }}
 
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          ref: ${{ github.event_name == 'schedule' && 'dev' || '' }}
 
       - name: Detect exact beta release preparation
         id: beta-release-prep
@@ -50,54 +38,6 @@ jobs:
           git show "${BASE_SHA}:scripts/classify-beta-release-prep.mjs" > "$RUNNER_TEMP/classify-beta-release-prep.mjs"
           node "$RUNNER_TEMP/classify-beta-release-prep.mjs" --github-output "$GITHUB_OUTPUT"
 
-      - name: Classify changed paths
-        id: changes
-        uses: actions/github-script@v9
-        with:
-          script: |
-            if (context.eventName !== "pull_request") {
-              core.info("Non-PR validation keeps the full platform matrix.");
-              core.setOutput("cross_platform", "true");
-              return;
-            }
-
-            const files = await github.paginate(github.rest.pulls.listFiles, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number,
-              per_page: 100,
-            });
-            const paths = files.flatMap((file) =>
-              file.previous_filename
-                ? [file.filename, file.previous_filename]
-                : [file.filename],
-            );
-            const isLightweight = (path) =>
-              path.startsWith("ui/") ||
-              path.startsWith("docs/") ||
-              /^[^/]+\.md$/i.test(path) ||
-              path === "LICENSE";
-            const platformSensitive = paths.filter((path) => !isLightweight(path));
-            const runCrossPlatform = paths.length === 0 || platformSensitive.length > 0;
-
-            core.info(`Changed paths: ${paths.join(", ") || "none reported"}`);
-            if (platformSensitive.length > 0) {
-              core.info(`Native host contracts required by: ${platformSensitive.join(", ")}`);
-            } else {
-              core.info("Only UI/docs paths changed; Ubuntu remains the PR gate.");
-            }
-            core.setOutput("cross_platform", String(runCrossPlatform));
-
-  build:
-    # Dev pushes belong exclusively to the rolling CLI publication workflow.
-    if: github.event_name != 'push' || github.ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event_name == 'schedule' && 'dev' || '' }}
-
       - uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v7
@@ -107,78 +47,77 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm build
+      - name: Verify CI workflow contracts
+        run: pnpm test:contract:workflow
 
-  test:
-    # Build and Vitest do not consume each other's output. Keep them on
-    # separate runners so either failure becomes actionable immediately.
-    if: github.event_name != 'push' || github.ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
+      - name: Typecheck root workspace
+        run: npx tsc --noEmit
+        timeout-minutes: 5
 
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event_name == 'schedule' && 'dev' || '' }}
-
-      - uses: pnpm/action-setup@v6
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
-
-      - run: pnpm test
-
-  # Preserve the established check name for branch protection and external
-  # consumers while the two independent validations report failures earlier.
-  build-and-test:
-    if: always() && (github.event_name != 'push' || github.ref == 'refs/heads/master')
-    needs: [build, test]
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Require successful build and test lanes
-        env:
-          BUILD_RESULT: ${{ needs.build.result }}
-          TEST_RESULT: ${{ needs.test.result }}
-        run: |
-          if [[ "$BUILD_RESULT" != "success" || "$TEST_RESULT" != "success" ]]; then
-            echo "Build result: $BUILD_RESULT"
-            echo "Test result: $TEST_RESULT"
-            exit 1
-          fi
-
-  # Routine dev PRs run the complete build and test suite once on Ubuntu, then
-  # exercise only native CLI/Guardian/path/process contracts on macOS and
-  # Windows. Repeating all 5,000+ platform-neutral tests on constrained hosted
-  # runners amplified resource starvation into false serial blockers. Stable
-  # promotion, master, scheduled, and manual validation still run the complete
-  # build and test suite on both hosts.
-  cross-platform-test:
-    needs: change-scope
+  workspace-build:
+    needs: source-contracts
     if: >-
       !cancelled() &&
-      (github.event_name != 'push' || github.ref == 'refs/heads/master') &&
-      (
-        needs.change-scope.result != 'success' ||
-        (
-          needs.change-scope.outputs.cross_platform == 'true' &&
-          needs.change-scope.outputs.beta_release_prep != 'true'
-        )
-      )
+      github.event_name == 'workflow_dispatch' &&
+      needs.source-contracts.result == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build complete workspace
+        run: pnpm build
+
+  hermetic-tests:
+    needs: source-contracts
+    if: >-
+      !cancelled() &&
+      github.event_name == 'workflow_dispatch' &&
+      needs.source-contracts.result == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run hermetic monorepo suite
+        run: pnpm test
+
+  cross-platform-test:
+    needs: source-contracts
+    if: >-
+      !cancelled() &&
+      github.event_name == 'workflow_dispatch' &&
+      needs.source-contracts.result == 'success'
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-14, windows-latest]
+        # Ubuntu owns the hermetic full suite. macOS keeps one native-host
+        # repetition; Windows is covered by the real dev-stack smoke below
+        # and the separate desktop/package acceptance workflow.
+        os: [macos-14]
     runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event_name == 'schedule' && 'dev' || '' }}
 
       - uses: pnpm/action-setup@v6
 
@@ -189,49 +128,29 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Build complete workspace for stable and scheduled validation
-        if: github.event_name != 'pull_request' || github.base_ref == 'master'
+      - name: Build complete workspace
         run: pnpm build
         timeout-minutes: 15
 
-      - name: Run native platform contracts for routine integration PRs
-        if: github.event_name == 'pull_request' && github.base_ref != 'master'
-        run: pnpm test:platform-contracts
-        timeout-minutes: 8
-
-      - name: Run complete suite for stable and scheduled validation
-        if: github.event_name != 'pull_request' || github.base_ref == 'master'
+      - name: Run complete suite
         run: pnpm test
         timeout-minutes: 15
 
-  # Boots the real `pnpm dev` stack and asserts UTA/Alice/Vite all spawn.
-  # Exists to catch cross-platform spawn regressions (e.g. `spawn tsx ENOENT`
-  # on Windows) that `pnpm test` can't see — esbuild transpiles, it never
-  # spawns the children. Runs on Windows (the at-risk OS) plus Ubuntu as a
-  # control: if Windows goes red while Ubuntu stays green, it's a real platform
-  # diff, not a harness bug. See scripts/guardian/smoke.ts.
+  # Windows remains the one automatic native-host smoke because it is not
+  # covered by the maintainer's local macOS/Linux development loop.
   dev-smoke:
-    needs: change-scope
+    needs: source-contracts
     if: >-
       !cancelled() &&
-      (github.event_name != 'push' || github.ref == 'refs/heads/master') &&
+      needs.source-contracts.result == 'success' &&
       (
-        needs.change-scope.result != 'success' ||
-        (
-          needs.change-scope.outputs.cross_platform == 'true' &&
-          needs.change-scope.outputs.beta_release_prep != 'true'
-        )
+        github.event_name == 'workflow_dispatch' ||
+        needs.source-contracts.outputs.beta_release_prep != 'true'
       )
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, ubuntu-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
 
     steps:
       - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event_name == 'schedule' && 'dev' || '' }}
 
       - uses: pnpm/action-setup@v6
 
@@ -240,15 +159,13 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      # Skip the Electron desktop shell — the smoke only needs UTA/Alice/UI,
-      # and this avoids a large electron download on the Windows runner.
+      # The native smoke needs UTA, Alice, and UI, not the Electron download.
       - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
 
-      # Exercises duplicate-start rejection, graceful takeover, crash-stale
-      # reclamation, heartbeat renewal, and forced recovery with real child
-      # processes before the heavier full-stack boot smoke.
-      - run: pnpm test:guardian-recovery
+      - name: Exercise Guardian recovery with real child processes
+        run: pnpm test:system:guardian
         timeout-minutes: 3
 
-      - run: pnpm test:smoke
+      - name: Boot the complete development stack
+        run: pnpm test:system:dev-stack
         timeout-minutes: 8

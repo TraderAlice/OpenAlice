@@ -53,6 +53,14 @@ describe('AgentRuntimeLog', () => {
     expect(page.total).toBe(3)
     expect(page.entries.map((entry) => entry.type)).toEqual(['runtime.stopped', 'runtime.started'])
 
+    const milestones = await log.query({
+      page: 1,
+      pageSize: 1,
+      types: ['session.born', 'runtime.stopped'],
+    })
+    expect(milestones.total).toBe(2)
+    expect(milestones.entries.map((entry) => entry.type)).toEqual(['runtime.stopped'])
+
     const replay = await log.read({ afterSeq: 1 })
     expect(replay.map((entry) => entry.seq)).toEqual([2, 3])
   })
@@ -131,6 +139,59 @@ describe('AgentRuntimeLog', () => {
         payload: expect.objectContaining({ resumeId: 'resume-bob', surface: 'webpi' }),
       }),
     ]))
+  })
+
+  it('installs optional product families without adding them to occupancy', async () => {
+    const { log } = await openLog()
+    const inbox = log.registerFamily({ family: 'inbox', types: ['inbox.received'] as const })
+    const news = log.registerFamily({ family: 'news', types: ['news.ingested'] as const })
+
+    await inbox.record('inbox.received', {
+      workspaceId: 'desk-a',
+      inboxEntryId: 'inbox-1',
+      agent: 'pi',
+      documentCount: 1,
+    })
+    await news.record('news.ingested', {
+      newsItemId: 42,
+      dedupKey: 'guid:42',
+      title: 'Markets reopen after holiday',
+      source: 'Reuters',
+      publishedAt: 1_000,
+      ingestSource: 'rss',
+    })
+    for (let index = 0; index < 60; index += 1) {
+      await log.record('runtime.turn.tool', {
+        workspaceId: 'desk-a',
+        resumeId: 'resume-noisy',
+        agent: 'codex',
+        toolId: `tool-${index}`,
+        toolName: 'workspace_list',
+        toolStatus: 'completed',
+      })
+    }
+
+    expect((await log.query({ page: 1, pageSize: 50 })).entries.every((entry) =>
+      entry.type === 'runtime.turn.tool')).toBe(true)
+    expect((await log.query({ page: 1, pageSize: 50, family: 'inbox' })).entries)
+      .toEqual([expect.objectContaining({ type: 'inbox.received' })])
+    expect((await log.query({ page: 1, pageSize: 50, family: 'news' })).entries)
+      .toEqual([expect.objectContaining({ type: 'news.ingested' })])
+    expect(log.projectionEvents()).toHaveLength(1)
+    expect(log.familyOf('news.ingested')).toBe('news')
+  })
+
+  it('rejects writes from event families that were not installed', async () => {
+    const { log } = await openLog()
+    const entry = await log.record('news.ingested', {
+      newsItemId: 1,
+      dedupKey: 'guid:1',
+      title: 'Hidden module',
+      publishedAt: 1,
+      ingestSource: 'rss',
+    })
+    expect(entry).toBeNull()
+    expect(await log.read()).toEqual([])
   })
 
 })

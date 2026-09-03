@@ -3,7 +3,7 @@ name: Desktop Package Smoke
 on:
   workflow_dispatch:
   pull_request:
-    branches: [dev, master, codex/usability-improvements]
+    branches: [master]
     paths:
       - ".github/workflows/desktop-package-smoke.yml"
       - ".github/workflows/release.yml"
@@ -74,23 +74,24 @@ jobs:
           node "$RUNNER_TEMP/classify-beta-release-prep.mjs" --github-output "$GITHUB_OUTPUT"
 
       - uses: pnpm/action-setup@v6
+        if: steps.beta-release-prep.outcome != 'success' || steps.beta-release-prep.outputs.beta_release_prep != 'true'
 
       - uses: actions/setup-node@v7
+        if: steps.beta-release-prep.outcome != 'success' || steps.beta-release-prep.outputs.beta_release_prep != 'true'
         with:
           node-version: 22
           cache: pnpm
 
       - name: Install dependencies
+        if: steps.beta-release-prep.outcome != 'success' || steps.beta-release-prep.outputs.beta_release_prep != 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Verify CI workflow contracts
-        run: >-
-          pnpm exec vitest run
-          scripts/ci-workflow.spec.ts
-          scripts/desktop-package-workflow.spec.ts
-          scripts/release-workflow.spec.ts
+        if: steps.beta-release-prep.outcome != 'success' || steps.beta-release-prep.outputs.beta_release_prep != 'true'
+        run: pnpm test:contract:workflow
 
       - name: Typecheck root workspace
+        if: steps.beta-release-prep.outcome != 'success' || steps.beta-release-prep.outputs.beta_release_prep != 'true'
         run: npx tsc --noEmit
         timeout-minutes: 5
 

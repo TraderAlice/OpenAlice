@@ -210,10 +210,10 @@ describe('PushApprovalPanel localization', () => {
 
     render(<PushApprovalPanel />)
 
-    fireEvent.click(await screen.findByText('买入 MU · 10 · @ 971'))
+    fireEvent.click(await screen.findByText('买入 MU, 10, @ 971'))
     expect(await screen.findByText('MU tactical swing long')).toBeTruthy()
     expect(await screen.findByText('买入 MU')).toBeTruthy()
-    expect(screen.getByText('LMT · 数量 10 · 限价 971 · GTC')).toBeTruthy()
+    expect(screen.getByText('LMT, 数量 10, 限价 971, GTC')).toBeTruthy()
     expect(screen.getByText('已提交')).toBeTruthy()
   })
 

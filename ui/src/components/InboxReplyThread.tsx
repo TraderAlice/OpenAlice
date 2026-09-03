@@ -27,9 +27,9 @@ export function InboxReplyThread({
   return (
     <section id="inquiries" className="mt-10 border-t border-border/60 pt-7">
       <div className="flex min-w-0 items-baseline gap-2">
-        <h2 className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground/60">{t('inbox.repliesTitle')}</h2>
+        <h2 className="text-[12px] font-medium leading-4 text-muted-foreground/70">{t('inbox.repliesTitle')}</h2>
         {records.length > 0 && (
-          <span className="text-[11px] tabular-nums text-muted-foreground/45">{records.length}</span>
+          <span className="text-[11px] leading-[15px] tabular-nums text-muted-foreground/45">{records.length}</span>
         )}
       </div>
       <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground/65">
@@ -39,7 +39,7 @@ export function InboxReplyThread({
       </p>
 
       {thread.loading && records.length === 0 ? (
-        <div className="mt-5 flex items-center gap-2 text-[12px] text-muted-foreground/60">
+        <div className="mt-5 flex items-center gap-2 text-[12px] leading-[18px] text-muted-foreground/60">
           <LoaderCircle size={13} className="animate-spin" aria-hidden />
           {t('inbox.repliesLoading')}
         </div>
@@ -73,7 +73,7 @@ export function InboxReplyThread({
             type="button"
             onClick={() => void thread.submit()}
             disabled={thread.sending || thread.prompt.trim().length === 0}
-            className="oa-pressable inline-flex h-10 w-10 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-primary px-0 text-[11px] font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-35 sm:h-8 sm:w-auto sm:px-3"
+            className="oa-pressable inline-flex h-10 w-10 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-primary px-0 text-[11px] leading-[15px] font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-35 sm:h-8 sm:w-auto sm:px-3"
             aria-label={thread.sending ? t('inbox.replySending') : t('inbox.replyAction')}
           >
             {thread.sending
@@ -103,7 +103,7 @@ function InboxReplyRecord({ record }: { record: InquiryRecord }) {
       </span>
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
         <span className="text-[12px] font-medium text-foreground">{t('inbox.replyYou')}</span>
-        <span className="text-[10px] tabular-nums text-muted-foreground/45" title={new Date(record.startedAt).toLocaleString()}>
+        <span className="text-[10px] leading-[14px] tabular-nums text-muted-foreground/45" title={new Date(record.startedAt).toLocaleString()}>
           {formatRelativeTime(record.startedAt)}
         </span>
       </div>
@@ -117,14 +117,14 @@ function InboxReplyRecord({ record }: { record: InquiryRecord }) {
             ? <LoaderCircle size={11} className="animate-spin text-primary" aria-hidden />
             : <Bot size={11} className={failed ? 'text-destructive' : 'text-primary'} aria-hidden />}
         </span>
-        <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+        <div className="flex flex-wrap items-center gap-1.5 text-[11px] leading-[15px]">
           <span className="font-medium text-foreground/80">
             {running
               ? t('inbox.replyAgentWorking', { agent: record.agent })
               : t('inbox.replyAgent', { agent: record.agent })}
           </span>
           {reconstructed && (
-            <span className="rounded-full bg-warning/10 px-1.5 py-0.5 text-[9px] font-medium text-warning">
+            <span className="rounded-full bg-warning/10 px-1.5 py-0.5 text-[10px] leading-[14px] font-medium text-warning">
               {t('inbox.replyReconstructed')}
             </span>
           )}

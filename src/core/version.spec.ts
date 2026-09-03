@@ -315,28 +315,6 @@ describe('getVersionInfo', () => {
     expect(info.error).toContain('boom')
   })
 
-  it('keeps Railway release selection service-owned and does not fetch a manifest', async () => {
-    const fetchMock = vi.fn()
-    globalThis.fetch = fetchMock as unknown as typeof fetch
-
-    const info = await getVersionInfo({
-      env: {
-        OPENALICE_SERVICE_MANAGER: 'railway',
-        OPENALICE_INSTALL_SOURCE: '/runtime/install-source.json',
-      },
-      readTextFile: () => JSON.stringify(installSource('development')),
-    })
-
-    expect(info).toMatchObject({
-      channel: 'dev',
-      updateAuthority: 'service',
-      latest: null,
-      hasUpdate: false,
-      error: null,
-    })
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
-
   it('keeps Docker release selection service-owned through the legacy launcher env', async () => {
     const fetchMock = vi.fn()
     globalThis.fetch = fetchMock as unknown as typeof fetch
@@ -351,6 +329,38 @@ describe('getVersionInfo', () => {
       hasUpdate: false,
       error: null,
     })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['Guardian source launcher', { OPENALICE_LAUNCHER: 'dev' }],
+    ['explicit source profile', { OPENALICE_RUNTIME_PROFILE: 'dev' }],
+    ['Electron source profile', { OPENALICE_RUNTIME_PROFILE: 'electron-dev' }],
+    ['legacy Electron source launcher', { OPENALICE_LAUNCHER: 'electron' }],
+  ] as const)('keeps %s on the dev channel without release discovery', async (_label, env) => {
+    const fetchMock = vi.fn()
+    const readTextFile = vi.fn(() => JSON.stringify(installSource('stable')))
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+
+    const info = await getVersionInfo({
+      env: {
+        ...env,
+        // A developer shell may inherit installed-CLI provenance. Explicit
+        // source identity still owns this process and must take precedence.
+        OPENALICE_INSTALL_SOURCE: '/runtime/install-source.json',
+      },
+      readTextFile,
+    })
+
+    expect(info).toMatchObject({
+      current: getCurrentVersion(),
+      channel: 'dev',
+      updateAuthority: 'source',
+      latest: null,
+      hasUpdate: false,
+      error: null,
+    })
+    expect(readTextFile).not.toHaveBeenCalled()
     expect(fetchMock).not.toHaveBeenCalled()
   })
 

@@ -15,10 +15,14 @@ import { ArrowLeft, FileText } from 'lucide-react'
 
 import { FileContentView } from '../components/FileContentView'
 import { CenteredLoading } from '../components/StateViews'
+import { Button } from '../components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { readWorkspaceFile, type ReadFileResult } from '../components/workspace/api'
 import { workspaceDisplayName, workspaceDisplayTitle } from '../components/workspace/display'
 import { useTrackedSelection } from '../live/tracked-selection'
+import { OfficeInboxDutyReturnBar } from '../office/OfficeInboxDutyReturnBar'
+import { useOfficeInboxDutyReturn } from '../office/useOfficeInboxDutyReturn'
 import { useWorkspace } from '../tabs/store'
 import type { ViewSpec } from '../tabs/types'
 
@@ -33,6 +37,7 @@ export function FileViewerPage({ spec }: Props) {
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const setSidebar = useWorkspace((s) => s.setSidebar)
   const selectTracked = useTrackedSelection((s) => s.select)
+  const returnToOffice = useOfficeInboxDutyReturn()
   const workspace = workspaces.find((w) => w.id === wsId)
   const workspaceName = workspace ? workspaceDisplayName(workspace) : wsId.slice(0, 8)
   const workspaceTitle = workspace ? workspaceDisplayTitle(workspace) : workspaceName
@@ -82,16 +87,23 @@ export function FileViewerPage({ spec }: Props) {
   return (
     <div className="h-full flex flex-col min-h-0">
       <div className="flex shrink-0 items-start gap-2 border-b border-border bg-secondary/30 px-4 py-2 sm:items-center">
-        <button
-          type="button"
-          onClick={goBack}
-          aria-label={backLabel}
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center gap-1.5 rounded-md border border-border bg-background px-0 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:h-7 sm:w-auto sm:px-2"
-          title={backLabel}
-        >
-          <ArrowLeft size={14} strokeWidth={1.8} aria-hidden />
-          <span className="hidden sm:inline">{t('fileViewer.back')}</span>
-        </button>
+        <Tooltip>
+          <TooltipTrigger
+            render={(
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goBack}
+                aria-label={backLabel}
+                className="h-10 w-10 shrink-0 px-0 sm:h-8 sm:w-auto sm:px-2.5"
+              >
+                <ArrowLeft size={14} strokeWidth={1.8} aria-hidden />
+                <span className="hidden sm:inline">{t('fileViewer.back')}</span>
+              </Button>
+            )}
+          />
+          <TooltipContent>{backLabel}</TooltipContent>
+        </Tooltip>
         <FileText size={13} strokeWidth={1.75} className="mt-1 shrink-0 text-muted-foreground/70 sm:mt-0" aria-hidden />
         <div className="min-w-0 flex-1 sm:contents">
           <span
@@ -108,6 +120,10 @@ export function FileViewerPage({ spec }: Props) {
           </span>
         </div>
       </div>
+      <OfficeInboxDutyReturnBar
+        surface={{ kind: 'file', workspaceId: wsId, path }}
+        onReturn={returnToOffice}
+      />
       <div className="flex-1 overflow-y-auto min-h-0">
         <div className="mx-auto max-w-[48rem] px-5 py-8 sm:px-8 sm:py-10 lg:py-12">
           {result === null ? (

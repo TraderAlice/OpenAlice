@@ -40,8 +40,6 @@ import {
   resolveAliceProjectIdentity,
   readAliceProjectProduct,
   normalizeProcessExitCode,
-  resolveRailwayRuntimeFence,
-  resolveRuntimeLockOwnerAuthority,
   RestartBackoff,
   takeoverRequested,
 } from '@traderalice/guardian-runtime'
@@ -55,17 +53,6 @@ import { runtimeProcessSpec } from './runtime-process-spec.mjs'
 const DATA_HOME = process.env.OPENALICE_HOME
   ?? process.env.OPENALICE_USER_DATA_HOME // deprecated alias, one-release courtesy
   ?? '/data'
-const RAILWAY_FENCE_CLAIMED = Boolean(
-  process.env.OPENALICE_RAILWAY_FENCE_FD
-  || process.env.OPENALICE_RAILWAY_ENTRYPOINT_OWNER,
-)
-const RAILWAY_RUNTIME_REQUIRED = process.env.OPENALICE_SERVICE_MANAGER?.trim() === 'railway'
-const RUNTIME_LOCK_OWNER_AUTHORITY = resolveRuntimeLockOwnerAuthority(process.env)
-const RAILWAY_RUNTIME_FENCE = RUNTIME_LOCK_OWNER_AUTHORITY === 'railway-fenced-handoff'
-  ? resolveRailwayRuntimeFence(process.env)
-  : null
-delete process.env.OPENALICE_RAILWAY_FENCE_FD
-delete process.env.OPENALICE_RAILWAY_ENTRYPOINT_OWNER
 const LAUNCHER_ROOT = process.env.AQ_LAUNCHER_ROOT ?? resolve(DATA_HOME, 'workspaces')
 const LAUNCHER = process.env.OPENALICE_LAUNCHER?.trim() || 'docker'
 const GUARDIAN_LAUNCHER = LAUNCHER.startsWith('guardian-') ? LAUNCHER : `guardian-${LAUNCHER}`
@@ -316,7 +303,7 @@ function makeUTASpec() {
 
 function spawnUTA() {
   const spec = makeUTASpec()
-  const child = spawn(spec.cmd, spec.args, trustedRailwayChildOptions(spec.env))
+  const child = spawn(spec.cmd, spec.args, { env: spec.env, stdio: 'inherit' })
   child.once('exit', (code, signal) => {
     if (utaChild === child) utaChild = null
     if (stopping || restartingUTA) return
@@ -335,7 +322,7 @@ function spawnConnector() {
     nodeBinary: NODE_BINARY,
   })
   const child = spawn(spec.cmd, spec.args, {
-    ...trustedRailwayChildOptions({
+    env: {
       ...process.env,
       ...ALICE_PROJECT_ENV,
       OPENALICE_CONNECTOR_PORT: String(CONNECTOR_PORT),
@@ -345,7 +332,8 @@ function spawnConnector() {
       OPENALICE_GUARDIAN_PID: String(process.pid),
       OPENALICE_GUARDIAN_STARTED_AT: String(GUARDIAN_STARTED_AT),
       ...(TAKEOVER ? { OPENALICE_TAKEOVER: '1' } : {}),
-    }),
+    },
+    stdio: 'inherit',
   })
   child.once('exit', (code, signal) => {
     if (connectorChild === child) connectorChild = null
@@ -366,7 +354,7 @@ function spawnAlice() {
     nodeBinary: NODE_BINARY,
   })
   const child = spawn(spec.cmd, spec.args, {
-    ...trustedRailwayChildOptions({
+    env: {
       ...process.env,
       ...ALICE_PROJECT_ENV,
       OPENALICE_WEB_PORT: String(WEB_PORT),
@@ -383,7 +371,8 @@ function spawnAlice() {
       ...(PROJECT_PRODUCT === 'nano'
         ? { OPENALICE_PROJECT_PRODUCT: 'nano', OPENALICE_UTA_DISABLED: '1' }
         : {}),
-    }),
+    },
+    stdio: 'inherit',
   })
   child.once('exit', (code, signal) => {
     if (stopping) return
@@ -392,17 +381,6 @@ function spawnAlice() {
     shutdown(typeof code === 'number' && code !== 0 ? code : 1)
   })
   return child
-}
-
-function trustedRailwayChildOptions(env) {
-  if (!RAILWAY_RUNTIME_FENCE) return { env, stdio: 'inherit' }
-  return {
-    env: {
-      ...env,
-      OPENALICE_RAILWAY_FENCE_FD: '3',
-    },
-    stdio: ['inherit', 'inherit', 'inherit', RAILWAY_RUNTIME_FENCE.fd],
-  }
 }
 
 async function waitForUTA() {
@@ -638,9 +616,6 @@ export async function startGuardianRuntime() {
   process.on('SIGTERM', () => shutdown())
   process.on('SIGHUP', () => shutdown())
 
-  if ((RAILWAY_FENCE_CLAIMED || RAILWAY_RUNTIME_REQUIRED) && !RAILWAY_RUNTIME_FENCE) {
-    throw new Error('invalid inherited Railway lifecycle fence; refusing to start Guardian')
-  }
   await initializeRuntimeState()
   if (!process.env.OPENALICE_HOME && process.env.OPENALICE_USER_DATA_HOME) {
     console.warn('[guardian/prod] OPENALICE_USER_DATA_HOME is deprecated — set OPENALICE_HOME instead')
@@ -663,7 +638,6 @@ export async function startGuardianRuntime() {
     launcher: GUARDIAN_LAUNCHER,
     takeover: TAKEOVER,
     processStartedAt: GUARDIAN_STARTED_AT,
-    ownerAuthority: RUNTIME_LOCK_OWNER_AUTHORITY,
     onOwnershipLost: (err) => {
       console.error('[guardian/prod] runtime ownership lost:', err)
       shutdown()

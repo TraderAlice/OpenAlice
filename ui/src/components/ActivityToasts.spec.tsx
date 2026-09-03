@@ -24,6 +24,7 @@ vi.mock('sonner', () => ({
   toast: {
     loading: vi.fn(),
     success: vi.fn(),
+    info: vi.fn(),
     error: vi.fn(),
     dismiss: vi.fn(),
   },
@@ -132,6 +133,30 @@ describe('ActivityToasts', () => {
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith(
       'Sonner success test',
       expect.objectContaining({ id: 'openalice-activity:sonner-test:42' }),
+    ))
+  })
+
+  it('announces each News activity with its source and headline', async () => {
+    useActivity.mockReturnValue(data([signal({
+      id: 'news:42',
+      kind: 'news',
+      workspaceId: undefined,
+      agent: undefined,
+      resumeId: undefined,
+      taskId: undefined,
+      newsItemId: 42,
+      source: 'Reuters',
+      detail: 'Markets reopen after holiday',
+      revision: 42,
+    })]))
+    render(<ActivityToasts />)
+
+    await waitFor(() => expect(toast.info).toHaveBeenCalledWith(
+      'activityToast.newsIngested:',
+      expect.objectContaining({
+        id: 'openalice-activity:news:42',
+        description: 'Markets reopen after holiday',
+      }),
     ))
   })
 })

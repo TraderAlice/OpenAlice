@@ -1,15 +1,10 @@
-import { execFile } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
-import { fstatSync, readFileSync, realpathSync, statSync } from 'node:fs'
-import { readFile, stat } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import { homedir, hostname, tmpdir } from 'node:os'
 import { createConnection } from 'node:net'
 import { resolve } from 'node:path'
-import { promisify } from 'node:util'
 
 import { resolveAliceProjectIdentity } from './alice-project.ts'
-
-const execFileAsync = promisify(execFile)
 
 export const GUARDIAN_CONTROL_PROTOCOL = 1
 export const GUARDIAN_CONTROL_API_VERSION = 1
@@ -128,13 +123,8 @@ export async function readRuntimeStatus(options = {}, dependencies = {}) {
 
   const inspectOwner = dependencies.inspectOwner ?? inspectGuardianOwner
   const owner = await inspectOwner(homeRoot, {
-    env: dependencies.env,
     hostname: dependencies.hostname,
     isProcessAlive: dependencies.isProcessAlive,
-    platform: dependencies.platform,
-    readMachineId: dependencies.readMachineId,
-    readProcessStartedAt: dependencies.readProcessStartedAt,
-    railwayFenceValid: dependencies.railwayFenceValid,
   })
   if (owner?.active) {
     return {
@@ -314,45 +304,15 @@ async function inspectGuardianOwner(homeRoot, options = {}) {
     resolve(homeRoot, 'state', 'runtime.lock', 'owner.json'),
     resolve(homeRoot, 'workspaces', 'state', 'runtime.lock', 'owner.json'),
   ]
-  const env = options.env ?? process.env
   const localHostname = options.hostname ?? hostname()
   const isAlive = options.isProcessAlive ?? isProcessAlive
-  const machineId = options.readMachineId ?? (() => readMachineId({
-    env,
-    hostname: localHostname,
-    platform: options.platform,
-  }))
-  let machineIdPromise
-  const currentMachineId = () => {
-    machineIdPromise ??= Promise.resolve().then(() => machineId())
-    return machineIdPromise
-  }
-  const processStartedAt = options.readProcessStartedAt
-    ?? ((pid) => readProcessStartedAt(pid, { platform: options.platform }))
   let staleOwner = null
   for (const ownerPath of ownerPaths) {
     let owner
     try {
       owner = JSON.parse(await readFile(ownerPath, 'utf8'))
     } catch (error) {
-      if (error?.code === 'ENOENT') {
-        const lockPath = resolve(ownerPath, '..')
-        try {
-          await stat(lockPath)
-          return {
-            active: true,
-            publicOwner: null,
-            detail: `Runtime lock exists without published owner metadata at ${lockPath}`,
-          }
-        } catch (lockError) {
-          if (lockError?.code === 'ENOENT') continue
-          return {
-            active: true,
-            publicOwner: null,
-            detail: `Runtime lock metadata is unreadable at ${lockPath}`,
-          }
-        }
-      }
+      if (error?.code === 'ENOENT') continue
       return {
         active: true,
         publicOwner: null,
@@ -366,25 +326,9 @@ async function inspectGuardianOwner(homeRoot, options = {}) {
         detail: `Runtime owner metadata is invalid at ${ownerPath}`,
       }
     }
-    const resolvedMachineId = await currentMachineId()
-    const railwayScope = railwayOwnerScope(owner, resolvedMachineId, env, homeRoot, options)
-    let active
-    if (railwayScope === 'cross-container-fenced') {
-      active = false
-    } else if (railwayScope === 'cross-container-observer') {
-      active = true
-    } else if (railwayScope === 'foreign') {
-      active = true
-    } else {
-      const sameMachine = railwayScope === 'same-container'
-        || (typeof owner.machineId === 'string' && owner.machineId
-          ? owner.machineId === resolvedMachineId
-          : typeof owner.hostname !== 'string' || owner.hostname === localHostname)
-      active = !sameMachine || await isSameProcess(owner, {
-        isAlive,
-        processStartedAt,
-      })
-    }
+    const sameHost = typeof owner.hostname !== 'string'
+      || owner.hostname === localHostname
+    const active = !sameHost || isAlive(owner.pid)
     const publicOwner = {
       surface: owner.launcher.startsWith('guardian-')
         ? owner.launcher.slice('guardian-'.length)
@@ -404,177 +348,6 @@ async function inspectGuardianOwner(homeRoot, options = {}) {
         detail: 'A stale Runtime owner record is present; the next start may recover it',
       }
     : null
-}
-
-function railwayOwnerScope(owner, currentMachineId, env, homeRoot, options) {
-  const serviceId = env['RAILWAY_SERVICE_ID']?.trim()
-  const environmentId = env['RAILWAY_ENVIRONMENT_ID']?.trim()
-  const configuredMachineId = env['OPENALICE_MACHINE_ID']?.trim()
-  const expectedMachineId = `railway-service-${serviceId}`
-  if (
-    env['OPENALICE_SERVICE_MANAGER']?.trim() !== 'railway'
-    || !environmentId
-    || !/^[A-Za-z0-9-]{1,128}$/.test(serviceId ?? '')
-    || configuredMachineId !== expectedMachineId
-    || currentMachineId !== `env:${expectedMachineId}`
-  ) {
-    return null
-  }
-  if (owner.machineId !== currentMachineId) return 'foreign'
-  if (owner.fencingProtocol !== 'railway-flock-v1') return 'foreign'
-  if (
-    owner.fencingInstanceId !== undefined
-    && !/^[A-Za-z0-9-]{16,128}$/.test(owner.fencingInstanceId)
-  ) return 'foreign'
-  const currentInstanceId = env['OPENALICE_RAILWAY_INSTANCE_ID']?.trim()
-  if (!/^[A-Za-z0-9-]{16,128}$/.test(currentInstanceId ?? '')) return 'foreign'
-  if (owner.fencingInstanceId === currentInstanceId) return 'same-container'
-  const fenceValid = options.railwayFenceValid
-    ?? hasValidRailwayFence(env, homeRoot)
-  return fenceValid ? 'cross-container-fenced' : 'cross-container-observer'
-}
-
-function hasValidRailwayFence(env, homeRoot) {
-  const rawFd = env['OPENALICE_RAILWAY_FENCE_FD']?.trim()
-  const fd = Number(rawFd)
-  if (
-    env['OPENALICE_RAILWAY_ENTRYPOINT_OWNER'] !== '1'
-    || !/^[0-9]{1,4}$/.test(rawFd ?? '')
-    || !Number.isInteger(fd)
-    || fd < 3
-  ) return false
-  const fencePath = railwayRuntimeFencePath(env, homeRoot)
-  if (!fencePath) return false
-  try {
-    const inherited = fstatSync(fd)
-    const expected = statSync(fencePath)
-    return inherited.isDirectory()
-      && expected.isDirectory()
-      && inherited.dev === expected.dev
-      && inherited.ino === expected.ino
-      && inheritedFdHoldsExclusiveFlock(fd)
-  } catch {
-    return false
-  }
-}
-
-function railwayRuntimeFencePath(env, homeRoot) {
-  const serviceId = env['RAILWAY_SERVICE_ID']?.trim()
-  if (!/^[A-Za-z0-9-]{1,128}$/.test(serviceId ?? '')) return null
-  const configuredRoots = [
-    env['RAILWAY_VOLUME_MOUNT_PATH']?.trim(),
-    env['OPENALICE_RAILWAY_VOLUME_ROOT']?.trim(),
-  ].filter(Boolean).map((value) => resolve(value))
-  if (configuredRoots.length === 0 || new Set(configuredRoots).size !== 1) return null
-  const volumeRoot = configuredRoots[0]
-  const installDir = env['OPENALICE_INSTALL_DIR']?.trim()
-  if (!volumeRoot || volumeRoot === '/' || !homeRoot || !installDir) return null
-  if (!pathIsWithin(volumeRoot, homeRoot) || !pathIsWithin(volumeRoot, installDir)) return null
-  return isLinuxMountPoint(volumeRoot) ? volumeRoot : null
-}
-
-function pathIsWithin(root, candidate) {
-  try {
-    const canonicalRoot = realpathSync(root)
-    const canonicalCandidate = realpathSync(candidate)
-    return canonicalCandidate !== canonicalRoot
-      && canonicalCandidate.startsWith(`${canonicalRoot}/`)
-  } catch {
-    return false
-  }
-}
-
-function isLinuxMountPoint(path) {
-  if (process.platform !== 'linux') return false
-  try {
-    const canonical = realpathSync(path)
-    return readFileSync('/proc/self/mountinfo', 'utf8')
-      .split('\n')
-      .some((line) => decodeMountInfoPath(line.split(' ')[4] ?? '') === canonical)
-  } catch {
-    return false
-  }
-}
-
-function decodeMountInfoPath(value) {
-  return value.replace(/\\([0-7]{3})/g, (_match, octal) => (
-    String.fromCharCode(Number.parseInt(octal, 8))
-  ))
-}
-
-function inheritedFdHoldsExclusiveFlock(fd) {
-  if (process.platform !== 'linux') return false
-  try {
-    return /^lock:\s+\d+:\s+FLOCK\s+ADVISORY\s+WRITE\b/m.test(
-      readFileSync(`/proc/self/fdinfo/${fd}`, 'utf8'),
-    )
-  } catch {
-    return false
-  }
-}
-
-async function isSameProcess(owner, dependencies) {
-  if (!dependencies.isAlive(owner.pid)) return false
-  if (typeof owner.processStartedAt !== 'string') return true
-  const expected = Date.parse(owner.processStartedAt)
-  if (!Number.isFinite(expected)) return true
-  const actual = await dependencies.processStartedAt(owner.pid)
-  if (actual === null) return true
-  return Math.abs(actual - expected) <= 2_000
-}
-
-async function readProcessStartedAt(pid, options = {}) {
-  try {
-    if ((options.platform ?? process.platform) === 'win32') {
-      const script = `(Get-Process -Id ${pid} -ErrorAction Stop).StartTime.ToUniversalTime().ToString('o')`
-      const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
-        windowsHide: true,
-        timeout: 2_000,
-      })
-      const parsed = Date.parse(stdout.trim())
-      return Number.isFinite(parsed) ? parsed : null
-    }
-
-    const { stdout } = await execFileAsync('ps', ['-p', String(pid), '-o', 'lstart='], { timeout: 2_000 })
-    const parsed = Date.parse(stdout.trim())
-    return Number.isFinite(parsed) ? parsed : null
-  } catch {
-    return null
-  }
-}
-
-// Installed CLI payloads do not include @traderalice/guardian-runtime. Keep
-// these machine/process identity readers aligned with its process-control.ts.
-async function readMachineId(options = {}) {
-  const env = options.env ?? process.env
-  const platform = options.platform ?? process.platform
-  const localHostname = options.hostname ?? hostname()
-  const override = env['OPENALICE_MACHINE_ID']?.trim()
-  if (override) return `env:${override}`
-  try {
-    if (platform === 'linux') {
-      const value = (await readFile('/etc/machine-id', 'utf8')).trim()
-      if (value) return `linux:${value}`
-    }
-    if (platform === 'darwin') {
-      const { stdout } = await execFileAsync('ioreg', ['-rd1', '-c', 'IOPlatformExpertDevice'], { timeout: 2_000 })
-      const value = /"IOPlatformUUID"\s*=\s*"([^"]+)"/.exec(stdout)?.[1]
-      if (value) return `darwin:${value}`
-    }
-    if (platform === 'win32') {
-      const { stdout } = await execFileAsync('reg.exe', [
-        'query',
-        'HKLM\\SOFTWARE\\Microsoft\\Cryptography',
-        '/v',
-        'MachineGuid',
-      ], { windowsHide: true, timeout: 2_000 })
-      const value = /MachineGuid\s+REG_\w+\s+([^\r\n]+)/i.exec(stdout)?.[1]?.trim()
-      if (value) return `win32:${value}`
-    }
-  } catch {
-    // Match Guardian's weaker fallback when a platform identity is unavailable.
-  }
-  return `hostname:${localHostname}`
 }
 
 function sanitizeControlOwner(owner) {

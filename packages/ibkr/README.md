@@ -109,12 +109,15 @@ Java/C++ sources are in `.gitignore` (available locally after extracting the TWS
 ## Testing
 
 ```bash
-pnpm test          # Unit tests (no external dependencies)
-pnpm test:e2e      # Integration tests (needs TWS/IB Gateway running)
-pnpm test:all      # Both
+pnpm test                        # Unit tests (no external dependencies)
+pnpm test:external:readonly      # Read-only TWS/Gateway integration
+OPENALICE_UTA_LIVE_PAPER=1 \
+  pnpm test:live-paper           # Order precision against verified paper TWS
 ```
 
-E2e tests share a single TWS connection via `tests/e2e/setup.ts`. If TWS is not running, e2e tests skip automatically.
+TWS tests share a single connection via `tests/e2e/setup.ts`. If TWS is not
+running, read-only tests skip automatically. The order-writing suite cannot be
+collected without the explicit live-paper acknowledgement.
 
 Text-decoder changes must include payload-only fixtures for the touched handler
 category plus framing and malformed-message recovery coverage. Run the

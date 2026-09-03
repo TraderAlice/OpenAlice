@@ -17,15 +17,15 @@ interface SidebarProps {
  */
 export function Sidebar({ title, actions, children, leading }: SidebarProps) {
   return (
-    <aside className="flex h-full w-full flex-col bg-secondary">
-      <div className="flex items-center justify-between px-4 h-10 shrink-0 gap-2 border-b border-border/60">
-        <div className="flex items-center gap-1.5 min-w-0">
+    <aside className="flex h-full w-full flex-col bg-sidebar text-sidebar-foreground">
+      <div className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-sidebar-border/70 px-3">
+        <div className="flex min-w-0 items-center gap-1.5">
           {leading}
-          <h2 className="text-[13px] font-semibold text-foreground truncate">{title}</h2>
+          <h2 className="truncate text-[13px] font-semibold leading-[18px] tracking-[-0.01em] text-foreground">{title}</h2>
         </div>
-        {actions && <div className="flex items-center gap-0.5 shrink-0">{actions}</div>}
+        {actions && <div className="flex shrink-0 items-center gap-0.5">{actions}</div>}
       </div>
-      <div className="flex-1 min-h-0 flex flex-col">{children}</div>
+      <div className="flex min-h-0 flex-1 flex-col">{children}</div>
     </aside>
   )
 }

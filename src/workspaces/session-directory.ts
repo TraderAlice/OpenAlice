@@ -13,6 +13,7 @@ import { sessionPreferredTitle, type SessionRecord } from './session-registry.js
 import type { SessionCreatedBy } from './session-metadata.js'
 import { projectSessionPresentationTitle } from './session-presentation.js'
 import {
+  isInteractiveSessionActive,
   projectPublicSessionRuntime,
   type PublicSessionRuntime,
 } from './public-session.js'
@@ -114,6 +115,7 @@ export function buildWorkspaceSessionDirectory(input: {
     sessions: input.identities.map((identity) => {
       const execution = input.latestExecutionFor(identity.resumeId)
       const interactive = input.interactiveFor(identity.resumeId)
+      const interactiveActive = isInteractiveSessionActive(interactive)
       const interactiveTitle = interactive ? sessionPreferredTitle(interactive) : undefined
       const presentationTitle = interactive
         ? projectSessionPresentationTitle({
@@ -137,7 +139,8 @@ export function buildWorkspaceSessionDirectory(input: {
         resumable: identity.lifecycle !== 'retired'
           && sessionPresence(identity) !== 'deleted'
           && Boolean(identity.agentSessionId),
-        active: identity.lifecycle !== 'retired' && input.isActive(identity.resumeId),
+        active: identity.lifecycle !== 'retired'
+          && (input.isActive(identity.resumeId) || interactiveActive),
         ...(identity.metadata?.createdBy ? { createdBy: identity.metadata.createdBy } : {}),
         ...(input.rosterVisibilityFor?.(identity.resumeId) === 'hidden'
           ? { rosterVisibility: 'hidden' as const }

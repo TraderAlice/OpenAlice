@@ -4,11 +4,12 @@ import { useTranslation } from 'react-i18next'
 
 import type { AgentActivitySignal } from '../hooks/useGlobalAgentActivity'
 import { useGlobalAgentActivity } from '../hooks/useGlobalAgentActivity'
+import { useWorkspace } from '../tabs/store'
 
 const MAX_ANNOUNCED_SIGNALS = 200
 
 function toastId(signal: AgentActivitySignal): string {
-  if (signal.kind === 'inbox' || signal.kind.startsWith('sonner-test-')) {
+  if (signal.kind === 'inbox' || signal.kind === 'news' || signal.kind.startsWith('sonner-test-')) {
     return `openalice-activity:${signal.id}`
   }
   const operation = signal.taskId
@@ -24,6 +25,7 @@ function toastId(signal: AgentActivitySignal): string {
  */
 export function ActivityToasts() {
   const { t } = useTranslation()
+  const openOrFocus = useWorkspace((state) => state.openOrFocus)
   const { signals, loading } = useGlobalAgentActivity()
   const announced = useRef(new Map<string, number>())
   const persistentSignals = useRef(new Set<string>())
@@ -61,6 +63,22 @@ export function ActivityToasts() {
         toast.success(t('activityToast.inboxDelivered', { agent }), {
           id,
           duration: 4_000,
+          action: {
+            label: t('activityToast.viewInbox'),
+            onClick: () => openOrFocus({ kind: 'inbox', params: {} }),
+          },
+        })
+      } else if (signal.kind === 'news') {
+        toast.info(t('activityToast.newsIngested', {
+          source: signal.source ?? t('activityToast.newsSource'),
+        }), {
+          id,
+          description: signal.detail,
+          duration: 6_000,
+          action: {
+            label: t('activityToast.viewNews'),
+            onClick: () => openOrFocus({ kind: 'news', params: {} }),
+          },
         })
       } else if (signal.kind === 'sonner-test-running') {
         toast.loading(signal.detail ?? 'Sonner running test', {
@@ -80,7 +98,7 @@ export function ActivityToasts() {
       if (!oldest) break
       announced.current.delete(oldest)
     }
-  }, [loading, signals, t])
+  }, [loading, openOrFocus, signals, t])
 
   return null
 }

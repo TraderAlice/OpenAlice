@@ -20,6 +20,9 @@ interface WorkflowJob {
 }
 
 interface Workflow {
+  on?: {
+    pull_request?: { branches?: string[] }
+  }
   jobs: Record<string, WorkflowJob>
 }
 
@@ -50,34 +53,54 @@ function expectOutcomeGatedOutput(job: WorkflowJob): void {
 }
 
 describe('exact beta release-preparation workflow lane', () => {
-  it('keeps Linux build/test while skipping only CI host matrices', () => {
+  it('keeps trusted source contracts while full Linux/macOS validation stays manual', () => {
     const jobs = workflow('ci.yml').jobs
-    expectTrustedClassifier(jobs['change-scope'])
-    expectOutcomeGatedOutput(jobs['change-scope'])
-    expect(jobs.build.needs).toBeUndefined()
-    expect(jobs.test.needs).toBeUndefined()
-    expect(jobs['build-and-test'].needs).toEqual(['build', 'test'])
-    for (const name of ['cross-platform-test', 'dev-smoke']) {
+    expectTrustedClassifier(jobs['source-contracts'])
+    expectOutcomeGatedOutput(jobs['source-contracts'])
+    expect(step(jobs['source-contracts'], 'Verify CI workflow contracts').run)
+      .toBe('pnpm test:contract:workflow')
+    expect(step(jobs['source-contracts'], 'Typecheck root workspace').run)
+      .toBe('npx tsc --noEmit')
+    for (const name of [
+      'workspace-build',
+      'hermetic-tests',
+      'cross-platform-test',
+    ]) {
+      expect(jobs[name].needs).toBe('source-contracts')
       expect(jobs[name].if).toContain('!cancelled()')
-      expect(jobs[name].if).toContain("needs.change-scope.result != 'success'")
-      expect(jobs[name].if).toContain("beta_release_prep != 'true'")
-      expect(jobs[name].if).toContain("github.ref == 'refs/heads/master'")
+      expect(jobs[name].if).toContain("github.event_name == 'workflow_dispatch'")
+      expect(jobs[name].if).toContain("needs.source-contracts.result == 'success'")
     }
+    expect(jobs['dev-smoke'].if).toContain("needs.source-contracts.result == 'success'")
+    expect(jobs['dev-smoke'].if).toContain("github.event_name == 'workflow_dispatch'")
+    expect(jobs['dev-smoke'].if).toContain("beta_release_prep != 'true'")
+    expect(jobs['build-and-test']).toBeUndefined()
   })
 
-  it('keeps desktop contracts and typecheck while skipping package matrices', () => {
-    const jobs = workflow('desktop-package-smoke.yml').jobs
+  it('keeps desktop classification cheap while central CI owns contracts and typecheck', () => {
+    const desktop = workflow('desktop-package-smoke.yml')
+    const jobs = desktop.jobs
+    expect(desktop.on?.pull_request?.branches).toEqual(['master'])
     expectTrustedClassifier(jobs.preflight)
     expectOutcomeGatedOutput(jobs.preflight)
-    expect(step(jobs.preflight, 'Verify CI workflow contracts')).toBeDefined()
-    expect(step(jobs.preflight, 'Typecheck root workspace')).toBeDefined()
+    for (const name of [
+      'Install dependencies',
+      'Verify CI workflow contracts',
+      'Typecheck root workspace',
+    ]) {
+      const candidate = step(jobs.preflight, name)
+      expect(candidate.if).toContain("steps.beta-release-prep.outcome != 'success'")
+      expect(candidate.if).toContain("beta_release_prep != 'true'")
+    }
     expect(jobs['broker-packs-windows'].if).toContain("beta_release_prep != 'true'")
     expect(jobs.package.if).toContain("beta_release_prep != 'true'")
   })
 
   it('skips CLI PR acceptance without changing the dev publication chain', () => {
-    const jobs = workflow('cli-installer-smoke.yml').jobs
+    const cli = workflow('cli-installer-smoke.yml')
+    const jobs = cli.jobs
     const scope = jobs['release-prep-scope']
+    expect(cli.on?.pull_request?.branches).toEqual(['master'])
     expectTrustedClassifier(scope)
     expectOutcomeGatedOutput(scope)
     expect(scope.if).toBe("github.event_name != 'push'")
@@ -87,13 +110,20 @@ describe('exact beta release-preparation workflow lane', () => {
       expect(jobs[name].if).toContain("needs.release-prep-scope.result != 'success'")
       expect(jobs[name].if).toContain("beta_release_prep != 'true'")
     }
+    expect(jobs['bun-cli-feasibility'].if).toContain("github.base_ref == 'master'")
+    expect(jobs['checkout-remote'].if).toContain("github.base_ref == 'master'")
+    expect(jobs['checkout-install'].if).not.toContain("github.base_ref == 'master'")
+    expect(jobs['build-dev-cli-neutral'].if).toBe("github.event_name == 'push'")
     expect(jobs['build-dev-cli'].if).toBe("github.event_name == 'push'")
-    expect(jobs['build-dev-cli'].needs).toBeUndefined()
-    expect(jobs['publish-dev-cli'].needs).toBe('build-dev-cli')
+    expect(jobs['build-dev-cli'].needs).toBe('build-dev-cli-neutral')
+    expect(jobs['publish-dev-cli-candidate'].needs).toBe('build-dev-cli')
+    expect(jobs['activate-dev-cli'].needs).toBe('publish-dev-cli-candidate')
   })
 
   it('keeps the Docker check green but omits setup, build, and smoke on an exact match', () => {
-    const smoke = workflow('docker-smoke.yml').jobs.smoke
+    const docker = workflow('docker-smoke.yml')
+    const smoke = docker.jobs.smoke
+    expect(docker.on?.pull_request?.branches).toEqual(['master'])
     expectTrustedClassifier(smoke)
     const expensive = smoke.steps?.filter((candidate) => [
       'actions/setup-node@v7',

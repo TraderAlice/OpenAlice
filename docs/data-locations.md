@@ -54,6 +54,43 @@ not operator config, and travels with the complete home. Missing or
 malformed files equal the default document (Dev Panel hidden). Settings
 cannot be hidden. Deep links to a hidden surface still adopt.
 
+`<OPENALICE_HOME>/data/inbox/routine-follow-ups.json` is the Office decision
+queue and receipt ledger. Its version-2 document contains active scheduled-report
+references the human explicitly carried out of a review shift and immutable
+decision receipts. Both retain the Inbox entry identity, immutable report
+timestamp, exact Issue coordinates, and first-carried timestamp; a receipt also
+stores the declared disposition, any required normalized note, and the server
+decision time. Saving a decision atomically removes the exact active row and
+appends its receipt. A new receipt is bound to the per-entry revision observed
+before its exact Inbox and Scheduled-Issue evidence checks, so it cannot consume
+a carry that appeared later. Source loading or read failure is never classified
+as missing evidence; `evidence-unavailable` requires successful authority reads
+that prove at least one exact source absent. Receipts are never silently pruned:
+every retained identity continues to make an identical retry idempotent and
+prevents that report from becoming active again. The ledger never owns Issue
+status or scheduling, and writing it never dispatches an Agent. Missing means an empty queue and ledger;
+malformed state is a load error rather than something the product silently
+discards or overwrites. Alice keeps serving its other surfaces, while the Office
+decision-queue API fails closed until the sidecar is repaired. The file moves
+with the complete AliceProject so browser and Electron views share one durable
+diligence workflow.
+
+`<OPENALICE_HOME>/data/office/day.json` is the AliceProject-wide Office Day
+sidecar. It stores one server-local IANA calendar day, the current finite shift
+of up to four exact duty keys, their pending order, a same-day ledger of every
+exact duty key already admitted, and exact evidence receipts. The admission
+ledger is append-only within the day and capped at 1,024 exact keys. The
+ledger prevents a stale renderer from reopening an older evidence version as a
+new shift while still allowing a genuinely new fingerprint.
+It is presentation/workflow state only: Inbox, Issues, schedules, and Decision
+Desk records remain the completion authorities. The backend supplies the day
+key and next local-midnight rollover; browser tabs mutate it through commands
+guarded by that day key and the current monotonic shift id. Missing means no day
+has been opened. Malformed state is never replaced: Alice keeps serving other
+surfaces while every Office Day API fails closed until the sidecar is repaired.
+Atomic replacement and process-local command serialization make every browser
+and Electron view of one AliceProject converge on the same day.
+
 Each product Session created in that Workspace owns a secret-free dossier
 at `.alice/sessions/<resumeId>.json`. The `ai` object records the Agent
 runtime plus the credential reference, model, and effort frozen for that

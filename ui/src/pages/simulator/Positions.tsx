@@ -29,10 +29,7 @@ export function Positions({ state }: { state: SimulatorState }) {
   }, [state.markPrices])
 
   return (
-    <Section
-      title="Positions"
-      description="Read-only — mutate via mark price moves, order fills, or external events."
-    >
+    <Section title="Positions">
       {state.positions.length === 0 ? (
         <p className="text-xs text-muted-foreground">No positions.</p>
       ) : (
@@ -64,9 +61,9 @@ export function Positions({ state }: { state: SimulatorState }) {
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="font-medium text-foreground">{describePosition(p)}</span>
                       {p.secType && (
-                        <span className="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded bg-muted text-muted-foreground/80">{p.secType}</span>
+                        <span className="rounded-sm bg-muted px-1 py-0.5 text-[10px] leading-[14px] text-muted-foreground/80">{p.secType}</span>
                       )}
-                      <span className={`text-[10px] px-1 py-0.5 rounded font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
+                      <span className={`rounded-sm px-1 py-0.5 text-[10px] leading-[14px] font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
                         {p.side}
                       </span>
                       {p.multiplier && p.multiplier !== '1' && (
@@ -80,7 +77,7 @@ export function Positions({ state }: { state: SimulatorState }) {
                   <td className="py-1 pr-3 font-mono text-xs text-right">{p.quantity}</td>
                   <td className="py-1 pr-3 font-mono text-xs text-right">{p.avgCost}</td>
                   <td className="py-1 pr-3 font-mono text-xs text-right text-muted-foreground">{mark ?? '—'}</td>
-                  <td className={`py-1 font-mono text-xs text-right transition-colors duration-300 ${pnlClass}`}>
+                  <td className={`py-1 text-right font-mono text-xs ${pnlClass}`}>
                     {pnl == null ? '—' : `${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}`}
                   </td>
                 </tr>

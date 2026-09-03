@@ -26,6 +26,16 @@ function expectValidGeometry(count: number) {
     expect(pod.x + pod.width).toBeLessThanOrEqual(layout.width)
     expect(pod.y + pod.height).toBeLessThanOrEqual(layout.height)
   }
+  expect(layout.serviceZone.x).toBeGreaterThanOrEqual(0)
+  expect(layout.serviceZone.y).toBeGreaterThanOrEqual(0)
+  expect(layout.serviceZone.x + layout.serviceZone.width).toBeLessThanOrEqual(layout.width)
+  expect(layout.serviceZone.y + layout.serviceZone.height).toBeLessThanOrEqual(layout.height)
+  expect(layout.pods.every((pod) => (
+    pod.x + pod.width <= layout.serviceZone.x
+    || layout.serviceZone.x + layout.serviceZone.width <= pod.x
+    || pod.y + pod.height <= layout.serviceZone.y
+    || layout.serviceZone.y + layout.serviceZone.height <= pod.y
+  ))).toBe(true)
   for (let left = 0; left < layout.pods.length; left += 1) {
     for (let right = left + 1; right < layout.pods.length; right += 1) {
       const a = layout.pods[left]!
@@ -55,10 +65,11 @@ describe('layoutOfficeMap', () => {
       rows: 0,
       alice: { x: 480, y: 336 },
       pods: [],
+      serviceZone: { x: 336, y: 456, width: 288, height: 216 },
     })
   })
 
-  it.each([1, 2, 5, 17])('packs %i Workspace pods into a bounded 2D tilemap', (count) => {
+  it.each([1, 2, 5, 17, 18])('packs %i Workspace pods into a bounded 2D tilemap', (count) => {
     expectValidGeometry(count)
   })
 
@@ -75,5 +86,13 @@ describe('layoutOfficeMap', () => {
   it('keeps dense maps close to the 4:3 game viewport', () => {
     const layout = expectValidGeometry(17)
     expect(Math.abs(layout.width / layout.height - 4 / 3)).toBeLessThan(0.3)
+  })
+
+  it('adds a real service cell when a dense Workspace grid is exactly full', () => {
+    const layout = expectValidGeometry(18)
+
+    expect(layout).toMatchObject({ columns: 5, rows: 4 })
+    expect(layout.serviceZone).toMatchObject({ width: 288, height: 216 })
+    expect(layout.pods).toHaveLength(18)
   })
 })

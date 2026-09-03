@@ -47,7 +47,6 @@ vi.mock('react-i18next', () => ({
     t: (key: string) => ({
       'nav.item.chat': 'Ask Alice',
       'nav.item.settings': 'Settings',
-      'nav.item.dev': 'Dev Panel',
       'nav.section.beta': 'Beta',
       'nav.section.system': 'System',
       'nav.primaryNavigation': 'Primary navigation',
@@ -106,16 +105,13 @@ describe('ActivityBar mobile drawer state', () => {
 
     const primaryAction = screen.getByRole('button', { name: 'Ask Alice' })
     const sectionToggle = screen.getByRole('button', { name: 'Beta' })
-    const sectionInfo = screen.getByRole('button', { name: 'nav.about' })
 
     expect(primaryAction.className).toContain('min-h-10')
-    expect(primaryAction.className).toContain('md:min-h-[34px]')
+    expect(primaryAction.className).toContain('md:min-h-8')
     expect(sectionToggle.className).toContain('min-h-10')
-    expect(sectionToggle.className).toContain('md:min-h-7')
-    expect(sectionInfo.className).toContain('min-h-10')
-    expect(sectionInfo.className).toContain('min-w-10')
-    expect(sectionInfo.className).toContain('md:min-h-7')
-    expect(sectionInfo.className).toContain('md:min-w-7')
+    expect(sectionToggle.className).toContain('md:min-h-6')
+    expect(sectionToggle.getAttribute('title')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'nav.about' })).toBeNull()
   })
 
   it('dismisses through the shared Sheet overlay', async () => {
@@ -151,11 +147,13 @@ describe('ActivityBar mobile drawer state', () => {
       drawer.querySelectorAll<HTMLButtonElement>('button:not([disabled])'),
     ).filter((element) => element.tabIndex >= 0 && element.getAttribute('aria-hidden') !== 'true')
     const firstAction = focusableActions[0]!
+    const firstDestination = focusableActions[1]!
     const lastAction = focusableActions.at(-1)!
     const backdrop = document.querySelector<HTMLElement>('[data-slot="sheet-overlay"]')
 
     expect(drawer.getAttribute('aria-modal')).toBe('true')
-    expect(firstAction.textContent).toContain('Ask Alice')
+    expect(firstAction.getAttribute('aria-label')).toBe('common.closePanel')
+    expect(firstDestination.textContent).toContain('Ask Alice')
     expect(lastAction.textContent).toContain('Settings')
     await waitFor(() => expect(document.activeElement).toBe(currentDestination))
     expect(drawer.className).toContain('motion-reduce:transition-none')

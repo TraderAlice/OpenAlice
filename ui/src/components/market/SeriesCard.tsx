@@ -9,7 +9,7 @@ import type { MacroSeriesCard } from '../../api/reference'
 export function SeriesCard({ card, label, emptyText }: { card: MacroSeriesCard; label: string; emptyText: string }) {
   const empty = card.points.length === 0
   return (
-    <div className="min-w-0 border border-border rounded-md bg-secondary/40 px-3 py-2.5 flex flex-col gap-1.5">
+    <div className="flex min-w-0 flex-col gap-1.5 rounded-lg border border-border bg-card px-3 py-2.5">
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-[12px] text-muted-foreground truncate" title={card.id}>{label}</span>
         <span className="shrink-0 text-[10px] text-muted-foreground">{card.latestDate ?? ''}</span>
@@ -18,7 +18,7 @@ export function SeriesCard({ card, label, emptyText }: { card: MacroSeriesCard; 
         <div className="flex min-w-0 items-baseline gap-2">
           <span className="shrink-0 text-[20px] font-semibold text-foreground font-mono">{fmtSeriesValue(card, card.latest)}</span>
           {card.change != null && card.change !== 0 && (
-            <span className={`text-[11px] font-mono ${card.change > 0 ? 'text-success' : 'text-destructive'}`}>
+            <span className={`text-[11px] leading-[15px] font-mono ${card.change > 0 ? 'text-success' : 'text-destructive'}`}>
               {card.change > 0 ? '+' : ''}{card.unit === 'count' ? fmtCompactNum(card.change) : card.change.toFixed(2)}
             </span>
           )}

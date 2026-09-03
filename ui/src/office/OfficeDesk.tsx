@@ -1,9 +1,9 @@
 import { useTranslation } from 'react-i18next'
 
 import type { OfficeFloorEmployee } from '../api/office'
-import { officeBubbleText } from './bubble-text'
-import { officeCoworkerLabel } from './label'
+import { officeCoworkerCallsign } from './label'
 import { OfficeCoworkerSprite } from './OfficeCoworkerSprite'
+import { OFFICE_COWORKER_EMOTES, type OfficeCoworkerSpriteAsset } from './coworker-sprites'
 import { OFFICE_FURNITURE, officePixelImg } from './furniture'
 import { officeStationComposition } from './station'
 
@@ -12,9 +12,14 @@ export function OfficeDesk({
   roomName,
   selected,
   nearby,
+  targeted,
+  acknowledged = false,
+  replayFocused = false,
   depth,
   reducedMotion,
+  interactionDisabled = false,
   spriteScale,
+  coworkerAsset,
   onSelect,
   onOpen,
 }: {
@@ -22,20 +27,50 @@ export function OfficeDesk({
   roomName: string
   selected: boolean
   nearby?: boolean
+  targeted?: boolean
+  acknowledged?: boolean
+  replayFocused?: boolean
   depth: number
   reducedMotion: boolean
+  interactionDisabled?: boolean
   spriteScale?: number
+  coworkerAsset?: OfficeCoworkerSpriteAsset
   onSelect: () => void
   onOpen?: () => void
 }) {
   const { t } = useTranslation()
   const station = officeStationComposition()
-  const showBubble = Boolean(employee?.bubble && (selected || nearby))
+  const moodEmote = employee && (
+    employee.mood === 'working'
+    || employee.mood === 'waiting'
+    || employee.mood === 'failed'
+    || employee.mood === 'review'
+  )
+    ? { kind: employee.mood, src: OFFICE_COWORKER_EMOTES[employee.mood] }
+    : null
+  const sleepingCue = employee && !employee.awake && (
+    selected || nearby || targeted || replayFocused
+  )
+    ? { kind: 'sleeping' as const, src: OFFICE_COWORKER_EMOTES.sleeping }
+    : null
+  const poweredDownOutcome = moodEmote && moodEmote.kind !== 'working'
+    ? moodEmote
+    : null
+  const emote = replayFocused && moodEmote
+    ? moodEmote
+    : employee && !employee.awake
+      ? poweredDownOutcome ?? sleepingCue
+      : moodEmote
   const label = employee
     ? t('office.employeeLabel', {
-      name: officeCoworkerLabel(employee),
+      name: officeCoworkerCallsign(employee, coworkerAsset),
       resumeId: employee.resumeId,
       mood: t(`office.mood.${employee.mood}`),
+      power: t(replayFocused
+        ? 'office.power.replayActive'
+        : employee.awake
+          ? 'office.power.awake'
+          : 'office.power.asleep'),
     })
     : t('office.emptyDesk', { name: roomName })
 
@@ -43,60 +78,57 @@ export function OfficeDesk({
     <li>
       <button
         type="button"
+        tabIndex={-1}
         data-testid={employee ? `office-desk-${employee.resumeId}` : 'office-desk-empty'}
         aria-label={label}
         aria-pressed={employee ? selected : undefined}
-        disabled={!employee}
+        disabled={!employee || interactionDisabled}
+        title={interactionDisabled ? t('office.replayLockedHint') : undefined}
         onClick={onSelect}
         onDoubleClick={() => employee && onOpen?.()}
         className="oa-office-desk"
         data-selected={selected}
         data-nearby={nearby}
+        data-route={targeted}
+        data-acknowledged={acknowledged || undefined}
+        data-replay-focus={replayFocused || undefined}
         data-occupied={Boolean(employee)}
+        data-awake={employee?.awake}
         data-mood={employee?.mood}
         style={{ width: station.widthPx, height: station.heightPx, zIndex: depth }}
       >
         <span className="oa-office-topdown-station" aria-hidden>
           <img
-            src={OFFICE_FURNITURE.generated.workstation}
+            src={employee?.awake
+              ? OFFICE_FURNITURE.generated.workstation
+              : OFFICE_FURNITURE.generated.vacantWorkstation}
             alt=""
             className="oa-office-topdown-station__asset"
             style={officePixelImg}
           />
         </span>
-        {employee?.bubble && showBubble && (
+        {emote && (
           <span
-            className="oa-office-bubble"
-            style={{ top: station.bubble.topPx, zIndex: station.bubble.zIndex }}
+            className="oa-office-mood-emote"
+            data-kind={emote.kind}
+            data-reduced-motion={reducedMotion || undefined}
+            data-testid={`office-emote-${emote.kind}`}
+            aria-hidden
           >
-            {officeBubbleText(employee.bubble, t)}
+            <img src={emote.src} alt="" style={officePixelImg} />
           </span>
         )}
         {employee && (
           <span
             className="oa-office-nameplate"
             style={{
-              top: showBubble ? station.name.topPx + 20 : station.name.topPx,
+              top: station.name.topPx,
               zIndex: station.name.zIndex,
             }}
           >
             <span className="oa-office-nameplate__dot" aria-hidden />
-            {officeCoworkerLabel(employee)}
+            {employee.name}
           </span>
-        )}
-        {!employee && (
-          <img
-            src={OFFICE_FURNITURE.chair}
-            alt=""
-            data-slot="office-chair-prop"
-            className="oa-office-chair"
-            style={{
-              ...officePixelImg,
-              bottom: station.sprite.bottomPx - 16,
-              zIndex: station.sprite.zIndex,
-              width: 52,
-            }}
-          />
         )}
         {employee && (
           <span
@@ -109,25 +141,19 @@ export function OfficeDesk({
           >
             <OfficeCoworkerSprite
               agent={employee.agent}
+              identity={employee.resumeId}
+              asset={coworkerAsset}
               mood={employee.mood}
               reducedMotion={reducedMotion}
               label={label}
               scale={spriteScale ?? station.sprite.scale}
+              pose="desk"
             />
           </span>
         )}
-        <img
-          src={OFFICE_FURNITURE.desk}
-          alt=""
-          data-slot="office-desk-prop"
-          className="oa-office-desk-prop"
-          style={{
-            ...officePixelImg,
-            bottom: station.desk.bottomPx,
-            zIndex: station.desk.zIndex,
-            width: station.desk.widthPx,
-          }}
-        />
+        {acknowledged && (
+          <span className="oa-office-landmark-ack" aria-hidden>OK</span>
+        )}
       </button>
     </li>
   )

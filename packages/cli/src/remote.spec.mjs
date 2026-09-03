@@ -175,98 +175,14 @@ describe('OpenAlice managed remote connector', () => {
     expect(plan.blocker).toBe('')
   })
 
-  it('treats Railway as the only release and lifecycle mutation authority', () => {
-    const remote = outdatedNativeRemote()
-    remote.deploymentAuthority = railwayAuthority()
-
-    const plan = createRemotePlan(parseRemoteArgs(['host']), remote)
-
-    expect(plan.cliMatchesLocal).toBe(false)
-    expect(plan.remoteRuntimeConsistent).toBe(true)
-    expect(plan.installCli).toBe(false)
-    expect(plan.startServer).toBe(false)
-    expect(plan.restartServer).toBe(false)
-    expect(plan.mutations).toEqual([])
-    expect(plan.blocker).toBe('')
-    expect(formatRemotePlan(plan)).toContain('Lifecycle      Railway (stable channel)')
-  })
-
-  it('does not resolve a local dev manifest for a Railway tunnel-only plan', async () => {
-    const remote = compatibleRemote()
-    remote.deploymentAuthority = railwayAuthority()
-    const fetchDevManifestDocumentImpl = vi.fn()
-
-    await expect(connectRemote(parseRemoteArgs(['host', '--plan']), {
-      probeRemote: async () => remote,
-      installSource: devInstallSource({
-        platform: 'darwin',
-        arch: 'arm64',
-        sha256: '1'.repeat(64),
-      }),
-      contentIdentity: '1111111111111111',
-      fetchDevManifestDocumentImpl,
-      stdout: { write: vi.fn() },
-    })).resolves.toBe(0)
-    expect(fetchDevManifestDocumentImpl).not.toHaveBeenCalled()
-  })
-
-  it('keeps a verified Railway fallback connectable while showing selector drift', () => {
-    const remote = compatibleRemote()
-    remote.deploymentAuthority = railwayAuthority({
-      channel: 'beta',
-      version: '0.91.0-beta.1',
-    })
-
-    const plan = createRemotePlan(parseRemoteArgs(['host']), remote)
-
-    expect(plan.blocker).toBe('')
-    expect(plan.mutations).toEqual([])
-    expect(plan.deploymentNotice).toContain('Configured beta 0.91.0-beta.1')
-    expect(plan.deploymentNotice).toContain('running verified fallback stable')
-  })
-
   it('accepts a published native fallback whose provider predates content identity status', () => {
     const remote = compatibleRemote()
-    remote.deploymentAuthority = railwayAuthority({
-      channel: 'beta',
-      version: '0.91.0-beta.1',
-    })
     delete remote.status.provider.contentIdentity
 
     const plan = createRemotePlan(parseRemoteArgs(['host']), remote)
 
-    expect(plan.remoteRuntimeConsistent).toBe(true)
     expect(plan.blocker).toBe('')
     expect(plan.mutations).toEqual([])
-  })
-
-  it('fails closed instead of repairing inconsistent Railway release state over SSH', () => {
-    const remote = compatibleRemote()
-    remote.deploymentAuthority = railwayAuthority()
-    remote.status.provider = {
-      ...remote.status.provider,
-      contentIdentity: 'ffffffffffffffff',
-    }
-
-    const plan = createRemotePlan(parseRemoteArgs(['host']), remote)
-
-    expect(plan.installCli).toBe(false)
-    expect(plan.startServer).toBe(false)
-    expect(plan.blocker).toContain('not self-consistent')
-  })
-
-  it('refuses source management and takeover on a Railway foreground service', () => {
-    const remote = compatibleRemote()
-    remote.deploymentAuthority = railwayAuthority()
-
-    expect(createRemotePlan(
-      parseRemoteArgs(['host', '--app-dir', '/srv/OpenAlice']),
-      remote,
-    ).blocker).toContain('--app-dir')
-    expect(createRemotePlan(
-      parseRemoteArgs(['host', '--takeover']),
-      remote,
-    ).blocker).toContain('Railway restart/redeploy')
   })
 
   it('does not reuse a running source Runtime when native mode was requested', () => {
@@ -698,10 +614,6 @@ describe('OpenAlice managed remote connector', () => {
       expect(command).toContain('server status --json')
       expect(command).toContain("--home '/data/openalice'")
       return [
-        'serviceManager=railway',
-        'serviceId=service-test',
-        'managedChannel=beta',
-        'managedVersion=0.91.0-beta.1',
         'cli=/home/alice/.openalice/bin/openalice',
         `version=${CLI_VERSION}`,
         'identity=' + JSON.stringify({
@@ -726,11 +638,6 @@ describe('OpenAlice managed remote connector', () => {
       cliContentIdentity: '1234567890abcdef',
       cliCompatible: true,
       status: expect.objectContaining({ class: 'running' }),
-      deploymentAuthority: expect.objectContaining({
-        manager: 'railway',
-        channel: 'beta',
-        version: '0.91.0-beta.1',
-      }),
     }))
     expect(buildRemoteControlProbeCommand(parseRemoteArgs(['host', '--stop'])))
       .toContain('server status --json')
@@ -739,7 +646,7 @@ describe('OpenAlice managed remote connector', () => {
   it('does not probe Node, build tools, or source in native remote mode', async () => {
     const runRemote = vi.fn(async (_options, command) => {
       if (command === 'uname -s; uname -m') return 'Linux\nx86_64\n'
-      if (command.includes('OPENALICE_SERVICE_MANAGER')) return '/home/alice\n\n\n\n\n'
+      if (command.includes(`printf '%s\\n' "$HOME"`)) return '/home/alice\n'
       if (command.includes('command -v curl')) return 'yes'
       if (command.includes('command -v openalice')) return ''
       throw new Error(`Unexpected native probe: ${command}`)
@@ -774,19 +681,6 @@ describe('OpenAlice managed remote connector', () => {
     expect(runRemote.mock.calls[0][1]).toContain('server stop')
     expect(connectTunnel).not.toHaveBeenCalled()
     expect(stdout.write).toHaveBeenCalledWith('OpenAlice Server is stopped on host.\n')
-  })
-
-  it('refuses remote stop for a Railway foreground Runtime', async () => {
-    const remote = compatibleRemote()
-    remote.deploymentAuthority = railwayAuthority()
-    const runRemote = vi.fn()
-
-    await expect(connectRemote(parseRemoteArgs(['host', '--stop']), {
-      probeRemote: async () => remote,
-      runRemote,
-      stdout: { write: vi.fn() },
-    })).rejects.toThrow('Stop or restart the service through Railway')
-    expect(runRemote).not.toHaveBeenCalled()
   })
 
   it('default-no leaves a missing remote Runtime unchanged', async () => {
@@ -1108,7 +1002,7 @@ describe('OpenAlice managed remote connector', () => {
 
   it('retries only transient SSH transport failures', async () => {
     const spawnProcess = vi.fn()
-      .mockImplementationOnce(() => commandChild({ code: 255, stderr: "Railway can't verify your SSH key right now\n" }))
+      .mockImplementationOnce(() => commandChild({ code: 255, stderr: "Provider can't verify your SSH key right now\n" }))
       .mockImplementationOnce(() => commandChild({ code: 255, stderr: 'Connection reset by peer\n' }))
       .mockImplementationOnce(() => commandChild({ code: 0, stdout: 'ready\n' }))
     const sleep = vi.fn(async () => undefined)
@@ -1355,16 +1249,5 @@ function devManifestDocument() {
         contentIdentity: '2222222222222222',
       },
     ],
-  }
-}
-
-function railwayAuthority(overrides = {}) {
-  return {
-    manager: 'railway',
-    serviceId: 'service-test',
-    channel: 'stable',
-    version: '',
-    error: '',
-    ...overrides,
   }
 }

@@ -72,7 +72,7 @@ describe('DataHomeSection', () => {
   it('does not suggest local launch commands for a remote service-owned data home', () => {
     mocks.getBackendConnection.mockReturnValue({
       kind: 'remote',
-      target: 'railway@example.com',
+      target: 'alice@example.com',
       sshPort: 22,
       runtimePort: 47331,
       localEndpoint: '127.0.0.1:40123',
