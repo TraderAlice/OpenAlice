@@ -298,6 +298,7 @@ describe('Supervisor TUI screen', () => {
     const toggled: string[] = []
     const openedInbox: string[] = []
     let opens = 0
+    let viewportHeight = 32
     const runtime = { class: 'running', endpoints: { web: 'http://127.0.0.1:2026' } }
     const screen = new SupervisorScreen({
       version: 'dev',
@@ -322,6 +323,7 @@ describe('Supervisor TUI screen', () => {
         entries: [{ id: 'hello', ts: Date.now(), workspaceId: 'ws', comments: 'Agent report ready.' }],
       },
     }, {
+      getViewportHeight: () => viewportHeight,
       motionEnabled: false,
       onToggleInboxRead: (entry) => toggled.push(entry.id),
       onOpenInboxEntry: (entry) => openedInbox.push(entry.id),
@@ -361,6 +363,11 @@ describe('Supervisor TUI screen', () => {
     expect(inbox).toContain('Agent report ready.')
     expect(inbox).toContain('[ o ] Open Workspace')
     expect(inbox).toContain('[ Enter ] Mark read')
+    const inboxTipRow = inboxLines.findIndex((line) => line.startsWith('◇  Tip:'))
+    const inboxSpineRow = inboxLines.findIndex((line) => line.includes('[ / ] Commands'))
+    expect(inboxLines).toHaveLength(32)
+    expect(inboxSpineRow).toBe(inboxTipRow + 2)
+    expect(inboxLines.slice(inboxSpineRow + 1).every((line) => line === '')).toBe(true)
     expect(renderSupervisorContextTip({ panel: 'inbox' }, 80))
       .toContain('o opens its Workspace')
     expect(renderSupervisorContextTip({ panel: 'inbox' }, 80))
@@ -374,6 +381,11 @@ describe('Supervisor TUI screen', () => {
     expect(openedInbox).toEqual(['hello', 'hello'])
     expect(screen.handleKey('enter', matchesKey)).toBe(true)
     expect(toggled).toEqual(['hello'])
+
+    viewportHeight = 48
+    const expandedInbox = screen.render(100)
+    expect(expandedInbox).toHaveLength(48)
+    expect(expandedInbox.findIndex((line) => line.includes('[ / ] Commands'))).toBe(inboxSpineRow)
 
     screen.update({
       panel: 'overview',

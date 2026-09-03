@@ -5155,7 +5155,11 @@ export class SupervisorScreen implements Component {
       }, width),
       width,
     )
-    const flowEntryConsole = (this.snapshot.panel === 'overview' || directLauncherTarget)
+    const flowContentConsole = (
+      this.snapshot.panel === 'overview'
+      || this.snapshot.panel === 'inbox'
+      || directLauncherTarget
+    )
       && !focusTask
       && !this.commandDeckOpen
       && !isConfigRecovery(this.snapshot)
@@ -5199,7 +5203,7 @@ export class SupervisorScreen implements Component {
               ? this.snapshot.doctor?.checks?.length ?? 0
               : undefined,
         }, width)],
-      flowEntryConsole ? 'flow' : 'bottom',
+      flowContentConsole ? 'flow' : 'bottom',
     ).map((line) => truncate(line, width))
     this.commandTargets = supervisorCommandTargets(visibleLines)
     if (this.focusConsoleHoveredCommand) {

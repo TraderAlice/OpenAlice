@@ -3923,6 +3923,26 @@ already large `supervisor-tui.ts` application controller.
   tests, and CLI typecheck/build passes. Maintainer acceptance remains pending
   on this branch.
 
+### Inbox workbench-cluster decision
+
+- A real 120x48 Inbox capture with three unread reports exposed a state-manager
+  version of the detached-control problem: the bounded Desk and its Tip ended in
+  the upper third while Command Spine sat alone at the terminal edge. The blank
+  stage made one message-review workflow feel like a temporary card above an
+  unrelated shell status bar.
+- Inbox now keeps Desk, contextual Tip, and Command Spine in one content-flow
+  cluster. Short histories remain naturally bounded, tall terminals put surplus
+  space after the full workbench, and longer histories still consume their
+  existing viewport budget. The open Command Dock stays bottom-anchored and no
+  Inbox fetch, polling, selection, read state, Workspace route, or history bound
+  changes.
+- Real 120x48, 120x32, 80x24, and 46x16 PTY captures verify wide split, compact
+  stack, and emergency selected-message forms. Screen coverage locks the
+  relocated Spine after the Tip and confirms its row remains stable across a
+  32-to-48-row resize. The focused screen/PTY closure passes 146 tests, the
+  complete CLI suite passes 657 tests, and CLI typecheck/build passes.
+  Maintainer acceptance remains pending on this branch.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and
