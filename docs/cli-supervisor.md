@@ -241,11 +241,11 @@ intentionally parameter-free:
   Retry and non-destructive Disconnect. Automatic checks continue while the
   target is retained;
 - the connected Home page is one responsive `Alice Session` stage rather than
-  a dashboard. It orders the selected context as identity, Now, one full-row
-  primary action, Signals, then Recent. Wide terminals keep the terminal-native
-  `ALICE` mark and AliceProject/Machine identity in a quiet left region while
-  the task sequence owns the right; an open gutter rather than an internal
-  border keeps both regions inside one visual canvas. Ordinary terminals
+  a dashboard. It orders the selected context as identity, Next, one full-row
+  primary action, Status, then Activity. Wide terminals keep the terminal-native
+  `ALICE` mark and promote the selected AliceProject plus Runtime state to the
+  identity heading. A continuous OMP-style vertical rail separates that stable
+  identity from the task sequence without creating a second card. Ordinary terminals
   preserve the same task order in one column, add bounded whitespace between
   each decision layer, and omit illustration before task truth. Home
   intentionally does not repeat PID, provider, endpoint, uptime, or component
@@ -259,7 +259,7 @@ intentionally parameter-free:
   explicit Open Web route; when attention clears, Enter returns to Open
   Workspace. The rendered label, whole-row pointer target, and Enter handler
   resolve from the same intent. A stopped Home does not repeat the same Start
-  instruction across every layer: Now names the user outcome, guidance previews
+  instruction across every layer: Next names the user outcome, guidance previews
   preparation and readiness verification, the Action Shelf owns the command,
   and the contextual Tip teaches only alternate `s` and `/` routes. `⌂`
   AliceProject remains
@@ -268,8 +268,8 @@ intentionally parameter-free:
   state, and actionable attention, but glyphs and text keep the complete
   contract under `NO_COLOR`. Below 60 columns and 18 rows, Home uses a five-row
   summary body so viewport pressure cannot remove Mission Navigation: selected
-  AliceProject and Runtime, Machine route, Now, the primary action, and the most
-  important Inbox-or-Connection signal remain visible; Recent returns with the
+  AliceProject and Runtime, Machine route, Next, the primary action, and the most
+  important Inbox-or-Connection status remain visible; Activity returns with the
   ordinary compact layout. The stopped primary action shortens to the complete
   `Start OpenAlice` label in this emergency fold instead of clipping a longer
   launch-and-open description;
@@ -401,8 +401,8 @@ intentionally parameter-free:
 - at 100 columns and wider, Home's single Alice Session Board uses a bounded
   OMP-style two-column composition instead of stretching with every surplus
   terminal row. The identity column centers the selected AliceProject while the
-  task column keeps one ordered path together: Now and its primary action,
-  Signals, then Recent. Home keeps the board, contextual Tip, and Command Spine
+  task column keeps one ordered path together: Next and its primary action,
+  Status, then Activity. Home keeps the board, contextual Tip, and Command Spine
   in one continuous interaction cluster; surplus terminal height follows that
   cluster instead of separating its guidance from its controls. Compact layouts
   keep the same hierarchy and flow with bounded vertical rhythm. Inbox and

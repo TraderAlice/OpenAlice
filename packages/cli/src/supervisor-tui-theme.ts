@@ -244,8 +244,8 @@ export function decorateSupervisorFrame(
         .replace(/\bUNREAD\b/gu, (label) => theme.warning(label))
         .replace(/\bREAD\b/gu, (label) => theme.muted(label))
     }
-    if (line.startsWith('│ ') && /\b(?:NOW|SIGNALS|RECENT)\b/u.test(line)) {
-      return line.replace(/\b(?:NOW|SIGNALS|RECENT)\b/u, (label) => theme.accentStrong(label))
+    if (line.startsWith('│ ') && /\b(?:NEXT|STATUS|ACTIVITY)\b/u.test(line)) {
+      return line.replace(/\b(?:NEXT|STATUS|ACTIVITY)\b/u, (label) => theme.accentStrong(label))
     }
     if (line.includes('│ ◆ Inbox')) return theme.warning(line)
     if (line.includes('│ ! Connection')) return theme.warning(line)

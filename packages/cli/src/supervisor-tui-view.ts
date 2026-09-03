@@ -210,12 +210,12 @@ function renderEmergencySessionStage(
   return renderCard('Alice Session · OpenAlice', [
     labelAndTail(homeHotspotLabel(view.projectName, 'project', view), state, innerWidth),
     sessionRoute(view),
-    `NOW  ${homeNowHeadline(view)}`,
+    `NEXT  ${homeNowHeadline(view)}`,
     primaryLaunchRow(
       view,
       view.state === 'absent' ? 'Start OpenAlice' : view.primaryAction,
     ),
-    `SIGNAL  ${signal}`,
+    `STATUS  ${signal}`,
   ], width)
 }
 
@@ -226,8 +226,10 @@ function renderWideSessionStage(
   targetHeight?: number,
 ): string[] {
   const innerWidth = width - 4
-  const gutter = '    '
-  const identityWidth = Math.min(29, Math.max(22, Math.floor(innerWidth * 0.25)))
+  const gutter = '  │  '
+  const identityWidth = width >= 116
+    ? 34
+    : Math.min(29, Math.max(22, Math.floor(innerWidth * 0.25)))
   const taskWidth = Math.max(1, innerWidth - identityWidth - displayWidth(gutter))
   const identity = wideSessionIdentity(view, state, identityWidth)
   const task = sessionTaskRows(view, taskWidth)
@@ -259,15 +261,15 @@ function renderCompactSessionStage(
     labelAndTail(homeHotspotLabel(view.projectName, 'project', view), state, innerWidth),
     sessionRoute(view),
     '',
-    `NOW  ${homeNowHeadline(view)}`,
+    `NEXT  ${homeNowHeadline(view)}`,
     ...guidance,
     '',
     primaryLaunchRow(view),
     '',
-    `SIGNALS  ${homeAttentionRow(view)}`,
+    `STATUS   ${homeAttentionRow(view)}`,
     `         ${homeConnectionRow(view)}`,
     '',
-    `RECENT   ${recent[0] ?? 'No connection changes in this TUI session'}`,
+    `ACTIVITY ${recent[0] ?? 'No connection changes in this TUI session'}`,
   ], width)
 }
 
@@ -279,11 +281,10 @@ function wideSessionIdentity(
   const markWidth = displayWidth(SUPERVISOR_BRAND_MARK_ROWS[0])
   const markInset = ' '.repeat(Math.max(0, Math.floor((width - markWidth) / 2)))
   return [
-    labelAndTail('ALICEPROJECT', state, width),
+    labelAndTail(homeHotspotLabel(view.projectName, 'project', view), state, width),
     '',
     ...SUPERVISOR_BRAND_MARK_ROWS.map((row) => `${markInset}${row}`),
     '',
-    truncateDisplayWidth(homeHotspotLabel(view.projectName, 'project', view), width),
     truncateDisplayWidth(sessionRoute(view), width),
     truncateDisplayWidth(sessionIdentityState(view), width),
   ]
@@ -293,17 +294,17 @@ function sessionTaskRows(view: SupervisorHomeView, width: number): string[] {
   const guidance = wrapDisplayText(homeGuidance(view).join(' '), width).slice(0, 2)
   const recent = homeRecentRows(view, width).slice(0, 2)
   return [
-    'NOW',
+    'NEXT',
     homeNowHeadline(view),
     ...guidance,
     '',
     primaryLaunchRow(view),
     '',
-    'SIGNALS',
+    'STATUS',
     homeAttentionRow(view),
     homeConnectionRow(view),
     '',
-    'RECENT',
+    'ACTIVITY',
     ...recent,
   ]
 }
@@ -316,9 +317,9 @@ function spreadSessionTaskRows(
   const guidance = wrapDisplayText(homeGuidance(view).join(' '), width).slice(0, 2)
   const recent = homeRecentRows(view, width).slice(0, 2)
   const sections = [
-    [homeSectionRail('NOW', width), homeNowHeadline(view), ...guidance, primaryLaunchRow(view)],
-    [homeSectionRail('SIGNALS', width), homeAttentionRow(view), homeConnectionRow(view)],
-    [homeSectionRail('RECENT', width), ...recent],
+    [homeSectionRail('NEXT', width), homeNowHeadline(view), ...guidance, primaryLaunchRow(view)],
+    [homeSectionRail('STATUS', width), homeAttentionRow(view), homeConnectionRow(view)],
+    [homeSectionRail('ACTIVITY', width), ...recent],
   ]
   const contentHeight = sections.reduce((total, section) => total + section.length, 0)
   const minimumHeight = contentHeight + sections.length - 1
@@ -848,7 +849,7 @@ export function renderSupervisorContextTip(
               : view.runtimeState === 'absent'
                 ? 'Alternate route: s starts without opening Web; / reveals every command.'
                 : view.runtimeState === 'running' || view.runtimeState === 'owned_elsewhere'
-                  ? 'Enter follows Now; o opens Web; Runtime keeps the diagnostic detail.'
+                  ? 'Enter follows Next; o opens Web; Runtime keeps the diagnostic detail.'
                   : 'Run Doctor before acting on an uncertain Runtime signal.'
   return truncateDisplayWidth(`◇  Tip: ${message}`, Math.max(1, width))
 }

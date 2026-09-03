@@ -1036,10 +1036,10 @@ describe('Supervisor TUI screen', () => {
     expect(lines.at(-1)).toContain('╰─ [ / ] Commands  ›  [ q ] Detach')
     expect(lines.at(-1)).toContain('[ i ] AliceProject  ›  ○ COLD')
     expect(lines.at(-1)).toMatch(/─╯$/u)
-    const compactNowRow = lines.findIndex((line) => line.includes('NOW'))
+    const compactNowRow = lines.findIndex((line) => line.includes('NEXT'))
     const compactActionRow = lines.findIndex((line) => line.includes('[ Enter ]'))
-    const compactSignalsRow = lines.findIndex((line) => line.includes('SIGNALS'))
-    const compactRecentRow = lines.findIndex((line) => line.includes('RECENT'))
+    const compactSignalsRow = lines.findIndex((line) => line.includes('STATUS'))
+    const compactRecentRow = lines.findIndex((line) => line.includes('ACTIVITY'))
     expect(compactActionRow).toBeGreaterThan(compactNowRow)
     expect(compactSignalsRow).toBeGreaterThan(compactActionRow + 1)
     expect(compactRecentRow).toBeGreaterThan(compactSignalsRow + 1)
@@ -1057,15 +1057,15 @@ describe('Supervisor TUI screen', () => {
     expect(wideLines[1]).toHaveLength(120)
     expect(wideLines.join('\n')).toContain('Alice Session · OpenAlice')
     expect(wideLines.join('\n')).toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
-    expect(wideLines.join('\n')).toContain('ALICEPROJECT')
+    expect(wideLines.join('\n')).toContain('⌂ Default AliceProject')
     expect(wideLines.filter((line) => line.includes('○ STOPPED'))).toHaveLength(1)
     expect(wideLines.join('\n')).toContain('Your workspace is one step away')
     expect(wideLines.join('\n')).toContain('prepare the selected checkout, verify readiness')
     expect(wideLines.join('\n')).toContain('Need another checkout? Press c before launch.')
     expect(wideLines.filter((line) => line.includes('Alice Session · OpenAlice'))).toHaveLength(1)
-    expect(wideLines.join('\n')).toContain('NOW')
-    expect(wideLines.join('\n')).toContain('SIGNALS')
-    expect(wideLines.join('\n')).toContain('RECENT')
+    expect(wideLines.join('\n')).toContain('NEXT')
+    expect(wideLines.join('\n')).toContain('STATUS')
+    expect(wideLines.join('\n')).toContain('ACTIVITY')
     expect(wideLines.find((line) => line.includes('[ Enter ]'))).not.toContain('Uptime')
     expect(wideLines.join('\n')).toContain('○ COLD')
     expect(wideLines.every((line) => displayWidth(line) <= 120)).toBe(true)
@@ -1134,8 +1134,8 @@ describe('Supervisor TUI screen', () => {
 
     expect(tall).toHaveLength(32)
     expect(stageRow).toBe(4)
-    const signalsRow = tall.findIndex((line) => line.includes('SIGNALS'))
-    const recentRow = tall.findIndex((line) => line.includes('RECENT'))
+    const signalsRow = tall.findIndex((line) => line.includes('STATUS'))
+    const recentRow = tall.findIndex((line) => line.includes('ACTIVITY'))
     expect(actionRow).toBeGreaterThan(stageRow)
     expect(signalsRow).toBeGreaterThan(actionRow)
     expect(recentRow).toBeGreaterThan(signalsRow)
@@ -1143,9 +1143,9 @@ describe('Supervisor TUI screen', () => {
     expect(tipRow).toBeGreaterThan(cardBottomRow)
     expect(cardBottomRow).toBeGreaterThanOrEqual(20)
     expect(cardBottomRow).toBeLessThanOrEqual(22)
-    expect(tall.join('\n')).toContain('NOW')
-    expect(tall.join('\n')).toContain('SIGNALS')
-    expect(tall.join('\n')).toContain('RECENT')
+    expect(tall.join('\n')).toContain('NEXT')
+    expect(tall.join('\n')).toContain('STATUS')
+    expect(tall.join('\n')).toContain('ACTIVITY')
     expect(tall.join('\n')).not.toContain('CONTROL PATH')
     expect(tall.join('\n')).not.toContain('Runtime Telemetry')
     expect(tall.at(-2)).toBe('')
@@ -1158,7 +1158,7 @@ describe('Supervisor TUI screen', () => {
     const expanded = screen.render(120).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
     expect(expanded).toHaveLength(48)
     const expandedBottom = expanded.findIndex((line, index) => index > stageRow && line.startsWith('╰'))
-    const expandedRecent = expanded.findIndex((line) => line.includes('RECENT'))
+    const expandedRecent = expanded.findIndex((line) => line.includes('ACTIVITY'))
     const expandedSpine = expanded.findIndex((line) => line.includes('[ / ] Commands'))
     expect(expandedBottom).toBe(cardBottomRow)
     expect(expandedRecent).toBe(recentRow)
@@ -1175,7 +1175,7 @@ describe('Supervisor TUI screen', () => {
     )
   })
 
-  it('folds an extremely short Home without losing Mission Navigation or Now', () => {
+  it('folds an extremely short Home without losing Mission Navigation or Next', () => {
     let opens = 0
     const runtime = { class: 'running', endpoints: { web: 'http://127.0.0.1:47331' } }
     const screen = new SupervisorScreen({
@@ -1209,10 +1209,10 @@ describe('Supervisor TUI screen', () => {
     expect(frame).toContain('Default AliceProject')
     expect(frame).toContain('● RUNNING')
     expect(frame).toContain('⌁ This computer · LOCAL')
-    expect(frame).toContain('NOW  Workspace is ready')
+    expect(frame).toContain('NEXT  Workspace is ready')
     expect(frame).toContain('[ Enter ]  Open Workspace')
-    expect(frame).toContain('SIGNAL  ● Connection  healthy')
-    expect(frame).not.toContain('RECENT')
+    expect(frame).toContain('STATUS  ● Connection  healthy')
+    expect(frame).not.toContain('ACTIVITY')
     expect(frame).toContain('[ / ] Commands')
     const actionRow = lines.findIndex((line) => line.includes('[ Enter ]  Open Workspace')) + 1
     expect(screen.handlePointer({
@@ -1637,7 +1637,7 @@ describe('Supervisor TUI screen', () => {
     expect(tallSpineRow).toBeLessThan(tall.length)
     expect(tall.slice(tallSpineRow).every((line) => line === '')).toBe(true)
     expect(tall.join('\n')).toContain(
-      '◇  Tip: Enter follows Now; o opens Web; Runtime keeps the diagnostic detail.',
+      '◇  Tip: Enter follows Next; o opens Web; Runtime keeps the diagnostic detail.',
     )
     expect(tall.findIndex((line) => line.includes('Runtime Signal Deck'))).toBeLessThan(20)
     expect(screen.handlePointer(pointerClick(6, tallSpineRow))).toBe(true)
@@ -1649,7 +1649,7 @@ describe('Supervisor TUI screen', () => {
     expect(resized).toHaveLength(24)
     expect(resized.at(-2)).toBe('')
     expect(resized.at(-1)).toContain('[ / ] Close')
-    expect(resized.join('\n')).toContain('◇  Tip: Enter follows Now; o opens Web; Runtime keeps the diagnostic detail.')
+    expect(resized.join('\n')).toContain('◇  Tip: Enter follows Next; o opens Web; Runtime keeps the diagnostic detail.')
     expect(screen.handlePointer(pointerClick(6, 24))).toBe(true)
     expect(paletteChanges).toEqual([true, false])
 
@@ -3133,7 +3133,7 @@ describe('Supervisor TUI screen', () => {
       runtime: { class: 'absent', endpoints: {} },
     }, { theme, motionEnabled: false }).render(100)
     expect(plain(overview.join('\n'))).toContain('Alice Session · OpenAlice')
-    expect(plain(overview.join('\n'))).toContain('NOW')
+    expect(plain(overview.join('\n'))).toContain('NEXT')
     expect(plain(overview.join('\n'))).not.toContain('Runtime Telemetry')
 
     const fleet = new SupervisorScreen({

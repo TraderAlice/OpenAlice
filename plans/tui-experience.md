@@ -4134,6 +4134,29 @@ already large `supervisor-tui.ts` application controller.
   Lifecycle, SSH, staging, transfer safety, and destination selection semantics
   are unchanged. Maintainer acceptance remains pending on this branch.
 
+### Home identity-rail decision
+
+- A fresh side-by-side 120x32 and 120x48 capture against Oh My Pi showed that
+  Home's remaining weakness was structural rather than chromatic. The wide
+  Session Board used an unowned blank gutter, labeled the identity merely
+  `ALICEPROJECT`, and made the actual selected project a low-priority line below
+  the logo. Its `NOW`, `SIGNALS`, and `RECENT` vocabulary still read like an
+  observability dashboard even though Home is primarily a launcher.
+- Wide Home now promotes the selected AliceProject and Runtime state into the
+  identity heading and uses one continuous vertical rail, matching OMP's stable
+  identity/work split without returning to two competing cards. The right-hand
+  journey is renamed `NEXT -> STATUS -> ACTIVITY`: consequence and primary
+  action first, state second, history last. At 116 columns the identity rail
+  expands enough to preserve the default project name; 100-column guidance
+  retains its previous width so recovery and Inbox explanations do not clip.
+- The 80/60-column stack and 46x16 emergency form use the same vocabulary and
+  preserve their complete primary action without the decorative identity rail.
+  Real running and cold captures at 120x48, 120x32, 80x24, 60x20, and 46x16
+  verify the responsive hierarchy. The focused screen and real-PTY closure
+  passes 149 tests. Pointer ownership, Inbox/Connection hotspots, Runtime
+  lifecycle, project selection, and the content-flow Command Spine are
+  unchanged. Maintainer acceptance remains pending on this branch.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and
