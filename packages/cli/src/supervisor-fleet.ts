@@ -369,7 +369,7 @@ export function renderSupervisorFleet(
       width,
       hovered,
       pulse,
-      launcher ? inventoryRows : SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
+      launcher ? inventoryRows : narrowFleetVisibleRows(visibleRows),
       hoveredRail,
       activeTarget,
       launcher,
@@ -800,7 +800,7 @@ export function supervisorFleetTargetAt(
   const rowCount = launcher
     ? fleetLauncherInventoryRows(state, visibleRows)
     : narrow
-      ? SUPERVISOR_FLEET_MIN_VISIBLE_ROWS
+      ? narrowFleetVisibleRows(visibleRows)
       : fleetVisibleRows(state, visibleRows)
   if (row < 1 || row > rowCount + 1) return undefined
   if (narrow) {
@@ -864,7 +864,7 @@ export function supervisorFleetRailTargetAt(
   const rowCount = launcher
     ? fleetLauncherInventoryRows(state, visibleRows)
     : narrow
-      ? SUPERVISOR_FLEET_MIN_VISIBLE_ROWS
+      ? narrowFleetVisibleRows(visibleRows)
       : fleetVisibleRows(state, visibleRows)
   if (row < 2 || row > rowCount + 1) return undefined
   const trackRow = row - 2
@@ -1367,6 +1367,12 @@ function fleetVisibleRows(state: SupervisorFleetState, requested: number): numbe
     ? Math.max(SUPERVISOR_FLEET_MIN_VISIBLE_ROWS, Math.floor(requested))
     : SUPERVISOR_FLEET_MIN_VISIBLE_ROWS
   return Math.min(safeRequested, inventoryRows)
+}
+
+function narrowFleetVisibleRows(requested: number): number {
+  return Number.isFinite(requested)
+    ? Math.max(1, Math.min(SUPERVISOR_FLEET_MIN_VISIBLE_ROWS, Math.floor(requested)))
+    : SUPERVISOR_FLEET_MIN_VISIBLE_ROWS
 }
 
 function formatChecked(value: string): string {

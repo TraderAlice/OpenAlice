@@ -187,6 +187,13 @@ intentionally parameter-free:
   Header. It names the local-start, remote-start, or remote-connect task and
   states either `INPUT OWNED UNTIL READY` or `RETRY OR CHANGE TARGET`; no false
   page pointer targets remain behind the operation.
+  Below 60 columns, the Recorder collapses the complete stage list into one
+  bounded current-step view: target route, optional From/To handoff, `STEP n/N`,
+  current consequence, and Control or Retry remain visible. Connected Fleet
+  selectors below 60x18 similarly reserve four rather than five inventory rows.
+  Together these bounds keep the Mission Header on-screen through selection,
+  remote handoff, and the resulting Home recovery state instead of triggering
+  terminal scroll at the final viewport row.
   The failed Recorder owns the failure explanation and recovery actions; the
   wide quiet field becomes a Recovery Brief that names the failed stage and
   pairs Retry with changing the target instead of displaying ambient launch

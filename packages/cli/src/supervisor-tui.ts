@@ -4887,12 +4887,14 @@ export class SupervisorScreen implements Component {
         this.snapshot.activeTarget ?? undefined,
       ))
     } else if (this.snapshot.panel === 'fleet' && this.snapshot.fleet) {
-      const emergencyLauncher = this.snapshot.activeTarget === null
-        && width < 60
+      const emergencyFleet = width < 60
         && Number.isFinite(viewportHeight)
         && Math.floor(viewportHeight ?? 0) < 18
+      const emergencyLauncher = this.snapshot.activeTarget === null && emergencyFleet
       this.fleetVisibleRows = emergencyLauncher
         ? 0
+        : emergencyFleet
+          ? 4
         : width >= 72 && Number.isFinite(viewportHeight)
           ? Math.max(
               SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,

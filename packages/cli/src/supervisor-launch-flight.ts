@@ -110,6 +110,38 @@ export function renderSupervisorLaunchFlight(
       || currentTarget.projectKey !== flight.target.projectKey)
     ? currentTarget
     : undefined
+  if (safeWidth < 60) {
+    const stepIndex = activeStageIndex >= 0
+      ? activeStageIndex
+      : Math.max(0, flight.stages.length - 1)
+    const step = flight.stages[stepIndex]
+    const emergencyRows = [
+      flight.status === 'failed'
+        ? `× ${status} · ${route}`
+        : `◆ ${status} · ${route}`,
+      ...(switchingFrom
+        ? [
+            `● FROM  ${switchingFrom.machineName} / ${switchingFrom.projectName}`,
+            `◆ TO    ${flight.target.machineName} / ${flight.target.projectName} · ${flight.target.transport === 'ssh-forward' ? 'SSH' : 'LOCAL'}`,
+          ]
+        : [`⌁ ${flight.target.machineKey}/${flight.target.projectKey} · ${flight.target.transport === 'ssh-forward' ? 'SSH' : 'LOCAL'}`]),
+      step
+        ? `${stageGlyph(step.state)} STEP ${stepIndex + 1}/${flight.stages.length} · ${step.label} · ${stageStateLabel(step.state)}`
+        : '✓ STEP · Launch handoff complete',
+      step
+        ? `${step.state === 'failed' ? '×' : '◆'} NOW  ${step.detail}`
+        : '✓ NOW  Launch handoff complete',
+      flight.status === 'failed'
+        ? '◆ [ Enter ] Retry  │  [ Esc ] Targets'
+        : '◇ CONTROL  Keep this terminal open.',
+    ]
+    return renderSupervisorPanel(
+      'Launch Flight Recorder',
+      `${flightKindLabel(flight.kind)} · ${status}`,
+      emergencyRows,
+      safeWidth,
+    )
+  }
   const rows = [
     flight.status === 'failed'
       ? `× ${status} · ${route}`
@@ -192,14 +224,15 @@ function renderStageRail(stages: SupervisorLaunchStage[], width: number): string
 }
 
 function renderStageRow(stage: SupervisorLaunchStage, index: number): string {
-  const state = stage.state === 'complete'
-    ? 'DONE'
-    : stage.state === 'active'
-      ? 'IN FLIGHT'
-      : stage.state === 'failed'
-        ? 'FAILED'
-        : 'WAITING'
+  const state = stageStateLabel(stage.state)
   return `${stageGlyph(stage.state)} ${String(index + 1).padStart(2, '0')}  ${stage.label} · ${state}`
+}
+
+function stageStateLabel(state: SupervisorLaunchStageState): string {
+  if (state === 'complete') return 'DONE'
+  if (state === 'active') return 'IN FLIGHT'
+  if (state === 'failed') return 'FAILED'
+  return 'WAITING'
 }
 
 function stageGlyph(state: SupervisorLaunchStageState): '✓' | '◆' | '◇' | '×' {

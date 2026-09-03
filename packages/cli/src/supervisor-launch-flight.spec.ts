@@ -144,4 +144,30 @@ describe('Supervisor launch flight recorder', () => {
     expect(text).not.toContain('⌁ cloud/research · SSH FORWARD')
     expect(lines.every((line) => displayWidth(line) <= 80)).toBe(true)
   })
+
+  it('turns a tiny remote launch into one bounded current-step view', () => {
+    const current = {
+      machineKey: 'local',
+      machineName: 'This computer',
+      projectKey: 'default',
+      projectName: 'Default AliceProject',
+      transport: 'loopback' as const,
+    }
+    const flight = advanceSupervisorLaunchFlight(
+      createSupervisorLaunchFlight('remote-start', target, startedAt),
+      'open-forward',
+    )
+    const lines = renderSupervisorLaunchFlight(flight, 46, startedAt, undefined, current)
+    const text = lines.join('\n')
+
+    expect(lines).toHaveLength(8)
+    expect(text).toContain('Launch Flight Recorder · REMOTE START')
+    expect(text).toContain('● FROM  This computer / Default AliceProj')
+    expect(text).toContain('◆ TO    Cloud Lab / Research · SSH')
+    expect(text).toContain('◆ STEP 4/5 · Open SSH forward · IN FLIGHT')
+    expect(text).toContain('◆ NOW  Create the TUI-owned loopback tran')
+    expect(text).toContain('◇ CONTROL  Keep this terminal open.')
+    expect(text).not.toContain('Refresh remote inventory · DONE')
+    expect(lines.every((line) => displayWidth(line) <= 46)).toBe(true)
+  })
 })

@@ -530,6 +530,87 @@ describe('Supervisor TUI screen', () => {
     expect(screen.snapshot.panel).toBe('logs')
   })
 
+  it('preserves the Mission Header through a 46x16 remote switch and recovery', () => {
+    const machines = fleetMachines()
+    const localRuntime = { class: 'running', endpoints: { web: 'http://127.0.0.1:47331' } }
+    const fleet = setFleetFocus({
+      ...createSupervisorFleetState('2026-09-03T00:00:00Z', machines, 'default'),
+      selectedMachine: 1,
+      selectedProjects: { local: 0, cloud: 0 },
+    }, 'projects')
+    const localTarget = {
+      kind: 'local' as const,
+      machineKey: 'local',
+      machineName: 'This computer',
+      projectKey: 'default',
+      projectName: 'Default AliceProject',
+      home: '/home/alice/default',
+      transport: 'loopback' as const,
+      endpoint: 'http://127.0.0.1:47331',
+      runtime: localRuntime,
+    }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'fleet',
+      runtime: localRuntime,
+      activeTarget: localTarget,
+      fleet,
+    }, {
+      getViewportHeight: () => 16,
+      motionEnabled: false,
+    })
+
+    const connections = screen.render(46)
+    expect(connections).toHaveLength(16)
+    expect(connections[0]).toContain('◆ OpenAlice')
+    expect(connections.join('\n')).toContain('AliceProjects · Cloud · 1/1')
+
+    screen.update({
+      launchFlight: advanceSupervisorLaunchFlight(
+        createSupervisorLaunchFlight('remote-connect', {
+          machineKey: 'cloud',
+          machineName: 'Cloud',
+          projectKey: 'research',
+          projectName: 'Research',
+          transport: 'ssh-forward',
+        }, 0),
+        'open-forward',
+      ),
+    })
+    const flight = screen.render(46)
+    expect(flight).toHaveLength(16)
+    expect(flight[0]).toContain('◆ OpenAlice')
+    expect(flight.join('\n')).toContain('◆ STEP 2/3 · Open SSH forward')
+
+    const remoteRuntime = { class: 'running', endpoints: { web: 'http://127.0.0.1:45454' } }
+    screen.update({
+      panel: 'overview',
+      launchFlight: undefined,
+      activeTarget: {
+        kind: 'ssh',
+        machineKey: 'cloud',
+        machineName: 'Cloud',
+        projectKey: 'research',
+        projectName: 'Research',
+        home: '/home/alice/research',
+        transport: 'ssh-forward',
+        endpoint: 'http://127.0.0.1:45454',
+        runtime: remoteRuntime,
+        health: {
+          phase: 'unreachable',
+          consecutiveFailures: 3,
+          checkedAt: 1,
+        },
+      },
+    })
+    const recovery = screen.render(46)
+    expect(recovery).toHaveLength(16)
+    expect(recovery[0]).toContain('◆ OpenAlice')
+    expect(recovery.join('\n')).toContain('NEXT  Active endpoint is unreachable')
+    expect(recovery.join('\n')).toContain('STATUS  × Connection  unreachable')
+  })
+
   it('keeps one Active Route, its guidance, and global controls together', () => {
     let viewportHeight = 32
     const local = fleetMachines()[0]!

@@ -4157,6 +4157,28 @@ already large `supervisor-tui.ts` application controller.
   lifecycle, project selection, and the content-flow Command Spine are
   unchanged. Maintainer acceptance remains pending on this branch.
 
+### Emergency launch viewport-budget decision
+
+- The post-Home health audit found that 46x16 Connections, Remote Connect, and
+  the resulting unreachable Home all lost the first Mission Header row. Home's
+  own emergency card fit its budget; the terminal had already scrolled while
+  connected Fleet reserved five empty inventory slots and the Flight Recorder
+  expanded every launch stage. Differential repaint then had no reason to
+  restore the unchanged header that had scrolled away.
+- A connected emergency Fleet now receives a four-row inventory budget, while
+  ordinary narrow Fleet retains its existing five-row window and scroll model.
+  Below 60 columns the Flight Recorder becomes one current-step surface with
+  route, optional From/To handoff, `STEP n/N`, Now, and Control or Retry. Remote
+  start still reports all five stages over time; it simply stops drawing every
+  waiting row simultaneously in a terminal that cannot contain them.
+- Real 46x16 PTY captures verify uninterrupted Mission Header continuity across
+  selected remote Connections, Remote Connect in flight, and unreachable Home.
+  Direct Fleet geometry, launch rendering, and full-screen state coverage lock
+  the four-row pointer window and bounded eight-row Recorder. Runtime lifecycle,
+  SSH forwarding, health polling, retry, disconnect, and target promotion are
+  unchanged. The complete CLI suite passes 667 tests and CLI typecheck/build
+  passes. Maintainer acceptance remains pending on this branch.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

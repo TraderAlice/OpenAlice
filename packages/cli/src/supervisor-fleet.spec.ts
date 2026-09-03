@@ -209,6 +209,15 @@ describe('Supervisor fleet state and presentation', () => {
     expect(narrow).toHaveLength(12)
     expect(narrow.join('\n')).not.toContain('Machine 7')
     expect(supervisorFleetTargetAt(state, 46, 8, 7, 8)).toBeUndefined()
+
+    const emergency = renderSupervisorFleet(state, 46, undefined, false, 4)
+    expect(emergency).toHaveLength(11)
+    expect(emergency.join('\n')).toContain('Machines · 1/7')
+    expect(supervisorFleetTargetAt(state, 46, 8, 5, 4)).toEqual({
+      focus: 'machines',
+      index: 3,
+    })
+    expect(supervisorFleetTargetAt(state, 46, 8, 6, 4)).toBeUndefined()
   })
 
   it('turns sparse wide surplus into a passive Selection Constellation', () => {
