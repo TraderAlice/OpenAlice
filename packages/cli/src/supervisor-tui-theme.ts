@@ -193,6 +193,16 @@ export function decorateSupervisorFrame(
     if (index === 1 && line.includes('◆ FOCUS ·')) {
       return decorateFocusHeader(line, theme, options.hoveredCommand?.label)
     }
+    if (index === 1 && (
+      line.includes('◆ OPERATION ·')
+      || line.includes('× RECOVERY ·')
+      || line.includes(' · WORKING')
+      || line.includes(' · RECOVERY')
+      || line.includes('INPUT OWNED UNTIL READY')
+      || line.includes('RETRY OR CHANGE TARGET')
+    )) {
+      return decorateOperationHeader(line, theme)
+    }
     if (index === 1) return decorateTabs(line, theme, options.panel, options.hoveredPanel)
     if (options.panel === 'inbox' && line.length >= 100 && /^│ [›»] /u.test(line)) {
       const match = /^(│ )([›»] .+?)(\s{4,})(.*)$/u.exec(line)
@@ -319,6 +329,30 @@ function decorateFocusHeader(
       output += theme.muted(token)
     } else {
       output += theme.accentStrong(token)
+    }
+    cursor = offset + token.length
+  }
+  output += theme.navigationRail(line.slice(cursor))
+  return output
+}
+
+function decorateOperationHeader(
+  line: string,
+  theme: SupervisorTuiTheme,
+): string {
+  const pattern = /[◆×] (?:OPERATION|RECOVERY) · [A-Z ]+|[◆×] [A-Z ]+ · (?:WORKING|RECOVERY)|[◆×] [A-Z ]+(?=  │)|INPUT OWNED UNTIL READY|RETRY OR CHANGE TARGET/gu
+  let output = ''
+  let cursor = 0
+  for (const match of line.matchAll(pattern)) {
+    const offset = match.index
+    const token = match[0]
+    output += theme.navigationRail(line.slice(cursor, offset))
+    if (token.startsWith('×') || token === 'RETRY OR CHANGE TARGET') {
+      output += theme.danger(token)
+    } else if (token === 'INPUT OWNED UNTIL READY') {
+      output += theme.muted(token)
+    } else {
+      output += theme.selected(token)
     }
     cursor = offset + token.length
   }

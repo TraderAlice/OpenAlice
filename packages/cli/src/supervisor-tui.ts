@@ -4819,6 +4819,12 @@ export class SupervisorScreen implements Component {
       selected: this.snapshot.panel ?? 'overview',
       focusTask,
       confirmation,
+      operation: this.snapshot.launchFlight
+        ? {
+            kind: this.snapshot.launchFlight.kind,
+            status: this.snapshot.launchFlight.status,
+          }
+        : undefined,
       recovery: isConfigRecovery(this.snapshot),
       connected: this.snapshot.activeTarget !== null,
       connectionHealth: this.snapshot.activeTarget?.health?.phase,

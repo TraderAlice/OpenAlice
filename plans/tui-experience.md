@@ -4048,6 +4048,26 @@ already large `supervisor-tui.ts` application controller.
   and CLI typecheck/build passes. Maintainer acceptance remains pending on this
   branch.
 
+### Launch operation-header decision
+
+- A fresh comparison against Oh My Pi's task-owned input context exposed a
+  false affordance in both local and remote launch transitions: OpenAlice kept
+  rendering ordinary Connect/Help or workbench tabs while the Flight Recorder
+  explicitly owned input and ignored those destinations.
+- An active Flight Recorder now replaces page navigation with a non-interactive
+  Operation Header. Running states name the exact local-start, remote-start, or
+  remote-connect task and say `INPUT OWNED UNTIL READY`; failed states become a
+  danger-colored Recovery Header with `RETRY OR CHANGE TARGET`. Successful
+  handoff restores the ordinary connected navigation, and Esc from failure
+  restores the disconnected Launcher navigation.
+- Real 120x32 and 80x24 PTY captures verify running and failed local launch
+  headers without truncation. The header publishes no mouse targets, matching
+  the existing input-ownership contract. Flight stages, Retry, Back, Detach,
+  lifecycle work, and post-success navigation are unchanged. The focused
+  navigation, screen, and real-PTY closure passes 155 tests, the complete CLI
+  suite passes 660 tests, and CLI typecheck/build passes. Maintainer acceptance
+  remains pending on this branch.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

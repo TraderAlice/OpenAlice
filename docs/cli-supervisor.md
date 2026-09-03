@@ -182,6 +182,11 @@ intentionally parameter-free:
   directly to connected Home. A failure remains on the selected target with
   Enter to retry or Esc to return to target selection; its contextual Tip names
   Retry, Back, and Detach rather than teaching the hidden inventory controls.
+  While any Flight Recorder owns the stage, the ordinary Connect, Help, or
+  connected workbench navigation is replaced by a non-interactive Operation
+  Header. It names the local-start, remote-start, or remote-connect task and
+  states either `INPUT OWNED UNTIL READY` or `RETRY OR CHANGE TARGET`; no false
+  page pointer targets remain behind the operation.
   The failed Recorder owns the failure explanation and recovery actions; the
   wide quiet field becomes a Recovery Brief that names the failed stage and
   pairs Retry with changing the target instead of displaying ambient launch

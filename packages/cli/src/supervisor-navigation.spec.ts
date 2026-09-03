@@ -108,6 +108,33 @@ describe('Supervisor navigation rail', () => {
     expect(displayWidth(compactConfirmation.line)).toBe(46)
   })
 
+  it('replaces false page affordances with a launch-operation header', () => {
+    const running = renderSupervisorNavigation({
+      selected: 'fleet',
+      connected: false,
+      operation: { kind: 'local-start', status: 'running' },
+    }, 80)
+
+    expect(running.line).toContain('◆ OPERATION · LOCAL START')
+    expect(running.line).toContain('INPUT OWNED UNTIL READY')
+    expect(running.line).not.toContain('Connect')
+    expect(running.line).not.toContain('Help')
+    expect(running.targets).toEqual([])
+    expect(displayWidth(running.line)).toBe(80)
+
+    const failed = renderSupervisorNavigation({
+      selected: 'fleet',
+      connected: true,
+      operation: { kind: 'remote-connect', status: 'failed' },
+    }, 46)
+
+    expect(failed.line).toContain('× REMOTE CONNECT')
+    expect(failed.line).toContain('RETRY OR CHANGE TARGET')
+    expect(failed.line).not.toContain('Connections')
+    expect(failed.targets).toEqual([])
+    expect(displayWidth(failed.line)).toBe(46)
+  })
+
   it('derives badge-edge pointer hits from the rendered layout', () => {
     const layout = renderSupervisorNavigation({
       selected: 'overview',

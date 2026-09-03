@@ -268,6 +268,10 @@ describe('Supervisor TUI screen', () => {
     })
 
     const activeFrame = screen.render(100).join('\n')
+    expect(activeFrame).toContain('◆ OPERATION · LOCAL START')
+    expect(activeFrame).toContain('INPUT OWNED UNTIL READY')
+    expect(activeFrame).not.toContain('[Connect]')
+    expect(activeFrame).not.toContain('? Help')
     expect(activeFrame).toContain('Launch Flight Recorder · LOCAL START · IN FLIGHT · T+00:04')
     expect(activeFrame).toContain('◆ 02 START')
     expect(activeFrame).toContain('◆ OPERATION ACTIVE')
@@ -282,6 +286,10 @@ describe('Supervisor TUI screen', () => {
       diagnostic: 'Runtime readiness timed out',
     })
     const failedFrame = screen.render(100).join('\n')
+    expect(failedFrame).toContain('× RECOVERY · LOCAL START')
+    expect(failedFrame).toContain('RETRY OR CHANGE TARGET')
+    expect(failedFrame).not.toContain('[Connect]')
+    expect(failedFrame).not.toContain('? Help')
     expect(failedFrame).toContain('RECOVERABLE FAILURE')
     expect(failedFrame).toContain('◇ RECOVERY BRIEF')
     expect(failedFrame).toContain('FAILED AT  02 Prepare and start Runtime')

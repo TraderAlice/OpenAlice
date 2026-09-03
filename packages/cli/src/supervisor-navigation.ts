@@ -1,4 +1,8 @@
 import { displayWidth, truncateDisplayWidth } from './supervisor-display.ts'
+import type {
+  SupervisorLaunchFlightKind,
+  SupervisorLaunchFlightStatus,
+} from './supervisor-launch-flight.ts'
 import type { SupervisorFocusTask } from './supervisor-task-surface.ts'
 
 export type SupervisorNavigationPanel = 'fleet' | 'overview' | 'inbox' | 'logs' | 'doctor' | 'help'
@@ -9,6 +13,10 @@ export interface SupervisorNavigationView {
   confirmation?: {
     confirmLabel: string
     cancelLabel: string
+  }
+  operation?: {
+    kind: SupervisorLaunchFlightKind
+    status: SupervisorLaunchFlightStatus
   }
   recovery?: boolean
   connected?: boolean
@@ -50,6 +58,7 @@ export function renderSupervisorNavigation(
   width: number,
 ): SupervisorNavigationLayout {
   if (view.focusTask) return renderFocusHeader(view.focusTask, width, view.confirmation)
+  if (view.operation) return renderOperationHeader(view.operation, width)
   const items = navigationItems(view)
   const variants = ['wide', 'compact', 'minimal'] as const
   const selected = view.selected
@@ -76,6 +85,32 @@ export function renderSupervisorNavigation(
   return {
     line: content.padEnd(width, ' '),
     targets,
+  }
+}
+
+function renderOperationHeader(
+  operation: NonNullable<SupervisorNavigationView['operation']>,
+  width: number,
+): SupervisorNavigationLayout {
+  const failed = operation.status === 'failed'
+  const glyph = failed ? '×' : '◆'
+  const mode = failed ? 'RECOVERY' : 'OPERATION'
+  const identity = operation.kind === 'local-start'
+    ? 'LOCAL START'
+    : operation.kind === 'remote-start'
+      ? 'REMOTE START'
+      : 'REMOTE CONNECT'
+  const contract = failed ? 'RETRY OR CHANGE TARGET' : 'INPUT OWNED UNTIL READY'
+  const candidates = [
+    `${glyph} ${mode} · ${identity}  │  ${contract}`,
+    `${glyph} ${identity}  │  ${contract}`,
+    `${glyph} ${identity} · ${failed ? 'RECOVERY' : 'WORKING'}`,
+  ]
+  const content = candidates.find((candidate) => displayWidth(candidate) <= width)
+    ?? truncateDisplayWidth(candidates.at(-1)!, width)
+  return {
+    line: content.padEnd(width, ' '),
+    targets: [],
   }
 }
 
