@@ -29,12 +29,6 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
-- [[plans/ssh-remote-boundary.md]] — Narrows remote deployment to a
-  provider-neutral SSH contract: OpenAlice may install, upgrade, start, reuse,
-  tunnel, and transfer Projects on a host the user already made reachable, but
-  does not provision or manage cloud services, containers, Volumes, or vendor
-  deployment lifecycles. Provider-specific product code and tests are being
-  removed while ordinary managed SSH remains intact.
 - [[plans/tui-experience.md]] — Rebuilds the Shell Supervisor as a polished,
   mouse-capable terminal control surface using Oh My Pi as the interaction and
   finish benchmark while preserving the Node CLI and Runtime ownership
