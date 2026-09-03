@@ -3943,6 +3943,27 @@ already large `supervisor-tui.ts` application controller.
   complete CLI suite passes 657 tests, and CLI typecheck/build passes.
   Maintainer acceptance remains pending on this branch.
 
+### Single-route Connections cluster decision
+
+- The cross-page visual audit showed that the direct Active Route had already
+  removed false 1/1 Machine and AliceProject panes, but its compact six-row
+  route board still left Tip and Command Spine separated by most of a 120x32
+  terminal. With no alternate candidate or scrollable canvas, the anchored rail
+  communicated inventory complexity that did not exist.
+- Connections with exactly one Machine and one AliceProject now keeps Active
+  Route, contextual Tip, and Command Spine in one content-flow cluster. Multiple
+  candidates retain their bottom-anchored Spine and independent scrollable
+  selectors. Local Transfer, remote Disconnect, Return Home, top-level
+  navigation, route health, endpoint detail, and target activation ownership are
+  unchanged.
+- Real 120x32, 80x24, and 46x16 PTY captures verify the wide two-column, compact,
+  and emergency route forms. Screen coverage locks the relocated Spine after
+  the Tip, trailing quiet field, and stable row across 32-to-48-row resize; the
+  existing real-PTY journey confirms that quiet space remains pointer-passive.
+  The focused screen/PTY closure passes 147 tests, the complete CLI suite passes
+  658 tests, and CLI typecheck/build passes. Maintainer acceptance remains
+  pending on this branch.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

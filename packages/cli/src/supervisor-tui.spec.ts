@@ -519,6 +519,46 @@ describe('Supervisor TUI screen', () => {
     expect(screen.snapshot.panel).toBe('logs')
   })
 
+  it('keeps one Active Route, its guidance, and global controls together', () => {
+    let viewportHeight = 32
+    const local = fleetMachines()[0]!
+    const runtime = { class: 'running', endpoints: { web: 'http://127.0.0.1:47331' } }
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      panel: 'fleet',
+      runtime,
+      activeTarget: {
+        kind: 'local',
+        machineKey: 'local',
+        machineName: 'This computer',
+        projectKey: 'default',
+        projectName: 'Default AliceProject',
+        home: '/fixture/default',
+        transport: 'loopback',
+        endpoint: 'http://127.0.0.1:47331',
+        runtime,
+      },
+      fleet: createSupervisorFleetState('2026-09-03T00:00:00Z', [local], 'default'),
+    }, {
+      getViewportHeight: () => viewportHeight,
+      motionEnabled: false,
+    })
+
+    const lines = screen.render(120)
+    const tipRow = lines.findIndex((line) => line.startsWith('◇  Tip:'))
+    const spineRow = lines.findIndex((line) => line.includes('[ / ] Commands'))
+    expect(lines).toHaveLength(32)
+    expect(lines.join('\n')).toContain('Active Route · LIVE · LOCAL')
+    expect(spineRow).toBe(tipRow + 2)
+    expect(lines.slice(spineRow + 1).every((line) => line === '')).toBe(true)
+
+    viewportHeight = 48
+    const expanded = screen.render(120)
+    expect(expanded).toHaveLength(48)
+    expect(expanded.findIndex((line) => line.includes('[ / ] Commands'))).toBe(spineRow)
+  })
+
   it('makes a one-target remote Active Route disconnect directly', () => {
     let disconnects = 0
     const remote = fleetMachines()[1]!

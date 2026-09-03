@@ -5119,6 +5119,10 @@ export class SupervisorScreen implements Component {
     const directLauncherTarget = launcherTarget
       && this.snapshot.fleet != null
       && supervisorFleetHasSingleLaunchTarget(this.snapshot.fleet)
+    const directConnectionTarget = this.snapshot.panel === 'fleet'
+      && this.snapshot.activeTarget != null
+      && this.snapshot.fleet != null
+      && supervisorFleetHasSingleLaunchTarget(this.snapshot.fleet)
     const launcherMachine = launcherTarget
       ? selectedFleetMachine(this.snapshot.fleet)
       : undefined
@@ -5159,6 +5163,7 @@ export class SupervisorScreen implements Component {
       this.snapshot.panel === 'overview'
       || this.snapshot.panel === 'inbox'
       || directLauncherTarget
+      || directConnectionTarget
     )
       && !focusTask
       && !this.commandDeckOpen

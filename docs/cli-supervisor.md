@@ -254,7 +254,7 @@ intentionally parameter-free:
   do not pretend to be controls. Color strengthens identity, focus, healthy
   state, and actionable attention, but glyphs and text keep the complete
   contract under `NO_COLOR`. Below 60 columns and 18 rows, Home uses a five-row
-  summary body so bottom anchoring cannot remove Mission Navigation: selected
+  summary body so viewport pressure cannot remove Mission Navigation: selected
   AliceProject and Runtime, Machine route, Now, the primary action, and the most
   important Inbox-or-Connection signal remain visible; Recent returns with the
   ordinary compact layout. The stopped primary action shortens to the complete
@@ -269,7 +269,10 @@ intentionally parameter-free:
   and becomes a direct Active Route board. Wide terminals pair route/Now with
   signals/detail; ordinary and emergency terminals keep the same identity,
   route, health, Return Home, and target-scoped Transfer or Disconnect actions
-  in one bounded stack. There is no hidden pane focus: Enter acts on the sole
+  in one bounded stack. The direct board, contextual Tip, and Command Spine form
+  one content-flow cluster with surplus height after the complete route; multi-
+  target selectors retain their viewport-anchored Spine. There is no hidden
+  pane focus: Enter acts on the sole
   target, left/right navigate top-level views, and pointer hit testing ignores
   the removed inventory surface. Multiple candidates restore the complete
   selector and Switch Target path;
