@@ -46,14 +46,18 @@ const cliVersion = JSON.parse(
 ).version
 const temporaryPaths: string[] = []
 const originalStartView = process.env.OPENALICE_TUI_START_VIEW
+const originalNoColor = process.env.NO_COLOR
 
 beforeAll(() => {
   process.env.OPENALICE_TUI_START_VIEW = 'home'
+  process.env.NO_COLOR = '1'
 })
 
 afterAll(() => {
   if (originalStartView === undefined) delete process.env.OPENALICE_TUI_START_VIEW
   else process.env.OPENALICE_TUI_START_VIEW = originalStartView
+  if (originalNoColor === undefined) delete process.env.NO_COLOR
+  else process.env.NO_COLOR = originalNoColor
 })
 
 function stripSgr(value: string): string {

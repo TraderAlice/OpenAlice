@@ -43,12 +43,12 @@ export default defineConfig({
     // absolute, slash-normalized globs explicit for every platform.
     forceRerunTriggers: collectionWideTestInputs,
     // The Node suite includes installer, PTY, and Guardian specs that spawn
-    // their own process trees. Leaving Vitest at `available CPUs - 1`
-    // lets those children contend with a worker per core on constrained CI
-    // hosts, turning fast installer checks into timeout flakes. Keep enough
-    // parallelism for the unit-heavy majority while reserving capacity for the
-    // subprocesses owned by each worker.
-    maxWorkers: '50%',
+    // their own process trees. CPU-relative worker counts scale the contention
+    // back up on larger development hosts and turn fast installer checks into
+    // timeout flakes. Keep this deterministic across laptops and CI: two
+    // workers retain useful parallelism while leaving capacity for child
+    // processes owned by each worker.
+    maxWorkers: 2,
     projects: [
       {
         resolve: {
