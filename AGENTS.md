@@ -106,9 +106,10 @@ parallel workers hand off commits rather than racing to push or creating one PR
 per finding.
 
 Pending CI alone does not block serial progress, but a known product or contract
-failure must be understood and repaired before adding scope. Master promotion,
-stable release, explicit review pauses, and untrusted contributions retain
-their synchronous gates.
+failure must be understood and repaired before adding scope. Beta promotion may
+use recorded local acceptance plus the lightweight master PR gates. Stable
+release, explicit review pauses, and untrusted contributions retain their full
+synchronous gates.
 
 ## Verification Ladder
 
@@ -120,7 +121,8 @@ with ownership breadth and risk:
 | Leaf change inside one owner | `pnpm test:changed` or an explicit `test:select` intersection; owning typecheck; real affected surface |
 | Shared change inside one owner | Matching `pnpm test:owner:*` suite or package-local test; owning typecheck; real affected surface |
 | Cross-owner, shared test/build infrastructure, dependency/config change, or uncertain impact | Root and applicable package/UI typechecks; complete `pnpm test`; every touched surface's acceptance |
-| Master promotion, scheduled/manual backstop, or stable release | Complete remote matrix and release gates from [[docs/development-workflow.md]] |
+| Beta promotion | Recorded local full-suite/surface acceptance plus automatic master source gate and Windows dev-stack smoke |
+| Manual backstop or stable release | Complete remote matrix and release gates from [[docs/development-workflow.md]] |
 
 `pnpm test:changed` compares the feature branch and working tree with freshly
 fetched `origin/dev`. It follows Vitest's static import graph; dynamic imports,
@@ -147,12 +149,12 @@ Add the applicable surface gate:
 | Guardian lock, ownership, or takeover | `pnpm test:system:guardian` and the real launcher path |
 | Desktop, IPC, PTY, managed runtime, or packaging | Matching unsigned Electron/package smoke from [[docs/managed-workspace-runtime.md]] |
 | Root installer or distributed CLI | [[docs/cli-installer.md]], `pnpm test:system:installer`, and the interactive playground before release |
-| Docker/server/remote deployment | [[docs/docker-deployment.md]], `pnpm docker:smoke`, `pnpm test:system:railway`, or `pnpm test:system:remote` as applicable |
+| Docker/server/remote deployment | [[docs/docker-deployment.md]], `pnpm docker:smoke`, or `pnpm test:system:remote` as applicable |
 | Persisted state | Apply the shipped-boundary rule above; shipped shapes need an idempotent migration, spec, and regenerated index |
 | Onboarding, first run, or auth | Isolated state plus dev and packaged paths where relevant |
 
-`pnpm test` is hermetic: it must not invoke Railway CLI, open real SSH, read
-cloud credentials, deploy, publish, or contend for a host-global Railway fence.
+`pnpm test` is hermetic: it must not open real SSH, read cloud credentials,
+deploy, or publish.
 Those system paths remain explicit `test:system:*` or artifact-owner commands.
 `pnpm test:integration` is non-trading and must never load configured broker
 accounts or contact public providers. External read-only and live-paper lanes

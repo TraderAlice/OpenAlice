@@ -211,48 +211,6 @@ install root, release root, provenance path, content identity, and install
 method to the native executable. They never hard-code one release path, so an
 atomic pointer change is enough for update or rollback.
 
-### Volume-backed service hosts
-
-A persistent service host must keep the native install root separate from the
-AliceProject Home even when both live on one mounted volume. The Railway SSH
-profile uses:
-
-```text
-/data/home                  fixed persistent Railway SSH HOME
-/data/home/.openalice       OPENALICE_INSTALL_DIR
-/data/projects/default      OPENALICE_HOME
-```
-
-The image fixes and exports `/data/home`, `/data/home/.openalice`,
-`/data/home/.local`, `/data/home/.bun`, and their persistent executable `PATH`.
-That image environment is intentional: a Railway SSH process must see the same
-user and installed commands as Guardian. The entrypoint starts installer
-bootstrap with system-only `PATH`, validates those fixed roots, and restores
-the persistent `PATH` only after the native CLI passes provenance and Runtime
-checks. These user/install paths are not deployment options.
-
-Only `OPENALICE_HOME` may select another AliceProject beneath `/data`.
-`AQ_LAUNCHER_ROOT` is always derived as `<OPENALICE_HOME>/workspaces`; an
-independent Workspace-root override is not honored, while an alternate
-Volume/user/install/npm/Bun root or normalized path escape is rejected.
-
-The install root owns immutable native releases, activation, provenance, and
-the five OpenAlice launchers. The AliceProject root owns user configuration,
-credentials, Workspaces, and Runtime state. Machine-level convenience links
-under `/usr/local/bin` may be rebuilt on every container boot; they are not the
-durable install or data authority. AliceProject transfer likewise excludes
-top-level `bin/`, `cli/`, and machine-local or escaping symlinks rather than
-copying installation bytes to another machine.
-
-Service bootstrap may call the shared installer with `--yes`,
-`--no-modify-path`, the fixed install root, and a stable, beta, or dev selector.
-This is service configuration authority, not a relaxation of the interactive
-user consent contract. Installation still does not start a background service
-by itself; the Railway entrypoint separately validates the active launcher and
-`exec`s foreground `openalice server run`. Agent Runtime executables and their
-user-level install roots remain outside both the OpenAlice install root and
-AliceProject transfer.
-
 ## Consent and transaction
 
 Before creating the install root, the installer prints:
@@ -333,8 +291,8 @@ offer an update; package semver alone is not authority:
   a package manager owns the files;
 - a direct dev CLI resolves updates in the native CLI by complete artifact
   checksum and content identity, never by a Web semver comparison;
-- Railway and Docker are updated by their service/deployment owner, not by the
-  browser UI or a command run inside the service; and
+- Docker is updated by its service/deployment owner, not by the browser UI or
+  a command run inside the service; and
 - pinned, custom, or invalid provenance is non-updating until the user repairs
   it or explicitly selects another channel.
 
@@ -530,28 +488,20 @@ npx tsc --noEmit
 pnpm test
 ```
 
-For a volume-backed Railway bootstrap or managed cross-target change, also run:
+For a managed SSH or AliceProject cross-target change, also run:
 
 ```bash
-pnpm test:system:railway
-pnpm exec vitest run \
-  packages/cli/src/remote.spec.mjs \
-  packages/cli/src/project-transfer.spec.ts \
-  packages/cli/src/project-transfer-ssh.spec.ts \
+pnpm test:system:remote
+pnpm exec vitest run \\
+  packages/cli/src/remote.spec.mjs \\
+  packages/cli/src/project-transfer.spec.ts \\
+  packages/cli/src/project-transfer-ssh.spec.ts \\
   packages/cli/src/project-transfer-stream.spec.ts
 ```
 
-The explicit Railway-local command is serialized because its entrypoint and
-Linux fence/PTY fixtures may own a host-global mount lock. It uses fake
-installer/Runtime processes and never calls Railway CLI or a hosted Project;
-the two hosted acceptance journeys below remain manual and external.
-
-These local checks replace neither hosted acceptance journey: a disposable
-empty-Volume bootstrap/fail-closed drill, nor a non-destructive deployment,
-AliceProject transfer, restart/redeploy, and SSH tunnel journey against the
-retained real Volume. The authoritative checklist is owned by
-[[docs/docker-deployment.md]]; run-specific progress and measurements live only
-in [[plans/bun-cli-distribution.md]].
+OpenAlice assumes the target is already reachable through ordinary SSH. These
+checks exercise installation and transfer on disposable targets; they do not
+provision a cloud service or manage an infrastructure provider.
 
 The Docker smoke uses a clean non-root Debian host with Node, npm, pnpm, Bun,
 and Agent Runtimes absent. It verifies plan, consent, native installation,

@@ -39,6 +39,7 @@ import {
 } from './supervisor-launch-flight.ts'
 
 const matchesKey = (data: string, key: string) => data === key
+const asyncTuiTimeoutMs = process.env.CI ? 15_000 : 5_000
 const pointerClick = (col: number, row: number) => ({
   button: 0,
   col,
@@ -3772,7 +3773,7 @@ describe('Supervisor TUI screen', () => {
 
     expect(calls).toEqual(['start'])
     expect(screen?.snapshot.launchFlight).toBeNull()
-  })
+  }, asyncTuiTimeoutMs)
 
   it('returns to the Launcher when the active local Runtime disappears', async () => {
     let inputListener: ((data: string) => unknown) | undefined
@@ -4089,13 +4090,14 @@ describe('Supervisor TUI screen', () => {
     })).resolves.toBe(0)
 
     expect(phases).toContain('degraded')
-    expect(phases).toContain('unreachable')
     expect(phases.at(-1)).toBe('connected')
     expect(screen?.snapshot.panel).toBe('overview')
     expect(screen?.snapshot.activeTarget).toMatchObject({
       kind: 'local',
       health: { phase: 'connected', consecutiveFailures: 0 },
     })
+    // Render requests may coalesce while the host is busy; the durable event
+    // sequence is the authoritative proof that unreachable was observed.
     expect(screen?.snapshot.connectionEvents?.map((event) => event.kind)).toEqual([
       'connected',
       'degraded',
@@ -4582,7 +4584,7 @@ describe('Supervisor TUI screen', () => {
       'configure-project',
       'start',
     ])
-  })
+  }, asyncTuiTimeoutMs)
 
   it('keeps foreign-owned lifecycle mutations unavailable', () => {
     const actions: SupervisorAction[] = []

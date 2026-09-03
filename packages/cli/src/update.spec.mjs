@@ -265,24 +265,6 @@ describe('OpenAlice CLI updates', () => {
     )
   })
 
-  it('leaves Railway release selection to service variables', async () => {
-    const applyUpdate = vi.fn(async () => 0)
-    const readInstallSourceImpl = vi.fn(async () => stableSource)
-    const stdout = { write: vi.fn() }
-
-    await expect(runUpdateCommand(['--channel', 'stable', '--yes'], {
-      applyUpdate,
-      readInstallSourceImpl,
-      stdout,
-      env: { OPENALICE_SERVICE_MANAGER: 'railway' },
-    })).resolves.toBe(0)
-
-    expect(readInstallSourceImpl).not.toHaveBeenCalled()
-    expect(applyUpdate).not.toHaveBeenCalled()
-    expect(stdout.write.mock.calls.flat().join('')).toContain('OPENALICE_RAILWAY_CHANNEL')
-    expect(stdout.write.mock.calls.flat().join('')).toContain('did not modify')
-  })
-
   it('routes package-managed updates back to the owner without invoking the installer', async () => {
     const applyUpdate = vi.fn(async () => 0)
     const fetchImpl = vi.fn(async () => { throw new Error('offline') })

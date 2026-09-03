@@ -88,7 +88,6 @@ describe('development test command contract', () => {
       'test:workflow-contracts',
       'test:platform-contracts',
       'test:cli',
-      'test:railway:local',
     ]
     expect(legacy.filter((name) => scripts[name] !== undefined)).toEqual([])
   })

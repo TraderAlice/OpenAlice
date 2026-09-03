@@ -119,7 +119,7 @@ describe('AboutOpenAliceSection', () => {
     }
     const recoveredProject = {
       ...currentProject,
-      displayName: 'Railway AliceProject',
+      displayName: 'Remote AliceProject',
       appRoot: '/data/home/.local/share/openalice/releases/0.91.0-beta.3',
     }
     const view = render(<AboutOpenAliceSection />)
@@ -137,7 +137,7 @@ describe('AboutOpenAliceSection', () => {
     view.rerender(<AboutOpenAliceSection />)
 
     expect(await screen.findByText('v0.91.0-beta.3')).toBeTruthy()
-    expect(await screen.findByText('Railway AliceProject')).toBeTruthy()
+    expect(await screen.findByText('Remote AliceProject')).toBeTruthy()
     expect(screen.getByText('/data/home/.local/share/openalice/releases/0.91.0-beta.3')).toBeTruthy()
     expect(mocks.getVersion).toHaveBeenCalledTimes(2)
     expect(mocks.getAliceProject).toHaveBeenCalledTimes(2)

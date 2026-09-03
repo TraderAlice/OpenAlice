@@ -1032,6 +1032,8 @@ jobs:
       id-token: write
 
     steps:
+      - uses: actions/checkout@v7
+
       - uses: actions/setup-node@v7
         with:
           node-version: 22.19.0
@@ -1043,13 +1045,9 @@ jobs:
           path: dist/cli-package-channels
 
       - name: Publish platform packages before the meta package
-        working-directory: dist/cli-package-channels/cli-npm-tarballs
-        run: |
-          set -euo pipefail
-          node -e 'const m=require("./npm-publish-order.json");for(const p of m.packages.slice(0,-1))console.log(p.filename)' |
-            while IFS= read -r package; do npm publish "$package" --access public --provenance; done
-          META=$(node -e 'const m=require("./npm-publish-order.json");process.stdout.write(m.packages.at(-1).filename)')
-          npm publish "$META" --access public --provenance
+        run: >-
+          node scripts/publish-cli-npm-packages.mjs
+          --packages-dir dist/cli-package-channels/cli-npm-tarballs
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 

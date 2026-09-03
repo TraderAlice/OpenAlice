@@ -144,11 +144,6 @@ export async function runUpdateCommand(argv, dependencies = {}) {
   const options = parseUpdateArgs(argv)
   const stdout = dependencies.stdout ?? process.stdout
   const env = dependencies.env ?? process.env
-  if (env['OPENALICE_SERVICE_MANAGER']?.trim() === 'railway' && !options.checkOnly) {
-    stdout.write('Railway service variables own this OpenAlice installation. Set OPENALICE_RAILWAY_CHANNEL and optional OPENALICE_RAILWAY_VERSION, then restart or redeploy the service.\n')
-    stdout.write('OpenAlice did not modify the persistent release pointer.\n')
-    return 0
-  }
   const installSource = await (
     dependencies.readInstallSourceImpl ?? readInstallSource
   )({ env })

@@ -484,9 +484,9 @@ running version, normalized channel, and update owner on every distribution
 surface. The backend derives that state from installed provenance and the
 runtime profile rather than guessing from package semver. A source checkout
 uses Git, packaged Electron uses its native updater, a directly installed
-stable or beta CLI uses `openalice update` as its entry point (with that command
-handing package-manager installs back to their manager), and Railway or Docker
-remains owned by its service deployment. Pinned and custom installs have no
+  stable or beta CLI uses `openalice update` as its entry point (with that command
+  handing package-manager installs back to their manager), and Docker remains
+  owned by its service deployment. Pinned and custom installs have no
 implicit updater.
 Invalid installed provenance fails closed as custom/non-updating instead of
 silently falling back to a stable package version.

@@ -53,7 +53,6 @@ export async function main(argv = process.argv.slice(2)) {
       installSource: await readInstallSource(),
       contentIdentity: installedContentIdentity(),
       managedRuntime: installedRuntimeInfo(version),
-      runtimeCapabilities: ['railway-flock-v1', 'railway-runtime-lock-v2'],
     })}\n`)
     return 0
   }

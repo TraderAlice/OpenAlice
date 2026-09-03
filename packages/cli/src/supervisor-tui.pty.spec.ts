@@ -46,14 +46,18 @@ const cliVersion = JSON.parse(
 ).version
 const temporaryPaths: string[] = []
 const originalStartView = process.env.OPENALICE_TUI_START_VIEW
+const originalNoColor = process.env.NO_COLOR
 
 beforeAll(() => {
   process.env.OPENALICE_TUI_START_VIEW = 'home'
+  process.env.NO_COLOR = '1'
 })
 
 afterAll(() => {
   if (originalStartView === undefined) delete process.env.OPENALICE_TUI_START_VIEW
   else process.env.OPENALICE_TUI_START_VIEW = originalStartView
+  if (originalNoColor === undefined) delete process.env.NO_COLOR
+  else process.env.NO_COLOR = originalNoColor
 })
 
 function stripSgr(value: string): string {
@@ -1566,7 +1570,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         expect(transcript).toContain('Transfer Flight Deck')
       }
       if (scenario !== 'default-no') {
-        expect(transcript).toContain('◇ BUILD v0.91.0-beta.3 · DEV')
+        expect(transcript).toContain(`◇ BUILD v${cliVersion} · DEV`)
         expect(transcript).toContain('◆ FOCUS · TRANSFER')
         expect(transcript).toContain('TRANSFER FLIGHT DECK')
         expect(transcript).toContain('◆ TRANSFER')

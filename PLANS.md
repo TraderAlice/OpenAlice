@@ -41,13 +41,11 @@ the durable truth after it changes. Git history is the archive.
   CLI package owns OpenAlice only: Agent Runtime installation and Electron
   packaging stay outside this plan. The native CLI is public through the
   separately dispatched `v0.91.0-beta.3`; stable/beta discovery now uses the
-  OpenAlice CDN manifests. The retained no-domain Railway profile has passed
-  real migration, OpenCode resume, normal restart, hard-kill recovery, and a
-  non-destructive dev-to-pinned-beta3 replacement. Beta3 core Runtime/PTY state
-  survives a long tunnel outage, and the following `dev` increment refreshes
-  Settings identity after recovery; disposable empty-Volume and
-  failure-fallback journeys, native PowerShell, and external package-manager
-  activation remain open on focused branches from current `dev`. Routine dev
+  OpenAlice CDN manifests. Managed SSH installation and Project transfer pass
+  the disposable Docker target; beta3 core Runtime/PTY state survives a long
+  tunnel outage, and the following `dev` increment refreshes Settings identity
+  after recovery. Native PowerShell and external package-manager activation
+  remain open on focused branches from current `dev`. Routine dev
   and exact-beta source feedback is reduced to local-first, lightweight
   hosted lanes while `master` promotion, stable, and final artifact acceptance
   retain the complete gates.
@@ -58,8 +56,8 @@ the durable truth after it changes. Git history is the archive.
   remote-readiness increment makes the attached browser truthful about remote
   identity, Agent and Broker Pack capability, scheduled-work blockers,
   reconnect recovery, and public Session titles. Controller/remote release
-  negotiation and a consented Railway redeploy adapter remain a separate
-  authority increment without background polling or SSH-owned installation.
+  negotiation remains a separate SSH-managed increment without background
+  polling or infrastructure-provider ownership.
 - [[plans/auto-prediction-harness.md]] — Auto Prediction Beta conversation
   Harness is in `dev`; managed AP/AQ Studio supervision, opaque routing, and
   embedded product surfaces are implemented. Shared verified/unverified source

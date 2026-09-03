@@ -27,11 +27,6 @@ export async function runUninstallCommand(argv, dependencies = {}) {
   const stdout = dependencies.stdout ?? process.stdout
   const stdin = dependencies.stdin ?? process.stdin
   const env = dependencies.env ?? process.env
-  if (env['OPENALICE_SERVICE_MANAGER']?.trim() === 'railway') {
-    stdout.write('Railway owns this OpenAlice installation and its retained fallback releases. Remove or reconfigure the Railway service instead of uninstalling from SSH.\n')
-    stdout.write('OpenAlice did not modify the persistent install root.\n')
-    return 0
-  }
   const layout = Object.hasOwn(dependencies, 'layout')
     ? dependencies.layout
     : resolveInstalledLayout(import.meta.url, { env })

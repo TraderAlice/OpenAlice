@@ -12,6 +12,7 @@ import {
   collectRepositorySpecFiles,
   externalReadonlyIncludes,
   integrationIncludes,
+  laneSuites,
   laneSuiteNames,
   lanesForTestFile,
   livePaperIncludes,
@@ -49,7 +50,7 @@ describe('test catalog ownership contract', () => {
     for (const owner of ownerSuiteNames) {
       expect(assignments.filter(({ owners }) => owners.includes(owner)).length).toBeGreaterThan(0)
     }
-    for (const lane of laneSuiteNames) {
+    for (const lane of laneSuiteNames.filter((name) => laneSuites[name].runnable)) {
       expect(assignments.filter(({ lanes }) => lanes.includes(lane)).length).toBeGreaterThan(0)
     }
   })
@@ -89,7 +90,6 @@ describe('test catalog ownership contract', () => {
     const workflow = selectTestFiles(repoRoot, { lanes: ['hermetic'], areas: ['workflow'] })
     expect(workflow.length).toBeGreaterThan(0)
     expect(workflow.every((file) => lanesForTestFile(file).includes('hermetic'))).toBe(true)
-    expect(workflow.some((file) => file.includes('railway-'))).toBe(false)
     expect(workflow.some((file) => file.includes('.e2e.spec.'))).toBe(false)
   })
 })

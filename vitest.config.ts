@@ -43,14 +43,12 @@ export default defineConfig({
     // absolute, slash-normalized globs explicit for every platform.
     forceRerunTriggers: collectionWideTestInputs,
     // The Node suite includes installer, PTY, and Guardian specs that spawn
-    // their own process trees. Leaving Vitest at `available CPUs - 1`
-    // lets those children contend with a worker per core on constrained CI
-    // hosts, turning fast installer checks into timeout flakes. Keep enough
-    // parallelism for the unit-heavy majority while reserving capacity for the
-    // subprocesses owned by each worker. The Railway lifecycle system harness
-    // has its own serialized config because it also owns a host-global mount
-    // fence on Linux.
-    maxWorkers: '50%',
+    // their own process trees. CPU-relative worker counts scale contention
+    // back up on larger development hosts, while two workers still saturate a
+    // two-core CI runner by running Node and jsdom work together. Keep local
+    // runs bounded at two workers and serialize the hermetic CI gate so child
+    // process and timer-driven lifecycle tests retain execution capacity.
+    maxWorkers: process.env.CI ? 1 : 2,
     projects: [
       {
         resolve: {
@@ -66,8 +64,6 @@ export default defineConfig({
             '**/*.bbProvider.spec.*',
             '**/*.live.spec.*',
             '**/node_modules/**',
-            'scripts/railway-entrypoint.spec.ts',
-            'scripts/railway-fence-pty.spec.ts',
           ],
         },
       },

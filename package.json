@@ -1,6 +1,6 @@
 {
   "name": "open-alice",
-  "version": "0.91.0-beta.3",
+  "version": "0.91.0-beta.4",
   "description": "File-based trading agent engine",
   "type": "module",
   "imports": {
@@ -67,7 +67,6 @@
     "test:system:dev-stack": "tsx scripts/guardian/smoke.ts",
     "test:system:guardian": "tsx scripts/guardian/runtime-recovery-smoke.ts",
     "test:system:connector": "node scripts/connector-service-smoke.mjs",
-    "test:system:railway": "bash -n scripts/railway/*.sh && vitest run --config vitest.railway.config.ts",
     "test:system:installer": "node scripts/install-docker-smoke.mjs",
     "test:system:installer:dev": "node scripts/install-channel-smoke.mjs",
     "test:system:remote": "node scripts/remote-ssh-smoke.mjs",
