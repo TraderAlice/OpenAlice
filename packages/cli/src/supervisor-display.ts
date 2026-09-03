@@ -26,7 +26,7 @@ function graphemes(value: string): Iterable<{ segment: string }> {
 
 function graphemeWidth(value: string): number {
   if (/^\p{Mark}+$/u.test(value)) return 0
-  if (/\p{Extended_Pictographic}/u.test(value)) return 2
+  if (value.includes('\uFE0F') || /\p{Emoji_Presentation}/u.test(value)) return 2
   const code = value.codePointAt(0) ?? 0
   return isWideCodePoint(code) ? 2 : 1
 }

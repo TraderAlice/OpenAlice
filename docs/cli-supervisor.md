@@ -410,6 +410,12 @@ intentionally parameter-free:
   unchanged;
   independent semantic rows in both panes may still style themselves. Single-
   pane and `NO_COLOR` output retain their existing plain-text structure;
+- terminal cell measurement follows Unicode presentation rather than treating
+  every extended pictograph as emoji-width. Default text-presentation symbols
+  such as `▶`, `©`, and `⚠` occupy one cell; default emoji and graphemes with an
+  explicit emoji variation selector occupy two, as do East Asian wide
+  characters. Pane padding, truncation, scroll rails, and pointer coordinates
+  share this measurement contract;
 - an empty Runtime log lens stays compact instead of claiming the Operational
   Canvas. Its four-line panel states Standby, Quiet, or Clear and retains only
   snapshot reload or filter cycling plus Help. Empty Doctor keeps its truthful

@@ -4317,6 +4317,25 @@ already large `supervisor-tui.ts` application controller.
   TUI modules contain no embedded RGB ANSI literal outside the palette builder.
   Maintainer acceptance remains pending on this branch.
 
+### Text-presentation cell-width decision
+
+- A real remote-Machine screenshot showed the selected row's right border one
+  cell left of the pane border. The renderer measured `▶` as two cells because
+  it classified every Unicode Extended Pictographic grapheme as emoji, while
+  the terminal correctly rendered that default text-presentation symbol as one.
+  The pane therefore omitted one padding cell only on focused rows.
+- The shared display-width primitive now assigns two cells only to default
+  Emoji Presentation graphemes or an explicit emoji variation selector. Text
+  symbols such as `▶`, `©`, and `⚠` remain one cell; actual emoji and East Asian
+  wide text retain two-cell measurement. This repairs padding at the common
+  geometry boundary rather than adding a Machine-row exception.
+- Unit coverage locks text symbols, explicit/default emoji, East Asian text,
+  total row width, and the focused Machine pane boundary. A real 120x32 PTY
+  capture measures the selected remote row at exactly 120 cells with borders at
+  columns 1, 36, 40, and 120. Focused display, Fleet, and screen coverage passes
+  113 tests; the complete CLI suite passes 702 tests and CLI typecheck/build
+  passes. Maintainer acceptance remains pending on this branch.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

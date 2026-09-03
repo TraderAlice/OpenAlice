@@ -62,6 +62,17 @@ describe('Supervisor fleet state and presentation', () => {
     expect(remote).toHaveLength(local.length)
   })
 
+  it('keeps the focused Machine row aligned with its pane border', () => {
+    const state = createSupervisorFleetState('2026-09-03T00:00:00Z', machines())
+    const line = renderSupervisorFleet(state, 120, undefined, false, 5, undefined, true)
+      .find((candidate) => candidate.includes('▶ This Mac'))
+
+    expect(line).toBeDefined()
+    expect(displayWidth(line!)).toBe(120)
+    const [machinePane] = line!.split(/(?<=│) {3}(?=│)/u)
+    expect(displayWidth(machinePane!)).toBe(36)
+  })
+
   it('turns one active 80-column target into a direct route board', () => {
     const state = setFleetFocus(
       createSupervisorFleetState('2026-08-23T00:00:00Z', [machines()[0]!]),
