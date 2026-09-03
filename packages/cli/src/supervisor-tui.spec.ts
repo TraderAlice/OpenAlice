@@ -107,7 +107,8 @@ describe('Supervisor TUI screen', () => {
     )
     expect(themed.join('\n')).toContain('\u001b[')
     expect(themed.join('\n')).toContain('[ Enter ]')
-    expect(themed.map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))).toEqual(plainLines)
+    expect(themed.map((line) => line.replace(/\u001b\[[0-9;]*m/gu, '').trimEnd()))
+      .toEqual(plainLines.map((line) => line.trimEnd()))
 
     const actionRow = plainLines.findIndex((line) => line.includes('◆ [ Enter ] Start OpenAlice')) + 1
     expect(screen.handlePointer(pointerClick(130, actionRow))).toBe(true)
@@ -3188,6 +3189,8 @@ describe('Supervisor TUI screen', () => {
       expect(right).not.toContain('\u001b[')
       expect(decorated.replace(/\u001b\[[0-9;]*m/gu, '')).toBe(line)
     }
+    expect(decorateSupervisorFramedColumns(selected, theme))
+      .toContain('│\u001b[48;2;21;23;24m\u001b[1;38;2;230;255;252;48;2;24;64;69m ')
 
     expect(decorateSupervisorFramedColumns(
       selected,
@@ -3219,7 +3222,8 @@ describe('Supervisor TUI screen', () => {
       expect(row).toBeDefined()
       const [owner, inspector] = columnsFor(row!)
       expect(owner).toContain(escape)
-      expect(inspector).not.toContain('\u001b[')
+      expect(inspector.replaceAll('\u001b[48;2;21;23;24m', '').replaceAll('\u001b[0m', ''))
+        .not.toContain('\u001b[')
     }
 
     const overview = new SupervisorScreen({
@@ -3245,7 +3249,7 @@ describe('Supervisor TUI screen', () => {
     expect(plain(fleetColumns[1]!)).toContain('◁ Default AliceProject')
     expect(fleetColumns[1]).toContain('\u001b[1;38;2;116;235;226m')
     expect(fleetColumns[1]).not.toContain('48;2;24;64;69m')
-    expect(fleetRow).toContain('\u001b[0m │   │ ')
+    expect(fleetRow).toContain('\u001b[0m\u001b[48;2;21;23;24m│   │ ')
 
     const logs = new SupervisorScreen({
       version: 'dev',

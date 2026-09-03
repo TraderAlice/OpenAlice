@@ -41,6 +41,27 @@ describe('Supervisor fleet state and presentation', () => {
     expect(lines.every((line) => displayWidth(line) <= 100)).toBe(true)
   })
 
+  it('keeps Launcher geometry stable across Machines with uneven project counts', () => {
+    const inventory = [
+      machine('local', 'This computer', 'local', Array.from(
+        { length: 6 },
+        (_, index) => project(`local-${index}`, `Local ${index + 1}`),
+      )),
+      machine('railway', 'Railway Beta', 'online', [
+        project('remote-default', 'Default AliceProject'),
+        project('remote-main', 'Main Cloud'),
+      ]),
+    ]
+    let state = createSupervisorFleetState('2026-09-03T00:00:00Z', inventory)
+    const local = renderSupervisorFleet(state, 160, undefined, false, 12, undefined, true)
+    state = moveFleetSelection(state, 1)
+    const remote = renderSupervisorFleet(state, 160, undefined, false, 12, undefined, true)
+
+    expect(remote.findIndex((line) => line.includes('Launch Briefing')))
+      .toBe(local.findIndex((line) => line.includes('Launch Briefing')))
+    expect(remote).toHaveLength(local.length)
+  })
+
   it('turns one active 80-column target into a direct route board', () => {
     const state = setFleetFocus(
       createSupervisorFleetState('2026-08-23T00:00:00Z', [machines()[0]!]),

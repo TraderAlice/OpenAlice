@@ -26,8 +26,11 @@ interface WritableTerminal {
   write?(chunk: string): unknown
 }
 
-const ALT_SCREEN_ENTER = '\u001b[?1049h\u001b[2J\u001b[H'
+const ALT_SCREEN_ENTER = '\u001b[?1049h'
 const ALT_SCREEN_EXIT = '\u001b[?1049l'
+const CLEAR_SCREEN = '\u001b[2J\u001b[H'
+const RESET_STYLE = '\u001b[0m'
+const DARK_CANVAS = '\u001b[48;2;21;23;24m'
 const MOUSE_TRACKING_ON = '\u001b[?1000h\u001b[?1003h\u001b[?1006h'
 const MOUSE_TRACKING_OFF = '\u001b[?1006l\u001b[?1003l\u001b[?1000l'
 
@@ -57,6 +60,10 @@ export function createSupervisorTerminalCanvas(
     && env['TERM'] !== 'dumb'
     && env['OPENALICE_TUI_ALT_SCREEN'] !== '0'
   const mouseEnabled = alternateScreen && env['OPENALICE_TUI_MOUSE'] !== '0'
+  const darkCanvas = alternateScreen
+    && env['NO_COLOR'] === undefined
+    && env['OPENALICE_TUI_COLOR'] !== '0'
+    && env['OPENALICE_TUI_DARK_CANVAS'] !== '0'
   let active = false
   return {
     get active() { return active },
@@ -64,12 +71,12 @@ export function createSupervisorTerminalCanvas(
     start(): void {
       if (active || !alternateScreen) return
       active = true
-      output.write?.(`${ALT_SCREEN_ENTER}${mouseEnabled ? MOUSE_TRACKING_ON : ''}`)
+      output.write?.(`${ALT_SCREEN_ENTER}${darkCanvas ? DARK_CANVAS : ''}${CLEAR_SCREEN}${mouseEnabled ? MOUSE_TRACKING_ON : ''}`)
     },
     stop(): void {
       if (!active) return
       active = false
-      output.write?.(`${mouseEnabled ? MOUSE_TRACKING_OFF : ''}${ALT_SCREEN_EXIT}`)
+      output.write?.(`${mouseEnabled ? MOUSE_TRACKING_OFF : ''}${RESET_STYLE}${ALT_SCREEN_EXIT}`)
     },
   }
 }

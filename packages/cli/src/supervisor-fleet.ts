@@ -1103,8 +1103,10 @@ function fleetLauncherInventoryRows(
   state: SupervisorFleetState,
   visibleRows: number,
 ): number {
-  const machine = selectedFleetMachine(state)
-  const candidates = Math.max(state.machines.length, machine?.projects.length ?? 0)
+  const candidates = Math.max(
+    state.machines.length,
+    ...state.machines.map((machine) => machine.projects.length),
+  )
   return Math.max(1, Math.min(Math.max(1, Math.floor(visibleRows)), candidates))
 }
 

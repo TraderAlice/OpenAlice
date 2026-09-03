@@ -4270,6 +4270,29 @@ already large `supervisor-tui.ts` application controller.
   and Runtime ownership are unchanged. Maintainer acceptance remains pending
   on this branch.
 
+### Dark-canvas and stable Launcher-geometry decision
+
+- Real screenshots from a light terminal exposed two ownership failures in the
+  multi-target Launcher: OpenAlice inherited a glaring white canvas, and moving
+  from a Machine with six AliceProjects to one with fewer projects pulled the
+  Launch Briefing upward. The selected Machine row also left one unpainted cell
+  beside each vertical border, making its right edge look inset.
+- A color-capable alternate-screen TUI now owns a dark `#151718` canvas from
+  entry through repaint and resets it before restoring the host screen. Every
+  rendered row explicitly paints the complete terminal width, including blank
+  rows and text after an ANSI reset. `NO_COLOR`, `TERM=dumb`,
+  `OPENALICE_TUI_COLOR=0`, and the dedicated
+  `OPENALICE_TUI_DARK_CANVAS=0` escape hatch retain host-background behavior.
+- Multi-target Launcher height now follows the largest project inventory among
+  all candidate Machines, so selection cannot move the Briefing. A selected
+  row paints the complete framed interior while preserving neutral borders,
+  gutter, and adjacent pane. Light-base real-PTY captures at 120x32 verify a
+  fully dark terminal canvas and an identical Briefing anchor for six-project
+  local and one-project remote selections. Focused pointer, Fleet, screen,
+  boot, and Command Deck coverage passes 123 tests; the complete CLI suite
+  passes 668 tests and CLI typecheck/build passes. Maintainer acceptance remains
+  pending on this branch.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

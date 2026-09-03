@@ -112,8 +112,14 @@ separate daemons.
 The TypeScript TUI reports and polls the selected Runtime, detaches with `q`,
 `Esc`, or `Ctrl+C`, and exposes the same presentation-neutral operations as the
 explicit commands. It owns an alternate-screen application canvas and restores
-the screen, cursor, and mouse modes on detach or signal exit. `NO_COLOR` and
-`TERM=dumb` remove decorative color without removing state text;
+the screen, cursor, and mouse modes on detach or signal exit. Color-capable
+alternate-screen sessions also own a dark canvas instead of inheriting a light
+terminal background; every rendered row paints the full viewport width so
+blank space and style resets cannot expose the host palette. `NO_COLOR`,
+`TERM=dumb`, and `OPENALICE_TUI_COLOR=0` opt out of the owned canvas and
+decorative color without removing state text;
+`OPENALICE_TUI_DARK_CANVAS=0` keeps decorative color but lets the host own the
+background;
 the default start view adapts to connectivity: a stopped Runtime or startup
 without a reachable target opens the Machine → AliceProject → Runtime Launcher,
 while a reachable target
@@ -144,7 +150,8 @@ intentionally parameter-free:
   command discovery rather than pane movement. Multiple Machines or Projects
   restore the keyboard- and pointer-selectable panes and `SELECT` rail, with a
   Launch Briefing instead of a pre-connection telemetry dump. Launcher panes
-  size to real visible candidates rather than reserving five empty rows. Wide
+  size to the largest real inventory among the candidate Machines rather than
+  changing height with the current selection or reserving five empty rows. Wide
   Briefing keeps only state, human outcome, three-stage Next, and the primary
   action; widths from 54 through 71 combine Machine and AliceProject readiness
   on one Launch Sequence row so the selector Tip remains visible. Below 60
@@ -390,7 +397,9 @@ intentionally parameter-free:
 - wide split-pane content follows the same containment contract. Selection,
   pointer hover, diagnostic severity, and launch-intent styling own only the
   inner content of the framed column that carries that semantic state. The
-  gutter, borders, and semantically neutral neighboring pane remain unchanged;
+  selected row paints the complete interior from its left border to its right
+  border; the gutter, borders, and semantically neutral neighboring pane remain
+  unchanged;
   independent semantic rows in both panes may still style themselves. Single-
   pane and `NO_COLOR` output retain their existing plain-text structure;
 - an empty Runtime log lens stays compact instead of claiming the Operational

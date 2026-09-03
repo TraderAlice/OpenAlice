@@ -64,7 +64,8 @@ describe('Supervisor launch flight recorder', () => {
     expect(decorated.join('\n')).toContain('\u001b[')
     expect(decorated.join('\n')).toContain('✓ 01 TARGET')
     expect(decorated.join('\n')).toContain('◆ 04 FORWARD')
-    expect(decorated.map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))).toEqual(frame)
+    expect(decorated.map((line) => line.replace(/\u001b\[[0-9;]*m/gu, '').trimEnd()))
+      .toEqual(frame.map((line) => line.trimEnd()))
     expect(decorateSupervisorFrame(
       frame,
       createSupervisorTuiTheme({ TERM: 'xterm-256color', NO_COLOR: '1' }),

@@ -1,5 +1,8 @@
+import { displayWidth } from './supervisor-display.ts'
+
 export interface SupervisorTuiTheme {
   enabled: boolean
+  darkCanvas: boolean
   accent(value: string): string
   accentStrong(value: string): string
   muted(value: string): string
@@ -38,6 +41,7 @@ export interface SupervisorFrameStyleOptions {
 }
 
 const RESET = '\u001b[0m'
+const DARK_CANVAS = '\u001b[48;2;21;23;24m'
 const BRAND_SWEEP = [
   '116;235;226',
   '92;220;211',
@@ -59,19 +63,22 @@ export function createSupervisorTuiTheme(
   const enabled = env['NO_COLOR'] === undefined
     && env['TERM'] !== 'dumb'
     && env['OPENALICE_TUI_COLOR'] !== '0'
+  const darkCanvas = enabled && env['OPENALICE_TUI_DARK_CANVAS'] !== '0'
+  const closeStyle = `${RESET}${darkCanvas ? DARK_CANVAS : ''}`
   const style = (open: string) => (value: string): string => enabled
-    ? `${open}${value}${RESET}`
+    ? `${darkCanvas ? DARK_CANVAS : ''}${open}${value}${closeStyle}`
     : value
   const brand = (value: string, frame?: number): string => {
     if (!enabled) return value
-    if (frame === undefined) return `\u001b[1;38;2;116;235;226m${value}${RESET}`
-    return `${[...value].map((character, index) => {
+    if (frame === undefined) return `${darkCanvas ? DARK_CANVAS : ''}\u001b[1;38;2;116;235;226m${value}${closeStyle}`
+    return `${darkCanvas ? DARK_CANVAS : ''}${[...value].map((character, index) => {
       const color = BRAND_SWEEP[(index + frame) % BRAND_SWEEP.length]!
       return `\u001b[1;38;2;${color}m${character}`
-    }).join('')}${RESET}`
+    }).join('')}${closeStyle}`
   }
   return {
     enabled,
+    darkCanvas,
     accent: style('\u001b[38;2;92;220;211m'),
     accentStrong: style('\u001b[1;38;2;116;235;226m'),
     muted: style('\u001b[38;2;116;132;153m'),
@@ -117,7 +124,8 @@ export function decorateSupervisorFrame(
         : line
     ))
   }
-  return lines.map((line, index) => {
+  const canvasWidth = Math.max(0, ...lines.map((line) => displayWidth(line)))
+  const decorated = lines.map((line, index) => {
     if (options.hoveredHomeHotspot?.row === index + 1) {
       const highlighted = line.replace(
         options.hoveredHomeHotspot.surface,
@@ -289,6 +297,11 @@ export function decorateSupervisorFrame(
     ) return theme.accentStrong(line)
     return line
   })
+  if (!theme.darkCanvas) return decorated
+  return decorated.map((line, index) => {
+    const padding = ' '.repeat(Math.max(0, canvasWidth - displayWidth(lines[index] ?? '')))
+    return `${DARK_CANVAS}${line}${padding}${RESET}`
+  })
 }
 
 function decorateLaunchFlightRail(
@@ -369,7 +382,8 @@ export function decorateSupervisorFramedColumns(
     if (!trimmed.startsWith('│ ') || !trimmed.endsWith(' │')) return column
     const content = trimmed.slice(2, -2)
     const semantic = content.trimStart()
-    const style = semantic.startsWith('› ') || semantic.startsWith('▶ ')
+    const selected = semantic.startsWith('› ') || semantic.startsWith('▶ ')
+    const style = selected
       ? theme.selected
       : semantic.startsWith('» ')
         ? theme.accent
@@ -406,6 +420,7 @@ export function decorateSupervisorFramedColumns(
                             : undefined
     if (!style) return column
     const trailing = column.slice(trimmed.length)
+    if (selected) return `│${style(` ${content} `)}│${trailing}`
     return `│ ${style(content)} │${trailing}`
   }).join('   ')
 }
