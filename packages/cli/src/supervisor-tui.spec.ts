@@ -3772,7 +3772,7 @@ describe('Supervisor TUI screen', () => {
 
     expect(calls).toEqual(['start'])
     expect(screen?.snapshot.launchFlight).toBeNull()
-  }, 10_000)
+  })
 
   it('returns to the Launcher when the active local Runtime disappears', async () => {
     let inputListener: ((data: string) => unknown) | undefined
@@ -4582,7 +4582,7 @@ describe('Supervisor TUI screen', () => {
       'configure-project',
       'start',
     ])
-  }, 10_000)
+  })
 
   it('keeps foreign-owned lifecycle mutations unavailable', () => {
     const actions: SupervisorAction[] = []
