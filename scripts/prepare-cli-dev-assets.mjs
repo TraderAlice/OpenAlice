@@ -65,7 +65,6 @@ export function prepareCliDevAssets({ inputDir, outputDir, commit, version, inst
     copyFileSync(checksumPath, join(immutableRoot, `${archiveName}.sha256`))
 
     const aliasName = `openalice-cli-dev-${platform}-${arch}.tar.gz`
-    copyFileSync(archivePath, join(aliasRoot, aliasName))
     writeFileSync(join(aliasRoot, `${aliasName}.sha256`), `${checksum}  ${aliasName}\n`)
     targets.push({ platform, arch, archive: aliasName, sha256: checksum, contentIdentity: metadata.contentIdentity })
   }

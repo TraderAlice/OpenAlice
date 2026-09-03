@@ -8,6 +8,7 @@ fail() {
 
 installer_url="${OPENALICE_CHANNEL_INSTALLER_URL:?OPENALICE_CHANNEL_INSTALLER_URL is required}"
 channel="${OPENALICE_CHANNEL:-dev}"
+expected_commit="${OPENALICE_CHANNEL_EXPECTED_COMMIT:-}"
 install_root="$HOME/.openalice"
 installer_path="$(mktemp)"
 plan_path="$(mktemp)"
@@ -19,6 +20,8 @@ trap cleanup EXIT
 
 [[ "$(id -u)" -ne 0 ]] || fail "container must run as a non-root user"
 [[ -z "$(find "$HOME" -mindepth 1 -maxdepth 1 -print -quit)" ]] || fail "HOME is not empty"
+[[ -z "$expected_commit" || "$expected_commit" =~ ^[a-f0-9]{7,64}$ ]] \
+  || fail "expected commit is not a lowercase hexadecimal commit identity"
 for command in node npm pnpm bun pi opencode codex claude; do
   ! command -v "$command" >/dev/null 2>&1 \
     || fail "clean host unexpectedly provides $command"
@@ -38,16 +41,23 @@ head -n 1 "$installer_path" | grep -Fq '#!/usr/bin/env bash' \
 bash -n "$installer_path"
 
 OPENALICE_INSTALL_URL="$installer_url" \
+  OPENALICE_EXPECTED_DEV_COMMIT="$expected_commit" \
   bash "$installer_path" --plan --channel "$channel" --no-modify-path >"$plan_path"
 grep -Eq "^Channel[[:space:]]+development \(${channel}\)$" "$plan_path" \
   || fail "plan did not select the development channel"
 grep -Eq "^Platform[[:space:]]+linux-(x64|arm64)$" "$plan_path" \
   || fail "plan did not select a supported Linux native target"
-grep -Eq "^Artifact[[:space:]]+https://download\.openalice\.ai/cli/dev/openalice-cli-dev-linux-(x64|arm64)\.tar\.gz$" "$plan_path" \
-  || fail "plan did not select the fixed native dev artifact"
+if [[ -n "$expected_commit" ]]; then
+  grep -Eq "^Artifact[[:space:]]+https://download\.openalice\.ai/cli/dev/releases/${expected_commit}/openalice-cli-[0-9A-Za-z.+-]+-linux-(x64|arm64)\.tar\.gz$" "$plan_path" \
+    || fail "plan did not select the expected immutable dev commit"
+else
+  grep -Eq "^Artifact[[:space:]]+https://download\.openalice\.ai/cli/dev/releases/[a-f0-9]{7,64}/openalice-cli-[0-9A-Za-z.+-]+-linux-(x64|arm64)\.tar\.gz$" "$plan_path" \
+    || fail "plan did not select an immutable native dev artifact"
+fi
 [[ ! -e "$install_root" ]] || fail "plan changed the install root"
 
 OPENALICE_INSTALL_URL="$installer_url" \
+  OPENALICE_EXPECTED_DEV_COMMIT="$expected_commit" \
   bash "$installer_path" --yes --channel "$channel" --no-modify-path \
     --install-dir "$install_root"
 
@@ -86,6 +96,7 @@ printf '%s' "$runtime_status" | jq -e '
 ' >/dev/null || fail "installed CLI could not execute native Runtime status"
 
 OPENALICE_INSTALL_URL="$installer_url" \
+  OPENALICE_EXPECTED_DEV_COMMIT="$expected_commit" \
   bash "$installer_path" --yes --channel "$channel" --no-modify-path \
     --install-dir "$install_root"
 
@@ -101,4 +112,4 @@ for command in node npm pnpm bun pi opencode codex claude; do
     || fail "native install unexpectedly provided $command"
 done
 
-echo "[install-channel-smoke] passed $installer_url -> channel $channel ($first_content_identity)"
+echo "[install-channel-smoke] passed $installer_url -> channel $channel commit ${expected_commit:-latest} ($first_content_identity)"

@@ -96,22 +96,35 @@ Git changes all produce a new identity.
 
 The channel-neutral installer defaults to the OpenAlice-owned stable
 `manifest.json`. `--channel beta` resolves `beta/manifest.json`, while
-`--channel dev` downloads the fixed per-commit preview aliases:
+`--channel dev` resolves `cli/dev/manifest.json` and derives a commit-addressed
+archive URL from its `commit` and `version`:
 
 ```text
-https://download.openalice.ai/cli/dev/openalice-cli-dev-<platform>-<arch>.tar.gz
-https://download.openalice.ai/cli/dev/openalice-cli-dev-<platform>-<arch>.tar.gz.sha256
+https://download.openalice.ai/cli/dev/releases/<commit>/openalice-cli-<version>-<platform>-<arch>.tar.gz
+https://download.openalice.ai/cli/dev/releases/<commit>/openalice-cli-<version>-<platform>-<arch>.tar.gz.sha256
 ```
 
 Every `dev` push builds all four native targets. Publication verifies each
 sidecar and the archive's target/version metadata, uploads an immutable copy
-under `cli/dev/releases/<commit>/`, then replaces the fixed archive aliases.
-Each checksum alias is written after its archive, so a reader racing a publish
-can fail verification but cannot activate mismatched bytes. The dev manifest is
-published last as the completed-set receipt. Versioned beta and stable releases
-publish the same four target archives and sidecars as GitHub Release assets and
-mirror them unchanged to the download CDN. Stable and beta manifests remain separate;
-immutable `OpenAlice-<version>-install` and
+under `cli/dev/releases/<commit>/`, and preserves a small candidate receipt.
+A separate activation stage rechecks that remote `refs/heads/dev` is exactly
+the workflow commit before replacing the live manifest. A stale rerun is a
+successful no-op. Candidate upload and channel activation can therefore be
+retried independently without rebuilding accepted native archives, and the
+manifest is the completed-set authority rather than an archive alias.
+
+The currently published channel-neutral installer predates this resolver and
+still downloads `openalice-cli-dev-<platform>-<arch>.tar.gz`. Activation
+temporarily refreshes those aliases after the exact-head check solely to keep
+that released bootstrap working. New installer snapshots and native dev
+updates do not consume them. Remove the compatibility writes after a beta or
+stable release has placed the manifest-driven installer on the shared public
+endpoint; do not make aliases part of the next manifest schema.
+
+Versioned beta and stable releases publish the same four target archives and
+sidecars as GitHub Release assets and mirror them unchanged to the download
+CDN. Stable and beta manifests remain separate; immutable
+`OpenAlice-<version>-install` and
 `cli/dev/releases/<commit>/install` files are verified snapshots of the same
 root `install` source, not separate channel scripts.
 
@@ -408,7 +421,7 @@ is no permanent dual-runtime resolver. Before changing the active pointer, the
 cutover also backs up every legacy launcher; a validation failure restores the
 old launchers and removes the unconfirmed native pointer.
 
-Both `dev` alias publication and every versioned beta/stable release replay this
+Both rolling `dev` publication and every versioned beta/stable release replay this
 cutover from the published v0.90.1 installer on Linux x64. The acceptance
 fixture pins the historical Pi manifests by SHA-256 because the upstream Pi
 release assets are not part of OpenAlice's durable release surface. It then
@@ -479,6 +492,7 @@ Bounded environment seams:
 | `OPENALICE_DOWNLOAD_BASE_URL` | Default stable/beta-manifest and dev-preview artifact base |
 | `OPENALICE_STABLE_MANIFEST_URL` | Stable release discovery manifest |
 | `OPENALICE_BETA_MANIFEST_URL` | Beta release discovery manifest |
+| `OPENALICE_DEV_MANIFEST_URL` | Dev completed-candidate discovery manifest |
 | `OPENALICE_RELEASE_ASSET_BASE_URL` | Versioned release asset base for release tests/mirrors |
 | `OPENALICE_LEGACY_STABLE_INSTALLER_URL` | Test override for the pinned v0.90.1 transition installer |
 | `OPENALICE_LEGACY_STABLE_INSTALLER_SHA256` | Test override for that transition installer's pinned digest |
@@ -486,6 +500,7 @@ Bounded environment seams:
 | `OPENALICE_EXPECTED_CLI_VERSION` | Update handoff binding to one artifact version |
 | `OPENALICE_EXPECTED_CLI_ARTIFACT_SHA256` | Dev update handoff binding to one complete archive |
 | `OPENALICE_EXPECTED_CLI_CONTENT_IDENTITY` | Dev update binding to the complete payload identity |
+| `OPENALICE_EXPECTED_DEV_COMMIT` | Dev publication smoke binding to one manifest commit |
 
 Do not add source package lists, managed Agent Runtime pins, package-manager
 installation, or system dependency mutation back to these seams.
@@ -536,8 +551,8 @@ Before promotion also:
 2. install it into an isolated root and run `version --json`;
 3. update from a distinct retained release and exercise rollback;
 4. build/install on native macOS and clean Linux for each supported arch;
-5. publish the fixed dev aliases and exercise the raw `dev/install` plus
-   `--channel dev` network path;
+5. publish the immutable dev candidate, activate its exact-commit manifest,
+   and exercise the raw `dev/install` plus `--channel dev` network path;
 6. verify release assets and sidecar checksums before making any channel alias
    visible; a beta mirror must also prove the stable manifest and stable update
    feeds remained byte-for-byte unchanged. The shared installer may change only

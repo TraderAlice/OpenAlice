@@ -9,11 +9,13 @@ interface WorkflowStep {
   run?: string
   uses?: string
   with?: Record<string, unknown>
+  env?: Record<string, string>
 }
 
 interface WorkflowJob {
   if?: string
   needs?: string | string[]
+  outputs?: Record<string, string>
   steps?: WorkflowStep[]
   strategy?: {
     matrix?: {
@@ -85,6 +87,7 @@ describe('CLI installer dev publication workflow', () => {
     expect(step(build, 'Preserve accepted dev candidate').with?.name).toBe(
       'dev-cli-${{ matrix.platform }}-${{ matrix.arch }}',
     )
+    expect(step(build, 'Preserve accepted dev candidate').with?.['retention-days']).toBe(7)
   })
 
   it('accepts native npm and Bun installs on PR macOS and Linux hosts', () => {
@@ -103,22 +106,54 @@ describe('CLI installer dev publication workflow', () => {
     expect(workflow.jobs['accept-dev-legacy-cutover']).toBeUndefined()
   })
 
-  it('validates candidates before uploading immutable assets and fixed aliases', () => {
-    const publish = workflow.jobs['publish-dev-cli']
+  it('publishes commit-addressed candidates without overwriting accepted bytes', () => {
+    const publish = workflow.jobs['publish-dev-cli-candidate']
     expect(publish.needs).toBe('build-dev-cli')
-    const prepare = step(publish, 'Validate candidates and prepare channel aliases').run ?? ''
+    const prepare = step(publish, 'Validate candidates and prepare candidate receipt').run ?? ''
     expect(prepare).toContain('prepare-cli-dev-assets.mjs')
     expect(prepare).toContain('--installer install')
-    const upload = step(publish, 'Publish immutable candidates and activate dev aliases').run ?? ''
-    expect(upload.indexOf('cli/dev/releases/${GITHUB_SHA}')).toBeGreaterThanOrEqual(0)
-    expect(upload.indexOf('aliases/*.tar.gz')).toBeLessThan(upload.indexOf('aliases/*.sha256'))
-    expect(upload.indexOf('aliases/*.sha256')).toBeLessThan(upload.indexOf('manifest.json'))
+    const upload = step(publish, 'Publish immutable candidate without overwriting accepted bytes').run ?? ''
+    expect(upload).toContain('cli/dev/releases/${GITHUB_SHA}/$(basename "$file")')
+    expect(upload).toContain("--if-none-match '*'")
+    expect(upload).toContain('Reusing byte-identical immutable object')
+    expect(upload).not.toContain('cli/dev/manifest.json')
+    expect(upload).not.toContain('openalice-cli-dev-')
+    expect(step(publish, 'Preserve candidate activation receipt').with).toMatchObject({
+      name: 'dev-channel-receipt',
+      'retention-days': 7,
+    })
   })
 
-  it('runs the live network install only after a successful push publication', () => {
+  it('activates only the exact remote dev head and makes stale reruns a no-op', () => {
+    const activate = workflow.jobs['activate-dev-cli']
+    expect(activate.needs).toBe('publish-dev-cli-candidate')
+    expect(activate.outputs?.activated).toContain('steps.activate.outputs.activated')
+    const firstCheck = step(activate, 'Check whether candidate is current dev head').run ?? ''
+    const finalCheck = step(activate, 'Revalidate dev head before mutable activation').run ?? ''
+    for (const check of [firstCheck, finalCheck]) {
+      expect(check).toContain('git ls-remote --exit-code origin refs/heads/dev')
+      expect(check).toContain('REMOTE_DEV_SHA" != "$GITHUB_SHA')
+      expect(check).toContain('current=false')
+      expect(check).toContain('activation is a no-op')
+    }
+    const activation = step(activate, 'Activate manifest and transitional aliases').run ?? ''
+    expect(activation).toContain('Compatibility only')
+    expect(activation).toContain('cli/dev/${alias}')
+    expect(activation).toContain('git ls-remote --exit-code origin refs/heads/dev')
+    expect(activation.indexOf('REMOTE_DEV_SHA" != "$GITHUB_SHA')).toBeLessThan(
+      activation.indexOf('--key "cli/dev/manifest.json"'),
+    )
+    expect(activation).toContain('echo "activated=true"')
+  })
+
+  it('runs exact-commit live acceptance only after successful activation', () => {
     const live = workflow.jobs['dev-channel-install']
-    expect(live.needs).toBe('publish-dev-cli')
-    expect(live.if).toContain("needs.publish-dev-cli.result == 'success'")
+    expect(live.needs).toBe('activate-dev-cli')
+    expect(live.if).toContain("needs.activate-dev-cli.result == 'success'")
+    expect(live.if).toContain("needs.activate-dev-cli.outputs.activated == 'true'")
+    const install = step(live, 'Install raw dev script and dev payload in a clean host')
+    expect(install.env?.EXPECTED_COMMIT).toBe("${{ github.event_name == 'push' && github.sha || '' }}")
+    expect(install.run).toContain('--expected-commit "$EXPECTED_COMMIT"')
   })
 
   it('installs the remote smoke parser before running the checkout fixture', () => {

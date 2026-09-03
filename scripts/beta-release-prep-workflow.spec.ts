@@ -113,7 +113,8 @@ describe('exact beta release-preparation workflow lane', () => {
     expect(jobs['checkout-install'].if).not.toContain("github.base_ref == 'master'")
     expect(jobs['build-dev-cli'].if).toBe("github.event_name == 'push'")
     expect(jobs['build-dev-cli'].needs).toBeUndefined()
-    expect(jobs['publish-dev-cli'].needs).toBe('build-dev-cli')
+    expect(jobs['publish-dev-cli-candidate'].needs).toBe('build-dev-cli')
+    expect(jobs['activate-dev-cli'].needs).toBe('publish-dev-cli-candidate')
   })
 
   it('keeps the Docker check green but omits setup, build, and smoke on an exact match', () => {

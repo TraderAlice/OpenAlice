@@ -30,6 +30,17 @@ COPY scripts/remote-smoke/entrypoint.sh /fixture/entrypoint.sh
 RUN archive="$(find /fixture/artifacts -name 'openalice-cli-*-linux-*.tar.gz' -type f -print -quit)" \
   && test -n "$archive" \
   && target_arch="$(uname -m | sed 's/x86_64/x64/; s/aarch64/arm64/')" \
+  && release_root="$(tar -tzf "$archive" | sed -n '1{s#/.*##;p}')" \
+  && version="$(tar -xOzf "$archive" "$release_root/release.json" | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)" \
+  && test -n "$version" \
+  && commit="0123456789abcdef0123456789abcdef01234567" \
+  && immutable_root="/fixture/www/cli/dev/releases/${commit}" \
+  && mkdir -p "$immutable_root" \
+  && cp "$archive" "$immutable_root/$(basename "$archive")" \
+  && cp "$archive.sha256" "$immutable_root/$(basename "$archive").sha256" \
+  && cp /fixture/www/install "$immutable_root/install" \
+  && printf '{"schemaVersion":1,"channel":"dev","repository":"TraderAlice/OpenAlice","version":"%s","commit":"%s"}\n' \
+    "$version" "$commit" > /fixture/www/cli/dev/manifest.json \
   && cp "$archive" "/fixture/www/cli/dev/openalice-cli-dev-linux-${target_arch}.tar.gz" \
   && cp "$archive.sha256" "/fixture/www/cli/dev/openalice-cli-dev-linux-${target_arch}.tar.gz.sha256" \
   && chmod +x /fixture/entrypoint.sh \

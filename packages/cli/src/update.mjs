@@ -492,7 +492,8 @@ export async function downloadAndRunInstaller(result, context) {
   if (
     channel === 'dev'
     && (
-      !/^[a-f0-9]{64}$/.test(result.latestArtifactSha256 ?? '')
+      !/^[a-f0-9]{7,64}$/.test(result.latestCommit ?? '')
+      || !/^[a-f0-9]{64}$/.test(result.latestArtifactSha256 ?? '')
       || !/^[a-f0-9]{16}$/.test(result.latestContentIdentity ?? '')
     )
   ) {
@@ -546,6 +547,9 @@ export async function downloadAndRunInstaller(result, context) {
           : {}),
         ...(result.latestArtifactSha256
           ? { OPENALICE_EXPECTED_CLI_ARTIFACT_SHA256: result.latestArtifactSha256 }
+          : {}),
+        ...(result.latestCommit
+          ? { OPENALICE_EXPECTED_DEV_COMMIT: result.latestCommit }
           : {}),
       },
     })
