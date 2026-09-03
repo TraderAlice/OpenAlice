@@ -331,8 +331,10 @@ describe('Release workflow critical path', () => {
     ])
     expect(npm.if).toContain("needs.verify-public-cli-channels.result == 'success'")
     expect(npm.if).toContain("needs.release.outputs.channel == 'stable'")
+    expect(npm.steps?.some((candidate) => candidate.uses === 'actions/checkout@v7')).toBe(true)
     const publish = step(npm, 'Publish platform packages before the meta package').run ?? ''
-    expect(publish.indexOf('packages.slice(0,-1)')).toBeLessThan(publish.indexOf('packages.at(-1)'))
+    expect(publish).toContain('publish-cli-npm-packages.mjs')
+    expect(publish).toContain('cli-npm-tarballs')
   })
 
   it('verifies public release bytes before activating external package channels', () => {

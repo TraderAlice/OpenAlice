@@ -22,7 +22,7 @@ describe('public CLI authority preflight', () => {
     const logger = { log: vi.fn() }
 
     await expect(preflightPublicCliAuthority({ env: {}, fetchImpl, verifyAur, logger }))
-      .resolves.toEqual({ enabled: [], npmUsername: null })
+      .resolves.toEqual({ enabled: [], npmUsername: null, npmUnreservedPackages: [] })
     expect(fetchImpl).not.toHaveBeenCalled()
     expect(verifyAur).not.toHaveBeenCalled()
   })
@@ -52,6 +52,7 @@ describe('public CLI authority preflight', () => {
     })).resolves.toEqual({
       enabled: ['npm', 'homebrew', 'aur'],
       npmUsername: 'alice-release',
+      npmUnreservedPackages: [],
     })
     expect(fetchImpl).toHaveBeenCalledTimes(NPM_PACKAGE_NAMES.length + 2)
     expect(verifyAur).toHaveBeenCalledWith({ env })
@@ -92,7 +93,27 @@ describe('public CLI authority preflight', () => {
     })).rejects.toThrow('npm token identity alice-release is not a maintainer of openalice')
   })
 
-  it('rejects unreserved npm names, read-only Tap tokens, and inaccessible AUR repos', async () => {
+  it('accepts unreserved npm names as explicit first-publication targets', async () => {
+    const fetchImpl = vi.fn(async (url) => {
+      if (url.endsWith('/-/whoami')) return response(200, { username: 'alice-release' })
+      return response(404, {})
+    })
+
+    await expect(preflightPublicCliAuthority({
+      env: {
+        OPENALICE_PUBLISH_NPM: 'true',
+        NPM_TOKEN: 'npm-secret',
+      },
+      fetchImpl,
+      logger: { log: vi.fn() },
+    })).resolves.toEqual({
+      enabled: ['npm'],
+      npmUsername: 'alice-release',
+      npmUnreservedPackages: NPM_PACKAGE_NAMES,
+    })
+  })
+
+  it('rejects read-only Tap tokens and inaccessible AUR repos', async () => {
     const env = {
       OPENALICE_PUBLISH_NPM: 'true',
       OPENALICE_PUBLISH_HOMEBREW: 'true',
@@ -105,7 +126,7 @@ describe('public CLI authority preflight', () => {
     const fetchImpl = vi.fn(async (url) => {
       if (url.endsWith('/-/whoami')) return response(200, { username: 'alice-release' })
       if (url.includes('api.github.com')) return response(200, { permissions: { push: false } })
-      return response(404, {})
+      return response(200, { maintainers: [{ name: 'alice-release' }] })
     })
 
     await expect(preflightPublicCliAuthority({
@@ -114,7 +135,6 @@ describe('public CLI authority preflight', () => {
       verifyAur: vi.fn(async () => { throw new Error('AUR repository is unavailable') }),
       logger: { log: vi.fn() },
     })).rejects.toThrow(new RegExp([
-      'npm package name openalice is not reserved',
       'HOMEBREW_TAP_TOKEN does not have push authority',
       'AUR repository is unavailable',
     ].join('[\\s\\S]*')))

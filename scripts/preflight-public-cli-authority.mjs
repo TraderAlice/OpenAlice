@@ -31,16 +31,22 @@ export async function preflightPublicCliAuthority({
   const selected = Object.entries(enabled).filter(([, value]) => value).map(([name]) => name)
   if (selected.length === 0) {
     logger.log('[public-cli-authority] no external CLI channels are enabled')
-    return { enabled: selected, npmUsername: null }
+    return { enabled: selected, npmUsername: null, npmUnreservedPackages: [] }
   }
 
   const failures = []
   let npmUsername = null
+  let npmUnreservedPackages = []
 
   if (enabled.npm) {
     try {
-      npmUsername = await verifyNpmAuthority({ env, fetchImpl })
+      const npmAuthority = await verifyNpmAuthority({ env, fetchImpl })
+      npmUsername = npmAuthority.username
+      npmUnreservedPackages = npmAuthority.unreservedPackages
       logger.log(`[public-cli-authority] npm authority verified for ${npmUsername}`)
+      if (npmUnreservedPackages.length > 0) {
+        logger.log(`[public-cli-authority] npm names available for first publication: ${npmUnreservedPackages.join(', ')}`)
+      }
     } catch (error) {
       failures.push(message(error))
     }
@@ -70,7 +76,7 @@ export async function preflightPublicCliAuthority({
     throw new Error(`public CLI channel authority preflight failed:\n- ${failures.join('\n- ')}`)
   }
 
-  return { enabled: selected, npmUsername }
+  return { enabled: selected, npmUsername, npmUnreservedPackages }
 }
 
 async function verifyNpmAuthority({ env, fetchImpl }) {
@@ -84,14 +90,22 @@ async function verifyNpmAuthority({ env, fetchImpl }) {
   const username = typeof whoami.username === 'string' ? whoami.username.trim() : ''
   if (!username) throw new Error('npm token identity did not return a username')
 
+  const unreservedPackages = []
   for (const packageName of NPM_PACKAGE_NAMES) {
-    const metadata = await fetchJson(
-      fetchImpl,
-      `${registry}/${encodeURIComponent(packageName)}`,
-      { headers },
-      `npm package ${packageName}`,
-      `npm package name ${packageName} is not reserved`,
-    )
+    const response = await fetchImpl(`${registry}/${encodeURIComponent(packageName)}`, { headers })
+    if (response.status === 404) {
+      unreservedPackages.push(packageName)
+      continue
+    }
+    if (!response.ok) {
+      throw new Error(`npm package ${packageName} request failed with HTTP ${response.status}`)
+    }
+    let metadata
+    try {
+      metadata = await response.json()
+    } catch {
+      throw new Error(`npm package ${packageName} returned invalid JSON`)
+    }
     const maintainers = Array.isArray(metadata.maintainers)
       ? metadata.maintainers.map((entry) => typeof entry?.name === 'string' ? entry.name : '')
       : []
@@ -100,7 +114,7 @@ async function verifyNpmAuthority({ env, fetchImpl }) {
     }
   }
 
-  return username
+  return { username, unreservedPackages }
 }
 
 async function verifyHomebrewAuthority({ env, fetchImpl }) {
