@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
+import { supervisorTuiBaseStyle } from './supervisor-tui-palette.ts'
 import { createSupervisorTerminalCanvas, parseSupervisorPointer } from './supervisor-tui-pointer.ts'
 
 describe('Supervisor TUI pointer', () => {
@@ -26,7 +27,7 @@ describe('Supervisor TUI pointer', () => {
     expect(canvas.mouseEnabled).toBe(true)
     expect(write).toHaveBeenCalledTimes(1)
     expect(write.mock.calls[0]![0]).toContain('\u001b[?1049h')
-    expect(write.mock.calls[0]![0]).toContain('\u001b[48;2;21;23;24m\u001b[2J')
+    expect(write.mock.calls[0]![0]).toContain(`${supervisorTuiBaseStyle()}\u001b[2J`)
     expect(write.mock.calls[0]![0]).toContain('\u001b[?1006h')
     canvas.stop()
     canvas.stop()
@@ -57,7 +58,7 @@ describe('Supervisor TUI pointer', () => {
       TERM: 'xterm-256color', OPENALICE_TUI_DARK_CANVAS: '0',
     })
     lightCanvas.start()
-    expect(lightCanvasWrite.mock.calls[0]![0]).not.toContain('\u001b[48;2;21;23;24m')
+    expect(lightCanvasWrite.mock.calls[0]![0]).not.toContain(supervisorTuiBaseStyle())
     lightCanvas.stop()
   })
 })

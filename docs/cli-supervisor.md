@@ -120,6 +120,14 @@ blank space and style resets cannot expose the host palette. `NO_COLOR`,
 decorative color without removing state text;
 `OPENALICE_TUI_DARK_CANVAS=0` keeps decorative color but lets the host own the
 background;
+All color-capable rendering consumes the semantic palette in
+`supervisor-tui-palette.ts`. It is the single owner for canvas, default text,
+muted text, brand accents, lifecycle states, selections, rails, actions, and
+the Command Spine. The frame shader establishes both the canvas and default
+text color before it applies those semantic roles, so unclassified copy never
+inherits an unreadable host foreground. Palette contrast tests keep every text
+and surface pairing at or above 4.5:1; renderers should add or reuse a semantic
+token instead of embedding an ANSI RGB literal;
 the default start view adapts to connectivity: a stopped Runtime or startup
 without a reachable target opens the Machine → AliceProject → Runtime Launcher,
 while a reachable target

@@ -4293,6 +4293,30 @@ already large `supervisor-tui.ts` application controller.
   passes 668 tests and CLI typecheck/build passes. Maintainer acceptance remains
   pending on this branch.
 
+### Unified TUI palette and base-foreground decision
+
+- A real light-host Launcher capture after the dark-canvas increment exposed
+  ordinary Machine, AliceProject, and Briefing copy as nearly black on the new
+  dark surface. Those strings were never assigned a TUI foreground; they had
+  inherited the light terminal's black default, while the first canvas change
+  established only a background. Per-string repairs would preserve that hidden
+  dependency and make every new surface vulnerable to the same failure.
+- `supervisor-tui-palette.ts` now owns typed RGB tokens for canvas, default text,
+  muted and brand accents, lifecycle states, selection, navigation, actions,
+  rails, and the Command Spine. It is also the only production module that
+  constructs RGB ANSI sequences. The theme and alternate-screen lifecycle
+  consume its shared base style, and each rendered row begins with explicit
+  default text plus canvas colors before semantic styling is layered on top.
+- Automated palette tests enforce at least 4.5:1 contrast for default, muted,
+  semantic, selected, rail, action, dock, and animated-brand foregrounds against
+  their owned backgrounds. A fresh white-host 120x32 real-PTY capture verifies
+  that every ordinary Launcher row remains legible while the stable Briefing
+  anchor and full-width selection behavior remain intact. Focused palette,
+  pointer, Fleet, screen, and Flight Recorder coverage passes 148 tests; the
+  complete CLI suite passes 698 tests and CLI typecheck/build passes. Production
+  TUI modules contain no embedded RGB ANSI literal outside the palette builder.
+  Maintainer acceptance remains pending on this branch.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

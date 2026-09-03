@@ -4,6 +4,8 @@
  * copies of this module.
  */
 
+import { supervisorTuiBaseStyle } from './supervisor-tui-palette.ts'
+
 export interface SupervisorPointerEvent {
   button: number
   col: number
@@ -30,7 +32,7 @@ const ALT_SCREEN_ENTER = '\u001b[?1049h'
 const ALT_SCREEN_EXIT = '\u001b[?1049l'
 const CLEAR_SCREEN = '\u001b[2J\u001b[H'
 const RESET_STYLE = '\u001b[0m'
-const DARK_CANVAS = '\u001b[48;2;21;23;24m'
+const DARK_CANVAS_STYLE = supervisorTuiBaseStyle()
 const MOUSE_TRACKING_ON = '\u001b[?1000h\u001b[?1003h\u001b[?1006h'
 const MOUSE_TRACKING_OFF = '\u001b[?1006l\u001b[?1003l\u001b[?1000l'
 
@@ -71,7 +73,7 @@ export function createSupervisorTerminalCanvas(
     start(): void {
       if (active || !alternateScreen) return
       active = true
-      output.write?.(`${ALT_SCREEN_ENTER}${darkCanvas ? DARK_CANVAS : ''}${CLEAR_SCREEN}${mouseEnabled ? MOUSE_TRACKING_ON : ''}`)
+      output.write?.(`${ALT_SCREEN_ENTER}${darkCanvas ? DARK_CANVAS_STYLE : ''}${CLEAR_SCREEN}${mouseEnabled ? MOUSE_TRACKING_ON : ''}`)
     },
     stop(): void {
       if (!active) return

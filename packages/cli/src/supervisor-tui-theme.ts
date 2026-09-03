@@ -1,8 +1,16 @@
 import { displayWidth } from './supervisor-display.ts'
+import {
+  SUPERVISOR_TUI_PALETTE,
+  supervisorTuiAnsiStyle,
+  supervisorTuiBaseStyle,
+  type SupervisorTuiPalette,
+  type SupervisorTuiRgb,
+} from './supervisor-tui-palette.ts'
 
 export interface SupervisorTuiTheme {
   enabled: boolean
   darkCanvas: boolean
+  palette: SupervisorTuiPalette
   accent(value: string): string
   accentStrong(value: string): string
   muted(value: string): string
@@ -41,15 +49,6 @@ export interface SupervisorFrameStyleOptions {
 }
 
 const RESET = '\u001b[0m'
-const DARK_CANVAS = '\u001b[48;2;21;23;24m'
-const BRAND_SWEEP = [
-  '116;235;226',
-  '92;220;211',
-  '111;198;255',
-  '168;166;255',
-  '226;156;255',
-  '255;164;210',
-] as const
 
 export const SUPERVISOR_BRAND_MARK_ROWS = [
   '▄▀▄ █   ▀█▀ ▄▀▀ █▀▀',
@@ -63,46 +62,52 @@ export function createSupervisorTuiTheme(
   const enabled = env['NO_COLOR'] === undefined
     && env['TERM'] !== 'dumb'
     && env['OPENALICE_TUI_COLOR'] !== '0'
+  const palette = SUPERVISOR_TUI_PALETTE
   const darkCanvas = enabled && env['OPENALICE_TUI_DARK_CANVAS'] !== '0'
-  const closeStyle = `${RESET}${darkCanvas ? DARK_CANVAS : ''}`
-  const style = (open: string) => (value: string): string => enabled
-    ? `${darkCanvas ? DARK_CANVAS : ''}${open}${value}${closeStyle}`
+  const baseStyle = supervisorTuiBaseStyle(palette)
+  const closeStyle = `${RESET}${darkCanvas ? baseStyle : ''}`
+  const style = (
+    foreground: SupervisorTuiRgb,
+    options: { bold?: boolean, background?: SupervisorTuiRgb } = {},
+  ) => (value: string): string => enabled
+    ? `${darkCanvas ? baseStyle : ''}${supervisorTuiAnsiStyle(foreground, options)}${value}${closeStyle}`
     : value
   const brand = (value: string, frame?: number): string => {
     if (!enabled) return value
-    if (frame === undefined) return `${darkCanvas ? DARK_CANVAS : ''}\u001b[1;38;2;116;235;226m${value}${closeStyle}`
-    return `${darkCanvas ? DARK_CANVAS : ''}${[...value].map((character, index) => {
-      const color = BRAND_SWEEP[(index + frame) % BRAND_SWEEP.length]!
-      return `\u001b[1;38;2;${color}m${character}`
+    if (frame === undefined) return `${darkCanvas ? baseStyle : ''}${supervisorTuiAnsiStyle(palette.accentStrong, { bold: true })}${value}${closeStyle}`
+    return `${darkCanvas ? baseStyle : ''}${[...value].map((character, index) => {
+      const color = palette.brandSweep[(index + frame) % palette.brandSweep.length]!
+      return `${supervisorTuiAnsiStyle(color, { bold: true })}${character}`
     }).join('')}${closeStyle}`
   }
   return {
     enabled,
     darkCanvas,
-    accent: style('\u001b[38;2;92;220;211m'),
-    accentStrong: style('\u001b[1;38;2;116;235;226m'),
-    muted: style('\u001b[38;2;116;132;153m'),
-    success: style('\u001b[38;2;89;214;145m'),
-    warning: style('\u001b[38;2;245;190;83m'),
-    danger: style('\u001b[38;2;255;107;129m'),
-    selected: style('\u001b[1;38;2;230;255;252;48;2;24;64;69m'),
+    palette,
+    accent: style(palette.accent),
+    accentStrong: style(palette.accentStrong, { bold: true }),
+    muted: style(palette.muted),
+    success: style(palette.success),
+    warning: style(palette.warning),
+    danger: style(palette.danger),
+    selected: style(palette.selectedText, { bold: true, background: palette.selectedCanvas }),
     brand,
-    busyRail: style('\u001b[1;38;2;183;255;248;48;2;12;42;45m'),
-    infoRail: style('\u001b[38;2;189;229;255;48;2;17;35;52m'),
-    successRail: style('\u001b[1;38;2;170;255;207;48;2;13;45;31m'),
-    warningRail: style('\u001b[1;38;2;255;222;151;48;2;54;40;16m'),
-    dangerRail: style('\u001b[1;38;2;255;190;201;48;2;55;20;31m'),
-    navigationRail: style('\u001b[38;2;162;190;198;48;2;11;28;34m'),
-    navigationHover: style('\u001b[1;38;2;203;250;246;48;2;19;49;55m'),
-    actionRail: style('\u001b[38;2;173;202;208;48;2;13;31;38m'),
-    actionPrimary: style('\u001b[1;38;2;183;255;248;48;2;18;54;59m'),
-    dockRail: style('\u001b[38;2;199;235;239;48;2;10;34;39m'),
-    dockControl: style('\u001b[1;38;2;183;255;248;48;2;10;34;39m'),
-    dockIdentity: style('\u001b[1;38;2;240;249;255;48;2;10;34;39m'),
-    dockSuccess: style('\u001b[1;38;2;145;242;187;48;2;10;34;39m'),
-    dockWarning: style('\u001b[1;38;2;255;214;128;48;2;10;34;39m'),
-    dockDanger: style('\u001b[1;38;2;255;151;169;48;2;10;34;39m'),
-    dockPanel: style('\u001b[1;38;2;213;179;255;48;2;10;34;39m'),
+    busyRail: style(palette.busyText, { bold: true, background: palette.busyCanvas }),
+    infoRail: style(palette.infoText, { background: palette.infoCanvas }),
+    successRail: style(palette.successRailText, { bold: true, background: palette.successRailCanvas }),
+    warningRail: style(palette.warningRailText, { bold: true, background: palette.warningRailCanvas }),
+    dangerRail: style(palette.dangerRailText, { bold: true, background: palette.dangerRailCanvas }),
+    navigationRail: style(palette.navigationText, { background: palette.navigationCanvas }),
+    navigationHover: style(palette.navigationHoverText, { bold: true, background: palette.navigationHoverCanvas }),
+    actionRail: style(palette.actionText, { background: palette.actionCanvas }),
+    actionPrimary: style(palette.actionPrimaryText, { bold: true, background: palette.actionPrimaryCanvas }),
+    dockRail: style(palette.dockText, { background: palette.dockCanvas }),
+    dockControl: style(palette.dockControl, { bold: true, background: palette.dockCanvas }),
+    dockIdentity: style(palette.dockIdentity, { bold: true, background: palette.dockCanvas }),
+    dockSuccess: style(palette.dockSuccess, { bold: true, background: palette.dockCanvas }),
+    dockWarning: style(palette.dockWarning, { bold: true, background: palette.dockCanvas }),
+    dockDanger: style(palette.dockDanger, { bold: true, background: palette.dockCanvas }),
+    dockPanel: style(palette.dockPanel, { bold: true, background: palette.dockCanvas }),
   }
 }
 
@@ -298,9 +303,10 @@ export function decorateSupervisorFrame(
     return line
   })
   if (!theme.darkCanvas) return decorated
+  const baseStyle = supervisorTuiBaseStyle(theme.palette)
   return decorated.map((line, index) => {
     const padding = ' '.repeat(Math.max(0, canvasWidth - displayWidth(lines[index] ?? '')))
-    return `${DARK_CANVAS}${line}${padding}${RESET}`
+    return `${baseStyle}${line}${padding}${RESET}`
   })
 }
 

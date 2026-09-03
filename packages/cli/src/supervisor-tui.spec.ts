@@ -15,6 +15,7 @@ import {
   decorateSupervisorFramedHeaders,
   decorateSupervisorFrame,
 } from './supervisor-tui-theme.ts'
+import { supervisorTuiBaseStyle } from './supervisor-tui-palette.ts'
 import {
   anchorSupervisorControlConsole,
   renderSupervisorCommandBar,
@@ -3189,8 +3190,9 @@ describe('Supervisor TUI screen', () => {
       expect(right).not.toContain('\u001b[')
       expect(decorated.replace(/\u001b\[[0-9;]*m/gu, '')).toBe(line)
     }
+    const baseStyle = supervisorTuiBaseStyle()
     expect(decorateSupervisorFramedColumns(selected, theme))
-      .toContain('│\u001b[48;2;21;23;24m\u001b[1;38;2;230;255;252;48;2;24;64;69m ')
+      .toContain(`│${baseStyle}\u001b[1;38;2;230;255;252;48;2;24;64;69m `)
 
     expect(decorateSupervisorFramedColumns(
       selected,
@@ -3214,6 +3216,7 @@ describe('Supervisor TUI screen', () => {
 
   it('keeps wide split-pane focus scoped while Home remains one unified stage', () => {
     const theme = createSupervisorTuiTheme({ TERM: 'xterm-256color' })
+    const baseStyle = supervisorTuiBaseStyle()
     const selectedEscape = '\u001b[1;38;2;230;255;252;48;2;24;64;69m'
     const columnsFor = (line: string) => line.split(/(?<=│) {3}(?=│)/u)
     const plain = (line: string) => line.replace(/\u001b\[[0-9;]*m/gu, '')
@@ -3222,7 +3225,7 @@ describe('Supervisor TUI screen', () => {
       expect(row).toBeDefined()
       const [owner, inspector] = columnsFor(row!)
       expect(owner).toContain(escape)
-      expect(inspector.replaceAll('\u001b[48;2;21;23;24m', '').replaceAll('\u001b[0m', ''))
+      expect(inspector.replaceAll(baseStyle, '').replaceAll('\u001b[0m', ''))
         .not.toContain('\u001b[')
     }
 
@@ -3249,7 +3252,7 @@ describe('Supervisor TUI screen', () => {
     expect(plain(fleetColumns[1]!)).toContain('◁ Default AliceProject')
     expect(fleetColumns[1]).toContain('\u001b[1;38;2;116;235;226m')
     expect(fleetColumns[1]).not.toContain('48;2;24;64;69m')
-    expect(fleetRow).toContain('\u001b[0m\u001b[48;2;21;23;24m│   │ ')
+    expect(fleetRow).toContain(`\u001b[0m${baseStyle}│   │ `)
 
     const logs = new SupervisorScreen({
       version: 'dev',
