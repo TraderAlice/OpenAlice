@@ -22,6 +22,13 @@ import '../../contract-ext.js'
 let broker: IBroker | null = null
 let marketOpen = false
 
+function requiredOrderId(order: { orderId?: string }): string {
+  if (!order.orderId) {
+    throw new Error('IBKR returned an open order without an orderId; cleanup cannot continue safely')
+  }
+  return order.orderId
+}
+
 beforeAll(async () => {
   const all = await getTestAccounts()
   const ibkr = filterByProvider(all, 'ibkr')[0]
@@ -134,7 +141,7 @@ describe('IbkrBroker — canonical conId routing', () => {
 
     const positionsBefore = await broker!.getPositions()
     const ordersBefore = await broker!.getOpenOrders!()
-    const baselineOrderIds = new Set(ordersBefore.map(order => order.orderId))
+    const baselineOrderIds = new Set(ordersBefore.map(requiredOrderId))
     const baselinePositions = positionsBefore
       .map(position => `${position.contract.conId}|${position.contract.localSymbol}|${position.side}|${position.quantity}`)
       .sort()
@@ -180,15 +187,17 @@ describe('IbkrBroker — canonical conId routing', () => {
       // whatIf should never become an open order. If venue behavior changes,
       // cancel any order introduced by this test before asserting the baseline.
       const afterAttempt = await broker!.getOpenOrders!()
-      const introduced = afterAttempt.filter(order => !baselineOrderIds.has(order.orderId))
-      for (const open of introduced) await broker!.cancelOrder(open.orderId)
+      for (const open of afterAttempt) {
+        const orderId = requiredOrderId(open)
+        if (!baselineOrderIds.has(orderId)) await broker!.cancelOrder(orderId)
+      }
 
       const positionsAfter = await broker!.getPositions()
       const ordersAfter = await broker!.getOpenOrders!()
       const finalPositions = positionsAfter
         .map(position => `${position.contract.conId}|${position.contract.localSymbol}|${position.side}|${position.quantity}`)
         .sort()
-      const finalOrderIds = ordersAfter.map(order => order.orderId).sort()
+      const finalOrderIds = ordersAfter.map(requiredOrderId).sort()
       const matchesBaseline =
         JSON.stringify(finalPositions) === JSON.stringify(baselinePositions) &&
         JSON.stringify(finalOrderIds) === JSON.stringify([...baselineOrderIds].sort())
@@ -299,7 +308,7 @@ describe('IbkrBroker — fill + position (market hours)', () => {
     const positionsBefore = await broker!.getPositions()
     const initialQty = positionsBefore.find(position => position.contract.symbol === 'AAPL')?.quantity ?? new Decimal(0)
     const ordersBefore = await broker!.getOpenOrders!()
-    const baselineOrderIds = new Set(ordersBefore.map(open => open.orderId))
+    const baselineOrderIds = new Set(ordersBefore.map(requiredOrderId))
     let entryOrderId: string | undefined
 
     const currentAaplQty = async (): Promise<Decimal> => {
@@ -334,8 +343,9 @@ describe('IbkrBroker — fill + position (market hours)', () => {
       expect(detail).not.toBeNull()
     } finally {
       const openAfterAttempt = await broker!.getOpenOrders!()
-      for (const open of openAfterAttempt.filter(order => !baselineOrderIds.has(order.orderId))) {
-        await broker!.cancelOrder(open.orderId)
+      for (const open of openAfterAttempt) {
+        const orderId = requiredOrderId(open)
+        if (!baselineOrderIds.has(orderId)) await broker!.cancelOrder(orderId)
       }
 
       // Cancel first, then close only the filled delta introduced by this test.
@@ -350,7 +360,7 @@ describe('IbkrBroker — fill + position (market hours)', () => {
 
       const cleanedQty = await waitForQty(initialQty)
       expect(cleanedQty.equals(initialQty)).toBe(true)
-      const finalOrderIds = (await broker!.getOpenOrders!()).map(open => open.orderId).sort()
+      const finalOrderIds = (await broker!.getOpenOrders!()).map(requiredOrderId).sort()
       expect(finalOrderIds).toEqual([...baselineOrderIds].sort())
     }
   }, 60_000)
