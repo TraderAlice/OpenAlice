@@ -618,10 +618,10 @@ Add as touched:
 
 ```bash
 pnpm -F @traderalice/openalice-cli test
-pnpm test:guardian-recovery
-pnpm test:install:docker
-pnpm test:install:dev-channel
-pnpm test:remote:docker
+pnpm test:system:guardian
+pnpm test:system:installer
+pnpm test:system:installer:dev
+pnpm test:system:remote
 pnpm docker:smoke
 cd ui && npx tsc -b
 pnpm electron:smoke:workspace

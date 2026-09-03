@@ -605,9 +605,10 @@ contract without growing the journal into a report archive.
 harness consumes only `notification.received` events and runs them through a
 fake adapter; recorded success/failure events are evidence and are never
 mistaken for new inputs. The real process smoke also waits for its accepted
-notification to appear in the journal. Run `pnpm test:connector-replay` for the
-offline fixture lane and `pnpm test:connector-service` after building the
-service for the real-process/journal lane.
+notification to appear in the journal. Run
+`pnpm test:contract:connector-replay` for the offline fixture lane and
+`pnpm test:system:connector` after building the service for the
+real-process/journal lane.
 
 ### Layer 2: opt-in web DM confirmation
 

@@ -1277,7 +1277,7 @@ following arguments are passed through to the same command surface:
 pnpm cli
 pnpm cli status --json
 pnpm cli doctor
-pnpm test:cli
+pnpm -F @traderalice/openalice-cli test
 ```
 
 This source entry does not install or copy a CLI payload. When `pnpm dev`
@@ -1299,14 +1299,14 @@ action gating, and confirmed update install dispatch.
 For launcher ownership, takeover, or existing-owner browser handoff:
 
 ```bash
-pnpm test:guardian-recovery
+pnpm test:system:guardian
 pnpm electron:smoke:existing-owner
 ```
 
 For a distributed payload change:
 
 ```bash
-pnpm test:install:docker
+pnpm test:system:installer
 ```
 
 Manually use an isolated home and unused port to walk:

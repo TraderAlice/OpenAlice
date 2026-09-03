@@ -525,7 +525,7 @@ For installer changes run:
 ```bash
 bash -n install
 pnpm exec vitest run packages/cli/src/install.spec.mjs
-pnpm test:install:docker
+pnpm test:system:installer
 npx tsc --noEmit
 pnpm test
 ```
@@ -533,7 +533,7 @@ pnpm test
 For a volume-backed Railway bootstrap or managed cross-target change, also run:
 
 ```bash
-pnpm test:railway:local
+pnpm test:system:railway
 pnpm exec vitest run \
   packages/cli/src/remote.spec.mjs \
   packages/cli/src/project-transfer.spec.ts \
@@ -556,7 +556,12 @@ in [[plans/bun-cli-distribution.md]].
 The Docker smoke uses a clean non-root Debian host with Node, npm, pnpm, Bun,
 and Agent Runtimes absent. It verifies plan, consent, native installation,
 dynamic launchers, update activation, retention, PATH, and lock cleanup. Use
-`pnpm test:install:docker -- --interactive` for the manual prompt playground.
+`pnpm test:system:installer -- --interactive` for the manual prompt playground.
+
+Use `pnpm test:system:installer:dev` only for the published dev-channel path.
+It downloads the current network installer and requires both network access and
+an activated dev candidate; it is not part of the hermetic or checkout-only
+installer gate.
 
 Before promotion also:
 
