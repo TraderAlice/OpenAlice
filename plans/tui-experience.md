@@ -3983,6 +3983,29 @@ already large `supervisor-tui.ts` application controller.
   147 tests, the complete CLI suite passes 658 tests, and CLI typecheck/build
   passes. Maintainer acceptance remains pending on this branch.
 
+### Content-owned Help and Doctor cluster decision
+
+- Fresh 120x48 captures showed the fixed three-topic Help console and a one-
+  check Doctor occupying only the upper quarter while their Command Spines sat
+  at the terminal edge. Neither surface had enough content to justify the gap:
+  Help is a bounded reference, and the Doctor report had no scrollable result
+  set.
+- Help now always keeps console, contextual Tip, and Command Spine in one
+  content-flow cluster. Doctor does the same while its report fits the natural
+  capacity for the current width: ten checks wide, five ordinary, four narrow.
+  Reports beyond that capacity retain the viewport-anchored Spine so selection,
+  rail drag, and scrolling stay spatially stable. The open Command Dock remains
+  bottom-anchored.
+- Real 120x48, 120x32, 80x24, and 46x16 PTY captures verify the wide Help
+  inspector, compact Help stack, emergency Control Guide, wide Doctor split,
+  compact Doctor stack, and emergency Doctor action path. Screen coverage locks
+  both bounded cluster positions across resize and confirms an eleven-check
+  Doctor restores bottom anchoring. Help selection/Close, Doctor Rerun, keyboard,
+  pointer, and read-only diagnostic ownership are unchanged. The focused
+  screen/PTY closure passes 147 tests, the complete CLI suite passes 658 tests,
+  and CLI typecheck/build passes. Maintainer acceptance remains pending on this
+  branch.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

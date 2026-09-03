@@ -381,7 +381,9 @@ intentionally parameter-free:
   selected-check path: result, cause, repair guidance, position, and Rerun. The
   selected failure or warning remains first, arrows/wheel retain selection, and
   Mission Header, navigation, contextual read-only Tip, and Command Spine stay
-  visible. Their
+  visible. Empty and naturally bounded Doctor reports keep checks, inspection,
+  Tip, and Spine in one content-flow cluster; reports beyond the current width's
+  natural capacity restore the viewport-anchored Spine for stable scrolling. Their
   contextual Tips state the same empty contract;
 - at 100 columns and wider, Home's single Alice Session Board uses a bounded
   OMP-style two-column composition instead of stretching with every surplus
@@ -500,7 +502,9 @@ intentionally parameter-free:
   and Close Help remain visible together with Mission Header, navigation,
   contextual Tip, and Command Spine. Full descriptions and long-tail key routes
   return automatically above that emergency threshold and remain searchable
-  through `/` Commands.
+  through `/` Commands. The Help console, Tip, and Command Spine form one
+  content-flow cluster at every width, with surplus height after the complete
+  reference workspace.
   Arrow/Home/End keys, wheel movement, and whole-row pointer hover/click share
   one selection. Keycaps in the inspector remain direct command targets rather
   than enlarging the system-selection hit area. Ordinary Help owns a final

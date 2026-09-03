@@ -5123,6 +5123,9 @@ export class SupervisorScreen implements Component {
       && this.snapshot.activeTarget != null
       && this.snapshot.fleet != null
       && supervisorFleetHasSingleLaunchTarget(this.snapshot.fleet)
+    const doctorNaturalCapacity = width >= 100 ? 10 : width < 60 ? 4 : 5
+    const boundedDoctor = this.snapshot.panel === 'doctor'
+      && (this.snapshot.doctor?.checks?.length ?? 0) <= doctorNaturalCapacity
     const launcherMachine = launcherTarget
       ? selectedFleetMachine(this.snapshot.fleet)
       : undefined
@@ -5163,6 +5166,8 @@ export class SupervisorScreen implements Component {
       this.snapshot.panel === 'overview'
       || this.snapshot.panel === 'inbox'
       || (this.snapshot.panel === 'logs' && (this.snapshot.logs?.entries?.length ?? 0) === 0)
+      || this.snapshot.panel === 'help'
+      || boundedDoctor
       || directLauncherTarget
       || directConnectionTarget
     )

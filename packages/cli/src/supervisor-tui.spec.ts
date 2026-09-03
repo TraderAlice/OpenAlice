@@ -665,6 +665,7 @@ describe('Supervisor TUI screen', () => {
   })
 
   it('keeps a task-led Control Guide and application chrome visible at 46x16', () => {
+    let viewportHeight = 16
     const runtime = { class: 'running', endpoints: { web: 'http://127.0.0.1:2026' } }
     const screen = new SupervisorScreen({
       version: 'dev',
@@ -683,7 +684,7 @@ describe('Supervisor TUI screen', () => {
         runtime,
       },
     }, {
-      getViewportHeight: () => 16,
+      getViewportHeight: () => viewportHeight,
       motionEnabled: false,
     })
 
@@ -701,6 +702,16 @@ describe('Supervisor TUI screen', () => {
     expect(frame).toContain('◇  Tip:')
     expect(frame).toContain('[ / ] Commands')
 
+    viewportHeight = 32
+    const wide = screen.render(120)
+    const wideTipRow = wide.findIndex((line) => line.startsWith('◇  Tip:'))
+    const wideSpineRow = wide.findIndex((line) => line.includes('[ / ] Commands'))
+    expect(wide).toHaveLength(32)
+    expect(wideSpineRow).toBe(wideTipRow + 2)
+    expect(wide.slice(wideSpineRow + 1).every((line) => line === '')).toBe(true)
+
+    viewportHeight = 16
+    screen.render(46)
     const runtimeRow = lines.findIndex((line) => line.includes('Runtime  Read state')) + 1
     expect(screen.handlePointer(pointerClick(20, runtimeRow))).toBe(true)
     expect(screen.render(46).join('\n')).toContain('Control Guide · 2/3 · RUNTIME')
@@ -1748,7 +1759,10 @@ describe('Supervisor TUI screen', () => {
     screen.update({ panel: 'doctor' })
     const emptyDoctor = screen.render(120)
     expect(emptyDoctor.join('\n')).toContain('◆ [ d ] Rerun Runtime Doctor')
-    expect(emptyDoctor.at(-1)).toContain('[ / ] Commands')
+    const doctorTipRow = emptyDoctor.findIndex((line) => line.startsWith('◇  Tip:'))
+    const doctorSpineRow = emptyDoctor.findIndex((line) => line.includes('[ / ] Commands'))
+    expect(doctorSpineRow).toBe(doctorTipRow + 2)
+    expect(emptyDoctor.slice(doctorSpineRow + 1).every((line) => line === '')).toBe(true)
     expect(emptyDoctor.join('\n')).toContain('No diagnostic checks in this report')
     expect(emptyDoctor[1]).not.toContain('Doctor✓')
 
@@ -1761,8 +1775,22 @@ describe('Supervisor TUI screen', () => {
         checks: [{ status: 'pass', summary: 'Runtime reachable' }],
       },
     })
-    expect(screen.render(120).join('\n')).toContain('Doctor checks')
+    const boundedDoctor = screen.render(120)
+    expect(boundedDoctor.join('\n')).toContain('Doctor checks')
+    expect(boundedDoctor.findIndex((line) => line.includes('[ / ] Commands')))
+      .toBe(boundedDoctor.findIndex((line) => line.startsWith('◇  Tip:')) + 2)
     expect(screen.render(120)[1]).not.toContain('Doctor')
+
+    screen.update({
+      doctor: {
+        overall: 'pass',
+        checks: Array.from({ length: 11 }, (_, index) => ({
+          status: 'pass' as const,
+          summary: `Check ${index + 1}`,
+        })),
+      },
+    })
+    expect(screen.render(120).at(-1)).toContain('[ / ] Commands')
   })
 
   it('keeps the narrow Command Spine closed while Commands and Close remain clickable', () => {
@@ -2458,8 +2486,10 @@ describe('Supervisor TUI screen', () => {
     const standbyDoctor = doctorScreen.render(120).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, ''))
     expect(standbyDoctor).toHaveLength(32)
     expect(standbyDoctor.join('\n')).toContain('◆ [ d ] Run Runtime Doctor')
-    expect(standbyDoctor.at(-2)).toBe('')
-    expect(standbyDoctor.at(-1)).toContain('[ / ] Commands')
+    const standbyTipRow = standbyDoctor.findIndex((line) => line.startsWith('◇  Tip:'))
+    const standbySpineRow = standbyDoctor.findIndex((line) => line.includes('[ / ] Commands'))
+    expect(standbySpineRow).toBe(standbyTipRow + 2)
+    expect(standbyDoctor.slice(standbySpineRow + 1).every((line) => line === '')).toBe(true)
   })
 
   it('scrubs Logs, Doctor, and Fleet rails without activating operations', () => {
