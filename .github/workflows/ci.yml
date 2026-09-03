@@ -53,7 +53,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Verify CI workflow contracts
-        run: pnpm test:workflow-contracts
+        run: pnpm test:contract:workflow
 
       - name: Typecheck root workspace
         run: npx tsc --noEmit
@@ -114,7 +114,7 @@ jobs:
         run: pnpm test
 
       - name: Run local Railway lifecycle system suite
-        run: pnpm test:railway:local
+        run: pnpm test:system:railway
         timeout-minutes: 5
 
   cross-platform-test:
@@ -186,9 +186,9 @@ jobs:
       - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
 
       - name: Exercise Guardian recovery with real child processes
-        run: pnpm test:guardian-recovery
+        run: pnpm test:system:guardian
         timeout-minutes: 3
 
       - name: Boot the complete development stack
-        run: pnpm test:smoke
+        run: pnpm test:system:dev-stack
         timeout-minutes: 8

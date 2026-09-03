@@ -95,12 +95,12 @@ describe('CI workflow authority lanes', () => {
 
     expect(commands(cleanBuild)).toEqual([
       'pnpm install --frozen-lockfile',
-      'pnpm test:workflow-contracts',
+      'pnpm test:contract:workflow',
       'pnpm build',
     ])
     expect(commands(cleanBuild)).not.toContain('npx tsc --noEmit')
     expect(commands(cleanBuild)).not.toContain('pnpm test')
-    expect(commands(cleanBuild)).not.toContain('pnpm test:railway:local')
+    expect(commands(cleanBuild)).not.toContain('pnpm test:system:railway')
     expect(cleanBuild.strategy).toBeUndefined()
     expect(cleanBuild['timeout-minutes']).toBe(15)
   })
@@ -118,7 +118,7 @@ describe('CI workflow authority lanes', () => {
       .toContain("steps.beta-release-prep.outcome == 'success'")
     expect(commands(sourceContracts)).toEqual(expect.arrayContaining([
       'pnpm install --frozen-lockfile',
-      'pnpm test:workflow-contracts',
+      'pnpm test:contract:workflow',
       'npx tsc --noEmit',
     ]))
     expect(commands(sourceContracts)).not.toContain('pnpm build')
@@ -138,7 +138,7 @@ describe('CI workflow authority lanes', () => {
     expect(commands(workspaceBuild)).toContain('pnpm build')
     expect(commands(workspaceBuild)).not.toContain('pnpm test')
     expect(commands(tests)).toContain('pnpm test')
-    expect(commands(tests)).toContain('pnpm test:railway:local')
+    expect(commands(tests)).toContain('pnpm test:system:railway')
     expect(commands(tests)).not.toContain('pnpm build')
 
     expect(crossPlatform.strategy?.matrix?.os).toEqual(['macos-14', 'windows-latest'])
@@ -147,8 +147,8 @@ describe('CI workflow authority lanes', () => {
     expect(crossPlatform['timeout-minutes']).toBe(30)
 
     expect(devSmoke.strategy?.matrix?.os).toEqual(['windows-latest', 'ubuntu-latest'])
-    expect(commands(devSmoke)).toContain('pnpm test:guardian-recovery')
-    expect(commands(devSmoke)).toContain('pnpm test:smoke')
+    expect(commands(devSmoke)).toContain('pnpm test:system:guardian')
+    expect(commands(devSmoke)).toContain('pnpm test:system:dev-stack')
   })
 
   it('checks out current dev for every scheduled full-validation job', () => {
@@ -160,8 +160,8 @@ describe('CI workflow authority lanes', () => {
 
   it('keeps Railway lifecycle system tests explicit, local, and serialized', () => {
     expect(packageJson.scripts.test).toBe('vitest run')
-    expect(packageJson.scripts['test:railway:local']).toContain('vitest.railway.config.ts')
-    expect(packageJson.scripts['test:platform-contracts']).not.toContain('railway-entrypoint.spec.ts')
+    expect(packageJson.scripts['test:system:railway']).toContain('vitest.railway.config.ts')
+    expect(packageJson.scripts['test:contract:platform']).not.toContain('railway-entrypoint.spec.ts')
     expect(defaultVitestConfig).toContain("'scripts/railway-entrypoint.spec.ts'")
     expect(defaultVitestConfig).toContain("'scripts/railway-fence-pty.spec.ts'")
     expect(railwayVitestConfig).toContain("'scripts/railway-entrypoint.spec.ts'")

@@ -58,7 +58,7 @@ describe('exact beta release-preparation workflow lane', () => {
     expectTrustedClassifier(jobs['source-contracts'])
     expectOutcomeGatedOutput(jobs['source-contracts'])
     expect(step(jobs['source-contracts'], 'Verify CI workflow contracts').run)
-      .toBe('pnpm test:workflow-contracts')
+      .toBe('pnpm test:contract:workflow')
     expect(step(jobs['source-contracts'], 'Typecheck root workspace').run)
       .toBe('npx tsc --noEmit')
     for (const name of [

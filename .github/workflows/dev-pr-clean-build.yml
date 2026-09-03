@@ -29,7 +29,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Verify CI workflow contracts
-        run: pnpm test:workflow-contracts
+        run: pnpm test:contract:workflow
 
       - name: Build complete workspace
         run: pnpm build
