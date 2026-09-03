@@ -53,7 +53,7 @@ function expectOutcomeGatedOutput(job: WorkflowJob): void {
 }
 
 describe('exact beta release-preparation workflow lane', () => {
-  it('keeps trusted source contracts while skipping build, test, and host matrices', () => {
+  it('keeps trusted source contracts while full Linux/macOS validation stays manual', () => {
     const jobs = workflow('ci.yml').jobs
     expectTrustedClassifier(jobs['source-contracts'])
     expectOutcomeGatedOutput(jobs['source-contracts'])
@@ -65,13 +65,15 @@ describe('exact beta release-preparation workflow lane', () => {
       'workspace-build',
       'hermetic-tests',
       'cross-platform-test',
-      'dev-smoke',
     ]) {
       expect(jobs[name].needs).toBe('source-contracts')
       expect(jobs[name].if).toContain('!cancelled()')
-      expect(jobs[name].if).toContain("needs.source-contracts.result != 'success'")
-      expect(jobs[name].if).toContain("beta_release_prep != 'true'")
+      expect(jobs[name].if).toContain("github.event_name == 'workflow_dispatch'")
+      expect(jobs[name].if).toContain("needs.source-contracts.result == 'success'")
     }
+    expect(jobs['dev-smoke'].if).toContain("needs.source-contracts.result == 'success'")
+    expect(jobs['dev-smoke'].if).toContain("github.event_name == 'workflow_dispatch'")
+    expect(jobs['dev-smoke'].if).toContain("beta_release_prep != 'true'")
     expect(jobs['build-and-test']).toBeUndefined()
   })
 

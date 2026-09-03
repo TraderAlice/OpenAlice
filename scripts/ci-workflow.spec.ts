@@ -64,15 +64,15 @@ function step(job: WorkflowJob, name: string): WorkflowStep {
   return found
 }
 
-function expectFullValidationGate(job: WorkflowJob): void {
+function expectManualFullValidationGate(job: WorkflowJob): void {
   expect(job.needs).toBe('source-contracts')
   expect(job.if).toContain('!cancelled()')
-  expect(job.if).toContain("needs.source-contracts.result != 'success'")
-  expect(job.if).toContain("beta_release_prep != 'true'")
+  expect(job.if).toContain("github.event_name == 'workflow_dispatch'")
+  expect(job.if).toContain("needs.source-contracts.result == 'success'")
 }
 
 describe('CI workflow authority lanes', () => {
-  it('gives dev PRs one clean-build workflow and reserves full validation for master/manual/scheduled events', () => {
+  it('gives dev PRs one clean-build workflow and makes full source validation opt-in', () => {
     expect(devPrWorkflow.name).toBe('Dev PR Clean Build')
     expect(devPrWorkflow.on?.pull_request?.branches).toEqual(['dev'])
     expect(devPrWorkflow.on?.push).toBeUndefined()
@@ -82,7 +82,7 @@ describe('CI workflow authority lanes', () => {
     expect(fullWorkflow.name).toBe('Full Source Validation')
     expect(fullWorkflow.on?.pull_request?.branches).toEqual(['master'])
     expect(fullWorkflow.on?.push).toBeUndefined()
-    expect(fullWorkflow.on?.schedule).toEqual([{ cron: '0 19 * * *' }])
+    expect(fullWorkflow.on?.schedule).toBeUndefined()
     expect(fullWorkflow.on).toHaveProperty('workflow_dispatch')
     expect(fullWorkflow.jobs['build-and-test']).toBeUndefined()
     expect(fullWorkflow.jobs['post-merge-dev-smoke']).toBeUndefined()
@@ -122,14 +122,14 @@ describe('CI workflow authority lanes', () => {
     expect(commands(sourceContracts)).not.toContain('pnpm test')
   })
 
-  it('runs complete build, hermetic, host, and native smoke lanes outside exact beta prep', () => {
+  it('runs Linux/macOS full validation only when a maintainer dispatches it', () => {
     const workspaceBuild = fullWorkflow.jobs['workspace-build']
     const tests = fullWorkflow.jobs['hermetic-tests']
     const crossPlatform = fullWorkflow.jobs['cross-platform-test']
     const devSmoke = fullWorkflow.jobs['dev-smoke']
 
-    for (const job of [workspaceBuild, tests, crossPlatform, devSmoke]) {
-      expectFullValidationGate(job)
+    for (const job of [workspaceBuild, tests, crossPlatform]) {
+      expectManualFullValidationGate(job)
     }
 
     expect(commands(workspaceBuild)).toContain('pnpm build')
@@ -142,15 +142,18 @@ describe('CI workflow authority lanes', () => {
     expect(step(crossPlatform, 'Run complete suite').run).toBe('pnpm test')
     expect(crossPlatform['timeout-minutes']).toBe(30)
 
-    expect(devSmoke.strategy?.matrix?.os).toEqual(['windows-latest', 'ubuntu-latest'])
+    expect(devSmoke.strategy).toBeUndefined()
+    expect(devSmoke.if).toContain("needs.source-contracts.result == 'success'")
+    expect(devSmoke.if).toContain("github.event_name == 'workflow_dispatch'")
+    expect(devSmoke.if).toContain("beta_release_prep != 'true'")
     expect(commands(devSmoke)).toContain('pnpm test:system:guardian')
     expect(commands(devSmoke)).toContain('pnpm test:system:dev-stack')
   })
 
-  it('checks out current dev for every scheduled full-validation job', () => {
+  it('validates the selected ref without a hidden scheduled checkout override', () => {
     for (const job of Object.values(fullWorkflow.jobs)) {
       const checkout = job.steps?.find((candidate) => candidate.uses === 'actions/checkout@v7')
-      expect(checkout?.with?.ref).toBe("${{ github.event_name == 'schedule' && 'dev' || '' }}")
+      expect(checkout?.with?.ref).toBeUndefined()
     }
   })
 
