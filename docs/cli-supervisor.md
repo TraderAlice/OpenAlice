@@ -711,10 +711,13 @@ active task's Enter, movement, and Back vocabulary, while the Command Spine
 shows `FOCUS WORKSPACE` and a real Esc exit instead of leaking unavailable
 Overview or Fleet commands. Pointer activation on either Focus Console row is
 routed to the same overlay component that owns keyboard input.
-When the wide stage has enough surplus rows, a read-only Focus Trajectory
-centers the task's existing workflow and mutation boundary in that quiet field.
-It does not claim completion state, expose a hit target, or add another action
-path: Setup projects Inspect/Edit/Validate/Save, Source projects
+When the wide stage has enough surplus rows, a read-only Focus Trajectory docks
+directly above the task-owned Action Shelf. Surplus space stays between the
+primary work surface and this bottom task dock, so progress context and the next
+action read as one control region instead of two unrelated islands. At compact
+heights the trajectory is omitted before it can displace task content. It does
+not claim completion state, expose a hit target, or add another action path:
+Setup projects Inspect/Edit/Validate/Save, Source projects
 Select/Validate/Save/Launch, AliceProjects project Inspect/Select or
 Create/Remember, and Release projects Choose/Probe/Confirm/Install.
 Remote Transfer does not add a second trajectory: its existing eight-stage

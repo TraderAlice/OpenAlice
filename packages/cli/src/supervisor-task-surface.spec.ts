@@ -69,7 +69,7 @@ describe('Supervisor secondary-task surface', () => {
     expect(renderSupervisorTaskSurface(['work'], size)).toEqual(['work'])
   })
 
-  it('centers a truthful task trajectory inside genuine surplus rows', () => {
+  it('docks a truthful task trajectory above the focused action shelf', () => {
     const lines = renderSupervisorTaskSurface(
       Array.from({ length: 12 }, (_, index) => `content ${index + 1}`),
       { width: 120, height: 32 },
@@ -82,6 +82,8 @@ describe('Supervisor secondary-task surface', () => {
     expect(output).toContain('01 SELECT  ━━━  02 VALIDATE  ━━━  03 SAVE  ━━━  04 LAUNCH')
     expect(output).toContain('One verified checkout; launch follows a successful save.')
     expect(output).toContain('Esc returns to the previous Supervisor view.')
+    expect(lines.at(-4)).toContain('◇  FOCUS TRAJECTORY · SOURCE')
+    expect(lines.at(-1)).toContain('Esc returns to the previous Supervisor view.')
     expect(lines.every((line) => displayWidth(line) <= 120)).toBe(true)
     expect(supervisorCommandTargets(lines)).toEqual([])
   })

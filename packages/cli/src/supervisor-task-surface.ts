@@ -69,12 +69,10 @@ export function renderSupervisorTaskSurface(
   if (trajectory.length === 0 || quietRows < trajectory.length + 2) {
     return [...content, ...blankRows(quietRows)]
   }
-  const leading = Math.floor((quietRows - trajectory.length) / 2)
   return [
     ...content,
-    ...blankRows(leading),
+    ...blankRows(quietRows - trajectory.length),
     ...trajectory,
-    ...blankRows(quietRows - leading - trajectory.length),
   ]
 }
 

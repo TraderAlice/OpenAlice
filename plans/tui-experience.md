@@ -4006,6 +4006,28 @@ already large `supervisor-tui.ts` application controller.
   and CLI typecheck/build passes. Maintainer acceptance remains pending on this
   branch.
 
+### Focus task-dock decision
+
+- The real 120x32 Focus Workspace audit exposed three vertical islands: task
+  content at the top, Focus Trajectory near the middle, and the actionable
+  Console at the terminal edge. The centered trajectory consumed quiet space
+  without helping the user connect current progress to the next action.
+- Setup, Source, AliceProjects, and Release now dock their truthful four-line
+  trajectory immediately above the Action Shelf whenever genuine surplus can
+  contain it. The remaining quiet field sits between primary work and the task
+  dock. At the 80x24 baseline the trajectory remains omitted, preserving the
+  complete compact task rather than competing with it. Transfer retains its
+  existing eight-stage Flight Deck and Confirmation retains its centered
+  Decision Gate.
+- Real 120x32 PTY captures verify the dock on Setup, AliceProjects, and Release;
+  real 80x24 captures verify compact omission and uninterrupted Action Shelf
+  geometry. Source uses the same shared task-surface renderer and is covered by
+  the same layout contract. The focused task-surface, screen, and real-PTY
+  closure passes 153 tests, the complete CLI suite passes 658 tests, and CLI
+  typecheck/build passes. Pointer targets, task mutations, Back behavior, and
+  Control Console ownership are unchanged. Maintainer acceptance remains pending
+  on this branch.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and
