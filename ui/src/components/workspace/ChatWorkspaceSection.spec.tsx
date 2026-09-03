@@ -151,14 +151,12 @@ function renderSection(
   workspaceManager: ManagerWorkspaceSnapshot | null = null,
   onNavigate?: () => void,
   displayMode: 'focused' | 'recent' | 'multi' = 'multi',
-  onRequestDisplayMode: (mode: 'focused' | 'recent' | 'multi') => void = () => undefined,
 ) {
   return render(
     <WorkspacesContext.Provider value={workspaceContext(workspaces, workspaceManager)}>
       <ChatWorkspaceSection
         onNavigate={onNavigate}
         displayMode={displayMode}
-        onRequestDisplayMode={onRequestDisplayMode}
       />
     </WorkspacesContext.Provider>,
   )
@@ -196,19 +194,7 @@ describe('ChatWorkspaceSection actions', () => {
     expect(onNavigate).toHaveBeenCalledOnce()
   })
 
-  it('routes the bottom Workspace context menu into the Workspace tree', () => {
-    const onRequestDisplayMode = vi.fn()
-    renderSection([chatWorkspace], null, undefined, 'focused', onRequestDisplayMode)
-
-    fireEvent.click(screen.getByRole('button', { name: 'Chat context: chat-jul11' }))
-    const menu = screen.getByRole('menu', { name: 'Chat Workspace options' })
-    expect(menu.className).toContain('w-60')
-    expect(menu.className).not.toContain('absolute bottom-full')
-    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Workspace tree' }))
-    expect(onRequestDisplayMode).toHaveBeenCalledWith('multi')
-  })
-
-  it('opens a semantic view menu and follows keyboard focus', async () => {
+  it('keeps Current Workspace as the only view and follows keyboard focus', async () => {
     const user = userEvent.setup()
     renderSection([chatWorkspace], null, undefined, 'focused')
 
@@ -217,12 +203,13 @@ describe('ChatWorkspaceSection actions', () => {
     await user.keyboard('{ArrowDown}')
 
     const currentWorkspace = screen.getByRole('menuitemradio', { name: 'Current Workspace' })
-    const recentWorkspaces = screen.getByRole('menuitemradio', { name: 'Recent across Workspaces' })
     expect(currentWorkspace.getAttribute('aria-checked')).toBe('true')
     expect(document.activeElement).toBe(currentWorkspace)
+    expect(screen.queryByRole('menuitemradio', { name: 'Recent across Workspaces' })).toBeNull()
+    expect(screen.queryByRole('menuitemradio', { name: 'Workspace tree' })).toBeNull()
 
     await user.keyboard('{ArrowDown}')
-    expect(document.activeElement).toBe(recentWorkspaces)
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Switch Workspace' }))
 
     await user.keyboard('{Escape}')
     await waitFor(() => expect(document.activeElement).toBe(trigger))
@@ -263,47 +250,6 @@ describe('ChatWorkspaceSection actions', () => {
     expect(document.activeElement).toBe(trigger)
   })
 
-  it('offers an explicit recent view and orders sessions across Workspaces with ownership visible', () => {
-    const olderWorkspace = {
-      ...chatWorkspace,
-      sessions: [{ ...chatSession(1), lastActiveAt: '2026-07-01T12:00:00.000Z' }],
-    }
-    const newerWorkspace: Workspace = {
-      ...chatWorkspace,
-      id: 'chat-2',
-      tag: 'chat-aug3',
-      dir: '/tmp/chat-aug3',
-      createdAt: '2026-08-03T00:00:00.000Z',
-      sessions: [{
-        ...chatSession(2),
-        id: 'newest-session',
-        wsId: 'chat-2',
-        lastActiveAt: '2026-08-03T12:00:00.000Z',
-      }],
-    }
-    const onRequestDisplayMode = vi.fn()
-
-    const { unmount } = renderSection(
-      [olderWorkspace, newerWorkspace],
-      null,
-      undefined,
-      'focused',
-      onRequestDisplayMode,
-    )
-    fireEvent.click(screen.getByRole('button', { name: 'Chat context: chat-aug3' }))
-    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Recent across Workspaces' }))
-    expect(onRequestDisplayMode).toHaveBeenCalledWith('recent')
-    unmount()
-
-    renderSection([olderWorkspace, newerWorkspace], null, undefined, 'recent')
-    const newer = screen.getByRole('button', { name: 'Conversation 2' })
-    const older = screen.getByRole('button', { name: 'Conversation 1' })
-    expect(newer.compareDocumentPosition(older) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(screen.getByText('chat-aug3')).toBeTruthy()
-    expect(screen.getByText('chat-jul11')).toBeTruthy()
-    expect(screen.queryByText('Workspaces', { selector: 'span.uppercase' })).toBeNull()
-  })
-
   it('switches the focused Workspace through a searchable Dialog', () => {
     const alternative = {
       ...chatWorkspace,
@@ -312,8 +258,7 @@ describe('ChatWorkspaceSection actions', () => {
       dir: '/tmp/chat-aug3',
       createdAt: '2026-08-03T00:00:00.000Z',
     }
-    const onRequestDisplayMode = vi.fn()
-    renderSection([chatWorkspace, alternative], null, undefined, 'focused', onRequestDisplayMode)
+    renderSection([chatWorkspace, alternative], null, undefined, 'focused')
 
     fireEvent.click(screen.getByRole('button', { name: 'Chat context: chat-aug3' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Switch Workspace' }))
@@ -328,7 +273,6 @@ describe('ChatWorkspaceSection actions', () => {
       kind: 'chat-landing',
       params: { targetWsId: chatWorkspace.id },
     })
-    expect(onRequestDisplayMode).toHaveBeenCalledWith('focused')
   })
 
   it('keeps conversation creation primary and scopes workspace creation to the workspace list', async () => {
@@ -374,7 +318,7 @@ describe('ChatWorkspaceSection actions', () => {
     })
     expect(onNavigate).toHaveBeenCalledTimes(3)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Chat context: Workspaces' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Chat context: chat-jul11' }))
     expect(screen.getByRole('menuitem', { name: 'New workspace' })).toBeTruthy()
   })
 
@@ -425,7 +369,7 @@ describe('ChatWorkspaceSection actions', () => {
 
     expect(screen.getByText(i18n.t('chat.noChatWorkspacesYet'))).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'New workspace' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Chat context: Workspaces' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Chat context: Current Workspace' }))
     expect(screen.getByRole('menuitem', { name: 'New workspace' })).toBeTruthy()
   })
 
@@ -1100,7 +1044,7 @@ describe('ChatWorkspaceSection actions', () => {
     expect(screen.getAllByText('Issue')).toHaveLength(2)
     expect(screen.getByText('Conversation')).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Chat context: Workspaces' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Chat context: chat-jul11' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Browse all conversations' }))
     const dialog = screen.getByRole('dialog', { name: 'Browse all conversations' })
     const browser = within(dialog)

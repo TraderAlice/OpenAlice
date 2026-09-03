@@ -97,12 +97,11 @@ export function ChatWorkspaceSection({
   onNavigate = () => undefined,
   mode = 'chat',
   displayMode = 'focused',
-  onRequestDisplayMode = () => undefined,
 }: {
   onNavigate?: () => void
   mode?: 'chat' | 'auto-quant' | 'prediction'
+  /** Legacy render variants stay internal while the product shell fixes this to Current Workspace. */
   displayMode?: ChatDisplayMode
-  onRequestDisplayMode?: (mode: ChatDisplayMode) => void
 }): ReactElement | null {
   const { t } = useTranslation()
   const ctx = useWorkspaces()
@@ -521,12 +520,10 @@ export function ChatWorkspaceSection({
         harness={mode}
         workspace={focusedWorkspace}
         workspaces={chatWorkspaces}
-        displayMode={displayMode}
         showManager={mode === 'chat'}
         createWorkspaceLabel={mode === 'auto-quant'
           ? t('autoQuant.newWorkspace')
           : mode === 'prediction' ? t('autoPrediction.newWorkspace') : t('chat.newWorkspace')}
-        onRequestDisplayMode={onRequestDisplayMode}
         onConfigure={() => focusedWorkspace && ctx.openAgentConfig(focusedWorkspace.id)}
         onUpgrade={() => focusedWorkspace && ctx.openAgentConfig(focusedWorkspace.id, undefined, 'template')}
         onOpenWorkspacePicker={openWorkspacePicker}
@@ -545,7 +542,6 @@ export function ChatWorkspaceSection({
         onSelectWorkspace={(workspaceId) => {
           selectHarnessWorkspace(workspaceId, () => {
             setWorkspacePickerOpen(false)
-            onRequestDisplayMode('focused')
             navigate({ kind: landingKind, params: { targetWsId: workspaceId } })
           })
         }}
@@ -614,7 +610,6 @@ export function ChatWorkspaceSection({
           onCreated={(workspace) => {
             ctx.refresh()
             selectHarnessWorkspace(workspace.id, () => {
-              onRequestDisplayMode('focused')
               navigate({ kind: landingKind, params: { targetWsId: workspace.id } })
             })
           }}
@@ -640,10 +635,8 @@ interface ChatWorkspaceContextFooterProps {
   harness: 'chat' | 'auto-quant' | 'prediction'
   workspace: Workspace | null
   workspaces: readonly Workspace[]
-  displayMode: ChatDisplayMode
   showManager: boolean
   createWorkspaceLabel: string
-  onRequestDisplayMode: (mode: ChatDisplayMode) => void
   onConfigure: () => void
   onUpgrade: () => void
   onOpenWorkspacePicker: (restoreFocus: HTMLElement | null) => void
@@ -659,20 +652,7 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
   const pendingActionRef = useRef<(() => void) | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
 
-  const title = props.displayMode === 'focused'
-    ? (props.workspace ? workspaceDisplayName(props.workspace) : t('chat.currentWorkspace'))
-    : props.displayMode === 'recent'
-      ? (props.harness === 'auto-quant'
-          ? t('autoQuant.recentResearch')
-          : props.harness === 'prediction'
-            ? t('autoPrediction.recentResearch')
-            : t('chat.recentConversations'))
-      : t('nav.item.workspaces')
-  const TriggerIcon = props.displayMode === 'recent'
-    ? Clock3
-    : props.displayMode === 'multi'
-      ? PanelsTopLeft
-      : LayoutGrid
+  const title = props.workspace ? workspaceDisplayName(props.workspace) : t('chat.currentWorkspace')
   const upgrade = props.workspace?.upgradeAvailable ?? null
   const upgradeVersion = upgrade?.to.replace(/^v(?=\d)/, '') ?? ''
   const contextLabel = props.harness === 'auto-quant'
@@ -717,10 +697,10 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
             className="oa-pressable text-caption flex min-h-8 w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-muted-foreground hover:bg-muted hover:text-foreground"
           />}
         >
-          <TriggerIcon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          <LayoutGrid className="h-3.5 w-3.5 shrink-0" aria-hidden />
           <span
             className="min-w-0 flex-1 truncate font-medium text-foreground"
-            title={props.displayMode === 'focused' && props.workspace ? workspaceDisplayTitle(props.workspace) : title}
+            title={props.workspace ? workspaceDisplayTitle(props.workspace) : title}
           >
             {title}
           </span>
@@ -737,10 +717,7 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
         >
           <span id={contextMenuLabelId} className="sr-only">{contextMenuLabel}</span>
           <DropdownMenuRadioGroup
-            value={props.displayMode}
-            onValueChange={(value) => {
-              queueAction(() => props.onRequestDisplayMode(value as ChatDisplayMode))
-            }}
+            value="focused"
           >
             <DropdownMenuLabel className="text-micro px-2 py-1 font-medium text-muted-foreground/70">
               {t('chat.view')}
@@ -753,14 +730,6 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
             >
               <LayoutGrid size={14} strokeWidth={2} aria-hidden />
               <span className="min-w-0 flex-1 truncate">{t('chat.currentWorkspace')}</span>
-            </DropdownMenuRadioItem>
-            <DropdownMenuRadioItem value="recent" closeOnClick className={modeItemClass}>
-              <Clock3 size={14} strokeWidth={2} aria-hidden />
-              <span className="min-w-0 flex-1 truncate">{t('chat.recentMode')}</span>
-            </DropdownMenuRadioItem>
-            <DropdownMenuRadioItem value="multi" closeOnClick className={modeItemClass}>
-              <PanelsTopLeft size={14} strokeWidth={2} aria-hidden />
-              <span className="min-w-0 flex-1 truncate">{t('chat.multiMode')}</span>
             </DropdownMenuRadioItem>
           </DropdownMenuRadioGroup>
 

@@ -138,7 +138,7 @@ describe('Ask Alice sidebar in AutoQuant mode', () => {
   it('stacks Harness capabilities as full-width rows', () => {
     render(
       <WorkspacesContext.Provider value={context()}>
-        <ChatWorkspaceSection mode="auto-quant" displayMode="focused" />
+        <ChatWorkspaceSection mode="auto-quant" />
       </WorkspacesContext.Provider>,
     )
 
@@ -155,7 +155,7 @@ describe('Ask Alice sidebar in AutoQuant mode', () => {
     const onNavigate = vi.fn()
     render(
       <WorkspacesContext.Provider value={context()}>
-        <ChatWorkspaceSection mode="auto-quant" displayMode="focused" onNavigate={onNavigate} />
+        <ChatWorkspaceSection mode="auto-quant" onNavigate={onNavigate} />
       </WorkspacesContext.Provider>,
     )
 
