@@ -12,12 +12,18 @@ This directory contains two deliberately separate acceptance layers:
 
 ```bash
 # Safe product/integration E2E. Never submits broker orders.
-pnpm test:e2e
+pnpm test:integration:uta
 
 # Explicit UTA acceptance against configured demo/paper accounts.
 # Verify the accounts first and leave them flat when the suite finishes.
-OPENALICE_UTA_LIVE_PAPER=1 pnpm test:uta:live-paper
+OPENALICE_UTA_LIVE_PAPER=1 pnpm test:live:bybit-paper
 ```
+
+Replace `bybit` with `ibkr`, `okx`, `alpaca`, or `hyperliquid` for another
+provider. The aggregate `pnpm test:live:uta-paper` command is available for a
+deliberate sweep, but it excludes `ccxt-raw-diagnostic.e2e.spec.ts`; that file
+performs a market buy and is only exposed as
+`pnpm test:live:bybit-diagnostic`.
 
 The live-paper tests run sequentially (`fileParallelism: false`) because broker
 APIs and accounts are shared resources. Without the acknowledgement variable,
@@ -29,7 +35,7 @@ the live-paper config exits before collecting tests or initializing a broker.
 |---------|-------|---------|
 | `{broker}.e2e.spec.ts` | Broker API | `alpaca-paper`, `ibkr-paper` — calls `broker.placeOrder()` directly |
 | `uta-{broker}.e2e.spec.ts` | UTA (Trading-as-Git) | `uta-alpaca`, `uta-ibkr` — uses `stagePlaceOrder → commit → push` |
-| `uta-lifecycle.e2e.spec.ts` | UTA + MockBroker | Pure in-memory; ordinary `test:e2e` |
+| `uta-lifecycle.e2e.spec.ts` | UTA + MockBroker | Pure in-memory; ordinary `test:integration:uta` |
 
 ## Precondition Pattern
 

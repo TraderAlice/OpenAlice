@@ -5,7 +5,7 @@
  * - Order lifecycle (any time): limit order stage → commit → push → cancel
  * - Full fill flow (market hours): market order → fill → verify → close
  *
- * Run: OPENALICE_UTA_LIVE_PAPER=1 pnpm test:uta:live-paper
+ * Run: OPENALICE_UTA_LIVE_PAPER=1 pnpm test:live:ibkr-paper
  */
 
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'

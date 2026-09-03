@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url'
 import { resolve, dirname } from 'node:path'
 
-import { deterministicProductE2eIncludes } from './scripts/test-lanes.mjs'
+import { integrationIncludes } from './scripts/test-lanes.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -24,7 +24,8 @@ export default {
     alias: workspaceAliases,
   },
   test: {
-    include: deterministicProductE2eIncludes,
+    include: integrationIncludes,
+    setupFiles: ['./vitest.setup.ts'],
     testTimeout: 60_000,
     fileParallelism: false,
     pool: 'forks',

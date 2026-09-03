@@ -4,7 +4,7 @@
  * Reads Alice's config, picks the first CCXT Bybit account on a
  * sandbox/demoTrading platform. If none configured, entire suite skips.
  *
- * Run: OPENALICE_UTA_LIVE_PAPER=1 pnpm test:uta:live-paper
+ * Run: OPENALICE_UTA_LIVE_PAPER=1 pnpm test:live:bybit-paper
  */
 
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'

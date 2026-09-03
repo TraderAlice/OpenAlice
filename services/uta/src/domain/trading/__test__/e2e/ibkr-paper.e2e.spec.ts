@@ -8,7 +8,7 @@
  *
  * Requires TWS or IB Gateway running with paper trading enabled.
  *
- * Run: OPENALICE_UTA_LIVE_PAPER=1 pnpm test:uta:live-paper
+ * Run: OPENALICE_UTA_LIVE_PAPER=1 pnpm test:live:ibkr-paper
  */
 
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'

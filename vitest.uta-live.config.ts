@@ -11,6 +11,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 
 assertLivePaperAcknowledgement()
 
+// Live-paper acceptance deliberately does not load vitest.setup.ts because it
+// must resolve the verified demo/paper accounts from the real local config.
+
 const workspaceAliases = {
   '@': resolve(__dirname, './src'),
   '@traderalice/guardian-runtime': resolve(__dirname, './packages/guardian-runtime/src/index.ts'),

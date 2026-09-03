@@ -16,7 +16,8 @@ const workspaceAliases = {
 
 // Explicit read-only integration lane. These tests may contact public providers,
 // a locally running TWS/Gateway, or APIs backed by keys in the local OpenAlice
-// config, but they never submit broker orders.
+// config, but they never submit broker orders. It deliberately does not load
+// vitest.setup.ts because that setup replaces the real local configuration root.
 export default {
   resolve: {
     alias: workspaceAliases,

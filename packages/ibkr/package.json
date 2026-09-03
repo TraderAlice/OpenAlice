@@ -21,8 +21,8 @@
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc",
     "test": "vitest run --config vitest.config.ts",
-    "test:external:readonly": "vitest run --root ../.. --config vitest.external.config.ts packages/ibkr/tests/e2e/connect.e2e.spec.ts packages/ibkr/tests/e2e/contract-details.e2e.spec.ts",
-    "test:live-paper": "vitest run --root ../.. --config vitest.uta-live.config.ts packages/ibkr/tests/e2e/order-precision.e2e.spec.ts",
+    "test:external:readonly": "node ../../scripts/run-tests.mjs --lane external-readonly --package @traderalice/ibkr",
+    "test:live-paper": "node ../../scripts/run-tests.mjs --lane live-paper --package @traderalice/ibkr",
     "typecheck": "tsc --noEmit",
     "generate:proto": "bash generate-proto.sh"
   },

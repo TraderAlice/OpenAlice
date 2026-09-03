@@ -14,7 +14,7 @@ const expectedCommit = optionValue('--expected-commit') ?? ''
 let imageBuilt = false
 
 if (args.includes('--help') || args.includes('-h')) {
-  console.log(`Usage: pnpm test:install:dev-channel [--installer-url <url>] [--channel dev] [--expected-commit <sha>] [--keep-image]
+  console.log(`Usage: pnpm test:system:installer:dev [--installer-url <url>] [--channel dev] [--expected-commit <sha>] [--keep-image]
 
 Build a clean container, download the installer from the live dev channel, and
 install the matching channel through the real network path. The default pair is

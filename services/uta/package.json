@@ -9,7 +9,7 @@
     "dev": "tsx watch src/main.ts",
     "start": "node dist/uta.js",
     "typecheck": "tsc --noEmit",
-    "test": "node ../../scripts/run-owner-tests.mjs uta"
+    "test": "node ../../scripts/run-tests.mjs --package @traderalice/uta-service"
   },
   "dependencies": {
     "@hono/node-server": "^2.0.12",
