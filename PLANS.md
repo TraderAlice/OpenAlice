@@ -29,6 +29,11 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
+- [[plans/tui-experience.md]] — Rebuilds the Shell Supervisor as a polished,
+  mouse-capable terminal control surface using Oh My Pi as the interaction and
+  finish benchmark while preserving the Node CLI and Runtime ownership
+  boundary. Work remains on `codex/tui-usability` for integrated acceptance
+  before any `dev` PR.
 - [[plans/development-test-optimization.md]] — Rebuilds local and hosted
   development feedback around affected/owner/cross-owner verification, keeps
   full hermetic and release backstops explicit, and returns `AGENTS.md` to a
