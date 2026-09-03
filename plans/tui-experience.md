@@ -4215,6 +4215,24 @@ already large `supervisor-tui.ts` application controller.
   semantics, Runtime lifecycle, hotspots, navigation, and Detach behavior are
   unchanged. Maintainer acceptance remains pending on this branch.
 
+### Wide Home state-deduplication decision
+
+- The real cold and running 120x32 Home captures showed one lifecycle fact four
+  times: the project heading carried `STOPPED` or `RUNNING`, the identity rail
+  translated it again, Status restated Runtime condition, and the global Spine
+  retained `COLD` or `LIVE`. The heading badge made project identity look like
+  another status widget and weakened the more useful launch phase below it.
+- Wide Home now keeps the selected AliceProject heading identity-only. The
+  identity rail owns the user-facing phase (`READY TO START`, `LIVE TARGET`, or
+  endpoint recovery), Status owns diagnostic facts, and the Spine keeps global
+  Runtime context. Compact and emergency layouts retain their existing heading
+  badge because they do not have a separate identity rail.
+- A real cold 120x32 PTY capture verifies the reduced hierarchy, while focused
+  screen and real-PTY coverage passes 150 tests; the complete CLI suite passes
+  667 tests and CLI typecheck/build passes. Project hotspot geometry, lifecycle
+  state, primary launch behavior, compact layouts, and Command Spine semantics
+  are unchanged. Maintainer acceptance remains pending on this branch.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

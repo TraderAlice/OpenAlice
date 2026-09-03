@@ -187,7 +187,7 @@ export function renderSupervisorHome(
   const cardWidth = Math.max(24, width)
   const state = homeStateBadge(view)
   const lines = width >= 100
-    ? renderWideSessionStage(view, state, cardWidth, targetHeight)
+    ? renderWideSessionStage(view, cardWidth, targetHeight)
     : width < 60 && Number.isFinite(targetHeight)
       ? renderEmergencySessionStage(view, state, cardWidth)
     : renderCompactSessionStage(view, state, cardWidth)
@@ -221,7 +221,6 @@ function renderEmergencySessionStage(
 
 function renderWideSessionStage(
   view: SupervisorHomeView,
-  state: string,
   width: number,
   targetHeight?: number,
 ): string[] {
@@ -231,7 +230,7 @@ function renderWideSessionStage(
     ? 34
     : Math.min(29, Math.max(22, Math.floor(innerWidth * 0.25)))
   const taskWidth = Math.max(1, innerWidth - identityWidth - displayWidth(gutter))
-  const identity = wideSessionIdentity(view, state, identityWidth)
+  const identity = wideSessionIdentity(view, identityWidth)
   const task = sessionTaskRows(view, taskWidth)
   const naturalBodyHeight = Math.max(identity.length, task.length)
   const requestedBodyHeight = Number.isFinite(targetHeight)
@@ -275,13 +274,12 @@ function renderCompactSessionStage(
 
 function wideSessionIdentity(
   view: SupervisorHomeView,
-  state: string,
   width: number,
 ): string[] {
   const markWidth = displayWidth(SUPERVISOR_BRAND_MARK_ROWS[0])
   const markInset = ' '.repeat(Math.max(0, Math.floor((width - markWidth) / 2)))
   return [
-    labelAndTail(homeHotspotLabel(view.projectName, 'project', view), state, width),
+    truncateDisplayWidth(homeHotspotLabel(view.projectName, 'project', view), width),
     '',
     ...SUPERVISOR_BRAND_MARK_ROWS.map((row) => `${markInset}${row}`),
     '',

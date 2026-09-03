@@ -408,7 +408,10 @@ intentionally parameter-free:
 - at 100 columns and wider, Home's single Alice Session Board uses a bounded
   OMP-style two-column composition instead of stretching with every surplus
   terminal row. The identity column centers the selected AliceProject while the
-  task column keeps one ordered path together: Next and its primary action,
+  project heading remains identity-only; one phase signal below the route owns
+  `READY TO START`, live, checking, or recovery truth instead of repeating a raw
+  Runtime badge beside the project name. The task column keeps one ordered path
+  together: Next and its primary action,
   Status, then Activity. The contextual Tip follows the board, while the
   Command Spine anchors the terminal's bottom edge; genuine surplus becomes a
   quiet field between guidance and global controls, matching OMP's top-workbench
