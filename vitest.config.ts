@@ -43,12 +43,12 @@ export default defineConfig({
     // absolute, slash-normalized globs explicit for every platform.
     forceRerunTriggers: collectionWideTestInputs,
     // The Node suite includes installer, PTY, and Guardian specs that spawn
-    // their own process trees. CPU-relative worker counts scale the contention
-    // back up on larger development hosts and turn fast installer checks into
-    // timeout flakes. Keep this deterministic across laptops and CI: two
-    // workers retain useful parallelism while leaving capacity for child
-    // processes owned by each worker.
-    maxWorkers: 2,
+    // their own process trees. CPU-relative worker counts scale contention
+    // back up on larger development hosts, while two workers still saturate a
+    // two-core CI runner by running Node and jsdom work together. Keep local
+    // runs bounded at two workers and serialize the hermetic CI gate so child
+    // process and timer-driven lifecycle tests retain execution capacity.
+    maxWorkers: process.env.CI ? 1 : 2,
     projects: [
       {
         resolve: {
