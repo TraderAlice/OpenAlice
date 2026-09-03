@@ -280,63 +280,67 @@ function printExplanation(plan) {
   }
 }
 
-const options = parseArgs(process.argv.slice(2))
-if (options.help) {
-  printHelp()
-  process.exit(0)
-}
-
-let files
-try {
-  files = selectTestFiles(repoRoot, options)
-} catch (error) {
-  fail(error instanceof Error ? error.message : String(error))
-}
-if (files.length === 0) fail('selection matched zero catalogued tests')
-
-const ambiguous = files.filter((file) => (
-  lanesForTestFile(file).length !== 1 || ownersForTestFile(file).length !== 1
-))
-if (ambiguous.length > 0) {
-  fail(`catalog ownership/lane invariant failed for: ${ambiguous.join(', ')}`)
-}
-
-const plan = createPlan(options, files)
-if (options.json) {
-  console.log(JSON.stringify(plan, null, 2))
-  process.exit(0)
-}
-if (options.explain) {
-  printExplanation(plan)
-  process.exit(0)
-}
-if (options.list) {
-  console.log('[test-select] dry-run: no tests ran; credentials and prerequisites were not probed')
-  for (const lane of plan.lanes) {
-    console.log(`[test-select] ${lane.name} side effects if run: ${lane.sideEffects}`)
+function main() {
+  const options = parseArgs(process.argv.slice(2))
+  if (options.help) {
+    printHelp()
+    return
   }
-  for (const file of plan.files) {
-    console.log(`${file.path}\t${file.lane[0]}\t${file.owner[0]}`)
-  }
-  process.exit(0)
-}
 
-if (plan.executionBlockers.length > 0) fail(plan.executionBlockers.join('\n'))
-if (options.lanes.includes('live-paper')) {
+  let files
   try {
-    assertLivePaperAcknowledgement()
+    files = selectTestFiles(repoRoot, options)
   } catch (error) {
     fail(error instanceof Error ? error.message : String(error))
   }
+  if (files.length === 0) fail('selection matched zero catalogued tests')
+
+  const ambiguous = files.filter((file) => (
+    lanesForTestFile(file).length !== 1 || ownersForTestFile(file).length !== 1
+  ))
+  if (ambiguous.length > 0) {
+    fail(`catalog ownership/lane invariant failed for: ${ambiguous.join(', ')}`)
+  }
+
+  const plan = createPlan(options, files)
+  if (options.json) {
+    console.log(JSON.stringify(plan, null, 2))
+    return
+  }
+  if (options.explain) {
+    printExplanation(plan)
+    return
+  }
+  if (options.list) {
+    console.log('[test-select] dry-run: no tests ran; credentials and prerequisites were not probed')
+    for (const lane of plan.lanes) {
+      console.log(`[test-select] ${lane.name} side effects if run: ${lane.sideEffects}`)
+    }
+    for (const file of plan.files) {
+      console.log(`${file.path}\t${file.lane[0]}\t${file.owner[0]}`)
+    }
+    return
+  }
+
+  if (plan.executionBlockers.length > 0) fail(plan.executionBlockers.join('\n'))
+  if (options.lanes.includes('live-paper')) {
+    try {
+      assertLivePaperAcknowledgement()
+    } catch (error) {
+      fail(error instanceof Error ? error.message : String(error))
+    }
+  }
+
+  const vitest = resolve(repoRoot, 'node_modules/vitest/vitest.mjs')
+  for (const candidate of plan.invocations) {
+    const result = spawnSync(process.execPath, [vitest, ...candidate.args], {
+      cwd: repoRoot,
+      env: process.env,
+      stdio: 'inherit',
+    })
+    if (result.error) throw result.error
+    if (result.status !== 0) process.exit(result.status ?? 1)
+  }
 }
 
-const vitest = resolve(repoRoot, 'node_modules/vitest/vitest.mjs')
-for (const candidate of plan.invocations) {
-  const result = spawnSync(process.execPath, [vitest, ...candidate.args], {
-    cwd: repoRoot,
-    env: process.env,
-    stdio: 'inherit',
-  })
-  if (result.error) throw result.error
-  if (result.status !== 0) process.exit(result.status ?? 1)
-}
+main()

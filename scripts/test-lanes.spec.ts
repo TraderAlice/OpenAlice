@@ -175,6 +175,14 @@ describe('composable selection contract', () => {
     ])
     expect(plan.invocations[0].argumentCharacters).toBeLessThan(8_000)
   })
+
+  it('flushes large machine-readable plans before the selector exits', () => {
+    const result = runSelector(['--owner', 'alice', '--owner', 'ui', '--json'])
+
+    expect(result.status).toBe(0)
+    expect(result.stdout.length).toBeGreaterThan(65_536)
+    expect(() => JSON.parse(result.stdout)).not.toThrow()
+  })
 })
 
 describe('risk and side-effect boundary contract', () => {
