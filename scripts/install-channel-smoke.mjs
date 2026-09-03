@@ -10,10 +10,11 @@ const keepImage = args.includes('--keep-image')
 const installerUrl = optionValue('--installer-url')
   ?? 'https://raw.githubusercontent.com/TraderAlice/OpenAlice/dev/install'
 const channel = optionValue('--channel') ?? 'dev'
+const expectedCommit = optionValue('--expected-commit') ?? ''
 let imageBuilt = false
 
 if (args.includes('--help') || args.includes('-h')) {
-  console.log(`Usage: pnpm test:install:dev-channel [--installer-url <url>] [--channel dev] [--keep-image]
+  console.log(`Usage: pnpm test:system:installer:dev [--installer-url <url>] [--channel dev] [--expected-commit <sha>] [--keep-image]
 
 Build a clean container, download the installer from the live dev channel, and
 install the matching channel through the real network path. The default pair is
@@ -22,13 +23,14 @@ raw.githubusercontent.com/TraderAlice/OpenAlice/dev/install plus --channel dev.
 Options:
   --installer-url <url>  Installer endpoint to exercise
   --channel dev          Development payload channel (default: dev)
+  --expected-commit <sha> Require the live manifest to identify this dev commit
   --keep-image           Preserve the temporary image for investigation
   -h, --help             Show this help
 `)
   process.exit(0)
 }
 
-const valuedOptions = new Set(['--installer-url', '--channel'])
+const valuedOptions = new Set(['--installer-url', '--channel', '--expected-commit'])
 const flagOptions = new Set(['--keep-image'])
 for (let index = 0; index < args.length; index += 1) {
   const arg = args[index]
@@ -52,6 +54,10 @@ if (!/^https:\/\//.test(installerUrl)) {
 }
 if (channel !== 'dev') {
   console.error('install channel smoke: only the dev preview channel is supported')
+  process.exit(1)
+}
+if (expectedCommit && !/^[a-f0-9]{7,64}$/.test(expectedCommit)) {
+  console.error('install channel smoke: --expected-commit must be a lowercase hexadecimal commit identity')
   process.exit(1)
 }
 
@@ -87,6 +93,7 @@ try {
     'run', '--rm',
     '--env', `OPENALICE_CHANNEL_INSTALLER_URL=${installerUrl}`,
     '--env', `OPENALICE_CHANNEL=${channel}`,
+    '--env', `OPENALICE_CHANNEL_EXPECTED_COMMIT=${expectedCommit}`,
     image,
   ])
 } catch (error) {

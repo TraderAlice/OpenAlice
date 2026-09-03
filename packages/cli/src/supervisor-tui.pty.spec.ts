@@ -13,18 +13,52 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import * as pty from 'node-pty'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 const cliEntry = join(dirname(fileURLToPath(import.meta.url)), '../bin/openalice.ts')
 const transferFixtureEntry = join(
   dirname(fileURLToPath(import.meta.url)),
   '__fixtures__/supervisor-transfer-tui-fixture.ts',
 )
+const confirmationFixtureEntry = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '__fixtures__/supervisor-confirmation-tui-fixture.ts',
+)
+const launchpadFixtureEntry = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '__fixtures__/supervisor-launchpad-tui-fixture.ts',
+)
+const doctorPrimaryFixtureEntry = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '__fixtures__/supervisor-doctor-primary-tui-fixture.ts',
+)
+const releaseFixtureEntry = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '__fixtures__/supervisor-release-tui-fixture.ts',
+)
+const eventLensFixtureEntry = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '__fixtures__/supervisor-event-lens-tui-fixture.ts',
+)
 const cliPackageRoot = dirname(dirname(cliEntry))
 const cliVersion = JSON.parse(
   await readFile(join(cliPackageRoot, 'package.json'), 'utf8'),
 ).version
 const temporaryPaths: string[] = []
+const originalStartView = process.env.OPENALICE_TUI_START_VIEW
+
+beforeAll(() => {
+  process.env.OPENALICE_TUI_START_VIEW = 'home'
+})
+
+afterAll(() => {
+  if (originalStartView === undefined) delete process.env.OPENALICE_TUI_START_VIEW
+  else process.env.OPENALICE_TUI_START_VIEW = originalStartView
+})
+
+function stripSgr(value: string): string {
+  return value.replace(/\u001b\[[0-9;]*m/gu, '')
+}
 
 afterEach(async () => {
   await Promise.all(temporaryPaths.splice(0).map((path) => (
@@ -33,19 +67,1377 @@ afterEach(async () => {
 })
 
 describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
+  it('shows a truthful Launch Flight Recorder while starting a local Runtime', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-launch-flight-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 110,
+      rows: 30,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_START_VIEW: 'connect',
+        OPENALICE_TUI_BOOT: '0',
+        OPENALICE_TUI_MOTION: '0',
+        OPENALICE_TUI_FIXTURE_FLEET_ROWS: '1',
+        OPENALICE_TUI_FIXTURE_START_DELAY_MS: '250',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let hovered = false
+      let started = false
+      let sawFlight = false
+      let reachedHome = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor launch flight timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        const plain = stripSgr(output)
+        if (
+          !hovered
+          && plain.includes('OPENALICE LAUNCH · READY → START → CONNECT')
+          && plain.includes('◆ [ Enter ] Start OpenAlice')
+        ) {
+          hovered = true
+          child.write('\u001b[<35;100;18M')
+        } else if (!started && plain.includes('› [ Enter ] Start OpenAlice')) {
+          started = true
+          child.write('\u001b[<0;100;18M')
+        }
+        if (!sawFlight && plain.includes('Launch Flight Recorder · LOCAL START · IN FLIGHT')) {
+          sawFlight = true
+        }
+        if (sawFlight && !reachedHome && plain.includes('◆ [Home] │ ● Inbox')) {
+          reachedHome = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && sawFlight && reachedHome) resolve(output)
+        else reject(new Error(`Supervisor launch flight exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    const plain = stripSgr(transcript)
+    const operationStart = plain.indexOf('◆ OPERATION · LOCAL START')
+    const flightStart = plain.indexOf('Launch Flight Recorder · LOCAL START · IN FLIGHT')
+    const homeStart = plain.indexOf('◆ [Home] │ ● Inbox', flightStart)
+    const flight = plain.slice(operationStart, homeStart)
+    expect(operationStart).toBeGreaterThanOrEqual(0)
+    expect(plain).toContain('◆ IN FLIGHT · This computer → Default AliceProject')
+    expect(plain).toContain('✓ 01  Validate local target · DONE')
+    expect(plain).toContain('◆ 02  Prepare and start Runtime · IN FLIGHT')
+    expect(plain).toContain('◇ 03  Bind local target · WAITING')
+    expect(plain).toContain('◇ CONTROL  Keep this terminal open')
+    expect(plain).toContain('NEXT')
+    expect(plain).toContain('› [ Enter ] Start OpenAlice')
+    expect(plain).toContain('1 Start Runtime')
+    expect(plain).toContain('2 Verify Web endpoint')
+    expect(plain).toContain('3 Enter connected Home')
+    expect(plain).toContain('◆ [ Enter ] Start OpenAlice')
+    expect(flight).toContain('◆ OPERATION · LOCAL START')
+    expect(flight).toContain('INPUT OWNED UNTIL READY')
+    expect(flight).not.toContain('[Connect]')
+    expect(flight).not.toContain('? Help')
+    expect(flight).toContain('Operation owns input until ready; q detaches this TUI.')
+    expect(flight).toContain('◆ OPERATION ACTIVE')
+    expect(flight).toContain('[ q ] Detach')
+    expect(flight).not.toContain('[ / ] Commands')
+    expect(plain).toContain('FIXTURE_RESULT starts=1 opens=0 loads=0 diagnoses=0')
+    expect(transcript).toContain('\u001b[?25h')
+  }, 12_000)
+
+  it('recovers from a failed local launch through Retry-or-Back guidance', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-launch-failure-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_START_VIEW: 'connect',
+        OPENALICE_TUI_BOOT: '0',
+        OPENALICE_TUI_MOTION: '0',
+        OPENALICE_TUI_FIXTURE_FLEET_ROWS: '1',
+        OPENALICE_TUI_FIXTURE_START_FAILURE: '1',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let stage = 0
+      let failureOffset = 0
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor launch failure timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        const plain = stripSgr(output)
+        if (stage === 0 && plain.includes('OPENALICE LAUNCH · READY → START → CONNECT')) {
+          stage = 1
+          child.write('\r')
+        } else if (stage === 1 && plain.includes('RECOVERABLE FAILURE')) {
+          stage = 2
+          failureOffset = plain.lastIndexOf('Launch Flight Recorder')
+          child.write('\u001b')
+        } else if (stage === 2
+          && plain.slice(failureOffset).includes('OPENALICE LAUNCH · READY → START → CONNECT')) {
+          stage = 3
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && stage === 3) resolve(output)
+        else reject(new Error(`Supervisor launch failure exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    const plain = stripSgr(transcript)
+    expect(plain).toContain('× RECOVERABLE FAILURE · This computer → Default AliceProject')
+    expect(plain).toContain('× 02  Prepare and start Runtime · FAILED')
+    expect(plain).toContain('Starting Runtime failed: Fixture Runtime…')
+    expect(plain).toContain('[ Enter ] Retry selected target')
+    expect(plain).toContain('[ Esc ] Back to targets')
+    expect(plain).toContain('Enter retries; Esc returns to targets; q detaches this TUI.')
+    expect(plain).toContain('Default AliceProject · LOCAL › ○ COLD')
+    expect(plain).toContain('FIXTURE_RESULT starts=1 opens=0 loads=0 diagnoses=0')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it('opens a stopped AliceProject in the connection-first Launcher by default', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-launcher-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 100,
+      rows: 28,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_START_VIEW: 'connect',
+        OPENALICE_TUI_BOOT: '0',
+        OPENALICE_TUI_MOTION: '0',
+        OPENALICE_TUI_FIXTURE_FLEET_ROWS: '1',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let launched = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Launcher timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!launched && output.includes('3 RUNTIME ○ READY')) {
+          launched = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && launched) resolve(output)
+        else reject(new Error(`Supervisor Launcher exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    const plain = stripSgr(transcript)
+    expect(plain).toContain('◆ [Connect]·1')
+    expect(plain).toContain('OPENALICE LAUNCH · READY → START → CONNECT')
+    expect(plain).toContain('1 MACHINE ✓ This computer')
+    expect(plain).toContain('2 ALICEPROJECT ✓ Default')
+    expect(plain).toContain('[ Enter ] Start OpenAlice')
+    expect(plain).toContain('Launchpad · Default')
+    expect(plain).toContain('◆ READY TO LAUNCH · READY TO START')
+    expect(plain).toContain('1 Start Runtime')
+    expect(plain).toContain('2 Verify Web endpoint')
+    expect(plain).toContain('3 Enter connected Home')
+    expect(plain).not.toContain('OWNER    none')
+    expect(plain).not.toContain('Inbox')
+    expect(transcript).toContain('\u001b[?25h')
+  }, 12_000)
+
+  it('connects and explicitly disconnects one remote target through a real PTY', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-remote-target-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 110,
+      rows: 30,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_START_VIEW: 'connect',
+        OPENALICE_TUI_BOOT: '0',
+        OPENALICE_TUI_MOTION: '0',
+        OPENALICE_TUI_FIXTURE_FLEET_ROWS: '1',
+        OPENALICE_TUI_FIXTURE_REMOTE: '1',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let connecting = false
+      let disconnecting = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor remote target timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        const plain = stripSgr(output)
+        if (!connecting && plain.includes('OPENALICE LAUNCH')) {
+          connecting = true
+          child.write('\u001b[B')
+          child.write('\t')
+          child.write('\r')
+        } else if (connecting && !disconnecting && plain.includes('⌁ Cloud Lab · SSH')) {
+          disconnecting = true
+          child.write('x')
+        } else if (disconnecting
+          && plain.includes('Disconnected from Cloud Lab / Research')
+          && plain.includes('OPENALICE LAUNCH')) {
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && disconnecting) resolve(output)
+        else reject(new Error(`Supervisor remote target exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    const plain = stripSgr(transcript)
+    expect(plain).toContain('⌁ Cloud Lab · SSH')
+    expect(plain).toContain('⌁ Cloud Lab · SSH')
+    expect(plain).toContain('Disconnected from Cloud Lab / Research')
+    expect(plain).toContain('FIXTURE_RESULT starts=0 opens=0 loads=0 diagnoses=0 disconnects=1 probes=0')
+    expect(transcript).toContain('\u001b[?25h')
+  }, 12_000)
+
+  it('shows remote degradation and recovers in place through a real PTY', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-remote-health-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 110,
+      rows: 30,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_START_VIEW: 'connect',
+        OPENALICE_TUI_BOOT: '0',
+        OPENALICE_TUI_MOTION: '0',
+        OPENALICE_TUI_FIXTURE_FLEET_ROWS: '1',
+        OPENALICE_TUI_FIXTURE_REMOTE: '1',
+        OPENALICE_TUI_FIXTURE_HEALTH: 'flap',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let connected = false
+      let unreachable = false
+      let openedRuntime = false
+      let exiting = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor remote health timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        const plain = stripSgr(output)
+        if (!connected && plain.includes('OPENALICE LAUNCH')) {
+          connected = true
+          child.write('\u001b[B')
+          child.write('\t')
+          child.write('\r')
+        } else if (connected && !unreachable && plain.includes('× UNREACHABLE')) {
+          unreachable = true
+        } else if (!openedRuntime && unreachable && plain.includes('Connection to Cloud Lab / Research is healthy.')) {
+          openedRuntime = true
+          child.write('\u001b[D')
+        } else if (!exiting
+          && openedRuntime
+          && plain.includes('Runtime Observatory')
+          && plain.includes('RECOVERED')
+          && plain.includes('UNREACHABLE')
+          && plain.includes('DEGRADED')) {
+          exiting = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && unreachable) resolve(output)
+        else reject(new Error(`Supervisor remote health exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    const plain = stripSgr(transcript)
+    expect(plain).toContain('! DEGRADED')
+    expect(plain).toContain('× UNREACHABLE')
+    expect(plain).toContain('Press Enter or r to retry')
+    expect(plain).toContain('Connection to Cloud Lab / Research is healthy.')
+    expect(plain).toContain('Runtime Observatory · CONNECTED · REMOTE')
+    expect(plain).toContain('RUNTIME')
+    expect(plain).toContain('ROUTE')
+    expect(plain).toContain('SERVICES')
+    expect(plain).toContain('RECOVERED')
+    expect(plain).toContain('FIXTURE_RESULT starts=0 opens=0 loads=0 diagnoses=0 disconnects=1 probes=4')
+    expect(transcript).toContain('\u001b[?25h')
+  }, 12_000)
+
+  it('skips the Boot Sequence with raw pointer input without click-through', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-boot-pointer-'))
+    temporaryPaths.push(isolatedHome)
+    const childEnv = { ...process.env }
+    delete childEnv.NO_COLOR
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...childEnv,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_BOOT: '1',
+        OPENALICE_TUI_FIXTURE_RUNTIME: 'running',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let skipped = false
+      let entered = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Boot Sequence pointer timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!skipped && output.includes('O P E N A L I C E')) {
+          skipped = true
+          child.write('\u001b[<35;20;9M')
+          child.write('\u001b[<0;20;9M')
+        } else if (skipped && !entered && output.includes('OpenAlice Supervisor')) {
+          entered = true
+          setTimeout(() => child.write('q'), 100)
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && skipped && entered) resolve(output)
+        else reject(new Error(`Supervisor Boot Sequence pointer exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('O P E N A L I C E')
+    expect(transcript).toContain('◆ ALICEPROJECT')
+    expect(transcript).toContain('OpenAlice Supervisor')
+    expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=0 loads=0 diagnoses=0')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it('detaches directly from the Boot Sequence with q', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-boot-detach-'))
+    temporaryPaths.push(isolatedHome)
+    const childEnv = { ...process.env }
+    delete childEnv.NO_COLOR
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...childEnv,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_BOOT: '1',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let detached = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Boot Sequence detach timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!detached && output.includes('O P E N A L I C E')) {
+          detached = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && detached) resolve(output)
+        else reject(new Error(`Supervisor Boot Sequence detach exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('O P E N A L I C E')
+    expect(transcript).not.toContain('OpenAlice Supervisor')
+    expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=0 loads=0 diagnoses=0')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
   it.each([
-    ['default-no', 50, 'sends=0 aborted=false'],
-    ['success', 100, 'sends=1 aborted=false'],
-    ['auth-loss', 100, 'sends=0 aborted=false'],
-    ['occupied', 100, 'sends=0 aborted=false'],
-    ['checksum-retry', 100, 'sends=2 aborted=false'],
-    ['cancel-retry', 100, 'sends=2 aborted=true'],
+    ['wide', 110, 30, 90, 70, 10, 'OpenAlice is current on dev.'],
+    ['compact', 80, 24, null, 15, 16, 'OpenAlice is current on d…'],
+  ] as const)('selects a release lane and clicks the %s Channel Brief action', async (
+    _layout,
+    cols,
+    rows,
+    releaseControlColumn,
+    briefActionColumn,
+    briefActionRow,
+    expectedFeedback,
+  ) => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-release-pointer-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [releaseFixtureEntry], {
+      cols,
+      rows,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let laneHovered = false
+      let laneSelected = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Release Observatory pointer timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!opened && output.includes('◆ [Home]')) {
+          opened = true
+          if (releaseControlColumn === null) {
+            child.write('u')
+          } else {
+            child.write(`\u001b[<35;${releaseControlColumn};1M`)
+            child.write(`\u001b[<0;${releaseControlColumn};1M`)
+          }
+        } else if (!laneHovered && output.includes('Release Observatory · 3 LANES')) {
+          laneHovered = true
+          setTimeout(() => child.write('\u001b[<35;20;7M'), 100)
+        } else if (!laneSelected && output.includes('│ › Dev')) {
+          laneSelected = true
+          child.write('\u001b[<0;20;7M')
+          setTimeout(() => {
+            child.write(`\u001b[<35;${briefActionColumn};${briefActionRow}M`)
+            setTimeout(() => {
+              child.write(`\u001b[<0;${briefActionColumn};${briefActionRow}M`)
+              setTimeout(() => child.write('q'), 300)
+            }, 100)
+          }, 100)
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor Release Observatory pointer exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('│ › Dev')
+    expect(transcript).toContain('Channel Brief · 3/3 · INSTALLED BETA')
+    expect(transcript).toContain('› [ Enter ] Check')
+    expect(transcript).toContain(expectedFeedback)
+    expect(transcript).toContain('FIXTURE_RESULT checked=dev')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it('opens Setup from the single-spine Command Dock', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-action-shelf-pointer-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    let overlayIdleOutput = ''
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let dockOpened = false
+      let queried = false
+      let clicked = false
+      let closed = false
+      let detached = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Command Dock pointer timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!dockOpened && output.includes('Alice Session · OpenAlice')) {
+          dockOpened = true
+          child.write('/')
+        } else if (!queried && output.includes('Command Dock')) {
+          queried = true
+          child.write('setup')
+        } else if (!clicked && output.includes('›   Setup')) {
+          clicked = true
+          child.write('\r')
+        } else if (!closed && clicked && output.includes('╭ Setup Studio · Default AliceProject')) {
+          closed = true
+          const pausedAt = output.length
+          setTimeout(() => {
+            overlayIdleOutput = output.slice(pausedAt)
+            child.write('\u001b')
+          }, 650)
+        } else if (!detached && closed && output.includes('Setup closed.')) {
+          detached = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor Command Dock pointer exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('Alice Session · OpenAlice')
+    expect(stripSgr(transcript)).not.toContain('Runtime Signal Deck')
+    expect(stripSgr(overlayIdleOutput)).not.toContain('OpenAlice Supervisor')
+    expect(transcript).not.toContain('CONTROL CONSOLE')
+    expect(transcript).toContain('MATCH “setup”')
+    expect(transcript).toContain('›   Setup')
+    expect(transcript).toContain('╭ Setup Studio · Default AliceProject')
+    expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=0')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it('hovers and clicks the quiet compact Runtime Lens reload segment', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-signal-scope-pointer-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+        OPENALICE_TUI_MOTION: '0',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let hovered = false
+      let clicked = false
+      let detached = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Signal Scope pointer timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!opened && output.includes('◆ [ Enter ]  Start OpenAlice')) {
+          opened = true
+          child.write('l')
+        } else if (!hovered && output.includes('Runtime Lens · QUIET · 0 EVENTS')) {
+          hovered = true
+          child.write('\u001b[<35;30;7M')
+        } else if (!clicked && output.includes('› [ l ] Reload Runtime snapshot')) {
+          clicked = true
+          child.write('\u001b[<0;30;7M')
+        } else if (!detached && clicked) {
+          detached = true
+          setTimeout(() => child.write('q'), 250)
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor Signal Scope pointer exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('Runtime Lens · QUIET · 0 EVENTS')
+    expect(transcript).toContain('○ QUIET · No Runtime events · all events · bounded/redacted')
+    expect(stripSgr(transcript)).toContain(
+      '◇  Tip: No Runtime events in this lens; l reloads the bounded snapshot.',
+    )
+    expect(stripSgr(transcript)).toContain('◆ [ l ] Reload Runtime snapshot')
+    expect(stripSgr(transcript)).not.toContain('[ ↑↓ ] Scroll')
+    expect(stripSgr(transcript)).not.toContain('[ End ] Latest')
+    expect(transcript).toContain('› [ l ] Reload Runtime snapshot')
+    expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=0 loads=2')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+    expect(transcript).toContain('\u001b[?1006l')
+  }, 12_000)
+
+  it('hovers and clicks the no-check Diagnostic Radar rerun segment', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-diagnostic-radar-pointer-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+        OPENALICE_TUI_MOTION: '0',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let hovered = false
+      let clicked = false
+      let detached = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Diagnostic Radar pointer timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!opened && output.includes('◆ [ Enter ]  Start OpenAlice')) {
+          opened = true
+          child.write('d')
+        } else if (!hovered && output.includes('Diagnostic Radar · NO CHECKS · 0F/0W/0P')) {
+          hovered = true
+          child.write('\u001b[<35;24;10M')
+        } else if (!clicked && output.includes('› [ d ] Rerun Runtime Doctor')) {
+          clicked = true
+          child.write('\u001b[<0;24;10M')
+        } else if (!detached && clicked) {
+          detached = true
+          setTimeout(() => child.write('q'), 250)
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor Diagnostic Radar pointer exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('Diagnostic Radar · NO CHECKS · 0F/0W/0P')
+    expect(transcript).toContain('○  NO CHECKS')
+    expect(transcript).toContain('› [ d ] Rerun Runtime Doctor')
+    expect(stripSgr(transcript)).toContain('◆ [ d ] Rerun Runtime Doctor')
+    expect(stripSgr(transcript)).not.toContain('[ ↑↓ ] Inspect')
+    expect(stripSgr(transcript)).not.toContain('[ Home ] First')
+    expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=0 loads=0 diagnoses=2')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+    expect(transcript).toContain('\u001b[?1006l')
+  }, 12_000)
+
+  it('hovers and selects an Event Lens row with raw pointer input', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-event-lens-pointer-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [eventLensFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let hovered = false
+      let clicked = false
+      let copyClicked = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Event Lens pointer timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!opened && output.includes('Alice Session · OpenAlice')) {
+          opened = true
+          child.write('l')
+        } else if (!hovered && output.includes('Event Lens · LINE 10 · INFO · TEXT')) {
+          hovered = true
+          child.write('\u001b[<35;20;11M')
+        } else if (!clicked && output.includes('│ » !  9  03:04:09Z Fixture event 9')) {
+          clicked = true
+          child.write('\u001b[<0;20;11M')
+        } else if (!copyClicked && clicked && output.includes('Event Lens · LINE 9 · WARNING · JSON')) {
+          copyClicked = true
+          child.write('y')
+        } else if (copyClicked && output.includes('Sent Runtime event 9')) {
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor Event Lens pointer exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('│ » !  9  03:04:09Z Fixture event 9')
+    expect(transcript).toContain('Event Lens · LINE 9 · WARNING · JSON')
+    expect(transcript).toContain('Sent Runtime event 9')
+    expect(transcript).toContain(
+      `\u001b]52;c;${Buffer.from('{"ts":"2026-09-02T03:04:09Z","level":"warn","msg":"Fixture event 9","scope":"pty"}').toString('base64')}\u0007`,
+    )
+    expect(transcript).toContain('█')
+    expect(transcript).toContain('FIXTURE_RESULT event-lens')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it('keeps a browsable Emergency Event Lens at 46x16', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-emergency-event-lens-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [eventLensFixtureEntry], {
+      cols: 46,
+      rows: 16,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_BOOT: '0',
+        OPENALICE_TUI_MOTION: '0',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let moved = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Emergency Event Lens timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        const plain = stripSgr(output)
+        if (!opened && plain.includes('Alice Session · OpenAlice')) {
+          opened = true
+          child.write('l')
+        } else if (!moved && plain.includes('Event Lens · 10/10 · ALL · INFO')) {
+          moved = true
+          child.write('\u001b[A')
+        } else if (moved && plain.includes('Event Lens · 9/10 · ALL · WARNING')) {
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && moved) resolve(output)
+        else reject(new Error(`Emergency Event Lens exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    const plain = stripSgr(transcript)
+    expect(plain).toContain('Event Lens · 10/10 · ALL · INFO')
+    expect(plain).toContain('Event Lens · 9/10 · ALL · WARNING')
+    expect(plain).toContain('DETAIL  03:04:09Z Fixture event 9')
+    expect(plain).toContain('KEYS    ↑↓ browse · f lens · y copy')
+    expect(plain).toContain('╰─ [ / ] Commands  ›  [ q ] Detach')
+    expect(plain).toContain('FIXTURE_RESULT event-lens')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it('scrubs the Event Lens rail with raw hover, press, drag, and release reports', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-event-rail-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [eventLensFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_MOTION: '0',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let hovered = false
+      let pressed = false
+      let dragged = false
+      let released = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Event rail timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!opened && output.includes('Alice Session · OpenAlice')) {
+          opened = true
+          child.write('l')
+        } else if (!hovered && output.includes('4–10/10 · ALL · LATEST')) {
+          hovered = true
+          child.write('\u001b[<35;78;6M')
+        } else if (hovered && !pressed && output.includes('Runtime event 1/10')) {
+          pressed = true
+          child.write('\u001b[<0;78;6M')
+        } else if (pressed && !dragged && output.includes('Event Lens · LINE 1 · INFO · TEXT')) {
+          dragged = true
+          child.write('\u001b[<32;78;12M')
+        } else if (dragged && !released && output.includes('Event Lens · LINE 10 · INFO · TEXT')) {
+          released = true
+          child.write('\u001b[<0;78;12m')
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && released) resolve(output)
+        else reject(new Error(`Supervisor Event rail exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('Runtime event 1/10')
+    expect(transcript).toContain('Event Lens · LINE 1 · INFO · TEXT')
+    expect(transcript).toContain('Event Lens · LINE 10 · INFO · TEXT')
+    expect(transcript).toContain('FIXTURE_RESULT event-lens')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it('uses a 120x32 Operational Canvas for twenty clickable Runtime events', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-event-canvas-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [eventLensFixtureEntry], {
+      cols: 120,
+      rows: 32,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_FIXTURE_EVENT_ROWS: '20',
+        OPENALICE_TUI_MOTION: '0',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    let expandedFrame = ''
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let hovered = false
+      let clicked = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Event Canvas timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!opened && output.includes('Alice Session · OpenAlice')) {
+          opened = true
+          child.write('l')
+        } else if (!hovered && output.includes('1–20/20 · ALL · LATEST')) {
+          hovered = true
+          expandedFrame = output.slice(output.lastIndexOf('Event stream · 1–20/20'))
+          child.write('\u001b[<35;20;24M')
+        } else if (!clicked && output.includes('» · 19  fixture event 19')) {
+          clicked = true
+          child.write('\u001b[<0;20;24M')
+        } else if (clicked && output.includes('Event Lens · LINE 19 · INFO · TEXT')) {
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && clicked) resolve(output)
+        else reject(new Error(`Supervisor Event Canvas exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(stripSgr(expandedFrame)).toContain('1–20/20 · ALL · LATEST')
+    expect(stripSgr(expandedFrame)).not.toContain('█')
+    expect(transcript).toContain('» · 19  fixture event 19')
+    expect(transcript).toContain('› · 19  fixture event 19')
+    expect(transcript).toContain('Event Lens · LINE 19 · INFO · TEXT')
+    expect(transcript).toContain('╰─ [ / ] Commands')
+    expect(transcript).not.toContain('CONTROL CONSOLE')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it('hovers and clicks the Session Stage primary surface outside its keycap', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-launchpad-pointer-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let hovered = false
+      let clicked = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Launchpad pointer timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!hovered && output.includes('Your workspace is one step away') && output.includes('[ Enter ]')) {
+          hovered = true
+          child.write('\u001b[<35;60;13M')
+        } else if (!clicked && stripSgr(output).includes('│ › [ Enter ]')) {
+          clicked = true
+          child.write('\u001b[<0;60;13M')
+        } else if (clicked && output.includes('OpenAlice started')) {
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor Launchpad pointer exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(stripSgr(transcript)).toContain('│ › [ Enter ]')
+    expect(transcript).toContain('FIXTURE_RESULT starts=1 opens=1')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it('opens the verified Web UI by clicking the running Session Stage primary', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-signal-hotspot-'))
+    temporaryPaths.push(isolatedHome)
+    const childEnv = { ...process.env }
+    delete childEnv.NO_COLOR
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...childEnv,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_FIXTURE_RUNTIME: 'running',
+        OPENALICE_TUI_MOTION: '0',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let hovered = false
+      let clicked = false
+      let detached = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Signal Hotspot pointer timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!hovered && output.includes('Runtime is live; AliceProject home is missing') && output.includes('[ Enter ]')) {
+          hovered = true
+          child.write('\u001b[<35;70;13M')
+        } else if (!clicked && stripSgr(output).includes('│ › [ Enter ]')) {
+          clicked = true
+          child.write('\u001b[<0;70;13M')
+        } else if (!detached && clicked && output.includes('FIXTURE_RESULT') === false && output.includes('Opened the verified Web')) {
+          detached = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor Signal Hotspot pointer exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(stripSgr(transcript)).toContain('│ › [ Enter ]')
+    expect(stripSgr(transcript)).toContain('HOME MISSING')
+    expect(transcript).toContain('Opened the verified Web')
+    expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=1')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it('routes the Home Inbox signal to unread work before opening the Workspace', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-home-inbox-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_FIXTURE_RUNTIME: 'running',
+        OPENALICE_TUI_FIXTURE_INBOX_UNREAD: '2',
+        OPENALICE_TUI_MOTION: '0',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let hoveredInbox = false
+      let openedInbox = false
+      let toggledRead = false
+      let detached = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Home Inbox route timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        const plain = stripSgr(output)
+        if (!hoveredInbox && plain.includes('◆ Inbox  2 unread reports')) {
+          hoveredInbox = true
+          child.write('\u001b[<35;20;15M')
+        } else if (!openedInbox && plain.includes('› Inbox  2 unread reports')) {
+          openedInbox = true
+          child.write('\u001b[<0;20;15M')
+        } else if (!toggledRead && openedInbox && output.includes('Inbox Desk') && output.includes('2 UNREAD')) {
+          toggledRead = true
+          child.write('\r')
+        } else if (!detached && toggledRead && output.includes('Inbox Desk · 1 UNREAD') && output.includes('Mark unread')) {
+          detached = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && openedInbox && toggledRead) resolve(output)
+        else reject(new Error(`Supervisor Home Inbox route exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('◆ Inbox  2 unread reports')
+    expect(stripSgr(transcript)).toContain('› Inbox  2 unread reports')
+    expect(transcript).toContain('[ Enter ]  Review 2 unread reports')
+    expect(transcript).toContain('Inbox Desk')
+    expect(transcript).toContain('[ o ] Open Workspace')
+    expect(transcript).toContain('2 UNREAD')
+    expect(transcript).toContain('1 UNREAD')
+    expect(transcript).toContain('Mark unread')
+    expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=0')
+    expect(transcript).toContain('\u001b[?25h')
+  }, 12_000)
+
+  it('integrates the wide Alice mark without breaking Session Stage pointer geometry', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-integrated-launchpad-'))
+    temporaryPaths.push(isolatedHome)
+    const childEnv = { ...process.env }
+    delete childEnv.NO_COLOR
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 120,
+      rows: 30,
+      cwd: dirname(cliEntry),
+      env: {
+        ...childEnv,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let hovered = false
+      let clicked = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor integrated Launchpad pointer timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        const plainOutput = output.replace(/\u001b\[[0-9;?<>]*[A-Za-z~]/gu, '')
+        if (
+          !hovered
+          && plainOutput.includes('Alice Session · OpenAlice')
+          && plainOutput.includes('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+        ) {
+          hovered = true
+          child.write('\u001b[<35;70;11M')
+        } else if (!clicked && plainOutput.includes('› [ Enter ]')) {
+          clicked = true
+          child.write('\u001b[<0;70;11M')
+        } else if (clicked && plainOutput.includes('OpenAlice started')) {
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor integrated Launchpad pointer exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('Alice Session · OpenAlice')
+    expect(stripSgr(transcript)).toContain('▄▀▄ █   ▀█▀ ▄▀▀ █▀▀')
+    expect(stripSgr(transcript)).toContain('Your workspace is one step away')
+    expect(stripSgr(transcript)).toContain('⌂ Default AliceProject')
+    expect(stripSgr(transcript)).toContain('STATUS')
+    expect(stripSgr(transcript)).toContain('ACTIVITY')
+    expect(stripSgr(transcript)).not.toContain('COMPONENT TELEMETRY')
+    expect(transcript).toContain('\u001b[1;38;2;')
+    expect(transcript).not.toMatch(
+      /\u001b\[1;38;2;183;255;248;48;2;18;54;59m[^\u001b\r\n]*Uptime/u,
+    )
+    expect(transcript.replace(/\u001b\[[0-9;?<>]*[A-Za-z~]/gu, '')).toContain('› [ Enter ]')
+    expect(transcript).toContain('FIXTURE_RESULT starts=1 opens=1')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it('runs Doctor from the degraded Launchpad primary action', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-doctor-primary-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [doctorPrimaryFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let invoked = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Doctor primary timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (
+          !invoked
+          && output.includes('[ Enter ]  Run Runtime Doctor')
+        ) {
+          invoked = true
+          child.write('\r')
+        } else if (invoked && output.includes('Fixture Runtime protocol mismatch')) {
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor Doctor primary exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('[ Enter ]  Run Runtime Doctor')
+    expect(transcript).not.toContain('No primary action is available')
+    expect(transcript).toContain('Fixture Runtime protocol mismatch')
+    expect(transcript).toContain('[ d ] Rerun Runtime Doctor')
+    expect(transcript).toContain('FIXTURE_RESULT diagnoses=1')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it('opens contextual Help and explores it with raw pointer input', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-navigation-pointer-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [cliEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_SUPERVISOR_HOME: join(isolatedHome, 'supervisor'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let clicked = false
+      let inspected = false
+      let closing = false
+      let closed = false
+      let closeOffset = 0
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor navigation pointer timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!clicked && output.includes('◆ [Home]')) {
+          clicked = true
+          child.write('?')
+        } else if (!inspected && clicked && output.includes('Help · START · SEARCH · SWITCH · 1/3')) {
+          inspected = true
+          child.write('\u001b[<35;10;8M')
+          child.write('\u001b[<0;10;8M')
+        } else if (!closing && inspected && output.includes('Help · START · SEARCH · SWITCH · 2/3')) {
+          closing = true
+          closeOffset = output.length
+          child.write('\u001b[<35;10;22M')
+          child.write('\u001b[<0;10;22M')
+        } else if (closing && !closed && output.slice(closeOffset).includes('Alice Session · OpenAlice')) {
+          closed = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && closed) resolve(output)
+        else reject(new Error(`Supervisor navigation pointer exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('Help · START · SEARCH · SWITCH · 1/3')
+    expect(transcript).toContain('Help · START · SEARCH · SWITCH · 2/3')
+    expect(transcript).toContain('NOW · [ Enter ] Start/connect/open')
+    expect(transcript).toContain('[ ? ] Close Help')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it('switches the wide Help inspector from its fixed system routes', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-help-board-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 120,
+      rows: 32,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_BOOT: '0',
+        OPENALICE_TUI_MOTION: '0',
+        OPENALICE_TUI_FIXTURE_RUNTIME: 'running',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let hovered = false
+      let selected = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Help Board pointer timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        const plain = stripSgr(output)
+        if (!opened && plain.includes('[ / ] Commands') && plain.includes('◆ HOME')) {
+          opened = true
+          child.write('?')
+        } else if (!hovered && plain.includes('Help · START · SEARCH · SWITCH')) {
+          hovered = true
+          child.write('\u001b[<35;10;13M')
+        } else if (!selected && plain.includes('» ● Runtime  Read state, then act')) {
+          selected = true
+          child.write('\u001b[<0;10;13M')
+        } else if (selected && plain.includes('› ● Runtime  Read state, then act')
+          && plain.includes('● SELECTED · RUNTIME')) {
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && selected) resolve(output)
+        else reject(new Error(`Supervisor Help Board pointer exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(stripSgr(transcript)).toContain('» ● Runtime  Read state, then act')
+    expect(stripSgr(transcript)).toContain('› ● Runtime  Read state, then act')
+    expect(stripSgr(transcript)).toContain('● SELECTED · RUNTIME')
+    expect(stripSgr(transcript)).toContain('[ x ] Stop local / disconnect remote target')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it.each([
+    ['default-no compact', 'default-no', 80, 24, 'sends=0 aborted=false', true],
+    ['success wide', 'success', 110, 30, 'sends=1 aborted=false', false],
+    ['success compact', 'success', 80, 24, 'sends=1 aborted=false', true],
+    ['auth-loss', 'auth-loss', 100, 30, 'sends=0 aborted=false', false],
+    ['occupied', 'occupied', 100, 30, 'sends=0 aborted=false', false],
+    ['checksum-retry', 'checksum-retry', 100, 30, 'sends=2 aborted=false', false],
+    ['cancel-retry', 'cancel-retry', 100, 30, 'sends=2 aborted=true', false],
   ] as const)(
     'drives the remote transfer %s recovery path through a real PTY',
-    async (scenario, cols, expectedResult) => {
+    async (_caseName, scenario, cols, rows, expectedResult, compact) => {
       const child = pty.spawn(process.execPath, [transferFixtureEntry], {
         cols,
-        rows: 30,
+        rows,
         cwd: dirname(cliEntry),
         env: {
           ...process.env,
@@ -57,28 +1449,64 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       const transcript = await new Promise<string>((resolve, reject) => {
         let output = ''
         let stage = 0
+        let openedFleet = false
+        let movedToProjects = false
         const timeout = setTimeout(() => {
           child.kill()
           reject(new Error(`Supervisor transfer ${scenario} timed out at stage ${stage}:\n${output}`))
         }, 12_000)
         child.onData((data) => {
           output += data
-          if (stage === 0 && output.includes('m Transfer')) {
+          if (
+            !openedFleet
+            && output.includes('Start OpenAlice & open Workspace')
+            && output.includes('◆ [Home]')
+          ) {
+            openedFleet = true
+            child.write('\t\t')
+          } else if (stage === 0 && !movedToProjects && output.includes('[ Enter ] Browse projects')) {
+            movedToProjects = true
+            child.write('\t')
+          } else if (stage === 0 && output.includes('[ m ] Transfer')) {
             stage = 1
             child.write('m')
           } else if (stage === 1 && output.includes('destination Machine')) {
             stage = 2
-            child.write('\r')
+            if (scenario === 'success' && !compact) {
+              child.write('\u001b[<35;50;7M')
+              child.write('\u001b[<0;50;7M')
+            } else {
+              child.write('\r')
+            }
           } else if (stage === 2 && output.includes('Destination AliceProject key')) {
+            if (scenario === 'success' && !compact) {
+              stage = 22
+              child.write('\u0005\u0015Bad Key')
+              setTimeout(() => {
+                child.write('\u001b[<35;10;29M')
+                setTimeout(() => child.write('\u001b[<0;10;29M'), 300)
+              }, 100)
+            } else {
+              stage = 3
+              child.write('\r')
+            }
+          } else if (
+            stage === 22
+            && output.includes('! Destination AliceProject key · FIX')
+          ) {
             stage = 3
-            child.write('\r')
+            child.write('\u0005\u0015source')
+            setTimeout(() => {
+              child.write('\u001b[<35;10;29M')
+              setTimeout(() => child.write('\u001b[<0;10;29M'), 300)
+            }, 100)
           } else if (stage === 3 && output.includes('Destination complete Home')) {
             stage = 4
             child.write('\r')
-          } else if (stage === 4 && output.includes('Credentials')) {
+          } else if (stage === 4 && output.includes('◆ Credentials')) {
             stage = 5
             child.write('\r')
-          } else if (stage === 5 && output.includes('Exact-Session scheduled Issue owners')) {
+          } else if (stage === 5 && output.includes('◆ Exact-Session scheduled Issue owners')) {
             stage = 6
             child.write('\r')
           } else if (stage === 6 && (scenario === 'auth-loss' || scenario === 'occupied')) {
@@ -87,24 +1515,31 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
               : 'Destination key or Home became occupied before planning.'
             if (output.includes(expected)) {
               stage = 20
-              child.write('\r')
+              if (scenario === 'auth-loss') {
+                child.write('\u001b[<35;90;2M')
+                setTimeout(() => child.write('\u001b[<0;90;2M'), 300)
+              } else {
+                child.write('\r')
+              }
             }
-          } else if (stage === 6 && output.includes('Review AliceProject transfer')) {
+          } else if (stage === 6 && output.includes('◆ Transfer manifest · READY')) {
             stage = scenario === 'default-no' ? 10 : 7
             child.write(scenario === 'default-no' ? 'n' : 'y')
           } else if (stage === 7 && scenario === 'checksum-retry' && output.includes('Synthetic checksum mismatch')) {
             stage = 8
-            child.write('r')
-          } else if (stage === 7 && scenario === 'cancel-retry' && output.includes('Transferring')) {
+            child.write('\u001b[<35;50;10M')
+            setTimeout(() => child.write('\u001b[<0;50;10M'), 300)
+          } else if (stage === 7 && scenario === 'cancel-retry' && output.includes('◈ Transfer in flight · STREAMING')) {
             stage = 9
             child.write('\u001b')
           } else if (stage === 9 && output.includes('Synthetic transfer cancellation acknowledged.')) {
             stage = 8
-            child.write('r')
-          } else if ((stage === 7 || stage === 8) && output.includes('AliceProject transfer complete')) {
+            child.write('\u001b[<35;50;10M')
+            setTimeout(() => child.write('\u001b[<0;50;10M'), 300)
+          } else if ((stage === 7 || stage === 8) && output.includes('✓ AliceProject arrived · PUBLISHED')) {
             stage = 20
             child.write('\r')
-          } else if (stage === 10 && output.includes('Transfer cancelled. Nothing changed.')) {
+          } else if (stage === 10 && output.includes('Transfer cancelled.')) {
             stage = 21
             child.write('q')
           } else if (stage === 20 && (
@@ -123,12 +1558,42 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       })
 
       expect(transcript).toContain(`FIXTURE_RESULT scenario=${scenario} ${expectedResult}`)
+      if (scenario === 'success') {
+        expect(transcript).toContain('Flight Deck · 1/8 · DESTINATION')
+        expect(transcript).toContain('Mission Brief · Source → Cloud fixture')
+        if (!compact) expect(transcript).toContain('! Destination AliceProject key · FIX')
+      } else if (scenario === 'default-no') {
+        expect(transcript).toContain('Transfer Flight Deck')
+      }
+      if (scenario !== 'default-no') {
+        expect(transcript).toContain('◇ BUILD v0.91.0-beta.3 · DEV')
+        expect(transcript).toContain('◆ FOCUS · TRANSFER')
+        expect(transcript).toContain('TRANSFER FLIGHT DECK')
+        expect(transcript).toContain('◆ TRANSFER')
+        expect(transcript).toContain('◆ [ Enter ] Choose / next  │  [ ↑↓ ] Move choice')
+        expect(transcript).toContain('◆ FOCUS WORKSPACE  ›  [ Esc ] Back')
+      }
+      expect(transcript).toContain('◆ Destination AliceProject key')
+      expect(transcript).toContain('◆ Credentials')
+      expect(transcript).toContain('◆ [ Enter ] Choose')
+      if (scenario !== 'auth-loss' && scenario !== 'occupied' && scenario !== 'default-no') {
+        expect(transcript).toContain('◆ Transfer manifest · READY')
+        expect(transcript).toContain('◈ Transfer in flight · STREAMING')
+      }
+      if (scenario === 'checksum-retry' || scenario === 'cancel-retry') {
+        expect(transcript).toContain('Flight Deck · 7/8 · STREAM')
+        expect(transcript).toContain('› [ r ] Retry')
+      }
       if (scenario === 'auth-loss') {
         expect(transcript).toContain('SSH authentication required after destination selection.')
       } else if (scenario === 'occupied') {
         expect(transcript).toContain('Destination key or Home became occupied before planning.')
       } else {
         expect(transcript).toContain('Sessions  0 imported')
+      }
+      if (scenario === 'success' || scenario === 'checksum-retry' || scenario === 'cancel-retry') {
+        expect(transcript).toContain('✓ AliceProject arrived · PUBLISHED')
+        expect(transcript).toContain('◆ [ s ] Start')
       }
       expect(transcript).toContain('\u001b[?25h')
       expect(transcript).toContain('\u001b[?2004l')
@@ -161,10 +1626,10 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 8_000)
       child.onData((data) => {
         output += data
-        if (!openedHelp && output.includes('q / Esc / Ctrl+C  Detach without stopping')) {
+        if (!openedHelp && output.includes('[ / ] Commands') && output.includes('[ q ] Detach')) {
           openedHelp = true
           child.write('?')
-        } else if (!detached && output.includes('Supervisor controls')) {
+        } else if (!detached && output.includes('Help · START · SEARCH · SWITCH · 1/3')) {
           detached = true
           child.write('q')
         }
@@ -176,12 +1641,571 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       })
     })
 
-    expect(transcript).toContain(`OpenAlice  ${cliVersion}  channel dev`)
-    expect(transcript).toContain('Runtime state: absent')
-    expect(transcript).toContain('Supervisor controls')
+    expect(transcript).toContain('OpenAlice Supervisor')
+    expect(transcript).toContain(`v${cliVersion} · DEV`)
+    expect(transcript).toContain('○ STOPPED')
+    expect(transcript).toContain('Help · START · SEARCH · SWITCH · 1/3')
+    expect(transcript).toContain('NOW · [ Enter ] Start/connect/open')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   })
+
+  it('uses raw pointer input inside the compact Setup Focus Workspace', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-overlay-pointer-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [cliEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let setupOpened = false
+      let clickedScope = false
+      let closed = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor overlay pointer timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!setupOpened && output.includes('[ / ] Commands') && output.includes('[ q ] Detach')) {
+          setupOpened = true
+          child.write('p')
+        } else if (!clickedScope && output.includes('Setup Studio · Default AliceProject') && output.includes('Editing')) {
+          clickedScope = true
+          child.write('\u001b[<32;10;5M')
+          child.write('\u001b[<0;10;5M')
+        } else if (!closed && output.includes('› Editing') && output.includes('Current · Machine defaults')) {
+          closed = true
+          child.write('\u001b')
+          setTimeout(() => child.write('q'), 50)
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && closed) resolve(output)
+        else reject(new Error(`Supervisor overlay pointer exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('Current · Machine defaults')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it('clicks the wide Setup Studio Inspector action outside its keycap', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-setup-studio-action-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [cliEntry], {
+      cols: 110,
+      rows: 30,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let hovered = false
+      let clicked = false
+      let closed = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Setup Studio action timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!opened && output.includes('Alice Session · OpenAlice')) {
+          opened = true
+          child.write('p')
+        } else if (!hovered && output.includes('Setup Studio · Default AliceProject') && output.includes('Cycle value')) {
+          hovered = true
+          child.write('\u001b[<35;75;9M')
+        } else if (!clicked && output.includes('› [ Enter ] Cycle value')) {
+          clicked = true
+          child.write('\u001b[<0;75;9M')
+        } else if (!closed && clicked && output.includes('Current · Machine defaults')) {
+          closed = true
+          child.write('\u001b')
+          setTimeout(() => child.write('q'), 50)
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && closed) resolve(output)
+        else reject(new Error(`Supervisor Setup Studio action exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('› [ Enter ] Cycle value')
+    expect(transcript).toContain('Current · Machine defaults')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it('gives a focused confirmation modal an isolated Decision Gate', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-confirmation-modal-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [confirmationFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let requested = false
+      let hoveredCancel = false
+      let clickedCancel = false
+      let cancelled = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor confirmation modal timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!requested && output.includes('[ / ] Commands') && output.includes('○ COLD')) {
+          requested = true
+          child.write('m')
+        } else if (!hoveredCancel && output.includes('Confirm Managed Source') && output.includes('◆ [ Enter ] Prepare source')) {
+          hoveredCancel = true
+          child.write('\u001b[<35;40;23M')
+        } else if (!clickedCancel && output.includes('│ › [ Esc ] Not now')) {
+          clickedCancel = true
+          child.write('\u001b[<0;40;23M')
+        } else if (!cancelled && output.includes('STATUS   Action cancelled.')) {
+          cancelled = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && cancelled) resolve(output)
+        else reject(new Error(`Supervisor confirmation modal exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('Confirm Managed Source')
+    expect(transcript).toContain('◆  CONFIRMATION REQUIRED')
+    expect(transcript).toContain('IMPACT')
+    expect(transcript).toContain('[ Enter ] Prepare source')
+    expect(transcript).toContain('[ Esc ] Not now')
+    expect(transcript).toContain('│ › [ Esc ] Not now')
+    expect(transcript).toContain('◆ FOCUS · PREPARE SOURCE')
+    expect(transcript).toContain('DECISION GATE')
+    expect(transcript).toContain('[ Esc ] Not now')
+    expect(transcript).toContain('◇ BUILD')
+    expect(transcript).toContain('◆ [ Enter ] Prepare source')
+    expect(transcript).toContain('[ Esc ] Not now')
+    expect(transcript).toContain('STATUS   Action cancelled.')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it('cancels a Decision Gate from its action-specific Mission Header', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-confirmation-header-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [confirmationFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let requested = false
+      let hovered = false
+      let clicked = false
+      let cancelled = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor confirmation Header timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!requested && output.includes('[ / ] Commands') && output.includes('○ COLD')) {
+          requested = true
+          child.write('m')
+        } else if (!hovered && output.includes('◆ FOCUS · PREPARE SOURCE') && output.includes('[ Esc ] Not now')) {
+          hovered = true
+          child.write('\u001b[<35;70;2M')
+        } else if (!clicked && output.includes('› [ Esc ] Not now')) {
+          clicked = true
+          child.write('\u001b[<0;70;2M')
+        } else if (!cancelled && output.includes('STATUS   Action cancelled.')) {
+          cancelled = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && cancelled) resolve(output)
+        else reject(new Error(`Supervisor confirmation Header exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('◆ FOCUS · PREPARE SOURCE')
+    expect(transcript).toContain('DECISION GATE')
+    expect(transcript).toContain('› [ Esc ] Not now')
+    expect(transcript).toContain('STATUS   Action cancelled.')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it('opens Setup by clicking a bottom Command Dock result', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-command-dock-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [cliEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let typedUnicode = false
+      let typedSearch = false
+      let clickedSetup = false
+      let setupOpened = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Command Dock timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!opened && output.includes('[ / ] Commands') && output.includes('○ COLD')) {
+          opened = true
+          child.write('/')
+        } else if (!typedSearch && output.includes('Command Dock') && output.includes('› ◆ Start OpenAlice')) {
+          if (!typedUnicode) {
+            typedUnicode = true
+            child.write('日志')
+            return
+          }
+          if (!output.includes('MATCH “日志”') || !output.includes('⌕  日志')) return
+          typedSearch = true
+          child.write('\x15')
+          setTimeout(() => child.write('setup'), 50)
+        } else if (
+          !clickedSetup
+          && output.includes('MATCH “setup”')
+          && output.includes('⌕  setup▌')
+          && output.includes('›   Setup')
+        ) {
+          clickedSetup = true
+          child.write('\u001b[<32;32;19M')
+          child.write('\u001b[<0;32;19M')
+        } else if (!setupOpened && output.includes('Setup Studio · Default AliceProject')) {
+          setupOpened = true
+          child.write('\u001b')
+          setTimeout(() => child.write('q'), 50)
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && setupOpened) resolve(output)
+        else reject(new Error(`Supervisor Command Dock exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('Command Dock')
+    expect(transcript).toContain('MATCH “日志”')
+    expect(transcript).toContain('⌕  日志')
+    expect(transcript).toContain('MATCH “setup”')
+    expect(transcript).toContain('⌕  setup▌')
+    expect(transcript).toContain('Alice Session · OpenAlice')
+    expect(transcript).toContain('Setup Studio · Default AliceProject')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it('keeps every visible Command Spine control segment clickable', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-context-ribbon-'))
+    temporaryPaths.push(isolatedHome)
+    const childEnv: NodeJS.ProcessEnv = {
+      ...process.env,
+      HOME: isolatedHome,
+      OPENALICE_HOME: join(isolatedHome, 'state'),
+      TERM: 'xterm-256color',
+    }
+    delete childEnv.NO_COLOR
+    const child = pty.spawn(process.execPath, [cliEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: childEnv,
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let clickedProject = false
+      let closedOverlay = false
+      let clickedAfterNotice = false
+      let openedPalette = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Command Spine timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (
+          !clickedProject
+          && output.includes('[ i ] Default AliceProject')
+          && output.includes('○ COLD')
+        ) {
+          clickedProject = true
+          child.write('\u001b[<32;56;23M')
+          child.write('\u001b[<0;56;23M')
+        } else if (!closedOverlay && output.includes('AliceProject Switchboard · 1 PROJECT')) {
+          closedOverlay = true
+          child.write('\u001b')
+        } else if (
+          closedOverlay
+          && !clickedAfterNotice
+          && output.includes('STATUS   AliceProject selection')
+        ) {
+          clickedAfterNotice = true
+          child.write('\u001b[<0;6;23M')
+        } else if (!openedPalette && output.includes('Command Dock')) {
+          openedPalette = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && openedPalette) resolve(output)
+        else reject(new Error(`Supervisor Command Spine exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('AliceProject Switchboard · 1 PROJECT')
+    expect(transcript).toContain('STATUS   AliceProject selection')
+    expect(transcript).toContain('Command Dock')
+    expect(transcript).toContain('╰─ ')
+    expect(transcript).toContain('  ›  ')
+    expect(transcript).toContain(' ─╯')
+    expect(transcript).toContain('\u001b[38;2;199;235;239;48;2;10;34;39m')
+    expect(transcript).toContain('\u001b[1;38;2;240;249;255;48;2;10;34;39m[ i ] Default AliceProject')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it('keeps the 46-column Command Spine continuously closed around the Command Dock', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-narrow-command-spine-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 46,
+      rows: 30,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+        OPENALICE_TUI_MOTION: '0',
+      },
+    })
+
+    const closedSpine = '╰─ [ / ] Commands  ›  [ q ] Detach ──────────╯'
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let closingAt = -1
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Narrow Supervisor Command Spine timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!opened && output.includes(closedSpine)) {
+          opened = true
+          child.write('\u001b[<0;6;23M')
+        } else if (opened && closingAt < 0 && output.includes('Command Dock · 1/10 · ABSENT')) {
+          closingAt = output.length
+          child.write('\u001b[<35;6;30M')
+          child.write('\u001b[<0;6;30M')
+          child.write('\u001b[<35;1;4M')
+        } else if (closingAt >= 0 && output.slice(closingAt).includes(closedSpine)) {
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && closingAt >= 0) resolve(output)
+        else reject(new Error(`Narrow Supervisor Command Spine exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain(closedSpine)
+    expect(transcript).not.toContain('[ q ] Detach ───────  ─╯')
+    expect(transcript).toContain('Command Dock · 1/10 · ABSENT')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+    expect(transcript).toContain('\u001b[?1006l')
+  }, 12_000)
+
+  it('keeps the complete Launcher target and action visible at 46x16', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-emergency-launcher-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 46,
+      rows: 16,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+        OPENALICE_TUI_BOOT: '0',
+        OPENALICE_TUI_MOTION: '0',
+        OPENALICE_TUI_START_VIEW: 'connect',
+        OPENALICE_TUI_FIXTURE_FLEET_ROWS: '1',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let hovered = false
+      let clicked = false
+      let detached = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Emergency Supervisor Launcher timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        const plain = stripSgr(output)
+        if (!hovered && plain.includes('◆ [ Enter ] Start OpenAlice')) {
+          hovered = true
+          child.write('\u001b[<35;22;9M')
+        } else if (!clicked && plain.includes('› [ Enter ] Start OpenAlice')) {
+          clicked = true
+          child.write('\u001b[<0;22;9M')
+        } else if (!detached && clicked && plain.includes('Alice Session · OpenAlice') && plain.includes('● RUNNING')) {
+          detached = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && clicked) resolve(output)
+        else reject(new Error(`Emergency Supervisor Launcher exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    const plain = stripSgr(transcript)
+    expect(plain).toContain('OPENALICE LAUNCH · ALICEPROJECT')
+    expect(plain).toContain('1 MACHINE ✓ This computer')
+    expect(plain).toContain('2 ALICEPROJECT ✓ Default AliceProject')
+    expect(plain).toContain('3 RUNTIME ○ READY TO START')
+    expect(plain).toContain('› [ Enter ] Start OpenAlice')
+    expect(plain).toContain('╰─ [Home] │ Inbox │ Link·1 │ Run')
+    expect(plain).toContain('NEXT  Workspace is ready')
+    expect(plain).toContain('◆ [ Enter ]  Open Workspace')
+    expect(plain).toContain('STATUS  ● Connection  healthy')
+    expect(transcript).toContain('FIXTURE_RESULT starts=1 opens=0')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it('keeps and activates tiny Runtime status controls at 46x16', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-emergency-runtime-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 46,
+      rows: 16,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        TERM: 'xterm-256color',
+        OPENALICE_TUI_BOOT: '0',
+        OPENALICE_TUI_MOTION: '0',
+        OPENALICE_TUI_FIXTURE_RUNTIME: 'running',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let hovered = false
+      let clicked = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Emergency Supervisor Runtime timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        const plain = stripSgr(output)
+        if (!opened && plain.includes('Alice Session · OpenAlice')) {
+          opened = true
+          child.write('l')
+        } else if (!hovered
+          && plain.includes('Runtime · LIVE · LOCAL · QUIET')
+          && plain.includes('◇  Tip:')) {
+          hovered = true
+          child.write('\u001b[<35;20;10M')
+        } else if (!clicked && plain.includes('› [ l ] Reload Runtime snapshot')) {
+          clicked = true
+          child.write('\u001b[<0;20;10M')
+          setTimeout(() => child.write('q'), 250)
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && clicked) resolve(output)
+        else reject(new Error(`Emergency Supervisor Runtime exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    const plain = stripSgr(transcript)
+    expect(plain).toContain('╰─ Home │ Inbox │ Link·1 │ [Run]')
+    expect(plain).toContain('Runtime · LIVE · LOCAL · QUIET')
+    expect(plain).toContain('● OPENALICE READY · source')
+    expect(plain).toContain('⌁ This computer → Default AliceProject')
+    expect(plain).toContain('● Alice ready · ○ UTA off · ○ Conn off')
+    expect(plain).toContain('◆ [ o ] Open verified Web UI')
+    expect(plain).toContain('› [ l ] Reload Runtime snapshot')
+    expect(plain).toContain('◇  Tip: No Runtime events in this lens')
+    expect(plain).toContain('╰─ [ / ] Commands  ›  [ q ] Detach')
+    expect(plain).toContain('FIXTURE_RESULT starts=0 opens=0 loads=2')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+    expect(transcript).toContain('\u001b[?1006l')
+  }, 12_000)
 
   it('renders an offline registered Machine and preserves drill-down across resize', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-fleet-offline-'))
@@ -213,23 +2237,34 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
 
     const transcript = await new Promise<string>((resolve, reject) => {
       let output = ''
+      let openedFleet = false
       let selectedRemote = false
       let drilledDown = false
       let returned = false
+      let returnOffset = 0
       const timeout = setTimeout(() => {
         child.kill()
         reject(new Error(`Supervisor offline fleet timed out:\n${output}`))
       }, 8_000)
       child.onData((data) => {
         output += data
-        if (!selectedRemote && output.includes('Cloud fixture') && output.includes('offline')) {
+        if (!openedFleet && output.includes('[Home]') && output.includes('Connections')) {
+          openedFleet = true
+          child.write('\t\t')
+        } else if (!selectedRemote && output.includes('Cloud fixture') && output.includes('offline')) {
           selectedRemote = true
           child.resize(48, 24)
-          child.write('\u001b[B\u001b[C')
+          setTimeout(() => child.write('\u001b[B\u001b[C'), 120)
         } else if (!drilledDown && output.includes('AliceProjects · Cloud fixture')) {
           drilledDown = true
-          child.write('\u001b')
-        } else if (drilledDown && !returned && output.includes('Enter / →  AliceProjects')) {
+          returnOffset = output.length
+          setTimeout(() => child.write('\u001b[D'), 120)
+        } else if (
+          drilledDown
+          && !returned
+          && output.slice(returnOffset).includes('Machines · ')
+          && output.slice(returnOffset).includes('▶ Cloud fixture')
+        ) {
           returned = true
           child.write('q')
         }
@@ -247,6 +2282,260 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   })
+
+  it('reveals and clicks a sixth Fleet row before showing a scroll rail', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-fleet-viewport-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 120,
+      rows: 32,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_FIXTURE_FLEET_ROWS: '6',
+        OPENALICE_TUI_MOTION: '0',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    let expandedFleet = ''
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let openedFleet = false
+      let hoveredSixth = false
+      let clickedSixth = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor expanded Fleet timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!openedFleet && output.includes('[Home]')) {
+          openedFleet = true
+          child.write(']]')
+        } else if (!hoveredSixth && output.includes('Local Project 6')) {
+          hoveredSixth = true
+          expandedFleet = output.slice(output.lastIndexOf('Machines · 1/1'))
+          child.write('\u001b[<35;70;11M')
+        } else if (!clickedSixth && output.includes('» Local Project 6')) {
+          clickedSixth = true
+          child.write('\u001b[<0;70;11M')
+        } else if (clickedSixth && output.includes('AliceProjects · This computer · 6/6')) {
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && clickedSixth) resolve(output)
+        else reject(new Error(`Supervisor expanded Fleet exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(stripSgr(expandedFleet)).toContain('Local Project 6')
+    expect(stripSgr(expandedFleet)).not.toContain('█')
+    expect(transcript).toContain('» Local Project 6')
+    expect(transcript).toContain('▶ Local Project 6')
+    expect(transcript).toContain('AliceProjects · This computer · 6/6')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it('keeps the wide direct Connection board bounded and its quiet field pointer-passive', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-fleet-constellation-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 120,
+      rows: 32,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_BOOT: '0',
+        OPENALICE_TUI_MOTION: '0',
+        OPENALICE_TUI_START_VIEW: 'connect',
+        OPENALICE_TUI_FIXTURE_RUNTIME: 'running',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let clicked = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor active Connection timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        const plain = stripSgr(output)
+        if (!opened && plain.includes('Alice Session · OpenAlice')) {
+          opened = true
+          child.write(']]')
+        } else if (!clicked && plain.includes('Active Route · LIVE · LOCAL')) {
+          clicked = true
+          child.write('\u001b[<35;70;20M')
+          child.write('\u001b[<0;70;20M')
+          setTimeout(() => child.write('q'), 150)
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && clicked) resolve(output)
+        else reject(new Error(`Supervisor active Connection exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(stripSgr(transcript)).toContain('Active Route · LIVE · LOCAL')
+    expect(stripSgr(transcript)).toContain('ACTIVE ROUTE')
+    expect(stripSgr(transcript)).toContain('Runtime is live; AliceProject home is missing')
+    expect(stripSgr(transcript)).toContain('Web route.')
+    expect(stripSgr(transcript)).toContain('◆ running · home missing')
+    expect(stripSgr(transcript)).toContain('◆ LIVE · HOME MISSING')
+    expect(stripSgr(transcript)).not.toContain('◇ missing')
+    expect(stripSgr(transcript)).toContain('↗ WEB  http://127.0.0.1:47331')
+    expect(stripSgr(transcript)).toContain('◆ [ Enter ] Return Home')
+    expect(stripSgr(transcript)).toContain('· Transfer unavailable')
+    expect(stripSgr(transcript)).not.toContain('Machines · 1/1')
+    expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=0 loads=0 diagnoses=0')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it('previews a compact remote switch without dropping the active target', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-switch-target-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_BOOT: '0',
+        OPENALICE_TUI_MOTION: '0',
+        OPENALICE_TUI_START_VIEW: 'connect',
+        OPENALICE_TUI_FIXTURE_RUNTIME: 'running',
+        OPENALICE_TUI_FIXTURE_FLEET_ROWS: '1',
+        OPENALICE_TUI_FIXTURE_REMOTE: '1',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let stage = 0
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor switch target timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        const plain = stripSgr(output)
+        if (stage === 0 && plain.includes('Alice Session · OpenAlice')) {
+          stage = 1
+          child.write(']]')
+        } else if (stage === 1 && plain.includes('Machines · 1/2')) {
+          stage = 2
+          child.write('\u001b[B')
+        } else if (stage === 2 && plain.includes('▶ Cloud Lab')) {
+          stage = 3
+          child.write('\t')
+        } else if (stage === 3 && plain.includes('[ Enter ] Connect & Switch')) {
+          stage = 4
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && stage === 4) resolve(output)
+        else reject(new Error(`Supervisor switch target exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    const plain = stripSgr(transcript)
+    expect(plain).toContain('AliceProjects · Cloud Lab · 1/1')
+    expect(plain).toContain('Switch Target')
+    expect(plain).toContain('◇ SWITCH CANDIDATE')
+    expect(plain).toContain('[ Enter ] Connect & Switch')
+    expect(plain).toContain('current target stays live until ready')
+    expect(plain).toMatch(/This computer\s+● ACTIVE · 1/u)
+    expect(plain).toContain('⌂ This comp… · LOCAL  ›  ● LIVE')
+    expect(transcript).toContain('FIXTURE_RESULT starts=0 opens=0 loads=0 diagnoses=0')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it('keeps the live source visible during a remote switch flight', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-switch-flight-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [launchpadFixtureEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_TUI_BOOT: '0',
+        OPENALICE_TUI_MOTION: '0',
+        OPENALICE_TUI_START_VIEW: 'connect',
+        OPENALICE_TUI_FIXTURE_RUNTIME: 'running',
+        OPENALICE_TUI_FIXTURE_FLEET_ROWS: '1',
+        OPENALICE_TUI_FIXTURE_REMOTE: '1',
+        OPENALICE_TUI_FIXTURE_REMOTE_READY_DELAY_MS: '500',
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let stage = 0
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor switch flight timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        const plain = stripSgr(output)
+        if (stage === 0 && plain.includes('Alice Session · OpenAlice')) {
+          stage = 1
+          child.write(']]')
+        } else if (stage === 1 && plain.includes('Machines · 1/2')) {
+          stage = 2
+          child.write('\u001b[B')
+        } else if (stage === 2 && plain.includes('▶ Cloud Lab')) {
+          stage = 3
+          child.write('\t')
+        } else if (stage === 3 && plain.includes('[ Enter ] Connect & Switch')) {
+          stage = 4
+          child.write('\r')
+        } else if (stage === 4 && plain.includes('◆ TO    Cloud Lab / Research · SSH FORWARD')) {
+          stage = 5
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && stage === 5) resolve(output)
+        else reject(new Error(`Supervisor switch flight exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    const plain = stripSgr(transcript)
+    expect(plain).toContain('Launch Flight Recorder · REMOTE CONNECT · IN FLIGHT')
+    expect(plain).toContain('● FROM  This computer / Default AliceProject · LOCAL · LIVE')
+    expect(plain).toContain('◆ TO    Cloud Lab / Research · SSH FORWARD')
+    expect(plain).toContain('◆ 02  Open SSH forward · IN FLIGHT')
+    expect(plain).toContain('◆ OPERATION ACTIVE')
+    expect(plain).toContain('FIXTURE_RESULT starts=0 opens=0 loads=0 diagnoses=0 disconnects=1')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
 
   it('renders an explicitly selected launch context before detach', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-context-'))
@@ -278,7 +2567,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 8_000)
       child.onData((data) => {
         output += data
-        if (!detached && output.includes('Resolved: home (--home) · port (--port)')) {
+        if (!detached && output.includes('Research') && output.includes('Alice Session · OpenAlice')) {
           detached = true
           child.write('q')
         }
@@ -290,9 +2579,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       })
     })
 
-    expect(transcript).toContain('AliceProject: Research')
-    expect(transcript).toContain(`Home: ${instanceHome}`)
-    expect(transcript).toContain('Resolved: home (--home) · port (--port)')
+    expect(transcript).toContain('Research')
+    expect(transcript).not.toContain(instanceHome)
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   })
@@ -301,7 +2589,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-source-prompt-'))
     temporaryPaths.push(isolatedHome)
     const child = pty.spawn(process.execPath, [cliEntry], {
-      cols: 100,
+      cols: 110,
       rows: 28,
       cwd: isolatedHome,
       env: {
@@ -325,16 +2613,20 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 8_000)
       child.onData((data) => {
         output += data
-        if (!requestedStart && output.includes('c Source')) {
+        if (!requestedStart && output.includes('Start OpenAlice & open Workspace')) {
           requestedStart = true
           child.write('s')
-        } else if (!submittedInvalidPath && output.includes('Configure Runtime source')) {
+        } else if (!submittedInvalidPath && output.includes('Source route · SELECT CHECKOUT')) {
           submittedInvalidPath = true
-          child.write('\u0005\u0015/definitely/not/openalice\r')
+          child.write('\u0005\u0015/definitely/not/openalice')
+          setTimeout(() => {
+            child.write('\u001b[<35;63;10M')
+            setTimeout(() => child.write('\u001b[<0;63;10M'), 100)
+          }, 100)
         } else if (!cancelledPrompt && output.includes('Could not use that checkout')) {
           cancelledPrompt = true
           child.write('\u001b')
-        } else if (!detached && output.includes('Source configuration cancelled.')) {
+        } else if (!detached && output.includes('Source configuration')) {
           detached = true
           child.write('q')
         }
@@ -346,9 +2638,68 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       })
     })
 
-    expect(transcript).toContain('Configure Runtime source')
+    expect(transcript).toContain('Source route · SELECT CHECKOUT')
+    expect(transcript).toContain('Runtime Source · AliceProject setting')
+    expect(transcript).toContain('› [ Enter ] Save & start')
+    expect(transcript).toContain('Source route · REJECTED')
     expect(transcript).toContain('Could not use that checkout')
-    expect(transcript).toContain('Source configuration cancelled.')
+    expect(transcript).toContain('Source configuration')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  })
+
+  it('keeps the complete Source Launch Bay route at the 80-column baseline', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-source-narrow-'))
+    temporaryPaths.push(isolatedHome)
+    const childEnv = { ...process.env }
+    delete childEnv.OPENALICE_HOME
+    delete childEnv.OPENALICE_INSTANCE
+    const child = pty.spawn(process.execPath, [cliEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...childEnv,
+        HOME: isolatedHome,
+        OPENALICE_SUPERVISOR_HOME: join(isolatedHome, 'supervisor'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let closed = false
+      let detached = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor narrow Source Launch Bay timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!opened && output.includes('Start OpenAlice & open Workspace')) {
+          opened = true
+          child.write('c')
+        } else if (!closed && output.includes('Source Launch Bay · SELECT CHECKOUT')) {
+          closed = true
+          child.write('\u001b')
+        } else if (!detached && output.includes('Source configuration')) {
+          detached = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor narrow Source Launch Bay exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('Source Launch Bay · SELECT CHECKOUT')
+    expect(transcript).toContain('◆ Select  → Validate  → Save  → Launch')
+    expect(transcript).toContain('Runtime Source · AliceProject setting')
+    expect(transcript).toContain('◆ CONTRACT')
+    expect(transcript).toContain('Source configuration')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   })
@@ -403,7 +2754,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 8_000)
       child.onData((data) => {
         output += data
-        if (!requestedStart && output.includes('Enter prepares anything missing')) {
+        if (!requestedStart && output.includes('Start OpenAlice & open Workspace')) {
           requestedStart = true
           child.write('\r')
         } else if (
@@ -424,9 +2775,10 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       })
     })
 
-    expect(transcript).toContain(`OpenAlice  ${cliVersion}  channel dev`)
+    expect(transcript).toContain('OpenAlice Supervisor')
+    expect(transcript).toContain(`v${cliVersion} · DEV`)
     expect(transcript).toContain('installer-managed OpenAlice source branch dev')
-    expect(transcript).not.toContain('Configure Runtime source')
+    expect(transcript).not.toContain('Runtime Source · AliceProject setting')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   })
@@ -455,6 +2807,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       let output = ''
       let openedSettings = false
       let selectedPort = false
+      let submittedInvalidPort = false
       let submittedPort = false
       let closedSettings = false
       let detached = false
@@ -464,15 +2817,30 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 10_000)
       child.onData((data) => {
         output += data
-        if (!openedSettings && output.includes('p Setup')) {
+        if (!openedSettings && output.includes('Alice Session · OpenAlice')) {
           openedSettings = true
           child.write('p')
-        } else if (!selectedPort && output.includes('OpenAlice setup · Default AliceProject')) {
+        } else if (!selectedPort && output.includes('Setup Studio · Default AliceProject')) {
           selectedPort = true
           child.write('\u001b[B\u001b[B\r')
-        } else if (!submittedPort && output.includes('Set AliceProject browser port')) {
+        } else if (!submittedInvalidPort && output.includes('Set AliceProject browser port')) {
+          submittedInvalidPort = true
+          child.write('99999')
+          setTimeout(() => {
+            child.write('\u001b[<35;65;10M')
+            setTimeout(() => child.write('\u001b[<0;65;10M'), 300)
+          }, 100)
+        } else if (
+          !submittedPort
+          && output.includes('Layer Context · PROJECT · FIX')
+          && output.includes('Browser port must be a whole number')
+        ) {
           submittedPort = true
-          child.write('49001\r')
+          child.write('\u0005\u001549001')
+          setTimeout(() => {
+            child.write('\u001b[<35;65;10M')
+            setTimeout(() => child.write('\u001b[<0;65;10M'), 300)
+          }, 100)
         } else if (
           !closedSettings
           && output.includes('Saved browser port for AliceProject "Default AliceProject".')
@@ -481,7 +2849,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           child.write('\u001b')
         } else if (
           !detached
-          && output.includes('port (project.default.port)')
+          && output.includes('STATUS   Setup closed.')
         ) {
           detached = true
           child.write('q')
@@ -498,10 +2866,14 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       await readFile(join(supervisorHome, 'config.json'), 'utf8'),
     )
     expect(config.projects.default.port).toBe(49_001)
-    expect(transcript).toContain('OpenAlice setup · Default AliceProject')
+    expect(transcript).toContain('Setup Studio · Default AliceProject')
+    expect(transcript).toContain('Layer Context · PROJECT · EDIT')
     expect(transcript).toContain('Set AliceProject browser port')
+    expect(transcript).toContain('› [ Enter ] Validate & save')
+    expect(transcript).toContain('Layer Context · PROJECT · FIX')
+    expect(transcript).toContain('Browser port must be a whole number')
     expect(transcript).toContain('Saved browser port for AliceProject "Default AliceProject".')
-    expect(transcript).toContain('port (project.default.port)')
+    expect(transcript).toContain('STATUS   Setup closed.')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   }, 15_000)
@@ -514,8 +2886,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     delete childEnv.OPENALICE_HOME
     delete childEnv.OPENALICE_INSTANCE
     const child = pty.spawn(process.execPath, [cliEntry], {
-      cols: 110,
-      rows: 30,
+      cols: 80,
+      rows: 24,
       cwd: dirname(cliEntry),
       env: {
         ...childEnv,
@@ -539,7 +2911,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 10_000)
       child.onData((data) => {
         output += data
-        if (!openedSetup && output.includes('p Setup')) {
+        if (!openedSetup && output.includes('Alice Session · OpenAlice')) {
           openedSetup = true
           child.write('p')
         } else if (
@@ -569,7 +2941,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           child.write('\u001b')
         } else if (
           !detached
-          && output.includes('port (machine.defaults.port)')
+          && output.includes('STATUS   Setup closed.')
         ) {
           detached = true
           child.write('q')
@@ -587,9 +2959,11 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     )
     expect(config.defaults.port).toBe(49_002)
     expect(transcript).toContain('Editing machine defaults.')
+    expect(transcript).toContain('Setup Workbench · MACHINE · EDIT')
+    expect(transcript).toContain('◆ Edit  → Validate  → Save')
     expect(transcript).toContain('Set machine-default browser port')
     expect(transcript).toContain('Saved browser port for machine default.')
-    expect(transcript).toContain('port (machine.defaults.port)')
+    expect(transcript).toContain('STATUS   Setup closed.')
   }, 15_000)
 
   it('creates, selects, remembers, and switches named AliceProjects inside the TUI', async () => {
@@ -618,6 +2992,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       let submittedName = false
       let acceptedHome = false
       let reopenedProjects = false
+      let focusedDefault = false
+      let defaultFocusOffset = 0
       let selectedDefault = false
       let detached = false
       const timeout = setTimeout(() => {
@@ -626,7 +3002,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 12_000)
       child.onData((data) => {
         output += data
-        if (!openedProjects && output.includes('i AliceProjects')) {
+        if (!openedProjects && output.includes('Start OpenAlice & open Workspace')) {
           openedProjects = true
           child.write('i')
         } else if (!requestedCreate && output.includes('+ Create AliceProject')) {
@@ -637,32 +3013,47 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
           && output.includes('AliceProject key')
         ) {
           submittedName = true
-          child.write('research\r')
+          child.write('research')
+          setTimeout(() => {
+            child.write('\u001b[<35;60;10M')
+            setTimeout(() => child.write('\u001b[<0;60;10M'), 100)
+          }, 100)
         } else if (
           !acceptedHome
           && output.includes('Create AliceProject · research')
           && output.includes('Complete home')
         ) {
           acceptedHome = true
-          child.write('\r')
+          child.write('\u001b[<35;64;10M')
+          setTimeout(() => child.write('\u001b[<0;64;10M'), 100)
         } else if (
           !reopenedProjects
-          && output.includes('Created and selected AliceProject Research.')
-          && output.includes('AliceProject: Research')
+          && output.includes('Created and selected AliceProject Research')
+          && output.includes('Research')
         ) {
           reopenedProjects = true
           child.write('i')
         } else if (
           reopenedProjects
+          && !focusedDefault
           && !selectedDefault
-          && output.includes('Research · current · default')
+          && output.includes('Research')
+          && output.includes('CURRENT·DEFAULT')
+        ) {
+          focusedDefault = true
+          defaultFocusOffset = output.length
+          setTimeout(() => child.write('\u001b[A'), 50)
+        } else if (
+          focusedDefault
+          && !selectedDefault
+          && output.slice(defaultFocusOffset).includes('◆ Default AliceProject · 1/3')
         ) {
           selectedDefault = true
-          child.write('\u001b[A\r')
+          child.write('\r')
         } else if (
           !detached
-          && output.includes('Selected AliceProject Default AliceProject; future bare starts use it.')
-          && output.includes('AliceProject: Default AliceProject')
+          && output.includes('Selected AliceProject Default AliceProject')
+          && output.includes('Default AliceProject')
         ) {
           detached = true
           child.write('q')
@@ -683,12 +3074,219 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       name: 'research',
       home: await realpath(join(isolatedHome, '.openalice-research')),
     })
-    expect(transcript).toContain('OpenAlice AliceProjects')
-    expect(transcript).toContain('Created and selected AliceProject Research.')
-    expect(transcript).toContain('Selected AliceProject Default AliceProject; future bare starts use it.')
+    expect(transcript).toContain('AliceProject Switchboard · 1 PROJECT')
+    expect(transcript).toContain('› [ Enter ] Continue')
+    expect(transcript).toContain('› [ Enter ] Create & select')
+    expect(transcript).toContain('Created and selected AliceProject Research')
+    expect(transcript).toContain('Selected AliceProject Default AliceProject')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   }, 15_000)
+
+  it('keeps the Foundry identity step complete at the 80-column baseline', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-foundry-narrow-'))
+    temporaryPaths.push(isolatedHome)
+    const childEnv = { ...process.env }
+    delete childEnv.OPENALICE_HOME
+    delete childEnv.OPENALICE_INSTANCE
+    const child = pty.spawn(process.execPath, [cliEntry], {
+      cols: 80,
+      rows: 24,
+      cwd: dirname(cliEntry),
+      env: {
+        ...childEnv,
+        HOME: isolatedHome,
+        OPENALICE_SUPERVISOR_HOME: join(isolatedHome, 'supervisor'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let requestedCreate = false
+      let foundry = false
+      let returned = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor narrow Foundry timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!opened && output.includes('Start OpenAlice & open Workspace')) {
+          opened = true
+          child.write('i')
+        } else if (!requestedCreate && output.includes('+ Create AliceProject')) {
+          requestedCreate = true
+          child.write('\u001b[B\r')
+        } else if (!foundry && output.includes('AliceProject Foundry · 1/2 · IDENTITY')) {
+          foundry = true
+          child.write('\u001b')
+        } else if (foundry && !returned && data.includes('AliceProject Switchboard')) {
+          returned = true
+          child.write('\u001b')
+        } else if (returned && output.includes('AliceProject selection')) {
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor narrow Foundry exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('AliceProject Foundry · 1/2 · IDENTITY')
+    expect(transcript).toContain('◆ Identity  → Complete Home')
+    expect(transcript).toContain('Create AliceProject · Project key')
+    expect(transcript).toContain('◆ CONTRACT')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
+
+  it('selects a wide Switchboard row and clicks its Inspector action outside the keycap', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-switchboard-action-'))
+    temporaryPaths.push(isolatedHome)
+    const supervisorHome = join(isolatedHome, 'supervisor')
+    const researchHome = join(isolatedHome, 'research-home')
+    await mkdir(supervisorHome, { recursive: true })
+    await mkdir(researchHome, { recursive: true })
+    await writeFile(join(supervisorHome, 'config.json'), `${JSON.stringify({
+      schemaVersion: 2,
+      projects: {
+        research: {
+          name: 'research',
+          home: researchHome,
+        },
+      },
+    }, null, 2)}\n`)
+    const childEnv = { ...process.env }
+    delete childEnv.OPENALICE_HOME
+    delete childEnv.OPENALICE_INSTANCE
+    const child = pty.spawn(process.execPath, [cliEntry], {
+      cols: 110,
+      rows: 30,
+      cwd: dirname(cliEntry),
+      env: {
+        ...childEnv,
+        HOME: isolatedHome,
+        OPENALICE_SUPERVISOR_HOME: supervisorHome,
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let rowHovered = false
+      let actionHovered = false
+      let actionClicked = false
+      let detached = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor Switchboard action timed out:\n${output}`))
+      }, 10_000)
+      child.onData((data) => {
+        output += data
+        if (!opened && output.includes('[ i ] Default AliceProject')) {
+          opened = true
+          child.write('i')
+        } else if (
+          !rowHovered
+          && output.includes('AliceProject Switchboard · 2 PROJECTS')
+          && output.includes('Research')
+        ) {
+          rowHovered = true
+          child.write('\u001b[<35;20;6M')
+        } else if (
+          !actionHovered
+          && output.includes('› Research')
+          && output.includes('Inspector · 2/3')
+        ) {
+          actionHovered = true
+          child.write('\u001b[<35;75;10M')
+        } else if (!actionClicked && output.includes('› [ Enter ] Select')) {
+          actionClicked = true
+          child.write('\u001b[<0;75;10M')
+        } else if (
+          !detached
+          && output.includes('Selected AliceProject Research')
+        ) {
+          detached = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && detached) resolve(output)
+        else reject(new Error(`Supervisor Switchboard action exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    const config = JSON.parse(await readFile(join(supervisorHome, 'config.json'), 'utf8'))
+    expect(config.defaultProject).toBe('research')
+    expect(transcript).toContain('› Research')
+    expect(transcript).toContain('› [ Enter ] Select')
+    expect(transcript).toContain('Selected AliceProject Research')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 15_000)
+
+  it('keeps the Switchboard Inspector and status complete in an 80x20 terminal', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-switchboard-short-'))
+    temporaryPaths.push(isolatedHome)
+    const childEnv = { ...process.env }
+    delete childEnv.OPENALICE_HOME
+    delete childEnv.OPENALICE_INSTANCE
+    const child = pty.spawn(process.execPath, [cliEntry], {
+      cols: 80,
+      rows: 20,
+      cwd: dirname(cliEntry),
+      env: {
+        ...childEnv,
+        HOME: isolatedHome,
+        OPENALICE_SUPERVISOR_HOME: join(isolatedHome, 'supervisor'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let opened = false
+      let closed = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Short Supervisor Switchboard timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!opened && output.includes('[ i ] Default AliceProject')) {
+          opened = true
+          child.write('i')
+        } else if (
+          !closed
+          && output.includes('Inspector · 1/2 · SELECT & CREATE')
+          && output.includes('Switchboard status · Default AliceProject')
+          && output.includes('Copy AI credentials with openalice project copy-ai-creds.')
+        ) {
+          closed = true
+          child.write('\u001b')
+          setTimeout(() => child.write('q'), 40)
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0 && closed) resolve(output)
+        else reject(new Error(`Short Supervisor Switchboard exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('AliceProject Switchboard · 1 PROJECT')
+    expect(transcript).toContain('Inspector · 1/2 · SELECT & CREATE')
+    expect(transcript).toContain('Switchboard status · Default AliceProject')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 12_000)
 
   it('recovers in the AliceProject picker when the remembered complete home is missing', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-instance-recovery-'))
@@ -733,22 +3331,24 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         output += data
         if (
           !openedProjects
-          && output.includes('Using "default"; press i AliceProjects to recover.')
-          && output.includes('AliceProject: Default AliceProject')
+          && output.includes('Using "default"; press i Alice')
+          && output.includes('Default AliceProject')
         ) {
           openedProjects = true
           child.write('i')
         } else if (
           openedProjects
           && !repairedDefault
-          && output.includes('Default AliceProject · current')
+          && output.includes('AliceProject Switchboard')
+          && output.includes('Default AliceProject')
+          && output.includes('CURRENT')
           && output.includes('+ Create AliceProject')
         ) {
           repairedDefault = true
           child.write('\r')
         } else if (
           !detached
-          && output.includes('Selected AliceProject Default AliceProject; future bare starts use it.')
+          && output.includes('Selected AliceProject Default AliceProject')
         ) {
           detached = true
           child.write('q')
@@ -767,9 +3367,9 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(config.defaultProject).toBeUndefined()
     expect(config.projects.missing.home).toBe(join(isolatedHome, 'disconnected-home'))
     expect(transcript).toContain('AliceProject "missing" is missing.')
-    expect(transcript).toContain('Using "default"; press i AliceProjects to recover.')
+    expect(transcript).toContain('Using "default"; press i Alice')
     expect(transcript).toContain('+ Create AliceProject')
-    expect(transcript).toContain('Selected AliceProject Default AliceProject; future bare starts use it.')
+    expect(transcript).toContain('Selected AliceProject Default AliceProject')
   }, 15_000)
 
   it('shows higher-priority CLI overrides as locked settings', async () => {
@@ -803,13 +3403,17 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 10_000)
       child.onData((data) => {
         output += data
-        if (!openedSettings && output.includes('p Setup')) {
+        if (!openedSettings && output.includes('Alice Session · OpenAlice')) {
           openedSettings = true
           child.write('p')
-        } else if (!selectedPort && output.includes('44000 · locked')) {
+        } else if (!selectedPort && output.includes('Setup Studio · Default AliceProject')) {
           selectedPort = true
           child.write('\u001b[B\u001b[B')
-        } else if (!testedLockedPort && output.includes('Locked by --port.')) {
+        } else if (
+          !testedLockedPort
+          && output.includes('Current · 44000 · locked')
+          && output.includes('Locked by --port.')
+        ) {
           testedLockedPort = true
           child.write('\r')
           setTimeout(() => child.write('\u001b'), 50)
@@ -861,22 +3465,17 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 10_000)
       child.onData((data) => {
         output += data
-        if (!openedInstances && output.includes('i AliceProjects')) {
+        if (!openedInstances && output.includes('Start OpenAlice & open Workspace')) {
           openedInstances = true
           child.write('i')
-        } else if (
-          !closedInstances
-          && output.includes('AliceProject selection is read-only.')
-          && output.includes('Research · current')
-        ) {
-          closedInstances = true
-          child.write('\u001b')
-        } else if (
-          !detached
-          && output.includes('AliceProject selection closed.')
-        ) {
-          detached = true
-          child.write('q')
+          setTimeout(() => {
+            closedInstances = true
+            child.write('\u001b')
+            setTimeout(() => {
+              detached = true
+              child.write('q')
+            }, 200)
+          }, 300)
         }
       })
       child.onExit(({ exitCode }) => {
@@ -887,9 +3486,11 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     })
 
     expect(transcript).toContain('Locked by --instance.')
-    expect(transcript).toContain('Research · current')
+    expect(transcript).toContain('Research')
+    expect(transcript).toContain('CURRENT')
+    expect(transcript).toContain('READ ONLY')
     expect(transcript).not.toContain('+ Create AliceProject')
-  })
+  }, 15_000)
 
   it('explains when managed source is unavailable from a source-run CLI', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-managed-source-'))
@@ -910,7 +3511,6 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     const transcript = await new Promise<string>((resolve, reject) => {
       let output = ''
       let openedOverview = false
-      let requestedManaged = false
       let detached = false
       const timeout = setTimeout(() => {
         child.kill()
@@ -918,13 +3518,10 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 8_000)
       child.onData((data) => {
         output += data
-        if (!openedOverview && output.includes('m Transfer')) {
+        if (!openedOverview && output.includes('Start OpenAlice & open Workspace')) {
           openedOverview = true
-          child.write(']')
-        } else if (!requestedManaged && output.includes('m Managed')) {
-          requestedManaged = true
           child.write('m')
-        } else if (!detached && output.includes('Managed source preparation is available from an installed')) {
+        } else if (!detached && output.includes('Managed source is unavailable')) {
           detached = true
           child.write('q')
         }
@@ -937,9 +3534,9 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     })
 
     expect(transcript).toContain(
-      'Managed source preparation is available from an installed',
+      'Managed source is unavailable',
     )
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
-  })
+  }, 12_000)
 })

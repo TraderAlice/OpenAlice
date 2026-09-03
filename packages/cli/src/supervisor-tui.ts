@@ -47,6 +47,7 @@ import { resolveInstalledLayout } from './install-layout.mjs'
 import { CLI_VERSION, readInstallSource } from './install-source.mjs'
 import { findOpenAliceRoot } from './local-start.mjs'
 import { readRuntimeLogs } from './logs.mjs'
+import { probeOpenAlice } from './runtime-client.mjs'
 import {
   inspectManagedSource,
   prepareManagedSource,
@@ -54,23 +55,201 @@ import {
   type ManagedSourceResult,
 } from './managed-source.ts'
 import { loadPiTui } from './pi-tui-loader.ts'
-import { connectSsh } from './ssh-connect.mjs'
+import {
+  createSupervisorTerminalCanvas,
+  parseSupervisorPointer,
+  type SupervisorPointerEvent,
+} from './supervisor-tui-pointer.ts'
+import {
+  SupervisorOverlayPointerRouter,
+  supervisorVisibleListIndexes,
+  type SupervisorOverlayListTarget,
+  type SupervisorOverlayOptions,
+} from './supervisor-overlay-pointer.ts'
+import {
+  renderSupervisorConfirmation,
+  renderSupervisorConfirmationActionBar,
+  SUPERVISOR_CONFIRMATION_OVERLAY_OPTIONS,
+  type SupervisorConfirmation,
+  type SupervisorConfirmationView,
+} from './supervisor-confirmation.ts'
+import {
+  createSupervisorCommandDeckState,
+  decorateSupervisorCommandDeck,
+  filterSupervisorCommandDeckItems,
+  moveSupervisorCommandDeckSelection,
+  normalizeSupervisorCommandDeckState,
+  renderSupervisorCommandDeck,
+  supervisorCommandDockOverlayOptions,
+  supervisorCommandDeckItems,
+  type SupervisorCommandDeckItem,
+  type SupervisorCommandDeckState,
+} from './supervisor-command-deck.ts'
+import {
+  createSupervisorTuiTheme,
+  decorateSupervisorFrame,
+  type SupervisorTuiTheme,
+} from './supervisor-tui-theme.ts'
+import {
+  decorateSupervisorSetupStudio,
+  decorateSupervisorSetupWorkbench,
+  renderSupervisorSetupStudio,
+  renderSupervisorSetupWorkbench,
+  supervisorSetupWorkbenchFieldWidth,
+  type SupervisorSetupItem,
+} from './supervisor-setup-view.ts'
+import {
+  decorateSupervisorProjectSwitchboard,
+  renderSupervisorProjectSwitchboard,
+  type SupervisorProjectSwitchboardItem,
+} from './supervisor-projects-view.ts'
+import {
+  decorateSupervisorProjectFoundry,
+  renderSupervisorProjectFoundry,
+  supervisorProjectFoundryFieldWidth,
+  type SupervisorProjectFoundryView,
+} from './supervisor-project-foundry-view.ts'
+import {
+  decorateSupervisorSourceLaunchBay,
+  renderSupervisorSourceLaunchBay,
+  supervisorSourceFieldWidth,
+  type SupervisorSourcePhase,
+} from './supervisor-source-view.ts'
+import {
+  decorateSupervisorReleaseObservatory,
+  renderSupervisorReleaseObservatory,
+} from './supervisor-release-view.ts'
+import {
+  decorateSupervisorTaskSurface,
+  renderSupervisorTaskSurface,
+  supervisorTaskSurfaceOptions,
+  supervisorUsesTaskStage,
+  type SupervisorFocusTask,
+} from './supervisor-task-surface.ts'
+import {
+  createSupervisorHelpState,
+  moveSupervisorHelpSelection,
+  normalizeSupervisorHelpState,
+  renderSupervisorHelp,
+  selectSupervisorHelpBoundary,
+  type SupervisorHelpState,
+  type SupervisorHelpTarget,
+} from './supervisor-help-view.ts'
+import {
+  renderSupervisorNavigation,
+  supervisorNavigationPanelAt,
+  type SupervisorNavigationTarget,
+} from './supervisor-navigation.ts'
+import {
+  renderSupervisorActivitySlot,
+  supervisorCommandHoverPreview,
+  supervisorMotionEnabled,
+} from './supervisor-tui-feedback.ts'
+import {
+  renderSupervisorBootSequence,
+  supervisorBootSequenceEnabled,
+  SUPERVISOR_BOOT_LAST_FRAME,
+} from './supervisor-boot-sequence.ts'
+import {
+  nextSupervisorLogFilter,
+  renderSupervisorLogs,
+  supervisorFilteredLogCount,
+  supervisorLogFilterLabel,
+  supervisorSelectedLogEntry,
+  type SupervisorLogFilter,
+  type SupervisorLogTarget,
+  type SupervisorRuntimeLogs as RuntimeLogs,
+} from './supervisor-tui-logs.ts'
+import {
+  appendSupervisorConnectionEvent,
+  createSupervisorConnectionEvent,
+  renderSupervisorConnectionChronicle,
+  renderSupervisorRuntimeSummary,
+  type SupervisorConnectionEvent,
+  type SupervisorConnectionEventKind,
+  type SupervisorConnectionEventOrigin,
+  type SupervisorConnectionPhase,
+} from './supervisor-connection-chronicle.ts'
+import {
+  advanceSupervisorLaunchFlight,
+  createSupervisorLaunchFlight,
+  failSupervisorLaunchFlight,
+  renderSupervisorLaunchFlight,
+  type SupervisorLaunchFlight,
+  type SupervisorLaunchFlightKind,
+  type SupervisorLaunchStageId,
+} from './supervisor-launch-flight.ts'
+import { supervisorClipboardPayload } from './supervisor-terminal-clipboard.ts'
+import {
+  createSupervisorInboxState,
+  moveSupervisorInboxSelection,
+  normalizeSupervisorInboxState,
+  readSupervisorInbox,
+  renderSupervisorInbox,
+  selectedSupervisorInboxEntry,
+  setSupervisorInboxRead,
+  supervisorInboxWorkspaceUrl,
+  supervisorInboxUnreadCount,
+  updateSupervisorInboxEntryRead,
+  type SupervisorInboxSnapshot,
+  type SupervisorInboxState,
+  type SupervisorInboxTarget,
+} from './supervisor-inbox.ts'
+import {
+  createSupervisorDoctorState,
+  moveSupervisorDoctorSelection,
+  normalizeSupervisorDoctorState,
+  renderSupervisorDoctor,
+  selectSupervisorDoctorBoundary,
+  type SupervisorDoctorReport as DoctorReport,
+  type SupervisorDoctorState,
+  type SupervisorDoctorTarget,
+} from './supervisor-doctor-view.ts'
+import {
+  anchorSupervisorControlConsole,
+  renderSupervisorCommandBar,
+  renderSupervisorControlConsole,
+  renderSupervisorContextTip,
+  renderSupervisorDock,
+  renderSupervisorFocusActionBar,
+  renderSupervisorHeaderLayout,
+  renderSupervisorHome,
+  renderSupervisorPanel,
+  supervisorCommandTargets,
+  type SupervisorCommandTarget,
+  type SupervisorHomeHotspotKind,
+  type SupervisorHomeHotspotTarget,
+  type SupervisorHomeTarget,
+} from './supervisor-tui-view.ts'
+import { connectSsh, openBrowser } from './ssh-connect.mjs'
 import { buildRemoteSshArgs } from './remote.mjs'
 import { planProjectTransfer, type ProjectTransferPlan } from './project-transfer.ts'
 import { transferProjectOverSsh } from './project-transfer-ssh.ts'
 import type { ProjectTransferReceipt } from './project-transfer-stream.ts'
 import {
   createSupervisorFleetState,
+  displayWidth,
   fleetTunnelKey,
   moveFleetSelection,
   renderSupervisorFleet,
   replaceFleetInventory,
+  selectFleetIndex,
   selectedFleetMachine,
   selectedFleetProject,
   selectFleetProjectByKey,
   setFleetFocus,
+  SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
+  supervisorFleetLaunchIntent,
+  supervisorFleetRailTargetAt,
+  supervisorFleetHasSingleLaunchTarget,
+  supervisorFleetLauncherRows,
+  supervisorFleetTargetAt,
+  type SupervisorFleetRailTarget,
+  type SupervisorFleetPointerTarget,
   type SupervisorFleetState,
 } from './supervisor-fleet.ts'
+import { truncateDisplayWidth } from './supervisor-display.ts'
+import type { SupervisorScrollRailTarget } from './supervisor-scroll-rail.ts'
 import {
   createSupervisorTransferWizard,
   renderTransferPlanReview,
@@ -78,6 +257,17 @@ import {
   selectTransferDestination,
   selectedTransferDestination,
 } from './supervisor-transfer.ts'
+import {
+  decorateSupervisorTransferFlightDeck,
+  renderSupervisorTransferArrival,
+  renderSupervisorTransferChoice,
+  renderSupervisorTransferFlightDeck,
+  renderSupervisorTransferInput,
+  renderSupervisorTransferPlanning,
+  renderSupervisorTransferProgress,
+  renderSupervisorTransferRecovery,
+  renderSupervisorTransferReview,
+} from './supervisor-transfer-view.ts'
 import {
   createSupervisorAliceProject,
   persistAliceProjectLaunchConfig,
@@ -107,8 +297,19 @@ const ENABLED_SETTING = 'Enabled'
 const DISABLED_SETTING = 'Disabled'
 const PROJECT_SCOPE = 'This AliceProject'
 const MACHINE_SCOPE = 'Machine defaults'
+const WIDE_OVERVIEW_RESERVED_CHROME_HEIGHT = 5
+const FLEET_VIEWPORT_RESERVED_HEIGHT = 12
+const WIDE_OPERATIONAL_CANVAS_RESERVED_CHROME_HEIGHT = 5
 
-interface RuntimeSummary {
+type SupervisorRailSurface = 'logs' | 'doctor' | 'fleet-machines' | 'fleet-projects'
+
+interface SupervisorRailPointerTarget {
+  surface: SupervisorRailSurface
+  index: number
+  trackRow: number
+}
+
+export interface RuntimeSummary {
   class?: string
   state?: string
   home?: string
@@ -130,25 +331,6 @@ interface RuntimeSummary {
     uta?: string
     connector?: string
   }
-}
-
-interface RuntimeLogs {
-  entries?: Array<{ text?: string }>
-  truncated?: boolean
-}
-
-interface DoctorReport {
-  overall?: string
-  summary?: {
-    passed?: number
-    warnings?: number
-    failures?: number
-  }
-  checks?: Array<{
-    status?: string
-    summary?: string
-    detail?: string
-  }>
 }
 
 interface UpdateResult {
@@ -175,7 +357,9 @@ interface UpdateResult {
 
 export type SupervisorUpdateChannel = 'stable' | 'beta' | 'dev'
 
-export type SupervisorPanel = 'fleet' | 'overview' | 'logs' | 'doctor' | 'help'
+export type SupervisorPanel = 'fleet' | 'overview' | 'inbox' | 'logs' | 'doctor' | 'help'
+export type { SupervisorFocusTask } from './supervisor-task-surface.ts'
+
 export type SupervisorMode = 'normal' | 'config-recovery'
 export type SupervisorConfigRecoveryReason = 'newer-schema' | 'unreadable'
 export type SupervisorAction =
@@ -188,11 +372,27 @@ export type SupervisorAction =
   | 'doctor'
   | 'update'
   | 'apply-update'
-export type SupervisorConfirmation =
-  | 'stop'
-  | 'restart'
-  | 'managed-source'
-  | 'update'
+export type { SupervisorConfirmation } from './supervisor-confirmation.ts'
+
+export interface SupervisorConnectionHealth {
+  phase: SupervisorConnectionPhase
+  consecutiveFailures: number
+  checkedAt?: number
+}
+
+export interface SupervisorActiveTarget {
+  kind: 'local' | 'ssh'
+  machineKey: string
+  machineName: string
+  projectKey: string
+  projectName: string
+  home: string
+  transport: 'loopback' | 'ssh-forward'
+  endpoint: string
+  clientUrl?: string
+  runtime: RuntimeSummary
+  health?: SupervisorConnectionHealth
+}
 
 export interface SupervisorSnapshot {
   version: string
@@ -203,6 +403,7 @@ export interface SupervisorSnapshot {
   recoveryReason?: SupervisorConfigRecoveryReason
   diagnostic?: string
   panel?: SupervisorPanel
+  focusTask?: SupervisorFocusTask
   busy?: string
   notice?: string
   confirmation?: SupervisorConfirmation
@@ -211,12 +412,17 @@ export interface SupervisorSnapshot {
   update?: UpdateResult | null
   managedSource?: ManagedSourcePlan | null
   fleet?: SupervisorFleetState | null
+  activeTarget?: SupervisorActiveTarget | null
+  connectionEvents?: SupervisorConnectionEvent[]
+  launchFlight?: SupervisorLaunchFlight | null
+  inbox?: SupervisorInboxSnapshot | null
 }
 
 export interface SupervisorTuiDependencies {
   env?: NodeJS.ProcessEnv
   stdin?: NodeJS.ReadStream
   stdout?: NodeJS.WriteStream
+  initialPanel?: SupervisorPanel
   inspect?: (options?: { homeRoot?: string; waitMs?: number }) => Promise<RuntimeSummary>
   start?: (options: Record<string, unknown>) => Promise<unknown>
   stop?: (options: Record<string, unknown>) => Promise<unknown>
@@ -264,6 +470,11 @@ export interface SupervisorTuiDependencies {
   version?: string
   channel?: string
   pollIntervalMs?: number
+  connectionPollIntervalMs?: number
+  probeTarget?: (endpoint: string) => Promise<boolean>
+  readInbox?: typeof readSupervisorInbox
+  setInboxRead?: typeof setSupervisorInboxRead
+  now?: () => number
   seedFleet?: () => Promise<MachineFleetEnvelope>
   inspectFleet?: () => Promise<MachineFleetEnvelope>
   loadMachineRegistry?: () => Promise<MachineRegistrySummary>
@@ -271,7 +482,7 @@ export interface SupervisorTuiDependencies {
     machine: MachineInventory
     project: MachineProjectInventory
     signal: AbortSignal
-    onReady: () => void
+    onReady: (connection: { localPort: number; localUrl: string; clientUrl: string }) => void
   }) => Promise<number>
   planProjectTransfer?: typeof planProjectTransfer
   sendProjectTransfer?: (input: {
@@ -297,12 +508,20 @@ interface SupervisorServices {
   applyUpdate: NonNullable<SupervisorTuiDependencies['applyUpdate']>
 }
 
+interface SupervisorHomePrimaryIntent {
+  kind: 'runtime' | 'inbox'
+  label: string
+  inboxUnread: number
+}
+
 export async function runSupervisorTui(
   launchFlags: TuiLaunchFlags = {},
   dependencies: SupervisorTuiDependencies = {},
 ): Promise<number> {
   const stdin = dependencies.stdin ?? process.stdin
   const stdout = dependencies.stdout ?? process.stdout
+  const readInbox = dependencies.readInbox ?? readSupervisorInbox
+  const setInboxRead = dependencies.setInboxRead ?? setSupervisorInboxRead
   if (!stdin.isTTY || !stdout.isTTY) {
     throw Object.assign(
       new Error('the Supervisor TUI requires an interactive terminal; use "openalice status --json" for automation'),
@@ -385,6 +604,12 @@ export async function runSupervisorTui(
       diagnostic = diagnostic ?? safeError(error)
     }
   }
+  const now = dependencies.now ?? (() => Date.now())
+  let activeTarget = localSupervisorTarget(context, runtime)
+  let connectionEvents: SupervisorConnectionEvent[] = activeTarget
+    ? [createSupervisorConnectionEvent('connected', activeTarget, now(), 'startup')]
+    : []
+  let inbox: SupervisorInboxSnapshot | null = null
   const piTui = await (dependencies.loadTui ?? loadPiTui)(dependencies.env)
   const resolvedChannel = dependencies.channel
     ?? await (dependencies.resolveChannel ?? resolveSupervisorChannel)()
@@ -395,6 +620,19 @@ export async function runSupervisorTui(
     undefined,
     join(supervisorRoot, 'logs'),
   )
+  const canvas = createSupervisorTerminalCanvas(stdout, dependencies.env ?? process.env)
+  const overlayPointer = new SupervisorOverlayPointerRouter()
+  const tuiTheme = createSupervisorTuiTheme(dependencies.env ?? process.env)
+  const plainTuiTheme = createSupervisorTuiTheme({ NO_COLOR: '1' })
+  const motionEnabled = supervisorMotionEnabled(dependencies.env ?? process.env)
+  const bootSequenceEnabled = supervisorBootSequenceEnabled(
+    dependencies.env ?? process.env,
+    motionEnabled,
+    tuiTheme.enabled,
+  )
+  const requestedStartView = dependencies.env?.OPENALICE_TUI_START_VIEW
+    ?? process.env.OPENALICE_TUI_START_VIEW
+  const forceHomeStart = requestedStartView === 'home'
   let active = true
   let actionRunning = false
   let sourcePromptActive = false
@@ -402,17 +640,255 @@ export async function runSupervisorTui(
   let projectsActive = false
   let transferActive = false
   let updateChannelActive = false
+  let confirmationActive = false
+  let commandPaletteActive = false
   let fleetRefreshing = false
+  let targetProbeRunning = false
   const tunnelControllers = new Map<string, AbortController>()
+  const tunnelCloseOrigins = new Map<string, SupervisorConnectionEventOrigin>()
   let managedStartAction: 'start' | 'start-open' = 'start'
   let closeSourcePrompt: (() => void) | null = null
   let closeSettings: (() => void) | null = null
   let closeProjects: (() => void) | null = null
   let closeTransfer: (() => void) | null = null
   let closeUpdateChannel: (() => void) | null = null
-  const screen = new SupervisorScreen({
+  let closeConfirmation: (() => void) | null = null
+  let closeCommandPalette: (() => void) | null = null
+  let motionTimer: NodeJS.Timeout | undefined
+  let screen: SupervisorScreen
+  const terminalSize = () => ({
+    width: stdout.columns ?? 80,
+    height: stdout.rows ?? 24,
+  })
+  const captureOverlayPointer = (
+    lines: string[],
+    width: number,
+    options: SupervisorOverlayOptions,
+    input: (data: string) => void,
+    list?: SupervisorOverlayListTarget,
+    hoverCommand?: (label?: string) => void,
+  ) => {
+    const terminal = terminalSize()
+    const focusTask = screen.activeFocusTask()
+    const confirmation = screen.activeConfirmationView()
+    const focusConsole = focusTask
+      ? renderSupervisorControlConsole(
+          '',
+          screen.renderFocusActionBar(Math.max(1, terminal.width - 4)),
+          renderSupervisorDock({
+            panel: screen.snapshot.panel ?? 'overview',
+            focusTask,
+            focusLabel: confirmation?.confirmLabel,
+            projectName: screen.snapshot.context?.aliceProject.displayName,
+            runtimeState: screen.snapshot.runtime?.class,
+            projectAvailable: currentFleetProjectAvailable(
+              screen.snapshot.fleet,
+              screen.snapshot.context,
+            ),
+          }, terminal.width),
+          terminal.width,
+        )
+      : []
+    const focusConsoleRow = terminal.height - focusConsole.length
+    const focusHeader = focusTask
+      ? renderSupervisorNavigation({
+          selected: screen.snapshot.panel ?? 'overview',
+          focusTask,
+          confirmation,
+        }, Math.max(1, terminal.width - 4)).line
+      : ''
+    const focusBack = focusTask === 'confirmation'
+      ? `[ Esc ] ${confirmation?.cancelLabel ?? 'Cancel'}`
+      : '[ Esc ] Back'
+    const focusBackOffset = focusHeader.indexOf(focusBack)
+    const headerCommands: SupervisorCommandTarget[] = focusBackOffset >= 0
+      ? [{
+          row: 2,
+          startColumn: displayWidth(focusHeader.slice(0, focusBackOffset)) + 3,
+          endColumn: displayWidth(focusHeader.slice(0, focusBackOffset)) + 2 + displayWidth(focusBack),
+          label: 'Esc',
+          surface: focusBack,
+        }]
+      : []
+    const consoleCommands = supervisorCommandTargets(focusConsole)
+      .filter((target) => target.label === 'Enter' || target.label === '↑↓' || target.label === 'Esc')
+      .map((target) => ({ ...target, row: target.row + focusConsoleRow }))
+    const externalCommands = [...headerCommands, ...consoleCommands]
+    overlayPointer.capture({
+      lines,
+      width,
+      terminalWidth: terminal.width,
+      terminalHeight: terminal.height,
+      options,
+      externalCommands,
+      input,
+      list,
+      hoverCommand: (label) => {
+        screen.setFocusConsoleHoveredCommand(label)
+        hoverCommand?.(label)
+      },
+    })
+  }
+  const selectListPointerTarget = (
+    items: SelectItem[],
+    list: {
+      getSelectedItem(): SelectItem | null
+      setSelectedIndex(index: number): void
+      handleInput(data: string): void
+    },
+    maxVisible: number,
+    firstRow: number,
+  ): SupervisorOverlayListTarget => {
+    const selected = list.getSelectedItem()
+    const selectedIndex = Math.max(0, items.findIndex((item) => item.value === selected?.value))
+    return {
+      firstRow,
+      indexes: supervisorVisibleListIndexes(selectedIndex, items.length, maxVisible),
+      select(index) {
+        list.setSelectedIndex(index)
+        ui.requestRender()
+      },
+      activate() {
+        list.handleInput('\r')
+      },
+      move(delta) {
+        list.handleInput(delta < 0 ? '\u001b[A' : '\u001b[B')
+        ui.requestRender()
+      },
+    }
+  }
+  const stopMotionTimer = () => {
+    if (motionTimer) clearInterval(motionTimer)
+    motionTimer = undefined
+  }
+  const ambientMotionAllowed = () => !(
+    sourcePromptActive
+    || settingsActive
+    || projectsActive
+    || transferActive
+    || updateChannelActive
+    || confirmationActive
+    || commandPaletteActive
+  )
+  const syncMotionTimer = () => {
+    if (!active || !motionEnabled || !screen.hasActiveMotion(ambientMotionAllowed())) {
+      stopMotionTimer()
+      return
+    }
+    if (motionTimer) return
+    motionTimer = setInterval(() => {
+      const allowAmbient = ambientMotionAllowed()
+      if (screen.advanceMotion(allowAmbient)) ui.requestRender()
+      if (!screen.hasActiveMotion(allowAmbient)) stopMotionTimer()
+    }, 80)
+    motionTimer.unref()
+  }
+
+  function syncConfirmationOverlay(action?: SupervisorConfirmation): void {
+    closeConfirmation?.()
+    if (!action) return
+
+    confirmationActive = true
+    let hoveredCommand: string | undefined
+    const view = confirmationView(
+      action,
+      screen.snapshot.runtime,
+      screen.snapshot.managedSource,
+      screen.snapshot.update,
+    )
+    const panel = new (class implements Component {
+      render(width: number): string[] {
+        const plainLines = renderSupervisorConfirmation(
+          view,
+          width,
+          plainTuiTheme,
+        )
+        captureOverlayPointer(
+          plainLines,
+          width,
+          SUPERVISOR_CONFIRMATION_OVERLAY_OPTIONS,
+          (data) => this.handleInput(data),
+          undefined,
+          (label) => {
+            if (hoveredCommand === label) return
+            hoveredCommand = label
+            ui.requestRender()
+          },
+        )
+        return renderSupervisorConfirmation(view, width, tuiTheme, hoveredCommand)
+      }
+
+      handleInput(data: string): void {
+        if (piTui.matchesKey(data, 'escape')) {
+          screen.cancelConfirmation()
+          return
+        }
+        screen.handleKey(data, piTui.matchesKey)
+      }
+
+      invalidate(): void {}
+    })()
+    const overlay = ui.showOverlay(panel, SUPERVISOR_CONFIRMATION_OVERLAY_OPTIONS)
+    closeConfirmation = () => {
+      if (!confirmationActive) return
+      confirmationActive = false
+      closeConfirmation = null
+      hoveredCommand = undefined
+      overlayPointer.clear()
+      overlay.hide()
+      syncMotionTimer()
+    }
+    overlay.focus()
+  }
+
+  function syncCommandPaletteOverlay(open: boolean): void {
+    closeCommandPalette?.()
+    if (!open) return
+
+    commandPaletteActive = true
+    const overlayOptions = supervisorCommandDockOverlayOptions(terminalSize())
+    const panel = new (class implements Component {
+      render(width: number): string[] {
+        const deck = screen.renderCommandPalette(width)
+        captureOverlayPointer(
+          deck.lines,
+          width,
+          overlayOptions,
+          (data) => this.handleInput(data),
+          {
+            firstRow: deck.targets[0]?.row ?? 3,
+            indexes: deck.targets.map((target) => target.index),
+            select: (index) => screen.selectCommandPaletteItem(index),
+            activate: () => screen.activateCommandPaletteItem(),
+            move: (delta) => screen.moveCommandPaletteSelection(delta),
+          },
+        )
+        return decorateSupervisorCommandDeck(deck.lines, tuiTheme)
+      }
+
+      handleInput(data: string): void {
+        if (piTui.matchesKey(data, 'escape')) screen.handleEscape()
+        else screen.handleKey(data, piTui.matchesKey)
+      }
+
+      invalidate(): void {}
+    })()
+    const overlay = ui.showOverlay(panel, overlayOptions)
+    closeCommandPalette = () => {
+      if (!commandPaletteActive) return
+      commandPaletteActive = false
+      closeCommandPalette = null
+      overlayPointer.clear()
+      overlay.hide()
+    }
+    overlay.focus()
+  }
+
+  screen = new SupervisorScreen({
     version: dependencies.version ?? readCliVersion(),
     channel,
+    panel: dependencies.initialPanel
+      ?? (forceHomeStart ? 'overview' : activeTarget ? 'overview' : 'fleet'),
     runtime,
     context,
     mode: configRecovery ? 'config-recovery' : 'normal',
@@ -420,6 +896,9 @@ export async function runSupervisorTui(
     diagnostic,
     notice: startupNotice,
     fleet,
+    activeTarget: forceHomeStart ? undefined : activeTarget,
+    connectionEvents,
+    inbox,
   }, {
     onAction: (action) => {
       if (action === 'update') openUpdateChannelPicker()
@@ -452,7 +931,50 @@ export async function runSupervisorTui(
     onPrepareManagedSource: () => {
       void prepareManagedSourceAndStart()
     },
+    onCopyLog: (entry) => {
+      const payload = supervisorClipboardPayload(entry.text)
+      stdout.write(payload.sequence)
+      return { emitted: true, truncated: payload.truncated }
+    },
+    onRefreshInbox: () => {
+      void refreshInbox()
+    },
+    onToggleInboxRead: (entry) => {
+      void toggleInboxRead(entry.id)
+    },
+    onOpenInboxEntry: (entry) => {
+      const base = activeTarget?.clientUrl ?? activeTarget?.endpoint
+      if (!base) return
+      const url = supervisorInboxWorkspaceUrl(base, entry.workspaceId)
+      void openBrowser(url).then(
+        () => screen.update({ notice: `Opened Workspace ${entry.workspaceLabel ?? entry.workspaceId}.` }),
+        (error: unknown) => screen.update({ diagnostic: safeError(error) }),
+      )
+    },
+    onOpenActiveTarget: () => {
+      const url = activeTarget?.clientUrl ?? activeTarget?.endpoint
+      if (!url) return
+      void openBrowser(url).then(
+        () => screen.update({ notice: 'Opened the active AliceProject Web UI.' }),
+        (error: unknown) => screen.update({ diagnostic: safeError(error) }),
+      )
+    },
+    onDisconnectActiveTarget: () => {
+      disconnectActiveRemoteTarget()
+    },
+    onRefreshActiveTarget: () => {
+      if (activeTarget?.kind === 'local') void refreshRuntime({ manual: true })
+      else void refreshActiveTargetHealth({ manual: true })
+    },
+    onConfirmationChange: syncConfirmationOverlay,
+    onCommandPaletteChange: syncCommandPaletteOverlay,
     requestRender: () => ui.requestRender(),
+    theme: tuiTheme,
+    motionEnabled,
+    bootSequence: bootSequenceEnabled,
+    onMotionDemandChange: syncMotionTimer,
+    getViewportHeight: () => terminalSize().height,
+    now,
   })
   ui.addChild(screen)
 
@@ -534,7 +1056,7 @@ export async function runSupervisorTui(
       remotePort,
       sshPort: target.sshPort ?? null,
       identityFile: target.identityFile ?? null,
-      openBrowser: true,
+      openBrowser: false,
       waitMs: 60_000,
       signal,
       onReady,
@@ -546,9 +1068,214 @@ export async function runSupervisorTui(
     ?? ((home) => inspectRuntime({ homeRoot: home, waitMs: 2_000 }))
   const startRemoteProject = dependencies.startRemoteProject
     ?? ((machine, projectKey) => runRemoteProjectStart(machine, projectKey))
+  const probeTarget = dependencies.probeTarget
+    ?? ((endpoint) => probeOpenAlice(endpoint, { timeoutMs: 1_500 }))
 
-  async function refreshRuntime(): Promise<void> {
+  function recordConnectionEvent(
+    kind: SupervisorConnectionEventKind,
+    target: SupervisorActiveTarget,
+    origin: SupervisorConnectionEventOrigin,
+  ): SupervisorConnectionEvent[] {
+    connectionEvents = appendSupervisorConnectionEvent(
+      connectionEvents,
+      createSupervisorConnectionEvent(kind, target, now(), origin),
+    )
+    return connectionEvents
+  }
+
+  function beginLaunchFlight(
+    kind: SupervisorLaunchFlightKind,
+    target: {
+      machineKey: string
+      machineName: string
+      projectKey: string
+      projectName: string
+      transport: 'loopback' | 'ssh-forward'
+    },
+    stage: SupervisorLaunchStageId,
+    busy: string,
+  ): SupervisorLaunchFlight {
+    const launchFlight = advanceSupervisorLaunchFlight(
+      createSupervisorLaunchFlight(kind, target, now()),
+      stage,
+    )
+    screen.update({ launchFlight, busy, notice: undefined, diagnostic: undefined })
+    return launchFlight
+  }
+
+  function advanceLaunchFlight(
+    stage: SupervisorLaunchStageId,
+    busy: string,
+    detail?: string,
+  ): SupervisorLaunchFlight | null {
+    const current = screen.snapshot.launchFlight
+    if (!current) return null
+    const launchFlight = advanceSupervisorLaunchFlight(current, stage, detail)
+    screen.update({ launchFlight, busy })
+    return launchFlight
+  }
+
+  function failLaunchFlight(failure: string): SupervisorLaunchFlight | null {
+    const current = screen.snapshot.launchFlight
+    if (!current) return null
+    const launchFlight = failSupervisorLaunchFlight(current, failure)
+    screen.update({ launchFlight, busy: undefined })
+    return launchFlight
+  }
+
+  function abortRemoteTunnels(exceptKey?: string): void {
+    for (const [key, controller] of tunnelControllers) {
+      if (key !== exceptKey) controller.abort()
+    }
+  }
+
+  function disconnectActiveRemoteTarget(): void {
+    const target = activeTarget
+    if (!target || target.kind !== 'ssh') return
+    const key = fleetTunnelKey(target.machineKey, target.projectKey)
+    const controller = tunnelControllers.get(key)
+    screen.update({
+      busy: `Disconnecting ${target.machineName} / ${target.projectName}`,
+      notice: undefined,
+      diagnostic: undefined,
+    })
+    if (controller) {
+      tunnelCloseOrigins.set(key, 'user-disconnect')
+      controller.abort()
+      return
+    }
+    recordConnectionEvent('disconnected', target, 'user-disconnect')
+    activeTarget = localSupervisorTarget(context, runtime)
+    if (activeTarget) recordConnectionEvent('connected', activeTarget, 'target-switch')
+    inbox = null
+    screen.update({
+      busy: undefined,
+      activeTarget: forceHomeStart && !activeTarget ? undefined : activeTarget,
+      connectionEvents,
+      inbox,
+      panel: activeTarget || forceHomeStart ? 'overview' : 'fleet',
+      notice: `Disconnected from ${target.machineName} / ${target.projectName}.`,
+    })
+  }
+
+  async function refreshActiveTargetHealth(
+    options: { manual?: boolean } = {},
+  ): Promise<void> {
+    const target = activeTarget
+    if (!active || !target || target.kind !== 'ssh' || targetProbeRunning) return
+    targetProbeRunning = true
+    const previousPhase = target.health?.phase ?? 'connected'
+    if (options.manual) {
+      activeTarget = {
+        ...target,
+        health: {
+          phase: 'checking',
+          consecutiveFailures: target.health?.consecutiveFailures ?? 0,
+          checkedAt: target.health?.checkedAt,
+        },
+      }
+      screen.update({
+        activeTarget,
+        busy: `Checking ${target.machineName} / ${target.projectName}`,
+        notice: undefined,
+        diagnostic: undefined,
+      })
+    }
+    let reachable = false
+    try {
+      reachable = await probeTarget(target.endpoint)
+    } catch {
+      reachable = false
+    }
+    if (!active
+      || activeTarget?.kind !== 'ssh'
+      || activeTarget.endpoint !== target.endpoint) {
+      targetProbeRunning = false
+      return
+    }
+    const failures = reachable
+      ? 0
+      : (target.health?.consecutiveFailures ?? 0) + 1
+    const phase: SupervisorConnectionPhase = reachable
+      ? 'connected'
+      : failures >= 3 ? 'unreachable' : 'degraded'
+    activeTarget = {
+      ...activeTarget,
+      health: { phase, consecutiveFailures: failures, checkedAt: now() },
+    }
+    const transitioned = phase !== previousPhase
+    if (transitioned) {
+      recordConnectionEvent(
+        reachable ? 'recovered' : phase === 'unreachable' ? 'unreachable' : 'degraded',
+        activeTarget,
+        options.manual ? 'manual-retry' : 'automatic-probe',
+      )
+    }
+    screen.update({
+      activeTarget,
+      connectionEvents,
+      ...(reachable ? { diagnostic: undefined } : {}),
+      ...(reachable && (previousPhase !== 'connected' || options.manual)
+        ? { notice: `Connection to ${target.machineName} / ${target.projectName} is healthy.` }
+        : !reachable && transitioned
+          ? {
+              notice: phase === 'unreachable'
+                ? `OpenAlice at ${target.machineName} / ${target.projectName} is unreachable. Retry or disconnect.`
+                : `Connection to ${target.machineName} / ${target.projectName} is degraded; retrying automatically.`,
+            }
+          : {}),
+      ...(options.manual ? { busy: undefined } : {}),
+    })
+    targetProbeRunning = false
+  }
+
+  async function refreshInbox(options: { quiet?: boolean } = {}): Promise<void> {
+    const target = activeTarget
+    if (!active || !target) return
+    if (!options.quiet) screen.update({ busy: 'Refreshing Inbox', diagnostic: undefined })
+    try {
+      const next = await readInbox(target.endpoint)
+      if (!active || activeTarget?.endpoint !== target.endpoint) return
+      inbox = next
+      screen.update({ inbox: next, ...(options.quiet ? {} : { notice: 'Inbox refreshed.' }) })
+    } catch (error: unknown) {
+      if (active && !options.quiet && activeTarget?.endpoint === target.endpoint) {
+        screen.update({ diagnostic: safeError(error) })
+      }
+    } finally {
+      if (active && !options.quiet) screen.update({ busy: undefined })
+    }
+  }
+
+  async function toggleInboxRead(id: string): Promise<void> {
+    const target = activeTarget
+    const current = inbox?.entries.find((entry) => entry.id === id)
+    if (!target || !inbox || !current || actionRunning) return
+    actionRunning = true
+    const read = !current.readAt
+    screen.update({ busy: read ? 'Marking message read' : 'Marking message unread', diagnostic: undefined })
+    try {
+      const readAt = await setInboxRead(target.endpoint, id, read)
+      if (!active || activeTarget?.endpoint !== target.endpoint || !inbox) return
+      inbox = updateSupervisorInboxEntryRead(inbox, id, readAt)
+      screen.update({ inbox, notice: read ? 'Message marked read.' : 'Message marked unread.' })
+    } catch (error: unknown) {
+      if (active) screen.update({ diagnostic: safeError(error) })
+    } finally {
+      actionRunning = false
+      if (active) screen.update({ busy: undefined })
+    }
+  }
+
+  async function refreshRuntime(options: { manual?: boolean } = {}): Promise<void> {
     if (!active || actionRunning || configRecovery || !context) return
+    if (options.manual) {
+      screen.update({
+        busy: `Checking ${activeTarget?.machineName ?? 'local Runtime'} / ${activeTarget?.projectName ?? context.aliceProject.displayName}`,
+        notice: undefined,
+        diagnostic: undefined,
+      })
+    }
     try {
       const nextRuntime = await services.inspect({
         homeRoot: context.home,
@@ -556,29 +1283,93 @@ export async function runSupervisorTui(
       })
       if (!active) return
       runtime = nextRuntime
+      const previousTarget = activeTarget
+      if (!activeTarget || activeTarget.kind === 'local') {
+        activeTarget = localSupervisorTarget(context, nextRuntime)
+        if (activeTarget?.endpoint !== previousTarget?.endpoint) inbox = null
+      }
+      const localTargetLost = previousTarget?.kind === 'local' && !activeTarget
+      const localTargetRecovered = previousTarget?.kind === 'local'
+        && previousTarget.health?.phase !== undefined
+        && previousTarget.health.phase !== 'connected'
+        && activeTarget?.kind === 'local'
+      if (activeTarget && !previousTarget) {
+        recordConnectionEvent('connected', activeTarget, 'local-inspection')
+      } else if (localTargetLost && previousTarget) {
+        recordConnectionEvent('stopped', previousTarget, 'local-inspection')
+      } else if (localTargetRecovered && activeTarget) {
+        recordConnectionEvent('recovered', activeTarget, options.manual ? 'manual-retry' : 'local-inspection')
+      }
       const currentFleet = screen.snapshot.fleet
       screen.update({
         runtime: nextRuntime,
+        activeTarget: forceHomeStart && !activeTarget ? undefined : activeTarget,
+        connectionEvents,
+        inbox,
+        ...(activeTarget && !previousTarget && screen.snapshot.panel === 'fleet'
+          ? { panel: 'overview' as const, notice: 'Runtime started. Connected to this AliceProject.' }
+          : {}),
+        ...(localTargetLost && !forceHomeStart
+          ? {
+              panel: 'fleet' as const,
+              notice: nextRuntime.class === 'absent'
+                ? 'Runtime stopped. Choose an AliceProject to start or connect.'
+                : 'Connection to the local Runtime was lost. Choose a target to continue.',
+            }
+          : {}),
+        ...(localTargetRecovered
+          ? { notice: `Connection to ${activeTarget?.machineName ?? 'This computer'} / ${activeTarget?.projectName ?? context.aliceProject.displayName} recovered.` }
+          : {}),
         fleet: currentFleet && context
-          ? selectFleetProjectByKey(
-              replaceFleetInventory(
-                currentFleet,
-                currentFleet.generatedAt,
-                alignLocalFleetProject(
-                  currentFleet.machines,
-                  context,
-                  nextRuntime,
-                ),
+          ? replaceFleetInventory(
+              currentFleet,
+              currentFleet.generatedAt,
+              alignLocalFleetProject(
+                currentFleet.machines,
+                context,
+                nextRuntime,
               ),
-              'local',
-              context.project,
             )
           : currentFleet,
         diagnostic: undefined,
       })
+      if (activeTarget && (!inbox || activeTarget.endpoint !== inbox.endpoint)) {
+        void refreshInbox({ quiet: true })
+      }
     } catch (error: unknown) {
       if (!active) return
-      screen.update({ diagnostic: safeError(error) })
+      if (activeTarget?.kind === 'local') {
+        const previousPhase = activeTarget.health?.phase ?? 'connected'
+        const failures = (activeTarget.health?.consecutiveFailures ?? 0) + 1
+        const phase: SupervisorConnectionPhase = failures >= 3 ? 'unreachable' : 'degraded'
+        activeTarget = {
+          ...activeTarget,
+          health: { phase, consecutiveFailures: failures, checkedAt: now() },
+        }
+        if (phase !== previousPhase) {
+          recordConnectionEvent(
+            phase === 'unreachable' ? 'unreachable' : 'degraded',
+            activeTarget,
+            options.manual ? 'manual-retry' : 'local-inspection',
+          )
+        }
+        screen.update({
+          activeTarget,
+          connectionEvents,
+          diagnostic: safeError(error),
+          ...(phase !== previousPhase
+            ? {
+                notice: phase === 'unreachable'
+                  ? 'The local Runtime is unreachable. Status polling will keep trying.'
+                  : 'The local Runtime connection is degraded; retrying automatically.',
+              }
+            : {}),
+        })
+      } else {
+        screen.update({ diagnostic: safeError(error) })
+      }
+    } finally {
+      if (active && options.manual) screen.update({ busy: undefined })
     }
   }
 
@@ -630,9 +1421,24 @@ export async function runSupervisorTui(
           context = await selectProject(context, project.key)
           services = createServices(dependencies, context)
           runtime = await services.inspect({ homeRoot: context.home, waitMs: 2_000 })
+          abortRemoteTunnels()
+          const previousTarget = activeTarget
+          const previousEndpoint = activeTarget?.endpoint
+          activeTarget = localSupervisorTarget(context, runtime)
+          if (previousTarget && previousTarget.endpoint !== activeTarget?.endpoint) {
+            recordConnectionEvent('disconnected', previousTarget, 'target-switch')
+          }
+          if (activeTarget && previousTarget?.endpoint !== activeTarget.endpoint) {
+            recordConnectionEvent('connected', activeTarget, 'target-switch')
+          }
+          if (activeTarget?.endpoint !== previousEndpoint) inbox = null
           screen.update({
             context,
             runtime,
+            activeTarget: forceHomeStart && !activeTarget ? undefined : activeTarget,
+            connectionEvents,
+            inbox,
+            panel: activeTarget || forceHomeStart ? 'overview' : 'fleet',
             fleet: screen.snapshot.fleet
               ? selectFleetProjectByKey(
                   replaceFleetInventory(
@@ -660,7 +1466,36 @@ export async function runSupervisorTui(
         }
         return
       }
-      const action = primaryAction(screen.snapshot.runtime)
+      if (activeTarget?.kind === 'ssh') {
+        recordConnectionEvent('disconnected', activeTarget, 'target-switch')
+        abortRemoteTunnels()
+        activeTarget = null
+        inbox = null
+        screen.update({ activeTarget, connectionEvents, inbox })
+      }
+      const localTarget = localSupervisorTarget(context, runtime)
+      if (localTarget) {
+        abortRemoteTunnels()
+        const previousEndpoint = activeTarget?.endpoint
+        activeTarget = localTarget
+        if (activeTarget.endpoint !== previousEndpoint) {
+          recordConnectionEvent('connected', activeTarget, 'target-switch')
+        }
+        if (activeTarget.endpoint !== previousEndpoint) inbox = null
+        screen.update({
+          activeTarget,
+          connectionEvents,
+          inbox,
+          panel: 'overview',
+          notice: `Using ${localTarget.machineName} / ${localTarget.projectName}.`,
+          diagnostic: undefined,
+        })
+        if (!inbox) void refreshInbox({ quiet: true })
+        return
+      }
+      const action = screen.snapshot.runtime?.class === 'absent'
+        ? 'start'
+        : primaryAction(screen.snapshot.runtime)
       if (action) await requestAction(action)
       return
     }
@@ -675,6 +1510,15 @@ export async function runSupervisorTui(
       return
     }
     const key = fleetTunnelKey(machine.key, project.key)
+    if (activeTarget?.kind === 'ssh'
+      && activeTarget.machineKey === machine.key
+      && activeTarget.projectKey === project.key) {
+      screen.update({
+        panel: 'overview',
+        notice: `Already connected to ${machine.displayName} / ${project.displayName}.`,
+      })
+      return
+    }
     if (tunnelControllers.has(key)) {
       screen.update({ notice: `The ${machine.key}/${project.key} tunnel is already active.` })
       return
@@ -682,28 +1526,96 @@ export async function runSupervisorTui(
     const controller = new AbortController()
     tunnelControllers.set(key, controller)
     updateTunnelState(key, 'connecting')
-    screen.update({ notice: `Connecting to ${machine.displayName} / ${project.displayName}…` })
+    const currentFlight = screen.snapshot.launchFlight
+    if (currentFlight?.kind === 'remote-start'
+      && currentFlight.target.machineKey === machine.key
+      && currentFlight.target.projectKey === project.key) {
+      advanceLaunchFlight(
+        'open-forward',
+        `Opening SSH forward to ${machine.key}/${project.key}`,
+      )
+    } else {
+      beginLaunchFlight('remote-connect', {
+        machineKey: machine.key,
+        machineName: machine.displayName,
+        projectKey: project.key,
+        projectName: project.displayName,
+        transport: 'ssh-forward',
+      }, 'open-forward', `Opening SSH forward to ${machine.key}/${project.key}`)
+    }
     try {
       await connectRemoteProject({
         machine,
         project,
         signal: controller.signal,
-        onReady: () => {
+        onReady: ({ localUrl, clientUrl }) => {
+          advanceLaunchFlight(
+            'bind-target',
+            `Binding ${machine.key}/${project.key}`,
+            'SSH forward is ready; promoting the endpoint into the workbench',
+          )
+          const previousTarget = activeTarget
+          if (previousTarget && (previousTarget.machineKey !== machine.key
+            || previousTarget.projectKey !== project.key
+            || previousTarget.kind !== 'ssh')) {
+            recordConnectionEvent('disconnected', previousTarget, 'target-switch')
+          }
+          abortRemoteTunnels(key)
           updateTunnelState(key, 'connected')
-          screen.update({ notice: `Connected to ${machine.displayName} / ${project.displayName}.` })
+          activeTarget = remoteSupervisorTarget(machine, project, localUrl, clientUrl)
+          recordConnectionEvent('connected', activeTarget, 'ssh-forward')
+          inbox = null
+          screen.update({
+            activeTarget,
+            connectionEvents,
+            launchFlight: null,
+            busy: undefined,
+            inbox,
+            panel: 'overview',
+            notice: `Connected to ${machine.displayName} / ${project.displayName}.`,
+          })
+          void refreshInbox({ quiet: true })
         },
       })
       if (active && !controller.signal.aborted) {
-        screen.update({ notice: `Tunnel to ${machine.key}/${project.key} closed.` })
+        if (screen.snapshot.launchFlight?.status === 'running') {
+          const failure = `SSH forward to ${machine.key}/${project.key} closed before the target was ready.`
+          failLaunchFlight(failure)
+          screen.update({ diagnostic: failure })
+        } else {
+          screen.update({ notice: `Tunnel to ${machine.key}/${project.key} closed.` })
+        }
       }
     } catch (error: unknown) {
       if (active && !controller.signal.aborted) {
         updateTunnelState(key, 'failed')
-        screen.update({ diagnostic: safeError(error) })
+        const failure = safeError(error)
+        failLaunchFlight(failure)
+        screen.update({ diagnostic: failure })
       }
     } finally {
       tunnelControllers.delete(key)
-      if (active) clearTunnelState(key)
+      const closeOrigin = tunnelCloseOrigins.get(key) ?? 'tunnel-exit'
+      tunnelCloseOrigins.delete(key)
+      if (active) {
+        clearTunnelState(key)
+        if (activeTarget?.kind === 'ssh'
+          && activeTarget.machineKey === machine.key
+          && activeTarget.projectKey === project.key) {
+          recordConnectionEvent('disconnected', activeTarget, closeOrigin)
+          activeTarget = localSupervisorTarget(context, runtime)
+          if (activeTarget) recordConnectionEvent('connected', activeTarget, 'target-switch')
+          inbox = null
+          screen.update({
+            activeTarget: forceHomeStart && !activeTarget ? undefined : activeTarget,
+            connectionEvents,
+            inbox,
+            panel: activeTarget || forceHomeStart ? 'overview' : 'fleet',
+            busy: undefined,
+            notice: `Disconnected from ${machine.displayName} / ${project.displayName}.`,
+          })
+        }
+      }
     }
   }
 
@@ -714,7 +1626,13 @@ export async function runSupervisorTui(
     if (machine.key === 'local' || actionRunning) return
     let started = false
     actionRunning = true
-    screen.update({ busy: `Checking ${machine.key}/${project.key}`, diagnostic: undefined })
+    beginLaunchFlight('remote-start', {
+      machineKey: machine.key,
+      machineName: machine.displayName,
+      projectKey: project.key,
+      projectName: project.displayName,
+      transport: 'ssh-forward',
+    }, 'validate-target', `Checking ${machine.key}/${project.key}`)
     try {
       const latest = await inspectFleet()
       const remote = latest.machines.find((entry) => entry.key === machine.key)
@@ -726,17 +1644,47 @@ export async function runSupervisorTui(
       const registry = await loadMachines()
       const registered = registry.machines.find((entry) => entry.key === machine.key)
       if (!registered) throw new Error(`Machine "${machine.key}" is no longer registered.`)
-      screen.update({ busy: `Starting ${machine.key}/${project.key}` })
+      advanceLaunchFlight(
+        'start-runtime',
+        `Starting ${machine.key}/${project.key}`,
+        'Remote selection and lifecycle capability confirmed',
+      )
       await startRemoteProject(registered, project.key)
       started = true
-      screen.update({ notice: `Started ${machine.displayName} / ${project.displayName}.` })
+      advanceLaunchFlight(
+        'refresh-inventory',
+        `Refreshing ${machine.key}/${project.key}`,
+        'Remote start returned; waiting for the advertised endpoint',
+      )
     } catch (error: unknown) {
-      screen.update({ diagnostic: safeError(error) })
+      const failure = safeError(error)
+      failLaunchFlight(failure)
+      screen.update({ diagnostic: failure })
     } finally {
       actionRunning = false
-      screen.update({ busy: undefined })
+      if (!started) screen.update({ busy: undefined })
     }
-    if (started) await refreshFleet({ quiet: true })
+    if (started) {
+      await refreshFleet({ quiet: true })
+      const refreshedMachine = screen.snapshot.fleet?.machines
+        .find((entry) => entry.key === machine.key)
+      const refreshedProject = refreshedMachine?.projects
+        .find((entry) => entry.key === project.key)
+      if (refreshedMachine && refreshedProject
+        && refreshedProject.runtime.webEndpoint
+        && runtimeIsConnected(refreshedProject.runtime)) {
+        advanceLaunchFlight(
+          'open-forward',
+          `Opening SSH forward to ${machine.key}/${project.key}`,
+          'Remote inventory advertises a ready Web endpoint',
+        )
+        void activateFleetProject(refreshedMachine, refreshedProject)
+      } else {
+        const failure = 'Remote Runtime started, but no reachable Web endpoint was advertised.'
+        failLaunchFlight(failure)
+        screen.update({ diagnostic: failure })
+      }
+    }
   }
 
   function updateTunnelState(
@@ -771,6 +1719,8 @@ export async function runSupervisorTui(
       || actionRunning
     ) return
     updateChannelActive = true
+    screen.update({ focusTask: 'release' })
+    let updateChannelHoveredCommand: string | undefined
     const items: SelectItem[] = [
       {
         value: 'stable',
@@ -789,23 +1739,33 @@ export async function runSupervisorTui(
       },
     ]
     const theme: SelectListTheme = {
-      selectedPrefix: (text) => text,
-      selectedText: (text) => text,
-      description: (text) => text,
-      scrollInfo: (text) => text,
-      noMatch: (text) => text,
+      selectedPrefix: (text) => tuiTheme.accentStrong(text),
+      selectedText: (text) => tuiTheme.selected(text),
+      description: (text) => tuiTheme.muted(text),
+      scrollInfo: (text) => tuiTheme.muted(text),
+      noMatch: (text) => tuiTheme.warning(text),
     }
     const list = new piTui.SelectList(items, items.length, theme)
     list.setSelectedIndex(Math.max(
       0,
       items.findIndex((item) => item.value === screen.snapshot.channel),
     ))
+    const overlayOptions = supervisorTaskSurfaceOptions(terminalSize(), {
+      width: '90%',
+      maxHeight: '90%',
+      anchor: 'center',
+      margin: 1,
+    } as const, 'release')
     const close = (notice?: string) => {
       if (!updateChannelActive) return
       updateChannelActive = false
       closeUpdateChannel = null
+      overlayPointer.clear()
+      updateChannelHoveredCommand = undefined
+      overlay.unfocus?.({ target: screen })
       overlay.hide()
-      if (notice) screen.update({ notice })
+      screen.update({ focusTask: undefined, ...(notice ? { notice } : {}) })
+      syncMotionTimer()
     }
     list.onCancel = () => close('Update channel unchanged.')
     list.onSelect = (item) => {
@@ -821,17 +1781,59 @@ export async function runSupervisorTui(
     }
     const panel = new (class implements Component {
       render(width: number): string[] {
-        return [
-          'OpenAlice update channel',
-          '─'.repeat(Math.max(1, width)),
-          '',
-          ...list.render(width),
-          '',
-          'Enter  Check selected channel · Esc  Cancel',
-        ]
+        const selectedItem = list.getSelectedItem()
+        const selectedIndex = Math.max(0, items.findIndex((item) => item.value === selectedItem?.value))
+        const observatory = renderSupervisorReleaseObservatory({
+          installedVersion: screen.snapshot.version,
+          currentLane: normalizeSupervisorUpdateChannel(screen.snapshot.channel) ?? 'stable',
+          selected: selectedIndex,
+        }, width)
+        const baseList = selectListPointerTarget(
+          items,
+          list,
+          items.length,
+          observatory.targets[0]?.row ?? 2,
+        )
+        const firstTarget = observatory.targets[0]
+        const listTarget: SupervisorOverlayListTarget = {
+          ...baseList,
+          indexes: observatory.targets.map((target) => target.index),
+          startColumn: firstTarget?.startColumn ?? 2,
+          endColumn: firstTarget?.endColumn ?? Math.max(2, width - 1),
+          select: (index) => {
+            updateChannelHoveredCommand = undefined
+            list.setSelectedIndex(index)
+            list.invalidate()
+            ui.requestRender()
+          },
+          move: (delta) => {
+            updateChannelHoveredCommand = undefined
+            baseList.move(delta)
+          },
+          activate: () => undefined,
+        }
+        const lines = renderSupervisorTaskSurface(observatory.lines, terminalSize(), 'release')
+        captureOverlayPointer(
+          lines,
+          width,
+          overlayOptions,
+          (data) => this.handleInput(data),
+          listTarget,
+          (label) => {
+            if (updateChannelHoveredCommand === label) return
+            updateChannelHoveredCommand = label
+            ui.requestRender()
+          },
+        )
+        return decorateSupervisorTaskSurface(decorateSupervisorReleaseObservatory(
+          lines,
+          tuiTheme,
+          updateChannelHoveredCommand,
+        ), tuiTheme)
       }
 
       handleInput(data: string): void {
+        updateChannelHoveredCommand = undefined
         list.handleInput(data)
       }
 
@@ -839,12 +1841,7 @@ export async function runSupervisorTui(
         list.invalidate()
       }
     })()
-    const overlay = ui.showOverlay(panel, {
-      width: '72%',
-      maxHeight: '70%',
-      anchor: 'center',
-      margin: 1,
-    })
+    const overlay = ui.showOverlay(panel, overlayOptions)
     closeUpdateChannel = () => close()
     overlay.focus()
   }
@@ -878,6 +1875,16 @@ export async function runSupervisorTui(
     let actionFailure: string | undefined
     const homeRoot = context?.home
     const actionLabel = actionName(action)
+    const launchAction = action === 'start' || action === 'start-open'
+    if (launchAction && context) {
+      beginLaunchFlight('local-start', {
+        machineKey: 'local',
+        machineName: 'This computer',
+        projectKey: context.project,
+        projectName: context.aliceProject.displayName,
+        transport: 'loopback',
+      }, 'start-runtime', 'Preparing and starting local Runtime')
+    }
     screen.update({
       busy: actionLabel,
       notice: undefined,
@@ -920,6 +1927,11 @@ export async function runSupervisorTui(
           waitMs: 120_000,
           takeover: false,
         })
+        advanceLaunchFlight(
+          'bind-target',
+          'Binding ready local target',
+          'Runtime readiness confirmed; promoting the loopback endpoint',
+        )
         if (action === 'start-open') {
           screen.update({ notice: 'Runtime started.' })
           try {
@@ -965,12 +1977,23 @@ export async function runSupervisorTui(
       }
     } catch (error: unknown) {
       actionFailure = `${actionLabel} failed: ${safeError(error)}`
+      if (launchAction) failLaunchFlight(actionFailure)
       screen.update({ confirmation: undefined })
     } finally {
       actionRunning = false
       if (active) {
-        screen.update({ busy: undefined })
+        screen.update({
+          busy: launchAction && !actionFailure ? 'Binding ready local target' : undefined,
+        })
         await refreshRuntime()
+        if (launchAction && activeTarget) {
+          screen.update({ launchFlight: null, busy: undefined })
+        } else if (launchAction && !actionFailure) {
+          actionFailure = 'Runtime start returned without a reachable local endpoint.'
+          failLaunchFlight(actionFailure)
+        } else {
+          screen.update({ busy: undefined })
+        }
         if (actionFailure) screen.update({ diagnostic: actionFailure })
       }
     }
@@ -1092,48 +2115,78 @@ export async function runSupervisorTui(
     }
 
     sourcePromptActive = true
+    screen.update({ focusTask: 'source' })
     let saving = false
+    let phase: SupervisorSourcePhase = 'select'
+    let sourceHoveredCommand: string | undefined
+    const overlayOptions = supervisorTaskSurfaceOptions(terminalSize(), {
+      width: '92%',
+      maxHeight: 20,
+      anchor: 'center',
+      margin: 1,
+    } as const, 'source')
     const input = new (class extends piTui.Input {
       detail = reason
         ? `Start needs an OpenAlice source checkout. ${reason}`
         : 'Choose the OpenAlice source checkout for this AliceProject.'
 
-      setDetail(detail: string): void {
+      setDetail(detail: string, nextPhase: SupervisorSourcePhase = phase): void {
         this.detail = detail
+        phase = nextPhase
         this.invalidate()
         ui.requestRender()
       }
 
       override render(width: number): string[] {
-        return [
-          'Configure Runtime source',
-          '',
-          sanitize(this.detail),
-          '',
-          ...super.render(width),
-          '',
-          'Enter  Save for this AliceProject and start',
-          'Esc    Cancel',
-        ]
+        const launchBay = renderSupervisorSourceLaunchBay({
+          phase,
+          projectName: sourceContext.aliceProject.displayName,
+          provenance: sourceContext.provenance.appDir.source,
+          fieldLines: super.render(supervisorSourceFieldWidth(width)),
+          detail: sanitize(this.detail),
+          contract: 'Validate the checkout before saving; launch only follows a saved source.',
+        }, width)
+        const lines = renderSupervisorTaskSurface(launchBay.lines, terminalSize(), 'source')
+        captureOverlayPointer(
+          lines,
+          width,
+          overlayOptions,
+          (data) => this.handleInput(data),
+          undefined,
+          (label) => {
+            if (sourceHoveredCommand === label) return
+            sourceHoveredCommand = label
+            ui.requestRender()
+          },
+        )
+        return decorateSupervisorTaskSurface(decorateSupervisorSourceLaunchBay(
+          lines,
+          tuiTheme,
+          sourceHoveredCommand,
+        ), tuiTheme)
+      }
+
+      override handleInput(data: string): void {
+        sourceHoveredCommand = undefined
+        super.handleInput(data)
       }
     })()
     input.setValue(sourceContext.appDir ?? process.cwd())
     input.handleInput('\u0005')
-    const overlay = ui.showOverlay(input, {
-      width: '80%',
-      maxHeight: 10,
-      anchor: 'center',
-      margin: 1,
-    })
+    const overlay = ui.showOverlay(input, overlayOptions)
     ui.setShowHardwareCursor(true)
 
     const close = (notice?: string) => {
       if (!sourcePromptActive) return
       sourcePromptActive = false
       closeSourcePrompt = null
+      overlayPointer.clear()
+      sourceHoveredCommand = undefined
+      overlay.unfocus?.({ target: screen })
       overlay.hide()
       ui.setShowHardwareCursor(false)
-      if (notice) screen.update({ notice })
+      screen.update({ focusTask: undefined, ...(notice ? { notice } : {}) })
+      syncMotionTimer()
     }
     closeSourcePrompt = () => close('Source configuration cancelled.')
     input.onEscape = closeSourcePrompt
@@ -1141,11 +2194,11 @@ export async function runSupervisorTui(
       if (saving) return
       const requested = value.trim()
       if (!requested) {
-        input.setDetail('Enter a source checkout path.')
+        input.setDetail('Enter a source checkout path.', 'error')
         return
       }
       saving = true
-      input.setDetail('Validating and saving the source checkout…')
+      input.setDetail('Validating the checkout before saving or launching…', 'validating')
       void (async () => {
         try {
           const appDir = await findSource(requested)
@@ -1160,7 +2213,7 @@ export async function runSupervisorTui(
           close()
           await performAction('start')
         } catch (error: unknown) {
-          input.setDetail(`Could not use that checkout: ${safeError(error)}`)
+          input.setDetail(`Could not use that checkout: ${safeError(error)}`, 'error')
         } finally {
           saving = false
         }
@@ -1207,7 +2260,12 @@ export async function runSupervisorTui(
     if (!active) return
 
     settingsActive = true
+    screen.update({ focusTask: 'setup' })
     let saving = false
+    let settingsSelectedIndex = 0
+    let settingsSubmenuOpen = false
+    let activeSettingsInput: Component | null = null
+    let settingsHoveredCommand: string | undefined
     let scope: typeof PROJECT_SCOPE | typeof MACHINE_SCOPE = PROJECT_SCOPE
     let message = 'Changes apply to this AliceProject. Environment and command-line overrides remain locked.'
     const items: SettingItem[] = []
@@ -1221,9 +2279,15 @@ export async function runSupervisorTui(
       if (!settingsActive) return
       settingsActive = false
       closeSettings = null
+      overlayPointer.clear()
+      settingsSubmenuOpen = false
+      activeSettingsInput = null
+      settingsHoveredCommand = undefined
+      overlay.unfocus?.({ target: screen })
       overlay.hide()
       ui.setShowHardwareCursor(false)
-      screen.update({ notice })
+      screen.update({ focusTask: undefined, notice })
+      syncMotionTimer()
     }
     const inputSubmenu = (
       title: string,
@@ -1234,31 +2298,40 @@ export async function runSupervisorTui(
     ): Component => {
       const input = new (class extends piTui.Input {
         detail = initialDetail
+        phase: 'edit' | 'error' = 'edit'
 
         setDetail(next: string): void {
           this.detail = next
+          this.phase = 'error'
           this.invalidate()
           ui.requestRender()
         }
 
         override render(width: number): string[] {
-          return [
-            title,
-            '',
-            ...super.render(width),
-            '',
-            sanitize(this.detail),
-            '',
-            'Enter  Save · Esc  Cancel',
-          ]
+          return renderSupervisorSetupWorkbench({
+            phase: this.phase,
+            projectName: settingsContext.aliceProject.displayName,
+            scope,
+            fieldTitle: title,
+            fieldPosition: `${settingsSelectedIndex + 1}/${items.length}`,
+            runtimeClass: screen.snapshot.runtime?.class,
+            fieldLines: super.render(supervisorSetupWorkbenchFieldWidth(width)),
+            detail: sanitize(this.detail),
+            message: scope === MACHINE_SCOPE
+              ? 'Blank values fall through to OpenAlice defaults; AliceProject overrides remain above.'
+              : 'Blank values inherit from Machine defaults; environment and command-line overrides remain above.',
+          }, width)
         }
       })()
       input.setValue(initialValue)
       input.focused = true
+      activeSettingsInput = input
       ui.setShowHardwareCursor(true)
       input.onEscape = () => {
         input.focused = false
+        activeSettingsInput = null
         ui.setShowHardwareCursor(false)
+        settingsSubmenuOpen = false
         done()
       }
       input.onSubmit = (value) => {
@@ -1268,7 +2341,9 @@ export async function runSupervisorTui(
           return
         }
         input.focused = false
+        activeSettingsInput = null
         ui.setShowHardwareCursor(false)
+        settingsSubmenuOpen = false
         done(value.trim() || INHERIT_SETTING)
       }
       return input
@@ -1507,11 +2582,11 @@ export async function runSupervisorTui(
     }
 
     const theme: SettingsListTheme = {
-      label: (text) => text,
-      value: (text) => text,
-      description: (text) => text,
-      cursor: '> ',
-      hint: (text) => text,
+      label: (text) => tuiTheme.accentStrong(text),
+      value: (text) => tuiTheme.accent(text),
+      description: (text) => tuiTheme.muted(text),
+      cursor: tuiTheme.accentStrong('› '),
+      hint: (text) => tuiTheme.muted(text),
     }
     settings = new piTui.SettingsList(
       items,
@@ -1522,32 +2597,124 @@ export async function runSupervisorTui(
       },
       () => close(),
     )
+    const moveSettings = (delta: -1 | 1) => {
+      settingsHoveredCommand = undefined
+      settingsSelectedIndex = delta < 0
+        ? settingsSelectedIndex === 0 ? items.length - 1 : settingsSelectedIndex - 1
+        : settingsSelectedIndex === items.length - 1 ? 0 : settingsSelectedIndex + 1
+      settings.handleInput(delta < 0 ? '\u001b[A' : '\u001b[B')
+    }
+    const handleSettingsInput = (data: string) => {
+      if (saving) return
+      settingsHoveredCommand = undefined
+      if (settingsSubmenuOpen && activeSettingsInput) {
+        activeSettingsInput.handleInput?.(data)
+        return
+      }
+      if (!settingsSubmenuOpen) {
+        if (piTui.matchesKey(data, 'up')) {
+          moveSettings(-1)
+          return
+        } else if (piTui.matchesKey(data, 'down')) {
+          moveSettings(1)
+          return
+        } else if (
+          (piTui.matchesKey(data, 'enter') || data === ' ')
+          && items[settingsSelectedIndex]?.submenu
+        ) {
+          settingsSubmenuOpen = true
+        }
+      }
+      settings.handleInput(data)
+    }
+    const overlayOptions = supervisorTaskSurfaceOptions(terminalSize(), {
+      width: '90%',
+      maxHeight: '90%',
+      anchor: 'center',
+      margin: 1,
+    } as const, 'setup')
     const panel = new (class implements Component {
       render(width: number): string[] {
-        return [
-          `OpenAlice setup · ${settingsContext.aliceProject.displayName}`,
-          '─'.repeat(Math.max(1, width)),
-          '',
-          ...settings.render(width),
-          '',
-          sanitize(message),
-        ]
+        if (settingsSubmenuOpen) {
+          const lines = renderSupervisorTaskSurface(settings.render(width), terminalSize(), 'setup')
+          captureOverlayPointer(
+            lines,
+            width,
+            overlayOptions,
+            (data) => this.handleInput(data),
+            undefined,
+            (label) => {
+              if (settingsHoveredCommand === label) return
+              settingsHoveredCommand = label
+              ui.requestRender()
+            },
+          )
+          return decorateSupervisorTaskSurface(decorateSupervisorSetupWorkbench(
+            lines,
+            tuiTheme,
+            settingsHoveredCommand,
+          ), tuiTheme)
+        }
+        const studioItems: SupervisorSetupItem[] = items.map((item) => ({
+          id: item.id,
+          label: item.label,
+          value: sanitize(item.currentValue),
+          description: sanitize(item.description ?? 'No additional setup guidance is available.'),
+          kind: item.submenu ? 'editor' : item.values?.length ? 'choice' : 'readonly',
+        }))
+        const studio = renderSupervisorSetupStudio({
+          projectName: settingsContext.aliceProject.displayName,
+          scope: scope === MACHINE_SCOPE ? 'Machine defaults' : 'AliceProject',
+          runtimeClass: screen.snapshot.runtime?.class,
+          message: sanitize(message),
+          items: studioItems,
+          selected: settingsSelectedIndex,
+        }, width)
+        const firstTarget = studio.targets[0]
+        const list = {
+          firstRow: firstTarget?.row ?? 2,
+          indexes: studio.targets.map((target) => target.index),
+          startColumn: firstTarget?.startColumn ?? 2,
+          endColumn: firstTarget?.endColumn ?? Math.max(2, width - 1),
+          select: (index: number) => {
+            while (settingsSelectedIndex !== index) moveSettings(1)
+            settingsHoveredCommand = undefined
+            ui.requestRender()
+          },
+          activate: () => handleSettingsInput('\r'),
+          move: (delta: -1 | 1) => {
+            moveSettings(delta)
+            ui.requestRender()
+          },
+        }
+        const lines = renderSupervisorTaskSurface(studio.lines, terminalSize(), 'setup')
+        captureOverlayPointer(
+          lines,
+          width,
+          overlayOptions,
+          (data) => this.handleInput(data),
+          list,
+          (label) => {
+            if (settingsHoveredCommand === label) return
+            settingsHoveredCommand = label
+            ui.requestRender()
+          },
+        )
+        return decorateSupervisorTaskSurface(
+          decorateSupervisorSetupStudio(lines, tuiTheme, settingsHoveredCommand),
+          tuiTheme,
+        )
       }
 
       handleInput(data: string): void {
-        if (!saving) settings.handleInput(data)
+        handleSettingsInput(data)
       }
 
       invalidate(): void {
         settings.invalidate()
       }
     })()
-    const overlay = ui.showOverlay(panel, {
-      width: '90%',
-      maxHeight: '90%',
-      anchor: 'center',
-      margin: 1,
-    })
+    const overlay = ui.showOverlay(panel, overlayOptions)
     closeSettings = () => close()
     overlay.focus()
   }
@@ -1586,7 +2753,9 @@ export async function runSupervisorTui(
     if (!active) return
 
     projectsActive = true
+    screen.update({ focusTask: 'projects' })
     let changing = false
+    let projectsHoveredCommand: string | undefined
     let message = 'Selecting an AliceProject also makes it the next bare-start default. Copy AI credentials with openalice project copy-ai-creds.'
     const lock = instanceSelectionOverrideLock(projectContext)
     if (lock) message = lock
@@ -1624,13 +2793,30 @@ export async function runSupervisorTui(
         description: 'Register a separate complete home and select it.',
       })
     }
+    const switchboardItems: SupervisorProjectSwitchboardItem[] = visibleInstances.map((entry) => ({
+      key: entry.key,
+      label: entry.displayName,
+      kind: 'project',
+      home: entry.home,
+      port: entry.port,
+      portAutomatic: entry.portAutomatic,
+      current: entry.key === projectContext.project,
+      isDefault: entry.isDefault,
+    }))
+    if (!lock) {
+      switchboardItems.push({
+        key: createValue,
+        label: '+ Create AliceProject…',
+        kind: 'create',
+      })
+    }
 
     const theme: SelectListTheme = {
-      selectedPrefix: (text) => text,
-      selectedText: (text) => text,
-      description: (text) => text,
-      scrollInfo: (text) => text,
-      noMatch: (text) => text,
+      selectedPrefix: (text) => tuiTheme.accentStrong(text),
+      selectedText: (text) => tuiTheme.selected(text),
+      description: (text) => tuiTheme.muted(text),
+      scrollInfo: (text) => tuiTheme.muted(text),
+      noMatch: (text) => tuiTheme.warning(text),
     }
     const list = new piTui.SelectList(items, 8, theme, {
       minPrimaryColumnWidth: 20,
@@ -1641,6 +2827,14 @@ export async function runSupervisorTui(
     )
     list.setSelectedIndex(Math.max(0, selectedIndex))
     let component: Component = list
+    let projectListActive = true
+    let creatorView: Omit<SupervisorProjectFoundryView, 'fieldLines'> | null = null
+    const overlayOptions = supervisorTaskSurfaceOptions(terminalSize(), {
+      width: '92%',
+      maxHeight: '90%',
+      anchor: 'center',
+      margin: 1,
+    } as const, 'projects')
 
     const setMessage = (next: string) => {
       message = next
@@ -1650,13 +2844,20 @@ export async function runSupervisorTui(
       if (!projectsActive) return
       projectsActive = false
       closeProjects = null
+      overlayPointer.clear()
+      projectsHoveredCommand = undefined
+      overlay.unfocus?.({ target: screen })
       overlay.hide()
       ui.setShowHardwareCursor(false)
-      screen.update({ notice })
+      screen.update({ focusTask: undefined, notice })
+      syncMotionTimer()
     }
     const showList = () => {
       ui.setShowHardwareCursor(false)
       component = list
+      projectListActive = true
+      creatorView = null
+      projectsHoveredCommand = undefined
       setMessage(lock ?? 'Selecting an AliceProject also makes it the next bare-start default. Copy AI credentials with openalice project copy-ai-creds.')
     }
     const activateContext = async (
@@ -1687,6 +2888,7 @@ export async function runSupervisorTui(
       }
     }
     const showCreateHomeInput = (name: string) => {
+      projectListActive = false
       const defaultHome = registry.projects.find(
         (entry) => entry.key === 'default',
       )?.home ?? projectContext.home
@@ -1695,25 +2897,19 @@ export async function runSupervisorTui(
         `.openalice-${name}`,
       )
       const input = new (class extends piTui.Input {
-        detail = 'Use a separate complete home. An empty directory is prepared when registered.'
+        detail = 'Use a separate complete home; empty paths are prepared.'
 
         setDetail(next: string): void {
           this.detail = next
+          if (creatorView?.step === 'home' && creatorView.projectKey === name) {
+            creatorView = { ...creatorView, detail: next }
+          }
           this.invalidate()
           ui.requestRender()
         }
 
         override render(width: number): string[] {
-          return [
-            `Create AliceProject · ${name}`,
-            '',
-            'Complete home',
-            ...super.render(width),
-            '',
-            sanitize(this.detail),
-            '',
-            'Enter  Create and select · Esc  Back',
-          ]
+          return super.render(width)
         }
       })()
       input.setValue(suggestedHome)
@@ -1735,29 +2931,31 @@ export async function runSupervisorTui(
         )
       }
       component = input
+      creatorView = {
+        step: 'home',
+        currentProjectName: projectContext.aliceProject.displayName,
+        projectKey: name,
+        detail: sanitize(input.detail),
+        message: 'The new AliceProject owns only its registry entry; existing data is never copied or deleted.',
+      }
       setMessage('The new AliceProject owns only its registry entry; existing data is never copied or deleted.')
     }
     const showCreateNameInput = () => {
+      projectListActive = false
       const input = new (class extends piTui.Input {
         detail = 'Use a short lowercase name such as research or paper.'
 
         setDetail(next: string): void {
           this.detail = next
+          if (creatorView?.step === 'identity') {
+            creatorView = { ...creatorView, detail: next }
+          }
           this.invalidate()
           ui.requestRender()
         }
 
         override render(width: number): string[] {
-          return [
-            'Create AliceProject',
-            '',
-            'AliceProject key',
-            ...super.render(width),
-            '',
-            sanitize(this.detail),
-            '',
-            'Enter  Continue · Esc  Back',
-          ]
+          return super.render(width)
         }
       })()
       input.focused = true
@@ -1781,6 +2979,12 @@ export async function runSupervisorTui(
         showCreateHomeInput(name)
       }
       component = input
+      creatorView = {
+        step: 'identity',
+        currentProjectName: projectContext.aliceProject.displayName,
+        detail: sanitize(input.detail),
+        message: 'Create a named AliceProject without leaving the Supervisor.',
+      }
       setMessage('Create a named AliceProject without leaving the Supervisor.')
     }
 
@@ -1809,30 +3013,93 @@ export async function runSupervisorTui(
 
     const panel = new (class implements Component {
       render(width: number): string[] {
-        return [
-          'OpenAlice AliceProjects',
-          '─'.repeat(Math.max(1, width)),
-          '',
-          ...component.render(width),
-          '',
-          sanitize(message),
-        ]
+        if (!projectListActive) {
+          if (!creatorView) return []
+          const foundry = renderSupervisorProjectFoundry({
+            ...creatorView,
+            detail: sanitize(creatorView.detail),
+            message: sanitize(message),
+            fieldLines: component.render(supervisorProjectFoundryFieldWidth(width)),
+          }, width)
+          const lines = renderSupervisorTaskSurface(foundry.lines, terminalSize(), 'projects')
+          captureOverlayPointer(
+            lines,
+            width,
+            overlayOptions,
+            (data) => this.handleInput(data),
+            undefined,
+            (label) => {
+              if (projectsHoveredCommand === label) return
+              projectsHoveredCommand = label
+              ui.requestRender()
+            },
+          )
+          return decorateSupervisorTaskSurface(decorateSupervisorProjectFoundry(
+            lines,
+            tuiTheme,
+            projectsHoveredCommand,
+          ), tuiTheme)
+        }
+        const selectedItem = list.getSelectedItem()
+        const activeIndex = Math.max(0, items.findIndex((item) => item.value === selectedItem?.value))
+        const switchboard = renderSupervisorProjectSwitchboard({
+          currentProjectName: projectContext.aliceProject.displayName,
+          message: sanitize(message),
+          locked: Boolean(lock),
+          items: switchboardItems,
+          selected: activeIndex,
+          maxVisible: width >= 92
+            ? 8
+            : Math.max(1, Math.min(5, Math.floor(terminalSize().height * 0.9) - 16)),
+        }, width, supervisorUsesTaskStage(terminalSize(), 'projects'))
+        const baseList = selectListPointerTarget(items, list, 8, switchboard.targets[0]?.row ?? 2)
+        const firstTarget = switchboard.targets[0]
+        const listTarget: SupervisorOverlayListTarget = {
+          ...baseList,
+          indexes: switchboard.targets.map((target) => target.index),
+          startColumn: firstTarget?.startColumn ?? 2,
+          endColumn: firstTarget?.endColumn ?? Math.max(2, width - 1),
+          select: (index) => {
+            projectsHoveredCommand = undefined
+            baseList.select(index)
+          },
+          move: (delta) => {
+            projectsHoveredCommand = undefined
+            baseList.move(delta)
+          },
+        }
+        const lines = renderSupervisorTaskSurface(switchboard.lines, terminalSize(), 'projects')
+        captureOverlayPointer(
+          lines,
+          width,
+          overlayOptions,
+          (data) => this.handleInput(data),
+          listTarget,
+          (label) => {
+            if (projectsHoveredCommand === label) return
+            projectsHoveredCommand = label
+            ui.requestRender()
+          },
+        )
+        return decorateSupervisorTaskSurface(decorateSupervisorProjectSwitchboard(
+          lines,
+          tuiTheme,
+          projectsHoveredCommand,
+        ), tuiTheme)
       }
 
       handleInput(data: string): void {
-        if (!changing) component.handleInput?.(data)
+        if (!changing) {
+          projectsHoveredCommand = undefined
+          component.handleInput?.(data)
+        }
       }
 
       invalidate(): void {
         component.invalidate()
       }
     })()
-    const overlay = ui.showOverlay(panel, {
-      width: '92%',
-      maxHeight: '90%',
-      anchor: 'center',
-      margin: 1,
-    })
+    const overlay = ui.showOverlay(panel, overlayOptions)
     closeProjects = () => close()
     overlay.focus()
   }
@@ -1863,15 +3130,22 @@ export async function runSupervisorTui(
       return
     }
     transferActive = true
+    screen.update({ focusTask: 'transfer' })
     let component: Component
+    let activeChoice: {
+      items: SelectItem[]
+      list: InstanceType<typeof piTui.SelectList>
+      maxVisible: number
+    } | null = null
     let message = 'Choose the SSH Machine that will own the new AliceProject.'
     let transferController: AbortController | null = null
+    let transferHoveredCommand: string | undefined
     const theme: SelectListTheme = {
-      selectedPrefix: (text) => text,
-      selectedText: (text) => text,
-      description: (text) => text,
-      scrollInfo: (text) => text,
-      noMatch: (text) => text,
+      selectedPrefix: (text) => tuiTheme.accentStrong(text),
+      selectedText: (text) => tuiTheme.selected(text),
+      description: (text) => tuiTheme.muted(text),
+      scrollInfo: (text) => tuiTheme.muted(text),
+      noMatch: (text) => tuiTheme.warning(text),
     }
     const setMessage = (next: string) => { message = next; ui.requestRender() }
     const close = (notice = 'Transfer cancelled. Nothing changed.') => {
@@ -1879,9 +3153,13 @@ export async function runSupervisorTui(
       transferController?.abort()
       transferActive = false
       closeTransfer = null
+      overlayPointer.clear()
+      transferHoveredCommand = undefined
+      overlay.unfocus?.({ target: screen })
       overlay.hide()
       ui.setShowHardwareCursor(false)
-      screen.update({ notice })
+      screen.update({ focusTask: undefined, notice })
+      syncMotionTimer()
     }
     const showInput = (
       title: string,
@@ -1891,10 +3169,17 @@ export async function runSupervisorTui(
       submit: (value: string) => void,
       back: () => void,
     ) => {
+      activeChoice = null
       const input = new (class extends piTui.Input {
         detailText = detail
+        invalid = false
         override render(width: number): string[] {
-          return [title, '', ...super.render(width), '', sanitize(this.detailText), '', 'Enter  Continue · Esc  Back']
+          return renderSupervisorTransferInput(
+            title,
+            super.render(width),
+            sanitize(this.detailText),
+            this.invalid,
+          )
         }
       })()
       input.setValue(initial)
@@ -1904,7 +3189,7 @@ export async function runSupervisorTui(
       input.onSubmit = (value) => {
         const normalized = value.trim()
         const issue = validate(normalized)
-        if (issue) { input.detailText = issue; input.invalidate(); ui.requestRender(); return }
+        if (issue) { input.detailText = issue; input.invalid = true; input.invalidate(); ui.requestRender(); return }
         input.focused = false
         ui.setShowHardwareCursor(false)
         submit(normalized)
@@ -1918,11 +3203,15 @@ export async function runSupervisorTui(
       select: (value: string) => void,
       back: () => void,
     ) => {
-      const list = new piTui.SelectList(items, Math.min(8, items.length), theme)
+      const maxVisible = Math.min(8, items.length)
+      const list = new piTui.SelectList(items, maxVisible, theme)
       list.onSelect = (item) => select(item.value)
       list.onCancel = back
+      activeChoice = { items, list, maxVisible }
       component = new (class implements Component {
-        render(width: number): string[] { return [title, '', ...list.render(width)] }
+        render(width: number): string[] {
+          return renderSupervisorTransferChoice(title, list.render(width))
+        }
         handleInput(data: string): void { list.handleInput(data) }
         invalidate(): void { list.invalidate() }
       })()
@@ -1975,8 +3264,12 @@ export async function runSupervisorTui(
     const buildReview = async () => {
       const destination = selectedTransferDestination(state)!
       state.phase = 'planning'
+      activeChoice = null
       setMessage('Building a checksum and exclusion plan…')
-      component = { render: () => ['Planning transfer…'], invalidate: () => undefined }
+      component = {
+        render: (width) => renderSupervisorTransferPlanning(width),
+        invalidate: () => undefined,
+      }
       try {
         const latest = await inspectFleet()
         const remote = latest.machines.find((machine) => machine.key === destination.key)
@@ -2004,7 +3297,11 @@ export async function runSupervisorTui(
       }
     }
     const reviewComponent = (): Component => ({
-      render: (width) => renderTransferPlanReview(state.plan!, width),
+      render: (width) => renderSupervisorTransferReview(
+        renderTransferPlanReview(state.plan!, width),
+        state.plan!.readyToApply,
+        width,
+      ),
       handleInput: (data) => {
         if (piTui.matchesKey(data, 'escape') || piTui.matchesKey(data, 'n')) close()
         else if ((piTui.matchesKey(data, 'y') || piTui.matchesKey(data, 'enter')) && state.plan?.readyToApply) void applyTransfer()
@@ -2012,15 +3309,11 @@ export async function runSupervisorTui(
       invalidate: () => undefined,
     })
     const failureComponent = (): Component => ({
-      render: (width) => [
-        'Transfer failed',
-        '',
+      render: (width) => renderSupervisorTransferRecovery(
         sanitize(state.error ?? 'Unknown error'),
-        '',
-        state.plan?.readyToApply
-          ? 'r  Retry the same transaction · Enter / Esc  Close'
-          : 'r  Rebuild the plan · Enter / Esc  Close',
-      ].map((line) => truncate(line, width)),
+        Boolean(state.plan?.readyToApply),
+        width,
+      ),
       handleInput: (data) => {
         if (piTui.matchesKey(data, 'r')) {
           state.error = null
@@ -2041,13 +3334,7 @@ export async function runSupervisorTui(
       transferController = new AbortController()
       let progress = { files: 0, bytes: 0, totalFiles: state.plan!.portable.files, totalBytes: state.plan!.portable.bytes }
       component = {
-        render: () => [
-          'Transferring…',
-          '',
-          `${progress.files}/${progress.totalFiles} files · ${formatTransferProgress(progress.bytes, progress.totalBytes)}`,
-          'Checksums are verified before atomic publish.',
-          'Esc / Ctrl+C  Cancel',
-        ],
+        render: (width) => renderSupervisorTransferProgress(progress, width),
         handleInput: (data) => {
           if (piTui.matchesKey(data, 'escape')) {
             transferController?.abort()
@@ -2085,7 +3372,10 @@ export async function runSupervisorTui(
       ui.requestRender()
     }
     const successComponent = (machine: RegisteredMachine): Component => ({
-      render: (width) => renderTransferResult(state.receipt!, machine.displayName, state.projectKey, width),
+      render: (width) => renderSupervisorTransferArrival(
+        renderTransferResult(state.receipt!, machine.displayName, state.projectKey, width),
+        width,
+      ),
       handleInput: (data) => {
         if (piTui.matchesKey(data, 'enter') || piTui.matchesKey(data, 'escape')) { close(`Transferred ${machine.key}/${state.projectKey}.`) }
         else if (piTui.matchesKey(data, 's')) void (async () => {
@@ -2104,12 +3394,62 @@ export async function runSupervisorTui(
       invalidate: () => undefined,
     })
     showDestination()
+    const overlayOptions = supervisorTaskSurfaceOptions(terminalSize(), {
+      width: '92%',
+      maxHeight: '92%',
+      anchor: 'center',
+      margin: 1,
+    } as const, 'transfer')
     const panel = new (class implements Component {
-      render(width: number): string[] { return ['AliceProject Remote Transfer', '─'.repeat(Math.max(1, width)), '', ...component.render(width), '', sanitize(message)] }
-      handleInput(data: string): void { component.handleInput?.(data) }
+      render(width: number): string[] {
+        const flightDeck = renderSupervisorTransferFlightDeck({
+          phase: state.phase === 'failed' && state.plan ? 'transferring' : state.phase,
+          sourceName: source.displayName,
+          destinationName: selectedTransferDestination(state)?.displayName,
+          content: component.render(Math.max(1, width >= 96 ? width - 43 : width - 4)),
+          message: sanitize(message),
+        }, width)
+        const choice = activeChoice
+        const choiceTarget = choice
+          ? selectListPointerTarget(
+              choice.items,
+              choice.list,
+              choice.maxVisible,
+              flightDeck.choiceFirstRow ?? flightDeck.contentFirstRow + 2,
+            )
+          : undefined
+        const lines = renderSupervisorTaskSurface(flightDeck.lines, terminalSize(), 'transfer')
+        captureOverlayPointer(
+          lines,
+          width,
+          overlayOptions,
+          (data) => this.handleInput(data),
+          choiceTarget
+            ? {
+                ...choiceTarget,
+                startColumn: flightDeck.contentStartColumn,
+                endColumn: flightDeck.contentEndColumn,
+              }
+            : undefined,
+          (label) => {
+            if (transferHoveredCommand === label) return
+            transferHoveredCommand = label
+            ui.requestRender()
+          },
+        )
+        return decorateSupervisorTransferFlightDeck(
+          lines,
+          tuiTheme,
+          transferHoveredCommand,
+        )
+      }
+      handleInput(data: string): void {
+        transferHoveredCommand = undefined
+        component.handleInput?.(data)
+      }
       invalidate(): void { component.invalidate() }
     })()
-    const overlay = ui.showOverlay(panel, { width: '92%', maxHeight: '92%', anchor: 'center', margin: 1 })
+    const overlay = ui.showOverlay(panel, overlayOptions)
     closeTransfer = () => close()
     overlay.focus()
   }
@@ -2136,17 +3476,28 @@ export async function runSupervisorTui(
 
   return new Promise<number>((resolve) => {
     let settled = false
+    if (activeTarget) void refreshInbox({ quiet: true })
     const poll = setInterval(
       () => void refreshRuntime(),
       dependencies.pollIntervalMs ?? 1_500,
     )
     poll.unref()
+    const inboxPoll = setInterval(() => void refreshInbox({ quiet: true }), 20_000)
+    inboxPoll.unref()
+    const connectionPoll = setInterval(
+      () => void refreshActiveTargetHealth(),
+      dependencies.connectionPollIntervalMs ?? 5_000,
+    )
+    connectionPoll.unref()
 
     const finish = (code = 0) => {
       if (settled) return
       settled = true
       active = false
       clearInterval(poll)
+      clearInterval(inboxPoll)
+      clearInterval(connectionPoll)
+      stopMotionTimer()
       for (const controller of tunnelControllers.values()) controller.abort()
       tunnelControllers.clear()
       closeSourcePrompt?.()
@@ -2154,14 +3505,48 @@ export async function runSupervisorTui(
       closeProjects?.()
       closeTransfer?.()
       closeUpdateChannel?.()
+      closeConfirmation?.()
+      closeCommandPalette?.()
       removeInputListener()
       process.off('SIGTERM', onTerminate)
       process.off('SIGINT', onTerminate)
       ui.stop()
+      canvas.stop()
       resolve(code)
     }
+    screen.setDetachHandler(() => finish())
     const onTerminate = () => finish()
     const removeInputListener = ui.addInputListener((data) => {
+      const pointer = parseSupervisorPointer(data)
+      if (pointer) {
+        if (commandPaletteActive) {
+          const spineHandled = screen.handleCommandSpinePointer(pointer)
+          if (pointer.motion || !spineHandled) overlayPointer.route(pointer)
+        } else if (sourcePromptActive || settingsActive || projectsActive || transferActive || updateChannelActive || confirmationActive) {
+          overlayPointer.route(pointer)
+        } else {
+          screen.handlePointer(pointer)
+        }
+        return { consume: true }
+      }
+      if (confirmationActive) {
+        if (piTui.matchesKey(data, 'ctrl+c')) {
+          finish()
+          return { consume: true }
+        }
+        if (piTui.matchesKey(data, 'escape')) screen.cancelConfirmation()
+        else screen.handleKey(data, piTui.matchesKey)
+        return { consume: true }
+      }
+      if (commandPaletteActive) {
+        if (piTui.matchesKey(data, 'q') || piTui.matchesKey(data, 'ctrl+c')) {
+          finish()
+          return { consume: true }
+        }
+        if (piTui.matchesKey(data, 'escape')) screen.handleEscape()
+        else screen.handleKey(data, piTui.matchesKey)
+        return { consume: true }
+      }
       if (sourcePromptActive || settingsActive || projectsActive || transferActive || updateChannelActive) {
         if (piTui.matchesKey(data, 'ctrl+c')) {
           finish()
@@ -2169,15 +3554,15 @@ export async function runSupervisorTui(
         }
         return undefined
       }
-      if (screen.snapshot.confirmation && piTui.matchesKey(data, 'escape')) {
-        screen.cancelConfirmation()
-        return { consume: true }
-      }
       if (
         piTui.matchesKey(data, 'q')
         || piTui.matchesKey(data, 'ctrl+c')
       ) {
         finish()
+        return { consume: true }
+      }
+      if (screen.bootSequenceOwnsInput()) {
+        screen.skipBootSequence()
         return { consume: true }
       }
       if (piTui.matchesKey(data, 'escape')) {
@@ -2191,7 +3576,20 @@ export async function runSupervisorTui(
 
     process.once('SIGTERM', onTerminate)
     process.once('SIGINT', onTerminate)
-    ui.start()
+    canvas.start()
+    try {
+      ui.start()
+    } catch (error: unknown) {
+      active = false
+      clearInterval(poll)
+      stopMotionTimer()
+      removeInputListener()
+      process.off('SIGTERM', onTerminate)
+      process.off('SIGINT', onTerminate)
+      canvas.stop()
+      throw error
+    }
+    syncMotionTimer()
     void refreshFleet({ quiet: true })
     void discoverUpdateInBackground()
   })
@@ -2242,7 +3640,64 @@ export class SupervisorScreen implements Component {
   private readonly onTransferFleet?: (source: MachineProjectInventory) => void
   private readonly onRequestManagedSource?: () => void
   private readonly onPrepareManagedSource?: () => void
+  private readonly onCopyLog?: (
+    entry: { number: number; text: string },
+  ) => { emitted: boolean; truncated: boolean }
+  private readonly onRefreshInbox?: () => void
+  private readonly onToggleInboxRead?: (entry: NonNullable<SupervisorInboxSnapshot['entries'][number]>) => void
+  private readonly onOpenInboxEntry?: (entry: NonNullable<SupervisorInboxSnapshot['entries'][number]>) => void
+  private readonly onOpenActiveTarget?: () => void
+  private readonly onDisconnectActiveTarget?: () => void
+  private readonly onRefreshActiveTarget?: () => void
+  private readonly onConfirmationChange?: (action?: SupervisorConfirmation) => void
+  private readonly onCommandPaletteChange?: (open: boolean) => void
   private readonly requestRender?: () => void
+  private readonly theme: SupervisorTuiTheme
+  private readonly motionEnabled: boolean
+  private readonly onMotionDemandChange?: () => void
+  private readonly getViewportHeight?: () => number
+  private readonly now: () => number
+  private onDetach?: () => void
+  private hoveredPanel?: SupervisorPanel
+  private headerReleaseHovered = false
+  private headerReleaseTarget?: { startColumn: number; endColumn: number }
+  private navigationTargets: SupervisorNavigationTarget[] = []
+  private hoveredFleetTarget?: SupervisorFleetPointerTarget
+  private hoveredRail?: SupervisorRailPointerTarget
+  private activeRailDrag?: SupervisorRailSurface
+  private fleetVisibleRows = SUPERVISOR_FLEET_MIN_VISIBLE_ROWS
+  private hoveredCommandTarget?: SupervisorCommandTarget
+  private focusConsoleHoveredCommand?: string
+  private commandTargets: SupervisorCommandTarget[] = []
+  private commandSpineTargets: SupervisorCommandTarget[] = []
+  private commandDeckOpen = false
+  private commandDeckState: SupervisorCommandDeckState = createSupervisorCommandDeckState()
+  private commandDeckQuery = ''
+  private commandDeckCursorFrame = 0
+  private motionFrame = 0
+  private bootFrame?: number
+  private bootInputShield = false
+  private introFrame?: number
+  private ambientBrandFrame = 0
+  private ambientBrandTick = 0
+  private runtimePulse = false
+  private logsFromEnd = 0
+  private logFilter: SupervisorLogFilter = 'all'
+  private hoveredLogFromEnd: number | null = null
+  private logTargets: SupervisorLogTarget[] = []
+  private logRailTargets: SupervisorScrollRailTarget[] = []
+  private inboxState: SupervisorInboxState = createSupervisorInboxState()
+  private inboxTargets: SupervisorInboxTarget[] = []
+  private doctorState: SupervisorDoctorState = createSupervisorDoctorState()
+  private doctorTargets: SupervisorDoctorTarget[] = []
+  private doctorRailTargets: SupervisorScrollRailTarget[] = []
+  private helpState: SupervisorHelpState = createSupervisorHelpState()
+  private helpTargets: SupervisorHelpTarget[] = []
+  private homePrimaryHovered = false
+  private homePrimaryTarget?: SupervisorHomeTarget
+  private hoveredHomeHotspot?: SupervisorHomeHotspotKind
+  private homeHotspotTargets: SupervisorHomeHotspotTarget[] = []
+  private renderWidth = 80
 
   constructor(
     snapshot: SupervisorSnapshot,
@@ -2263,13 +3718,32 @@ export class SupervisorScreen implements Component {
       onTransferFleet?: (source: MachineProjectInventory) => void
       onRequestManagedSource?: () => void
       onPrepareManagedSource?: () => void
+      onCopyLog?: (
+        entry: { number: number; text: string },
+      ) => { emitted: boolean; truncated: boolean }
+      onRefreshInbox?: () => void
+      onToggleInboxRead?: (entry: NonNullable<SupervisorInboxSnapshot['entries'][number]>) => void
+      onOpenInboxEntry?: (entry: NonNullable<SupervisorInboxSnapshot['entries'][number]>) => void
+      onOpenActiveTarget?: () => void
+      onDisconnectActiveTarget?: () => void
+      onRefreshActiveTarget?: () => void
+      onConfirmationChange?: (action?: SupervisorConfirmation) => void
+      onCommandPaletteChange?: (open: boolean) => void
       requestRender?: () => void
+      theme?: SupervisorTuiTheme
+      motionEnabled?: boolean
+      bootSequence?: boolean
+      onMotionDemandChange?: () => void
+      getViewportHeight?: () => number
+      now?: () => number
+      onDetach?: () => void
     } = {},
   ) {
     this.snapshot = {
       panel: snapshot.fleet ? 'fleet' : 'overview',
       ...snapshot,
     }
+    this.doctorState = createSupervisorDoctorState(this.snapshot.doctor)
     this.onAction = callbacks.onAction
     this.onConfigureSource = callbacks.onConfigureSource
     this.onSettings = callbacks.onSettings
@@ -2280,22 +3754,264 @@ export class SupervisorScreen implements Component {
     this.onTransferFleet = callbacks.onTransferFleet
     this.onRequestManagedSource = callbacks.onRequestManagedSource
     this.onPrepareManagedSource = callbacks.onPrepareManagedSource
+    this.onCopyLog = callbacks.onCopyLog
+    this.onRefreshInbox = callbacks.onRefreshInbox
+    this.onToggleInboxRead = callbacks.onToggleInboxRead
+    this.onOpenInboxEntry = callbacks.onOpenInboxEntry
+    this.onOpenActiveTarget = callbacks.onOpenActiveTarget
+    this.onDisconnectActiveTarget = callbacks.onDisconnectActiveTarget
+    this.onRefreshActiveTarget = callbacks.onRefreshActiveTarget
+    this.onConfirmationChange = callbacks.onConfirmationChange
+    this.onCommandPaletteChange = callbacks.onCommandPaletteChange
     this.requestRender = callbacks.requestRender
+    this.theme = callbacks.theme ?? createSupervisorTuiTheme({ NO_COLOR: '1' })
+    this.motionEnabled = callbacks.motionEnabled ?? true
+    this.bootFrame = callbacks.bootSequence && this.motionEnabled && this.theme.enabled
+      ? 0
+      : undefined
+    this.onMotionDemandChange = callbacks.onMotionDemandChange
+    this.getViewportHeight = callbacks.getViewportHeight
+    this.now = callbacks.now ?? (() => Date.now())
+    this.introFrame = this.motionEnabled && this.theme.enabled ? 0 : undefined
+    this.onDetach = callbacks.onDetach
+  }
+
+  setDetachHandler(handler: () => void): void {
+    this.onDetach = handler
+  }
+
+  activeFocusTask(): SupervisorFocusTask | undefined {
+    return this.snapshot.confirmation ? 'confirmation' : this.snapshot.focusTask
+  }
+
+  activeConfirmationView(): SupervisorConfirmationView | undefined {
+    if (!this.snapshot.confirmation) return undefined
+    return confirmationView(
+      this.snapshot.confirmation,
+      this.snapshot.runtime,
+      this.snapshot.managedSource,
+      this.snapshot.update,
+    )
+  }
+
+  renderFocusActionBar(width: number): string[] {
+    const confirmation = this.activeConfirmationView()
+    if (confirmation) {
+      return renderSupervisorConfirmationActionBar(confirmation, width)
+    }
+    if (!this.snapshot.focusTask || this.snapshot.focusTask === 'confirmation') return []
+    return renderSupervisorFocusActionBar(this.snapshot.focusTask, width)
+  }
+
+  bootSequenceActive(): boolean {
+    return this.bootFrame !== undefined
+  }
+
+  bootSequenceOwnsInput(): boolean {
+    return this.bootFrame !== undefined || this.bootInputShield
+  }
+
+  skipBootSequence(): boolean {
+    if (this.bootFrame === undefined) return false
+    this.bootFrame = undefined
+    this.bootInputShield = false
+    this.requestRender?.()
+    this.onMotionDemandChange?.()
+    return true
   }
 
   update(patch: Partial<SupervisorSnapshot>): void {
+    const wasBusy = Boolean(this.snapshot.busy)
+    const previousConfirmation = this.snapshot.confirmation
+    const activeTargetChanged = 'activeTarget' in patch && (
+      patch.activeTarget?.machineKey !== this.snapshot.activeTarget?.machineKey
+      || patch.activeTarget?.projectKey !== this.snapshot.activeTarget?.projectKey
+    )
+    const surfaceChanged = ('panel' in patch && patch.panel !== this.snapshot.panel)
+      || activeTargetChanged
+      || ('focusTask' in patch && patch.focusTask !== this.snapshot.focusTask)
+      || ('confirmation' in patch && patch.confirmation !== this.snapshot.confirmation)
+    if (surfaceChanged) {
+      this.hoveredCommandTarget = undefined
+      this.focusConsoleHoveredCommand = undefined
+      this.homePrimaryHovered = false
+      this.hoveredHomeHotspot = undefined
+      this.hoveredFleetTarget = undefined
+      this.hoveredRail = undefined
+      this.activeRailDrag = undefined
+    }
+    if (patch.logs !== undefined && patch.logs !== this.snapshot.logs) {
+      this.logsFromEnd = 0
+      this.hoveredLogFromEnd = null
+      if (this.hoveredRail?.surface === 'logs') this.hoveredRail = undefined
+    }
+    if (patch.doctor !== undefined && patch.doctor !== this.snapshot.doctor) {
+      this.doctorState = createSupervisorDoctorState(patch.doctor)
+      if (this.hoveredRail?.surface === 'doctor') this.hoveredRail = undefined
+    }
+    if (patch.inbox !== undefined && patch.inbox !== this.snapshot.inbox) {
+      this.inboxState = normalizeSupervisorInboxState(this.inboxState, patch.inbox)
+    }
+    if (patch.busy !== undefined && patch.busy !== this.snapshot.busy) this.motionFrame = 0
+    if (patch.runtime !== undefined) {
+      const nextFleet = patch.fleet ?? this.snapshot.fleet
+      const anyFleetRuntime = nextFleet?.machines.some((machine) => (
+        machine.projects.some((project) => (
+          project.runtime.class === 'running' || project.runtime.class === 'owned_elsewhere'
+        ))
+      )) ?? false
+      this.runtimePulse = this.motionEnabled
+        && (patch.runtime?.class === 'running'
+          || patch.runtime?.class === 'owned_elsewhere'
+          || anyFleetRuntime)
+        ? !this.runtimePulse
+        : false
+    }
+    if ('focusTask' in patch && patch.focusTask === undefined) {
+      this.focusConsoleHoveredCommand = undefined
+      this.hoveredCommandTarget = undefined
+    }
     this.snapshot = { ...this.snapshot, ...patch }
+    if (this.snapshot.confirmation !== previousConfirmation) {
+      this.onConfirmationChange?.(this.snapshot.confirmation)
+    }
+    const isBusy = Boolean(this.snapshot.busy)
+    if (isBusy !== wasBusy) this.onMotionDemandChange?.()
     this.requestRender?.()
+  }
+
+  setFocusConsoleHoveredCommand(label?: string): void {
+    if (this.focusConsoleHoveredCommand === label) return
+    this.focusConsoleHoveredCommand = label
+    if (label === undefined) this.hoveredCommandTarget = undefined
+    this.requestRender?.()
+  }
+
+  advanceMotion(ambientMotionAllowed = true): boolean {
+    if (!this.motionEnabled) return false
+    let changed = false
+    if (this.bootFrame !== undefined) {
+      if (this.bootFrame >= SUPERVISOR_BOOT_LAST_FRAME) {
+        this.bootFrame = undefined
+        this.bootInputShield = true
+      } else {
+        this.bootFrame += 1
+      }
+      return true
+    }
+    if (this.bootInputShield) {
+      this.bootInputShield = false
+      return false
+    }
+    const brandMotionAllowed = ambientMotionAllowed && !this.snapshot.busy
+    if (this.introFrame !== undefined && brandMotionAllowed) {
+      this.introFrame = this.introFrame >= 8 ? undefined : this.introFrame + 1
+      changed = true
+    }
+    if (this.ambientBrandMotionActive(brandMotionAllowed)) {
+      this.ambientBrandTick = (this.ambientBrandTick + 1) % 3
+      if (this.ambientBrandTick === 0) {
+        this.ambientBrandFrame = (this.ambientBrandFrame + 1) % 6
+        changed = this.renderWidth >= 72 || changed
+      }
+    }
+    if (this.snapshot.busy) {
+      this.motionFrame = (this.motionFrame + 1) % 10
+      changed = true
+    }
+    if (this.commandDeckOpen) {
+      const wasVisible = this.commandDeckCursorFrame < 6
+      this.commandDeckCursorFrame = (this.commandDeckCursorFrame + 1) % 12
+      if (wasVisible !== (this.commandDeckCursorFrame < 6)) changed = true
+    }
+    return changed
+  }
+
+  hasActiveMotion(ambientMotionAllowed = true): boolean {
+    const brandMotionAllowed = ambientMotionAllowed && !this.snapshot.busy
+    return this.motionEnabled
+      && (
+        this.bootFrame !== undefined
+        || this.bootInputShield
+        || (brandMotionAllowed && this.introFrame !== undefined)
+        || this.ambientBrandMotionActive(brandMotionAllowed)
+        || Boolean(this.snapshot.busy)
+        || this.commandDeckOpen
+      )
+  }
+
+  private ambientBrandMotionActive(brandMotionAllowed: boolean): boolean {
+    return brandMotionAllowed
+      && this.theme.enabled
+      && this.introFrame === undefined
+      && (this.snapshot.panel ?? 'overview') === 'overview'
   }
 
   cancelConfirmation(): void {
     this.update({ confirmation: undefined, notice: 'Action cancelled.' })
   }
 
+  renderCommandPalette(width: number) {
+    const items = this.filteredCommandDeckItems()
+    const runtime = this.snapshot.activeTarget?.runtime ?? this.snapshot.runtime
+    this.commandDeckState = normalizeSupervisorCommandDeckState(
+      this.commandDeckState,
+      items.length,
+    )
+    return renderSupervisorCommandDeck(
+      items,
+      this.commandDeckState,
+      isConfigRecovery(this.snapshot)
+        ? 'recovery'
+        : runtime?.class ?? 'unavailable',
+      width,
+      this.commandDeckQuery,
+      !this.motionEnabled || this.commandDeckCursorFrame < 6,
+    )
+  }
+
+  commandPaletteItemCount(): number {
+    return this.filteredCommandDeckItems().length
+  }
+
+  selectCommandPaletteItem(index: number): void {
+    this.commandDeckState = normalizeSupervisorCommandDeckState({
+      selected: index,
+      hovered: index,
+    }, this.commandPaletteItemCount())
+    this.requestRender?.()
+  }
+
+  moveCommandPaletteSelection(delta: -1 | 1): void {
+    this.commandDeckState = moveSupervisorCommandDeckSelection(
+      this.commandDeckState,
+      delta,
+      this.commandPaletteItemCount(),
+      false,
+    )
+    this.requestRender?.()
+  }
+
+  activateCommandPaletteItem(): boolean {
+    return this.activateCommandDeckItem(
+      this.filteredCommandDeckItems()[this.commandDeckState.selected],
+    )
+  }
+
   handleEscape(): boolean {
+    if (this.commandDeckOpen) {
+      this.setCommandPaletteOpen(false)
+      return true
+    }
+    if (this.snapshot.launchFlight?.status === 'failed') {
+      this.update({ launchFlight: null, diagnostic: undefined, notice: 'Returned to launch targets.' })
+      return true
+    }
     if (
       this.snapshot.panel === 'fleet'
       && this.snapshot.fleet?.focus === 'projects'
+      && !(this.snapshot.activeTarget != null
+        && supervisorFleetHasSingleLaunchTarget(this.snapshot.fleet))
     ) {
       this.update({ fleet: setFleetFocus(this.snapshot.fleet, 'machines') })
       return true
@@ -2303,19 +4019,48 @@ export class SupervisorScreen implements Component {
     return false
   }
 
+  activateFleetPrimary(fleet: SupervisorFleetState): void {
+    if (this.snapshot.activeTarget === null) {
+      const intent = supervisorFleetLaunchIntent(fleet)
+      if (intent.action.key === 'r') {
+        this.onRefreshFleet?.()
+        return
+      }
+    }
+    if (fleet.focus === 'machines') {
+      this.update({ fleet: setFleetFocus(fleet, 'projects') })
+      return
+    }
+    const machine = selectedFleetMachine(fleet)
+    const project = selectedFleetProject(fleet)
+    if (!machine || !project) {
+      this.update({ notice: 'No AliceProject is available on the selected Machine.' })
+      return
+    }
+    if (machine.key !== 'local' && project.runtime.class === 'absent') {
+      this.onStartFleet?.(machine, project)
+    } else {
+      this.onActivateFleet?.(machine, project)
+    }
+  }
+
   handleKey(
     data: string,
     matchesKey: (data: string, key: KeyId) => boolean,
   ): boolean {
+    if (this.skipBootSequence()) return true
+    if (this.bootInputShield) return true
     if (this.snapshot.busy) return false
     if (this.snapshot.confirmation) {
       if (matchesKey(data, 'y') || matchesKey(data, 'enter')) {
-        if (this.snapshot.confirmation === 'managed-source') {
+        const confirmation = this.snapshot.confirmation
+        this.update({ confirmation: undefined })
+        if (confirmation === 'managed-source') {
           this.onPrepareManagedSource?.()
-        } else if (this.snapshot.confirmation === 'update') {
+        } else if (confirmation === 'update') {
           this.onAction?.('apply-update')
         } else {
-          this.onAction?.(this.snapshot.confirmation)
+          this.onAction?.(confirmation)
         }
         return true
       }
@@ -2325,8 +4070,47 @@ export class SupervisorScreen implements Component {
       }
       return false
     }
+    if (data === '/' && !this.commandDeckOpen) {
+      this.setCommandPaletteOpen(true)
+      return true
+    }
+    if (this.commandDeckOpen) {
+      if (data === '/') {
+        this.setCommandPaletteOpen(false)
+        return true
+      }
+      const items = this.filteredCommandDeckItems()
+      if (matchesKey(data, 'up') || matchesKey(data, 'down')) {
+        this.commandDeckState = moveSupervisorCommandDeckSelection(
+          this.commandDeckState,
+          matchesKey(data, 'down') ? 1 : -1,
+          items.length,
+        )
+        this.requestRender?.()
+        return true
+      }
+      if (matchesKey(data, 'enter')) {
+        return this.activateCommandDeckItem(items[this.commandDeckState.selected])
+      }
+      if (data === '\x7f' || data === '\b') {
+        this.setCommandDeckQuery(dropLastCommandQueryCodePoint(this.commandDeckQuery))
+        return true
+      }
+      if (data === '\x15') {
+        this.setCommandDeckQuery('')
+        return true
+      }
+      const query = appendCommandQueryInput(this.commandDeckQuery, data, 48)
+      if (query !== null) {
+        this.setCommandDeckQuery(query)
+        return true
+      }
+      return true
+    }
     if (matchesKey(data, '?')) {
-      this.update({ panel: this.snapshot.panel === 'help' ? 'overview' : 'help' })
+      this.selectPanel(this.snapshot.panel === 'help'
+        ? this.snapshot.activeTarget !== null ? 'overview' : 'fleet'
+        : 'help')
       return true
     }
     if (matchesKey(data, ']') || matchesKey(data, '[')) {
@@ -2335,7 +4119,18 @@ export class SupervisorScreen implements Component {
     }
     const fleet = this.snapshot.panel === 'fleet' ? this.snapshot.fleet : null
     if (fleet) {
+      const directConnection = this.snapshot.activeTarget !== null
+        && supervisorFleetHasSingleLaunchTarget(fleet)
+      if (directConnection && (matchesKey(data, 'tab') || matchesKey(data, 'right'))) {
+        this.selectAdjacentPanel(1)
+        return true
+      }
+      if (directConnection && (matchesKey(data, 'shift+tab') || matchesKey(data, 'left'))) {
+        this.selectAdjacentPanel(-1)
+        return true
+      }
       if (matchesKey(data, 'up') || matchesKey(data, 'down')) {
+        if (directConnection) return true
         this.update({
           fleet: moveFleetSelection(fleet, matchesKey(data, 'down') ? 1 : -1),
         })
@@ -2350,20 +4145,24 @@ export class SupervisorScreen implements Component {
         return true
       }
       if (matchesKey(data, 'enter')) {
-        if (fleet.focus === 'machines') {
-          this.update({ fleet: setFleetFocus(fleet, 'projects') })
-        } else {
-          const machine = selectedFleetMachine(fleet)
-          const project = selectedFleetProject(fleet)
-          if (machine && project) this.onActivateFleet?.(machine, project)
-          else this.update({ notice: 'No AliceProject is available on the selected Machine.' })
-        }
+        this.activateFleetPrimary(directConnection ? setFleetFocus(fleet, 'projects') : fleet)
         return true
       }
       const machine = selectedFleetMachine(fleet)
       const project = selectedFleetProject(fleet)
       const remote = machine?.key !== 'local'
-      if (matchesKey(data, 'r') && remote) {
+      const directSelectionActive = directConnection
+        && machine?.key === this.snapshot.activeTarget?.machineKey
+        && project?.key === this.snapshot.activeTarget?.projectKey
+      if (directSelectionActive && remote && matchesKey(data, 'x')) {
+        this.onDisconnectActiveTarget?.()
+        return true
+      }
+      if (matchesKey(data, 'r') && (
+        remote
+        || (this.snapshot.activeTarget === null
+          && supervisorFleetLaunchIntent(fleet).action.key === 'r')
+      )) {
         this.onRefreshFleet?.()
         return true
       }
@@ -2381,7 +4180,8 @@ export class SupervisorScreen implements Component {
         return true
       }
       if (matchesKey(data, 'm') && !remote) {
-        if (project) this.onTransferFleet?.(project)
+        if (project?.available) this.onTransferFleet?.(project)
+        else if (project) this.update({ notice: 'Transfer requires an available AliceProject home.' })
         else this.update({ notice: 'Select a local AliceProject to transfer.' })
         return true
       }
@@ -2393,9 +4193,170 @@ export class SupervisorScreen implements Component {
         return true
       }
     }
+    if (this.snapshot.panel === 'inbox') {
+      if (matchesKey(data, 'up') || matchesKey(data, 'down')) {
+        this.inboxState = moveSupervisorInboxSelection(
+          this.inboxState,
+          matchesKey(data, 'down') ? 1 : -1,
+          this.snapshot.inbox,
+        )
+        this.requestRender?.()
+        return true
+      }
+      if (matchesKey(data, 'enter')) {
+        const entry = selectedSupervisorInboxEntry(this.snapshot.inbox, this.inboxState)
+        if (entry) this.onToggleInboxRead?.(entry)
+        else this.update({ notice: 'Inbox has no selected message.' })
+        return true
+      }
+      if (matchesKey(data, 'o')) {
+        const entry = selectedSupervisorInboxEntry(this.snapshot.inbox, this.inboxState)
+        if (entry) this.onOpenInboxEntry?.(entry)
+        else this.update({ notice: 'Inbox has no selected Workspace.' })
+        return true
+      }
+      if (matchesKey(data, 'r')) {
+        this.onRefreshInbox?.()
+        return true
+      }
+      if (matchesKey(data, 'c')) {
+        this.selectPanel('fleet')
+        return true
+      }
+    }
+    if (this.snapshot.panel === 'logs' || this.snapshot.panel === 'doctor') {
+      if (this.snapshot.panel === 'logs' && matchesKey(data, 'f')) {
+        this.logFilter = nextSupervisorLogFilter(this.logFilter)
+        this.logsFromEnd = 0
+        this.requestRender?.()
+        return true
+      }
+      if (this.snapshot.panel === 'logs' && matchesKey(data, 'y')) {
+        const entry = supervisorSelectedLogEntry(
+          this.snapshot.logs,
+          this.logFilter,
+          this.logsFromEnd,
+        )
+        if (!entry) {
+          this.update({ notice: 'No Runtime event is selected to copy.' })
+          return true
+        }
+        const result = this.onCopyLog?.(entry)
+        this.update({
+          notice: result?.emitted
+            ? `Sent Runtime event ${entry.number}${result.truncated ? ' (truncated)' : ''} to the terminal clipboard.`
+            : 'Terminal clipboard output is unavailable in this TUI host.',
+        })
+        return true
+      }
+      const direction = matchesKey(data, 'up') || matchesKey(data, 'pageUp')
+        ? -1
+        : matchesKey(data, 'down') || matchesKey(data, 'pageDown') ? 1 : 0
+      if (direction !== 0) {
+        const amount = matchesKey(data, 'pageUp') || matchesKey(data, 'pageDown') ? 8 : 1
+        if (this.snapshot.panel === 'doctor') {
+          this.doctorState = moveSupervisorDoctorSelection(
+            this.doctorState,
+            direction * amount,
+            this.snapshot.doctor,
+            amount === 1,
+          )
+          this.requestRender?.()
+        } else {
+          this.scrollOperationalPanel(direction * amount)
+        }
+        return true
+      }
+      if (matchesKey(data, 'home') || matchesKey(data, 'end')) {
+        if (this.snapshot.panel === 'doctor') {
+          this.doctorState = selectSupervisorDoctorBoundary(
+            this.snapshot.doctor,
+            matchesKey(data, 'end'),
+          )
+          this.requestRender?.()
+        } else {
+          this.jumpOperationalPanel(matchesKey(data, 'end'))
+        }
+        return true
+      }
+    }
+    if (this.snapshot.panel === 'help') {
+      const recovery = isConfigRecovery(this.snapshot)
+      const direction = matchesKey(data, 'up') || matchesKey(data, 'pageUp')
+        ? -1
+        : matchesKey(data, 'down') || matchesKey(data, 'pageDown') ? 1 : 0
+      if (direction !== 0) {
+        this.helpState = moveSupervisorHelpSelection(
+          this.helpState,
+          direction,
+          recovery,
+          !matchesKey(data, 'pageUp') && !matchesKey(data, 'pageDown'),
+        )
+        this.requestRender?.()
+        return true
+      }
+      if (matchesKey(data, 'home') || matchesKey(data, 'end')) {
+        this.helpState = selectSupervisorHelpBoundary(recovery, matchesKey(data, 'end'))
+        this.requestRender?.()
+        return true
+      }
+    }
+    if (this.snapshot.activeTarget?.kind === 'local'
+      && !activeTargetIsReachable(this.snapshot.activeTarget)) {
+      if (matchesKey(data, 'r') || matchesKey(data, 'enter')) {
+        this.onRefreshActiveTarget?.()
+        return true
+      }
+      if (matchesKey(data, 'o')) {
+        this.update({ notice: 'The local endpoint is not healthy. Retry the connection before opening it.' })
+        return true
+      }
+      if (matchesKey(data, 'c')) {
+        this.selectPanel('fleet')
+        return true
+      }
+    }
+    if (this.snapshot.activeTarget?.kind === 'ssh') {
+      const healthy = activeTargetIsReachable(this.snapshot.activeTarget)
+      if (matchesKey(data, 'x')) {
+        this.onDisconnectActiveTarget?.()
+        return true
+      }
+      if (matchesKey(data, 'r') || (matchesKey(data, 'enter') && !healthy)) {
+        this.onRefreshActiveTarget?.()
+        return true
+      }
+      if (matchesKey(data, 'o') && !healthy) {
+        this.update({ notice: 'The active endpoint is not healthy. Retry the connection before opening it.' })
+        return true
+      }
+      if (matchesKey(data, 'c') || matchesKey(data, 'i')) {
+        this.selectPanel('fleet')
+        return true
+      }
+      const localOnlyKeys: KeyId[] = ['s', 'l', 'd', 'p', 'm']
+      if (localOnlyKeys.some((key) => matchesKey(data, key))) {
+        this.update({
+          notice: 'That command controls a local Runtime. Use Connections to select a local target first.',
+        })
+        return true
+      }
+    }
     if (matchesKey(data, 'enter')) {
       if (isConfigRecovery(this.snapshot)) {
         this.update({ notice: configRecoveryBlockedNotice() })
+        return true
+      }
+      if (
+        this.snapshot.panel === 'overview'
+        && supervisorHomePrimaryIntent(this.snapshot).kind === 'inbox'
+      ) {
+        this.selectPanel('inbox')
+        return true
+      }
+      if (this.snapshot.activeTarget) {
+        if (this.onOpenActiveTarget) this.onOpenActiveTarget()
+        else this.onAction?.('open')
         return true
       }
       const action = primaryAction(this.snapshot.runtime)
@@ -2456,6 +4417,10 @@ export class SupervisorScreen implements Component {
       this.selectAdjacentPanel(-1)
       return true
     }
+    if (matchesKey(data, 'o') && this.snapshot.activeTarget) {
+      this.onOpenActiveTarget?.()
+      return true
+    }
     const keyActions: Array<[KeyId, SupervisorAction]> = [
       ['s', 'start'],
       ['o', 'open'],
@@ -2496,115 +4461,992 @@ export class SupervisorScreen implements Component {
     return false
   }
 
+  handlePointer(event: SupervisorPointerEvent): boolean {
+    if (this.bootSequenceOwnsInput()) {
+      if (event.leftClick) this.skipBootSequence()
+      return true
+    }
+    const headerRelease = !this.commandDeckOpen
+      && event.row === 1
+      && this.headerReleaseTarget
+      && event.col >= this.headerReleaseTarget.startColumn
+      && event.col <= this.headerReleaseTarget.endColumn
+      ? this.headerReleaseTarget
+      : undefined
+    const hovered = !this.commandDeckOpen && event.row === 2
+      ? supervisorNavigationPanelAt(this.navigationTargets, event.col)
+      : undefined
+    const fleet = !this.commandDeckOpen && this.snapshot.panel === 'fleet'
+      ? this.snapshot.fleet
+      : undefined
+    const fleetLauncher = fleet && this.snapshot.activeTarget === null
+    const directFleetConnection = Boolean(
+      fleet
+      && this.snapshot.activeTarget !== null
+      && supervisorFleetHasSingleLaunchTarget(fleet),
+    )
+    const fleetContentOffset = supervisorFleetLauncherRows(this.renderWidth, Boolean(fleetLauncher))
+    const fleetRailTarget = fleet
+      ? supervisorFleetRailTargetAt(
+          fleet,
+          this.renderWidth,
+          event.col,
+          event.row - 4 - fleetContentOffset,
+          this.fleetVisibleRows,
+          Boolean(fleetLauncher),
+          directFleetConnection,
+        )
+      : undefined
+    const fleetTarget = fleet && !fleetRailTarget
+      ? supervisorFleetTargetAt(
+          fleet,
+          this.renderWidth,
+          event.col,
+          event.row - 4 - fleetContentOffset,
+          this.fleetVisibleRows,
+          Boolean(fleetLauncher),
+          directFleetConnection,
+        )
+      : undefined
+    const doctorRailTarget = !this.commandDeckOpen && this.snapshot.panel === 'doctor'
+      ? this.doctorRailTargets.find((target) => (
+          target.row === event.row && target.column === event.col
+        ))
+      : undefined
+    const doctorTarget = !doctorRailTarget
+      && !this.commandDeckOpen && this.snapshot.panel === 'doctor'
+      ? this.doctorTargets.find((target) => (
+          target.row === event.row
+          && event.col >= target.startColumn
+          && event.col <= target.endColumn
+        ))
+      : undefined
+    const logRailTarget = !this.commandDeckOpen && this.snapshot.panel === 'logs'
+      ? this.logRailTargets.find((target) => (
+          target.row === event.row && target.column === event.col
+        ))
+      : undefined
+    const logTarget = !logRailTarget
+      && !this.commandDeckOpen && this.snapshot.panel === 'logs'
+      ? this.logTargets.find((target) => (
+          target.row === event.row
+          && event.col >= target.startColumn
+          && event.col <= target.endColumn
+        ))
+      : undefined
+    const inboxTarget = !this.commandDeckOpen && this.snapshot.panel === 'inbox'
+      ? this.inboxTargets.find((target) => (
+          target.row === event.row
+          && event.col >= target.startColumn
+          && event.col <= target.endColumn
+        ))
+      : undefined
+    const helpTarget = !this.commandDeckOpen && this.snapshot.panel === 'help'
+      ? this.helpTargets.find((target) => (
+          target.row === event.row
+          && event.col >= target.startColumn
+          && event.col <= target.endColumn
+        ))
+      : undefined
+    const homePrimaryTarget = !this.commandDeckOpen && this.snapshot.panel === 'overview'
+      && this.homePrimaryTarget
+      && event.row === this.homePrimaryTarget.row
+      && event.col >= this.homePrimaryTarget.startColumn
+      && event.col <= this.homePrimaryTarget.endColumn
+      ? this.homePrimaryTarget
+      : undefined
+    const homeHotspot = !this.commandDeckOpen && this.snapshot.panel === 'overview'
+      ? this.homeHotspotTargets.find((target) => (
+          target.row === event.row
+          && event.col >= target.startColumn
+          && event.col <= target.endColumn
+        ))
+      : undefined
+    const commandTarget = commandAtPosition(this.commandTargets, event.col, event.row)
+    const railTarget: SupervisorRailPointerTarget | undefined = fleetRailTarget
+      ? {
+          surface: fleetRailTarget.focus === 'machines'
+            ? 'fleet-machines'
+            : 'fleet-projects',
+          index: fleetRailTarget.index,
+          trackRow: fleetRailTarget.trackRow,
+        }
+      : logRailTarget
+        ? { surface: 'logs', index: logRailTarget.index, trackRow: logRailTarget.trackRow }
+        : doctorRailTarget
+          ? { surface: 'doctor', index: doctorRailTarget.index, trackRow: doctorRailTarget.trackRow }
+          : undefined
+    if (event.motion) {
+      if (event.leftDrag && this.activeRailDrag) {
+        if (railTarget?.surface === this.activeRailDrag) {
+          this.hoveredRail = railTarget
+          this.selectRailTarget(railTarget)
+        }
+        return true
+      }
+      const fleetHoverChanged = fleetTarget?.focus !== this.hoveredFleetTarget?.focus
+        || fleetTarget?.index !== this.hoveredFleetTarget?.index
+        || fleetTarget?.surface !== this.hoveredFleetTarget?.surface
+      const commandHoverChanged = commandTarget?.row !== this.hoveredCommandTarget?.row
+        || commandTarget?.label !== this.hoveredCommandTarget?.label
+      const doctorHover = doctorTarget?.index ?? null
+      const doctorHoverChanged = doctorHover !== this.doctorState.hovered
+      const logHover = logTarget?.fromEnd ?? null
+      const logHoverChanged = logHover !== this.hoveredLogFromEnd
+      const inboxHover = inboxTarget?.index ?? null
+      const inboxHoverChanged = inboxHover !== this.inboxState.hovered
+      const helpHover = helpTarget?.index ?? null
+      const helpHoverChanged = helpHover !== this.helpState.hovered
+      const homeHover = Boolean(homePrimaryTarget)
+      const homeHoverChanged = homeHover !== this.homePrimaryHovered
+      const homeHotspotHover = homeHotspot?.kind
+      const homeHotspotHoverChanged = homeHotspotHover !== this.hoveredHomeHotspot
+      const headerReleaseHover = Boolean(headerRelease)
+      const headerReleaseHoverChanged = headerReleaseHover !== this.headerReleaseHovered
+      const railHoverChanged = railTarget?.surface !== this.hoveredRail?.surface
+        || railTarget?.index !== this.hoveredRail?.index
+        || railTarget?.trackRow !== this.hoveredRail?.trackRow
+      if (
+        headerReleaseHoverChanged
+        || hovered !== this.hoveredPanel
+        || fleetHoverChanged
+        || commandHoverChanged
+        || doctorHoverChanged
+        || logHoverChanged
+        || inboxHoverChanged
+        || helpHoverChanged
+        || homeHoverChanged
+        || homeHotspotHoverChanged
+        || railHoverChanged
+      ) {
+        this.headerReleaseHovered = headerReleaseHover
+        this.hoveredPanel = hovered
+        this.hoveredFleetTarget = fleetTarget
+        this.hoveredCommandTarget = commandTarget
+        this.doctorState = { ...this.doctorState, hovered: doctorHover }
+        this.hoveredLogFromEnd = logHover
+        this.inboxState = { ...this.inboxState, hovered: inboxHover }
+        this.helpState = { ...this.helpState, hovered: helpHover }
+        this.homePrimaryHovered = homeHover
+        this.hoveredHomeHotspot = homeHotspotHover
+        this.hoveredRail = railTarget
+        this.requestRender?.()
+      }
+      return true
+    }
+    if (event.leftClick && railTarget) {
+      this.activeRailDrag = railTarget.surface
+      this.hoveredRail = railTarget
+      this.selectRailTarget(railTarget)
+      return true
+    }
+    if (event.leftClick) this.activeRailDrag = undefined
+    if (event.leftClick && headerRelease) {
+      this.headerReleaseHovered = true
+      return this.handleKey('u', (data, key) => data === key)
+    }
+    if (event.leftClick && hovered) {
+      this.hoveredPanel = hovered
+      this.selectPanel(hovered)
+      return true
+    }
+    if (event.leftClick && logTarget) {
+      this.logsFromEnd = logTarget.fromEnd
+      this.hoveredLogFromEnd = logTarget.fromEnd
+      this.requestRender?.()
+      return true
+    }
+    if (event.leftClick && inboxTarget) {
+      if (this.inboxState.selected === inboxTarget.index) {
+        const entry = selectedSupervisorInboxEntry(this.snapshot.inbox, this.inboxState)
+        if (entry) this.onToggleInboxRead?.(entry)
+      } else {
+        this.inboxState = { selected: inboxTarget.index, hovered: inboxTarget.index }
+        this.requestRender?.()
+      }
+      return true
+    }
+    if (event.leftClick && commandTarget) {
+      return this.activatePointerCommand(commandTarget.label)
+    }
+    if (event.leftClick && homeHotspot) {
+      this.hoveredHomeHotspot = homeHotspot.kind
+      if (homeHotspot.input === 'inbox') {
+        this.selectPanel('inbox')
+        return true
+      }
+      if (homeHotspot.input === 'connections') {
+        this.selectPanel('fleet')
+        return true
+      }
+      return this.handleKey(homeHotspot.input, (data, key) => data === key)
+    }
+    if (event.leftClick && homePrimaryTarget) {
+      return this.handleKey('enter', (data, key) => data === key)
+    }
+    if (event.leftClick && helpTarget) {
+      this.helpState = { selected: helpTarget.index, hovered: helpTarget.index }
+      this.requestRender?.()
+      return true
+    }
+    if (event.leftClick && doctorTarget) {
+      this.doctorState = { selected: doctorTarget.index, hovered: doctorTarget.index }
+      this.requestRender?.()
+      return true
+    }
+    if (event.leftClick && fleet && fleetTarget) {
+      if (fleetTarget.surface === 'pane') {
+        if (fleet.focus !== fleetTarget.focus) {
+          this.update({ fleet: setFleetFocus(fleet, fleetTarget.focus) })
+        }
+        return true
+      }
+      const selected = fleetTarget.focus === 'machines'
+        ? fleet.selectedMachine
+        : fleet.selectedProjects[selectedFleetMachine(fleet)?.key ?? ''] ?? 0
+      if (fleet.focus !== fleetTarget.focus || selected !== fleetTarget.index) {
+        this.update({ fleet: selectFleetIndex(fleet, fleetTarget.focus, fleetTarget.index) })
+      } else {
+        if (fleetTarget.focus === 'machines') {
+          this.activateFleetPrimary(fleet)
+        } else {
+          this.activateFleetPrimary(fleet)
+        }
+      }
+      return true
+    }
+    if (event.wheel !== null && fleet) {
+      this.update({
+        fleet: moveFleetSelection(fleet, event.wheel),
+      })
+      return true
+    }
+    if (event.wheel !== null && (this.snapshot.panel === 'logs' || this.snapshot.panel === 'doctor')) {
+      this.scrollOperationalPanel(event.wheel)
+      return true
+    }
+    if (event.wheel !== null && this.snapshot.panel === 'inbox') {
+      this.inboxState = moveSupervisorInboxSelection(
+        this.inboxState,
+        event.wheel,
+        this.snapshot.inbox,
+      )
+      this.requestRender?.()
+      return true
+    }
+    if (event.wheel !== null && this.snapshot.panel === 'help') {
+      this.helpState = moveSupervisorHelpSelection(
+        this.helpState,
+        event.wheel,
+        isConfigRecovery(this.snapshot),
+        false,
+      )
+      this.requestRender?.()
+      return true
+    }
+    if (event.release) {
+      this.activeRailDrag = undefined
+      return true
+    }
+    return false
+  }
+
+  handleCommandSpinePointer(event: SupervisorPointerEvent): boolean {
+    const commandTarget = commandAtPosition(
+      this.commandSpineTargets,
+      event.col,
+      event.row,
+    )
+    if (event.motion) {
+      const changed = commandTarget?.row !== this.hoveredCommandTarget?.row
+        || commandTarget?.label !== this.hoveredCommandTarget?.label
+      if (changed) {
+        this.hoveredCommandTarget = commandTarget
+        this.requestRender?.()
+      }
+      return Boolean(commandTarget)
+    }
+    if (event.leftClick && commandTarget) {
+      if (
+        this.commandDeckOpen
+        && commandTarget.label !== '/'
+        && commandTarget.label !== 'q'
+      ) {
+        this.setCommandPaletteOpen(false)
+      }
+      return this.activatePointerCommand(commandTarget.label)
+    }
+    return Boolean(commandTarget) && (event.release || event.wheel !== null)
+  }
+
   render(width: number): string[] {
-    const runtime = this.snapshot.runtime
-    const narrow = width < 60
-    const state = runtime?.class ?? 'unavailable'
+    this.renderWidth = width
+    const viewportHeight = this.getViewportHeight?.()
+    if (this.bootFrame !== undefined) {
+      this.navigationTargets = []
+      this.commandTargets = []
+      this.commandSpineTargets = []
+      this.doctorTargets = []
+      this.doctorRailTargets = []
+      this.logTargets = []
+      this.logRailTargets = []
+      this.inboxTargets = []
+      this.helpTargets = []
+      this.homePrimaryTarget = undefined
+      this.homeHotspotTargets = []
+      return renderSupervisorBootSequence(
+        width,
+        Number.isFinite(viewportHeight) ? Math.floor(viewportHeight ?? 24) : 24,
+        this.bootFrame,
+        this.theme,
+      )
+    }
+    const runtime = this.snapshot.activeTarget?.runtime ?? this.snapshot.runtime
+    const connectionHealth = this.snapshot.activeTarget?.health?.phase
+    const homePrimaryIntent = supervisorHomePrimaryIntent(this.snapshot)
+    const state = connectionHealth === 'checking'
+      ? 'checking'
+      : connectionHealth === 'degraded'
+        ? 'unhealthy'
+        : connectionHealth === 'unreachable'
+          ? 'unreachable'
+          : runtime?.class ?? 'unavailable'
+    const focusTask = this.activeFocusTask()
+    const confirmation = this.activeConfirmationView()
     const updateBadge = this.snapshot.update?.status === 'available'
       ? ` · update ${formatUpdateCandidate(this.snapshot.update)}`
       : ''
+    const navigation = renderSupervisorNavigation({
+      selected: this.snapshot.panel ?? 'overview',
+      focusTask,
+      confirmation,
+      operation: this.snapshot.launchFlight
+        ? {
+            kind: this.snapshot.launchFlight.kind,
+            status: this.snapshot.launchFlight.status,
+          }
+        : undefined,
+      recovery: isConfigRecovery(this.snapshot),
+      connected: this.snapshot.activeTarget !== null,
+      connectionHealth: this.snapshot.activeTarget?.health?.phase,
+      inboxUnread: supervisorInboxUnreadCount(this.snapshot.inbox),
+      machineCount: this.snapshot.fleet?.machines.length,
+      logCount: this.snapshot.logs?.entries?.length,
+      doctor: this.snapshot.doctor
+        ? {
+            checks: this.snapshot.doctor.checks?.length ?? 0,
+            failures: this.snapshot.doctor.summary?.failures ?? 0,
+            warnings: this.snapshot.doctor.summary?.warnings ?? 0,
+          }
+        : undefined,
+    }, Math.max(1, width - 4))
+    this.navigationTargets = navigation.targets.map((target) => ({
+      ...target,
+      startColumn: target.startColumn + 3,
+      endColumn: target.endColumn + 3,
+    }))
+    const header = renderSupervisorHeaderLayout(
+      this.snapshot.version,
+      this.snapshot.channel,
+      width,
+      updateBadge,
+      !focusTask,
+    )
+    this.headerReleaseTarget = header.releaseTarget
     const lines = [
-      `OpenAlice  ${this.snapshot.version}  channel ${this.snapshot.channel}${updateBadge}`,
-      '─'.repeat(Math.max(1, Math.min(width, 80))),
-      renderTabs(this.snapshot.panel ?? 'overview', narrow, isConfigRecovery(this.snapshot)),
+      header.line,
+      renderMissionNavigationRail(navigation.line, width),
+      '',
       '',
     ]
 
-    if (this.snapshot.panel === 'fleet' && this.snapshot.fleet) {
-      lines.push(...renderSupervisorFleet(this.snapshot.fleet, width))
-      const fleetMachine = selectedFleetMachine(this.snapshot.fleet)
-      const fleetProject = selectedFleetProject(this.snapshot.fleet)
-      if (fleetMachine?.key === 'local' && fleetProject) {
-        lines.push(
-          '',
-          narrow ? `Runtime: ${state}` : `Runtime state: ${state}`,
-          `AliceProject: ${fleetProject.displayName}`,
-          `Home: ${fleetProject.home}`,
+    this.doctorTargets = []
+    this.doctorRailTargets = []
+    this.logTargets = []
+    this.logRailTargets = []
+    this.inboxTargets = []
+    this.helpTargets = []
+    this.homePrimaryTarget = undefined
+    this.homeHotspotTargets = []
+    const operationalCanvasHeight = width >= 100 && Number.isFinite(viewportHeight)
+      ? Math.max(
+          0,
+          Math.floor(viewportHeight ?? 0)
+            - lines.length
+            - WIDE_OPERATIONAL_CANVAS_RESERVED_CHROME_HEIGHT,
         )
-        if (!narrow && this.snapshot.context) {
-          lines.push(`Resolved: home ${formatProvenance(this.snapshot.context.provenance.home)} · port ${formatPortResolution(this.snapshot.context)}`)
-        }
-        lines.push('', ...renderGuidance(runtime, this.snapshot.context))
-      }
+      : undefined
+    if (focusTask === 'confirmation') {
+      // The centered Decision Gate owns this field. Leaving it empty prevents
+      // clipped page copy and inactive controls from reading as modal context.
+    } else if (this.snapshot.panel === 'fleet' && this.snapshot.launchFlight) {
+      lines.push(...renderSupervisorLaunchFlight(
+        this.snapshot.launchFlight,
+        width,
+        this.now(),
+        operationalCanvasHeight,
+        this.snapshot.activeTarget ?? undefined,
+      ))
+    } else if (this.snapshot.panel === 'fleet' && this.snapshot.fleet) {
+      const emergencyFleet = width < 60
+        && Number.isFinite(viewportHeight)
+        && Math.floor(viewportHeight ?? 0) < 18
+      const emergencyLauncher = this.snapshot.activeTarget === null && emergencyFleet
+      this.fleetVisibleRows = emergencyLauncher
+        ? 0
+        : emergencyFleet
+          ? 4
+        : width >= 72 && Number.isFinite(viewportHeight)
+          ? Math.max(
+              SUPERVISOR_FLEET_MIN_VISIBLE_ROWS,
+              Math.floor(viewportHeight ?? 0)
+                - lines.length
+                - FLEET_VIEWPORT_RESERVED_HEIGHT,
+            )
+          : SUPERVISOR_FLEET_MIN_VISIBLE_ROWS
+      lines.push(...renderSupervisorFleet(
+        this.snapshot.fleet,
+        width,
+        this.hoveredFleetTarget,
+        this.runtimePulse,
+        this.fleetVisibleRows,
+        fleetRailTargetFromPointer(this.hoveredRail),
+        this.snapshot.activeTarget === null,
+        this.snapshot.activeTarget
+          ? {
+              machineKey: this.snapshot.activeTarget.machineKey,
+              projectKey: this.snapshot.activeTarget.projectKey,
+              transport: this.snapshot.activeTarget.transport,
+            }
+          : undefined,
+      ))
+    } else if (this.snapshot.panel === 'inbox') {
+      this.inboxState = normalizeSupervisorInboxState(this.inboxState, this.snapshot.inbox)
+      const inboxCanvasHeight = Number.isFinite(operationalCanvasHeight)
+        ? operationalCanvasHeight
+        : width < 60
+          && Number.isFinite(viewportHeight)
+          && Math.floor(viewportHeight ?? 0) < 18
+          ? Math.max(
+              0,
+              Math.floor(viewportHeight ?? 0)
+                - lines.length
+                - WIDE_OPERATIONAL_CANVAS_RESERVED_CHROME_HEIGHT,
+            )
+          : undefined
+      const inboxView = renderSupervisorInbox(
+        this.snapshot.inbox,
+        this.inboxState,
+        width,
+        inboxCanvasHeight,
+      )
+      const rowOffset = lines.length
+      this.inboxTargets = inboxView.targets.map((target) => ({
+        ...target,
+        row: target.row + rowOffset,
+      }))
+      lines.push(...inboxView.lines)
     } else if (this.snapshot.panel === 'logs') {
-      lines.push(...renderLogs(this.snapshot.logs))
+      const emergencyRuntime = width < 60
+        && Number.isFinite(viewportHeight)
+        && Math.floor(viewportHeight ?? 0) < 18
+      const emergencyRuntimeSummary = emergencyRuntime && this.snapshot.activeTarget != null
+      const runtimeCanvasHeight = Number.isFinite(operationalCanvasHeight)
+        ? operationalCanvasHeight
+        : emergencyRuntime
+          ? Math.max(
+              0,
+              Math.floor(viewportHeight ?? 0)
+                - lines.length
+                - WIDE_OPERATIONAL_CANVAS_RESERVED_CHROME_HEIGHT,
+            )
+          : undefined
+      const chronicle = this.snapshot.activeTarget
+        ? emergencyRuntime
+          ? renderSupervisorRuntimeSummary({
+              target: this.snapshot.activeTarget,
+              events: this.snapshot.connectionEvents ?? [],
+            }, width, this.snapshot.activeTarget.kind === 'ssh'
+              ? undefined
+              : {
+                  meta: compactRuntimeLensMeta(this.snapshot.logs, this.logFilter),
+                  action: {
+                    key: 'l',
+                    label: this.snapshot.logs ? 'Reload Runtime snapshot' : 'Load Runtime tail',
+                  },
+                })
+          : renderSupervisorConnectionChronicle({
+              target: this.snapshot.activeTarget,
+              events: this.snapshot.connectionEvents ?? [],
+            }, width, this.snapshot.activeTarget.kind === 'ssh' ? operationalCanvasHeight : undefined)
+        : []
+      if (emergencyRuntimeSummary || this.snapshot.activeTarget?.kind === 'ssh') {
+        lines.push(...chronicle)
+      } else {
+        if (chronicle.length > 0) lines.push(...chronicle, '')
+        const remainingHeight = Number.isFinite(runtimeCanvasHeight)
+          ? Math.max(
+              0,
+              Math.floor(runtimeCanvasHeight ?? 0)
+                - chronicle.length
+                - (chronicle.length > 0 ? 1 : 0),
+            )
+          : undefined
+        const logs = renderSupervisorLogs(
+          this.snapshot.logs,
+          width,
+          this.logsFromEnd,
+          this.logFilter,
+          this.hoveredLogFromEnd,
+          remainingHeight,
+          this.hoveredRail?.surface === 'logs' ? this.hoveredRail.trackRow : null,
+        )
+        const rowOffset = lines.length
+        this.logTargets = logs.targets.map((target) => ({
+          ...target,
+          row: target.row + rowOffset,
+        }))
+        this.logRailTargets = logs.railTargets.map((target) => ({
+          ...target,
+          row: target.row + rowOffset,
+        }))
+        lines.push(...logs.lines)
+      }
     } else if (this.snapshot.panel === 'doctor') {
-      lines.push(...renderDoctor(this.snapshot.doctor))
+      this.doctorState = normalizeSupervisorDoctorState(
+        this.doctorState,
+        this.snapshot.doctor,
+      )
+      const doctorCanvasHeight = Number.isFinite(operationalCanvasHeight)
+        ? operationalCanvasHeight
+        : width < 60
+          && Number.isFinite(viewportHeight)
+          && Math.floor(viewportHeight ?? 0) < 18
+          ? Math.max(
+              0,
+              Math.floor(viewportHeight ?? 0)
+                - lines.length
+                - WIDE_OPERATIONAL_CANVAS_RESERVED_CHROME_HEIGHT,
+            )
+          : undefined
+      const doctor = renderSupervisorDoctor(
+        this.snapshot.doctor,
+        this.doctorState,
+        width,
+        doctorCanvasHeight,
+        this.hoveredRail?.surface === 'doctor' ? this.hoveredRail.trackRow : null,
+      )
+      const rowOffset = lines.length
+      this.doctorTargets = doctor.targets.map((target) => ({
+        ...target,
+        row: target.row + rowOffset,
+      }))
+      this.doctorRailTargets = doctor.railTargets.map((target) => ({
+        ...target,
+        row: target.row + rowOffset,
+      }))
+      lines.push(...doctor.lines)
     } else if (this.snapshot.panel === 'help') {
-      lines.push(...renderHelp(isConfigRecovery(this.snapshot)))
+      const recovery = isConfigRecovery(this.snapshot)
+      this.helpState = normalizeSupervisorHelpState(this.helpState, recovery)
+      const helpCanvasHeight = Number.isFinite(operationalCanvasHeight)
+        ? operationalCanvasHeight
+        : width < 60
+          && Number.isFinite(viewportHeight)
+          && Math.floor(viewportHeight ?? 0) < 18
+          ? Math.max(
+              0,
+              Math.floor(viewportHeight ?? 0)
+                - lines.length
+                - WIDE_OPERATIONAL_CANVAS_RESERVED_CHROME_HEIGHT,
+            )
+          : undefined
+      const help = renderSupervisorHelp(
+        this.helpState,
+        recovery,
+        width,
+        helpCanvasHeight,
+      )
+      const rowOffset = lines.length
+      this.helpTargets = help.targets.map((target) => ({
+        ...target,
+        row: target.row + rowOffset,
+      }))
+      lines.push(...help.lines)
     } else if (isConfigRecovery(this.snapshot)) {
       lines.push(...renderConfigRecovery(this.snapshot))
     } else {
-      lines.push(
-        narrow ? `Runtime: ${state}` : `Runtime state: ${state}`,
-        `AliceProject: ${this.snapshot.context?.aliceProject.displayName ?? 'Default AliceProject'}`,
-        `Home: ${this.snapshot.context?.home ?? runtime?.home ?? 'default'}`,
-      )
-      if (!narrow) {
-        lines.push(
-          `Owner: ${formatOwner(runtime)}`,
-          `Web: ${runtime?.endpoints?.web ?? 'not available'}`,
-          `Components: ${formatComponents(runtime)}`,
-        )
-        const reportedProvider = runtime?.provider?.kind
-        const provider = reportedProvider && reportedProvider !== 'unknown'
-          ? reportedProvider
-          : this.snapshot.context?.runtimeProvider.kind
-        if (provider) {
-          lines.push(`Provider: ${provider}${runtime?.class === 'absent' && provider === 'bundle' ? ' (installed)' : ''}`)
-        }
-        if (Number.isInteger(runtime?.uptimeSeconds)) {
-          lines.push(`Uptime: ${formatDuration(runtime?.uptimeSeconds ?? 0)}`)
-        }
-        if (this.snapshot.context) {
-          lines.push(`Resolved: home ${formatProvenance(this.snapshot.context.provenance.home)} · port ${formatPortResolution(this.snapshot.context)}`)
-          if (this.snapshot.context.runtimeProvider.kind === 'bundle') {
-            lines.push(
-              `Runtime: OpenAlice ${this.snapshot.version} · bundle ${this.snapshot.context.runtimeProvider.contentIdentity ?? 'verified'}`,
-            )
-          } else {
-            lines.push(`Source: ${this.snapshot.context.appDir ?? runtime?.provider?.root ?? 'current directory discovery'} ${formatProvenance(this.snapshot.context.provenance.appDir)}`)
-          }
-        }
+      const home = renderSupervisorHome({
+        projectName: this.snapshot.activeTarget?.projectName
+          ?? this.snapshot.context?.aliceProject.displayName
+          ?? 'Default AliceProject',
+        machineName: this.snapshot.activeTarget?.machineName ?? 'This computer',
+        targetKind: this.snapshot.activeTarget?.kind ?? 'local',
+        transport: this.snapshot.activeTarget?.transport ?? 'loopback',
+        state,
+        connectionHealth,
+        projectAvailable: activeTargetProjectAvailable(this.snapshot),
+        guidance: renderGuidance(runtime, this.snapshot.context, this.snapshot.activeTarget),
+        primaryAction: homePrimaryIntent.label,
+        inboxPrimary: homePrimaryIntent.kind === 'inbox',
+        inboxUnread: homePrimaryIntent.inboxUnread,
+        recentActivity: supervisorHomeRecentActivity(this.snapshot.connectionEvents),
+        primaryHovered: this.homePrimaryHovered,
+        projectHotspot: this.snapshot.activeTarget?.kind !== 'ssh',
+        webHotspot: Boolean(runtime?.endpoints?.web)
+          && (!this.snapshot.activeTarget || activeTargetIsReachable(this.snapshot.activeTarget)),
+        providerHotspot: runtime?.class === 'absent',
+        hoveredHotspot: this.hoveredHomeHotspot,
+        pulse: this.runtimePulse,
+      }, width, (width >= 100 || (
+        width < 60
+        && Number.isFinite(viewportHeight)
+        && Math.floor(viewportHeight ?? 0) < 18
+      )) && Number.isFinite(viewportHeight)
+        ? Math.max(
+            0,
+            Math.floor(viewportHeight ?? 0)
+              - lines.length
+              - WIDE_OVERVIEW_RESERVED_CHROME_HEIGHT,
+          )
+        : undefined)
+      const rowOffset = lines.length
+      this.homePrimaryTarget = {
+        ...home.primaryTarget,
+        row: home.primaryTarget.row + rowOffset,
       }
-      lines.push('', ...renderGuidance(runtime, this.snapshot.context))
+      this.homeHotspotTargets = home.hotspotTargets.map((target) => ({
+        ...target,
+        row: target.row + rowOffset,
+      }))
+      lines.push(...home.lines)
     }
 
-    if (this.snapshot.confirmation) {
-      lines.push('', ...renderConfirmation(
-        this.snapshot.confirmation,
-        runtime,
-        this.snapshot.managedSource,
-        this.snapshot.update,
+    const hoverPreview = this.hoverPreview(runtime?.class)
+    const launchFlightOwnsFailure = this.snapshot.launchFlight?.status === 'failed'
+    const activity = renderSupervisorActivitySlot({
+      ...(this.snapshot.busy ? { busy: sanitize(this.snapshot.busy) } : {}),
+      ...(this.snapshot.notice ? { notice: sanitize(this.snapshot.notice) } : {}),
+      ...(this.snapshot.diagnostic && !launchFlightOwnsFailure
+        ? { diagnostic: sanitize(this.snapshot.diagnostic) }
+        : {}),
+      ...(hoverPreview ? { preview: sanitize(hoverPreview) } : {}),
+    }, width, this.motionFrame, this.motionEnabled)
+    const actionShelf = focusTask
+      ? this.renderFocusActionBar(Math.max(1, width - 4))
+      : []
+    const launcherTarget = this.snapshot.panel === 'fleet' && this.snapshot.activeTarget === null
+    const directLauncherTarget = launcherTarget
+      && this.snapshot.fleet != null
+      && supervisorFleetHasSingleLaunchTarget(this.snapshot.fleet)
+    const directConnectionTarget = this.snapshot.panel === 'fleet'
+      && this.snapshot.activeTarget != null
+      && this.snapshot.fleet != null
+      && supervisorFleetHasSingleLaunchTarget(this.snapshot.fleet)
+    const doctorNaturalCapacity = width >= 100 ? 10 : width < 60 ? 4 : 5
+    const boundedDoctor = this.snapshot.panel === 'doctor'
+      && (this.snapshot.doctor?.checks?.length ?? 0) <= doctorNaturalCapacity
+    const launcherMachine = launcherTarget
+      ? selectedFleetMachine(this.snapshot.fleet)
+      : undefined
+    const launcherProject = launcherTarget
+      ? selectedFleetProject(this.snapshot.fleet)
+      : undefined
+    const launcherTargetKind = launcherMachine
+      ? launcherMachine.key === 'local' ? 'local' : 'ssh'
+      : undefined
+    const launcherTransport = launcherMachine
+      ? launcherMachine.key === 'local' ? 'loopback' : 'ssh-forward'
+      : undefined
+    const controlConsole = renderSupervisorControlConsole(
+      activity,
+      actionShelf,
+      renderSupervisorDock({
+        panel: this.snapshot.panel ?? 'overview',
+        launcher: launcherTarget,
+        focusTask,
+        focusLabel: confirmation?.confirmLabel,
+        projectName: this.snapshot.activeTarget?.projectName
+          ?? launcherProject?.displayName
+          ?? this.snapshot.context?.aliceProject.displayName,
+        machineName: this.snapshot.activeTarget?.machineName ?? launcherMachine?.displayName,
+        targetKind: this.snapshot.activeTarget?.kind ?? launcherTargetKind,
+        transport: this.snapshot.activeTarget?.transport ?? launcherTransport,
+        connectionHealth: this.snapshot.activeTarget?.health?.phase,
+        runtimeState: launcherProject?.runtime.class ?? state,
+        projectAvailable: launcherProject?.available ?? activeTargetProjectAvailable(this.snapshot),
+        pulse: this.runtimePulse,
+        commandPaletteOpen: this.commandDeckOpen,
+        inputLocked: Boolean(this.snapshot.busy),
+        recovery: isConfigRecovery(this.snapshot),
+      }, width),
+      width,
+    )
+    const flowContentConsole = (
+      (this.snapshot.panel === 'overview' && width < 100)
+      || (this.snapshot.panel === 'inbox' && width < 100)
+      || (this.snapshot.panel === 'logs' && (this.snapshot.logs?.entries?.length ?? 0) === 0)
+      || this.snapshot.panel === 'help'
+      || boundedDoctor
+      || directLauncherTarget
+      || (directConnectionTarget && width < 100)
+    )
+      && !focusTask
+      && !this.commandDeckOpen
+      && !isConfigRecovery(this.snapshot)
+    const visibleLines = anchorSupervisorControlConsole(
+      lines,
+      controlConsole,
+      viewportHeight ?? lines.length + controlConsole.length,
+      focusTask
+        ? []
+        : [renderSupervisorContextTip({
+          panel: this.snapshot.panel ?? 'overview',
+          runtimeState: state,
+          targetKind: this.snapshot.activeTarget?.kind,
+          connectionHealth: this.snapshot.activeTarget?.health?.phase,
+          launcher: this.snapshot.panel === 'fleet' && this.snapshot.activeTarget === null,
+          directLauncher: this.snapshot.panel === 'fleet'
+            && this.snapshot.activeTarget === null
+            && this.snapshot.fleet != null
+            && supervisorFleetHasSingleLaunchTarget(this.snapshot.fleet),
+          directConnection: this.snapshot.panel === 'fleet'
+            && this.snapshot.activeTarget != null
+            && this.snapshot.fleet != null
+            && supervisorFleetHasSingleLaunchTarget(this.snapshot.fleet),
+          activeSelection: this.snapshot.panel === 'fleet'
+            && this.snapshot.activeTarget != null
+            && this.snapshot.fleet?.focus === 'projects'
+            && selectedFleetMachine(this.snapshot.fleet)?.key === this.snapshot.activeTarget.machineKey
+            && selectedFleetProject(this.snapshot.fleet)?.key === this.snapshot.activeTarget.projectKey,
+          switchSelection: this.snapshot.panel === 'fleet'
+            && this.snapshot.activeTarget != null
+            && this.snapshot.fleet?.focus === 'projects'
+            && selectedFleetMachine(this.snapshot.fleet) != null
+            && selectedFleetProject(this.snapshot.fleet) != null
+            && (selectedFleetMachine(this.snapshot.fleet)?.key !== this.snapshot.activeTarget.machineKey
+              || selectedFleetProject(this.snapshot.fleet)?.key !== this.snapshot.activeTarget.projectKey),
+          inputLocked: Boolean(this.snapshot.busy),
+          launchFailure: this.snapshot.launchFlight?.status === 'failed',
+          recovery: isConfigRecovery(this.snapshot),
+          itemCount: this.snapshot.panel === 'logs'
+            ? supervisorFilteredLogCount(this.snapshot.logs, this.logFilter)
+            : this.snapshot.panel === 'doctor'
+              ? this.snapshot.doctor?.checks?.length ?? 0
+              : undefined,
+        }, width)],
+      flowContentConsole ? 'flow' : 'bottom',
+    ).map((line) => truncate(line, width))
+    this.commandTargets = supervisorCommandTargets(visibleLines)
+    if (this.focusConsoleHoveredCommand) {
+      this.hoveredCommandTarget = [...this.commandTargets].reverse().find((target) => (
+        target.label === this.focusConsoleHoveredCommand
       ))
     }
-    if (this.snapshot.busy) lines.push('', `Working: ${this.snapshot.busy}…`)
-    if (this.snapshot.notice) lines.push('', `Notice: ${sanitize(this.snapshot.notice)}`)
-    if (this.snapshot.diagnostic) {
-      lines.push('', `Diagnostic: ${sanitize(this.snapshot.diagnostic)}`)
-    }
-    lines.push(
-      '',
-      ...(this.snapshot.panel === 'fleet' && this.snapshot.fleet
-        ? fleetActionBar(
-            this.snapshot.fleet,
-            runtime,
-            this.snapshot.context,
-            width,
-          )
-        : actionBar(runtime, this.snapshot.context, width, isConfigRecovery(this.snapshot))),
-      'q / Esc / Ctrl+C  Detach without stopping',
+    const commandSpineRow = visibleLines.findLastIndex((line) => line.startsWith('╰─ ')) + 1
+    this.commandSpineTargets = commandSpineRow > 0
+      ? this.commandTargets.filter((target) => target.row === commandSpineRow)
+      : []
+    return decorateSupervisorFrame(
+      visibleLines,
+      this.theme,
+      {
+        panel: this.snapshot.panel ?? 'overview',
+        headerReleaseHovered: this.headerReleaseHovered,
+        hoveredPanel: this.hoveredPanel,
+        hoveredCommand: this.hoveredCommandTarget,
+        hoveredHomeHotspot: this.homeHotspotTargets.find(
+          (target) => target.kind === this.hoveredHomeHotspot,
+        ),
+        runtimeClass: runtime?.class,
+        introFrame: this.introFrame,
+        ambientBrandFrame: this.ambientBrandFrame,
+      },
     )
-    return lines.map((line) => truncate(line, width))
   }
 
   invalidate(): void {}
+
+  private hoverPreview(runtimeClass = 'unavailable'): string | undefined {
+    if (this.commandDeckOpen) return undefined
+    if (this.hoveredRail?.surface === 'logs') {
+      const total = supervisorFilteredLogCount(this.snapshot.logs, this.logFilter)
+      return `Runtime event ${this.hoveredRail.index + 1}/${total} · drag to inspect.`
+    }
+    if (this.hoveredRail?.surface === 'doctor') {
+      const total = this.snapshot.doctor?.checks?.length ?? 0
+      return `Doctor check ${this.hoveredRail.index + 1}/${total} · drag to inspect.`
+    }
+    if (this.hoveredRail?.surface === 'fleet-machines') {
+      const total = this.snapshot.fleet?.machines.length ?? 0
+      return `Machine ${this.hoveredRail.index + 1}/${total} · drag to select.`
+    }
+    if (this.hoveredRail?.surface === 'fleet-projects') {
+      const total = selectedFleetMachine(this.snapshot.fleet)?.projects.length ?? 0
+      return `AliceProject ${this.hoveredRail.index + 1}/${total} · drag to select.`
+    }
+    if (this.headerReleaseHovered) {
+      return `Release ${this.snapshot.channel} · inspect lane and update.`
+    }
+    if (this.hoveredPanel) {
+      return {
+        overview: 'Return to the selected AliceProject launch and Runtime overview.',
+        inbox: 'Review reports and open their Workspace in the active AliceProject.',
+        fleet: 'Browse local and remote Machines and their AliceProjects.',
+        logs: 'Inspect the bounded, redacted Runtime event lens.',
+        doctor: 'Inspect read-only Runtime ownership and readiness checks.',
+        help: 'Explore contextual controls and keyboard routes.',
+      }[this.hoveredPanel]
+    }
+    if (this.hoveredHomeHotspot === 'project') {
+      return 'AliceProject Switchboard · Runtime unchanged.'
+    }
+    if (this.hoveredHomeHotspot === 'web') {
+      return 'Open the verified Web UI for this running Runtime.'
+    }
+    if (this.hoveredHomeHotspot === 'provider') {
+      return 'Choose and validate the source checkout used by this stopped Runtime.'
+    }
+    if (this.hoveredHomeHotspot === 'inbox') {
+      return 'Open Inbox reports for the selected AliceProject.'
+    }
+    if (this.hoveredHomeHotspot === 'connection') {
+      return 'Open Connections to inspect or switch the active target.'
+    }
+    if (this.homePrimaryHovered) {
+      if (this.snapshot.activeTarget && !activeTargetIsReachable(this.snapshot.activeTarget)) {
+        return 'Probe the selected OpenAlice endpoint and recover this target in place.'
+      }
+      return runtimeClass === 'absent'
+        ? 'Prepare the Runtime, start OpenAlice, and open its verified Web UI.'
+        : runtimeClass === 'running' || runtimeClass === 'owned_elsewhere'
+          ? 'Open the verified Web UI for this running Runtime.'
+          : 'Run read-only Runtime Doctor checks before making changes.'
+    }
+    const target = this.hoveredCommandTarget
+    return target
+      ? supervisorCommandHoverPreview(
+          target.label,
+          this.snapshot.panel ?? 'overview',
+          runtimeClass,
+          target.surface,
+        )
+      : undefined
+  }
+
+  private activatePointerCommand(label: string): boolean {
+    if (label === 'q' || label === 'q / Esc') {
+      this.onDetach?.()
+      return true
+    }
+    if (label === '/') {
+      this.setCommandPaletteOpen(!this.commandDeckOpen)
+      return true
+    }
+    const input = pointerCommandInput(label)
+    if (!input) return true
+    if (input === 'escape') return this.handleEscape()
+    return this.handleKey(input, (data, key) => data === key)
+  }
+
+  private commandDeckItems(): SupervisorCommandDeckItem[] {
+    const runtime = this.snapshot.activeTarget?.runtime ?? this.snapshot.runtime
+    return supervisorCommandDeckItems({
+      recovery: isConfigRecovery(this.snapshot),
+      targetKind: this.snapshot.activeTarget?.kind,
+      targetHealth: this.snapshot.activeTarget?.health?.phase,
+      runtimeState: runtime?.class ?? 'unavailable',
+      primaryLabel: primaryActionLabel(runtime),
+      primaryAvailable: Boolean(primaryAction(runtime) && this.actionAvailable(primaryAction(runtime)!)),
+      startAvailable: this.actionAvailable('start'),
+      restartAvailable: this.actionAvailable('restart'),
+      stopAvailable: this.actionAvailable('stop'),
+    })
+  }
+
+  private filteredCommandDeckItems(): SupervisorCommandDeckItem[] {
+    return filterSupervisorCommandDeckItems(this.commandDeckItems(), this.commandDeckQuery)
+  }
+
+  private setCommandDeckQuery(query: string): void {
+    if (this.commandDeckQuery === query) return
+    this.commandDeckQuery = query
+    this.commandDeckState = createSupervisorCommandDeckState()
+    this.requestRender?.()
+  }
+
+  private activateCommandDeckItem(item?: SupervisorCommandDeckItem): boolean {
+    if (!item) return true
+    this.setCommandPaletteOpen(false)
+    return this.handleKey(item.input, (data, key) => data === key)
+  }
+
+  private setCommandPaletteOpen(open: boolean): void {
+    if (this.commandDeckOpen === open) return
+    this.commandDeckOpen = open
+    this.commandDeckQuery = ''
+    this.commandDeckCursorFrame = 0
+    this.commandDeckState = open
+      ? createSupervisorCommandDeckState()
+      : { ...this.commandDeckState, hovered: null }
+    this.onCommandPaletteChange?.(open)
+    this.onMotionDemandChange?.()
+    this.requestRender?.()
+  }
+
+  private selectRailTarget(target: SupervisorRailPointerTarget): void {
+    if (target.surface === 'logs') {
+      const total = supervisorFilteredLogCount(this.snapshot.logs, this.logFilter)
+      this.logsFromEnd = Math.max(0, total - 1 - clamp(target.index, 0, Math.max(0, total - 1)))
+      this.hoveredLogFromEnd = null
+      this.requestRender?.()
+      return
+    }
+    if (target.surface === 'doctor') {
+      const total = this.snapshot.doctor?.checks?.length ?? 0
+      this.doctorState = {
+        selected: clamp(target.index, 0, Math.max(0, total - 1)),
+        hovered: null,
+      }
+      this.requestRender?.()
+      return
+    }
+    const fleet = this.snapshot.fleet
+    if (!fleet) return
+    const focus = target.surface === 'fleet-machines' ? 'machines' : 'projects'
+    this.update({ fleet: selectFleetIndex(fleet, focus, target.index) })
+  }
+
+  private scrollOperationalPanel(direction: number): void {
+    if (this.snapshot.panel === 'logs') {
+      const length = supervisorFilteredLogCount(this.snapshot.logs, this.logFilter)
+      this.logsFromEnd = clamp(this.logsFromEnd - direction, 0, Math.max(0, length - 1))
+    } else if (this.snapshot.panel === 'doctor') {
+      this.doctorState = moveSupervisorDoctorSelection(
+        this.doctorState,
+        direction,
+        this.snapshot.doctor,
+        false,
+      )
+    }
+    this.requestRender?.()
+  }
+
+  private jumpOperationalPanel(end: boolean): void {
+    if (this.snapshot.panel === 'logs') {
+      this.logsFromEnd = end
+        ? 0
+        : Math.max(0, supervisorFilteredLogCount(this.snapshot.logs, this.logFilter) - 1)
+    }
+    this.requestRender?.()
+  }
 
   private actionAvailable(action: SupervisorAction): boolean {
     if (isConfigRecovery(this.snapshot)) {
       return action === 'update' || action === 'apply-update'
     }
     const runtime = this.snapshot.runtime
+    if ((action === 'logs' || action === 'doctor') && this.snapshot.activeTarget?.kind === 'ssh') return false
     if (action === 'logs' || action === 'doctor' || action === 'update') return true
     if (action === 'start' || action === 'start-open') {
       return runtime?.class === 'absent'
@@ -2621,14 +5463,78 @@ export class SupervisorScreen implements Component {
   private selectAdjacentPanel(direction: 1 | -1): void {
     const panels: SupervisorPanel[] = isConfigRecovery(this.snapshot)
       ? ['overview', 'help']
-      : ['fleet', 'overview', 'logs', 'doctor', 'help']
-    const current = panels.indexOf(this.snapshot.panel ?? 'overview')
+      : this.snapshot.activeTarget !== null
+        ? ['overview', 'inbox', 'fleet', 'logs']
+        : ['fleet', 'help']
+    const selected = this.snapshot.panel ?? (this.snapshot.activeTarget ? 'overview' : 'fleet')
+    const current = Math.max(0, panels.indexOf(selected))
     const panel = panels[(current + direction + panels.length) % panels.length]
       ?? 'overview'
+    this.selectPanel(panel)
+  }
+
+  private selectPanel(panel: SupervisorPanel): void {
+    this.setCommandPaletteOpen(false)
+    this.homePrimaryHovered = false
+    this.hoveredHomeHotspot = undefined
+    this.hoveredLogFromEnd = null
+    this.hoveredRail = undefined
+    this.activeRailDrag = undefined
     this.update({ panel })
-    if (panel === 'logs') this.onAction?.('logs')
+    if (panel === 'logs' && this.snapshot.activeTarget?.kind !== 'ssh') this.onAction?.('logs')
     if (panel === 'doctor') this.onAction?.('doctor')
   }
+}
+
+function fleetRailTargetFromPointer(
+  target?: SupervisorRailPointerTarget,
+): SupervisorFleetRailTarget | undefined {
+  if (target?.surface === 'fleet-machines') {
+    return { focus: 'machines', index: target.index, trackRow: target.trackRow }
+  }
+  if (target?.surface === 'fleet-projects') {
+    return { focus: 'projects', index: target.index, trackRow: target.trackRow }
+  }
+  return undefined
+}
+
+function appendCommandQueryInput(
+  current: string,
+  input: string,
+  maxCodePoints: number,
+): string | null {
+  if (!input || /[\u0000-\u001f\u007f-\u009f]/u.test(input)) return null
+  const remaining = Math.max(0, maxCodePoints - [...current].length)
+  return `${current}${[...input].slice(0, remaining).join('')}`
+}
+
+function compactRuntimeLensMeta(
+  logs: RuntimeLogs | null | undefined,
+  filter: SupervisorLogFilter,
+): string {
+  if (!logs) return 'STANDBY'
+  const total = logs.entries?.length ?? 0
+  if (total === 0) return 'QUIET'
+  const visible = supervisorFilteredLogCount(logs, filter)
+  return filter === 'all'
+    ? `${visible} EVENTS`
+    : `${visible}/${total} ${supervisorLogFilterLabel(filter).toUpperCase()}`
+}
+
+function dropLastCommandQueryCodePoint(query: string): string {
+  return [...query].slice(0, -1).join('')
+}
+
+function renderMissionNavigationRail(line: string, width: number): string {
+  const prefix = '╰─ '
+  const suffix = '╯'
+  const innerWidth = Math.max(1, width - displayWidth(prefix) - displayWidth(suffix))
+  const content = truncateDisplayWidth(line.trimEnd(), innerWidth)
+  const trackWidth = Math.max(0, innerWidth - displayWidth(content))
+  const track = trackWidth > 0
+    ? ` ${'─'.repeat(Math.max(0, trackWidth - 1))}`
+    : ''
+  return truncateDisplayWidth(`${prefix}${content}${track}${suffix}`, width)
 }
 
 function createServices(
@@ -2681,86 +5587,117 @@ function createServices(
   }
 }
 
-function renderTabs(
-  selected: SupervisorPanel,
-  narrow: boolean,
-  recovery = false,
-): string {
-  const labels: Array<[SupervisorPanel, string]> = recovery
-    ? [
-        ['overview', narrow ? 'Home' : 'Overview'],
-        ['help', 'Help'],
-      ]
-    : [
-        ['fleet', narrow ? 'Fleet' : 'Machines'],
-        ['overview', narrow ? 'Home' : 'Overview'],
-        ['logs', 'Logs'],
-        ['doctor', 'Doctor'],
-        ['help', 'Help'],
-      ]
-  return labels
-    .map(([panel, label]) => panel === selected ? `[${label}]` : label)
-    .join('  ')
+function commandAtPosition(
+  targets: SupervisorCommandTarget[],
+  column: number,
+  row: number,
+): SupervisorCommandTarget | undefined {
+  return targets.find((target) => (
+    target.row === row
+    && column >= target.startColumn
+    && column <= target.endColumn
+  ))
 }
 
-function fleetActionBar(
-  fleet: SupervisorFleetState,
-  runtime: RuntimeSummary | null,
+function pointerCommandInput(label: string): KeyId | undefined {
+  const inputs: Record<string, KeyId> = {
+    Enter: 'enter',
+    'y / Enter': 'enter',
+    'n / Esc': 'n',
+    Esc: 'escape',
+    'Tab / →': 'tab',
+    'Shift+Tab / ←': 'shift+tab',
+    Tab: 'tab',
+    'PgUp / PgDn': 'pageDown',
+    '↑ / ↓': 'down',
+    '↑↓': 'down',
+    End: 'end',
+    Home: 'home',
+    '←': 'left',
+    s: 's',
+    o: 'o',
+    r: 'r',
+    x: 'x',
+    l: 'l',
+    f: 'f',
+    y: 'y',
+    d: 'd',
+    u: 'u',
+    i: 'i',
+    p: 'p',
+    m: 'm',
+    c: 'c',
+    '?': '?',
+  }
+  return inputs[label]
+}
+
+function currentFleetProjectAvailable(
+  fleet: SupervisorFleetState | null | undefined,
   context: ResolvedLaunchContext | undefined,
-  width: number,
-): string[] {
-  const machine = selectedFleetMachine(fleet)
-  const project = selectedFleetProject(fleet)
-  if (machine?.key === 'local') {
-    return [
-      ...actionBar(runtime, context, width, false)
-        .map((line) => line
-          .replace(' · m Managed', '')
-          .replace('m Managed · ', '')
-          .replace('  m Managed', '')),
-      width < 72
-        ? 'm Transfer · ↑/↓ Select · ←/→ Pane'
-        : 'm Transfer · ↑/↓ Select · Tab/←/→ Pane · [ / ] Pages',
-    ]
+): boolean | undefined {
+  if (!context) return undefined
+  return fleet?.machines
+    .find((machine) => machine.key === 'local')
+    ?.projects.find((project) => project.key === context.project)
+    ?.available
+}
+
+function activeTargetProjectAvailable(snapshot: SupervisorSnapshot): boolean | undefined {
+  const target = snapshot.activeTarget
+  if (target?.kind === 'ssh') {
+    return snapshot.fleet?.machines
+      .find((machine) => machine.key === target.machineKey)
+      ?.projects.find((project) => project.key === target.projectKey)
+      ?.available
   }
-  if (width < 72) {
-    if (fleet.focus === 'machines') {
-      return ['↑/↓ Select · Enter/→ Projects · ] Pages · ? Help']
-    }
-    return [
-      machine?.key === 'local'
-        ? '↑/↓ Select · Enter Activate · ← Machines · ] Pages'
-        : project?.runtime.class === 'absent'
-          ? '↑/↓ Select · s Start · r Refresh · ← Machines'
-          : '↑/↓ Select · Enter/o Connect · r Refresh · ← Machines',
-    ]
-  }
-  const primary = project?.runtime.class === 'absent'
-    ? 's Start stopped AliceProject'
-    : project
-      ? 'Enter/o Connect running AliceProject'
-      : 'Enter AliceProjects'
-  return [
-    `${primary} · ↑/↓ Select · Tab/←/→ Pane · r Refresh`,
-    '[ / ] Pages · i AliceProjects · p Setup · ? Help',
-  ]
+  return currentFleetProjectAvailable(snapshot.fleet, snapshot.context)
 }
 
 function renderGuidance(
   runtime: RuntimeSummary | null,
   context?: ResolvedLaunchContext,
+  target?: SupervisorActiveTarget | null,
 ): string[] {
+  if (target?.health?.phase === 'checking') {
+    return [
+      'Checking the active OpenAlice endpoint now.',
+      target.kind === 'ssh'
+        ? 'The SSH forward stays open while readiness is verified.'
+        : 'The local Runtime stays selected while readiness is verified.',
+    ]
+  }
+  if (target?.health?.phase === 'degraded') {
+    return [
+      target.kind === 'ssh'
+        ? 'The SSH forward is open, but the OpenAlice endpoint missed a health check.'
+        : 'The local OpenAlice endpoint missed a Runtime inspection.',
+      target.kind === 'ssh'
+        ? 'Press Enter or r to retry now; automatic probes will continue.'
+        : 'Automatic Runtime inspection will continue.',
+    ]
+  }
+  if (target?.health?.phase === 'unreachable') {
+    return [
+      target.kind === 'ssh'
+        ? 'The SSH forward is open, but OpenAlice is currently unreachable.'
+        : 'The selected local Runtime cannot currently be inspected.',
+      target.kind === 'ssh'
+        ? 'Press Enter or r to retry, or x to disconnect without stopping the remote Runtime.'
+        : 'Automatic inspection will continue; no lifecycle mutation has been attempted.',
+    ]
+  }
   if (!runtime) return ['Runtime status is unavailable. Doctor may explain why.']
   if (runtime.class === 'absent') {
     if (context?.runtimeProvider.kind === 'bundle') {
       return [
-        'OpenAlice is ready to start.',
-        'Press Enter to start and open the browser, or p to review setup first.',
+        'The TUI will prepare OpenAlice, verify readiness, and open the Web UI.',
+        'Review setup first with p.',
       ]
     }
     return [
-      'OpenAlice is ready to start.',
-      'Enter prepares anything missing and opens the browser; c chooses a checkout.',
+      'The TUI will prepare the selected checkout, verify readiness, and open the Web UI.',
+      'Need another checkout? Press c before launch.',
     ]
   }
   if (runtime.class === 'incompatible') {
@@ -2772,64 +5709,75 @@ function renderGuidance(
   return [`Runtime is ${runtime.class ?? runtime.state ?? 'unknown'}; status will refresh automatically.`]
 }
 
-function renderLogs(logs: RuntimeLogs | null | undefined): string[] {
-  if (!logs) return ['Press l to load the bounded, redacted Runtime log tail.']
-  const entries = logs.entries ?? []
-  if (entries.length === 0) return ['No Runtime log entries were found.']
-  const lines = ['Runtime logs (bounded and redacted):', '']
-  lines.push(...entries.slice(-16).map((entry) => sanitize(entry.text ?? '')))
-  if (logs.truncated || entries.length > 16) {
-    lines.push('[showing the most recent visible lines]')
+function activeTargetPrimaryActionLabel(
+  runtime: RuntimeSummary | null,
+  target?: SupervisorActiveTarget | null,
+): string {
+  if (target && !activeTargetIsReachable(target)) {
+    return 'Retry active connection'
   }
-  return lines
+  return primaryActionLabel(runtime)
 }
 
-function renderDoctor(doctor: DoctorReport | null | undefined): string[] {
-  if (!doctor) return ['Press d to run read-only Runtime diagnostics.']
-  const summary = doctor.summary
-  const lines = [
-    `Doctor: ${doctor.overall ?? 'unknown'} · ${summary?.passed ?? 0} pass · ${summary?.warnings ?? 0} warn · ${summary?.failures ?? 0} fail`,
-    '',
-  ]
-  for (const check of (doctor.checks ?? []).slice(0, 12)) {
-    lines.push(`[${(check.status ?? 'unknown').toUpperCase()}] ${sanitize(check.summary ?? '')}`)
-    if (check.detail) lines.push(`  ${sanitize(check.detail)}`)
+function localSupervisorTarget(
+  context: ResolvedLaunchContext | undefined,
+  runtime: RuntimeSummary | null,
+): SupervisorActiveTarget | null {
+  const endpoint = runtime?.endpoints?.web
+  if (!context || !endpoint || !runtimeIsConnected(runtime)) return null
+  return {
+    kind: 'local',
+    machineKey: 'local',
+    machineName: 'This computer',
+    projectKey: context.project,
+    projectName: context.aliceProject.displayName,
+    home: context.home,
+    transport: 'loopback',
+    endpoint,
+    runtime,
+    health: { phase: 'connected', consecutiveFailures: 0, checkedAt: Date.now() },
   }
-  return lines
 }
 
-function renderHelp(recovery = false): string[] {
-  if (recovery) {
-    return [
-      'Supervisor recovery controls',
-      '',
-      'AliceProject configuration cannot be read by this OpenAlice.',
-      'This shell will not inspect, start, stop, open, or configure a project.',
-      '',
-      'u  Choose stable, beta, or dev; then check and install',
-      '?  Toggle this help',
-      'q / Esc  Detach only',
-      '',
-      'After a successful update, exit and run openalice again. This process does not reload.',
-    ]
+function remoteSupervisorTarget(
+  machine: MachineInventory,
+  project: MachineProjectInventory,
+  endpoint: string,
+  clientUrl: string,
+): SupervisorActiveTarget {
+  return {
+    kind: 'ssh',
+    machineKey: machine.key,
+    machineName: machine.displayName,
+    projectKey: project.key,
+    projectName: project.displayName,
+    home: project.home,
+    transport: 'ssh-forward',
+    endpoint,
+    clientUrl,
+    runtime: {
+      class: project.runtime.class,
+      state: project.runtime.state,
+      home: project.home,
+      uptimeSeconds: project.runtime.uptimeSeconds ?? undefined,
+      endpoints: { web: endpoint },
+      owner: project.runtime.ownerSurface ? { surface: project.runtime.ownerSurface } : null,
+      components: project.runtime.components,
+    },
+    health: { phase: 'connected', consecutiveFailures: 0, checkedAt: Date.now() },
   }
-  return [
-    'Supervisor controls',
-    '',
-    'Enter  Start and open / open Web UI',
-    's  Start in background            o  Open verified Web UI',
-    'x  Stop (confirmation required)   r  Restart (confirmation required)',
-    'l  Bounded redacted logs          d  Read-only Doctor',
-    'u  Choose stable, beta, or dev; then check and install',
-    '?  Toggle this help',
-    'i  Select or create an AliceProject',
-    'p  Review setup for this AliceProject',
-    'm  Fleet: transfer local project · Overview: prepare managed source',
-    'c  Advanced: choose and remember a source checkout',
-    'Tab / arrows  Change panel        q / Esc  Detach only',
-    '',
-    'The Supervisor manages Runtime state. Workspaces, trading, and chat stay in the Web UI.',
-  ]
+}
+
+function runtimeIsConnected(runtime: { class?: string }): boolean {
+  return runtime.class === 'running' || runtime.class === 'owned_elsewhere'
+}
+
+function activeTargetIsReachable(target: SupervisorActiveTarget): boolean {
+  return !target.health || target.health.phase === 'connected'
+}
+
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.min(Math.max(value, minimum), maximum)
 }
 
 function renderConfigRecovery(snapshot: SupervisorSnapshot): string[] {
@@ -2843,72 +5791,122 @@ function renderConfigRecovery(snapshot: SupervisorSnapshot): string[] {
   ]
 }
 
-function renderConfirmation(
+function confirmationView(
   action: SupervisorConfirmation,
   runtime: RuntimeSummary | null,
   managedSource?: ManagedSourcePlan | null,
   update?: UpdateResult | null,
-): string[] {
+): SupervisorConfirmationView {
   if (action === 'update') {
     const target = formatUpdateCandidate(update)
     const sourceChannel = update?.sourceChannel ?? 'current'
     const targetChannel = update?.channel ?? 'selected'
-    return [
-      sourceChannel === targetChannel
+    return {
+      action,
+      title: 'Confirm Update',
+      meta: target,
+      prompt: sourceChannel === targetChannel
         ? `Install OpenAlice ${target} from ${targetChannel} now?`
         : `Switch ${sourceChannel} → ${targetChannel} and install OpenAlice ${target}?`,
-      `Current CLI: ${update?.currentVersion ?? 'this running process'}.`,
-      'This downloads the release installer, verifies its SHA-256, and atomically replaces the installed command.',
-      'This running Supervisor will not reload. After success, exit and run openalice again.',
-      'Press y / Enter to install, n / Esc to cancel.',
-    ]
+      impact: [
+        `Current CLI: ${update?.currentVersion ?? 'this running process'}.`,
+        'The release installer is downloaded, SHA-256 verified, then the installed command is atomically replaced.',
+        'This Supervisor will not reload. After success, exit and run openalice again.',
+      ],
+      confirmLabel: 'Install update',
+      cancelLabel: 'Not now',
+    }
   }
   if (action === 'managed-source') {
     const selector = managedSource
       ? `${managedSource.selector.kind} ${managedSource.selector.value}`
       : 'the branch/version paired with this CLI'
-    return [
-      `Prepare and use installer-managed OpenAlice source ${selector}?`,
-      `Destination: ${managedSource?.appDir ?? 'the OpenAlice install root'}`,
-      'First start may install dependencies and build the Runtime.',
-      'Press y / Enter to continue, n / Esc to cancel.',
-    ]
+    return {
+      action,
+      title: 'Confirm Managed Source',
+      meta: managedSource?.state ?? 'prepare',
+      prompt: `Prepare and use installer-managed OpenAlice source ${selector}?`,
+      impact: [
+        `Destination: ${managedSource?.appDir ?? 'the OpenAlice install root'}`,
+        'First start may install dependencies and build the Runtime.',
+      ],
+      confirmLabel: 'Prepare source',
+      cancelLabel: 'Not now',
+    }
   }
-  const effect = action === 'stop'
-    ? 'This stops the Guardian-owned Runtime and disconnects active Web/agent sessions.'
-    : 'This stops and starts the Guardian-owned Runtime; active Web/agent sessions reconnect or end.'
-  return [
-    `${action === 'stop' ? 'Stop' : 'Restart'} Runtime owned by ${formatOwner(runtime)}?`,
-    effect,
-    'Press y / Enter to continue, n / Esc to cancel.',
-  ]
+  const stopping = action === 'stop'
+  return {
+    action,
+    title: `Confirm ${stopping ? 'Stop' : 'Restart'}`,
+    meta: formatOwner(runtime),
+    prompt: `${stopping ? 'Stop' : 'Restart'} Runtime owned by ${formatOwner(runtime)}?`,
+    impact: [stopping
+      ? 'The Guardian-owned Runtime stops and active Web and agent sessions disconnect.'
+      : 'The Guardian-owned Runtime stops and starts; active Web and agent sessions reconnect or end.'],
+    confirmLabel: stopping ? 'Stop Runtime' : 'Restart Runtime',
+    cancelLabel: 'Keep running',
+  }
 }
 
-function actionBar(
-  runtime: RuntimeSummary | null,
-  context: ResolvedLaunchContext | undefined,
-  width: number,
-  recovery = false,
+function supervisorHomePrimaryIntent(
+  snapshot: SupervisorSnapshot,
+): SupervisorHomePrimaryIntent {
+  const runtime = snapshot.activeTarget?.runtime ?? snapshot.runtime
+  const inboxUnread = supervisorInboxUnreadCount(snapshot.inbox)
+  const target = snapshot.activeTarget
+  const inboxTargetReachable = target
+    ? activeTargetIsReachable(target)
+    : Boolean(runtime && runtimeIsConnected(runtime) && runtime.endpoints?.web)
+  const inboxOwnsPrimary = Boolean(
+    inboxTargetReachable
+    && inboxUnread > 0,
+  )
+  if (inboxOwnsPrimary) {
+    return {
+      kind: 'inbox',
+      label: `Review ${inboxUnread} unread ${inboxUnread === 1 ? 'report' : 'reports'}`,
+      inboxUnread,
+    }
+  }
+  return {
+    kind: 'runtime',
+    label: activeTargetPrimaryActionLabel(runtime, target),
+    inboxUnread,
+  }
+}
+
+function supervisorHomeRecentActivity(
+  events: SupervisorConnectionEvent[] | undefined,
 ): string[] {
-  if (recovery) {
-    const actions = 'u Update · ? Help'
-    return actions.length <= width ? [actions] : ['u Update', '? Help']
-  }
-  const primary = runtime?.class === 'absent'
-    ? context?.runtimeProvider.kind === 'bundle'
-      ? 'Enter Start & open · s Background · p Setup · i AliceProjects'
-      : 'Enter Start & open · s Background · p Setup · i AliceProjects · m Managed · c Source'
-    : 'Enter / o Open · i AliceProjects · p Setup · r Restart · x Stop'
-  const secondary = 'd Doctor · l Logs · u Update · ? Help'
-  const actions = `${primary} · ${secondary}`
-  if (actions.length <= width) return [actions]
-  if (width < 60) {
-    return [
-      primary.replaceAll(' · ', '  '),
-      secondary.replaceAll(' · ', '  '),
-    ]
-  }
-  return [primary, secondary]
+  return (events ?? []).slice(-2).reverse().map((event) => {
+    const date = new Date(event.at)
+    const time = [date.getHours(), date.getMinutes()]
+      .map((part) => String(part).padStart(2, '0'))
+      .join(':')
+    const presentation = event.kind === 'degraded'
+      ? '! DEGRADED'
+      : event.kind === 'unreachable'
+        ? '× UNREACHABLE'
+        : event.kind === 'recovered'
+          ? '✓ RECOVERED'
+          : event.kind === 'disconnected'
+            ? '○ DISCONNECTED'
+            : event.kind === 'stopped'
+              ? '○ STOPPED'
+              : '● CONNECTED'
+    return `${presentation}  ${time} · ${homeConnectionOrigin(event.origin)}`
+  })
+}
+
+function homeConnectionOrigin(origin: SupervisorConnectionEventOrigin): string {
+  if (origin === 'startup') return 'startup discovery'
+  if (origin === 'local-inspection') return 'local inspection'
+  if (origin === 'automatic-probe') return 'automatic probe'
+  if (origin === 'manual-retry') return 'manual retry'
+  if (origin === 'ssh-forward') return 'SSH forward ready'
+  if (origin === 'target-switch') return 'target switch'
+  if (origin === 'user-disconnect') return 'user disconnect'
+  return 'tunnel exit'
 }
 
 function unavailableActionMessage(
@@ -2946,7 +5944,13 @@ function primaryAction(
 ): SupervisorAction | undefined {
   if (runtime?.class === 'absent') return 'start-open'
   if (runtime?.endpoints?.web) return 'open'
-  return undefined
+  return 'doctor'
+}
+
+function primaryActionLabel(runtime: RuntimeSummary | null): string {
+  if (runtime?.class === 'absent') return 'Start OpenAlice & open Workspace'
+  if (runtime?.endpoints?.web) return 'Open Workspace'
+  return 'Run Runtime Doctor'
 }
 
 function formatUpdateNotice(
@@ -3240,12 +6244,6 @@ function remoteHomesOverlap(left: string, right: string): boolean {
   return leftRelative === ''
     || (!leftRelative.startsWith('../') && leftRelative !== '..')
     || (!rightRelative.startsWith('../') && rightRelative !== '..')
-}
-
-function formatTransferProgress(bytes: number, total: number): string {
-  if (total <= 0) return '0 B'
-  const percent = Math.min(100, Math.floor((bytes / total) * 100))
-  return `${percent}% · ${bytes}/${total} bytes`
 }
 
 async function runRemoteProjectStart(

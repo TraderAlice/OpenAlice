@@ -919,7 +919,7 @@ Machine/fleet increment:
 
 ```bash
 pnpm vitest run packages/cli/src/<machine-and-inventory-specs>
-pnpm test:remote:docker
+pnpm test:system:remote
 ```
 
 TUI increments:
@@ -934,8 +934,8 @@ pnpm vitest run \
 Distributed transfer increment:
 
 ```bash
-pnpm test:remote:docker
-pnpm test:install:docker
+pnpm test:system:remote
+pnpm test:system:installer
 CSC_IDENTITY_AUTO_DISCOVERY=false pnpm electron:smoke:workspace
 ```
 

@@ -230,30 +230,31 @@ it does not purchase the complete monorepo suite by default.
 
 | Change shape | Local gate |
 |---|---|
-| Leaf change inside one owner | `pnpm test:affected` or explicit affected specs, the owning typecheck, and the real affected surface |
-| Shared change inside one owner | The complete owner/project suite, the owning typecheck, and the real affected surface |
+| Leaf change inside one owner | `pnpm test:changed` or an explicit `test:select` intersection, the owning typecheck, and the real affected surface |
+| Shared change inside one owner | The matching `pnpm test:owner:*` suite or package-local test, the owning typecheck, and the real affected surface |
 | Cross-owner, shared test/build infrastructure, dependency/config change, or uncertain impact | Root and applicable package/UI typechecks, complete `pnpm test`, and every touched surface's acceptance |
 
-`pnpm test:affected` uses Vitest's changed-file dependency selection against a
+`pnpm test:changed` uses Vitest's changed-file dependency selection against a
 freshly fetched `origin/dev`, including committed and working-tree changes. It
 is a routine feature-branch feedback tool, not a release gate. Static imports
 are discoverable; dynamic imports, generated contracts, registries, implicit
-runtime coupling, and a zero-test selection require explicit specs or
-escalation. Changes to package manifests, Vitest/Vite configuration, aliases,
-or the test harness run the complete suite because they can change collection
-for every owner.
+runtime coupling, and a zero-test selection require an explicit owner, area,
+package, or path selection or escalation. Changes to package manifests,
+Vitest/Vite configuration, aliases, or the test harness run the complete suite
+because they can change collection for every owner.
 
 Typecheck the code that changed. Root `npx tsc --noEmit` covers `src/`, UI uses
 `cd ui && npx tsc -b`, and Workspace packages use their own typecheck commands.
 A green command that did not include the changed code is not evidence. UI and
 runtime behavior still require their real browser, launcher, package, or native
-surface; affected unit tests do not replace that acceptance.
+surface; changed-test selection does not replace that acceptance.
 
-Record the exact commands and real-surface result in the PR. Use `pnpm test:ui`
-or `pnpm test:node` as broad project fallbacks when one owner's impact is wider
-than the static dependency closure. Keep `pnpm test` as the explicit hermetic
-integration backstop for the third row and for master, scheduled, manual, and
-stable lanes.
+Record the exact commands and real-surface result in the PR. Use the matching
+`pnpm test:owner:*` suite when one owner's impact is wider than the static
+dependency closure. Keep `pnpm test` as the explicit hermetic full-suite
+backstop for the third row and for master, scheduled, manual, and stable lanes.
+The complete command catalog, package-local contract, selector composition,
+and side-effect rules live in [[docs/testing.md]].
 
 ## CI Feedback Lanes
 
@@ -273,7 +274,7 @@ delivery lane:
   suite, macOS/Windows build-and-test matrix, and native dev-smoke. Routine
   integration PRs do not allocate those runners. There is no hosted changed-path
   or actor/label router: the branch boundary is intentionally simple, local
-  development owns affected-test selection, and current `dev` receives a daily
+  development owns changed-test selection, and current `dev` receives a daily
   full cross-platform backstop.
 - A `master`-targeted PR whose complete diff is exactly the synchronized,
   forward beta `version` value in `package.json` and
@@ -335,7 +336,7 @@ delivery lane:
   daily cross-platform backstop for lightweight PRs.
 
 Routine integration has no hosted changed-path allowlist. Serial development
-uses the local ladder above, adding `pnpm test:railway:local`, real browser,
+uses the local ladder above, adding `pnpm test:system:railway`, real browser,
 OrbStack, installer, unsigned Electron/package, and native runtime acceptance
 only when those surfaces change. Record those commands and results in the PR.
 The Railway local suite executes the image entrypoint and Linux mount-fence/PTY
@@ -601,7 +602,7 @@ matrix.
 | Persisted data | Establish whether the old shape shipped. If yes: idempotent migration + spec + regenerated index + backup behavior. If no: direct replacement and isolated-state verification. |
 | Desktop, Guardian, PTY, IPC, managed runtimes | Matching dev/Electron/package smoke on affected platforms |
 | UI/API contracts | Strict UI types, real browser route, and matching demo handler |
-| CLI bootstrap installer | Follow [CLI installer](cli-installer.md); run local `pnpm test:install:docker` against the real download path before release |
+| CLI bootstrap installer | Follow [CLI installer](cli-installer.md); run local `pnpm test:system:installer` against the real download path before release |
 | Public contributor/release workflow | Cross-check `AGENTS.md`, `CONTRIBUTING.md`, and GitHub Actions triggers |
 
 If a required gate cannot run, document the exact residual risk in the PR and

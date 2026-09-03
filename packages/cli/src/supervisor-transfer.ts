@@ -99,7 +99,9 @@ export function renderTransferPlanReview(plan: ProjectTransferPlan, width: numbe
   if (plan.blockers.length > 0) {
     lines.push('', 'Blocked:', ...plan.blockers.map((blocker) => `• ${blocker.message}`))
   }
-  lines.push('', plan.readyToApply ? 'y / Enter  Transfer · n / Esc  Cancel' : 'Esc  Close')
+  lines.push('', plan.readyToApply
+    ? '[ y ] / [ Enter ] Transfer · [ n ] / [ Esc ] Cancel'
+    : '[ Esc ] Close')
   return lines.map((line) => truncate(line, width))
 }
 
@@ -118,7 +120,7 @@ export function renderTransferResult(
     '',
     'The source remains unchanged. The remote Runtime is stopped.',
     '',
-    's  Start · o  Connect/Open · Enter  Done',
+    '[ s ] Start · [ o ] Connect/Open · [ Enter ] Done',
   ].map((line) => truncate(line, width))
 }
 

@@ -433,6 +433,51 @@ describe('OpenAlice CLI updates', () => {
     expect(spawnImpl).not.toHaveBeenCalled()
   })
 
+  it('binds a dev installer transaction to the manifest commit and artifact identity', async () => {
+    const bytes = Buffer.from('#!/usr/bin/env bash\nexit 0\n')
+    const commit = '0123456789abcdef0123456789abcdef01234567'
+    let invocation
+    const spawnImpl = (command, args, options) => {
+      invocation = { command, args, options }
+      const child = new EventEmitter()
+      queueMicrotask(() => child.emit('exit', 0, null))
+      return child
+    }
+    await expect(downloadAndRunInstaller({
+      latestVersion: currentCliVersion,
+      latestCommit: commit,
+      latestArtifactSha256: 'e'.repeat(64),
+      latestContentIdentity: '1'.repeat(16),
+      channel: 'dev',
+      installer: {
+        versionedUrl: `https://download.openalice.ai/cli/dev/releases/${commit}/install`,
+        sha256: createHash('sha256').update(bytes).digest('hex'),
+      },
+    }, {
+      layout: { installRoot: '/tmp/.openalice' },
+      yes: true,
+      env: { PATH: '/bin' },
+      fetchImpl: async () => ({
+        ok: true,
+        status: 200,
+        arrayBuffer: async () => bytes,
+      }),
+      spawnImpl,
+    })).resolves.toBe(0)
+    expect(invocation).toMatchObject({
+      command: 'bash',
+      args: expect.arrayContaining(['--channel', 'dev']),
+      options: {
+        env: expect.objectContaining({
+          OPENALICE_EXPECTED_CLI_VERSION: currentCliVersion,
+          OPENALICE_EXPECTED_CLI_ARTIFACT_SHA256: 'e'.repeat(64),
+          OPENALICE_EXPECTED_CLI_CONTENT_IDENTITY: '1'.repeat(16),
+          OPENALICE_EXPECTED_DEV_COMMIT: commit,
+        }),
+      },
+    })
+  })
+
   it('checks silently on startup and emits at most one notice per day', async () => {
     let cache = null
     const stderr = { isTTY: true, write: vi.fn() }

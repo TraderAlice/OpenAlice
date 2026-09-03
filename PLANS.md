@@ -29,12 +29,11 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
-- [[plans/development-test-optimization.md]] — Rebuilds local and hosted
-  development feedback around affected/owner/cross-owner verification, keeps
-  full hermetic and release backstops explicit, and returns `AGENTS.md` to a
-  compact repository entry point. The feedback-ladder checkpoint is accepted
-  for `dev`; rolling native-CLI build reuse and retryable channel activation
-  remain follow-up increments.
+- [[plans/tui-experience.md]] — Rebuilds the Shell Supervisor as a polished,
+  mouse-capable terminal control surface using Oh My Pi as the interaction and
+  finish benchmark while preserving the Node CLI and Runtime ownership
+  boundary. Work remains on `codex/tui-usability` for integrated acceptance
+  before any `dev` PR.
 - [[plans/bun-cli-distribution.md]] — Replaces the expanded Node headless
   Runtime with a Bun-compiled, multi-process CLI distribution. Direct,
   npm/Bun, Homebrew, and AUR channels consume one accepted artifact set. The

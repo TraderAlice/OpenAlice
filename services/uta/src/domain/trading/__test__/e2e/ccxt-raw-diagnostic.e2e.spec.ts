@@ -1,6 +1,9 @@
 /**
  * Raw CCXT diagnostic — uses the shared broker's exchange instance.
  * Purpose: understand what Bybit demoTrading actually returns.
+ * This performs a market buy with best-effort close and is deliberately
+ * excluded from the aggregate paper sweep.
+ * Run: OPENALICE_UTA_LIVE_PAPER=1 pnpm test:live:bybit-diagnostic
  */
 
 import { describe, it, beforeAll, beforeEach } from 'vitest'

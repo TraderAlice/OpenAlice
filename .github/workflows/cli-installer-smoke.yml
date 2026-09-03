@@ -44,6 +44,8 @@ on:
       - "scripts/prepare-cli-previous-release.mjs"
       - "scripts/prepare-cli-dev-assets.mjs"
       - "scripts/prepare-cli-dev-assets.spec.mjs"
+      - "scripts/prepare-cli-neutral-inputs.mjs"
+      - "scripts/prepare-cli-neutral-inputs.spec.mjs"
       - "THIRD_PARTY_NOTICES.md"
       - "scripts/remote-ssh-smoke.mjs"
       - "scripts/remote-smoke/**"
@@ -199,7 +201,44 @@ jobs:
       - name: Exercise clean SSH host fixture
         run: node scripts/remote-ssh-smoke.mjs --skip-tui
 
+  build-dev-cli-neutral:
+    if: github.event_name == 'push'
+    name: Build dev platform-neutral inputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
+
+      - name: Build platform-neutral server inputs
+        run: pnpm build:server
+
+      - name: Prepare commit-bound neutral input receipt
+        run: >-
+          node scripts/prepare-cli-neutral-inputs.mjs prepare
+          --repository-root .
+          --output-dir dist/dev-neutral-inputs
+          --commit "$GITHUB_SHA"
+
+      - name: Preserve platform-neutral inputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: rolling-dev-neutral-inputs
+          path: dist/dev-neutral-inputs
+          if-no-files-found: error
+          retention-days: 7
+
   build-dev-cli:
+    needs: build-dev-cli-neutral
     if: github.event_name == 'push'
     name: Build dev native CLI (${{ matrix.platform }}-${{ matrix.arch }})
     strategy:
@@ -237,8 +276,19 @@ jobs:
 
       - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
 
-      - name: Build Alice server
-        run: pnpm build:server
+      - name: Download platform-neutral inputs
+        uses: actions/download-artifact@v4
+        with:
+          name: rolling-dev-neutral-inputs
+          path: dist/dev-neutral-inputs
+
+      - name: Verify and install commit-bound neutral inputs
+        run: >-
+          node scripts/prepare-cli-neutral-inputs.mjs verify
+          --repository-root .
+          --input-dir dist/dev-neutral-inputs
+          --commit "$GITHUB_SHA"
+          --install
 
       - name: Accept multiprocess recovery once per dev commit
         if: matrix.platform == 'linux' && matrix.arch == 'x64'
@@ -263,11 +313,11 @@ jobs:
             dist/bun-release/openalice-cli-*.report.json
           if-no-files-found: error
           compression-level: 0
-          retention-days: 1
+          retention-days: 7
 
-  publish-dev-cli:
+  publish-dev-cli-candidate:
     if: github.event_name == 'push'
-    name: Publish dev native CLI aliases
+    name: Publish immutable dev CLI candidate
     needs: build-dev-cli
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -285,7 +335,7 @@ jobs:
           path: dist/dev-cli-candidates
           merge-multiple: true
 
-      - name: Validate candidates and prepare channel aliases
+      - name: Validate candidates and prepare candidate receipt
         run: |
           VERSION=$(node -p "require('./package.json').version")
           node scripts/prepare-cli-dev-assets.mjs \
@@ -300,7 +350,7 @@ jobs:
           python3 -m pip install --user awscli
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      - name: Publish immutable candidates and activate dev aliases
+      - name: Publish immutable candidate without overwriting accepted bytes
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -310,35 +360,186 @@ jobs:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
         run: |
           ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
-          aws s3 cp "dist/dev-cli-upload/releases/${GITHUB_SHA}" \
-            "s3://${R2_BUCKET}/cli/dev/releases/${GITHUB_SHA}/" \
-            --recursive \
-            --cache-control "public, max-age=31536000, immutable" \
-            --endpoint-url "$ENDPOINT"
+          put_immutable() {
+            file="$1"
+            key="$2"
+            content_type="$3"
+            error_path="$RUNNER_TEMP/r2-put-$(basename "$file").err"
+            existing_path="$RUNNER_TEMP/r2-existing-$(basename "$file")"
+            if aws s3api put-object \
+              --bucket "$R2_BUCKET" \
+              --key "$key" \
+              --body "$file" \
+              --cache-control "public, max-age=31536000, immutable" \
+              --content-type "$content_type" \
+              --if-none-match '*' \
+              --endpoint-url "$ENDPOINT" > /dev/null 2>"$error_path"; then
+              return
+            fi
+            rm -f "$existing_path"
+            if aws s3api get-object \
+              --bucket "$R2_BUCKET" \
+              --key "$key" \
+              "$existing_path" \
+              --endpoint-url "$ENDPOINT" > /dev/null 2>&1 \
+              && cmp -s "$file" "$existing_path"; then
+              echo "Reusing byte-identical immutable object $key"
+              return
+            fi
+            cat "$error_path" >&2
+            echo "Immutable dev candidate collision or upload failure at $key" >&2
+            return 1
+          }
 
-          for archive in dist/dev-cli-upload/aliases/*.tar.gz; do
-            aws s3 cp "$archive" "s3://${R2_BUCKET}/cli/dev/$(basename "$archive")" \
+          for file in "dist/dev-cli-upload/releases/${GITHUB_SHA}"/*; do
+            case "$file" in
+              *.tar.gz) content_type="application/gzip" ;;
+              *.sha256) content_type="text/plain" ;;
+              */install) content_type="text/x-shellscript" ;;
+              *) echo "Unexpected immutable dev candidate file: $file" >&2; exit 1 ;;
+            esac
+            put_immutable \
+              "$file" \
+              "cli/dev/releases/${GITHUB_SHA}/$(basename "$file")" \
+              "$content_type"
+          done
+
+      - name: Preserve candidate activation receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-channel-receipt
+          path: |
+            dist/dev-cli-upload/manifest.json
+            dist/dev-cli-upload/aliases/*.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  activate-dev-cli:
+    if: github.event_name == 'push'
+    name: Activate current dev CLI channel
+    needs: publish-dev-cli-candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      activated: ${{ steps.activate.outputs.activated || 'false' }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check whether candidate is current dev head
+        id: dev-head
+        shell: bash
+        run: |
+          REMOTE_DEV_SHA=$(git ls-remote --exit-code origin refs/heads/dev | awk '$2 == "refs/heads/dev" { print $1 }')
+          [[ "$REMOTE_DEV_SHA" =~ ^[a-f0-9]{40}$ ]] || {
+            echo "Could not resolve exactly one remote refs/heads/dev commit" >&2
+            exit 1
+          }
+          if [[ "$REMOTE_DEV_SHA" != "$GITHUB_SHA" ]]; then
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "Dev candidate $GITHUB_SHA is superseded by $REMOTE_DEV_SHA; activation is a no-op."
+            exit 0
+          fi
+          echo "current=true" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v7
+        if: steps.dev-head.outputs.current == 'true'
+        with:
+          node-version: 22.19.0
+
+      - uses: actions/download-artifact@v4
+        if: steps.dev-head.outputs.current == 'true'
+        with:
+          pattern: dev-cli-*
+          path: dist/dev-cli-candidates
+          merge-multiple: true
+
+      - uses: actions/download-artifact@v4
+        if: steps.dev-head.outputs.current == 'true'
+        with:
+          name: dev-channel-receipt
+          path: dist/dev-channel-receipt
+
+      - name: Install AWS CLI
+        if: steps.dev-head.outputs.current == 'true'
+        run: |
+          python3 -m pip install --user awscli
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Revalidate dev head before mutable activation
+        id: dev-head-final
+        if: steps.dev-head.outputs.current == 'true'
+        shell: bash
+        run: |
+          REMOTE_DEV_SHA=$(git ls-remote --exit-code origin refs/heads/dev | awk '$2 == "refs/heads/dev" { print $1 }')
+          [[ "$REMOTE_DEV_SHA" =~ ^[a-f0-9]{40}$ ]] || {
+            echo "Could not resolve exactly one remote refs/heads/dev commit" >&2
+            exit 1
+          }
+          if [[ "$REMOTE_DEV_SHA" != "$GITHUB_SHA" ]]; then
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "Dev candidate $GITHUB_SHA became superseded by $REMOTE_DEV_SHA; activation is a no-op."
+            exit 0
+          fi
+          echo "current=true" >> "$GITHUB_OUTPUT"
+
+      - name: Activate manifest and transitional aliases
+        id: activate
+        if: steps.dev-head-final.outputs.current == 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_EC2_METADATA_DISABLED: true
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        shell: bash
+        run: |
+          echo "activated=false" >> "$GITHUB_OUTPUT"
+          ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          VERSION=$(node -p "require('./package.json').version")
+
+          # Compatibility only: the currently published shared installer still
+          # resolves fixed aliases. New dev installers use the immutable path
+          # derived from manifest.commit and manifest.version.
+          for target in darwin-arm64 darwin-x64 linux-arm64 linux-x64; do
+            platform="${target%-*}"
+            arch="${target#*-}"
+            archive="dist/dev-cli-candidates/openalice-cli-${VERSION}-${platform}-${arch}.tar.gz"
+            alias="openalice-cli-dev-${platform}-${arch}.tar.gz"
+            checksum="dist/dev-channel-receipt/aliases/${alias}.sha256"
+            aws s3 cp "$archive" "s3://${R2_BUCKET}/cli/dev/${alias}" \
               --cache-control "no-cache" \
               --content-type "application/gzip" \
               --endpoint-url "$ENDPOINT"
-          done
-
-          for checksum in dist/dev-cli-upload/aliases/*.sha256; do
-            aws s3 cp "$checksum" "s3://${R2_BUCKET}/cli/dev/$(basename "$checksum")" \
+            aws s3 cp "$checksum" "s3://${R2_BUCKET}/cli/dev/${alias}.sha256" \
               --cache-control "no-cache" \
               --content-type "text/plain" \
               --endpoint-url "$ENDPOINT"
           done
 
-          aws s3 cp dist/dev-cli-upload/manifest.json "s3://${R2_BUCKET}/cli/dev/manifest.json" \
+          REMOTE_DEV_SHA=$(git ls-remote --exit-code origin refs/heads/dev | awk '$2 == "refs/heads/dev" { print $1 }')
+          [[ "$REMOTE_DEV_SHA" =~ ^[a-f0-9]{40}$ ]] || {
+            echo "Could not resolve exactly one remote refs/heads/dev commit before manifest activation" >&2
+            exit 1
+          }
+          if [[ "$REMOTE_DEV_SHA" != "$GITHUB_SHA" ]]; then
+            echo "Dev candidate $GITHUB_SHA became superseded by $REMOTE_DEV_SHA; manifest remains unchanged."
+            exit 0
+          fi
+          aws s3api put-object \
+            --bucket "$R2_BUCKET" \
+            --key "cli/dev/manifest.json" \
+            --body dist/dev-channel-receipt/manifest.json \
             --cache-control "no-cache" \
             --content-type "application/json" \
-            --endpoint-url "$ENDPOINT"
+            --endpoint-url "$ENDPOINT" > /dev/null
+          echo "activated=true" >> "$GITHUB_OUTPUT"
 
   dev-channel-install:
-    if: always() && ((github.event_name == 'push' && needs.publish-dev-cli.result == 'success') || github.event_name == 'workflow_dispatch')
+    if: always() && ((github.event_name == 'push' && needs.activate-dev-cli.result == 'success' && needs.activate-dev-cli.outputs.activated == 'true') || github.event_name == 'workflow_dispatch')
     name: Live raw dev channel install
-    needs: publish-dev-cli
+    needs: activate-dev-cli
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -350,4 +551,12 @@ jobs:
           node-version: 22.19.0
 
       - name: Install raw dev script and dev payload in a clean host
-        run: node scripts/install-channel-smoke.mjs
+        env:
+          EXPECTED_COMMIT: ${{ github.event_name == 'push' && github.sha || '' }}
+        shell: bash
+        run: |
+          args=()
+          if [[ -n "$EXPECTED_COMMIT" ]]; then
+            args+=(--expected-commit "$EXPECTED_COMMIT")
+          fi
+          node scripts/install-channel-smoke.mjs "${args[@]}"

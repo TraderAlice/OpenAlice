@@ -22,7 +22,7 @@
  *     wrapper, not the grandchild). We want the signal in CI logs without
  *     blocking the boot fix on a separately-scoped teardown concern.
  *
- * Runnable locally on POSIX too (`pnpm test:smoke`) — there it's the control
+ * Runnable locally on POSIX too (`pnpm test:system:dev-stack`) — there it's the control
  * case where everything already works, useful for validating the harness
  * itself when you can't run Windows.
  */

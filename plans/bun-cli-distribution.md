@@ -793,13 +793,13 @@ Add according to the increment:
 
 ```bash
 cd ui && npx tsc -b
-pnpm test:guardian-recovery
-pnpm test:install:docker
-pnpm test:install:dev-channel
-pnpm test:remote:docker
+pnpm test:system:guardian
+pnpm test:system:installer
+pnpm test:system:installer:dev
+pnpm test:system:remote
 pnpm electron:smoke:pty
 pnpm electron:smoke:workspace
-pnpm test:railway:local
+pnpm test:system:railway
 pnpm exec vitest run \
   packages/cli/src/install.spec.mjs \
   packages/cli/src/lifecycle.spec.mjs \

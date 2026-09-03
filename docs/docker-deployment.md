@@ -275,7 +275,7 @@ plugins, and upgrades remain outside the OpenAlice release transaction.
 Local contract checks for this profile are:
 
 ```bash
-pnpm test:railway:local
+pnpm test:system:railway
 pnpm exec vitest run \
   packages/guardian-runtime/src/runtime-lock.spec.ts \
   packages/cli/src/lifecycle.spec.mjs \
@@ -286,7 +286,7 @@ pnpm exec vitest run \
   packages/cli/src/project-transfer-stream.spec.ts
 ```
 
-`pnpm test:railway:local` owns shell syntax, the fake-installer/fake-Runtime
+`pnpm test:system:railway` owns shell syntax, the fake-installer/fake-Runtime
 entrypoint journey, and the Linux `/dev/shm` lifecycle-fence/PTY proof. It is a
 serialized local system test: it does not call Railway CLI, open remote SSH,
 read cloud credentials, or touch a hosted Project. It is intentionally outside
@@ -450,7 +450,7 @@ observable CLI round trip rather than only asserting that files exist. Docker
 build cache is shared infrastructure and is retained; only resources owned by
 the smoke are deleted. Use `--keep` or `--keep-image` for investigation.
 
-`pnpm test:remote:docker` is the corresponding disposable existing-host SSH
+`pnpm test:system:remote` is the corresponding disposable existing-host SSH
 journey. In addition to install, Server lifecycle, tunnel, TUI, and Project
 transfer acceptance, it exercises the layered-readiness contract without
 starting an Agent or contacting a broker: a temporary inert CLI shim must
