@@ -48,7 +48,6 @@ import { HarnessSurfacePage } from '../pages/HarnessSurfacePage'
 import { TrackedSidebar } from '../components/TrackedSidebar'
 import { WorkspacesSidebar } from '../components/workspace/WorkspacesSidebar'
 import { SettingsCategoryList } from '../components/SettingsCategoryList'
-import { DevCategoryList } from '../components/DevCategoryList'
 import { MarketSidebar } from '../components/MarketSidebar'
 import { PortfolioSidebar } from '../components/PortfolioSidebar'
 import { AutomationSidebar } from '../components/AutomationSidebar'
@@ -378,13 +377,14 @@ const devTabTitle: Record<Extract<ViewSpec, { kind: 'dev' }>['params']['tab'], s
 const devModule: ViewModule<'dev'> = {
   kind: 'dev',
   title: (spec) => devTabTitle[spec.params.tab],
-  toUrl: (spec) => `/dev/${spec.params.tab}`,
+  toUrl: (spec) => `/settings/developer/${spec.params.tab}`,
   Component: (props) => (
     <PageSidebarShell
-      storageKey="dev"
-      titleKey="nav.item.dev"
+      storageKey="settings"
+      titleKey="nav.item.settings"
       defaultWidth={220}
-      sidebar={<DevCategoryList />}
+      desktopMinWidth={960}
+      sidebar={({ closeMobileDrawer }) => <SettingsCategoryList onSelect={closeMobileDrawer} />}
     >
       <DevPage {...props} />
     </PageSidebarShell>

@@ -16,7 +16,7 @@
 export type WorkspaceSource = 'chat' | 'auto-quant' | 'prediction'
 export type FileViewerSource = WorkspaceSource | 'tracked'
 
-/** One source of truth for the Dev sidebar and `/dev/:tab` URL contract. */
+/** One source of truth for the Developer section and its Settings URL contract. */
 export const DEV_TABS = ['frontend', 'tools', 'onboarding', 'snapshots', 'logs', 'simulator'] as const
 export type DevTab = typeof DEV_TABS[number]
 
@@ -93,7 +93,6 @@ export type ActivitySection =
   | 'workspaces'
   | 'connectors'
   | 'settings'
-  | 'dev'
   | 'market'
   | 'portfolio'
   | 'issue'

@@ -9,11 +9,14 @@ interface WorkflowStep {
   run?: string
   uses?: string
   with?: Record<string, unknown>
+  env?: Record<string, string>
 }
 
 interface WorkflowJob {
   if?: string
   needs?: string | string[]
+  'runs-on'?: string
+  outputs?: Record<string, string>
   steps?: WorkflowStep[]
   strategy?: {
     matrix?: {
@@ -61,7 +64,32 @@ describe('CLI installer dev publication workflow', () => {
   })
 
   it('builds all four supported native targets with the pinned Bun version', () => {
+    const neutral = workflow.jobs['build-dev-cli-neutral']
     const build = workflow.jobs['build-dev-cli']
+    expect(neutral.needs).toBeUndefined()
+    expect(neutral['runs-on']).toBe('ubuntu-24.04')
+    expect(neutral.if).toBe("github.event_name == 'push'")
+    const neutralInstall = neutral.steps?.findIndex(
+      (candidate) => candidate.run === "pnpm install --frozen-lockfile --filter='!@traderalice/desktop'",
+    ) ?? -1
+    const neutralBuild = neutral.steps?.findIndex(
+      (candidate) => candidate.name === 'Build platform-neutral server inputs',
+    ) ?? -1
+    expect(neutralInstall).toBeGreaterThanOrEqual(0)
+    expect(neutralBuild).toBeGreaterThan(neutralInstall)
+    expect(step(neutral, 'Build platform-neutral server inputs').run).toBe('pnpm build:server')
+    const prepareNeutral = step(neutral, 'Prepare commit-bound neutral input receipt').run ?? ''
+    expect(prepareNeutral).toContain('prepare-cli-neutral-inputs.mjs prepare')
+    expect(prepareNeutral).toContain('--commit "$GITHUB_SHA"')
+    const neutralUpload = step(neutral, 'Preserve platform-neutral inputs').with
+    expect(neutralUpload).toMatchObject({
+      name: 'rolling-dev-neutral-inputs',
+      path: 'dist/dev-neutral-inputs',
+      'if-no-files-found': 'error',
+      'retention-days': 7,
+    })
+    expect(String(neutralUpload?.name)).not.toMatch(/^dev-cli-/)
+    expect(build.needs).toBe('build-dev-cli-neutral')
     expect(build.strategy?.matrix?.include).toEqual([
       { os: 'macos-14', platform: 'darwin', arch: 'arm64' },
       { os: 'macos-15-intel', platform: 'darwin', arch: 'x64' },
@@ -73,10 +101,26 @@ describe('CLI installer dev publication workflow', () => {
       if: "matrix.platform == 'linux' && matrix.arch == 'x64'",
       run: 'pnpm build:bun-runtime:feasibility',
     })
-    expect(step(build, 'Build Alice server').run).toBe('pnpm build:server')
+    expect(build.steps?.some((candidate) => candidate.run?.includes('pnpm build:server'))).toBe(false)
+    expect(step(build, 'Download platform-neutral inputs').with).toMatchObject({
+      name: 'rolling-dev-neutral-inputs',
+      path: 'dist/dev-neutral-inputs',
+    })
+    const verifyNeutral = step(build, 'Verify and install commit-bound neutral inputs').run ?? ''
+    expect(verifyNeutral).toContain('prepare-cli-neutral-inputs.mjs verify')
+    expect(verifyNeutral).toContain('--commit "$GITHUB_SHA"')
+    expect(verifyNeutral).toContain('--install')
     expect(step(build, 'Build native CLI').run).toBe('pnpm build:bun:release')
     const stepNames = build.steps?.map((candidate) => candidate.name)
-    expect(stepNames?.indexOf('Build Alice server')).toBeLessThan(
+    const install = build.steps?.findIndex(
+      (candidate) => candidate.run === "pnpm install --frozen-lockfile --filter='!@traderalice/desktop'",
+    ) ?? -1
+    expect(install).toBeGreaterThanOrEqual(0)
+    expect(install).toBeLessThan(stepNames?.indexOf('Download platform-neutral inputs') ?? -1)
+    expect(stepNames?.indexOf('Download platform-neutral inputs')).toBeLessThan(
+      stepNames?.indexOf('Verify and install commit-bound neutral inputs') ?? -1,
+    )
+    expect(stepNames?.indexOf('Verify and install commit-bound neutral inputs')).toBeLessThan(
       stepNames?.indexOf('Accept multiprocess recovery once per dev commit') ?? -1,
     )
     expect(stepNames?.indexOf('Accept multiprocess recovery once per dev commit')).toBeLessThan(
@@ -85,6 +129,21 @@ describe('CLI installer dev publication workflow', () => {
     expect(step(build, 'Preserve accepted dev candidate').with?.name).toBe(
       'dev-cli-${{ matrix.platform }}-${{ matrix.arch }}',
     )
+    expect(step(build, 'Preserve accepted dev candidate').with?.['retention-days']).toBe(7)
+  })
+
+  it('shares only the reviewed platform-neutral build roots', async () => {
+    const { CLI_NEUTRAL_INPUT_ROOTS } = await import('./prepare-cli-neutral-inputs.mjs')
+    expect(CLI_NEUTRAL_INPUT_ROOTS).toEqual([
+      'ui/dist',
+      'packages/connector-protocol/dist',
+      'packages/guardian-runtime/dist',
+      'packages/ibkr/dist',
+      'packages/opentypebb/dist',
+      'packages/uta-protocol/dist',
+    ])
+    expect(CLI_NEUTRAL_INPUT_ROOTS).not.toContain('node_modules')
+    expect(CLI_NEUTRAL_INPUT_ROOTS.every((path: string) => !path.includes('bun-release'))).toBe(true)
   })
 
   it('accepts native npm and Bun installs on PR macOS and Linux hosts', () => {
@@ -103,22 +162,54 @@ describe('CLI installer dev publication workflow', () => {
     expect(workflow.jobs['accept-dev-legacy-cutover']).toBeUndefined()
   })
 
-  it('validates candidates before uploading immutable assets and fixed aliases', () => {
-    const publish = workflow.jobs['publish-dev-cli']
+  it('publishes commit-addressed candidates without overwriting accepted bytes', () => {
+    const publish = workflow.jobs['publish-dev-cli-candidate']
     expect(publish.needs).toBe('build-dev-cli')
-    const prepare = step(publish, 'Validate candidates and prepare channel aliases').run ?? ''
+    const prepare = step(publish, 'Validate candidates and prepare candidate receipt').run ?? ''
     expect(prepare).toContain('prepare-cli-dev-assets.mjs')
     expect(prepare).toContain('--installer install')
-    const upload = step(publish, 'Publish immutable candidates and activate dev aliases').run ?? ''
-    expect(upload.indexOf('cli/dev/releases/${GITHUB_SHA}')).toBeGreaterThanOrEqual(0)
-    expect(upload.indexOf('aliases/*.tar.gz')).toBeLessThan(upload.indexOf('aliases/*.sha256'))
-    expect(upload.indexOf('aliases/*.sha256')).toBeLessThan(upload.indexOf('manifest.json'))
+    const upload = step(publish, 'Publish immutable candidate without overwriting accepted bytes').run ?? ''
+    expect(upload).toContain('cli/dev/releases/${GITHUB_SHA}/$(basename "$file")')
+    expect(upload).toContain("--if-none-match '*'")
+    expect(upload).toContain('Reusing byte-identical immutable object')
+    expect(upload).not.toContain('cli/dev/manifest.json')
+    expect(upload).not.toContain('openalice-cli-dev-')
+    expect(step(publish, 'Preserve candidate activation receipt').with).toMatchObject({
+      name: 'dev-channel-receipt',
+      'retention-days': 7,
+    })
   })
 
-  it('runs the live network install only after a successful push publication', () => {
+  it('activates only the exact remote dev head and makes stale reruns a no-op', () => {
+    const activate = workflow.jobs['activate-dev-cli']
+    expect(activate.needs).toBe('publish-dev-cli-candidate')
+    expect(activate.outputs?.activated).toContain('steps.activate.outputs.activated')
+    const firstCheck = step(activate, 'Check whether candidate is current dev head').run ?? ''
+    const finalCheck = step(activate, 'Revalidate dev head before mutable activation').run ?? ''
+    for (const check of [firstCheck, finalCheck]) {
+      expect(check).toContain('git ls-remote --exit-code origin refs/heads/dev')
+      expect(check).toContain('REMOTE_DEV_SHA" != "$GITHUB_SHA')
+      expect(check).toContain('current=false')
+      expect(check).toContain('activation is a no-op')
+    }
+    const activation = step(activate, 'Activate manifest and transitional aliases').run ?? ''
+    expect(activation).toContain('Compatibility only')
+    expect(activation).toContain('cli/dev/${alias}')
+    expect(activation).toContain('git ls-remote --exit-code origin refs/heads/dev')
+    expect(activation.indexOf('REMOTE_DEV_SHA" != "$GITHUB_SHA')).toBeLessThan(
+      activation.indexOf('--key "cli/dev/manifest.json"'),
+    )
+    expect(activation).toContain('echo "activated=true"')
+  })
+
+  it('runs exact-commit live acceptance only after successful activation', () => {
     const live = workflow.jobs['dev-channel-install']
-    expect(live.needs).toBe('publish-dev-cli')
-    expect(live.if).toContain("needs.publish-dev-cli.result == 'success'")
+    expect(live.needs).toBe('activate-dev-cli')
+    expect(live.if).toContain("needs.activate-dev-cli.result == 'success'")
+    expect(live.if).toContain("needs.activate-dev-cli.outputs.activated == 'true'")
+    const install = step(live, 'Install raw dev script and dev payload in a clean host')
+    expect(install.env?.EXPECTED_COMMIT).toBe("${{ github.event_name == 'push' && github.sha || '' }}")
+    expect(install.run).toContain('--expected-commit "$EXPECTED_COMMIT"')
   })
 
   it('installs the remote smoke parser before running the checkout fixture', () => {

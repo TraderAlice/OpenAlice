@@ -1016,14 +1016,14 @@ When this surface changes:
 1. use isolated `OPENALICE_HOME` roots; never exercise recovery against the
    user's normal home;
 2. follow [[docs/cli-installer.md]] for distributed CLI payload changes and run
-   `pnpm test:install:docker`, plus the manual installer playground before a
+   `pnpm test:system:installer`, plus the manual installer playground before a
    release;
 3. run the Guardian recovery case matrix when lifecycle, ownership, signals,
    locks, or the control endpoint changes;
 4. start the real localhost route and verify the Workspace terminal and
    loginless loopback Origin contract;
 5. exercise pure `ssh` and managed `remote` against a disposable SSH/Docker
-   host with `pnpm test:remote:docker`, including default-no, installed payload
+   host with `pnpm test:system:remote`, including default-no, installed payload
    equality, detach persistence, reconnect, and structured stop;
 6. for the Railway profile, run the entrypoint and cross-target/project-transfer
    specs documented in [[docs/docker-deployment.md]], then exercise two hosted

@@ -17,7 +17,7 @@ vi.mock('../api', () => ({
 
 const customLayout = {
   ...defaultUiLayout(),
-  hidden: ['dev', 'market'] as const,
+  hidden: ['market'] as const,
 }
 
 beforeEach(() => {
@@ -37,12 +37,12 @@ afterEach(() => {
 })
 
 describe('useUiLayout', () => {
-  it('starts from the default document so Dev stays hidden while loading', async () => {
+  it('starts from the default document while loading', async () => {
     const { result } = renderHook(() => useUiLayout())
     expect(result.current.loading).toBe(true)
-    expect(result.current.layout.hidden).toContain('dev')
+    expect(result.current.layout.hidden).toEqual([])
     await waitFor(() => expect(result.current.loading).toBe(false))
-    expect(result.current.layout.hidden).toEqual(['dev', 'market'])
+    expect(result.current.layout.hidden).toEqual(['market'])
     expect(result.current.error).toBeNull()
   })
 
@@ -50,7 +50,7 @@ describe('useUiLayout', () => {
     mocks.get.mockRejectedValueOnce(new Error('backend offline'))
     const { result } = renderHook(() => useUiLayout())
     await waitFor(() => expect(result.current.error).toBe('backend offline'))
-    expect(result.current.layout.hidden).toEqual(['dev'])
+    expect(result.current.layout.hidden).toEqual([])
   })
 
   it('saves through the same domain boundary and updates the shared store', async () => {
@@ -59,10 +59,10 @@ describe('useUiLayout', () => {
 
     const next: import('../live/ui-layout').UiLayout = {
       ...defaultUiLayout(),
-      hidden: ['dev', 'market'],
+      hidden: ['market'],
     }
     await act(async () => { await result.current.save(next) })
     expect(mocks.put).toHaveBeenCalledWith(next)
-    expect(result.current.layout.hidden).toEqual(['dev', 'market'])
+    expect(result.current.layout.hidden).toEqual(['market'])
   })
 })

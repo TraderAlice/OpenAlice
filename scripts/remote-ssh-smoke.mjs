@@ -34,7 +34,7 @@ let container = ''
 let scratch = ''
 
 if (options.help) {
-  console.log(`Usage: pnpm test:remote:docker [--keep-image] [--keep-container]
+  console.log(`Usage: pnpm test:system:remote [--keep-image] [--keep-container]
   [--image <name> [--skip-build]] [--skip-tui]
 
 Builds a clean local SSH host, serves the real OpenAlice installer inside that

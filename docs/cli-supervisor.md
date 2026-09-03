@@ -111,44 +111,599 @@ separate daemons.
 
 The TypeScript TUI reports and polls the selected Runtime, detaches with `q`,
 `Esc`, or `Ctrl+C`, and exposes the same presentation-neutral operations as the
-explicit commands. Its ordinary path is intentionally parameter-free:
+explicit commands. It owns an alternate-screen application canvas and restores
+the screen, cursor, and mouse modes on detach or signal exit. Color-capable
+alternate-screen sessions also own a dark canvas instead of inheriting a light
+terminal background; every rendered row paints the full viewport width so
+blank space and style resets cannot expose the host palette. `NO_COLOR`,
+`TERM=dumb`, and `OPENALICE_TUI_COLOR=0` opt out of the owned canvas and
+decorative color without removing state text;
+`OPENALICE_TUI_DARK_CANVAS=0` keeps decorative color but lets the host own the
+background;
+All color-capable rendering consumes the semantic palette in
+`supervisor-tui-palette.ts`. It is the single owner for canvas, default text,
+muted text, brand accents, lifecycle states, selections, rails, actions, and
+the Command Spine. The frame shader establishes both the canvas and default
+text color before it applies those semantic roles, so unclassified copy never
+inherits an unreadable host foreground. Palette contrast tests keep every text
+and surface pairing at or above 4.5:1; renderers should add or reuse a semantic
+token instead of embedding an ANSI RGB literal;
+the default start view adapts to connectivity: a stopped Runtime or startup
+without a reachable target opens the Machine → AliceProject → Runtime Launcher,
+while a reachable target
+opens the connected workbench. `OPENALICE_TUI_START_VIEW=home` explicitly opens
+the Home surface for expert workflows and focused regression checks without
+changing lifecycle state;
+`OPENALICE_TUI_MOUSE=0` keeps the full keyboard surface while disabling terminal
+mouse reporting, and `OPENALICE_TUI_MOTION=0` replaces purposeful activity
+animation with a stable glyph without changing its text or layout. A normal
+animated color launch begins with a full-viewport OpenAlice Boot Sequence: the
+existing `ALICE` prism, deterministic signal field, and
+`AliceProject → Machine → Runtime → Control` rail hand the shell into the
+Mission Header in at most sixteen 80ms ticks. Any ordinary key or left click
+skips and is consumed so it cannot activate the surface underneath; `q` and
+Ctrl-C still detach immediately. Reduced motion, `NO_COLOR`, `TERM=dumb`, and
+`OPENALICE_TUI_BOOT=0` enter the ready surface directly. The sequence performs
+no Runtime read, write, discovery, or lifecycle action. Its ordinary path is
+intentionally parameter-free:
 
-- the default Fleet page renders `Machine → AliceProject`: ordinary terminals
-  use two panes and narrow terminals drill down from Machines to Projects;
+- before connection, the default Connect page is an OpenAlice Launcher. Its
+  explicit Machine → AliceProject → Runtime rail names all three selected
+  values and whether the Runtime is ready to browse, start, connect, or use. If
+  inventory resolves to exactly one Machine and one AliceProject, the Launcher
+  omits false 1/1 selection panes and becomes a direct Launchpad. Wide terminals
+  pair its Alice identity with route, outcome, three-stage handoff, and primary
+  action; ordinary and narrow terminals fold the same truth into a four-row
+  card. Its rail reads `READY → START → CONNECT`, and its Tip teaches Enter and
+  command discovery rather than pane movement. Multiple Machines or Projects
+  restore the keyboard- and pointer-selectable panes and `SELECT` rail, with a
+  Launch Briefing instead of a pre-connection telemetry dump. Launcher panes
+  size to the largest real inventory among the candidate Machines rather than
+  changing height with the current selection or reserving five empty rows. Wide
+  Briefing keeps only state, human outcome, three-stage Next, and the primary
+  action; widths from 54 through 71 combine Machine and AliceProject readiness
+  on one Launch Sequence row so the selector Tip remains visible. Below 60
+  columns and 18 rows, the Launcher uses one emergency target card rather than
+  letting bottom anchoring crop Machine context. It keeps the selected Machine,
+  AliceProject, Runtime readiness, and current Launch intent visible together;
+  keyboard selection still uses the existing Fleet state and the action remains
+  mouse-capable. The final command is a
+  full-row primary Action Shelf such as `◆ [ Enter ] Start OpenAlice`, not a
+  keycap buried in a prose Next sentence; its complete painted row is also its
+  pointer target, including when embedded in the wide Launchpad's task column.
+  Direct Launchpad, contextual Tip, and Command Spine form one continuous entry
+  cluster, with surplus viewport height following the complete cluster. This
+  keeps the primary action, guidance, and global controls visually adjacent.
+  Multi-target selectors retain their viewport-anchored Spine. The Briefing and its
+  content-owned action share one
+  resolved intent,
+  so an offline, unavailable, capability-blocked, or endpoint-less target
+  promotes Refresh instead of advertising a stale Start or Connect. An offline
+  Machine can still expose its last known AliceProjects for inspection before
+  the selected project asks for Refresh. The connected Connections page keeps
+  the technical Selection Constellation for owner, service, endpoint, and
+  capability inspection. Starting locally stays in the TUI and transitions to
+  the connected workbench after readiness.
+  A stopped remote target starts on Enter and automatically continues into its
+  SSH connection when the refreshed inventory advertises a Web endpoint.
+  While local start, remote start, or SSH connection owns input, the target
+  inventory becomes a Launch Flight Recorder instead of remaining deceptively
+  selectable behind a generic busy label. It keeps the selected Machine and
+  AliceProject visible, names only observable validation, lifecycle, inventory,
+  forwarding, and binding stages, and distinguishes complete, active, waiting,
+  and failed stages in text and glyphs without relying on color. When replacing
+  an active target, the Recorder keeps the still-live source visible as From
+  and the in-flight candidate as To until readiness promotes it. Success hands
+  directly to connected Home. A failure remains on the selected target with
+  Enter to retry or Esc to return to target selection; its contextual Tip names
+  Retry, Back, and Detach rather than teaching the hidden inventory controls.
+  While any Flight Recorder owns the stage, the ordinary Connect, Help, or
+  connected workbench navigation is replaced by a non-interactive Operation
+  Header. It names the local-start, remote-start, or remote-connect task and
+  states either `INPUT OWNED UNTIL READY` or `RETRY OR CHANGE TARGET`; no false
+  page pointer targets remain behind the operation.
+  Below 60 columns, the Recorder collapses the complete stage list into one
+  bounded current-step view: target route, optional From/To handoff, `STEP n/N`,
+  current consequence, and Control or Retry remain visible. Connected Fleet
+  selectors below 60x18 similarly reserve four rather than five inventory rows.
+  Together these bounds keep the Mission Header on-screen through selection,
+  remote handoff, and the resulting Home recovery state instead of triggering
+  terminal scroll at the final viewport row.
+  The failed Recorder owns the failure explanation and recovery actions; the
+  wide quiet field becomes a Recovery Brief that names the failed stage and
+  pairs Retry with changing the target instead of displaying ambient launch
+  decoration. Compact terminals omit that brief before it can displace the
+  failed stage, diagnostic, or action row. The Command Spine keeps Machine,
+  AliceProject, Runtime, and Launch context instead of repeating the same
+  diagnostic in a second, independently truncated row.
+  `q` can still detach at any time. While a stage is in flight, the Command
+  Spine replaces the disabled Commands affordance with Operation Active and the
+  contextual Tip states that input is owned until ready; only the truthful `q`
+  detach route remains actionable. The recorder is session-local presentation
+  state and does not own
+  Runtime readiness, lifecycle, SSH cancellation, or persistence;
+  At 72–95 columns the launch path uses compact stage vocabulary that spends
+  width on the selected target names and readiness state instead of repeating
+  the same Enter command or independently truncating three equal-width
+  technical labels. The compact Briefing then owns the resolved full-row action
+  and its immediate consequence; it does not repeat the same three-stage
+  handoff. Its Tip names selection, pane movement, and repeated-click
+  activation without repeating the visible primary action;
+- the connected workbench has exactly one active target. Its persistent command
+  spine names the Machine, AliceProject, loopback or SSH transport, and live
+  Runtime signal on every page. Connections marks the active Machine and
+  AliceProject independently from its current keyboard or pointer selection.
+  Its contextual Tip always teaches `←→` pane movement and `↑↓` selection
+  before the state-specific Enter consequence, so the single-pane compact
+  layout never hides the route back to Machines. The Command Spine calls this
+  surface `CONNECTIONS` when space permits, contracts it to `CONN` before
+  dropping the page badge, and never leaks the internal `fleet` owner name.
+  Selecting another target closes the previous TUI-owned SSH forward; it never
+  leaves hidden remote tunnels behind. A remote target exposes `x` Disconnect,
+  which closes only the SSH forward and does not stop the remote Runtime. Its
+  Command Dock contains only remote-safe open, disconnect, navigation, and help
+  routes; local Source, Setup, Logs, Doctor, restart, and stop commands do not
+  silently act on the local Runtime while a remote target is active. If an
+  authoritative poll reports that the active local Runtime stopped, the default
+  shell returns to the Launcher and explains why. An SSH tunnel exit returns to
+  the available local target or Connections with a visible disconnect notice;
+- active-target health is independent from tunnel ownership. A bounded
+  `/api/auth/status` probe moves a TUI-owned SSH target from connected to
+  degraded after one failed check and unreachable after three consecutive
+  failures without closing the forward. Any later success restores connected
+  in place. Local inspection failures use the same degraded/unreachable
+  presentation but do not claim the Runtime stopped; only an authoritative
+  absent result returns to the Launcher. Navigation, Home guidance, Runtime,
+  the persistent Dock, and the Command Dock expose the same non-color phase.
+  An unhealthy target replaces Open and lifecycle mutations with `r` Retry;
+  SSH `x` Disconnect remains available and still does not stop the remote
+  Runtime. Home's contextual Tip follows that same recovery route instead of
+  recommending Doctor: checking explains retained ownership, degraded leads
+  with Retry while automatic probes continue, and unreachable SSH names both
+  Retry and non-destructive Disconnect. Automatic checks continue while the
+  target is retained;
+- the connected Home page is one responsive `Alice Session` stage rather than
+  a dashboard. It orders the selected context as identity, Next, one full-row
+  primary action, Status, then Activity. Wide terminals keep the terminal-native
+  `ALICE` mark and promote the selected AliceProject plus Runtime state to the
+  identity heading. A continuous OMP-style vertical rail separates that stable
+  identity from the task sequence without creating a second card. Ordinary terminals
+  preserve the same task order in one column, add bounded whitespace between
+  each decision layer, and omit illustration before task truth. Home
+  intentionally does not repeat PID, provider, endpoint, uptime, or component
+  telemetry; Runtime owns those diagnostic facts. The primary action paints
+  the complete task-column width on the wide canvas and the complete content
+  width when compact; its glyph and keycap retain the same hierarchy with
+  color disabled, and the existing whole-row pointer target is unchanged.
+  Before connection, Enter starts or connects the selected target. A degraded
+  or unreachable endpoint always promotes Retry. After a healthy connection,
+  unread Inbox reports promote Enter to Review Inbox and keep `o` as the
+  explicit Open Web route; when attention clears, Enter returns to Open
+  Workspace. The rendered label, whole-row pointer target, and Enter handler
+  resolve from the same intent. A stopped Home does not repeat the same Start
+  instruction across every layer: Next names the user outcome, guidance previews
+  preparation and readiness verification, the Action Shelf owns the command,
+  and the contextual Tip teaches only alternate `s` and `/` routes. `⌂`
+  AliceProject remains
+  a direct route into the Switchboard, while passive identity and status rows
+  do not pretend to be controls. Color strengthens identity, focus, healthy
+  state, and actionable attention, but glyphs and text keep the complete
+  contract under `NO_COLOR`. Below 60 columns and 18 rows, Home uses a five-row
+  summary body so viewport pressure cannot remove Mission Navigation: selected
+  AliceProject and Runtime, Machine route, Next, the primary action, and the most
+  important Inbox-or-Connection status remain visible; Activity returns with the
+  ordinary compact layout. The stopped primary action shortens to the complete
+  `Start OpenAlice` label in this emergency fold instead of clipping a longer
+  launch-and-open description;
+- the Fleet page renders `Machine → AliceProject`: launch-capable ordinary
+  terminals use two bordered panes, while a connected Connections page below
+  96 columns gives the focused inventory one complete full-width pane instead
+  of truncating both sides. Terminals below 72 columns retain the narrow
+  Machines-to-Projects drill-down. When connected inventory contains exactly
+  one Machine and one AliceProject, Connections removes both false 1/1 panes
+  and becomes a direct Active Route board. Wide terminals pair route/Now with
+  signals/detail; ordinary and emergency terminals keep the same identity,
+  route, health, Return Home, and target-scoped Transfer or Disconnect actions
+  in one bounded stack. At 100 columns and wider the direct board and contextual
+  Tip remain together while the Command Spine anchors the terminal edge; below
+  100 columns all three form one compact content-flow cluster. Multi-target
+  selectors retain their viewport-anchored Spine. There is no hidden
+  pane focus: Enter acts on the sole
+  target, left/right navigate top-level views, and pointer hit testing ignores
+  the removed inventory surface. Multiple candidates restore the complete
+  selector and Switch Target path;
   selection and list windows survive resize, use Unicode display width, and
-  keep the action/detach footer visible at the supported 80×24 baseline;
-- `↑`/`↓` move within the active Fleet pane, Tab/left/right switch panes, and
-  `[`/`]` switch Fleet/Overview/Logs/Doctor/Help pages. With only the local
-  Machine, focus starts on its current AliceProject so the historical one-key
-  Enter start/open path remains intact;
+  keep the action/detach footer visible at the supported 80×24 baseline.
+  Overflowing Machine and AliceProject panes reserve their final content column
+  for a proportional `│` track and `█` thumb, exposing each pane's independent
+  window position. Hovering that Rail Navigator replaces the track cell with
+  `◆` and previews the proportional Machine or AliceProject; left press jumps
+  selection to it and owns a left-button drag until release. Rail interaction
+  only changes focus and selection, so it never drills in, opens, stops,
+  restarts, or detaches an AliceProject. In the wide
+  hierarchy, the active pane uses a `◆` title and `▶` strong selection while
+  the related inactive pane uses a `◇` title and foreground-only `◁` context.
+  Enter, left-arrow, or pointer selection moves that same focus owner; narrow
+  drill-down retains one active pane, and `NO_COLOR` keeps the distinction in
+  the glyphs.
+  Background refresh of the selected local Runtime updates its inventory row
+  without moving a user who is inspecting another Machine or AliceProject;
+- the top-level chrome is a two-row Mission Rail: a framed brand/release
+  masthead and one OMP-style closing navigation rail. It replaces the legacy
+  title/divider/tab stack and removes the decorative traveling View Beacon.
+  Navigation changes immediately instead of animating application chrome and
+  accepts Tab, left/right, and `[`/`]`. Its valid destinations are adaptive:
+  connected sessions expose Home, Inbox, Connections, and Runtime; the
+  Launcher exposes Connect and Help; Recovery exposes Recovery and Help. Each
+  destination keeps a stable glyph, label, and optional status badge. Color
+  terminals use strong foreground emphasis for the selected bracketed label,
+  a bounded background only for pointer hover, and a muted rail for passive
+  destinations; `NO_COLOR` preserves the same brackets and glyphs. Wide labels
+  collapse through compact and minimal variants so every valid destination
+  remains reachable at 46 columns. The renderer publishes exact final segment
+  geometry for pointer hover and click rather than reconstructing hit regions
+  from labels.
+  `↑`/`↓` move within the active Fleet pane and the mouse wheel moves the
+  focused Fleet selection.
+  Connections, Inbox, and loaded Runtime events expose available counts in the
+  navigation rail.
+  Each status badge is part of its tab's pointer target rather than a separate
+  control.
+  Fleet rows expose pointer hover and click: the first click selects or focuses,
+  including when the row was already selected only as inactive related context.
+  A second click on the focused selected Machine drills into AliceProjects; a
+  second click on the focused selected AliceProject invokes Enter's primary
+  action. Pointer activation therefore cannot cross an inactive pane boundary
+  on its first click. Pane headers and unused body space are focus-only pointer
+  surfaces: hovering an inactive pane changes its title marker from `◇` to `»`,
+  and clicking transfers focus without selecting or activating a row. The
+  inter-pane gutter remains inert.
+  Fleet uses five visible inventory rows as its compact baseline. At 72 columns
+  and wider, surplus viewport height expands that window only as far as real
+  Machine or selected AliceProject inventory requires. Both panes, independent
+  scroll rails, and pointer row mapping consume the same final count, so a tall
+  terminal reveals more real rows before it asks the user to scroll; narrow
+  drill-down and constrained terminals keep the five-row contract.
+  When wide Fleet still has at least nine complete detail rows after revealing
+  all available inventory, Selection becomes a passive Constellation instead
+  of leaving that surplus unowned. It visualizes the selected
+  Machine → AliceProject → Runtime/Web route and expands only reported product,
+  port, owner, uptime, service, capability, and refresh facts. The Constellation
+  has no pointer target or lifecycle action. The Selection surface owns the
+  current Enter action in both forms and exposes Transfer only for an available
+  local AliceProject; compact Selection remains two rows plus that content-
+  owned action. When the exact connected AliceProject is selected, that surface
+  is titled Active Connection and Enter returns Home; choosing any other target
+  turns it into a Switch Target surface with an explicit Switch Candidate
+  identity and Switch AliceProject or Connect & Switch action. Its contextual
+  Tip explains that the current target remains live until the new route is
+  ready. Machine focus retains Browse projects and its generic focus guidance.
+  With only the local Machine, Fleet focus starts on its current AliceProject;
+- ordinary workbench pages have one persistent control surface: the Command
+  Spine. Primary
+  and contextual actions live with the object they affect: Alice Session,
+  Launch Briefing, Launch Flight Recorder, Fleet Selection, the selected
+  message inside Inbox Desk, Runtime Observatory or Lens, and Doctor Signal
+  Scope. `/` Commands owns the
+  long tail while direct shortcuts remain active; `?` retains the complete
+  keyboard reference. The Inbox Desk's selected message exposes `o` Open
+  Workspace as its primary follow-through and Enter's read-state mutation as
+  the secondary organization action. A failed Flight Recorder keeps both Enter
+  Retry and Esc Back visible in its content. This avoids a second footer that
+  competes with page truth or repeats the Spine. Focus Workspaces and
+  confirmation/refusal overlays still own a local Action Shelf because that
+  bounded task temporarily replaces ordinary workbench navigation. Each
+  complete local action segment derives a display-
+  width-aware pointer target from the final responsive layout, so hover and
+  click survive reflow and invoke the same input state machine as the
+  corresponding key. Hover changes the leading `◆`/`·` or divider to `›`,
+  preserving a visible focus signal even under `NO_COLOR`. Confirmation and
+  refusal semantics therefore do not have a separate mouse-only path. When a
+  wide layout composes adjacent framed cards, theme decoration classifies each card
+  column independently at the rendered gutter; a primary action in one card
+  must not color fields, borders, or whitespace in its neighbor;
+- wide split-pane content follows the same containment contract. Selection,
+  pointer hover, diagnostic severity, and launch-intent styling own only the
+  inner content of the framed column that carries that semantic state. The
+  selected row paints the complete interior from its left border to its right
+  border; the gutter, borders, and semantically neutral neighboring pane remain
+  unchanged;
+  independent semantic rows in both panes may still style themselves. Single-
+  pane and `NO_COLOR` output retain their existing plain-text structure;
+- terminal cell measurement follows Unicode presentation rather than treating
+  every extended pictograph as emoji-width. Default text-presentation symbols
+  such as `▶`, `©`, and `⚠` occupy one cell; default emoji and graphemes with an
+  explicit emoji variation selector occupy two, as do East Asian wide
+  characters. Pane padding, truncation, scroll rails, and pointer coordinates
+  share this measurement contract;
+- an empty Runtime log lens stays compact instead of claiming the Operational
+  Canvas. Its four-line panel states Standby, Quiet, or Clear and retains only
+  snapshot reload or filter cycling plus Help. Empty Doctor keeps its truthful
+  Signal Scope with Run/Rerun and Help. Scroll, copy, Inspect, Latest, First,
+  and Last return only when a filtered event or diagnostic check exists. Below
+  60 columns and 18 rows, a populated Doctor folds list and inspection into one
+  selected-check path: result, cause, repair guidance, position, and Rerun. The
+  selected failure or warning remains first, arrows/wheel retain selection, and
+  Mission Header, navigation, contextual read-only Tip, and Command Spine stay
+  visible. Empty and naturally bounded Doctor reports keep checks, inspection,
+  Tip, and Spine in one content-flow cluster; reports beyond the current width's
+  natural capacity restore the viewport-anchored Spine for stable scrolling. Their
+  contextual Tips state the same empty contract;
+- at 100 columns and wider, Home's single Alice Session Board uses a bounded
+  OMP-style two-column composition instead of stretching with every surplus
+  terminal row. The identity column centers the selected AliceProject while the
+  project heading remains identity-only; one phase signal below the route owns
+  `READY TO START`, live, checking, or recovery truth instead of repeating a raw
+  Runtime badge beside the project name. The task column keeps one ordered path
+  together: Next and its primary action,
+  Status, then Activity. The contextual Tip follows the board, while the
+  Command Spine anchors the terminal's bottom edge; genuine surplus becomes a
+  quiet field between guidance and global controls, matching OMP's top-workbench
+  and bottom-input composition. Below 100 columns Home keeps the same hierarchy
+  in one continuous flow so compact and emergency terminals do not displace the
+  primary task to preserve decorative space. Inbox and
+  Connection signals are whole-row pointer targets
+  backed by the same panel-selection path as Mission Navigation; hover previews
+  their destination in the stable Activity Slot;
+- the connected Home page keeps one product name from Mission Header through
+  Command Spine: the footer projects `◆ HOME`, never the internal `overview`
+  panel key. At compact widths the view badge is removed before selected
+  AliceProject or Runtime truth, matching the Spine's existing priority order;
+- a persistent full-width Command Spine is the sole default control rail and closes
+  the application with `╰─`/`─╯`
+  while keeping `[ / ] Commands` and `[ q ] Detach` visible on every Supervisor
+  page. A flexible track joins those controls to an OMP-style breadcrumb of the
+  selected AliceProject, compact Runtime signal, and active-view badge. The
+  responsive order removes the view, then project context, before the essential
+  controls; 80 columns retain the complete project name and Runtime signal,
+  while wider terminals retain all four segments. Controls, project identity,
+  Runtime health, and view use distinct semantic tones on one continuous rail;
+  `NO_COLOR` preserves the border, track, glyphs, and breadcrumb hierarchy.
+  Below 60 columns, where all right-side context is intentionally removed, the
+  flexible track closes continuously from Detach into `─╯`; it does not retain
+  an empty breadcrumb gap or a detached final rail.
+  `[ i ]` and its complete visible project-name segment are one direct
+  pointer/keyboard route into the existing AliceProjects overlay. Commands and
+  Detach likewise expose their complete labels as pointer targets. `/`
+  opens a shallow Command Dock and changes the Spine action to `Close`. At
+  ordinary sizes it remains a bottom-anchored drawer over the unchanged current
+  page. Below 60 columns and 18 rows it instead owns the workspace immediately
+  below Mission Navigation, preventing a clipped one-line remnant of the
+  underlying page from competing with the command task. The Dock spans the
+  available width, shows at most four results around the current selection, and
+  contracts for filtered or empty states. It exposes
+  only commands valid for the current Runtime/recovery context. An empty local
+  Dock orders the current primary task before read-only Runtime evidence and
+  Next view, then navigation/configuration; Restart and Stop remain searchable
+  Manage commands at the tail rather than occupying the discovery surface as
+  Primary actions. A healthy remote Dock likewise keeps Connections, Next view,
+  and Help ahead of Disconnect. Typing filters
+  and ranks command names, groups, shortcuts, and compact English/Chinese
+  intent aliases in place. The focused search rail always exposes a caret;
+  color terminals pulse it at a bounded cadence while reduced motion keeps the
+  same solid affordance. That rail is the sole typing instruction. A muted
+  footer names only the current navigation, run, close, and—once a query
+  exists—edit/clear routes; keycaps carry the emphasis while the persistent
+  Spine remains the owner of `/` Close. Unicode input is preserved, Backspace
+  removes one code point, Ctrl+U clears,
+  and an explicit empty state keeps the query available for correction. Up/Down
+  wraps selection, the mouse wheel moves within the visible result set, pointer
+  hover highlights a complete row, and clicking a row selects and runs it.
+  Enter runs the selected command, while direct shortcuts remain available from
+  the Supervisor outside the Dock. All routes feed the existing keyboard
+  action, confirmation, refusal, or detach state machine.
+  Activation closes the Dock before Setup, Update, project selection, or a
+  confirmation modal takes focus; only one overlay owns input at a time.
+  The persistent Command Spine is the sole exception to overlay pointer
+  isolation: its final rendered Close, Detach, and visible AliceProject segments
+  remain mouse-capable while the Dock is open and still feed the same Screen
+  input handlers. No other overlay permits pointer click-through. `/`, `Esc`, or
+  the visible Close segment closes the Dock without exiting, while `q`, its
+  visible Detach segment, and `Ctrl+C` retain global detach behavior;
+  Before connection, the Spine describes the selected Launcher target instead
+  of the local process context: Machine/AliceProject, LOCAL or SSH transport,
+  selected Runtime signal, and a wide `LAUNCH` badge. This route is passive and
+  deliberately has no `[ i ]` keycap because that key edits the local registry,
+  not the selected remote target. Compact projection drops Machine before the
+  AliceProject identity so the actionable target survives at 80 columns;
+- asynchronous work, results, and pointer previews replace the Command Spine's
+  right-side context instead of inserting a separate activity row. Working wins
+  over Error, which wins over Notice/Ready/Status, which wins over Preview;
+  removing hover restores the selected Machine/AliceProject/Runtime/view
+  breadcrumb. Busy, informational, successful, actionable-warning, failed, and
+  preview states retain distinct glyph and text labels without depending on
+  color; only the busy glyph animates. Feedback is object-first and bounded to
+  the available rail width, so it never moves Command Spine pointer targets
+  and does not introduce a second lifecycle or error path.
+  On operational pages, an elastic blank stage grounds the Command Spine at the
+  terminal edge. Home instead keeps it immediately after the Session Board and
+  Tip so the launcher reads as one task; surplus height follows the complete
+  cluster. Short terminals retain their natural complete flow without clipping.
+  Resize changes only elastic whitespace and does not reset selection, focus,
+  or action state.
+  When the stage has at least two spare rows, one contextual `Tip:` Beacon
+  teaches a useful interaction for the active view or Runtime state while
+  preserving a blank row after page content. It disappears rather than consume
+  a required row, has no pointer target or action path, and remains identical
+  text under `NO_COLOR`;
+- color-capable motion-enabled sessions play one bounded brand-color sweep on
+  entry across the OpenAlice header and any visible brand mark. The header then
+  settles while a visible Overview `ALICE` mark continues a slow six-phase
+  prism at 240ms per phase. The ambient mark pauses whenever a focused overlay,
+  confirmation, or busy operation owns attention and resumes after it closes;
+  `NO_COLOR` and reduced motion remain completely static. A successfully refreshed
+  running Runtime alternates `●`/`◉` as a low-frequency heartbeat in Overview
+  and Fleet; the adjacent `RUNNING`/`running` text never changes, and failed
+  probes still surface through the diagnostic rail rather than animation;
+- Help is a responsive task-led Control Atlas rather than a prose screen or
+  static shortcut wall. Wide tall terminals become a Help console: a stable
+  left rail exposes Start/Connect/Open, command search, AliceProject selection,
+  and the Navigation/Runtime/AliceProject systems; a single right inspector
+  explains only the selected system and presents its complete command list.
+  The console follows its real rail/inspector content with two breathing rows
+  rather than stretching both panes through the Operational Canvas.
+  Description text wraps instead of being silently truncated. Ordinary
+  terminals split those groups from the selected group's explanation and
+  visible keycaps; narrower terminals stack the same focus model. The compact
+  card retains the task-led `Help · START · SEARCH · SWITCH` identity and leads
+  with one responsive Fast-routes row for contextual Enter, `/` command search,
+  and `i` AliceProject selection before presenting the reference groups. At
+  very narrow widths that row becomes two lines rather than truncating a route.
+  Below 60 columns and 18 rows, Help becomes a seven-line Control Guide: the
+  selected system's first truthful Next command, all three task-domain choices,
+  and Close Help remain visible together with Mission Header, navigation,
+  contextual Tip, and Command Spine. Full descriptions and long-tail key routes
+  return automatically above that emergency threshold and remain searchable
+  through `/` Commands. The Help console, Tip, and Command Spine form one
+  content-flow cluster at every width, with surplus height after the complete
+  reference workspace.
+  Arrow/Home/End keys, wheel movement, and whole-row pointer hover/click share
+  one selection. Keycaps in the inspector remain direct command targets rather
+  than enlarging the system-selection hit area. Ordinary Help owns a final
+  `◆ [ ? ] Close Help` content action in the wide console, list-detail, and
+  compact stacked layouts; its visible row is pointer-active and invokes the
+  same `?` toggle as the keyboard. It does not restore the ordinary footer
+  Action Shelf. Recovery keeps its explicit `? Close safe controls` action
+  inside the safe update/detach groups instead of duplicating a generic exit.
+  Recovery mode projects only safe update and detach groups. Help remains the
+  place to understand controls, while `/` remains the faster Command Dock.
+  Update, Setup, AliceProject selection, Runtime Source, and Remote Transfer
+  use the same bordered overlay shell and semantic selected/description states.
+  Runtime Source is a responsive Launch Bay: its Select, Validate, Save, and
+  Launch route stays visible beside the checkout Field Inspector on wide
+  terminals and stacks intact at the 80-column baseline. Rejected checkouts
+  visibly block Save and Launch without leaving the focused input.
+  Overlay lists share the application pointer contract: motion moves the
+  visible selection, the wheel moves its list window, and a click invokes the
+  same Enter path. Rendered keycaps remain clickable inside list, input,
+  review, failure, and completion phases; the pointer router derives the
+  overlay origin from the same terminal dimensions, anchor, margin, and
+  rendered height used by the TUI compositor.
+  Lifecycle, managed-source, and update confirmations enter a focused Decision
+  Gate. The bounded card remains centered, but the operational field behind it
+  is cleared so clipped page copy and inactive controls cannot read as modal
+  context. Mission Header navigation becomes
+  an action-specific identity such as `FOCUS · STOP RUNTIME / DECISION GATE`,
+  its Esc target repeats the exact refusal such as `Keep running`, release
+  provenance becomes read-only `BUILD`, and the bottom Console repeats the same
+  exact action/refusal pair plus the positive action as its task badge. Each
+  modal separates the question from an explicit Impact section and routes its
+  own plus the Console's complete-segment pointer hover/click through the same
+  confirmation state machine. Acceptance closes the gate before work appears in
+  the fixed activity slot; cancellation restores the exact previous page and
+  changes no Runtime or configuration state.
+  Existing validation and hardware-cursor contracts remain unchanged;
 - registered Machines refresh in the background with one bounded,
   non-interactive (`BatchMode=yes`) SSH inventory request each. Registered,
   checking, online, unauthorized, offline, and incompatible remain distinct
   from per-project Runtime state;
 - `m` on a selected local Fleet AliceProject opens the remote-transfer wizard.
-  It selects an online compatible SSH Machine, destination key/Home, credential
-  handling, and exact-Session Issue policy; then renders the same checksum and
-  exclusion plan as the explicit command. Default No changes nothing. Success
-  offers separate Start, Connect/Open, and Done actions and never auto-starts;
+  Its Transfer Flight Deck keeps an eight-stage route, the current Mission
+  Brief, and a stable Safety Rail visible across destination Machine,
+  key/Home, credential handling, exact-Session Issue policy, checksum review,
+  streaming, and arrival. Wide terminals pair route and Brief; the 80-column
+  baseline compresses completed/current/next stages above the complete Brief.
+  Entry phases render as a Mission Console with semantic field/choice headers,
+  visible validation repair state, and whole-segment Continue, Choose, and Back
+  actions; these project the existing wizard inputs and lists rather than
+  introducing another transfer controller.
+  Planning and execution stay in the same Mission Control region: Manifest
+  exposes READY/HOLD evidence and the default-No boundary, In Flight shows
+  files, bytes, progress, verification, and cancellation, Recovery distinguishes
+  transaction retry from plan rebuild, and Arrival keeps Start, Connect/Open,
+  and Done as separate whole-segment actions.
+  It renders the same checksum and exclusion plan as the explicit command.
+  Default No changes nothing. Success offers separate Start, Connect/Open, and
+  Done actions and never auto-starts;
 - Enter or `o` on a running compatible remote AliceProject opens a TUI-owned
-  loopback tunnel and browser. Detaching aborts only those tunnel processes;
+  loopback tunnel and makes its forwarded endpoint the active target. It stays
+  in the TUI; `o` from the connected workbench opens the browser separately.
+  Detaching aborts only those tunnel processes;
   it never stops the local or remote Runtime. `s` on a stopped compatible
   remote AliceProject re-probes inventory and registration, then starts it
-  through the registered SSH Machine. Remote stop, restart, logs, Doctor,
+  through the registered SSH Machine. Enter is the visible primary equivalent.
+  Remote stop, restart, logs, Doctor,
   Setup, source, and other configuration mutations remain refused;
 
-- Enter starts the persistent Runtime and opens the verified Web endpoint when
-  stopped, or opens the endpoint when already running;
+- Enter on the disconnected local Launcher starts the persistent Runtime without
+  opening a browser; once connected, Enter on Home opens the active endpoint;
 - `s` starts the persistent Runtime in the background without opening a
   browser;
 - `o` opens an advertised, verified Web endpoint;
+- connected navigation is Home, Inbox, Connections, and Runtime. Inbox reads
+  the active target's bounded `/api/inbox/history` surface, shares server-owned
+  read/unread state, polls every 20 seconds, and offers no delete action. Its
+  single responsive Inbox Desk keeps Message Stream and Selected Message in
+  open columns on wide terminals and stacks the same reading order at compact
+  widths. A short wide stream owns only its natural content plus two breathing
+  rows instead of stretching to fill the Operational Canvas; longer streams
+  still expand within the existing 20-message history bound. At 100 columns and
+  wider, Inbox keeps the Desk and contextual Tip together while anchoring the
+  Command Spine at the terminal edge; surplus becomes a quiet field between the
+  selected-message workflow and global controls. Below 100 columns all three
+  remain in one content-flow cluster so compact pointer geometry stays stable
+  and no primary message action is displaced. Below 60 columns
+  and 18 rows, the Desk folds to the selected message's Workspace, read state,
+  title, provenance, Open Workspace action, and Mark read/unread action so the
+  Mission Header, navigation, contextual Tip, and Command Spine all remain in
+  the viewport. Stream rows lead with Workspace and agent provenance before their
+  bounded summary and relative time, so truncation cannot hide the identity
+  users need to choose a message; Selected Message owns the complete body and
+  documents. The selected message opens its encoded `/workspaces/:workspaceId`
+  Web route with `o` and owns Enter's Mark read/unread action; arrows or the
+  wheel move selection, and the contextual Tip teaches that exact loop.
+  The Command Spine uses the themed `● INBOX` view identity, contracts it to
+  `● BOX` only at the intermediate responsive tier, and removes the badge
+  before sacrificing target or Runtime truth.
+  Help remains available through `?`; Doctor remains a Runtime tool rather
+  than a top-level product destination;
+- Runtime is a layered status-manager surface rather than a renamed log tail.
+  Its Command Spine identity is therefore `RUNTIME`, with `RUN` as the
+  intermediate responsive badge before the view identity is removed; the
+  internal `logs` panel key never appears in product chrome.
+  Its responsive Runtime Observatory leads with three wide columns—Runtime,
+  Route, and Services—or the same facts in one compact stack. It owns process
+  state, owner/PID, provider identity, uptime, Alice/UTA/Connector status, the
+  active Machine → AliceProject route, loopback or SSH-forward transport,
+  endpoint health, failed-check count, and the valid Open or Retry action.
+  Optional disabled services remain neutral; only reported failure is danger,
+  and missing telemetry says `not reported` instead of inventing state. A
+  bounded recent-event region records only meaningful acquire, release,
+  degraded, unreachable, recovered, and stopped transitions, keeps at most
+  twelve newest events, sanitizes target identity, and is never persisted. Its
+  retained count stays inside the wide `History` field rather than competing
+  in the Observatory title with Runtime Lens event counts. Local Runtime log
+  evidence remains directly below the Observatory; remote
+  targets give surplus height to recent transitions and expose only remote-safe
+  Open, Check, Disconnect, Connections, and Help actions. When the local Event
+  Lens is empty or not yet reported, Observatory, quiet Lens, contextual Tip,
+  and Command Spine form one content-flow cluster. Once events exist, the Spine
+  remains viewport-anchored so log selection and scrolling keep a stable frame.
+  Below 60 columns and 18 rows, a populated Runtime without an active endpoint
+  becomes a seven-line Emergency Event Lens instead of disappearing behind the
+  target-summary fallback. It retains the selected and adjacent events, detail,
+  sanitized raw text, browse/filter/copy vocabulary, clickable visible rows,
+  contextual Tip, and Command Spine. A Runtime with an active target instead
+  folds Observatory and Lens into one five-row status surface:
+  Runtime/provider/uptime identity, active route, compact Alice/UTA/Connector
+  health, the valid Open-or-Retry action, and a local Load/Reload or remote
+  Disconnect action. The fold preserves Mission Header, navigation, contextual
+  Tip, and Command Spine instead of cropping application wayfinding;
 - `x` stops and `r` restarts only a `cli-server` owner, after an impact
   confirmation;
 - `l` reads the bounded, redacted log tail;
 - `d` runs read-only Doctor checks;
-- `u` first chooses stable, beta, or dev, then probes that channel and, when a
-  candidate is available, can install it after explicit confirmation through
-  the same verified atomic installer path as `openalice update --yes`. The
+- `u` opens the responsive Release Observatory. The Mission Header exposes that
+  same path as a responsive Release Control.
+  Wide terminals show `[ u ]` beside version/channel provenance, compact
+  terminals retain a `↗` affordance, and the whole rendered segment owns hover
+  and click rather than only the keycap. The lane map and selected Channel
+  Brief sit side by side on wide terminals and stack at the
+  80-column baseline. Pointer movement or a lane click only changes the
+  selection; `Enter` or the full `Check` action is the sole network boundary.
+  It probes that one channel and, when a candidate is available, can install it
+  after explicit confirmation through the same verified atomic installer path
+  as `openalice update --yes`. The
   choice is session-local until installation succeeds; installer provenance
   makes the chosen channel the next launch's default. Package-manager-owned
   installs are never overwritten by the TUI: a stable candidate shows the
@@ -162,14 +717,78 @@ explicit commands. Its ordinary path is intentionally parameter-free:
   again;
 - `i` lists the implicit default plus registered AliceProjects, selects one
   without stopping another project, or creates a separate named complete home.
-  AI vault copy is a separate command: `openalice project copy-ai-creds`;
+  The responsive Switchboard pairs a bounded project map with Home, Web, role,
+  and action inspection on wide terminals, then stacks the same regions at the
+  80-column baseline. Its Create row opens a two-stage AliceProject Foundry:
+  Identity and Complete Home remain visible beside the focused Field Inspector
+  on wide terminals and stack as a compact route at 80 columns. Validation
+  remains ordered, and only the final `Create & select` action registers the
+  new complete home. AI vault copy is a separate command:
+  `openalice project copy-ai-creds`;
 - `p` opens Setup for data home, browser port, update checks, and resolved
   Runtime/config provenance. Setup can edit either the selected AliceProject or
-  machine defaults inherited by projects;
+  machine defaults inherited by projects. Wide terminals present a Setup map
+  beside the selected field's Inspector; narrower terminals stack the same
+  complete regions. Editable fields stay in that model through a responsive
+  Setup Workbench: the active layer and Edit/Validate/Save route remain visible
+  beside the focused input, while invalid values block Save and keep the field
+  available for correction;
 - `m` on Overview is an advanced control that confirms, prepares, remembers, and starts an installer-managed source
   aligned to the installed CLI branch/version;
-- `c` is an advanced control that chooses and remembers the selected AliceProject's source checkout;
+- `c` opens the Source Launch Bay to choose, validate, remember, and then start
+  the selected AliceProject's source checkout;
 - `?` toggles Help; `[` and `]` expose the other top-level panels.
+
+Setup, Source, AliceProject, Release, and Remote Transfer use one secondary-task
+surface. At 100x28 and larger, a Focus Workspace replaces every Overview
+content row between the Mission Header and Control Console instead of allowing
+unrelated cards to show through a centered dialog. During focus, the ordinary
+navigation rail is replaced by a task-owned Focus Header: it names the task
+surface and existing workflow contract, exposes a real Esc Back action, and
+publishes no page targets. The Context Ribbon uses the same task identity. The
+task renderer, pointer targets, and mutation
+callbacks remain unchanged inside that stage. Smaller terminals retain the
+bounded centered sheet because their stacked responsive content takes priority
+over clearing the whole viewport, except Setup, Source, AliceProject, Release,
+and Remote Transfer: from 72x24 they use the complete header-to-console Focus
+Workspace so their content never overlaps the Focus Header or reveals unrelated
+Home or Launcher content behind the task. Compact Setup and AliceProject status
+become bounded two-line signals rather than third framed sheets, keeping each
+complete task within its 18-row canvas. Closing the
+task restores the prior top-level panel identity without changing Runtime or
+selection state.
+Remote Transfer additionally owns the usable viewport from 40x14. Below 48
+columns its eight-stage route becomes one borderless emergency step with the
+current stage, route, selected value, and Safety signal. Below 60x18 it replaces
+the ordinary Mission Header rows as well, preventing the previous Connections
+selection from showing through above the task. The task Action Shelf is the sole
+Enter/movement control; mirrored Choose/Continue rows are removed from the
+Flight Deck, while phase-specific Review, Cancel, Retry, and Arrival commands
+remain in their owning content.
+While a Focus Workspace owns the screen, ordinary Home, Launcher, and workbench
+Context Tips are not mounted in its reserved Console rows. The task's own
+Focus Header, content contract, Action Shelf, and Back route remain the only
+guidance until it closes.
+The Mission Header keeps version, channel, and update provenance as a read-only
+`◇ BUILD` signal while focused; the normal `[ u ]` Release Control and its
+pointer target return only after the task closes.
+The Control Console follows the same ownership rule: its Action Shelf uses the
+active task's Enter and movement vocabulary, while the Command Spine owns the
+single real Esc Back exit instead of duplicating it or leaking unavailable
+Overview or Fleet commands. Pointer activation on either Focus Console row is
+routed to the same overlay component that owns keyboard input.
+When the wide stage has enough surplus rows, a read-only Focus Trajectory docks
+directly above the task-owned Action Shelf. Surplus space stays between the
+primary work surface and this bottom task dock, so progress context and the next
+action read as one control region instead of two unrelated islands. At compact
+heights the trajectory is omitted before it can displace task content. It does
+not claim completion state, expose a hit target, or add another action path:
+Setup projects Inspect/Edit/Validate/Save, Source projects
+Select/Validate/Save/Launch, AliceProjects project Inspect/Select or
+Create/Remember, and Release projects Choose/Probe/Confirm/Install.
+Remote Transfer does not add a second trajectory: its existing eight-stage
+Flight Deck already supplies destination, identity, location, secrets,
+schedules, checksums, stream, and arrival context inside the same stage.
 
 The TUI refuses to stop or restart Electron, development, incompatible, or
 otherwise foreign owners. Its stop/restart confirmation states that active Web
@@ -255,6 +874,15 @@ read-only while the selected Runtime is active when the edited layer affects
 that Runtime. A machine default may still be changed while a higher project,
 environment, or flag layer shields the running AliceProject.
 
+Setup renders as a responsive Setup Studio rather than exposing the underlying
+settings widget directly. The map keeps all six fields and their EDIT/CYCLE/READ
+capability visible; the Inspector keeps the selected field's current resolved
+value, precedence or safety explanation, Runtime state, and complete Enter/Esc
+Action Shelf together. At wide sizes the regions are adjacent and pointer input
+is column-bounded, so clicking an Inspector action cannot select the row beside
+it. At the 80-column baseline they stack without changing keyboard order or the
+atomic configuration write path.
+
 Any selected-project value supplied by an environment variable or explicit
 CLI flag is shown with its resolved value and a locked provenance message; the
 TUI never writes a lower-priority project value that appears to override it.
@@ -284,6 +912,18 @@ sibling such as
 project or complete home came from `OPENALICE_PROJECT`,
 `OPENALICE_HOME`, `--project`, or `--home` shows the registry read-only
 instead of pretending that a lower-priority selection can win.
+
+The registry appears as an AliceProject Switchboard rather than the underlying
+selection widget. Its map identifies current, bare-start default, available,
+and create rows; the Inspector keeps the selected Home, automatic or fixed Web
+port, role, consequence, and complete Enter/Esc Action Shelf together. Up to
+eight rows remain visible beside the Inspector on wide terminals, while the
+80-column layout uses a five-row scrolling window so map, Inspector, status,
+and borders remain complete within 24 rows; shorter terminals reduce the map
+window further instead of clipping the Inspector or status. The proportional
+rail reflects overflow without owning selection. Pointer input is
+column-bounded and feeds the existing list callbacks, so an Inspector click
+cannot select the project beside it and no second persistence path exists.
 
 `OPENALICE_INSTANCE` and `--instance` remain deprecated aliases at the released
 automation boundary; they are not current product terminology.
@@ -475,8 +1115,48 @@ openalice logs --lines 200
 openalice logs --lines 200 --json
 ```
 
-Follow, pause, component filtering, and TUI log navigation belong to the later
-Logs/TUI increment and must reuse this bounded reader.
+The TUI projects that same bounded snapshot into a selectable Event stream and
+Event Lens.
+OpenAlice JSON log lines are rendered best-effort as severity, clock time,
+message, then compact context so the useful event survives terminal clipping;
+unrecognized and third-party lines remain plain text. The latest matching event
+starts focused. Up/Down, Page Up/Page Down, Home/End, the mouse wheel, pointer
+hover, and whole-row click share that focus model; the Lens follows it with the
+source line, semantic severity, JSON/text format, projected message, and
+sanitized raw content. Wide terminals split stream and Lens while 80-column and
+narrow terminals stack the same information. End returns to the `LATEST` edge
+and `l` reloads it. `f`, or its clickable footer keycap, cycles
+All, Attention (warning plus error), and Errors views locally over that loaded
+snapshot. Filtering retains the source line numbers and resets navigation to
+the latest matching entry. When an event is focused, `y` and the complete
+clickable `Copy event` shelf segment send its already redacted, terminal-safe
+raw projection through an explicit OSC 52 clipboard request. The request is
+capped at 24 KiB, never reads clipboard contents, and reports that it was sent
+rather than claiming the terminal accepted it; terminal policy may disable OSC
+52. Empty and filtered-empty lenses expose no Copy segment. Runtime events may
+still contain private product or trading context, so the action is always
+explicit. Unloaded, loaded-but-quiet, and filtered-empty snapshots share a
+compact Runtime Lens. Its `STANDBY`, `QUIET`, or `CLEAR` state names the exact
+condition alongside snapshot/lens and bounded/redacted context. The final
+whole-segment `l` or `f` action is pointer-capable and emits the same existing
+key as the footer; it performs no extra read and does not change the Logs
+command contract. This is navigation
+over a redacted snapshot, not an unbounded file follower. Follow, pause, and
+component filtering remain later work and must reuse this bounded reader.
+When the stream exceeds its responsive window, its final content column renders
+a proportional `│` track and `█` thumb that follows the same selected window.
+Hovering that Rail Navigator marks the exact track row with `◆` and previews
+the proportional event. Left press jumps to that real event and begins a
+rail-owned left-button drag; motion scrubs the bounded snapshot until release.
+It never reloads Logs or invokes the selected event as an action.
+At 100 columns and wider, a known terminal height turns Logs into an Operational
+Canvas: the compact ten-event baseline expands only as far as the loaded,
+filtered snapshot and available viewport permit. The Event stream, Lens height,
+scroll rail, and pointer rows consume that same final window. A zero-event lens
+has no evidence to expand, so it never inherits canvas height: its four-line
+panel stays next to the Observatory and leaves honest breathing room above the
+grounded action rails. Constrained and narrower terminals retain the same
+compact layout.
 
 ## Doctor
 
@@ -499,6 +1179,37 @@ Human output uses explicit PASS/WARN/FAIL rows. JSON uses the same versioned
 root envelope as lifecycle commands. A completed Doctor run exits `1` when it
 contains failures, `0` for healthy or warning-only results, and `2` for invalid
 syntax.
+
+The TUI presents that unchanged report as a selectable checklist plus an
+Inspector for the selected check. Initial focus goes to the first failure, then
+the first warning, then the first check. Up/Down wraps selection; Page Up/Page
+Down and the mouse wheel move within the list bounds; Home/End select the first
+or last check. Pointer hover highlights a complete row and click selects it.
+At 100 columns and wider the checklist and Inspector render side by side;
+narrower terminals stack the same complete regions. The Inspector separates the
+check summary, existing Doctor evidence, and conservative status guidance. It
+does not run a repair or invent a command. Its final Action Shelf keeps `d`
+visible as the explicit read-only rerun request for pass, warning, failure, and
+unknown checks.
+Before a report exists, the same page renders a responsive Diagnostic Radar
+instead of a loose instruction line. `DOCTOR STANDBY` names the unrun state and
+keeps read-only mode, inspection scope, and the zero-write guarantee visible.
+A completed report with no checks uses the distinct `NO CHECKS` state rather
+than claiming health. Both states expose a pointer-capable `d` action segment
+that emits the existing Doctor key; neither performs a repair or introduces a
+second diagnostic path.
+An overflowing checklist uses the same proportional `│`/`█` rail as Event Lens
+and Fleet. Hover marks a proportional check with `◆` and previews it; left
+press selects that real check and begins a rail-owned left-button drag until
+release. This Rail Navigator changes inspection selection only and never runs
+Doctor or performs a repair.
+At 100 columns and wider, a known terminal height applies the same Operational
+Canvas rule independently to Doctor: the ten-check baseline may expand to show
+more real checks, while the Inspector pads only to keep the two owning frames
+aligned and keeps Rerun on its own lower edge. `DOCTOR STANDBY` and `NO CHECKS`
+contain their surplus quiet region inside the Radar frame and keep the existing
+`d` action on its lower edge.
+No additional check, evidence, repair affordance, or write path is synthesized.
 
 ## Shell Completion
 
@@ -566,7 +1277,7 @@ following arguments are passed through to the same command surface:
 pnpm cli
 pnpm cli status --json
 pnpm cli doctor
-pnpm test:cli
+pnpm -F @traderalice/openalice-cli test
 ```
 
 This source entry does not install or copy a CLI payload. When `pnpm dev`
@@ -588,14 +1299,14 @@ action gating, and confirmed update install dispatch.
 For launcher ownership, takeover, or existing-owner browser handoff:
 
 ```bash
-pnpm test:guardian-recovery
+pnpm test:system:guardian
 pnpm electron:smoke:existing-owner
 ```
 
 For a distributed payload change:
 
 ```bash
-pnpm test:install:docker
+pnpm test:system:installer
 ```
 
 Manually use an isolated home and unused port to walk:

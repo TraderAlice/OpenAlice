@@ -1,13 +1,10 @@
-name: CI
+name: Full Source Validation
 
 on:
-  push:
-    branches: [master]
   pull_request:
-    branches: [dev, master]
-  # Keep a full cross-platform safety net for lightweight PRs that intentionally
-  # skip the focused host matrix. Scheduled workflows run from the default
-  # branch, while checkout below points the jobs at the current dev branch.
+    branches: [master]
+  # Scheduled workflows load from the default branch, then validate the latest
+  # dev source through the explicit checkout refs below.
   schedule:
     - cron: "0 19 * * *"
   workflow_dispatch:
@@ -15,21 +12,17 @@ on:
 permissions:
   contents: read
 
-# Agent-driven iterations often supersede an earlier commit before its Windows
-# job finishes. Keep only the latest PR run while never cancelling a master or
-# scheduled validation.
 concurrency:
-  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  group: full-source-validation-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Every PR keeps a small, deterministic contract/type gate. The beta
-  # classifier is loaded from the trusted base revision so a candidate cannot
-  # weaken its own release-preparation lane. Any classifier failure produces
-  # `false`, which fails beta preparation closed; routine integration still
-  # stays on its intentionally light branch lane.
-  change-scope:
-    if: github.event_name != 'push' || github.ref == 'refs/heads/master'
+  # This job is the bounded source gate for every full-validation event and the
+  # complete central gate for an exact beta version-only PR. The classifier is
+  # loaded from the trusted base revision so a candidate cannot weaken its own
+  # lane. Any classifier or source-gate failure falls back to the complete
+  # validation matrix instead of granting the beta fast path.
+  source-contracts:
     runs-on: ubuntu-latest
     outputs:
       beta_release_prep: ${{ steps.beta-release-prep.outcome == 'success' && steps.beta-release-prep.outputs.beta_release_prep || 'false' }}
@@ -50,12 +43,30 @@ jobs:
           git show "${BASE_SHA}:scripts/classify-beta-release-prep.mjs" > "$RUNNER_TEMP/classify-beta-release-prep.mjs"
           node "$RUNNER_TEMP/classify-beta-release-prep.mjs" --github-output "$GITHUB_OUTPUT"
 
-  build:
-    needs: change-scope
-    # Keep contracts and typecheck inside the stable aggregate gate for every
-    # PR. Exact beta preparation skips only the complete source build;
-    # classifier failures fall back to it.
-    if: ${{ !cancelled() }}
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Verify CI workflow contracts
+        run: pnpm test:contract:workflow
+
+      - name: Typecheck root workspace
+        run: npx tsc --noEmit
+        timeout-minutes: 5
+
+  workspace-build:
+    needs: source-contracts
+    if: >-
+      !cancelled() &&
+      (
+        needs.source-contracts.result != 'success' ||
+        needs.source-contracts.outputs.beta_release_prep != 'true'
+      )
     runs-on: ubuntu-latest
 
     steps:
@@ -72,32 +83,16 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Verify CI workflow contracts
-        run: pnpm test:workflow-contracts
-
-      - name: Typecheck root workspace
-        run: npx tsc --noEmit
-        timeout-minutes: 5
-
       - name: Build complete workspace
-        if: >-
-          needs.change-scope.result != 'success' ||
-          needs.change-scope.outputs.beta_release_prep != 'true'
         run: pnpm build
 
-  test:
-    needs: change-scope
-    # Local verification plus build/type/contracts are the routine dev gate.
-    # Keep the hermetic suite and serialized local Railway lifecycle suite for
-    # master, scheduled, and manually requested runs.
-    # A classifier/preflight failure falls back to the full suite only where
-    # full validation already belongs: master, scheduled, and manual lanes.
+  hermetic-and-railway-tests:
+    needs: source-contracts
     if: >-
       !cancelled() &&
-      (github.event_name != 'pull_request' || github.base_ref == 'master') &&
       (
-        needs.change-scope.result != 'success' ||
-        needs.change-scope.outputs.beta_release_prep != 'true'
+        needs.source-contracts.result != 'success' ||
+        needs.source-contracts.outputs.beta_release_prep != 'true'
       )
     runs-on: ubuntu-latest
 
@@ -119,61 +114,16 @@ jobs:
         run: pnpm test
 
       - name: Run local Railway lifecycle system suite
-        run: pnpm test:railway:local
+        run: pnpm test:system:railway
         timeout-minutes: 5
 
-  # Preserve the established check name for branch protection and external
-  # consumers while the two independent validations report failures earlier.
-  build-and-test:
-    if: always() && (github.event_name != 'push' || github.ref == 'refs/heads/master')
-    needs: [change-scope, build, test]
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Require successful build and test lanes
-        env:
-          PREFLIGHT_RESULT: ${{ needs.change-scope.result }}
-          BETA_RELEASE_PREP: ${{ needs.change-scope.outputs.beta_release_prep }}
-          BUILD_RESULT: ${{ needs.build.result }}
-          TEST_RESULT: ${{ needs.test.result }}
-          FULL_VALIDATION: ${{ github.event_name != 'pull_request' || github.base_ref == 'master' }}
-        run: |
-          echo "Preflight result: $PREFLIGHT_RESULT"
-          echo "Beta release preparation: $BETA_RELEASE_PREP"
-          echo "Build result: $BUILD_RESULT"
-          echo "Test result: $TEST_RESULT"
-
-          if [[ "$PREFLIGHT_RESULT" != "success" ]]; then
-            exit 1
-          fi
-
-          if [[ "$BETA_RELEASE_PREP" == "true" ]]; then
-            [[ "$BUILD_RESULT" == "success" ]] || exit 1
-            [[ "$TEST_RESULT" == "skipped" ]] || exit 1
-            exit 0
-          fi
-
-          if [[ "$BUILD_RESULT" != "success" ]]; then
-            exit 1
-          fi
-
-          if [[ "$FULL_VALIDATION" == "true" ]]; then
-            [[ "$TEST_RESULT" == "success" ]] || exit 1
-          else
-            [[ "$TEST_RESULT" == "skipped" ]] || exit 1
-          fi
-
-  # Cross-platform hosted runners are a master/scheduled/manual safety net.
-  # Routine dev PRs rely on local multi-platform acceptance plus the focused
-  # contracts, typecheck, and complete Ubuntu build above.
   cross-platform-test:
-    needs: change-scope
+    needs: source-contracts
     if: >-
       !cancelled() &&
-      (github.event_name != 'pull_request' || github.base_ref == 'master') &&
       (
-        needs.change-scope.result != 'success' ||
-        needs.change-scope.outputs.beta_release_prep != 'true'
+        needs.source-contracts.result != 'success' ||
+        needs.source-contracts.outputs.beta_release_prep != 'true'
       )
     timeout-minutes: 30
     strategy:
@@ -196,28 +146,23 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Build complete workspace for stable and scheduled validation
+      - name: Build complete workspace
         run: pnpm build
         timeout-minutes: 15
 
-      - name: Run complete suite for stable and scheduled validation
+      - name: Run complete suite
         run: pnpm test
         timeout-minutes: 15
 
-  # Boots the real `pnpm dev` stack and asserts UTA/Alice/Vite all spawn.
-  # Exists to catch cross-platform spawn regressions (e.g. `spawn tsx ENOENT`
-  # on Windows) that `pnpm test` can't see — esbuild transpiles, it never
-  # spawns the children. Runs on Windows (the at-risk OS) plus Ubuntu as a
-  # control: if Windows goes red while Ubuntu stays green, it's a real platform
-  # diff, not a harness bug. See scripts/guardian/smoke.ts.
+  # Boots the real `pnpm dev` stack on Windows and an Ubuntu control host. This
+  # owns native process-spawn feedback that transpiled tests cannot provide.
   dev-smoke:
-    needs: change-scope
+    needs: source-contracts
     if: >-
       !cancelled() &&
-      (github.event_name != 'pull_request' || github.base_ref == 'master') &&
       (
-        needs.change-scope.result != 'success' ||
-        needs.change-scope.outputs.beta_release_prep != 'true'
+        needs.source-contracts.result != 'success' ||
+        needs.source-contracts.outputs.beta_release_prep != 'true'
       )
     strategy:
       fail-fast: false
@@ -237,15 +182,13 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      # Skip the Electron desktop shell — the smoke only needs UTA/Alice/UI,
-      # and this avoids a large electron download on the Windows runner.
+      # The native smoke needs UTA, Alice, and UI, not the Electron download.
       - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
 
-      # Exercises duplicate-start rejection, graceful takeover, crash-stale
-      # reclamation, heartbeat renewal, and forced recovery with real child
-      # processes before the heavier full-stack boot smoke.
-      - run: pnpm test:guardian-recovery
+      - name: Exercise Guardian recovery with real child processes
+        run: pnpm test:system:guardian
         timeout-minutes: 3
 
-      - run: pnpm test:smoke
+      - name: Boot the complete development stack
+        run: pnpm test:system:dev-stack
         timeout-minutes: 8

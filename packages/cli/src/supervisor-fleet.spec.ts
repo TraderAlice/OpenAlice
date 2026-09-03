@@ -7,8 +7,12 @@ import {
   moveFleetSelection,
   renderSupervisorFleet,
   replaceFleetInventory,
+  selectFleetIndex,
   selectedFleetProject,
   setFleetFocus,
+  supervisorFleetLaunchIntent,
+  supervisorFleetRailTargetAt,
+  supervisorFleetTargetAt,
 } from './supervisor-fleet.ts'
 
 describe('Supervisor fleet state and presentation', () => {
@@ -29,21 +33,448 @@ describe('Supervisor fleet state and presentation', () => {
   it('renders a wide two-pane hierarchy within terminal width', () => {
     const lines = renderSupervisorFleet(
       createSupervisorFleetState('2026-08-23T00:00:00Z', machines()),
-      80,
+      100,
     )
     expect(lines.join('\n')).toContain('Machines')
     expect(lines.join('\n')).toContain('AliceProjects · This Mac')
     expect(lines.join('\n')).toContain('Default AliceProject')
-    expect(lines.every((line) => displayWidth(line) <= 80)).toBe(true)
+    expect(lines.every((line) => displayWidth(line) <= 100)).toBe(true)
+  })
+
+  it('keeps Launcher geometry stable across Machines with uneven project counts', () => {
+    const inventory = [
+      machine('local', 'This computer', 'local', Array.from(
+        { length: 6 },
+        (_, index) => project(`local-${index}`, `Local ${index + 1}`),
+      )),
+      machine('railway', 'Railway Beta', 'online', [
+        project('remote-default', 'Default AliceProject'),
+        project('remote-main', 'Main Cloud'),
+      ]),
+    ]
+    let state = createSupervisorFleetState('2026-09-03T00:00:00Z', inventory)
+    const local = renderSupervisorFleet(state, 160, undefined, false, 12, undefined, true)
+    state = moveFleetSelection(state, 1)
+    const remote = renderSupervisorFleet(state, 160, undefined, false, 12, undefined, true)
+
+    expect(remote.findIndex((line) => line.includes('Launch Briefing')))
+      .toBe(local.findIndex((line) => line.includes('Launch Briefing')))
+    expect(remote).toHaveLength(local.length)
+  })
+
+  it('keeps the focused Machine row aligned with its pane border', () => {
+    const state = createSupervisorFleetState('2026-09-03T00:00:00Z', machines())
+    const line = renderSupervisorFleet(state, 120, undefined, false, 5, undefined, true)
+      .find((candidate) => candidate.includes('▶ This Mac'))
+
+    expect(line).toBeDefined()
+    expect(displayWidth(line!)).toBe(120)
+    const [machinePane] = line!.split(/(?<=│) {3}(?=│)/u)
+    expect(displayWidth(machinePane!)).toBe(36)
+  })
+
+  it('turns one active 80-column target into a direct route board', () => {
+    const state = setFleetFocus(
+      createSupervisorFleetState('2026-08-23T00:00:00Z', [machines()[0]!]),
+      'projects',
+    )
+    const output = renderSupervisorFleet(
+      state,
+      80,
+      undefined,
+      false,
+      5,
+      undefined,
+      false,
+      { machineKey: 'local', projectKey: 'default', transport: 'loopback' },
+    ).join('\n')
+
+    expect(output).toContain('Active Route · LIVE · LOCAL')
+    expect(output).toContain('● running Default AliceProject · TraderAlice')
+    expect(output).toContain('⌁ This Mac → Default AliceProject')
+    expect(output).toContain('● Runtime live · ● Web ready · ● Alice ready')
+    expect(output).toContain('[ Enter ] Return Home')
+    expect(output).toContain('[ m ] Transfer AliceProject')
+    expect(output).not.toContain('Machines · 1/1')
+    expect(output).not.toContain('AliceProjects · This Mac · 1/1')
+    expect(supervisorFleetTargetAt(state, 80, 20, 2, 5, false, true)).toBeUndefined()
+    expect(supervisorFleetRailTargetAt(state, 80, 78, 2, 5, false, true)).toBeUndefined()
+  })
+
+  it('marks the active target independently from Connections focus', () => {
+    let state = createSupervisorFleetState('2026-08-23T00:00:00Z', machines())
+    state = selectFleetIndex(state, 'machines', 1)
+    state = setFleetFocus(state, 'projects')
+    const output = renderSupervisorFleet(
+      state,
+      100,
+      undefined,
+      false,
+      5,
+      undefined,
+      false,
+      { machineKey: 'cloud', projectKey: 'research', transport: 'ssh-forward' },
+    ).join('\n')
+
+    expect(output).toMatch(/Research\s+ACTIVE · default · ● running/u)
+    expect(output).toContain('● ACTIVE TARGET · ● running Research')
+    expect(output).toContain('Active Connection')
+    expect(output).toContain('[ Enter ] Return Home')
+    expect(output).not.toContain('[ Enter ] Use AliceProject')
+  })
+
+  it('frames a different connected target as a switch before activation', () => {
+    let state = createSupervisorFleetState('2026-08-23T00:00:00Z', machines())
+    state = selectFleetIndex(state, 'machines', 1)
+    state = setFleetFocus(state, 'projects')
+    const output = renderSupervisorFleet(
+      state,
+      80,
+      undefined,
+      false,
+      5,
+      undefined,
+      false,
+      { machineKey: 'local', projectKey: 'default', transport: 'loopback' },
+    ).join('\n')
+
+    expect(output).toContain('Switch Target')
+    expect(output).toContain('◇ SWITCH CANDIDATE')
+    expect(output).toContain('[ Enter ] Connect & Switch')
+    expect(output).not.toContain('[ Enter ] Return Home')
+  })
+
+  it('distinguishes active focus from the related inactive selection', () => {
+    let state = createSupervisorFleetState('2026-08-23T00:00:00Z', machines())
+    const machinesFocused = renderSupervisorFleet(state, 100).join('\n')
+    expect(machinesFocused).toContain('╭ ◆ Machines · 1/2')
+    expect(machinesFocused).toContain('╭ ◇ AliceProjects · This Mac · 1/1')
+    expect(machinesFocused).toContain('│ ▶ This Mac')
+    expect(machinesFocused).toContain('│ ◁ Default AliceProject')
+    expect(machinesFocused).toContain('╭ Selection ')
+
+    state = setFleetFocus(state, 'projects')
+    const projectsFocused = renderSupervisorFleet(state, 100).join('\n')
+    expect(projectsFocused).toContain('╭ ◇ Machines · 1/2')
+    expect(projectsFocused).toContain('╭ ◆ AliceProjects · This Mac · 1/1')
+    expect(projectsFocused).toContain('│ ◁ This Mac')
+    expect(projectsFocused).toContain('│ ▶ Default AliceProject')
+    expect(projectsFocused).not.toContain('◇ Selection')
   })
 
   it('uses a narrow drill-down and handles wide Unicode labels', () => {
     let state = createSupervisorFleetState('2026-08-23T00:00:00Z', machines())
-    expect(renderSupervisorFleet(state, 40).join('\n')).toContain('Enter / →  AliceProjects')
+    expect(renderSupervisorFleet(state, 40).join('\n')).toContain('◆ Machines · 1/2')
+    expect(renderSupervisorFleet(state, 40).join('\n')).toContain('▶ This Mac')
     state = setFleetFocus(state, 'projects')
     const lines = renderSupervisorFleet(state, 40)
-    expect(lines.join('\n')).toContain('← / Esc  Machines')
+    expect(lines.join('\n')).toContain('◆ AliceProjects · This Mac')
+    expect(lines.join('\n')).toContain('▶ Default Alice')
     expect(lines.every((line) => displayWidth(line) <= 40)).toBe(true)
+  })
+
+  it('shows independent scroll rails for overflowing Machine and AliceProject panes', () => {
+    const inventory = Array.from({ length: 7 }, (_, index) => machine(
+      `machine-${index}`,
+      `Machine ${index + 1}`,
+      index === 0 ? 'local' : 'online',
+      Array.from({ length: 8 }, (_, projectIndex) => project(
+        `project-${projectIndex}`,
+        `Project ${projectIndex + 1}`,
+      )),
+    ))
+    let state = createSupervisorFleetState('2026-08-23T00:00:00Z', inventory)
+    const top = renderSupervisorFleet(state, 100).join('\n')
+    expect(top).toContain('█')
+    expect(top).toContain('│')
+    expect(supervisorFleetRailTargetAt(state, 100, 34, 2)).toEqual({
+      focus: 'machines', index: 0, trackRow: 0,
+    })
+    expect(supervisorFleetRailTargetAt(state, 100, 98, 6)).toEqual({
+      focus: 'projects', index: 7, trackRow: 4,
+    })
+    expect(supervisorFleetRailTargetAt(state, 100, 50, 6)).toBeUndefined()
+    const hoveredRail = renderSupervisorFleet(
+      state,
+      100,
+      undefined,
+      false,
+      5,
+      { focus: 'projects', index: 4, trackRow: 2 },
+    ).join('\n')
+    expect(hoveredRail).toContain('◆')
+
+    state = selectFleetIndex(state, 'machines', 6)
+    state = setFleetFocus(state, 'projects')
+    state = selectFleetIndex(state, 'projects', 7)
+    const bottom = renderSupervisorFleet(state, 100).join('\n')
+    expect(bottom).toContain('Machine 7')
+    expect(bottom).toContain('Project 8')
+    expect(bottom).toContain('█')
+    expect(bottom).toContain('│')
+  })
+
+  it('spends a larger viewport window on real Fleet inventory before scrolling', () => {
+    const inventory = Array.from({ length: 7 }, (_, index) => machine(
+      `machine-${index}`,
+      `Machine ${index + 1}`,
+      index === 0 ? 'local' : 'online',
+      Array.from({ length: 8 }, (_, projectIndex) => project(
+        `project-${projectIndex}`,
+        `Project ${projectIndex + 1}`,
+      )),
+    ))
+    const state = createSupervisorFleetState('2026-08-23T00:00:00Z', inventory)
+    const expanded = renderSupervisorFleet(state, 100, undefined, false, 8)
+
+    expect(expanded).toHaveLength(15)
+    expect(expanded.join('\n')).toContain('Machine 7')
+    expect(expanded.join('\n')).toContain('Project 8')
+    expect(expanded.join('\n')).not.toContain('█')
+    expect(supervisorFleetTargetAt(state, 100, 50, 9, 8)).toEqual({
+      focus: 'projects',
+      index: 7,
+    })
+    expect(supervisorFleetTargetAt(state, 100, 50, 10, 8)).toBeUndefined()
+
+    const narrow = renderSupervisorFleet(state, 46, undefined, false, 8)
+    expect(narrow).toHaveLength(12)
+    expect(narrow.join('\n')).not.toContain('Machine 7')
+    expect(supervisorFleetTargetAt(state, 46, 8, 7, 8)).toBeUndefined()
+
+    const emergency = renderSupervisorFleet(state, 46, undefined, false, 4)
+    expect(emergency).toHaveLength(11)
+    expect(emergency.join('\n')).toContain('Machines · 1/7')
+    expect(supervisorFleetTargetAt(state, 46, 8, 5, 4)).toEqual({
+      focus: 'machines',
+      index: 3,
+    })
+    expect(supervisorFleetTargetAt(state, 46, 8, 6, 4)).toBeUndefined()
+  })
+
+  it('turns sparse wide surplus into a passive Selection Constellation', () => {
+    const state = createSupervisorFleetState(
+      '2026-08-23T00:00:00Z',
+      [machines()[0]!],
+      'default',
+    )
+    const expanded = renderSupervisorFleet(state, 120, undefined, false, 15)
+    const output = expanded.join('\n')
+
+    expect(expanded).toHaveLength(22)
+    expect(output).toContain('Selection Constellation · AliceProject')
+    expect(output).toContain('◇ CONTROL ROUTE')
+    expect(output).toContain('● This Mac')
+    expect(output).toContain('● running Default AliceProject')
+    expect(output).toContain('↗ WEB  http://127.0.0.1:47331')
+    expect(output).toContain('PRODUCT  TraderAlice')
+    expect(output).toContain('PORT  47331 · AUTO')
+    expect(output).toContain('OWNER    cli-server')
+    expect(output).toContain('UPTIME  12s')
+    expect(output).toContain('SERVICES Alice ready')
+    expect(output).toContain('CAPS     inspect · lifecycle · tunnel')
+    expect(expanded.every((line) => displayWidth(line) <= 120)).toBe(true)
+    expect(supervisorFleetTargetAt(state, 120, 40, 14, 15)).toBeUndefined()
+
+    expect(renderSupervisorFleet(state, 120, undefined, false, 11).join('\n'))
+      .not.toContain('Selection Constellation')
+    expect(renderSupervisorFleet(state, 120, undefined, false, 12).join('\n'))
+      .toContain('Selection Constellation')
+    expect(renderSupervisorFleet(state, 100, undefined, false, 12).join('\n'))
+      .toContain('Selection Constellation')
+    expect(renderSupervisorFleet(state, 99, undefined, false, 15).join('\n'))
+      .not.toContain('Selection Constellation')
+  })
+
+  it('turns one disconnected target into a direct Launchpad', () => {
+    const stoppedLocal = {
+      ...machines()[0]!,
+      projects: machines()[0]!.projects.map((entry) => ({
+        ...entry,
+        runtime: {
+          ...entry.runtime,
+          class: 'absent' as const,
+          state: 'absent',
+          ownerSurface: null,
+          webEndpoint: null,
+        },
+      })),
+    }
+    const state = setFleetFocus(
+      createSupervisorFleetState('2026-08-23T00:00:00Z', [stoppedLocal], 'default'),
+      'projects',
+    )
+    const intent = supervisorFleetLaunchIntent(state)
+    const launcher = renderSupervisorFleet(
+      state,
+      120,
+      undefined,
+      false,
+      15,
+      undefined,
+      true,
+    )
+    const output = launcher.join('\n')
+
+    expect(intent).toMatchObject({
+      state: 'ready',
+      headline: 'READY TO START',
+      action: { key: 'Enter', label: 'Start OpenAlice' },
+    })
+    expect(output).toContain('OPENALICE LAUNCH · READY → START → CONNECT')
+    expect(output).toContain('Launchpad · Default AliceProject')
+    expect(output).toContain('◆ READY TO LAUNCH · READY TO START')
+    expect(output).toContain('This Mac → Default AliceProject')
+    expect(output).toContain('Start OpenAlice locally, verify readiness, and stay inside this terminal.')
+    expect(output).toContain('1 Start Runtime')
+    expect(output).toContain('2 Verify Web endpoint')
+    expect(output).toContain('3 Enter connected Home')
+    expect(output).toContain('◆ [ Enter ] Start OpenAlice')
+    expect(output).not.toContain('Selection Constellation')
+    expect(output).not.toContain('OWNER    ')
+    expect(output).not.toContain('PORT  ')
+    expect(output).not.toContain('Machines · 1/1')
+    expect(output).not.toContain('AliceProjects · This Mac · 1/1')
+    expect(launcher).toHaveLength(15)
+    expect(launcher.at(-2)).toContain('◆ [ Enter ] Start OpenAlice')
+    expect(launcher.every((line) => displayWidth(line) <= 120)).toBe(true)
+    expect(supervisorFleetTargetAt(state, 120, 10, 2, 15, true)).toBeUndefined()
+    expect(supervisorFleetRailTargetAt(state, 120, 118, 2, 15, true)).toBeUndefined()
+
+    const compactLauncher = renderSupervisorFleet(
+      state,
+      80,
+      undefined,
+      false,
+      5,
+      undefined,
+      true,
+    ).join('\n')
+    expect(compactLauncher).toContain('1 ✓ This Mac')
+    expect(compactLauncher).toContain('2 ✓ Default AliceProject')
+    expect(compactLauncher).toContain('3 ○ READY TO START')
+    expect(compactLauncher).toContain('NEXT  stay here through readiness')
+    expect(compactLauncher).toContain('◆ [ Enter ] Start OpenAlice')
+    expect(compactLauncher).not.toContain('Start Runtime → Verify Web endpoint')
+
+    const connectedManager = renderSupervisorFleet(state, 120, undefined, false, 15)
+      .join('\n')
+    expect(connectedManager).toContain('Selection Constellation · AliceProject')
+    expect(connectedManager).toContain('OWNER    none')
+  })
+
+  it('shares blocked launch intent with the refresh primary action', () => {
+    const remote = {
+      ...machines()[1]!,
+      capabilities: { ...machines()[1]!.capabilities, openTunnel: false },
+    }
+    const state = setFleetFocus(
+      createSupervisorFleetState('2026-08-23T00:00:00Z', [remote]),
+      'projects',
+    )
+    const intent = supervisorFleetLaunchIntent(state)
+    const compact = renderSupervisorFleet(
+      state,
+      80,
+      undefined,
+      false,
+      5,
+      undefined,
+      true,
+    ).join('\n')
+
+    expect(intent).toMatchObject({
+      state: 'blocked',
+      headline: 'SSH FORWARD UNAVAILABLE',
+      action: { key: 'r', label: 'Refresh' },
+    })
+    expect(compact).toContain('× LAUNCH BLOCKED · SSH FORWARD UNAVAILABLE')
+    expect(compact).toContain('◆ [ r ] Refresh')
+  })
+
+  it('names compact local-use and remote-connect consequences explicitly', () => {
+    const local = setFleetFocus(
+      createSupervisorFleetState('2026-08-23T00:00:00Z', [machines()[0]!]),
+      'projects',
+    )
+    const localOutput = renderSupervisorFleet(
+      local, 80, undefined, false, 5, undefined, true,
+    ).join('\n')
+    expect(localOutput).toContain('3 ● READY TO USE')
+    expect(localOutput).toContain('NEXT  enter connected Home')
+    expect(localOutput).toContain('◆ [ Enter ] Use AliceProject')
+
+    let remote = createSupervisorFleetState('2026-08-23T00:00:00Z', machines())
+    remote = selectFleetIndex(remote, 'machines', 1)
+    remote = setFleetFocus(remote, 'projects')
+    const remoteOutput = renderSupervisorFleet(
+      remote, 80, undefined, false, 5, undefined, true,
+    ).join('\n')
+    expect(remoteOutput).toContain('3 ● READY TO CONNECT')
+    expect(remoteOutput).toContain('◆ [ Enter ] Connect · open its SSH forward into Home')
+  })
+
+  it('maps pointer rows to visible Machine and AliceProject selections', () => {
+    let state = createSupervisorFleetState('2026-08-23T00:00:00Z', machines())
+    expect(supervisorFleetTargetAt(state, 80, 4, 3)).toEqual({
+      focus: 'machines',
+      index: 1,
+    })
+    state = selectFleetIndex(state, 'machines', 1)
+    expect(supervisorFleetTargetAt(state, 80, 40, 2)).toEqual({
+      focus: 'machines',
+      index: 0,
+    })
+    expect(supervisorFleetTargetAt(state, 80, 40, 2, 5, true)).toEqual({
+      focus: 'projects',
+      index: 0,
+    })
+    state = setFleetFocus(state, 'projects')
+    expect(supervisorFleetTargetAt(state, 40, 8, 3)).toEqual({
+      focus: 'projects',
+      index: 1,
+    })
+  })
+
+  it('maps pane headers and unused body space to focus-only surfaces', () => {
+    let state = createSupervisorFleetState('2026-08-23T00:00:00Z', machines())
+    expect(supervisorFleetTargetAt(state, 100, 4, 1)).toEqual({
+      focus: 'machines',
+      index: 0,
+      surface: 'pane',
+    })
+    expect(supervisorFleetTargetAt(state, 100, 50, 1)).toEqual({
+      focus: 'projects',
+      index: 0,
+      surface: 'pane',
+    })
+    expect(supervisorFleetTargetAt(state, 100, 38, 1)).toBeUndefined()
+    expect(supervisorFleetTargetAt(state, 100, 4, 6)).toEqual({
+      focus: 'machines',
+      index: 0,
+      surface: 'pane',
+    })
+
+    state = setFleetFocus(state, 'projects')
+    expect(supervisorFleetTargetAt(state, 40, 8, 1)).toEqual({
+      focus: 'projects',
+      index: 0,
+      surface: 'pane',
+    })
+    expect(supervisorFleetTargetAt(state, 40, 8, 6)).toEqual({
+      focus: 'projects',
+      index: 0,
+      surface: 'pane',
+    })
+
+    const hovered = renderSupervisorFleet(
+      createSupervisorFleetState('2026-08-23T00:00:00Z', machines()),
+      100,
+      { focus: 'projects', index: 0, surface: 'pane' },
+    ).join('\n')
+    expect(hovered).toContain('╭ ◆ Machines')
+    expect(hovered).toContain('╭ » AliceProjects')
+    expect(hovered).not.toContain('» Default AliceProject')
   })
 
   it('keeps unauthorized and incompatible Machines as truthful rows', () => {
@@ -66,6 +497,27 @@ describe('Supervisor fleet state and presentation', () => {
     ).join('\n')
     expect(output).toContain('unauthorized')
     expect(output).toContain('incompatible')
+  })
+
+  it('keeps an active Runtime visible when its AliceProject home is missing', () => {
+    const missingHome = {
+      ...machines()[0]!,
+      projects: [{
+        ...machines()[0]!.projects[0]!,
+        available: false,
+      }],
+    }
+    const output = renderSupervisorFleet(
+      createSupervisorFleetState('2026-08-23T00:00:00Z', [missingHome], 'default'),
+      120,
+      undefined,
+      false,
+      15,
+    ).join('\n')
+
+    expect(output).toContain('◆ running · home missing')
+    expect(output).toContain('↗ WEB  http://127.0.0.1:47331')
+    expect(output).not.toContain('◇ missing')
   })
 })
 

@@ -36,7 +36,6 @@ function activitySectionFor(page: Page): ActivitySection {
     case 'workspaces':           return 'workspaces'
     case 'connectors':           return 'connectors'
     case 'settings':             return 'settings'
-    case 'dev':                  return 'dev'
     case 'market':               return 'market'
     case 'portfolio':            return 'portfolio'
     case 'issue':                return 'issue'

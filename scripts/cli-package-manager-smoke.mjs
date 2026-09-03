@@ -20,6 +20,13 @@ import {
   syntheticPreviousVersion,
 } from './cli-release-fixture.mjs'
 
+const packageManagerUsage = 'Usage: node scripts/cli-package-manager-smoke.mjs --manager <npm|bun> --packages-dir <dir> --expected-version <version> --expected-content-identity <id> [--npm <path>] [--bun <path>] [--keep]'
+if (process.argv.includes('--help')) {
+  process.stdout.write(`${packageManagerUsage}\n`)
+  process.stdout.write('Artifact acceptance only: generate the CLI package candidates before running this command.\n')
+  process.exit(0)
+}
+
 const options = parseArgs(process.argv.slice(2))
 const root = mkdtempSync(join(tmpdir(), `openalice-${options.manager}-package-smoke-`))
 const sourcePackages = resolve(options.packagesDir)
@@ -315,7 +322,7 @@ function parseArgs(argv) {
   }
   if (!['npm', 'bun'].includes(result.manager)) fail('--manager must be npm or bun')
   if (!result.packagesdir || !result.expectedversion || !/^[a-f0-9]{16}$/.test(result.expectedcontentidentity ?? '')) {
-    fail('Usage: cli-package-manager-smoke.mjs --manager <npm|bun> --packages-dir <dir> --expected-version <version> --expected-content-identity <id> [--npm <path>] [--bun <path>] [--keep]')
+    fail(packageManagerUsage)
   }
   return {
     manager: result.manager,

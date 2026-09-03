@@ -8,6 +8,7 @@ DOWNLOAD_BASE_URL="${OPENALICE_DOWNLOAD_BASE_URL:-https://download.openalice.ai}
 RELEASE_ASSET_BASE_URL="${OPENALICE_RELEASE_ASSET_BASE_URL:-https://github.com/${REPOSITORY}/releases/download}"
 STABLE_MANIFEST_URL="${OPENALICE_STABLE_MANIFEST_URL:-${DOWNLOAD_BASE_URL}/manifest.json}"
 BETA_MANIFEST_URL="${OPENALICE_BETA_MANIFEST_URL:-${DOWNLOAD_BASE_URL}/beta/manifest.json}"
+DEV_MANIFEST_URL="${OPENALICE_DEV_MANIFEST_URL:-${DOWNLOAD_BASE_URL}/cli/dev/manifest.json}"
 LEGACY_STABLE_VERSION="0.90.1"
 LEGACY_STABLE_INSTALLER_URL="${OPENALICE_LEGACY_STABLE_INSTALLER_URL:-${RELEASE_ASSET_BASE_URL}/v${LEGACY_STABLE_VERSION}/OpenAlice-${LEGACY_STABLE_VERSION}-install}"
 LEGACY_STABLE_INSTALLER_SHA256="${OPENALICE_LEGACY_STABLE_INSTALLER_SHA256:-a2f34a715cc4a089854fde18741e316953868c1685db592b67b2b4ea10ede0bb}"
@@ -290,7 +291,27 @@ else
     fi
     artifact_url="${RELEASE_ASSET_BASE_URL}/v${release_version}/openalice-cli-${release_version}-${platform}-${architecture}.tar.gz"
   else
-    artifact_url="${DOWNLOAD_BASE_URL}/cli/dev/openalice-cli-dev-${platform}-${architecture}.tar.gz"
+    dev_json="$(curl -fsSL --max-time 15 "$DEV_MANIFEST_URL")" \
+      || fail "Could not resolve the latest OpenAlice dev build"
+    dev_channel="$(printf '%s' "$dev_json" | sed -n 's/.*"channel"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)"
+    dev_repository="$(printf '%s' "$dev_json" | sed -n 's/.*"repository"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)"
+    release_version="$(printf '%s' "$dev_json" | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)"
+    dev_commit="$(printf '%s' "$dev_json" | sed -n 's/.*"commit"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)"
+    [[ "$dev_channel" == dev ]] \
+      || fail "Dev manifest did not identify the dev channel"
+    [[ "$dev_repository" == "$REPOSITORY" ]] \
+      || fail "Dev manifest did not identify the OpenAlice repository"
+    [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]] \
+      || fail "Dev manifest did not contain a valid OpenAlice version"
+    [[ "$dev_commit" =~ ^[a-f0-9]{7,64}$ ]] \
+      || fail "Dev manifest did not contain a valid commit identity"
+    if [[ -n "${OPENALICE_EXPECTED_DEV_COMMIT:-}" ]]; then
+      [[ "$OPENALICE_EXPECTED_DEV_COMMIT" =~ ^[a-f0-9]{7,64}$ ]] \
+        || fail "OPENALICE_EXPECTED_DEV_COMMIT must be a lowercase hexadecimal commit identity"
+      [[ "$dev_commit" == "$OPENALICE_EXPECTED_DEV_COMMIT" ]] \
+        || fail "Dev manifest commit $dev_commit does not match expected $OPENALICE_EXPECTED_DEV_COMMIT"
+    fi
+    artifact_url="${DOWNLOAD_BASE_URL}/cli/dev/releases/${dev_commit}/openalice-cli-${release_version}-${platform}-${architecture}.tar.gz"
   fi
   checksum_url="${artifact_url}.sha256"
   checksum_text="$(curl -fsSL --max-time 15 "$checksum_url")" \

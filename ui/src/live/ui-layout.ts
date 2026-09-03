@@ -14,7 +14,6 @@ export const ACTIVITY_PAGE_IDS = [
   'issue',
   'connectors',
   'settings',
-  'dev',
 ] as const satisfies readonly Page[]
 
 export type ActivityPageId = (typeof ACTIVITY_PAGE_IDS)[number]
@@ -47,9 +46,9 @@ export function defaultUiLayout(): UiLayout {
     groups: [
       { id: 'primary', items: ['chat', 'inbox', 'issue', 'auto-quant', 'tracked', 'market'] },
       { id: 'beta', items: ['prediction', 'office', 'portfolio', 'connectors'] },
-      { id: 'system', items: ['workspaces', 'automation', 'settings', 'dev'] },
+      { id: 'system', items: ['workspaces', 'automation', 'settings'] },
     ],
-    hidden: ['dev'],
+    hidden: [],
   }
 }
 

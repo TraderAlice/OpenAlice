@@ -4,7 +4,7 @@
  * Tests: stage → commit → push → sync → reject → log
  * Crypto markets are 24/7, so this test is always runnable.
  *
- * Run: OPENALICE_UTA_LIVE_PAPER=1 pnpm test:uta:live-paper
+ * Run: OPENALICE_UTA_LIVE_PAPER=1 pnpm test:live:bybit-paper
  */
 
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'

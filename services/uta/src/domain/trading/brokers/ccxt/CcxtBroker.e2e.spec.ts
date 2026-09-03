@@ -3,7 +3,7 @@
  * key). Proves the whole keyless path: construct → init() WITHOUT credentials
  * (must not throw) → getHistorical → real OHLCV. Gated; does NOT mock ccxt.
  *
- *   Run:  CCXT_E2E=1 pnpm exec vitest run --config vitest.e2e.config.ts \
+ *   Run:  pnpm exec vitest run --config vitest.external.config.ts \
  *           services/uta/src/domain/trading/brokers/ccxt/CcxtBroker.e2e.spec.ts
  */
 import { describe, it, expect } from 'vitest'

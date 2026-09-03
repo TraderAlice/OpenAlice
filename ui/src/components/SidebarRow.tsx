@@ -24,6 +24,10 @@ interface SidebarRowProps {
   title?: string
   /** Optional disabled / dimmed presentation, e.g. for off-by-default rows. */
   dim?: boolean
+  /** Disclosure state when the row controls a collapsible child group. */
+  ariaExpanded?: boolean
+  /** Id of the collapsible child group controlled by this row. */
+  ariaControls?: string
 }
 
 /**
@@ -39,12 +43,24 @@ interface SidebarRowProps {
  * buttons within valid HTML.
  * Enter / Space activate the row for keyboard users.
  */
-export function SidebarRow({ label, active = false, onClick, icon, trail, title, dim = false }: SidebarRowProps) {
+export function SidebarRow({
+  label,
+  active = false,
+  onClick,
+  icon,
+  trail,
+  title,
+  dim = false,
+  ariaExpanded,
+  ariaControls,
+}: SidebarRowProps) {
   const row = (
     <div
       role="button"
       tabIndex={0}
       aria-current={active ? 'page' : undefined}
+      aria-expanded={ariaExpanded}
+      aria-controls={ariaControls}
       onClick={onClick}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {

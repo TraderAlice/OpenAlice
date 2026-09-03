@@ -20,7 +20,6 @@ export const zh: Resources = {
       issue: '议题',
       automation: '自动化',
       settings: '设置',
-      dev: '开发面板',
     },
     section: {
       beta: '测试版',
@@ -353,6 +352,7 @@ export const zh: Resources = {
       agents: '智能体',
       operations: '运行',
       connections: '连接',
+      developer: '开发者',
     },
     language: {
       title: '语言',
@@ -534,7 +534,7 @@ export const zh: Resources = {
       deleteGroup: '删除分组',
       renameGroup: '分组名称',
       reset: '恢复默认',
-      resetConfirm: '恢复默认分组并隐藏开发面板？',
+      resetConfirm: '恢复默认侧栏分组？',
       path: '保存在 data/ui-layout.json',
       show: '显示{{label}}',
       hide: '隐藏{{label}}',
