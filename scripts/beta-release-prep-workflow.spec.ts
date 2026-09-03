@@ -63,7 +63,7 @@ describe('exact beta release-preparation workflow lane', () => {
       .toBe('npx tsc --noEmit')
     for (const name of [
       'workspace-build',
-      'hermetic-and-railway-tests',
+      'hermetic-tests',
       'cross-platform-test',
       'dev-smoke',
     ]) {

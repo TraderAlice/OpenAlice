@@ -745,18 +745,19 @@ async function driveTransferTui(env, options) {
     child.onData((data) => {
       output += data
       const visible = stripAnsi(output)
-      if (stage === 0 && visible.includes('m Transfer') && /Smoke Cloud\s+\d+/u.test(visible)) { stage = 1; child.write('m') }
+      if (stage === 0 && /Smoke Cloud\s+●\s+\d+/u.test(visible)) { stage = 0.5; child.write('\t') }
+      else if (stage === 0.5 && visible.includes('◆ AliceProjects · This computer')) { stage = 1; child.write('m') }
       else if (stage === 1 && visible.includes('destination Machine')) { stage = 2; child.write('\r') }
       else if (stage === 2 && visible.includes('Destination AliceProject key')) { stage = 3; writeValue(options.projectKey) }
       else if (stage === 3 && visible.includes('Destination complete Home')) { stage = 4; writeValue(options.destinationHome) }
       else if (stage === 4 && visible.includes('Credentials')) { stage = 5; child.write('\r') }
       else if (stage === 5 && visible.includes('Exact-Session scheduled Issue owners')) { stage = 6; child.write('\r') }
-      else if (stage === 6 && visible.includes('Review AliceProject transfer')) {
+      else if (stage === 6 && visible.includes('Transfer manifest · READY')) {
         stage = 7
         child.write(options.approve ? 'y' : 'n')
       } else if (stage === 7 && !options.approve && visible.includes('Transfer cancelled')) {
         stage = 8; child.write('q')
-      } else if (stage === 7 && options.approve && visible.includes('AliceProject transfer complete')) {
+      } else if (stage === 7 && options.approve && visible.includes('AliceProject arrived · PUBLISHED')) {
         stage = 8; child.write('\r'); setTimeout(() => child.write('q'), 50)
       }
     })

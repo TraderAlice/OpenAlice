@@ -315,28 +315,6 @@ describe('getVersionInfo', () => {
     expect(info.error).toContain('boom')
   })
 
-  it('keeps Railway release selection service-owned and does not fetch a manifest', async () => {
-    const fetchMock = vi.fn()
-    globalThis.fetch = fetchMock as unknown as typeof fetch
-
-    const info = await getVersionInfo({
-      env: {
-        OPENALICE_SERVICE_MANAGER: 'railway',
-        OPENALICE_INSTALL_SOURCE: '/runtime/install-source.json',
-      },
-      readTextFile: () => JSON.stringify(installSource('development')),
-    })
-
-    expect(info).toMatchObject({
-      channel: 'dev',
-      updateAuthority: 'service',
-      latest: null,
-      hasUpdate: false,
-      error: null,
-    })
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
-
   it('keeps Docker release selection service-owned through the legacy launcher env', async () => {
     const fetchMock = vi.fn()
     globalThis.fetch = fetchMock as unknown as typeof fetch

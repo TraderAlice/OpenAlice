@@ -47,7 +47,7 @@ describe('Supervisor fleet state and presentation', () => {
         { length: 6 },
         (_, index) => project(`local-${index}`, `Local ${index + 1}`),
       )),
-      machine('railway', 'Railway Beta', 'online', [
+      machine('cloud-dev', 'Cloud Dev', 'online', [
         project('remote-default', 'Default AliceProject'),
         project('remote-main', 'Main Cloud'),
       ]),

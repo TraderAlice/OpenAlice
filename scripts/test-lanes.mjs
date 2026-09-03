@@ -257,11 +257,6 @@ export const systemCommandSuites = {
     sideEffects: 'starts a test-owned local Connector process',
     prerequisites: ['Connector build/runtime dependencies available'],
   },
-  railway: {
-    command: 'bash -n scripts/railway/*.sh && vitest run --config vitest.railway.config.ts',
-    sideEffects: 'starts serialized local Railway-style lifecycle processes',
-    prerequisites: ['POSIX shell and workspace dependencies installed'],
-  },
   installer: {
     command: 'node scripts/install-docker-smoke.mjs',
     sideEffects: 'builds disposable Docker images and installs into containers',
@@ -280,10 +275,7 @@ export const systemCommandSuites = {
 }
 
 const collectionRoots = ['src', 'packages', 'services', 'apps', 'scripts', 'ui']
-const systemTestFiles = new Set([
-  'scripts/railway-entrypoint.spec.ts',
-  'scripts/railway-fence-pty.spec.ts',
-])
+const systemTestFiles = new Set()
 
 function isWithin(file, root) {
   return file === root || file.startsWith(`${root}/`)

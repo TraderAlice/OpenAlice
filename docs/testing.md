@@ -51,7 +51,6 @@ System commands intentionally expose their prerequisite and artifact boundary:
 | `pnpm test:system:dev-stack` | Starts a real temporary local development process tree. |
 | `pnpm test:system:guardian` | Starts and kills test-owned Guardian process trees. |
 | `pnpm test:system:connector` | Starts a built Connector Service against test-owned state. |
-| `pnpm test:system:railway` | Runs the serialized local Railway-style entrypoint and Linux fence/PTY fixtures; it does not call Railway CLI or a hosted Project. |
 | `pnpm test:system:installer` | Builds disposable Docker images and exercises the checked-out installer payload. |
 | `pnpm test:system:installer:dev` | Downloads the current dev installer and uses disposable Docker images. This command requires network access and a published dev candidate. |
 | `pnpm test:system:remote` | Creates a disposable Docker/SSH target and transfers a built or selected CLI payload. |

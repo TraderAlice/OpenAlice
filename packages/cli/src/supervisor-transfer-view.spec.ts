@@ -19,13 +19,13 @@ describe('Supervisor Transfer Flight Deck', () => {
     const rendered = renderSupervisorTransferFlightDeck({
       phase: 'credentials',
       sourceName: 'Default AliceProject',
-      destinationName: 'Railway Beta',
+      destinationName: 'Cloud Dev',
       content: ['Credentials', '', '› Transfer and re-seal', '  Leave credentials behind'],
       message: 'Choose how private values cross the SSH boundary.',
     }, 100)
     const output = rendered.lines.join('\n')
     expect(output).toContain('Flight Deck · 4/8 · SECRETS')
-    expect(output).toContain('Mission Brief · Default AliceProject → Railway Beta')
+    expect(output).toContain('Mission Brief · Default AliceProject → Cloud Dev')
     expect(output).toContain('✓ 03 Remote Home')
     expect(output).toContain('◆ 04 Credentials')
     expect(output).toContain('· 05 Issue Owners')

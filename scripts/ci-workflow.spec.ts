@@ -53,8 +53,6 @@ const packageJson = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8
 const cliPackageJson = JSON.parse(
   readFileSync(resolve(root, 'packages/cli/package.json'), 'utf8'),
 ) as { version: string }
-const defaultVitestConfig = readFileSync(resolve(root, 'vitest.config.ts'), 'utf8')
-const railwayVitestConfig = readFileSync(resolve(root, 'vitest.railway.config.ts'), 'utf8')
 
 function commands(job: WorkflowJob): string[] {
   return job.steps?.flatMap((step) => step.run ? [step.run] : []) ?? []
@@ -100,7 +98,6 @@ describe('CI workflow authority lanes', () => {
     ])
     expect(commands(cleanBuild)).not.toContain('npx tsc --noEmit')
     expect(commands(cleanBuild)).not.toContain('pnpm test')
-    expect(commands(cleanBuild)).not.toContain('pnpm test:system:railway')
     expect(cleanBuild.strategy).toBeUndefined()
     expect(cleanBuild['timeout-minutes']).toBe(15)
   })
@@ -125,9 +122,9 @@ describe('CI workflow authority lanes', () => {
     expect(commands(sourceContracts)).not.toContain('pnpm test')
   })
 
-  it('runs complete build, hermetic, Railway, host, and native smoke lanes outside exact beta prep', () => {
+  it('runs complete build, hermetic, host, and native smoke lanes outside exact beta prep', () => {
     const workspaceBuild = fullWorkflow.jobs['workspace-build']
-    const tests = fullWorkflow.jobs['hermetic-and-railway-tests']
+    const tests = fullWorkflow.jobs['hermetic-tests']
     const crossPlatform = fullWorkflow.jobs['cross-platform-test']
     const devSmoke = fullWorkflow.jobs['dev-smoke']
 
@@ -138,7 +135,6 @@ describe('CI workflow authority lanes', () => {
     expect(commands(workspaceBuild)).toContain('pnpm build')
     expect(commands(workspaceBuild)).not.toContain('pnpm test')
     expect(commands(tests)).toContain('pnpm test')
-    expect(commands(tests)).toContain('pnpm test:system:railway')
     expect(commands(tests)).not.toContain('pnpm build')
 
     expect(crossPlatform.strategy?.matrix?.os).toEqual(['macos-14', 'windows-latest'])
@@ -156,19 +152,6 @@ describe('CI workflow authority lanes', () => {
       const checkout = job.steps?.find((candidate) => candidate.uses === 'actions/checkout@v7')
       expect(checkout?.with?.ref).toBe("${{ github.event_name == 'schedule' && 'dev' || '' }}")
     }
-  })
-
-  it('keeps Railway lifecycle system tests explicit, local, and serialized', () => {
-    expect(packageJson.scripts.test).toBe('vitest run')
-    expect(packageJson.scripts['test:system:railway']).toContain('vitest.railway.config.ts')
-    expect(packageJson.scripts['test:contract:platform']).not.toContain('railway-entrypoint.spec.ts')
-    expect(defaultVitestConfig).toContain("'scripts/railway-entrypoint.spec.ts'")
-    expect(defaultVitestConfig).toContain("'scripts/railway-fence-pty.spec.ts'")
-    expect(railwayVitestConfig).toContain("'scripts/railway-entrypoint.spec.ts'")
-    expect(railwayVitestConfig).toContain("'scripts/railway-fence-pty.spec.ts'")
-    expect(railwayVitestConfig).toContain('fileParallelism: false')
-    expect(railwayVitestConfig).toContain('maxWorkers: 1')
-    expect(railwayVitestConfig).toContain('testTimeout: 35_000')
   })
 
   it('keeps the runtime-visible root and CLI version baselines synchronized', () => {

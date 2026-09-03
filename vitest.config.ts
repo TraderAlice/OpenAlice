@@ -47,9 +47,7 @@ export default defineConfig({
     // lets those children contend with a worker per core on constrained CI
     // hosts, turning fast installer checks into timeout flakes. Keep enough
     // parallelism for the unit-heavy majority while reserving capacity for the
-    // subprocesses owned by each worker. The Railway lifecycle system harness
-    // has its own serialized config because it also owns a host-global mount
-    // fence on Linux.
+    // subprocesses owned by each worker.
     maxWorkers: '50%',
     projects: [
       {
@@ -66,8 +64,6 @@ export default defineConfig({
             '**/*.bbProvider.spec.*',
             '**/*.live.spec.*',
             '**/node_modules/**',
-            'scripts/railway-entrypoint.spec.ts',
-            'scripts/railway-fence-pty.spec.ts',
           ],
         },
       },

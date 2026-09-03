@@ -270,8 +270,8 @@ delivery lane:
   Docker, installer, or native-runtime evidence from the ladder above; hosted
   CI is not a second purchase of the same confidence.
 - PRs to `master`, `master` pushes, scheduled runs, and manual validation retain
-  the hermetic Ubuntu suite, the serialized local Railway lifecycle system
-  suite, macOS/Windows build-and-test matrix, and native dev-smoke. Routine
+  the hermetic Ubuntu suite, macOS/Windows build-and-test matrix, and native
+  dev-smoke. Routine
   integration PRs do not allocate those runners. There is no hosted changed-path
   or actor/label router: the branch boundary is intentionally simple, local
   development owns changed-test selection, and current `dev` receives a daily
@@ -336,14 +336,14 @@ delivery lane:
   daily cross-platform backstop for lightweight PRs.
 
 Routine integration has no hosted changed-path allowlist. Serial development
-uses the local ladder above, adding `pnpm test:system:railway`, real browser,
+uses the local ladder above, adding `pnpm test:system:remote`, real browser,
 OrbStack, installer, unsigned Electron/package, and native runtime acceptance
-only when those surfaces change. Record those commands and results in the PR.
-The Railway local suite executes the image entrypoint and Linux mount-fence/PTY
-harness against disposable fixtures; it never invokes Railway CLI or a live
-Project. A promotion to `master` re-establishes full remote evidence; stable
-keeps the complete matrix even when routine integration and beta used lighter
-hosted feedback.
+only when those surfaces change. Remote acceptance starts from a host the user
+already made reachable through ordinary SSH; CI and repository scripts do not
+provision or manage a cloud provider. Record the commands and results in the
+PR. A promotion to `master` re-establishes full remote evidence; stable keeps
+the complete matrix even when routine integration and beta used lighter hosted
+feedback.
 
 ### Package signing boundary
 
