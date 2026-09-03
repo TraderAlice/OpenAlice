@@ -613,10 +613,12 @@ intentionally parameter-free:
   open columns on wide terminals and stacks the same reading order at compact
   widths. A short wide stream owns only its natural content plus two breathing
   rows instead of stretching to fill the Operational Canvas; longer streams
-  still expand within the existing 20-message history bound. Inbox Desk,
-  contextual Tip, and Command Spine stay in one content-flow cluster; unused
-  viewport height follows the cluster instead of splitting message actions from
-  global controls. Below 60 columns
+  still expand within the existing 20-message history bound. At 100 columns and
+  wider, Inbox keeps the Desk and contextual Tip together while anchoring the
+  Command Spine at the terminal edge; surplus becomes a quiet field between the
+  selected-message workflow and global controls. Below 100 columns all three
+  remain in one content-flow cluster so compact pointer geometry stays stable
+  and no primary message action is displaced. Below 60 columns
   and 18 rows, the Desk folds to the selected message's Workspace, read state,
   title, provenance, Open Workspace action, and Mark read/unread action so the
   Mission Header, navigation, contextual Tip, and Command Spine all remain in

@@ -4233,6 +4233,25 @@ already large `supervisor-tui.ts` application controller.
   state, primary launch behavior, compact layouts, and Command Spine semantics
   are unchanged. Maintainer acceptance remains pending on this branch.
 
+### Wide Inbox vertical-anchor decision
+
+- A fresh three-unread 120x32 capture showed the same unfinished lower field
+  that wide Home had exposed: Inbox Desk, its contextual Tip, and Command Spine
+  all ended in the upper portion of the viewport, leaving the terminal's lower
+  edge without an interaction anchor. The 80x24 and 46x16 layouts remained
+  naturally complete and did not need additional spacing.
+- At 100 columns and wider, Inbox now keeps the bounded Desk and Tip at the top
+  while anchoring the global Command Spine to the bottom row. Below 100 columns
+  it retains the established content-flow cluster, preserving compact and
+  emergency action positions. This applies the same OMP-derived workbench/input
+  relationship as Home without stretching a short message history.
+- Real three-unread 120x32, 80x24, and 46x16 PTY captures verify the responsive
+  boundary. Focused Inbox, screen, and real-PTY coverage passes 159 tests; the
+  complete CLI suite passes 667 tests and CLI typecheck/build passes. Message
+  selection, read state, Workspace opening, polling, scroll bounds, pointer
+  targets, and global Detach behavior are unchanged. Maintainer acceptance
+  remains pending on this branch.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

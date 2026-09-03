@@ -5184,7 +5184,7 @@ export class SupervisorScreen implements Component {
     )
     const flowContentConsole = (
       (this.snapshot.panel === 'overview' && width < 100)
-      || this.snapshot.panel === 'inbox'
+      || (this.snapshot.panel === 'inbox' && width < 100)
       || (this.snapshot.panel === 'logs' && (this.snapshot.logs?.entries?.length ?? 0) === 0)
       || this.snapshot.panel === 'help'
       || boundedDoctor

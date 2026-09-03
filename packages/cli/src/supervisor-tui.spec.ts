@@ -377,8 +377,8 @@ describe('Supervisor TUI screen', () => {
     const inboxTipRow = inboxLines.findIndex((line) => line.startsWith('◇  Tip:'))
     const inboxSpineRow = inboxLines.findIndex((line) => line.includes('[ / ] Commands'))
     expect(inboxLines).toHaveLength(32)
-    expect(inboxSpineRow).toBe(inboxTipRow + 2)
-    expect(inboxLines.slice(inboxSpineRow + 1).every((line) => line === '')).toBe(true)
+    expect(inboxSpineRow).toBe(inboxLines.length - 1)
+    expect(inboxLines.slice(inboxTipRow + 1, inboxSpineRow).every((line) => line === '')).toBe(true)
     expect(renderSupervisorContextTip({ panel: 'inbox' }, 80))
       .toContain('o opens its Workspace')
     expect(renderSupervisorContextTip({ panel: 'inbox' }, 80))
@@ -396,7 +396,8 @@ describe('Supervisor TUI screen', () => {
     viewportHeight = 48
     const expandedInbox = screen.render(100)
     expect(expandedInbox).toHaveLength(48)
-    expect(expandedInbox.findIndex((line) => line.includes('[ / ] Commands'))).toBe(inboxSpineRow)
+    expect(expandedInbox.findIndex((line) => line.includes('[ / ] Commands')))
+      .toBe(expandedInbox.length - 1)
 
     screen.update({
       panel: 'overview',
