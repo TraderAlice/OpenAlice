@@ -1562,7 +1562,6 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         expect(transcript).toContain('Flight Deck · 1/8 · DESTINATION')
         expect(transcript).toContain('Mission Brief · Source → Cloud fixture')
         if (!compact) expect(transcript).toContain('! Destination AliceProject key · FIX')
-        if (!compact) expect(transcript).toContain('› [ Enter ] Continue')
       } else if (scenario === 'default-no') {
         expect(transcript).toContain('Transfer Flight Deck')
       }
@@ -1571,7 +1570,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         expect(transcript).toContain('◆ FOCUS · TRANSFER')
         expect(transcript).toContain('TRANSFER FLIGHT DECK')
         expect(transcript).toContain('◆ TRANSFER')
-        expect(transcript).toContain('◆ [ Enter ] Continue  │  [ ↑↓ ] Move choice  │  [ Esc ] Step back')
+        expect(transcript).toContain('◆ [ Enter ] Choose / next  │  [ ↑↓ ] Move choice')
         expect(transcript).toContain('◆ FOCUS WORKSPACE  ›  [ Esc ] Back')
       }
       expect(transcript).toContain('◆ Destination AliceProject key')

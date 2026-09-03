@@ -603,18 +603,17 @@ export function renderSupervisorFocusActionBar(
   task: Exclude<SupervisorFocusTask, 'confirmation'>,
   width: number,
 ): string[] {
-  const labels: Record<Exclude<SupervisorFocusTask, 'confirmation'>, readonly [string, string, string]> = {
-    setup: ['Edit / apply', 'Move field', 'Step back'],
-    source: ['Validate / continue', 'Move cursor', 'Step back'],
-    projects: ['Choose', 'Move project', 'Step back'],
-    release: ['Inspect / continue', 'Move channel', 'Step back'],
-    transfer: ['Continue', 'Move choice', 'Step back'],
+  const labels: Record<Exclude<SupervisorFocusTask, 'confirmation'>, readonly [string, string]> = {
+    setup: ['Edit / apply', 'Move field'],
+    source: ['Validate / continue', 'Move cursor'],
+    projects: ['Choose', 'Move project'],
+    release: ['Inspect / continue', 'Move channel'],
+    transfer: ['Choose / next', 'Move choice'],
   }
-  const [primary, move, back] = labels[task]
+  const [primary, move] = labels[task]
   return renderSupervisorCommandBar([
     { key: 'Enter', label: primary, primary: true },
     { key: '↑↓', label: move },
-    { key: 'Esc', label: back },
   ], width)
 }
 

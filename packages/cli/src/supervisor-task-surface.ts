@@ -15,6 +15,8 @@ export const SUPERVISOR_TASK_STAGE_MIN_WIDTH = 100
 export const SUPERVISOR_TASK_STAGE_MIN_HEIGHT = 28
 export const SUPERVISOR_COMPACT_TASK_STAGE_MIN_WIDTH = 72
 export const SUPERVISOR_COMPACT_TASK_STAGE_MIN_HEIGHT = 24
+export const SUPERVISOR_TRANSFER_TASK_STAGE_MIN_WIDTH = 40
+export const SUPERVISOR_TRANSFER_TASK_STAGE_MIN_HEIGHT = 14
 export const SUPERVISOR_TASK_STAGE_HEADER_ROWS = 3
 export const SUPERVISOR_TASK_STAGE_CONSOLE_ROWS = 3
 
@@ -22,11 +24,14 @@ export function supervisorUsesTaskStage(
   size: SupervisorTaskSurfaceSize,
   task?: SupervisorTaskSurfaceTask,
 ): boolean {
+  if (task === 'transfer') {
+    return size.width >= SUPERVISOR_TRANSFER_TASK_STAGE_MIN_WIDTH
+      && size.height >= SUPERVISOR_TRANSFER_TASK_STAGE_MIN_HEIGHT
+  }
   const compactFocusTask = task === 'setup'
     || task === 'source'
     || task === 'projects'
     || task === 'release'
-    || task === 'transfer'
   return compactFocusTask
     ? size.width >= SUPERVISOR_COMPACT_TASK_STAGE_MIN_WIDTH
       && size.height >= SUPERVISOR_COMPACT_TASK_STAGE_MIN_HEIGHT
@@ -40,12 +45,13 @@ export function supervisorTaskSurfaceOptions(
   task?: SupervisorTaskSurfaceTask,
 ): SupervisorOverlayOptions {
   if (!supervisorUsesTaskStage(size, task)) return fallback
+  const top = emergencyTransferStage(size, task) ? 0 : SUPERVISOR_TASK_STAGE_HEADER_ROWS
   return {
     width: '100%',
     maxHeight: '100%',
     anchor: 'top-left',
     margin: {
-      top: SUPERVISOR_TASK_STAGE_HEADER_ROWS,
+      top,
       right: 0,
       bottom: SUPERVISOR_TASK_STAGE_CONSOLE_ROWS,
       left: 0,
@@ -59,9 +65,12 @@ export function renderSupervisorTaskSurface(
   task?: SupervisorTaskSurfaceTask,
 ): string[] {
   if (!supervisorUsesTaskStage(size, task)) return lines
+  const headerRows = emergencyTransferStage(size, task)
+    ? 0
+    : SUPERVISOR_TASK_STAGE_HEADER_ROWS
   const rows = Math.max(
     1,
-    size.height - SUPERVISOR_TASK_STAGE_HEADER_ROWS - SUPERVISOR_TASK_STAGE_CONSOLE_ROWS,
+    size.height - headerRows - SUPERVISOR_TASK_STAGE_CONSOLE_ROWS,
   )
   const content = lines.slice(0, rows)
   const quietRows = Math.max(0, rows - content.length)
@@ -74,6 +83,13 @@ export function renderSupervisorTaskSurface(
     ...blankRows(quietRows - trajectory.length),
     ...trajectory,
   ]
+}
+
+function emergencyTransferStage(
+  size: SupervisorTaskSurfaceSize,
+  task?: SupervisorTaskSurfaceTask,
+): boolean {
+  return task === 'transfer' && size.width < 60 && size.height < 18
 }
 
 export function decorateSupervisorTaskSurface(

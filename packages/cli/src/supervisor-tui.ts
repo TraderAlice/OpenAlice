@@ -3414,7 +3414,7 @@ export async function runSupervisorTui(
               choice.items,
               choice.list,
               choice.maxVisible,
-              flightDeck.contentFirstRow + 2,
+              flightDeck.choiceFirstRow ?? flightDeck.contentFirstRow + 2,
             )
           : undefined
         const lines = renderSupervisorTaskSurface(flightDeck.lines, terminalSize(), 'transfer')

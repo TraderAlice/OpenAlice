@@ -17,6 +17,7 @@ export interface SupervisorTransferFlightDeckView {
 export interface SupervisorTransferFlightDeckRender {
   lines: string[]
   contentFirstRow: number
+  choiceFirstRow?: number
   contentStartColumn: number
   contentEndColumn: number
 }
@@ -167,12 +168,30 @@ export function renderSupervisorTransferFlightDeck(
   const stage = TRANSFER_STAGES[active]!
   const mission = `${view.sourceName} → ${view.destinationName ?? 'Choose Machine'}`
   const wide = safeWidth >= 96
+  const content = withoutMirroredTransferActions(view.content)
+
+  if (safeWidth < 48) {
+    const emergencyContent = emergencyTransferContent(content)
+    return {
+      lines: fitTransferRows([
+        `◆ TRANSFER · ${active + 1}/${TRANSFER_STAGES.length} · ${stage.signal}`,
+        `PATH  ${compactRoute(active, Math.max(1, safeWidth - 6))}`,
+        `ROUTE ${mission}`,
+        ...emergencyContent,
+        `◇ SAFETY · ${stage.label} · ${view.message}`,
+      ], safeWidth),
+      contentFirstRow: 4,
+      choiceFirstRow: 5,
+      contentStartColumn: 1,
+      contentEndColumn: safeWidth,
+    }
+  }
 
   if (wide) {
     const gap = 3
     const pathWidth = 36
     const briefWidth = safeWidth - pathWidth - gap
-    const height = Math.max(TRANSFER_STAGES.length, view.content.length)
+    const height = Math.max(TRANSFER_STAGES.length, content.length)
     const path = renderSupervisorPanel(
       'Flight Deck',
       `${active + 1}/${TRANSFER_STAGES.length} · ${stage.signal}`,
@@ -182,7 +201,7 @@ export function renderSupervisorTransferFlightDeck(
     const brief = renderSupervisorPanel(
       'Mission Brief',
       mission,
-      padRows(view.content, height),
+      padRows(content, height),
       briefWidth,
     )
     return {
@@ -210,7 +229,7 @@ export function renderSupervisorTransferFlightDeck(
     [route],
     safeWidth,
   )
-  const brief = renderSupervisorPanel('Mission Brief', mission, view.content, safeWidth)
+  const brief = renderSupervisorPanel('Mission Brief', mission, content, safeWidth)
   return {
     lines: [
       ...path,
@@ -223,6 +242,24 @@ export function renderSupervisorTransferFlightDeck(
     contentStartColumn: 2,
     contentEndColumn: safeWidth - 1,
   }
+}
+
+function withoutMirroredTransferActions(lines: string[]): string[] {
+  return lines.filter((line) => {
+    const content = line.trim()
+    return content !== '◆ [ Enter ] Choose  │  [ Esc ] Back'
+      && content !== '◆ [ Enter ] Continue  │  [ Esc ] Back'
+  })
+}
+
+function emergencyTransferContent(lines: string[]): string[] {
+  const compact = lines.filter((line) => line.trim().length > 0)
+  if (compact.length <= 7) return compact
+  return [
+    ...compact.slice(0, 4),
+    '…',
+    ...compact.slice(-2),
+  ]
 }
 
 export function decorateSupervisorTransferFlightDeck(

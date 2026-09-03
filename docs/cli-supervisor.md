@@ -716,6 +716,14 @@ become bounded two-line signals rather than third framed sheets, keeping each
 complete task within its 18-row canvas. Closing the
 task restores the prior top-level panel identity without changing Runtime or
 selection state.
+Remote Transfer additionally owns the usable viewport from 40x14. Below 48
+columns its eight-stage route becomes one borderless emergency step with the
+current stage, route, selected value, and Safety signal. Below 60x18 it replaces
+the ordinary Mission Header rows as well, preventing the previous Connections
+selection from showing through above the task. The task Action Shelf is the sole
+Enter/movement control; mirrored Choose/Continue rows are removed from the
+Flight Deck, while phase-specific Review, Cancel, Retry, and Arrival commands
+remain in their owning content.
 While a Focus Workspace owns the screen, ordinary Home, Launcher, and workbench
 Context Tips are not mounted in its reserved Console rows. The task's own
 Focus Header, content contract, Action Shelf, and Back route remain the only
@@ -724,8 +732,8 @@ The Mission Header keeps version, channel, and update provenance as a read-only
 `◇ BUILD` signal while focused; the normal `[ u ]` Release Control and its
 pointer target return only after the task closes.
 The Control Console follows the same ownership rule: its Action Shelf uses the
-active task's Enter, movement, and Back vocabulary, while the Command Spine
-shows `FOCUS WORKSPACE` and a real Esc exit instead of leaking unavailable
+active task's Enter and movement vocabulary, while the Command Spine owns the
+single real Esc Back exit instead of duplicating it or leaking unavailable
 Overview or Fleet commands. Pointer activation on either Focus Console row is
 routed to the same overlay component that owns keyboard input.
 When the wide stage has enough surplus rows, a read-only Focus Trajectory docks

@@ -2959,7 +2959,7 @@ describe('Supervisor TUI screen', () => {
 
   it('gives each Focus Workspace an honest task-owned Action Shelf', () => {
     expect(renderSupervisorFocusActionBar('setup', 96)[0]).toContain(
-      '◆ [ Enter ] Edit / apply  │  [ ↑↓ ] Move field  │  [ Esc ] Step back',
+      '◆ [ Enter ] Edit / apply  │  [ ↑↓ ] Move field',
     )
     expect(renderSupervisorFocusActionBar('source', 96)[0]).toContain(
       '◆ [ Enter ] Validate / continue  │  [ ↑↓ ] Move cursor',
@@ -2971,8 +2971,9 @@ describe('Supervisor TUI screen', () => {
       '◆ [ Enter ] Inspect / continue  │  [ ↑↓ ] Move channel',
     )
     expect(renderSupervisorFocusActionBar('transfer', 96)[0]).toContain(
-      '◆ [ Enter ] Continue  │  [ ↑↓ ] Move choice',
+      '◆ [ Enter ] Choose / next  │  [ ↑↓ ] Move choice',
     )
+    expect(renderSupervisorFocusActionBar('transfer', 96)[0]).not.toContain('[ Esc ]')
     expect(renderSupervisorConfirmationActionBar({
       confirmLabel: 'Stop Runtime',
       cancelLabel: 'Keep running',

@@ -57,6 +57,37 @@ describe('Supervisor Transfer Flight Deck', () => {
     expect(rendered.lines.every((line) => displayWidth(line) <= 50)).toBe(true)
   })
 
+  it('turns the tiny Transfer overlay into one borderless emergency step', () => {
+    const rendered = renderSupervisorTransferFlightDeck({
+      phase: 'destination',
+      sourceName: 'Source Project',
+      content: [
+        '◆ Transfer Source · destination Machine',
+        '',
+        '› Cloud fixture · alice@example.test',
+        '',
+        '◆ [ Enter ] Choose  │  [ Esc ] Back',
+      ],
+      message: 'Choose the SSH Machine that will own the new AliceProject.',
+    }, 44)
+    const output = rendered.lines.join('\n')
+
+    expect(output).toContain('◆ TRANSFER · 1/8 · DESTINATION')
+    expect(output).toContain('PATH  ◆ Machine  → Project ID')
+    expect(output).toContain('ROUTE Source Project → Choose Machine')
+    expect(output).toContain('› Cloud fixture · alice@example.test')
+    expect(output).not.toContain('◆ [ Enter ] Choose  │  [ Esc ] Back')
+    expect(output).toContain('◇ SAFETY · Machine')
+    expect(output).not.toContain('╭')
+    expect(output).not.toContain('╰')
+    expect(rendered.lines).toHaveLength(6)
+    expect(rendered.contentFirstRow).toBe(4)
+    expect(rendered.choiceFirstRow).toBe(5)
+    expect(rendered.contentStartColumn).toBe(1)
+    expect(rendered.contentEndColumn).toBe(44)
+    expect(rendered.lines.every((line) => displayWidth(line) <= 44)).toBe(true)
+  })
+
   it('keeps the current route leg visible without color', () => {
     const lines = renderSupervisorTransferFlightDeck({
       phase: 'transferring',

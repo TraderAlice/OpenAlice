@@ -4111,6 +4111,29 @@ already large `supervisor-tui.ts` application controller.
   closure passes 158 tests, the complete CLI suite passes 663 tests, and CLI
   typecheck/build passes. Maintainer acceptance remains pending on this branch.
 
+### Emergency Transfer task-stage decision
+
+- A real 46x16 PTY capture showed that merely simplifying Transfer's nested
+  cards was insufficient: the centered overlay remained transparent, leaving
+  the selected AliceProject and its Start/Transfer shelf visible above and
+  below the wizard. Transfer then advertised three competing control regions:
+  the old selection shelf, a local Choose/Back row, and the Focus Console.
+- Transfer now owns the complete usable screen from 40x14. Below 48 columns it
+  renders one borderless step containing the eight-stage position, compact
+  route, selected value, and Safety contract. Below 60x18 the task also replaces
+  the normal three-row Mission Header reservation, so no underlying Connections
+  pixels remain. At larger sizes it retains the stacked 60/80-column Flight
+  Deck and the wide 120-column route-plus-brief composition.
+- The Focus Action Shelf is now the only mirrored Enter/movement control.
+  Generic Choose/Continue rows are removed when Transfer embeds its components,
+  and Esc Back has one owner in the Command Spine instead of appearing in both
+  Console rows. Phase-specific transfer, cancellation, retry, and arrival
+  commands remain visible in their authoritative step. Real 46x16, 60x20,
+  80x24, and 120x32 PTY captures verify all four responsive forms; the focused
+  Transfer, task-surface, screen, and real-PTY closure passes 165 tests.
+  Lifecycle, SSH, staging, transfer safety, and destination selection semantics
+  are unchanged. Maintainer acceptance remains pending on this branch.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

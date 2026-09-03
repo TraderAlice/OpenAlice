@@ -69,6 +69,23 @@ describe('Supervisor secondary-task surface', () => {
     expect(renderSupervisorTaskSurface(['work'], size)).toEqual(['work'])
   })
 
+  it('lets Transfer own the usable screen in a tiny terminal', () => {
+    const size = { width: 46, height: 16 }
+
+    expect(supervisorUsesTaskStage(size, 'transfer')).toBe(true)
+    expect(supervisorUsesTaskStage(size, 'setup')).toBe(false)
+    expect(supervisorTaskSurfaceOptions(size, sheet, 'transfer')).toEqual({
+      width: '100%',
+      maxHeight: '100%',
+      anchor: 'top-left',
+      margin: { top: 0, right: 0, bottom: 3, left: 0 },
+    })
+    const lines = renderSupervisorTaskSurface(['transfer', 'choice'], size, 'transfer')
+    expect(lines).toHaveLength(13)
+    expect(lines.slice(0, 2)).toEqual(['transfer', 'choice'])
+    expect(lines.slice(2).every((line) => line === '')).toBe(true)
+  })
+
   it('docks a truthful task trajectory above the focused action shelf', () => {
     const lines = renderSupervisorTaskSurface(
       Array.from({ length: 12 }, (_, index) => `content ${index + 1}`),
