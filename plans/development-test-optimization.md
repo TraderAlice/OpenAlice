@@ -1,12 +1,13 @@
 # Development and Test Feedback Optimization
 
-Status: Active — the feedback-ladder and `AGENTS.md` checkpoint on
-`codex/dev-test-optimization` is accepted for integration; rolling native-CLI
-build reuse and retryable channel activation remain follow-up work.
+Status: Active — the feedback-ladder and `AGENTS.md` checkpoint landed in PR
+#1312. The complete development/test loop is now being rebuilt on
+`codex/dev-test-loop-refactor`: owner/risk test lanes, CI authority separation,
+and retryable rolling-dev activation remain in progress.
 
-Delivery mode: Serial / interactive from current `dev`. The maintainer lifted
-the initial feature-branch hold for this checkpoint; later increments use
-focused branches from the updated integration lane.
+Delivery mode: Autonomous / topic contribution from current `dev`. One Draft
+PR owns the coherent initiative; independently reviewable commits accumulate
+there and it does not merge without maintainer acceptance.
 
 Owner guides:
 
@@ -32,6 +33,15 @@ startup index but currently combines repository invariants, detailed branch and
 release procedures, a test manual, plan lifecycle rules, issue policy, and a
 copy of the owner-guide index. That duplication makes later workflow changes
 easy to patch in one place and contradict in another.
+
+The first checkpoint corrected the leaf-versus-full decision but exposed a
+second structural mismatch. The root Vitest projects are named for execution
+environments (`node` and `ui`), while development decisions need product-owner
+boundaries. The `node` project currently contains Alice, UTA, Connector, CLI,
+Desktop, shared packages, and repository tooling, so `test:node` is not a
+meaningful owner suite. The generic `e2e` label also mixes deterministic local
+integration, credentialed read-only network checks, and separately configured
+broker writes, hiding both reliability and safety boundaries.
 
 ## Baseline Evidence
 
@@ -77,6 +87,24 @@ currently purchases.
 - The historical `codex/usability-improvements` branch had no open PR using it
   as base or head but remained in routine workflow triggers. The branch itself
   stays intact; only the stale CI routing is removed.
+- The `node` Vitest project collects every non-UI owner. UTA alone has 51 spec
+  files while its package script still prints `no tests yet`; UI, Desktop, and
+  OpenTypeBB likewise have specs without a truthful package-level test API.
+- `pnpm test:e2e` includes deterministic Workspace/MockBroker lifecycle tests,
+  public Hyperliquid network access, and FRED/EIA paths that read configured
+  local keys. Network availability and developer configuration therefore alter
+  a command documented as ordinary product integration.
+- `packages/ibkr` exposes `test:e2e` and `test:all` that place and cancel paper
+  TWS orders whenever the default connection is available, without the
+  repository's explicit `OPENALICE_UTA_LIVE_PAPER=1` acknowledgement gate.
+- The central `CI` workflow multiplexes routine `dev` PR feedback, trusted beta
+  version classification, master validation, schedule, and manual backstops.
+  Its `build-and-test` job is not required by branch protection and does not
+  aggregate the cross-platform or native-startup jobs its name implies.
+- A successful rolling-dev run still repeats the platform-neutral server build
+  four times. More importantly, candidate upload, mutable alias replacement,
+  manifest activation, and live install share one failure boundary, and an old
+  rerun has no final `refs/heads/dev == GITHUB_SHA` activation fence.
 
 ## Objective
 
@@ -90,7 +118,13 @@ Create a boring, predictable feedback system in which:
   retain full acceptance;
 - `pnpm test` remains the explicit hermetic full-suite contract and never gains
   external Railway or credentialed behavior; and
-- `AGENTS.md` becomes a compact entry point whose detailed workflow truth lives
+- test commands state both what product owner they cover and whether they may
+  use subprocesses, containers, public networks, credentials, or trading
+  writes;
+- routine `dev` PR clean-build, master/full-source validation, and rolling-dev
+  artifact activation are separate authorities rather than conditional modes
+  inside one workflow; and
+- `AGENTS.md` remains a compact entry point whose detailed workflow truth lives
   in the owner guide.
 
 ## Decisions
@@ -131,6 +165,61 @@ Cross-surface means crossing code ownership or runtime boundaries. Navigating
 between two routes inside the same UI owner does not by itself make a change
 cross-surface.
 
+### Separate execution environment from product ownership
+
+Keep the root Node/jsdom Vitest projects as internal execution environments;
+do not create one Vitest project per package. The developer-facing API instead
+offers a small stable set of owner suites for Alice, UI, UTA, Connector,
+Runtime/CLI, Desktop, and repository tooling. `test:node` may remain as a broad
+compatibility aggregate, but it is not cited as an owner gate.
+
+Owner selection stays explicit and repository-owned. Do not build a generic
+changed-path CI router or require agents to infer package graphs. A contract
+check proves that every hermetic spec belongs to the full suite and the
+intended owner inventory without accidental overlap or omission.
+
+### Name lanes by their side effects
+
+`pnpm test` and owner suites are hermetic. Deterministic local product E2E stays
+under `test:e2e`; host/process/container/package acceptance remains explicit
+under surface-specific system commands. Public or credentialed read-only
+network checks move to `test:external:readonly`. Every broker-writing suite,
+including package-local IBKR tests, requires the same explicit live-paper
+acknowledgement and paper/flat-account discipline.
+
+Skipping because a key, network, TWS, Docker, or cloud service is absent is not
+success for an external or live lane. It is either an explicit not-run result
+or a reported residual gap.
+
+### Split CI by authority, not by paths
+
+A routine PR to `dev` owns one clean Ubuntu workspace build plus workflow
+contracts. Full source validation owns `master` PRs, schedule, and manual runs:
+root/full type checks, the hermetic suite, local Railway lifecycle, macOS and
+Windows builds/tests, and native startup smoke. Exact beta version preparation
+keeps its trusted-base classifier inside the master authority. Release and
+path-specific installer/Desktop/Docker workflows retain their existing gates.
+
+The legacy aggregate check is removed unless branch protection is deliberately
+configured to require a replacement that truly depends on every full-source
+job. A post-merge master rerun is not a substitute for the already validated
+merge ref and is removed when no publication contract consumes it.
+
+### Make rolling-dev publication a resumable state transition
+
+Rolling `dev` publication proceeds through explicit evidence: source inputs,
+platform-neutral outputs, four native candidates, a commit-addressed immutable
+candidate receipt, current-head activation, and exact-commit live install.
+GitHub artifacts are short-lived transport; R2 immutable receipts record
+accepted candidates; the live manifest is the sole channel pointer.
+
+Activation performs a final remote `dev` head comparison before any mutable
+write. A superseded SHA exits successfully without activation. Prefer live
+manifests that resolve immutable archives directly; fixed aliases may remain
+only as a bounded compatibility surface, not as candidate truth. Upload,
+activation, and smoke failures retry from their own evidence boundary rather
+than rebuilding accepted native bytes.
+
 ### Make the root instructions an index again
 
 `AGENTS.md` retains global safety and architecture invariants, the branch
@@ -149,7 +238,8 @@ make development metrics look better.
 
 ## Scope
 
-- Root test commands for affected, Node-owner, UI-owner, and full-suite use.
+- Root test commands for affected, product-owner, hermetic-full,
+  local-system, external-readonly, and live-write use.
 - `AGENTS.md` development, delivery, verification, plan, and guide routing.
 - `docs/development-workflow.md` as the detailed authority for the new ladder.
 - The applicable OpenAlice development/release skills so they request the same
@@ -157,6 +247,8 @@ make development metrics look better.
 - Routine PR and rolling `dev` workflow triggers whose work is measured as
   duplicate or unrelated.
 - Local timing/selection fixtures that demonstrate the intended feedback loop.
+- Candidate receipts, activation fencing, and exact-commit live smoke for the
+  rolling native CLI preview.
 
 ## Non-goals
 
@@ -168,6 +260,9 @@ make development metrics look better.
   the hermetic default suite.
 - Building a custom dependency graph or a general-purpose changed-path CI
   classifier in the first increment.
+- Creating one Vitest project per package, moving every spec into a new folder
+  taxonomy, or renaming thousands of test cases to express the new lanes.
+- Treating retries as evidence that a deterministic product failure is flaky.
 - Optimizing individual slow specs before the lane topology is correct.
 
 ## Work Plan
@@ -198,6 +293,21 @@ make development metrics look better.
   the full hermetic and workflow backstops before its integration checkpoint.
 - [x] Present the feedback-ladder checkpoint and receive maintainer acceptance
   to integrate it into `dev`.
+- [x] Re-audit the accepted checkpoint from current `dev` and identify the
+  environment-versus-owner mismatch, mixed E2E risk, package-script drift,
+  unguarded IBKR writes, CI authority multiplexing, and dev activation hazard.
+- [ ] Add the stable owner-suite API and coverage contracts without multiplying
+  Vitest projects or changing the complete hermetic suite's meaning.
+- [ ] Split deterministic local product E2E from explicit external read-only
+  checks; put every broker write behind the live-paper acknowledgement gate.
+- [ ] Split routine `dev` PR clean-build from master/scheduled/manual full-source
+  validation and remove misleading or duplicated aggregate/backstop jobs.
+- [ ] Publish commit-addressed rolling-dev candidates, fence current-head
+  activation, and make upload/activation/live-smoke independently retryable.
+- [ ] Build platform-neutral native inputs once and reuse only their explicit
+  hash-verified output whitelist across the four host-native candidate jobs.
+- [ ] Align `AGENTS.md`, owner guides, package scripts, workflow contracts, and
+  applicable skills with the final command and authority vocabulary.
 - [ ] Run proportional local acceptance for each later increment, then run the
   full hermetic and workflow backstops once for the completed initiative.
 - [ ] Present final measurements and residual platform/release risks for
@@ -212,7 +322,14 @@ During implementation:
 - confirm an Office-sized UI delta selects its relevant dependency closure;
 - confirm Node-only and UI-only project commands do not collect the other
   owner;
+- prove each owner suite selects only its declared hermetic inventory and their
+  union remains covered by the full suite;
+- prove local E2E performs no external network or trading write, external
+  read-only never mutates accounts, and every live-write config fails closed
+  without acknowledgement;
 - run workflow contract specs after workflow edits;
+- exercise stale-SHA, upload retry, activation retry, and exact-commit live
+  manifest behavior without publishing real bytes;
 - validate any edited skill with the skill validator; and
 - inspect the rendered browser route for product-facing fixtures used as
   acceptance examples.
@@ -233,6 +350,16 @@ At initiative acceptance:
 - A small Node-only feature change likewise avoids collecting the UI project.
 - Owners have clear escalation commands rather than permission to skip
   verification.
+- `test:e2e`, external read-only checks, local system acceptance, and live-paper
+  writes have disjoint, truthful side-effect contracts.
+- No broker-writing command can begin merely because a local service or
+  credential happens to be present.
+- Routine `dev` PR CI, full source validation, rolling preview publication, and
+  manual release are separate workflows or explicit authorities with no fake
+  aggregate gate.
+- A transient publication or activation failure can resume without rebuilding
+  four already accepted native candidates, and an old rerun cannot reactivate a
+  stale `dev` SHA.
 - `AGENTS.md`, the development workflow guide, package scripts, skills, and
   hosted workflow behavior describe one coherent lane model.
 - Full-suite and release gates remain directly runnable and are still required
