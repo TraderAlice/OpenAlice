@@ -125,7 +125,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-14, windows-latest]
+        # Ubuntu owns the hermetic full suite. macOS keeps one native-host
+        # repetition; Windows is covered by the real dev-stack smoke below
+        # and the separate desktop/package acceptance workflow.
+        os: [macos-14]
     runs-on: ${{ matrix.os }}
 
     steps:

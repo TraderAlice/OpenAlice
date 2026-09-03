@@ -137,7 +137,7 @@ describe('CI workflow authority lanes', () => {
     expect(commands(tests)).toContain('pnpm test')
     expect(commands(tests)).not.toContain('pnpm build')
 
-    expect(crossPlatform.strategy?.matrix?.os).toEqual(['macos-14', 'windows-latest'])
+    expect(crossPlatform.strategy?.matrix?.os).toEqual(['macos-14'])
     expect(step(crossPlatform, 'Build complete workspace').run).toBe('pnpm build')
     expect(step(crossPlatform, 'Run complete suite').run).toBe('pnpm test')
     expect(crossPlatform['timeout-minutes']).toBe(30)

@@ -270,8 +270,9 @@ delivery lane:
   Docker, installer, or native-runtime evidence from the ladder above; hosted
   CI is not a second purchase of the same confidence.
 - PRs to `master`, `master` pushes, scheduled runs, and manual validation retain
-  the hermetic Ubuntu suite, macOS/Windows build-and-test matrix, and native
-  dev-smoke. Routine
+  the hermetic Ubuntu suite, macOS build-and-test repetition, and native
+  Windows/Ubuntu dev-smoke. Windows desktop and Broker Pack packaging remain in
+  the separate package workflow. Routine
   integration PRs do not allocate those runners. There is no hosted changed-path
   or actor/label router: the branch boundary is intentionally simple, local
   development owns changed-test selection, and current `dev` receives a daily
@@ -332,8 +333,10 @@ delivery lane:
   still stops or withdraws a candidate; hosted-runner starvation and a known
   non-product fixture timeout do not become product risk through repetition.
 - Once this workflow version reaches the default `master` branch, the scheduled
-  validation checks out current `dev` and runs the complete matrix, providing a
-  daily cross-platform backstop for lightweight PRs.
+  validation checks out current `dev` and runs the same complete lane set:
+  Ubuntu hermetic/build, macOS build-and-test, and native Windows/Ubuntu
+  dev-smoke. It provides a daily multi-host backstop for lightweight PRs
+  without repeating the entire repository suite on Windows.
 
 Routine integration has no hosted changed-path allowlist. Serial development
 uses the local ladder above, adding `pnpm test:system:remote`, real browser,
