@@ -4028,6 +4028,26 @@ already large `supervisor-tui.ts` application controller.
   Control Console ownership are unchanged. Maintainer acceptance remains pending
   on this branch.
 
+### Launch recovery-brief decision
+
+- A fresh 120x32 failed-launch capture exposed an information-priority failure:
+  the Recorder devoted its largest quiet region to a decorative failure glyph,
+  while the failed stage, diagnostic, Retry, and target-change route were split
+  between the upper and lower edges.
+- A failed Recorder now turns genuine surplus into a three-line Recovery Brief:
+  it names the exact failed stage and places Enter Retry beside Esc change
+  target. The authoritative diagnostic remains in the content-owned `NOW` row.
+  Running flights retain their restrained ambient signal, and compact failures
+  omit the brief when fewer than three quiet rows exist so no operational fact
+  or action is displaced.
+- Real 120x32 PTY capture verifies the semantic Recovery Brief; the real 80x24
+  capture verifies the complete compact failure path without it. Launch state,
+  retry dispatch, target selection, lifecycle ownership, pointer geometry, and
+  Command Spine context are unchanged. The focused Flight Recorder, screen, and
+  real-PTY closure passes 152 tests, the complete CLI suite passes 659 tests,
+  and CLI typecheck/build passes. Maintainer acceptance remains pending on this
+  branch.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

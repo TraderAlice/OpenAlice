@@ -99,9 +99,10 @@ export function renderSupervisorLaunchFlight(
   const safeWidth = Math.max(24, width)
   const compact = safeWidth < 72
   const elapsed = formatElapsed(Math.max(0, now - flight.startedAt))
-  const activeStage = flight.stages.find((stage) => (
+  const activeStageIndex = flight.stages.findIndex((stage) => (
     stage.state === 'active' || stage.state === 'failed'
   ))
+  const activeStage = activeStageIndex >= 0 ? flight.stages[activeStageIndex] : undefined
   const status = flight.status === 'failed' ? 'RECOVERABLE FAILURE' : 'IN FLIGHT'
   const route = `${flight.target.machineName} → ${flight.target.projectName}`
   const switchingFrom = currentTarget
@@ -133,7 +134,17 @@ export function renderSupervisorLaunchFlight(
   const quietRows = Number.isFinite(targetHeight)
     ? Math.max(0, Math.floor(targetHeight ?? naturalHeight) - naturalHeight)
     : 0
-  if (quietRows > 0) rows.splice(rows.length - 2, 0, ...flightSignalField(quietRows, flight.status))
+  if (quietRows > 0) rows.splice(
+    rows.length - 2,
+    0,
+    ...flightSignalField(
+      quietRows,
+      flight.status,
+      activeStage,
+      activeStageIndex,
+      Math.max(1, safeWidth - 4),
+    ),
+  )
   return renderSupervisorPanel(
     'Launch Flight Recorder',
     `${flightKindLabel(flight.kind)} · ${status} · T+${elapsed}`,
@@ -212,14 +223,28 @@ function flightKindLabel(kind: SupervisorLaunchFlightKind): string {
   return 'REMOTE CONNECT'
 }
 
-function flightSignalField(rows: number, status: SupervisorLaunchFlightStatus): string[] {
+function flightSignalField(
+  rows: number,
+  status: SupervisorLaunchFlightStatus,
+  activeStage: SupervisorLaunchStage | undefined,
+  activeStageIndex: number,
+  width: number,
+): string[] {
   const field = Array.from({ length: rows }, () => '')
   if (rows >= 3) {
     const center = Math.floor(rows / 2)
+    if (status === 'failed' && activeStage) {
+      const stageNumber = String(Math.max(0, activeStageIndex) + 1).padStart(2, '0')
+      field[center - 1] = '◇ RECOVERY BRIEF'
+      field[center] = truncateDisplayWidth(`FAILED AT  ${stageNumber} ${activeStage.label}`, width)
+      field[center + 1] = truncateDisplayWidth(
+        'NEXT       Enter retries this target · Esc changes target',
+        width,
+      )
+      return field
+    }
     field[center - 1] = '                         ·'
-    field[center] = status === 'failed'
-      ? '                  · ───── × ───── ·'
-      : '                  · ━━━━━ ◆ ━━━━━ ·'
+    field[center] = '                  · ━━━━━ ◆ ━━━━━ ·'
     field[center + 1] = '                         ·'
   }
   return field

@@ -100,6 +100,30 @@ describe('Supervisor launch flight recorder', () => {
     expect(lines.every((line) => displayWidth(line) <= 80)).toBe(true)
   })
 
+  it('uses surplus failure space for a recovery brief instead of decoration', () => {
+    const flight = failSupervisorLaunchFlight(
+      advanceSupervisorLaunchFlight(
+        createSupervisorLaunchFlight('local-start', {
+          machineKey: 'local',
+          machineName: 'This computer',
+          projectKey: 'default',
+          projectName: 'Default AliceProject',
+          transport: 'loopback',
+        }, startedAt),
+        'start-runtime',
+      ),
+      'Runtime readiness timed out',
+    )
+    const lines = renderSupervisorLaunchFlight(flight, 120, startedAt + 61_000, 22)
+    const text = lines.join('\n')
+
+    expect(text).toContain('◇ RECOVERY BRIEF')
+    expect(text).toContain('FAILED AT  02 Prepare and start Runtime')
+    expect(text).toContain('NEXT       Enter retries this target · Esc changes target')
+    expect(text).not.toContain('· ───── × ───── ·')
+    expect(lines.every((line) => displayWidth(line) <= 120)).toBe(true)
+  })
+
   it('keeps the live source visible while a remote replacement is in flight', () => {
     const current = {
       machineKey: 'local',
