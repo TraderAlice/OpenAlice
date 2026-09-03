@@ -252,7 +252,7 @@ surface; changed-test selection does not replace that acceptance.
 Record the exact commands and real-surface result in the PR. Use the matching
 `pnpm test:owner:*` suite when one owner's impact is wider than the static
 dependency closure. Keep `pnpm test` as the explicit hermetic full-suite
-backstop for the third row and for master, scheduled, manual, and stable lanes.
+backstop for the third row and for manually dispatched/stable lanes.
 The complete command catalog, package-local contract, selector composition,
 and side-effect rules live in [[docs/testing.md]].
 
@@ -269,14 +269,14 @@ delivery lane:
   record the applicable owner-scoped tests, typecheck, browser, Electron,
   Docker, installer, or native-runtime evidence from the ladder above; hosted
   CI is not a second purchase of the same confidence.
-- PRs to `master`, `master` pushes, scheduled runs, and manual validation retain
-  the hermetic Ubuntu suite, macOS build-and-test repetition, and native
-  Windows/Ubuntu dev-smoke. Windows desktop and Broker Pack packaging remain in
-  the separate package workflow. Routine
-  integration PRs do not allocate those runners. There is no hosted changed-path
-  or actor/label router: the branch boundary is intentionally simple, local
-  development owns changed-test selection, and current `dev` receives a daily
-  full cross-platform backstop.
+- PRs to `master` automatically run the trusted source-contract/typecheck gate
+  and the native Windows dev-stack smoke. The hermetic Ubuntu suite, complete
+  workspace build, and macOS build-and-test repetition run only when a
+  maintainer explicitly dispatches Full Source Validation for the selected
+  commit. Windows desktop and Broker Pack packaging remain in the separate
+  package workflow. Local development owns macOS/Linux changed-test selection;
+  hosted runners are a deliberate native-host or release-candidate tool, not a
+  second purchase of every local check.
 - A `master`-targeted PR whose complete diff is exactly the synchronized,
   forward beta `version` value in `package.json` and
   `packages/cli/package.json` takes the release-preparation fast lane. It keeps
@@ -288,7 +288,7 @@ delivery lane:
   `master` SHA.
   The classifier is read from the trusted base commit and fails closed: stable
   versions, extra bytes or paths, mismatches, invalid versions, and classifier
-  errors all retain the full PR suite.
+  errors all retain the normal master PR gate.
 - Superseded runs for the same PR are cancelled. Only the latest-head result is
   actionable evidence.
 - The central CI aggregate owns workflow contracts and root typecheck for an
@@ -314,9 +314,10 @@ delivery lane:
   CLI candidates are assembled and each candidate runs its packaged
   Guardian/Alice, Web, Workspace, PTY, and release-owned Git acceptance before
   one atomic dev manifest is activated. The heavier UTA/Connector recovery and
-  external Broker Pack fixture run once on Linux x64; `master`, scheduled, and
-  final Release lanes keep the broader native-host coverage. The scheduled CI
-  run remains the daily full cross-platform backstop for current `dev`.
+  external Broker Pack fixture run once on Linux x64; manual Full Source
+  Validation and final Release lanes keep broader native-host coverage. Full
+  Source Validation is an explicit maintainer action when that broader
+  Ubuntu/macOS backstop is useful.
 - Installer or distributed-CLI work proves the checked-out tree locally with
   the deterministic clean-container HTTP install. A routine `dev` PR does not
   purchase a second hosted copy of that fixture. After merge, the `dev` push
@@ -325,18 +326,13 @@ delivery lane:
   provenance, commands, server control surface, and idempotent reuse. Hosted
   checkout, Bun host, package-manager, and managed-SSH candidate acceptance
   begins at the `master`/manual boundary.
-- A push to `master` always runs the complete matrix. Reusing PR evidence after
-  merge remains a useful accepted-tree provenance backstop. For stable it is a
-  synchronous release gate. For an exact beta, it may finish after dispatch and
-  is not a second source-test gate: the trusted version PR plus the Release
-  workflow's final artifact acceptance own publication. A real product failure
-  still stops or withdraws a candidate; hosted-runner starvation and a known
-  non-product fixture timeout do not become product risk through repetition.
-- Once this workflow version reaches the default `master` branch, the scheduled
-  validation checks out current `dev` and runs the same complete lane set:
-  Ubuntu hermetic/build, macOS build-and-test, and native Windows/Ubuntu
-  dev-smoke. It provides a daily multi-host backstop for lightweight PRs
-  without repeating the entire repository suite on Windows.
+- A beta promotion uses recorded local acceptance, the automatic source gate,
+  Windows dev-stack smoke, and the final Release workflow's artifact acceptance;
+  it does not wait for a duplicate hosted macOS/Linux full suite. A stable
+  candidate requires a manually dispatched Full Source Validation on its exact
+  commit before release. A real product failure still stops or withdraws a
+  candidate; hosted-runner starvation and a known non-product fixture timeout
+  do not become product risk through repetition.
 
 Routine integration has no hosted changed-path allowlist. Serial development
 uses the local ladder above, adding `pnpm test:system:remote`, real browser,
@@ -344,9 +340,8 @@ OrbStack, installer, unsigned Electron/package, and native runtime acceptance
 only when those surfaces change. Remote acceptance starts from a host the user
 already made reachable through ordinary SSH; CI and repository scripts do not
 provision or manage a cloud provider. Record the commands and results in the
-PR. A promotion to `master` re-establishes full remote evidence; stable keeps
-the complete matrix even when routine integration and beta used lighter hosted
-feedback.
+PR. Stable release preparation re-establishes the complete manually dispatched
+matrix even when routine integration and beta used lighter hosted feedback.
 
 ### Package signing boundary
 
@@ -384,8 +379,9 @@ Optimize measured waiting time without collapsing the confidence lanes:
    inputs across the remaining jobs;
 5. measure queue time versus install/build/test time before buying larger
    runners;
-6. keep complete `master` promotion and stable acceptance, signing, and
-   publication gated even when routine `dev` and beta feedback are light.
+6. keep complete stable-candidate acceptance, signing, and publication gated;
+   beta promotion may use recorded local acceptance plus the lightweight
+   automatic master gate.
 
 Any CI optimization PR should include before/after timing evidence and name the
 confidence gate it preserves, moves, or removes.

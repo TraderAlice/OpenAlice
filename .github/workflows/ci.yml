@@ -3,10 +3,6 @@ name: Full Source Validation
 on:
   pull_request:
     branches: [master]
-  # Scheduled workflows load from the default branch, then validate the latest
-  # dev source through the explicit checkout refs below.
-  schedule:
-    - cron: "0 19 * * *"
   workflow_dispatch:
 
 permissions:
@@ -17,11 +13,11 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # This job is the bounded source gate for every full-validation event and the
-  # complete central gate for an exact beta version-only PR. The classifier is
+  # This is the bounded automatic gate for master PRs and the entry gate for an
+  # explicitly requested full validation. The classifier is
   # loaded from the trusted base revision so a candidate cannot weaken its own
-  # lane. Any classifier or source-gate failure falls back to the complete
-  # validation matrix instead of granting the beta fast path.
+  # lane. A classifier failure retains the normal Windows PR smoke instead of
+  # granting the exact-beta fast path; a source-gate failure stops dependents.
   source-contracts:
     runs-on: ubuntu-latest
     outputs:
@@ -31,7 +27,6 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          ref: ${{ github.event_name == 'schedule' && 'dev' || '' }}
 
       - name: Detect exact beta release preparation
         id: beta-release-prep
@@ -63,16 +58,12 @@ jobs:
     needs: source-contracts
     if: >-
       !cancelled() &&
-      (
-        needs.source-contracts.result != 'success' ||
-        needs.source-contracts.outputs.beta_release_prep != 'true'
-      )
+      github.event_name == 'workflow_dispatch' &&
+      needs.source-contracts.result == 'success'
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event_name == 'schedule' && 'dev' || '' }}
 
       - uses: pnpm/action-setup@v6
 
@@ -90,16 +81,12 @@ jobs:
     needs: source-contracts
     if: >-
       !cancelled() &&
-      (
-        needs.source-contracts.result != 'success' ||
-        needs.source-contracts.outputs.beta_release_prep != 'true'
-      )
+      github.event_name == 'workflow_dispatch' &&
+      needs.source-contracts.result == 'success'
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event_name == 'schedule' && 'dev' || '' }}
 
       - uses: pnpm/action-setup@v6
 
@@ -117,10 +104,8 @@ jobs:
     needs: source-contracts
     if: >-
       !cancelled() &&
-      (
-        needs.source-contracts.result != 'success' ||
-        needs.source-contracts.outputs.beta_release_prep != 'true'
-      )
+      github.event_name == 'workflow_dispatch' &&
+      needs.source-contracts.result == 'success'
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -133,8 +118,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event_name == 'schedule' && 'dev' || '' }}
 
       - uses: pnpm/action-setup@v6
 
@@ -153,26 +136,21 @@ jobs:
         run: pnpm test
         timeout-minutes: 15
 
-  # Boots the real `pnpm dev` stack on Windows and an Ubuntu control host. This
-  # owns native process-spawn feedback that transpiled tests cannot provide.
+  # Windows remains the one automatic native-host smoke because it is not
+  # covered by the maintainer's local macOS/Linux development loop.
   dev-smoke:
     needs: source-contracts
     if: >-
       !cancelled() &&
+      needs.source-contracts.result == 'success' &&
       (
-        needs.source-contracts.result != 'success' ||
+        github.event_name == 'workflow_dispatch' ||
         needs.source-contracts.outputs.beta_release_prep != 'true'
       )
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, ubuntu-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
 
     steps:
       - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event_name == 'schedule' && 'dev' || '' }}
 
       - uses: pnpm/action-setup@v6
 

@@ -106,9 +106,10 @@ parallel workers hand off commits rather than racing to push or creating one PR
 per finding.
 
 Pending CI alone does not block serial progress, but a known product or contract
-failure must be understood and repaired before adding scope. Master promotion,
-stable release, explicit review pauses, and untrusted contributions retain
-their synchronous gates.
+failure must be understood and repaired before adding scope. Beta promotion may
+use recorded local acceptance plus the lightweight master PR gates. Stable
+release, explicit review pauses, and untrusted contributions retain their full
+synchronous gates.
 
 ## Verification Ladder
 
@@ -120,7 +121,8 @@ with ownership breadth and risk:
 | Leaf change inside one owner | `pnpm test:changed` or an explicit `test:select` intersection; owning typecheck; real affected surface |
 | Shared change inside one owner | Matching `pnpm test:owner:*` suite or package-local test; owning typecheck; real affected surface |
 | Cross-owner, shared test/build infrastructure, dependency/config change, or uncertain impact | Root and applicable package/UI typechecks; complete `pnpm test`; every touched surface's acceptance |
-| Master promotion, scheduled/manual backstop, or stable release | Complete remote matrix and release gates from [[docs/development-workflow.md]] |
+| Beta promotion | Recorded local full-suite/surface acceptance plus automatic master source gate and Windows dev-stack smoke |
+| Manual backstop or stable release | Complete remote matrix and release gates from [[docs/development-workflow.md]] |
 
 `pnpm test:changed` compares the feature branch and working tree with freshly
 fetched `origin/dev`. It follows Vitest's static import graph; dynamic imports,
