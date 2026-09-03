@@ -4068,6 +4068,27 @@ already large `supervisor-tui.ts` application controller.
   suite passes 660 tests, and CLI typecheck/build passes. Maintainer acceptance
   remains pending on this branch.
 
+### Unhealthy Home recovery-tip decision
+
+- A real health-flap PTY capture exposed two competing recovery instructions on
+  Home: the Session Board correctly promoted Retry for an unreachable remote
+  endpoint, while the contextual Tip still recommended running Doctor before
+  acting. The generic fallback weakened the launcher's state-manager role at
+  exactly the moment the user needed one unambiguous next step.
+- Home Tips now receive the active target's health phase and ownership. Checking
+  says that endpoint verification is in progress, degraded leads with Retry and
+  explains continuing automatic probes, and unreachable leads with Retry. For
+  SSH targets it also states that `x` disconnects the forward without stopping
+  the remote Runtime; local targets instead explain that automatic inspection
+  does not mutate lifecycle state.
+- Real 120x32 and 80x24 PTY captures freeze the complete unreachable transaction
+  and verify that the Tip agrees with Now, Signals, Recent, the primary Action
+  Shelf, and Command Spine. Health polling, thresholds, Retry/Disconnect
+  dispatch, Runtime ownership, and compact Tip omission remain unchanged. The
+  focused screen and real-PTY closure covers 147 tests, the complete CLI suite
+  passes 660 tests, and CLI typecheck/build passes. Maintainer acceptance remains
+  pending on this branch.
+
 ## Completion Criteria
 
 - A first-time user can identify the selected AliceProject, Runtime health, and

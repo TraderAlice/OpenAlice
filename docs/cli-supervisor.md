@@ -235,7 +235,11 @@ intentionally parameter-free:
   the persistent Dock, and the Command Dock expose the same non-color phase.
   An unhealthy target replaces Open and lifecycle mutations with `r` Retry;
   SSH `x` Disconnect remains available and still does not stop the remote
-  Runtime. Automatic checks continue while the target is retained;
+  Runtime. Home's contextual Tip follows that same recovery route instead of
+  recommending Doctor: checking explains retained ownership, degraded leads
+  with Retry while automatic probes continue, and unreachable SSH names both
+  Retry and non-destructive Disconnect. Automatic checks continue while the
+  target is retained;
 - the connected Home page is one responsive `Alice Session` stage rather than
   a dashboard. It orders the selected context as identity, Now, one full-row
   primary action, Signals, then Recent. Wide terminals keep the terminal-native

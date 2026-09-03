@@ -5190,6 +5190,7 @@ export class SupervisorScreen implements Component {
           panel: this.snapshot.panel ?? 'overview',
           runtimeState: state,
           targetKind: this.snapshot.activeTarget?.kind,
+          connectionHealth: this.snapshot.activeTarget?.health?.phase,
           launcher: this.snapshot.panel === 'fleet' && this.snapshot.activeTarget === null,
           directLauncher: this.snapshot.panel === 'fleet'
             && this.snapshot.activeTarget === null

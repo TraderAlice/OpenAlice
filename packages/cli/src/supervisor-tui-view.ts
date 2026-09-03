@@ -106,6 +106,7 @@ export interface SupervisorContextTipView {
   panel: string
   runtimeState?: string
   targetKind?: 'local' | 'ssh'
+  connectionHealth?: 'connected' | 'checking' | 'degraded' | 'unreachable'
   launcher?: boolean
   directLauncher?: boolean
   directConnection?: boolean
@@ -803,6 +804,18 @@ export function renderSupervisorContextTip(
       ? 'Operation owns input until ready; q detaches this TUI.'
     : view.launchFailure
       ? 'Enter retries; Esc returns to targets; q detaches this TUI.'
+    : view.connectionHealth === 'checking'
+      ? view.targetKind === 'ssh'
+        ? 'Checking the endpoint now; the SSH forward stays open.'
+        : 'Checking the local Runtime now; no lifecycle action is running.'
+    : view.connectionHealth === 'degraded'
+      ? view.targetKind === 'ssh'
+        ? 'Enter retries now; automatic probes keep the SSH forward open.'
+        : 'Enter retries inspection; automatic checks continue without changing Runtime.'
+    : view.connectionHealth === 'unreachable'
+      ? view.targetKind === 'ssh'
+        ? 'Enter retries now; x disconnects without stopping the remote Runtime.'
+        : 'Enter retries inspection; automatic checks continue without changing Runtime.'
     : view.panel === 'fleet'
       ? view.launcher
         ? view.directLauncher

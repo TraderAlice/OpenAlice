@@ -868,6 +868,7 @@ describe('Supervisor TUI screen', () => {
       },
     }, {
       motionEnabled: false,
+      getViewportHeight: () => 32,
       onRefreshActiveTarget: () => { retries += 1 },
       onOpenActiveTarget: () => { opens += 1 },
     })
@@ -881,6 +882,8 @@ describe('Supervisor TUI screen', () => {
     expect(frame).not.toContain('INBOX ATTENTION')
     expect(frame).toContain('currently unreachable')
     expect(frame).toContain('[ Enter ]  Retry active connection')
+    expect(frame).toContain('◇  Tip: Enter retries now; x disconnects without stopping the remote Runtime.')
+    expect(frame).not.toContain('Run Doctor before acting')
     expect(frame).not.toContain('[ o ] Open Web')
     expect(screen.renderCommandPalette(100).lines.join('\n')).toContain('Retry connection')
 
@@ -920,6 +923,7 @@ describe('Supervisor TUI screen', () => {
       },
     }, {
       motionEnabled: false,
+      getViewportHeight: () => 32,
       onRefreshActiveTarget: () => { retries += 1 },
     })
 
@@ -930,6 +934,8 @@ describe('Supervisor TUI screen', () => {
     expect(frame).toContain('! Connection  degraded')
     expect(frame).toContain('endpoint missed a Runtime')
     expect(frame).toContain('[ Enter ]  Retry active connection')
+    expect(frame).toContain('◇  Tip: Enter retries inspection; automatic checks continue without changing Runtime.')
+    expect(frame).not.toContain('Run Doctor before acting')
     expect(screen.handleKey('r', matchesKey)).toBe(true)
     expect(retries).toBe(1)
 
@@ -1672,6 +1678,15 @@ describe('Supervisor TUI screen', () => {
     const recovery = renderSupervisorContextTip({ panel: 'overview', recovery: true }, 100)
     const locked = renderSupervisorContextTip({ panel: 'fleet', inputLocked: true }, 100)
     const launchFailure = renderSupervisorContextTip({ panel: 'fleet', launchFailure: true }, 100)
+    const checkingRemote = renderSupervisorContextTip({
+      panel: 'overview', targetKind: 'ssh', connectionHealth: 'checking',
+    }, 100)
+    const degradedRemote = renderSupervisorContextTip({
+      panel: 'overview', targetKind: 'ssh', connectionHealth: 'degraded',
+    }, 100)
+    const unreachableRemote = renderSupervisorContextTip({
+      panel: 'overview', targetKind: 'ssh', connectionHealth: 'unreachable',
+    }, 100)
 
     expect(fleet).toContain('←→ changes pane; ↑↓ chooses')
     expect(activeFleet).toContain('Enter returns Home')
@@ -1698,6 +1713,9 @@ describe('Supervisor TUI screen', () => {
     expect(locked).toContain('Operation owns input until ready')
     expect(locked).toContain('q detaches this TUI')
     expect(launchFailure).toContain('Enter retries; Esc returns to targets')
+    expect(checkingRemote).toContain('SSH forward stays open')
+    expect(degradedRemote).toContain('Enter retries now; automatic probes')
+    expect(unreachableRemote).toContain('x disconnects without stopping the remote Runtime')
     expect(supervisorCommandTargets([
       fleet,
       activeFleet,
@@ -1714,6 +1732,9 @@ describe('Supervisor TUI screen', () => {
       recovery,
       locked,
       launchFailure,
+      checkingRemote,
+      degradedRemote,
+      unreachableRemote,
     ])).toEqual([])
 
     const compact = renderSupervisorContextTip({ panel: 'fleet' }, 46)
