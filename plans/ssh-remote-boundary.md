@@ -1,6 +1,6 @@
 # SSH Remote Boundary
 
-**Status:** Active
+**Status:** Ready for maintainer acceptance
 
 **Related issues:** None
 
@@ -68,30 +68,30 @@ does not copy Herdr's terminal protocol or turn a provider into product state.
 
 ## Ordered Work
 
-- [ ] Record the provider-neutral SSH boundary in the remote and deployment
+- [x] Record the provider-neutral SSH boundary in the remote and deployment
   owner guides and refresh the Herdr comparison to current public behavior.
-- [ ] Delete the Railway image, entrypoint, shell wrapper, preflight utility,
+- [x] Delete the Railway image, entrypoint, shell wrapper, preflight utility,
   dedicated Vitest config, and Railway-only system lane.
-- [ ] Remove Railway deployment authority from remote probe/plan/apply while
+- [x] Remove Railway deployment authority from remote probe/plan/apply while
   retaining ordinary managed SSH installation and Runtime lifecycle.
-- [ ] Remove Railway service-manager guards from update, rollback, uninstall,
+- [x] Remove Railway service-manager guards from update, rollback, uninstall,
   version identity, and CLI capability reporting.
-- [ ] Remove the inherited Railway fence protocol from Guardian, CLI lifecycle,
+- [x] Remove the inherited Railway fence protocol from Guardian, CLI lifecycle,
   server control, production launcher, service entrypoints, and Workspace child
   environment handling without weakening normal same-machine ownership.
-- [ ] Delete or rewrite Railway-only tests; retain focused coverage for normal
+- [x] Delete or rewrite Railway-only tests; retain focused coverage for normal
   Runtime ownership, SSH planning, installer identity, and hostile environment
   stripping.
-- [ ] Reconcile active plans, test-lane documentation, workflow contracts, and
+- [x] Reconcile active plans, test-lane documentation, workflow contracts, and
   local release/runtime skill guidance with the new boundary.
-- [ ] Run the full verification matrix and inspect the resulting Draft PR as one
+- [x] Run the full verification matrix and inspect the resulting Draft PR as one
   coherent provider-boundary change.
 
 ## Verification
 
 ```bash
 npx tsc --noEmit
-pnpm -F @traderalice/cli typecheck
+pnpm -F @traderalice/openalice-cli typecheck
 pnpm -F @traderalice/guardian-runtime typecheck
 pnpm test
 pnpm test:system:remote
@@ -99,7 +99,7 @@ pnpm test:system:installer
 pnpm docker:smoke
 bash ~/.codex/skills/openalice-guardian-recovery/scripts/run-checks.sh "$PWD" full
 pnpm build
-rg -n -i 'railway' --glob '!plans/ssh-remote-boundary.md' .
+rg -n -i 'railway' --glob '!.git/**' --glob '!plans/ssh-remote-boundary.md' .
 ```
 
 The final search must find no active product code, test, workflow, image,

@@ -1593,7 +1593,7 @@ already large `supervisor-tui.ts` application controller.
   Stop or Restart actions.
 - The rebuilt Fleet was exercised against the real Default AliceProject at
   80x24 with two Machines and six local AliceProjects. Raw SGR hover and click
-  selected the Railway Machine, and detach restored cursor, mouse, bracketed
+  selected the remote Machine, and detach restored cursor, mouse, bracketed
   paste, and alternate-screen modes.
 - Focused screen/pointer specs, all 18 real-PTY workflows, CLI build/typecheck,
   and the repository suite pass through the completed Fleet increment.
@@ -1644,7 +1644,7 @@ already large `supervisor-tui.ts` application controller.
 - A nine-frame brand-color entrance now settles in under a second, after which
   no intro timer remains. Successful Runtime probes drive a low-frequency
   `●`/`◉` heartbeat without changing status text. Real Fleet acceptance against
-  Railway Beta / Main Cloud exposed and fixed a pre-existing selection bug:
+  Cloud Dev / Main Cloud exposed and fixed a pre-existing selection bug:
   the local Runtime poll no longer snaps a remote Machine/Project inspection
   back to the selected local AliceProject. Repeated live probes preserved the
   remote pane focus while repainting only Main Cloud's running glyph; a focused

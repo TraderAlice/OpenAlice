@@ -343,15 +343,12 @@ function resolveUpdateContext(
   readTextFile: ReadTextFile,
   currentVersion: string,
 ): UpdateContext {
-  const serviceManager = env['OPENALICE_SERVICE_MANAGER']?.trim()
   const runtimeProfile = env['OPENALICE_RUNTIME_PROFILE']?.trim()
     || env['OPENALICE_LAUNCHER']?.trim()
 
   // package.json remains the source runtime's display/build baseline, but it
-  // must not turn a dev checkout into the stable or beta update channel. Keep
-  // Railway service ownership ahead of this override because its launcher is
-  // selected by the deployed service rather than the local source tree.
-  if (serviceManager !== 'railway' && isSourceRuntimeProfile(runtimeProfile)) {
+  // must not turn a dev checkout into the stable or beta update channel.
+  if (isSourceRuntimeProfile(runtimeProfile)) {
     return { channel: 'dev', authority: 'source', error: null }
   }
 
@@ -367,10 +364,6 @@ function resolveUpdateContext(
       ? 'custom'
       : releaseChannelForVersion(currentVersion)
   )
-
-  if (serviceManager === 'railway') {
-    return { channel, authority: 'service', error: provenanceError }
-  }
 
   if (runtimeProfile === 'electron-packaged') {
     return { channel, authority: 'desktop', error: provenanceError }

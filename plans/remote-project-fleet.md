@@ -31,9 +31,9 @@ Related active plan:
   lifecycle core, installer-managed Runtime, update model, and terminal
   acceptance. This plan owns the new machine fleet, remote AliceProject
   inventory, transfer transaction, and the TUI flows built on those services.
-- [[plans/bun-cli-distribution.md]] owns the Railway native host profile,
-  release authority, and hosted deployment acceptance. This plan continues to
-  own the AliceProject content/credential transaction used against that host.
+- [[plans/bun-cli-distribution.md]] owns the native CLI artifact and installer
+  used by managed SSH. This plan owns the AliceProject content/credential
+  transaction and controller/remote release relation.
 
 ## Objective
 
@@ -460,29 +460,12 @@ The plan classifies every connection before proposing a mutation:
 | `channel-conflict` | Do not infer ordering across stable, beta, and dev. Require an explicit channel-switch intent before any release mutation. |
 | `incompatible` | Fail closed with the required controller or remote upgrade; do not guess a PID, selector, or fallback. |
 
-Ordinary SSH and Railway share this relation model but keep distinct apply
-authorities:
-
-- an ordinary SSH host continues to use the normal installer with the
-  controller's verified logical release and the destination-specific artifact;
-- a Railway host remains service-managed. The controller never runs an
-  installer through Railway SSH or changes the live release pointer. A Railway
-  adapter uses locally held deployment authority to request restart/redeploy;
-  the image entrypoint resolves and validates the selected release, owns the
-  lifecycle fence, and retains the previous verified release on failure;
-- Railway credentials and project/environment/service identifiers stay on the
-  controller. They are not discovered from remote secrets or copied into an
-  AliceProject;
-- rolling dev is checked when the service starts; no polling or hot-update loop
-  is added. A controller-triggered redeploy is the normal deliberate refresh
-  path.
-
-A real regression fixture comes from the retained Railway host: the installed
-0.90.2 stable controller treated a newer dev Railway release as an ordinary SSH
-target and proposed replacing it with stable, while the current dev controller
-correctly recognized `Lifecycle: Railway (dev channel)` and planned a tunnel
-only. The unified relation must make the former `controller-behind` or
-`channel-conflict`, never an update plan.
+Managed SSH uses one apply authority: after explicit consent, the controller
+invokes the ordinary installer with the verified logical release and the
+remote platform's exact artifact identity. OpenAlice does not discover or call
+a cloud provider, deployment API, container manager, or service lifecycle.
+Rolling dev is checked only when the user requests connection or upgrade; no
+background polling or hot-update loop is added.
 
 ## Browser Remote Readiness and Recovery
 
@@ -516,8 +499,8 @@ Rules:
   deep-linked order forms stay gated until Pack, account reachability,
   permissions, and trading mode all allow the action.
 - Healthy browser chrome shows the SSH target, local tunnel, remote Runtime
-  endpoint, current AliceProject, and lifecycle/update owner. A Railway-owned
-  Data Home must not recommend local `openalice start` or `pnpm dev` commands.
+  endpoint, current AliceProject, and lifecycle/update owner. A remote Data
+  Home must not recommend local `openalice start` or `pnpm dev` commands.
 - The full CLI-issued client URL is the authority for establishing browser-side
   SSH identity; same-tab reload must retain it. A scrubbed bare origin cannot
   be asserted as a particular SSH target unless a bounded, backend-validated
@@ -655,7 +638,7 @@ Rules:
   criterion is repository truth and the maintainer accepts the completed
   product behavior.
 
-### Increment 6 — Railway-backed transfer hardening
+### Increment 6 — SSH transfer hardening
 
 - [x] Make Workspace inclusion Git-aware: preserve tracked and nonignored
   untracked content plus self-contained Git state, exclude ignored generated
@@ -665,15 +648,15 @@ Rules:
   them under a new destination key.
 - [x] Validate the complete receipt and exact published entry set before an
   idempotent registration retry, including receiver-created credential files.
-- [x] Apply the reviewed transfer to the retained Railway Volume, select the
-  imported Project, and verify portable Workspace/configuration state plus a
-  new user-owned Agent Runtime turn without importing native Session state.
+- [x] Apply the reviewed transfer to a retained SSH host, select the imported
+  Project, and verify portable Workspace/configuration state plus a new
+  user-owned Agent Runtime turn without importing native Session state.
 
 ### Increment 7 — controller-driven remote release convergence
 
-- [x] Audit ordinary SSH and Railway release authority, dev-manifest selection,
-  target-specific artifact identity, and the retained-host stale-controller
-  failure described above; record the chosen relation model in this plan.
+- [x] Audit managed SSH release authority, dev-manifest selection,
+  target-specific artifact identity, and stale-controller behavior; record the
+  chosen relation model in this plan.
 - [ ] Add one typed release-relation result shared by raw-target Remote, fleet
   inventory/detail, CLI plans, and Supervisor TUI presentation.
 - [ ] Preserve the existing latest-dev-controller gate and add directional
@@ -682,18 +665,15 @@ Rules:
 - [ ] Keep compatible read-only status/tunnel access available when the
   controller is behind, while blocking every remote lifecycle or release
   mutation with actionable local-upgrade guidance.
-- [ ] Add a Railway deployment adapter that validates locally configured
-  project/environment/service identity, shows the exact restart/PTY impact,
-  requires consent, requests a service-owned redeploy, and waits for a bounded
-  target-identity/readiness re-probe. It must not inherit write authority from
-  Railway SSH or run the installer inside the foreground container.
-- [ ] Treat transport loss, owner replacement, configured-selector fallback,
-  deployment failure, and readiness timeout as non-convergence. Report the
-  verified running release and never claim that the remote upgraded.
-- [ ] Add focused ordinary-SSH, dev-manifest, stale-controller, cross-channel,
-  Railway-adapter, consent/default-No, and post-redeploy identity tests. Extend
-  the disposable Docker SSH journey and run one retained Railway convergence
-  acceptance without exposing a public Web port.
+- [ ] When the remote is behind, show the exact install/restart/PTY impact,
+  require consent, invoke the normal SSH installer, and wait for a bounded
+  target-identity/readiness re-probe.
+- [ ] Treat transport loss, owner replacement, install failure, and readiness
+  timeout as non-convergence. Report the verified running release and never
+  claim that the remote upgraded.
+- [ ] Add focused managed-SSH, dev-manifest, stale-controller, cross-channel,
+  consent/default-No, and post-install identity tests. Extend the disposable
+  Docker SSH journey without exposing a public Web port.
 - [ ] Update `docs/remote-access.md`, `docs/docker-deployment.md`, CLI help, and
   Supervisor wording with the shipped apply authority and downgrade rules.
 
@@ -730,7 +710,7 @@ the SSH path deployment authority or broaden Agent/broker ownership.
 - [x] Extend the Docker SSH journey with dynamic free Runtime discovery,
   missing-Pack account projection, complete client URL retention, and a real
   shell PTY tunnel reconnect. Cover the longer logical retry window with fake
-  timers and run one retained Railway long-outage journey for beta acceptance.
+  timers and run one retained SSH long-outage journey for beta acceptance.
 - [x] Update the remote access, Agent/runtime, scheduling, Broker Pack, and
   Docker owner guides with the shipped layered-readiness contract.
 
@@ -817,36 +797,21 @@ snapshot, streamed separately from portable files, and re-sealed at the
 destination; native Agent login/config/session state remains excluded. Receipt
 validation covers the exact manifest, credentials policy, and published entry
 set, including idempotent recovery when the receiver created an AI vault before
-registry registration failed. Hosted Railway apply and real Project selection
+registry registration failed. Disposable SSH apply and real Project selection
 were the acceptance step shared with the Bun CLI distribution plan.
 
 Increment 6 hosted acceptance (2026-09-01): the stopped local Default
 AliceProject transferred through the production SSH path into
-`/data/projects/main-cloud` on the retained Railway Volume. The destination
+`/data/projects/main-cloud` on the retained remote volume. The destination
 published 10,702 files and 222,635,304 bytes, registered and selected its new
 AliceProject identity, retained portable Workspace/configuration state, copied
 no native Sessions, and left transfer staging clean. OpenCode 1.18.25 was then
 installed as user-owned persistent state outside the OpenAlice release, and
 Workspace `chat-solid-coral-ridge` completed a real headless turn returning
 `OPENALICE_REMOTE_OK`. The local source remains stopped to avoid divergent
-writes. Restart/resume and hard-kill persistence are owned by the Bun CLI
-distribution plan's still-open Railway acceptance, not by this transfer
-increment.
+writes.
 
-Increment 7 live authority observation (2026-09-01): the retained Railway
-service changed explicitly from rolling `dev` to pinned `beta`
-`0.91.0-beta.2` through local Railway deployment authority and one redeploy.
-The controller and SSH path remained inspection-only: no remote installer,
-pointer mutation, stop, or takeover ran through SSH. Re-probe found the exact
-accepted Linux x64 checksum/content identity, Bun provider, both Railway
-Runtime capabilities, ready Alice/UTA/Connector components, the same selected
-Project id with 10,763 files and six Workspace directories, and persistent Pi
-and OpenCode executables. This validates the manual destination-owner journey
-and its post-redeploy evidence, but does not complete Increment 7: the typed
-release relation, consented Railway adapter, controller-behind guard, and TUI
-presentation remain implementation work.
-
-Increment 8 discovery evidence (2026-09-01): a real retained-Railway browser
+Increment 8 discovery evidence (2026-09-01): a real retained-SSH browser
 journey proved that the core SSH/backend recovery path survives a short outage,
 but optional capability and presentation state is not yet truthful. Pi appeared
 only after an explicit probe because cached `not_installed` overrode fresh PATH
@@ -854,7 +819,7 @@ discovery; four Grok schedules said their schedule was valid while Grok was
 missing; six configured trading accounts collapsed to "No trading accounts
 connected", while Alpaca still showed a green indicator, stale equity, enabled
 Reconnect, and an order-entry dialog despite its missing Pack. Healthy Settings
-omitted the SSH target and advised local start commands for a Railway-owned
+omitted the SSH target and advised local start commands for a remote
 Data Home. A copied scrubbed URL lost remote recovery identity, while the full
 CLI-issued URL retained exact target and port guidance. Workspaces and
 Automation exposed reconstruction wrappers/raw target JSON as public titles,
@@ -876,8 +841,7 @@ executing, and a migrated Alpaca account stayed configured but non-operational
 with its Pack missing.
 
 Increment 8 release acceptance (2026-09-01): public `v0.91.0-beta.3` replaced
-beta2 on the retained Railway service through platform-owned deployment
-`745fbb1f-ed13-4df0-ab20-4d03d6e35ec0`. The accepted Runtime preserved the
+beta2 on the retained SSH service through an operator-managed restart. The accepted Runtime preserved the
 same `/data/projects/main-cloud` AliceProject, six Workspace directories, Pi,
 OpenCode, and ready Alice/UTA/Connector components. A real shell PTY kept PID
 893 while a 120-second command crossed a tunnel outage longer than the terminal
@@ -889,7 +853,7 @@ AliceProject domain hooks now invalidate outage-era requests, refetch on the
 shared backend-recovery generation, and ignore late stale responses. Confirmed
 snapshots are valid only for their recovery generation, so a failed recovery
 read shows unavailable instead of reviving the old owner; version reads also
-abort when the transport disappears. The source UI repeated the real Railway
+abort when the transport disappears. The source UI repeated the real SSH
 tunnel cut while staying on Settings;
 proxy evidence recorded fresh `/api/version` and `/api/alice-project` reads,
 and the visible beta3 Runtime source remained correct after automatic recovery.
@@ -903,7 +867,7 @@ authoritative `attached` frame, Agent inventory rediscovers on backend recovery,
 scheduled health reuses the assignee Session projection so a missing Workspace
 cannot appear ready, and in-flight Agent probes are shared only for the same
 executable path and fingerprint. Combined focused tests cover all six cases;
-the full repository/package and retained Railway gates remain below.
+the full repository/package and retained SSH gates remain below.
 
 Always:
 

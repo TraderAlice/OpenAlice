@@ -7,7 +7,6 @@
  */
 import { Hono } from 'hono'
 import { serve } from '@hono/node-server'
-import { adoptRailwayRuntimeFence } from '@traderalice/guardian-runtime'
 import {
   connectorArtifactDeliverySchema,
   connectorArtifactFailureSchema,
@@ -29,17 +28,8 @@ import { dataPath } from '@/core/paths.js'
 import { installConnectorProxyTransport } from './core/proxy.js'
 
 const CONNECTOR_PORT = Number(process.env['OPENALICE_CONNECTOR_PORT'] ?? 47334)
-const RAILWAY_RUNTIME_REQUIRED = Boolean(
-  process.env['OPENALICE_RAILWAY_FENCE_FD']
-  || process.env['OPENALICE_RAILWAY_ENTRYPOINT_OWNER']
-  || process.env['OPENALICE_SERVICE_MANAGER']?.trim() === 'railway'
-)
-const RUNTIME_LOCK_OWNER_AUTHORITY = adoptRailwayRuntimeFence(process.env)
 
 export async function startConnectorService(): Promise<void> {
-  if (RAILWAY_RUNTIME_REQUIRED && RUNTIME_LOCK_OWNER_AUTHORITY !== 'railway-fenced-handoff') {
-    throw new Error('invalid or missing inherited Railway lifecycle fence; refusing to start Connector')
-  }
   const startedAt = new Date().toISOString()
   console.log(`[connector] bootstrap @ ${startedAt}`)
 

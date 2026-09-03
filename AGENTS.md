@@ -147,12 +147,12 @@ Add the applicable surface gate:
 | Guardian lock, ownership, or takeover | `pnpm test:system:guardian` and the real launcher path |
 | Desktop, IPC, PTY, managed runtime, or packaging | Matching unsigned Electron/package smoke from [[docs/managed-workspace-runtime.md]] |
 | Root installer or distributed CLI | [[docs/cli-installer.md]], `pnpm test:system:installer`, and the interactive playground before release |
-| Docker/server/remote deployment | [[docs/docker-deployment.md]], `pnpm docker:smoke`, `pnpm test:system:railway`, or `pnpm test:system:remote` as applicable |
+| Docker/server/remote deployment | [[docs/docker-deployment.md]], `pnpm docker:smoke`, or `pnpm test:system:remote` as applicable |
 | Persisted state | Apply the shipped-boundary rule above; shipped shapes need an idempotent migration, spec, and regenerated index |
 | Onboarding, first run, or auth | Isolated state plus dev and packaged paths where relevant |
 
-`pnpm test` is hermetic: it must not invoke Railway CLI, open real SSH, read
-cloud credentials, deploy, publish, or contend for a host-global Railway fence.
+`pnpm test` is hermetic: it must not open real SSH, read cloud credentials,
+deploy, or publish.
 Those system paths remain explicit `test:system:*` or artifact-owner commands.
 `pnpm test:integration` is non-trading and must never load configured broker
 accounts or contact public providers. External read-only and live-paper lanes

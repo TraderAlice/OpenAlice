@@ -86,7 +86,7 @@ jobs:
       - name: Build complete workspace
         run: pnpm build
 
-  hermetic-and-railway-tests:
+  hermetic-tests:
     needs: source-contracts
     if: >-
       !cancelled() &&
@@ -112,10 +112,6 @@ jobs:
 
       - name: Run hermetic monorepo suite
         run: pnpm test
-
-      - name: Run local Railway lifecycle system suite
-        run: pnpm test:system:railway
-        timeout-minutes: 5
 
   cross-platform-test:
     needs: source-contracts
