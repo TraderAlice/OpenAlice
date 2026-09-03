@@ -5,9 +5,10 @@ Status: Active — the feedback-ladder and `AGENTS.md` checkpoint landed in PR
 `codex/dev-test-loop-refactor`: owner/risk test lanes, CI authority separation,
 and retryable rolling-dev activation remain in progress.
 
-Delivery mode: Autonomous / topic contribution from current `dev`. One Draft
-PR owns the coherent initiative; independently reviewable commits accumulate
-there and it does not merge without maintainer acceptance.
+Delivery mode: Serial / interactive from current `dev`. PR #1324 owns the
+coherent initiative; independently reviewable commits accumulate there, and
+the maintainer has authorized merge after complete proportional verification
+and repair of any known product, safety, or publication-contract failure.
 
 Owner guides:
 
