@@ -38,8 +38,9 @@ the durable truth after it changes. Git history is the archive.
   development feedback around changed/owner/risk-scoped verification while
   keeping full hermetic and release backstops explicit. The coherent command
   catalog, CI authority split, hash-verified native-input reuse, and retryable
-  rolling-dev activation are implemented on PR #1324; final skill alignment,
-  integrated acceptance, and serial merge remain.
+  rolling-dev activation are implemented on PR #1324; skill alignment and local
+  acceptance are complete, while hosted clean-build, serial merge, and the
+  post-merge dev-channel run remain.
 - [[plans/bun-cli-distribution.md]] — Replaces the expanded Node headless
   Runtime with a Bun-compiled, multi-process CLI distribution. Direct,
   npm/Bun, Homebrew, and AUR channels consume one accepted artifact set. The

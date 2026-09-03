@@ -3,8 +3,9 @@
 Status: Active — the feedback-ladder and `AGENTS.md` checkpoint landed in PR
 #1312. On `codex/dev-test-loop-refactor`, the owner/risk command catalog, CI
 authority split, hash-verified platform-neutral build reuse, and resumable
-rolling-dev activation are implemented. External skill vocabulary alignment,
-integrated acceptance, and serial merge remain.
+rolling-dev activation are implemented. Repository/skill vocabulary and local
+integrated acceptance are complete; the latest hosted clean-build, serial
+merge, and post-merge rolling-dev activation remain.
 
 Delivery mode: Serial / interactive from current `dev`. PR #1324 owns the
 coherent initiative; independently reviewable commits accumulate there, and
@@ -333,12 +334,16 @@ make development metrics look better.
   hash-verified output whitelist across the four host-native candidate jobs.
 - [x] Align `AGENTS.md`, owner guides, package scripts, and workflow contracts
   with the final command and authority vocabulary.
-- [ ] Align applicable external development/release skills with the finalized
+- [x] Align applicable external development/release skills with the finalized
   repository vocabulary.
-- [ ] Run proportional local acceptance for each later increment, then run the
+- [x] Run proportional local acceptance for each later increment, then run the
   full hermetic and workflow backstops once for the completed initiative.
-- [ ] Present final measurements and residual platform/release risks for
+- [x] Present final measurements and residual platform/release risks for
   initiative completion.
+- [ ] Merge PR #1324 after the latest hosted clean-build is understood.
+- [ ] Inspect the post-merge rolling-dev candidate, activation, and exact-commit
+  installer run; repair a known product/publication failure before closing the
+  initiative.
 
 ## Verification
 
@@ -369,6 +374,29 @@ At initiative acceptance:
 - YAML/workflow validation through the repository's contract specs; and
 - a comparison table showing old and new work for a UI leaf change, a Node leaf
   change, a shared-owner change, and a cross-owner change.
+
+Latest integrated local evidence on 2026-09-03:
+
+- root and UI typechecks passed; the UTA service and IBKR package typechecks
+  also passed after repairing test-only fixture types exposed by the new package
+  boundary;
+- `pnpm test` passed 708 files and 6,358 tests, with 4 intentional skips;
+- `test:owner:ui` passed 281 files / 1,676 tests, `test:owner:uta` passed
+  55 / 1,002, `test:owner:repo-tooling` passed 43 / 254 with 2 skips, and the
+  UTA service package-local command passed 38 / 898;
+- deterministic integration passed 2 files / 19 tests, workflow contracts
+  passed 10 / 80, and platform contracts passed 90 / 1,003 with 4 skips;
+- the complete build, checkout installer Docker smoke, and managed remote
+  Docker/SSH/Bun journey passed; the remote run intentionally skipped only its
+  dependency-backed TUI subjourney;
+- the serialized Railway lane passed 44 tests with 3 Linux-only fence/PTY cases
+  skipped on macOS; those cases remain in the master/full-source Linux gate;
+- both edited OpenAlice skills passed `quick_validate.py`; and
+- external read-only and broker-writing suites were not run. A provider-specific
+  live command was instead proven to reject execution without
+  `OPENALICE_UTA_LIVE_PAPER=1`. Real GitHub artifact transfer, production-R2
+  conditional creation, current-head activation, and exact-commit network
+  install remain post-merge evidence rather than local claims.
 
 ## Completion Criteria
 
