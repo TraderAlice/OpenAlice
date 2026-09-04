@@ -74,7 +74,7 @@ describe('Toggle', () => {
     )
 
     const toggle = screen.getByRole('switch', { name: 'Enable keyboard control' })
-    expect(toggle.className).toContain('focus-visible:[&_[data-slot=switch-track]]:ring-2')
+    expect(toggle.className).toContain('focus-visible:[&_[data-slot=switch-track]]:[box-shadow:var(--oa-focus-shadow)]')
 
     toggle.focus()
     await user.keyboard(' ')

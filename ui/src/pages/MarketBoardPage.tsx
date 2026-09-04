@@ -348,7 +348,7 @@ function EquityDetailButton({
         event.stopPropagation()
         open(symbol)
       }}
-      className="inline-flex max-w-full items-baseline gap-2 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+      className="inline-flex max-w-full items-baseline gap-2 rounded-sm text-left outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
     >
       <span className="shrink-0 font-mono font-semibold text-foreground">{symbol}</span>
       {name && <span className="min-w-0 truncate text-muted-foreground">{name}</span>}
@@ -672,7 +672,7 @@ function TermCurveCard({ curve }: { curve: TermCurve }) {
         {({ width, height }) => {
           const compact = width < 420
           return (
-            <LineChart width={width} height={height} data={chartData} margin={{ top: 8, right: compact ? 8 : 16, bottom: 0, left: 0 }}>
+            <LineChart accessibilityLayer width={width} height={height} data={chartData} margin={{ top: 8, right: compact ? 8 : 16, bottom: 0, left: 0 }}>
               <XAxis
                 dataKey="label"
                 tick={{ fontSize: 10, fill: 'var(--chart-axis)' }}
@@ -689,11 +689,21 @@ function TermCurveCard({ curve }: { curve: TermCurve }) {
                 tickFormatter={(value: number) => formatTermAxisPrice(value, width)}
               />
               <Tooltip
+                isAnimationActive={false}
                 formatter={(v) => [Number(v).toLocaleString('en-US'), '']}
                 labelFormatter={(l) => `20${l}`}
-                contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', fontSize: 11 }}
+                separator=""
+                cursor={{ strokeDasharray: '3 3' }}
               />
-              <Line type="monotone" dataKey="price" stroke="var(--primary)" strokeWidth={1.5} dot={{ r: 2.5 }} isAnimationActive={false} />
+              <Line
+                type="monotone"
+                dataKey="price"
+                stroke="var(--primary)"
+                strokeWidth={1.5}
+                dot={{ r: 2.5 }}
+                activeDot={{ r: 4, stroke: 'var(--background)', strokeWidth: 2 }}
+                isAnimationActive={false}
+              />
             </LineChart>
           )
         }}
@@ -935,15 +945,25 @@ function ChokepointCard({ curve }: { curve: ShippingCurve }) {
       </div>
       <MeasuredChartFrame className="h-28">
         {({ width, height }) => (
-          <LineChart width={width} height={height} data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+          <LineChart accessibilityLayer width={width} height={height} data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
             <XAxis dataKey="label" tick={{ fontSize: 9, fill: 'var(--chart-axis)' }} stroke="var(--chart-axis)" minTickGap={28} />
             <YAxis tick={{ fontSize: 9, fill: 'var(--chart-axis)' }} stroke="var(--chart-axis)" width={36}
               tickFormatter={(v: number) => v.toFixed(1)} domain={['auto', 'auto']} />
             <Tooltip
+              isAnimationActive={false}
               formatter={(v) => [`${Number(v).toFixed(2)}M t`, '']}
-              contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', fontSize: 11 }}
+              separator=""
+              cursor={{ strokeDasharray: '3 3' }}
             />
-            <Line type="monotone" dataKey="mt" stroke="var(--primary)" strokeWidth={1.25} dot={false} isAnimationActive={false} />
+            <Line
+              type="monotone"
+              dataKey="mt"
+              stroke="var(--primary)"
+              strokeWidth={1.25}
+              dot={false}
+              activeDot={{ r: 4, stroke: 'var(--background)', strokeWidth: 2 }}
+              isAnimationActive={false}
+            />
           </LineChart>
         )}
       </MeasuredChartFrame>

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react'
+import { PageTopBar } from '../PageTopBar'
 import { Check, ChevronRight, CircleAlert, CircleDashed, LoaderCircle, Send, Square } from 'lucide-react'
 
 import { MarkdownContent } from '../MarkdownContent'
@@ -32,13 +33,14 @@ interface Props {
   readonly wsId: string
   readonly sessionId: string
   readonly label?: string
+  readonly headerActions?: ReactNode
   readonly onSessionLost: () => void
 }
 
 /** A thin browser renderer over Pi's own RPC messages. Pi remains responsible
  * for the conversation schema and JSONL persistence; this component does not
  * introduce an OpenAlice message model. */
-export function WebPiView({ wsId, sessionId, label, onSessionLost }: Props): ReactElement {
+export function WebPiView({ wsId, sessionId, label, headerActions, onSessionLost }: Props): ReactElement {
   const [snapshot, setSnapshot] = useState<WebPiSnapshot | null>(null)
   const [draft, setDraft] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -128,16 +130,13 @@ export function WebPiView({ wsId, sessionId, label, onSessionLost }: Props): Rea
 
   return (
     <div className="webpi-shell">
-      <header className="webpi-header">
-        <div>
-          <div className="webpi-title">{label ?? 'Pi'} <span>WebPi · Beta</span></div>
-          <div className="webpi-subtitle">Same Pi session · browser surface</div>
-        </div>
+      <PageTopBar title={label ?? 'Pi'} actions={headerActions}>
+        <span className="shrink-0 text-xs text-muted-foreground">WebPi · Beta</span>
         <div className={`webpi-phase is-${snapshot?.phase ?? 'starting'}`}>
           {(working || !snapshot) && <LoaderCircle size={12} className="animate-spin" aria-hidden="true" />}
           {snapshot?.phase ?? 'starting'}
         </div>
-      </header>
+      </PageTopBar>
 
       <div
         ref={scrollerRef}

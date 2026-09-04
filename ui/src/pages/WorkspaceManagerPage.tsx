@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
+import { PageTopBar } from '../components/PageTopBar'
 import {
   ArrowLeft,
   ArrowUp,
@@ -135,6 +136,7 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
     const terminalCanvas =
       session.state === 'running' &&
       (session.surface ?? 'terminal') === 'terminal'
+    const webPiCanvas = session.state === 'running' && session.agent === 'pi' && session.surface === 'webpi'
     const backButton = (
       <Button
         type="button"
@@ -157,18 +159,8 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
 
     return (
       <div className={`workspaces-root flex h-full min-h-0 flex-col bg-background${terminalCanvas ? ' workspace-manager-terminal-canvas' : ''}`}>
-        {!terminalCanvas && (
-          <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border bg-secondary/35 px-3 py-2 md:px-4">
-            <div className="flex min-w-0 items-center gap-2.5">
-              {backButton}
-              <Network size={15} className="shrink-0 text-muted-foreground" />
-              <div className="min-w-0">
-                <div className="truncate text-[12px] font-semibold text-foreground">{t('workspaceManager.title')}</div>
-                <div className="truncate text-[10px] text-muted-foreground">{session.title ?? session.name}</div>
-              </div>
-            </div>
-            {runtimeBadge}
-          </header>
+        {!terminalCanvas && !webPiCanvas && (
+          <PageTopBar title={session.title ?? session.name} leading={backButton} actions={runtimeBadge} />
         )}
         <div className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden${terminalCanvas ? '' : ' p-2 md:p-3'}`}>
           {session.state === 'paused' ? (
@@ -182,6 +174,7 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
               wsId={MANAGER_WORKSPACE_ID}
               sessionId={sessionId}
               label={t('workspaceManager.title')}
+              headerActions={<>{backButton}{runtimeBadge}</>}
               onSessionLost={() => void refreshWorkspaceManager()}
             />
           ) : (
@@ -205,6 +198,7 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
 
   return (
     <div className="h-full overflow-y-auto bg-background">
+      <PageTopBar title={t('workspaceManager.title')} />
       <div className="workspace-manager-layout mx-auto flex min-h-full w-full max-w-5xl flex-col px-4 py-6 md:px-8 md:py-10">
         <div className="workspace-manager-hero mb-6">
           <div className="min-w-0">

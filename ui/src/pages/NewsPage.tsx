@@ -86,7 +86,7 @@ function ArticleRow({ article }: { article: NewsArticle }) {
         aria-expanded={expanded}
         aria-controls={panelId}
         onClick={() => setExpanded((current) => !current)}
-        className={`group w-full px-1 text-left hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40 sm:px-2 ${
+        className={`group w-full px-1 text-left hover:bg-muted/30 focus-visible:outline-none focus-visible:[box-shadow:inset_0_0_0_1px_var(--oa-focus-ring)] sm:px-2 ${
           hasPreview ? 'py-3 sm:py-3.5' : 'py-2.5'
         }`}
       >

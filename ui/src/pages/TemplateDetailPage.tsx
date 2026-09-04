@@ -16,6 +16,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { PageTopBar } from '../components/PageTopBar'
 
 import { MarkdownContent } from '../components/MarkdownContent'
 import { useWorkspaces } from '../contexts/workspaces-context'
@@ -98,12 +99,14 @@ export function TemplateDetailPage({ spec }: Props) {
 
   return (
     <div className="h-full overflow-y-auto">
+      <PageTopBar title={title} actions={
+        <Button type="button" size="sm" onClick={() => setShowCreate(true)}>{t('createWorkspace.create')}</Button>
+      } />
       <div className="max-w-4xl mx-auto px-6 py-6">
         {/* Header — identity + metadata band */}
         <div className="mb-5 flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-baseline gap-2.5 flex-wrap">
-              <h2 className="text-[20px] font-semibold text-foreground truncate">{title}</h2>
               <span className="text-[12px] font-mono text-muted-foreground tabular-nums shrink-0">
                 v{template.version}
               </span>
@@ -138,13 +141,6 @@ export function TemplateDetailPage({ spec }: Props) {
               </span>
             </div>
           </div>
-          <Button
-            type="button"
-            onClick={() => setShowCreate(true)}
-            className="shrink-0"
-          >
-            {t('createWorkspace.create')}
-          </Button>
         </div>
 
         {/* README body — the template's starting-shape doc */}

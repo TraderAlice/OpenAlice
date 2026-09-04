@@ -151,7 +151,7 @@ function FxDeskEntry({ icon, title, onClick }: {
     <button
       type="button"
       onClick={onClick}
-      className="oa-pressable group flex min-h-12 items-center gap-2.5 rounded-lg border border-border/70 bg-card px-3 py-2 text-left transition-[border-color,background-color] duration-[var(--motion-fast)] hover:border-success/30 hover:bg-success/5"
+      className="oa-data-surface oa-pressable group flex min-h-11 items-center gap-2.5 rounded-lg border px-3 py-2 text-left hover:border-success/30 hover:bg-success/5"
     >
       <span className="flex h-6 w-6 shrink-0 items-center justify-center text-success">
         {icon}
@@ -174,7 +174,7 @@ function MarketLaunchCard({
     <button
       type="button"
       onClick={onClick}
-      className="oa-pressable group flex min-h-12 items-center gap-2.5 rounded-lg border border-border/70 bg-card px-3 py-2 text-left transition-[border-color,background-color] duration-[var(--motion-fast)] hover:border-primary/30 hover:bg-primary/[0.045]"
+      className="oa-data-surface oa-pressable group flex min-h-11 items-center gap-2.5 rounded-lg border px-3 py-2 text-left hover:border-primary/30 hover:bg-primary/[0.045]"
     >
       <span className="flex h-6 w-6 shrink-0 items-center justify-center text-primary">
         {icon}

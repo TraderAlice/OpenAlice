@@ -245,17 +245,12 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
       <PageHeader
         title={displayName}
         live={lastUpdated && policy.canRead ? { lastUpdated } : undefined}
-        stackActionsOnNarrow
         description={
-          <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-2">
             <Link to="/trading" className="text-muted-foreground hover:text-foreground">← Trading</Link>
             <span className="font-mono text-muted-foreground">{uta.id}</span>
             <AccountReadinessBadge readiness={readiness} health={health} size="sm" />
-          </span>
-        }
-        right={
-          <div className="flex w-full flex-wrap items-center gap-2">
-            <div className="mr-auto flex items-center gap-2">
+            <span className="inline-flex items-center gap-2">
               <Toggle
                 ariaLabel={`${preset?.label ?? uta.id} enabled`}
                 size="sm"
@@ -267,8 +262,10 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
               <span className="text-[11px] text-muted-foreground">
                 {isDisabled ? 'Configured off' : 'Configured on'}
               </span>
-            </div>
-            <div className="oa-uta-header-divider h-5 w-px bg-border" />
+            </span>
+          </span>
+        }
+        right={
             <div className="flex flex-wrap items-center gap-2">
               <ReconnectButton accountId={uta.id} disabled={!policy.canReconnect} disabledReason={policy.reason} />
               <Button onClick={() => setEditing(true)} variant="outline" size="sm">
@@ -283,7 +280,6 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
                 + Place Order
               </Button>
             </div>
-          </div>
         }
       />
 
@@ -818,7 +814,7 @@ function PositionMobileRow({ position: p, onClose, canClose, closeDisabledReason
     <details className="group border-t border-border">
       <summary
         aria-label={`${name} ${p.side} position, market value ${fmt(p.marketValue, ccy)}, PnL ${fmtPnl(pnl, ccy)}, ${fmtPctSigned(pct)}. Expand for position details.`}
-        className="list-none px-3 py-3 outline-none hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary [&::-webkit-details-marker]:hidden"
+        className="list-none px-3 py-3 outline-none hover:bg-muted/30 focus-visible:[box-shadow:inset_0_0_0_1px_var(--oa-focus-ring)] [&::-webkit-details-marker]:hidden"
       >
         <div className="grid grid-cols-[minmax(0,1fr)_auto_16px] items-start gap-2">
           <div className="min-w-0">

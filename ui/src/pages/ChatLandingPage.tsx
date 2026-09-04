@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import { useTranslation } from 'react-i18next'
+import { PageTopBar } from '../components/PageTopBar'
 import {
   ArrowUp,
   BriefcaseBusiness,
@@ -447,6 +448,7 @@ function HarnessLandingPage({
       data-testid="harness-landing-root"
       className="@container/harness flex h-full min-h-0 w-full flex-col overflow-hidden bg-background"
     >
+      <PageTopBar title={t(mode === 'chat' ? 'chat.newChat' : mode === 'auto-quant' ? 'autoQuant.newResearch' : 'autoPrediction.newResearch')} />
       <div
         data-testid="harness-landing-scroll"
         className="oa-harness-scroll flex min-h-0 flex-1 justify-start overflow-x-hidden overflow-y-auto overscroll-contain px-5 py-8 @min-[42rem]/harness:px-8 @min-[42rem]/harness:py-10"
@@ -515,7 +517,7 @@ function HarnessLandingPage({
                     type="button"
                     onClick={() => useExample(example.prompt)}
                     disabled={launching}
-                    className="group flex min-h-11 w-full items-center gap-3 border-b border-border/70 px-1 text-left outline-none transition-colors duration-[var(--motion-fast)] hover:border-border hover:text-foreground focus-visible:border-ring disabled:opacity-40"
+                    className="group flex min-h-11 w-full items-center gap-3 border-b border-border/70 px-1 text-left outline-none transition-[border-color,color,box-shadow] duration-[var(--motion-fast)] hover:border-border hover:text-foreground focus-visible:[box-shadow:var(--oa-focus-shadow)] disabled:opacity-40"
                   >
                     <IntentIcon
                       aria-hidden

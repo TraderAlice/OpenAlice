@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
+import { PageTopBar, TopBar } from '../PageTopBar';
+import { Button } from '../ui/button';
 
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
@@ -202,7 +204,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
   if (import.meta.env.VITE_DEMO_MODE) {
     return (
       <Suspense fallback={null}>
-        <DemoTerminalReplay label={props.label ?? props.wsId} wsId={props.wsId} sessionId={props.sessionId} />
+        <DemoTerminalReplay label={props.sessionLabel ?? props.label ?? props.wsId} wsId={props.wsId} sessionId={props.sessionId} headerActions={props.headerActions} />
       </Suspense>
     );
   }
@@ -698,31 +700,14 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
     retryRecoverableRef.current?.();
   }, [backendRecoveryGeneration]);
 
+  const Header = props.chrome === 'canvas' ? PageTopBar : TopBar;
   return (
     <div className={`terminal-shell${props.chrome === 'canvas' ? ' is-canvas' : ''}`}>
-      <header className="terminal-header">
-        <StatusDot status={status} />
-        <span className="terminal-title">{props.label ?? wsId}</span>
-        {props.sessionLabel && (
-          <>
-            <span className="terminal-title-separator" aria-hidden>·</span>
-            <span className="terminal-session-title">{props.sessionLabel}</span>
-          </>
-        )}
-        <span className="terminal-meta">
-          {pid !== null ? `pid ${pid}` : ''}
-          {childExited ? ' · child exited' : ''}
-          {scrollbackTruncated ? ' · scrollback truncated' : ''}
-          {exitInfo
-            ? ` · session ended code=${exitInfo.code}${
-                exitInfo.signal !== null ? ` signal=${exitInfo.signal}` : ''
-              }`
-            : ''}
-        </span>
+      <Header title={props.sessionLabel ?? props.label ?? wsId}
+        leading={<StatusDot status={status} />} actions={<>
         {status === 'locked' && (
-          <button
+          <Button variant="ghost" size="sm"
             type="button"
-            className="terminal-header-action"
             onClick={() => {
               takeoverNextAttachRef.current = true;
               setStatus('connecting');
@@ -731,25 +716,32 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
             title="take over this session"
           >
             take over
-          </button>
+          </Button>
         )}
         {status === 'closed' && closedRecoverable && (
-          <button
+          <Button variant="ghost" size="sm"
             type="button"
-            className="terminal-header-action"
             onClick={() => retryRecoverableRef.current?.()}
             aria-label="retry this terminal connection"
             title="retry this terminal connection"
           >
             retry
-          </button>
+          </Button>
         )}
-        {props.headerActions && (
-          <span className="terminal-header-actions">
-            {props.headerActions}
-          </span>
-        )}
-      </header>
+        {props.headerActions}
+      </>}>
+        <span className="truncate text-xs text-muted-foreground" title={[
+          props.label ?? wsId,
+          pid !== null ? `pid ${pid}` : '',
+          childExited ? 'child exited' : '',
+          scrollbackTruncated ? 'scrollback truncated' : '',
+          exitInfo ? `session ended code=${exitInfo.code} signal=${exitInfo.signal ?? 'none'}` : '',
+        ].filter(Boolean).join(' · ')}>
+          {childExited ? 'child exited' : status}
+          {scrollbackTruncated ? ' · scrollback truncated' : ''}
+          {exitInfo ? ` · session ended code=${exitInfo.code}` : ''}
+        </span>
+      </Header>
       {/* FitAddon reads the computed size of xterm's direct parent. Keep that
           parent padding-free: putting the visual inset on `.terminal-host`
           makes FitAddon count the padding as usable columns, so the xterm

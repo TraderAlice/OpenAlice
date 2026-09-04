@@ -15,6 +15,7 @@
 
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { PageTopBar } from '../components/PageTopBar'
 
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { useWorkspace } from '../tabs/store'
@@ -69,10 +70,8 @@ export function TemplateCatalogPage() {
 
   return (
     <div className="h-full overflow-y-auto">
+      <PageTopBar title={t('templates.catalogTitle')} />
       <div className="max-w-5xl mx-auto px-6 py-6">
-        <div className="mb-6">
-          <h2 className="text-[18px] font-semibold text-foreground">{t('templates.catalogTitle')}</h2>
-        </div>
 
         {renderGrid(official)}
 

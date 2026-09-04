@@ -29,6 +29,11 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
+- [[plans/unified-page-topbar.md]] — Unifies navigator and content toolbars
+  across the UI, with fixed page actions and content-owned sidebar restoration.
+  Held on `codex/ui-usability-followup` for visual acceptance.
+
+- [[plans/interaction-density-convergence.md]] — Converges field focus, compact-rail expansion, Connector setup hierarchy, and dense market surfaces through shared interaction primitives on the current `dev` baseline.
 - [[plans/tui-experience.md]] — Rebuilds the Shell Supervisor as a polished,
   mouse-capable terminal control surface using Oh My Pi as the interaction and
   finish benchmark while preserving the Node CLI and Runtime ownership

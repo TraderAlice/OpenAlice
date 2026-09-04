@@ -105,31 +105,36 @@ export function MarketSidebar() {
       </div>
 
       <div className="flex-1 overflow-y-auto min-h-0">
-        {/* Browse */}
-        <SidebarSectionHeader>{t('market.browseSection')}</SidebarSectionHeader>
-        <SidebarRow
-          label={t('market.browseMarkets')}
-          active={isFocused('market-list')}
-          onClick={() => openOrFocus({ kind: 'market-list', params: {} })}
-        />
-        <SidebarRow
-          label={t('market.sectorRotation')}
-          active={isFocused('market-rotation')}
-          onClick={() => openOrFocus({ kind: 'market-rotation', params: {} })}
-        />
         <SidebarRow
           label={t('nav.item.news')}
           active={isFocused('news')}
           onClick={() => openOrFocus({ kind: 'news', params: {} })}
         />
-        {/* Boards — a distinct cluster from the three browse rows above, on the
-            same kinship rail the Inbox uses for grouped sub-rows. */}
-        <div className="ml-[18px] border-l border-border/50">
+        <div role="group" aria-label={t('market.marketsSection')}>
+          <SidebarSectionHeader>{t('market.marketsSection')}</SidebarSectionHeader>
+          <SidebarRow
+            label={t('market.browseMarkets')}
+            active={isFocused('market-list')}
+            onClick={() => openOrFocus({ kind: 'market-list', params: {} })}
+          />
           <SidebarRow
             label={t('market.boardMovers')}
             active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'movers'}
             onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'movers' } })}
           />
+          <SidebarRow
+            label={t('market.sectorRotation')}
+            active={isFocused('market-rotation')}
+            onClick={() => openOrFocus({ kind: 'market-rotation', params: {} })}
+          />
+          <SidebarRow
+            label={t('market.boardTermStructure')}
+            active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'term-structure'}
+            onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'term-structure' } })}
+          />
+        </div>
+        <div role="group" aria-label={t('market.macroSection')}>
+          <SidebarSectionHeader>{t('market.macroSection')}</SidebarSectionHeader>
           <SidebarRow
             label={t('market.boardCalendar')}
             active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'calendar'}
@@ -139,11 +144,6 @@ export function MarketSidebar() {
             label={t('market.boardMacro')}
             active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'macro'}
             onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'macro' } })}
-          />
-          <SidebarRow
-            label={t('market.boardTermStructure')}
-            active={focusedSpec?.kind === 'market-board' && focusedSpec.params.board === 'term-structure'}
-            onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'term-structure' } })}
           />
           <SidebarRow
             label={t('market.boardGlobalMacro')}

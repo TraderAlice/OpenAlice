@@ -6,11 +6,11 @@ import { useMobilePageNavigation, MobilePageNavigationProvider } from '../contex
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../i18n'
+import { PrimaryNavigationContext } from '../contexts/PrimaryNavigationContext'
+import { PageHeader } from './PageHeader'
 import {
   calculatePageSidebarConstraints,
-  calculatePageSidebarOverdrag,
   PageSidebarLayout,
-  shouldCollapsePageSidebar,
 } from './PageSidebarLayout'
 
 class ResizeObserverStub {
@@ -41,15 +41,20 @@ afterEach(() => {
 })
 
 describe('PageSidebarLayout', () => {
-  it('applies diminishing resistance and a deliberate overdrag commit boundary', () => {
-    expect(calculatePageSidebarOverdrag(-1)).toBe(0)
-    expect(calculatePageSidebarOverdrag(0)).toBe(0)
-    expect(calculatePageSidebarOverdrag(16)).toBeCloseTo(11.67, 1)
-    expect(calculatePageSidebarOverdrag(40)).toBeCloseTo(22.14, 1)
-    expect(calculatePageSidebarOverdrag(64)).toBeCloseTo(27.69, 1)
-    expect(calculatePageSidebarOverdrag(200)).toBeLessThanOrEqual(34)
-    expect(shouldCollapsePageSidebar(77.9)).toBe(false)
-    expect(shouldCollapsePageSidebar(78)).toBe(true)
+
+  it('places the only global navigation control in the first toolbar, not both panes', () => {
+    const view = render(
+      <PrimaryNavigationContext.Provider value={<button>Toggle primary navigation</button>}>
+        <PageSidebarLayout storageKey="portfolio" title="Trading" sidebar={<div>Accounts</div>}>
+          <PageHeader title="Portfolio" right={<button>Refresh</button>} />
+        </PageSidebarLayout>
+      </PrimaryNavigationContext.Provider>,
+    )
+    const toggle = screen.getByRole('button', { name: 'Toggle primary navigation' })
+    expect(screen.getByTestId('page-sidebar-expanded').contains(toggle)).toBe(true)
+    expect(view.container.querySelectorAll('[data-slot="page-topbar"]')).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: 'Toggle primary navigation' })).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeTruthy()
   })
 
   it('keeps responsive panel minimums feasible while preserving the former content reserve', () => {
@@ -142,53 +147,22 @@ describe('PageSidebarLayout', () => {
     expect(document.activeElement).toBe(contextTrigger)
   })
 
-  it('persists the desktop focus mode and restores the full sidebar', async () => {
+  it('keeps the desktop navigator visible even when an old collapsed preference exists', () => {
     window.localStorage.setItem('openalice.page-sidebar-width.market.v1', '312')
-    const view = render(
-      <PageSidebarLayout storageKey="market" title="Market" sidebar={<div>Market navigation</div>}>
-        <div>Market content</div>
-      </PageSidebarLayout>,
-    )
-
-    const desktopSidebar = screen.getByTestId('page-sidebar-desktop')
-    const expandedSurface = screen.getByTestId('page-sidebar-expanded')
-    const collapsedSurface = screen.getByTestId('page-sidebar-collapsed')
-    const separator = screen.getByRole('separator')
-    expect(desktopSidebar.getAttribute('data-state')).toBe('expanded')
-    expect(screen.getAllByRole('separator')).toHaveLength(1)
-    expect(separator.getAttribute('data-slot')).toBe('resizable-handle')
-    expect(separator.getAttribute('aria-label')).toBe('Resize Market')
-    expect(separator.className).toContain('w-px')
-    expect(desktopSidebar.className).not.toContain('border-r')
-    expect(separator.tabIndex).toBe(0)
-    expect(expandedSurface.hasAttribute('inert')).toBe(false)
-    expect(collapsedSurface.hasAttribute('inert')).toBe(true)
-
-    fireEvent.click(screen.getByRole('button', { name: 'Collapse Market' }))
-    await waitFor(() => {
-      expect(window.localStorage.getItem('openalice.page-sidebar-collapsed.market.v1')).toBe('1')
-    })
-    expect(window.localStorage.getItem('openalice.page-sidebar-width.market.v1')).toBe('312')
-    expect(desktopSidebar.getAttribute('data-state')).toBe('collapsed')
-    expect(expandedSurface.hasAttribute('inert')).toBe(true)
-    expect(collapsedSurface.hasAttribute('inert')).toBe(false)
-    expect(screen.getByRole('button', { name: 'Open Market' })).toBeTruthy()
-
-    view.unmount()
+    window.localStorage.setItem('openalice.page-sidebar-collapsed.market.v1', '1')
     render(
-      <PageSidebarLayout storageKey="market" title="Market" sidebar={<div>Market navigation</div>}>
+      <PageSidebarLayout storageKey="market" title="Market" sidebar={<button>Market navigation</button>}>
         <div>Market content</div>
       </PageSidebarLayout>,
     )
-    expect(screen.getByRole('button', { name: 'Open Market' })).toBeTruthy()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open Market' }))
-    await waitFor(() => {
-      expect(window.localStorage.getItem('openalice.page-sidebar-collapsed.market.v1')).toBe('0')
-    })
-    expect(screen.getByTestId('page-sidebar-desktop').getAttribute('data-state')).toBe('expanded')
+    expect(screen.getByRole('button', { name: 'Market navigation' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Collapse Market' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Open Market' })).toBeNull()
     expect(screen.getByTestId('page-sidebar-expanded').hasAttribute('inert')).toBe(false)
-    expect(screen.getByText('Market navigation')).toBeTruthy()
+    expect(screen.getAllByRole('separator')).toHaveLength(1)
+    expect(screen.getByRole('separator').getAttribute('aria-label')).toBe('Resize Market')
+    expect(screen.getByRole('separator').tabIndex).toBe(0)
+    expect(window.localStorage.getItem('openalice.page-sidebar-width.market.v1')).toBe('312')
   })
 
   it('lets a phone sidebar selection close the navigation drawer', async () => {

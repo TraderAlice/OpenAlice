@@ -26,6 +26,7 @@ import { useWorkspaceSessionData } from '../hooks/useWorkspaceData'
 import { useWorkspace } from '../tabs/store'
 import { workspaceDisplayName, workspaceDisplayTitle } from '../components/workspace/display'
 import { WorkspaceView } from '../components/workspace/WorkspaceView'
+import { PageTopBar } from '../components/PageTopBar'
 import { WorkspaceFilesToggle } from '../components/workspace/WorkspaceFilesToggle'
 import { Button } from '../components/ui/button'
 import { AgentRuntimeIcon } from '../lib/agentRuntimeIcon'
@@ -99,13 +100,12 @@ export function WorkspacePage({ spec, visible }: Props) {
   }
 
   const workspaceName = workspaceDisplayName(workspace)
-  const workspaceTitle = workspaceDisplayTitle(workspace)
   const hasCustomName = workspaceName !== workspace.tag
   const terminalCanvas =
-    !import.meta.env.VITE_DEMO_MODE &&
     activeRecord?.state === 'running' &&
     (activeRecord.surface ?? 'terminal') === 'terminal'
   const pausedCanvas = activeRecord?.state === 'paused'
+  const webPiCanvas = activeRecord?.state === 'running' && activeRecord.surface === 'webpi' && activeRecord.agent === 'pi'
   const workspaceCanvas = terminalCanvas || pausedCanvas
   const workspaceActions = (
     <>
@@ -152,28 +152,16 @@ export function WorkspacePage({ spec, visible }: Props) {
   // state needs the full list to render resume/continue cards.
   return (
     <div className={`workspaces-root workspace-page-shell flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden${terminalCanvas ? ' is-terminal-canvas' : ''}${pausedCanvas ? ' is-paused-canvas' : ''}`}>
-      {/* Library, paused, WebPi, and demo surfaces keep a page-level header.
-       * A live TUI promotes these actions into the terminal's own titlebar so
-       * the primary canvas does not sit inside a second shell. */}
-      {!terminalCanvas && (
-        <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-secondary/30 shrink-0">
-          <div
-            className="flex min-w-0 items-baseline gap-2 pr-2"
-            title={workspaceTitle}
-          >
-            <span className="truncate text-[12px] font-medium text-foreground">
-              {workspaceName}
-            </span>
+      {/* Running renderers fill the shared header slot with session identity
+       * and these actions. Libraries and paused sessions own their header here. */}
+      {!terminalCanvas && !webPiCanvas && (
+        <PageTopBar title={workspaceName} titleHint={workspaceDisplayTitle(workspace)} actions={workspaceActions}>
             {hasCustomName && (
               <span className="hidden shrink-0 font-mono text-[10px] text-muted-foreground/70 sm:inline">
                 {workspace.tag}
               </span>
             )}
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
-            {workspaceActions}
-          </div>
-        </div>
+        </PageTopBar>
       )}
 
       <div className={`flex min-h-0 min-w-0 flex-1 flex-col${workspaceCanvas ? '' : ' p-3'}`}>
@@ -185,7 +173,7 @@ export function WorkspacePage({ spec, visible }: Props) {
           sessions={sessions}
           agents={ctx.agents}
           label={workspaceName}
-          terminalHeaderActions={terminalCanvas ? workspaceActions : undefined}
+          terminalHeaderActions={terminalCanvas || webPiCanvas ? workspaceActions : undefined}
           onSpawnFresh={spawnDefault}
           onResume={(id) => ctx.resumeSession(wsId, id, source)}
           onUpdateSessionRuntime={(_id, update) => updateRuntime(update).then(() => undefined)}

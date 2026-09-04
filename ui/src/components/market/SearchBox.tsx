@@ -77,7 +77,7 @@ export function SearchBox() {
   return (
     <div ref={containerRef} className="relative">
       <input
-        className="w-full rounded-md border border-border bg-background px-3 py-2 text-[14px] leading-5 outline-none placeholder:text-muted-foreground/50 focus:border-primary focus:ring-2 focus:ring-primary/20"
+        className="oa-field-control w-full rounded-md border border-input bg-background px-3 py-2 text-[14px] leading-5 outline-none transition-[border-color,box-shadow] duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-out)] placeholder:text-muted-foreground/50 motion-reduce:transition-none"
         placeholder={t('market.searchInputPlaceholder')}
         value={query}
         onChange={(e) => { setQuery(e.target.value); setOpen(true) }}

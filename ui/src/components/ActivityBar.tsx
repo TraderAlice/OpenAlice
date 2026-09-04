@@ -1,5 +1,5 @@
-import { ChevronDown, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { ChevronDown, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { type Page } from '../App'
 import { useWorkspace } from '../tabs/store'
 import type { ActivitySection } from '../tabs/types'
@@ -51,8 +51,10 @@ interface ActivityBarProps {
   desktopStatic?: boolean
   /** Static desktop rail width chosen by App's shell breakpoints. */
   railMode?: 'compact' | 'narrow' | 'full'
-  /** Force the static rail into icon-only mode for a compact workbench. */
-  compactRailForced?: boolean
+  /** Effective shell state, including temporary workbench expansion. */
+  collapsed?: boolean
+  /** Shell-owned collapse control, shown beside the expanded brand only. */
+  headerAction?: ReactNode
   /** Mobile drawer trigger that receives focus again when the drawer closes. */
   returnFocusRef?: RefObject<HTMLElement | null>
 }
@@ -92,7 +94,8 @@ export function ActivityBar({
   onClose,
   desktopStatic = true,
   railMode = 'full',
-  compactRailForced = false,
+  collapsed,
+  headerAction,
   returnFocusRef,
 }: ActivityBarProps) {
   const { t } = useTranslation()
@@ -112,47 +115,14 @@ export function ActivityBar({
   const collapsedSections = useActivityBarCollapse((s) => s.collapsedSections)
   const setCollapsed = useActivityBarCollapse((s) => s.setCollapsed)
   const railCollapsed = useActivityBarCollapse((s) => s.railCollapsed)
-  const setRailCollapsed = useActivityBarCollapse((s) => s.setRailCollapsed)
   const shortRailHeight = useMediaQuery('(max-height: 700px)')
-  const veryShortRailHeight = useMediaQuery('(max-height: 520px)')
-  const workbenchRail = selectedSidebar === 'chat' ||
-    selectedSidebar === 'auto-quant' ||
-    selectedSidebar === 'prediction'
-  const forcedCompactRail = desktopStatic && (
-    compactRailForced || workbenchRail || railMode === 'compact' || veryShortRailHeight
-  )
-  const compactRail = desktopStatic && (forcedCompactRail || railCollapsed)
-  const narrowRail = desktopStatic && railMode === 'narrow' && !compactRail
+  const compactRail = desktopStatic && (collapsed ?? railCollapsed ?? railMode === 'compact')
+  const narrowRail = desktopStatic && railMode !== 'full' && !compactRail
   const denseRail = desktopStatic && shortRailHeight
   const mobileDrawerRef = useRef<HTMLDivElement>(null)
-  const railToggle = desktopStatic && !forcedCompactRail ? (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <Button
-            type="button"
-            onClick={() => setRailCollapsed(!railCollapsed)}
-            aria-label={t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
-            className={`${denseRail ? 'h-[26px] w-[26px]' : ''} shrink-0 text-muted-foreground`}
-            variant="ghost"
-            size="icon-sm"
-          />
-        }
-      >
-        {railCollapsed
-          ? <PanelLeftOpen size={denseRail ? 14 : 16} strokeWidth={1.75} aria-hidden />
-          : <PanelLeftClose size={denseRail ? 14 : 16} strokeWidth={1.75} aria-hidden />}
-      </TooltipTrigger>
-      <TooltipContent side="right" sideOffset={8}>
-        {t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
-      </TooltipContent>
-    </Tooltip>
-  ) : null
   const railContent = (
     <>
         <div className={`${denseRail ? 'h-10 md:h-8' : 'h-10'} flex shrink-0 items-center ${compactRail ? 'justify-center px-0' : narrowRail ? 'gap-1.5 px-2.5' : 'gap-2.5 px-3.5'}`}>
-          {railCollapsed && !forcedCompactRail && desktopStatic ? railToggle : (
-            <>
               <img
                 src="/alice.ico"
                 alt="Alice"
@@ -171,9 +141,7 @@ export function ActivityBar({
                 >
                   <X size={15} strokeWidth={1.75} aria-hidden />
                 </Button>
-              ) : railToggle}
-            </>
-          )}
+              ) : !compactRail ? headerAction : null}
         </div>
 
         {/* Navigation */}

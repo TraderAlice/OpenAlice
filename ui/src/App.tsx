@@ -15,6 +15,10 @@ import {
 } from './contexts/MobilePageNavigationContext'
 import { UrlAdopter } from './tabs/UrlAdopter'
 import { useLocale } from './i18n/useLocale'
+import { useActivityRailState } from './hooks/useActivityRailState'
+import { useWorkspace } from './tabs/store'
+import { PrimaryNavigationContext } from './contexts/PrimaryNavigationContext'
+import { PrimaryNavigationToggle, useNavigationToggleFocus } from './components/PrimaryNavigationToggle'
 
 /**
  * Activity-bar pages — only items that appear as icons in the ActivityBar.
@@ -44,11 +48,12 @@ function useMediaQuery(query: string): boolean {
 /**
  * Three breakpoints drive the responsive shell:
  *  - <768  (phone):  rail = drawer (hamburger), sidebar = drawer (drill-in)
- *  - 768–959 (small desktop): rail = compact static icon column.
+ *  - 768–959 (small desktop): rail defaults to a compact static icon column.
  *    Page-owned sidebars stay static here, so the business navigator does not
  *    disappear just because the app is in a partial-width browser window.
  *  - 960–1279 (narrow desktop): rail keeps text labels in a slimmer column.
  *  - ≥1280 (roomy desktop): rail gets its full text width.
+ * Explicit expanded/collapsed preference overrides the desktop default.
  */
 const useIsDesktop = () => useMediaQuery('(min-width: 768px)') // rail static
 const useHasRailText = () => useMediaQuery('(min-width: 960px)') // text rail allowed
@@ -85,6 +90,16 @@ function AppShellContent() {
   const hasRailText = useHasRailText() // ≥960 — text rail is allowed
   const hasFullRail = useHasFullRail() // ≥1280 — full rail width
   const railMode = !isDesktop ? 'full' : hasFullRail ? 'full' : hasRailText ? 'narrow' : 'compact'
+  const area = useWorkspace((state) => state.selectedSidebar)
+  const workbench = area === 'chat' || area === 'auto-quant' || area === 'prediction'
+  const { collapsed: railCollapsed, toggle: toggleRail } = useActivityRailState(workbench, railMode === 'compact')
+  const toggleFocus = useNavigationToggleFocus()
+  const railToggle = isDesktop ? (
+    <PrimaryNavigationToggle ref={toggleFocus.ref} collapsed={railCollapsed} onToggle={() => {
+      toggleFocus.requestFocus()
+      toggleRail()
+    }} />
+  ) : null
   const location = useLocation()
   const mobilePageNavigation = useMobilePageNavigation()
   const showFirstRunGuide = firstRunGuideEnabled && !location.pathname.startsWith('/design/')
@@ -105,7 +120,9 @@ function AppShellContent() {
         closeRail={() => setSidebarOpen(false)}
       />
 
-      <TabHost />
+      <PrimaryNavigationContext.Provider value={railCollapsed ? railToggle : null}>
+        <TabHost />
+      </PrimaryNavigationContext.Provider>
     </main>
   )
 
@@ -121,6 +138,8 @@ function AppShellContent() {
           onClose={() => setSidebarOpen(false)}
           desktopStatic={isDesktop}
           railMode={railMode}
+          collapsed={railCollapsed}
+          headerAction={!railCollapsed ? railToggle : null}
           returnFocusRef={mobileRailMenuButtonRef}
         />
         <div
