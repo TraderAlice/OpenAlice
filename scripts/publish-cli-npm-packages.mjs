@@ -20,12 +20,11 @@ export function publishCliNpmPackages({
   logger = console,
 } = {}) {
   const root = resolve(packagesDir ?? process.cwd())
-  const manifest = readManifest(root)
-  const packages = validateManifest(manifest)
+  const manifest = verifyCliNpmPackages(root)
+  const packages = manifest.packages
 
   for (const entry of packages) {
     const tarballPath = resolveTarball(root, entry.filename)
-    verifyTarball(tarballPath, entry)
     const current = readPublishedIntegrity(runNpm, entry)
     if (current === entry.integrity) {
       logger.log(`[npm-publish] ${entry.name}@${entry.version} already matches; skipping`)
@@ -49,6 +48,15 @@ export function publishCliNpmPackages({
   }
 
   return { version: manifest.version, packages: packages.map(({ name }) => name) }
+}
+
+export function verifyCliNpmPackages(packagesDir) {
+  const root = resolve(packagesDir)
+  const manifest = readManifest(root)
+  for (const entry of validateManifest(manifest)) {
+    verifyTarball(resolveTarball(root, entry.filename), entry)
+  }
+  return manifest
 }
 
 function readManifest(root) {
