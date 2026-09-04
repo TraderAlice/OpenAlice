@@ -1,4 +1,4 @@
-import { lstat, readFile, rename, rm, rmdir, writeFile } from 'node:fs/promises'
+import { lstat, open, readFile, rename, rm, rmdir, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline/promises'
@@ -69,7 +69,7 @@ export async function runUninstallCommand(argv, dependencies = {}) {
     processKill: dependencies.processKill,
   })
   if (result.deferred) {
-    stdout.write('\nWindows cleanup is scheduled after this command exits. See .cli-uninstall-result.json in the install root for its result. User data is preserved.\n')
+    stdout.write('\nWindows cleanup is scheduled after this command exits. See .cli-uninstall-result.json for its result or .cli-uninstall.log for startup errors in the install root. User data is preserved.\n')
     return 0
   }
   stdout.write('\nOpenAlice CLI releases and installer-owned launchers were removed.\n')
@@ -113,12 +113,15 @@ async function scheduleWindowsUninstall(layout) {
   await writeFile(script, await readFile(source))
   const env = { ...process.env }
   delete env.PSModulePath
-  const child = spawn(join(env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), [
-    '-NoLogo', '-NoProfile', '-File', script, '-InstallDir', layout.installRoot,
-    '-Uninstall', '-WaitForPid', String(process.pid), '-Yes',
-  ], { detached: true, windowsHide: true, stdio: 'ignore', env })
-  await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject) })
-  child.unref()
+  const log = await open(join(layout.installRoot, '.cli-uninstall.log'), 'w', 0o600)
+  try {
+    const child = spawn(join(env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), [
+      '-NoLogo', '-NoProfile', '-File', script, '-InstallDir', layout.installRoot,
+      '-Uninstall', '-WaitForPid', String(process.pid), '-Yes',
+    ], { detached: true, windowsHide: true, stdio: ['ignore', log.fd, log.fd], env })
+    await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject) })
+    child.unref()
+  } finally { await log.close() }
   return { profilesChanged: [], deferred: true }
 }
 

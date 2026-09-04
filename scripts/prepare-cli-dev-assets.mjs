@@ -138,7 +138,7 @@ export function validateCliReleaseArchive({ archivePath, version, platform, arch
     throw new Error(`${archiveName} content identity does not match its release manifest`)
   }
   const entries = execFileSync('tar', ['-tzf', archivePath], TAR_TEXT_OPTIONS)
-    .split('\n')
+    .split(/\r?\n/)
     .filter(Boolean)
   if (entries.some((entry) => !entry.startsWith(`${releaseName}/`) || entry.includes('/../'))) {
     throw new Error(`${archiveName} contains entries outside its release root`)

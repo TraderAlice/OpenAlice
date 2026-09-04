@@ -91,7 +91,8 @@ The installer can add only its own bin directory to user PATH and records that
 ownership; `-NoModifyPath` leaves PATH unchanged. Removal preserves the shared
 root and user data. Because an executing Windows EXE cannot remove itself,
 `openalice uninstall` schedules cleanup after that command exits and records
-the outcome in `.cli-uninstall-result.json`. A running installed Runtime blocks
+the outcome in `.cli-uninstall-result.json`; `.cli-uninstall.log` records helper
+startup failures that occur before a receipt can be written. A running installed Runtime blocks
 cleanup; stop all AliceProjects using that installation before retrying.
 
 This first Windows implementation retains installed release directories until

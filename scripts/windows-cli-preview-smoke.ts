@@ -33,9 +33,14 @@ const portProbe = Bun.listen({ hostname: '127.0.0.1', port: 0, socket: { data() 
 const port = portProbe.port
 portProbe.stop(true)
 const environment = {
+  // Keep Windows account/system discovery real while isolating Alice state
+  // and excluding every host development tool from PATH.
+  ...Object.fromEntries(['APPDATA', 'LOCALAPPDATA', 'ProgramData', 'SystemDrive',
+    'USERNAME', 'USERDOMAIN', 'COMPUTERNAME', 'HOMEDRIVE', 'HOMEPATH', 'ComSpec',
+    'ProgramFiles', 'ProgramFiles(x86)'].flatMap(key => process.env[key] ? [[key, process.env[key]!]] : [])),
   SystemRoot: process.env.SystemRoot!, WINDIR: process.env.WINDIR!,
   OS: 'Windows_NT', PROCESSOR_ARCHITECTURE: process.arch === 'arm64' ? 'ARM64' : 'AMD64',
-  TEMP: scratch, TMP: scratch, HOME: scratch, USERPROFILE: scratch,
+  TEMP: scratch, TMP: scratch, HOME: scratch, USERPROFILE: process.env.USERPROFILE!,
   PATH: join(process.env.SystemRoot!, 'System32'),
   OPENALICE_HOME: home, OPENALICE_TRADING_MODE: 'lite',
   OPENALICE_DISABLE_AUTH: '1', OPENALICE_BIND_HOST: '127.0.0.1',
@@ -92,7 +97,7 @@ try {
     await writeFile(marker, 'preserve user data')
     console.log(await command(executable, ['uninstall', '--yes'], environment))
     const receipt = join(installDir, '.cli-uninstall-result.json')
-    const deadline = Date.now() + 45_000
+    const deadline = Date.now() + 90_000
     let removed: { status?: string } | undefined
     while (Date.now() < deadline) {
       try { removed = JSON.parse((await readFile(receipt, 'utf8')).replace(/^\uFEFF/, '')); break }
@@ -100,6 +105,7 @@ try {
       await Bun.sleep(250)
     }
     if (!removed) {
+      console.log(await readFile(join(installDir, '.cli-uninstall.log'), 'utf8').catch(() => 'No helper startup log'))
       // Diagnose the retained helper with the exact minimal environment. Plan
       // mode cannot remove files and exposes errors before receipt creation.
       console.log(await command(powershell, ['-NoProfile', '-File', join(installDir, '.cli-uninstall.ps1'), '-InstallDir', installDir, '-Uninstall', '-Plan'], environment))
