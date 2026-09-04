@@ -719,7 +719,7 @@ export function SessionRow(props: SessionRowProps): ReactElement {
       data-reorder-id={props.reorderId}
       data-active={props.isActive}
       aria-busy={headlessOccupying || undefined}
-      className={`oa-session-row group relative mx-1.5 flex min-h-9 items-center gap-1 rounded-md px-2 py-1.5 text-[13px] leading-[18px] transition-colors ${
+      className={`oa-session-row text-body group relative mx-1.5 flex min-h-9 items-center gap-1 rounded-md px-2 py-1.5 transition-colors ${
         props.isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'hover:bg-sidebar-accent/65'
       }`}
     >
@@ -744,7 +744,7 @@ export function SessionRow(props: SessionRowProps): ReactElement {
             {display}
           </span>
           {props.subtitle && (
-            <span className="mt-0.5 block truncate text-[10px] leading-3 text-muted-foreground/55">
+            <span className="text-micro mt-0.5 block truncate text-muted-foreground/55">
               {props.subtitle}
             </span>
           )}

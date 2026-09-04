@@ -32,6 +32,8 @@ export const ja: Resources = {
     connectorNeedsAttention: '要確認のコネクター {{count}} 件',
     about: '{{label}}について',
     primaryNavigation: 'メインナビゲーション',
+    applicationMenu: '設定メニューを開く',
+    appearanceMenu: '外観：{{mode}}',
     collapseRail: 'アクティビティバーを折りたたむ',
     expandRail: 'アクティビティバーを展開',
   },

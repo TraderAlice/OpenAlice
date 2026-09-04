@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../tabs/store', () => ({
   useWorkspace: (selector: (state: Record<string, unknown>) => unknown) => selector({
-    selectedSidebar: 'settings',
+    selectedSidebar: 'issue',
     setSidebar: mocks.setSidebar,
     openOrFocus: mocks.openOrFocus,
   }),
@@ -46,7 +46,8 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => ({
       'nav.item.chat': 'Ask Alice',
-      'nav.item.settings': 'Settings',
+      'nav.item.issue': 'Issues',
+      'nav.item.automation': 'Automation',
       'nav.section.beta': 'Beta',
       'nav.section.system': 'System',
       'nav.primaryNavigation': 'Primary navigation',
@@ -54,8 +55,8 @@ vi.mock('react-i18next', () => ({
   }),
 }))
 
-vi.mock('./ThemeToggle', () => ({
-  ThemeToggle: () => null,
+vi.mock('./ActivityBarUtilityMenu', () => ({
+  ActivityBarUtilityMenu: () => <button type="button">Project menu</button>,
 }))
 
 beforeEach(() => {
@@ -142,7 +143,7 @@ describe('ActivityBar mobile drawer state', () => {
     )
 
     const drawer = screen.getByRole('dialog', { name: 'Primary navigation' })
-    const currentDestination = screen.getByRole('button', { name: 'Settings' })
+    const currentDestination = screen.getByRole('button', { name: 'Issues' })
     const focusableActions = Array.from(
       drawer.querySelectorAll<HTMLButtonElement>('button:not([disabled])'),
     ).filter((element) => element.tabIndex >= 0 && element.getAttribute('aria-hidden') !== 'true')
@@ -154,7 +155,7 @@ describe('ActivityBar mobile drawer state', () => {
     expect(drawer.getAttribute('aria-modal')).toBe('true')
     expect(firstAction.getAttribute('aria-label')).toBe('common.closePanel')
     expect(firstDestination.textContent).toContain('Ask Alice')
-    expect(lastAction.textContent).toContain('Settings')
+    expect(lastAction.textContent).toContain('Project menu')
     await waitFor(() => expect(document.activeElement).toBe(currentDestination))
     expect(drawer.className).toContain('motion-reduce:transition-none')
     expect(backdrop?.getAttribute('aria-hidden')).toBe('true')
