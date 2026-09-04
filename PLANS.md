@@ -36,8 +36,9 @@ the durable truth after it changes. Git history is the archive.
   before any `dev` PR.
 - [[plans/bun-cli-distribution.md]] — Replaces the expanded Node headless
   Runtime with a Bun-compiled, multi-process CLI distribution. Direct,
-  npm/Bun, Homebrew, and AUR channels consume one accepted artifact set. The
-  CLI package owns OpenAlice only: Agent Runtime installation and Electron
+  npm/Bun, Homebrew, and AUR channels consume one accepted artifact set.
+  Homebrew tap is public at `0.90.2` with lightweight hourly/manual stable sync.
+  The CLI package owns OpenAlice only: Agent Runtime installation and Electron
   packaging stay outside this plan. The native CLI is public through the
   separately dispatched `v0.91.0-beta.3`; stable/beta discovery now uses the
   OpenAlice CDN manifests. Managed SSH installation and Project transfer pass

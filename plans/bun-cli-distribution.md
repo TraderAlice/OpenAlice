@@ -1,9 +1,37 @@
 # Bun-native CLI Distribution
 
+## Homebrew activation — 2026-09-04
+
+The maintainer created `TraderAlice/homebrew-tap` and authorized completing
+the channel. Use the existing stable `v0.90.2` formula and archive bytes, not
+new dev builds or an invented version. The tap owns one lightweight hourly/manual
+stable sync workflow, using its own `GITHUB_TOKEN`; the main repository's
+cross-repository token writer remains disabled. Owner contract:
+[[docs/cli-package-managers.md]].
+
+- [x] Verify all four public archive checksums, sidecars, and formula asset digest.
+- [x] Exercise native macOS ARM64 Homebrew install and real detached Runtime
+  startup with an isolated AliceProject and no Node/Bun/agent commands in PATH.
+- [x] Publish the tap, verify its public install and hosted sync receipt.
+- [x] Confirm manager-owned update/removal, user-data preservation, and record
+  final acceptance links. Existing user PATH and installations remain untouched.
+
+Accepted [tap PR #1](https://github.com/TraderAlice/homebrew-tap/pull/1);
+[sync run 33889442153](https://github.com/TraderAlice/homebrew-tap/actions/runs/33889442153)
+used `GITHUB_TOKEN` to publish formula commit `43d9f20`. Public
+`brew install traderalice/tap/openalice` resolved `0.90.2` on macOS ARM64.
+Local verification covered five sync contracts, four public archive hashes and
+sidecars, formula digest/byte equality, real isolated Runtime/Web start/stop,
+package-manager update/uninstall guidance, and data preservation. No new
+Linux/Intel runtime test was purchased for byte-identical release assets.
+A second [sync run](https://github.com/TraderAlice/homebrew-tap/actions/runs/33889497212)
+verified the unchanged version without archive downloads or an empty commit.
+
 Status: Active — macOS/Linux native CLI is public in v0.90.2 and the separately
 dispatched v0.91.0-beta.3 is externally verified; stable remains v0.90.2 while
 stable/beta discovery authority is converged on the OpenAlice CDN. Native
-Windows x64/ARM64 unified-channel integration and Homebrew/AUR activation remain in progress. npm/Bun's five public
+Windows x64/ARM64 channel acceptance and AUR activation remain in progress;
+Homebrew is public at `0.90.2`. npm/Bun's five public
 packages are published at v0.90.2 under maintainer `jiaran258`.
 
 Accepted OIDC increment: replace the temporary npm token with GitHub OIDC trust on
