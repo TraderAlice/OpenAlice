@@ -1693,6 +1693,8 @@ export const zh: Resources = {
     searchInputPlaceholder: '搜索资产——AAPL、比特币、EUR、黄金…',
     searching: '搜索中…',
     browseSection: '浏览',
+    marketsSection: '市场',
+    macroSection: '宏观',
     browseMarkets: '浏览市场',
     searchResults: '搜索结果',
     noMatches: '无匹配',

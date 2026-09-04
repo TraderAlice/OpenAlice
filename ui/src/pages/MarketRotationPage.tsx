@@ -135,7 +135,7 @@ export function MarketRotationPage() {
 
 function QuadrantChart({ points, t }: { points: Point[]; t: TFunction }) {
   return (
-    <div className="relative">
+    <div className="relative shrink-0">
       {/* Quadrant corner labels */}
       <div className="pointer-events-none absolute inset-0 z-10">
         <CornerLabel className="top-1 right-2 text-success/70" text={t('market.quadRotatingIn')} />
@@ -203,7 +203,8 @@ function PointTooltip({ active, payload, t }: { active?: boolean; payload?: Arra
 
 function RotationTable({ rows, benchmarkSymbol, t }: { rows: SectorRotationRow[]; benchmarkSymbol: string; t: TFunction }) {
   return (
-    <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0" data-testid="sector-rotation-table-scroll">
+    <div className="-mx-4 shrink-0 overflow-x-auto px-4 md:mx-0 md:px-0" data-testid="sector-rotation-table-scroll">
+      {/* The page owns vertical scrolling; horizontal overflow must not let flex shrink the table's height. */}
       {/* Keep the market columns readable; narrow screens scroll instead of compressing headers together. */}
       <table className="w-full min-w-[820px] border-collapse text-caption" data-testid="sector-rotation-table">
         <thead>

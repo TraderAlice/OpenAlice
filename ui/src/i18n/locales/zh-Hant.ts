@@ -1701,6 +1701,8 @@ export const zhHant: Resources = {
     searchInputPlaceholder: '搜尋資產——AAPL、比特幣、EUR、黃金…',
     searching: '搜尋中…',
     browseSection: '瀏覽',
+    marketsSection: '市場',
+    macroSection: '總體經濟',
     browseMarkets: '瀏覽市場',
     searchResults: '搜尋結果',
     noMatches: '無相符項目',

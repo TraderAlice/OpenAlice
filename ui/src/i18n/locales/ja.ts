@@ -1694,6 +1694,8 @@ export const ja: Resources = {
     searchInputPlaceholder: '銘柄を検索 — AAPL、ビットコイン、EUR、金…',
     searching: '検索中…',
     browseSection: '閲覧',
+    marketsSection: 'マーケット',
+    macroSection: 'マクロ',
     browseMarkets: 'マーケットを見る',
     searchResults: '検索結果',
     noMatches: '一致なし',

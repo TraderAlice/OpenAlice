@@ -1726,6 +1726,8 @@ export const en = {
     searchInputPlaceholder: 'Search assets — AAPL, bitcoin, EUR, gold…',
     searching: 'Searching…',
     browseSection: 'Browse',
+    marketsSection: 'Markets',
+    macroSection: 'Macro',
     browseMarkets: 'Browse Markets',
     searchResults: 'Search Results',
     noMatches: 'No matches',
