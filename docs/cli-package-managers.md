@@ -14,8 +14,14 @@ Public npm activation: `openalice` and its four platform packages were first
 published as `0.90.2` on 2026-09-04 under maintainer `jiaran258`. The registry
 integrities and a fresh npm 12 installation/start/stop were independently
 verified after [publication](https://github.com/TraderAlice/OpenAlice/actions/runs/33860369715).
-Homebrew and AUR still require their separate external activation; package
-metadata in a GitHub Release alone does not make those commands available.
+Homebrew was activated at `0.90.2` on 2026-09-04 in
+[`TraderAlice/homebrew-tap`](https://github.com/TraderAlice/homebrew-tap).
+The first [sync](https://github.com/TraderAlice/homebrew-tap/actions/runs/33889442153)
+verified all four public archives and committed the unchanged formula using
+the tap's built-in token. A fresh public macOS ARM64 Homebrew installation and
+isolated Runtime startup/stop/removal passed; no new product version was made.
+AUR still requires separate external activation. Package metadata in a GitHub
+Release alone does not make a channel available.
 
 ## User commands
 
@@ -100,6 +106,21 @@ inputs and cannot mutate any of those public package channels.
 
 ## Homebrew and AUR topology
 
+The public `TraderAlice/homebrew-tap` consumes the unchanged `openalice.rb`
+asset from the current stable release. Its small `Sync stable formula` workflow
+checks hourly (minute 23) or by manual dispatch, waits for matching GitHub/CDN
+stable versions, verifies the formula asset digest and all four Homebrew archive
+hashes/sidecars, then commits only the formula with the tap's own `GITHUB_TOKEN`.
+An unchanged version performs no archive downloads or commits. It never builds
+the product and needs no cross-repository token. GitHub can delay schedules and
+disable them after 60 days without repository activity; maintainers can
+re-enable/run the tap workflow in Actions.
+
+Keep `OPENALICE_PUBLISH_HOMEBREW` disabled in OpenAlice: the older push-based
+writer below is an alternative, not a second active writer. New stable release
+acceptance should include the tap sync receipt (manual dispatch is available
+without waiting for the hourly schedule). Beta/dev never update the formula.
+
 The generated Homebrew formula selects the accepted archive and SHA-256 for the
 current macOS or Linux architecture. It installs the executable, immutable
 resources, release metadata, notices, and Homebrew provenance without compiling
@@ -136,7 +157,7 @@ External channels are explicit release switches:
 | Channel | Repository variable | Required authority |
 |---|---|---|
 | npm + Bun | `OPENALICE_PUBLISH_NPM=true` | npm Trusted Publishing for all seven names, bound to `TraderAlice/OpenAlice` / `release.yml` |
-| Homebrew | `OPENALICE_PUBLISH_HOMEBREW=true` | `HOMEBREW_TAP_TOKEN` with write access to `TraderAlice/homebrew-tap` |
+| Homebrew (alternative push writer; disabled for our tap) | `OPENALICE_PUBLISH_HOMEBREW=true` | `HOMEBREW_TAP_TOKEN` with write access to `TraderAlice/homebrew-tap` |
 | AUR / paru | `OPENALICE_PUBLISH_AUR=true` | dedicated `AUR_SSH_PRIVATE_KEY` plus manually verified `AUR_KNOWN_HOSTS` |
 
 Before a stable GitHub Release can be created, the release workflow preflights
