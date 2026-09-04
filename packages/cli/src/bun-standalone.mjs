@@ -58,7 +58,15 @@ export function buildBunRuntimeEnvironment(
 ) {
   const gitRoot = join(resourceRoot, 'runtime', 'git')
   const gitBin = join(gitRoot, 'bin')
+  const windows = (options.platform ?? process.platform) === 'win32'
+  const gitPrefix = (options.arch ?? process.arch) === 'arm64' ? 'clangarm64' : 'mingw64'
   const runtimeEnv = buildExternalAgentRuntimeEnvironment(env)
+  // Windows environment names are case-insensitive; do not pass both Path and PATH.
+  const inheritedPath = runtimeEnv.PATH ?? runtimeEnv.Path ?? ''
+  if (windows) delete runtimeEnv.Path
+  const gitPaths = windows
+    ? [join(gitRoot, 'cmd'), gitBin, join(gitRoot, 'usr', 'bin'), join(gitRoot, gitPrefix, 'bin')]
+    : [gitBin]
   const installSource = resolveBunInstallSourcePath(
     runtimeEnv,
     executable,
@@ -70,9 +78,14 @@ export function buildBunRuntimeEnvironment(
     ...(installSource ? { OPENALICE_INSTALL_SOURCE: installSource } : {}),
     OPENALICE_RUNTIME_EXECUTABLE: executable,
     LOCAL_GIT_DIRECTORY: gitRoot,
-    GIT_EXEC_PATH: join(gitRoot, 'libexec', 'git-core'),
-    GIT_TEMPLATE_DIR: join(gitRoot, 'share', 'git-core', 'templates'),
-    PATH: runtimeEnv.PATH ? `${gitBin}${delimiter}${runtimeEnv.PATH}` : gitBin,
+    ...(windows ? { OPENALICE_MANAGED_SHELL_PATH: join(gitBin, 'bash.exe') } : {}),
+    GIT_EXEC_PATH: windows
+      ? join(gitRoot, gitPrefix, 'libexec', 'git-core')
+      : join(gitRoot, 'libexec', 'git-core'),
+    GIT_TEMPLATE_DIR: windows
+      ? join(gitRoot, gitPrefix, 'share', 'git-core', 'templates')
+      : join(gitRoot, 'share', 'git-core', 'templates'),
+    PATH: [...gitPaths, ...(inheritedPath ? [inheritedPath] : [])].join(windows ? ';' : delimiter),
   }
 }
 
