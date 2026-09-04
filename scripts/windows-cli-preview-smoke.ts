@@ -96,7 +96,11 @@ try {
     if ((await readFile(join(installDir, 'cli/current.txt'), 'utf8')).trim() !== releaseName) throw new Error('Inverse rollback did not restore the candidate')
     const marker = join(installDir, 'user-data-marker.txt')
     await writeFile(marker, 'preserve user data')
-    console.log(await command(executable, ['uninstall', '--yes'], environment))
+    try { console.log(await command(executable, ['uninstall', '--yes'], environment)) }
+    catch (error) {
+      console.log(await readFile(join(installDir, '.cli-uninstall.log'), 'utf8').catch(() => 'No helper startup log'))
+      throw error
+    }
     const receipt = join(installDir, '.cli-uninstall-result.json')
     const deadline = Date.now() + 90_000
     let removed: { status?: string } | undefined
@@ -105,7 +109,7 @@ try {
         removed = JSON.parse((await readFile(receipt, 'utf8')).replace(/^\uFEFF/, ''))
         if (removed?.status === 'removed' || removed?.status === 'failed') break
       }
-      catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error }
+      catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT' && !(error instanceof SyntaxError)) throw error }
       await Bun.sleep(250)
     }
     if (!removed) {
