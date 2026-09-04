@@ -3,7 +3,7 @@
 Status: Active — macOS/Linux native CLI is public in v0.90.2 and the separately
 dispatched v0.91.0-beta.3 is externally verified; stable remains v0.90.2 while
 stable/beta discovery authority is converged on the OpenAlice CDN. Native
-Windows x64/ARM64 preview and Homebrew/AUR activation remain in progress. npm/Bun's five public
+Windows x64/ARM64 unified-channel integration and Homebrew/AUR activation remain in progress. npm/Bun's five public
 packages are published at v0.90.2 under maintainer `jiaran258`.
 
 Accepted OIDC increment: replace the temporary npm token with GitHub OIDC trust on
@@ -34,7 +34,78 @@ normal source promotion must carry the OIDC workflow to `master` before a new
 stable release uses it. Windows x64 and ARM64 are the maintainer's accepted next
 platform increment, separate from this completed authentication change.
 
-## Current increment: Windows previews
+## Current increment: unified Windows channels
+
+Accepted 2026-09-04: the portable-only decision below is superseded. Windows
+x64 and ARM64 join the existing stable/beta/dev version authority, not a new
+preview version system. Missing personal Windows hardware is an explicitly
+recorded interactive acceptance gap, not a reason to postpone distribution.
+Use the existing native runners for bounded artifact checks; do not restore
+full hosted source suites to dev/beta publication.
+
+Ordered delivery:
+
+- [x] Extend common target/provenance and installer selection to Windows;
+  retain readable manifests for already-installed macOS/Linux dev clients.
+- [x] Add the shared-channel PowerShell bootstrap and side-by-side activation,
+  update, rollback, and data-preserving removal. Never overwrite a mapped EXE.
+- [x] Produce canonical Windows artifacts in the ordinary dev/release lanes,
+  preserving candidates before acceptance and allowing replay without rebuild.
+- [x] Extend npm/Bun materialization and publication inputs to Windows without
+  adding Windows branches to Homebrew/AUR. First publication and OIDC enrollment
+  are separate external-authority checkpoints, not implied by generated files.
+- [ ] Verify local contracts/types/full regression once, existing POSIX
+  installation, and bounded native Windows install/update/rollback/start/stop.
+- [ ] Integrate to dev, inspect live six-target publication, and record the
+  remaining interactive Windows/provider gap before any versioned promotion.
+
+One product version and source commit bind the target set. Platform-specific
+installer bytes are checksum-bound snapshots selected by the shared updater.
+Windows uses an atomic text activation pointer to immutable release directories
+instead of requiring administrator symlink privileges or overwriting a running
+executable. Electron remains on its existing desktop updater.
+
+Dev/beta cross-build Windows on Linux, reusing dev's platform-neutral inputs.
+Only stable and an explicit native rehearsal allocate Windows runners. Native
+acceptance preserves the candidate before running and can replay it without
+dependency installation or recompilation.
+
+Current verification: root/CLI typechecks passed; complete local suite ran once
+(6,348 passed, six stale package-count/workflow assertions repaired and their
+focused suites rerun green, three expected skips). The clean OrbStack installer
+and real macOS npm/Bun installation, pending update, restart and removal passed.
+Canonical Windows candidates from source `5b172265` are preserved in
+[run 33878424385](https://github.com/TraderAlice/OpenAlice/actions/runs/33878424385).
+Native replay exposed PortableGit internal hard links, Windows PowerShell 5.1's
+null-string conversion in atomic replacement, and a transient staged-EXE rename
+lock; these now have bounded handling. ARM64 managed installation, real
+Guardian/Alice/Web/Git, mapped-runtime update, bidirectional rollback and external
+data-preserving removal passed in
+[run 33880423746](https://github.com/TraderAlice/OpenAlice/actions/runs/33880423746).
+Its npm package assembly exposed a release inventory larger than the default
+1 MiB subprocess buffer; the bounded buffer and a local regression fixture are
+fixed. Deferred CLI self-removal and native npm/Bun acceptance are being replayed
+against those same candidate bytes, not represented as a new product build.
+
+Delivery update: [PR #1346](https://github.com/TraderAlice/OpenAlice/pull/1346)
+integrates this topic into the ordinary dev lane after local acceptance; the
+remaining manual Windows rerun is deliberately not a synchronous dev gate.
+Both architectures have exercised install/start/update/rollback. The post-exit
+helper exposed Bun's Windows detached-child behavior, matching
+[Bun #31603](https://github.com/oven-sh/bun/issues/31603); the implementation now
+uses an awaited, quoted `cmd /c start` bootstrap instead of a new polling
+protocol. Its fresh native recheck is
+[33884781763](https://github.com/TraderAlice/OpenAlice/actions/runs/33884781763)
+(candidate source `5e800195`), still pending when this delivery note was written.
+Windows x64 npm install/native execution/manager removal and Bun install/native
+execution/ownership passed. Bun leaves a global entry after removing its package;
+[issue #1347](https://github.com/TraderAlice/OpenAlice/issues/1347) records the
+upstream boundary, and receipts must expose it rather than claim clean removal.
+Post-merge six-target CDN activation and the final native receipt are recorded
+on the integration PR; versioned release and Windows npm authority are still
+separate maintainer actions.
+
+### Accepted preview groundwork
 
 Accepted 2026-09-04: ship both Windows architectures iteratively, without making
 the Windows experiment a prerequisite for existing macOS/Linux channels.

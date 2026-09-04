@@ -88,7 +88,7 @@ boundary, avoiding an unbounded JavaScript spool. Graceful shutdown resumes a
 stopped group before terminating it. Electron and source-backed Node execution
 continue using `node-pty` pause/resume.
 
-The experimental Windows CLI uses Bun ConPTY without pretending POSIX group
+The Windows CLI uses Bun ConPTY without pretending POSIX group
 signals work on Windows. This backend advertises no read-side pause support;
 when an attached WebSocket exceeds its high watermark, Alice detaches that
 consumer with retryable close code 1013, retaining the independent agent and

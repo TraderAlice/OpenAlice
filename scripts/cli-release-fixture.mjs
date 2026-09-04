@@ -17,6 +17,7 @@ import {
   validateCliReleaseArchive,
 } from './prepare-cli-dev-assets.mjs'
 import { bunReleaseContentIdentity } from './bun-release-content-identity.mjs'
+import { cliExecutableName } from '../packages/cli/src/release-targets.mjs'
 
 export function preparePreviousCliReleaseArchives({ inputDir, outputDir, version }) {
   const inputRoot = resolve(inputDir)
@@ -74,7 +75,10 @@ export function preparePreviousCliReleaseArchives({ inputDir, outputDir, version
 }
 
 export function rewriteExpandedCliRelease({ releaseRoot, fromVersion, toVersion }) {
-  const executablePath = join(releaseRoot, 'bin', 'openalice')
+  const releasePath = join(releaseRoot, 'release.json')
+  const release = JSON.parse(readFileSync(releasePath, 'utf8'))
+  const executableRelative = `bin/${cliExecutableName(release.platform)}`
+  const executablePath = join(releaseRoot, executableRelative)
   const executable = readFileSync(executablePath)
   const from = Buffer.from(fromVersion)
   const to = Buffer.from(toVersion)
@@ -101,13 +105,11 @@ export function rewriteExpandedCliRelease({ releaseRoot, fromVersion, toVersion 
   resourcePackage.version = toVersion
   writeFileSync(resourcePackagePath, `${JSON.stringify(resourcePackage, null, 2)}\n`)
 
-  const releasePath = join(releaseRoot, 'release.json')
-  const release = JSON.parse(readFileSync(releasePath, 'utf8'))
   if (release.version !== fromVersion) {
     throw new Error(`release metadata version is ${release.version}, expected ${fromVersion}`)
   }
   release.version = toVersion
-  updateReleaseFile(release, 'bin/openalice', executablePath)
+  updateReleaseFile(release, executableRelative, executablePath)
   updateReleaseFile(release, 'share/openalice/package.json', resourcePackagePath)
   const contentIdentity = bunReleaseContentIdentity(release)
   release.contentIdentity = contentIdentity
