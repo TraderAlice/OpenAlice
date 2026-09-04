@@ -153,6 +153,171 @@ describe('runtime lock ownership', () => {
     await lock.release()
   })
 
+  it('treats an owner recorded under this process\u2019s own pid as stale after a restart', async () => {
+    // Reproduces the Docker restart crash loop: the container comes back with
+    // the same low pid the previous guardian recorded two days earlier.
+    controller.add(process.pid, 10_000)
+    const lockDir = join(home, 'guardian.lock')
+    await acquireRuntimeLock(lockDir, {
+      pid: process.pid,
+      processStartedAt: Date.now() - 2 * 24 * 60 * 60 * 1_000,
+      launcher: 'guardian-docker',
+      heartbeatMs: 0,
+      processController: controller,
+    })
+
+    await expect(inspectRuntimeLock(lockDir, {
+      processController: controller,
+      staleHeartbeatMs: -1,
+    })).resolves.toMatchObject({
+      state: 'stale',
+      reason: expect.stringContaining('this process'),
+    })
+
+    const fresh = await acquireRuntimeLock(lockDir, {
+      pid: process.pid,
+      processStartedAt: Date.now(),
+      launcher: 'guardian-docker',
+      heartbeatMs: 0,
+      processController: controller,
+    })
+    expect(controller.signals).toEqual([])
+    await fresh.release()
+  })
+
+  it('reclaims an unverifiable same-machine owner only once its heartbeat is stale', async () => {
+    const lockDir = join(home, 'runtime.lock')
+    await acquireRuntimeLock(lockDir, {
+      pid: 101,
+      processStartedAt: 10_000,
+      heartbeatMs: 0,
+      processController: controller,
+    })
+    // Alive, but the platform cannot report a start time for it.
+    controller.alive.set(101, true)
+    controller.starts.delete(101)
+
+    await expect(inspectRuntimeLock(lockDir, { processController: controller })).resolves.toMatchObject({
+      state: 'active',
+      heartbeatStale: false,
+      reason: 'owner process is alive',
+    })
+    await expect(inspectRuntimeLock(lockDir, {
+      processController: controller,
+      staleHeartbeatMs: -1,
+    })).resolves.toMatchObject({
+      state: 'stale',
+      heartbeatStale: true,
+      reason: expect.stringContaining('cannot be verified'),
+    })
+  })
+
+  it('keeps an unverifiable stale owner on another machine untouchable', async () => {
+    const lockDir = join(home, 'runtime.lock')
+    await acquireRuntimeLock(lockDir, {
+      pid: 101,
+      processStartedAt: 10_000,
+      heartbeatMs: 0,
+      processController: controller,
+    })
+    controller.alive.set(101, true)
+    controller.starts.delete(101)
+    controller.currentMachineId = 'machine-b'
+
+    await expect(inspectRuntimeLock(lockDir, {
+      processController: controller,
+      staleHeartbeatMs: -1,
+    })).resolves.toMatchObject({
+      state: 'active',
+      reason: expect.stringContaining('another machine'),
+    })
+  })
+
+  it('reclaims a dead hostname-derived owner after the machine id scheme changes', async () => {
+    controller.currentMachineId = 'hostname:ff00126d7ea7'
+    controller.add(101, 10_000)
+    const lockDir = join(home, 'runtime.lock')
+    await acquireRuntimeLock(lockDir, {
+      pid: 101,
+      processStartedAt: 10_000,
+      heartbeatMs: 0,
+      processController: controller,
+    })
+    controller.alive.set(101, false)
+    controller.currentMachineId = 'env:openalice-docker'
+
+    await expect(inspectRuntimeLock(lockDir, {
+      processController: controller,
+      staleHeartbeatMs: -1,
+    })).resolves.toMatchObject({
+      state: 'stale',
+      reason: expect.stringContaining('not running'),
+    })
+  })
+
+  it('keeps a live hostname-derived owner active after the machine id scheme changes', async () => {
+    controller.currentMachineId = 'hostname:ff00126d7ea7'
+    controller.add(101, 10_000)
+    const lockDir = join(home, 'runtime.lock')
+    await acquireRuntimeLock(lockDir, {
+      pid: 101,
+      processStartedAt: 10_000,
+      heartbeatMs: 0,
+      processController: controller,
+    })
+    controller.currentMachineId = 'env:openalice-docker'
+
+    await expect(inspectRuntimeLock(lockDir, { processController: controller })).resolves.toMatchObject({
+      state: 'active',
+      reason: 'owner process is alive',
+    })
+  })
+
+  it('reclaims a dead owner when only the recorded hostname differs', async () => {
+    controller.currentMachineId = 'hostname:a'
+    controller.add(101, 10_000)
+    const lockDir = join(home, 'runtime.lock')
+    await acquireRuntimeLock(lockDir, {
+      pid: 101,
+      processStartedAt: 10_000,
+      heartbeatMs: 0,
+      processController: controller,
+    })
+    controller.alive.set(101, false)
+    controller.currentMachineId = 'hostname:b'
+
+    await expect(inspectRuntimeLock(lockDir, {
+      processController: controller,
+      staleHeartbeatMs: -1,
+    })).resolves.toMatchObject({
+      state: 'stale',
+      reason: expect.stringContaining('not running'),
+    })
+  })
+
+  it('still refuses takeover when both machine ids are strong and differ', async () => {
+    controller.currentMachineId = 'linux:aaa'
+    controller.add(101, 10_000)
+    const lockDir = join(home, 'runtime.lock')
+    await acquireRuntimeLock(lockDir, {
+      pid: 101,
+      processStartedAt: 10_000,
+      heartbeatMs: 0,
+      processController: controller,
+    })
+    controller.alive.set(101, false)
+    controller.currentMachineId = 'linux:bbb'
+
+    await expect(inspectRuntimeLock(lockDir, {
+      processController: controller,
+      staleHeartbeatMs: -1,
+    })).resolves.toMatchObject({
+      state: 'active',
+      heartbeatStale: true,
+      reason: expect.stringContaining('another machine'),
+    })
+  })
+
   it('never signals or reclaims an owner recorded on another machine', async () => {
     controller.add(101, 10_000)
     controller.add(202, 20_000)

@@ -4,9 +4,11 @@ import { hostname } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 
 import {
+  compareProcessIdentity,
   currentProcessStartedAt,
   defaultProcessController,
   isSameProcess,
+  isWeakMachineId,
   terminateProcessTree,
   type ProcessController,
 } from './process-control.js'
@@ -148,7 +150,8 @@ export async function inspectRuntimeLock(
   const heartbeatAt = Date.parse(owner.heartbeatAt)
   const heartbeatAgeMs = Number.isFinite(heartbeatAt) ? Math.max(0, Date.now() - heartbeatAt) : null
   const heartbeatStale = heartbeatAgeMs === null || heartbeatAgeMs > staleMs
-  if (owner.machineId && owner.machineId !== await controller.machineId()) {
+  const crossMachine = await isCrossMachineOwner(owner, controller)
+  if (crossMachine) {
     return inspection(
       lockDir,
       'active',
@@ -164,8 +167,34 @@ export async function inspectRuntimeLock(
   if (!controller.isAlive(owner.pid)) {
     return inspection(lockDir, 'stale', owner, heartbeatAgeMs, heartbeatStale, directoryIdentity, 'owner process is not running')
   }
-  if (!(await isSameProcess(owner.pid, owner.processStartedAt, controller))) {
-    return inspection(lockDir, 'stale', owner, heartbeatAgeMs, heartbeatStale, directoryIdentity, 'owner pid has been reused')
+  const identity = await compareProcessIdentity(owner.pid, owner.processStartedAt, controller)
+  if (identity === 'different') {
+    return inspection(
+      lockDir,
+      'stale',
+      owner,
+      heartbeatAgeMs,
+      heartbeatStale,
+      directoryIdentity,
+      owner.pid === process.pid
+        ? 'owner pid is this process, so the recorded owner is gone (pid reuse after a restart)'
+        : 'owner pid has been reused',
+    )
+  }
+  // The owner is on this machine, its recorded identity cannot be confirmed,
+  // and it stopped heartbeating. Failing open here strands the lock forever on
+  // hosts where no start time is readable; the cross-machine refusal above
+  // still runs first, and a fresh heartbeat still keeps the owner authoritative.
+  if (identity === 'unverified' && heartbeatStale && owner.processStartedAt) {
+    return inspection(
+      lockDir,
+      'stale',
+      owner,
+      heartbeatAgeMs,
+      heartbeatStale,
+      directoryIdentity,
+      'owner identity cannot be verified and its heartbeat is stale',
+    )
   }
   return inspection(
     lockDir,
@@ -176,6 +205,23 @@ export async function inspectRuntimeLock(
     directoryIdentity,
     heartbeatStale ? 'owner process is alive but its heartbeat is stale' : 'owner process is alive',
   )
+}
+
+/**
+ * True only when both sides carry strong machine ids that differ. A
+ * `hostname:`-scheme id is the fallback for slim containers without
+ * /etc/machine-id, and hostnames change on every container recreate, so a
+ * mismatch involving one is not evidence of a different machine.
+ */
+async function isCrossMachineOwner(
+  owner: RuntimeLockOwner,
+  controller: ProcessController,
+): Promise<boolean> {
+  const ownerMachineId = owner.machineId
+  if (!ownerMachineId) return false
+  const currentMachineId = await controller.machineId()
+  if (ownerMachineId === currentMachineId) return false
+  return !isWeakMachineId(ownerMachineId) && !isWeakMachineId(currentMachineId)
 }
 
 export async function acquireRuntimeLock(
@@ -295,7 +341,8 @@ export async function recoverRuntimeOwner(
   opts: { readonly processController?: ProcessController } = {},
 ): Promise<void> {
   const controller = opts.processController ?? defaultProcessController
-  if (owner.machineId && owner.machineId !== await controller.machineId()) {
+  const crossMachine = await isCrossMachineOwner(owner, controller)
+  if (crossMachine) {
     throw new Error(`OpenAlice owner ${owner.pid} belongs to another machine; refusing to signal it`)
   }
   if (!controller.isAlive(owner.pid)) return

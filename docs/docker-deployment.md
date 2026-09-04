@@ -96,6 +96,16 @@ docker compose up -d --build
 `docker compose down` preserves the named volume. `docker compose down -v` is
 a factory reset and permanently removes user data.
 
+The image pins `OPENALICE_MACHINE_ID=openalice-docker` because slim runtime
+images have no `/etc/machine-id`, and the container hostname (Guardian's
+fallback) changes on every recreate; since `/data` is a host-local volume, a
+stable identity lets Guardian reclaim a stale `runtime.lock` left by an
+unclean shutdown instead of crash-looping with an "owner belongs to another
+machine" error. The pin only affects records written by images that carry it;
+locks written before it are reclaimed because Guardian never treats a
+hostname-derived machine id as another machine. `OPENALICE_TAKEOVER=1` remains
+the manual escape hatch when a lock genuinely needs to be forced.
+
 ## Backup and Restore
 
 Stop the container before taking a filesystem-consistent volume snapshot:
