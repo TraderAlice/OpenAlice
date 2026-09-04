@@ -103,8 +103,15 @@ stable identity lets Guardian reclaim a stale `runtime.lock` left by an
 unclean shutdown instead of crash-looping with an "owner belongs to another
 machine" error. The pin only affects records written by images that carry it;
 locks written before it are reclaimed because Guardian never treats a
-hostname-derived machine id as another machine. `OPENALICE_TAKEOVER=1` remains
-the manual escape hatch when a lock genuinely needs to be forced.
+hostname-derived machine id as another machine.
+
+`OPENALICE_TAKEOVER=1` is the manual escape hatch for a lock that must be
+forced, including one recorded against a different machine id (an overridden
+`OPENALICE_MACHINE_ID`, or a volume restored from another host). Guardian never
+signals a process it cannot address, so it clears such a record only once the
+owner's heartbeat has gone stale. A cross-machine owner that is still
+heartbeating keeps refusing takeover: something is running against this state
+and the correct fix is to stop it, not to force the lock.
 
 ## Backup and Restore
 

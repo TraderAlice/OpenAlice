@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import type { ProcessController } from './process-control.js'
 import {
+  CrossMachineOwnerError,
   RuntimeAlreadyRunningError,
   acquireGuardianRuntime,
   acquireOpenAliceRuntimeLocks,
@@ -316,6 +317,87 @@ describe('runtime lock ownership', () => {
       heartbeatStale: true,
       reason: expect.stringContaining('another machine'),
     })
+  })
+
+  it('claims a stale cross-machine lock under takeover without signalling anything', async () => {
+    controller.currentMachineId = 'linux:aaa'
+    controller.add(101, 10_000)
+    const lockDir = join(home, 'runtime.lock')
+    await acquireRuntimeLock(lockDir, {
+      pid: 101,
+      processStartedAt: 10_000,
+      heartbeatMs: 0,
+      processController: controller,
+    })
+    controller.currentMachineId = 'linux:bbb'
+    controller.add(202, 20_000)
+
+    const reclaimed = await acquireRuntimeLock(lockDir, {
+      pid: 202,
+      processStartedAt: 20_000,
+      heartbeatMs: 0,
+      takeover: true,
+      staleHeartbeatMs: -1,
+      processController: controller,
+    })
+
+    expect(reclaimed.owner.pid).toBe(202)
+    expect(controller.signals).toEqual([])
+    expect(controller.isAlive(101)).toBe(true)
+    await reclaimed.release()
+  })
+
+  it('refuses takeover of a cross-machine lock that is still heartbeating', async () => {
+    controller.currentMachineId = 'linux:aaa'
+    controller.add(101, 10_000)
+    const lockDir = join(home, 'runtime.lock')
+    await acquireRuntimeLock(lockDir, {
+      pid: 101,
+      processStartedAt: 10_000,
+      heartbeatMs: 0,
+      processController: controller,
+    })
+    controller.currentMachineId = 'linux:bbb'
+    controller.add(202, 20_000)
+
+    const refusal = await acquireRuntimeLock(lockDir, {
+      pid: 202,
+      processStartedAt: 20_000,
+      heartbeatMs: 0,
+      takeover: true,
+      processController: controller,
+    }).catch((err: unknown) => err)
+
+    expect(refusal).toBeInstanceOf(CrossMachineOwnerError)
+    expect(refusal).toBeInstanceOf(RuntimeAlreadyRunningError)
+    expect(refusal).toMatchObject({
+      message: 'OpenAlice owner 101 belongs to another machine; refusing to signal it',
+      inspection: { state: 'active', owner: { pid: 101 } },
+    })
+    expect(controller.signals).toEqual([])
+  })
+
+  it('reports a stale cross-machine lock as already running without takeover', async () => {
+    controller.currentMachineId = 'linux:aaa'
+    controller.add(101, 10_000)
+    const lockDir = join(home, 'runtime.lock')
+    await acquireRuntimeLock(lockDir, {
+      pid: 101,
+      processStartedAt: 10_000,
+      heartbeatMs: 0,
+      processController: controller,
+    })
+    controller.currentMachineId = 'linux:bbb'
+    controller.add(202, 20_000)
+
+    await expect(acquireRuntimeLock(lockDir, {
+      pid: 202,
+      processStartedAt: 20_000,
+      heartbeatMs: 0,
+      staleHeartbeatMs: -1,
+      processController: controller,
+    })).rejects.toBeInstanceOf(RuntimeAlreadyRunningError)
+    expect(controller.signals).toEqual([])
   })
 
   it('never signals or reclaims an owner recorded on another machine', async () => {
