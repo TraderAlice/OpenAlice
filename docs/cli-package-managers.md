@@ -258,6 +258,13 @@ Stop a running
 Runtime with `openalice down` before changing the installed version; a running
 Guardian keeps its already-mapped executable until stopped.
 
+Known Windows Bun limitation: native acceptance reproduced successful package
+removal with a leftover global `openalice.exe` entry. This is tracked in
+[OpenAlice #1347](https://github.com/TraderAlice/OpenAlice/issues/1347) and
+[Bun #11970](https://github.com/oven-sh/bun/issues/11970). Acceptance verifies
+the package is gone and reports the residue explicitly; OpenAlice does not
+delete Bun-owned files to hide it. Do not call this a completely clean uninstall.
+
 If the manager replaces the installed package while an older Guardian remains
 active, `openalice status` and `openalice up` compare content identities and
 report the new product version as pending activation. OpenAlice never rolls

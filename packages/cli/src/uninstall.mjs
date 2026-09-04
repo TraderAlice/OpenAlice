@@ -106,44 +106,38 @@ export async function performUninstall(layout, options = {}) {
 }
 
 async function scheduleWindowsUninstall(layout) {
-  // An executing PE file cannot remove itself. Run a retained installer copy
-  // from the install root after this process exits; never remove the root.
+  // A mapped PE cannot remove itself. Bun's Windows detached children may
+  // still be killed with their parent (oven-sh/bun#31603); cmd/start launches
+  // the post-exit helper outside that lifetime. Await only the bootstrap.
   const script = join(layout.installRoot, '.cli-uninstall.ps1')
-  const source = join(layout.releaseDir, 'share', 'openalice', 'install.ps1')
-  await writeFile(script, await readFile(source))
+  await writeFile(script, await readFile(join(layout.releaseDir, 'share', 'openalice', 'install.ps1')))
+  await rm(join(layout.installRoot, '.cli-uninstall-result.json'), { force: true })
   const env = { ...process.env }
   delete env.PSModulePath
-  const receipt = join(layout.installRoot, '.cli-uninstall-result.json')
-  await rm(receipt, { force: true })
+  const systemRoot = env.SystemRoot ?? 'C:\\Windows'
+  const powershell = join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+  const command = windowsUninstallBootstrap(powershell, script, layout.installRoot, process.pid)
   const log = await open(join(layout.installRoot, '.cli-uninstall.log'), 'w', 0o600)
   try {
-    const child = spawn(join(env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), [
-      '-NoLogo', '-NoProfile', '-ExecutionPolicy', 'RemoteSigned', '-File', script, '-InstallDir', layout.installRoot,
-      '-Uninstall', '-WaitForPid', String(process.pid), '-Yes',
-    ], { detached: true, windowsHide: true, stdio: ['ignore', log.fd, log.fd], env })
-    await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject) })
-    // Keep the parent alive until the helper is actually waiting for it,
-    // matching the detached Guardian's explicit readiness handoff.
-    const deadline = Date.now() + 45_000
-    let ready = false
-    while (Date.now() < deadline) {
-      try {
-        const value = JSON.parse((await readFile(receipt, 'utf8')).replace(/^\uFEFF/, ''))
-        if (value.status === 'waiting' && value.parentPid === process.pid) { ready = true; break }
-        if (value.status === 'failed') throw new Error(value.message || 'Windows cleanup failed')
-      } catch (error) {
-        if (error?.code !== 'ENOENT' && !(error instanceof SyntaxError)) throw error
-      }
-      if (child.exitCode !== null) break
-      await new Promise(resolve => setTimeout(resolve, 100))
-    }
-    if (!ready) {
-      child.kill()
-      throw new Error(`Windows cleanup did not become ready. See ${join(layout.installRoot, '.cli-uninstall.log')}`)
-    }
-    child.unref()
+    const child = spawn(join(systemRoot, 'System32', 'cmd.exe'), ['/d', '/c', command], {
+      cwd: layout.installRoot, windowsVerbatimArguments: true, windowsHide: true,
+      stdio: ['ignore', log.fd, log.fd], env,
+    })
+    await new Promise((resolve, reject) => {
+      child.once('error', reject)
+      child.once('exit', code => code === 0 ? resolve() : reject(new Error(`Windows cleanup bootstrap exited ${code}; see .cli-uninstall.log`)))
+    })
   } finally { await log.close() }
   return { profilesChanged: [], deferred: true }
+}
+
+export function windowsUninstallBootstrap(powershell, script, installRoot, parentPid) {
+  if (!Number.isSafeInteger(parentPid) || parentPid < 1) throw new Error('Invalid uninstall parent PID')
+  const quote = value => {
+    if (!value || /["\r\n%!]/.test(value)) throw new Error('Unsupported Windows cleanup path')
+    return `"${value}"`
+  }
+  return `start "" /b ${quote(powershell)} -NoLogo -NoProfile -ExecutionPolicy RemoteSigned -File ${quote(script)} -InstallDir ${quote(installRoot)} -Uninstall -WaitForPid ${parentPid} -Yes`
 }
 
 export async function removeManagedPathBlock(profile, binDir, dependencies = {}) {

@@ -36,9 +36,6 @@ if ($Uninstall) {
   $receipt = Join-Path $root '.cli-uninstall-result.json'
   $guard = $null
   try {
-    # Acknowledge readiness before the owning CLI exits. Spawn success alone
-    # does not prove that Windows PowerShell has initialized its runspace.
-    @{ status = 'waiting'; parentPid = $WaitForPid; dataPreserved = $true } | ConvertTo-Json | Set-Content -LiteralPath $receipt
     if ($WaitForPid) {
       $parent = Get-Process -Id $WaitForPid -ErrorAction SilentlyContinue
       if ($parent -and -not $parent.WaitForExit(30000)) { throw 'CLI did not exit; no files removed.' }

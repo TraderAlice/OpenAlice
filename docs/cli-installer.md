@@ -100,6 +100,11 @@ the outcome in `.cli-uninstall-result.json`; `.cli-uninstall.log` records helper
 startup failures that occur before a receipt can be written. A running installed Runtime blocks
 cleanup; stop all AliceProjects using that installation before retrying.
 
+The deferred helper uses an awaited `cmd /c start` bootstrap, because Bun's
+Windows detached-process behavior can otherwise kill a post-exit helper with
+its parent ([Bun #31603](https://github.com/oven-sh/bun/issues/31603)). This
+workaround is local to uninstall; it does not add a service or process manager.
+
 This first Windows implementation retains installed release directories until
 uninstall. Unlike the POSIX three-release collector, it does not yet prune old
 releases that could still be mapped by another AliceProject.
