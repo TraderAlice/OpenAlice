@@ -74,6 +74,14 @@ or mutate any release/channel. Each downloadable Actions artifact contains a
 ZIP, its `.sha256`, installer, and candidate receipt. Native acceptance is a
 separate receipt: an available ZIP alone is not a passed smoke.
 
+To retry only native acceptance after fixing a smoke/installer issue, add
+`-f windows_candidate_run=<run-id>` to that command. This downloads the preserved
+candidate of each architecture and skips Node/pnpm setup, dependency install,
+source build, compilation and candidate upload. It requires exactly one
+candidate per architecture in the selected run and verifies its archive digest.
+The receipt identifies the original product commit, not the newer smoke source.
+Rebuild after changing product code; an old package cannot verify that fix.
+
 After downloading the candidate and reviewing its checksum, use ordinary
 Windows PowerShell (no administrator rights):
 

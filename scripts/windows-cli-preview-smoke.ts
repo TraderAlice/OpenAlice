@@ -1,10 +1,16 @@
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 
 if (process.platform !== 'win32') throw new Error('Run this smoke on native Windows')
-const candidateFile = resolve(process.argv[2] ?? `dist/windows-cli-preview/${process.arch}/candidate.json`)
+const outputRoot = resolve(`dist/windows-cli-preview/${process.arch}`)
+const candidates = process.argv[2] ? [resolve(process.argv[2])] : await findCandidates(outputRoot)
+if (candidates.length !== 1) throw new Error(`Expected one candidate for this architecture, found ${candidates.length}`)
+const candidateFile = candidates[0]!
 const candidate = JSON.parse(await readFile(candidateFile, 'utf8'))
+// Actions downloads have a new filesystem root. The candidate's ZIP and
+// checksum travel together; never execute paths recorded on the old runner.
+const archive = join(dirname(candidateFile), basename(candidate.archive))
 if (candidate.arch !== process.arch) throw new Error('Native smoke architecture mismatch')
 const scratch = await mkdtemp(join(tmpdir(), 'openalice-preview-smoke-'))
 const installDir = join(scratch, 'installed preview')
@@ -16,7 +22,7 @@ const powershell = join(process.env.SystemRoot!, 'System32/WindowsPowerShell/v1.
 const powershellEnv = { ...process.env }
 delete powershellEnv.PSModulePath
 await command(powershell, ['-NoProfile', '-File', resolve('install-preview.ps1'),
-  '-Archive', candidate.archive, '-Sha256', candidate.sha256, '-InstallDir', installDir, '-Yes'], powershellEnv)
+  '-Archive', archive, '-Sha256', candidate.sha256, '-InstallDir', installDir, '-Yes'], powershellEnv)
 const executable = join(installDir, 'bin/openalice.exe')
 const portProbe = Bun.listen({ hostname: '127.0.0.1', port: 0, socket: { data() {} } })
 const port = portProbe.port
@@ -42,7 +48,7 @@ try {
   await command(executable, ['down', '--home', home, '--wait', '30'], environment)
   const stopped = JSON.parse(await command(executable, ['status', '--home', home, '--json'], environment)).result.status
   if (stopped.class === 'running') throw new Error('Runtime did not stop')
-  await writeFile(resolve(candidateFile, '..', 'native-smoke.json'), JSON.stringify({
+  await writeFile(join(outputRoot, 'native-smoke.json'), JSON.stringify({
     status: 'pass', arch: process.arch, archiveSha256: candidate.sha256,
     contentIdentity: candidate.contentIdentity, sourceCommit: candidate.sourceCommit,
     accepted: ['PowerShell ZIP install', 'detached Guardian/Alice', 'real Web UI', 'Git', 'stop'],
@@ -50,6 +56,16 @@ try {
   }, null, 2) + '\n')
 } finally {
   await command(executable, ['down', '--home', home, '--wait', '30'], environment).catch(console.error)
+}
+
+async function findCandidates(directory: string): Promise<string[]> {
+  const result: string[] = []
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name)
+    if (entry.isDirectory()) result.push(...await findCandidates(path))
+    else if (entry.name === 'candidate.json') result.push(path)
+  }
+  return result
 }
 
 async function command(exe: string, args: string[], env = process.env) {

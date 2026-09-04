@@ -77,6 +77,9 @@ Its installation smoke exposed inherited PowerShell 7 `PSModulePath` preventing
 Windows PowerShell 5.1 from discovering `Get-FileHash`; reset only that child
 environment, not the host. A separate old classifier assertion also needed to
 recognize the manual Windows-only selector. Neither failure is waived.
+The next smoke attempt accepts the saved ZIPs with `windows_candidate_run`,
+skipping dependency installation and all rebuilds; product changes still need
+a newly compiled candidate. Ambiguous/missing archived candidates fail closed.
 
 Delivery mode: Serial / interactive from current `dev`. The accepted native CLI
 increments have already reached `dev`; the old `codex/usability-improvements`

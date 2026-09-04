@@ -5,8 +5,9 @@ OpenAlice CLI. The accepted native archive and direct Bash installer remain
 owned by [[docs/cli-installer.md]]. Runtime lifecycle after installation remains
 owned by [[docs/cli-supervisor.md]] and [[docs/local-runtime.md]].
 
-Native Windows package-manager and PowerShell channels are deferred. This guide
-covers macOS and glibc Linux on arm64 and x64.
+Native Windows package-manager channels are deferred. Independent Windows
+x64/ARM64 ZIP and PowerShell previews live in [[docs/cli-installer.md]]; they
+are not npm publications. This guide covers macOS and glibc Linux on arm64 and x64.
 
 Public npm activation: `openalice` and its four platform packages were first
 published as `0.90.2` on 2026-09-04 under maintainer `jiaran258`. The registry
