@@ -175,6 +175,17 @@ That skip alone is not proof of OIDC authorization.
 
 ### npm Trusted Publishing (OIDC)
 
+Activated on 2026-09-04: all five package connections were saved and
+[real OIDC exchanges passed](https://github.com/TraderAlice/OpenAlice/actions/runs/33871780397)
+from integrated `dev` tooling in a single 15-second job. The temporary
+`openalice-first-publish` token was then revoked and the repository's
+`NPM_TOKEN` secret deleted. This did not publish a new version or enable the
+persistent npm publication switch. A
+[second exchange rehearsal](https://github.com/TraderAlice/OpenAlice/actions/runs/33872141409)
+passed after both credentials were removed. Carry the workflow to `master` through
+normal promotion before the next stable release; do not restore the old token
+to operate historical tooling.
+
 For each of `openalice`, `openalice-darwin-arm64`, `openalice-darwin-x64`,
 `openalice-linux-arm64`, and `openalice-linux-x64`, configure npm Package Settings
 → Trusted Publisher → GitHub Actions:
