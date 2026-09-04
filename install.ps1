@@ -136,11 +136,16 @@ $previous = $null
 $oldReceipt = $null
 function Write-Atomic([string]$path, [string]$text) {
   $temporary = "$path.next.$PID.$([guid]::NewGuid().ToString('N'))"
+  $backup = "$temporary.previous"
   try {
     [IO.File]::WriteAllText($temporary, $text, (New-Object Text.UTF8Encoding $false))
-    if ([IO.File]::Exists($path)) { [IO.File]::Replace($temporary, $path, $null) }
+    # Windows PowerShell 5.1 coerces a null string argument to an empty path.
+    if ([IO.File]::Exists($path)) { [IO.File]::Replace($temporary, $path, $backup) }
     else { [IO.File]::Move($temporary, $path) }
-  } finally { if ([IO.File]::Exists($temporary)) { [IO.File]::Delete($temporary) } }
+  } finally {
+    if ([IO.File]::Exists($temporary)) { [IO.File]::Delete($temporary) }
+    if ([IO.File]::Exists($backup)) { [IO.File]::Delete($backup) }
+  }
 }
 try {
   [IO.Directory]::CreateDirectory($root) | Out-Null

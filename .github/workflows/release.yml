@@ -1583,10 +1583,27 @@ jobs:
           '
 
           if [ "$RELEASE_OPERATION" = "release" ]; then
+            test -f "dist/r2-upload/OpenAlice-${VERSION}-install.ps1"
             curl -fsSL "${BASE_URL}/${INSTALL_PATH}" -o /tmp/openalice-channel-install
             cmp /tmp/openalice-versioned-install /tmp/openalice-channel-install
             bash /tmp/openalice-channel-install --plan | tee /tmp/openalice-default-install-plan
             grep -Fq "Channel         stable (latest)" /tmp/openalice-default-install-plan
+          fi
+
+          if [ -f "dist/r2-upload/OpenAlice-${VERSION}-install.ps1" ]; then
+            curl -fsSL "${BASE_URL}/OpenAlice-${VERSION}-install.ps1" -o /tmp/openalice-versioned-install.ps1
+            cmp /tmp/openalice-versioned-install.ps1 "dist/r2-upload/OpenAlice-${VERSION}-install.ps1"
+            MANIFEST_URL="${BASE_URL}/${MANIFEST_PATH}" WINDOWS_INSTALL_URL="${BASE_URL}/OpenAlice-${VERSION}-install.ps1" node -e '
+              const { createHash } = require("node:crypto");
+              const { readFileSync } = require("node:fs");
+              const manifest = JSON.parse(require("node:child_process").execFileSync("curl", ["-fsSL", process.env.MANIFEST_URL], { encoding: "utf8" }));
+              const digest = createHash("sha256").update(readFileSync("/tmp/openalice-versioned-install.ps1")).digest("hex");
+              if (manifest.windowsInstaller?.versionedUrl !== process.env.WINDOWS_INSTALL_URL || manifest.windowsInstaller?.sha256 !== digest) process.exit(1);
+            '
+            if [ "$RELEASE_OPERATION" = "release" ]; then
+              curl -fsSL "${BASE_URL}/install.ps1" -o /tmp/openalice-channel-install.ps1
+              cmp /tmp/openalice-versioned-install.ps1 /tmp/openalice-channel-install.ps1
+            fi
           fi
 
           if [ "$RELEASE_CHANNEL" = "stable" ]; then
@@ -1623,7 +1640,11 @@ jobs:
             curl -fsSI "${BASE_URL}/$(basename "$archive")"
             curl -fsSI "${BASE_URL}/$(basename "$checksum")"
           done
-          test "$cli_asset_count" = 4
+          expected_cli_assets=6
+          if [ "$RELEASE_OPERATION" = "mirror" ] && [ ! -f "dist/r2-upload/OpenAlice-${VERSION}-install.ps1" ]; then
+            expected_cli_assets=4
+          fi
+          test "$cli_asset_count" = "$expected_cli_assets"
 
           for catalog in dist/r2-upload/OpenAlice-Broker-Packs-${VERSION}-*.json; do
             curl -fsSI "${BASE_URL}/$(basename "$catalog")"

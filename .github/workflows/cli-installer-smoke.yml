@@ -430,6 +430,7 @@ jobs:
               *.tar.gz) content_type="application/gzip" ;;
               *.sha256) content_type="text/plain" ;;
               */install) content_type="text/x-shellscript" ;;
+              */install.ps1) content_type="text/plain" ;;
               *) echo "Unexpected immutable dev candidate file: $file" >&2; exit 1 ;;
             esac
             put_immutable \

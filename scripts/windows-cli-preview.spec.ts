@@ -71,6 +71,7 @@ describe('Windows preview delivery boundary', () => {
     expect(release.jobs['publish-release'].needs).toContain('build-cli-windows')
     expect(release.jobs['build-cli-package-channels'].needs).toContain('build-cli-windows')
     expect(read('install.ps1')).not.toMatch(/Set-ExecutionPolicy|npm install|Invoke-Expression/)
-    expect(read('install.ps1')).toContain('[IO.File]::Replace($temporary, $path, $null)')
+    expect(read('install.ps1')).toContain('[IO.File]::Replace($temporary, $path, $backup)')
+    expect(read('install.ps1')).toContain('[IO.File]::Delete($backup)')
   })
 })
