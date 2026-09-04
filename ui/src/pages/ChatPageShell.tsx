@@ -1,15 +1,7 @@
-import { useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PageSidebarLayout } from '../components/PageSidebarLayout'
 import { ChatChannelListContainer } from '../components/ChatChannelListContainer'
-import {
-  AUTO_QUANT_DISPLAY_MODE_STORAGE_KEY,
-  AUTO_PREDICTION_DISPLAY_MODE_STORAGE_KEY,
-  CHAT_DISPLAY_MODE_STORAGE_KEY,
-  readChatDisplayMode,
-  writeChatDisplayMode,
-  type ChatDisplayMode,
-} from '../components/workspace/chat-display-mode'
 import { useWorkspaces } from '../contexts/workspaces-context'
 
 export type HarnessSidebarMode = 'chat' | 'auto-quant' | 'prediction'
@@ -57,17 +49,6 @@ function AutoQuantReadyShell({ children }: { children: ReactNode }) {
 
 function HarnessPageShell({ children, mode }: { children: ReactNode; mode: HarnessSidebarMode }) {
   const { t } = useTranslation()
-  const displayModeStorageKey = mode === 'auto-quant'
-    ? AUTO_QUANT_DISPLAY_MODE_STORAGE_KEY
-    : mode === 'prediction' ? AUTO_PREDICTION_DISPLAY_MODE_STORAGE_KEY : CHAT_DISPLAY_MODE_STORAGE_KEY
-  const [displayMode, setDisplayMode] = useState<ChatDisplayMode>(() =>
-    readChatDisplayMode(displayModeStorageKey))
-
-  const requestDisplayMode = (next: ChatDisplayMode) => {
-    if (next === displayMode) return
-    setDisplayMode(next)
-    writeChatDisplayMode(next, displayModeStorageKey)
-  }
 
   return (
     <>
@@ -81,8 +62,6 @@ function HarnessPageShell({ children, mode }: { children: ReactNode; mode: Harne
           <ChatChannelListContainer
             mode={mode}
             onNavigate={closeMobileDrawer}
-            displayMode={displayMode}
-            onRequestDisplayMode={requestDisplayMode}
           />
         )}
       >

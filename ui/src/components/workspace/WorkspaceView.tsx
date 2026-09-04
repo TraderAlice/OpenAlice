@@ -32,7 +32,7 @@ export interface WorkspaceViewProps {
   readonly sessions: readonly SessionRecord[];
   readonly agents?: readonly AgentInfo[];
   readonly label?: string;
-  /** Actions promoted into the live terminal's shared titlebar. */
+  /** Actions promoted into the live terminal or WebPi shared titlebar. */
   readonly terminalHeaderActions?: ReactNode;
   readonly onSpawnFresh: () => void;
   readonly onResume: (sessionId: string) => Promise<void>;
@@ -138,6 +138,7 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
                     sessionId={s.id}
                     {...(props.label !== undefined ? { label: `${props.label} · ${s.name}` } : {})}
                     onSessionLost={props.onSessionLost}
+                    headerActions={props.terminalHeaderActions}
                   />
                 ) : (
                   <TerminalView

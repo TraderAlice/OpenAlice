@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { BarSourceCandidate } from '../api/market'
@@ -55,6 +55,28 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('MarketSidebar search keyboard controls', () => {
+  it('groups peer destinations by purpose without nesting boards under News', () => {
+    render(<MarketSidebar />)
+    const markets = screen.getByRole('group', { name: 'Markets' })
+    const macro = screen.getByRole('group', { name: 'Macro' })
+    const news = screen.getByRole('button', { name: 'News' })
+    expect(news.closest('[role="group"]')).toBeNull()
+    expect(screen.getAllByRole('button')[0]).toBe(news)
+    expect(within(markets).getAllByRole('button').map((button) => button.textContent)).toEqual([
+      'Browse Markets', 'Movers', 'Sector Rotation', 'Term Structure',
+    ])
+    expect(within(macro).getAllByRole('button').map((button) => button.textContent)).toEqual([
+      'Calendar', 'Macro', 'Global Macro', 'Fed', 'Shipping',
+    ])
+    for (const group of [markets, macro]) {
+      expect(group.className).not.toContain('border-l')
+      for (const button of within(group).getAllByRole('button')) fireEvent.click(button)
+    }
+    expect(getFocusedTab(useWorkspace.getState())?.spec).toEqual({
+      kind: 'market-board', params: { board: 'shipping' },
+    })
+  })
+
   it('opens the first exact provider when Enter is pressed', () => {
     render(<MarketSidebar />)
     const search = screen.getByRole('textbox', { name: 'Search assets…' })

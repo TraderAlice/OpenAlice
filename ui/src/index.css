@@ -80,14 +80,21 @@
   --font-mono: "SF Mono", "Fira Code", "Cascadia Code", Menlo, Consolas,
     monospace;
 
-  /* Compact workbench geometry. Composer and drawer silhouettes keep their
+  /* OpenAlice is a dense workbench: Tailwind's default 14px `text-sm` makes
+     shared controls and overlays compete with page titles. Keep the familiar
+     20px reading rhythm while aligning the global body/control size to the
+     semantic `.text-body` token below. */
+  --text-sm: 13px;
+  --text-sm--line-height: 20px;
+
+  /* Shared workbench geometry. Composer and drawer silhouettes keep their
      dedicated larger radii at the component boundary. */
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 10px;
-  --radius-2xl: 12px;
-  --radius-3xl: 16px;
+  --radius-sm: 5px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-3xl: 20px;
 }
 
 /* Base resolution (no attribute / explicit light). */
@@ -98,6 +105,10 @@
   --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --motion-ease-drawer: var(--motion-ease-out);
+  --oa-control-hover-border: color-mix(in srgb, var(--foreground) 18%, transparent);
+  --oa-control-focus-border: color-mix(in srgb, var(--foreground) 28%, transparent);
+  --oa-focus-ring: color-mix(in srgb, var(--foreground) 46%, transparent);
+  --oa-focus-shadow: 0 0 0 1px var(--oa-focus-ring);
 }
 
 /* Japanese gets a JP-first sans stack so shared Han characters render in
@@ -129,7 +140,11 @@ body,
 body {
   background: var(--app-background-wash), var(--background);
   color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
   overflow: hidden;
+  text-rendering: optimizeLegibility;
   transition:
     background-color var(--motion-slow) var(--motion-ease-out),
     color var(--motion-slow) var(--motion-ease-out);
@@ -148,6 +163,27 @@ body {
 
 :where(button, [role="button"], summary, a[href], select):not(:disabled):not([aria-disabled="true"]) {
   cursor: pointer;
+}
+
+:root:not([data-ui-style="win98"]) .oa-field-control {
+  transition:
+    border-color var(--motion-fast) var(--motion-ease-out),
+    background-color var(--motion-fast) var(--motion-ease-out),
+    box-shadow var(--motion-fast) var(--motion-ease-out);
+}
+
+:root:not([data-ui-style="win98"]) .oa-field-control:hover:not(:disabled):not([aria-invalid="true"]) {
+  border-color: var(--oa-control-hover-border);
+}
+
+:root:not([data-ui-style="win98"]) .oa-field-control:focus-visible {
+  border-color: var(--oa-control-focus-border);
+  box-shadow: var(--oa-focus-shadow);
+}
+
+:root:not([data-ui-style="win98"]) .oa-field-control[aria-invalid="true"]:focus-visible {
+  border-color: color-mix(in srgb, var(--destructive) 64%, var(--border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--destructive) 42%, transparent);
 }
 
 :root:not([data-ui-style="win98"]) select.oa-field-control {
@@ -200,7 +236,52 @@ body {
 .oa-nav-row {
   transition:
     color var(--motion-fast) var(--motion-ease-out),
-    background-color var(--motion-fast) var(--motion-ease-out);
+    background-color var(--motion-fast) var(--motion-ease-out),
+    box-shadow var(--motion-fast) var(--motion-ease-out);
+}
+
+:where(.oa-pressable, .oa-nav-item, .oa-nav-row):focus-visible {
+  outline: none;
+  box-shadow: var(--oa-focus-shadow);
+}
+
+.oa-data-surface {
+  border-color: color-mix(in srgb, var(--foreground) 9%, transparent);
+  background: color-mix(in srgb, var(--card) 94%, var(--background));
+}
+
+.oa-data-surface-header {
+  border-color: color-mix(in srgb, var(--foreground) 7%, transparent);
+  background: color-mix(in srgb, var(--secondary) 38%, transparent);
+}
+
+.oa-chart {
+  font-variant-numeric: tabular-nums;
+}
+
+.oa-chart .recharts-tooltip-wrapper {
+  outline: none;
+}
+
+.oa-chart .recharts-default-tooltip,
+.oa-chart-tooltip {
+  border: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent) !important;
+  border-radius: var(--radius-lg) !important;
+  background: color-mix(in srgb, var(--popover) 96%, transparent) !important;
+  color: var(--popover-foreground) !important;
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--shadow-color) 8%, transparent),
+    0 8px 24px color-mix(in srgb, var(--shadow-color) 12%, transparent);
+}
+
+.oa-chart .recharts-default-tooltip {
+  padding: 0.375rem 0.625rem !important;
+  font-size: 0.75rem !important;
+  line-height: 1rem !important;
+}
+
+.oa-chart .recharts-tooltip-cursor {
+  stroke: color-mix(in srgb, var(--foreground) 18%, transparent);
 }
 
 .oa-status-surface {
@@ -516,56 +597,6 @@ body {
   animation: oa-backdrop-enter var(--motion-standard) ease-out both;
 }
 
-/* Keep direct pointer resizing attached to the cursor, then soften only the
-   primitive's discrete 200px -> 44px collapse snap. Panel classes are applied
-   to react-resizable-panels' nested content element, so this rule deliberately
-   targets the direct flex item from the product-owned group seam. */
-.oa-page-sidebar-resizable[data-collapse-motion="armed"]
-  > [data-panel][data-collapse-state] {
-  transition: flex-grow var(--motion-standard) var(--motion-ease-out);
-}
-
-/* The expanded navigator keeps a hard 200px layout floor. Pointer travel past
-   that floor is represented as a damped, clipped overdrag: content retains its
-   layout width, the separator follows the resisted edge, and the working pane
-   shifts only for the duration of the gesture. Releasing before the commit
-   boundary uses a deliberately light spring; a committed gesture blends this
-   offset back into the primitive-owned 200px -> 44px collapse. */
-.oa-page-sidebar-resizable {
-  --oa-page-sidebar-overdrag: 0px;
-}
-
-.oa-page-sidebar-resizable > [data-page-sidebar-panel="navigator"] {
-  clip-path: inset(0 var(--oa-page-sidebar-overdrag) 0 0);
-}
-
-.oa-page-sidebar-resizable > [data-slot="resizable-handle"],
-.oa-page-sidebar-resizable > [data-page-sidebar-panel="content"] {
-  transform: translateX(calc(-1 * var(--oa-page-sidebar-overdrag)));
-}
-
-.oa-page-sidebar-resizable[data-overdrag-motion]
-  > [data-page-sidebar-panel="navigator"] {
-  transition: clip-path 240ms cubic-bezier(0.2, 1.3, 0.35, 1);
-}
-
-.oa-page-sidebar-resizable[data-overdrag-motion]
-  > [data-slot="resizable-handle"],
-.oa-page-sidebar-resizable[data-overdrag-motion]
-  > [data-page-sidebar-panel="content"] {
-  transition: transform 240ms cubic-bezier(0.2, 1.3, 0.35, 1);
-}
-
-.oa-page-sidebar-resizable[data-overdrag-state="resisting"]
-  > [data-slot="resizable-handle"] {
-  background-color: color-mix(in srgb, var(--foreground) 22%, var(--border));
-}
-
-.oa-page-sidebar-resizable[data-overdrag-state="armed"]
-  > [data-slot="resizable-handle"] {
-  background-color: color-mix(in srgb, var(--foreground) 36%, var(--border));
-}
-
 /* Page-owned navigators become touch surfaces inside the phone drawer.
    A 40px height floor removes the old 18–28px rows; icon controls keep 36px
    of horizontal room so adjacent workspace names remain distinguishable. */
@@ -666,27 +697,29 @@ body {
   @apply text-[11px] leading-[15px];
 }
 
-/* Page headers normally keep compact actions inline. Dense operational
-   controls can opt into a content-pane-aware stack so their title and status
-   retain full width after app/local sidebars are accounted for. */
-@container (max-width: 34rem) {
-  .oa-page-header-stack-actions {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .oa-page-header-stack-actions > :first-child {
-    width: 100%;
-  }
-
-  .oa-page-header-actions {
-    width: 100%;
-  }
-
-  .oa-uta-header-divider {
-    display: none;
-  }
+/* One chrome row for navigator and working view. Body descriptions are not
+   toolbar content. Layout owns the header slot; pages retain their actions. */
+.oa-topbar-host { container-type: inline-size; }
+.oa-topbar {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-height: 40px;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--foreground);
+}
+.oa-topbar-leading { display: flex; flex: 0 0 auto; align-items: center; gap: 4px; }
+.oa-topbar-leading:empty { display: none; }
+.oa-topbar-identity { display: flex; flex: 1 1 6rem; min-width: 0; align-items: center; gap: 8px; }
+.oa-topbar-actions { display: flex; flex: 0 1 auto; max-width: 100%; min-width: 0; flex-wrap: wrap; align-items: center; gap: 4px; }
+.oa-topbar-actions > div { max-width: 100%; flex-wrap: wrap; }
+.oa-topbar [data-slot="button"] { min-height: 28px; }
+@media (max-width: 767px), (pointer: coarse) {
+  .oa-topbar { min-height: 48px; }
+  .oa-topbar [data-slot="button"] { min-height: 40px; }
 }
 
 /* ==================== Live-data pulse ====================

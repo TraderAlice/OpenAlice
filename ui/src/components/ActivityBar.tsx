@@ -1,5 +1,5 @@
-import { ChevronDown, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { ChevronDown, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { type Page } from '../App'
 import { useWorkspace } from '../tabs/store'
 import type { ActivitySection } from '../tabs/types'
@@ -8,7 +8,7 @@ import { usePendingPushCount } from '../live/trading-push'
 import { useConnectorWarningCount } from '../live/connector-health'
 import { useActivityBarCollapse } from '../live/activity-bar-collapse'
 import { useTranslation } from 'react-i18next'
-import { ThemeToggle } from './ThemeToggle'
+import { ActivityBarUtilityMenu } from './ActivityBarUtilityMenu'
 import { useAliceProject } from '../hooks/useAliceProject'
 import { useBetaFeatures } from '../live/beta-features'
 import { joinNavLayout, NAV_SECTIONS } from './activity-navigation'
@@ -51,8 +51,10 @@ interface ActivityBarProps {
   desktopStatic?: boolean
   /** Static desktop rail width chosen by App's shell breakpoints. */
   railMode?: 'compact' | 'narrow' | 'full'
-  /** Force the static rail into icon-only mode for a compact workbench. */
-  compactRailForced?: boolean
+  /** Effective shell state, including temporary workbench expansion. */
+  collapsed?: boolean
+  /** Shell-owned collapse control, shown beside the expanded brand only. */
+  headerAction?: ReactNode
   /** Mobile drawer trigger that receives focus again when the drawer closes. */
   returnFocusRef?: RefObject<HTMLElement | null>
 }
@@ -92,7 +94,8 @@ export function ActivityBar({
   onClose,
   desktopStatic = true,
   railMode = 'full',
-  compactRailForced = false,
+  collapsed,
+  headerAction,
   returnFocusRef,
 }: ActivityBarProps) {
   const { t } = useTranslation()
@@ -112,41 +115,33 @@ export function ActivityBar({
   const collapsedSections = useActivityBarCollapse((s) => s.collapsedSections)
   const setCollapsed = useActivityBarCollapse((s) => s.setCollapsed)
   const railCollapsed = useActivityBarCollapse((s) => s.railCollapsed)
-  const setRailCollapsed = useActivityBarCollapse((s) => s.setRailCollapsed)
   const shortRailHeight = useMediaQuery('(max-height: 700px)')
-  const veryShortRailHeight = useMediaQuery('(max-height: 520px)')
-  const workbenchRail = selectedSidebar === 'chat' ||
-    selectedSidebar === 'auto-quant' ||
-    selectedSidebar === 'prediction'
-  const forcedCompactRail = desktopStatic && (
-    compactRailForced || workbenchRail || railMode === 'compact' || veryShortRailHeight
-  )
-  const compactRail = desktopStatic && (forcedCompactRail || railCollapsed)
-  const narrowRail = desktopStatic && railMode === 'narrow' && !compactRail
+  const compactRail = desktopStatic && (collapsed ?? railCollapsed ?? railMode === 'compact')
+  const narrowRail = desktopStatic && railMode !== 'full' && !compactRail
   const denseRail = desktopStatic && shortRailHeight
   const mobileDrawerRef = useRef<HTMLDivElement>(null)
   const railContent = (
     <>
-        <div className={`${denseRail ? 'h-10 md:h-8' : 'h-10'} flex shrink-0 items-center ${compactRail ? 'justify-center px-0' : narrowRail ? 'gap-2 px-3' : 'gap-2.5 px-3.5'}`}>
-          <img
-            src="/alice.ico"
-            alt="Alice"
-            className={`${denseRail ? 'h-6 w-6 md:h-5 md:w-5' : 'h-[22px] w-[22px]'} shrink-0 object-contain`}
-            draggable={false}
-          />
-          <h1 className={`min-w-0 flex-1 truncate text-[13px] font-semibold leading-[18px] tracking-[-0.01em] text-foreground ${compactRail ? 'md:hidden' : ''}`}>OpenAlice</h1>
-          {!desktopStatic && (
-            <Button
-              type="button"
-              onClick={onClose}
-              aria-label={t('common.closePanel', { title: t('nav.primaryNavigation') })}
-              className="-mr-1 shrink-0 text-muted-foreground"
-              variant="ghost"
-              size="icon"
-            >
-              <X size={15} strokeWidth={1.75} aria-hidden />
-            </Button>
-          )}
+        <div className={`${denseRail ? 'h-10 md:h-8' : 'h-10'} flex shrink-0 items-center ${compactRail ? 'justify-center px-0' : narrowRail ? 'gap-1.5 px-2.5' : 'gap-2.5 px-3.5'}`}>
+              <img
+                src="/alice.ico"
+                alt="Alice"
+                className={`${denseRail ? 'h-6 w-6 md:h-5 md:w-5' : 'h-[22px] w-[22px]'} shrink-0 object-contain`}
+                draggable={false}
+              />
+              <h1 className={`min-w-0 flex-1 truncate text-[13px] font-semibold leading-[18px] tracking-[-0.01em] text-foreground ${compactRail ? 'md:hidden' : ''}`}>OpenAlice</h1>
+              {!desktopStatic ? (
+                <Button
+                  type="button"
+                  onClick={onClose}
+                  aria-label={t('common.closePanel', { title: t('nav.primaryNavigation') })}
+                  className="-mr-1 shrink-0 text-muted-foreground"
+                  variant="ghost"
+                  size="icon"
+                >
+                  <X size={15} strokeWidth={1.75} aria-hidden />
+                </Button>
+              ) : !compactRail ? headerAction : null}
         </div>
 
         {/* Navigation */}
@@ -275,34 +270,18 @@ export function ActivityBar({
           })}
         </nav>
 
-        {/* Footer — global icon controls pinned to the bottom of the rail. */}
-        <div className={`flex shrink-0 items-center ${compactRail ? `${denseRail ? 'py-2 md:py-0.5 md:gap-px' : 'py-2 md:gap-1'} px-4 md:flex-col md:items-center md:px-2` : 'justify-between gap-2 border-t border-border/55 px-2 py-1'}`}>
-          <ThemeToggle compact={denseRail} />
-          {!forcedCompactRail && (
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    type="button"
-                    onClick={() => setRailCollapsed(!railCollapsed)}
-                    aria-label={t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
-                    aria-hidden={!desktopStatic ? true : undefined}
-                    tabIndex={!desktopStatic ? -1 : undefined}
-                    className={`hidden ${denseRail ? 'md:h-[26px] md:w-[26px]' : ''} shrink-0 text-muted-foreground md:flex`}
-                    variant="ghost"
-                    size="icon"
-                  />
-                }
-              >
-                {railCollapsed
-                  ? <PanelLeftOpen size={denseRail ? 14 : 17} strokeWidth={1.75} aria-hidden />
-                  : <PanelLeftClose size={denseRail ? 14 : 17} strokeWidth={1.75} aria-hidden />}
-              </TooltipTrigger>
-              <TooltipContent side="right" sideOffset={8}>
-                {t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
-              </TooltipContent>
-            </Tooltip>
-          )}
+        {/* Application controls pinned to the bottom of the rail. */}
+        <div className={`shrink-0 border-t border-border/55 ${compactRail ? `flex justify-center ${denseRail ? 'py-0.5' : 'py-2'}` : 'p-1.5'}`}>
+          <ActivityBarUtilityMenu
+            compactRail={compactRail}
+            denseRail={denseRail}
+            active={selectedSidebar === 'settings'}
+            onOpenSettings={() => {
+              setSidebar('settings')
+              openOrFocus({ kind: 'settings', params: { category: 'general' } })
+              onClose()
+            }}
+          />
         </div>
     </>
   )

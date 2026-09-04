@@ -13,7 +13,6 @@ export const ACTIVITY_PAGE_IDS = [
   'market',
   'issue',
   'connectors',
-  'settings',
 ] as const satisfies readonly Page[]
 
 export type ActivityPageId = (typeof ACTIVITY_PAGE_IDS)[number]
@@ -21,7 +20,7 @@ export type ActivityPageId = (typeof ACTIVITY_PAGE_IDS)[number]
 export const BUILTIN_GROUP_IDS = ['primary', 'beta', 'system'] as const
 export type BuiltinGroupId = (typeof BUILTIN_GROUP_IDS)[number]
 
-export const PINNED_ACTIVITY_PAGE: ActivityPageId = 'settings'
+export const PINNED_ACTIVITY_PAGE: ActivityPageId = 'chat'
 export const MAX_CUSTOM_GROUP_LABEL = 40
 export const CUSTOM_GROUP_ID_RE = /^custom:[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$/
 
@@ -46,7 +45,7 @@ export function defaultUiLayout(): UiLayout {
     groups: [
       { id: 'primary', items: ['chat', 'inbox', 'issue', 'auto-quant', 'tracked', 'market'] },
       { id: 'beta', items: ['prediction', 'office', 'portfolio', 'connectors'] },
-      { id: 'system', items: ['workspaces', 'automation', 'settings'] },
+      { id: 'system', items: ['workspaces', 'automation'] },
     ],
     hidden: [],
   }

@@ -6,7 +6,7 @@ import {
   markActivationRolledBack,
   readActivationReceipt,
 } from './activation.mjs'
-import { resolveInstalledLayout } from './install-layout.mjs'
+import { resolveCurrentRelease, resolveInstalledLayout } from './install-layout.mjs'
 import { CLI_VERSION, installedContentIdentity } from './install-source.mjs'
 import {
   activateRelease,
@@ -42,7 +42,7 @@ export async function resolveActivationContext(env, dependencies = {}) {
   let currentRelease = null
   try {
     const realpathImpl = dependencies.realpathImpl ?? realpath
-    const currentPath = await realpathImpl(layout.currentPath)
+    const currentPath = await resolveCurrentRelease(layout, dependencies)
     const releasesPath = await realpathImpl(layout.releasesDir)
     if (dirname(currentPath) !== releasesPath) {
       const error = new Error('The active OpenAlice release pointer leaves the installer-owned releases directory.')

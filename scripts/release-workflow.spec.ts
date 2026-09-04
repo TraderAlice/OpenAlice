@@ -12,6 +12,7 @@ interface WorkflowStep {
 }
 
 interface WorkflowJob {
+  permissions?: Record<string, string>
   if?: string
   needs?: string | string[]
   'timeout-minutes'?: number
@@ -55,16 +56,38 @@ function needs(job: WorkflowJob): string[] {
 }
 
 describe('Release workflow critical path', () => {
+  it('publishes existing stable npm assets without rebuilding or changing product channels', () => {
+    const job = workflow.jobs['publish-existing-npm']
+    expect(job.if).toBe("inputs.operation == 'publish-npm'")
+    expect(workflow.jobs.release.if).toBe("inputs.operation == 'release' || inputs.operation == 'mirror'")
+    expect(needs(job)).toEqual([])
+    expect(job['timeout-minutes']).toBe(15)
+    const guard = step(job, 'Require the current published stable release').run ?? ''
+    expect(guard).toContain('refs/heads/dev')
+    expect(guard).toContain('releases/latest')
+    expect(guard).toContain('.draft == false and .prerelease == false')
+    expect(guard).toContain('merge-base --is-ancestor')
+    expect(guard).toContain('packages/cli/package.json')
+    const download = step(job, 'Download and verify existing public release bytes').run ?? ''
+    expect(download).toContain('verifyCliNpmPackages')
+    expect(download).toContain('verify-public-cli-channels.mjs')
+    expect(download).toContain('npm-publish-order.json')
+    const allSteps = job.steps?.map((candidate) => candidate.run ?? '').join('\n') ?? ''
+    expect(allSteps).not.toMatch(/pnpm build|electron:|aws s3|gh release create/)
+    expect(step(job, 'Publish platform packages before the meta package').run)
+      .toContain('publish-cli-npm-packages.mjs --packages-dir dist/existing-npm')
+  })
+
   it('requires an explicit tag/package release decision instead of publishing on master push', () => {
     expect(Object.keys(workflow.on)).toEqual(['workflow_dispatch'])
     expect(workflow.on.workflow_dispatch?.inputs).toMatchObject({
       operation: {
         required: true,
         type: 'choice',
-        options: ['release', 'mirror'],
+        options: ['release', 'mirror', 'publish-npm', 'verify-npm'],
       },
       tag: {
-        required: true,
+        required: false,
         type: 'string',
       },
       channel: {
@@ -94,6 +117,30 @@ describe('Release workflow critical path', () => {
       expect(step(workflow.jobs['publish-release'], name).with?.target_commitish)
         .toBe('${{ needs.release.outputs.source_sha }}')
     }
+  })
+
+  it('rehearses real OIDC exchanges under the trusted workflow without release work', () => {
+    const job = workflow.jobs['verify-npm']
+    expect(job.if).toBe("inputs.operation == 'verify-npm'")
+    expect(needs(job)).toEqual([])
+    expect(job['timeout-minutes']).toBe(5)
+    expect(job.permissions).toEqual({ contents: 'read', 'id-token': 'write' })
+    expect(step(job, 'Require integrated release tooling').run).toContain('refs/heads/dev')
+    expect(step(job, 'Verify all trusted publisher connections').run)
+      .toBe('node scripts/preflight-public-cli-authority.mjs')
+    expect(JSON.stringify(job)).not.toMatch(/secrets\.|publish-cli-npm|pnpm build|gh release/)
+  })
+
+  it('uses modern npm and OIDC permissions without long-lived token fallback', () => {
+    for (const name of ['publish-cli-npm', 'publish-existing-npm']) {
+      const job = workflow.jobs[name]
+      expect(job.permissions?.['id-token']).toBe('write')
+      expect(job.steps?.find((entry) => entry.uses === 'actions/setup-node@v7')?.with)
+        .toMatchObject({ 'node-version': '22.22.2', 'package-manager-cache': false })
+      expect(step(job, 'Install OIDC-capable npm').run).toContain('npm@12.0.2')
+    }
+    expect(workflow.jobs['preflight-public-cli-authority'].permissions?.['id-token']).toBe('write')
+    expect(JSON.stringify(workflow)).not.toMatch(/NPM_TOKEN|NODE_AUTH_TOKEN/)
   })
 
   it('selects the previous release from the same channel', () => {
@@ -277,7 +324,7 @@ describe('Release workflow critical path', () => {
       .toContain("needs.release.outputs.channel == 'stable'")
     expect(npmAndBun).toContain('--manager npm')
     expect(npmAndBun).toContain('--manager bun')
-    expect(needs(channels)).toEqual(['release', 'build-cli-release'])
+    expect(needs(channels)).toEqual(['release', 'build-cli-release', 'build-cli-windows'])
     expect(channels.if).toContain("needs.release.outputs.channel == 'stable'")
     expect(step(channels, 'Derive package-manager metadata from accepted archives').run)
       .toContain('--require-all')
@@ -331,8 +378,10 @@ describe('Release workflow critical path', () => {
     ])
     expect(npm.if).toContain("needs.verify-public-cli-channels.result == 'success'")
     expect(npm.if).toContain("needs.release.outputs.channel == 'stable'")
+    expect(npm.steps?.some((candidate) => candidate.uses === 'actions/checkout@v7')).toBe(true)
     const publish = step(npm, 'Publish platform packages before the meta package').run ?? ''
-    expect(publish.indexOf('packages.slice(0,-1)')).toBeLessThan(publish.indexOf('packages.at(-1)'))
+    expect(publish).toContain('publish-cli-npm-packages.mjs')
+    expect(publish).toContain('cli-npm-tarballs')
   })
 
   it('verifies public release bytes before activating external package channels', () => {

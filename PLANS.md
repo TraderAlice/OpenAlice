@@ -29,6 +29,11 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
+- [[plans/unified-page-topbar.md]] — Unifies navigator and content toolbars
+  across the UI, with fixed page actions and content-owned sidebar restoration.
+  Held on `codex/ui-usability-followup` for visual acceptance.
+
+- [[plans/interaction-density-convergence.md]] — Converges field focus, compact-rail expansion, Connector setup hierarchy, and dense market surfaces through shared interaction primitives on the current `dev` baseline.
 - [[plans/tui-experience.md]] — Rebuilds the Shell Supervisor as a polished,
   mouse-capable terminal control surface using Oh My Pi as the interaction and
   finish benchmark while preserving the Node CLI and Runtime ownership
@@ -36,15 +41,20 @@ the durable truth after it changes. Git history is the archive.
   before any `dev` PR.
 - [[plans/bun-cli-distribution.md]] — Replaces the expanded Node headless
   Runtime with a Bun-compiled, multi-process CLI distribution. Direct,
-  npm/Bun, Homebrew, and AUR channels consume one accepted artifact set. The
-  CLI package owns OpenAlice only: Agent Runtime installation and Electron
+  npm/Bun, Homebrew, and AUR channels consume one accepted artifact set.
+  Homebrew tap is public at `0.90.2` with lightweight hourly/manual stable sync.
+  Stable `0.91.0` is authorized; native Intel acceptance passed with a measured
+  renderer delay (#1350), and bounded smoke-budget correction precedes promotion.
+  AUR registration remains deferred.
+  The CLI package owns OpenAlice only: Agent Runtime installation and Electron
   packaging stay outside this plan. The native CLI is public through the
   separately dispatched `v0.91.0-beta.3`; stable/beta discovery now uses the
   OpenAlice CDN manifests. Managed SSH installation and Project transfer pass
   the disposable Docker target; beta3 core Runtime/PTY state survives a long
   tunnel outage, and the following `dev` increment refreshes Settings identity
-  after recovery. Native PowerShell and external package-manager activation
-  remain open on focused branches from current `dev`. Routine dev
+  after recovery. Native Windows x64/ARM64 now proceed from accepted previews
+  into the shared stable/beta/dev installer, updater, and npm topology; external
+  package-manager activation remains a separate checkpoint. Routine dev
   and exact-beta source feedback is reduced to local-first, lightweight
   hosted lanes while `master` promotion, stable, and final artifact acceptance
   retain the complete gates.

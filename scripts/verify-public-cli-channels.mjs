@@ -5,12 +5,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-const TARGETS = Object.freeze([
-  ['darwin', 'arm64'],
-  ['darwin', 'x64'],
-  ['linux', 'arm64'],
-  ['linux', 'x64'],
-])
+import { CLI_RELEASE_TARGETS as TARGETS } from '../packages/cli/src/release-targets.mjs'
 
 export async function verifyPublicCliChannels({
   manifestPath,

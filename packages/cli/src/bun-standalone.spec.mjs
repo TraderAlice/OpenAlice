@@ -12,6 +12,19 @@ import {
 } from './bun-standalone.mjs'
 
 describe('Bun standalone launch boundary', () => {
+  it.each(['x64', 'arm64'])('uses private Windows Git/Bash without selecting managed Pi (%s)', (arch) => {
+    const resourceRoot = resolve('/preview/share/openalice')
+    const prefix = arch === 'arm64' ? 'clangarm64' : 'mingw64'
+    const env = buildBunRuntimeEnvironment({ Path: 'user-tools', OPENALICE_MANAGED_PI_PATH: 'old' },
+      resourceRoot, '/preview/bin/openalice.exe', { platform: 'win32', arch, exists: () => false })
+    expect(env).not.toHaveProperty('Path')
+    expect(env).not.toHaveProperty('OPENALICE_MANAGED_PI_PATH')
+    expect(env.OPENALICE_MANAGED_SHELL_PATH).toBe(resolve(resourceRoot, 'runtime/git/bin/bash.exe'))
+    expect(env.GIT_EXEC_PATH).toBe(resolve(resourceRoot, `runtime/git/${prefix}/libexec/git-core`))
+    expect(env.PATH).toBe([
+      'cmd', 'bin', 'usr/bin', `${prefix}/bin`,
+    ].map(path => resolve(resourceRoot, 'runtime/git', path)).concat('user-tools').join(';'))
+  })
   it('derives an installed sidecar resource root from the executable', () => {
     expect(resolveBunResourceRoot({}, '/opt/openalice/releases/v1/bin/openalice'))
       .toBe(resolve('/opt/openalice/releases/v1/share/openalice'))

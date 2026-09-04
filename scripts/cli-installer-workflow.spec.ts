@@ -164,7 +164,7 @@ describe('CLI installer dev publication workflow', () => {
 
   it('publishes commit-addressed candidates without overwriting accepted bytes', () => {
     const publish = workflow.jobs['publish-dev-cli-candidate']
-    expect(publish.needs).toBe('build-dev-cli')
+    expect(publish.needs).toEqual(['build-dev-cli', 'build-dev-cli-windows'])
     const prepare = step(publish, 'Validate candidates and prepare candidate receipt').run ?? ''
     expect(prepare).toContain('prepare-cli-dev-assets.mjs')
     expect(prepare).toContain('--installer install')

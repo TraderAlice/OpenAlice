@@ -138,7 +138,7 @@ describe('Ask Alice sidebar in AutoQuant mode', () => {
   it('stacks Harness capabilities as full-width rows', () => {
     render(
       <WorkspacesContext.Provider value={context()}>
-        <ChatWorkspaceSection mode="auto-quant" displayMode="focused" />
+        <ChatWorkspaceSection mode="auto-quant" />
       </WorkspacesContext.Provider>,
     )
 
@@ -146,6 +146,8 @@ describe('Ask Alice sidebar in AutoQuant mode', () => {
     const studio = screen.getByRole('button', { name: 'Studio' })
     expect(newResearch.parentElement).toBe(studio.parentElement)
     expect(newResearch.parentElement?.className).toContain('grid-cols-1')
+    expect(screen.getByText('New research').className).toContain('text-body')
+    expect(screen.getByText('Studio').className).toContain('text-body')
   })
 
   it('keeps the active research current and routes destructive actions through the More menu', async () => {
@@ -153,7 +155,7 @@ describe('Ask Alice sidebar in AutoQuant mode', () => {
     const onNavigate = vi.fn()
     render(
       <WorkspacesContext.Provider value={context()}>
-        <ChatWorkspaceSection mode="auto-quant" displayMode="focused" onNavigate={onNavigate} />
+        <ChatWorkspaceSection mode="auto-quant" onNavigate={onNavigate} />
       </WorkspacesContext.Provider>,
     )
 

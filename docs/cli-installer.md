@@ -1,6 +1,6 @@
 # CLI Installer
 
-This guide owns the macOS/Linux OpenAlice CLI bootstrap, installed layout,
+This guide owns the macOS/Linux/Windows OpenAlice CLI bootstrap, installed layout,
 activation, provenance, update, rollback, uninstall, and release acceptance.
 Runtime behavior after activation belongs to [[docs/local-runtime.md]]. Electron
 packaging remains independent under [[docs/managed-workspace-runtime.md]].
@@ -51,16 +51,85 @@ bash install --archive ./openalice-cli-0.91.0-linux-x64.tar.gz \
   --sha256 <64-lowercase-hex>
 ```
 
-Native Windows PowerShell installation is deferred. Windows users use the
-Electron distribution or an explicitly chosen POSIX environment until that
-lane is implemented and accepted.
+### Windows x64 and ARM64
+
+Windows uses `install.ps1` and the same stable/beta/dev manifest authority and
+product version as macOS/Linux. The first Windows channel activation is dev;
+existing stable/beta manifests do not gain Windows retroactively. Their
+PowerShell snapshot becomes public at the next accepted versioned release.
+
+The dev bootstrap from integrated source is:
+
+```powershell
+& ([scriptblock]::Create((Invoke-RestMethod https://raw.githubusercontent.com/TraderAlice/OpenAlice/dev/install.ps1))) -Channel dev
+```
+
+Versioned publication exposes the shared bootstrap at
+`https://download.openalice.ai/install.ps1`. Its default is stable;
+`-Channel beta` or `-Channel dev` selects the other channels. Review `-Plan`
+first or provide `-Yes` intentionally. A downloaded script also accepts:
+
+```powershell
+.\install.ps1 -Archive .\openalice-cli-<version>-win32-arm64.tar.gz `
+  -Sha256 <64-hex-digest> -Channel beta -InstallDir "$env:USERPROFILE\.openalice" -Yes
+```
+
+The host architecture must match the package. The payload includes private
+PortableGit/Bash but no Agent Runtime or host Node/Bun dependency. The installer
+requires Windows PowerShell 5.1 and the system `tar.exe`; it does not request
+administrator privileges, change persistent execution policy, or install a
+service. The updater and deferred uninstaller use `-ExecutionPolicy RemoteSigned`
+only for their child process, after downloading checksum-bound installer bytes
+or reading the accepted release's local helper. Machine/user Group Policy still
+takes precedence. A manually downloaded script can use the same per-process flag;
+do not ask users to run `Set-ExecutionPolicy` globally.
+
+Windows uses `cli/current.txt` instead of a directory symlink. It contains
+only a retained release name; `bin/*.cmd` launchers resolve it each time and
+export the same layout/provenance fields as POSIX launchers. Atomic file
+replacement needs neither developer mode nor symlink privileges. Installation
+never overwrites a mapped EXE. Update and bidirectional rollback reuse the
+existing pending-activation/readiness recovery contract. Restart explicitly
+with `openalice down` and `openalice up`.
+
+The installer can add only its own bin directory to user PATH and records that
+ownership; `-NoModifyPath` leaves PATH unchanged. Removal preserves the shared
+root and user data. Because an executing Windows EXE cannot remove itself,
+`openalice uninstall` schedules cleanup after that command exits and records
+the outcome in `.cli-uninstall-result.json`; `.cli-uninstall.log` records helper
+startup failures that occur before a receipt can be written. A running installed Runtime blocks
+cleanup; stop all AliceProjects using that installation before retrying.
+
+The deferred helper uses an awaited `cmd /c start` bootstrap, because Bun's
+Windows detached-process behavior can otherwise kill a post-exit helper with
+its parent ([Bun #31603](https://github.com/oven-sh/bun/issues/31603)). This
+workaround is local to uninstall; it does not add a service or process manager.
+
+This first Windows implementation retains installed release directories until
+uninstall. Unlike the POSIX three-release collector, it does not yet prune old
+releases that could still be mapped by another AliceProject.
+
+Windows builds preserve their archive before native acceptance. Dev/beta
+cross-build on Linux; stable and explicit rehearsal use native Windows.
+Rehearse the managed install/update/rollback and npm/Bun command shims without
+running the ordinary hosted source suites:
+
+```bash
+gh workflow run cli-installer-smoke.yml --ref <feature-or-dev> \
+  -f windows_preview=true -f windows_channel_build=true
+```
+
+Add `-f windows_candidate_run=<run-id>` to accept preserved bytes without
+rebuilding. An installer or test-only fix may replay those bytes; executable
+changes require a new candidate. The earlier custom ZIPs remain historical
+diagnostic fixtures, not a second channel or an upgrade target.
 
 ## Artifact contract
 
 Every accepted archive is named:
 
 ```text
-openalice-cli-<version>-<darwin|linux>-<arm64|x64>.tar.gz
+openalice-cli-<version>-<darwin|linux|win32>-<arm64|x64>.tar.gz
 ```
 
 It contains exactly one top-level directory with:
@@ -323,7 +392,7 @@ commits may carry the same package version. Pinned and custom installs remain
 non-updating unless the user explicitly selects a channel.
 
 For a direct install, `openalice update` downloads the channel manifest's
-immutable snapshot of the shared Bash installer, verifies its SHA-256, and
+immutable snapshot of the shared Bash or PowerShell installer, verifies its SHA-256, and
 invokes it with the current install root and ordinary consent. Native stable
 and beta releases pass both the channel and exact accepted version. Dev passes
 the channel and binds the expected archive identity. An update therefore
@@ -332,6 +401,11 @@ exact-version pin. The historical v0.90.1 bridge is a bootstrap and forward
 cutover seam only; it is never used to replace an existing native layout. A
 running process keeps its already-mapped executable; the new pointer affects
 the next invocation.
+
+Windows uses the equivalent `windowsInstaller` descriptor; POSIX clients keep
+reading `installer`. Dev retains its shipped four-entry `targets` field and
+adds both Windows targets in `additionalTargets`, bound to the same commit.
+This lets old dev clients still discover updates without a separate feed.
 
 In the manifest, `installer.versionedUrl` is the executable update input and
 `installer.sha256` binds those immutable bytes. `installer.url` is the mutable

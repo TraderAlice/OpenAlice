@@ -8,7 +8,6 @@ import {
   Microscope,
   Binary,
   Plug,
-  Settings,
   Telescope,
   TerminalSquare,
   Zap,
@@ -29,7 +28,7 @@ import {
 type NavItemKey =
   | 'nav.item.inbox' | 'nav.item.tracked' | 'nav.item.chat' | 'nav.item.autoQuant' | 'nav.item.autoPrediction' | 'nav.item.workspaces'
   | 'nav.item.market' | 'nav.item.office' | 'nav.item.issue'
-  | 'nav.item.trading' | 'nav.item.connectors' | 'nav.item.automation' | 'nav.item.settings'
+  | 'nav.item.trading' | 'nav.item.connectors' | 'nav.item.automation'
 
 interface NavLeaf {
   page: Page
@@ -113,7 +112,6 @@ export const NAV_SECTIONS: NavSection[] = [
       // and provenance debugging; conversation continuation belongs to Chat.
       { page: 'workspaces', labelKey: 'nav.item.workspaces', icon: TerminalSquare, defaultTab: { kind: 'workspace-list', params: {} } },
       { page: 'automation', labelKey: 'nav.item.automation', icon: Zap, defaultTab: { kind: 'automation', params: { section: 'runs' } } },
-      { page: 'settings',   labelKey: 'nav.item.settings',   icon: Settings, defaultTab: { kind: 'settings', params: { category: 'general' } } },
     ],
   },
 ]

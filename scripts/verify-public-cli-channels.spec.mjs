@@ -20,7 +20,7 @@ describe('public CLI channel verification', () => {
       fetchImpl: fixture.fetchImpl,
     })
     expect(receipt.status).toBe('pass')
-    expect(receipt.targets).toHaveLength(4)
+    expect(receipt.targets).toHaveLength(6)
     expect(receipt.targets.every((target) => target.public)).toBe(true)
   })
 
@@ -62,6 +62,8 @@ function createFixture(overrides = {}) {
     ['darwin', 'x64'],
     ['linux', 'arm64'],
     ['linux', 'x64'],
+    ['win32', 'arm64'],
+    ['win32', 'x64'],
   ].map(([platform, arch], index) => {
     const archive = `openalice-cli-${version}-${platform}-${arch}.tar.gz`
     const body = Buffer.from(`accepted-${platform}-${arch}`)

@@ -1,9 +1,231 @@
 # Bun-native CLI Distribution
 
+## Stable 0.91.0 acceptance — 2026-09-05
+
+Maintainer authorized stable publication, including both Windows CLI targets.
+AUR activation is deferred while account registration is closed. Promotion
+[PR #1349](https://github.com/TraderAlice/OpenAlice/pull/1349) remains unmerged:
+local full regression (712 files, 6,360 passes, three expected skips), root
+types, unsigned packaged Workspace/Pi acceptance, OrbStack Docker and Guardian
+recovery passed. The exact dev channel and both Windows native replay receipts
+passed. Hosted Docker passed unchanged on retry, as did Windows desktop/upgrade,
+Windows Broker Packs and Apple Silicon desktop/upgrade.
+
+Intel desktop Guardian/PTY smoke timed out twice after successful takeover;
+the second run also recorded a spawned Shell but no PTY connection. Do not retry
+blindly or waive it. Add smoke-only boundary diagnostics and a single-host manual
+rehearsal selector, identify the cause, then resume promotion and the separate
+version-only preparation. No stable tag or public 0.91.0 bytes exist yet. Release
+and package-manager authority remain owned by [[docs/development-workflow.md]]
+and [[docs/cli-package-managers.md]].
+
+Diagnostic [run 33893555127](https://github.com/TraderAlice/OpenAlice/actions/runs/33893555127)
+passed native Intel takeover, PTY/CLI, packaged Workspace/Pi, and previous-app
+upgrade acceptance. Main returned Workspace HTTP 201 at `16:17:23.386Z`; the
+renderer observed response headers at `16:18:24.943Z`, then successfully spawned
+and attached the Shell. Total takeover smoke was 88 seconds against a 90-second
+budget. Increase only the smoke's bounded overall deadline to 180 seconds;
+retain every assertion and phase diagnostic, with no sleep, retry loop or
+production transport workaround. The underlying renderer delivery latency is
+not explained or claimed fixed; track it in [#1350](https://github.com/TraderAlice/OpenAlice/issues/1350). Local diagnostic regression
+passed 712 files / 6,361 tests with three expected skips, root/Desktop types and
+real isolated takeover/PTY/socket acceptance.
+
+## Homebrew activation — 2026-09-04
+
+The maintainer created `TraderAlice/homebrew-tap` and authorized completing
+the channel. Use the existing stable `v0.90.2` formula and archive bytes, not
+new dev builds or an invented version. The tap owns one lightweight hourly/manual
+stable sync workflow, using its own `GITHUB_TOKEN`; the main repository's
+cross-repository token writer remains disabled. Owner contract:
+[[docs/cli-package-managers.md]].
+
+- [x] Verify all four public archive checksums, sidecars, and formula asset digest.
+- [x] Exercise native macOS ARM64 Homebrew install and real detached Runtime
+  startup with an isolated AliceProject and no Node/Bun/agent commands in PATH.
+- [x] Publish the tap, verify its public install and hosted sync receipt.
+- [x] Confirm manager-owned update/removal, user-data preservation, and record
+  final acceptance links. Existing user PATH and installations remain untouched.
+
+Accepted [tap PR #1](https://github.com/TraderAlice/homebrew-tap/pull/1);
+[sync run 33889442153](https://github.com/TraderAlice/homebrew-tap/actions/runs/33889442153)
+used `GITHUB_TOKEN` to publish formula commit `43d9f20`. Public
+`brew install traderalice/tap/openalice` resolved `0.90.2` on macOS ARM64.
+Local verification covered five sync contracts, four public archive hashes and
+sidecars, formula digest/byte equality, real isolated Runtime/Web start/stop,
+package-manager update/uninstall guidance, and data preservation. No new
+Linux/Intel runtime test was purchased for byte-identical release assets.
+A second [sync run](https://github.com/TraderAlice/homebrew-tap/actions/runs/33889497212)
+verified the unchanged version without archive downloads or an empty commit.
+
 Status: Active — macOS/Linux native CLI is public in v0.90.2 and the separately
 dispatched v0.91.0-beta.3 is externally verified; stable remains v0.90.2 while
 stable/beta discovery authority is converged on the OpenAlice CDN. Native
-PowerShell and external package-manager activation remain deferred.
+Windows x64/ARM64 channel acceptance and AUR activation remain in progress;
+Homebrew is public at `0.90.2`. npm/Bun's five public
+packages are published at v0.90.2 under maintainer `jiaran258`.
+
+Accepted OIDC increment: replace the temporary npm token with GitHub OIDC trust on
+the same five packages. Preserve stable-only publication and accepted artifact
+bytes; no Windows activation, new version, or package-manager switch changes.
+The non-publishing exchange rehearsal lives in `release.yml` so it verifies
+the real trusted workflow identity. Owner contract: [[docs/cli-package-managers.md]].
+
+- [x] Replace token-based preflight/publication wiring and add OIDC contract tests.
+- [x] Save all five npm Trusted Publisher connections, allowing direct publish
+  from `TraderAlice/OpenAlice` / `release.yml` (2026-09-04).
+- [x] Complete local verification: root typecheck; 708 full-suite files,
+  6,331 passed and 3 expected skips; 47 focused checks and 82 workflow contracts.
+- [x] Integrate [PR #1342](https://github.com/TraderAlice/OpenAlice/pull/1342)
+  into `dev` at `f37243b7`.
+- [x] Run the real five-package OIDC exchange rehearsal without publishing:
+  [run 33871780397](https://github.com/TraderAlice/OpenAlice/actions/runs/33871780397),
+  one successful 15-second job; all release/build/publication jobs skipped.
+- [x] Revoke `openalice-first-publish` on npm and delete the GitHub `NPM_TOKEN`
+  secret after maintainer confirmation on 2026-09-04. Both removals verified.
+- [x] Repeat the five-package exchange after removing both credentials:
+  [run 33872141409](https://github.com/TraderAlice/OpenAlice/actions/runs/33872141409)
+  passed in a single 16-second job without publishing.
+
+The next authorized stable release still owns real new-version upload and
+provenance acceptance. The persistent npm channel switch remains unchanged;
+normal source promotion must carry the OIDC workflow to `master` before a new
+stable release uses it. Windows x64 and ARM64 are the maintainer's accepted next
+platform increment, separate from this completed authentication change.
+
+## Current increment: unified Windows channels
+
+Accepted 2026-09-04: the portable-only decision below is superseded. Windows
+x64 and ARM64 join the existing stable/beta/dev version authority, not a new
+preview version system. Missing personal Windows hardware is an explicitly
+recorded interactive acceptance gap, not a reason to postpone distribution.
+Use the existing native runners for bounded artifact checks; do not restore
+full hosted source suites to dev/beta publication.
+
+Ordered delivery:
+
+- [x] Extend common target/provenance and installer selection to Windows;
+  retain readable manifests for already-installed macOS/Linux dev clients.
+- [x] Add the shared-channel PowerShell bootstrap and side-by-side activation,
+  update, rollback, and data-preserving removal. Never overwrite a mapped EXE.
+- [x] Produce canonical Windows artifacts in the ordinary dev/release lanes,
+  preserving candidates before acceptance and allowing replay without rebuild.
+- [x] Extend npm/Bun materialization and publication inputs to Windows without
+  adding Windows branches to Homebrew/AUR. First publication and OIDC enrollment
+  are separate external-authority checkpoints, not implied by generated files.
+- [ ] Verify local contracts/types/full regression once, existing POSIX
+  installation, and bounded native Windows install/update/rollback/start/stop.
+- [ ] Integrate to dev, inspect live six-target publication, and record the
+  remaining interactive Windows/provider gap before any versioned promotion.
+
+One product version and source commit bind the target set. Platform-specific
+installer bytes are checksum-bound snapshots selected by the shared updater.
+Windows uses an atomic text activation pointer to immutable release directories
+instead of requiring administrator symlink privileges or overwriting a running
+executable. Electron remains on its existing desktop updater.
+
+Dev/beta cross-build Windows on Linux, reusing dev's platform-neutral inputs.
+Only stable and an explicit native rehearsal allocate Windows runners. Native
+acceptance preserves the candidate before running and can replay it without
+dependency installation or recompilation.
+
+Current verification: root/CLI typechecks passed; complete local suite ran once
+(6,348 passed, six stale package-count/workflow assertions repaired and their
+focused suites rerun green, three expected skips). The clean OrbStack installer
+and real macOS npm/Bun installation, pending update, restart and removal passed.
+Canonical Windows candidates from source `5b172265` are preserved in
+[run 33878424385](https://github.com/TraderAlice/OpenAlice/actions/runs/33878424385).
+Native replay exposed PortableGit internal hard links, Windows PowerShell 5.1's
+null-string conversion in atomic replacement, and a transient staged-EXE rename
+lock; these now have bounded handling. ARM64 managed installation, real
+Guardian/Alice/Web/Git, mapped-runtime update, bidirectional rollback and external
+data-preserving removal passed in
+[run 33880423746](https://github.com/TraderAlice/OpenAlice/actions/runs/33880423746).
+Its npm package assembly exposed a release inventory larger than the default
+1 MiB subprocess buffer; the bounded buffer and a local regression fixture are
+fixed. Deferred CLI self-removal and native npm/Bun acceptance are being replayed
+against those same candidate bytes, not represented as a new product build.
+
+Delivery update: [PR #1346](https://github.com/TraderAlice/OpenAlice/pull/1346)
+integrates this topic into the ordinary dev lane after local acceptance; the
+remaining manual Windows rerun is deliberately not a synchronous dev gate.
+Both architectures have exercised install/start/update/rollback. The post-exit
+helper exposed Bun's Windows detached-child behavior, matching
+[Bun #31603](https://github.com/oven-sh/bun/issues/31603); the implementation now
+uses an awaited, quoted `cmd /c start` bootstrap instead of a new polling
+protocol. Its fresh native recheck is
+[33884781763](https://github.com/TraderAlice/OpenAlice/actions/runs/33884781763)
+(candidate source `5e800195`), still pending when this delivery note was written.
+Windows x64 npm install/native execution/manager removal and Bun install/native
+execution/ownership passed. Bun leaves a global entry after removing its package;
+[issue #1347](https://github.com/TraderAlice/OpenAlice/issues/1347) records the
+upstream boundary, and receipts must expose it rather than claim clean removal.
+Post-merge six-target CDN activation and the final native receipt are recorded
+on the integration PR; versioned release and Windows npm authority are still
+separate maintainer actions.
+
+### Accepted preview groundwork
+
+Accepted 2026-09-04: ship both Windows architectures iteratively, without making
+the Windows experiment a prerequisite for existing macOS/Linux channels.
+Owner contracts: [[docs/cli-installer.md]], [[docs/local-runtime.md]].
+
+Choose a portable ZIP plus checksum-bound, side-by-side PowerShell installation
+first. This gives testers a complete product immediately without prematurely
+claiming stable npm availability or adding Windows junction/update recovery to
+the first increment. A direct managed updater and npm registration remain later
+acceptance steps; custom preview provenance deliberately disables automatic
+channel discovery. Agent CLIs remain user-owned.
+
+- [x] Compile both Windows architectures with pinned Bun 1.4.0 locally.
+- [x] Assemble complete ZIPs with UI, templates, helpers and checksum-pinned
+  PortableGit/Bash; use the existing desktop Git pins, not desktop managed Pi.
+- [x] Add explicit PowerShell archive installation into a new directory, with
+  checksum/path/host checks, consent, no admin/PATH changes, and no data removal.
+- [x] Correct Windows Git environment, npm-agent interpreter resolution and
+  ConPTY termination; bound slow WebSocket consumers without POSIX signals.
+- [x] Add an independently retryable, manual x64/ARM64 workflow. Preserve each
+  archive before its native smoke so failures retain reproduction bytes.
+- [x] Complete local regression/type checks and integrate [PR #1344](https://github.com/TraderAlice/OpenAlice/pull/1344)
+  into `dev` at `1d1dc21d`: full baseline 6,342 passes, final focused 74 passes,
+  root/CLI types, local Windows ZIP builds and complete macOS native smoke.
+- [x] Run native Windows installation, Guardian/Alice/Web, Git, ConPTY input,
+  resize, independent termination and stop checks for each architecture.
+- [ ] Perform interactive external-agent/provider acceptance; record concrete
+  failures instead of claiming cross-compilation proves Windows runtime support.
+- [ ] Add accepted Windows artifacts to the normal direct-channel manifest and
+  npm topology, then first-publish and enroll the two new package identities.
+
+The first preview is not a new beta/stable release. It is commit-addressed
+Actions output with a separate native acceptance receipt and no mutable channel
+alias. `CLI Installer Smoke` can dispatch only this lane from integrated `dev`
+using `windows_preview=true`, without the normal manual installer matrix.
+
+Native rehearsal [33874069985](https://github.com/TraderAlice/OpenAlice/actions/runs/33874069985)
+preserved the x64 ZIP and passed ConPTY input/resize/independent termination.
+Its installation smoke exposed inherited PowerShell 7 `PSModulePath` preventing
+Windows PowerShell 5.1 from discovering `Get-FileHash`; reset only that child
+environment, not the host. A separate old classifier assertion also needed to
+recognize the manual Windows-only selector. Neither failure is waived.
+The next smoke attempt accepts the saved ZIPs with `windows_candidate_run`,
+skipping dependency installation and all rebuilds; product changes still need
+a newly compiled candidate. Ambiguous/missing archived candidates fail closed.
+
+Accepted native replay: [33875035438](https://github.com/TraderAlice/OpenAlice/actions/runs/33875035438)
+passed on both native hosts, reusing product commit `579bd53e` from the first
+build. ARM64 took 66 seconds and x64 67 seconds; both skipped Node/pnpm setup,
+dependency installation and all builds. The receipts bind these exact archives:
+
+| Architecture | Content identity | Archive SHA-256 |
+|---|---|---|
+| x64 | `bec6a7546a3e1c4c` | `66f98d667861df4e8bc74a60f2e12665dd1bbbcbbfe76495d0b7764bc25bcf0c` |
+| ARM64 | `dc78db8c9192513a` | `8ad8791c605e5105dedfe84c8e5faa56258e706d653914d64275d5a08cd41fc8` |
+
+[x64 preview](https://github.com/TraderAlice/OpenAlice/actions/runs/33874069985/artifacts/9937224452)
+and [ARM64 preview](https://github.com/TraderAlice/OpenAlice/actions/runs/33874069985/artifacts/9937338651)
+are retained for 30 days as Actions artifacts, not permanent GitHub Release or
+npm assets. Real interactive Agent/provider use and manual upgrade/removal are
+still explicit follow-up acceptance, not implied by this smoke.
 
 Delivery mode: Serial / interactive from current `dev`. The accepted native CLI
 increments have already reached `dev`; the old `codex/usability-improvements`
@@ -223,19 +445,17 @@ installations are never removal targets.
 
 ### Initial build matrix
 
-The current cutover gate covers macOS and Linux. Native Windows is explicitly
-deferred; its PowerShell, PTY, path, junction, signing, and locked-executable
-work remains a later platform initiative rather than blocking this plan.
+The original cutover gate covers macOS and Linux. Windows x64 and ARM64 now
+have a separate preview increment above; they do not block the existing matrix.
 
 | Platform | Architectures | Initial gate |
 |---|---|---|
 | macOS | arm64, x64 | Required |
 | Linux glibc | arm64, x64 | Required |
-| Windows | x64 | Deferred |
+| Windows | x64, arm64 | Independent preview; native acceptance pending |
 
-Linux musl and Windows arm64 are follow-up targets only after there is a
-supported-user or deployment requirement. Do not multiply release variants
-before the required matrix is proven.
+Linux musl remains deferred. Windows ARM64 is explicitly requested and is not
+replaced by an x64 emulation claim.
 
 ## Installation and Package-manager Topology
 
@@ -455,7 +675,7 @@ build harness when it improves the next investigation.
 
 ### 5. Package-manager publication
 
-- [ ] Reserve the npm meta and platform package names; keep the resulting
+- [x] Reserve the npm meta and platform package names; keep the resulting
   command named `openalice`.
 - [x] Generate npm platform packages from accepted release archives and one
   meta package with platform `optionalDependencies`.
@@ -484,6 +704,9 @@ build harness when it improves the next investigation.
   AUR Git access without logging or weakening the external credentials.
 - [x] Expose the authority preflight as a bounded manual, read-only rehearsal
   that cannot publish packages, push metadata, or create a release.
+- [x] Let an authenticated first stable publication claim the five fixed,
+  unreserved npm names, while retaining maintainer checks for existing names
+  and integrity-checked idempotent retries after partial publication.
 - [ ] Publish Brew/AUR metadata only after the referenced release assets are
   public and verified. The opt-in automation and public-byte receipt are ready;
   external repository creation, credentials, activation, and first public
@@ -759,6 +982,24 @@ This plan is complete only when:
     an ordinary SSH-reachable host without owning its infrastructure provider.
 ## Progress Log
 
+- 2026-09-04: Maintainer authorized attempting the five unscoped npm names
+  with the accepted v0.90.2 tarballs. A seven-day bootstrap token is configured
+  in GitHub Actions. Added an explicit `Release / publish-npm` operation for
+  current stable assets only, without rebuilding or changing version/CDN state.
+  npm 12 installation requires explicit `--allow-scripts=openalice`. An
+  isolated local registry serving the original, integrity-verified tarballs
+  passed npm 12.0.2 / Node 22.22.2 install, version, detached start, status, and
+  stop on macOS arm64 with no Node/Bun in Runtime PATH. All five packages were
+  published under `jiaran258` in
+  [run 33860369715](https://github.com/TraderAlice/OpenAlice/actions/runs/33860369715)
+  (98 seconds, one hosted job). Independent registry reads matched all five
+  accepted integrity values; a fresh public-registry npm 12 install passed
+  version, detached start, status, and stop with isolated data. Tooling merged
+  through [PR #1340](https://github.com/TraderAlice/OpenAlice/pull/1340), with
+  root typecheck, 34 focused tests, and 6,319 hermetic tests passing (3 expected
+  skips). No beta, CDN, desktop, Homebrew, or AUR publication ran. The persistent
+  automatic npm switch remains disabled; OIDC is still follow-up work.
+
 - 2026-08-29: Maintainer selected the architecture after comparing Herdr and
   OpenCode. CLI is treated as a primary long-running distribution. The selected
   direction is one Bun-compiled OpenAlice artifact that re-executes into the
@@ -977,6 +1218,16 @@ This plan is complete only when:
   absent from the Runtime `PATH`. Stable registry/tap/AUR publication and the
   tagged-release matrix remain release activation work; Windows remains
   deferred.
+- 2026-09-03: Public-channel inspection confirmed the direct Bash installer is
+  live, all five intended npm names remain unreserved, the Homebrew Tap does
+  not exist, and the repository's `NPM_TOKEN` now returns HTTP 401. The npm
+  authority gate now treats 404 names as explicit first-publication targets
+  after authenticating the token, while existing names still require matching
+  maintainership. Stable npm publication now verifies every tarball against
+  the accepted manifest and safely skips an already-published identical
+  version, so a partial first publication can be retried without weakening
+  package identity. External activation remains blocked on replacing the npm
+  token and deliberately enabling the stable npm switch.
 - 2026-08-30: Closed the Linuxbrew acceptance gap with pinned official
   Homebrew 6.0.15 images for native Linux arm64 and x64 runners. The shared
   system-package lifecycle now accepts Homebrew on macOS or Linux, while a

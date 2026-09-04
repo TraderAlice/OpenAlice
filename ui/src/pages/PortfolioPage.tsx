@@ -768,7 +768,7 @@ export function PositionsTable({ positions, fxRates }: { positions: PositionWith
             <details key={key} className="group border-t border-border first:border-t-0">
               <summary
                 aria-label={`${display.name} in ${position.accountLabel}, market value ${fmt(Number(position.marketValue), position.currency)}, PnL ${fmtPctSigned(pnlPercent)}, ${fmtPnl(unrealizedPnl, position.currency)}. Expand for position details.`}
-                className="list-none px-3 py-3 outline-none hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary [&::-webkit-details-marker]:hidden"
+                className="list-none px-3 py-3 outline-none hover:bg-muted/30 focus-visible:[box-shadow:inset_0_0_0_1px_var(--oa-focus-ring)] [&::-webkit-details-marker]:hidden"
               >
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">
@@ -1044,7 +1044,7 @@ export function SnapshotSettings({ enabled, every, onEnabledChange, onEveryChang
               aria-label="Custom portfolio snapshot interval"
               aria-invalid={!customEveryValid}
               aria-describedby={!customEveryValid ? 'snapshot-interval-error' : undefined}
-              className="w-20 rounded-md border border-border bg-background px-1.5 py-1 text-center text-[12px] leading-[18px] text-foreground outline-none focus:border-primary"
+              className="oa-field-control w-20 rounded-md border border-input bg-background px-1.5 py-1 text-center text-[12px] leading-[18px] text-foreground outline-none"
               value={customEvery}
               onChange={(e) => {
                 const next = e.target.value

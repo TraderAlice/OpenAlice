@@ -112,6 +112,24 @@ describe('PersistentSession backpressure / socket-drop deadlock', () => {
     vi.clearAllMocks();
   });
 
+  it('bounds a slow consumer without killing a ConPTY agent when pause is unavailable', () => {
+    const unpausable = { ...term, pause: undefined, resume: undefined };
+    const session = new PersistentSession(makeOptions({
+      pty: { name: 'bun-native', supportsFlowControl: false, spawn: () => unpausable as never },
+    }));
+    const ws = new FakeWs();
+    session.attach(ws as never, 80, 24, undefined);
+    ws.send.mockClear();
+    ws.bufferedAmount = 2048;
+    term.emitData(Buffer.from('slow consumer output'));
+    expect(ws.send).not.toHaveBeenCalled();
+    expect(ws.close).toHaveBeenCalledWith(1013, expect.stringContaining('reconnect'));
+    expect(term.kill).not.toHaveBeenCalled();
+    term.emitData(Buffer.from('agent survives detached'));
+    expect(ws.send).not.toHaveBeenCalled();
+    session.dispose('test complete');
+  });
+
   it('resumes the PTY when a backpressure-paused socket drops (detach)', () => {
     const session = new PersistentSession(makeOptions());
     const ws = new FakeWs();

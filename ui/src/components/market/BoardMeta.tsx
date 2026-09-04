@@ -27,7 +27,7 @@ export function BoardMeta({ meta, extra }: { meta: ReferenceMeta; extra?: string
           <span
             tabIndex={0}
             aria-label={detail}
-            className="inline-flex items-center text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
+            className="inline-flex items-center rounded-sm text-muted-foreground outline-none focus-visible:[box-shadow:var(--oa-focus-shadow)]"
           />
         }
       >

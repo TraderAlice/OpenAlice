@@ -15,6 +15,7 @@ import { promisify } from 'node:util'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { cliExecutableName } from '../packages/cli/src/release-targets.mjs'
 import { bunReleaseContentIdentity } from './bun-release-content-identity.mjs'
 import { buildCliPackageChannels } from './build-cli-package-channels.mjs'
 
@@ -39,7 +40,7 @@ describe.skipIf(process.platform === 'win32')('CLI package-manager channel gener
       requireAll: true,
     })
 
-    expect(manifest.targets).toHaveLength(4)
+    expect(manifest.targets).toHaveLength(6)
     expect(manifest.executableBytesPreserved).toBe(true)
     expect(manifest.assetBaseUrl).toBe(
       `https://github.com/TraderAlice/OpenAlice/releases/download/v${version}`,
@@ -50,6 +51,8 @@ describe.skipIf(process.platform === 'win32')('CLI package-manager channel gener
       'openalice-darwin-x64': version,
       'openalice-linux-arm64': version,
       'openalice-linux-x64': version,
+      'openalice-win32-arm64': version,
+      'openalice-win32-x64': version,
     })
     const platformExecutable = await readFile(join(
       output,
@@ -106,7 +109,7 @@ describe.skipIf(process.platform === 'win32')('CLI package-manager channel gener
       env: { ...process.env, npm_config_user_agent: 'npm/11.0.0 node/v22.0.0' },
     })
 
-    const installed = await execFileAsync(join(metaRoot, 'bin/openalice'), ['--version'])
+    const installed = await execFileAsync(join(metaRoot, 'bin/openalice.exe'), ['--version'])
     expect(installed.stdout).toBe(`${version}\n`)
     expect(JSON.parse(await readFile(join(metaRoot, 'install-source.json'), 'utf8'))).toMatchObject({
       method: 'npm',
@@ -114,7 +117,7 @@ describe.skipIf(process.platform === 'win32')('CLI package-manager channel gener
     })
     expect(await readFile(join(metaRoot, 'share/openalice/fixture.txt'), 'utf8')).toBe('resource\n')
     expect(await readFile(join(metaRoot, 'postinstall.mjs'), 'utf8')).not.toContain('npm install')
-    expect(await readFile(join(metaRoot, 'postinstall.sh'), 'utf8')).toContain('bun/*) exec bun')
+    expect(JSON.parse(await readFile(join(metaRoot, 'package.json'), 'utf8')).scripts.postinstall).toBe('node ./postinstall.mjs')
     expect(await readFile(join(metaRoot, 'README.md'), 'utf8')).toContain(
       'bun add -g --trust openalice',
     )
@@ -127,7 +130,7 @@ describe.skipIf(process.platform === 'win32')('CLI package-manager channel gener
       outputDir: join(root, 'all-output'),
       version,
       releasedAt,
-    })).toThrow('require all four')
+    })).toThrow('requires all native')
     expect(() => buildCliPackageChannels({
       inputDir: join(root, 'input'),
       outputDir: join(root, 'npm-output'),
@@ -148,11 +151,13 @@ async function fixture(options = {}) {
     ['darwin', 'x64'],
     ['linux', 'arm64'],
     ['linux', 'x64'],
+    ['win32', 'arm64'],
+    ['win32', 'x64'],
   ]
   for (const [platform, arch] of targets) {
     const releaseName = `openalice-cli-${version}-${platform}-${arch}`
     const releaseRoot = join(root, releaseName)
-    const executable = join(releaseRoot, 'bin/openalice')
+    const executable = join(releaseRoot, 'bin', cliExecutableName(platform))
     await mkdir(join(releaseRoot, 'bin'), { recursive: true })
     await mkdir(join(releaseRoot, 'share/openalice'), { recursive: true })
     await writeFile(executable, `#!/bin/sh\nprintf '${version}\\n'\n`)
@@ -170,10 +175,10 @@ async function fixture(options = {}) {
       platform,
       arch,
       bunVersion: '1.4.0',
-      executable: 'bin/openalice',
+      executable: `bin/${cliExecutableName(platform)}`,
       resourceRoot: 'share/openalice',
       files: [
-        fileEntry('bin/openalice', await readFile(executable), 0o755),
+        fileEntry(`bin/${cliExecutableName(platform)}`, await readFile(executable), 0o755),
         fileEntry('share/openalice/fixture.txt', await readFile(resource)),
         fileEntry('LICENSE', await readFile(license)),
         fileEntry('THIRD_PARTY_NOTICES.md', await readFile(notices)),

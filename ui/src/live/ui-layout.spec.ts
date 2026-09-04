@@ -22,7 +22,7 @@ describe('ui-layout document', () => {
     expect(defaultUiLayout().hidden).not.toContain(PINNED_ACTIVITY_PAGE)
   })
 
-  it('keeps Settings visible, drops retired Dev state, and restores missing catalog pages', () => {
+  it('keeps Chat visible, drops retired Settings and Dev state, and restores missing catalog pages', () => {
     const layout = normalizeUiLayout({
       version: 1,
       groups: [{ id: 'primary', items: ['chat'] }],
@@ -45,9 +45,9 @@ describe('ui-layout document', () => {
     expect(layout.groups.find((group) => group.id === 'primary')?.items).toContain('chat')
   })
 
-  it('cannot hide Settings', () => {
-    const layout = setPageHidden(defaultUiLayout(), 'settings', true)
-    expect(layout.hidden).not.toContain('settings')
+  it('cannot hide Chat', () => {
+    const layout = setPageHidden(defaultUiLayout(), 'chat', true)
+    expect(layout.hidden).not.toContain('chat')
   })
 
   it('drops a retired news rail entry from persisted layouts', () => {

@@ -1,13 +1,9 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../i18n'
-import {
-  AUTO_QUANT_DISPLAY_MODE_STORAGE_KEY,
-  CHAT_DISPLAY_MODE_STORAGE_KEY,
-} from '../components/workspace/chat-display-mode'
 import { ChatPageShell } from './ChatPageShell'
 
 const workspaceState = vi.hoisted(() => ({
@@ -22,20 +18,7 @@ vi.mock('../contexts/workspaces-context', () => ({
 }))
 
 vi.mock('../components/ChatChannelListContainer', () => ({
-  ChatChannelListContainer: ({
-    displayMode,
-    onRequestDisplayMode,
-  }: {
-    displayMode: 'focused' | 'recent' | 'multi'
-    onRequestDisplayMode: (mode: 'focused' | 'recent' | 'multi') => void
-  }) => (
-    <div>
-      <span data-testid="display-mode">{displayMode}</span>
-      <button type="button" onClick={() => onRequestDisplayMode('focused')}>Request current</button>
-      <button type="button" onClick={() => onRequestDisplayMode('recent')}>Request recent</button>
-      <button type="button" onClick={() => onRequestDisplayMode('multi')}>Request tree</button>
-    </div>
-  ),
+  ChatChannelListContainer: () => <div data-testid="harness-sidebar" />,
 }))
 
 class ResizeObserverStub {
@@ -69,37 +52,21 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('ChatPageShell display mode', () => {
-  it('keeps mode controls out of the title bar and persists all three views', () => {
+describe('ChatPageShell', () => {
+  it('keeps Workspace view controls out of the title bar', () => {
     render(<ChatPageShell><div>Chat content</div></ChatPageShell>)
 
-    expect(screen.getByTestId('display-mode').textContent).toBe('focused')
-    expect(screen.getByRole('button', { name: 'Collapse Ask Alice' })).toBeTruthy()
+    expect(screen.getByTestId('harness-sidebar')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Collapse Ask Alice' })).toBeNull()
+    expect(screen.getByRole('separator', { name: 'Resize Ask Alice' })).toBeTruthy()
     expect(screen.queryByRole('group', { name: 'Workspace display mode' })).toBeNull()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Request recent' }))
-    expect(screen.getByTestId('display-mode').textContent).toBe('recent')
-    expect(window.localStorage.getItem(CHAT_DISPLAY_MODE_STORAGE_KEY)).toBe('recent')
-
-    fireEvent.click(screen.getByRole('button', { name: 'Request tree' }))
-    expect(screen.getByTestId('display-mode').textContent).toBe('multi')
-    expect(window.localStorage.getItem(CHAT_DISPLAY_MODE_STORAGE_KEY)).toBe('multi')
-
-    fireEvent.click(screen.getByRole('button', { name: 'Request current' }))
-    expect(screen.queryByRole('dialog')).toBeNull()
-    expect(screen.getByTestId('display-mode').textContent).toBe('focused')
-    expect(window.localStorage.getItem(CHAT_DISPLAY_MODE_STORAGE_KEY)).toBe('focused')
   })
 
-  it('reuses the Ask Alice shell chrome for a ready AutoQuant desk without sharing view state', () => {
-    window.localStorage.setItem(CHAT_DISPLAY_MODE_STORAGE_KEY, 'multi')
+  it('reuses the Ask Alice shell chrome for a ready AutoQuant desk', () => {
     render(<ChatPageShell mode="auto-quant"><div>Quant content</div></ChatPageShell>)
-    expect(screen.getByRole('button', { name: 'Collapse Quant' })).toBeTruthy()
-    expect(screen.getByTestId('display-mode').textContent).toBe('focused')
-
-    fireEvent.click(screen.getByRole('button', { name: 'Request recent' }))
-    expect(window.localStorage.getItem(AUTO_QUANT_DISPLAY_MODE_STORAGE_KEY)).toBe('recent')
-    expect(window.localStorage.getItem(CHAT_DISPLAY_MODE_STORAGE_KEY)).toBe('multi')
+    expect(screen.queryByRole('button', { name: 'Collapse Quant' })).toBeNull()
+    expect(screen.getByRole('separator', { name: 'Resize Quant' })).toBeTruthy()
+    expect(screen.getByTestId('harness-sidebar')).toBeTruthy()
   })
 
   it('keeps AutoQuant navigation hidden until a default desk is ready', () => {

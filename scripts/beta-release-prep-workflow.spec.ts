@@ -103,7 +103,7 @@ describe('exact beta release-preparation workflow lane', () => {
     expect(cli.on?.pull_request?.branches).toEqual(['master'])
     expectTrustedClassifier(scope)
     expectOutcomeGatedOutput(scope)
-    expect(scope.if).toBe("github.event_name != 'push'")
+    expect(scope.if).toBe("github.event_name != 'push' && !inputs.windows_preview")
     for (const name of ['bun-cli-feasibility', 'checkout-install', 'checkout-remote']) {
       expect(jobs[name].needs).toBe('release-prep-scope')
       expect(jobs[name].if).toContain('!cancelled()')
@@ -116,7 +116,7 @@ describe('exact beta release-preparation workflow lane', () => {
     expect(jobs['build-dev-cli-neutral'].if).toBe("github.event_name == 'push'")
     expect(jobs['build-dev-cli'].if).toBe("github.event_name == 'push'")
     expect(jobs['build-dev-cli'].needs).toBe('build-dev-cli-neutral')
-    expect(jobs['publish-dev-cli-candidate'].needs).toBe('build-dev-cli')
+    expect(jobs['publish-dev-cli-candidate'].needs).toEqual(['build-dev-cli', 'build-dev-cli-windows'])
     expect(jobs['activate-dev-cli'].needs).toBe('publish-dev-cli-candidate')
   })
 

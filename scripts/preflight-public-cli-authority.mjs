@@ -11,6 +11,8 @@ export const NPM_PACKAGE_NAMES = Object.freeze([
   'openalice-darwin-x64',
   'openalice-linux-arm64',
   'openalice-linux-x64',
+  'openalice-win32-arm64',
+  'openalice-win32-x64',
 ])
 
 const DEFAULT_NPM_REGISTRY = 'https://registry.npmjs.org'
@@ -31,16 +33,16 @@ export async function preflightPublicCliAuthority({
   const selected = Object.entries(enabled).filter(([, value]) => value).map(([name]) => name)
   if (selected.length === 0) {
     logger.log('[public-cli-authority] no external CLI channels are enabled')
-    return { enabled: selected, npmUsername: null }
+    return { enabled: selected, npmPackages: [] }
   }
 
   const failures = []
-  let npmUsername = null
+  let npmPackages = []
 
   if (enabled.npm) {
     try {
-      npmUsername = await verifyNpmAuthority({ env, fetchImpl })
-      logger.log(`[public-cli-authority] npm authority verified for ${npmUsername}`)
+      npmPackages = await verifyNpmAuthority({ env, fetchImpl })
+      logger.log(`[public-cli-authority] npm OIDC exchange verified: ${npmPackages.join(', ')} (no packages published)`)
     } catch (error) {
       failures.push(message(error))
     }
@@ -70,37 +72,63 @@ export async function preflightPublicCliAuthority({
     throw new Error(`public CLI channel authority preflight failed:\n- ${failures.join('\n- ')}`)
   }
 
-  return { enabled: selected, npmUsername }
+  return { enabled: selected, npmPackages }
 }
 
 async function verifyNpmAuthority({ env, fetchImpl }) {
-  const token = requireSecret(env, 'NPM_TOKEN', 'npm publication')
-  const registry = trimTrailingSlash(env.OPENALICE_NPM_REGISTRY_URL || DEFAULT_NPM_REGISTRY)
-  const headers = {
-    accept: 'application/json',
-    authorization: `Bearer ${token}`,
+  // Use the same package-scoped exchange as npm publish, without uploading a
+  // version. npm whoami and an idempotent publish skip cannot test OIDC trust.
+  const requestToken = requireSecret(env, 'ACTIONS_ID_TOKEN_REQUEST_TOKEN', 'npm OIDC')
+  const rawRequestUrl = requireSecret(env, 'ACTIONS_ID_TOKEN_REQUEST_URL', 'npm OIDC')
+  let requestUrl
+  try {
+    requestUrl = new URL(rawRequestUrl)
+  } catch {
+    throw new Error('npm OIDC requires the GitHub Actions identity endpoint')
   }
-  const whoami = await fetchJson(fetchImpl, `${registry}/-/whoami`, { headers }, 'npm token identity')
-  const username = typeof whoami.username === 'string' ? whoami.username.trim() : ''
-  if (!username) throw new Error('npm token identity did not return a username')
-
+  if (requestUrl.protocol !== 'https:' || requestUrl.username || requestUrl.password ||
+      !requestUrl.hostname.endsWith('.actions.githubusercontent.com')) {
+    throw new Error('npm OIDC requires the GitHub Actions identity endpoint')
+  }
+  requestUrl.searchParams.set('audience', 'npm:registry.npmjs.org')
+  const identity = await fetchOidcJson(fetchImpl, requestUrl.href, {
+    headers: { authorization: `Bearer ${requestToken}` },
+  }, 'GitHub OIDC identity')
+  if (typeof identity?.value !== 'string' || !identity.value.trim()) {
+    throw new Error('GitHub OIDC identity did not return an ID token')
+  }
   for (const packageName of NPM_PACKAGE_NAMES) {
-    const metadata = await fetchJson(
-      fetchImpl,
-      `${registry}/${encodeURIComponent(packageName)}`,
-      { headers },
-      `npm package ${packageName}`,
-      `npm package name ${packageName} is not reserved`,
-    )
-    const maintainers = Array.isArray(metadata.maintainers)
-      ? metadata.maintainers.map((entry) => typeof entry?.name === 'string' ? entry.name : '')
-      : []
-    if (!maintainers.includes(username)) {
-      throw new Error(`npm token identity ${username} is not a maintainer of ${packageName}`)
+    const exchanged = await fetchOidcJson(fetchImpl,
+      `${DEFAULT_NPM_REGISTRY}/-/npm/v1/oidc/token/exchange/package/${encodeURIComponent(packageName)}`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${identity.value}` },
+      }, `npm OIDC exchange for ${packageName}`)
+    if (exchanged?.token_type !== 'oidc' || typeof exchanged.token !== 'string' || !exchanged.token.trim()) {
+      throw new Error(`npm OIDC exchange for ${packageName} did not return a publishing token`)
     }
+    // Never log, persist, return, or reuse the temporary publishing credential.
   }
+  return [...NPM_PACKAGE_NAMES]
+}
 
-  return username
+async function fetchOidcJson(fetchImpl, url, options, label) {
+  let response
+  try {
+    response = await fetchImpl(url, {
+      ...options,
+      redirect: 'error',
+      signal: AbortSignal.timeout(20_000),
+    })
+  } catch {
+    // Raw transport errors or response bodies may contain credential material.
+    throw new Error(`${label} request failed`)
+  }
+  if (!response.ok) throw new Error(`${label} request failed with HTTP ${response.status}`)
+  try {
+    return await response.json()
+  } catch {
+    throw new Error(`${label} returned invalid JSON`)
+  }
 }
 
 async function verifyHomebrewAuthority({ env, fetchImpl }) {
@@ -177,10 +205,6 @@ function requireSecret(env, name, purpose) {
   const value = typeof env[name] === 'string' ? env[name].trim() : ''
   if (!value) throw new Error(`${purpose} is enabled but ${name} is missing`)
   return value
-}
-
-function trimTrailingSlash(value) {
-  return value.replace(/\/+$/, '')
 }
 
 function message(error) {

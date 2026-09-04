@@ -1,7 +1,8 @@
-import { lstat, readFile, rename, rm, rmdir, writeFile } from 'node:fs/promises'
+import { lstat, open, readFile, rename, rm, rmdir, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline/promises'
+import { spawn } from 'node:child_process'
 
 import { resolveInstalledLayout } from './install-layout.mjs'
 import { readInstallSource } from './install-source.mjs'
@@ -67,6 +68,10 @@ export async function runUninstallCommand(argv, dependencies = {}) {
     profiles,
     processKill: dependencies.processKill,
   })
+  if (result.deferred) {
+    stdout.write('\nWindows cleanup is scheduled after this command exits. See .cli-uninstall-result.json for its result or .cli-uninstall.log for startup errors in the install root. User data is preserved.\n')
+    return 0
+  }
   stdout.write('\nOpenAlice CLI releases and installer-owned launchers were removed.\n')
   stdout.write(`Preserved application data and user work under ${layout.installRoot}.\n`)
   if (result.profilesChanged.length > 0) {
@@ -78,6 +83,7 @@ export async function runUninstallCommand(argv, dependencies = {}) {
 export async function performUninstall(layout, options = {}) {
   const processKill = options.processKill ?? process.kill
   await assertNoLiveInstaller(layout.lockDir, processKill)
+  if (layout.platform === 'win32') return scheduleWindowsUninstall(layout)
 
   const profilesChanged = []
   for (const profile of options.profiles ?? []) {
@@ -97,6 +103,41 @@ export async function performUninstall(layout, options = {}) {
     if (!['ENOENT', 'ENOTEMPTY', 'EEXIST'].includes(error?.code)) throw error
   }
   return { profilesChanged }
+}
+
+async function scheduleWindowsUninstall(layout) {
+  // A mapped PE cannot remove itself. Bun's Windows detached children may
+  // still be killed with their parent (oven-sh/bun#31603); cmd/start launches
+  // the post-exit helper outside that lifetime. Await only the bootstrap.
+  const script = join(layout.installRoot, '.cli-uninstall.ps1')
+  await writeFile(script, await readFile(join(layout.releaseDir, 'share', 'openalice', 'install.ps1')))
+  await rm(join(layout.installRoot, '.cli-uninstall-result.json'), { force: true })
+  const env = { ...process.env }
+  delete env.PSModulePath
+  const systemRoot = env.SystemRoot ?? 'C:\\Windows'
+  const powershell = join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+  const command = windowsUninstallBootstrap(powershell, script, layout.installRoot, process.pid)
+  const log = await open(join(layout.installRoot, '.cli-uninstall.log'), 'w', 0o600)
+  try {
+    const child = spawn(join(systemRoot, 'System32', 'cmd.exe'), ['/d', '/c', command], {
+      cwd: layout.installRoot, windowsVerbatimArguments: true, windowsHide: true,
+      stdio: ['ignore', log.fd, log.fd], env,
+    })
+    await new Promise((resolve, reject) => {
+      child.once('error', reject)
+      child.once('exit', code => code === 0 ? resolve() : reject(new Error(`Windows cleanup bootstrap exited ${code}; see .cli-uninstall.log`)))
+    })
+  } finally { await log.close() }
+  return { profilesChanged: [], deferred: true }
+}
+
+export function windowsUninstallBootstrap(powershell, script, installRoot, parentPid) {
+  if (!Number.isSafeInteger(parentPid) || parentPid < 1) throw new Error('Invalid uninstall parent PID')
+  const quote = value => {
+    if (!value || /["\r\n%!]/.test(value)) throw new Error('Unsupported Windows cleanup path')
+    return `"${value}"`
+  }
+  return `start "" /b ${quote(powershell)} -NoLogo -NoProfile -ExecutionPolicy RemoteSigned -File ${quote(script)} -InstallDir ${quote(installRoot)} -Uninstall -WaitForPid ${parentPid} -Yes`
 }
 
 export async function removeManagedPathBlock(profile, binDir, dependencies = {}) {
@@ -170,7 +211,9 @@ Options:
 
 function printUninstallPlan(stdout, layout, profiles) {
   const releaseRoot = layout.cliDir ?? layout.versionsDir
-  const launchers = layout.kind === 'bun' ? NATIVE_LAUNCHERS : LEGACY_LAUNCHERS
+  const launchers = layout.kind === 'bun'
+    ? NATIVE_LAUNCHERS.map((name) => layout.platform === 'win32' ? `${name}.cmd` : name)
+    : LEGACY_LAUNCHERS
   stdout.write(`OpenAlice CLI uninstall plan
 
 Remove:

@@ -21,6 +21,13 @@ Canonical startup rules: [[AGENTS.md]]. Guide index: [[docs/README.md]].
   manifests must agree before candidate work begins. Each accepted tag may
   update only its own mutable product aliases; a newly accepted release may
   also refresh the shared channel-neutral `install` bootstrap.
+- The separate `Release` operation `publish-npm` only distributes an already
+  published stable release. It may use integrated `dev` or `master` tooling;
+  it cannot create a version, rebuild an artifact, or mutate product channels.
+  See [[docs/cli-package-managers.md]] for its first-publication/retry contract.
+- `Release` operation `verify-npm` checks the complete npm OIDC package set from
+  `dev` or `master` without a tag, build, or package upload. npm publishing uses
+  the workflow's identity, not a rotating repository token.
 - `archive/dev-pre-beta6` is a historical snapshot; do not modify or delete it.
 - `local` is a legacy shared-worktree branch. It is not the default workflow;
   audit its unmerged commits before deciding whether to retain or retire it.
@@ -310,10 +317,13 @@ delivery lane:
   block related commits, but only the latest head is evidence and a completed
   failure blocks further scope until repaired. CI never grants merge authority.
 - A push to `dev` is a CLI-only rolling publication lane. It does not run the
-  generic CI workflow, build Electron, or build Docker. Four native macOS/Linux
-  CLI candidates are assembled and each candidate runs its packaged
+  generic CI workflow, build Electron, or build Docker. Six native CLI candidates
+  are assembled from one shared server input. macOS/Linux candidates run packaged
   Guardian/Alice, Web, Workspace, PTY, and release-owned Git acceptance before
-  one atomic dev manifest is activated. The heavier UTA/Connector recovery and
+  one atomic dev manifest is activated. Windows x64/ARM64 cross-build on Linux;
+  their native runner acceptance is manual or stable-only, so a Windows queue
+  is not a dev/beta publication dependency. Native rehearsal preserves artifacts
+  first and may replay acceptance after installer/fixture fixes. The heavier UTA/Connector recovery and
   external Broker Pack fixture run once on Linux x64; manual Full Source
   Validation and final Release lanes keep broader native-host coverage. Full
   Source Validation is an explicit maintainer action when that broader

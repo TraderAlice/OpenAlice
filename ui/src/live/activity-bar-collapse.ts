@@ -24,7 +24,8 @@ reloadOnHotUpdate('live/activity-bar-collapse')
 
 interface ActivityBarCollapseState {
   collapsedSections: Record<string, boolean>
-  railCollapsed: boolean
+  /** null uses the shell's responsive default; explicit choices always win. */
+  railCollapsed: boolean | null
 }
 
 function migrateCollapseKeys(collapsed: Record<string, boolean>): Record<string, boolean> {
@@ -52,7 +53,7 @@ export const useActivityBarCollapse = create<ActivityBarCollapseState & Activity
   persist(
     (set) => ({
       collapsedSections: {},
-      railCollapsed: false,
+      railCollapsed: null,
       setCollapsed: (name, collapsed, defaultCollapsed) =>
         set((s) => {
           const next = { ...s.collapsedSections }
