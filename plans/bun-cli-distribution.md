@@ -56,7 +56,9 @@ channel discovery. Agent CLIs remain user-owned.
   ConPTY termination; bound slow WebSocket consumers without POSIX signals.
 - [x] Add an independently retryable, manual x64/ARM64 workflow. Preserve each
   archive before its native smoke so failures retain reproduction bytes.
-- [ ] Complete local regression/type checks and integrate this increment.
+- [x] Complete local regression/type checks and integrate [PR #1344](https://github.com/TraderAlice/OpenAlice/pull/1344)
+  into `dev` at `1d1dc21d`: full baseline 6,342 passes, final focused 74 passes,
+  root/CLI types, local Windows ZIP builds and complete macOS native smoke.
 - [ ] Run native Windows installation, Guardian/Alice/Web, Git, ConPTY input,
   resize, independent termination and stop checks for each architecture.
 - [ ] Perform interactive external-agent/provider acceptance; record concrete
@@ -68,6 +70,13 @@ The first preview is not a new beta/stable release. It is commit-addressed
 Actions output with a separate native acceptance receipt and no mutable channel
 alias. `CLI Installer Smoke` can dispatch only this lane from integrated `dev`
 using `windows_preview=true`, without the normal manual installer matrix.
+
+Native rehearsal [33874069985](https://github.com/TraderAlice/OpenAlice/actions/runs/33874069985)
+preserved the x64 ZIP and passed ConPTY input/resize/independent termination.
+Its installation smoke exposed inherited PowerShell 7 `PSModulePath` preventing
+Windows PowerShell 5.1 from discovering `Get-FileHash`; reset only that child
+environment, not the host. A separate old classifier assertion also needed to
+recognize the manual Windows-only selector. Neither failure is waived.
 
 Delivery mode: Serial / interactive from current `dev`. The accepted native CLI
 increments have already reached `dev`; the old `codex/usability-improvements`

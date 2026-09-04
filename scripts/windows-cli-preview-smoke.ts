@@ -10,8 +10,13 @@ const scratch = await mkdtemp(join(tmpdir(), 'openalice-preview-smoke-'))
 const installDir = join(scratch, 'installed preview')
 const home = join(scratch, 'alice-home')
 const powershell = join(process.env.SystemRoot!, 'System32/WindowsPowerShell/v1.0/powershell.exe')
+// GitHub starts this script from PowerShell 7. Do not leak its module search
+// path into Windows PowerShell 5.1: the latter must discover its own Utility
+// module (Get-FileHash, ConvertFrom-Json), just as on an ordinary user host.
+const powershellEnv = { ...process.env }
+delete powershellEnv.PSModulePath
 await command(powershell, ['-NoProfile', '-File', resolve('install-preview.ps1'),
-  '-Archive', candidate.archive, '-Sha256', candidate.sha256, '-InstallDir', installDir, '-Yes'])
+  '-Archive', candidate.archive, '-Sha256', candidate.sha256, '-InstallDir', installDir, '-Yes'], powershellEnv)
 const executable = join(installDir, 'bin/openalice.exe')
 const portProbe = Bun.listen({ hostname: '127.0.0.1', port: 0, socket: { data() {} } })
 const port = portProbe.port

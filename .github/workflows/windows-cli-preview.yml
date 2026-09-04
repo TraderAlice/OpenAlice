@@ -45,7 +45,7 @@ jobs:
       - name: Preserve complete candidate for reproduction
         uses: actions/upload-artifact@v6
         with:
-          name: openalice-windows-${{ matrix.arch }}-${{ github.sha }}
+          name: openalice-windows-${{ matrix.arch }}-${{ github.sha }}-${{ github.run_attempt }}
           path: |
             dist/windows-cli-preview/${{ matrix.arch }}/*.zip
             dist/windows-cli-preview/${{ matrix.arch }}/*.sha256
@@ -62,7 +62,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: windows-cli-smoke-${{ matrix.arch }}-${{ github.sha }}
+          name: windows-cli-smoke-${{ matrix.arch }}-${{ github.sha }}-${{ github.run_attempt }}
           path: dist/windows-cli-preview/${{ matrix.arch }}/native-smoke.json
           if-no-files-found: ignore
           retention-days: 30
