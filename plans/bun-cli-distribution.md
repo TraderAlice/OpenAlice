@@ -6,7 +6,7 @@ stable/beta discovery authority is converged on the OpenAlice CDN. Native
 PowerShell and Homebrew/AUR activation remain deferred. npm/Bun's five public
 packages are published at v0.90.2 under maintainer `jiaran258`.
 
-Current increment: replace the temporary npm token with GitHub OIDC trust on
+Accepted OIDC increment: replace the temporary npm token with GitHub OIDC trust on
 the same five packages. Preserve stable-only publication and accepted artifact
 bytes; no Windows activation, new version, or package-manager switch changes.
 The non-publishing exchange rehearsal lives in `release.yml` so it verifies
@@ -17,9 +17,22 @@ the real trusted workflow identity. Owner contract: [[docs/cli-package-managers.
   from `TraderAlice/OpenAlice` / `release.yml` (2026-09-04).
 - [x] Complete local verification: root typecheck; 708 full-suite files,
   6,331 passed and 3 expected skips; 47 focused checks and 82 workflow contracts.
-- [ ] Integrate the focused PR to `dev`.
-- [ ] Run the real five-package OIDC exchange rehearsal without publishing.
-- [ ] Retire the temporary npm token and GitHub secret after verification.
+- [x] Integrate [PR #1342](https://github.com/TraderAlice/OpenAlice/pull/1342)
+  into `dev` at `f37243b7`.
+- [x] Run the real five-package OIDC exchange rehearsal without publishing:
+  [run 33871780397](https://github.com/TraderAlice/OpenAlice/actions/runs/33871780397),
+  one successful 15-second job; all release/build/publication jobs skipped.
+- [x] Revoke `openalice-first-publish` on npm and delete the GitHub `NPM_TOKEN`
+  secret after maintainer confirmation on 2026-09-04. Both removals verified.
+- [x] Repeat the five-package exchange after removing both credentials:
+  [run 33872141409](https://github.com/TraderAlice/OpenAlice/actions/runs/33872141409)
+  passed in a single 16-second job without publishing.
+
+The next authorized stable release still owns real new-version upload and
+provenance acceptance. The persistent npm channel switch remains unchanged;
+normal source promotion must carry the OIDC workflow to `master` before a new
+stable release uses it. Windows x64 is the maintainer's accepted next platform
+increment, separate from this completed authentication change.
 
 Delivery mode: Serial / interactive from current `dev`. The accepted native CLI
 increments have already reached `dev`; the old `codex/usability-improvements`
