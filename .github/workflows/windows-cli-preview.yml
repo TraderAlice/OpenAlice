@@ -118,11 +118,20 @@ jobs:
       - name: Install and start the packaged Runtime
         if: inputs.native_acceptance
         run: bun scripts/windows-cli-preview-smoke.ts
+      - name: Accept Windows npm and Bun native command shims
+        if: inputs.native_acceptance && inputs.channel_build
+        shell: pwsh
+        run: |
+          $candidates = @(Get-ChildItem -Recurse -Path dist/windows-cli-preview/${{ matrix.arch }} -Filter candidate.json)
+          if ($candidates.Count -ne 1) { throw 'Expected exactly one package candidate' }
+          ./scripts/windows-cli-package-smoke.ps1 -CandidateDir $candidates[0].DirectoryName
       - name: Preserve native verification receipt
         if: always()
         uses: actions/upload-artifact@v6
         with:
           name: windows-cli-smoke-${{ matrix.arch }}-${{ github.sha }}-${{ github.run_attempt }}
-          path: dist/windows-cli-preview/${{ matrix.arch }}/native-smoke.json
+          path: |
+            dist/windows-cli-preview/${{ matrix.arch }}/native-smoke.json
+            dist/windows-cli-preview/${{ matrix.arch }}/**/package-manager-smoke.json
           if-no-files-found: ignore
           retention-days: 30

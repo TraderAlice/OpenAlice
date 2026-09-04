@@ -5,9 +5,10 @@ OpenAlice CLI. The accepted native archive and direct Bash installer remain
 owned by [[docs/cli-installer.md]]. Runtime lifecycle after installation remains
 owned by [[docs/cli-supervisor.md]] and [[docs/local-runtime.md]].
 
-Native Windows package-manager channels are deferred. Independent Windows
-x64/ARM64 ZIP and PowerShell previews live in [[docs/cli-installer.md]]; they
-are not npm publications. This guide covers macOS and glibc Linux on arm64 and x64.
+The native target set is macOS, glibc Linux, and Windows on arm64 and x64.
+Windows direct installation lives in [[docs/cli-installer.md]]. Generated Windows
+packages are not public npm packages: first publication and Trusted Publisher
+enrollment remain required external activation steps.
 
 Public npm activation: `openalice` and its four platform packages were first
 published as `0.90.2` on 2026-09-04 under maintainer `jiaran258`. The registry
@@ -40,13 +41,15 @@ or the installing package manager in `PATH` at Runtime.
 
 ## One accepted artifact set
 
-The release build produces four archives:
+The release build produces six archives:
 
 ```text
 openalice-cli-<version>-darwin-arm64.tar.gz
 openalice-cli-<version>-darwin-x64.tar.gz
 openalice-cli-<version>-linux-arm64.tar.gz
 openalice-cli-<version>-linux-x64.tar.gz
+openalice-cli-<version>-win32-arm64.tar.gz
+openalice-cli-<version>-win32-x64.tar.gz
 ```
 
 Every channel consumes those exact accepted archive bytes and SHA-256 values.
@@ -65,7 +68,9 @@ openalice
 ├── optional openalice-darwin-arm64
 ├── optional openalice-darwin-x64
 ├── optional openalice-linux-arm64
-└── optional openalice-linux-x64
+├── optional openalice-linux-x64
+├── optional openalice-win32-arm64
+└── optional openalice-win32-x64
 ```
 
 The meta package exposes the `openalice` command. Its postinstall step selects
@@ -75,7 +80,15 @@ executable, links immutable resources, records provenance, and verifies
 platform package is an installation failure, not permission to download
 unreviewed bytes.
 
-Release packaging records a strict publish order. All four platform packages
+The meta package uses a JavaScript postinstall entry: npm uses its Node, while
+pinned Bun 1.4 also executes it without a host Node. The private materialized
+binary is `bin/openalice.exe` on every host so npm's Windows command shim needs
+neither Node nor Shell at runtime. POSIX links still expose `openalice`. The
+placeholder must have no interpreter shebang: npm creates Windows shims before
+postinstall. Windows resources use a directory junction without admin rights.
+Homebrew and AUR exclude Windows targets.
+
+Release packaging records a strict publish order. All six platform packages
 must publish successfully before the `openalice` meta package is published.
 Stable npm publication is disabled unless the repository explicitly enables
 `OPENALICE_PUBLISH_NPM` and provides npm publishing authority.
@@ -107,7 +120,7 @@ public.
 
 ## Public channel activation
 
-For every non-prerelease, the release workflow first downloads all four
+For every non-prerelease, the release workflow first downloads all six
 archives anonymously from their final public GitHub Release URLs and verifies
 their bytes plus public SHA-256 sidecars against the accepted channel manifest.
 It then downloads the public formula, `PKGBUILD`, `openalice-bin.SRCINFO`, and
@@ -122,13 +135,13 @@ External channels are explicit release switches:
 
 | Channel | Repository variable | Required authority |
 |---|---|---|
-| npm + Bun | `OPENALICE_PUBLISH_NPM=true` | npm Trusted Publishing for all five names, bound to `TraderAlice/OpenAlice` / `release.yml` |
+| npm + Bun | `OPENALICE_PUBLISH_NPM=true` | npm Trusted Publishing for all seven names, bound to `TraderAlice/OpenAlice` / `release.yml` |
 | Homebrew | `OPENALICE_PUBLISH_HOMEBREW=true` | `HOMEBREW_TAP_TOKEN` with write access to `TraderAlice/homebrew-tap` |
 | AUR / paru | `OPENALICE_PUBLISH_AUR=true` | dedicated `AUR_SSH_PRIVATE_KEY` plus manually verified `AUR_KNOWN_HOSTS` |
 
 Before a stable GitHub Release can be created, the release workflow preflights
 every enabled switch. npm exchanges a GitHub OIDC identity for a short-lived,
-package-scoped credential for each of the five existing names. Missing packages
+package-scoped credential for each expected package name. Missing packages
 or missing/mismatched trusted publishers fail the check; there is no token
 fallback or automatic name reservation. Credentials stay in memory and are
 discarded without publishing. The
@@ -142,7 +155,7 @@ The `Public CLI Channel Authority` workflow rehearses Homebrew and/or AUR
 authority without publishing. npm uses `Release` with `operation=verify-npm`
 from integrated `dev` or `master` (no tag required). The rehearsal must run in
 `release.yml` because npm validates that exact workflow identity. It exchanges
-credentials for all five packages but does not upload, build, sign, change a
+credentials for the complete package set but does not upload, build, sign, change a
 version, or create a release. Use it before enabling the npm switch.
 
 The npm, Tap, and AUR writers are idempotent. npm verifies each local tarball
@@ -219,7 +232,10 @@ secret. npm's restrictive 2FA/token policy is compatible with OIDC.
 See [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/) and
 the [registry OIDC exchange API](https://api-docs.npmjs.com/). Adding future
 platform packages (including Windows) requires first publication and their own
-trusted-publisher connections; the current native matrix is macOS/Linux only.
+trusted-publisher connections. The historical receipts above cover only the
+original five names. `openalice-win32-arm64` and `openalice-win32-x64` must be
+enrolled before seven-package publication. Do not restore the revoked bootstrap
+token or count the old receipt as Windows publishing authority.
 
 ## Update and uninstall ownership
 
@@ -265,11 +281,14 @@ pnpm exec vitest run \
 ```
 
 The PR workflow samples native macOS arm64 and Linux x64 candidates through npm
-and Bun. A `dev` push stays on the preview packaging lane: it builds the four
+and Bun. A `dev` push stays on the preview packaging lane: it builds the six
 native artifacts, validates their sidecars and metadata, publishes them, and
 runs the live channel smoke without waiting for package-manager or historical
-upgrade gates. The formal beta/stable release matrix repeats npm/Bun mechanics
-on all four targets before preserving the candidate. Stable release acceptance
+upgrade gates. Windows dev/beta artifacts cross-build on Linux using the shared
+server inputs. Native Windows install/update/rollback and npm/Bun command-shim
+acceptance is separately replayable and mandatory for stable, not every dev
+commit. Beta remains a direct-install channel, not npm publication.
+Stable release acceptance
 also installs the formula on native arm64 and Intel macOS runners, repeats the
 full formula lifecycle on native Linux arm64/x64 runners inside pinned official
 Homebrew images, and builds plus installs

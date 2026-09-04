@@ -160,7 +160,9 @@ function buildNpmPackages({ outputRoot, version, targets }) {
   writeFileSync(join(metaRoot, 'README.md'), npmReadme(version))
   writeFileSync(join(metaRoot, 'postinstall.mjs'), npmPostinstallSource())
   const placeholder = join(metaRoot, 'bin', 'openalice.exe')
-  writeFileSync(placeholder, '#!/bin/sh\necho "OpenAlice native package installation did not finish." >&2\nexit 1\n')
+  // npm constructs Windows shims before postinstall. A shell/Node shebang here
+  // would permanently make that shim require an interpreter after replacement.
+  writeFileSync(placeholder, 'OpenAlice native package installation did not finish.\n')
   chmodSync(placeholder, 0o755)
   return { metaPackage: npmMetaName, platformPackages }
 }

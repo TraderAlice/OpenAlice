@@ -22,6 +22,13 @@ $root = [IO.Path]::GetFullPath($InstallDir).TrimEnd('\')
 if ($root -eq [IO.Path]::GetPathRoot($root).TrimEnd('\') -or $root -eq $env:USERPROFILE -or $root -match '[\r\n"%!]' ) {
   throw 'Choose a dedicated install directory without command expansion characters.'
 }
+function Assert-PlainDirectory([string]$path) {
+  if (Test-Path -LiteralPath $path) {
+    $item = Get-Item -Force -LiteralPath $path
+    if (-not $item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw "Installer directory is not a plain directory: $path" }
+  }
+}
+foreach ($path in @($root, (Join-Path $root 'cli'), (Join-Path $root 'cli\releases'), (Join-Path $root 'cli\staging'), (Join-Path $root 'cli\provenance'), (Join-Path $root 'bin'))) { Assert-PlainDirectory $path }
 if ($Uninstall) {
   Write-Host "Remove only CLI releases, launchers and owned PATH entry under $root. Preserve all AliceProjects and user data."
   if ($Plan) { return }
@@ -39,6 +46,7 @@ if ($Uninstall) {
     $guard = [IO.File]::Open((Join-Path $root '.cli-install.lock.guard'), 'OpenOrCreate', 'ReadWrite', 'None')
     $running = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($releasePrefix, [StringComparison]::OrdinalIgnoreCase) })
     if ($running.Count) { throw 'An installed Runtime is still running. Run openalice down for each AliceProject, then retry uninstall.' }
+    if (@(Get-ChildItem -Force -Recurse -LiteralPath $cliRoot | Where-Object { $_.Attributes -band [IO.FileAttributes]::ReparsePoint }).Count) { throw 'Refusing to remove a CLI tree containing reparse points.' }
     $pathReceipt = Join-Path $cliRoot 'path.json'
     $binDir = Join-Path $root 'bin'
     if ([IO.File]::Exists($pathReceipt)) {
@@ -161,7 +169,8 @@ try {
     }
   }
   $listing = @(& $tar -tvzf $payload)
-  if ($LASTEXITCODE -ne 0 -or @($listing | Where-Object { $_ -notmatch '^[-d]' }).Count -ne 0) { throw 'Archive contains links or special files.' }
+  $special = @($listing | Where-Object { $_ -notmatch '^[-d]' })
+  if ($LASTEXITCODE -ne 0 -or $special.Count -ne 0) { throw "Archive contains links or special files: $($special | Select-Object -First 3)" }
   & $tar -xzf $payload -C $stage
   if ($LASTEXITCODE -ne 0) { throw 'Archive extraction failed.' }
   $expanded = Join-Path $stage $top
@@ -179,6 +188,8 @@ try {
   $releaseName = "$Version-win32-$arch-$($metadata.contentIdentity)"
   $destination = Join-Path $releases $releaseName
   if (Test-Path -LiteralPath $destination) {
+    Assert-PlainDirectory $destination
+    if (@(Get-ChildItem -Force -Recurse -LiteralPath $destination | Where-Object { $_.Attributes -band [IO.FileAttributes]::ReparsePoint }).Count) { throw 'Existing release contains reparse points.' }
     # Immutable collisions are never overwritten, including when the EXE is mapped.
     foreach ($file in (Get-ChildItem -LiteralPath $expanded -File -Recurse)) {
       $relative = $file.FullName.Substring($expanded.Length + 1)
