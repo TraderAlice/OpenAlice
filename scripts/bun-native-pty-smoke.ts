@@ -192,7 +192,9 @@ function interactiveCommand(label: string): { file: string; args: string[] } {
 async function waitForOutput(
   session: { output: string },
   expected: string,
-  timeoutMs = process.platform === 'win32' ? 30_000 : 10_000,
+  // Cold Windows PowerShell initialization exceeded 30s after an archive
+  // build on hosted x64. Keep the output condition, not a fixed sleep.
+  timeoutMs = process.platform === 'win32' ? 60_000 : 10_000,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
