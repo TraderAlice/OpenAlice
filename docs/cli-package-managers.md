@@ -201,7 +201,8 @@ normal promotion before the next stable release; do not restore the old token
 to operate historical tooling.
 
 For each of `openalice`, `openalice-darwin-arm64`, `openalice-darwin-x64`,
-`openalice-linux-arm64`, and `openalice-linux-x64`, configure npm Package Settings
+`openalice-linux-arm64`, `openalice-linux-x64`, `openalice-win32-arm64`, and
+`openalice-win32-x64`, configure npm Package Settings
 → Trusted Publisher → GitHub Actions:
 
 - Organization/user: `TraderAlice`; repository: `OpenAlice`.
@@ -216,7 +217,7 @@ publishing; neither `NPM_TOKEN` nor `NODE_AUTH_TOKEN` is configured. The generat
 packages must retain the matching `TraderAlice/OpenAlice` repository URL.
 Provenance is not itself proof of OIDC authentication.
 
-After adding all five connections, run:
+After adding all seven connections, run:
 
 ```bash
 gh workflow run release.yml --ref dev -f operation=verify-npm
