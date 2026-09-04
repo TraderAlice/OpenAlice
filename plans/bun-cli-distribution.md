@@ -56,8 +56,10 @@ channel discovery. Agent CLIs remain user-owned.
   ConPTY termination; bound slow WebSocket consumers without POSIX signals.
 - [x] Add an independently retryable, manual x64/ARM64 workflow. Preserve each
   archive before its native smoke so failures retain reproduction bytes.
-- [ ] Complete local regression/type checks and integrate this increment.
-- [ ] Run native Windows installation, Guardian/Alice/Web, Git, ConPTY input,
+- [x] Complete local regression/type checks and integrate [PR #1344](https://github.com/TraderAlice/OpenAlice/pull/1344)
+  into `dev` at `1d1dc21d`: full baseline 6,342 passes, final focused 74 passes,
+  root/CLI types, local Windows ZIP builds and complete macOS native smoke.
+- [x] Run native Windows installation, Guardian/Alice/Web, Git, ConPTY input,
   resize, independent termination and stop checks for each architecture.
 - [ ] Perform interactive external-agent/provider acceptance; record concrete
   failures instead of claiming cross-compilation proves Windows runtime support.
@@ -68,6 +70,32 @@ The first preview is not a new beta/stable release. It is commit-addressed
 Actions output with a separate native acceptance receipt and no mutable channel
 alias. `CLI Installer Smoke` can dispatch only this lane from integrated `dev`
 using `windows_preview=true`, without the normal manual installer matrix.
+
+Native rehearsal [33874069985](https://github.com/TraderAlice/OpenAlice/actions/runs/33874069985)
+preserved the x64 ZIP and passed ConPTY input/resize/independent termination.
+Its installation smoke exposed inherited PowerShell 7 `PSModulePath` preventing
+Windows PowerShell 5.1 from discovering `Get-FileHash`; reset only that child
+environment, not the host. A separate old classifier assertion also needed to
+recognize the manual Windows-only selector. Neither failure is waived.
+The next smoke attempt accepts the saved ZIPs with `windows_candidate_run`,
+skipping dependency installation and all rebuilds; product changes still need
+a newly compiled candidate. Ambiguous/missing archived candidates fail closed.
+
+Accepted native replay: [33875035438](https://github.com/TraderAlice/OpenAlice/actions/runs/33875035438)
+passed on both native hosts, reusing product commit `579bd53e` from the first
+build. ARM64 took 66 seconds and x64 67 seconds; both skipped Node/pnpm setup,
+dependency installation and all builds. The receipts bind these exact archives:
+
+| Architecture | Content identity | Archive SHA-256 |
+|---|---|---|
+| x64 | `bec6a7546a3e1c4c` | `66f98d667861df4e8bc74a60f2e12665dd1bbbcbbfe76495d0b7764bc25bcf0c` |
+| ARM64 | `dc78db8c9192513a` | `8ad8791c605e5105dedfe84c8e5faa56258e706d653914d64275d5a08cd41fc8` |
+
+[x64 preview](https://github.com/TraderAlice/OpenAlice/actions/runs/33874069985/artifacts/9937224452)
+and [ARM64 preview](https://github.com/TraderAlice/OpenAlice/actions/runs/33874069985/artifacts/9937338651)
+are retained for 30 days as Actions artifacts, not permanent GitHub Release or
+npm assets. Real interactive Agent/provider use and manual upgrade/removal are
+still explicit follow-up acceptance, not implied by this smoke.
 
 Delivery mode: Serial / interactive from current `dev`. The accepted native CLI
 increments have already reached `dev`; the old `codex/usability-improvements`

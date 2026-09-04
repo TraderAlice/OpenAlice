@@ -2,10 +2,20 @@ name: Windows CLI Preview
 
 on:
   workflow_dispatch:
+    inputs:
+      candidate_run:
+        description: Existing preview run ID to accept without rebuilding
+        type: string
+        default: ''
   workflow_call:
+    inputs:
+      candidate_run:
+        type: string
+        default: ''
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: windows-cli-preview-${{ github.ref }}
@@ -30,7 +40,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
+        if: inputs.candidate_run == ''
       - uses: actions/setup-node@v7
+        if: inputs.candidate_run == ''
         with:
           node-version: 22.22.2
           architecture: ${{ matrix.arch }}
@@ -39,13 +51,17 @@ jobs:
         with:
           bun-version-file: .bun-version
       - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
+        if: inputs.candidate_run == ''
       - run: pnpm build:server
+        if: inputs.candidate_run == ''
       - name: Assemble preview before native acceptance
+        if: inputs.candidate_run == ''
         run: bun scripts/build-windows-cli-preview.ts ${{ matrix.arch }}
       - name: Preserve complete candidate for reproduction
+        if: inputs.candidate_run == ''
         uses: actions/upload-artifact@v6
         with:
-          name: openalice-windows-${{ matrix.arch }}-${{ github.sha }}
+          name: openalice-windows-${{ matrix.arch }}-${{ github.sha }}-${{ github.run_attempt }}
           path: |
             dist/windows-cli-preview/${{ matrix.arch }}/*.zip
             dist/windows-cli-preview/${{ matrix.arch }}/*.sha256
@@ -54,6 +70,15 @@ jobs:
           if-no-files-found: error
           retention-days: 30
           compression-level: 0
+      - name: Reuse an existing candidate without installing dependencies or rebuilding
+        if: inputs.candidate_run != ''
+        uses: actions/download-artifact@v5
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.candidate_run }}
+          pattern: openalice-windows-${{ matrix.arch }}-*
+          path: dist/windows-cli-preview/${{ matrix.arch }}
+          merge-multiple: false
       - name: Check native ConPTY input resize and independent termination
         run: bun scripts/bun-native-pty-smoke.ts
       - name: Install and start the packaged Runtime
@@ -62,7 +87,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: windows-cli-smoke-${{ matrix.arch }}-${{ github.sha }}
+          name: windows-cli-smoke-${{ matrix.arch }}-${{ github.sha }}-${{ github.run_attempt }}
           path: dist/windows-cli-preview/${{ matrix.arch }}/native-smoke.json
           if-no-files-found: ignore
           retention-days: 30

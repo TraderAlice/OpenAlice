@@ -103,7 +103,7 @@ describe('exact beta release-preparation workflow lane', () => {
     expect(cli.on?.pull_request?.branches).toEqual(['master'])
     expectTrustedClassifier(scope)
     expectOutcomeGatedOutput(scope)
-    expect(scope.if).toBe("github.event_name != 'push'")
+    expect(scope.if).toBe("github.event_name != 'push' && !inputs.windows_preview")
     for (const name of ['bun-cli-feasibility', 'checkout-install', 'checkout-remote']) {
       expect(jobs[name].needs).toBe('release-prep-scope')
       expect(jobs[name].if).toContain('!cancelled()')

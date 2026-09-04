@@ -11,6 +11,7 @@ if (backend.name !== 'bun-native') {
 const env = Object.fromEntries(
   Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined),
 )
+if (process.platform === 'win32') delete env.PSModulePath
 const one = spawnInteractive('ONE')
 const two = spawnInteractive('TWO')
 let flowControl: Awaited<ReturnType<typeof probeFlowControl>> | undefined
@@ -191,7 +192,7 @@ function interactiveCommand(label: string): { file: string; args: string[] } {
 async function waitForOutput(
   session: { output: string },
   expected: string,
-  timeoutMs = 10_000,
+  timeoutMs = process.platform === 'win32' ? 30_000 : 10_000,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {

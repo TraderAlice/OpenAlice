@@ -10,7 +10,7 @@ describe('Windows preview delivery boundary', () => {
   it('is manually dispatched, independent per architecture, and cannot publish stable aliases', () => {
     const workflow = YAML.parse(read('.github/workflows/windows-cli-preview.yml'))
     expect(Object.keys(workflow.on)).toEqual(['workflow_dispatch', 'workflow_call'])
-    expect(workflow.permissions).toEqual({ contents: 'read' })
+    expect(workflow.permissions).toEqual({ contents: 'read', actions: 'read' })
     const job = workflow.jobs.preview
     expect(job.needs).toBeUndefined()
     expect(job.strategy['fail-fast']).toBe(false)
@@ -21,6 +21,20 @@ describe('Windows preview delivery boundary', () => {
     expect(steps.findIndex(s => s.name === 'Preserve complete candidate for reproduction'))
       .toBeLessThan(steps.findIndex(s => s.name === 'Install and start the packaged Runtime'))
     expect(steps.some(s => /pnpm test(?:\s|$)|npm publish|electron:pack/.test(s.run ?? ''))).toBe(false)
+  })
+
+  it('replays existing bytes without dependency setup, compilation, or candidate re-upload', () => {
+    const workflow = YAML.parse(read('.github/workflows/windows-cli-preview.yml'))
+    const steps = workflow.jobs.preview.steps as Array<{ uses?: string; name?: string; run?: string; if?: string; with?: Record<string, unknown> }>
+    for (const step of steps.filter(s => s.uses === 'pnpm/action-setup@v6' || s.uses === 'actions/setup-node@v7' ||
+      s.run?.startsWith('pnpm ') || s.run?.includes('build-windows-cli-preview.ts') ||
+      s.name === 'Preserve complete candidate for reproduction')) {
+      expect(step.if).toBe("inputs.candidate_run == ''")
+    }
+    const download = steps.find(s => s.uses === 'actions/download-artifact@v5')!
+    expect(download.if).toBe("inputs.candidate_run != ''")
+    expect(download.with?.['merge-multiple']).toBe(false)
+    expect(download.with?.['run-id']).toBe('${{ inputs.candidate_run }}')
   })
 
   it('the registered installer workflow can dispatch previews without its normal manual gates or dev activation', () => {
