@@ -13,13 +13,15 @@ covers macOS and glibc Linux on arm64 and x64.
 Stable package-manager installs use:
 
 ```bash
-npm install -g openalice
+npm install -g openalice --allow-scripts=openalice
 bun add -g --trust openalice
 brew install traderalice/tap/openalice
 paru -S openalice-bin
 ```
 
-Bun does not run dependency lifecycle scripts by default. `--trust` is the
+npm 12 requires explicit installation-script approval; `--allow-scripts=openalice`
+allows only this package's materialization step. Bun likewise does not run
+dependency lifecycle scripts by default. `--trust` is the
 explicit Bun authorization that lets the small `openalice` meta package select
 and materialize its already-published native platform package. It does not give
 OpenAlice permission to install an Agent Runtime or another system dependency.
@@ -146,13 +148,30 @@ deliberate maintainer actions. Enabling a switch without its external
 repository or authority is a release failure, not permission to invent another
 channel or silently skip publication.
 
+### First npm publication or retry without rebuilding
+
+Dispatch the existing `Release` workflow with `operation=publish-npm`,
+`channel=stable`, and the current published stable tag. This explicit operation
+authorizes only that npm publication; it does not enable the persistent
+`OPENALICE_PUBLISH_NPM` switch. It can run from integrated `dev` tooling or
+`master`, but accepts only GitHub's current non-draft, non-prerelease latest
+release, whose tag is on `master` and whose two product manifests agree.
+
+The single job checks npm authority, downloads the release-owned npm tarballs
+and manifests, verifies every tarball before any upload, verifies the public
+native archives, then uses the same platform-first publisher as a new stable
+release. No build, signing, version change, tag creation, CDN mutation,
+Homebrew, or AUR job runs. After upload, verify an actual registry install.
+Trusted publishing configuration and retirement of the temporary token are
+separate follow-up actions; do not confuse `--provenance` with OIDC authority.
+
 ## Update and uninstall ownership
 
 The installer that owns the visible command also owns later file mutation:
 
 | Method | Update | Uninstall |
 |---|---|---|
-| npm | `npm install -g openalice@latest` | `npm uninstall -g openalice` |
+| npm | `npm install -g openalice@latest --allow-scripts=openalice` | `npm uninstall -g openalice` |
 | Bun | `bun add -g --trust openalice@latest` | `bun remove -g openalice` |
 | Homebrew | `brew upgrade traderalice/tap/openalice` | `brew uninstall traderalice/tap/openalice` |
 | AUR | `paru -S openalice-bin` | `paru -Rns openalice-bin` |

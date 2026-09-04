@@ -83,7 +83,8 @@ describe('publish CLI npm packages', () => {
 
   it('verifies local tarball bytes before reading or mutating the registry', () => {
     const root = fixture()
-    writeFileSync(join(root, 'openalice-darwin-arm64-0.90.2.tgz'), 'tampered')
+    // Even the last package must be verified before the first platform publishes.
+    writeFileSync(join(root, 'openalice-0.90.2.tgz'), 'tampered')
     const runNpm = vi.fn()
 
     expect(() => publishCliNpmPackages({ packagesDir: root, runNpm, logger: silent() }))

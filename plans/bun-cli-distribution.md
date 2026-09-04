@@ -762,6 +762,17 @@ This plan is complete only when:
     an ordinary SSH-reachable host without owning its infrastructure provider.
 ## Progress Log
 
+- 2026-09-04: Maintainer authorized attempting the five unscoped npm names
+  with the accepted v0.90.2 tarballs. A seven-day bootstrap token is configured
+  in GitHub Actions. Added an explicit `Release / publish-npm` operation for
+  current stable assets only, without rebuilding or changing version/CDN state.
+  npm 12 installation requires explicit `--allow-scripts=openalice`. An
+  isolated local registry serving the original, integrity-verified tarballs
+  passed npm 12.0.2 / Node 22.22.2 install, version, detached start, status, and
+  stop on macOS arm64 with no Node/Bun in Runtime PATH. Actual registry
+  publication is pending, not inferred from absent public names. OIDC remains
+  follow-up work.
+
 - 2026-08-29: Maintainer selected the architecture after comparing Herdr and
   OpenCode. CLI is treated as a primary long-running distribution. The selected
   direction is one Bun-compiled OpenAlice artifact that re-executes into the

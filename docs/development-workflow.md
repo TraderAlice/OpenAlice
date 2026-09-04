@@ -21,6 +21,10 @@ Canonical startup rules: [[AGENTS.md]]. Guide index: [[docs/README.md]].
   manifests must agree before candidate work begins. Each accepted tag may
   update only its own mutable product aliases; a newly accepted release may
   also refresh the shared channel-neutral `install` bootstrap.
+- The separate `Release` operation `publish-npm` only distributes an already
+  published stable release. It may use integrated `dev` or `master` tooling;
+  it cannot create a version, rebuild an artifact, or mutate product channels.
+  See [[docs/cli-package-managers.md]] for its first-publication/retry contract.
 - `archive/dev-pre-beta6` is a historical snapshot; do not modify or delete it.
 - `local` is a legacy shared-worktree branch. It is not the default workflow;
   audit its unmerged commits before deciding whether to retain or retire it.

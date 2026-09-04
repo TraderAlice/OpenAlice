@@ -55,13 +55,35 @@ function needs(job: WorkflowJob): string[] {
 }
 
 describe('Release workflow critical path', () => {
+  it('publishes existing stable npm assets without rebuilding or changing product channels', () => {
+    const job = workflow.jobs['publish-existing-npm']
+    expect(job.if).toBe("inputs.operation == 'publish-npm'")
+    expect(workflow.jobs.release.if).toBe("inputs.operation != 'publish-npm'")
+    expect(needs(job)).toEqual([])
+    expect(job['timeout-minutes']).toBe(15)
+    const guard = step(job, 'Require the current published stable release').run ?? ''
+    expect(guard).toContain('refs/heads/dev')
+    expect(guard).toContain('releases/latest')
+    expect(guard).toContain('.draft == false and .prerelease == false')
+    expect(guard).toContain('merge-base --is-ancestor')
+    expect(guard).toContain('packages/cli/package.json')
+    const download = step(job, 'Download and verify existing public release bytes').run ?? ''
+    expect(download).toContain('verifyCliNpmPackages')
+    expect(download).toContain('verify-public-cli-channels.mjs')
+    expect(download).toContain('npm-publish-order.json')
+    const allSteps = job.steps?.map((candidate) => candidate.run ?? '').join('\n') ?? ''
+    expect(allSteps).not.toMatch(/pnpm build|electron:|aws s3|gh release create/)
+    expect(step(job, 'Publish platform packages before the meta package').run)
+      .toContain('publish-cli-npm-packages.mjs --packages-dir dist/existing-npm')
+  })
+
   it('requires an explicit tag/package release decision instead of publishing on master push', () => {
     expect(Object.keys(workflow.on)).toEqual(['workflow_dispatch'])
     expect(workflow.on.workflow_dispatch?.inputs).toMatchObject({
       operation: {
         required: true,
         type: 'choice',
-        options: ['release', 'mirror'],
+        options: ['release', 'mirror', 'publish-npm'],
       },
       tag: {
         required: true,
