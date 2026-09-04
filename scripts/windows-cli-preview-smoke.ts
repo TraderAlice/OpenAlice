@@ -40,6 +40,7 @@ const environment = {
     'ProgramFiles', 'ProgramFiles(x86)'].flatMap(key => process.env[key] ? [[key, process.env[key]!]] : [])),
   SystemRoot: process.env.SystemRoot!, WINDIR: process.env.WINDIR!,
   OS: 'Windows_NT', PROCESSOR_ARCHITECTURE: process.arch === 'arm64' ? 'ARM64' : 'AMD64',
+  PSExecutionPolicyPreference: 'Restricted',
   TEMP: scratch, TMP: scratch, HOME: scratch, USERPROFILE: process.env.USERPROFILE!,
   PATH: join(process.env.SystemRoot!, 'System32'),
   OPENALICE_HOME: home, OPENALICE_TRADING_MODE: 'lite',
@@ -108,7 +109,7 @@ try {
       console.log(await readFile(join(installDir, '.cli-uninstall.log'), 'utf8').catch(() => 'No helper startup log'))
       // Diagnose the retained helper with the exact minimal environment. Plan
       // mode cannot remove files and exposes errors before receipt creation.
-      console.log(await command(powershell, ['-NoProfile', '-File', join(installDir, '.cli-uninstall.ps1'), '-InstallDir', installDir, '-Uninstall', '-Plan'], environment))
+      console.log(await command(powershell, ['-NoProfile', '-ExecutionPolicy', 'RemoteSigned', '-File', join(installDir, '.cli-uninstall.ps1'), '-InstallDir', installDir, '-Uninstall', '-Plan'], environment))
     }
     if (removed?.status !== 'removed' || await readFile(marker, 'utf8') !== 'preserve user data') throw new Error(`Data-preserving removal failed: ${JSON.stringify(removed)}`)
     uninstalled = true

@@ -558,7 +558,7 @@ export async function downloadAndRunInstaller(result, context) {
       ? ['--channel', 'dev']
       : ['--channel', channel, '--version', result.latestVersion]
     const args = windows ? [
-      '-NoLogo', '-NoProfile', '-File', installerPath,
+      '-NoLogo', '-NoProfile', '-ExecutionPolicy', 'RemoteSigned', '-File', installerPath,
       '-Channel', channel,
       ...(channel === 'dev' ? [] : ['-Version', result.latestVersion]),
       '-InstallDir', context.layout.installRoot, '-NoModifyPath',

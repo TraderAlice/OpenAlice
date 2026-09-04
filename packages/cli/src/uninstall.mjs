@@ -116,7 +116,7 @@ async function scheduleWindowsUninstall(layout) {
   const log = await open(join(layout.installRoot, '.cli-uninstall.log'), 'w', 0o600)
   try {
     const child = spawn(join(env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), [
-      '-NoLogo', '-NoProfile', '-File', script, '-InstallDir', layout.installRoot,
+      '-NoLogo', '-NoProfile', '-ExecutionPolicy', 'RemoteSigned', '-File', script, '-InstallDir', layout.installRoot,
       '-Uninstall', '-WaitForPid', String(process.pid), '-Yes',
     ], { detached: true, windowsHide: true, stdio: ['ignore', log.fd, log.fd], env })
     await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject) })

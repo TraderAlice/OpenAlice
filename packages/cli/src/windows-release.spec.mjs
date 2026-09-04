@@ -72,7 +72,7 @@ describe('Windows unified release system', () => {
     await expect(checkForUpdate({ installSource: source, channel, platform: 'win32' }, { fetchImpl: fetchDocument(document) })).rejects.toThrow('not published a Windows')
   })
 
-  it('checks immutable PowerShell bytes and hands off the same dev identity without relaxing policy', async () => {
+  it('checks immutable PowerShell bytes and uses only a process-scoped local-script policy', async () => {
     const bytes = Buffer.from('# OpenAlice Windows CLI installer\nparam()\n')
     const spawnImpl = vi.fn(() => {
       const child = new EventEmitter()
@@ -91,7 +91,8 @@ describe('Windows unified release system', () => {
     const [command, args, options] = spawnImpl.mock.calls[0]
     expect(command).toContain('powershell.exe')
     expect(args).toEqual(expect.arrayContaining(['-File', '-Channel', 'dev', '-InstallDir', 'C:\\Users\\Alice Test\\.openalice', '-Yes']))
-    expect(args).not.toContain('-ExecutionPolicy')
+    expect(args).toEqual(expect.arrayContaining(['-ExecutionPolicy', 'RemoteSigned']))
+    expect(args).not.toContain('Bypass')
     expect(options.env.PSModulePath).toBeUndefined()
     expect(options.env.OPENALICE_EXPECTED_DEV_COMMIT).toBe('a'.repeat(40))
   })
