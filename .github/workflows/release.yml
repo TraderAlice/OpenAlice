@@ -437,6 +437,8 @@ jobs:
           cp install "dist/cli-installer/${installer}"
           bash -n "dist/cli-installer/${installer}"
           (cd dist/cli-installer && sha256sum "$installer" > "${installer}.sha256")
+          cp install.ps1 "dist/cli-installer/${installer}.ps1"
+          (cd dist/cli-installer && sha256sum "${installer}.ps1" > "${installer}.ps1.sha256")
 
       - name: Preserve immutable installer candidate
         uses: actions/upload-artifact@v4
@@ -445,6 +447,8 @@ jobs:
           path: |
             dist/cli-installer/OpenAlice-*-install
             dist/cli-installer/OpenAlice-*-install.sha256
+            dist/cli-installer/OpenAlice-*-install.ps1
+            dist/cli-installer/OpenAlice-*-install.ps1.sha256
           if-no-files-found: error
           retention-days: 1
 
@@ -561,9 +565,21 @@ jobs:
           compression-level: 0
           retention-days: 1
 
+  build-cli-windows:
+    needs: release
+    if: needs.release.outputs.created == 'true'
+    uses: ./.github/workflows/windows-cli-preview.yml
+    permissions:
+      contents: read
+      actions: read
+    with:
+      channel_build: true
+      artifact_prefix: cli-release
+      native_acceptance: ${{ needs.release.outputs.channel == 'stable' }}
+
   build-cli-package-channels:
     name: Build CLI package-manager channels
-    needs: [release, build-cli-release]
+    needs: [release, build-cli-release, build-cli-windows]
     if: needs.release.outputs.created == 'true' && needs.release.outputs.channel == 'stable' && needs.build-cli-release.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -614,7 +630,7 @@ jobs:
 
   accept-cli-homebrew:
     name: Accept Homebrew CLI (${{ matrix.arch }})
-    needs: [release, build-cli-release]
+    needs: [release, build-cli-release, build-cli-windows]
     if: needs.release.outputs.created == 'true' && needs.release.outputs.channel == 'stable' && needs.build-cli-release.result == 'success'
     strategy:
       fail-fast: false
@@ -681,7 +697,7 @@ jobs:
 
   accept-cli-linuxbrew:
     name: Accept Linuxbrew CLI (${{ matrix.arch }})
-    needs: [release, build-cli-release]
+    needs: [release, build-cli-release, build-cli-windows]
     if: needs.release.outputs.created == 'true' && needs.release.outputs.channel == 'stable' && needs.build-cli-release.result == 'success'
     strategy:
       fail-fast: false
@@ -746,7 +762,7 @@ jobs:
 
   accept-cli-aur:
     name: Accept Arch/AUR CLI package (${{ matrix.arch }})
-    needs: [release, build-cli-release]
+    needs: [release, build-cli-release, build-cli-windows]
     if: needs.release.outputs.created == 'true' && needs.release.outputs.channel == 'stable' && needs.build-cli-release.result == 'success'
     strategy:
       fail-fast: false
@@ -902,13 +918,14 @@ jobs:
 
   publish-release:
     name: Publish accepted release
-    needs: [release, preflight-public-cli-authority, build-desktop, accept-desktop-upgrade, build-cli-installer, build-cli-release, build-cli-package-channels, accept-cli-homebrew, accept-cli-linuxbrew, accept-cli-aur, accept-cli-legacy-cutover, build-broker-packs, cli-installer-acceptance]
+    needs: [release, preflight-public-cli-authority, build-desktop, accept-desktop-upgrade, build-cli-installer, build-cli-release, build-cli-windows, build-cli-package-channels, accept-cli-homebrew, accept-cli-linuxbrew, accept-cli-aur, accept-cli-legacy-cutover, build-broker-packs, cli-installer-acceptance]
     if: >-
       always() &&
       needs.release.outputs.created == 'true' &&
       needs.build-desktop.result == 'success' &&
       needs.build-cli-installer.result == 'success' &&
       needs.build-cli-release.result == 'success' &&
+      needs.build-cli-windows.result == 'success' &&
       needs.build-broker-packs.result == 'success' &&
       needs.cli-installer-acceptance.result == 'success' &&
       (
@@ -994,6 +1011,8 @@ jobs:
             dist/release-cli/*.tar.gz.sha256
             dist/release-cli-installer/OpenAlice-*-install
             dist/release-cli-installer/OpenAlice-*-install.sha256
+            dist/release-cli-installer/OpenAlice-*-install.ps1
+            dist/release-cli-installer/OpenAlice-*-install.ps1.sha256
 
       - name: Create stable tag and GitHub Release from accepted candidates
         if: needs.release.outputs.channel == 'stable'
@@ -1018,6 +1037,8 @@ jobs:
             dist/release-cli/*.tar.gz.sha256
             dist/release-cli-installer/OpenAlice-*-install
             dist/release-cli-installer/OpenAlice-*-install.sha256
+            dist/release-cli-installer/OpenAlice-*-install.ps1
+            dist/release-cli-installer/OpenAlice-*-install.ps1.sha256
             dist/release-cli-packages/cli-package-channels/cli-package-channels.json
             dist/release-cli-packages/cli-package-channels/homebrew/openalice.rb
             dist/release-cli-packages/cli-package-channels/aur/PKGBUILD
@@ -1044,7 +1065,7 @@ jobs:
         env:
           SOURCE_REF: ${{ github.ref }}
         run: '[[ "$SOURCE_REF" = refs/heads/dev || "$SOURCE_REF" = refs/heads/master ]]'
-      - name: Verify all five trusted publisher connections
+      - name: Verify all trusted publisher connections
         run: node scripts/preflight-public-cli-authority.mjs
         env:
           OPENALICE_PUBLISH_NPM: 'true'
@@ -1106,7 +1127,7 @@ jobs:
             curl --fail --location --retry 3 "$base/$metadata" -o "dist/existing-npm/$metadata"
           done
           jq -e --arg version "${RELEASE_TAG#v}" '.version == $version' dist/existing-npm/npm-publish-order.json
-          for package in openalice-darwin-arm64 openalice-darwin-x64 openalice-linux-arm64 openalice-linux-x64 openalice; do
+          for package in openalice-darwin-arm64 openalice-darwin-x64 openalice-linux-arm64 openalice-linux-x64 openalice-win32-arm64 openalice-win32-x64 openalice; do
             filename="$package-${RELEASE_TAG#v}.tgz"
             curl --fail --location --retry 3 "$base/$filename" -o "dist/existing-npm/$filename"
           done
@@ -1410,8 +1431,10 @@ jobs:
             --exclude "manifest.json" \
             --exclude "beta/*" \
             --exclude "install" \
+            --exclude "install.ps1" \
             --exclude "OpenAlice-*-install" \
             --exclude "OpenAlice-*-install.sha256" \
+            --exclude "OpenAlice-*-install.ps1*" \
             --exclude "mac-arm64.dmg" \
             --exclude "mac-arm64.zip" \
             --exclude "mac-x64.dmg" \
@@ -1430,7 +1453,9 @@ jobs:
 
           for installer in \
             dist/r2-upload/OpenAlice-*-install \
-            dist/r2-upload/OpenAlice-*-install.sha256; do
+            dist/r2-upload/OpenAlice-*-install.sha256 \
+            dist/r2-upload/OpenAlice-*-install.ps1 \
+            dist/r2-upload/OpenAlice-*-install.ps1.sha256; do
             [ -f "$installer" ] || continue
             key=$(basename "$installer")
             existing="/tmp/${key}.existing"
@@ -1447,6 +1472,8 @@ jobs:
           done
 
           if [ "$RELEASE_OPERATION" = "release" ]; then
+            aws s3 cp dist/r2-upload/install.ps1 "s3://${R2_BUCKET}/install.ps1" \
+              --cache-control "no-cache" --content-type "text/plain" --endpoint-url "$ENDPOINT"
             aws s3 cp dist/r2-upload/install "s3://${R2_BUCKET}/install" \
               --cache-control "no-cache" \
               --content-type "text/plain" \
@@ -1556,10 +1583,27 @@ jobs:
           '
 
           if [ "$RELEASE_OPERATION" = "release" ]; then
+            test -f "dist/r2-upload/OpenAlice-${VERSION}-install.ps1"
             curl -fsSL "${BASE_URL}/${INSTALL_PATH}" -o /tmp/openalice-channel-install
             cmp /tmp/openalice-versioned-install /tmp/openalice-channel-install
             bash /tmp/openalice-channel-install --plan | tee /tmp/openalice-default-install-plan
             grep -Fq "Channel         stable (latest)" /tmp/openalice-default-install-plan
+          fi
+
+          if [ -f "dist/r2-upload/OpenAlice-${VERSION}-install.ps1" ]; then
+            curl -fsSL "${BASE_URL}/OpenAlice-${VERSION}-install.ps1" -o /tmp/openalice-versioned-install.ps1
+            cmp /tmp/openalice-versioned-install.ps1 "dist/r2-upload/OpenAlice-${VERSION}-install.ps1"
+            MANIFEST_URL="${BASE_URL}/${MANIFEST_PATH}" WINDOWS_INSTALL_URL="${BASE_URL}/OpenAlice-${VERSION}-install.ps1" node -e '
+              const { createHash } = require("node:crypto");
+              const { readFileSync } = require("node:fs");
+              const manifest = JSON.parse(require("node:child_process").execFileSync("curl", ["-fsSL", process.env.MANIFEST_URL], { encoding: "utf8" }));
+              const digest = createHash("sha256").update(readFileSync("/tmp/openalice-versioned-install.ps1")).digest("hex");
+              if (manifest.windowsInstaller?.versionedUrl !== process.env.WINDOWS_INSTALL_URL || manifest.windowsInstaller?.sha256 !== digest) process.exit(1);
+            '
+            if [ "$RELEASE_OPERATION" = "release" ]; then
+              curl -fsSL "${BASE_URL}/install.ps1" -o /tmp/openalice-channel-install.ps1
+              cmp /tmp/openalice-versioned-install.ps1 /tmp/openalice-channel-install.ps1
+            fi
           fi
 
           if [ "$RELEASE_CHANNEL" = "stable" ]; then
@@ -1596,7 +1640,11 @@ jobs:
             curl -fsSI "${BASE_URL}/$(basename "$archive")"
             curl -fsSI "${BASE_URL}/$(basename "$checksum")"
           done
-          test "$cli_asset_count" = 4
+          expected_cli_assets=6
+          if [ "$RELEASE_OPERATION" = "mirror" ] && [ ! -f "dist/r2-upload/OpenAlice-${VERSION}-install.ps1" ]; then
+            expected_cli_assets=4
+          fi
+          test "$cli_asset_count" = "$expected_cli_assets"
 
           for catalog in dist/r2-upload/OpenAlice-Broker-Packs-${VERSION}-*.json; do
             curl -fsSI "${BASE_URL}/$(basename "$catalog")"

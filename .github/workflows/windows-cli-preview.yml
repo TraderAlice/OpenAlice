@@ -3,12 +3,32 @@ name: Windows CLI Preview
 on:
   workflow_dispatch:
     inputs:
+      channel_build:
+        description: Build the canonical shared-channel candidate instead of a portable ZIP
+        type: boolean
+        default: false
+      native_acceptance:
+        description: Use native Windows hosts and exercise the packaged Runtime
+        type: boolean
+        default: true
       candidate_run:
         description: Existing preview run ID to accept without rebuilding
         type: string
         default: ''
   workflow_call:
     inputs:
+      native_acceptance:
+        type: boolean
+        default: true
+      channel_build:
+        type: boolean
+        default: false
+      artifact_prefix:
+        type: string
+        default: openalice-windows
+      neutral_inputs:
+        type: boolean
+        default: false
       candidate_run:
         type: string
         default: ''
@@ -24,7 +44,7 @@ concurrency:
 jobs:
   preview:
     name: Windows CLI (${{ matrix.arch }})
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ inputs.channel_build && !inputs.native_acceptance && 'ubuntu-24.04' || matrix.os }}
     timeout-minutes: 25
     strategy:
       fail-fast: false
@@ -37,6 +57,8 @@ jobs:
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       DUGITE_SKIP_INSTALL: '1'
+      OPENALICE_WINDOWS_CHANNEL_BUILD: ${{ inputs.channel_build && '1' || '0' }}
+      OPENALICE_7ZIP: 7z
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -45,7 +67,7 @@ jobs:
         if: inputs.candidate_run == ''
         with:
           node-version: 22.22.2
-          architecture: ${{ matrix.arch }}
+          architecture: ${{ inputs.channel_build && !inputs.native_acceptance && 'x64' || matrix.arch }}
           cache: pnpm
       - uses: oven-sh/setup-bun@v2
         with:
@@ -53,41 +75,65 @@ jobs:
       - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
         if: inputs.candidate_run == ''
       - run: pnpm build:server
-        if: inputs.candidate_run == ''
+        if: inputs.candidate_run == '' && !inputs.neutral_inputs
+      - name: Reuse shared server inputs on dev
+        if: inputs.candidate_run == '' && inputs.neutral_inputs
+        uses: actions/download-artifact@v4
+        with:
+          name: rolling-dev-neutral-inputs
+          path: dist/dev-neutral-inputs
+      - name: Verify shared server inputs
+        if: inputs.candidate_run == '' && inputs.neutral_inputs
+        run: node scripts/prepare-cli-neutral-inputs.mjs verify --repository-root . --input-dir dist/dev-neutral-inputs --commit "${{ github.sha }}" --install
       - name: Assemble preview before native acceptance
         if: inputs.candidate_run == ''
         run: bun scripts/build-windows-cli-preview.ts ${{ matrix.arch }}
       - name: Preserve complete candidate for reproduction
+        id: preserve
         if: inputs.candidate_run == ''
         uses: actions/upload-artifact@v6
         with:
-          name: openalice-windows-${{ matrix.arch }}-${{ github.sha }}-${{ github.run_attempt }}
+          name: ${{ inputs.artifact_prefix || 'openalice-windows' }}-${{ inputs.channel_build && 'win32-' || '' }}${{ matrix.arch }}-${{ github.sha }}-${{ github.run_attempt }}
           path: |
             dist/windows-cli-preview/${{ matrix.arch }}/*.zip
+            dist/windows-cli-preview/${{ matrix.arch }}/*.tar.gz
             dist/windows-cli-preview/${{ matrix.arch }}/*.sha256
             dist/windows-cli-preview/${{ matrix.arch }}/install-preview.ps1
+            dist/windows-cli-preview/${{ matrix.arch }}/install.ps1
             dist/windows-cli-preview/${{ matrix.arch }}/candidate.json
           if-no-files-found: error
           retention-days: 30
           compression-level: 0
       - name: Reuse an existing candidate without installing dependencies or rebuilding
+        id: download
         if: inputs.candidate_run != ''
         uses: actions/download-artifact@v5
         with:
           github-token: ${{ github.token }}
           run-id: ${{ inputs.candidate_run }}
-          pattern: openalice-windows-${{ matrix.arch }}-*
+          pattern: openalice-windows-${{ inputs.channel_build && 'win32-' || '' }}${{ matrix.arch }}-*
           path: dist/windows-cli-preview/${{ matrix.arch }}
           merge-multiple: false
       - name: Check native ConPTY input resize and independent termination
+        if: inputs.native_acceptance
         run: bun scripts/bun-native-pty-smoke.ts
       - name: Install and start the packaged Runtime
+        if: ${{ !cancelled() && inputs.native_acceptance && (steps.preserve.outcome == 'success' || steps.download.outcome == 'success') }}
         run: bun scripts/windows-cli-preview-smoke.ts
+      - name: Accept Windows npm and Bun native command shims
+        if: ${{ !cancelled() && inputs.native_acceptance && inputs.channel_build && (steps.preserve.outcome == 'success' || steps.download.outcome == 'success') }}
+        shell: pwsh
+        run: |
+          $candidates = @(Get-ChildItem -Recurse -Path dist/windows-cli-preview/${{ matrix.arch }} -Filter candidate.json)
+          if ($candidates.Count -ne 1) { throw 'Expected exactly one package candidate' }
+          ./scripts/windows-cli-package-smoke.ps1 -CandidateDir $candidates[0].DirectoryName
       - name: Preserve native verification receipt
         if: always()
         uses: actions/upload-artifact@v6
         with:
           name: windows-cli-smoke-${{ matrix.arch }}-${{ github.sha }}-${{ github.run_attempt }}
-          path: dist/windows-cli-preview/${{ matrix.arch }}/native-smoke.json
+          path: |
+            dist/windows-cli-preview/${{ matrix.arch }}/native-smoke.json
+            dist/windows-cli-preview/${{ matrix.arch }}/**/package-manager-smoke.json
           if-no-files-found: ignore
           retention-days: 30

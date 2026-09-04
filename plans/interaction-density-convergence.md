@@ -46,7 +46,8 @@ The shared primitives own the changed behavior, affected routes retain their cur
 ## Local integration with UI usability work
 
 - Preview integrates PR #1318 at `ee04e98b992ec62df5ac6287a6fbafc33eb4abdb`.
-  Maintainer visual acceptance is pending; this is not a remote merge.
+  Maintainer accepted the preview and authorized merging into `dev` on
+  2026-09-05. Preserve the original contribution commits in the integration PR.
 - Retain our toggle placement: beside OpenAlice when expanded, at the leading
   content top bar when compact. Do not adopt the brand-hover expansion action.
 - Adopt temporary expansion for the Chat/Quant/Prediction group without
@@ -56,3 +57,7 @@ The shared primitives own the changed behavior, affected routes retain their cur
   radius scale, shared focus, Connector hierarchy, and market/chart material.
 - Integrated UI owner suite: 284 files and 1675 tests passed. UI typecheck
   passed. Real local preview remains available for maintainer inspection.
+- Follow-up acceptance: independent News entry; flat Markets/Macro/Watchlist
+  grouping; Sector Rotation table uses natural height and page-owned vertical
+  scrolling. Real Market, News, Connectors, and temporary rail expansion were
+  inspected. Restarting Vite resolved stale compiled shared-surface CSS.

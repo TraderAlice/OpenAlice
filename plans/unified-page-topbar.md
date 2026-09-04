@@ -1,6 +1,6 @@
 # Unified page top bar
 
-Status: implemented and locally verified on `codex/ui-usability-followup`; maintainer visual acceptance pending.
+Status: maintainer accepted the local preview and authorized integration into `dev` on 2026-09-05.
 Related issues: none.
 Owner guide: [[docs/ui-interaction-and-motion.md]].
 
@@ -28,7 +28,7 @@ Owner guide: [[docs/ui-interaction-and-motion.md]].
   maintainer-approved contextual behavior from community PR #1318.
 - Reuse theme, button, tooltip, and Resizable primitives. No backend, trading,
   route, or backend data-model changes.
-- Keep the branch for interactive acceptance; no PR or merge this iteration.
+- Interactive acceptance hold lifted on 2026-09-05; integrate via a dev-targeted PR.
 
 ## Checklist
 

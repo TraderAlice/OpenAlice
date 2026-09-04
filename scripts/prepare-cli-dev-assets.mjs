@@ -8,16 +8,14 @@ import { basename, join, parse, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import { bunReleaseContentIdentity } from './bun-release-content-identity.mjs'
+import { CLI_RELEASE_TARGETS, cliExecutableName } from '../packages/cli/src/release-targets.mjs'
 
-export const CLI_RELEASE_TARGETS = [
-  ['darwin', 'arm64'],
-  ['darwin', 'x64'],
-  ['linux', 'arm64'],
-  ['linux', 'x64'],
-]
+export { CLI_RELEASE_TARGETS }
 const PINNED_BUN_VERSION = readFileSync(new URL('../.bun-version', import.meta.url), 'utf8').trim()
+// PortableGit's complete file inventory exceeds child_process's 1 MiB default.
+const TAR_TEXT_OPTIONS = { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 }
 
-export function prepareCliDevAssets({ inputDir, outputDir, commit, version, installerPath }) {
+export function prepareCliDevAssets({ inputDir, outputDir, commit, version, installerPath, windowsInstallerPath }) {
   if (!/^[a-f0-9]{7,64}$/.test(commit)) {
     throw new Error(`invalid commit identity: ${commit}`)
   }
@@ -47,6 +45,9 @@ export function prepareCliDevAssets({ inputDir, outputDir, commit, version, inst
   const installerBytes = readFileSync(installerSource)
   const installerSha256 = createHash('sha256').update(installerBytes).digest('hex')
   copyFileSync(installerSource, join(immutableRoot, 'install'))
+  const windowsInstallerSource = windowsInstallerPath ?? fileURLToPath(new URL('../install.ps1', import.meta.url))
+  const windowsInstallerBytes = readFileSync(windowsInstallerSource)
+  copyFileSync(windowsInstallerSource, join(immutableRoot, 'install.ps1'))
 
   const expectedArchives = new Set()
   const targets = []
@@ -86,7 +87,13 @@ export function prepareCliDevAssets({ inputDir, outputDir, commit, version, inst
       versionedUrl: `https://download.openalice.ai/cli/dev/releases/${commit}/install`,
       sha256: installerSha256,
     },
-    targets,
+    windowsInstaller: {
+      url: 'https://download.openalice.ai/install.ps1',
+      versionedUrl: `https://download.openalice.ai/cli/dev/releases/${commit}/install.ps1`,
+      sha256: createHash('sha256').update(windowsInstallerBytes).digest('hex'),
+    },
+    targets: targets.filter((target) => target.platform !== 'win32'),
+    additionalTargets: targets.filter((target) => target.platform === 'win32'),
   }
   writeFileSync(join(outputRoot, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`)
   return manifest
@@ -109,7 +116,7 @@ export function validateCliReleaseArchive({ archivePath, version, platform, arch
   const releaseName = archiveName.slice(0, -'.tar.gz'.length)
   const metadata = JSON.parse(execFileSync('tar', [
     '-xOzf', archivePath, `${releaseName}/release.json`,
-  ], { encoding: 'utf8' }))
+  ], TAR_TEXT_OPTIONS))
   if (
     metadata?.schemaVersion !== 1
     || metadata?.product !== 'OpenAlice CLI'
@@ -130,14 +137,14 @@ export function validateCliReleaseArchive({ archivePath, version, platform, arch
   if (contentIdentity !== metadata.contentIdentity) {
     throw new Error(`${archiveName} content identity does not match its release manifest`)
   }
-  const entries = execFileSync('tar', ['-tzf', archivePath], { encoding: 'utf8' })
-    .split('\n')
+  const entries = execFileSync('tar', ['-tzf', archivePath], TAR_TEXT_OPTIONS)
+    .split(/\r?\n/)
     .filter(Boolean)
   if (entries.some((entry) => !entry.startsWith(`${releaseName}/`) || entry.includes('/../'))) {
     throw new Error(`${archiveName} contains entries outside its release root`)
   }
-  if (!entries.includes(`${releaseName}/bin/openalice`)) {
-    throw new Error(`${archiveName} does not contain bin/openalice`)
+  if (!entries.includes(`${releaseName}/bin/${cliExecutableName(platform)}`)) {
+    throw new Error(`${archiveName} does not contain bin/${cliExecutableName(platform)}`)
   }
   return { archiveName, releaseName, checksumPath, checksum, metadata, entries }
 }

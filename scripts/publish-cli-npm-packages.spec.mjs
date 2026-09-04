@@ -13,6 +13,8 @@ const packageNames = [
   'openalice-darwin-x64',
   'openalice-linux-arm64',
   'openalice-linux-x64',
+  'openalice-win32-arm64',
+  'openalice-win32-x64',
   'openalice',
 ]
 

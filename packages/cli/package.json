@@ -61,6 +61,7 @@
     "src/doctor.mjs",
     "src/install-layout.mjs",
     "src/install-source.mjs",
+    "src/release-targets.mjs",
     "src/lifecycle-command.mjs",
     "src/lifecycle.mjs",
     "src/local-start.mjs",

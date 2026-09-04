@@ -5,16 +5,23 @@ OpenAlice CLI. The accepted native archive and direct Bash installer remain
 owned by [[docs/cli-installer.md]]. Runtime lifecycle after installation remains
 owned by [[docs/cli-supervisor.md]] and [[docs/local-runtime.md]].
 
-Native Windows package-manager channels are deferred. Independent Windows
-x64/ARM64 ZIP and PowerShell previews live in [[docs/cli-installer.md]]; they
-are not npm publications. This guide covers macOS and glibc Linux on arm64 and x64.
+The native target set is macOS, glibc Linux, and Windows on arm64 and x64.
+Windows direct installation lives in [[docs/cli-installer.md]]. Generated Windows
+packages are not public npm packages: first publication and Trusted Publisher
+enrollment remain required external activation steps.
 
 Public npm activation: `openalice` and its four platform packages were first
 published as `0.90.2` on 2026-09-04 under maintainer `jiaran258`. The registry
 integrities and a fresh npm 12 installation/start/stop were independently
 verified after [publication](https://github.com/TraderAlice/OpenAlice/actions/runs/33860369715).
-Homebrew and AUR still require their separate external activation; package
-metadata in a GitHub Release alone does not make those commands available.
+Homebrew was activated at `0.90.2` on 2026-09-04 in
+[`TraderAlice/homebrew-tap`](https://github.com/TraderAlice/homebrew-tap).
+The first [sync](https://github.com/TraderAlice/homebrew-tap/actions/runs/33889442153)
+verified all four public archives and committed the unchanged formula using
+the tap's built-in token. A fresh public macOS ARM64 Homebrew installation and
+isolated Runtime startup/stop/removal passed; no new product version was made.
+AUR still requires separate external activation. Package metadata in a GitHub
+Release alone does not make a channel available.
 
 ## User commands
 
@@ -40,13 +47,15 @@ or the installing package manager in `PATH` at Runtime.
 
 ## One accepted artifact set
 
-The release build produces four archives:
+The release build produces six archives:
 
 ```text
 openalice-cli-<version>-darwin-arm64.tar.gz
 openalice-cli-<version>-darwin-x64.tar.gz
 openalice-cli-<version>-linux-arm64.tar.gz
 openalice-cli-<version>-linux-x64.tar.gz
+openalice-cli-<version>-win32-arm64.tar.gz
+openalice-cli-<version>-win32-x64.tar.gz
 ```
 
 Every channel consumes those exact accepted archive bytes and SHA-256 values.
@@ -65,7 +74,9 @@ openalice
 ├── optional openalice-darwin-arm64
 ├── optional openalice-darwin-x64
 ├── optional openalice-linux-arm64
-└── optional openalice-linux-x64
+├── optional openalice-linux-x64
+├── optional openalice-win32-arm64
+└── optional openalice-win32-x64
 ```
 
 The meta package exposes the `openalice` command. Its postinstall step selects
@@ -75,7 +86,15 @@ executable, links immutable resources, records provenance, and verifies
 platform package is an installation failure, not permission to download
 unreviewed bytes.
 
-Release packaging records a strict publish order. All four platform packages
+The meta package uses a JavaScript postinstall entry: npm uses its Node, while
+pinned Bun 1.4 also executes it without a host Node. The private materialized
+binary is `bin/openalice.exe` on every host so npm's Windows command shim needs
+neither Node nor Shell at runtime. POSIX links still expose `openalice`. The
+placeholder must have no interpreter shebang: npm creates Windows shims before
+postinstall. Windows resources use a directory junction without admin rights.
+Homebrew and AUR exclude Windows targets.
+
+Release packaging records a strict publish order. All six platform packages
 must publish successfully before the `openalice` meta package is published.
 Stable npm publication is disabled unless the repository explicitly enables
 `OPENALICE_PUBLISH_NPM` and provides npm publishing authority.
@@ -86,6 +105,21 @@ archives, but it does not generate or attach registry/Tap/AUR publication
 inputs and cannot mutate any of those public package channels.
 
 ## Homebrew and AUR topology
+
+The public `TraderAlice/homebrew-tap` consumes the unchanged `openalice.rb`
+asset from the current stable release. Its small `Sync stable formula` workflow
+checks hourly (minute 23) or by manual dispatch, waits for matching GitHub/CDN
+stable versions, verifies the formula asset digest and all four Homebrew archive
+hashes/sidecars, then commits only the formula with the tap's own `GITHUB_TOKEN`.
+An unchanged version performs no archive downloads or commits. It never builds
+the product and needs no cross-repository token. GitHub can delay schedules and
+disable them after 60 days without repository activity; maintainers can
+re-enable/run the tap workflow in Actions.
+
+Keep `OPENALICE_PUBLISH_HOMEBREW` disabled in OpenAlice: the older push-based
+writer below is an alternative, not a second active writer. New stable release
+acceptance should include the tap sync receipt (manual dispatch is available
+without waiting for the hourly schedule). Beta/dev never update the formula.
 
 The generated Homebrew formula selects the accepted archive and SHA-256 for the
 current macOS or Linux architecture. It installs the executable, immutable
@@ -107,7 +141,7 @@ public.
 
 ## Public channel activation
 
-For every non-prerelease, the release workflow first downloads all four
+For every non-prerelease, the release workflow first downloads all six
 archives anonymously from their final public GitHub Release URLs and verifies
 their bytes plus public SHA-256 sidecars against the accepted channel manifest.
 It then downloads the public formula, `PKGBUILD`, `openalice-bin.SRCINFO`, and
@@ -122,13 +156,13 @@ External channels are explicit release switches:
 
 | Channel | Repository variable | Required authority |
 |---|---|---|
-| npm + Bun | `OPENALICE_PUBLISH_NPM=true` | npm Trusted Publishing for all five names, bound to `TraderAlice/OpenAlice` / `release.yml` |
-| Homebrew | `OPENALICE_PUBLISH_HOMEBREW=true` | `HOMEBREW_TAP_TOKEN` with write access to `TraderAlice/homebrew-tap` |
+| npm + Bun | `OPENALICE_PUBLISH_NPM=true` | npm Trusted Publishing for all seven names, bound to `TraderAlice/OpenAlice` / `release.yml` |
+| Homebrew (alternative push writer; disabled for our tap) | `OPENALICE_PUBLISH_HOMEBREW=true` | `HOMEBREW_TAP_TOKEN` with write access to `TraderAlice/homebrew-tap` |
 | AUR / paru | `OPENALICE_PUBLISH_AUR=true` | dedicated `AUR_SSH_PRIVATE_KEY` plus manually verified `AUR_KNOWN_HOSTS` |
 
 Before a stable GitHub Release can be created, the release workflow preflights
 every enabled switch. npm exchanges a GitHub OIDC identity for a short-lived,
-package-scoped credential for each of the five existing names. Missing packages
+package-scoped credential for each expected package name. Missing packages
 or missing/mismatched trusted publishers fail the check; there is no token
 fallback or automatic name reservation. Credentials stay in memory and are
 discarded without publishing. The
@@ -142,7 +176,7 @@ The `Public CLI Channel Authority` workflow rehearses Homebrew and/or AUR
 authority without publishing. npm uses `Release` with `operation=verify-npm`
 from integrated `dev` or `master` (no tag required). The rehearsal must run in
 `release.yml` because npm validates that exact workflow identity. It exchanges
-credentials for all five packages but does not upload, build, sign, change a
+credentials for the complete package set but does not upload, build, sign, change a
 version, or create a release. Use it before enabling the npm switch.
 
 The npm, Tap, and AUR writers are idempotent. npm verifies each local tarball
@@ -188,7 +222,8 @@ normal promotion before the next stable release; do not restore the old token
 to operate historical tooling.
 
 For each of `openalice`, `openalice-darwin-arm64`, `openalice-darwin-x64`,
-`openalice-linux-arm64`, and `openalice-linux-x64`, configure npm Package Settings
+`openalice-linux-arm64`, `openalice-linux-x64`, `openalice-win32-arm64`, and
+`openalice-win32-x64`, configure npm Package Settings
 → Trusted Publisher → GitHub Actions:
 
 - Organization/user: `TraderAlice`; repository: `OpenAlice`.
@@ -203,7 +238,7 @@ publishing; neither `NPM_TOKEN` nor `NODE_AUTH_TOKEN` is configured. The generat
 packages must retain the matching `TraderAlice/OpenAlice` repository URL.
 Provenance is not itself proof of OIDC authentication.
 
-After adding all five connections, run:
+After adding all seven connections, run:
 
 ```bash
 gh workflow run release.yml --ref dev -f operation=verify-npm
@@ -219,7 +254,10 @@ secret. npm's restrictive 2FA/token policy is compatible with OIDC.
 See [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/) and
 the [registry OIDC exchange API](https://api-docs.npmjs.com/). Adding future
 platform packages (including Windows) requires first publication and their own
-trusted-publisher connections; the current native matrix is macOS/Linux only.
+trusted-publisher connections. The historical receipts above cover only the
+original five names. `openalice-win32-arm64` and `openalice-win32-x64` must be
+enrolled before seven-package publication. Do not restore the revoked bootstrap
+token or count the old receipt as Windows publishing authority.
 
 ## Update and uninstall ownership
 
@@ -240,6 +278,13 @@ package-manager prefix; switching channels requires an explicit direct install.
 Stop a running
 Runtime with `openalice down` before changing the installed version; a running
 Guardian keeps its already-mapped executable until stopped.
+
+Known Windows Bun limitation: native acceptance reproduced successful package
+removal with a leftover global `openalice.exe` entry. This is tracked in
+[OpenAlice #1347](https://github.com/TraderAlice/OpenAlice/issues/1347) and
+[Bun #11970](https://github.com/oven-sh/bun/issues/11970). Acceptance verifies
+the package is gone and reports the residue explicitly; OpenAlice does not
+delete Bun-owned files to hide it. Do not call this a completely clean uninstall.
 
 If the manager replaces the installed package while an older Guardian remains
 active, `openalice status` and `openalice up` compare content identities and
@@ -265,11 +310,14 @@ pnpm exec vitest run \
 ```
 
 The PR workflow samples native macOS arm64 and Linux x64 candidates through npm
-and Bun. A `dev` push stays on the preview packaging lane: it builds the four
+and Bun. A `dev` push stays on the preview packaging lane: it builds the six
 native artifacts, validates their sidecars and metadata, publishes them, and
 runs the live channel smoke without waiting for package-manager or historical
-upgrade gates. The formal beta/stable release matrix repeats npm/Bun mechanics
-on all four targets before preserving the candidate. Stable release acceptance
+upgrade gates. Windows dev/beta artifacts cross-build on Linux using the shared
+server inputs. Native Windows install/update/rollback and npm/Bun command-shim
+acceptance is separately replayable and mandatory for stable, not every dev
+commit. Beta remains a direct-install channel, not npm publication.
+Stable release acceptance
 also installs the formula on native arm64 and Intel macOS runners, repeats the
 full formula lifecycle on native Linux arm64/x64 runners inside pinned official
 Homebrew images, and builds plus installs
